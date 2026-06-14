@@ -7,13 +7,13 @@ open Fable.Core.JsInterop
 /// operator in Fable requires identifier keys; these Emit helpers accept any
 /// string so we can read keys known only at runtime.
 
-[<Emit("$0[$1]")>]
+[<Emit("$0 == null ? undefined : $0[$1]")>]
 let get (o: obj) (key: string) : obj = jsNative
 
 [<Emit("$0[$1]")>]
 let getValue<'a> (o: obj) (key: string) : 'a = jsNative
 
-[<Emit("$0[$1] !== undefined && $0[$1] !== null")>]
+[<Emit("$0 == null ? false : ($0[$1] !== undefined && $0[$1] !== null)")>]
 let has (o: obj) (key: string) : bool = jsNative
 
 [<Emit("typeof $0 === $1")>]

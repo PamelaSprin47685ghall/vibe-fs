@@ -76,16 +76,29 @@ let private resolveAgent (input: obj) : string =
         | Some a -> a
         | None -> "orchestrator"
 
-/// Merge user tool overrides onto defaults, keeping only boolean overrides.
+/// Merge user tool overrides onto defaults. Defaults are authoritative: an
+/// explicit false in current can disable a default-true tool, but an explicit
+/// true cannot enable a tool that defaults to false. Extra keys in current
+/// (dynamic tools such as stealth-browser-mcp_foo) are preserved only when
+/// their value is a boolean.
 let private mergeTools (current: obj) (defaults: obj) : obj =
     let merged = emptyObj ()
     for key in objectKeys defaults do
         setKey merged key (Dyn.get defaults key)
     if not (Dyn.isNullish current) then
+        let defaultKeys = objectKeys defaults |> Set.ofArray
         for key in objectKeys current do
-            let value = Dyn.get current key
-            if Dyn.typeIs value "boolean" then
-                setKey merged key value
+            let currentValue = Dyn.get current key
+            if not (Set.contains key defaultKeys) then
+                if Dyn.typeIs currentValue "boolean" then
+                    setKey merged key currentValue
+            else
+                let defaultValue = Dyn.get defaults key
+                if Dyn.typeIs defaultValue "boolean" && Dyn.typeIs currentValue "boolean" then
+                    if defaultValue :?> bool then
+                        setKey merged key currentValue
+                    elif not (currentValue :?> bool) then
+                        setKey merged key (box false)
     merged
 
 /// For non-browser agents, strip every stealth-browser-mcp tool.

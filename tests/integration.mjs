@@ -349,6 +349,36 @@ await p['chat.message']({ sessionID: 'child-orch-session' }, childOrchChat);
 check('child session resolves to orchestrator', childOrchChat.message.tools['stealth-browser-mcp_*'] === false);
 unregisterChildAgent('child-orch-session');
 
+// ── chat.message websearch/webfetch tool boundaries ──
+const orchWebChat = { message: { tools: { websearch: true, webfetch: true, read: true } } };
+await p['chat.message']({ sessionID: 'root', agent: 'orchestrator' }, orchWebChat);
+check('orch websearch preserved', orchWebChat.message.tools.websearch === true);
+check('orch webfetch preserved', orchWebChat.message.tools.webfetch === true);
+check('orch read preserved alongside web tools', orchWebChat.message.tools.read === true);
+
+const editorWebChat = { message: { tools: { websearch: true, webfetch: true, patch: true } } };
+await p['chat.message']({ sessionID: 'root', agent: 'editor' }, editorWebChat);
+check('editor websearch forced false', editorWebChat.message.tools.websearch === false);
+check('editor webfetch forced false', editorWebChat.message.tools.webfetch === false);
+check('editor patch preserved', editorWebChat.message.tools.patch === true);
+
+const greperWebChat = { message: { tools: { websearch: true, webfetch: true, fuzzy_find: true } } };
+await p['chat.message']({ sessionID: 'root', agent: 'greper' }, greperWebChat);
+check('greper websearch forced false', greperWebChat.message.tools.websearch === false);
+check('greper webfetch forced false', greperWebChat.message.tools.webfetch === false);
+check('greper fuzzy_find preserved', greperWebChat.message.tools.fuzzy_find === true);
+
+const reverieWebChat = { message: { tools: { websearch: true, webfetch: true } } };
+await p['chat.message']({ sessionID: 'root', agent: 'reverie' }, reverieWebChat);
+check('reverie websearch forced false', reverieWebChat.message.tools.websearch === false);
+check('reverie webfetch forced false', reverieWebChat.message.tools.webfetch === false);
+
+const browserWebChat = { message: { tools: { websearch: true, webfetch: true, 'stealth-browser-mcp_*': true } } };
+await p['chat.message']({ sessionID: 'root', agent: 'browser' }, browserWebChat);
+check('browser websearch forced false', browserWebChat.message.tools.websearch === false);
+check('browser webfetch forced false', browserWebChat.message.tools.webfetch === false);
+check('browser stealth-browser preserved', browserWebChat.message.tools['stealth-browser-mcp_*'] === true);
+
 check('plugin.tool.definition', typeof p['tool.definition'] === 'function');
 check('plugin.tool.execute.before', typeof p['tool.execute.before'] === 'function');
 
