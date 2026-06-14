@@ -167,7 +167,7 @@ let runReviewerSession (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.R
             reviewStore.addChild(sessionID, childID)
             ChildAgent.registerChildAgent childID "reviewer" parentID
             let verdict : VibeFs.Kernel.ReviewSession.ReviewResult option ref = ref None
-            reviewStore.setPendingReview(childID, (fun r -> verdict := Some r))
+            reviewStore.setPendingReview(childID, (fun r -> verdict.Value <- Some r))
             reviewStore.tryLockReview childID |> ignore
             let maxNudges = 3
             let rec nudgeLoop nudgeCount =
@@ -192,7 +192,7 @@ let runReviewerSession (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.R
                         match caught with
                         | Choice2Of2 _ -> return VibeFs.Kernel.ReviewSession.Terminated
                         | Choice1Of2 () ->
-                            match !verdict with
+                            match verdict.Value with
                             | Some v -> return v
                             | None -> return! nudgeLoop (nudgeCount + 1)
                 }
