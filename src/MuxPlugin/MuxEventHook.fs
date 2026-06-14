@@ -36,7 +36,6 @@ let private handleEvent (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
                 elif Dyn.isNullish helpers then ()
                 else
                     let lastMessage = getLastAssistantText properties
-                    coordinator.clearSession(workspaceId)
                     if state.stoppedWorkspaces.Contains(workspaceId) then ()
                     else
                         let! todosOpt =

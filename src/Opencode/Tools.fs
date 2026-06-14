@@ -180,7 +180,7 @@ let websearchTool () : obj =
                             if Dyn.isNullish results || not (Dyn.isArray results) then []
                             else (results :?> obj array) |> Array.map (fun r -> { title = Dyn.str r "title"; url = Dyn.str r "url"; content = Dyn.str r "content" }) |> List.ofArray
                         return formatSearchResults items
-                    with ex -> return $"Web search failed: {ex.Message}"
+                    with ex -> return $"Search failed: {ex.Message}"
                 } |> Async.StartAsPromise)
 
 /// Fetch a URL via the Ollama web_fetch endpoint.
@@ -199,7 +199,7 @@ let webfetchTool () : obj =
                 async {
                     let! urlError = validateFetchUrl url |> Async.AwaitPromise
                     match urlError with
-                    | Some e -> return $"Cannot fetch URL: {e}"
+                    | Some e -> return e
                     | None ->
                         let bodyEntries = ResizeArray<(string * obj)>()
                         bodyEntries.Add("url", box url)

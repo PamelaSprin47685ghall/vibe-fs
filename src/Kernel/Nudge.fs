@@ -43,21 +43,23 @@ let decide (context: NudgeContext) : NudgeAction =
         if skipsLoop text || isQuestion text then NudgeNone else NudgeLoop
     else NudgeNone
 
-/// Per-session dedup state: the last non-none action that was allowed through.
-/// If the next decision yields the same action, it is suppressed to prevent
-/// duplicate nudges from overlapping events (session.idle + session.status(idle),
-/// message.updated + session.next.step.ended, etc.) that fire concurrently.
-type SessionNudgeState = { lastAction: NudgeAction option }
+/// Per-session dedup state: the last non-none action and the assistant message
+/// it was fired against.  Suppress only when BOTH repeat — overlapping events
+/// for the same idle transition see the same message and are deduped, but when
+/// the agent produces new output (or calls tools and stops again) the message
+/// changes and a fresh nudge is correctly allowed through.
+type SessionNudgeState = { lastAction: NudgeAction option; lastMessage: string }
 
-let freshSession : SessionNudgeState = { lastAction = None }
+let freshSession : SessionNudgeState = { lastAction = None; lastMessage = "" }
 
 type CoordinatorState = { sessions: Map<string, SessionNudgeState> }
 
 let freshCoordinator : CoordinatorState = { sessions = Map.empty }
 
-/// Pure state transition: decide the action; suppress if it repeats the last
-/// non-none action for this session (concurrent events for the same idle
-/// transition must not double-fire).  NudgeNone leaves the state untouched.
+/// Pure state transition: decide the action; suppress only if the same action
+/// would repeat for the same assistant message (concurrent events for one idle
+/// transition).  A different message means the agent did new work — allow it.
+/// NudgeNone leaves the state untouched.
 let update (state: CoordinatorState) (sessionId: string) (context: NudgeContext)
            : CoordinatorState * NudgeAction =
     let action = decide context
@@ -65,9 +67,10 @@ let update (state: CoordinatorState) (sessionId: string) (context: NudgeContext)
     else
         let prev = Map.tryFind sessionId state.sessions |> Option.defaultValue freshSession
         match prev.lastAction with
-        | Some last when last = action -> state, NudgeNone
+        | Some last when last = action && prev.lastMessage = context.lastAssistantMessage ->
+            state, NudgeNone
         | _ ->
-            let updated = { lastAction = Some action }
+            let updated = { lastAction = Some action; lastMessage = context.lastAssistantMessage }
             { sessions = Map.add sessionId updated state.sessions }, action
 
 /// Terminal todo statuses that should NOT count as open work.

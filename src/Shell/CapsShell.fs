@@ -27,6 +27,7 @@ let private pathRelative (a: string) (b: string) : string = jsNative
 
 let capsFileRe = Regex(@"^[A-Z][A-Z0-9_]*\.md$")
 let capsDirRe = Regex(@"^[A-Z][A-Z0-9_]*$")
+let capsDotDirRe = Regex(@"^\.[A-Z][A-Z0-9_]*$")
 let private excludedFileNames = set [ "AGENTS.md"; "CLAUDE.md"; "README.md" ]
 let private excludedDirNames =
     set [ "AGENTS"; "CLAUDE"; "NODE_MODULES"; ".GIT"; "TARGET"; "DIST"; "OUT"
@@ -39,7 +40,7 @@ let maxDirDepth = 5
 
 let private isExcludedDir (name: string) : bool =
     Set.contains (name.ToUpperInvariant ()) excludedDirNames
-    || (name.StartsWith(".") && not (capsDirRe.IsMatch name))
+    || (name.StartsWith(".") && not (capsDotDirRe.IsMatch name))
 
 /// Mutable budget threaded through sequential discovery.
 type private Budget = { results: CapsFile ResizeArray; totalBytes: int; count: int }

@@ -178,7 +178,7 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
                         let statusType = Dyn.str (Dyn.get props "status") "type"
                         match statusType with
                         | "idle" -> do! nudgeIfNeeded(sessionID) |> Async.AwaitPromise
-                        | "busy" -> coordinator.clearSession(sessionID)
+                        | "busy" -> ()
                         | "retry" -> ()
                         | _ -> ()
                     | "session.error" ->
