@@ -1,0 +1,245 @@
+module VibeFs.Opencode.Tools
+
+open Fable.Core
+open Fable.Core.JsInterop
+open VibeFs.Kernel
+open VibeFs.Kernel.AgentRole
+open VibeFs.Kernel.ExecutorKernel
+open VibeFs.Kernel.OllamaFormat
+open VibeFs.Kernel.ReviewSession
+open VibeFs.Shell.OllamaClient
+open VibeFs.Opencode.Sdk
+open VibeFs.Opencode.ToolCopy
+open VibeFs.Opencode.Session
+
+[<Emit("({ [$0]: $1 })")>]
+let private entry (key: string) (value: obj) : obj = jsNative
+[<Emit("Object.assign({}, ...$0)")>]
+let private mergeObjects (objs: obj array) : obj = jsNative
+[<Emit("Promise.resolve($0)")>]
+let private resolveStr (s: string) : JS.Promise<string> = jsNative
+
+let private optStr (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(string v)
+let private optInt (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<int> v)
+let private optBool (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<bool> v)
+let private optField (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some v
+
+/// The editor tool: each [intent, files] tuple runs its own editor subagent.
+let editorTool (ctx: obj) : obj =
+    let client = Dyn.get ctx "client"
+    define editor
+        (box {| intents = intentsSchema Params.editorIntents; _ui = uiParam |})
+        (fun args context ->
+            let tc = extractToolContext context (Dyn.str ctx "directory")
+            let directory = Dyn.str tc "directory"
+            let sessionID = Dyn.str tc "sessionID"
+            let intents = Dyn.get args "intents" :?> obj array
+            async {
+                let! reports =
+                    intents |> Array.map (fun intent ->
+                        let pair = intent :?> obj array
+                        let intentText = string pair.[0]
+                        let files = pair.[1] :?> obj array |> Array.map string |> List.ofArray
+                        let prompt = HostKernel.formatEditorIntent intentText files
+                        runSubagent client (AgentRole.toString Editor) "Editor" prompt directory sessionID context
+                        |> Async.AwaitPromise) |> Async.Parallel
+                return String.concat "\n---\n" (List.ofArray reports)
+            } |> Async.StartAsPromise)
+
+/// The greper tool: each intent runs its own search subagent in parallel.
+let greperTool (ctx: obj) : obj =
+    let client = Dyn.get ctx "client"
+    define greper
+        (box {| intents = call1 (call1 (arr (strMin 1 "")) "min" (box 1)) "describe" (box Params.greperIntents)
+                _ui = uiParam |})
+        (fun args context ->
+            let tc = extractToolContext context (Dyn.str ctx "directory")
+            let intents = Dyn.get args "intents" :?> obj array |> Array.map string
+            async {
+                let! reports =
+                    intents |> Array.map (fun intent ->
+                        runSubagent client (AgentRole.toString Greper) "Greper" intent
+                            (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
+                        |> Async.AwaitPromise) |> Async.Parallel
+                return String.concat "\n---\n" (List.ofArray reports)
+            } |> Async.StartAsPromise)
+
+/// The reverie tool: deep reasoning over provided file context.
+let reverieTool (ctx: obj) : obj =
+    let client = Dyn.get ctx "client"
+    define reverie
+        (box {| intent = strReq Params.reverieIntent; files = strArrayOpt Params.reverieFiles |})
+        (fun args context ->
+            let tc = extractToolContext context (Dyn.str ctx "directory")
+            let directory = Dyn.str tc "directory"
+            let sessionID = Dyn.str tc "sessionID"
+            let intent = Dyn.str args "intent"
+            let files = if Dyn.isNullish (Dyn.get args "files") then [||] else Dyn.get args "files" :?> obj array |> Array.map string
+            async {
+                let! readResults = VibeFs.Shell.ReverieFiles.readReverieFiles directory (List.ofArray files) |> Async.AwaitPromise
+                let sections =
+                    Array.map2 (fun file (r: VibeFs.Shell.ReverieFiles.ReverieFileResult) ->
+                        { file = file; content = r.content } : HostKernel.ReverieFileSection)
+                        files (List.toArray readResults)
+                    |> List.ofArray
+                let prompt = HostKernel.buildReveriePrompt sections intent
+                return! runSubagent client (AgentRole.toString Reverie) "Reverie" prompt
+                    directory sessionID context
+                    |> Async.AwaitPromise
+            } |> Async.StartAsPromise)
+
+/// The executor tool: run a program with timeout, returning captured output.
+let executorTool (ctx: obj) : obj =
+    define executor
+        (box {| language = strReq Params.executorLanguage; program = strReq Params.executorProgram
+                dependencies = strArrayOpt Params.executorDeps; timeout_type = strReq Params.executorTimeout |})
+        (fun args context ->
+            let tc = extractToolContext context (Dyn.str ctx "directory")
+            let lang = match Dyn.str args "language" with "python" -> Python | "javascript" -> Javascript | _ -> Shell
+            let timeout = match Dyn.str args "timeout_type" with "long" -> Long | _ -> Short
+            let deps = if Dyn.isNullish (Dyn.get args "dependencies") then [] else Dyn.get args "dependencies" :?> obj array |> Array.map string |> List.ofArray
+            let options : ExecuteOptions =
+                { program = Dyn.str args "program"; language = lang; dependencies = deps
+                  timeoutType = timeout; cwd = Some (Dyn.str tc "directory") }
+            async {
+                let! result = VibeFs.Shell.ExecutorShell.execute options (Dyn.str tc "sessionID") |> Async.AwaitPromise
+                return match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
+            } |> Async.StartAsPromise)
+
+/// The browser tool.
+let browserTool (ctx: obj) : obj =
+    let client = Dyn.get ctx "client"
+    define browser
+        (box {| intent = strReq Params.browserIntent |})
+        (fun args context ->
+            let tc = extractToolContext context (Dyn.str ctx "directory")
+            runSubagent client (AgentRole.toString Browser) "Browser" (Dyn.str args "intent")
+                (Dyn.str tc "directory") (Dyn.str tc "sessionID") context)
+
+/// The fuzzy_find tool.
+let fuzzyFindTool () : obj =
+    define fuzzyFind
+        (box {| pattern = strMinNullish 1 Params.fuzzyFindPattern; path = strOpt Params.fuzzyFindPath
+                limit = intMinNullish 1 Params.fuzzyFindLimit; iterator = strOpt Params.fuzzyFindIterator |})
+        (fun args context ->
+            let scopeId = Dyn.str context "sessionID"
+            if scopeId = "" then resolveStr "Error: fuzzy_find requires an active session"
+            else
+                let p : VibeFs.Shell.FuzzyCoordinator.FuzzyFindParams =
+                    { pattern = optStr args "pattern"; path = optStr args "path"
+                      limit = optInt args "limit"; iterator = optStr args "iterator" }
+                let o : VibeFs.Shell.FuzzyCoordinator.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None }
+                async { let! r = VibeFs.Shell.FuzzyFindCmd.fuzzyFind p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
+
+/// The fuzzy_grep tool.
+let fuzzyGrepTool () : obj =
+    define fuzzyGrep
+        (box {| pattern = strMinNullish 1 Params.fuzzyGrepPattern; path = strOpt Params.fuzzyGrepPath
+                exclude = excludeOpt Params.fuzzyGrepExclude; caseSensitive = boolOpt Params.fuzzyGrepCaseSensitive
+                context = intMinNullish 0 Params.fuzzyGrepContext; limit = intMinNullish 1 Params.fuzzyGrepLimit
+                iterator = strOpt Params.fuzzyGrepIterator |})
+        (fun args context ->
+            let scopeId = Dyn.str context "sessionID"
+            if scopeId = "" then resolveStr "Error: fuzzy_grep requires an active session"
+            else
+                let p : VibeFs.Shell.FuzzyCoordinator.FuzzyGrepParams =
+                    { pattern = optStr args "pattern"; path = optStr args "path"; exclude = optField args "exclude"
+                      caseSensitive = optBool args "caseSensitive"; context = optInt args "context"
+                      limit = optInt args "limit"; iterator = optStr args "iterator" }
+                let o : VibeFs.Shell.FuzzyCoordinator.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None }
+                async { let! r = VibeFs.Shell.FuzzyGrepCmd.fuzzyGrep p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
+
+let private abortSignal (context: obj) : obj =
+    if Dyn.isNullish context then null else Dyn.get context "abort"
+
+/// Search the web via the Ollama web_search endpoint.
+let websearchTool () : obj =
+    define websearch
+        (box {| query = strReq Params.websearchQuery
+                numResults = numOpt Params.websearchNumResults |})
+        (fun args context ->
+            let query = Dyn.str args "query"
+            if query = "" then resolveStr "Error: query is required"
+            else
+                let signal = abortSignal context
+                async {
+                    try
+                        let numResults = defaultArg (optInt args "numResults") 10
+                        let body = createObj [ "query", box query; "max_results", box numResults ]
+                        let! data = ollamaPost "web_search" body (if Dyn.isNullish signal then None else Some signal) |> Async.AwaitPromise
+                        let results = Dyn.get data "results"
+                        let items =
+                            if Dyn.isNullish results || not (Dyn.isArray results) then []
+                            else (results :?> obj array) |> Array.map (fun r -> { title = Dyn.str r "title"; url = Dyn.str r "url"; content = Dyn.str r "content" }) |> List.ofArray
+                        return formatSearchResults items
+                    with ex -> return $"Web search failed: {ex.Message}"
+                } |> Async.StartAsPromise)
+
+/// Fetch a URL via the Ollama web_fetch endpoint.
+let webfetchTool () : obj =
+    define webfetch
+        (box {| url = strReq Params.webfetchUrl
+                extract_main = boolOpt Params.webfetchExtractMain
+                prefer_llms_txt = enumOpt [| "auto"; "always"; "never" |] Params.webfetchPreferLlmsTxt
+                prompt = strOpt Params.webfetchPrompt
+                timeout = numOpt Params.webfetchTimeout |})
+        (fun args context ->
+            let url = Dyn.str args "url"
+            if url = "" then resolveStr "Error: url is required"
+            else
+                let signal = abortSignal context
+                async {
+                    let! urlError = validateFetchUrl url |> Async.AwaitPromise
+                    match urlError with
+                    | Some e -> return $"Cannot fetch URL: {e}"
+                    | None ->
+                        let bodyEntries = ResizeArray<(string * obj)>()
+                        bodyEntries.Add("url", box url)
+                        match optBool args "extract_main" with Some v -> bodyEntries.Add("extract_main", box v) | None -> ()
+                        match optStr args "prefer_llms_txt" with Some v -> bodyEntries.Add("prefer_llms_txt", box v) | None -> ()
+                        match optStr args "prompt" with Some v -> bodyEntries.Add("prompt", box v) | None -> ()
+                        match optInt args "timeout" with Some v -> bodyEntries.Add("timeout", box v) | None -> ()
+                        let body = createObj (Seq.toList bodyEntries)
+                        try
+                            let! data = ollamaPost "web_fetch" body (if Dyn.isNullish signal then None else Some signal) |> Async.AwaitPromise
+                            let title = if Dyn.isNullish (Dyn.get data "title") then None else Some (Dyn.str data "title")
+                            let byline = if Dyn.isNullish (Dyn.get data "byline") then None else Some (Dyn.str data "byline")
+                            let length_ = if Dyn.isNullish (Dyn.get data "length") then None else Some (unbox<int> (Dyn.get data "length"))
+                            let content = if Dyn.isNullish (Dyn.get data "content") then None else Some (Dyn.str data "content")
+                            return formatFetchResponse { title = title; byline = byline; length = length_; content = content }
+                        with ex -> return $"Web fetch failed: {ex.Message}"
+                } |> Async.StartAsPromise)
+
+/// submit_review: activate a review for the loop.
+let submitReviewTool (store: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
+    define "Submit your work for review (loop mode)."
+        (box {| report = strReq "Detailed report of what you did"; affectedFiles = strArrayOpt "Files you modified" |})
+        (fun args context ->
+            let sessionID =
+                let id = Dyn.str context "sessionID"
+                if id = "" then "loop" else id
+            async { store.activateReview (sessionID, Dyn.str args "report", 0)
+                    return "Review activated. A reviewer will inspect your work." } |> Async.StartAsPromise)
+
+/// submit_review_result: submit the reviewer's verdict.
+let submitReviewResultTool (store: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
+    define "Submit your review verdict."
+        (box {| feedback = strOpt "null to accept, or specific rejection feedback" |})
+        (fun args context ->
+            let sessionID =
+                let id = Dyn.str context "sessionID"
+                if id = "" then "loop" else id
+            let result = match optStr args "feedback" with None -> Accepted | Some f -> Rejected f
+            async { return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve." } |> Async.StartAsPromise)
+
+/// Build the full tool map: name → ToolDefinition, as a plain JS object.
+let createTools (ctx: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
+    mergeObjects [|
+        entry "editor" (editorTool ctx); entry "greper" (greperTool ctx)
+        entry "reverie" (reverieTool ctx); entry "browser" (browserTool ctx)
+        entry "executor" (executorTool ctx)
+        entry "fuzzy_find" (fuzzyFindTool ()); entry "fuzzy_grep" (fuzzyGrepTool ())
+        entry "websearch" (websearchTool ()); entry "webfetch" (webfetchTool ())
+        entry "submit_review" (submitReviewTool reviewStore)
+        entry "submit_review_result" (submitReviewResultTool reviewStore)
+    |]

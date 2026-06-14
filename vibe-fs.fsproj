@@ -1,0 +1,110 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>VibeFs</RootNamespace>
+    <LangVersion>preview</LangVersion>
+    <OtherFlags>--nowarn:1182 --nowarn:3520</OtherFlags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fable.Core" Version="5.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Kernel: domain types & pure logic -->
+    <Compile Include="src/Kernel/Dyn.fs" />
+    <Compile Include="src/Kernel/Boundary.fs" />
+    <Compile Include="src/Kernel/RecordValidator.fs" />
+    <Compile Include="src/Kernel/Schema.fs" />
+    <Compile Include="src/Kernel/Prompts.fs" />
+    <Compile Include="src/Kernel/McpConfig.fs" />
+    <Compile Include="src/Kernel/AgentRole.fs" />
+    <Compile Include="src/Kernel/Permission.fs" />
+    <Compile Include="src/Kernel/AgentPolicy.fs" />
+    <Compile Include="src/Kernel/Review.fs" />
+    <Compile Include="src/Kernel/ReviewSession.fs" />
+    <Compile Include="src/Kernel/ReviewerLoop.fs" />
+    <Compile Include="src/Kernel/ReviewRuntime.fs" />
+    <Compile Include="src/Kernel/Nudge.fs" />
+    <Compile Include="src/Kernel/FuzzyQuery.fs" />
+    <Compile Include="src/Kernel/FuzzyFormat.fs" />
+    <Compile Include="src/Kernel/FuzzyGrepDetect.fs" />
+    <Compile Include="src/Kernel/IpAllowlist.fs" />
+    <Compile Include="src/Kernel/Dedup.fs" />
+    <Compile Include="src/Kernel/Lru.fs" />
+    <Compile Include="src/Kernel/HeadTail.fs" />
+    <Compile Include="src/Kernel/ExecutorKernel.fs" />
+    <Compile Include="src/Kernel/CapsFormat.fs" />
+    <Compile Include="src/Kernel/HostKernel.fs" />
+    <Compile Include="src/Kernel/NudgeEvents.fs" />
+    <Compile Include="src/Kernel/MuxPolicy.fs" />
+    <Compile Include="src/Kernel/OllamaFormat.fs" />
+    <Compile Include="src/Kernel/AbortKernel.fs" />
+    <Compile Include="src/Kernel/UnifiedContext.fs" />
+    <Compile Include="src/Kernel/UtilPath.fs" />
+    <Compile Include="src/Kernel/ExcludedDirs.fs" />
+    <Compile Include="src/Kernel/SyntaxTypes.fs" />
+    <Compile Include="src/Kernel/TreeSitterKernel.fs" />
+    <Compile Include="src/Kernel/SessionText.fs" />
+    <Compile Include="src/Kernel/IteratorStore.fs" />
+    <!-- Shell: effectful boundary -->
+    <Compile Include="src/Shell/CapsShell.fs" />
+    <Compile Include="src/Shell/ReverieFiles.fs" />
+    <Compile Include="src/Shell/ExecutorPaths.fs" />
+    <Compile Include="src/Shell/ExecutorProcess.fs" />
+    <Compile Include="src/Shell/ExecutorScript.fs" />
+    <Compile Include="src/Shell/ExecutorJavascript.fs" />
+    <Compile Include="src/Shell/ExecutorShell.fs" />
+    <Compile Include="src/Shell/SecureFetch.fs" />
+    <Compile Include="src/Shell/OllamaClient.fs" />
+    <Compile Include="src/Shell/TreeSitterShell.fs" />
+    <Compile Include="src/Shell/FuzzyFinderShell.fs" />
+    <Compile Include="src/Shell/FuzzyCoordinator.fs" />
+    <Compile Include="src/Shell/FuzzyRawMapping.fs" />
+    <Compile Include="src/Shell/FuzzyFindCmd.fs" />
+    <Compile Include="src/Shell/FuzzyGrepCmd.fs" />
+    <!-- Mux: host-adapter pure contracts -->
+    <Compile Include="src/Mux/Contract.fs" />
+    <Compile Include="src/Mux/StreamEnd.fs" />
+    <Compile Include="src/Mux/TodoWriteNudge.fs" />
+    <Compile Include="src/Mux/Dedup.fs" />
+    <Compile Include="src/Mux/CapsFileRead.fs" />
+    <!-- Opencode plugin adapter (F# → JS, default export) -->
+    <Compile Include="src/Opencode/ToolCopy.fs" />
+    <Compile Include="src/Opencode/Sdk.fs" />
+    <Compile Include="src/Opencode/ChildAgent.fs" />
+    <Compile Include="src/Opencode/NudgeHook.fs" />
+    <Compile Include="src/Opencode/Session.fs" />
+    <Compile Include="src/Opencode/Tools.fs" />
+    <Compile Include="src/Opencode/AgentConfig.fs" />
+    <Compile Include="src/Opencode/Hooks.fs" />
+    <Compile Include="src/Opencode/Plugin.fs" />
+    <!-- Mux plugin adapter (F# → JS, createRegistration export) -->
+    <Compile Include="src/MuxPlugin/Delegate.fs" />
+    <Compile Include="src/MuxPlugin/MuxTools/Shared.fs" />
+    <Compile Include="src/MuxPlugin/MuxTools/AgentTools.fs" />
+    <Compile Include="src/MuxPlugin/MuxTools/IoTools.fs" />
+    <Compile Include="src/MuxPlugin/MuxTools/SearchTools.fs" />
+    <Compile Include="src/MuxPlugin/MuxTools/WebTools.fs" />
+    <Compile Include="src/MuxPlugin/MuxTools/ReviewTool.fs" />
+    <Compile Include="src/MuxPlugin/MuxTools.fs" />
+    <Compile Include="src/MuxPlugin/MuxWrappers.fs" />
+    <Compile Include="src/MuxPlugin/MuxEventHook.fs" />
+    <Compile Include="src/MuxPlugin/MuxSlashCommands.fs" />
+    <Compile Include="src/MuxPlugin/Registration.fs" />
+    <!-- Public JS/TS entry module exposed to mux -->
+    <Compile Include="src/Index.fs" />
+    <!-- Public API + tests -->
+    <Compile Include="src/VibeFs.fs" />
+    <Compile Include="tests/Assert.fs" />
+    <Compile Include="tests/ReviewTests.fs" />
+    <Compile Include="tests/AgentTests.fs" />
+    <Compile Include="tests/KernelTests.fs" />
+    <Compile Include="tests/FuzzyTests.fs" />
+    <Compile Include="tests/ShellTests.fs" />
+    <Compile Include="tests/DynTests.fs" />
+    <Compile Include="tests/Tests.fs" />
+  </ItemGroup>
+
+</Project>

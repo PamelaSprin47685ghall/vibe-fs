@@ -1,0 +1,122 @@
+module VibeFs.Shell.ExecutorJavascript
+
+open Fable.Core
+open Fable.Core.JsInterop
+open System.Text.RegularExpressions
+open VibeFs.Kernel
+
+[<Import("join", "node:path")>]
+let private join (a: string) (b: string) : string = jsNative
+[<Import("resolve", "node:path")>]
+let private resolve (cwd: string) (p: string) : string = jsNative
+[<Import("pathToFileURL", "node:url")>]
+let private pathToFileURL (p: string) : obj = jsNative
+
+[<Import("existsSync", "node:fs")>]
+let private existsSync (p: string) : bool = jsNative
+[<Import("readFileSync", "node:fs")>]
+let private readFileSync (p: string) (encoding: string) : string = jsNative
+[<Import("mkdirSync", "node:fs")>]
+let private mkdirSync (dir: string) (opts: obj) : unit = jsNative
+[<Import("writeFileSync", "node:fs")>]
+let private writeFileSync (path: string) (content: string) (encoding: string) : unit = jsNative
+[<Import("spawn", "node:child_process")>]
+let private childSpawn (cmd: string) (args: string array) (opts: obj) : obj = jsNative
+
+/// Initialise the lexer and parse a program's static imports in one step.
+[<Emit("(async () => { const { init, parse } = await import('es-module-lexer'); await init; return parse($0)[0]; })()")>]
+let private parseImports (program: string) : JS.Promise<obj array> = jsNative
+
+/// Read the full package.json object, defaulting to `{ type:'module', dependencies:{} }`
+/// and ensuring both fields exist (repairs a pre-existing file lacking type:module).
+[<Emit("(() => { try { const p = JSON.parse($0); if (!p.dependencies) p.dependencies = {}; if (!p.type) p.type = 'module'; return p; } catch { return ({ type: 'module', dependencies: {} }); } })()")>]
+let private parsePkgJson (json: string) : obj = jsNative
+[<Emit("$0[$1] = $2")>]
+let private setDep (deps: obj) (pkg: string) (value: string) : unit = jsNative
+[<Emit("JSON.stringify($0, null, 2)")>]
+let private jsonStringify (value: obj) : string = jsNative
+[<Emit("JSON.stringify($0)")>]
+let private jsonEscape (s: string) : string = jsNative
+/// Force `type: "module"` onto a package object (type is reserved in F#).
+[<Emit("$0.type = 'module'")>]
+let private setTypeModule (pkg: obj) : unit = jsNative
+
+/// Spawn `npx npm install` in the project dir, resolving on a clean exit.
+[<Emit("new Promise((res, rej) => { const c = $3($0, $1, $2); c.on('error', rej); c.on('close', code => code === 0 ? res() : rej(new Error('npm install exited with ' + code))); })")>]
+let private npmInstallRaw (cmd: string) (args: string array) (opts: obj) (spawnFn: obj) : JS.Promise<unit> = jsNative
+
+let private npmInstall (projectDir: string) (packages: string array) : JS.Promise<unit> =
+    let args' = Array.append [| "--yes"; "npm@latest"; "install"; "--prefix"; projectDir |] packages
+    npmInstallRaw "npx" args' (box {| cwd = projectDir; stdio = "ignore" |}) (box childSpawn)
+
+/// Build the ESM prelude that gives a transpiled script require/__dirname/__filename.
+let createJavascriptPrelude (cwd: string) : string =
+    let requirePath = join cwd "__runner__.cjs"
+    let filename = join cwd "__runner__.mjs"
+    String.concat "\n"
+        [ "import { createRequire } from \"node:module\";"
+          $"const require = createRequire({jsonEscape requirePath});"
+          $"const __dirname = {jsonEscape cwd};"
+          $"const __filename = {jsonEscape filename};"
+          "" ]
+
+/// Resolve a relative module specifier (`./x`, `../x`) to a file:// URL.
+let resolveJavascriptSpecifier (cwd: string) (specifier: string) : string =
+    let match' = Regex.Match(specifier, @"^(\.{1,2}(?:/[^?#]*)?)([?#].*)?$")
+    if not match'.Success then specifier
+    else
+        let basePath = match'.Groups.[1].Value
+        let suffix = if match'.Groups.[2].Success then match'.Groups.[2].Value else ""
+        $"{(pathToFileURL (resolve cwd basePath))?href}{suffix}"
+
+/// Rewrite relative import specifiers in a JS program to absolute file:// URLs.
+let rewriteJavascriptModuleSpecifiers (program: string) (cwd: string) : JS.Promise<string> =
+    async {
+        let! imports = parseImports program |> Async.AwaitPromise
+        if Dyn.isNullish imports || Array.isEmpty imports then return program
+        else
+            let replacements =
+                imports |> Array.choose (fun imp ->
+                    let n = Dyn.get imp "n"
+                    if Dyn.isNullish n then None
+                    else
+                        let ns = string n
+                        if not (Regex.IsMatch(ns, @"^\.\.?/")) then None
+                        else
+                            let d = Dyn.get imp "d"
+                            let isDynamic = not (Dyn.isNullish d) && unbox<int> d <> -1
+                            let s = unbox<int> (Dyn.get imp "s")
+                            let e = unbox<int> (Dyn.get imp "e")
+                            Some((if isDynamic then s + 1 else s), (if isDynamic then e - 1 else e),
+                                 resolveJavascriptSpecifier cwd ns))
+            if Array.isEmpty replacements then return program
+            else
+                let mutable result = program
+                for (s, e, replacement) in replacements |> Array.sortByDescending (fun (s, _, _) -> s) do
+                    result <- result.[.. s - 1] + replacement + result.[e..]
+                return result
+    }
+    |> Async.StartAsPromise
+
+/// Ensure the temp project dir is an ESM project with tsx + dependencies.
+/// Always guarantees `type: "module"` is present (even when deps are satisfied),
+/// matching the original "ensure is ESM project" semantics.
+let ensureJavascriptProject (projectDir: string) (dependencies: string list) : JS.Promise<unit> =
+    async {
+        mkdirSync projectDir (box {| recursive = true |})
+        let pkgPath = $"{projectDir}/package.json"
+        let pkg = if existsSync pkgPath then parsePkgJson (readFileSync pkgPath "utf8") else box {| |}
+        let deps = Dyn.get pkg "dependencies"
+        let deps = if Dyn.isNullish deps then box {| |} else deps
+        // Always (re)assert type:module so a pre-existing file lacking it is repaired.
+        setTypeModule pkg
+        let required = "tsx" :: dependencies |> List.distinct
+        let toInstall = required |> List.filter (fun pkgName -> Dyn.isNullish (Dyn.get deps pkgName))
+        for pkgName in toInstall do setDep deps pkgName "*"
+        // Write back whenever there are packages to install OR the file is freshly created.
+        if not (existsSync pkgPath) || not toInstall.IsEmpty then
+            writeFileSync pkgPath $"{jsonStringify pkg}\n" "utf-8"
+        if not toInstall.IsEmpty then
+            do! npmInstall projectDir (Array.ofList toInstall) |> Async.AwaitPromise
+    }
+    |> Async.StartAsPromise
