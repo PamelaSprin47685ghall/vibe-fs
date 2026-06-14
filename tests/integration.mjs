@@ -212,6 +212,52 @@ const seeded = deduplicateReadOutputsWithSeen(seen, [
 ]);
 check('deduplicateReadOutputsWithSeen replaces historical repeat', seeded[0]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
 
+// ── opencode messages.transform: read-output dedup MUST mutate in place ──
+// REGRESSION GUARD. The opencode host keys internal bookkeeping (UI state,
+// tool-call maps, render caches) off the part and state object references
+// found in the messages it hands to the transform hook. Building a fresh
+// object chain — `{...part, state: {...state, output: marker}}` or the Fable
+// equivalent `Dyn.withKey` — leaves the host pointing at the stale objects;
+// the marker lands on a copy nobody reads, so the second read silently keeps
+// its full original text. The only correct write is `state.output = marker`
+// on the live object. These assertions pin that contract: every enclosing
+// reference must stay identical, only the `output` field may change.
+const stableContent = `${'line of stable content\n'.repeat(8)}`;
+const readStateA = { output: stableContent };
+const readStateB = { output: stableContent };
+const readPartA = { type: 'tool', tool: 'read', state: readStateA };
+const readPartB = { type: 'tool', tool: 'read', state: readStateB };
+const dedupInPlace = {
+  messages: [
+    { info: { id: 'dedup-m1', agent: 'orchestrator' }, parts: [readPartA] },
+    { info: { id: 'dedup-m2', agent: 'orchestrator' }, parts: [readPartB] },
+  ],
+};
+const dedupMessagesRef = dedupInPlace.messages;
+await p['experimental.chat.messages.transform']({}, dedupInPlace);
+
+check('opencode dedup keeps messages array ref (host contract)', dedupInPlace.messages === dedupMessagesRef);
+check('opencode dedup keeps first part ref (host bookkeeping)', dedupInPlace.messages[0].parts[0] === readPartA);
+check('opencode dedup keeps second part ref (host bookkeeping)', dedupInPlace.messages[1].parts[0] === readPartB);
+check('opencode dedup keeps first state ref (host bookkeeping)', dedupInPlace.messages[0].parts[0].state === readStateA);
+check('opencode dedup keeps second state ref (host bookkeeping)', dedupInPlace.messages[1].parts[0].state === readStateB);
+check('opencode dedup keeps first read output', dedupInPlace.messages[0].parts[0].state.output === stableContent);
+check('opencode dedup replaces exact duplicate with marker', dedupInPlace.messages[1].parts[0].state.output === '[No Change Since Previous Read/Write]');
+
+// Same contract under the substring-repeat shape: second read appends new
+// content to the first. Still must mutate state.output in place.
+const supersetState = { output: `${stableContent}${'new content\n'.repeat(8)}` };
+const supersetPart = { type: 'tool', tool: 'read', state: supersetState };
+const dedupSuperset = {
+  messages: [
+    { info: { id: 'dedup-s1', agent: 'orchestrator' }, parts: [readPartA] },
+    { info: { id: 'dedup-s2', agent: 'orchestrator' }, parts: [supersetPart] },
+  ],
+};
+await p['experimental.chat.messages.transform']({}, dedupSuperset);
+check('opencode dedup superset keeps state ref', dedupSuperset.messages[1].parts[0].state === supersetState);
+check('opencode dedup superset replaces with marker', dedupSuperset.messages[1].parts[0].state.output === '[No Change Since Previous Read/Write]');
+
 // ── writeTool field-missing vs empty-string semantics ──
 const writeDef = reg.tools.find(t => t.name === 'write');
 const writeMissingPath = await writeDef.execute({ cwd: '/tmp' }, { content: 'x' });

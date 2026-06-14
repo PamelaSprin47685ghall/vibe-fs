@@ -134,12 +134,13 @@ let toolExecuteAfter (input: obj) (output: obj) : JS.Promise<unit> =
     } |> Async.StartAsPromise
 
 /// Deduplicate repeated `read` tool outputs across messages to reduce token use.
-let private applyReadDedup (messages: obj array) : obj array =
-    if Dyn.isNullish messages || not (Dyn.isArray messages) then
-        messages
+/// Mutates `state.output` in place; never swaps part/state/array references.
+/// The opencode host keys internal bookkeeping off those references and ignores
+/// replacements, so building a new object chain (Dyn.withKey / Array.copy)
+/// silently no-ops.
+let private applyReadDedup (messages: obj array) : unit =
+    if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
     else
-        let mutable messagesChanged = false
-        let mutable nextMessages = messages
         let mutable seen : string list = []
 
         for i = 0 to messages.Length - 1 do
@@ -148,8 +149,6 @@ let private applyReadDedup (messages: obj array) : obj array =
                 let parts = Dyn.get message "parts"
                 if not (Dyn.isNullish parts) && Dyn.isArray parts then
                     let partsArr = parts :?> obj array
-                    let mutable partsChanged = false
-                    let mutable nextParts = partsArr
 
                     for j = 0 to partsArr.Length - 1 do
                         let part = partsArr.[j]
@@ -164,21 +163,7 @@ let private applyReadDedup (messages: obj array) : obj array =
                                     let result = Dedup.deduplicate seen currentOutput
                                     seen <- result.seenOutputs
                                     if result.output <> currentOutput then
-                                        if not partsChanged then
-                                            nextParts <- Array.copy partsArr
-                                            partsChanged <- true
-                                        if not messagesChanged then
-                                            nextMessages <- Array.copy messages
-                                            messagesChanged <- true
-                                        let nextState = Dyn.withKey state "output" (box result.output)
-                                        let nextPart = Dyn.withKey part "state" (box nextState)
-                                        nextParts.[j] <- nextPart
-
-                    if partsChanged then
-                        let nextMessage = Dyn.withKey message "parts" (box nextParts)
-                        nextMessages.[i] <- nextMessage
-
-        nextMessages
+                                        setOutput state result.output
 
 /// messages.transform: synthesise a user+assistant read pair from CAPS files.
 /// Mutates output.messages in place so the host never sees a swapped array reference.
@@ -194,8 +179,8 @@ let messagesTransform (directory: string) (output: obj) : JS.Promise<unit> =
                     directory
                     defaultExcludedAgents
                     capsFiles
-            let deduped = applyReadDedup next
-            replaceArrayInPlace messagesArr deduped
+            replaceArrayInPlace messagesArr next
+            applyReadDedup messagesArr
     } |> Async.StartAsPromise
 
 /// tool.definition: hide the internal `_ui` parameter from editor/greper schemas.
