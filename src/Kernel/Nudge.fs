@@ -43,51 +43,32 @@ let decide (context: NudgeContext) : NudgeAction =
         if skipsLoop text || isQuestion text then NudgeNone else NudgeLoop
     else NudgeNone
 
-/// Suppress when the message is a question, carries a skip tag, or would repeat
-/// the previous non-none action (avoid nagging).
-let shouldSuppress (context: NudgeContext) (previous: NudgeAction option) : bool =
-    let text = context.lastAssistantMessage.Trim()
-    if isQuestion text then true
-    elif skipsTodo text || skipsLoop text then true
-    else
-        match previous with
-        | Some prev when prev <> NudgeNone -> decide context = prev
-        | _ -> false
+/// Per-session dedup state: the last non-none action that was allowed through.
+/// If the next decision yields the same action, it is suppressed to prevent
+/// duplicate nudges from overlapping events (session.idle + session.status(idle),
+/// message.updated + session.next.step.ended, etc.) that fire concurrently.
+type SessionNudgeState = { lastAction: NudgeAction option }
 
-/// Per-session throttle state.  Each action tracks its own last-fired timestamp.
-type SessionNudgeState =
-    { todoAt: int; loopAt: int; runnerAt: int; lastIndex: int option }
-
-let freshSession : SessionNudgeState =
-    { todoAt = 0; loopAt = 0; runnerAt = 0; lastIndex = None }
-
-let timestampKeyFor = function
-    | NudgeTodo | NudgeNone -> "todoAt"
-    | NudgeLoop -> "loopAt"
-    | NudgeRunner -> "runnerAt"
-
-let private stamp (state: SessionNudgeState) key now : SessionNudgeState =
-    let nextIndex = state.lastIndex |> Option.map ((+) 1) |> Option.defaultValue 0
-    match key with
-    | "todoAt" -> { state with todoAt = now; lastIndex = Some nextIndex }
-    | "loopAt" -> { state with loopAt = now; lastIndex = Some nextIndex }
-    | _ -> { state with runnerAt = now; lastIndex = Some nextIndex }
+let freshSession : SessionNudgeState = { lastAction = None }
 
 type CoordinatorState = { sessions: Map<string, SessionNudgeState> }
 
 let freshCoordinator : CoordinatorState = { sessions = Map.empty }
 
-/// Pure state transition: decide the action, record its timestamp, return the
-/// updated coordinator.  NudgeNone leaves the state untouched.
-let update (state: CoordinatorState) (sessionId: string) (context: NudgeContext) (now: int)
+/// Pure state transition: decide the action; suppress if it repeats the last
+/// non-none action for this session (concurrent events for the same idle
+/// transition must not double-fire).  NudgeNone leaves the state untouched.
+let update (state: CoordinatorState) (sessionId: string) (context: NudgeContext)
            : CoordinatorState * NudgeAction =
     let action = decide context
     if action = NudgeNone then state, NudgeNone
     else
         let prev = Map.tryFind sessionId state.sessions |> Option.defaultValue freshSession
-        let key = timestampKeyFor action
-        let updated = stamp prev key now
-        { sessions = Map.add sessionId updated state.sessions }, action
+        match prev.lastAction with
+        | Some last when last = action -> state, NudgeNone
+        | _ ->
+            let updated = { lastAction = Some action }
+            { sessions = Map.add sessionId updated state.sessions }, action
 
 /// Terminal todo statuses that should NOT count as open work.
 let terminalTodoStatuses: Set<string> = Set.ofList [ "completed"; "cancelled"; "abandoned" ]
@@ -100,12 +81,12 @@ type NudgeCoordinator() =
 
     /// Decide and record the nudge for a session, unless it was suppressed this
     /// round (a suppress consumes itself — a single free pass).
-    member _.shouldNudge(sessionId, context: NudgeContext, now) : string =
+    member _.shouldNudge(sessionId, context: NudgeContext) : string =
         if Set.contains sessionId suppressed then
             suppressed <- Set.remove sessionId suppressed
             "none"
         else
-            let next, action = update state sessionId context now
+            let next, action = update state sessionId context
             state <- next
             toString action
 

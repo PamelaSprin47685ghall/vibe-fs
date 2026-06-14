@@ -38,15 +38,18 @@ let decision () =
 
 let updateState () =
     let ctx = nudgeContext [ "a" ] "working" false false
-    let state, action = update freshCoordinator "sess" ctx 1000
+    let state, action = update freshCoordinator "sess" ctx
     equal "update → NudgeTodo" NudgeTodo action
     check "state records session" (Map.containsKey "sess" state.sessions)
+    let _, action2 = update state "sess" ctx
+    equal "repeat suppressed → None" NudgeNone action2
 
 let coordinator () =
     let coord = NudgeCoordinator()
     let ctx : NudgeContext = { todos = [ "a" ]; lastAssistantMessage = "working"; hasActiveRunner = false; isLoopActive = false }
-    equal "first nudge todo" "nudge-todo" (coord.shouldNudge ("s", ctx, 1))
+    equal "first nudge todo" "nudge-todo" (coord.shouldNudge ("s", ctx))
+    equal "repeat suppressed" "none" (coord.shouldNudge ("s", ctx))
     coord.suppress "s"
-    equal "suppressed none" "none" (coord.shouldNudge ("s", ctx, 2))
+    equal "explicit suppress none" "none" (coord.shouldNudge ("s", ctx))
     coord.clearSession "s"
-    equal "after clear todo" "nudge-todo" (coord.shouldNudge ("s", ctx, 4))
+    equal "after clear todo" "nudge-todo" (coord.shouldNudge ("s", ctx))

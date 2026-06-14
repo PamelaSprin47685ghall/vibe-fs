@@ -13,9 +13,6 @@ open VibeFs.Kernel.Prompts
 [<Emit("$2[$1]($0)")>]
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = jsNative
 
-[<Emit("Date.now()")>]
-let private dateNow () : int = jsNative
-
 let getSessionID (eventType: string) (props: obj) : string =
     let part = Dyn.get props "part"
     let info = Dyn.get props "info"
@@ -114,26 +111,19 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
     let client = Dyn.get ctx "client"
     let coordinator = Nudge.defaultCoordinator
     let stoppedSessions = HashSet<string>()
-    let lastNudgeSignature = Dictionary<string, string>()
 
-    let removeSignature sessionID =
-        lastNudgeSignature.Remove(sessionID) |> ignore
-
-    let sendNudge sessionID (context: NudgeContext) promptText =
+    let sendNudge sessionID promptText =
         async {
-            let previewLength = min context.lastAssistantMessage.Length 200
-            let signature = $"{context.todos.Length}:{context.lastAssistantMessage.Substring(0, previewLength)}"
-            if lastNudgeSignature.ContainsKey(sessionID) && lastNudgeSignature.[sessionID] = signature then return ()
-            else
-                let agent = ChildAgent.lookupChildAgent(sessionID)
-                let body = createPromptBody agent promptText
-                let session = Dyn.get client "session"
-                let! result = Async.Catch (invoke1 body "prompt" session |> Async.AwaitPromise)
-                match result with
-                | Choice1Of2 _ -> lastNudgeSignature.[sessionID] <- signature
-                | Choice2Of2 exn ->
-                    if Dyn.str (box exn) "_tag" = "SessionBusyError" then
-                        lastNudgeSignature.Remove(sessionID) |> ignore
+            let agent = ChildAgent.lookupChildAgent(sessionID)
+            let body = createPromptBody agent promptText
+            let promptArg = box {| path = box {| id = sessionID |}; body = body |}
+            let session = Dyn.get client "session"
+            let! result = Async.Catch (invoke1 promptArg "prompt" session |> Async.AwaitPromise)
+            match result with
+            | Choice1Of2 _ -> ()
+            | Choice2Of2 exn ->
+                if Dyn.str (box exn) "_tag" = "SessionBusyError" then
+                    coordinator.clearSession(sessionID)
         }
 
     let nudgeIfNeeded (sessionID: string) : JS.Promise<unit> =
@@ -145,9 +135,9 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
                 | None -> return ()
                 | Some snapshot ->
                     let context = { snapshot with isLoopActive = reviewStore.isReviewActive(sessionID) }
-                    match coordinator.shouldNudge(sessionID, context, dateNow()) with
-                    | "nudge-todo" -> do! sendNudge sessionID context todoNudgePrompt
-                    | "nudge-loop" -> do! sendNudge sessionID context loopNudgePrompt
+                    match coordinator.shouldNudge(sessionID, context) with
+                    | "nudge-todo" -> do! sendNudge sessionID todoNudgePrompt
+                    | "nudge-loop" -> do! sendNudge sessionID loopNudgePrompt
                     | _ -> ()
         } |> Async.StartAsPromise
 
@@ -166,11 +156,9 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
                         reviewStore.deactivateReview(sessionID)
                         stoppedSessions.Add(sessionID) |> ignore
                         coordinator.clearSession(sessionID)
-                        removeSignature(sessionID)
                     | "session.delete" | "session.close" | "session.remove" | "session.deleted" ->
                         coordinator.clearSession(sessionID)
                         stoppedSessions.Remove(sessionID) |> ignore
-                        removeSignature(sessionID)
                     | "session.idle" ->
                         do! nudgeIfNeeded(sessionID) |> Async.AwaitPromise
                     | "message.updated" ->
@@ -178,7 +166,6 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
                         if isAbortError (Dyn.get info "error") then
                             stoppedSessions.Add(sessionID) |> ignore
                             coordinator.clearSession(sessionID)
-                            removeSignature(sessionID)
                         elif isCompletedAssistantMessage info then
                             do! nudgeIfNeeded(sessionID) |> Async.AwaitPromise
                     | "session.next.step.ended" ->
@@ -191,14 +178,13 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
                         let statusType = Dyn.str (Dyn.get props "status") "type"
                         match statusType with
                         | "idle" -> do! nudgeIfNeeded(sessionID) |> Async.AwaitPromise
-                        | "busy" -> removeSignature(sessionID)
+                        | "busy" -> coordinator.clearSession(sessionID)
                         | "retry" -> ()
                         | _ -> ()
                     | "session.error" ->
                         if isAbortError (Dyn.get props "error") then
                             stoppedSessions.Add(sessionID) |> ignore
                             coordinator.clearSession(sessionID)
-                            removeSignature(sessionID)
                     | "session.next.prompted" ->
                         let text =
                             let partsText = getPartsText (Dyn.get props "parts")
@@ -206,7 +192,6 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
                         if not (isNudgePrompt text) then
                             coordinator.clearSession(sessionID)
                             stoppedSessions.Remove(sessionID) |> ignore
-                            removeSignature(sessionID)
                     | _ -> ()
             with _ -> ()
         } |> Async.StartAsPromise

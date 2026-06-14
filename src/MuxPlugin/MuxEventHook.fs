@@ -7,9 +7,6 @@ open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.Prompts
 open VibeFs.Mux.StreamEnd
 
-[<Emit("Date.now()")>]
-let private dateNow () : int = jsNative
-
 /// Extract the last assistant text from event properties.parts.
 let private getLastAssistantText (properties: obj) : string =
     if Dyn.isNullish properties then ""
@@ -39,7 +36,7 @@ let private handleEvent (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
                 elif Dyn.isNullish helpers then ()
                 else
                     let lastMessage = getLastAssistantText properties
-                    state.lastNudgeSignature.Remove(workspaceId) |> ignore
+                    coordinator.clearSession(workspaceId)
                     if state.stoppedWorkspaces.Contains(workspaceId) then ()
                     else
                         let! todosOpt =
@@ -54,25 +51,19 @@ let private handleEvent (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
                         let action =
                             coordinator.shouldNudge(workspaceId,
                                 { todos = todos; lastAssistantMessage = lastMessage
-                                  hasActiveRunner = false; isLoopActive = reviewStore.isReviewActive workspaceId },
-                                dateNow ())
+                                  hasActiveRunner = false; isLoopActive = reviewStore.isReviewActive workspaceId })
                         match selectNudgePrompt action todoNudgePrompt loopNudgePrompt with
                         | None -> ()
                         | Some prompt ->
-                            let signature = $"{todos.Length}:{lastMessage.Substring(0, min lastMessage.Length 200)}"
-                            if state.lastNudgeSignature.ContainsKey(workspaceId)
-                               && state.lastNudgeSignature.[workspaceId] = signature then ()
-                            else
-                                try
-                                    let nudgeFn = Dyn.get helpers "nudge"
-                                    let! _ = (Dyn.call2 nudgeFn workspaceId prompt :?> JS.Promise<bool>) |> Async.AwaitPromise
-                                    state.lastNudgeSignature.[workspaceId] <- signature
-                                    let prev = if state.deliveredCounts.ContainsKey(workspaceId) then state.deliveredCounts.[workspaceId] else 0
-                                    state.deliveredCounts.[workspaceId] <- prev + 1
-                                with _ -> ()
+                            try
+                                let nudgeFn = Dyn.get helpers "nudge"
+                                let! _ = (Dyn.call2 nudgeFn workspaceId prompt :?> JS.Promise<bool>) |> Async.AwaitPromise
+                                let prev = if state.deliveredCounts.ContainsKey(workspaceId) then state.deliveredCounts.[workspaceId] else 0
+                                state.deliveredCounts.[workspaceId] <- prev + 1
+                            with _ -> coordinator.clearSession(workspaceId)
             | "stream-abort" ->
                 reviewStore.deactivateReview workspaceId
-                state.lastNudgeSignature.Remove(workspaceId) |> ignore
+                coordinator.clearSession(workspaceId)
                 state.stoppedWorkspaces.Add(workspaceId) |> ignore
                 state.retryPendingWorkspaces.Remove(workspaceId) |> ignore
             | "error" ->

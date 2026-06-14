@@ -128,17 +128,27 @@ let private buildAssistantMessage (assistantId: string) (userId: string) (sessio
         "parts", box toolParts
     ])
 
+let private findFirstRealMessage (messages: obj array) : obj option =
+    messages
+    |> Array.tryFind (fun msg ->
+        let id = messageId msg
+        id <> "" && not (id.StartsWith capsUserPrefix) && not (id.StartsWith capsAssistantPrefix))
+
 let buildCapsMessages
     (messages: obj array)
     (projectRoot: string)
     (excludedAgents: string list)
     (capsFiles: CapsFile list)
     : obj array =
-    if messages.Length = 0 then messages
+    let shouldSkip =
+        match findFirstRealMessage messages with
+        | None -> true
+        | Some firstReal -> excludedAgents |> List.contains (messageAgent firstReal)
+
+    if shouldSkip then messages
     else
         let existingStripped = if hasExistingCapsMessages messages then messages.[2..] else messages
         if existingStripped.Length = 0 then messages
-        elif excludedAgents |> List.contains (messageAgent existingStripped.[0]) then existingStripped
         elif capsFiles.IsEmpty then existingStripped
         else
             let sessionID = messageSessionID existingStripped.[0]

@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 
-let private defaultExcludedAgents = [ "browser"; "greper"; "executor"; "title" ]
+let private defaultExcludedAgents = [ "browser"; "greper"; "summarizer"; "title" ]
 
 [<Emit("{}")>]
 let private emptyObj () : obj = jsNative

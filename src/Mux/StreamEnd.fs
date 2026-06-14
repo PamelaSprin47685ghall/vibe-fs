@@ -12,11 +12,9 @@ let selectNudgePrompt (action: string) (todoPrompt: string) (loopPrompt: string)
 type StreamEndState =
     { stoppedWorkspaces: System.Collections.Generic.HashSet<string>
       retryPendingWorkspaces: System.Collections.Generic.HashSet<string>
-      deliveredCounts: System.Collections.Generic.Dictionary<string, int>
-      lastNudgeSignature: System.Collections.Generic.Dictionary<string, string> }
+      deliveredCounts: System.Collections.Generic.Dictionary<string, int> }
 
 let createStreamEndState () : StreamEndState =
     { stoppedWorkspaces = System.Collections.Generic.HashSet<string>()
       retryPendingWorkspaces = System.Collections.Generic.HashSet<string>()
-      deliveredCounts = System.Collections.Generic.Dictionary<string, int>()
-      lastNudgeSignature = System.Collections.Generic.Dictionary<string, string>() }
+      deliveredCounts = System.Collections.Generic.Dictionary<string, int>() }

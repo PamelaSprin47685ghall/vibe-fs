@@ -218,16 +218,49 @@ let webfetchTool () : obj =
                         with ex -> return $"Web fetch failed: {ex.Message}"
                 } |> Async.StartAsPromise)
 
-/// submit_review: activate a review for the loop.
-let submitReviewTool (store: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
+/// Format a reviewer verdict into the orchestrator-facing tool output.
+let private formatReviewResult (result: VibeFs.Kernel.ReviewSession.ReviewResult) : string =
+    match result with
+    | VibeFs.Kernel.ReviewSession.Accepted ->
+        "Review passed. Your changes have been accepted. loop mode has ended."
+    | VibeFs.Kernel.ReviewSession.Terminated -> "Review terminated."
+    | VibeFs.Kernel.ReviewSession.Rejected feedback ->
+        "Review feedback:\n\n" + feedback
+        + "\n\nAddress the feedback above. loop mode is still active — fix the issues and call submit_review again."
+
+/// submit_review: submit work for review. Creates a reviewer sub-agent that
+/// inspects the changes against the original task and returns PASS or
+/// actionable feedback. Only works when session is in active loop mode.
+let submitReviewTool (ctx: obj) (store: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
+    let client = Dyn.get ctx "client"
     define "Submit your work for review (loop mode)."
         (box {| report = strReq "Detailed report of what you did"; affectedFiles = strArrayOpt "Files you modified" |})
         (fun args context ->
-            let sessionID =
-                let id = Dyn.str context "sessionID"
-                if id = "" then "loop" else id
-            async { store.activateReview (sessionID, Dyn.str args "report", 0)
-                    return "Review activated. A reviewer will inspect your work." } |> Async.StartAsPromise)
+            let tc = extractToolContext context (Dyn.str ctx "directory")
+            let sessionID = Dyn.str tc "sessionID"
+            if sessionID = "" || not (store.isReviewActive sessionID) then
+                resolveStr "You do not need review. Just continue with your work."
+            elif not (store.tryLockReview sessionID) then
+                resolveStr "A review is already in progress. Wait for it to finish."
+            else
+                let report = Dyn.str args "report"
+                let affectedFiles =
+                    if Dyn.isNullish (Dyn.get args "affectedFiles") then []
+                    else Dyn.get args "affectedFiles" :?> obj array |> Array.map string |> List.ofArray
+                let abort = Dyn.get tc "abortSignal"
+                async {
+                    try
+                        let task = defaultArg (store.getReviewTask sessionID) ""
+                        let! result = runSubmitReview client store (Dyn.str tc "directory") sessionID report affectedFiles task abort |> Async.AwaitPromise
+                        match result with
+                        | VibeFs.Kernel.ReviewSession.Accepted
+                        | VibeFs.Kernel.ReviewSession.Terminated ->
+                            store.deactivateReview sessionID
+                        | VibeFs.Kernel.ReviewSession.Rejected _ -> ()
+                        return formatReviewResult result
+                    finally
+                        store.unlockReview sessionID
+                } |> Async.StartAsPromise)
 
 /// submit_review_result: submit the reviewer's verdict.
 let submitReviewResultTool (store: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
@@ -248,6 +281,6 @@ let createTools (ctx: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore
         entry "executor" (executorTool ctx)
         entry "fuzzy_find" (fuzzyFindTool ()); entry "fuzzy_grep" (fuzzyGrepTool ())
         entry "websearch" (websearchTool ()); entry "webfetch" (webfetchTool ())
-        entry "submit_review" (submitReviewTool reviewStore)
+        entry "submit_review" (submitReviewTool ctx reviewStore)
         entry "submit_review_result" (submitReviewResultTool reviewStore)
     |]

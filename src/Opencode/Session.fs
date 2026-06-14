@@ -12,6 +12,14 @@ let private firstString (ctx: obj) (keys: string list) : string option =
         let v = Dyn.get ctx key
         if Dyn.isNullish v then None else Some(string v))
 
+/// Get the abort signal from the opencode context.  The host exposes it as
+/// `context.abort` (an AbortSignal), not `context.abortSignal`.
+let private getAbortSignal (context: obj) : obj =
+    if Dyn.isNullish context then null
+    else
+        let abort = Dyn.get context "abort"
+        if Dyn.isNullish abort then null else abort
+
 /// Extract the tool-execution context from an opencode tool `context`.
 /// sessionID is returned as null when the host did not provide one, so parent
 /// resolution treats the subagent as a top-level session.
@@ -27,16 +35,8 @@ let extractToolContext (context: obj) (pluginDirectory: string) : obj =
             match sessionID with
             | Some s when s <> "" -> box s
             | _ -> box null
+        abortSignal = getAbortSignal context
     |}
-
-/// Get the abort signal from the opencode context.  The host exposes it as
-/// `context.abort` (an AbortSignal), not `context.abortSignal`.  If no context
-/// is supplied the function returns null so the prompt runs without abort.
-let private getAbortSignal (context: obj) : obj =
-    if Dyn.isNullish context then null
-    else
-        let abort = Dyn.get context "abort"
-        if Dyn.isNullish abort then null else abort
 
 /// Dynamically invoke a method chain on ctx.client and await the resulting promise.
 [<Emit("$2[$1]($0)")>]
@@ -141,14 +141,12 @@ let runSubagent (client: obj) (agent: string) (title: string) (prompt: string)
     }
     |> Async.StartAsPromise
 
-/// Run a pre-review session: create a reviewer child, prompt it with review
-/// instructions + task, wait for the verdict via submit_review_result, nudging
-/// up to maxNudges times if the reviewer hasn't submitted.
-let runReviewerSession (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
-                       (directory: string) (sessionID: string) (task: string)
-                       : JS.Promise<VibeFs.Kernel.ReviewSession.ReviewResult> =
+/// Create a reviewer child session under the given parent, register it, and
+/// return the child id (empty string on failure).
+let createReviewerChild (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+                        (directory: string) (parentID: string option)
+                        (sessionID: string) (title: string) : JS.Promise<string> =
     async {
-        let parentID = ChildAgent.resolveSubsessionParentID (if sessionID = "" then None else Some sessionID)
         let createBody =
             box {|
                 query = box {| directory = directory |}
@@ -157,48 +155,94 @@ let runReviewerSession (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.R
                         match parentID with
                         | Some p -> box p
                         | None -> box null
-                    title = "Pre-Reviewer"
+                    title = title
                 |}
             |}
         let! createResult = invoke1 createBody "create" (Dyn.get client "session") |> Async.AwaitPromise
         let childID = Dyn.str (Dyn.get createResult "data") "id"
-        if childID = "" then return VibeFs.Kernel.ReviewSession.Terminated
-        else
+        if childID <> "" then
             reviewStore.addChild(sessionID, childID)
             ChildAgent.registerChildAgent childID "reviewer" parentID
-            let verdict : VibeFs.Kernel.ReviewSession.ReviewResult option ref = ref None
-            reviewStore.setPendingReview(childID, (fun r -> verdict.Value <- Some r))
-            reviewStore.tryLockReview childID |> ignore
-            let maxNudges = 3
-            let rec nudgeLoop nudgeCount =
-                async {
-                    if nudgeCount >= maxNudges then
-                        return VibeFs.Kernel.ReviewSession.Terminated
-                    else
-                        let parts : obj array =
-                            if nudgeCount = 0 then
-                                [|
-                                    box {| ``type`` = "text"; text = reviewInstructions |}
-                                    box {| ``type`` = "text"; text = $"=== Task ===\n\n{task}" |}
-                                |]
-                            else
-                                [| box {| ``type`` = "text"; text = reviewerNudgePrompt |} |]
-                        let promptBody =
-                            box {|
-                                path = box {| id = childID |}
-                                body = box {| agent = "reviewer"; parts = parts; tools = box {| submit_review_result = true |} |}
-                            |}
-                        let! caught = Async.Catch (promptWithAbort client promptBody null |> Async.AwaitPromise)
-                        match caught with
-                        | Choice2Of2 _ -> return VibeFs.Kernel.ReviewSession.Terminated
-                        | Choice1Of2 () ->
-                            match verdict.Value with
-                            | Some v -> return v
-                            | None -> return! nudgeLoop (nudgeCount + 1)
-                }
-            let! result = nudgeLoop 0
-            reviewStore.unlockReview childID
-            return result
+        return childID
+    }
+    |> Async.StartAsPromise
+
+/// Run the reviewer prompt-nudge loop on an existing child session: prompt with
+/// the review instructions, wait for the verdict via submit_review_result,
+/// nudging up to maxNudges times if the reviewer hasn't submitted.
+let runReviewerLoop (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+                    (childID: string) (initialParts: obj array) (abortSignal: obj)
+                    : JS.Promise<VibeFs.Kernel.ReviewSession.ReviewResult> =
+    async {
+        let verdict : VibeFs.Kernel.ReviewSession.ReviewResult option ref = ref None
+        reviewStore.setPendingReview(childID, (fun r -> verdict.Value <- Some r))
+        reviewStore.tryLockReview childID |> ignore
+        let maxNudges = 3
+        let rec loop nudgeCount =
+            async {
+                if nudgeCount >= maxNudges then return VibeFs.Kernel.ReviewSession.Terminated
+                else
+                    let parts =
+                        if nudgeCount = 0 then initialParts
+                        else [| box {| ``type`` = "text"; text = reviewerNudgePrompt |} |]
+                    let promptBody =
+                        box {|
+                            path = box {| id = childID |}
+                            body = box {| agent = "reviewer"; parts = parts; tools = box {| submit_review_result = true |} |}
+                        |}
+                    let! caught = Async.Catch (promptWithAbort client promptBody abortSignal |> Async.AwaitPromise)
+                    match caught with
+                    | Choice2Of2 _ -> return VibeFs.Kernel.ReviewSession.Terminated
+                    | Choice1Of2 () ->
+                        match verdict.Value with
+                        | Some v -> return v
+                        | None -> return! loop (nudgeCount + 1)
+            }
+        let! result = loop 0
+        reviewStore.unlockReview childID
+        return result
+    }
+    |> Async.StartAsPromise
+
+/// Run a pre-review session (used by /loop-review): create a reviewer child,
+/// prompt it with review instructions + task, wait for the verdict.
+let runReviewerSession (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+                       (directory: string) (sessionID: string) (task: string)
+                       : JS.Promise<VibeFs.Kernel.ReviewSession.ReviewResult> =
+    async {
+        let parentID = ChildAgent.resolveSubsessionParentID (if sessionID = "" then None else Some sessionID)
+        let! childID = createReviewerChild client reviewStore directory parentID sessionID "Pre-Reviewer" |> Async.AwaitPromise
+        if childID = "" then return VibeFs.Kernel.ReviewSession.Terminated
+        else
+            let parts =
+                [| box {| ``type`` = "text"; text = reviewInstructions |}
+                   box {| ``type`` = "text"; text = $"=== Task ===\n\n{task}" |} |]
+            return! runReviewerLoop client reviewStore childID parts null |> Async.AwaitPromise
+    }
+    |> Async.StartAsPromise
+
+/// Run a submit-review (used by the submit_review tool): create a reviewer
+/// child, prompt it with review instructions + change report + affected files +
+/// original task, wait for the verdict.
+let runSubmitReview (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+                    (directory: string) (sessionID: string)
+                    (report: string) (affectedFiles: string list)
+                    (task: string) (abortSignal: obj)
+                    : JS.Promise<VibeFs.Kernel.ReviewSession.ReviewResult> =
+    async {
+        let parentID = ChildAgent.resolveSubsessionParentID (Some sessionID)
+        let! childID = createReviewerChild client reviewStore directory parentID sessionID "Reviewer" |> Async.AwaitPromise
+        if childID = "" then return VibeFs.Kernel.ReviewSession.Terminated
+        else
+            let filesText = String.concat "\n" affectedFiles
+            let sections = [
+                reviewInstructions
+                $"=== Change Report ===\n\n{report}"
+                $"=== Affected Files ===\n\n{filesText}"
+                if task <> "" then $"=== Original Task ===\n\n{task}"
+            ]
+            let parts = sections |> List.map (fun text -> box {| ``type`` = "text"; text = text |}) |> Array.ofList
+            return! runReviewerLoop client reviewStore childID parts abortSignal |> Async.AwaitPromise
     }
     |> Async.StartAsPromise
 
