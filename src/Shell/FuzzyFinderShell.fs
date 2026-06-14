@@ -13,7 +13,7 @@ type FinderLike =
 
 /// Raw JS result of FileFinder.create + scan wait: `{ ok: bool, value?, error? }`.
 /// Returned as obj because Fable's Result DU uses a different shape ({tag,fields}).
-[<Emit("(async () => { const { FileFinder } = await import('@ff-labs/fff-node'); const r = FileFinder.create({ basePath: $0, aiMode: true }); if(!r.ok) return { ok: false, error: r.error }; const f = r.value; try { await f.waitForScan(15000); } catch {} return { ok: true, value: f }; })($0)")>]
+[<Emit("(async () => { const moduleName = '@ff-labs/fff-node'; const { FileFinder } = await import(moduleName); const r = FileFinder.create({ basePath: $0, aiMode: true }); if(!r.ok) return { ok: false, error: r.error }; const f = r.value; try { await f.waitForScan(15000); } catch {} return { ok: true, value: f }; })($0)")>]
 let private createFinderRaw (basePath: string) : JS.Promise<obj> = jsNative
 
 /// Convert a raw JS `{ok, value?, error?}` object into a typed F# Result.

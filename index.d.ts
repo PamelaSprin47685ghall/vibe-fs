@@ -222,7 +222,8 @@ export interface PluginEventHelpers {
 
 export interface PluginSlashCommandDefinition {
   key: string;
-  description?: string;
+  description: string;
+  inputHint?: string;
   execute: (workspaceId: string, args: string) => Promise<string | null>;
 }
 
@@ -230,7 +231,7 @@ export interface PluginRegistration {
   toolNames: string[];
   tools: PluginToolDefinition[];
   wrappers: PluginToolWrapper[];
-  mcpServers: Record<string, unknown>;
+  mcpServers: Readonly<Record<string, string>>;
   contextInjector: { inject: (projectPath: string) => Promise<unknown> };
   eventHook: (event: PluginEvent, helpers: PluginEventHelpers) => Promise<void>;
   slashCommands: PluginSlashCommandDefinition[];
