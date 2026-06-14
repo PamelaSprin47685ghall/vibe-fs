@@ -95,12 +95,16 @@ let plugin (ctx: obj) : JS.Promise<obj> =
                 registerCommands cfg
                 return assignInto cfg next
             } |> Async.StartAsPromise)))
-        setKey result "chat.message" (box (fun (input: obj) (output: obj) -> chatMessage input output))
+        setKey result "chat.message" (box (fun (input: obj) (output: obj) -> chatMessage nudgeHook input output))
         setKey result "tool.definition" (box (fun (input: obj) (output: obj) -> toolDefinition input output))
         setKey result "tool.execute.before" (box (fun (input: obj) (output: obj) -> toolExecuteBefore input output))
-        setKey result "tool.execute.after" (box (fun (input: obj) (output: obj) -> toolExecuteAfter input output))
+        setKey result "tool.execute.after" (box (fun (input: obj) (output: obj) -> toolExecuteAfter directory nudgeHook input output))
         setKey result "experimental.chat.messages.transform" (box (fun (_input: obj) (output: obj) -> messagesTransform directory output))
-        setKey result "command.execute.before" (box (fun (input: obj) (output: obj) -> commandExecuteBefore ctx reviewStore input output))
+        setKey result "command.execute.before" (box (fun (input: obj) (output: obj) ->
+            async {
+                do! nudgeHook.handleCommandExecuteBefore input output |> Async.AwaitPromise
+                do! commandExecuteBefore ctx reviewStore input output |> Async.AwaitPromise
+            } |> Async.StartAsPromise))
         setKey result "event" (box (fun (input: obj) ->
             async {
                 do! Hooks.eventHandler reviewStore input |> Async.AwaitPromise

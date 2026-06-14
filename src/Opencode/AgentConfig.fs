@@ -37,7 +37,7 @@ let private permissionDefaults (role: AgentRole) : obj =
 let toolDefaults (role: AgentRole) : obj =
     let o = emptyObj ()
     toolMapFor role |> Map.iter (fun name p -> setKey o name (box (p = Allow)))
-    migrateBrowserKey o
+    o
 
 let private defaultPromptFor (name: string) : string =
     match name with

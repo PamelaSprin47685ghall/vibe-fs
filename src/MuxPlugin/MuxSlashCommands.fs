@@ -11,6 +11,8 @@ open VibeFs.MuxPlugin.Delegate
 let private dateNow () : int = jsNative
 [<Emit("process.cwd()")>]
 let private processCwd () : string = jsNative
+[<Emit("Promise.race([$0.then(r => ({ kind: 'report', value: r })), new Promise(resolve => setTimeout(() => resolve({ kind: 'timeout' }), $1))])")>]
+let private raceDelegateWithTimeout (delegatePromise: JS.Promise<string>) (ms: int) : JS.Promise<obj> = jsNative
 
 let private loopFooter =
     [ "- report: a detailed description of what you did and why"
@@ -62,22 +64,28 @@ let createLoopReviewCommand (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntim
                     let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box ((subagentToolPolicy Reviewer).disabledTools |> Array.ofList) ]) ]
                     let reviewPrompt = reviewPromptFor task
                     async {
-                        let! report = delegateToSubAgent config "explore" reviewPrompt "Pre-review" (Some (createObj [ "experiments", box experiments ])) |> Async.AwaitPromise
-                        let trimmed = report.Trim()
-                        let isReject = System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"\b(REJECT|FAIL|DENIED|DO NOT ACCEPT)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
-                        let passMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"\bPASS\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
-                        let isPass =
-                            if isReject then false
-                            elif passMatch.Success && passMatch.Index < 200 then
-                                let afterPass = trimmed.Substring(passMatch.Index + 4)
-                                not (System.Text.RegularExpressions.Regex.IsMatch(afterPass, @"\bFAIL\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-                            else false
+                        let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
+                        let delegatePromise = delegateToSubAgent deps config "explore" reviewPrompt "Pre-review" (Some opts)
+                        let! result = raceDelegateWithTimeout delegatePromise 300000 |> Async.AwaitPromise
                         reviewStore.activateReview(workspaceId, task, dateNow ())
-                        return
-                            if isPass then
-                                buildLoopMessage task [ "Loop mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
-                            else
-                                buildLoopMessage task [ "Pre-review feedback:"; ""; trimmed; ""; "Loop mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
+                        if Dyn.str result "kind" = "timeout" then
+                            return buildLoopMessage task [ "Loop mode is active. Pre-review timed out; proceeding without feedback. Complete the task above, then call submit_review with:" ]
+                        else
+                            let report = Dyn.str result "value"
+                            let trimmed = report.Trim()
+                            let isReject = System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"\b(REJECT|FAIL|DENIED|DO NOT ACCEPT)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                            let passMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"\bPASS\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+                            let isPass =
+                                if isReject then false
+                                elif passMatch.Success && passMatch.Index < 200 then
+                                    let afterPass = trimmed.Substring(passMatch.Index + 4)
+                                    not (System.Text.RegularExpressions.Regex.IsMatch(afterPass, @"\bFAIL\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                                else false
+                            return
+                                if isPass then
+                                    buildLoopMessage task [ "Loop mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
+                                else
+                                    buildLoopMessage task [ "Pre-review feedback:"; ""; trimmed; ""; "Loop mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
                     } |> Async.StartAsPromise) |}
 
 /// Build all slash commands.

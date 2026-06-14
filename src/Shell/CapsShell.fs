@@ -140,8 +140,8 @@ let private discoverRootAsync (api: obj) (projectRoot: string) (budget: Budget) 
                        && not (Set.contains name excludedFileNames) then
                         let! b' = absorbFileAsync full name b
                         return! processEntry (i + 1) b'
-                    elif entryIsDirectory entry && capsDirRe.IsMatch name
-                         && not (isExcludedDir name) then
+                    elif entryIsDirectory entry && not (isExcludedDir name)
+                         && (capsDirRe.IsMatch name || capsDotDirRe.IsMatch name) then
                         let! (sub, _) = discoverFilesInDirAsync full 0 Set.empty
                         let! b' = absorbFilesAsync sub projectRoot b
                         return! processEntry (i + 1) b'

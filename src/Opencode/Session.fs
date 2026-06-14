@@ -95,10 +95,11 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) : J
 })(""" + "$0" + "," + "$1" + "," + "$2" + ")")>]
 let private promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> = jsNative
 
-/// Run a subagent: resolve the parent session id, create a child session with
-/// that parent, register the child, prompt it, and extract the text response.
-let runSubagent (client: obj) (agent: string) (title: string) (prompt: string)
-                (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
+/// Core subagent runner. When cleanup is true, the child session is aborted and
+/// unregistered after the prompt finishes so temporary subagents do not linger.
+let private runSubagentCore (client: obj) (agent: string) (title: string) (prompt: string)
+                            (directory: string) (sessionID: string) (context: obj)
+                            (cleanup: bool) : JS.Promise<string> =
     async {
         let parentID = ChildAgent.resolveSubsessionParentID (if sessionID = "" then None else Some sessionID)
         let session = Dyn.get client "session"
@@ -117,29 +118,49 @@ let runSubagent (client: obj) (agent: string) (title: string) (prompt: string)
         let childID = Dyn.str (Dyn.get createResult "data") "id"
         if childID = "" then return "Failed to create child session"
         else
+            let mutable cleanedUp = false
+            let abortAndUnregister () =
+                if not cleanedUp then
+                    cleanedUp <- true
+                    let abortPromise : JS.Promise<obj> = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
+                    abortPromise |> ignore
+                    ChildAgent.unregisterChildAgent childID
             ChildAgent.registerChildAgent childID agent parentID
             try
-                let promptBody =
-                    box {|
-                        path = box {| id = childID |}
-                        body = box {|
-                            agent = agent
-                            parts = [| box {| ``type`` = "text"; text = prompt |} |]
+                try
+                    let promptBody =
+                        box {|
+                            path = box {| id = childID |}
+                            body = box {|
+                                agent = agent
+                                parts = [| box {| ``type`` = "text"; text = prompt |} |]
+                            |}
                         |}
-                    |}
-                do! promptWithAbort client promptBody (getAbortSignal context) |> Async.AwaitPromise
-                let! text = extractSessionText client childID directory |> Async.AwaitPromise
-                return if text = "" then "(no output)" else text
+                    do! promptWithAbort client promptBody (getAbortSignal context) |> Async.AwaitPromise
+                    let! text = extractSessionText client childID directory |> Async.AwaitPromise
+                    return if text = "" then "(no output)" else text
+                finally
+                    if cleanup then abortAndUnregister ()
             with err ->
                 if AbortKernel.isAbortError err then
-                    let aborted : JS.Promise<obj> = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
-                    try let! _ = aborted |> Async.AwaitPromise in () with _ -> ()
-                    ChildAgent.unregisterChildAgent childID
+                    abortAndUnregister ()
                     let! text = extractSessionText client childID directory |> Async.AwaitPromise
                     return if text = "" then "(aborted)" else $"(aborted) {text}"
                 else return raise err
     }
     |> Async.StartAsPromise
+
+/// Run a subagent: resolve the parent session id, create a child session with
+/// that parent, register the child, prompt it, and extract the text response.
+let runSubagent (client: obj) (agent: string) (title: string) (prompt: string)
+                (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
+    runSubagentCore client agent title prompt directory sessionID context false
+
+/// Run a subagent and clean up the child session afterwards. Used for
+/// short-lived analysis subagents such as the executor summarizer.
+let runSubagentWithCleanup (client: obj) (agent: string) (title: string) (prompt: string)
+                           (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
+    runSubagentCore client agent title prompt directory sessionID context true
 
 /// Create a reviewer child session under the given parent, register it, and
 /// return the child id (empty string on failure).

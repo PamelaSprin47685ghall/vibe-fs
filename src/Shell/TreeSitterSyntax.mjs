@@ -79,8 +79,7 @@ export default async function checkTreeSitterSyntax(content, filePath) {
     if (missing || (err && !hasInner)) {
       const s = node.startPosition ? node.startPosition() : { row: 0, column: 0 };
       const e = node.endPosition ? node.endPosition() : { row: 0, column: 0 };
-      const rawKind = typeof node.kind === 'function' ? node.kind() : node.type;
-      const kind = rawKind || (missing ? 'MISSING' : 'ERROR');
+      const kind = typeof node.kind === 'function' ? node.kind() : (missing ? 'MISSING' : 'ERROR');
       out.push({
         line: s.row + 1,
         column: s.column + 1,
@@ -95,6 +94,6 @@ export default async function checkTreeSitterSyntax(content, filePath) {
   }
 
   const errors = [];
-  collect(tree.rootNode, errors);
+  collect(tree.rootNode(), errors);
   return { ok: true, lang, errors };
 }

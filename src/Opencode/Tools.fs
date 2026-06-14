@@ -109,7 +109,7 @@ let executorTool (ctx: obj) : obj =
                 if not (shouldSummarize output) then return output
                 else
                     let prompt = buildSummaryPrompt options result
-                    return! runSubagent client "summarizer" "Executor summary" prompt
+                    return! runSubagentWithCleanup client "summarizer" "Executor summary" prompt
                                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
                             |> Async.AwaitPromise
             } |> Async.StartAsPromise)
@@ -270,7 +270,12 @@ let submitReviewResultTool (store: VibeFs.Kernel.ReviewRuntime.ReviewStore) : ob
             let sessionID =
                 let id = Dyn.str context "sessionID"
                 if id = "" then "loop" else id
-            let result = match optStr args "feedback" with None -> Accepted | Some f -> Rejected f
+            let result =
+                match optStr args "feedback" with
+                | None -> Accepted
+                | Some f ->
+                    let trimmed = f.Trim()
+                    if trimmed = "" then Accepted else Rejected trimmed
             async { return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve." } |> Async.StartAsPromise)
 
 /// Build the full tool map: name → ToolDefinition, as a plain JS object.

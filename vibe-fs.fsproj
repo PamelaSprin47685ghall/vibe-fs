@@ -81,6 +81,7 @@
     <Compile Include="src/Opencode/Hooks.fs" />
     <Compile Include="src/Opencode/Plugin.fs" />
     <!-- Mux plugin adapter (F# → JS, createRegistration export) -->
+    <Compile Include="src/MuxPlugin/ResolveAiSettings.fs" />
     <Compile Include="src/MuxPlugin/Delegate.fs" />
     <Compile Include="src/MuxPlugin/MuxTools/Shared.fs" />
     <Compile Include="src/MuxPlugin/MuxTools/AgentTools.fs" />

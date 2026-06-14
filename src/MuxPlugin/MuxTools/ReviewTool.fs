@@ -10,7 +10,7 @@ open VibeFs.Mux.Contract
 open VibeFs.MuxPlugin.Delegate
 open VibeFs.MuxPlugin.MuxTools.Shared
 
-let submitReviewTool (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : ToolDefinition =
+let submitReviewTool (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : ToolDefinition =
     { name = "submit_review"
       description = "Submit completed work for review. Creates a reviewer sub-agent that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active loop mode."
       parameters = mkSchema (createObj [ "report", box (strProp "Detailed report of what was done"); "affectedFiles", box (strArrayProp "List of file paths that were modified or created") ]) [| "report"; "affectedFiles" |]
@@ -30,7 +30,8 @@ let submitReviewTool (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : To
                           let taskSection = if originalTask = "" then "" else "\n=== Original Task ===\n\n" + originalTask
                           let reviewPrompt = Prompts.agentReportReviewInstructions + "\n\n=== Change Report ===\n\n" + report + "\n\n=== Affected Files ===\n\n" + String.concat "\n" affectedFiles + "\n" + taskSection
                           let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box ((subagentToolPolicy Reviewer).disabledTools |> Array.ofList) ]) ]
-                          let! reviewReport = delegateToSubAgent config "explore" reviewPrompt "Review" (Some (createObj [ "experiments", box experiments ])) |> Async.AwaitPromise
+                          let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
+                          let! reviewReport = delegateToSubAgent deps config "explore" reviewPrompt "Review" (Some opts) |> Async.AwaitPromise
                           let trimmed = reviewReport.Trim()
                           let rejectMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"\b(REJECT|FAIL|DENIED|DO NOT ACCEPT)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
                           let passMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"\bPASS\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)

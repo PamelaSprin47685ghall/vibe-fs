@@ -8,7 +8,7 @@ open VibeFs.MuxPlugin.MuxTools.WebTools
 open VibeFs.MuxPlugin.MuxTools.ReviewTool
 
 /// Build the full ordered tool list for createRegistration.
-let createToolCatalog (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : ToolDefinition array =
-    [| editorTool; greperTool; reverieTool; browserTool; executorTool
-       submitReviewTool reviewStore; websearchTool; webfetchTool
+let createToolCatalog (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : ToolDefinition array =
+    [| editorTool deps; greperTool deps; reverieTool deps; browserTool deps; executorTool deps
+       submitReviewTool deps reviewStore; websearchTool; webfetchTool
        fuzzyGrepTool; fuzzyFindTool; writeTool |]

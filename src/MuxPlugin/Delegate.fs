@@ -3,6 +3,7 @@ module VibeFs.MuxPlugin.Delegate
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.MuxPlugin.ResolveAiSettings
 
 [<Emit("Promise.resolve($0)")>]
 let private resolveStr (s: string) : JS.Promise<string> = jsNative
@@ -31,7 +32,7 @@ let private createInput (workspaceId: string) (agentId: string) (prompt: string)
 
 /// Delegate a sub-agent task via the host's taskService.  Returns the report
 /// markdown or an error string.  Mirrors vibe-me-mux delegateToSubAgent.
-let delegateToSubAgent (config: obj) (agentId: string) (prompt: string) (title: string)
+let delegateToSubAgent (deps: obj) (config: obj) (agentId: string) (prompt: string) (title: string)
                        (options: obj option) : JS.Promise<string> =
     let workspaceId = requireWorkspaceId config title
     if workspaceId = "" then resolveStr $"{title.ToLower()} requires workspaceId"
@@ -41,9 +42,13 @@ let delegateToSubAgent (config: obj) (agentId: string) (prompt: string) (title: 
         else
             async {
                 let opts = defaultArg options (box null)
-                let modelStr = Dyn.str opts "modelString"
-                let thinking = Dyn.str opts "thinkingLevel"
                 let experiments = Dyn.get opts "experiments"
+                let aiSettingsAgentId = Dyn.str opts "aiSettingsAgentId"
+                let! aiSettings =
+                    if aiSettingsAgentId = "" then async { return emptySettings }
+                    else resolveDelegatedAgentAiSettings deps config aiSettingsAgentId |> Async.AwaitPromise
+                let modelStr = defaultArg aiSettings.modelString ""
+                let thinking = defaultArg aiSettings.thinkingLevel ""
                 let input = createInput workspaceId agentId prompt title modelStr thinking experiments
                 let! createResult = taskCreate taskService input |> Async.AwaitPromise
                 let success = Dyn.truthy (Dyn.get createResult "success")

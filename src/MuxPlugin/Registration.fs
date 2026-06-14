@@ -23,7 +23,7 @@ let private toolsToObject (tools: VibeFs.Mux.Contract.ToolDefinition array) : ob
 /// + event hook + slash commands + policy.
 let createRegistration (_deps: obj) : obj =
     let reviewStore = VibeFs.Kernel.ReviewRuntime.createReviewStore ()
-    let tools = createToolCatalog reviewStore
+    let tools = createToolCatalog _deps reviewStore
     let toolNames = tools |> Array.map (fun t -> t.name)
     let toolsObj = toolsToObject tools
     let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.McpConfig.getStealthBrowserMcpCommand () |}

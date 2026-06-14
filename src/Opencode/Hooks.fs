@@ -3,6 +3,8 @@ module VibeFs.Opencode.Hooks
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.TreeSitterKernel
+open VibeFs.Shell.TreeSitterShell
 
 let private defaultExcludedAgents = [ "browser"; "greper"; "summarizer"; "title" ]
 
@@ -124,9 +126,11 @@ let private resolveChatTools (agent: string) (existingTools: obj) : obj option =
         Some (applyStealthBrowserRestrictions merged agent)
 
 /// chat.message: enforce per-agent tool boundaries at runtime.
-let chatMessage (input: obj) (output: obj) : JS.Promise<unit> =
+let chatMessage (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let agent = resolveAgent input
+        let sessionID = Dyn.str input "sessionID"
+        do! nudgeHook.handleChatMessage(sessionID, agent, Dyn.get output "parts") |> Async.AwaitPromise
         let message = Dyn.get output "message"
         if not (Dyn.isNullish message) then
             let tools = Dyn.get message "tools"
@@ -135,15 +139,27 @@ let chatMessage (input: obj) (output: obj) : JS.Promise<unit> =
             | None -> ()
     } |> Async.StartAsPromise
 
-/// tool.execute.after: append the reverie nudge to todowrite output.
-let toolExecuteAfter (input: obj) (output: obj) : JS.Promise<unit> =
+/// tool.execute.after: syntax-check file edits and delegate to the nudge hook.
+let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
-        if Dyn.str input "tool" <> "todowrite" then ()
-        else
+        let tool = Dyn.str input "tool"
+        if isFileEditTool tool then
             let out = Dyn.get output "output"
             if not (Dyn.isNullish out) && Dyn.typeIs out "string" then
                 let s = string out
-                if not (s.Contains Prompts.reverieNudge) then setOutput output (s + "\n" + Prompts.reverieNudge)
+                if not (hasSyntaxCheckMarker s) then
+                    let args = Dyn.get input "args"
+                    let paths = extractFilePaths args
+                    let! diagnostics =
+                        paths
+                        |> List.map (fun path -> readAndCheckSyntax path directory false |> Async.AwaitPromise)
+                        |> Async.Parallel
+                    let formatted =
+                        diagnostics
+                        |> Array.choose id
+                        |> String.concat "\n"
+                    if formatted <> "" then setOutput output (s + "\n\n" + formatted)
+        do! nudgeHook.handleToolExecuteAfter input output |> Async.AwaitPromise
     } |> Async.StartAsPromise
 
 /// Deduplicate repeated `read` tool outputs across messages to reduce token use.

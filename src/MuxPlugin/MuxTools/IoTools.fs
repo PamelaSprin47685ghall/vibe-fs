@@ -4,7 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.ExecutorKernel
+open VibeFs.Kernel.Permission
 open VibeFs.Mux.Contract
+open VibeFs.MuxPlugin.Delegate
 open VibeFs.MuxPlugin.MuxTools.Shared
 open VibeFs.Opencode.ToolCopy
 open VibeFs.Shell.ExecutorShell
@@ -21,7 +23,21 @@ let private mkdir (fs': obj) (dir: string) : JS.Promise<unit> = jsNative
 [<Emit("$0.writeFile($1, $2, 'utf-8')")>]
 let private writeFile (fs': obj) (p: string) (content: string) : JS.Promise<unit> = jsNative
 
-let executorTool : ToolDefinition =
+let private summarizerDisabledTools : string list =
+    canonicalToolNames @ [ "read"; "write"; "edit"; "bash"; "bash_.*"; "task"; "task_.*"; "patch"; "fetch"; "fetch_.*"; "webfetch"; "webfetch_.*"; "websearch"; "websearch_.*"; "stealth_browser_mcp_.*" ]
+    |> List.distinct
+
+let private summarizeOutput (deps: obj) (config: obj) (options: ExecuteOptions) (result: ExecuteResult) : Async<string> =
+    async {
+        let prompt = Prompts.executorSummarizerSystemPrompt + "\n\n" + buildSummaryPrompt options result
+        let experiments =
+            createObj [ "subagentRole", box "summarizer"
+                        "toolPolicy", box (createObj [ "disabledTools", box (Array.ofList summarizerDisabledTools) ]) ]
+        let opts = createObj [ "aiSettingsAgentId", box "explore"; "experiments", box experiments ]
+        return! delegateToSubAgent deps config "explore" prompt "Executor summary" (Some opts) |> Async.AwaitPromise
+    }
+
+let executorTool (deps: obj) : ToolDefinition =
     { name = "executor"
       description = executor
       parameters = mkSchema (createObj [ "language", box (strEnumProp Params.executorLanguage [| "shell"; "python"; "javascript" |]); "program", box (strProp Params.executorProgram); "dependencies", box (strArrayProp Params.executorDeps); "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long" |]) ]) [| "language"; "program"; "timeout_type" |]
@@ -36,7 +52,9 @@ let executorTool : ToolDefinition =
                     timeoutType = timeout; cwd = Some (Dyn.str config "cwd") }
               async {
                   let! result = execute options (Dyn.str config "workspaceId") |> Async.AwaitPromise
-                  return match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
+                  let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
+                  if not (shouldSummarize output) then return output
+                  else return! summarizeOutput deps config options result
               } |> Async.StartAsPromise
       condition = None }
 

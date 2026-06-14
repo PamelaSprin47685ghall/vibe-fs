@@ -268,6 +268,11 @@ const writeEmptyDir = await fs.mkdtemp(path.join('/tmp', 'write-test-'));
 const writeEmptyResult = await writeDef.execute({ cwd: writeEmptyDir }, { file_path: 'empty.txt', content: '' });
 check('write empty string succeeds', writeEmptyResult.includes('Successfully wrote'));
 check('write empty file has correct content', await fs.readFile(path.join(writeEmptyDir, 'empty.txt'), 'utf-8') === '');
+
+// ── writeTool syntax-check reports bad files ──
+const writeBadResult = await writeDef.execute({ cwd: writeEmptyDir }, { file_path: 'bad.js', content: 'const x = {\n  foo: \n};' });
+check('write bad syntax appends syntax-check marker', writeBadResult.includes('[syntax-check]'));
+check('write bad syntax reports missing identifier', writeBadResult.includes('Missing: identifier'));
 await fs.rm(writeEmptyDir, { recursive: true });
 
 // ── loop command returns Promise ──
@@ -285,7 +290,7 @@ check('browser has prompt', typeof browserAgent?.prompt === 'string' && browserA
 check('browser mode is subagent', browserAgent?.mode === 'subagent');
 check('browser mcps includes stealth-browser-mcp', Array.isArray(browserAgent?.mcps) && browserAgent.mcps.includes('stealth-browser-mcp'));
 check('browser permission allows stealth-browser-mcp', browserAgent?.permission?.['stealth-browser-mcp_*'] === 'allow');
-check('browser tools enables stealth-browser-mcp', browserAgent?.tools?.['stealth-browser-mcp_*'] === true);
+check('browser tools enables stealth-browser-mcp', browserAgent?.tools?.['stealth_browser_mcp_star'] === true);
 const summarizerAgent = agentCfgResult?.agent?.summarizer;
 check('summarizer has prompt', typeof summarizerAgent?.prompt === 'string' && summarizerAgent.prompt.includes('output summarizer'));
 check('summarizer mode is subagent', summarizerAgent?.mode === 'subagent');
