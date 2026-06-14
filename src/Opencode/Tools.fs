@@ -88,8 +88,10 @@ let reverieTool (ctx: obj) : obj =
                     |> Async.AwaitPromise
             } |> Async.StartAsPromise)
 
-/// The executor tool: run a program with timeout, returning captured output.
+/// The executor tool: run a program with timeout, returning captured output —
+/// or a summarizer subagent report when the output exceeds the summary threshold.
 let executorTool (ctx: obj) : obj =
+    let client = Dyn.get ctx "client"
     define executor
         (box {| language = strReq Params.executorLanguage; program = strReq Params.executorProgram
                 dependencies = strArrayOpt Params.executorDeps; timeout_type = strReq Params.executorTimeout |})
@@ -103,7 +105,13 @@ let executorTool (ctx: obj) : obj =
                   timeoutType = timeout; cwd = Some (Dyn.str tc "directory") }
             async {
                 let! result = VibeFs.Shell.ExecutorShell.execute options (Dyn.str tc "sessionID") |> Async.AwaitPromise
-                return match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
+                let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
+                if not (shouldSummarize output) then return output
+                else
+                    let prompt = buildSummaryPrompt options result
+                    return! runSubagent client "summarizer" "Executor summary" prompt
+                                (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
+                            |> Async.AwaitPromise
             } |> Async.StartAsPromise)
 
 /// The browser tool.
