@@ -17,6 +17,15 @@ let private randomHex4 () : string = sprintf "%04x" (rng.Next(65536))
 let private pushPart (arr: obj) (part: obj) : unit =
     (arr :?> ResizeArray<obj>).Add(part)
 
+let private ensureParts (output: obj) : obj =
+    let parts = Dyn.get output "parts"
+    if Dyn.isNullish parts then
+        let arr = ResizeArray<obj>()
+        output?("parts") <- box arr
+        box arr
+    else
+        parts
+
 let private planFooter =
     "\n\nYou must output ONLY the JSON requested. Do not write files, run commands, or modify the workspace."
 
@@ -34,7 +43,7 @@ let handlePlanCommand (ctx: obj) (input: obj) (output: obj) : Async<unit> =
             let directory = Dyn.str ctx "directory"
             let sessionID = Dyn.str input "sessionID"
             let client = Dyn.get ctx "client"
-            let parts = Dyn.get output "parts"
+            let parts = ensureParts output
             if rawRequirement = "" then
                 pushPart parts (box {| ``type`` = "text"; text = "Please provide a requirement, e.g. /plan design a login flow." |})
             else

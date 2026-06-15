@@ -16,7 +16,7 @@ let lenses () =
         { requestId = "r"; rawRequirement = "x"; normalizedRequirement = "x"; branchCount = 3
           branchModelName = ""; judgeModelName = ""; outputFileName = "PLAN-x.md"; workspaceRoot = "/"
           existingContext = None }
-    check "buildPlanLenses returns 3 lenses" (List.length (buildPlanLenses req) = 3)
+    check "buildPlanLenses returns 5 lenses" (List.length (buildPlanLenses req) = 5)
 
 let hypotheses () =
     let req =

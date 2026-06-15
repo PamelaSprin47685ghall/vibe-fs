@@ -27,6 +27,15 @@ let private loopFooter =
 let private buildLoopMessage (task: string) (intro: string) : string =
     $"Task (loop): {task}\n\n{intro}\n{loopFooter}"
 
+let private ensureParts (output: obj) : obj =
+    let parts = Dyn.get output "parts"
+    if Dyn.isNullish parts then
+        let arr = ResizeArray<obj>()
+        setKey output "parts" (box arr)
+        box arr
+    else
+        parts
+
 /// Handle /loop and /loop-review slash commands.
 let private commandExecuteBefore (ctx: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
     (input: obj) (output: obj) : JS.Promise<unit> =
@@ -37,8 +46,8 @@ let private commandExecuteBefore (ctx: obj) (reviewStore: VibeFs.Kernel.ReviewRu
         elif command = "loop" || command = "loop-review" then
             let sessionID = Dyn.str input "sessionID"
             let task = (Dyn.str input "arguments").Trim()
-            let parts = Dyn.get output "parts"
-            if not (Dyn.isNullish parts) then clearArray parts
+            let parts = ensureParts output
+            clearArray parts
             if task = "" then
                 reviewStore.deactivateReview sessionID
                 let cancelText = if command = "loop-review" then "loop-review mode cancelled." else "loop mode cancelled."

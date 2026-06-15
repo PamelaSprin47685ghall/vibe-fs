@@ -163,21 +163,53 @@ let parsePlanJudgeResponse (raw: string) : Result<PlanJudgeDecision, string> =
              mergeNotes = getStringArray o "mergeNotes" }
 
 let renderPlanMarkdown (result: PlanRunResult) : string =
-    let hyps = result.hypotheses |> List.map (fun h -> "- " + h.text) |> String.concat "\n"
-    let parts = result.revisions |> List.map (fun r ->
-        "### " + r.branchId + " — " + r.title + " (" + lensName r.lens + ")\n" + r.revisedPlanSummary)
-    let revs = String.concat "\n\n" parts
+    let bullet items = items |> List.map (fun s -> "- " + s) |> String.concat "\n"
+    let hyps = bullet (result.hypotheses |> List.map (fun h -> h.text))
+    let overview =
+        result.revisions
+        |> List.map (fun r ->
+            sprintf "- **%s** (%s, conf %.2f): %s" r.branchId (lensName r.lens) r.confidence r.revisedPlanSummary)
+        |> String.concat "\n"
+    let comparison =
+        result.revisions
+        |> List.map (fun r ->
+            let status = if result.decision.keptBranchIds |> List.contains r.branchId then "kept" else "rejected"
+            let risks = if r.keyRisks.IsEmpty then "None listed" else String.concat "; " r.keyRisks
+            sprintf "### %s — %s\n- **Status:** %s\n- **Risks:** %s\n- **Summary:** %s" r.branchId r.title status risks r.revisedPlanSummary)
+        |> String.concat "\n\n"
     let winner = result.revisions |> List.tryFind (fun r -> r.branchId = result.decision.winnerBranchId)
-    let plan = match winner with Some r -> r.revisedPlanMarkdown | None -> ""
-    let merge = String.concat "\n" result.decision.mergeNotes
-    "# " + result.finalFileName + "\n\n## Requirement\n\n" + result.request.normalizedRequirement
-    + "\n\n## Uncertainties\n\n" + hyps
-    + "\n\n## Branch Overview\n\n" + revs
-    + "\n\n## Judge Decision\n\n**Winner:** " + result.decision.winnerBranchId
-    + "\n**Rejected:** " + String.concat ", " result.decision.rejectedBranchIds
-    + "\n\n" + result.decision.judgeReasoning
-    + "\n\n**Merge notes:**\n" + merge
-    + "\n\n## Final Plan\n\n" + plan + "\n"
+    let plan, steps, acceptance, risks, openIssues, rejected =
+        match winner with
+        | Some r ->
+            r.revisedPlanMarkdown,
+            bullet r.validationChecks,
+            bullet r.validationChecks,
+            bullet r.keyRisks,
+            bullet r.keyAssumptions,
+            ""
+        | None -> "", "", "", "", "", ""
+    let rejectedSummary =
+        result.revisions
+        |> List.filter (fun r -> result.decision.rejectedBranchIds |> List.contains r.branchId)
+        |> List.map (fun r -> sprintf "- %s (%s): %s" r.branchId (lensName r.lens) r.revisedPlanSummary)
+        |> String.concat "\n"
+    let merge = bullet result.decision.mergeNotes
+    String.concat "\n\n" [
+        "# " + result.finalFileName
+        "## 需求\n\n" + result.request.normalizedRequirement
+        "## 侦察到的不确定性\n\n" + hyps
+        "## 分支总览\n\n" + overview
+        "## 分支候选对比\n\n" + comparison
+        "## Judge 结论\n\n**Winner:** " + result.decision.winnerBranchId
+            + "\n\n" + result.decision.judgeReasoning
+            + "\n\n**合并建议：**\n" + merge
+        "## 最终计划\n\n" + plan
+        "## 实施步骤\n\n" + steps
+        "## 验收标准\n\n" + acceptance
+        "## 风险与回退\n\n" + risks
+        "## 未决问题\n\n" + openIssues
+        "## 附录：被淘汰分支摘要\n\n" + (if rejectedSummary = "" then "无" else rejectedSummary)
+    ] + "\n"
 
 let private emptyCandidate (bid: string) (lens: PlanLens) : PlanBranchCandidate =
     { branchId = bid; lens = lens; title = "Fallback"; candidatePlanMarkdown = ""
