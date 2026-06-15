@@ -19,8 +19,7 @@ type ToolDefinition =
       condition: (obj -> bool) option }
 
 /// A structural view of a host tool, for wrapping without the ai-sdk dependency.
-[<Emit("$0")>]
-let asToolLike (tool: obj) : obj = jsNative
+let asToolLike (tool: obj) : obj = tool
 
 /// Require a workspaceId from the config, returning an error Result when absent.
 let requireWorkspaceId (config: obj) (toolName: string) : Result<string, string> =

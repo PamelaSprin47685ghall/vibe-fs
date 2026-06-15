@@ -8,16 +8,8 @@ open VibeFs.MuxPlugin.MuxWrappers
 open VibeFs.MuxPlugin.MuxEventHook
 open VibeFs.MuxPlugin.MuxSlashCommands
 
-[<Emit("{}")>]
-let private emptyObj () : obj = jsNative
-[<Emit("$0[$1] = $2")>]
-let private setKey (o: obj) (k: string) (v: obj) : unit = jsNative
-
-/// Convert a ToolDefinition array into a plain JS object keyed by tool name.
 let private toolsToObject (tools: VibeFs.Mux.Contract.ToolDefinition array) : obj =
-    let o = emptyObj ()
-    for t in tools do setKey o t.name (box t)
-    o
+    createObj [ for t in tools -> t.name, box t ]
 
 /// The mux PluginRegistration: tools + mcp servers + wrappers + context injector
 /// + event hook + slash commands + policy.

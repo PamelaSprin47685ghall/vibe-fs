@@ -3,8 +3,26 @@ module VibeFs.Kernel.ExecutorKernel
 open Fable.Core
 open VibeFs.Kernel.HeadTail
 
-[<Emit("Buffer.byteLength($0, 'utf8')")>]
-let private byteLength (s: string) : int = jsNative
+let private byteLength (s: string) : int =
+    if System.String.IsNullOrEmpty s then 0
+    else
+        let mutable count = 0
+        let mutable i = 0
+        while i < s.Length do
+            let high = int s.[i]
+            if high >= 0xD800 && high <= 0xDBFF && i + 1 < s.Length then
+                let low = int s.[i + 1]
+                let cp = 0x10000 + ((high - 0xD800) <<< 10) + (low - 0xDC00)
+                if cp < 0x110000 then count <- count + 4
+                i <- i + 2
+            else
+                count <-
+                    count +
+                    if high < 0x80 then 1
+                    elif high < 0x800 then 2
+                    else 3
+                i <- i + 1
+        count
 
 let private truncateToBytes (s: string) (maxBytes: int) : string =
     let mutable result = ""

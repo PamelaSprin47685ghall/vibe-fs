@@ -2,9 +2,15 @@ module VibeFs.Kernel.McpConfig
 
 open Fable.Core
 
+open Fable.Core.JsInterop
+
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
+
 /// Read an environment variable, returning "" when unset.
-[<Emit("process.env[$0] ?? ''")>]
-let private env (_name: string) : string = jsNative
+let private env (name: string) : string =
+    let v = nodeProcess?env?(name)
+    if isNull v then "" else string v
 
 let stealthBrowserMcpRef () : string =
     let value = env "STEALTH_BROWSER_MCP_REF"

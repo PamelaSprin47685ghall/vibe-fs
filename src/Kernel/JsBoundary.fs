@@ -53,8 +53,8 @@ let parseJsBoundary (s: string) : int option =
 let parseJsBoundaryArray (arr: obj array) : int array =
     arr |> Array.choose (fun x -> parseJsBoundary (string x))
 
-[<Emit("Object.keys($0)")>]
-let private objectKeys (_: obj) : string array = jsNative
+let private objectKeys (o: obj) : string array =
+    JS.Constructors.Object.keys(o) |> Seq.toArray
 
 /// Parse a plain JS object into a string->int map, dropping non-numeric values.
 let parseJsBoundaryObj (o: obj) : Map<string, int> =

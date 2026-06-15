@@ -3,14 +3,21 @@ module VibeFs.Shell.ExecutorProcess
 open Fable.Core
 open Fable.Core.JsInterop
 
-[<Emit("process.platform")>]
-let private platform : string = jsNative
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
+
+let private platform : string = nodeProcess?platform
+
+let private processKill (pid: int) (signal: string) : unit =
+    nodeProcess?kill(pid, signal) |> ignore
+
+[<Global("Object.assign")>]
+let private objectAssign : obj -> obj -> obj = jsNative
+
+let private env () : obj = objectAssign (createObj []) nodeProcess?env
+
 [<Import("spawn", "node:child_process")>]
 let private spawn (cmd: string) (args: string array) (opts: obj) : obj = jsNative
-[<Emit("process.kill($0, $1)")>]
-let private processKill (pid: int) (signal: string) : unit = jsNative
-[<Emit("({ ...process.env })")>]
-let private env () : obj = jsNative
 
 /// A minimal view of a spawned child process with stdio streams.
 type SpawnedChild =

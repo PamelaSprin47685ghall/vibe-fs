@@ -13,14 +13,13 @@ open VibeFs.Kernel.Prompts
 
 let private opencodeTodoWriteToolName = "todowrite"
 
-[<Emit("$2[$1]($0)")>]
-let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = jsNative
+let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
+    unbox (target?(method)(arg))
 
-[<Emit("$0.output = $1")>]
-let private setOutput (o: obj) (v: string) : unit = jsNative
+let private setOutput (o: obj) (v: string) : unit =
+    o?("output") <- v
 
-[<Emit("Promise.resolve()")>]
-let private resolvedUnitPromise () : JS.Promise<unit> = jsNative
+let private resolvedUnitPromise () : JS.Promise<unit> = async { return () } |> Async.StartAsPromise
 
 let getSessionID (eventType: string) (props: obj) : string =
     let part = Dyn.get props "part"
@@ -201,10 +200,10 @@ let private collectSnapshot (client: obj) (sessionID: string) : Async<SessionSna
 
 // ── Nudge dispatch ──
 
-let private selectNudgePromptText (action: string) : string option =
-    if action = "nudge-todo" then Some todoNudgePrompt
-    elif action = "nudge-loop" then Some loopNudgePrompt
-    else None
+let private selectNudgePrompt = function
+    | NudgeTodo -> Some todoNudgePrompt
+    | NudgeLoop -> Some loopNudgePrompt
+    | _ -> None
 
 let private sendNudge (client: obj) (sessionID: string) (agentOpt: string option) (promptText: string) : Async<unit> =
     async {
@@ -236,10 +235,11 @@ let private nudgeIfNeeded (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntim
                           lastAssistantMessage = snapshot.lastAssistantMessage
                           hasActiveRunner = false
                           isLoopActive = reviewStore.isReviewActive(sessionID) }
-                    match defaultCoordinator.shouldNudge(sessionID, context) with
-                    | "none" -> return deleteNudgedSession state sessionID
+                    match decide context with
+                    | NudgeNone
+                    | NudgeRunner -> return deleteNudgedSession state sessionID
                     | action ->
-                        match selectNudgePromptText action with
+                        match selectNudgePrompt action with
                         | None -> return deleteNudgedSession state sessionID
                         | Some promptText ->
                             let agentOpt =

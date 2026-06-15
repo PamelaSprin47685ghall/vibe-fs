@@ -3,16 +3,18 @@ module VibeFs.Opencode.Sdk
 open Fable.Core
 open VibeFs.Kernel
 
+open Fable.Core.JsInterop
+
 /// The opencode plugin SDK's `tool` factory + `tool.schema` (Zod-like) builder.
 [<Import("tool", "@opencode-ai/plugin/tool")>]
 let toolFactory : obj = jsNative
 let schema : obj = Dyn.get toolFactory "schema"
 
 /// `o.method()` and `o.method(arg)` — explicit object-first, no pipelines.
-[<Emit("$0[$1]()")>]
-let call0 (o: obj) (method: string) : obj = jsNative
-[<Emit("$0[$1]($2)")>]
-let call1 (o: obj) (method: string) (arg: obj) : obj = jsNative
+let call0 (o: obj) (method: string) : obj = o?(method)()
+let call1 (o: obj) (method: string) (arg: obj) : obj = o?(method)(arg)
+
+let private invokeTool (factory: obj) (config: obj) : obj = factory $ config
 
 let private str () = call0 schema "string"
 let arr (item: obj) : obj = call1 schema "array" item
@@ -46,7 +48,5 @@ let numOpt (desc: string) : obj =
 let enumOpt (values: string array) (desc: string) : obj =
     call1 (call0 (call1 schema "enum" (box values)) "optional") "describe" (box desc)
 
-[<Emit("$0($1)")>]
-let private invokeTool (factory: obj) (config: obj) : obj = jsNative
 let define (description: string) (args: obj) (execute: obj -> obj -> JS.Promise<string>) : obj =
     invokeTool toolFactory (box {| description = description; args = args; execute = execute |})

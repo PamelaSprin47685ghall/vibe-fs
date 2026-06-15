@@ -186,6 +186,105 @@ await resumePlugin.event({
 });
 check('session.next.prompted prompt.text resumes todo nudge flow', resumedPromptCalls.length === 1);
 
+let repeatedAssistantMessages = [
+  {
+    info: {
+      role: 'assistant',
+      agent: 'orchestrator',
+      finish: 'stop',
+      time: { completed: 1 },
+    },
+    parts: [{ type: 'text', text: 'still working' }],
+  },
+];
+const repeatedAssistantPromptCalls = [];
+const repeatedAssistantPlugin = await plugin({
+  directory: '/tmp/vibe',
+  client: {
+    session: {
+      todo: async () => ({
+        data: [
+          { id: 'todo-1', content: 'task', status: 'in_progress' },
+        ],
+      }),
+      messages: async () => ({ data: repeatedAssistantMessages }),
+      prompt: async (arg) => {
+        repeatedAssistantPromptCalls.push(arg);
+      },
+    },
+  },
+});
+await repeatedAssistantPlugin.event({
+  event: { type: 'session.idle', properties: { sessionID: 'same-text-ws' } },
+});
+check('same text first assistant turn nudges', repeatedAssistantPromptCalls.length === 1);
+repeatedAssistantMessages = [
+  ...repeatedAssistantMessages,
+  {
+    info: {
+      role: 'assistant',
+      agent: 'orchestrator',
+      finish: 'stop',
+      time: { completed: 2 },
+    },
+    parts: [{ type: 'text', text: 'still working' }],
+  },
+];
+await repeatedAssistantPlugin.event({
+  event: { type: 'session.idle', properties: { sessionID: 'same-text-ws' } },
+});
+check('same text new assistant turn nudges again', repeatedAssistantPromptCalls.length === 2);
+
+let recycledSessionMessages = [
+  {
+    info: {
+      role: 'assistant',
+      agent: 'orchestrator',
+      finish: 'stop',
+      time: { completed: 1 },
+    },
+    parts: [{ type: 'text', text: 'reopened work' }],
+  },
+];
+const recycledSessionPromptCalls = [];
+const recycledSessionPlugin = await plugin({
+  directory: '/tmp/vibe',
+  client: {
+    session: {
+      todo: async () => ({
+        data: [
+          { id: 'todo-1', content: 'task', status: 'in_progress' },
+        ],
+      }),
+      messages: async () => ({ data: recycledSessionMessages }),
+      prompt: async (arg) => {
+        recycledSessionPromptCalls.push(arg);
+      },
+    },
+  },
+});
+await recycledSessionPlugin.event({
+  event: { type: 'session.idle', properties: { sessionID: 'reused-session' } },
+});
+await recycledSessionPlugin.event({
+  event: { type: 'session.deleted', properties: { info: { id: 'reused-session' } } },
+});
+recycledSessionMessages = [
+  {
+    info: {
+      role: 'assistant',
+      agent: 'orchestrator',
+      finish: 'stop',
+      time: { completed: 1 },
+    },
+    parts: [{ type: 'text', text: 'reopened work' }],
+  },
+];
+await recycledSessionPlugin.event({
+  event: { type: 'session.idle', properties: { sessionID: 'reused-session' } },
+});
+check('reused session id nudges after session.deleted', recycledSessionPromptCalls.length === 2);
+
 // ── Fix #4: webfetch schema and execute handle all declared params ──
 const webfetchDef = reg.tools.find(t => t.name === 'webfetch');
 const wfParams = webfetchDef.parameters.properties;

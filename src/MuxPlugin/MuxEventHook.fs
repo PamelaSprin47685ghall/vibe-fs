@@ -93,7 +93,7 @@ let private handleEvent (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
 /// instead of a curried `(event) => (helpers) => ...`.
 let createEventHook (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
     let state = createStreamEndState ()
-    let coordinator = defaultCoordinator
+    let coordinator = NudgeCoordinator()
     let fn = System.Func<obj, obj, JS.Promise<unit>>(fun event helpers ->
         handleEvent reviewStore state coordinator event helpers)
     box fn

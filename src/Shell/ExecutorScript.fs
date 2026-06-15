@@ -8,8 +8,10 @@ open VibeFs.Shell.ExecutorPaths
 let private writeFileSync (path: string) (content: string) (encoding: string) : unit = jsNative
 [<Import("chmodSync", "node:fs")>]
 let private chmodSync (path: string) (mode: int) : unit = jsNative
-[<Emit("process.platform")>]
-let private platform : string = jsNative
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
+
+let private platform : string = nodeProcess?platform
 
 /// Write a program to a temp script path, making it executable on Unix.
 let createTempScript (scriptPath: string) (program: string) : string =

@@ -2,6 +2,7 @@ module VibeFs.Kernel.FuzzyQuery
 
 open System.Text.RegularExpressions
 open Fable.Core
+open Fable.Core.JsInterop
 
 [<Import("resolve", "node:path")>]
 let private resolve (p: string) : string = jsNative
@@ -15,8 +16,10 @@ let private isAbsolute (p: string) : bool = jsNative
 let private dirname (p: string) : string = jsNative
 [<Import("sep", "node:path")>]
 let private sep : string = jsNative
-[<Emit("process.cwd()")>]
-let private processCwd () : string = jsNative
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
+
+let private processCwd () : string = nodeProcess?cwd()
 
 let private toForwardSlashes (p: string) = p.Replace(sep, "/")
 let private cwd () = resolve (processCwd ())

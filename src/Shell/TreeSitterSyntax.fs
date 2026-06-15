@@ -3,6 +3,7 @@ module VibeFs.Shell.TreeSitterSyntax
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.SyntaxTypes
+open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 
 type private Position = { row: int; column: int }
@@ -10,23 +11,25 @@ type private Position = { row: int; column: int }
 [<Import("createRequire", "node:module")>]
 let private createRequire (url: string) : (string -> obj) = jsNative
 
-[<Emit("import.meta.url")>]
-let private importMetaUrl : string = jsNative
+[<Global("import.meta")>]
+let private importMeta : obj = jsNative
+
+let private importMetaUrl : string = string importMeta?url
 
 [<Import("default", "highlight.js")>]
 let private hljs : {| highlightAuto: string -> {| language: string; relevance: float |} |} = jsNative
 
-[<Emit("typeof $0[$1] === 'function' ? $0[$1]() : $0[$1]")>]
-let private getOrCall0 (o: obj) (key: string) : obj = jsNative
+let private getOrCall0 (o: obj) (key: string) : obj =
+    if Dyn.typeIs (Dyn.get o key) "function" then o?(key)() else Dyn.get o key
 
-[<Emit("typeof $0[$1] === 'function' ? $0[$1]($2) : $0[$1]")>]
-let private getOrCall1 (o: obj) (key: string) (arg: obj) : obj = jsNative
+let private getOrCall1 (o: obj) (key: string) (arg: obj) : obj =
+    if Dyn.typeIs (Dyn.get o key) "function" then o?(key)(arg) else Dyn.get o key
 
-[<Emit("process.platform")>]
-let private processPlatform () : string = jsNative
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
 
-[<Emit("process.arch")>]
-let private processArch () : string = jsNative
+let private processPlatform () : string = nodeProcess?platform
+let private processArch () : string = nodeProcess?arch
 
 let private platformSuffix (platform: string) (arch: string) : string option =
     match platform, arch with

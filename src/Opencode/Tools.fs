@@ -13,12 +13,15 @@ open VibeFs.Opencode.ToolCopy
 open VibeFs.Opencode.Session
 open VibeFs.Kernel.Prompts
 
-[<Emit("({ [$0]: $1 })")>]
-let private entry (key: string) (value: obj) : obj = jsNative
-[<Emit("Object.assign({}, ...$0)")>]
-let private mergeObjects (objs: obj array) : obj = jsNative
-[<Emit("Promise.resolve($0)")>]
-let private resolveStr (s: string) : JS.Promise<string> = jsNative
+[<Global("Object.assign")>]
+let private objectAssign : obj -> obj -> obj = jsNative
+
+let private entry (key: string) (value: obj) : obj = createObj [ key, value ]
+
+let private mergeObjects (objs: obj array) : obj =
+    objs |> Array.fold (fun acc o -> objectAssign acc o) (createObj [])
+
+let private resolveStr (s: string) : JS.Promise<string> = async { return s } |> Async.StartAsPromise
 
 let private optStr (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(string v)
 let private optInt (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<int> v)

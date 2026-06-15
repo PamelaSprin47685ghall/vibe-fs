@@ -1,6 +1,7 @@
 module VibeFs.MuxPlugin.ResolveAiSettings
 
 open Fable.Core
+open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 
@@ -12,14 +13,13 @@ let emptySettings : DelegatedAiSettings =
     { modelString = None
       thinkingLevel = None }
 
-[<Emit("$0.loadConfigOrDefault()")>]
-let private loadConfigOrDefault (deps: obj) : obj = jsNative
+let private loadConfigOrDefault (deps: obj) : obj = deps?loadConfigOrDefault()
 
-[<Emit("$0.findWorkspaceEntry($1, $2)")>]
-let private findWorkspaceEntry (deps: obj) (configFile: obj) (workspaceId: string) : obj = jsNative
+let private findWorkspaceEntry (deps: obj) (configFile: obj) (workspaceId: string) : obj =
+    deps?findWorkspaceEntry(configFile, workspaceId)
 
-[<Emit("$0.resolveAgentFrontmatter($1, $2, $3)")>]
-let private resolveAgentFrontmatter (deps: obj) (runtime: obj) (cwd: string) (agentId: string) : JS.Promise<obj> = jsNative
+let private resolveAgentFrontmatter (deps: obj) (runtime: obj) (cwd: string) (agentId: string) : JS.Promise<obj> =
+    unbox (deps?resolveAgentFrontmatter(runtime, cwd, agentId))
 
 let private normalizeStr (v: obj) : string option =
     if Dyn.isNullish v then None
