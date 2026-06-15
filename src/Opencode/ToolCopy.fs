@@ -7,7 +7,7 @@ let editor =
 
 let greper =
     "Search the codebase from natural-language intents. Each intent in the array spawns its own search subagent session and runs independently in parallel — pass as many intents as you can at once so they execute concurrently. "
-    + "IMPORTANT: Subagents do not receive role instructions in their system prompt; each subagent gets its task as a user message from your intent string. You (the parent) must put full context into every intent. Do NOT assume the search agent knows the project background. Reports must include concrete file paths (for example via agent_report structuredOutput relatedFiles)."
+    + "IMPORTANT: Subagents do not receive role instructions in their system prompt; each subagent gets its task as a user message from your intent string. You (the parent) must put full context into every intent. Do NOT assume the search agent knows the project background. Reports must include concrete file paths."
 
 let reverie =
     "Receive a natural-language intent or question for deep reasoning and delegate to the reverie agent. "

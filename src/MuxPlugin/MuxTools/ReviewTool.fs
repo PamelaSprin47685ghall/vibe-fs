@@ -6,9 +6,10 @@ open VibeFs.Kernel
 open VibeFs.Kernel.AgentRole
 open VibeFs.Kernel.AgentPolicy
 open VibeFs.Kernel.HostKernel
-open VibeFs.Kernel.Prompts
 open VibeFs.Mux.Contract
 open VibeFs.MuxPlugin.Delegate
+open VibeFs.MuxPlugin.PlanTools
+open VibeFs.MuxPlugin.MuxPrompts
 open VibeFs.MuxPlugin.MuxTools.Shared
 
 let submitReviewTool (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : ToolDefinition =
@@ -29,8 +30,9 @@ let submitReviewTool (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.Revie
                       try
                           let originalTask = defaultArg (reviewStore.getReviewTask workspaceId) ""
                           let taskSection = if originalTask = "" then "" else "\n=== Original Task ===\n\n" + originalTask
-                          let reviewPrompt = Prompts.agentReportReviewInstructions + "\n\n=== Change Report ===\n\n" + report + "\n\n=== Affected Files ===\n\n" + String.concat "\n" affectedFiles + "\n" + taskSection
-                          let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box ((subagentToolPolicy Reviewer).disabledTools |> Array.ofList) ]) ]
+                          let reviewPrompt = agentReportReviewInstructions + "\n\n=== Change Report ===\n\n" + report + "\n\n=== Affected Files ===\n\n" + String.concat "\n" affectedFiles + "\n" + taskSection
+                          let disabledTools = (subagentToolPolicy Reviewer).disabledTools @ planToolNames
+                          let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box (disabledTools |> Array.ofList) ]) ]
                           let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
                           let! reviewReport = delegateToSubAgent deps config "explore" reviewPrompt "Review" (Some opts) |> Async.AwaitPromise
                           let trimmed = reviewReport.Trim()

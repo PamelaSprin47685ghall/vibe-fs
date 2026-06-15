@@ -1,5 +1,6 @@
 module VibeFs.Tests.PlanTests
 
+open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.PlanTypes
 open VibeFs.Kernel.PlanEngine
@@ -24,27 +25,91 @@ let hypotheses () =
           branchModelName = ""; judgeModelName = ""; outputFileName = "PLAN-x.md"; workspaceRoot = "/"
           existingContext = None }
     let lenses = buildPlanLenses req
-    check "buildPlanHypotheses returns 3" (List.length (buildPlanHypotheses req lenses) = 3)
+    check "buildPlanLenses returns 5" (List.length lenses = 5)
+    check "static hypotheses fallback length is 3" (List.length (staticHypothesesForTest req) = 3)
 
-let branchParse () =
-    let raw =
-        "{\"branchId\":\"b1\",\"lens\":\"ArchitectureFirst\",\"title\":\"T\","
-        + "\"candidatePlanMarkdown\":\"# P\",\"candidatePlanSummary\":\"S\","
-        + "\"keyAssumptions\":[\"a\"],\"keyRisks\":[\"r\"],\"validationChecks\":[\"v\"],"
-        + "\"selfCritique\":\"c\",\"confidence\":0.75}"
-    match parsePlanBranchResponse raw with
-    | Ok c ->
-        equal "branchId" "b1" c.branchId
-        equal "lens" ArchitectureFirst c.lens
-        equal "confidence" 0.75 c.confidence
-    | Error e -> failwith e
+let hypothesesToolCall () =
+    let raw = createObj
+                  [ "hypotheses",
+                    box [| createObj [ "text", box "Ambiguous scope"; "targetBranchIds", box [| "b1"; "b2" |] ] |] ]
+    let parsed = parsePlanHypothesesToolCall raw
+    check "parsePlanHypothesesToolCall returns 1" (List.length parsed = 1)
+    match parsed with
+    | h :: _ ->
+        equal "hypothesis text" "Ambiguous scope" h.text
+        check "targetBranchIds" (h.targetBranchIds = ["b1"; "b2"])
+    | [] -> failwith "unexpected empty"
 
-let judgeParse () =
+let lensSelection () =
+    let req (text: string) =
+        { requestId = "r"; rawRequirement = text; normalizedRequirement = text; branchCount = 5
+          branchModelName = ""; judgeModelName = ""; outputFileName = "PLAN-x.md"; workspaceRoot = "/"
+          existingContext = None }
+    let has lens text = buildPlanLenses (req text) |> List.contains lens
+    check "constraint heavy picks ConstraintFirst" (has ConstraintFirst "must comply with GDPR")
+    check "easy to drift picks CounterexampleFirst" (has CounterexampleFirst "just a quick prototype")
+    check "default picks CrossDomainFirst" (has CrossDomainFirst "design a login flow")
+
+let branchToolCall () =
     let raw =
-        "{\"winnerBranchId\":\"b2\",\"keptBranchIds\":[\"b2\"],\"rejectedBranchIds\":[\"b1\"],"
-        + "\"judgeReasoning\":\"r\",\"mergeNotes\":[\"m\"]}"
-    match parsePlanJudgeResponse raw with
-    | Ok d ->
-        equal "winner" "b2" d.winnerBranchId
-        check "rejected non-empty" (d.rejectedBranchIds <> [])
-    | Error e -> failwith e
+        createObj
+            [ "branchId", box "b1"
+              "lens", box "ArchitectureFirst"
+              "title", box "T"
+              "candidatePlanMarkdown", box "# P"
+              "candidatePlanSummary", box "S"
+              "keyAssumptions", box [| "a" |]
+              "keyRisks", box [| "r" |]
+              "validationChecks", box [| "v" |]
+              "selfCritique", box "c"
+              "confidence", box 0.75 ]
+    let c = parsePlanBranchToolCall raw
+    equal "branchId" "b1" c.branchId
+    equal "lens" ArchitectureFirst c.lens
+    equal "confidence" 0.75 c.confidence
+
+let judgeToolCall () =
+    let raw =
+        createObj
+            [ "winnerBranchId", box "b2"
+              "keptBranchIds", box [| "b2" |]
+              "rejectedBranchIds", box [| "b1" |]
+              "judgeReasoning", box "r"
+              "mergeNotes", box [| "m" |] ]
+    let d = parsePlanJudgeToolCall raw
+    equal "winner" "b2" d.winnerBranchId
+    check "rejected non-empty" (d.rejectedBranchIds <> [])
+
+let revisionToolCall () =
+    let raw =
+        createObj
+            [ "branchId", box "b1"
+              "lens", box "ArchitectureFirst"
+              "title", box "T"
+              "revisedPlanMarkdown", box "# P"
+              "revisedPlanSummary", box "S"
+              "keyAssumptions", box [| "a" |]
+              "keyRisks", box [| "r" |]
+              "validationChecks", box [| "v" |]
+              "selfCritique", box "c"
+              "confidence", box 0.8 ]
+    let r = parsePlanRevisionToolCall raw
+    equal "revisedPlanSummary parsed" "S" r.revisedPlanSummary
+
+let poolToolCall () =
+    let raw =
+        createObj
+            [ "branchId", box "b1"
+              "entries",
+              box [| createObj
+                         [ "title", box "Alt"
+                           "contentMarkdown", box "Body"
+                           "approachSummary", box "Approach"
+                           "confidence", box 0.6 ] |] ]
+    let entries = parsePlanPoolToolCall raw
+    check "pool entries length" (List.length entries = 1)
+    match entries with
+    | e :: _ ->
+        equal "entry title" "Alt" e.title
+        equal "entry branchId" "b1" e.branchId
+    | [] -> failwith "unexpected empty"

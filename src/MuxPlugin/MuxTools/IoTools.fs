@@ -4,9 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.ExecutorKernel
-open VibeFs.Kernel.Prompts
 open VibeFs.Mux.Contract
 open VibeFs.MuxPlugin.Delegate
+open VibeFs.MuxPlugin.MuxPrompts
 open VibeFs.MuxPlugin.MuxTools.Shared
 open VibeFs.Opencode.ToolCopy
 open VibeFs.Shell.Read
@@ -42,7 +42,7 @@ let private summarizeWhenNeeded (deps: obj) (config: obj) (output: string) : Asy
         if not (shouldSummarize output) then
             return output
         else
-            let prompt = formatExecutorSummarizerUserPrompt output
+            let prompt = formatMuxExecutorSummarizerUserPrompt output
             let! report = runMuxSubagent deps config "summarizer" prompt "Executor summary" None |> Async.AwaitPromise
             return report
     }

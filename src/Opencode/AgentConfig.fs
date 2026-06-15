@@ -17,11 +17,28 @@ let private mergeObj (a: obj) (b: obj) : obj =
 
 let private emptyMcps : obj = [||] :> obj
 
+let private restrictedPlanToolNames =
+    [ "submit_plan_hypotheses"
+      "submit_plan_branch"
+      "submit_plan_critique"
+      "submit_plan_pool"
+      "submit_plan_revision"
+      "submit_plan_judge" ]
+
+let private applyRestrictedPlanPermissions (o: obj) : unit =
+    for name in restrictedPlanToolNames do
+        setKey o name (box "deny")
+
+let private applyRestrictedPlanTools (o: obj) : unit =
+    for name in restrictedPlanToolNames do
+        setKey o name (box false)
+
 /// Build a plain-JS permission map {name: "allow"|"deny"} from a role's defaults.
 let private permissionDefaults (role: AgentRole) : obj =
     let o = emptyObj ()
     for KeyValue(name, p) in defaultPermissions role do
         setKey o name (box (match p with Allow -> "allow" | Deny -> "deny"))
+    applyRestrictedPlanPermissions o
     o
 
 /// Build a plain-JS tool map {name: bool} from a role's tool policy.
@@ -29,6 +46,7 @@ let toolDefaults (role: AgentRole) : obj =
     let o = emptyObj ()
     for KeyValue(name, p) in toolMapFor role do
         setKey o name (box (p = Allow))
+    applyRestrictedPlanTools o
     o
 
 /// Built-in subagent system prompts are intentionally empty; role instructions live in user/tool prompts.
@@ -70,7 +88,6 @@ let private summarizerPermissionBase (o: obj) : unit =
     setKey o "bash" (box "deny")
 
 let private summarizerToolsBase (o: obj) : unit =
-    setKey o "agent_report" (box true)
     setKey o "read" (box false)
     setKey o "write" (box false)
     setKey o "edit" (box false)
@@ -125,6 +142,8 @@ let private withRoleDefaults (name: string) (userAgent: obj) : obj =
             if Dyn.isNullish userMcps then emptyMcps else userMcps
 
     let result = mergeObj (emptyObj ()) userAgent
+    applyRestrictedPlanPermissions perm
+    applyRestrictedPlanTools tools
     setKey result "prompt" (box prompt)
     setKey result "mode" (box mode)
     setKey result "permission" perm

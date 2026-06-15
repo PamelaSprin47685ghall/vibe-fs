@@ -1,5 +1,5 @@
 import plugin from '../build/src/Opencode/Plugin.js';
-import { createRegistration, getPluginToolPolicy, buildCapsFileReadData, deduplicateReadOutputs, deduplicateReadOutputsAgainstHistory, deduplicateModelReadOutputsWithSeen, collectReadOutputs } from '../build/src/Index.js';
+import { createRegistration, getPluginToolPolicy, setCapsFileReadTimestampSource, buildCapsFileReadData, deduplicateReadOutputs, deduplicateReadOutputsAgainstHistory, deduplicateModelReadOutputsWithSeen, collectReadOutputs } from '../build/src/Index.js';
 import { runSubagent } from '../build/src/Opencode/Session.js';
 import { registerChildAgent, unregisterChildAgent } from '../build/src/Opencode/ChildAgent.js';
 import { checkSyntax } from '../build/src/Shell/TreeSitterSyntax.js';
@@ -311,18 +311,19 @@ check('plan command has execute', typeof planCmd.execute === 'function');
 check('plan execute.length === 2', planCmd.execute.length === 2);
 
 // ── Wrapper completeness ──
-check('wrapper count === 6', reg.wrappers.length === 6);
+check('wrapper count === 7', reg.wrappers.length === 7);
 const wrapperTargets = reg.wrappers.map(w => w.targetTool).sort();
-check('wrapper targets correct', JSON.stringify(wrapperTargets) === JSON.stringify(['file_edit_insert', 'file_edit_replace_string', 'file_read', 'todo_write', 'web_fetch', 'web_search']));
+check('wrapper targets correct', JSON.stringify(wrapperTargets) === JSON.stringify(['agent_report', 'file_edit_insert', 'file_edit_replace_string', 'file_read', 'todo_write', 'web_fetch', 'web_search']));
 
 // ── Tool completeness ──
-check('tool count === 12', reg.tools.length === 12);
+check('tool count === 18', reg.tools.length === 18);
 const toolNames = reg.tools.map(t => t.name).sort();
 check('has editor tool', toolNames.includes('editor'));
 check('has webfetch tool', toolNames.includes('webfetch'));
 check('has write tool', toolNames.includes('write'));
 check('has read tool', toolNames.includes('read'));
 check('has submit_review tool', toolNames.includes('submit_review'));
+check('has submit_plan_branch tool', toolNames.includes('submit_plan_branch'));
 
 // ── web_search override wrapper forwards config ──
 const wsOverride = reg.wrappers.find(w => w.targetTool === 'web_search');
@@ -334,12 +335,13 @@ check('web_search override has execute', typeof wsWrapped.execute === 'function'
 
 // ── buildCapsFileReadData returns real array ──
 const tmpDir = await fs.mkdtemp(path.join('/tmp', 'caps-test-'));
+setCapsFileReadTimestampSource(() => 1704067200000);
 await fs.writeFile(path.join(tmpDir, 'CAPS.md'), '# Capabilities\nTest content');
 const capsEntries = await buildCapsFileReadData(tmpDir);
 check('buildCapsFileReadData returns array', Array.isArray(capsEntries));
 check('buildCapsFileReadData finds caps file', capsEntries.length === 1);
 check('caps entry has path', capsEntries[0]?.path === 'CAPS.md');
-check('caps entry has callId', typeof capsEntries[0]?.callId === 'string');
+check('caps entry has deterministic callId', capsEntries[0]?.callId === 'caps-fr-1704067200000-0');
 check('caps entry output has content', typeof capsEntries[0]?.output?.content === 'string');
 await fs.rm(tmpDir, { recursive: true });
 
@@ -682,7 +684,7 @@ check('browser tools enables stealth-browser-mcp_*', browserAgent?.tools?.['stea
 const summarizerAgent = agentCfgResult?.agent?.summarizer;
 check('summarizer builtin system prompt empty', summarizerAgent?.prompt === '');
 check('summarizer mode is subagent', summarizerAgent?.mode === 'subagent');
-check('summarizer tools only agent_report', summarizerAgent?.tools?.agent_report === true && summarizerAgent?.tools?.read === false);
+check('summarizer tools disabled', summarizerAgent?.tools?.agent_report !== true && summarizerAgent?.tools?.read === false);
 check('user plan disable preserved', agentCfgResult?.agent?.plan?.disable === true);
 
 // ── Role defaults applied to all agents, preserving user fields ──
@@ -697,6 +699,8 @@ const planAgent = agentCfgResult?.agent?.plan;
 check('plan disable preserved', planAgent?.disable === true);
 check('plan gets reverie bash deny', planAgent?.permission?.bash === 'deny');
 check('plan gets reverie stealth-browser deny', planAgent?.permission?.['stealth-browser-mcp_*'] === 'deny');
+check('plan submit_plan_branch permission denied', planAgent?.permission?.submit_plan_branch === 'deny');
+check('plan submit_plan_branch tool disabled', planAgent?.tools?.submit_plan_branch === false);
 check('plan mode subagent', planAgent?.mode === 'subagent');
 
 const orchestratorAgent = agentCfgResult?.agent?.orchestrator;
@@ -712,10 +716,11 @@ check('runner dropped', legacyResult?.agent?.runner === undefined);
 // ── chat.message enforces tool boundaries ──
 check('plugin.chat.message', typeof p['chat.message'] === 'function');
 
-const orchChat = { message: { tools: { 'stealth-browser-mcp_*': true, 'stealth-browser-mcp_foo': true, 'read': true } } };
+const orchChat = { message: { tools: { 'stealth-browser-mcp_*': true, 'stealth-browser-mcp_foo': true, 'submit_plan_branch': true, 'read': true } } };
 await p['chat.message']({ sessionID: 'root', agent: 'orchestrator' }, orchChat);
 check('orch stealth-browser-mcp_* disabled', orchChat.message.tools['stealth-browser-mcp_*'] === false);
 check('orch stealth-browser-mcp_foo disabled', orchChat.message.tools['stealth-browser-mcp_foo'] === false);
+check('orch submit_plan_branch disabled', orchChat.message.tools['submit_plan_branch'] === false);
 check('orch read preserved', orchChat.message.tools['read'] === true);
 
 const editorChat = { message: { tools: { 'stealth-browser-mcp_bar': true, 'patch': true } } };

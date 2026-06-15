@@ -93,7 +93,10 @@
     <!-- Mux plugin adapter (F# → JS, createRegistration export) -->
     <Compile Include="src/MuxPlugin/ResolveAiSettings.fs" />
     <Compile Include="src/MuxPlugin/Delegate.fs" />
+    <Compile Include="src/MuxPlugin/MuxPrompts.fs" />
+    <Compile Include="src/MuxPlugin/PlanToolStore.fs" />
     <Compile Include="src/MuxPlugin/MuxTools/Shared.fs" />
+    <Compile Include="src/MuxPlugin/PlanTools.fs" />
     <Compile Include="src/MuxPlugin/MuxTools/AgentTools.fs" />
     <Compile Include="src/MuxPlugin/MuxTools/IoTools.fs" />
     <Compile Include="src/MuxPlugin/MuxTools/SearchTools.fs" />

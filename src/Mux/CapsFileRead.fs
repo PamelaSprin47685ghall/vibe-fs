@@ -4,8 +4,16 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Shell.CapsShell
 
-let private now () : int = int (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+/// The current timestamp as milliseconds since the Unix epoch.
+/// Keep it as a string so JS callers can inject large millisecond values
+/// without losing precision to F#'s 32-bit `int`.
+let mutable private timestampSource = fun () -> box (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+
+let private nowToken () : string = string (timestampSource ())
 let private isoNow () : string = System.DateTime.UtcNow.ToString("O")
+
+/// Replace the timestamp source for deterministic tests.
+let setTimestampSource (source: unit -> obj) : unit = timestampSource <- source
 
 /// One synthesised `read` tool-result entry, so the host sees caps files as if
 /// the agent had already opened them.
@@ -24,7 +32,7 @@ let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]
         let! files = findCapsFiles projectRoot |> Async.AwaitPromise
         if List.isEmpty files then return [||]
         else
-            let timestamp = now ()
+            let timestamp = nowToken ()
             let modified = isoNow ()
             return
                 files

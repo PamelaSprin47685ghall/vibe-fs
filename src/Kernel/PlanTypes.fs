@@ -82,3 +82,12 @@ type PlanRunResult =
       decision: PlanJudgeDecision
       finalMarkdown: string
       finalFileName: string }
+
+type PlanToolSchema =
+    { name: string
+      description: string
+      parameters: obj }
+
+type PlanToolCall = { toolName: string; arguments: obj }
+
+type PlanModelCaller = string -> PlanToolSchema list -> Async<PlanToolCall list>

@@ -9,6 +9,14 @@ open VibeFs.Shell.TreeSitterShell
 
 let private defaultExcludedAgents = [ "browser"; "greper"; "summarizer"; "title" ]
 
+let private restrictedPlanToolNames =
+    [ "submit_plan_hypotheses"
+      "submit_plan_branch"
+      "submit_plan_critique"
+      "submit_plan_pool"
+      "submit_plan_revision"
+      "submit_plan_judge" ]
+
 let private emptyObj () : obj = createObj []
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
@@ -134,6 +142,14 @@ let private applyStealthBrowserRestrictions (tools: obj) (agent: string) : obj =
         setKey next "stealth-browser-mcp_*" (box false)
         next
 
+let private applyPlanToolRestrictions (tools: obj) : obj =
+    let next = emptyObj ()
+    for key in objectKeys tools do
+        setKey next key (Dyn.get tools key)
+    for name in restrictedPlanToolNames do
+        setKey next name (box false)
+    next
+
 /// Re-apply an agent's tool defaults and enforce browser-MCP boundaries.
 let private resolveChatTools (agent: string) (existingTools: obj) : obj option =
     match AgentRole.ofString agent with
@@ -141,7 +157,7 @@ let private resolveChatTools (agent: string) (existingTools: obj) : obj option =
     | Ok role ->
         let defaults = AgentConfig.toolDefaults role
         let merged = mergeTools existingTools defaults
-        Some (applyStealthBrowserRestrictions merged agent)
+        Some (applyPlanToolRestrictions (applyStealthBrowserRestrictions merged agent))
 
 /// chat.message: enforce per-agent tool boundaries at runtime.
 let chatMessage (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =

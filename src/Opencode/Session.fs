@@ -6,7 +6,9 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.DomainError
 open VibeFs.Kernel.JsBoundary
+open VibeFs.Kernel.PlanEngine
 open VibeFs.Kernel.SessionText
+open VibeFs.Kernel.PlanTypes
 
 let private firstString (ctx: obj) (keys: string list) : string option =
     keys
@@ -136,7 +138,7 @@ let private promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise
 /// unregistered after the prompt finishes so temporary subagents do not linger.
 let private runSubagentCore (client: obj) (agent: string) (title: string) (prompt: string)
                             (directory: string) (sessionID: string) (context: obj)
-                            (cleanup: bool) : JS.Promise<string> =
+                            (tools: obj) : JS.Promise<string * obj list> =
     async {
         let parentID = ChildAgent.resolveSubsessionParentID (if sessionID = "" then None else Some sessionID)
         let session = Dyn.get client "session"
@@ -153,15 +155,15 @@ let private runSubagentCore (client: obj) (agent: string) (title: string) (promp
             |}
         let! createResult = invoke1 createBody "create" session |> Async.AwaitPromise
         let childID = Dyn.str (Dyn.get createResult "data") "id"
-        if childID = "" then return "Failed to create child session"
+        if childID = "" then return ("Failed to create child session", [])
         else
             let mutable cleanedUp = false
+            let calls = ref []
             let abortAndUnregister () =
                 if not cleanedUp then
                     cleanedUp <- true
                     let abortPromise : JS.Promise<obj> = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
                     abortPromise |> ignore
-                    ChildAgent.unregisterChildAgent childID
             ChildAgent.registerChildAgent childID agent parentID
             try
                 try
@@ -171,19 +173,20 @@ let private runSubagentCore (client: obj) (agent: string) (title: string) (promp
                             body = box {|
                                 agent = agent
                                 parts = [| box {| ``type`` = "text"; text = prompt |} |]
+                                tools = tools
                             |}
                         |}
                     do! promptWithAbort client promptBody (getAbortSignal context) |> Async.AwaitPromise
                     let! text = extractSessionText client childID directory |> Async.AwaitPromise
-                    return if text = "" then "(no output)" else text
+                    return (if text = "" then "(no output)" else text), calls.Value
                 finally
-                    if cleanup then abortAndUnregister ()
+                    abortAndUnregister ()
             with err ->
                 match translateJsError err with
                 | MessageAborted ->
                     abortAndUnregister ()
                     let! text = extractSessionText client childID directory |> Async.AwaitPromise
-                    return if text = "" then "(aborted)" else $"(aborted) {text}"
+                    return (if text = "" then "(aborted)" else $"(aborted) {text}"), []
                 | _ -> return raise err
     }
     |> Async.StartAsPromise
@@ -192,13 +195,37 @@ let private runSubagentCore (client: obj) (agent: string) (title: string) (promp
 /// that parent, register the child, prompt it, and extract the text response.
 let runSubagent (client: obj) (agent: string) (title: string) (prompt: string)
                 (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
-    runSubagentCore client agent title prompt directory sessionID context false
+    async {
+        let! result = runSubagentCore client agent title prompt directory sessionID context (box null) |> Async.AwaitPromise
+        let text, _ = result
+        return text
+    }
+    |> Async.StartAsPromise
 
 /// Run a subagent and clean up the child session afterwards. Used for
 /// short-lived analysis subagents such as the executor summarizer.
 let runSubagentWithCleanup (client: obj) (agent: string) (title: string) (prompt: string)
                            (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
-    runSubagentCore client agent title prompt directory sessionID context true
+    runSubagent client agent title prompt directory sessionID context
+
+/// Run a subagent with an explicit tool set. Returns the final assistant text
+/// together with every captured tool call.
+let runSubagentWithTools
+    (client: obj) (agent: string) (title: string) (prompt: string)
+    (directory: string) (sessionID: string) (context: obj)
+    (tools: obj) : JS.Promise<string * PlanToolCall list> =
+    async {
+        let! text, captured = runSubagentCore client agent title prompt directory sessionID context tools |> Async.AwaitPromise
+        let toolCalls =
+            captured
+            |> List.choose (fun c ->
+                let toolName = Dyn.str c "toolName"
+                let arguments = Dyn.get c "arguments"
+                if toolName = "" || Dyn.isNullish arguments then None
+                else Some { toolName = toolName; arguments = arguments })
+        return text, toolCalls
+    }
+    |> Async.StartAsPromise
 
 /// Create a reviewer child session under the given parent, register it, and
 /// return the child id (empty string on failure).
@@ -304,4 +331,3 @@ let runSubmitReview (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.Revi
             return! runReviewerLoop client reviewStore childID parts abortSignal |> Async.AwaitPromise
     }
     |> Async.StartAsPromise
-

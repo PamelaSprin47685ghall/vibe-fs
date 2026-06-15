@@ -9,11 +9,18 @@ open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.PlanTypes
 open VibeFs.Kernel.PlanEngine
 open VibeFs.MuxPlugin.Delegate
+open VibeFs.MuxPlugin.PlanTools
+open VibeFs.MuxPlugin.PlanToolStore
 open VibeFs.Shell.Write
 
 let private rng = System.Random()
 
-let private dateNow () : int = int (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+let mutable private dateNowSource = fun () -> int (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+let private dateNow () : int = dateNowSource ()
+
+/// Replace the clock used by /loop and /loop-review for deterministic tests.
+let setDateNowSource (source: unit -> int) : unit = dateNowSource <- source
+
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
 
@@ -94,7 +101,8 @@ let createLoopReviewCommand (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntim
                 else
                     async {
                         let! config = pluginConfigForSlash deps workspaceId |> Async.AwaitPromise
-                        let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box ((subagentToolPolicy Reviewer).disabledTools |> Array.ofList) ]) ]
+                        let disabledTools = (subagentToolPolicy Reviewer).disabledTools @ planToolNames
+                        let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box (disabledTools |> Array.ofList) ]) ]
                         let reviewPrompt = reviewPromptFor task
                         let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
                         let! outcome = delegateWithTimeout deps config "explore" reviewPrompt "Pre-review" (Some opts) 300000
@@ -119,8 +127,39 @@ let createLoopReviewCommand (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntim
                                     buildLoopMessage task [ "Pre-review feedback:"; ""; trimmed; ""; "Loop mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
                     } |> Async.StartAsPromise) |}
 
-let private planFooter =
-    "\n\nYou must output ONLY the JSON requested. Do not write files, run commands, or modify the workspace."
+let private planInstructionFooter (toolName: string) (callId: string) =
+    "\n\nYou must call the `" + toolName + "` tool to submit your answer. "
+    + "Use callId `" + callId + "`. Do not write files, run commands, or modify the workspace."
+
+let private toolPolicyForPlan (toolName: string) : obj =
+    let disabled =
+        [ "editor"; "greper"; "reverie"; "browser"; "executor"; "fuzzy_find"; "fuzzy_grep"
+          "websearch"; "webfetch"; "submit_review"; "read"; "write"; "edit"; "bash"; "task" ] @ planToolNames
+    createObj
+        [ "disabledTools", box (disabled |> Array.ofList)
+          "allowedTools", box [| "agent_report" |] ]
+
+let private callPlanModel
+    (deps: obj) (config: obj) (agentId: string) (title: string) (prompt: string)
+    (aiSettingsAgentId: string) (toolSchemas: PlanToolSchema list) (callId: string)
+    : Async<PlanToolCall list> =
+    async {
+        let primarySchema = List.head toolSchemas
+        let registerPromise = registerCall callId
+        let upstreamPrompt = prompt.Replace(primarySchema.name, "agent_report")
+        let experiments =
+            createObj
+                [ "aiSettingsAgentId", box aiSettingsAgentId
+                  "subagentRole", box "reverie"
+                  "toolPolicy", toolPolicyForPlan primarySchema.name ]
+        let opts = createObj [ "aiSettingsAgentId", box aiSettingsAgentId; "experiments", box experiments ]
+        let! outcome = delegateWithTimeout deps config agentId (upstreamPrompt + planInstructionFooter "agent_report" callId) title (Some opts) 300000
+        match outcome with
+        | TimedOut -> return []
+        | Report _ ->
+            let! args = registerPromise |> Async.AwaitPromise
+            return [ { toolName = primarySchema.name; arguments = args } ]
+    }
 
 /// /plan: generate a structured plan file via multi-branch reasoning.
 let createPlanCommand (deps: obj) : obj =
@@ -128,40 +167,43 @@ let createPlanCommand (deps: obj) : obj =
            description = "Generate a structured plan file via multi-branch reasoning."
            inputHint = "<requirement>"
            execute = System.Func<string, string, JS.Promise<string>>(fun workspaceId args ->
-                async {
-                    let! config = pluginConfigForSlash deps workspaceId |> Async.AwaitPromise
-                    let rawRequirement = args.Trim()
-                    if rawRequirement = "" then
-                        return "Please provide a requirement, e.g. /plan design a login flow."
-                    else
-                        let hex4 = randomHex4 ()
-                        let directory = Dyn.str config "cwd"
-                        let request =
-                            { requestId = workspaceId + "-" + hex4
-                              rawRequirement = rawRequirement
-                              normalizedRequirement = normalizeRequirement rawRequirement
-                              branchCount = 5
-                              branchModelName = "plan"
-                              judgeModelName = "reviewer"
-                              outputFileName = formatPlanFileName hex4
-                              workspaceRoot = directory
-                              existingContext = None }
-                        let branchOpts = createObj [ "aiSettingsAgentId", box request.branchModelName; "subagentRole", box "reverie" ]
-                        let judgeOpts = createObj [ "aiSettingsAgentId", box request.judgeModelName; "subagentRole", box "reviewer" ]
-                        let branchCaller prompt =
-                            async {
-                                let! outcome = delegateWithTimeout deps config "explore" (prompt + planFooter) "Plan branch" (Some branchOpts) 300000
-                                match outcome with Report s -> return s | TimedOut -> return "{}"
-                            }
-                        let judgeCaller prompt =
-                            async {
-                                let! outcome = delegateWithTimeout deps config "explore" (prompt + planFooter) "Plan judge" (Some judgeOpts) 300000
-                                match outcome with Report s -> return s | TimedOut -> return "{}"
-                            }
-                        let! result = runPlanPipeline request branchCaller judgeCaller
-                        let! writeMsg = write (Some directory) result.finalFileName result.finalMarkdown
-                        return $"Plan written to {result.finalFileName}\n\n{writeMsg}"
-                } |> Async.StartAsPromise) |}
+               async {
+                   let! config = pluginConfigForSlash deps workspaceId |> Async.AwaitPromise
+                   let rawRequirement = args.Trim()
+                   if rawRequirement = "" then
+                       return "Please provide a requirement, e.g. /plan design a login flow."
+                   else
+                       let hex4 = randomHex4 ()
+                       let directory = Dyn.str config "cwd"
+                       let request =
+                           { requestId = workspaceId + "-" + hex4
+                             rawRequirement = rawRequirement
+                             normalizedRequirement = normalizeRequirement rawRequirement
+                             branchCount = 5
+                             branchModelName = "plan"
+                             judgeModelName = "reviewer"
+                             outputFileName = formatPlanFileName hex4
+                             workspaceRoot = directory
+                             existingContext = None }
+                       let mutable callCounter = 0
+                       let nextCallId () =
+                           callCounter <- callCounter + 1
+                           workspaceId + "-plan-" + hex4 + "-" + string callCounter
+                       let branchCaller prompt schemas =
+                           async {
+                               let! calls = callPlanModel deps config "explore" "Plan branch" prompt request.branchModelName schemas (nextCallId ())
+                               return calls
+                           }
+                       let judgeCaller prompt schemas =
+                           async {
+                               let! calls = callPlanModel deps config "explore" "Plan judge" prompt request.judgeModelName schemas (nextCallId ())
+                               return calls
+                           }
+                       let hypothesisCaller = Some branchCaller
+                       let! result = runPlanPipeline request branchCaller judgeCaller hypothesisCaller
+                       let! writeMsg = write (Some directory) result.finalFileName result.finalMarkdown
+                       return $"Plan written to {result.finalFileName}\n\n{writeMsg}"
+               } |> Async.StartAsPromise) |}
 
 /// Build all slash commands.
 let createSlashCommands (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj array =

@@ -5,6 +5,8 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Mux.TodoWriteNudge
+open VibeFs.MuxPlugin.PlanTools
+open VibeFs.MuxPlugin.PlanToolStore
 open VibeFs.MuxPlugin.MuxTools.IoTools
 open VibeFs.Shell.TreeSitterShell
 
@@ -115,11 +117,42 @@ let private mkWebOverride (sourceToolName: string) (tools: obj) (targetTool: str
                         "execute", box execFn ])
     createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
 
+let private mkAgentReportOverride () : obj =
+    let wrapperFn =
+        System.Func<obj, obj, obj>(fun (tool: obj) (_config: obj) ->
+            let execFn =
+                System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
+                    async {
+                        let callId = Dyn.str args "callId"
+                        if callId <> "" && hasCall callId then
+                            resolveCall callId args |> ignore
+                            let upstreamArgs = createObj [ "reportMarkdown", box (formatAgentReportMarkdown args) ]
+                            let raw = tool?execute(upstreamArgs, opts)
+                            return!
+                                if isThenable raw then
+                                    Async.AwaitPromise(unbox<JS.Promise<obj>> raw)
+                                else
+                                    async { return raw }
+                        else
+                            let raw = tool?execute(args, opts)
+                            return!
+                                if isThenable raw then
+                                    Async.AwaitPromise(unbox<JS.Promise<obj>> raw)
+                                else
+                                    async { return raw }
+                    }
+                    |> Async.StartAsPromise)
+            createObj [ "description", box fakeAgentReportDefinition.description
+                        "parameters", box fakeAgentReportDefinition.parameters
+                        "execute", box execFn ])
+    createObj [ "targetTool", box "agent_report"; "wrapper", box wrapperFn ]
+
 /// Build all wrappers.
 let createAllWrappers (tools: obj) : obj array =
     Array.append
         (mkSyntaxWrappers ())
         [| mkFileReadCapture ()
            mkTodoNudgeWrapper ()
+           mkAgentReportOverride ()
            mkWebOverride "websearch" tools "web_search"
            mkWebOverride "webfetch" tools "web_fetch" |]

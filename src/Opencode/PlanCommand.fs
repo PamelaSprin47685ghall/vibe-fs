@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.PlanTypes
 open VibeFs.Kernel.PlanEngine
 open VibeFs.Opencode.Session
+open VibeFs.Opencode.Sdk
 open VibeFs.Shell.Write
 
 open System.Collections.Generic
@@ -26,13 +27,36 @@ let private ensureParts (output: obj) : obj =
     else
         parts
 
-let private planFooter =
-    "\n\nYou must output ONLY the JSON requested. Do not write files, run commands, or modify the workspace."
+/// Build an opencode tool object that captures its arguments into a shared list
+/// and reports the call using the canonical plan tool name.
+let private planTool (calls: PlanToolCall list ref) (schema: PlanToolSchema) : obj =
+    define schema.description schema.parameters
+        (fun args _ ->
+            calls.Value <- { toolName = schema.name; arguments = args } :: calls.Value
+            async { return "Submitted." } |> Async.StartAsPromise)
 
-let private callModel (client: obj) (agent: string) (title: string) (directory: string) (sessionID: string) (prompt: string) : Async<string> =
+/// Build the JS tool map used for a plan stage. The map is keyed by tool name.
+let private planToolsObj (calls: PlanToolCall list ref) (schemas: PlanToolSchema list) : obj =
+    let o = createObj []
+    for schema in schemas do
+        o?(schema.name) <- planTool calls schema
+    o
+
+/// Call a plan model through an opencode subagent equipped with the requested tools.
+let private callPlanModel
+    (client: obj) (agent: string) (title: string) (directory: string) (sessionID: string)
+    (prompt: string) (schemas: PlanToolSchema list) : Async<PlanToolCall list> =
     async {
-        let! text = runSubagentWithCleanup client agent title (prompt + planFooter) directory sessionID null |> Async.AwaitPromise
-        return text
+        let calls = ref []
+        let tools = planToolsObj calls schemas
+        let! _, captured = runSubagentWithTools client agent title prompt directory sessionID null tools |> Async.AwaitPromise
+        let capturedToolCalls =
+            captured
+            |> List.choose (fun c ->
+                let toolName = Dyn.str c "toolName"
+                let arguments = Dyn.get c "arguments"
+                if toolName = "" || Dyn.isNullish arguments then None else Some { toolName = toolName; arguments = arguments })
+        return if List.isEmpty capturedToolCalls then calls.Value else capturedToolCalls
     }
 
 let handlePlanCommand (ctx: obj) (input: obj) (output: obj) : Async<unit> =
@@ -60,9 +84,10 @@ let handlePlanCommand (ctx: obj) (input: obj) (output: obj) : Async<unit> =
                       existingContext = None }
                 let branchAgent = if request.branchModelName = "" then "reverie" else request.branchModelName
                 let judgeAgent = if request.judgeModelName = "" then "reviewer" else request.judgeModelName
-                let branchCaller prompt = callModel client branchAgent "Plan branch" directory sessionID prompt
-                let judgeCaller prompt = callModel client judgeAgent "Plan judge" directory sessionID prompt
-                let! result = PlanEngine.runPlanPipeline request branchCaller judgeCaller
+                let branchCaller prompt schemas = callPlanModel client branchAgent "Plan branch" directory sessionID prompt schemas
+                let judgeCaller prompt schemas = callPlanModel client judgeAgent "Plan judge" directory sessionID prompt schemas
+                let hypothesisCaller = Some(branchCaller)
+                let! result = PlanEngine.runPlanPipeline request branchCaller judgeCaller hypothesisCaller
                 let! writeMsg = write (Some directory) result.finalFileName result.finalMarkdown
                 pushPart parts (box {| ``type`` = "text"; text = $"Plan written to {result.finalFileName}\n\n{writeMsg}" |})
     }

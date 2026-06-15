@@ -5,16 +5,18 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.AgentRole
 open VibeFs.Kernel.HostKernel
-open VibeFs.Kernel.Prompts
 open VibeFs.Mux.Contract
 open VibeFs.MuxPlugin.Delegate
+open VibeFs.MuxPlugin.PlanTools
+open VibeFs.MuxPlugin.MuxPrompts
 open VibeFs.MuxPlugin.MuxTools.Shared
 open VibeFs.Opencode.ToolCopy
 
 let private experimentsFor (role: AgentRole) : obj =
+    let disabledTools = (subagentToolPolicy role).disabledTools @ planToolNames
     createObj [
         "subagentRole", box (AgentRole.toString role)
-        "toolPolicy", box (createObj [ "disabledTools", box ((subagentToolPolicy role).disabledTools |> Array.ofList) ])
+        "toolPolicy", box (createObj [ "disabledTools", box (disabledTools |> Array.ofList) ])
     ]
 
 let private optionsFor (aiSettingsAgentId: string) (role: AgentRole) : obj =
@@ -96,7 +98,7 @@ let private buildEditorPrompts (_config: obj) (args: obj) : Async<string array> 
                         let pair = intent :?> obj array
                         let intentText = string pair.[0]
                         let files = pair.[1] :?> obj array |> Array.map string |> List.ofArray
-                        formatEditorUserPrompt intentText files)
+                        formatMuxEditorUserPrompt intentText files)
     }
 
 let editorTool (deps: obj) : ToolDefinition =
@@ -115,7 +117,7 @@ let private buildGreperPrompts (_config: obj) (args: obj) : Async<string array> 
     async {
         let intents = requireStrArray args "intents"
         if Array.isEmpty intents then return [||]
-        else return intents |> Array.map formatGreperUserPrompt
+        else return intents |> Array.map formatMuxGreperUserPrompt
     }
 
 let greperTool (deps: obj) : ToolDefinition =
@@ -134,7 +136,13 @@ let private reveriePromptFromArgs (config: obj) (args: obj) : Async<string> =
         let sections =
             results
             |> List.map (fun r -> { file = r.filePath; content = r.content })
-        return buildReveriePrompt sections intent
+        let skipped = "(skipped)"
+        let rendered =
+            sections
+            |> List.map (fun s -> $"=== {s.file} ===\n\n{Option.defaultValue skipped s.content}")
+        let body = rendered |> String.concat "\n\n"
+        let basePrompt = formatMuxReverieUserPrompt intent (sections |> List.map (fun s -> s.file))
+        return if body = "" then basePrompt else $"{body}\n\n{basePrompt}"
     }
 
 let reverieTool (deps: obj) : ToolDefinition =
@@ -150,7 +158,7 @@ let reverieTool (deps: obj) : ToolDefinition =
 let private buildBrowserPrompt (_config: obj) (args: obj) : Async<string> =
     async {
         let intent = defaultArg (strField args "intent") ""
-        return formatBrowserUserPrompt intent
+        return formatMuxBrowserUserPrompt intent
     }
 
 let browserTool (deps: obj) : ToolDefinition =

@@ -9,6 +9,9 @@ let getPluginToolPolicy (_agentId: string) (role: string) : VibeFs.Kernel.MuxPol
     let roleOpt = if System.String.IsNullOrEmpty role then None else Some role
     VibeFs.Kernel.MuxPolicy.getPluginToolPolicy roleOpt
 
+let setCapsFileReadTimestampSource (source: unit -> obj) : unit =
+    VibeFs.Mux.CapsFileRead.setTimestampSource source
+
 let buildCapsFileReadData (projectRoot: string) : JS.Promise<VibeFs.Mux.CapsFileRead.CapsFileReadEntry[]> =
     VibeFs.Mux.CapsFileRead.buildCapsFileReadData projectRoot
 
