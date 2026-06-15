@@ -9,6 +9,7 @@ open VibeFs.Tests.ShellTests
 open VibeFs.Tests.DynTests
 open VibeFs.Tests.DelegateTests
 open VibeFs.Tests.ResolveAiSettingsTests
+open VibeFs.Tests.PlanTests
 
 [<EntryPoint>]
 let main _ =
@@ -52,4 +53,10 @@ let main _ =
     DynTests.nullish ()
     DelegateTests.run ()
     ResolveAiSettingsTests.run ()
+    PlanTests.normalize ()
+    PlanTests.fileName ()
+    PlanTests.lenses ()
+    PlanTests.hypotheses ()
+    PlanTests.branchParse ()
+    PlanTests.judgeParse ()
     summary ()

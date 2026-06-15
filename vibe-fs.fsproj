@@ -50,6 +50,8 @@
     <Compile Include="src/Kernel/TreeSitterKernel.fs" />
     <Compile Include="src/Kernel/SessionText.fs" />
     <Compile Include="src/Kernel/IteratorStore.fs" />
+    <Compile Include="src/Kernel/PlanTypes.fs" />
+    <Compile Include="src/Kernel/PlanEngine.fs" />
     <!-- Shell: effectful boundary -->
     <Compile Include="src/Shell/CapsShell.fs" />
     <Compile Include="src/Shell/FileReadCache.fs" />
@@ -86,6 +88,7 @@
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/AgentConfig.fs" />
     <Compile Include="src/Opencode/Hooks.fs" />
+    <Compile Include="src/Opencode/PlanCommand.fs" />
     <Compile Include="src/Opencode/Plugin.fs" />
     <!-- Mux plugin adapter (F# → JS, createRegistration export) -->
     <Compile Include="src/MuxPlugin/ResolveAiSettings.fs" />
@@ -114,6 +117,7 @@
     <Compile Include="tests/DynTests.fs" />
     <Compile Include="tests/DelegateTests.fs" />
     <Compile Include="tests/ResolveAiSettingsTests.fs" />
+    <Compile Include="tests/PlanTests.fs" />
     <Compile Include="tests/Tests.fs" />
   </ItemGroup>
 

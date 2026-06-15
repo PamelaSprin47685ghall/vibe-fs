@@ -39,6 +39,8 @@ module SyntaxTypes = VibeFs.Kernel.SyntaxTypes
 module TreeSitterKernel = VibeFs.Kernel.TreeSitterKernel
 module SessionText = VibeFs.Kernel.SessionText
 module IteratorStore = VibeFs.Kernel.IteratorStore
+module PlanTypes = VibeFs.Kernel.PlanTypes
+module PlanEngine = VibeFs.Kernel.PlanEngine
 
 module Shell =
     module Caps = VibeFs.Shell.CapsShell

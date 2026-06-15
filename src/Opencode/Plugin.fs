@@ -8,6 +8,7 @@ open VibeFs.Opencode.Hooks
 open VibeFs.Opencode.NudgeHook
 open VibeFs.Opencode.Session
 open VibeFs.Opencode.AgentConfig
+open VibeFs.Opencode.PlanCommand
 
 [<Emit("{}")>]
 let private emptyObj () : obj = jsNative
@@ -36,7 +37,9 @@ let private commandExecuteBefore (ctx: obj) (reviewStore: VibeFs.Kernel.ReviewRu
     (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let command = Dyn.str input "command"
-        if command = "loop" || command = "loop-review" then
+        if command = "plan" then
+            do! handlePlanCommand ctx input output
+        elif command = "loop" || command = "loop-review" then
             let sessionID = Dyn.str input "sessionID"
             let task = (Dyn.str input "arguments").Trim()
             let parts = Dyn.get output "parts"
@@ -73,6 +76,8 @@ let private registerCommands (cfg: obj) : unit =
         setKey cmdObj "loop" (box {| template = "Enable loop mode."; description = "Enable loop mode — the next submission must pass through a reviewer before being accepted" |})
     if Dyn.isNullish (Dyn.get cmdObj "loop-review") then
         setKey cmdObj "loop-review" (box {| template = "Enable while-loop mode with pre-review."; description = "Enable while-loop mode — the task is pre-reviewed immediately, and reviewer feedback is prepended to your prompt before any work begins" |})
+    if Dyn.isNullish (Dyn.get cmdObj "plan") then
+        setKey cmdObj "plan" (box {| template = "Generate a structured plan for a requirement."; description = "Generate a structured plan file via multi-branch reasoning" |})
     setKey cfg "command" cmdObj
 
 /// The opencode plugin entry point: `async (ctx) => Plugin`.

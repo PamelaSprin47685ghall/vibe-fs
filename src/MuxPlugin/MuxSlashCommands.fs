@@ -6,12 +6,17 @@ open VibeFs.Kernel
 open VibeFs.Kernel.AgentRole
 open VibeFs.Kernel.AgentPolicy
 open VibeFs.Kernel.HostKernel
+open VibeFs.Kernel.PlanTypes
+open VibeFs.Kernel.PlanEngine
 open VibeFs.MuxPlugin.Delegate
+open VibeFs.Shell.Write
 
 [<Emit("Date.now()")>]
 let private dateNow () : int = jsNative
 [<Emit("process.cwd()")>]
 let private processCwd () : string = jsNative
+[<Emit("Math.floor(Math.random()*65536).toString(16).padStart(4,'0')")>]
+let private randomHex4 () : string = jsNative
 [<Emit("Promise.resolve($0)")>]
 let private resolveObj (o: obj) : JS.Promise<obj> = jsNative
 [<Emit("$0.then($1)")>]
@@ -116,6 +121,50 @@ let createLoopReviewCommand (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntim
                                     buildLoopMessage task [ "Pre-review feedback:"; ""; trimmed; ""; "Loop mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
                     } |> Async.StartAsPromise) |}
 
+let private planFooter =
+    "\n\nYou must output ONLY the JSON requested. Do not write files, run commands, or modify the workspace."
+
+/// /plan: generate a structured plan file via multi-branch reasoning.
+let createPlanCommand (deps: obj) : obj =
+    box {| key = "plan"
+           description = "Generate a structured plan file via multi-branch reasoning."
+           inputHint = "<requirement>"
+           execute = System.Func<string, string, JS.Promise<string>>(fun workspaceId args ->
+                async {
+                    let! config = pluginConfigForSlash deps workspaceId |> Async.AwaitPromise
+                    let rawRequirement = args.Trim()
+                    if rawRequirement = "" then
+                        return "Please provide a requirement, e.g. /plan design a login flow."
+                    else
+                        let hex4 = randomHex4 ()
+                        let directory = Dyn.str config "cwd"
+                        let request =
+                            { requestId = workspaceId + "-" + hex4
+                              rawRequirement = rawRequirement
+                              normalizedRequirement = normalizeRequirement rawRequirement
+                              branchCount = 3
+                              branchModelName = "plan"
+                              judgeModelName = "reviewer"
+                              outputFileName = formatPlanFileName hex4
+                              workspaceRoot = directory
+                              existingContext = None }
+                        let branchOpts = createObj [ "aiSettingsAgentId", box request.branchModelName; "subagentRole", box "reverie" ]
+                        let judgeOpts = createObj [ "aiSettingsAgentId", box request.judgeModelName; "subagentRole", box "reviewer" ]
+                        let branchCaller prompt =
+                            async {
+                                let! outcome = delegateWithTimeout deps config "explore" (prompt + planFooter) "Plan branch" (Some branchOpts) 300000
+                                match outcome with Report s -> return s | TimedOut -> return "{}"
+                            }
+                        let judgeCaller prompt =
+                            async {
+                                let! outcome = delegateWithTimeout deps config "explore" (prompt + planFooter) "Plan judge" (Some judgeOpts) 300000
+                                match outcome with Report s -> return s | TimedOut -> return "{}"
+                            }
+                        let! result = runPlanPipeline request branchCaller judgeCaller
+                        let! writeMsg = write (Some directory) result.finalFileName result.finalMarkdown
+                        return $"Plan written to {result.finalFileName}\n\n{writeMsg}"
+                } |> Async.StartAsPromise) |}
+
 /// Build all slash commands.
 let createSlashCommands (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj array =
-    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps reviewStore |]
+    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps reviewStore; createPlanCommand deps |]
