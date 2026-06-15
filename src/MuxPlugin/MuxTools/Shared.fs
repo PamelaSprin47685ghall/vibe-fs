@@ -5,10 +5,9 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Mux.Contract
 
-[<Emit("Promise.resolve($0)")>]
-let resolveStr (s: string) : JS.Promise<string> = jsNative
-[<Emit("JSON.stringify($0)")>]
-let jsonStringify (o: obj) : string = jsNative
+let resolveStr (s: string) : JS.Promise<string> = async { return s } |> Async.StartAsPromise
+
+let jsonStringify (o: obj) : string = JS.JSON.stringify(o)
 
 let optInt (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<int> v)
 let optBool (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<bool> v)

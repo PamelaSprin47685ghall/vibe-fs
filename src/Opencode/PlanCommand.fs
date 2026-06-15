@@ -8,11 +8,14 @@ open VibeFs.Kernel.PlanEngine
 open VibeFs.Opencode.Session
 open VibeFs.Shell.Write
 
-[<Emit("Math.floor(Math.random()*65536).toString(16).padStart(4,'0')")>]
-let private randomHex4 () : string = jsNative
+open System.Collections.Generic
 
-[<Emit("$0.push($1)")>]
-let private pushPart (arr: obj) (part: obj) : unit = jsNative
+let private rng = System.Random()
+
+let private randomHex4 () : string = sprintf "%04x" (rng.Next(65536))
+
+let private pushPart (arr: obj) (part: obj) : unit =
+    (arr :?> List<obj>).Add(part)
 
 let private planFooter =
     "\n\nYou must output ONLY the JSON requested. Do not write files, run commands, or modify the workspace."

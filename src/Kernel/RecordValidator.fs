@@ -15,16 +15,16 @@ let parseId (label: string) : Parser<string> =
 
 /// Build a plain JS object from key/value pairs (NOT a Fable map/tuple array),
 /// so callers can read fields with `result.path` exactly like the original TS.
-[<Emit("(() => { const o = {}; for (const kv of $0) o[kv[0]] = kv[1]; return o; })()")>]
-let private objFromPairs (pairs: (string * obj) array) : obj = jsNative
+let private objFromPairs (pairs: (string * obj) array) : obj =
+    pairs |> Array.toList |> createObj
 
 /// Build a plain JS object of field-name → error-message for the failure case.
-[<Emit("(() => { const o = {}; for (const kv of $0) o[kv[0]] = kv[1]; return o; })()")>]
-let private errorsFromPairs (pairs: (string * string) array) : obj = jsNative
+let private errorsFromPairs (pairs: (string * string) array) : obj =
+    pairs |> Array.map (fun (k, v) -> k, box v) |> Array.toList |> createObj
 
 /// Read a property by string key from a dynamic object.
-[<Emit("$0[$1]")>]
-let private getKey (o: obj) (key: string) : obj = jsNative
+let private getKey (o: obj) (key: string) : obj =
+    if isNull o then null else o?(key)
 
 /// Validate a record of named fields against a schema of parsers.  Independent
 /// fields are all checked — the caller sees every failure at once.  Returns a

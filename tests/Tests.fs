@@ -43,6 +43,7 @@ let main _ =
     FuzzyTests.findPagingDefault ()
     FuzzyTests.totalMatchedSemantics ()
     ShellTests.ollamaFetchInit ()
+    ShellTests.ollamaResponseMethodCall ()
     ShellTests.executorMapping ()
     ShellTests.recordValidator ()
     ShellTests.capsFileShape ()

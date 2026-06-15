@@ -1,6 +1,7 @@
 module VibeFs.Tests.ShellTests
 
 open Fable.Core
+open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.ExecutorKernel
 open VibeFs.Kernel.OllamaFormat
@@ -17,6 +18,15 @@ let ollamaFetchInit () =
     let withSignal = VibeFs.Shell.OllamaClient.postInitWithSignal "K" "b" (box "ABORT")
     check "init signal when Some" (not (VibeFs.Kernel.Dyn.isNullish (VibeFs.Kernel.Dyn.get withSignal "signal")))
 
+let ollamaResponseMethodCall () =
+    let response =
+        createObj
+            [ "text", box (fun () -> "body")
+              "json", box (fun () -> createObj [ "ok", box "yes" ]) ]
+    equal "response.text() invoked" "body" (unbox<string> (VibeFs.Shell.OllamaClient.responseMethod0 response "text"))
+    let json = VibeFs.Shell.OllamaClient.responseMethod0 response "json"
+    equal "response.json() invoked" "yes" (VibeFs.Kernel.Dyn.str json "ok")
+
 let executorMapping () =
     let opts : ExecuteOptions =
         { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; cwd = None }
@@ -30,11 +40,11 @@ let recordValidator () =
     let parsePath (o: obj) = if string o = "" then Error "path required" else Ok o
     let result = VibeFs.Kernel.RecordValidator.validateRecord [ "path", parsePath ] (box {| path = "src/x.fs" |})
     check "valid ok" (Result.isOk result)
-    let okObj = result |> Result.defaultValue (box {| |})
+    let okObj = result |> Result.defaultValue (createObj [])
     equal "valid .path" "src/x.fs" (string (VibeFs.Kernel.Dyn.get okObj "path"))
     let bad = VibeFs.Kernel.RecordValidator.validateRecord [ "path", parsePath ] (box {| path = "" |})
     check "invalid errors" (Result.isError bad)
-    let errObj = match bad with Error e -> e | _ -> box {| |}
+    let errObj = match bad with Error e -> e | _ -> createObj []
     equal "error .path message" "path required" (string (VibeFs.Kernel.Dyn.get errObj "path"))
 
 let capsFileShape () =

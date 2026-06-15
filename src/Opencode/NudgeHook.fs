@@ -140,7 +140,7 @@ type private StateHolder<'state>(initialState: 'state) =
             let previous = tail
             let next =
                 async {
-                    do! previous |> Async.AwaitPromise
+                    let! _ = previous |> Async.AwaitPromise |> Async.Catch
                     try
                         let! nextState = transition state
                         state <- nextState
@@ -148,7 +148,7 @@ type private StateHolder<'state>(initialState: 'state) =
                     with ex -> err ex
                 }
                 |> Async.StartAsPromise
-            tail <- next |> Async.AwaitPromise |> Async.Ignore |> Async.StartAsPromise)
+            tail <- next |> Async.AwaitPromise |> Async.Catch |> Async.Ignore |> Async.StartAsPromise)
 
 // ── Snapshot ──
 

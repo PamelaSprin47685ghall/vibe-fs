@@ -12,6 +12,8 @@ let private envApiKey () : string = jsNative
 let private newUrl (url: string) : obj = jsNative
 [<Emit("JSON.stringify($0)")>]
 let private stringify (o: obj) : string = jsNative
+[<Emit("$0[$1]()")>]
+let responseMethod0 (response: obj) (methodName: string) : obj = jsNative
 
 /// Build a fetch init with exact JS field names (method, Content-Type,
 /// Authorization).  Anonymous F# records would compile `method'`/`ContentType`
@@ -59,7 +61,7 @@ let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
             let! text =
                 async {
                     try
-                        let! t = (Dyn.get response "text" :?> JS.Promise<string>) |> Async.AwaitPromise
+                        let! t = (responseMethod0 response "text" :?> JS.Promise<string>) |> Async.AwaitPromise
                         return t
                     with _ -> return ""
                 }
@@ -68,7 +70,7 @@ let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
             let detail = if text <> "" then text else statusText
             return raise (exn $"Ollama API error ({status}): {detail}")
         else
-            let! json = (Dyn.get response "json" :?> JS.Promise<obj>) |> Async.AwaitPromise
+            let! json = (responseMethod0 response "json" :?> JS.Promise<obj>) |> Async.AwaitPromise
             return json
     }
     |> Async.StartAsPromise

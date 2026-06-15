@@ -16,6 +16,30 @@ let private emptyObj () : obj = jsNative
 [<Emit("$0[$1] = $2")>]
 let private setKey (o: obj) (k: string) (v: obj) : unit = jsNative
 
+[<Emit("new AbortController()")>]
+let private abortControllerCreate () : obj = jsNative
+
+[<Emit("$0.signal")>]
+let private abortSignalFromController (controller: obj) : obj = jsNative
+
+[<Emit("$0.abort()")>]
+let private abortControllerAbort (controller: obj) : unit = jsNative
+
+[<Emit("$0.then(v => ({ __vibeFsValue: v }))")>]
+let private wrapWorkResult (promise: JS.Promise<'T>) : JS.Promise<obj> = jsNative
+
+[<Emit("new Promise(resolve => setTimeout(() => resolve({ __vibeFsTimedOut: true }), $0))")>]
+let private timeoutResultPromise (timeoutMs: int) : JS.Promise<obj> = jsNative
+
+[<Emit("Promise.race([$0, $1])")>]
+let private promiseRace (a: JS.Promise<obj>) (b: JS.Promise<obj>) : JS.Promise<obj> = jsNative
+
+[<Emit("!!$0.__vibeFsTimedOut")>]
+let private isTimedOutResult (value: obj) : bool = jsNative
+
+[<Emit("$0.__vibeFsValue !== undefined ? $0.__vibeFsValue : $0")>]
+let private unwrapResult (value: obj) : 'T = jsNative
+
 let private requireWorkspaceId (config: obj) (title: string) : string =
     let wid = Dyn.str config "workspaceId"
     if wid = "" then "" else wid
@@ -179,20 +203,6 @@ let runMuxSubagent
     : JS.Promise<string> =
     delegateToSubAgent deps config agentId prompt title options
 
-let private raceFirst (work: Async<'T>) (timeout: Async<'T>) : Async<'T> =
-    Async.FromContinuations(fun (success, error, cancel) ->
-        let mutable finished = false
-        let finish result =
-            if not finished then
-                finished <- true
-                success result
-        let fail ex =
-            if not finished then
-                finished <- true
-                error ex
-        Async.StartWithContinuations(work, finish, fail, cancel)
-        Async.StartWithContinuations(timeout, finish, fail, cancel))
-
 let delegateWithTimeout
     (deps: obj)
     (config: obj)
@@ -202,16 +212,24 @@ let delegateWithTimeout
     (options: obj option)
     (timeoutMs: int)
     : Async<DelegateOutcome> =
-    let work =
-        async {
-            let! report = delegateToSubAgent deps config agentId prompt title options |> Async.AwaitPromise
-            return Report report
-        }
+    async {
+        let controller = abortControllerCreate ()
+        let signal = abortSignalFromController controller
+        let configWithSignal = Dyn.withKey config "abortSignal" signal
 
-    let timeout =
-        async {
-            do! Async.Sleep timeoutMs
-            return TimedOut
-        }
+        let workPromise = delegateToSubAgent deps configWithSignal agentId prompt title options
+        let wrappedWork = wrapWorkResult workPromise
+        let timeoutPromise = timeoutResultPromise timeoutMs
 
-    raceFirst work timeout
+        try
+            let! result = promiseRace wrappedWork timeoutPromise |> Async.AwaitPromise
+            if isTimedOutResult result then
+                abortControllerAbort controller
+                return TimedOut
+            else
+                return Report (unwrapResult result)
+        with err ->
+            match translateJsError err with
+            | MessageAborted -> return TimedOut
+            | _ -> return raise err
+    }

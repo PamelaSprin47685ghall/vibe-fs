@@ -7,8 +7,7 @@ open VibeFs.Kernel.PlanTypes
 
 type PlanModelCaller = string -> Async<string>
 
-[<Emit("JSON.parse($0)")>]
-let private jsonParse (s: string) : obj = jsNative
+let private jsonParse (s: string) : obj = JS.JSON.parse(s)
 
 let private tryParseJson (s: string) : obj option =
     try Some(jsonParse s) with | _ -> None
@@ -19,8 +18,14 @@ let private extractJsonBlock (raw: string) : string =
     let j = s.LastIndexOf("}")
     if i >= 0 && j > i then s.[i..j] else s
 
-[<Emit("$0 == null ? 0 : +$0")>]
-let private toFloat (o: obj) : float = jsNative
+let private toFloat (o: obj) : float =
+    if isNull o then 0.0
+    else
+        match o with
+        | :? float as f -> f
+        | :? int as i -> float i
+        | :? string as s -> (try float s with | _ -> 0.0)
+        | _ -> 0.0
 
 let private getString (o: obj) (k: string) : string = str o k
 let private getFloat (o: obj) (k: string) : float = toFloat (get o k)

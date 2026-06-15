@@ -11,17 +11,14 @@ open VibeFs.Kernel.PlanEngine
 open VibeFs.MuxPlugin.Delegate
 open VibeFs.Shell.Write
 
-[<Emit("Date.now()")>]
-let private dateNow () : int = jsNative
-[<Emit("process.cwd()")>]
-let private processCwd () : string = jsNative
-[<Emit("Math.floor(Math.random()*65536).toString(16).padStart(4,'0')")>]
-let private randomHex4 () : string = jsNative
-[<Emit("Promise.resolve($0)")>]
-let private resolveObj (o: obj) : JS.Promise<obj> = jsNative
-[<Emit("$0.then($1)")>]
-let private promiseThen (p: JS.Promise<obj>) (f: obj -> obj) : JS.Promise<obj> = jsNative
+let private rng = System.Random()
 
+let private dateNow () : int = int (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
+
+let private processCwd () : string = nodeProcess?cwd()
+let private randomHex4 () : string = sprintf "%04x" (rng.Next(65536))
 let private fallbackSlashConfig (deps: obj) (workspaceId: string) : obj =
     createObj
         [ "cwd", box (processCwd ())
@@ -42,13 +39,14 @@ let private slashConfigFromCtx (deps: obj) (workspaceId: string) (ctx: obj) : ob
               "taskService", box (Dyn.get deps "taskService") ]
 
 let private pluginConfigForSlash (deps: obj) (workspaceId: string) : JS.Promise<obj> =
-    let resolver = Dyn.get deps "resolveWorkspacePluginContext"
-    if not (Dyn.typeIs resolver "function") then
-        resolveObj (fallbackSlashConfig deps workspaceId)
-    else
-        let p = Dyn.call2 resolver (box workspaceId) (box null) :?> JS.Promise<obj>
-        promiseThen p (fun ctx -> slashConfigFromCtx deps workspaceId ctx)
-
+    async {
+        let resolver = Dyn.get deps "resolveWorkspacePluginContext"
+        if not (Dyn.typeIs resolver "function") then
+            return fallbackSlashConfig deps workspaceId
+        else
+            let! ctx = Dyn.call2 resolver (box workspaceId) (box null) :?> JS.Promise<obj> |> Async.AwaitPromise
+            return slashConfigFromCtx deps workspaceId ctx
+    } |> Async.StartAsPromise
 let private loopFooter =
     [ "- report: a detailed description of what you did and why"
       "- affectedFiles: list of every file you modified or created"

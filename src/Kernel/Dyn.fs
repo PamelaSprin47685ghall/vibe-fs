@@ -3,56 +3,57 @@ module VibeFs.Kernel.Dyn
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// Reliable dynamic access helpers for heterogeneous host JS data.  The `?`
-/// operator in Fable requires identifier keys; these Emit helpers accept any
-/// string so we can read keys known only at runtime.
+[<Global("Object.assign")>]
+let private objectAssign : obj -> obj -> obj = jsNative
 
-[<Emit("$0 == null ? undefined : $0[$1]")>]
-let get (o: obj) (key: string) : obj = jsNative
+[<Global>]
+let private structuredClone : obj -> obj = jsNative
 
-[<Emit("$0[$1]")>]
-let getValue<'a> (o: obj) (key: string) : 'a = jsNative
+let undefinedValue : obj = Unchecked.defaultof<obj>
 
-[<Emit("$0 == null ? false : ($0[$1] !== undefined && $0[$1] !== null)")>]
-let has (o: obj) (key: string) : bool = jsNative
+let jsType (o: obj) : string = jsTypeof o
 
-[<Emit("typeof $0 === $1")>]
-let typeIs (o: obj) (ty: string) : bool = jsNative
+let isNullish (o: obj) : bool = isNull o || jsType o = "undefined"
 
-[<Emit("$0($1)")>]
-let call1 (f: obj) (a: obj) : obj = jsNative
+let get (o: obj) (key: string) : obj =
+    if isNullish o then undefinedValue else o?(key)
 
-[<Emit("$0($1, $2)")>]
-let call2 (f: obj) (a: obj) (b: obj) : obj = jsNative
+let getValue<'a> (o: obj) (key: string) : 'a =
+    if isNullish o then unbox<'a> undefinedValue else o?(key)
 
-[<Emit("{ ...$0, [$1]: $2 }")>]
-let withKey (o: obj) (key: string) (v: obj) : obj = jsNative
+let has (o: obj) (key: string) : bool =
+    not (isNullish o) && not (isNullish (o?(key)))
 
-[<Emit("Array.isArray($0)")>]
-let isArray (o: obj) : bool = jsNative
+let typeIs (o: obj) (ty: string) : bool = jsType o = ty
 
-/// True when a value is null OR undefined (JS loose nullish check).  Used for
-/// all dynamic-value guards so missing properties are never mistaken for present.
-[<Emit("$0 == null")>]
-let isNullish (o: obj) : bool = jsNative
+let call1 (f: obj) (a: obj) : obj = f $ a
 
-/// A real JS `undefined` value, for testing the undefined branch of guards.
-[<Emit("undefined")>]
-let undefinedValue : obj = jsNative
+let call2 (f: obj) (a: obj) (b: obj) : obj = f $ (a, b)
 
-/// Coerce a dynamically-typed value to bool using JS truthiness.
-[<Emit("!!$0")>]
-let truthy (o: obj) : bool = jsNative
+let withKey (o: obj) (key: string) (v: obj) : obj =
+    let copy = createObj []
+    objectAssign copy o |> ignore
+    copy?(key) <- v
+    copy
 
-[<Emit("structuredClone($0)")>]
-let clone (o: obj) : obj = jsNative
+let isArray (o: obj) : bool = JS.Constructors.Array.isArray(o)
 
-/// Read a property as a string, "" when absent (null or undefined).
+let truthy (o: obj) : bool =
+    if isNullish o then false
+    else
+        match o with
+        | :? bool as b -> b
+        | :? int as i -> i <> 0
+        | :? float as f -> f <> 0.0 && not (System.Double.IsNaN f)
+        | :? string as s -> s.Length > 0
+        | _ -> true
+
+let clone (o: obj) : obj = structuredClone o
+
 let str (o: obj) (key: string) : string =
     let v = get o key
     if isNullish v then "" else string v
 
-/// Read a property as an option (None when null/undefined).
 let opt (o: obj) (key: string) : obj option =
     let v = get o key
     if isNullish v then None else Some v

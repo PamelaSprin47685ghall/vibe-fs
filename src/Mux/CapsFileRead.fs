@@ -4,10 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Shell.CapsShell
 
-[<Emit("Date.now()")>]
-let private now () : int = jsNative
-[<Emit("new Date().toISOString()")>]
-let private isoNow () : string = jsNative
+let private now () : int = int (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+let private isoNow () : string = System.DateTime.UtcNow.ToString("O")
 
 /// One synthesised `read` tool-result entry, so the host sees caps files as if
 /// the agent had already opened them.
