@@ -13,6 +13,7 @@ let private muxToolPatterns: Map<string, string list> =
         [ "read", [ "read" ]
           "write", [ "write" ]
           "edit", [ "file_edit_.*" ]
+          "patch", [ "patch"; "apply_patch" ]
           "executor", [ "executor" ]
           "glob", [ "glob" ]
           "fuzzy_find", [ "fuzzy_find" ]

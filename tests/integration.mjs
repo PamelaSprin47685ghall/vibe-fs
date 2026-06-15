@@ -35,6 +35,7 @@ check('mux.contextInjector', typeof reg.contextInjector === 'object');
 const policy = reg.getToolPolicy('x', 'orchestrator');
 check('mux.getToolPolicy non-null', policy !== null && typeof policy === 'object');
 check('mux.getToolPolicy shape', Array.isArray(policy?.add) && Array.isArray(policy?.remove));
+check('mux.getToolPolicy orchestrator removes apply_patch', policy?.remove?.includes('apply_patch'));
 
 const syntax = await checkSyntax('const x = 1;', 'test.js');
 check('tree-sitter returns a result', typeof syntax === 'object');
@@ -44,14 +45,67 @@ check('tree-sitter no errors', Array.isArray(syntax.fields[1]) && syntax.fields[
 // ── Fix #1: getPluginToolPolicy(agentId, role) two-arg signature ──
 const pol1 = getPluginToolPolicy('some-agent', 'orchestrator');
 check('getPluginToolPolicy(agentId, role) returns policy', pol1 !== undefined && Array.isArray(pol1.remove));
+check('getPluginToolPolicy orchestrator removes apply_patch', pol1?.remove?.includes('apply_patch'));
 const pol2 = getPluginToolPolicy('some-agent');
 check('getPluginToolPolicy(agentId) with undefined role returns policy', pol2 !== undefined);
+const pol3 = getPluginToolPolicy('some-agent', 'editor');
+check('getPluginToolPolicy editor keeps apply_patch', pol3 !== undefined && !pol3.remove.includes('apply_patch'));
 
 // ── Fix #2: eventHook is a two-argument JS function ──
 check('eventHook.length === 2', reg.eventHook.length === 2);
 const ehResult = reg.eventHook({ type: 'stream-abort', workspaceId: 'test-ws' }, null);
 check('eventHook(event, helpers) returns Promise', ehResult && typeof ehResult.then === 'function');
 await ehResult;
+
+const repeatedTodoNudges = [];
+const repeatedTodoHelpers = {
+  getTodos: async () => ['pending'],
+  nudge: async (_workspaceId, message) => {
+    repeatedTodoNudges.push(message);
+    return true;
+  },
+};
+await reg.eventHook(
+  {
+    type: 'stream-end',
+    workspaceId: 'repeat-ws',
+    properties: { parts: [{ type: 'text', text: 'first' }] },
+  },
+  repeatedTodoHelpers,
+);
+await reg.eventHook(
+  {
+    type: 'stream-end',
+    workspaceId: 'repeat-ws',
+    properties: { parts: [{ type: 'text', text: 'second' }] },
+  },
+  repeatedTodoHelpers,
+);
+check('eventHook suppresses repeated todo nudges across consecutive stream-end', repeatedTodoNudges.length === 1);
+
+await reg.eventHook(
+  {
+    type: 'stream-end',
+    workspaceId: 'repeat-ws',
+    properties: { parts: [{ type: 'text', text: 'cleared' }] },
+  },
+  {
+    getTodos: async () => [],
+    nudge: async (_workspaceId, message) => {
+      repeatedTodoNudges.push(message);
+      return true;
+    },
+  },
+);
+await reg.eventHook(
+  {
+    type: 'stream-end',
+    workspaceId: 'repeat-ws',
+    properties: { parts: [{ type: 'text', text: 'reopened' }] },
+  },
+  repeatedTodoHelpers,
+);
+check('eventHook allows todo nudge again after todo context clears', repeatedTodoNudges.length === 2);
 
 // ── Fix #3: syntax wrapper passes config and appends diagnostics ──
 const syntaxWrapper = reg.wrappers.find(w => w.targetTool === 'file_edit_replace_string');
@@ -71,6 +125,66 @@ const mockTodoTool = { execute: async () => 'Todos updated' };
 const wrappedTodo = todoWrapper.wrapper(mockTodoTool, {});
 const todoResult = await wrappedTodo.execute({});
 check('todo_write wrapper appends reverie nudge', todoResult.includes('Think thrice'));
+
+const todoAfterOutput = { output: 'Todos updated' };
+await p['tool.execute.after']({ tool: 'todowrite', sessionID: 'test-ws', callID: 'todo-1' }, todoAfterOutput);
+check('tool.execute.after appends reverie nudge for todowrite', todoAfterOutput.output.includes('Think thrice'));
+
+const resumedPromptCalls = [];
+const resumePlugin = await plugin({
+  directory: '/tmp/vibe',
+  client: {
+    session: {
+      todo: async () => ({
+        data: [
+          { id: 'todo-1', content: 'task', status: 'in_progress' },
+        ],
+      }),
+      messages: async () => ({
+        data: [
+          {
+            info: {
+              role: 'assistant',
+              agent: 'orchestrator',
+              finish: 'stop',
+              time: { completed: 1 },
+            },
+            parts: [{ type: 'text', text: 'working' }],
+          },
+        ],
+      }),
+      prompt: async (arg) => {
+        resumedPromptCalls.push(arg);
+      },
+    },
+  },
+});
+await resumePlugin.event({
+  event: {
+    type: 'session.next.step.failed',
+    properties: {
+      sessionID: 'resume-ws',
+      error: { type: 'unknown', message: 'Aborted' },
+    },
+  },
+});
+await resumePlugin.event({
+  event: { type: 'session.idle', properties: { sessionID: 'resume-ws' } },
+});
+check('aborted retry does not nudge before new prompt', resumedPromptCalls.length === 0);
+await resumePlugin.event({
+  event: {
+    type: 'session.next.prompted',
+    properties: {
+      sessionID: 'resume-ws',
+      prompt: { text: 'continue' },
+    },
+  },
+});
+await resumePlugin.event({
+  event: { type: 'session.idle', properties: { sessionID: 'resume-ws' } },
+});
+check('session.next.prompted prompt.text resumes todo nudge flow', resumedPromptCalls.length === 1);
 
 // ── Fix #4: webfetch schema and execute handle all declared params ──
 const webfetchDef = reg.tools.find(t => t.name === 'webfetch');

@@ -33,7 +33,7 @@ let private excludedDirNames =
     set [ "AGENTS"; "CLAUDE"; "NODE_MODULES"; ".GIT"; "TARGET"; "DIST"; "OUT"
           ".VENV"; "VENV"; "__PYCACHE__"; ".CACHE"; ".NEXT"; ".TURBO"; ".PARCEL-CACHE" ]
 
-let maxFileSize = 1_048_576
+let maxFileSize = 4 * 1_048_576
 let maxTotalContextBytes = 8 * 1_048_576
 let maxCapsFiles = 2000
 let maxDirDepth = 5

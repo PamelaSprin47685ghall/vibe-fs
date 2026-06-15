@@ -11,6 +11,8 @@ open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeEvents
 open VibeFs.Kernel.Prompts
 
+let private opencodeTodoWriteToolName = "todowrite"
+
 [<Emit("$2[$1]($0)")>]
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = jsNative
 
@@ -264,8 +266,12 @@ let private handleSessionDelete state sessionID = clearSession state sessionID
 
 let private handleSessionNextPrompted state (props: obj) sessionID =
     let text =
-        let partsText = getPartsText (Dyn.get props "parts")
-        if partsText <> "" then partsText else Dyn.str props "text"
+        let prompt = Dyn.get props "prompt"
+        let promptText = Dyn.str prompt "text"
+        if promptText <> "" then promptText
+        else
+            let partsText = getPartsText (Dyn.get props "parts")
+            if partsText <> "" then partsText else Dyn.str props "text"
     if isNudgePrompt text then state else resumeSession state sessionID
 
 let private handleSessionNextRetried state sessionID = addRetryPendingSession state sessionID
@@ -394,7 +400,7 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
 
     member _.handleToolExecuteAfter(input: obj) (output: obj) : JS.Promise<unit> =
         async {
-            if Dyn.str input "tool" = "todowrite" then
+            if Dyn.str input "tool" = opencodeTodoWriteToolName then
                 let out = Dyn.get output "output"
                 if not (Dyn.isNullish out) && Dyn.typeIs out "string" then
                     let s = string out

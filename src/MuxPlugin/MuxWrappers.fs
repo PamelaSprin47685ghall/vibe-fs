@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Mux.TodoWriteNudge
+open VibeFs.MuxPlugin.MuxTools.IoTools
 open VibeFs.Shell.TreeSitterShell
 
 [<Emit("$0.execute.bind($0)")>]
@@ -50,6 +51,17 @@ let private mkSyntaxWrappers () : obj array =
 let private mkTodoNudgeWrapper () : obj =
     mkSyncResultWrapper "todo_write" (fun result -> appendReverieNudge result)
 
+/// Capture the host file_read tool so the plugin read tool can delegate to it.
+let private mkFileReadCapture () : obj =
+    let wrapperFn =
+        System.Func<obj, obj, obj>(fun (hostTool: obj) (_config: obj) ->
+            hostFileReadExecute <- Some (bindExecute hostTool)
+            let execFn =
+                System.Func<obj, obj, JS.Promise<string>>(fun (_args: obj) (_opts: obj) ->
+                    disabledResult ())
+            createObj [ "execute", box execFn ])
+    createObj [ "targetTool", box "file_read"; "wrapper", box wrapperFn ]
+
 /// Create a web-override wrapper that replaces a host tool with the plugin definition.
 /// Uses Func delegate so it emits a real two-arg JS function.
 let private mkWebOverride (sourceToolName: string) (tools: obj) (targetTool: string) : obj =
@@ -65,18 +77,6 @@ let private mkWebOverride (sourceToolName: string) (tools: obj) (targetTool: str
                         "parameters", box (Dyn.get def "parameters")
                         "execute", box execFn ])
     createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
-
-/// Create a wrapper that captures the host's native file_read execute and
-/// replaces the tool with a disabled stub so the custom read tool is used.
-let private mkFileReadCapture () : obj =
-    let wrapperFn =
-        System.Func<obj, obj, obj>(fun (hostTool: obj) (_config: obj) ->
-            VibeFs.MuxPlugin.MuxTools.IoTools.hostFileReadExecute <- Some (bindExecute hostTool)
-            let execFn =
-                System.Func<obj, obj, JS.Promise<string>>(fun (_config: obj) (_args: obj) ->
-                    disabledResult ())
-            createObj [ "execute", box execFn ])
-    createObj [ "targetTool", box "file_read"; "wrapper", box wrapperFn ]
 
 /// Build all wrappers.
 let createAllWrappers (tools: obj) : obj array =

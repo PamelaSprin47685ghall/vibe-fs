@@ -48,6 +48,9 @@ let capsContextFormat () =
     check "caps file= label escaped" (ctx.Contains "file=\"A &amp; B.md\"")
     check "caps content raw" (ctx.Contains "body text")
 
+let capsFileSizeLimit () =
+    equal "caps file size limit 4MB" (4 * 1_048_576) VibeFs.Shell.CapsShell.maxFileSize
+
 let ollamaFormat () =
     let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]
     let formatted = VibeFs.Kernel.OllamaFormat.formatSearchResults results

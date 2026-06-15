@@ -8,11 +8,16 @@ open VibeFs.Kernel.Prompts
 /// The disabled-tool list a host must enforce when delegating to a role.
 type SubagentToolPolicy = { disabledTools: string list }
 
+let private hostDisabledToolsFor (role: AgentRole) : string list =
+    expandPatterns ((effectivePolicy role).deniedTools)
+
 let subagentToolPolicy (role: AgentRole) : SubagentToolPolicy =
-    { disabledTools = (effectivePolicy role).deniedTools }
+    { disabledTools = hostDisabledToolsFor role }
 
 let resolveMuxToolPolicy (toolName: string) : SubagentToolPolicy =
-    { disabledTools = expandPatterns (disabledToolsFor toolName) }
+    match AgentRole.ofString toolName with
+    | Ok role -> { disabledTools = hostDisabledToolsFor role }
+    | Error _ -> { disabledTools = [] }
 
 /// A subagent delegation request: pure data the host interprets.
 type SubagentRequest =

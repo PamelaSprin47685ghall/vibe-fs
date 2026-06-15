@@ -12,6 +12,7 @@ open VibeFs.Kernel.ExcludedDirs
 open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.JsBoundary
+open VibeFs.Kernel.DomainError
 
 let headTail' () =
     let r = headTail "hello" 2 2
@@ -44,8 +45,11 @@ let ipStrict () =
     check "public allowed" r
 
 let muxPolicy' () =
-    let r = resolveMuxToolPolicy "editor"
-    check "editor disables task" (List.contains "task" r.disabledTools)
+    let editor = resolveMuxToolPolicy "editor"
+    let orchestrator = resolveMuxToolPolicy "orchestrator"
+    check "editor disables task" (List.contains "task" editor.disabledTools)
+    check "editor keeps apply_patch" (not (List.contains "apply_patch" editor.disabledTools))
+    check "orchestrator disables apply_patch" (List.contains "apply_patch" orchestrator.disabledTools)
 
 let excludedDirs' () =
     let r = isExcludedDir "node_modules"
@@ -60,6 +64,7 @@ let jsBoundary' () =
     check "parse array" (arr = [| 1; 2 |])
     let obj = parseJsBoundaryObj (createObj [ "a", box 1 ])
     check "parse obj" (Map.find "a" obj = 1)
+    check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = MessageAborted)
 
 let hostKernel' () =
     let intent = formatEditorUserPrompt "fix bug" [ "a.ts"; "b.ts" ]
@@ -71,4 +76,3 @@ let hostKernel' () =
     let greper = formatGreperUserPrompt "find auth"
     check "greper has intent" (greper.IndexOf("find auth") >= 0)
     check "greper read-only" (greper.IndexOf("READ-ONLY") >= 0)
-

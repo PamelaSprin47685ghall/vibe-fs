@@ -47,30 +47,44 @@ let private handleEvent (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
                                 with _ -> return None
                             }
                         let todos = (defaultArg todosOpt [||]) |> Array.map string |> List.ofArray
-                        let action =
-                            coordinator.shouldNudge(workspaceId,
-                                { todos = todos; lastAssistantMessage = lastMessage
-                                  hasActiveRunner = false; isLoopActive = reviewStore.isReviewActive workspaceId })
-                        match selectNudgePrompt action todoNudgePrompt loopNudgePrompt with
-                        | None -> ()
-                        | Some prompt ->
-                            try
-                                let nudgeFn = Dyn.get helpers "nudge"
-                                let! _ = (Dyn.call2 nudgeFn workspaceId prompt :?> JS.Promise<bool>) |> Async.AwaitPromise
-                                let prev = if state.deliveredCounts.ContainsKey(workspaceId) then state.deliveredCounts.[workspaceId] else 0
-                                state.deliveredCounts.[workspaceId] <- prev + 1
-                            with _ -> coordinator.clearSession(workspaceId)
+                        let context =
+                            { todos = todos; lastAssistantMessage = lastMessage
+                              hasActiveRunner = false; isLoopActive = reviewStore.isReviewActive workspaceId }
+                        let action = coordinator.shouldNudge(workspaceId, context)
+                        let previousAction =
+                            match state.lastNudgeActions.TryGetValue(workspaceId) with
+                            | true, previous -> Some previous
+                            | _ -> None
+                        if shouldSuppressNudge workspaceId context previousAction then ()
+                        else
+                            match selectNudgePrompt action todoNudgePrompt loopNudgePrompt with
+                            | None ->
+                                match ofString action with
+                                | Ok parsed -> state.lastNudgeActions.[workspaceId] <- parsed
+                                | Error _ -> ()
+                            | Some prompt ->
+                                try
+                                    let nudgeFn = Dyn.get helpers "nudge"
+                                    let! _ = (Dyn.call2 nudgeFn workspaceId prompt :?> JS.Promise<bool>) |> Async.AwaitPromise
+                                    let prev = if state.deliveredCounts.ContainsKey(workspaceId) then state.deliveredCounts.[workspaceId] else 0
+                                    state.deliveredCounts.[workspaceId] <- prev + 1
+                                    match ofString action with
+                                    | Ok parsed -> state.lastNudgeActions.[workspaceId] <- parsed
+                                    | Error _ -> ()
+                                with _ -> coordinator.clearSession(workspaceId)
             | "stream-abort" ->
                 reviewStore.deactivateReview workspaceId
                 coordinator.clearSession(workspaceId)
                 state.stoppedWorkspaces.Add(workspaceId) |> ignore
                 state.retryPendingWorkspaces.Remove(workspaceId) |> ignore
+                state.lastNudgeActions.Remove(workspaceId) |> ignore
             | "error" ->
                 let properties = Dyn.get event "properties"
                 let errorType = Dyn.str properties "errorType"
                 if errorType = "aborted" then
                     coordinator.suppress workspaceId
                     state.stoppedWorkspaces.Add(workspaceId) |> ignore
+                    state.lastNudgeActions.Remove(workspaceId) |> ignore
             | _ -> ()
     } |> Async.StartAsPromise
 

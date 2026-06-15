@@ -17,9 +17,6 @@ let private getCwd (config: obj) : string =
     | Some v when not (System.String.IsNullOrWhiteSpace v) -> v
     | _ -> defaultArg (strField config "directory") ""
 
-let private getAbortSignal (config: obj) : obj =
-    Dyn.get config "abortSignal"
-
 let private parseLanguage (value: string) : ExecutorLanguage =
     match value.ToLowerInvariant() with
     | "python" -> Python
@@ -75,7 +72,8 @@ let executorTool (deps: obj) : ToolDefinition =
             |> Async.StartAsPromise
       condition = None }
 
-/// When set by the host (Mux), `read` delegates to the native file_read tool.
+/// When the host provides a richer native file_read implementation, wrappers can
+/// capture it here so the plugin read tool delegates instead of re-implementing.
 let mutable hostFileReadExecute : obj option = None
 
 let readTool (_deps: obj) : ToolDefinition =

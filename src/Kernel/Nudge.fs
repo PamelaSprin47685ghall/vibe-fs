@@ -73,6 +73,18 @@ let update (state: CoordinatorState) (sessionId: string) (context: NudgeContext)
             let updated = { lastAction = Some action; lastMessage = context.lastAssistantMessage }
             { sessions = Map.add sessionId updated state.sessions }, action
 
+/// Suppress a stream-end nudge when the assistant already received the same
+/// nudge action for the current phase. A cleared context records NudgeNone,
+/// which re-allows the next todo/loop nudge after work resumes.
+let shouldSuppressNudge (_sessionId: string) (context: NudgeContext) (previousAction: NudgeAction option) : bool =
+    let text = context.lastAssistantMessage.Trim()
+    if isQuestion text then true
+    elif skipsTodo text || skipsLoop text then true
+    else
+        match previousAction with
+        | Some previous when previous <> NudgeNone -> decide context = previous
+        | _ -> false
+
 /// Terminal todo statuses that should NOT count as open work.
 let terminalTodoStatuses: Set<string> = Set.ofList [ "completed"; "cancelled"; "abandoned" ]
 
@@ -107,4 +119,3 @@ type NudgeCoordinator() =
         suppressed <- Set.empty
 
 let defaultCoordinator = NudgeCoordinator()
-

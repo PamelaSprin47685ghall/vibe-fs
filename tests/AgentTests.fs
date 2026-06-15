@@ -5,6 +5,7 @@ open VibeFs.Kernel.AgentRole
 open VibeFs.Kernel.Permission
 open VibeFs.Kernel.AgentPolicy
 open VibeFs.Kernel.HostKernel
+open VibeFs.Kernel.MuxPolicy
 open VibeFs.Kernel.Nudge
 
 let role () =
@@ -62,10 +63,17 @@ let effectivePolicyDeniedToolsCrossValidation () =
         check $"{roleLabel role} allowed+denied disjoint" (union.Count = policy.allowedTools.Length + policy.deniedTools.Length)
         check $"{roleLabel role} covers canonical tools" (union.Count = canonicalToolNames.Length))
 
-let subagentToolPolicyMatchesDeniedTools () =
+let subagentToolPolicyUsesHostToolNames () =
   allRoles
   |> List.iter (fun role ->
-    equal $"{roleLabel role} subagent disabledTools" (effectivePolicy role).deniedTools (subagentToolPolicy role).disabledTools)
+    equal $"{roleLabel role} subagent disabledTools"
+      (expandPatterns ((effectivePolicy role).deniedTools))
+      (subagentToolPolicy role).disabledTools)
+
+  check "orchestrator subagent disables apply_patch"
+    (List.contains "apply_patch" (subagentToolPolicy Orchestrator).disabledTools)
+  check "editor subagent keeps apply_patch"
+    (not (List.contains "apply_patch" (subagentToolPolicy Editor).disabledTools))
 
 
 let private nudgeContext todos msg runner loopActive =
@@ -102,3 +110,19 @@ let coordinator () =
     equal "explicit suppress none" "none" (coord.shouldNudge ("s", ctxNew))
     coord.clearSession "s"
     equal "after clear todo" "nudge-todo" (coord.shouldNudge ("s", ctx))
+
+let shouldSuppress' () =
+    let previous = Some NudgeTodo
+    let repeated : NudgeContext =
+        { todos = [ "a" ]; lastAssistantMessage = "did more work"
+          hasActiveRunner = false; isLoopActive = false }
+    let cleared : NudgeContext =
+        { todos = []; lastAssistantMessage = "all done"
+          hasActiveRunner = false; isLoopActive = false }
+    let reopened : NudgeContext =
+        { todos = [ "a" ]; lastAssistantMessage = "new open todos"
+          hasActiveRunner = false; isLoopActive = false }
+
+    check "same action suppressed across consecutive stream-end" (shouldSuppressNudge "s" repeated previous)
+    check "cleared context resets suppression" (not (shouldSuppressNudge "s" cleared previous))
+    check "reopened context re-allows todo nudge" (not (shouldSuppressNudge "s" reopened None))
