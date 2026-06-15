@@ -246,4 +246,8 @@ export function deduplicateReadOutputsWithSeen<T extends MuxMessageLike>(
   seenOutputs: readonly string[],
   messages: readonly T[],
 ): T[];
+export function deduplicateModelReadOutputsWithSeen(
+  seenOutputs: readonly string[],
+  messages: readonly unknown[],
+): [string[], unknown[]];
 export function collectReadOutputs<T extends MuxMessageLike>(messages: readonly T[]): string[];
