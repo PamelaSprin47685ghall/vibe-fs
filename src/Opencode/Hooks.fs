@@ -3,51 +3,66 @@ module VibeFs.Opencode.Hooks
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Shell.TreeSitterShell
 
 let private defaultExcludedAgents = [ "browser"; "greper"; "summarizer"; "title" ]
 
-[<Emit("{}")>]
-let private emptyObj () : obj = jsNative
-[<Emit("$0[$1] = $2")>]
-let private setKey (o: obj) (k: string) (v: obj) : unit = jsNative
-[<Emit("$0.output = $1")>]
-let private setOutput (o: obj) (v: string) : unit = jsNative
-[<Emit("Promise.resolve()")>]
-let private resolvedUnit : JS.Promise<unit> = jsNative
+let private emptyObj () : obj = createObj []
+let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
+let private setOutput (o: obj) (v: string) : unit = o?output <- v
+let private resolvedUnit : JS.Promise<unit> = async { return () } |> Async.StartAsPromise
 
-[<Emit("Object.keys($0)")>]
-let private objectKeys (o: obj) : string array = jsNative
+let private objectKeys (o: obj) : string array =
+    JS.Constructors.Object.keys(o) |> Seq.toArray
 
-[<Emit("$0.splice(0, $0.length, ...$1)")>]
-let private replaceArrayInPlace (target: obj array) (source: obj array) : unit = jsNative
+let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
+    let targetObj = box target
+    targetObj?length <- 0
+    for item in source do
+        targetObj?push(item) |> ignore
 
-[<Emit("typeof $0")>]
-let private jsTypeof (o: obj) : string = jsNative
+let private jsTypeof (o: obj) : string = Dyn.jsType o
 
 let private isStringArray (value: obj) : bool =
-    Dyn.isArray value && (value :?> obj array) |> Array.forall (fun x -> Dyn.typeIs x "string")
+    if not (Dyn.isArray value) then false
+    else
+        let items: obj array = unbox value
+        let mutable allStrings = true
+        let mutable index = 0
+        while allStrings && index < items.Length do
+            allStrings <- Dyn.typeIs items.[index] "string"
+            index <- index + 1
+        allStrings
 
 let private joinGreperIntents (intents: obj) : Result<string, string> =
     if not (Dyn.isArray intents) || not (isStringArray intents) then
         Error "Invalid LLM input for greper: intents must be an array of strings"
     else
-        Ok (String.concat "; " ((intents :?> obj array) |> Array.map string))
+        let items: obj array = unbox intents
+        let texts = Array.zeroCreate<string> items.Length
+        for index = 0 to items.Length - 1 do
+            texts.[index] <- string items.[index]
+        Ok (String.concat "; " texts)
 
 let private joinEditorIntents (intents: obj) : Result<string, string> =
     if not (Dyn.isArray intents) then
         Error "Invalid LLM input for editor: intents must be an array"
     else
-        // Use Dyn.get with "0" so the same index access works for both real
-        // arrays and numeric-keyed objects some providers emit for prefixItems tuples.
-        let firstItems =
-            (intents :?> obj array)
-            |> Array.map (fun intent -> Dyn.get intent "0")
-        if firstItems |> Array.exists (fun x -> not (Dyn.typeIs x "string")) then
+        let items: obj array = unbox intents
+        let firstItems = Array.zeroCreate<string> items.Length
+        let mutable invalid = false
+        let mutable index = 0
+        while not invalid && index < items.Length do
+            let firstItem = Dyn.get items.[index] "0"
+            if not (Dyn.typeIs firstItem "string") then invalid <- true
+            else firstItems.[index] <- string firstItem
+            index <- index + 1
+        if invalid then
             Error "Invalid LLM input for editor: each intent must start with a string"
         else
-            Ok (String.concat "; " (firstItems |> Array.map string))
+            Ok (String.concat "; " firstItems)
 
 let private stripUiParameter (parameters: obj) : unit =
     let properties = Dyn.get parameters "properties"
@@ -59,7 +74,12 @@ let private stripUiParameter (parameters: obj) : unit =
         let required = Dyn.get parameters "required"
         let nextRequired =
             if Dyn.isArray required then
-                box ((required :?> string array) |> Array.filter (fun k -> k <> "_ui"))
+                let requiredKeys: obj array = unbox required
+                let kept = ResizeArray<string>()
+                for keyObj in requiredKeys do
+                    let key = string keyObj
+                    if key <> "_ui" then kept.Add key
+                box (kept.ToArray())
             else
                 required
         setKey parameters "properties" nextProps
@@ -85,14 +105,13 @@ let private mergeTools (current: obj) (defaults: obj) : obj =
     for key in objectKeys defaults do
         setKey merged key (Dyn.get defaults key)
     if not (Dyn.isNullish current) then
-        let defaultKeys = objectKeys defaults |> Set.ofArray
         for key in objectKeys current do
             let currentValue = Dyn.get current key
-            if not (Set.contains key defaultKeys) then
+            let defaultValue = Dyn.get defaults key
+            if Dyn.isNullish defaultValue then
                 if Dyn.typeIs currentValue "boolean" then
                     setKey merged key currentValue
             else
-                let defaultValue = Dyn.get defaults key
                 if Dyn.typeIs defaultValue "boolean" && Dyn.typeIs currentValue "boolean" then
                     if defaultValue :?> bool then
                         setKey merged key currentValue
@@ -152,9 +171,12 @@ let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.N
                         |> List.map (fun path -> readAndCheckSyntax path directory false |> Async.AwaitPromise)
                         |> Async.Parallel
                     let formatted =
-                        diagnostics
-                        |> Array.choose id
-                        |> String.concat "\n"
+                        let lines = ResizeArray<string>()
+                        for diagnostic in diagnostics do
+                            match diagnostic with
+                            | Some text -> lines.Add text
+                            | None -> ()
+                        String.concat "\n" lines
                     if formatted <> "" then setOutput output (s + "\n\n" + formatted)
         do! nudgeHook.handleToolExecuteAfter input output |> Async.AwaitPromise
     } |> Async.StartAsPromise
@@ -169,7 +191,7 @@ open VibeFs.Kernel.Dedup
 let private applyReadDedup (messages: obj array) : unit =
     if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
     else
-        let mutable seenByPath : Map<string, DedupState> = Map.empty
+        let seenByPath = emptyObj ()
 
         for i = 0 to messages.Length - 1 do
             let message = messages.[i]
@@ -193,9 +215,12 @@ let private applyReadDedup (messages: obj array) : unit =
                                         | path :: _ -> path
                                         | [] -> ""
                                     let payload = { path = pathKey; content = currentOutput }
-                                    let pathState = Map.tryFind pathKey seenByPath |> Option.defaultValue { seenContents = [] }
+                                    let pathState =
+                                        let existing = Dyn.get seenByPath pathKey
+                                        if Dyn.isNullish existing then { seenContents = [] }
+                                        else unbox<DedupState> existing
                                     let verdict, nextState = processDedup pathState payload
-                                    seenByPath <- Map.add pathKey nextState seenByPath
+                                    setKey seenByPath pathKey (box nextState)
                                     match verdict with
                                     | AlreadySeen -> setOutput state dedupMarker
                                     | NewContent _ -> ()

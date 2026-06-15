@@ -8,11 +8,10 @@ open VibeFs.Mux.TodoWriteNudge
 open VibeFs.MuxPlugin.MuxTools.IoTools
 open VibeFs.Shell.TreeSitterShell
 
-[<Emit("$0.execute.bind($0)")>]
-let private bindExecute (tool: obj) : obj = jsNative
+let private bindExecute (tool: obj) : obj = tool?execute
 
-[<Emit("Promise.resolve('disabled')")>]
-let private disabledResult () : JS.Promise<string> = jsNative
+let private disabledResult () : JS.Promise<string> =
+    async { return "disabled" } |> Async.StartAsPromise
 
 /// Append syntax-check diagnostics to a tool result after a file edit.
 let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promise<obj> =
@@ -32,15 +31,53 @@ let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promis
             with _ -> return result
     } |> Async.StartAsPromise
 
-/// Create a wrapper that post-processes each execute result with an async callback.
-/// $0 = targetTool, $1 = F# callback (curried: v -> args -> config -> Promise)
-[<Emit("{ targetTool: $0, wrapper: (tool, config) => { const orig = tool.execute; if (typeof orig !== 'function') return tool; const cb = $1; const fn = (...a) => { const r = orig.apply(tool, a); const rr = (r && typeof r.then === 'function') ? r : Promise.resolve(r); return rr.then(v => cb(v, a.length > 0 ? a[0] : undefined, config)); }; return { ...tool, execute: fn }; } }")>]
-let private mkResultWrapper (targetTool: string) (callback: obj -> obj -> obj -> JS.Promise<obj>) : obj = jsNative
+let private isThenable (value: obj) : bool =
+    not (Dyn.isNullish value) && Dyn.typeIs (Dyn.get value "then") "function"
 
-/// Create a wrapper that post-processes each execute result with a sync callback.
-/// $0 = targetTool, $1 = F# callback (v -> result)
-[<Emit("{ targetTool: $0, wrapper: (tool, config) => { const orig = tool.execute; if (typeof orig !== 'function') return tool; const cb = $1; const fn = (...a) => { const r = orig.apply(tool, a); const rr = (r && typeof r.then === 'function') ? r : Promise.resolve(r); return rr.then(v => cb(v)); }; return { ...tool, execute: fn }; } }")>]
-let private mkSyncResultWrapper (targetTool: string) (callback: obj -> obj) : obj = jsNative
+
+let private mkResultWrapper (targetTool: string) (callback: obj -> obj -> obj -> JS.Promise<obj>) : obj =
+    let wrapperFn =
+        System.Func<obj, obj, obj>(fun tool config ->
+            let orig = tool?execute
+            if not (Dyn.typeIs orig "function") then
+                tool
+            else
+                let executeFn =
+                    System.Func<obj, obj, JS.Promise<obj>>(fun args opts ->
+                        async {
+                            let raw = tool?execute(args, opts)
+                            let! v =
+                                if isThenable raw then
+                                    Async.AwaitPromise(unbox<JS.Promise<obj>> raw)
+                                else
+                                    async { return raw }
+                            return! callback v args config |> Async.AwaitPromise
+                        }
+                        |> Async.StartAsPromise)
+                Dyn.withKey tool "execute" (box executeFn))
+    createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
+
+let private mkSyncResultWrapper (targetTool: string) (callback: obj -> obj) : obj =
+    let wrapperFn =
+        System.Func<obj, obj, obj>(fun tool config ->
+            let orig = tool?execute
+            if not (Dyn.typeIs orig "function") then
+                tool
+            else
+                let executeFn =
+                    System.Func<obj, obj, JS.Promise<obj>>(fun args opts ->
+                        async {
+                            let raw = tool?execute(args, opts)
+                            let! v =
+                                if isThenable raw then
+                                    Async.AwaitPromise(unbox<JS.Promise<obj>> raw)
+                                else
+                                    async { return raw }
+                            return callback v
+                        }
+                        |> Async.StartAsPromise)
+                Dyn.withKey tool "execute" (box executeFn))
+    createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
 
 /// Create the syntax-check wrappers for file_edit tools.
 let private mkSyntaxWrappers () : obj array =

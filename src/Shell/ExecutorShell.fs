@@ -9,15 +9,48 @@ open VibeFs.Shell.ExecutorScript
 open VibeFs.Shell.ExecutorPaths
 open VibeFs.Shell.ExecutorJavascript
 
-[<Emit("process.cwd()")>]
-let private processCwd () : string = jsNative
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
 
 type RunOutcome = { stdout: string; stderr: string; code: int option; timedOut: bool }
 
 /// Await a spawned child's completion, collecting stdout/stderr and enforcing a
-/// timeout by killing the tree.  One focused emit over the JS event loop.
-[<Emit("new Promise((resolve, reject) => { let out=''; let err=''; let settled=false; const settle=(code,timedOut)=>{ if(settled) return; settled=true; try { $0.stdout.removeAllListeners(); $0.stderr.removeAllListeners(); } catch {} resolve({stdout:out, stderr:err, code, timedOut}); }; let timer = ($2==null ? null : setTimeout(()=>{ $1($0); settle(null,true); }, $2)); $0.stdout.on('data', c=>{ out+=c.toString(); }); $0.stderr.on('data', c=>{ err+=c.toString(); }); $0.on('error', e=>{ if(timer) clearTimeout(timer); reject(e); }); $0.on('close', code=>{ if(timer) clearTimeout(timer); settle(code,false); }); })")>]
-let private awaitChild (child: SpawnedChild) (kill: SpawnedChild -> unit) (timeoutMs: int option) : JS.Promise<RunOutcome> = jsNative
+/// timeout by killing the tree.
+let private awaitChild (child: SpawnedChild) (kill: SpawnedChild -> unit) (timeoutMs: int option) : JS.Promise<RunOutcome> =
+    let work =
+        Async.FromContinuations(fun (resolve, reject, _) ->
+            let stdout = ResizeArray<string>()
+            let stderr = ResizeArray<string>()
+            let mutable settled = false
+            let removeListeners () =
+                try child?stdout?removeAllListeners() |> ignore with _ -> ()
+                try child?stderr?removeAllListeners() |> ignore with _ -> ()
+            let settle code timedOut =
+                if not settled then
+                    settled <- true
+                    removeListeners ()
+                    resolve { stdout = String.concat "" stdout
+                              stderr = String.concat "" stderr
+                              code = code
+                              timedOut = timedOut }
+            child?stdout?on("data", fun (c: obj) -> stdout.Add(string c)) |> ignore
+            child?stderr?on("data", fun (c: obj) -> stderr.Add(string c)) |> ignore
+            child?on("error", fun (e: obj) -> reject (e :?> exn)) |> ignore
+            child?on("close", fun (code: obj) ->
+                settle (if isNull code then None else Some(unbox<int> code)) false) |> ignore
+            match timeoutMs with
+            | None -> ()
+            | Some ms ->
+                async {
+                    do! Async.Sleep ms
+                    if not settled then
+                        kill child
+                        settle None true
+                }
+                |> Async.Start
+        )
+    work |> Async.StartAsPromise
+
 
 /// Spawn a command and await it with a timeout, killing the tree on expiry.
 let spawnAndRun (command: string) (args: string array) (cwd: string) (timeoutMs: int option)
@@ -116,7 +149,7 @@ let executeWith (deps: ExecuteDeps) (options: ExecuteOptions) (sessionId: string
                 : JS.Promise<ExecuteResult> =
     async {
         let timeout = timeoutMs options.timeoutType
-        let cwd = defaultArg options.cwd (processCwd ())
+        let cwd = defaultArg options.cwd (nodeProcess?cwd())
         let program = if options.language = Shell then prepareShellProgram options.program else options.program
         try
             let! outcome =

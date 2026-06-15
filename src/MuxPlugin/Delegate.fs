@@ -7,53 +7,34 @@ open VibeFs.Kernel.DomainError
 open VibeFs.Kernel.JsBoundary
 open VibeFs.MuxPlugin.ResolveAiSettings
 
-[<Emit("Promise.resolve($0)")>]
-let private resolveStr (s: string) : JS.Promise<string> = jsNative
+[<Global>]
+type AbortController() =
+    member _.signal: obj = jsNative
+    member _.abort(): unit = jsNative
 
-[<Emit("{}")>]
-let private emptyObj () : obj = jsNative
+[<Global("Promise")>]
+let private PromiseCtor : obj = jsNative
 
-[<Emit("$0[$1] = $2")>]
-let private setKey (o: obj) (k: string) (v: obj) : unit = jsNative
+let private promiseRace<'T> (promises: JS.Promise<'T> array) : JS.Promise<'T> =
+    unbox<JS.Promise<'T>> (PromiseCtor?race(promises))
 
-[<Emit("new AbortController()")>]
-let private abortControllerCreate () : obj = jsNative
+let private resolveStr (s: string) : JS.Promise<string> =
+    async { return s } |> Async.StartAsPromise
 
-[<Emit("$0.signal")>]
-let private abortSignalFromController (controller: obj) : obj = jsNative
+let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
+    unbox<JS.Promise<obj>>(taskService?create(input))
 
-[<Emit("$0.abort()")>]
-let private abortControllerAbort (controller: obj) : unit = jsNative
-
-[<Emit("$0.then(v => ({ __vibeFsValue: v }))")>]
-let private wrapWorkResult (promise: JS.Promise<'T>) : JS.Promise<obj> = jsNative
-
-[<Emit("new Promise(resolve => setTimeout(() => resolve({ __vibeFsTimedOut: true }), $0))")>]
-let private timeoutResultPromise (timeoutMs: int) : JS.Promise<obj> = jsNative
-
-[<Emit("Promise.race([$0, $1])")>]
-let private promiseRace (a: JS.Promise<obj>) (b: JS.Promise<obj>) : JS.Promise<obj> = jsNative
-
-[<Emit("!!$0.__vibeFsTimedOut")>]
-let private isTimedOutResult (value: obj) : bool = jsNative
-
-[<Emit("$0.__vibeFsValue !== undefined ? $0.__vibeFsValue : $0")>]
-let private unwrapResult (value: obj) : 'T = jsNative
+let private taskWait (taskService: obj) (taskId: string) (opts: obj) : JS.Promise<obj> =
+    unbox<JS.Promise<obj>>(taskService?waitForAgentReport(taskId, opts))
 
 let private requireWorkspaceId (config: obj) (title: string) : string =
     let wid = Dyn.str config "workspaceId"
     if wid = "" then "" else wid
 
-[<Emit("$0.create($1)")>]
-let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> = jsNative
-[<Emit("$0.waitForAgentReport($1, $2)")>]
-let private taskWait (taskService: obj) (taskId: string) (opts: obj) : JS.Promise<obj> = jsNative
-
 type DelegateOutcome =
     | Report of string
     | TimedOut
 
-/// Match mux `coerceThinkingLevel` / task tool parent-runtime hint (med → medium).
 let internal coerceThinkingLevel (value: string) : string option =
     let trimmed = value.Trim()
     if trimmed = "" then None
@@ -70,8 +51,6 @@ let internal coerceThinkingLevel (value: string) : string option =
     else
         None
 
-/// Parent live model/thinking from `config.muxEnv`, forwarded as a low-priority
-/// fallback in `taskService.create` (same as mux `buildParentRuntimeAiSettings`).
 let internal buildParentRuntimeAiSettings (config: obj) : obj =
     let muxEnv = Dyn.get config "muxEnv"
     if Dyn.isNullish muxEnv then
@@ -84,12 +63,12 @@ let internal buildParentRuntimeAiSettings (config: obj) : obj =
         match modelOpt, thinkingOpt with
         | None, None -> null
         | _ ->
-            let o = emptyObj ()
+            let o = createObj []
             match modelOpt with
-            | Some m -> setKey o "modelString" (box m)
+            | Some m -> o?modelString <- m
             | None -> ()
             match thinkingOpt with
-            | Some t -> setKey o "thinkingLevel" (box t)
+            | Some t -> o?thinkingLevel <- t
             | None -> ()
             o
 
@@ -103,30 +82,27 @@ let private createInput
     (parentRuntimeAiSettings: obj)
     (experiments: obj)
     : obj =
-    let o = emptyObj ()
-    setKey o "parentWorkspaceId" (box workspaceId)
-    setKey o "kind" (box "agent")
-    setKey o "agentId" (box agentId)
-    setKey o "prompt" (box prompt)
-    setKey o "title" (box title)
-    setKey o "experiments" experiments
+    let o = createObj []
+    o?parentWorkspaceId <- workspaceId
+    o?kind <- "agent"
+    o?agentId <- agentId
+    o?prompt <- prompt
+    o?title <- title
+    o?experiments <- experiments
 
     match modelString with
-    | Some m when m.Trim() <> "" -> setKey o "modelString" (box m)
+    | Some m when m.Trim() <> "" -> o?modelString <- m
     | _ -> ()
 
     match thinkingLevel with
-    | Some t when t.Trim() <> "" -> setKey o "thinkingLevel" (box t)
+    | Some t when t.Trim() <> "" -> o?thinkingLevel <- t
     | _ -> ()
 
     if not (Dyn.isNullish parentRuntimeAiSettings) then
-        setKey o "parentRuntimeAiSettings" parentRuntimeAiSettings
+        o?parentRuntimeAiSettings <- parentRuntimeAiSettings
 
     o
 
-/// Delegate a sub-agent task via the host's taskService.  Returns the report
-/// markdown or an error string.  Mirrors vibe-me-mux delegateToSubAgent, with
-/// parent `muxEnv` forwarded as `parentRuntimeAiSettings` like the native task tool.
 let delegateToSubAgent
     (deps: obj)
     (config: obj)
@@ -192,7 +168,6 @@ let delegateToSubAgent
             }
             |> Async.StartAsPromise
 
-/// Host taskService delegation for mux plugin tools (not Opencode Session).
 let runMuxSubagent
     (deps: obj)
     (config: obj)
@@ -213,21 +188,28 @@ let delegateWithTimeout
     (timeoutMs: int)
     : Async<DelegateOutcome> =
     async {
-        let controller = abortControllerCreate ()
-        let signal = abortSignalFromController controller
+        let controller = new AbortController()
+        let signal = controller.signal
         let configWithSignal = Dyn.withKey config "abortSignal" signal
 
-        let workPromise = delegateToSubAgent deps configWithSignal agentId prompt title options
-        let wrappedWork = wrapWorkResult workPromise
-        let timeoutPromise = timeoutResultPromise timeoutMs
+        let workPromise =
+            async {
+                let! report = delegateToSubAgent deps configWithSignal agentId prompt title options |> Async.AwaitPromise
+                return box (Report report)
+            }
+            |> Async.StartAsPromise
+
+        let timeoutPromise =
+            async {
+                do! Async.Sleep timeoutMs
+                controller.abort()
+                return box TimedOut
+            }
+            |> Async.StartAsPromise
 
         try
-            let! result = promiseRace wrappedWork timeoutPromise |> Async.AwaitPromise
-            if isTimedOutResult result then
-                abortControllerAbort controller
-                return TimedOut
-            else
-                return Report (unwrapResult result)
+            let! winner = promiseRace [| workPromise; timeoutPromise |] |> Async.AwaitPromise
+            return unbox<DelegateOutcome> winner
         with err ->
             match translateJsError err with
             | MessageAborted -> return TimedOut

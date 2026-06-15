@@ -5,16 +5,22 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.CapsFormat
 
-[<Emit("import('node:fs/promises')")>]
-let private fsAsync () : JS.Promise<obj> = jsNative
-[<Emit("$0.readdir($1, { withFileTypes: true })")>]
-let private readdir (fs': obj) (dir: string) : JS.Promise<obj[]> = jsNative
-[<Emit("$0.stat($1)")>]
-let private stat (fs': obj) (path: string) : JS.Promise<obj> = jsNative
-[<Emit("$0.readFile($1, 'utf-8')")>]
-let private readFile (fs': obj) (path: string) : JS.Promise<string> = jsNative
-[<Emit("$0.realpath($1)")>]
-let private realpath (fs': obj) (path: string) : JS.Promise<string> = jsNative
+[<Import("promises", "node:fs")>]
+let private fsPromises : obj = jsNative
+
+let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
+
+let private readdir (dir: string) : JS.Promise<obj[]> =
+    fsPromises?readdir(dir, {| withFileTypes = true |}) |> asPromise<obj[]>
+
+let private stat (path: string) : JS.Promise<obj> =
+    fsPromises?stat(path) |> asPromise<obj>
+
+let private readFile (path: string) : JS.Promise<string> =
+    fsPromises?readFile(path, "utf-8") |> asPromise<string>
+
+let private realpath (path: string) : JS.Promise<string> =
+    fsPromises?realpath(path) |> asPromise<string>
 let private entryName (e: obj) : string = e?name
 let private entryIsFile (e: obj) : bool = e?isFile ()
 let private entryIsDirectory (e: obj) : bool = e?isDirectory ()
@@ -49,12 +55,11 @@ let private freshBudget () : Budget = { results = ResizeArray (); totalBytes = 0
 
 let private tryReadFileAsync (filePath: string) (label: string) : Async<CapsFile option> =
     async {
-        let! api = fsAsync () |> Async.AwaitPromise
         try
-            let! s = stat api filePath |> Async.AwaitPromise
+            let! s = stat filePath |> Async.AwaitPromise
             if not (statIsFile s) || statSize s > maxFileSize then return None
             else
-                let! content = readFile api filePath |> Async.AwaitPromise
+                let! content = readFile filePath |> Async.AwaitPromise
                 return if content.Trim() = "" then None else Some { filePath = filePath; label = label; content = content }
         with _ -> return None
     }
@@ -81,12 +86,11 @@ let rec private discoverFilesInDirAsync (dirPath: string) (depth: int) (visited:
     async {
         if depth >= maxDirDepth then return ([], visited)
         else
-            let! api = fsAsync () |> Async.AwaitPromise
             try
-                let! realPath = realpath api dirPath |> Async.AwaitPromise
+                let! realPath = realpath dirPath |> Async.AwaitPromise
                 if Set.contains realPath visited then return ([], visited)
                 else
-                    let! entries = readdir api dirPath |> Async.AwaitPromise
+                    let! entries = readdir dirPath |> Async.AwaitPromise
                     let visited' = Set.add realPath visited
                     let rec processEntry i acc vis =
                         async {
@@ -122,11 +126,11 @@ let private absorbFilesAsync (files: string list) (projectRoot: string) (budget:
     }
 
 /// Walk the project root, absorbing caps files and recursing into caps dirs.
-let private discoverRootAsync (api: obj) (projectRoot: string) (budget: Budget) : Async<Budget> =
+let private discoverRootAsync (projectRoot: string) (budget: Budget) : Async<Budget> =
     async {
         let! entries =
             async {
-                try return! readdir api projectRoot |> Async.AwaitPromise
+                try return! readdir projectRoot |> Async.AwaitPromise
                 with _ -> return [||]
             }
         let rec processEntry i b =
@@ -162,8 +166,7 @@ let discoverFilesInDir (dirPath: string) (depth: int) (visited: Set<string>)
 /// Discover all capability files rooted at `projectRoot`, respecting budgets.
 let findCapsFiles (projectRoot: string) : JS.Promise<CapsFile list> =
     async {
-        let! api = fsAsync () |> Async.AwaitPromise
-        let! final = discoverRootAsync api projectRoot (freshBudget ())
+        let! final = discoverRootAsync projectRoot (freshBudget ())
         return final.results |> Seq.toList |> List.sortBy (fun f -> f.filePath)
     }
     |> Async.StartAsPromise

@@ -13,13 +13,13 @@ open VibeFs.Opencode.ToolCopy
 open VibeFs.Opencode.Session
 open VibeFs.Kernel.Prompts
 
-[<Global("Object.assign")>]
-let private objectAssign : obj -> obj -> obj = jsNative
-
 let private entry (key: string) (value: obj) : obj = createObj [ key, value ]
 
 let private mergeObjects (objs: obj array) : obj =
-    objs |> Array.fold (fun acc o -> objectAssign acc o) (createObj [])
+    let merged = createObj []
+    for item in objs do
+        Dyn.assignInto merged item |> ignore
+    merged
 
 let private resolveStr (s: string) : JS.Promise<string> = async { return s } |> Async.StartAsPromise
 

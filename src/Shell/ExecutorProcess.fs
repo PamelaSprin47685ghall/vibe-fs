@@ -2,6 +2,7 @@ module VibeFs.Shell.ExecutorProcess
 
 open Fable.Core
 open Fable.Core.JsInterop
+open VibeFs.Kernel
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -11,10 +12,10 @@ let private platform : string = nodeProcess?platform
 let private processKill (pid: int) (signal: string) : unit =
     nodeProcess?kill(pid, signal) |> ignore
 
-[<Global("Object.assign")>]
-let private objectAssign : obj -> obj -> obj = jsNative
-
-let private env () : obj = objectAssign (createObj []) nodeProcess?env
+let private env () : obj =
+    let copy = createObj []
+    Dyn.assignInto copy nodeProcess?env |> ignore
+    copy
 
 [<Import("spawn", "node:child_process")>]
 let private spawn (cmd: string) (args: string array) (opts: obj) : obj = jsNative

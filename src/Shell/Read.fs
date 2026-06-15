@@ -5,19 +5,19 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Shell.Path
 
-[<Emit("process.cwd()")>]
-let private processCwd () : string = jsNative
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
 
-[<Emit("import('node:fs/promises')")>]
-let private importFsPromises () : JS.Promise<obj> = jsNative
+[<Import("promises", "node:fs")>]
+let private fsPromises : obj = jsNative
 
-let private fsApi () = importFsPromises () |> Async.AwaitPromise
+let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
 
-[<Emit("$0.readFile($1, 'utf-8')")>]
-let private readFileAsync (fs': obj) (p: string) : JS.Promise<string> = jsNative
+let private readFileAsync (p: string) : JS.Promise<string> =
+    fsPromises?readFile(p, "utf-8") |> asPromise<string>
 
-[<Emit("$0.readdir($1, { withFileTypes: true })")>]
-let private readdir (fs': obj) (p: string) : JS.Promise<obj[]> = jsNative
+let private readdir (p: string) : JS.Promise<obj[]> =
+    fsPromises?readdir(p, {| withFileTypes = true |}) |> asPromise<obj[]>
 
 let private formatSize (bytes: int) : string =
     if bytes < 1024 then $"{bytes}B"
@@ -32,8 +32,7 @@ let private formatMtime (mtime: obj) : string =
 
 let private listDirectoryEntries (dirPath: string) : Async<string> =
     async {
-        let! api = fsApi ()
-        let! entries = readdir api dirPath |> Async.AwaitPromise
+        let! entries = readdir dirPath |> Async.AwaitPromise
         let lines = ResizeArray<string>()
         lines.Add($"total {entries.Length}")
         for entry in entries do
@@ -48,8 +47,7 @@ let private listDirectoryEntries (dirPath: string) : Async<string> =
 
 let private readFileWithLineNumbers (filePath: string) (offset: int option) (limit: int option) : Async<string> =
     async {
-        let! api = fsApi ()
-        let! raw = readFileAsync api filePath |> Async.AwaitPromise
+        let! raw = readFileAsync filePath |> Async.AwaitPromise
         let lines = raw.Split('\n')
         let startLine = defaultArg offset 1
         let startIdx = max 0 (startLine - 1)
@@ -66,11 +64,9 @@ let private readFileWithLineNumbers (filePath: string) (offset: int option) (lim
 /// Read a file (with optional offset/limit) or format a directory listing for `path`.
 let read (cwd: string option) (path: string) (offset: int option) (limit: int option) : Async<string> =
     async {
-        let cwd' = defaultArg cwd (processCwd ())
+        let cwd' = defaultArg cwd (nodeProcess?cwd())
         let resolved = resolve cwd' path
-        let! api = fsApi ()
-        let statFn = Dyn.get api "stat"
-        let! st = Dyn.call1 statFn resolved |> unbox<JS.Promise<obj>> |> Async.AwaitPromise
+        let! st = fsPromises?stat(resolved) |> unbox<JS.Promise<obj>> |> Async.AwaitPromise
         let isDir = unbox<bool> (st?isDirectory())
         if isDir then
             return! listDirectoryEntries resolved

@@ -2,6 +2,7 @@ module VibeFs.Shell.SecureFetch
 
 open Fable.Core
 open Fable.Core.JsInterop
+open VibeFs.Kernel
 open VibeFs.Kernel.IpAllowlist
 
 [<Import("resolve4", "node:dns/promises")>]
@@ -13,8 +14,10 @@ let private resolve6 (hostname: string) : JS.Promise<string array> = jsNative
 [<Import("isIP", "node:net")>]
 let private netIsIP (ip: string) : int = jsNative
 
-[<Emit("new URL($0)")>]
-let private parseUrl (url: string) : obj = jsNative
+[<Global>]
+type URL(url: string) =
+    member _.protocol : string = jsNative
+    member _.hostname : string = jsNative
 
 type private LookupCallback = string -> obj -> (obj -> string -> int -> unit) -> unit
 
@@ -87,21 +90,18 @@ let private getAgentPair (hostname: string) : Async<AgentPair> =
             return pair
     }
 
-[<Emit("({ ...$0, agent: $1 })")>]
-let private withAgent (init: obj) (agent: obj) : obj = jsNative
-
 [<Global>]
 let private fetch (url: string) (init: obj) : JS.Promise<obj> = jsNative
 
 let secureFetch (url: string) (init: obj) : JS.Promise<obj> =
     async {
-        let u = parseUrl url
-        let protocol = u?protocol
+        let u = URL(url)
+        let protocol = u.protocol
         if protocol <> "http:" && protocol <> "https:" then
             failwith $"Unsupported protocol: {protocol}"
-        let hostname = u?hostname
+        let hostname = u.hostname
         let! pair = getAgentPair hostname
         let agent = if protocol = "https:" then box pair.https else box pair.http
-        return! fetch url (withAgent init agent) |> Async.AwaitPromise
+        return! fetch url (Dyn.withKey init "agent" agent) |> Async.AwaitPromise
     }
     |> Async.StartAsPromise

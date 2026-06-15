@@ -2,45 +2,66 @@ module VibeFs.Shell.OllamaClient
 
 open Fable.Core
 open Fable.Core.JsInterop
+open VibeFs.Kernel
 open VibeFs.Kernel.IpAllowlist
 open VibeFs.Shell.SecureFetch
-open VibeFs.Kernel
 
-[<Emit("process.env.OLLAMA_API_KEY ?? ''")>]
-let private envApiKey () : string = jsNative
-[<Emit("new URL($0)")>]
-let private newUrl (url: string) : obj = jsNative
-[<Emit("JSON.stringify($0)")>]
-let private stringify (o: obj) : string = jsNative
-[<Emit("$0[$1]()")>]
-let responseMethod0 (response: obj) (methodName: string) : obj = jsNative
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
 
-/// Build a fetch init with exact JS field names (method, Content-Type,
-/// Authorization).  Anonymous F# records would compile `method'`/`ContentType`
-/// verbatim, breaking fetch — so build the literal in JS.  Public so the field
-/// shape can be asserted in tests.
-[<Emit("({ method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: ('Bearer ' + $0) }, body: $1 })")>]
-let postInitNoSignal (apiKey: string) (body: string) : obj = jsNative
-[<Emit("({ method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: ('Bearer ' + $0) }, body: $1, signal: $2 })")>]
-let postInitWithSignal (apiKey: string) (body: string) (signal: obj) : obj = jsNative
+[<Global>]
+type URL(url: string) =
+    member _.protocol : string = jsNative
+    member _.hostname : string = jsNative
+
+let postInitNoSignal (apiKey: string) (body: string) : obj =
+    createObj [
+        "method" ==> "POST"
+        "headers" ==> createObj [
+            "Content-Type" ==> "application/json"
+            "Authorization" ==> $"Bearer {apiKey}"
+        ]
+        "body" ==> body
+    ]
+
+let postInitWithSignal (apiKey: string) (body: string) (signal: obj) : obj =
+    createObj [
+        "method" ==> "POST"
+        "headers" ==> createObj [
+            "Content-Type" ==> "application/json"
+            "Authorization" ==> $"Bearer {apiKey}"
+        ]
+        "body" ==> body
+        "signal" ==> signal
+    ]
+
+let responseMethod0 (response: obj) (methodName: string) : obj =
+    response?(methodName)()
 
 let ollamaApiBase = "https://ollama.com/api"
 
-let getOllamaApiKey () : string = envApiKey ()
+let getOllamaApiKey () : string =
+    let env = nodeProcess?env
+    if Dyn.isNullish env then ""
+    else
+        let key = env?("OLLAMA_API_KEY")
+        if Dyn.isNullish key then "" else string key
 
 let private normalizeOllamaPath (pathname: string) : string =
     if pathname.StartsWith("/") then pathname else $"/{pathname}"
 
 /// Validate a fetch URL: must be http(s) and on an allowed (non-private) host.
+let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
+
 let validateFetchUrl (url: string) : JS.Promise<string option> =
     async {
         try
-            let parsed = newUrl url
-            let protocol = Dyn.str parsed "protocol"
+            let parsed = URL(url)
+            let protocol = parsed.protocol
             if protocol <> "http:" && protocol <> "https:" then
                 return Some($"unsupported URL scheme: {protocol}")
             else
-                let hostname = Dyn.str parsed "hostname"
+                let hostname = parsed.hostname
                 return if validateHostname hostname then None else Some "host not allowed"
         with _ -> return Some "invalid URL"
     }
@@ -50,7 +71,7 @@ let validateFetchUrl (url: string) : JS.Promise<string option> =
 let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Promise<obj> =
     async {
         let url = $"{ollamaApiBase}{normalizeOllamaPath pathname}"
-        let bodyStr = stringify body
+        let bodyStr = JS.JSON.stringify(body)
         let init =
             match abortSignal with
             | Some signal -> postInitWithSignal (getOllamaApiKey ()) bodyStr signal
@@ -61,7 +82,7 @@ let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
             let! text =
                 async {
                     try
-                        let! t = (responseMethod0 response "text" :?> JS.Promise<string>) |> Async.AwaitPromise
+                        let! t = response?text() |> asPromise<string> |> Async.AwaitPromise
                         return t
                     with _ -> return ""
                 }
@@ -70,7 +91,7 @@ let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
             let detail = if text <> "" then text else statusText
             return raise (exn $"Ollama API error ({status}): {detail}")
         else
-            let! json = (responseMethod0 response "json" :?> JS.Promise<obj>) |> Async.AwaitPromise
+            let! json = response?json() |> asPromise<obj> |> Async.AwaitPromise
             return json
     }
     |> Async.StartAsPromise

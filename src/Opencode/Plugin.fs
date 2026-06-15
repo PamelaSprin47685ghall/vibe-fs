@@ -2,6 +2,7 @@ module VibeFs.Opencode.Plugin
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Fable.Core.JS
 open VibeFs.Kernel
 open VibeFs.Opencode.Tools
 open VibeFs.Opencode.Hooks
@@ -10,19 +11,13 @@ open VibeFs.Opencode.Session
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.PlanCommand
 
-[<Emit("{}")>]
-let private emptyObj () : obj = jsNative
-[<Emit("$0[$1] = $2")>]
-let private setKey (o: obj) (k: string) (v: obj) : unit = jsNative
-[<Emit("Object.assign($0, $1)")>]
-let private assignInto (target: obj) (source: obj) : obj = jsNative
-[<Emit("$0.length = 0")>]
-let private clearArray (arr: obj) : unit = jsNative
-[<Emit("$0.push($1)")>]
-let private pushPart (arr: obj) (part: obj) : unit = jsNative
+let private emptyObj () : obj = createObj []
+let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
+let private assignInto (target: obj) (source: obj) : obj = Dyn.assignInto target source
+let private clearArray (arr: obj) : unit = (arr :?> ResizeArray<obj>).Clear()
+let private pushPart (arr: obj) (part: obj) : unit = (arr :?> ResizeArray<obj>).Add(part)
 
-[<Emit("Date.now()")>]
-let private dateNow () : int = jsNative
+let private dateNow () : int = int (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
 
 let private loopFooter =
     "- report: a detailed description of what you did and why\n"
@@ -80,7 +75,7 @@ let private registerCommands (cfg: obj) : unit =
         setKey cmdObj "plan" (box {| template = "Generate a structured plan for a requirement."; description = "Generate a structured plan file via multi-branch reasoning" |})
     setKey cfg "command" cmdObj
 
-/// The opencode plugin entry point: `async (ctx) => Plugin`.
+/// The legacy opencode plugin hook builder.
 [<ExportDefault>]
 let plugin (ctx: obj) : JS.Promise<obj> =
     async {
@@ -91,6 +86,7 @@ let plugin (ctx: obj) : JS.Promise<obj> =
         let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.McpConfig.getStealthBrowserMcpLocalConfig().command |}
         let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
         let result = emptyObj ()
+        setKey result "id" (box "kunwei")
         setKey result "name" (box "kunwei")
         setKey result "mcp" mcpMap
         setKey result "tool" tools

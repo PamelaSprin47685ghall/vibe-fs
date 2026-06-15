@@ -7,26 +7,28 @@ open VibeFs.Kernel.AgentRole
 open VibeFs.Kernel.Permission
 open VibeFs.Kernel.AgentPolicy
 
-[<Emit("{}")>]
-let private emptyObj () : obj = jsNative
-[<Emit("$0[$1] = $2")>]
-let private setKey (o: obj) (k: string) (v: obj) : unit = jsNative
-[<Emit("Object.assign({}, $0, $1)")>]
-let private mergeObj (a: obj) (b: obj) : obj = jsNative
+let private emptyObj () : obj = createObj []
+let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
+let private mergeObj (a: obj) (b: obj) : obj =
+    let result = emptyObj ()
+    Dyn.assignInto result a |> ignore
+    Dyn.assignInto result b |> ignore
+    result
 
 let private emptyMcps : obj = [||] :> obj
 
 /// Build a plain-JS permission map {name: "allow"|"deny"} from a role's defaults.
 let private permissionDefaults (role: AgentRole) : obj =
     let o = emptyObj ()
-    defaultPermissions role |> Map.iter (fun name p ->
-        setKey o name (box (match p with Allow -> "allow" | Deny -> "deny")))
+    for KeyValue(name, p) in defaultPermissions role do
+        setKey o name (box (match p with Allow -> "allow" | Deny -> "deny"))
     o
 
 /// Build a plain-JS tool map {name: bool} from a role's tool policy.
 let toolDefaults (role: AgentRole) : obj =
     let o = emptyObj ()
-    toolMapFor role |> Map.iter (fun name p -> setKey o name (box (p = Allow)))
+    for KeyValue(name, p) in toolMapFor role do
+        setKey o name (box (p = Allow))
     o
 
 /// Built-in subagent system prompts are intentionally empty; role instructions live in user/tool prompts.
@@ -130,8 +132,8 @@ let private withRoleDefaults (name: string) (userAgent: obj) : obj =
     setKey result "mcps" mcps
     result
 
-[<Emit("Object.keys($0)")>]
-let private objectKeys (o: obj) : string array = jsNative
+let private objectKeys (o: obj) : string array =
+    JS.Constructors.Object.keys(o) |> Seq.toArray
 
 let private builtinAgents = [ "editor"; "greper"; "reverie"; "reviewer"; "browser"; "summarizer" ]
 

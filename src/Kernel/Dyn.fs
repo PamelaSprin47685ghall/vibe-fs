@@ -2,9 +2,7 @@ module VibeFs.Kernel.Dyn
 
 open Fable.Core
 open Fable.Core.JsInterop
-
-[<Global("Object.assign")>]
-let private objectAssign : obj -> obj -> obj = jsNative
+open Fable.Core.JS
 
 [<Global>]
 let private structuredClone : obj -> obj = jsNative
@@ -14,6 +12,21 @@ let undefinedValue : obj = Unchecked.defaultof<obj>
 let jsType (o: obj) : string = jsTypeof o
 
 let isNullish (o: obj) : bool = isNull o || jsType o = "undefined"
+
+let keys (o: obj) : string array =
+    if isNullish o then [||]
+    else JS.Constructors.Object.keys(o) |> Seq.toArray
+
+let assignInto (target: obj) (source: obj) : obj =
+    if not (isNullish source) then
+        for key in keys source do
+            target?(key) <- source?(key)
+    target
+
+let cloneShallow (o: obj) : obj =
+    let copy = createObj []
+    assignInto copy o |> ignore
+    copy
 
 let get (o: obj) (key: string) : obj =
     if isNullish o then undefinedValue else o?(key)
@@ -31,8 +44,7 @@ let call1 (f: obj) (a: obj) : obj = f $ a
 let call2 (f: obj) (a: obj) (b: obj) : obj = f $ (a, b)
 
 let withKey (o: obj) (key: string) (v: obj) : obj =
-    let copy = createObj []
-    objectAssign copy o |> ignore
+    let copy = cloneShallow o
     copy?(key) <- v
     copy
 

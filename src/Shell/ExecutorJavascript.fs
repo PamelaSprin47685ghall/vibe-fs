@@ -23,31 +23,59 @@ let private writeFileSync (path: string) (content: string) (encoding: string) : 
 [<Import("spawn", "node:child_process")>]
 let private childSpawn (cmd: string) (args: string array) (opts: obj) : obj = jsNative
 
+let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
+
 /// Initialise the lexer and parse a program's static imports in one step.
-[<Emit("(async () => { const { init, parse } = await import('es-module-lexer'); await init; return parse($0)[0]; })()")>]
-let private parseImports (program: string) : JS.Promise<obj array> = jsNative
+let private parseImports (program: string) : JS.Promise<obj array> =
+    async {
+        let! module' = importDynamic<obj> "es-module-lexer" |> Async.AwaitPromise
+        let init = Dyn.get module' "init"
+        do! Dyn.call1 init (box ()) |> asPromise<unit> |> Async.AwaitPromise
+        let parse = Dyn.get module' "parse"
+        let! result = Dyn.call1 parse (box program) |> asPromise<obj[]> |> Async.AwaitPromise
+        return unbox<obj[]> result.[0]
+    }
+    |> Async.StartAsPromise
 
 /// Read the full package.json object, defaulting to `{ type:'module', dependencies:{} }`
 /// and ensuring both fields exist (repairs a pre-existing file lacking type:module).
-[<Emit("(() => { try { const p = JSON.parse($0); if (!p.dependencies) p.dependencies = {}; if (!p.type) p.type = 'module'; return p; } catch { return ({ type: 'module', dependencies: {} }); } })()")>]
-let private parsePkgJson (json: string) : obj = jsNative
-[<Emit("$0[$1] = $2")>]
-let private setDep (deps: obj) (pkg: string) (value: string) : unit = jsNative
-[<Emit("JSON.stringify($0, null, 2)")>]
-let private jsonStringify (value: obj) : string = jsNative
-[<Emit("JSON.stringify($0)")>]
-let private jsonEscape (s: string) : string = jsNative
+let private parsePkgJson (json: string) : obj =
+    try
+        let p = JS.JSON.parse(json)
+        if Dyn.isNullish (Dyn.get p "dependencies") then p?("dependencies") <- createObj []
+        if Dyn.isNullish (Dyn.get p "type") then p?("type") <- "module"
+        p
+    with _ ->
+        createObj [ "type" ==> "module"; "dependencies" ==> createObj [] ]
+
+let private setDep (deps: obj) (pkg: string) (value: string) : unit =
+    deps?(pkg) <- value
+
+[<Global>]
+let private JSON : obj = jsNative
+
+let private jsonStringify (value: obj) : string =
+    JSON?stringify(value, Unchecked.defaultof<obj>, 2)
+
+let private jsonEscape (s: string) : string =
+    JS.JSON.stringify(s)
+
 /// Force `type: "module"` onto a package object (type is reserved in F#).
-[<Emit("$0.type = 'module'")>]
-let private setTypeModule (pkg: obj) : unit = jsNative
+let private setTypeModule (pkg: obj) : unit =
+    pkg?("type") <- "module"
 
 /// Spawn `npx npm install` in the project dir, resolving on a clean exit.
-[<Emit("new Promise((res, rej) => { const c = $3($0, $1, $2); c.on('error', rej); c.on('close', code => code === 0 ? res() : rej(new Error('npm install exited with ' + code))); })")>]
-let private npmInstallRaw (cmd: string) (args: string array) (opts: obj) (spawnFn: obj) : JS.Promise<unit> = jsNative
-
 let private npmInstall (projectDir: string) (packages: string array) : JS.Promise<unit> =
     let args' = Array.append [| "--yes"; "npm@latest"; "install"; "--prefix"; projectDir |] packages
-    npmInstallRaw "npx" args' (box {| cwd = projectDir; stdio = "ignore" |}) (box childSpawn)
+    let work =
+        Async.FromContinuations(fun (resolve, reject, _) ->
+            let c = childSpawn "npx" args' (box {| cwd = projectDir; stdio = "ignore" |})
+            c?on("error", fun (e: obj) -> reject (e :?> exn)) |> ignore
+            c?on("close", fun (code: obj) ->
+                if unbox<int> code = 0 then resolve ()
+                else reject (exn $"npm install exited with {code}")) |> ignore
+        )
+    work |> Async.StartAsPromise
 
 /// Build the ESM prelude that gives a transpiled script require/__dirname/__filename.
 let createJavascriptPrelude (cwd: string) : string =

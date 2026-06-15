@@ -11,10 +11,24 @@ type FinderLike =
     abstract member destroy: unit -> unit
     abstract member isDestroyed: bool with get
 
-/// Raw JS result of FileFinder.create + scan wait: `{ ok: bool, value?, error? }`.
-/// Returned as obj because Fable's Result DU uses a different shape ({tag,fields}).
-[<Emit("(async () => { const moduleName = '@ff-labs/fff-node'; const { FileFinder } = await import(moduleName); const r = FileFinder.create({ basePath: $0, aiMode: true }); if(!r.ok) return { ok: false, error: r.error }; const f = r.value; try { await f.waitForScan(15000); } catch {} return { ok: true, value: f }; })($0)")>]
-let private createFinderRaw (basePath: string) : JS.Promise<obj> = jsNative
+let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
+
+/// Create the fff-node FileFinder and wait for the initial scan.
+let private createFinderRaw (basePath: string) : JS.Promise<obj> =
+    async {
+        let! module' = importDynamic<obj> "@ff-labs/fff-node" |> Async.AwaitPromise
+        let fileFinder = Dyn.get module' "FileFinder"
+        let r = fileFinder?create({| basePath = basePath; aiMode = true |})
+        if not (Dyn.truthy (Dyn.get r "ok")) then
+            return createObj [ "ok" ==> false; "error" ==> Dyn.get r "error" ]
+        else
+            let f = Dyn.get r "value"
+            try
+                do! f?waitForScan(15000) |> asPromise<unit> |> Async.AwaitPromise
+            with _ -> ()
+            return createObj [ "ok" ==> true; "value" ==> f ]
+    }
+    |> Async.StartAsPromise
 
 /// Convert a raw JS `{ok, value?, error?}` object into a typed F# Result.
 /// Extracted so the shape-mapping is directly testable without fff-node.

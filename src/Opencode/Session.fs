@@ -41,13 +41,22 @@ let extractToolContext (context: obj) (pluginDirectory: string) : obj =
     |}
 
 /// Dynamically invoke a method chain on ctx.client and await the resulting promise.
-[<Emit("$2[$1]($0)")>]
-let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = jsNative
+let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
+    unbox (target?(method)(arg))
 
 /// Convert opencode's message shape `{ info: { role }, parts: [...] }` into the
 /// session-entry shape expected by `readAssistantText`.
-[<Emit("($0 || []).map(function(m) { return { type: 'message', message: { role: m.info && m.info.role, content: m.parts || [] } }; })")>]
-let private toEntries (messages: obj) : obj array = jsNative
+let private toEntries (messages: obj) : obj array =
+    if Dyn.isNullish messages then [||]
+    else
+        (unbox<obj[]> messages)
+        |> Array.map (fun m ->
+            let info = Dyn.get m "info"
+            let role = if Dyn.isNullish info then null else Dyn.get info "role"
+            let parts = Dyn.get m "parts"
+            let content = if Dyn.isNullish parts then [||] else unbox<obj[]> parts
+            let message = box {| role = role; content = content |}
+            box {| ``type`` = "message"; message = message |})
 
 /// Pull the latest assistant text from a session's messages.
 let extractSessionText (client: obj) (sessionId: string) (directory: string) : JS.Promise<string> =
@@ -69,33 +78,59 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) : J
     }
     |> Async.StartAsPromise
 
+let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
+
+[<Global("Promise")>]
+let private PromiseCtor : obj = jsNative
+
+let private promiseRace<'T> (promises: JS.Promise<'T> array) : JS.Promise<'T> =
+    unbox<JS.Promise<'T>> (PromiseCtor?race(promises))
+
 /// Prompt a session and race it against an AbortSignal.
-[<Emit("""
-(function(client, args, signal) {
-  const session = client.session;
-  if (signal && signal.aborted) {
-    return Promise.reject(new DOMException('Aborted', 'AbortError'));
-  }
-  if (!signal) {
-    return session.prompt(args).then(function() {});
-  }
-  return new Promise(function(resolve, reject) {
-    let settled = false;
-    function onAbort() {
-      if (settled) return;
-      settled = true;
-      signal.removeEventListener('abort', onAbort);
-      reject(new DOMException('Aborted', 'AbortError'));
+[<Global>]
+type DOMException(message: string, name: string) =
+    inherit System.Exception()
+
+let private promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
+    async {
+        let session = Dyn.get client "session"
+        if Dyn.isNullish signal then
+            do! session?prompt(args) |> asPromise<unit> |> Async.AwaitPromise
+        elif Dyn.truthy (Dyn.get signal "aborted") then
+            raise (DOMException("Aborted", "AbortError"))
+        else
+            let settled = ref false
+            let handlerRef = ref None
+            let abortAsync =
+                Async.FromContinuations (fun (cont, _, _) ->
+                    let handler = fun () ->
+                        if not settled.Value then
+                            settled.Value <- true
+                            match handlerRef.Value with
+                            | Some h -> signal?removeEventListener("abort", h) |> ignore
+                            | None -> ()
+                            cont "aborted"
+                    handlerRef.Value <- Some handler
+                    signal?addEventListener("abort", handler) |> ignore)
+            let promptAsync =
+                async {
+                    do! session?prompt(args) |> asPromise<unit> |> Async.AwaitPromise
+                    if not settled.Value then
+                        settled.Value <- true
+                        match handlerRef.Value with
+                        | Some h -> signal?removeEventListener("abort", h) |> ignore
+                        | None -> ()
+                    return "ok"
+                }
+            try
+                let! winner = promiseRace [| promptAsync |> Async.StartAsPromise; abortAsync |> Async.StartAsPromise |] |> Async.AwaitPromise
+                if winner = "aborted" then raise (DOMException("Aborted", "AbortError"))
+            with err ->
+                match translateJsError err with
+                | MessageAborted -> raise (DOMException("Aborted", "AbortError"))
+                | _ -> raise err
     }
-    signal.addEventListener('abort', onAbort);
-    session.prompt(args).then(function() {
-      if (!settled) { settled = true; signal.removeEventListener('abort', onAbort); resolve(); }
-    }, function(err) {
-      if (!settled) { settled = true; signal.removeEventListener('abort', onAbort); reject(err); }
-    });
-  });
-})(""" + "$0" + "," + "$1" + "," + "$2" + ")")>]
-let private promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> = jsNative
+    |> Async.StartAsPromise
 
 /// Core subagent runner. When cleanup is true, the child session is aborted and
 /// unregistered after the prompt finishes so temporary subagents do not linger.
