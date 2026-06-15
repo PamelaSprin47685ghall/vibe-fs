@@ -18,10 +18,12 @@ let private objectKeys (o: obj) : string array =
     JS.Constructors.Object.keys(o) |> Seq.toArray
 
 let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
-    let targetObj = box target
-    targetObj?length <- 0
-    for item in source do
-        targetObj?push(item) |> ignore
+    if obj.ReferenceEquals(target, source) then ()
+    else
+        let targetObj = box target
+        targetObj?length <- 0
+        for item in source do
+            targetObj?push(item) |> ignore
 
 let private jsTypeof (o: obj) : string = Dyn.jsType o
 

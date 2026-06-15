@@ -140,7 +140,7 @@ let createPlanCommand (deps: obj) : obj =
                             { requestId = workspaceId + "-" + hex4
                               rawRequirement = rawRequirement
                               normalizedRequirement = normalizeRequirement rawRequirement
-                              branchCount = 3
+                              branchCount = 5
                               branchModelName = "plan"
                               judgeModelName = "reviewer"
                               outputFileName = formatPlanFileName hex4
@@ -165,4 +165,4 @@ let createPlanCommand (deps: obj) : obj =
 
 /// Build all slash commands.
 let createSlashCommands (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj array =
-    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps reviewStore |]
+    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps reviewStore; createPlanCommand deps |]

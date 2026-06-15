@@ -56,7 +56,7 @@ let normalizeRequirement (raw: string) : string = raw.Trim().Replace("\r\n", "\n
 let formatPlanFileName (hex4: string) : string = "PLAN-" + hex4 + ".md"
 
 let buildPlanLenses (_: PlanRequest) : PlanLens list =
-    [ DirectDelivery; ArchitectureFirst; RiskFirst ]
+    [ DirectDelivery; ArchitectureFirst; RiskFirst; SimplificationFirst; CrossDomainFirst ]
 
 let buildPlanHypotheses (req: PlanRequest) (_: PlanLens list) : PlanHypothesis list =
     [ { hypothesisId = "h1"; text = "Most ambiguous part of: " + req.normalizedRequirement; targetBranchIds = [] }

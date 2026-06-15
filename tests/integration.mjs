@@ -296,7 +296,7 @@ check('webfetch schema has timeout', !!wfParams.timeout);
 check('webfetch execute is function', typeof webfetchDef.execute === 'function');
 
 // ── Fix #5: slash commands ──
-check('slash commands count', reg.slashCommands.length === 2);
+check('slash commands count', reg.slashCommands.length === 3);
 const loopCmd = reg.slashCommands.find(c => c.key === 'loop');
 check('loop command exists', !!loopCmd);
 check('loop command has execute', typeof loopCmd.execute === 'function');
@@ -305,6 +305,10 @@ check('loop with empty args cancels', loopResult === 'Loop mode cancelled.');
 const loopReviewCmd = reg.slashCommands.find(c => c.key === 'loop-review');
 check('loop-review command exists', !!loopReviewCmd);
 check('loop-review execute.length === 2', loopReviewCmd.execute.length === 2);
+const planCmd = reg.slashCommands.find(c => c.key === 'plan');
+check('plan command exists', !!planCmd);
+check('plan command has execute', typeof planCmd.execute === 'function');
+check('plan execute.length === 2', planCmd.execute.length === 2);
 
 // ── Wrapper completeness ──
 check('wrapper count === 6', reg.wrappers.length === 6);

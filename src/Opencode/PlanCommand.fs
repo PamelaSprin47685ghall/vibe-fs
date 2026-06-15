@@ -15,7 +15,7 @@ let private rng = System.Random()
 let private randomHex4 () : string = sprintf "%04x" (rng.Next(65536))
 
 let private pushPart (arr: obj) (part: obj) : unit =
-    (arr :?> List<obj>).Add(part)
+    (arr :?> ResizeArray<obj>).Add(part)
 
 let private planFooter =
     "\n\nYou must output ONLY the JSON requested. Do not write files, run commands, or modify the workspace."
@@ -43,7 +43,7 @@ let handlePlanCommand (ctx: obj) (input: obj) (output: obj) : Async<unit> =
                     { requestId = sessionID + "-" + hex4
                       rawRequirement = rawRequirement
                       normalizedRequirement = PlanEngine.normalizeRequirement rawRequirement
-                      branchCount = 3
+                      branchCount = 5
                       branchModelName = "reverie"
                       judgeModelName = "reviewer"
                       outputFileName = PlanEngine.formatPlanFileName hex4
