@@ -128,26 +128,24 @@ let private addRetryPendingSession state sessionID =
 let private deleteRetryPendingSession state sessionID =
     { state with retryPendingSessions = Set.remove sessionID state.retryPendingSessions }
 
-// ── Serialized state holder ──
+// ── Atomic state holder ──
+//
+// JavaScript is single-threaded, so a synchronous read-modify-write is atomic
+// with respect to every other hook callback.  The holder must NEVER await
+// inside a transition: that was the freeze.  The old serialized queue chained
+// every hook onto one promise, and a transition that awaited `session.prompt`
+// (a whole assistant turn) left that promise pending — jamming every later
+// chat.message / command.execute.before behind it, and deadlocking outright
+// when the nudge's own prompt re-entered chat.message.  All I/O now lives in
+// detached flows outside this lock; transitions are pure and instant.
 
 type private StateHolder<'state>(initialState: 'state) =
     let mutable state = initialState
-    let mutable tail : JS.Promise<unit> = resolvedUnitPromise()
 
-    member _.Enqueue(transition: 'state -> Async<'state>) : Async<'state> =
-        Async.FromContinuations(fun (ok, err, _) ->
-            let previous = tail
-            let next =
-                async {
-                    let! _ = previous |> Async.AwaitPromise |> Async.Catch
-                    try
-                        let! nextState = transition state
-                        state <- nextState
-                        ok nextState
-                    with ex -> err ex
-                }
-                |> Async.StartAsPromise
-            tail <- next |> Async.AwaitPromise |> Async.Catch |> Async.Ignore |> Async.StartAsPromise)
+    member _.Mutate<'result>(transition: 'state -> 'state * 'result) : 'result =
+        let nextState, result = transition state
+        state <- nextState
+        result
 
 // ── Snapshot ──
 
@@ -213,52 +211,111 @@ let private sendNudge (client: obj) (sessionID: string) (agentOpt: string option
         do! invoke1 promptArg "prompt" session |> Async.AwaitPromise |> Async.Ignore
     }
 
-let private nudgeIfNeeded (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
-                          (state: NudgeShellState) (sessionID: string) : Async<NudgeShellState> =
+// ── Nudge: claim (pure) → I/O (detached) → record (pure) ──
+//
+// Phase 1 `tryClaimNudge` runs under the lock: it checks the guards and, if the
+// session is eligible, marks it nudged and returns true.  Holding the claim
+// dedups concurrent idle/step events for the same session.
+// Phase 2 (snapshot + send) runs OUTSIDE the lock in a detached async.
+// Phase 3 (`decideNudge` re-validation, `recordSend`) re-enters the lock for
+// instant pure updates only.
+
+let private tryClaimNudge (state: NudgeShellState) (sessionID: string) : NudgeShellState * bool =
+    if hasStoppedSession state sessionID
+       || hasRetryPendingSession state sessionID
+       || hasNudgedSession state sessionID then
+        state, false
+    else
+        addNudgedSession state sessionID, true
+
+/// The pure decision made after the snapshot is in hand, re-validating the
+/// claim against any state changes that happened during the (lock-free) I/O.
+type private NudgeDecision =
+    | StandDown
+    | Send of promptText: string * agentOpt: string option * messageCount: int option
+
+let private decideNudge (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+                        (state: NudgeShellState) (sessionID: string)
+                        (snapshot: SessionSnapshot) : NudgeShellState * NudgeDecision =
+    // The claim may have been dropped while we did I/O (user resumed, session
+    // cleared, or an unexpected busy released it).  If so, stand down silently.
+    if not (hasNudgedSession state sessionID) || hasStoppedSession state sessionID then
+        state, StandDown
+    else
+        let state = rememberAgent state sessionID snapshot.agentFromMessage
+        match snapshot.messageCount with
+        | Some count when getDeliveredCount state sessionID = Some count ->
+            deleteNudgedSession state sessionID, StandDown
+        | _ ->
+            let context =
+                { todos = snapshot.todos
+                  lastAssistantMessage = snapshot.lastAssistantMessage
+                  hasActiveRunner = false
+                  isLoopActive = reviewStore.isReviewActive(sessionID) }
+            match decide context with
+            | NudgeNone | NudgeRunner -> deleteNudgedSession state sessionID, StandDown
+            | action ->
+                match selectNudgePrompt action with
+                | None -> deleteNudgedSession state sessionID, StandDown
+                | Some promptText ->
+                    let agentOpt =
+                        getAgent state sessionID
+                        |> Option.orElse (ChildAgent.lookupChildAgent sessionID)
+                    let state = { state with lastNudgedSession = Some sessionID }
+                    state, Send(promptText, agentOpt, snapshot.messageCount)
+
+/// The pure state update applied after the send attempt resolves.
+type private SendOutcome = Delivered of messageCount: int option | Aborted | Busy | Failed
+
+let private recordSend (state: NudgeShellState) (sessionID: string) (outcome: SendOutcome) : NudgeShellState =
+    match outcome with
+    | Delivered count ->
+        let state =
+            match count with
+            | Some c -> setDeliveredCount state sessionID c
+            | None -> state
+        deleteNudgedSession state sessionID
+    | Aborted -> stopSession state sessionID
+    | Busy -> deleteNudgedSession state sessionID
+    | Failed -> addRetryPendingSession (deleteNudgedSession state sessionID) sessionID
+
+/// The detached nudge flow: all client I/O happens here, never under the lock.
+/// Each lock re-entry (`Mutate`) is a pure, instant transition.
+let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
+                         (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+                         (sessionID: string) : Async<unit> =
     async {
-        if hasStoppedSession state sessionID then return state
-        elif hasRetryPendingSession state sessionID then return state
-        elif hasNudgedSession state sessionID then return state
-        else
-            let state = addNudgedSession state sessionID
+        try
             let! snapshotOpt = collectSnapshot client sessionID
             match snapshotOpt with
-            | None -> return deleteNudgedSession state sessionID
+            | None -> holder.Mutate(fun state -> deleteNudgedSession state sessionID, ())
             | Some snapshot ->
-                let state = rememberAgent state sessionID snapshot.agentFromMessage
-                match snapshot.messageCount with
-                | Some count when getDeliveredCount state sessionID = Some count ->
-                    return deleteNudgedSession state sessionID
-                | _ ->
-                    let context =
-                        { todos = snapshot.todos
-                          lastAssistantMessage = snapshot.lastAssistantMessage
-                          hasActiveRunner = false
-                          isLoopActive = reviewStore.isReviewActive(sessionID) }
-                    match decide context with
-                    | NudgeNone
-                    | NudgeRunner -> return deleteNudgedSession state sessionID
-                    | action ->
-                        match selectNudgePrompt action with
-                        | None -> return deleteNudgedSession state sessionID
-                        | Some promptText ->
-                            let agentOpt =
-                                getAgent state sessionID
-                                |> Option.orElse (ChildAgent.lookupChildAgent sessionID)
-                            let state = { state with lastNudgedSession = Some sessionID }
-                            try
-                                do! sendNudge client sessionID agentOpt promptText
-                                let state =
-                                    match snapshot.messageCount with
-                                    | Some count -> setDeliveredCount state sessionID count
-                                    | None -> state
-                                return deleteNudgedSession state sessionID
-                            with error ->
-                                match translateJsError error with
-                                | MessageAborted -> return stopSession state sessionID
-                                | SessionBusy -> return deleteNudgedSession state sessionID
-                                | _ -> return addRetryPendingSession (deleteNudgedSession state sessionID) sessionID
+                match holder.Mutate(fun state -> decideNudge reviewStore state sessionID snapshot) with
+                | StandDown -> ()
+                | Send(promptText, agentOpt, messageCount) ->
+                    let! caught = Async.Catch(sendNudge client sessionID agentOpt promptText)
+                    let outcome =
+                        match caught with
+                        | Choice1Of2 () -> Delivered messageCount
+                        | Choice2Of2 error ->
+                            match translateJsError error with
+                            | MessageAborted -> Aborted
+                            | SessionBusy -> Busy
+                            | _ -> Failed
+                    holder.Mutate(fun state -> recordSend state sessionID outcome, ())
+        with _ ->
+            // Never let an unexpected throw strand the claim and re-block the session.
+            holder.Mutate(fun state -> deleteNudgedSession state sessionID, ())
     }
+
+/// Fire the nudge flow detached from the caller's hook promise.  `StartImmediate`
+/// runs only up to the first `AwaitPromise` (kicking off the snapshot SDK call,
+/// which is non-blocking) before yielding, so the hook returns at once and the
+/// rest of the flow — including any `session.prompt` — never blocks the lock.
+let private startNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
+                           (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+                           (sessionID: string) : unit =
+    Async.StartImmediate(runNudgeFlow holder client reviewStore sessionID)
 
 // ── Event handlers ──
 
@@ -276,16 +333,14 @@ let private handleSessionNextPrompted state (props: obj) sessionID =
 
 let private handleSessionNextRetried state sessionID = addRetryPendingSession state sessionID
 
-let private handleMessageUpdated client reviewStore state (props: obj) sessionID =
-    async {
-        let info = Dyn.get props "info"
-        if isAbortDomainError (Dyn.get info "error") then
-            return stopSession state sessionID
-        elif isCompletedAssistantMessage info then
-            return! nudgeIfNeeded client reviewStore state sessionID
-        else
-            return state
-    }
+let private handleMessageUpdated state (props: obj) sessionID =
+    let info = Dyn.get props "info"
+    if isAbortDomainError (Dyn.get info "error") then
+        stopSession state sessionID, false
+    elif isCompletedAssistantMessage info then
+        tryClaimNudge state sessionID
+    else
+        state, false
 
 let private handleMessagePartUpdated state (props: obj) sessionID =
     let part = Dyn.get props "part"
@@ -306,20 +361,17 @@ let private handleSessionNextToolFailed state (props: obj) sessionID =
     else
         deleteRetryPendingSession state sessionID
 
-let private handleSessionNextStepEnded client reviewStore state (props: obj) sessionID =
-    async {
-        let state = deleteRetryPendingSession state sessionID
-        let finish =
-            let direct = Dyn.str props "finish"
-            if direct <> "" then direct else Dyn.str (Dyn.get props "info") "finish"
-        if finish <> "" && isTerminalAssistantFinish finish then
-            return! nudgeIfNeeded client reviewStore state sessionID
-        else
-            return state
-    }
+let private handleSessionNextStepEnded state (props: obj) sessionID =
+    let state = deleteRetryPendingSession state sessionID
+    let finish =
+        let direct = Dyn.str props "finish"
+        if direct <> "" then direct else Dyn.str (Dyn.get props "info") "finish"
+    if finish <> "" && isTerminalAssistantFinish finish then
+        tryClaimNudge state sessionID
+    else
+        state, false
 
-let private handleSessionIdle client reviewStore state _props sessionID =
-    nudgeIfNeeded client reviewStore state sessionID
+let private handleSessionIdle state sessionID = tryClaimNudge state sessionID
 
 let private handleSessionBusy state sessionID =
     let state = if state.lastNudgedSession <> Some sessionID then deleteNudgedSession state sessionID else state
@@ -335,43 +387,41 @@ let private handleSessionRetryStatus state _props sessionID = addRetryPendingSes
 
 let private handleRetryProgress state _props sessionID = deleteRetryPendingSession state sessionID
 
-let private dispatchEvent client reviewStore state eventType (props: obj) sessionID =
-    async {
-        match eventType with
-        | "stream-abort" -> return clearSession state sessionID
-        | "session.delete" | "session.close" | "session.remove" | "session.deleted" ->
-            return handleSessionDelete state sessionID
-        | "session.next.prompted" ->
-            return handleSessionNextPrompted state props sessionID
-        | "session.next.retried" ->
-            return handleSessionNextRetried state sessionID
-        | "message.updated" ->
-            return! handleMessageUpdated client reviewStore state props sessionID
-        | "message.part.updated" ->
-            return handleMessagePartUpdated state props sessionID
-        | "session.next.step.failed" ->
-            return handleSessionNextStepFailed state props sessionID
-        | "session.next.tool.failed" ->
-            return handleSessionNextToolFailed state props sessionID
-        | "session.next.step.ended" ->
-            return! handleSessionNextStepEnded client reviewStore state props sessionID
-        | "session.idle" ->
-            return! handleSessionIdle client reviewStore state props sessionID
-        | "session.error" ->
-            return handleSessionError state props sessionID
-        | "session.status" ->
-            let statusType = Dyn.str (Dyn.get props "status") "type"
-            match statusType with
-            | "idle" -> return! handleSessionIdle client reviewStore state props sessionID
-            | "busy" -> return handleSessionBusy state sessionID
-            | "retry" -> return handleSessionRetryStatus state props sessionID
-            | _ -> return state
-        | _ ->
-            if isRetryProgressEvent eventType then
-                return handleRetryProgress state props sessionID
-            else
-                return state
-    }
+let private dispatchEvent state eventType (props: obj) sessionID : NudgeShellState * bool =
+    match eventType with
+    | "stream-abort" -> clearSession state sessionID, false
+    | "session.delete" | "session.close" | "session.remove" | "session.deleted" ->
+        handleSessionDelete state sessionID, false
+    | "session.next.prompted" ->
+        handleSessionNextPrompted state props sessionID, false
+    | "session.next.retried" ->
+        handleSessionNextRetried state sessionID, false
+    | "message.updated" ->
+        handleMessageUpdated state props sessionID
+    | "message.part.updated" ->
+        handleMessagePartUpdated state props sessionID, false
+    | "session.next.step.failed" ->
+        handleSessionNextStepFailed state props sessionID, false
+    | "session.next.tool.failed" ->
+        handleSessionNextToolFailed state props sessionID, false
+    | "session.next.step.ended" ->
+        handleSessionNextStepEnded state props sessionID
+    | "session.idle" ->
+        handleSessionIdle state sessionID
+    | "session.error" ->
+        handleSessionError state props sessionID, false
+    | "session.status" ->
+        let statusType = Dyn.str (Dyn.get props "status") "type"
+        match statusType with
+        | "idle" -> handleSessionIdle state sessionID
+        | "busy" -> handleSessionBusy state sessionID, false
+        | "retry" -> handleSessionRetryStatus state props sessionID, false
+        | _ -> state, false
+    | _ ->
+        if isRetryProgressEvent eventType then
+            handleRetryProgress state props sessionID, false
+        else
+            state, false
 
 // ── Hook class ──
 
@@ -380,23 +430,18 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
     let holder = StateHolder<NudgeShellState>(emptyState ())
 
     member _.handleChatMessage(sessionID: string, agent: string, parts: obj) : JS.Promise<unit> =
-        holder.Enqueue(fun state ->
-            async {
-                let text = getPartsText parts
-                if isNudgePrompt text then return state
-                else
-                    let agentOpt = if agent <> "" then Some agent else None
-                    let state = rememberAgent state sessionID agentOpt
-                    return resumeSession state sessionID
-            })
-        |> Async.Ignore
-        |> Async.StartAsPromise
+        holder.Mutate(fun state ->
+            let text = getPartsText parts
+            if isNudgePrompt text then state, ()
+            else
+                let agentOpt = if agent <> "" then Some agent else None
+                resumeSession (rememberAgent state sessionID agentOpt) sessionID, ())
+        resolvedUnitPromise ()
 
     member _.handleCommandExecuteBefore(input: obj) (_output: obj) : JS.Promise<unit> =
         let sessionID = Dyn.str input "sessionID"
-        holder.Enqueue(fun state -> async { return resumeSession state sessionID })
-        |> Async.Ignore
-        |> Async.StartAsPromise
+        holder.Mutate(fun state -> resumeSession state sessionID, ())
+        resolvedUnitPromise ()
 
     member _.handleToolExecuteAfter(input: obj) (output: obj) : JS.Promise<unit> =
         async {
@@ -409,20 +454,23 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
         } |> Async.StartAsPromise
 
     member _.handleEvent(input: obj) : JS.Promise<unit> =
-        holder.Enqueue(fun state ->
-            async {
+        let claimed =
+            holder.Mutate(fun state ->
                 try
                     let event = Dyn.get input "event"
                     let eventType = Dyn.str event "type"
                     let rawProps = Dyn.get event "properties"
                     let props = if Dyn.isNullish rawProps then event else rawProps
                     let sessionID = getSessionID eventType props
-                    if sessionID = "" then return state
-                    else return! dispatchEvent client reviewStore state eventType props sessionID
-                with _ -> return state
-            })
-        |> Async.Ignore
-        |> Async.StartAsPromise
+                    if sessionID = "" then state, None
+                    else
+                        let nextState, wantsNudge = dispatchEvent state eventType props sessionID
+                        nextState, (if wantsNudge then Some sessionID else None)
+                with _ -> state, None)
+        match claimed with
+        | Some sessionID -> startNudgeFlow holder client reviewStore sessionID
+        | None -> ()
+        resolvedUnitPromise ()
 
 let createNudgeHook (ctx: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : NudgeHook =
     NudgeHook(ctx, reviewStore)

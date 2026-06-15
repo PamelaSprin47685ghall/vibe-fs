@@ -9,8 +9,14 @@ open VibeFs.Shell.CapsShell
 /// without losing precision to F#'s 32-bit `int`.
 let mutable private timestampSource = fun () -> box (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
 
-let private nowToken () : string = string (timestampSource ())
-let private isoNow () : string = System.DateTime.UtcNow.ToString("O")
+let private timestampMs () : int64 =
+    match System.Int64.TryParse(string (timestampSource ())) with
+    | true, value -> value
+    | false, _ -> 0L
+
+let private nowToken (timestamp: int64) : string = string timestamp
+let private isoTime (timestamp: int64) : string =
+    System.DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime.ToString("O")
 
 /// Replace the timestamp source for deterministic tests.
 let setTimestampSource (source: unit -> obj) : unit = timestampSource <- source
@@ -32,14 +38,15 @@ let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]
         let! files = findCapsFiles projectRoot |> Async.AwaitPromise
         if List.isEmpty files then return [||]
         else
-            let timestamp = nowToken ()
-            let modified = isoNow ()
+            let timestamp = timestampMs ()
+            let token = nowToken timestamp
+            let modified = isoTime timestamp
             return
                 files
                 |> Array.ofList
                 |> Array.mapi (fun index f ->
                     { path = f.label
-                      callId = $"caps-fr-{timestamp}-{index}"
+                      callId = $"caps-fr-{token}-{index}"
                       input = {| path = f.label |}
                       output = {| success = true
                                   file_size = f.content.Length

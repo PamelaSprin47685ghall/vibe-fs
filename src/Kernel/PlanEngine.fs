@@ -5,25 +5,43 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.PlanTypes
 
-type PlanModelCaller = VibeFs.Kernel.PlanTypes.PlanModelCaller
-
-let private optString (o: obj) (k: string) : string =
-    let v = Dyn.get o k
-    if Dyn.isNullish v then "" else string v
-
-let private optStringArray (o: obj) (k: string) : string list =
-    let v = Dyn.get o k
-    if Dyn.isArray v then (unbox<obj[]> v) |> Array.map string |> Array.toList else []
-
-let private optFloat (o: obj) (k: string) : float =
-    let v = Dyn.get o k
-    if Dyn.isNullish v then 0.0
+let private optString (o: obj) (k: string) : Result<string, string> =
+    if Dyn.isNullish o then Error $"{k}: missing object"
     else
-        match v with
-        | :? float as f -> f
-        | :? int as i -> float i
-        | :? string as s -> (try float s with | _ -> 0.0)
-        | _ -> 0.0
+        let v = Dyn.get o k
+        if Dyn.isNullish v then Error $"{k}: missing"
+        else
+            let s = string v
+            if System.String.IsNullOrWhiteSpace s then Error $"{k}: empty"
+            else Ok s
+
+let private optStringArray (o: obj) (k: string) : Result<string list, string> =
+    if Dyn.isNullish o then Error $"{k}: missing object"
+    else
+        let v = Dyn.get o k
+        if Dyn.isNullish v then Ok []
+        elif Dyn.isArray v then
+            let arr = unbox<obj[]> v
+            let items = arr |> Array.toList |> List.map string
+            Ok items
+        else Error $"{k}: not an array"
+
+let private optFloat (o: obj) (k: string) : Result<float, string> =
+    if Dyn.isNullish o then Error $"{k}: missing object"
+    else
+        let v = Dyn.get o k
+        if Dyn.isNullish v then Error $"{k}: missing"
+        elif Dyn.typeIs v "number" then Ok (unbox<float> v)
+        elif Dyn.typeIs v "string" then
+            match System.Double.TryParse (string v) with
+            | true, f -> Ok f
+            | _ -> Error $"{k}: not a number"
+        else Error $"{k}: not a number"
+
+let private req (r: Result<'a, string>) : 'a =
+    match r with
+    | Ok v -> v
+    | Error e -> failwith e
 
 let private mkSchema (props: (string * obj) list) (required: string list) : obj =
     createObj
@@ -102,8 +120,11 @@ let parsePlanHypothesesToolCall (arguments: obj) : PlanHypothesis list =
         (unbox<obj[]> hyps)
         |> Array.mapi (fun i e ->
             { hypothesisId = "h" + string (i + 1)
-              text = optString e "text"
-              targetBranchIds = optStringArray e "targetBranchIds" })
+              text = req (optString e "text")
+              targetBranchIds =
+                  match optStringArray e "targetBranchIds" with
+                  | Ok xs -> xs
+                  | Error _ -> [] })
         |> Array.toList
     else []
 
@@ -125,11 +146,14 @@ let buildPlanHypotheses (req: PlanRequest) (caller: PlanModelCaller option) (len
     | Some call ->
         async {
             let! calls = call (buildPlanHypothesesPrompt req) [ buildPlanHypothesesToolSchema ]
-            return
-                calls
-                |> List.tryFind (fun c -> c.toolName = "submit_plan_hypotheses")
-                |> Option.map (fun c -> parsePlanHypothesesToolCall c.arguments)
-                |> Option.defaultValue (staticHypotheses req)
+            let validToolCalls = calls |> List.filter (fun c -> c.toolName = "submit_plan_hypotheses")
+            if List.isEmpty validToolCalls then return staticHypotheses req
+            else
+                return
+                    validToolCalls
+                    |> List.tryHead
+                    |> Option.map (fun c -> parsePlanHypothesesToolCall c.arguments)
+                    |> Option.defaultValue (staticHypotheses req)
         }
 
 let private hypothesisPacketForBranch (hyps: PlanHypothesis list) (branchId: string) : string =
@@ -146,12 +170,13 @@ let private hypothesisPacketForBranch (hyps: PlanHypothesis list) (branchId: str
 // Branch draft
 // ---------------------------------------------------------------------------
 
-let private parseLens (s: string) : PlanLens =
+let private parseLens (s: string) : Result<PlanLens, string> =
     match s with
-    | "ArchitectureFirst" -> ArchitectureFirst | "RiskFirst" -> RiskFirst
-    | "SimplificationFirst" -> SimplificationFirst | "CounterexampleFirst" -> CounterexampleFirst
-    | "CrossDomainFirst" -> CrossDomainFirst | "ConstraintFirst" -> ConstraintFirst
-    | _ -> DirectDelivery
+    | "ArchitectureFirst" -> Ok ArchitectureFirst | "RiskFirst" -> Ok RiskFirst
+    | "SimplificationFirst" -> Ok SimplificationFirst | "CounterexampleFirst" -> Ok CounterexampleFirst
+    | "CrossDomainFirst" -> Ok CrossDomainFirst | "ConstraintFirst" -> Ok ConstraintFirst
+    | "DirectDelivery" -> Ok DirectDelivery
+    | _ -> Error $"unknown lens '{s}'"
 
 let buildPlanBranchToolSchema : PlanToolSchema =
     { name = "submit_plan_branch"
@@ -172,16 +197,17 @@ let buildPlanBranchToolSchema : PlanToolSchema =
                 "keyAssumptions"; "keyRisks"; "validationChecks"; "selfCritique"; "confidence" ] }
 
 let parsePlanBranchToolCall (arguments: obj) : PlanBranchCandidate =
-    { branchId = optString arguments "branchId"
-      lens = parseLens (optString arguments "lens")
-      title = optString arguments "title"
-      candidatePlanMarkdown = optString arguments "candidatePlanMarkdown"
-      candidatePlanSummary = optString arguments "candidatePlanSummary"
-      keyAssumptions = optStringArray arguments "keyAssumptions"
-      keyRisks = optStringArray arguments "keyRisks"
-      validationChecks = optStringArray arguments "validationChecks"
-      selfCritique = optString arguments "selfCritique"
-      confidence = optFloat arguments "confidence" }
+    { branchId = req (optString arguments "branchId")
+      lens = req (Result.bind parseLens (optString arguments "lens"))
+      title = req (optString arguments "title")
+      candidatePlanMarkdown = req (optString arguments "candidatePlanMarkdown")
+      candidatePlanSummary = req (optString arguments "candidatePlanSummary")
+      keyAssumptions = req (optStringArray arguments "keyAssumptions")
+      keyRisks = req (optStringArray arguments "keyRisks")
+      validationChecks = req (optStringArray arguments "validationChecks")
+      selfCritique = req (optString arguments "selfCritique")
+      confidence = req (optFloat arguments "confidence") }
+
 
 let buildPlanBranchPrompt (req: PlanRequest) (lens: PlanLens) (hyps: PlanHypothesis list) : string =
     let h = hypothesisPacketForBranch hyps (lensName lens)
@@ -197,7 +223,7 @@ let buildPlanBranchPrompt (req: PlanRequest) (lens: PlanLens) (hyps: PlanHypothe
     + "\n\nRequirement: " + req.normalizedRequirement
     + ctxText
     + "\n\nKey uncertainties for this branch:\n" + h
-    + "\n\nCall the submit_plan_branch tool with the branch draft."
+    + "\n\nCall the submit_plan_branch tool with the branch draft. All required fields must be present and non-empty."
 
 // ---------------------------------------------------------------------------
 // Critique
@@ -217,12 +243,12 @@ let buildPlanCritiqueToolSchema : PlanToolSchema =
               [ "branchId"; "critiqueMarkdown"; "criticalIssues"; "missingRequirements"; "counterexamples"; "improvementDirections" ] }
 
 let parsePlanCritiqueToolCall (arguments: obj) : PlanBranchCritique =
-    { branchId = optString arguments "branchId"
-      critiqueMarkdown = optString arguments "critiqueMarkdown"
-      criticalIssues = optStringArray arguments "criticalIssues"
-      missingRequirements = optStringArray arguments "missingRequirements"
-      counterexamples = optStringArray arguments "counterexamples"
-      improvementDirections = optStringArray arguments "improvementDirections" }
+    { branchId = req (optString arguments "branchId")
+      critiqueMarkdown = req (optString arguments "critiqueMarkdown")
+      criticalIssues = req (optStringArray arguments "criticalIssues")
+      missingRequirements = req (optStringArray arguments "missingRequirements")
+      counterexamples = req (optStringArray arguments "counterexamples")
+      improvementDirections = req (optStringArray arguments "improvementDirections") }
 
 let buildPlanCritiquePrompt (_: PlanRequest) (c: PlanBranchCandidate) : string =
     "You are a ruthless critic reviewing a plan draft. Identify concrete problems, missing requirements, unstated assumptions, and ways the plan could fail. Do NOT propose fixes; only diagnose."
@@ -230,7 +256,7 @@ let buildPlanCritiquePrompt (_: PlanRequest) (c: PlanBranchCandidate) : string =
     + "\n\nPlan:\n" + c.candidatePlanMarkdown
     + "\n\nSummary: " + c.candidatePlanSummary
     + "\nSelf-critique: " + c.selfCritique
-    + "\n\nCall the submit_plan_critique tool with your diagnosis."
+    + "\n\nCall the submit_plan_critique tool with your diagnosis. All required fields must be present and non-empty."
 
 // ---------------------------------------------------------------------------
 // Pool
@@ -254,14 +280,14 @@ let buildPlanPoolToolSchema : PlanToolSchema =
               [ "branchId"; "entries" ] }
 
 let parsePlanPoolToolCall (arguments: obj) : PlanPoolEntry list =
-    let branchId = optString arguments "branchId"
+    let branchId = req (optString arguments "branchId")
     let entries = Dyn.get arguments "entries"
     if Dyn.isArray entries then
         (unbox<obj[]> entries)
         |> Array.mapi (fun i e ->
             { entryId = "e" + string (i + 1); branchId = branchId
-              title = optString e "title"; contentMarkdown = optString e "contentMarkdown"
-              approachSummary = optString e "approachSummary"; confidence = optFloat e "confidence" })
+              title = req (optString e "title"); contentMarkdown = req (optString e "contentMarkdown")
+              approachSummary = req (optString e "approachSummary"); confidence = req (optFloat e "confidence") })
         |> Array.toList
     else []
 
@@ -270,7 +296,7 @@ let buildPlanPoolPrompt (_: PlanRequest) (c: PlanBranchCandidate) (crit: PlanBra
     + "\n\nBranch: " + c.branchId + " (lens " + lensName c.lens + ")"
     + "\n\nOriginal plan summary: " + c.candidatePlanSummary
     + "\n\nCritique to address:\n" + crit.critiqueMarkdown
-    + "\n\nCall the submit_plan_pool tool with the alternative fragments."
+    + "\n\nCall the submit_plan_pool tool with the alternative fragments. All required fields must be present and non-empty."
 
 // ---------------------------------------------------------------------------
 // Revision
@@ -289,23 +315,24 @@ let buildPlanRevisionToolSchema : PlanToolSchema =
                 "keyAssumptions", strArrayProp "Key assumptions."
                 "keyRisks", strArrayProp "Key risks."
                 "validationChecks", strArrayProp "Validation checks."
+                "implementationSteps", strArrayProp "Ordered implementation steps."
                 "selfCritique", strProp "Self critique."
                 "confidence", numProp "Confidence 0.0-1.0." ]
               [ "branchId"; "lens"; "title"; "revisedPlanMarkdown"; "revisedPlanSummary"
-                "keyAssumptions"; "keyRisks"; "validationChecks"; "selfCritique"; "confidence" ] }
+                "keyAssumptions"; "keyRisks"; "validationChecks"; "implementationSteps"; "selfCritique"; "confidence" ] }
 
-let parsePlanRevisionToolCall (arguments: obj) : PlanBranchRevision =
-    { branchId = optString arguments "branchId"
-      lens = parseLens (optString arguments "lens")
-      title = optString arguments "title"
-      revisedPlanMarkdown = optString arguments "revisedPlanMarkdown"
-      revisedPlanSummary = optString arguments "revisedPlanSummary"
-      keyAssumptions = optStringArray arguments "keyAssumptions"
-      keyRisks = optStringArray arguments "keyRisks"
-      validationChecks = optStringArray arguments "validationChecks"
-      selfCritique = optString arguments "selfCritique"
-      confidence = optFloat arguments "confidence"
-      originalCandidate = Unchecked.defaultof<_>; critique = Unchecked.defaultof<_>; pool = [] }
+let parsePlanRevisionToolCall (arguments: obj) : PlanBranchRevisionData =
+    { branchId = req (optString arguments "branchId")
+      lens = req (Result.bind parseLens (optString arguments "lens"))
+      title = req (optString arguments "title")
+      revisedPlanMarkdown = req (optString arguments "revisedPlanMarkdown")
+      revisedPlanSummary = req (optString arguments "revisedPlanSummary")
+      keyAssumptions = req (optStringArray arguments "keyAssumptions")
+      keyRisks = req (optStringArray arguments "keyRisks")
+      validationChecks = req (optStringArray arguments "validationChecks")
+      implementationSteps = req (optStringArray arguments "implementationSteps")
+      selfCritique = req (optString arguments "selfCritique")
+      confidence = req (optFloat arguments "confidence") }
 
 let buildPlanRevisionPrompt (_: PlanRequest) (c: PlanBranchCandidate) (crit: PlanBranchCritique) (pool: PlanPoolEntry list) : string =
     let p = pool |> List.map (fun x -> "- " + x.title + ": " + x.contentMarkdown) |> String.concat "\n"
@@ -316,7 +343,7 @@ let buildPlanRevisionPrompt (_: PlanRequest) (c: PlanBranchCandidate) (crit: Pla
     + "\n\nOriginal plan:\n" + c.candidatePlanMarkdown
     + "\n\nCritique:\n" + crit.critiqueMarkdown
     + "\n\nPool alternatives:\n" + p
-    + "\n\nCall the submit_plan_revision tool with the revised plan."
+    + "\n\nCall the submit_plan_revision tool with the revised plan, including ordered implementation steps and validation checks. All required fields must be present and non-empty."
 
 // ---------------------------------------------------------------------------
 // Judge
@@ -335,11 +362,11 @@ let buildPlanJudgeToolSchema : PlanToolSchema =
               [ "winnerBranchId"; "keptBranchIds"; "rejectedBranchIds"; "judgeReasoning"; "mergeNotes" ] }
 
 let parsePlanJudgeToolCall (arguments: obj) : PlanJudgeDecision =
-    { winnerBranchId = optString arguments "winnerBranchId"
-      keptBranchIds = optStringArray arguments "keptBranchIds"
-      rejectedBranchIds = optStringArray arguments "rejectedBranchIds"
-      judgeReasoning = optString arguments "judgeReasoning"
-      mergeNotes = optStringArray arguments "mergeNotes" }
+    { winnerBranchId = req (optString arguments "winnerBranchId")
+      keptBranchIds = req (optStringArray arguments "keptBranchIds")
+      rejectedBranchIds = req (optStringArray arguments "rejectedBranchIds")
+      judgeReasoning = req (optString arguments "judgeReasoning")
+      mergeNotes = req (optStringArray arguments "mergeNotes") }
 
 let buildPlanJudgePrompt (_: PlanRequest) (revs: PlanBranchRevision list) : string =
     let parts =
@@ -353,12 +380,12 @@ let buildPlanJudgePrompt (_: PlanRequest) (revs: PlanBranchRevision list) : stri
                 r.critique.criticalIssues
                 |> List.map (fun s -> "  - " + s)
                 |> String.concat "\n"
-            [ "Branch " + r.branchId + " (" + lensName r.lens + ", conf " + string r.confidence + ")"
-              "Summary: " + r.revisedPlanSummary
-              "Plan:\n" + r.revisedPlanMarkdown
-              "Key assumptions: " + (String.concat "; " r.keyAssumptions)
-              "Key risks: " + (String.concat "; " r.keyRisks)
-              "Validation checks: " + (String.concat "; " r.validationChecks)
+            [ "Branch " + r.data.branchId + " (" + lensName r.data.lens + ", conf " + string r.data.confidence + ")"
+              "Summary: " + r.data.revisedPlanSummary
+              "Plan:\n" + r.data.revisedPlanMarkdown
+              "Key assumptions: " + (String.concat "; " r.data.keyAssumptions)
+              "Key risks: " + (String.concat "; " r.data.keyRisks)
+              "Validation checks: " + (String.concat "; " r.data.validationChecks)
               "Top critique issues:\n" + critiqueNotes
               "Pool alternatives considered:\n" + poolNotes ]
             |> String.concat "\n")
@@ -368,7 +395,7 @@ let buildPlanJudgePrompt (_: PlanRequest) (revs: PlanBranchRevision list) : stri
     + "Do NOT reward length, prose style, confidence scores, or abstract language."
     + " Prefer the candidate that best matches the requirement, is most implementable, and has the clearest risk/validation picture.\n\n"
     + lines
-    + "\n\nCall the submit_plan_judge tool with your decision."
+    + "\n\nCall the submit_plan_judge tool with your decision. All required fields must be present and non-empty."
 
 // ---------------------------------------------------------------------------
 // Rendering
@@ -384,29 +411,29 @@ let renderPlanMarkdown (result: PlanRunResult) : string =
     let overview =
         result.revisions
         |> List.map (fun r ->
-            sprintf "- **%s** (%s, conf %.2f): %s" r.branchId (lensName r.lens) r.confidence r.revisedPlanSummary)
+            sprintf "- **%s** (%s, conf %.2f): %s" r.data.branchId (lensName r.data.lens) r.data.confidence r.data.revisedPlanSummary)
         |> String.concat "\n"
     let comparison =
         result.revisions
         |> List.map (fun r ->
-            let status = if result.decision.keptBranchIds |> List.contains r.branchId then "kept" else "rejected"
-            let risks = if r.keyRisks.IsEmpty then "None listed" else String.concat "; " r.keyRisks
-            sprintf "### %s — %s\n- **Status:** %s\n- **Risks:** %s\n- **Summary:** %s" r.branchId r.title status risks r.revisedPlanSummary)
+            let status = if result.decision.keptBranchIds |> List.contains r.data.branchId then "kept" else "rejected"
+            let risks = if r.data.keyRisks.IsEmpty then "None listed" else String.concat "; " r.data.keyRisks
+            sprintf "### %s — %s\n- **Status:** %s\n- **Risks:** %s\n- **Summary:** %s" r.data.branchId r.data.title status risks r.data.revisedPlanSummary)
         |> String.concat "\n\n"
-    let winner = result.revisions |> List.tryFind (fun r -> r.branchId = result.decision.winnerBranchId)
+    let winner = result.revisions |> List.tryFind (fun r -> r.data.branchId = result.decision.winnerBranchId)
     let plan, steps, acceptance, risks, openIssues =
         match winner with
         | Some r ->
-            r.revisedPlanMarkdown,
-            numbered r.validationChecks,
-            bullet r.validationChecks,
-            bullet r.keyRisks,
-            bullet r.keyAssumptions
+            r.data.revisedPlanMarkdown,
+            numbered r.data.implementationSteps,
+            bullet r.data.validationChecks,
+            bullet r.data.keyRisks,
+            bullet r.data.keyAssumptions
         | None -> "", "", "", "", ""
     let rejectedSummary =
         result.revisions
-        |> List.filter (fun r -> result.decision.rejectedBranchIds |> List.contains r.branchId)
-        |> List.map (fun r -> sprintf "- %s (%s): %s" r.branchId (lensName r.lens) r.revisedPlanSummary)
+        |> List.filter (fun r -> result.decision.rejectedBranchIds |> List.contains r.data.branchId)
+        |> List.map (fun r -> sprintf "- %s (%s): %s" r.data.branchId (lensName r.data.lens) r.data.revisedPlanSummary)
         |> String.concat "\n"
     let merge = bullet result.decision.mergeNotes
     String.concat "\n\n" [
@@ -436,22 +463,24 @@ let private emptyCritique (bid: string) : PlanBranchCritique =
       counterexamples = []; improvementDirections = [] }
 
 let private fallbackRevision (c: PlanBranchCandidate) (cr: PlanBranchCritique) (p: PlanPoolEntry list) : PlanBranchRevision =
-    { branchId = c.branchId; lens = c.lens; title = c.title; revisedPlanMarkdown = c.candidatePlanMarkdown
-      revisedPlanSummary = c.candidatePlanSummary; keyAssumptions = c.keyAssumptions; keyRisks = c.keyRisks
-      validationChecks = c.validationChecks; selfCritique = c.selfCritique; confidence = c.confidence
+    { data =
+        { branchId = c.branchId; lens = c.lens; title = c.title; revisedPlanMarkdown = c.candidatePlanMarkdown
+          revisedPlanSummary = c.candidatePlanSummary; keyAssumptions = c.keyAssumptions; keyRisks = c.keyRisks
+          validationChecks = c.validationChecks; implementationSteps = []
+          selfCritique = c.selfCritique; confidence = c.confidence }
       originalCandidate = c; critique = cr; pool = p }
 
 let private revisedToCandidate (r: PlanBranchRevision) : PlanBranchCandidate =
-    { branchId = r.branchId
-      lens = r.lens
-      title = r.title
-      candidatePlanMarkdown = r.revisedPlanMarkdown
-      candidatePlanSummary = r.revisedPlanSummary
-      keyAssumptions = r.keyAssumptions
-      keyRisks = r.keyRisks
-      validationChecks = r.validationChecks
-      selfCritique = r.selfCritique
-      confidence = r.confidence }
+    { branchId = r.data.branchId
+      lens = r.data.lens
+      title = r.data.title
+      candidatePlanMarkdown = r.data.revisedPlanMarkdown
+      candidatePlanSummary = r.data.revisedPlanSummary
+      keyAssumptions = r.data.keyAssumptions
+      keyRisks = r.data.keyRisks
+      validationChecks = r.data.validationChecks
+      selfCritique = r.data.selfCritique
+      confidence = r.data.confidence }
 
 let runPlanPipeline (request: PlanRequest) (branchCaller: PlanModelCaller) (judgeCaller: PlanModelCaller) (hypothesisCaller: PlanModelCaller option) : Async<PlanRunResult> =
     async {
@@ -459,71 +488,87 @@ let runPlanPipeline (request: PlanRequest) (branchCaller: PlanModelCaller) (judg
         let! hyps = buildPlanHypotheses request hypothesisCaller lenses
         let indexed = lenses |> List.mapi (fun i l -> ("b" + string (i + 1), l))
 
+        let runBranch (label: string) (work: Async<'a>) (fallback: 'a) : Async<'a> =
+            async {
+                let! caught = Async.Catch work
+                match caught with
+                | Choice1Of2 value -> return value
+                | Choice2Of2 err ->
+                    return fallback
+            }
+
         let! drafts =
             Async.Parallel
                 (indexed
                  |> List.map (fun (bid, lens) ->
-                     async {
-                         let! calls = branchCaller (buildPlanBranchPrompt request lens hyps) [ buildPlanBranchToolSchema ]
-                         return
-                             calls
-                             |> List.tryFind (fun c -> c.toolName = "submit_plan_branch")
-                             |> Option.map (fun c -> { parsePlanBranchToolCall c.arguments with branchId = bid; lens = lens })
-                             |> Option.defaultValue (emptyCandidate bid lens)
-                     }))
+                     runBranch bid
+                         (async {
+                             let! calls = branchCaller (buildPlanBranchPrompt request lens hyps) [ buildPlanBranchToolSchema ]
+                             return
+                                 calls
+                                 |> List.tryFind (fun c -> c.toolName = "submit_plan_branch")
+                                 |> Option.map (fun c -> { parsePlanBranchToolCall c.arguments with branchId = bid; lens = lens })
+                                 |> Option.defaultValue (emptyCandidate bid lens)
+                         })
+                         (emptyCandidate bid lens)))
         let d = Array.toList drafts
 
         let! crits =
             Async.Parallel
                 (d
                  |> List.map (fun c ->
-                     async {
-                         let! calls = branchCaller (buildPlanCritiquePrompt request c) [ buildPlanCritiqueToolSchema ]
-                         return
-                             calls
-                             |> List.tryFind (fun c -> c.toolName = "submit_plan_critique")
-                             |> Option.map (fun c -> parsePlanCritiqueToolCall c.arguments)
-                             |> Option.defaultValue (emptyCritique c.branchId)
-                     }))
+                     runBranch c.branchId
+                         (async {
+                             let! calls = branchCaller (buildPlanCritiquePrompt request c) [ buildPlanCritiqueToolSchema ]
+                             return
+                                 calls
+                                 |> List.tryFind (fun c -> c.toolName = "submit_plan_critique")
+                                 |> Option.map (fun c -> parsePlanCritiqueToolCall c.arguments)
+                                 |> Option.defaultValue (emptyCritique c.branchId)
+                         })
+                         (emptyCritique c.branchId)))
         let cr = Array.toList crits
 
         let! pools =
             Async.Parallel
                 (List.zip d cr
                  |> List.map (fun (c, x) ->
-                     async {
-                         let! calls = branchCaller (buildPlanPoolPrompt request c x) [ buildPlanPoolToolSchema ]
-                         return
-                             calls
-                             |> List.tryFind (fun c -> c.toolName = "submit_plan_pool")
-                             |> Option.map (fun c -> parsePlanPoolToolCall c.arguments)
-                             |> Option.defaultValue
-                                 [ { entryId = "e-fallback"; branchId = c.branchId; title = "No alternatives generated"
-                                     contentMarkdown = "The pool generation step produced no usable alternatives."
-                                     approachSummary = "Continue with the original plan."
-                                     confidence = 0.0 } ]
-                     }))
+                     runBranch c.branchId
+                         (async {
+                             let! calls = branchCaller (buildPlanPoolPrompt request c x) [ buildPlanPoolToolSchema ]
+                             return
+                                 calls
+                                 |> List.tryFind (fun c -> c.toolName = "submit_plan_pool")
+                                 |> Option.map (fun c -> parsePlanPoolToolCall c.arguments)
+                                 |> Option.defaultValue
+                                     [ { entryId = "e-fallback"; branchId = c.branchId; title = "No alternatives generated"
+                                         contentMarkdown = "The pool generation step produced no usable alternatives."
+                                         approachSummary = "Continue with the original plan."
+                                         confidence = 0.0 } ]
+                         })
+                         [ { entryId = "e-fallback"; branchId = c.branchId; title = "Pool step failed"
+                             contentMarkdown = "The pool generation step failed."
+                             approachSummary = "Continue with the original plan."
+                             confidence = 0.0 } ]))
         let pl = Array.toList pools
 
         let! revisions =
             Async.Parallel
                 (List.zip3 d cr pl
                  |> List.map (fun (c, x, p) ->
-                     async {
-                         let! calls = branchCaller (buildPlanRevisionPrompt request c x p) [ buildPlanRevisionToolSchema ]
-                         return
-                             calls
-                             |> List.tryFind (fun c -> c.toolName = "submit_plan_revision")
-                              |> Option.map (fun toolCall ->
-                                  let parsed = parsePlanRevisionToolCall toolCall.arguments
-                                  { parsed with
-                                      branchId = c.branchId
-                                      lens = c.lens
-                                      originalCandidate = c
-                                      critique = x
-                                      pool = p })
-                             |> Option.defaultValue (fallbackRevision c x p)
-                     }))
+                     runBranch c.branchId
+                         (async {
+                             let! calls = branchCaller (buildPlanRevisionPrompt request c x p) [ buildPlanRevisionToolSchema ]
+                             return
+                                 calls
+                                 |> List.tryFind (fun c -> c.toolName = "submit_plan_revision")
+                                  |> Option.map (fun toolCall ->
+                                      let data = parsePlanRevisionToolCall toolCall.arguments
+                                      { data with branchId = c.branchId; lens = c.lens }
+                                      |> fun d -> { data = d; originalCandidate = c; critique = x; pool = p })
+                                 |> Option.defaultValue (fallbackRevision c x p)
+                         })
+                         (fallbackRevision c x p)))
         let revs = Array.toList revisions
 
         let! judgeCalls = judgeCaller (buildPlanJudgePrompt request revs) [ buildPlanJudgeToolSchema ]
@@ -532,8 +577,21 @@ let runPlanPipeline (request: PlanRequest) (branchCaller: PlanModelCaller) (judg
             |> List.tryFind (fun c -> c.toolName = "submit_plan_judge")
             |> Option.map (fun c -> parsePlanJudgeToolCall c.arguments)
             |> Option.defaultValue
-                { winnerBranchId = "b1"; keptBranchIds = ["b1"]; rejectedBranchIds = []
-                  judgeReasoning = "Fallback"; mergeNotes = [] }
+                (let winner =
+                    revs
+                    |> List.sortByDescending (fun r -> r.data.confidence)
+                    |> List.tryHead
+                 match winner with
+                 | Some r ->
+                     { winnerBranchId = r.data.branchId
+                       keptBranchIds = [ r.data.branchId ]
+                       rejectedBranchIds = revs |> List.map (fun x -> x.data.branchId) |> List.filter (fun id -> id <> r.data.branchId)
+                       judgeReasoning = "Judge did not return a decision; selected the highest-confidence branch as fallback."
+                       mergeNotes = [] }
+                 | None ->
+                     { winnerBranchId = "b1"; keptBranchIds = ["b1"]; rejectedBranchIds = []
+                       judgeReasoning = "Judge did not return a decision and no branches were available."
+                       mergeNotes = [] })
 
         let base_ =
             { request = request; hypotheses = hyps; revisions = revs

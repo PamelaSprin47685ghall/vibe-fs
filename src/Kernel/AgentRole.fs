@@ -10,9 +10,10 @@ type AgentRole =
     | Greper
     | Browser
     | Reverie
+    | Summarizer
 
 let allRoles: AgentRole list =
-    [ Orchestrator; Editor; Reviewer; Greper; Browser; Reverie ]
+    [ Orchestrator; Editor; Reviewer; Greper; Browser; Reverie; Summarizer ]
 
 let ofString (value: string) : Result<AgentRole, string> =
     match value with
@@ -22,6 +23,7 @@ let ofString (value: string) : Result<AgentRole, string> =
     | "greper" -> Ok Greper
     | "browser" -> Ok Browser
     | "reverie" -> Ok Reverie
+    | "summarizer" -> Ok Summarizer
     | other -> Error $"Invalid AgentRole: \"{other}\""
 
 let toString (role: AgentRole) : string =
@@ -32,3 +34,4 @@ let toString (role: AgentRole) : string =
     | Greper -> "greper"
     | Browser -> "browser"
     | Reverie -> "reverie"
+    | Summarizer -> "summarizer"

@@ -12,7 +12,7 @@ type ReviewResult = Accepted | Rejected of feedback: string | Terminated
 type ReviewSession =
     { id: string
       state: ReviewState
-      createdAt: int
+      createdAt: int64
       originalTask: string option
       lastFeedback: string option
       parentId: string option
@@ -38,9 +38,9 @@ let addChild session childId = { session with childIds = session.childIds @ [ ch
 /// reduce.  Every action is data; `reduce` is the single interpreter.
 [<RequireQualifiedAccess>]
 type RegistryAction =
-    | Activate of id: string * task: string * createdAt: int
+    | Activate of id: string * task: string * createdAt: int64
     | Deactivate of id: string
-    | Evict of cutoff: int
+    | Evict of cutoff: int64
     | Lock of id: string * reviewerId: string
     | Unlock of id: string
     | Accept of id: string

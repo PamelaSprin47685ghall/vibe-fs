@@ -325,6 +325,22 @@ check('has read tool', toolNames.includes('read'));
 check('has submit_review tool', toolNames.includes('submit_review'));
 check('has submit_plan_branch tool', toolNames.includes('submit_plan_branch'));
 
+// ── Plan tool schema shape ──
+const planBranch = reg.tools.find(t => t.name === 'submit_plan_branch');
+check('plan branch parameters type object', planBranch?.parameters?.type === 'object');
+check('plan branch parameters has branchId', planBranch?.parameters?.properties?.branchId?.type === 'string');
+check('plan branch parameters has candidatePlanMarkdown', planBranch?.parameters?.properties?.candidatePlanMarkdown?.type === 'string');
+check('plan branch parameters has callId', planBranch?.parameters?.properties?.callId?.type === 'string');
+check('plan branch required includes callId', planBranch?.parameters?.required?.includes('callId'));
+check('plan branch no nested schema', planBranch?.parameters?.properties?.type === undefined);
+
+// ── agent_report wrapper forwards plan fields ──
+const arOverride = reg.wrappers.find(w => w.targetTool === 'agent_report');
+check('agent_report wrapper exists', !!arOverride);
+const arWrapped = arOverride.wrapper({ execute: async args => args }, { cwd: '/tmp', workspaceId: 'ws1' });
+check('agent_report wrapper has callId property', arWrapped?.parameters?.properties?.callId?.type === 'string');
+check('agent_report wrapper has branchId property', arWrapped?.parameters?.properties?.branchId?.type === 'string');
+
 // ── web_search override wrapper forwards config ──
 const wsOverride = reg.wrappers.find(w => w.targetTool === 'web_search');
 check('web_search wrapper exists', !!wsOverride);
@@ -342,6 +358,7 @@ check('buildCapsFileReadData returns array', Array.isArray(capsEntries));
 check('buildCapsFileReadData finds caps file', capsEntries.length === 1);
 check('caps entry has path', capsEntries[0]?.path === 'CAPS.md');
 check('caps entry has deterministic callId', capsEntries[0]?.callId === 'caps-fr-1704067200000-0');
+check('caps entry has deterministic modifiedTime', capsEntries[0]?.output?.modifiedTime === '2024-01-01T00:00:00.000Z');
 check('caps entry output has content', typeof capsEntries[0]?.output?.content === 'string');
 await fs.rm(tmpDir, { recursive: true });
 

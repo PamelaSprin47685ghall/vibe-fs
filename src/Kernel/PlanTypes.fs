@@ -53,7 +53,7 @@ type PlanPoolEntry =
       approachSummary: string
       confidence: float }
 
-type PlanBranchRevision =
+type PlanBranchRevisionData =
     { branchId: string
       lens: PlanLens
       title: string
@@ -62,8 +62,12 @@ type PlanBranchRevision =
       keyAssumptions: string list
       keyRisks: string list
       validationChecks: string list
+      implementationSteps: string list
       selfCritique: string
-      confidence: float
+      confidence: float }
+
+type PlanBranchRevision =
+    { data: PlanBranchRevisionData
       originalCandidate: PlanBranchCandidate
       critique: PlanBranchCritique
       pool: PlanPoolEntry list }

@@ -38,26 +38,27 @@ let private requireCallId (args: obj) : string =
     defaultArg (strField args "callId") ""
 
 let private makePlanTool (schema: PlanToolSchema) : ToolDefinition =
-    let props = Dyn.clone schema.parameters
-    let properties = Dyn.get props "properties"
+    let parameters = Dyn.clone schema.parameters
+    let properties = Dyn.get parameters "properties"
     if not (Dyn.isNullish properties) then
         properties?("callId") <- createObj [ "type", box "string"; "description", box "Internal call id supplied in the prompt." ]
     let required =
-        let r = Dyn.get props "required"
+        let r = Dyn.get parameters "required"
         let existing =
             if Dyn.isArray r then
                 (r :?> obj[]) |> Array.map string
             else
                 [||]
         Array.append existing [| "callId" |]
-    props?("required") <- required
-    let jsonParams = JS.JSON.parse(JS.JSON.stringify(props))
+    parameters?("required") <- required
+    parameters?("additionalProperties") <- false
+    let propertiesObj = JS.JSON.parse(JS.JSON.stringify(properties))
     let requiredStrings = required |> Array.map (fun x -> string x)
     { name = schema.name
       description = schema.description + " This is an internal /plan tool."
       parameters =
         { ``type`` = "object"
-          properties = jsonParams
+          properties = propertiesObj
           required = Some requiredStrings
           additionalProperties = Some false }
       execute = fun _ args ->
@@ -108,7 +109,7 @@ let fakeAgentReportDefinition : ToolDefinition =
       parameters =
           { ``type`` = "object"
             properties = buildAgentReportProperties ()
-            required = None
+            required = Some [| "callId" |]
             additionalProperties = Some false }
       execute = fun _config args ->
           let callId = requireCallId args

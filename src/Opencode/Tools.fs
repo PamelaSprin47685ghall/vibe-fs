@@ -45,7 +45,7 @@ let editorTool (ctx: obj) : obj =
                         let intentText = string pair.[0]
                         let files = pair.[1] :?> obj array |> Array.map string |> List.ofArray
                         let prompt = formatEditorUserPrompt intentText files
-                        runSubagent client (AgentRole.toString Editor) "Editor" prompt directory sessionID context
+                        runSubagent client (AgentRole.toString Editor) "Editor" prompt directory sessionID context (box null)
                         |> Async.AwaitPromise) |> Async.Parallel
                 return String.concat "\n---\n" (List.ofArray reports)
             } |> Async.StartAsPromise)
@@ -64,7 +64,7 @@ let greperTool (ctx: obj) : obj =
                     intents |> Array.map (fun intent ->
                         let prompt = formatGreperUserPrompt intent
                         runSubagent client (AgentRole.toString Greper) "Greper" prompt
-                            (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
+                            (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null)
                         |> Async.AwaitPromise) |> Async.Parallel
                 return String.concat "\n---\n" (List.ofArray reports)
             } |> Async.StartAsPromise)
@@ -89,7 +89,7 @@ let reverieTool (ctx: obj) : obj =
                     |> List.ofArray
                 let prompt = HostKernel.buildReveriePrompt sections intent
                 return! runSubagent client (AgentRole.toString Reverie) "Reverie" prompt
-                    directory sessionID context
+                    directory sessionID context (box null)
                     |> Async.AwaitPromise
             } |> Async.StartAsPromise)
 
@@ -127,7 +127,7 @@ let browserTool (ctx: obj) : obj =
         (fun args context ->
             let tc = extractToolContext context (Dyn.str ctx "directory")
             runSubagent client (AgentRole.toString Browser) "Browser" (formatBrowserUserPrompt (Dyn.str args "intent"))
-                (Dyn.str tc "directory") (Dyn.str tc "sessionID") context)
+                (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null))
 
 /// The fuzzy_find tool.
 let fuzzyFindTool () : obj =

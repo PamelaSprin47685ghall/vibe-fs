@@ -18,7 +18,7 @@ let private firstString (ctx: obj) (keys: string list) : string option =
 
 /// Get the abort signal from the opencode context.  The host exposes it as
 /// `context.abort` (an AbortSignal), not `context.abortSignal`.
-let private getAbortSignal (context: obj) : obj =
+let getAbortSignal (context: obj) : obj =
     if Dyn.isNullish context then null
     else
         let abort = Dyn.get context "abort"
@@ -134,11 +134,11 @@ let private promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise
     }
     |> Async.StartAsPromise
 
-/// Core subagent runner. When cleanup is true, the child session is aborted and
-/// unregistered after the prompt finishes so temporary subagents do not linger.
+/// Core subagent runner. The `cleanup` flag controls whether the child session
+/// is aborted and unregistered after the prompt finishes.
 let private runSubagentCore (client: obj) (agent: string) (title: string) (prompt: string)
                             (directory: string) (sessionID: string) (context: obj)
-                            (tools: obj) : JS.Promise<string * obj list> =
+                            (tools: obj) (cleanup: bool) : JS.Promise<string> =
     async {
         let parentID = ChildAgent.resolveSubsessionParentID (if sessionID = "" then None else Some sessionID)
         let session = Dyn.get client "session"
@@ -155,15 +155,13 @@ let private runSubagentCore (client: obj) (agent: string) (title: string) (promp
             |}
         let! createResult = invoke1 createBody "create" session |> Async.AwaitPromise
         let childID = Dyn.str (Dyn.get createResult "data") "id"
-        if childID = "" then return ("Failed to create child session", [])
+        if childID = "" then return "Failed to create child session"
         else
-            let mutable cleanedUp = false
-            let calls = ref []
             let abortAndUnregister () =
-                if not cleanedUp then
-                    cleanedUp <- true
+                if cleanup then
                     let abortPromise : JS.Promise<obj> = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
                     abortPromise |> ignore
+                    ChildAgent.unregisterChildAgent childID
             ChildAgent.registerChildAgent childID agent parentID
             try
                 try
@@ -178,7 +176,7 @@ let private runSubagentCore (client: obj) (agent: string) (title: string) (promp
                         |}
                     do! promptWithAbort client promptBody (getAbortSignal context) |> Async.AwaitPromise
                     let! text = extractSessionText client childID directory |> Async.AwaitPromise
-                    return (if text = "" then "(no output)" else text), calls.Value
+                    return if text = "" then "(no output)" else text
                 finally
                     abortAndUnregister ()
             with err ->
@@ -186,46 +184,29 @@ let private runSubagentCore (client: obj) (agent: string) (title: string) (promp
                 | MessageAborted ->
                     abortAndUnregister ()
                     let! text = extractSessionText client childID directory |> Async.AwaitPromise
-                    return (if text = "" then "(aborted)" else $"(aborted) {text}"), []
+                    return if text = "" then "(aborted)" else $"(aborted) {text}"
                 | _ -> return raise err
     }
     |> Async.StartAsPromise
 
-/// Run a subagent: resolve the parent session id, create a child session with
-/// that parent, register the child, prompt it, and extract the text response.
+/// Run a subagent and keep the child session registered after return.
 let runSubagent (client: obj) (agent: string) (title: string) (prompt: string)
-                (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
-    async {
-        let! result = runSubagentCore client agent title prompt directory sessionID context (box null) |> Async.AwaitPromise
-        let text, _ = result
-        return text
-    }
-    |> Async.StartAsPromise
+                (directory: string) (sessionID: string) (context: obj)
+                (tools: obj) : JS.Promise<string> =
+    runSubagentCore client agent title prompt directory sessionID context tools false
 
 /// Run a subagent and clean up the child session afterwards. Used for
 /// short-lived analysis subagents such as the executor summarizer.
 let runSubagentWithCleanup (client: obj) (agent: string) (title: string) (prompt: string)
                            (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
-    runSubagent client agent title prompt directory sessionID context
+    runSubagentCore client agent title prompt directory sessionID context (box null) true
 
-/// Run a subagent with an explicit tool set. Returns the final assistant text
-/// together with every captured tool call.
+/// Run a subagent with an explicit tool set and clean up afterwards.
 let runSubagentWithTools
     (client: obj) (agent: string) (title: string) (prompt: string)
     (directory: string) (sessionID: string) (context: obj)
-    (tools: obj) : JS.Promise<string * PlanToolCall list> =
-    async {
-        let! text, captured = runSubagentCore client agent title prompt directory sessionID context tools |> Async.AwaitPromise
-        let toolCalls =
-            captured
-            |> List.choose (fun c ->
-                let toolName = Dyn.str c "toolName"
-                let arguments = Dyn.get c "arguments"
-                if toolName = "" || Dyn.isNullish arguments then None
-                else Some { toolName = toolName; arguments = arguments })
-        return text, toolCalls
-    }
-    |> Async.StartAsPromise
+    (tools: obj) : JS.Promise<string> =
+    runSubagentCore client agent title prompt directory sessionID context tools true
 
 /// Create a reviewer child session under the given parent, register it, and
 /// return the child id (empty string on failure).

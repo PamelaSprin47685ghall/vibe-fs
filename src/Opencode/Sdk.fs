@@ -46,7 +46,10 @@ let numOpt (desc: string) : obj =
     let n = call0 n "positive"
     call1 (call0 n "optional") "describe" (box desc)
 let enumOpt (values: string array) (desc: string) : obj =
-    call1 (call0 (call1 schema "enum" (box values)) "optional") "describe" (box desc)
+    let e = call1 schema "enum" values
+    call1 (call0 e "optional") "describe" (box desc)
+
+let obj (shape: obj) : obj = call1 schema "object" shape
 
 let define (description: string) (args: obj) (execute: obj -> obj -> JS.Promise<string>) : obj =
     invokeTool toolFactory (box {| description = description; args = args; execute = execute |})

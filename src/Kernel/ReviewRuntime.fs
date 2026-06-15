@@ -42,7 +42,7 @@ let disposeSessionTree (effects: SessionEffects) sessionIds : SessionEffects =
 
 /// The full host-facing review store: pure registry kernel plus effect side-table.
 type ReviewStore =
-    abstract member activateReview: sessionID: string * task: string * createdAt: int -> unit
+    abstract member activateReview: sessionID: string * task: string * createdAt: int64 -> unit
     abstract member deactivateReview: sessionID: string -> unit
     abstract member clearReviewSessions: unit -> unit
     abstract member tryLockReview: sessionID: string -> bool

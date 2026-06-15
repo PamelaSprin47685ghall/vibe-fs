@@ -17,7 +17,7 @@ let private assignInto (target: obj) (source: obj) : obj = Dyn.assignInto target
 let private clearArray (arr: obj) : unit = (arr :?> ResizeArray<obj>).Clear()
 let private pushPart (arr: obj) (part: obj) : unit = (arr :?> ResizeArray<obj>).Add(part)
 
-let private dateNow () : int = int (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
 
 let private loopFooter =
     "- report: a detailed description of what you did and why\n"

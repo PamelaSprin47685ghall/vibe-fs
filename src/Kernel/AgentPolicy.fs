@@ -21,6 +21,7 @@ let private enabledFor role : string list =
     | Greper -> [ "read"; "executor"; "glob"; "fuzzy_find"; "fuzzy_grep" ]
     | Browser -> [ "read"; "stealth-browser-mcp_*" ]
     | Reverie -> [ "read" ]
+    | Summarizer -> [ "read" ]
 
 /// Build the full tool map by marking enabled tools Allow and the rest Deny.
 let toolMapFor (role: AgentRole) : ToolMap =

@@ -117,6 +117,9 @@ let private mkWebOverride (sourceToolName: string) (tools: obj) (targetTool: str
                         "execute", box execFn ])
     createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
 
+let private isPlanCallId (callId: string) : bool =
+    callId.Contains("-plan-")
+
 let private mkAgentReportOverride () : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (tool: obj) (_config: obj) ->
@@ -124,7 +127,7 @@ let private mkAgentReportOverride () : obj =
                 System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
                     async {
                         let callId = Dyn.str args "callId"
-                        if callId <> "" && hasCall callId then
+                        if callId <> "" && isPlanCallId callId && hasCall callId then
                             resolveCall callId args |> ignore
                             let upstreamArgs = createObj [ "reportMarkdown", box (formatAgentReportMarkdown args) ]
                             let raw = tool?execute(upstreamArgs, opts)

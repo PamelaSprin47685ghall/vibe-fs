@@ -13,6 +13,9 @@ let private nodeProcess : obj = jsNative
 [<Import("promises", "node:fs")>]
 let private fsPromises : obj = jsNative
 
+[<Import("access", "node:fs/promises")>]
+let private accessAsync (p: string) (mode: int) : JS.Promise<unit> = jsNative
+
 let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
 
 let private mkdir (p: string) : JS.Promise<unit> =
@@ -20,6 +23,15 @@ let private mkdir (p: string) : JS.Promise<unit> =
 
 let private writeFile (p: string) (content: string) : JS.Promise<unit> =
     fsPromises?writeFile(p, content, "utf-8") |> asPromise<unit>
+
+let private fileExistsAsync (p: string) : Async<bool> =
+    async {
+        try
+            do! accessAsync p 0 |> Async.AwaitPromise
+            return true
+        with _ ->
+            return false
+    }
 
 let private formatSyntaxDiagnostics (filePath: string) (result: SyntaxCheckResult) : string =
     match result with
@@ -46,4 +58,36 @@ let write (cwd: string option) (file_path: string) (content: string) : Async<str
         do! writeFile resolved content |> Async.AwaitPromise
         let! syntax = checkSyntax content resolved |> Async.AwaitPromise
         return formatSyntaxDiagnostics resolved syntax
+    }
+
+/// Write `content` to a unique file based on `baseFileName`. If the file already
+/// exists, appends an incrementing suffix until a free name is found or
+/// `maxAttempts` is exhausted. Returns the final file name and the write report.
+let writeUnique (cwd: string option) (baseFileName: string) (content: string) (maxAttempts: int) : Async<string * string> =
+    async {
+        let cwd' = defaultArg cwd (nodeProcess?cwd())
+        let name = basename baseFileName
+        let ext = extname baseFileName
+        let stem = if ext = "" then name else name.Substring(0, name.Length - ext.Length)
+        let dir = dirname baseFileName
+        let targetDir = if System.String.IsNullOrEmpty dir then cwd' else resolve cwd' dir
+
+        let rec attempt (currentName: string) (n: int) =
+            async {
+                let resolved = resolve targetDir currentName
+                let! exists = fileExistsAsync resolved
+                if not exists then
+                    let parent = dirname resolved
+                    if not (System.String.IsNullOrEmpty parent) then
+                        do! mkdir parent |> Async.AwaitPromise
+                    do! writeFile resolved content |> Async.AwaitPromise
+                    let! syntax = checkSyntax content resolved |> Async.AwaitPromise
+                    return currentName, formatSyntaxDiagnostics resolved syntax
+                elif n >= maxAttempts then
+                    return currentName, $"Could not find a unique file name after {maxAttempts} attempts."
+                else
+                    let suffix = sprintf "-%03d" n
+                    return! attempt (stem + suffix + ext) (n + 1)
+            }
+        return! attempt name 1
     }
