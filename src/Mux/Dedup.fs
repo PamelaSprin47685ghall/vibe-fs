@@ -59,10 +59,75 @@ let deduplicateReadOutputsWithSeen
                             Dyn.withKey msg "parts" (box (Array.ofSeq newParts)))
     seen, if anyChanged then result else messages
 
+/// Extract the dedup key from a tool-result part in the Vercel AI SDK
+/// ModelMessage shape.  Text outputs keep their value; JSON outputs are
+/// delegated to the Mux-message extractor so file_read `{ content }` objects
+/// are handled without duplicating the parsing rule.
+let private extractModelReadOutputKey (part: obj) : string =
+    let output = Dyn.get part "output"
+    if Dyn.isNullish output then ""
+    else
+        let outputType = Dyn.str output "type"
+        let value = Dyn.get output "value"
+        if outputType = "text" && not (Dyn.isNullish value) then string value
+        elif outputType = "json" && not (Dyn.isNullish value) then extractReadOutputKey value
+        else ""
+
+/// Pure: fold `deduplicate` over read tool-result parts inside ModelMessage
+/// arrays, returning the final `seenOutputs` and any replacements in the
+/// provided messages.  This handles the AI SDK `ToolResultPart` shape where the
+/// useful payload lives at `output.value` rather than directly on `output`.
+let deduplicateModelReadOutputsWithSeen
+    (seenOutputs: string list)
+    (messages: obj array)
+    : string list * obj array =
+    let mutable seen = seenOutputs
+    let mutable anyChanged = false
+    let result =
+        messages |> Array.map (fun msg ->
+            if Dyn.isNullish msg then msg
+            else
+                let content = Dyn.get msg "content"
+                if Dyn.isNullish content then msg
+                elif Dyn.typeIs content "string" then msg
+                elif not (Dyn.isArray content) then msg
+                else
+                    let contentArr = content :?> obj array
+                    if Array.isEmpty contentArr then msg
+                    else
+                        let newContent = ResizeArray<obj>()
+                        let mutable partChanged = false
+                        for part in contentArr do
+                            let ty = Dyn.str part "type"
+                            let toolName = Dyn.str part "toolName"
+                            let current = extractModelReadOutputKey part
+                            if ty = "tool-result" && Set.contains toolName readToolNames && current.Length > 0 then
+                                let result = deduplicate seen current
+                                seen <- result.seenOutputs
+                                if result.output = current then newContent.Add(part)
+                                else
+                                    let newOutput =
+                                        Dyn.withKey
+                                            (Dyn.withKey (Dyn.get part "output") "type" (box "text"))
+                                            "value"
+                                            (box result.output)
+                                    newContent.Add(Dyn.withKey part "output" (box newOutput))
+                                    partChanged <- true
+                            else newContent.Add(part)
+                        if not partChanged then msg
+                        else
+                            anyChanged <- true
+                            Dyn.withKey msg "content" (box (Array.ofSeq newContent)))
+    seen, if anyChanged then result else messages
+
 /// Backwards-compatible one-shot deduplication: only compares read outputs
 /// against each other within the supplied messages.
 let deduplicateReadOutputs (messages: obj array) : obj array =
     deduplicateReadOutputsWithSeen [] messages |> snd
+
+/// One-shot deduplication for AI SDK ModelMessage arrays.
+let deduplicateModelReadOutputs (messages: obj array) : obj array =
+    deduplicateModelReadOutputsWithSeen [] messages |> snd
 
 /// Collect read outputs from an arbitrary message array, treating earlier
 /// messages as already seen.  Useful when the caller has access to the full
