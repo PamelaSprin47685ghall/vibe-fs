@@ -53,3 +53,17 @@ let ollamaFormat () =
     let formatted = VibeFs.Kernel.OllamaFormat.formatSearchResults results
     check "search numbering" (formatted.Contains "1. A" && formatted.Contains "2. B")
     equal "empty search" "No results found." (VibeFs.Kernel.OllamaFormat.formatSearchResults [])
+
+let summarizerInputCap () =
+    let opts : ExecuteOptions =
+        { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; cwd = None }
+    let small = String.replicate 100 "x"
+    let smallPrompt = buildSummaryPrompt opts (Completed small)
+    check "small output kept whole" (smallPrompt.Contains small)
+    check "small output not truncated" (not (smallPrompt.Contains "[Output truncated to 1MB for summarization]"))
+    let marker = "END_OF_OUTPUT_TAIL"
+    let large = String.replicate (1_048_576 + 100 - marker.Length) "x" + marker
+    let tail = marker
+    let largePrompt = buildSummaryPrompt opts (Completed large)
+    check "large output truncated message" (largePrompt.Contains "[Output truncated to 1MB for summarization]")
+    check "large output tail absent" (not (largePrompt.Contains tail))

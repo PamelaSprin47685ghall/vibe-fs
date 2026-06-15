@@ -11,6 +11,38 @@ open VibeFs.MuxPlugin.Delegate
 let private dateNow () : int = jsNative
 [<Emit("process.cwd()")>]
 let private processCwd () : string = jsNative
+[<Emit("Promise.resolve($0)")>]
+let private resolveObj (o: obj) : JS.Promise<obj> = jsNative
+[<Emit("$0.then($1)")>]
+let private promiseThen (p: JS.Promise<obj>) (f: obj -> obj) : JS.Promise<obj> = jsNative
+
+let private fallbackSlashConfig (deps: obj) (workspaceId: string) : obj =
+    createObj
+        [ "cwd", box (processCwd ())
+          "workspaceId", box workspaceId
+          "taskService", box (Dyn.get deps "taskService") ]
+
+let private slashConfigFromCtx (deps: obj) (workspaceId: string) (ctx: obj) : obj =
+    if Dyn.isNullish ctx then
+        fallbackSlashConfig deps workspaceId
+    else
+        let runtimeObj = Dyn.get ctx "runtime"
+        let runtime = if Dyn.isNullish runtimeObj then null else runtimeObj
+        createObj
+            [ "cwd", box (Dyn.str ctx "cwd")
+              "workspaceId", box workspaceId
+              "runtime", box runtime
+              "muxEnv", box (Dyn.get ctx "muxEnv")
+              "taskService", box (Dyn.get deps "taskService") ]
+
+let private pluginConfigForSlash (deps: obj) (workspaceId: string) : JS.Promise<obj> =
+    let resolver = Dyn.get deps "resolveWorkspacePluginContext"
+    if not (Dyn.typeIs resolver "function") then
+        resolveObj (fallbackSlashConfig deps workspaceId)
+    else
+        let p = Dyn.call2 resolver (box workspaceId) (box null) :?> JS.Promise<obj>
+        promiseThen p (fun ctx -> slashConfigFromCtx deps workspaceId ctx)
+
 [<Emit("Promise.race([$0.then(r => ({ kind: 'report', value: r })), new Promise(resolve => setTimeout(() => resolve({ kind: 'timeout' }), $1))])")>]
 let private raceDelegateWithTimeout (delegatePromise: JS.Promise<string>) (ms: int) : JS.Promise<obj> = jsNative
 
@@ -59,8 +91,7 @@ let createLoopReviewCommand (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntim
                 elif reviewStore.isReviewActive workspaceId then
                     (async { return "Loop mode is already active. Submit your work via submit_review." } |> Async.StartAsPromise)
                 else
-                    let taskService = Dyn.get deps "taskService"
-                    let config = createObj [ "cwd", box (processCwd ()); "workspaceId", box workspaceId; "taskService", box taskService ]
+                    let! config = pluginConfigForSlash deps workspaceId |> Async.AwaitPromise
                     let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box ((subagentToolPolicy Reviewer).disabledTools |> Array.ofList) ]) ]
                     let reviewPrompt = reviewPromptFor task
                     async {

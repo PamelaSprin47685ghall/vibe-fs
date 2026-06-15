@@ -18,11 +18,49 @@ let policy () =
     let orchestrator = effectivePolicy Orchestrator
     check "orchestrator can read" (List.contains "read" orchestrator.allowedTools)
     check "orchestrator can todowrite" (List.contains "todowrite" orchestrator.allowedTools)
+    check "orchestrator fuzzy_find allowed" (List.contains "fuzzy_find" orchestrator.allowedTools)
+    check "orchestrator fuzzy_find not in deniedTools" (not (List.contains "fuzzy_find" orchestrator.deniedTools))
+    check "orchestrator fuzzy_grep denied" (List.contains "fuzzy_grep" orchestrator.deniedTools)
+    check "orchestrator fuzzy_grep not allowed" (not (List.contains "fuzzy_grep" orchestrator.allowedTools))
     check "editor can write" (List.contains "write" (effectivePolicy Editor).allowedTools)
     check "reviewer submit_review_result" (List.contains "submit_review_result" (effectivePolicy Reviewer).allowedTools)
     check "greper fuzzy_grep" (List.contains "fuzzy_grep" (effectivePolicy Greper).allowedTools)
     equal "bash denied" (Some Deny) (Map.tryFind "bash" orchestrator.permissions)
     check "question denied for editor" (Map.tryFind "question" (effectivePolicy Editor).permissions = Some Deny)
+
+let private toolPermissionLabel = function Allow -> "allow" | Deny -> "deny"
+
+let private roleLabel (role: AgentRole) = VibeFs.Kernel.AgentRole.toString role
+
+let private expectedAllowedDenied (role: AgentRole) =
+    let tools = toolMapFor role
+    canonicalToolNames
+    |> List.choose (fun name -> Map.tryFind name tools |> Option.map (fun p -> name, p))
+    |> List.partition (fun (_, p) -> p = Allow)
+    |> fun (allowed, denied) -> List.map fst allowed, List.map fst denied
+
+let effectivePolicyDeniedToolsCrossValidation () =
+    allRoles
+    |> List.iter (fun role ->
+        let policy = effectivePolicy role
+        let tools = toolMapFor role
+        let permissions = defaultPermissions role
+        let expectedAllowed, expectedDenied =
+            expectedAllowedDenied role
+        let expectedDeniedPermissions =
+            permissions
+            |> Map.toList
+            |> List.choose (fun (n, p) -> if p = Deny then Some n else None)
+        equal $"{roleLabel role} role" role policy.role
+        equal $"{roleLabel role} tools" tools policy.tools
+        equal $"{roleLabel role} permissions" permissions policy.permissions
+        equal $"{roleLabel role} allowedTools" expectedAllowed policy.allowedTools
+        equal $"{roleLabel role} deniedTools" expectedDenied policy.deniedTools
+        equal $"{roleLabel role} deniedPermissions" expectedDeniedPermissions policy.deniedPermissions
+        let union = Set.ofList (policy.allowedTools @ policy.deniedTools)
+        check $"{roleLabel role} allowed+denied disjoint" (union.Count = policy.allowedTools.Length + policy.deniedTools.Length)
+        check $"{roleLabel role} covers canonical tools" (union.Count = canonicalToolNames.Length))
+
 
 let private nudgeContext todos msg runner loopActive =
     { todos = todos; lastAssistantMessage = msg; hasActiveRunner = runner; isLoopActive = loopActive }

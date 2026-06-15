@@ -7,6 +7,8 @@ open VibeFs.Tests.KernelTests
 open VibeFs.Tests.FuzzyTests
 open VibeFs.Tests.ShellTests
 open VibeFs.Tests.DynTests
+open VibeFs.Tests.DelegateTests
+open VibeFs.Tests.ResolveAiSettingsTests
 
 [<EntryPoint>]
 let main _ =
@@ -17,6 +19,7 @@ let main _ =
     ReviewTests.runtime ()
     AgentTests.role ()
     AgentTests.policy ()
+    AgentTests.effectivePolicyDeniedToolsCrossValidation ()
     AgentTests.decision ()
     AgentTests.updateState ()
     AgentTests.coordinator ()
@@ -41,5 +44,8 @@ let main _ =
     ShellTests.capsFileShape ()
     ShellTests.capsContextFormat ()
     ShellTests.ollamaFormat ()
+    ShellTests.summarizerInputCap ()
     DynTests.nullish ()
+    DelegateTests.run ()
+    ResolveAiSettingsTests.run ()
     summary ()

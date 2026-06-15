@@ -21,20 +21,46 @@ let private findWorkspaceEntry (deps: obj) (configFile: obj) (workspaceId: strin
 [<Emit("$0.resolveAgentFrontmatter($1, $2, $3)")>]
 let private resolveAgentFrontmatter (deps: obj) (runtime: obj) (cwd: string) (agentId: string) : JS.Promise<obj> = jsNative
 
-let private optStr (o: obj) (key: string) : string option =
-    let v = Dyn.get o key
-    if Dyn.isNullish v then None else Some (string v)
+let private normalizeStr (v: obj) : string option =
+    if Dyn.isNullish v then None
+    else
+        let s = (string v).Trim()
+        if s = "" then None else Some s
 
-let private agentSettings (source: obj) (agentId: string) : DelegatedAiSettings option =
-    let entry = Dyn.get source agentId
-    if Dyn.isNullish entry then None
-    else Some { modelString = optStr entry "model"; thinkingLevel = optStr entry "thinkingLevel" }
+/// Workspace `aiSettingsByAgent` uses `model`; config defaults use `modelString`.
+let internal modelFromEntry (entry: obj) : string option =
+    normalizeStr (Dyn.get entry "model")
+    |> Option.orElseWith (fun () -> normalizeStr (Dyn.get entry "modelString"))
 
-let private merge (sources: DelegatedAiSettings option list) : DelegatedAiSettings =
-    let pick current fallback =
-        { modelString = current.modelString |> Option.orElse fallback.modelString
-          thinkingLevel = current.thinkingLevel |> Option.orElse fallback.thinkingLevel }
-    sources |> List.choose id |> List.fold pick emptySettings
+let private thinkingFromEntry (entry: obj) : string option =
+    normalizeStr (Dyn.get entry "thinkingLevel")
+
+let internal namedSettingsFromRecord (source: obj) (agentId: string) : DelegatedAiSettings option =
+    if Dyn.isNullish source then None
+    else
+        let entry = Dyn.get source agentId
+        if Dyn.isNullish entry then None
+        else
+            Some
+                { modelString = modelFromEntry entry
+                  thinkingLevel = thinkingFromEntry entry }
+
+/// First non-blank value per field wins (same order as vibe-me-mux `mergeNamedSettings`).
+let internal mergeNamedSettings (sources: DelegatedAiSettings option list) : DelegatedAiSettings =
+    let mutable modelString = None
+    let mutable thinkingLevel = None
+
+    for source in sources do
+        match source with
+        | Some s ->
+            if modelString.IsNone then
+                modelString <- s.modelString
+
+            if thinkingLevel.IsNone then
+                thinkingLevel <- s.thinkingLevel
+        | None -> ()
+
+    { modelString = modelString; thinkingLevel = thinkingLevel }
 
 let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) : JS.Promise<DelegatedAiSettings> =
     async {
@@ -57,18 +83,20 @@ let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) 
                     let cwd = Dyn.str config "cwd"
                     let! fm = resolveAgentFrontmatter deps runtime cwd agentId |> Async.AwaitPromise
                     let ai = Dyn.get fm "ai"
-                    return { modelString = optStr ai "model"; thinkingLevel = optStr ai "thinkingLevel" }
+                    return
+                        { modelString = normalizeStr (Dyn.get ai "model")
+                          thinkingLevel = thinkingFromEntry ai }
                 with _ ->
                     return emptySettings
             }
 
         let sources = [
-            agentSettings byAgent agentId
-            agentSettings (Dyn.get configFile "subagentAiDefaults") agentId
-            agentSettings (Dyn.get configFile "agentAiDefaults") agentId
+            namedSettingsFromRecord byAgent agentId
+            namedSettingsFromRecord (Dyn.get configFile "subagentAiDefaults") agentId
+            namedSettingsFromRecord (Dyn.get configFile "agentAiDefaults") agentId
             Some descriptorSettings
-            if agentId = "exec" then agentSettings byAgent "exec" else None
+            if agentId = "exec" then namedSettingsFromRecord byAgent "exec" else None
         ]
 
-        return merge sources
+        return mergeNamedSettings sources
     } |> Async.StartAsPromise

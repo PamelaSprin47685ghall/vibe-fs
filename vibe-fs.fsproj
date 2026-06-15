@@ -50,6 +50,7 @@
     <Compile Include="src/Kernel/IteratorStore.fs" />
     <!-- Shell: effectful boundary -->
     <Compile Include="src/Shell/CapsShell.fs" />
+    <Compile Include="src/Shell/FileReadCache.fs" />
     <Compile Include="src/Shell/ReverieFiles.fs" />
     <Compile Include="src/Shell/ExecutorPaths.fs" />
     <Compile Include="src/Shell/ExecutorProcess.fs" />
@@ -105,6 +106,8 @@
     <Compile Include="tests/FuzzyTests.fs" />
     <Compile Include="tests/ShellTests.fs" />
     <Compile Include="tests/DynTests.fs" />
+    <Compile Include="tests/DelegateTests.fs" />
+    <Compile Include="tests/ResolveAiSettingsTests.fs" />
     <Compile Include="tests/Tests.fs" />
   </ItemGroup>
 

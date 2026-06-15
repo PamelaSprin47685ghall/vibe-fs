@@ -67,12 +67,18 @@ export interface PluginToolWrapper {
   wrapper: (tool: PluginToolLike, config: unknown) => PluginToolLike;
 }
 
+export interface ParentRuntimeAiSettings {
+  readonly modelString?: string;
+  readonly thinkingLevel?: string;
+}
+
 export interface PluginToolConfiguration {
   readonly cwd: string;
   readonly workspaceId?: string;
   readonly runtime?: RuntimeHandle | null;
   readonly taskService?: TaskServiceLike;
   readonly abortSignal?: AbortSignal;
+  readonly muxEnv?: Record<string, string>;
 }
 
 export interface RuntimeHandle {
@@ -85,6 +91,7 @@ export interface TaskCreateInput {
   readonly agentId: string;
   readonly modelString?: string;
   readonly thinkingLevel?: string;
+  readonly parentRuntimeAiSettings?: ParentRuntimeAiSettings;
   readonly prompt: string;
   readonly title: string;
   readonly experiments?: {
@@ -186,9 +193,25 @@ export interface FindWorkspaceEntryResult {
   readonly workspace: WorkspaceEntry;
 }
 
+/** Partial MUX_* overlay from the parent conversation (MUX_MODEL_STRING, MUX_THINKING_LEVEL). */
+export type ParentRuntimeMuxEnvOverlay = {
+  readonly MUX_MODEL_STRING?: string;
+  readonly MUX_THINKING_LEVEL?: string;
+};
+
+export interface WorkspacePluginContext {
+  readonly cwd: string;
+  readonly runtime: RuntimeHandle | null;
+  readonly muxEnv: Record<string, string>;
+}
+
 export interface HostDependencies {
   readonly log: LoggerLike;
   readonly taskService?: TaskServiceLike;
+  readonly resolveWorkspacePluginContext?: (
+    workspaceId: string,
+    parentRuntime?: ParentRuntimeMuxEnvOverlay | null,
+  ) => Promise<WorkspacePluginContext | null>;
   readonly loadConfigOrDefault: () => ConfigFile;
   readonly readAgentDefinition: (
     runtime: RuntimeHandle | null,
@@ -244,6 +267,10 @@ export function buildCapsFileReadData(projectRoot: string): Promise<CapsFileRead
 export function deduplicateReadOutputs<T extends MuxMessageLike>(messages: readonly T[]): T[];
 export function deduplicateReadOutputsWithSeen<T extends MuxMessageLike>(
   seenOutputs: readonly string[],
+  messages: readonly T[],
+): T[];
+export function deduplicateReadOutputsAgainstHistory<T extends MuxMessageLike>(
+  history: readonly T[],
   messages: readonly T[],
 ): T[];
 export function deduplicateModelReadOutputsWithSeen(

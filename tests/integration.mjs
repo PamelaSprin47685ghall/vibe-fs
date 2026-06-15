@@ -1,5 +1,5 @@
 import plugin from '../build/src/Opencode/Plugin.js';
-import { createRegistration, getPluginToolPolicy, buildCapsFileReadData, deduplicateReadOutputs, deduplicateReadOutputsWithSeen, collectReadOutputs } from '../build/src/Index.js';
+import { createRegistration, getPluginToolPolicy, buildCapsFileReadData, deduplicateReadOutputs, deduplicateReadOutputsWithSeen, deduplicateReadOutputsAgainstHistory, deduplicateModelReadOutputsWithSeen, collectReadOutputs } from '../build/src/Index.js';
 import { runSubagent } from '../build/src/Opencode/Session.js';
 import { registerChildAgent, unregisterChildAgent } from '../build/src/Opencode/ChildAgent.js';
 import checkSyntax from '../build/src/Shell/TreeSitterSyntax.mjs';
@@ -193,38 +193,190 @@ const inPlaceNoCapsRef = inPlaceNoCaps.messages;
 await p['experimental.chat.messages.transform']({}, inPlaceNoCaps);
 check('caps transform preserves array ref when no caps files', inPlaceNoCaps.messages === inPlaceNoCapsRef);
 
-// ── deduplicateReadOutputs collapses repeated reads ──
-const deduped = deduplicateReadOutputs([
-  { parts: [{ type: 'dynamic-tool', toolName: 'read', state: 'output-available', output: 'same content', toolCallId: '1' }] },
-  { parts: [{ type: 'dynamic-tool', toolName: 'file_read', state: 'output-available', output: 'same content', toolCallId: '2' }] },
-]);
-check('deduplicateReadOutputs returns array', Array.isArray(deduped));
-check('deduplicateReadOutputs keeps first', deduped[0]?.parts?.[0]?.output === 'same content');
-check('deduplicateReadOutputs replaces repeat with marker', deduped[1]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
-
-// ── collectReadOutputs + deduplicateReadOutputsWithSeen seed from history ──
-const history = [
-  { parts: [{ type: 'dynamic-tool', toolName: 'read', state: 'output-available', output: 'seen before', toolCallId: 'h1' }] },
-];
-const seen = collectReadOutputs(history);
-check('collectReadOutputs returns array', Array.isArray(seen) && seen.length === 1 && seen[0] === 'seen before');
-const seeded = deduplicateReadOutputsWithSeen(seen, [
-  { parts: [{ type: 'dynamic-tool', toolName: 'file_read', state: 'output-available', output: 'seen before', toolCallId: 'n1' }] },
-]);
-check('deduplicateReadOutputsWithSeen replaces historical repeat', seeded[0]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
-
-// ── file_read object outputs: dedup by content field (mux host format) ──
+// ── Dedup helpers ──
+const readMsg = (toolName, output, toolCallId) => ({
+  parts: [{ type: 'dynamic-tool', toolName, state: 'output-available', output, toolCallId }]
+});
 const fileReadOutput = (content) => ({ success: true, file_size: content.length, modifiedTime: '2024-01-01T00:00:00.000Z', lines_read: 1, content });
-const dedupedObj = deduplicateReadOutputs([
-  { parts: [{ type: 'dynamic-tool', toolName: 'file_read', state: 'output-available', output: fileReadOutput('hello world'), toolCallId: '1' }] },
-  { parts: [{ type: 'dynamic-tool', toolName: 'file_read', state: 'output-available', output: fileReadOutput('hello world'), toolCallId: '2' }] },
-]);
-check('file_read object: keeps first output', dedupedObj[0]?.parts?.[0]?.output?.content === 'hello world');
-check('file_read object: replaces repeat with marker', dedupedObj[1]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
-const seenFromObj = collectReadOutputs([
-  { parts: [{ type: 'dynamic-tool', toolName: 'file_read', state: 'output-available', output: fileReadOutput('historical'), toolCallId: 'h1' }] },
-]);
-check('file_read object: collectReadOutputs extracts content', Array.isArray(seenFromObj) && seenFromObj.length === 1 && seenFromObj[0] === 'historical');
+
+// ── deduplicateReadOutputs ──
+// String output (opencode `read` tool)
+{
+  const msgs = [readMsg('read', 'same content', '1'), readMsg('file_read', 'same content', '2')];
+  const r = deduplicateReadOutputs(msgs);
+  check('dedupRead: returns array', Array.isArray(r));
+  check('dedupRead: keeps first', r[0]?.parts?.[0]?.output === 'same content');
+  check('dedupRead: replaces repeat with marker', r[1]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+}
+// Object output (mux `file_read` tool)
+{
+  const msgs = [readMsg('file_read', fileReadOutput('hello'), '1'), readMsg('file_read', fileReadOutput('hello'), '2')];
+  const r = deduplicateReadOutputs(msgs);
+  check('dedupRead object: keeps first content', r[0]?.parts?.[0]?.output?.content === 'hello');
+  check('dedupRead object: replaces repeat with marker', r[1]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+}
+
+// Same content on different paths: do not dedup across files
+{
+  const readMsgWithPath = (toolName, filePath, output, toolCallId) => ({
+    parts: [{ type: 'dynamic-tool', toolName, state: 'output-available', input: { path: filePath }, output, toolCallId }],
+  });
+  const shared = fileReadOutput('shared bytes');
+  const msgs = [
+    readMsgWithPath('file_read', 'a.ts', shared, '1'),
+    readMsgWithPath('file_read', 'b.ts', shared, '2'),
+  ];
+  const r = deduplicateReadOutputs(msgs);
+  check('dedupRead per-path: first file kept', r[0]?.parts?.[0]?.output?.content === 'shared bytes');
+  check('dedupRead per-path: different path not deduped', r[1]?.parts?.[0]?.output?.content === 'shared bytes');
+}
+// Second read of the same path with same content: dedup
+{
+  const readMsgWithPath = (toolName, filePath, output, toolCallId) => ({
+    parts: [{ type: 'dynamic-tool', toolName, state: 'output-available', input: { path: filePath }, output, toolCallId }],
+  });
+  const out = fileReadOutput('repeat me');
+  const msgs = [
+    readMsgWithPath('file_read', 'same.ts', out, '1'),
+    readMsgWithPath('file_read', 'same.ts', out, '2'),
+  ];
+  const r = deduplicateReadOutputs(msgs);
+  check('dedupRead same path: first kept', r[0]?.parts?.[0]?.output?.content === 'repeat me');
+  check('dedupRead same path: second marked', r[1]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+}
+// Different content: no dedup
+{
+  const msgs = [readMsg('read', 'unique a', '1'), readMsg('read', 'unique b', '2')];
+  const r = deduplicateReadOutputs(msgs);
+  check('dedupRead different: first unchanged', r[0]?.parts?.[0]?.output === 'unique a');
+  check('dedupRead different: second unchanged', r[1]?.parts?.[0]?.output === 'unique b');
+  check('dedupRead different: same length', r.length === 2);
+}
+// Non-read parts preserved
+{
+  const msgs = [
+    readMsg('read', 'read content', '1'),
+    { parts: [{ type: 'dynamic-tool', toolName: 'write', state: 'output-available', output: 'write result', toolCallId: '2' }] },
+  ];
+  const r = deduplicateReadOutputs(msgs);
+  check('dedupRead non-read: write preserved', r[1]?.parts?.[0]?.output === 'write result');
+}
+// Empty messages
+{
+  const r = deduplicateReadOutputs([]);
+  check('dedupRead empty: empty array', Array.isArray(r) && r.length === 0);
+}
+
+// ── collectReadOutputs + deduplicateReadOutputsWithSeen ──
+{
+  const seen = collectReadOutputs([readMsg('read', 'seen before', 'h1')]);
+  check('collectReadOutputs: returns array', Array.isArray(seen) && seen.length === 1 && seen[0] === 'seen before');
+}
+{
+  const seen = collectReadOutputs([readMsg('file_read', fileReadOutput('historical'), 'h1')]);
+  check('collectReadOutputs object: extracts content', Array.isArray(seen) && seen.length === 1 && seen[0] === 'historical');
+}
+{
+  const seeded = deduplicateReadOutputsWithSeen(['seen before'], [readMsg('file_read', 'seen before', 'n1')]);
+  check('deduplicateReadOutputsWithSeen: replaces historical repeat', seeded[0]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+}
+// Legacy flat seen seed applies to path-scoped reads
+{
+  const readMsgWithPath = (toolName, filePath, output, toolCallId) => ({
+    parts: [{ type: 'dynamic-tool', toolName, state: 'output-available', input: { path: filePath }, output, toolCallId }],
+  });
+  const shared = fileReadOutput('legacy seed content');
+  const seeded = deduplicateReadOutputsWithSeen(['legacy seed content'], [readMsgWithPath('file_read', 'a.ts', shared, 'n1')]);
+  check('deduplicateReadOutputsWithSeen legacy seed: path-scoped repeat marked', seeded[0]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+}
+// collectReadOutputs preserves message order, not path-sorted order
+{
+  const readMsgWithPath = (toolName, filePath, output, toolCallId) => ({
+    parts: [{ type: 'dynamic-tool', toolName, state: 'output-available', input: { path: filePath }, output, toolCallId }],
+  });
+  const seen = collectReadOutputs([
+    readMsgWithPath('file_read', 'z.ts', fileReadOutput('first'), '1'),
+    readMsgWithPath('file_read', 'a.ts', fileReadOutput('second'), '2'),
+  ]);
+  check('collectReadOutputs: preserves message order', seen.length === 2 && seen[0] === 'first' && seen[1] === 'second');
+}
+
+// ── deduplicateReadOutputsAgainstHistory (mux messagePipeline window seeding) ──
+{
+  const history = [readMsg('file_read', fileReadOutput('from history'), 'h1')];
+  const window = [readMsg('file_read', fileReadOutput('from history'), 'w1')];
+  const r = deduplicateReadOutputsAgainstHistory(history, window);
+  check('againstHistory: window repeat vs history marked', r[0]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+}
+{
+  const window = [readMsg('read', 'same', 'w1'), readMsg('read', 'same', 'w2')];
+  const r = deduplicateReadOutputsAgainstHistory([], window);
+  check('againstHistory: window first occurrence kept', r[0]?.parts?.[0]?.output === 'same');
+  check('againstHistory: window second repeat marked', r[1]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+}
+{
+  const readMsgWithPath = (toolName, filePath, output, toolCallId) => ({
+    parts: [{ type: 'dynamic-tool', toolName, state: 'output-available', input: { path: filePath }, output, toolCallId }],
+  });
+  const shared = fileReadOutput('shared across files');
+  const history = [readMsgWithPath('file_read', 'a.ts', shared, 'h1')];
+  const window = [readMsgWithPath('file_read', 'b.ts', shared, 'w1')];
+  const r = deduplicateReadOutputsAgainstHistory(history, window);
+  check('againstHistory per-path: different path not deduped vs history', r[0]?.parts?.[0]?.output?.content === 'shared across files');
+}
+{
+  const readMsgWithPath = (toolName, filePath, output, toolCallId) => ({
+    parts: [{ type: 'dynamic-tool', toolName, state: 'output-available', input: { path: filePath }, output, toolCallId }],
+  });
+  const out = fileReadOutput('same file repeat');
+  const history = [readMsgWithPath('file_read', 'x.ts', out, 'h1')];
+  const window = [readMsgWithPath('file_read', 'x.ts', out, 'w1')];
+  const r = deduplicateReadOutputsAgainstHistory(history, window);
+  check('againstHistory per-path: same path repeat vs history marked', r[0]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+}
+
+// ── deduplicateModelReadOutputsWithSeen (AI SDK ModelMessage) ──
+// Text output dedup
+{
+  const [s, msgs] = deduplicateModelReadOutputsWithSeen([], [
+    { content: [{ type: 'tool-result', toolName: 'read', output: { type: 'text', value: 'hello' } }] },
+    { content: [{ type: 'tool-result', toolName: 'read', output: { type: 'text', value: 'hello' } }] },
+  ]);
+  check('ModelMessage text: returns seen', Array.isArray(s) && s.includes('hello'));
+  check('ModelMessage text: first preserved', msgs[0]?.content?.[0]?.output?.value === 'hello');
+  check('ModelMessage text: second replaced', msgs[1]?.content?.[0]?.output?.value === '[No Change Since Previous Read/Write]');
+}
+// JSON output (file_read via mux host format)
+{
+  const [s, msgs] = deduplicateModelReadOutputsWithSeen([], [
+    { content: [{ type: 'tool-result', toolName: 'file_read', output: { type: 'json', value: { content: 'json content' } } }] },
+    { content: [{ type: 'tool-result', toolName: 'file_read', output: { type: 'json', value: { content: 'json content' } } }] },
+  ]);
+  check('ModelMessage json: returns seen', Array.isArray(s) && s.includes('json content'));
+  check('ModelMessage json: first preserved', msgs[0]?.content?.[0]?.output?.value?.content === 'json content');
+  check('ModelMessage json: second replaced', msgs[1]?.content?.[0]?.output?.value === '[No Change Since Previous Read/Write]');
+}
+// Different content: no dedup
+{
+  const [, msgs] = deduplicateModelReadOutputsWithSeen([], [
+    { content: [{ type: 'tool-result', toolName: 'read', output: { type: 'text', value: 'first' } }] },
+    { content: [{ type: 'tool-result', toolName: 'read', output: { type: 'text', value: 'second' } }] },
+  ]);
+  check('ModelMessage different: first unchanged', msgs[0]?.content?.[0]?.output?.value === 'first');
+  check('ModelMessage different: second unchanged', msgs[1]?.content?.[0]?.output?.value === 'second');
+}
+// Non-read parts preserved
+{
+  const [, msgs] = deduplicateModelReadOutputsWithSeen([], [
+    { content: [{ type: 'tool-result', toolName: 'write', output: { type: 'text', value: 'write result' } }] },
+  ]);
+  check('ModelMessage non-read: write preserved', msgs[0]?.content?.[0]?.output?.value === 'write result');
+}
+// Empty messages
+{
+  const [, msgs] = deduplicateModelReadOutputsWithSeen([], []);
+  check('ModelMessage empty: empty array', Array.isArray(msgs) && msgs.length === 0);
+}
 
 // ── opencode messages.transform: read-output dedup MUST mutate in place ──
 // REGRESSION GUARD. The opencode host keys internal bookkeeping (UI state,

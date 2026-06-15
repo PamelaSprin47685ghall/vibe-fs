@@ -167,7 +167,7 @@ let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.N
 let private applyReadDedup (messages: obj array) : unit =
     if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
     else
-        let mutable seen : string list = []
+        let mutable seenByPath : Map<string, string list> = Map.empty
 
         for i = 0 to messages.Length - 1 do
             let message = messages.[i]
@@ -186,8 +186,13 @@ let private applyReadDedup (messages: obj array) : unit =
                                 let output = Dyn.get state "output"
                                 if not (Dyn.isNullish output) && Dyn.typeIs output "string" then
                                     let currentOutput = string output
-                                    let result = Dedup.deduplicate seen currentOutput
-                                    seen <- result.seenOutputs
+                                    let pathKey =
+                                        match extractFilePaths (Dyn.get state "input") with
+                                        | path :: _ -> path
+                                        | [] -> ""
+                                    let pathSeen = seenByPath |> Map.tryFind pathKey |> Option.defaultValue []
+                                    let result = Dedup.deduplicate pathSeen currentOutput
+                                    seenByPath <- seenByPath |> Map.add pathKey result.seenOutputs
                                     if result.output <> currentOutput then
                                         setOutput state result.output
 

@@ -72,6 +72,7 @@ let writeTool : ToolDefinition =
                   let resolved = pathResolve (Dyn.str config "cwd") filePath
                   do! mkdir api (pathDirname resolved) |> Async.AwaitPromise
                   do! writeFile api resolved content |> Async.AwaitPromise
+                  VibeFs.Shell.FileReadCache.invalidate resolved
                   let! diagnostics = appendSyntaxDiagnostics resolved content false |> Async.AwaitPromise
                   let baseMsg = "Successfully wrote to " + resolved
                   return match diagnostics with Some d -> baseMsg + "\n\n" + d | None -> baseMsg
@@ -139,8 +140,16 @@ let listDirectoryEntries (dirPath: string) : JS.Promise<string> =
 let readFileWithLineNumbers (filePath: string, offset: int option, limit: int option) : JS.Promise<string> =
     async {
         try
-            let! fsApi = fsAsync () |> Async.AwaitPromise
-            let! content = readFileAsync fsApi filePath |> Async.AwaitPromise
+            let! content =
+                match VibeFs.Shell.FileReadCache.get filePath with
+                | Some cached -> async { return cached }
+                | None ->
+                    async {
+                        let! fsApi = fsAsync () |> Async.AwaitPromise
+                        let! raw = readFileAsync fsApi filePath |> Async.AwaitPromise
+                        VibeFs.Shell.FileReadCache.set filePath raw
+                        return raw
+                    }
             let lines =
                 if content = "" then [||]
                 else

@@ -7,13 +7,14 @@ open VibeFs.Kernel.Permission
 type ToolMap = Map<string, ToolPermission>
 
 let private searchRoles = [ Editor; Greper ]
+let private fuzzyFindRoles = [ Editor; Greper; Orchestrator ]
 
 /// The closed, role-specific tool inventories.  These are data, not behaviour.
 let private enabledFor role : string list =
     match role with
     | Orchestrator ->
         [ "read"; "editor"; "greper"; "reverie"; "submit_review"; "webfetch"
-          "websearch"; "executor"; "browser"; "glob"; "todowrite" ]
+          "websearch"; "executor"; "browser"; "glob"; "todowrite"; "fuzzy_find" ]
     | Editor ->
         [ "read"; "write"; "edit"; "glob"; "patch"; "fuzzy_find"; "fuzzy_grep" ]
     | Reviewer -> [ "read"; "submit_review_result" ]
@@ -34,8 +35,8 @@ let universalRules: UniversalRule list =
       DenyAllExcept ("stealth-browser-mcp_star", [ Browser ])
       DenyAllExcept ("submit_review_result", [ Reviewer ])
       DenyAllExcept ("glob", searchRoles)
-      AllowForRoles ("fuzzy_find", searchRoles)
-      DenyAllExcept ("fuzzy_find", searchRoles)
+      AllowForRoles ("fuzzy_find", fuzzyFindRoles)
+      DenyAllExcept ("fuzzy_find", fuzzyFindRoles)
       AllowForRoles ("fuzzy_grep", searchRoles)
       DenyAllExcept ("fuzzy_grep", searchRoles)
       DenyAll "grep"

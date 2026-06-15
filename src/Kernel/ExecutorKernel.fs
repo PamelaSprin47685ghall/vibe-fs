@@ -6,6 +6,22 @@ open VibeFs.Kernel.HeadTail
 [<Emit("Buffer.byteLength($0, 'utf8')")>]
 let private byteLength (s: string) : int = jsNative
 
+[<Emit("""
+(function (s, maxBytes) {
+  const encoder = new TextEncoder();
+  let result = "";
+  let bytes = 0;
+  for (const codePoint of s) {
+    const cpBytes = encoder.encode(codePoint).length;
+    if (bytes + cpBytes > maxBytes) break;
+    result += codePoint;
+    bytes += cpBytes;
+  }
+  return result;
+})($0, $1)
+""")>]
+let private truncateToBytes (s: string) (maxBytes: int) : string = jsNative
+
 /// Languages the executor can spawn.  A closed set: adding one is a compile
 /// error at every match site.
 type ExecutorLanguage = Shell | Python | Javascript
@@ -15,6 +31,7 @@ let languages: ExecutorLanguage list = [ Shell; Python; Javascript ]
 
 let timeoutMs = function Short -> 1000 | Long -> 10000
 let summaryThresholdBytes = 8192
+let rawOutputCapBytes = 1_048_576
 
 type ExecuteOptions =
     { program: string
@@ -71,13 +88,21 @@ let describeResultTag (result: ExecuteResult) (timeoutType: ExecutorTimeoutType)
 
 /// Build the prompt handed to the summariser agent.
 let buildSummaryPrompt (options: ExecuteOptions) (result: ExecuteResult) : string =
+    let rawOutput =
+        match result with
+        | Completed o | Truncated(o, _) | Failed o -> o
+        | MissingExecutable(_, o) -> o
+    let outputForSummary =
+        if byteLength rawOutput > rawOutputCapBytes then
+            truncateToBytes rawOutput rawOutputCapBytes
+            + "\n\n[Output truncated to 1MB for summarization]"
+        else
+            rawOutput
     let depList = String.concat ", " options.dependencies
     let depInfo = if options.dependencies.IsEmpty then "" else $"Dependencies: {depList}\n\n"
     [ describeResultTag result options.timeoutType; ""; "Program:"; options.program
       ""; depInfo.TrimEnd()
       "Summarize the output. Highlight successes, failures, and key values. Do not invent details."
-      ""; "Raw output:"; (match result with
-                            | Completed o | Truncated(o, _) | Failed o -> o
-                            | MissingExecutable(_, o) -> o) ]
+      ""; "Raw output:"; outputForSummary ]
     |> List.choose (fun s -> if System.String.IsNullOrEmpty(s) then None else Some s)
     |> String.concat "\n"

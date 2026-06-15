@@ -22,5 +22,9 @@ let deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj a
     let seen, result = VibeFs.Mux.Dedup.deduplicateModelReadOutputsWithSeen (List.ofArray seenOutputs) messages
     Array.ofList seen, result
 
+let deduplicateReadOutputsAgainstHistory (history: obj array) (messages: obj array) : obj array =
+    let seenByPath = VibeFs.Mux.Dedup.collectReadOutputsByPath history
+    VibeFs.Mux.Dedup.deduplicateReadOutputsWithSeenByPath seenByPath messages |> snd
+
 let collectReadOutputs (messages: obj array) : string[] =
     VibeFs.Mux.Dedup.collectReadOutputs messages |> Array.ofList
