@@ -7,6 +7,16 @@ open VibeFs.Kernel
 /// host names the tool `read`; the Mux host names it `file_read`.
 let readToolNames = Set [ "read"; "file_read" ]
 
+/// Extract the dedup key from a read-tool output.  Mux's `file_read` returns an
+/// object `{ success, content, ... }`; OpenCode's `read` returns a string.
+/// Returns "" when no usable key can be extracted.
+let private extractReadOutputKey (output: obj) : string =
+    if Dyn.isNullish output then ""
+    elif Dyn.typeIs output "string" then string output
+    else
+        let content = Dyn.get output "content"
+        if Dyn.isNullish content then "" else string content
+
 /// Pure: fold `deduplicate` over read outputs already collected from the
 /// conversation history, returning the final `seenOutputs` and any replacements
 /// in the provided messages.
@@ -33,9 +43,9 @@ let deduplicateReadOutputsWithSeen
                             let toolName = Dyn.str part "toolName"
                             let state = Dyn.str part "state"
                             let output = Dyn.get part "output"
+                            let current = extractReadOutputKey output
                             if ty = "dynamic-tool" && Set.contains toolName readToolNames && state = "output-available"
-                               && not (Dyn.isNullish output) && Dyn.typeIs output "string" then
-                                let current = string output
+                               && current.Length > 0 then
                                 let result = deduplicate seen current
                                 seen <- result.seenOutputs
                                 if result.output = current then newParts.Add(part)
@@ -73,8 +83,9 @@ let collectReadOutputs (messages: obj array) : string list =
                     let toolName = Dyn.str part "toolName"
                     let state = Dyn.str part "state"
                     let output = Dyn.get part "output"
+                    let key = extractReadOutputKey output
                     if ty = "dynamic-tool" && Set.contains toolName readToolNames && state = "output-available"
-                       && not (Dyn.isNullish output) && Dyn.typeIs output "string" then
-                        Some (string output)
+                       && key.Length > 0 then
+                        Some key
                     else None))
     |> Array.toList

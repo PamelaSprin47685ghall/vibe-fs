@@ -82,6 +82,7 @@ let private mkFileReadCapture () : obj =
 let createAllWrappers (tools: obj) : obj array =
     Array.append
         (mkSyntaxWrappers ())
-        [| mkTodoNudgeWrapper ()
+        [| mkFileReadCapture ()
+           mkTodoNudgeWrapper ()
            mkWebOverride "websearch" tools "web_search"
            mkWebOverride "webfetch" tools "web_fetch" |]

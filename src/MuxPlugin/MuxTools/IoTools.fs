@@ -46,9 +46,9 @@ let executorTool (deps: obj) : ToolDefinition =
           else
               let lang = match Dyn.str args "language" with "python" -> Python | "javascript" -> Javascript | _ -> Shell
               let timeout = match Dyn.str args "timeout_type" with "long" -> Long | _ -> Short
-              let deps = if Dyn.isNullish (Dyn.get args "dependencies") then [] else Dyn.get args "dependencies" :?> obj array |> Array.map string |> List.ofArray
+              let dependencyList = if Dyn.isNullish (Dyn.get args "dependencies") then [] else Dyn.get args "dependencies" :?> obj array |> Array.map string |> List.ofArray
               let options : ExecuteOptions =
-                  { program = Dyn.str args "program"; language = lang; dependencies = deps
+                  { program = Dyn.str args "program"; language = lang; dependencies = dependencyList
                     timeoutType = timeout; cwd = Some (Dyn.str config "cwd") }
               async {
                   let! result = execute options (Dyn.str config "workspaceId") |> Async.AwaitPromise
@@ -184,17 +184,7 @@ let readTool : ToolDefinition =
                       elif statIsFile stat then
                           let offset = optInt args "offset"
                           let limit = optInt args "limit"
-                          match hostFileReadExecute with
-                          | Some fn ->
-                              let hostArgs = {| path = resolved; offset = offset; limit = limit |}
-                              let hostOpts = {| abortSignal = Dyn.get config "abortSignal" |}
-                              let! result = Dyn.call2 fn hostArgs hostOpts :?> JS.Promise<obj> |> Async.AwaitPromise
-                              if Dyn.truthy (Dyn.get result "success") then
-                                  return string (Dyn.get result "content")
-                              else
-                                  return string (Dyn.get result "error")
-                          | None ->
-                              return! readFileWithLineNumbers (resolved, offset, limit) |> Async.AwaitPromise
+                          return! readFileWithLineNumbers (resolved, offset, limit) |> Async.AwaitPromise
                       else
                           return sprintf "Error: `%s` is not a file or directory" resolved
                   with ex ->

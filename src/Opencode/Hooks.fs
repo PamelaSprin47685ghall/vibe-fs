@@ -39,15 +39,12 @@ let private joinEditorIntents (intents: obj) : Result<string, string> =
     if not (Dyn.isArray intents) then
         Error "Invalid LLM input for editor: intents must be an array"
     else
+        // Use Dyn.get with "0" so the same index access works for both real
+        // arrays and numeric-keyed objects some providers emit for prefixItems tuples.
         let firstItems =
             (intents :?> obj array)
-            |> Array.map (fun intent ->
-                if Dyn.isArray intent then
-                    let arr = intent :?> obj array
-                    if Array.isEmpty arr then box null else arr.[0]
-                else
-                    intent)
-        if not (firstItems |> Array.forall (fun x -> Dyn.typeIs x "string")) then
+            |> Array.map (fun intent -> Dyn.get intent "0")
+        if firstItems |> Array.exists (fun x -> not (Dyn.typeIs x "string")) then
             Error "Invalid LLM input for editor: each intent must start with a string"
         else
             Ok (String.concat "; " (firstItems |> Array.map string))

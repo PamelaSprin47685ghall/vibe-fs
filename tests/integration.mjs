@@ -94,16 +94,17 @@ check('loop-review command exists', !!loopReviewCmd);
 check('loop-review execute.length === 2', loopReviewCmd.execute.length === 2);
 
 // ── Wrapper completeness ──
-check('wrapper count === 5', reg.wrappers.length === 5);
+check('wrapper count === 6', reg.wrappers.length === 6);
 const wrapperTargets = reg.wrappers.map(w => w.targetTool).sort();
-check('wrapper targets correct', JSON.stringify(wrapperTargets) === JSON.stringify(['file_edit_insert', 'file_edit_replace_string', 'todo_write', 'web_fetch', 'web_search']));
+check('wrapper targets correct', JSON.stringify(wrapperTargets) === JSON.stringify(['file_edit_insert', 'file_edit_replace_string', 'file_read', 'todo_write', 'web_fetch', 'web_search']));
 
 // ── Tool completeness ──
-check('tool count === 11', reg.tools.length === 11);
+check('tool count === 12', reg.tools.length === 12);
 const toolNames = reg.tools.map(t => t.name).sort();
 check('has editor tool', toolNames.includes('editor'));
 check('has webfetch tool', toolNames.includes('webfetch'));
 check('has write tool', toolNames.includes('write'));
+check('has read tool', toolNames.includes('read'));
 check('has submit_review tool', toolNames.includes('submit_review'));
 
 // ── web_search override wrapper forwards config ──
@@ -211,6 +212,19 @@ const seeded = deduplicateReadOutputsWithSeen(seen, [
   { parts: [{ type: 'dynamic-tool', toolName: 'file_read', state: 'output-available', output: 'seen before', toolCallId: 'n1' }] },
 ]);
 check('deduplicateReadOutputsWithSeen replaces historical repeat', seeded[0]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+
+// ── file_read object outputs: dedup by content field (mux host format) ──
+const fileReadOutput = (content) => ({ success: true, file_size: content.length, modifiedTime: '2024-01-01T00:00:00.000Z', lines_read: 1, content });
+const dedupedObj = deduplicateReadOutputs([
+  { parts: [{ type: 'dynamic-tool', toolName: 'file_read', state: 'output-available', output: fileReadOutput('hello world'), toolCallId: '1' }] },
+  { parts: [{ type: 'dynamic-tool', toolName: 'file_read', state: 'output-available', output: fileReadOutput('hello world'), toolCallId: '2' }] },
+]);
+check('file_read object: keeps first output', dedupedObj[0]?.parts?.[0]?.output?.content === 'hello world');
+check('file_read object: replaces repeat with marker', dedupedObj[1]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+const seenFromObj = collectReadOutputs([
+  { parts: [{ type: 'dynamic-tool', toolName: 'file_read', state: 'output-available', output: fileReadOutput('historical'), toolCallId: 'h1' }] },
+]);
+check('file_read object: collectReadOutputs extracts content', Array.isArray(seenFromObj) && seenFromObj.length === 1 && seenFromObj[0] === 'historical');
 
 // ── opencode messages.transform: read-output dedup MUST mutate in place ──
 // REGRESSION GUARD. The opencode host keys internal bookkeeping (UI state,
@@ -407,6 +421,10 @@ check('tool.definition leaves other tools alone', otherDefOut.parameters.propert
 const editorExecOut = { args: { intents: [['fix bug', ['a.ts']], ['add feature', ['b.ts']]] } };
 await p['tool.execute.before']({ tool: 'editor', sessionID: 's1', callID: 'c1' }, editorExecOut);
 check('tool.execute.before populates editor _ui', editorExecOut.args._ui === 'fix bug; add feature');
+
+const editorObjOut = { args: { intents: [{ 0: 'fix bug', 1: ['a.ts'] }, { 0: 'add feature', 1: ['b.ts'] }] } };
+await p['tool.execute.before']({ tool: 'editor', sessionID: 's1', callID: 'c1' }, editorObjOut);
+check('tool.execute.before populates editor _ui from object tuples', editorObjOut.args._ui === 'fix bug; add feature');
 
 const greperExecOut = { args: { intents: ['find usages', 'list exports'] } };
 await p['tool.execute.before']({ tool: 'greper', sessionID: 's1', callID: 'c2' }, greperExecOut);
