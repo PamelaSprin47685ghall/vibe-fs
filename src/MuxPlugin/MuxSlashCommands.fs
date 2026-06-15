@@ -165,4 +165,4 @@ let createPlanCommand (deps: obj) : obj =
 
 /// Build all slash commands.
 let createSlashCommands (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj array =
-    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps reviewStore; createPlanCommand deps |]
+    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps reviewStore |]

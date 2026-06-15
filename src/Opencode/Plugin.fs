@@ -75,6 +75,8 @@ let private registerCommands (cfg: obj) : unit =
         setKey cmdObj "plan" (box {| template = "Generate a structured plan for a requirement."; description = "Generate a structured plan file via multi-branch reasoning" |})
     setKey cfg "command" cmdObj
 
+let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<obj, obj, JS.Promise<unit>>(f))
+
 /// The legacy opencode plugin hook builder.
 [<ExportDefault>]
 let plugin (ctx: obj) : JS.Promise<obj> =
@@ -96,12 +98,12 @@ let plugin (ctx: obj) : JS.Promise<obj> =
                 registerCommands cfg
                 return assignInto cfg next
             } |> Async.StartAsPromise)))
-        setKey result "chat.message" (box (fun (input: obj) (output: obj) -> chatMessage nudgeHook input output))
-        setKey result "tool.definition" (box (fun (input: obj) (output: obj) -> toolDefinition input output))
-        setKey result "tool.execute.before" (box (fun (input: obj) (output: obj) -> toolExecuteBefore input output))
-        setKey result "tool.execute.after" (box (fun (input: obj) (output: obj) -> toolExecuteAfter directory nudgeHook input output))
-        setKey result "experimental.chat.messages.transform" (box (fun (_input: obj) (output: obj) -> messagesTransform directory output))
-        setKey result "command.execute.before" (box (fun (input: obj) (output: obj) ->
+        setKey result "chat.message" (twoArgHook (fun input output -> chatMessage nudgeHook input output))
+        setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinition input output))
+        setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBefore input output))
+        setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfter directory nudgeHook input output))
+        setKey result "experimental.chat.messages.transform" (twoArgHook (fun _input output -> messagesTransform directory output))
+        setKey result "command.execute.before" (twoArgHook (fun input output ->
             async {
                 do! nudgeHook.handleCommandExecuteBefore input output |> Async.AwaitPromise
                 do! commandExecuteBefore ctx reviewStore input output |> Async.AwaitPromise

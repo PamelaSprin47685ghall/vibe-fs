@@ -47,7 +47,7 @@ let private awaitChild (child: SpawnedChild) (kill: SpawnedChild -> unit) (timeo
                         kill child
                         settle None true
                 }
-                |> Async.Start
+                |> Async.StartImmediate
         )
     work |> Async.StartAsPromise
 
