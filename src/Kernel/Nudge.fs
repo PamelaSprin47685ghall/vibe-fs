@@ -86,6 +86,23 @@ let shouldSuppressNudge (_sessionId: string) (context: NudgeContext) (previousAc
         | _ -> false
 
 /// Terminal todo statuses that should NOT count as open work.
+type TodoStatus = Completed | Cancelled | Abandoned | InProgress | Pending
+
+let todoStatusOfString (s: string) : TodoStatus option =
+    match s.ToLowerInvariant() with
+    | "completed" -> Some Completed
+    | "cancelled" -> Some Cancelled
+    | "abandoned" -> Some Abandoned
+    | "in_progress" | "inprogress" -> Some InProgress
+    | "pending" -> Some Pending
+    | _ -> None
+
+let isTerminal (s: TodoStatus) : bool =
+    match s with
+    | Completed | Cancelled | Abandoned -> true
+    | InProgress | Pending -> false
+
+/// Set of terminal statuses for backward compatibility with string-based checks.
 let terminalTodoStatuses: Set<string> = Set.ofList [ "completed"; "cancelled"; "abandoned" ]
 
 /// The host-facing coordinator: wraps the pure decision in mutable per-session

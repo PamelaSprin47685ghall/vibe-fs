@@ -9,12 +9,15 @@ let private escapeRegex (pattern: string) : string =
 
 /// Detect whether a pattern is plain text, a valid regex, or a broken regex
 /// (treated as plain).  Mirrors the host's three-mode search selection.
+let private isValidRegex (pattern: string) : bool =
+    try Regex(pattern) |> ignore; true
+    with _ -> false
+
 let detectGrepMode (pattern: string) : string =
     let escaped = escapeRegex pattern
     if pattern = escaped then "plain"
-    else
-        try Regex(pattern) |> ignore; "regex"
-        with _ -> "plain"
+    elif isValidRegex pattern then "regex"
+    else "plain"
 
 /// Wildcard-only patterns (`.*`, `\s`, `.` alone) match everything and are
 /// rejected as useless.  Only meaningful for regex/fuzzy modes.

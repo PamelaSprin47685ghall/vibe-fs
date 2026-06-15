@@ -45,7 +45,6 @@ type RegistryAction =
     | Unlock of id: string
     | Accept of id: string
     | Reject of id: string * feedback: string
-    | SetFeedback of id: string * feedback: string option
     | AddChild of parentId: string * childId: string
     | Clear
 
@@ -94,8 +93,6 @@ let reduce (registry: Registry) (action: RegistryAction) : Registry =
         transitionIn registry id (ReviewCommand.Reject feedback) (fun s -> withFeedback s feedback)
     | RegistryAction.Deactivate id -> Map.remove id registry
     | RegistryAction.Evict cutoff -> evictStale registry cutoff
-    | RegistryAction.SetFeedback (id, feedback) ->
-        patch registry id (fun s -> withFeedback s (Option.defaultValue "" feedback))
     | RegistryAction.AddChild (parentId, childId) ->
         patch registry parentId (fun s -> addChild s childId)
     | RegistryAction.Clear -> emptyRegistry

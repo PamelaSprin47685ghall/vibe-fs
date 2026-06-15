@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.PlanTypes
+open VibeFs.Kernel.PlanCommon
 open VibeFs.Kernel.PlanEngine
 open VibeFs.Opencode.Session
 open VibeFs.Opencode.Sdk
@@ -136,11 +137,11 @@ let handlePlanCommand (ctx: obj) (input: obj) (output: obj) : Async<unit> =
                 let request =
                     { requestId = sessionID + "-" + hex4
                       rawRequirement = rawRequirement
-                      normalizedRequirement = PlanEngine.normalizeRequirement rawRequirement
+                      normalizedRequirement = PlanCommon.normalizeRequirement rawRequirement
                       branchCount = 5
                       branchModelName = "reverie"
                       judgeModelName = "reviewer"
-                      outputFileName = PlanEngine.formatPlanFileName hex4
+                      outputFileName = PlanCommon.formatPlanFileName hex4
                       workspaceRoot = directory
                       existingContext = None }
                 let branchAgent = if request.branchModelName = "" then "reverie" else request.branchModelName

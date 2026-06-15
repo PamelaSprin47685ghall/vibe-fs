@@ -8,6 +8,7 @@ open VibeFs.Kernel.AgentPolicy
 open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.PlanTypes
 open VibeFs.Kernel.PlanEngine
+open VibeFs.Kernel.PlanCommon
 open VibeFs.MuxPlugin.Delegate
 open VibeFs.MuxPlugin.PlanTools
 open VibeFs.MuxPlugin.PlanToolStore
@@ -196,11 +197,11 @@ let createPlanCommand (deps: obj) : obj =
                         let request =
                             { requestId = workspaceId + "-" + hex4
                               rawRequirement = rawRequirement
-                              normalizedRequirement = normalizeRequirement rawRequirement
+                              normalizedRequirement = PlanCommon.normalizeRequirement rawRequirement
                               branchCount = 5
                               branchModelName = "exec"
                               judgeModelName = "plan"
-                              outputFileName = formatPlanFileName hex4
+                              outputFileName = PlanCommon.formatPlanFileName hex4
                               workspaceRoot = directory
                               existingContext = None }
                         let mutable callCounter = 0

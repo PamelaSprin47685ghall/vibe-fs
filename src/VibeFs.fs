@@ -40,6 +40,14 @@ module TreeSitterKernel = VibeFs.Kernel.TreeSitterKernel
 module SessionText = VibeFs.Kernel.SessionText
 module IteratorStore = VibeFs.Kernel.IteratorStore
 module PlanTypes = VibeFs.Kernel.PlanTypes
+module PlanCommon = VibeFs.Kernel.PlanCommon
+module PlanHypotheses = VibeFs.Kernel.PlanHypotheses
+module PlanBranches = VibeFs.Kernel.PlanBranches
+module PlanCritique = VibeFs.Kernel.PlanCritique
+module PlanRender = VibeFs.Kernel.PlanRender
+module PlanPool = VibeFs.Kernel.PlanPool
+module PlanRevision = VibeFs.Kernel.PlanRevision
+module PlanJudge = VibeFs.Kernel.PlanJudge
 module PlanEngine = VibeFs.Kernel.PlanEngine
 
 module Shell =

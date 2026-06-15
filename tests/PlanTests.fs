@@ -3,7 +3,13 @@ module VibeFs.Tests.PlanTests
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.PlanTypes
-open VibeFs.Kernel.PlanEngine
+open VibeFs.Kernel.PlanCommon
+open VibeFs.Kernel.PlanHypotheses
+open VibeFs.Kernel.PlanBranches
+open VibeFs.Kernel.PlanRevision
+open VibeFs.Kernel.PlanPool
+open VibeFs.Kernel.PlanCritique
+open VibeFs.Kernel.PlanJudge
 open VibeFs.Tests.Assert
 
 let normalize () =
@@ -26,13 +32,13 @@ let hypotheses () =
           existingContext = None }
     let lenses = buildPlanLenses req
     check "buildPlanLenses returns 5" (List.length lenses = 5)
-    check "static hypotheses fallback length is 3" (List.length (staticHypothesesForTest req) = 3)
+    check "static hypotheses fallback length is 3" (List.length (staticHypotheses req) = 3)
 
 let hypothesesToolCall () =
     let raw = createObj
                   [ "hypotheses",
                     box [| createObj [ "text", box "Ambiguous scope"; "targetBranchIds", box [| "b1"; "b2" |] ] |] ]
-    let parsed = parsePlanHypothesesToolCall raw
+    let parsed = parsePlanHypothesesToolCall raw |> Result.defaultValue []
     check "parsePlanHypothesesToolCall returns 1" (List.length parsed = 1)
     match parsed with
     | h :: _ ->
@@ -63,7 +69,10 @@ let branchToolCall () =
               "validationChecks", box [| "v" |]
               "selfCritique", box "c"
               "confidence", box 0.75 ]
-    let c = parsePlanBranchToolCall raw
+    let c =
+        match parsePlanBranchToolCall raw with
+        | Ok c -> c
+        | Error e -> failwith e
     equal "branchId" "b1" c.branchId
     equal "lens" ArchitectureFirst c.lens
     equal "confidence" 0.75 c.confidence
@@ -76,7 +85,7 @@ let judgeToolCall () =
               "rejectedBranchIds", box [| "b1" |]
               "judgeReasoning", box "r"
               "mergeNotes", box [| "m" |] ]
-    let d = parsePlanJudgeToolCall raw
+    let d = parsePlanJudgeToolCall raw |> Result.defaultValue { winnerBranchId = ""; keptBranchIds = []; rejectedBranchIds = []; judgeReasoning = ""; mergeNotes = [] }
     equal "winner" "b2" d.winnerBranchId
     check "rejected non-empty" (d.rejectedBranchIds <> [])
 
@@ -93,7 +102,10 @@ let revisionToolCall () =
               "validationChecks", box [| "v" |]
               "selfCritique", box "c"
               "confidence", box 0.8 ]
-    let r = parsePlanRevisionToolCall raw
+    let r =
+        match parsePlanRevisionToolCall raw with
+        | Ok r -> r
+        | Error e -> failwith e
     equal "revisedPlanSummary parsed" "S" r.revisedPlanSummary
 
 let poolToolCall () =
@@ -106,10 +118,41 @@ let poolToolCall () =
                            "contentMarkdown", box "Body"
                            "approachSummary", box "Approach"
                            "confidence", box 0.6 ] |] ]
-    let entries = parsePlanPoolToolCall raw
+    let entries =
+        match parsePlanPoolToolCall raw with
+        | Ok xs -> xs
+        | Error e -> failwith e
     check "pool entries length" (List.length entries = 1)
     match entries with
     | e :: _ ->
         equal "entry title" "Alt" e.title
         equal "entry branchId" "b1" e.branchId
     | [] -> failwith "unexpected empty"
+
+let poolToolCallError () =
+    let raw = createObj [ "branchId", box "b1" ]
+    match parsePlanPoolToolCall raw with
+    | Ok _ -> failwith "expected error for missing entries"
+    | Error _ -> check "pool parser returns error" true
+
+let critiqueToolCall () =
+    let raw =
+        createObj
+            [ "branchId", box "b1"
+              "critiqueMarkdown", box "The plan is vague."
+              "criticalIssues", box [| "vague scope" |]
+              "missingRequirements", box [| "auth flow" |]
+              "counterexamples", box [| "public endpoint" |]
+              "improvementDirections", box [| "add boundaries" |] ]
+    let c =
+        match parsePlanCritiqueToolCall raw with
+        | Ok c -> c
+        | Error e -> failwith e
+    equal "critique branchId" "b1" c.branchId
+    equal "critique issue" "vague scope" c.criticalIssues.Head
+
+let critiqueToolCallError () =
+    let raw = createObj [ "branchId", box "b1" ]
+    match parsePlanCritiqueToolCall raw with
+    | Ok _ -> failwith "expected error for missing fields"
+    | Error _ -> check "critique parser returns error" true

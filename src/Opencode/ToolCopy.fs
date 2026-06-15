@@ -30,7 +30,7 @@ let webfetch = "Fetch a URL with better extraction for static/docs pages. Suppor
 /// Param docs (inline strings used by schema builders).
 module Params =
     let editorIntents =
-        "Array of [intent, affectFiles] tuples. Each tuple is a natural-language change request plus affected file paths; each tuple runs in parallel via its own editor subagent. The intent string is delivered to the subagent as the user message — include all background, design rationale, and requirements there."
+        "Array of [intent, affectFiles] tuples. Each tuple is a natural-language change request plus an array of affected file paths; each tuple runs in parallel via its own editor subagent. The intent string is delivered to the subagent as the user message — include all background, design rationale, and requirements there. Example tuple: `[\"Fix login\", [\"src/auth.ts\", \"src/login.ts\"]]`."
     let greperIntents =
         "Array of independent code-search intent strings, each run in parallel via its own search subagent. Each string becomes the subagent user message — include background, paths, symbols, and what to find."
     let reverieIntent =
@@ -42,7 +42,7 @@ module Params =
     let executorLanguage = "Execution language: shell, python, or javascript"
     let executorProgram = "The program to execute."
     let executorDeps = "Dependencies to install (for python or javascript)."
-    let executorTimeout = "Execution timeout budget: 'short' (1s) or 'long' (10s)."
+    let executorTimeout = "Execution timeout budget: 'short' (1s), 'long' (10s), or 'last-resort' (100s). Use 'last-resort' only when absolutely necessary."
     let fuzzyFindPattern = "Initial plain fuzzy file path text to search for."
     let fuzzyFindPath = "Initial optional path constraint to narrow search scope"
     let fuzzyFindLimit = "Maximum number of results to return per call (default: 30)"

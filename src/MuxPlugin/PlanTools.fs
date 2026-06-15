@@ -73,12 +73,12 @@ let private makePlanTool (schema: PlanToolSchema) : ToolDefinition =
 
 /// All plan tool definitions, keyed by name.
 let planToolDefinitions : Map<string, ToolDefinition> =
-    [ PlanEngine.buildPlanHypothesesToolSchema
-      PlanEngine.buildPlanBranchToolSchema
-      PlanEngine.buildPlanCritiqueToolSchema
-      PlanEngine.buildPlanPoolToolSchema
-      PlanEngine.buildPlanRevisionToolSchema
-      PlanEngine.buildPlanJudgeToolSchema ]
+    [ PlanHypotheses.buildPlanHypothesesToolSchema
+      PlanBranches.buildPlanBranchToolSchema
+      PlanCritique.buildPlanCritiqueToolSchema
+      PlanPool.buildPlanPoolToolSchema
+      PlanRevision.buildPlanRevisionToolSchema
+      PlanJudge.buildPlanJudgeToolSchema ]
     |> List.map (fun schema -> planToolName schema, makePlanTool schema)
     |> Map.ofList
 
@@ -91,12 +91,12 @@ let private buildAgentReportProperties () : obj =
         createObj
             [ "reportMarkdown", box (createObj [ "type", box "string"; "description", box "Human-friendly markdown shown in the upstream UI." ])
               "callId", box (createObj [ "type", box "string"; "description", box "Internal plan call id supplied by the prompt." ]) ]
-    for schema in [ PlanEngine.buildPlanHypothesesToolSchema
-                    PlanEngine.buildPlanBranchToolSchema
-                    PlanEngine.buildPlanCritiqueToolSchema
-                    PlanEngine.buildPlanPoolToolSchema
-                    PlanEngine.buildPlanRevisionToolSchema
-                    PlanEngine.buildPlanJudgeToolSchema ] do
+    for schema in [ PlanHypotheses.buildPlanHypothesesToolSchema
+                    PlanBranches.buildPlanBranchToolSchema
+                    PlanCritique.buildPlanCritiqueToolSchema
+                    PlanPool.buildPlanPoolToolSchema
+                    PlanRevision.buildPlanRevisionToolSchema
+                    PlanJudge.buildPlanJudgeToolSchema ] do
         let schemaProps = Dyn.get schema.parameters "properties"
         if not (Dyn.isNullish schemaProps) then
             for key in objectKeys schemaProps do

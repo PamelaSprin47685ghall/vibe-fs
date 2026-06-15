@@ -58,7 +58,7 @@ let editorPromptBody (intent: string) (affectedFiles: string list) : string =
     + "Instructions:\n"
     + "1. Read the affected files and any related code you need to understand the change.\n"
     + "2. Edit or create files to implement the intent.\n"
-    + "3. Run tests or static checks if they are available and cheap.\n"
+    + "3. Perform static verification only (read, inspect, type-check). Do NOT run tests, execute code, or run any commands.\n"
 
 let formatEditorUserPrompt (intent: string) (affectedFiles: string list) : string =
     editorPromptBody intent affectedFiles

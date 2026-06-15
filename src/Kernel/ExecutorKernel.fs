@@ -44,11 +44,11 @@ let private truncateToBytes (s: string) (maxBytes: int) : string =
 /// Languages the executor can spawn.  A closed set: adding one is a compile
 /// error at every match site.
 type ExecutorLanguage = Shell | Python | Javascript
-type ExecutorTimeoutType = Short | Long
+type ExecutorTimeoutType = Short | Long | LastResort
 
 let languages: ExecutorLanguage list = [ Shell; Python; Javascript ]
 
-let timeoutMs = function Short -> 1000 | Long -> 10000
+let timeoutMs = function Short -> 1000 | Long -> 10000 | LastResort -> 100_000
 let summaryThresholdBytes = 8192
 let rawOutputCapBytes = 1_048_576
 

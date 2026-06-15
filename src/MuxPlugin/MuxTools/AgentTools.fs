@@ -97,7 +97,10 @@ let private buildEditorPrompts (_config: obj) (args: obj) : Async<string array> 
                     |> Array.map (fun intent ->
                         let pair = intent :?> obj array
                         let intentText = string pair.[0]
-                        let files = pair.[1] :?> obj array |> Array.map string |> List.ofArray
+                        let files =
+                            let filesRaw = pair.[1]
+                            if Dyn.typeIs filesRaw "string" then [string filesRaw]
+                            else filesRaw :?> obj array |> Array.map string |> List.ofArray
                         formatMuxEditorUserPrompt intentText files)
     }
 

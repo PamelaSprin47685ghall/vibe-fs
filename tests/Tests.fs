@@ -64,4 +64,7 @@ let main _ =
     PlanTests.judgeToolCall ()
     PlanTests.revisionToolCall ()
     PlanTests.poolToolCall ()
+    PlanTests.poolToolCallError ()
+    PlanTests.critiqueToolCall ()
+    PlanTests.critiqueToolCallError ()
     summary ()

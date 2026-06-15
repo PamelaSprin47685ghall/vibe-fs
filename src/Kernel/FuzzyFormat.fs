@@ -36,44 +36,41 @@ type GrepMatch =
 type GrepResult =
     { items: GrepMatch list; totalMatched: int option; regexFallbackError: string option }
 
-/// Render a grep result as a human-readable report grouped by file.  Wrapped in
-/// a defensive guard matching the original try/catch (returns a sentinel on failure).
+/// Render a grep result as a human-readable report grouped by file.
 let formatGrepOutput (result: GrepResult option) : string =
-    try
-        match result with
-        | None -> "No matches found"
-        | Some r ->
-            if r.items.IsEmpty then "No matches found"
-            else
-                let total = defaultArg r.totalMatched r.items.Length
-                let plural = if total = 1 then "match" else "matches"
-                let header = [ $"{total} {plural}"; "" ]
-                let body =
-                    r.items
-                    |> List.fold
-                        (fun (currentFile, lines) (m: GrepMatch) ->
-                            let lines = if m.relativePath <> currentFile && currentFile <> "" then lines @ [ "" ] else lines
-                            let lines =
-                                if m.relativePath <> currentFile then
-                                    lines @ [ $"{m.relativePath}{fileAnnotation m.annotation}" ]
-                                else lines
-                            let ctxLen = m.contextBefore.Length
-                            let before =
-                                m.contextBefore
-                                |> List.mapi (fun i line ->
-                                    let lineNum = m.lineNumber - ctxLen + i
-                                    $" {lineNum}- {truncateLine line grepMaxLineLength}")
-                            let main = [ $" {m.lineNumber}: {truncateLine m.lineContent grepMaxLineLength}" ]
-                            let after =
-                                m.contextAfter
-                                |> List.mapi (fun i line ->
-                                    let lineNum = m.lineNumber + 1 + i
-                                    $" {lineNum}- {truncateLine line grepMaxLineLength}")
-                            m.relativePath, lines @ before @ main @ after)
-                        ("", header)
-                    |> snd
-                String.concat "\n" body
-    with _ -> "(error formatting grep output)"
+    match result with
+    | None -> "No matches found"
+    | Some r ->
+        if r.items.IsEmpty then "No matches found"
+        else
+            let total = defaultArg r.totalMatched r.items.Length
+            let plural = if total = 1 then "match" else "matches"
+            let header = [ $"{total} {plural}"; "" ]
+            let body =
+                r.items
+                |> List.fold
+                    (fun (currentFile, lines) (m: GrepMatch) ->
+                        let lines = if m.relativePath <> currentFile && currentFile <> "" then lines @ [ "" ] else lines
+                        let lines =
+                            if m.relativePath <> currentFile then
+                                lines @ [ $"{m.relativePath}{fileAnnotation m.annotation}" ]
+                            else lines
+                        let ctxLen = m.contextBefore.Length
+                        let before =
+                            m.contextBefore
+                            |> List.mapi (fun i line ->
+                                let lineNum = m.lineNumber - ctxLen + i
+                                $" {lineNum}- {truncateLine line grepMaxLineLength}")
+                        let main = [ $" {m.lineNumber}: {truncateLine m.lineContent grepMaxLineLength}" ]
+                        let after =
+                            m.contextAfter
+                            |> List.mapi (fun i line ->
+                                let lineNum = m.lineNumber + 1 + i
+                                $" {lineNum}- {truncateLine line grepMaxLineLength}")
+                        m.relativePath, lines @ before @ main @ after)
+                    ("", header)
+                |> snd
+            String.concat "\n" body
 
 type FindMatch =
     { relativePath: string; annotation: FileAnnotation option }
@@ -85,15 +82,13 @@ type FindResult =
 
 /// Render a find result as a flat, annotated file list with a summary header.
 let formatFindOutput (result: FindResult option) : string =
-    try
-        match result with
-        | None -> "No matching files found"
-        | Some r ->
-            if r.items.IsEmpty then "No matching files found"
-            else
-                let total = defaultArg r.totalMatched r.items.Length
-                let plural = if total = 1 then "file" else "files"
-                let header = [ $"{total} matching {plural} ({r.totalFiles} total indexed)"; "" ]
-                let body = r.items |> List.map (fun m -> $"{m.relativePath}{fileAnnotation m.annotation}")
-                String.concat "\n" (header @ body)
-    with _ -> "(error formatting find output)"
+    match result with
+    | None -> "No matching files found"
+    | Some r ->
+        if r.items.IsEmpty then "No matching files found"
+        else
+            let total = defaultArg r.totalMatched r.items.Length
+            let plural = if total = 1 then "file" else "files"
+            let header = [ $"{total} matching {plural} ({r.totalFiles} total indexed)"; "" ]
+            let body = r.items |> List.map (fun m -> $"{m.relativePath}{fileAnnotation m.annotation}")
+            String.concat "\n" (header @ body)

@@ -26,6 +26,7 @@ let private parseLanguage (value: string) : ExecutorLanguage =
 let private parseTimeout (value: string) : ExecutorTimeoutType =
     match value.ToLowerInvariant() with
     | "long" -> Long
+    | "last-resort" -> LastResort
     | _ -> Short
 
 let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
@@ -56,7 +57,7 @@ let executorTool (deps: obj) : ToolDefinition =
                 [ "language", box (strEnumProp Params.executorLanguage [| "shell"; "python"; "javascript" |])
                   "program", box (strProp Params.executorProgram)
                   "dependencies", box (strArrayProp Params.executorDeps)
-                  "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long" |]) ])
+                  "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |]) ])
             [| "language"; "program"; "timeout" |]
       execute =
         fun config args ->

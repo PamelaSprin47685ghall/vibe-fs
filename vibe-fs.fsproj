@@ -51,6 +51,14 @@
     <Compile Include="src/Kernel/SessionText.fs" />
     <Compile Include="src/Kernel/IteratorStore.fs" />
     <Compile Include="src/Kernel/PlanTypes.fs" />
+    <Compile Include="src/Kernel/PlanCommon.fs" />
+    <Compile Include="src/Kernel/PlanHypotheses.fs" />
+    <Compile Include="src/Kernel/PlanBranches.fs" />
+    <Compile Include="src/Kernel/PlanCritique.fs" />
+    <Compile Include="src/Kernel/PlanRevision.fs" />
+    <Compile Include="src/Kernel/PlanPool.fs" />
+    <Compile Include="src/Kernel/PlanRender.fs" />
+    <Compile Include="src/Kernel/PlanJudge.fs" />
     <Compile Include="src/Kernel/PlanEngine.fs" />
     <!-- Shell: effectful boundary -->
     <Compile Include="src/Shell/CapsShell.fs" />

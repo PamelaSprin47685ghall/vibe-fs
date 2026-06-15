@@ -166,7 +166,9 @@ let private collectSnapshot (client: obj) (sessionID: string) : Async<SessionSna
                     (todosData :?> obj array)
                     |> Array.choose (fun todo ->
                         let status = Dyn.str todo "status"
-                        if terminalTodoStatuses.Contains status then None else Some status)
+                        match todoStatusOfString status with
+                        | Some s when isTerminal s -> None
+                        | _ -> Some status)
                     |> Array.toList
                 else []
             let mutable lastAssistantMessage = ""

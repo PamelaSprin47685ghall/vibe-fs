@@ -111,7 +111,7 @@ let private plugin (ctx: obj) : JS.Promise<obj> =
         setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinition input output))
         setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBefore input output))
         setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfter directory nudgeHook input output))
-        setKey result "experimental.chat.messages.transform" (twoArgHook (fun _input output -> messagesTransform directory output))
+        setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform directory input output))
         setKey result "command.execute.before" (twoArgHook (fun input output ->
             async {
                 do! nudgeHook.handleCommandExecuteBefore input output |> Async.AwaitPromise

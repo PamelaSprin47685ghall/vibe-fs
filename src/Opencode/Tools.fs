@@ -43,7 +43,10 @@ let editorTool (ctx: obj) : obj =
                     intents |> Array.map (fun intent ->
                         let pair = intent :?> obj array
                         let intentText = string pair.[0]
-                        let files = pair.[1] :?> obj array |> Array.map string |> List.ofArray
+                        let files =
+                            let filesRaw = pair.[1]
+                            if Dyn.typeIs filesRaw "string" then [string filesRaw]
+                            else filesRaw :?> obj array |> Array.map string |> List.ofArray
                         let prompt = formatEditorUserPrompt intentText files
                         runSubagent client (AgentRole.toString Editor) "Editor" prompt directory sessionID context (box null)
                         |> Async.AwaitPromise) |> Async.Parallel
@@ -103,7 +106,7 @@ let executorTool (ctx: obj) : obj =
         (fun args context ->
             let tc = extractToolContext context (Dyn.str ctx "directory")
             let lang = match Dyn.str args "language" with "python" -> Python | "javascript" -> Javascript | _ -> Shell
-            let timeout = match Dyn.str args "timeout_type" with "long" -> Long | _ -> Short
+            let timeout = match Dyn.str args "timeout_type" with "long" -> Long | "last-resort" -> LastResort | _ -> Short
             let deps = if Dyn.isNullish (Dyn.get args "dependencies") then [] else Dyn.get args "dependencies" :?> obj array |> Array.map string |> List.ofArray
             let options : ExecuteOptions =
                 { program = Dyn.str args "program"; language = lang; dependencies = deps

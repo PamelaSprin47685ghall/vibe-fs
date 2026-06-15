@@ -245,19 +245,22 @@ let private applyReadDedup (messages: obj array) : unit =
 
 /// messages.transform: synthesise a user+assistant read pair from CAPS files.
 /// Mutates output.messages in place so the host never sees a swapped array reference.
-let messagesTransform (directory: string) (output: obj) : JS.Promise<unit> =
+/// CAPS context is only injected for non-title agents; title-agent sessions are skipped.
+let messagesTransform (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let messages = Dyn.get output "messages"
         if not (Dyn.isNullish messages) && Dyn.isArray messages then
             let messagesArr = messages :?> obj array
-            let! capsFiles = VibeFs.Shell.CapsShell.findCapsFiles directory |> Async.AwaitPromise
-            let next =
-                VibeFs.Kernel.CapsFormat.buildCapsMessages
-                    messagesArr
-                    directory
-                    defaultExcludedAgents
-                    capsFiles
-            replaceArrayInPlace messagesArr next
+            let agent = resolveAgent input
+            if not (defaultExcludedAgents |> List.contains agent) then
+                let! capsFiles = VibeFs.Shell.CapsShell.findCapsFiles directory |> Async.AwaitPromise
+                let next =
+                    VibeFs.Kernel.CapsFormat.buildCapsMessages
+                        messagesArr
+                        directory
+                        defaultExcludedAgents
+                        capsFiles
+                replaceArrayInPlace messagesArr next
             applyReadDedup messagesArr
     } |> Async.StartAsPromise
 
