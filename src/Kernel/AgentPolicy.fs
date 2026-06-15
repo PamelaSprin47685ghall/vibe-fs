@@ -19,8 +19,8 @@ let private enabledFor role : string list =
         [ "read"; "write"; "edit"; "glob"; "patch"; "fuzzy_find"; "fuzzy_grep" ]
     | Reviewer -> [ "read"; "submit_review_result" ]
     | Greper -> [ "read"; "executor"; "glob"; "fuzzy_find"; "fuzzy_grep" ]
-    | Browser -> [ "read"; "stealth_browser_mcp_star" ]
-    | Reverie -> []
+    | Browser -> [ "read"; "stealth-browser-mcp_*" ]
+    | Reverie -> [ "read" ]
 
 /// Build the full tool map by marking enabled tools Allow and the rest Deny.
 let toolMapFor (role: AgentRole) : ToolMap =
@@ -32,7 +32,7 @@ let toolMapFor (role: AgentRole) : ToolMap =
 /// Universal rules apply to every role and are evaluated first.
 let universalRules: UniversalRule list =
     [ DenyAll "bash"
-      DenyAllExcept ("stealth-browser-mcp_star", [ Browser ])
+      DenyAllExcept ("stealth-browser-mcp_*", [ Browser ])
       DenyAllExcept ("submit_review_result", [ Reviewer ])
       DenyAllExcept ("glob", searchRoles)
       AllowForRoles ("fuzzy_find", fuzzyFindRoles)

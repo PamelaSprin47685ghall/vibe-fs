@@ -105,3 +105,9 @@ let strip (script: string) : StripResult =
         if List.isEmpty found then { script = current; stripped = acc }
         else loop next (found @ acc)
     loop script []
+
+/// Keep `head` characters at the start and `tail` characters at the end,
+/// inserting an ellipsis when the string is longer than head + tail.
+let headTail (s: string) (head: int) (tail: int) : string =
+    if s.Length <= head + tail then s
+    else s.Substring(0, head) + "..." + s.Substring(s.Length - tail)

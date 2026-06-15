@@ -17,7 +17,7 @@ let canonicalToolNames: string list =
     [ "read"; "write"; "edit"; "executor"; "glob"; "fuzzy_find"; "fuzzy_grep"
       "grep"; "editor"; "greper"; "reverie"; "submit_review"; "submit_review_result"
       "todowrite"; "webfetch"; "websearch"; "browser"; "task"; "patch"
-      "stealth_browser_mcp_star" ]
+      "stealth-browser-mcp_*" ]
 
 /// A universal permission rule: a declarative statement of policy that the
 /// engine evaluates to decide a tool's fate for a given agent.

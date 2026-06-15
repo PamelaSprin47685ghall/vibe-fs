@@ -49,13 +49,13 @@ let formatSyntaxDiagnostics (filePath: string) (result: SyntaxCheckResult)
         let langLabel = if lang = "" then "unknown" else lang
         Some($"{syntaxCheckMarker}\nSyntax check failed in {filePath} ({langLabel}): {reason}")
     | Ok(lang, errors) ->
-        if List.isEmpty errors then
+        if Array.isEmpty errors then
             if includeOk then Some($"{syntaxCheckMarker} {filePath}: ok ({lang})") else None
         else
             let lines =
-                errors |> List.map (fun e ->
+                errors |> Array.map (fun e ->
                     $"  L{e.line}:{e.column}-{e.endLine}:{e.endColumn} [{e.severity}] {e.message}")
-            Some(String.concat "\n" ($"{syntaxCheckMarker}\n{errors.Length} syntax issue(s) in {filePath} ({lang})" :: lines))
+            Some(String.concat "\n" ($"{syntaxCheckMarker}\n{errors.Length} syntax issue(s) in {filePath} ({lang})" :: (lines |> Array.toList)))
 
 /// Append a syntax annotation to tool output, skipping when already marked.
 let appendSyntaxDiagnosticsToOutput (currentOutput: string) (filePath: string)

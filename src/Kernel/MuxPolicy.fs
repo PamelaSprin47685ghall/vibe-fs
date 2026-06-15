@@ -28,8 +28,7 @@ let private muxToolPatterns: Map<string, string list> =
           "browser", [ "browser" ]
           "task", [ "task"; "task_.*" ]
           "todowrite", [ "todo_read"; "todoread"; "todo_write"; "todowrite" ]
-          "stealth_browser_mcp_star", [ "stealth_browser_mcp_.*" ]
-          "stealth-browser-mcp_star", [ "stealth_browser_mcp_.*" ]
+          "stealth-browser-mcp_*", [ "stealth_browser_mcp_.*" ]
           "bash", [ "bash"; "bash_.*" ]
           "question", [ "ask_user_question" ] ]
 
@@ -38,6 +37,12 @@ let expandPatterns (names: string seq) : string list =
     names
     |> Seq.collect (fun name -> Map.tryFind name muxToolPatterns |> Option.defaultValue [ name ])
     |> Set.ofSeq |> Set.toList
+
+/// Return the denied canonical tool names for a given role string.
+let disabledToolsFor (toolName: string) : string list =
+    match AgentRole.ofString toolName with
+    | Ok role -> (effectivePolicy role).deniedTools
+    | Error _ -> []
 
 /// Resolve a role string into the host tool-policy delta.  Unknown roles yield None.
 let getPluginToolPolicy (role: string option) : MuxPluginToolPolicy option =

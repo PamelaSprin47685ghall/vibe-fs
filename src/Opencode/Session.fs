@@ -4,6 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.DomainError
+open VibeFs.Kernel.JsBoundary
 open VibeFs.Kernel.SessionText
 
 let private firstString (ctx: obj) (keys: string list) : string option =
@@ -142,11 +144,12 @@ let private runSubagentCore (client: obj) (agent: string) (title: string) (promp
                 finally
                     if cleanup then abortAndUnregister ()
             with err ->
-                if AbortKernel.isAbortError err then
+                match translateJsError err with
+                | MessageAborted ->
                     abortAndUnregister ()
                     let! text = extractSessionText client childID directory |> Async.AwaitPromise
                     return if text = "" then "(aborted)" else $"(aborted) {text}"
-                else return raise err
+                | _ -> return raise err
     }
     |> Async.StartAsPromise
 

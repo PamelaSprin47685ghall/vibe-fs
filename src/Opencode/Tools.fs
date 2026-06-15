@@ -11,6 +11,7 @@ open VibeFs.Shell.OllamaClient
 open VibeFs.Opencode.Sdk
 open VibeFs.Opencode.ToolCopy
 open VibeFs.Opencode.Session
+open VibeFs.Kernel.Prompts
 
 [<Emit("({ [$0]: $1 })")>]
 let private entry (key: string) (value: obj) : obj = jsNative
@@ -40,7 +41,7 @@ let editorTool (ctx: obj) : obj =
                         let pair = intent :?> obj array
                         let intentText = string pair.[0]
                         let files = pair.[1] :?> obj array |> Array.map string |> List.ofArray
-                        let prompt = HostKernel.formatEditorIntent intentText files
+                        let prompt = formatEditorUserPrompt intentText files
                         runSubagent client (AgentRole.toString Editor) "Editor" prompt directory sessionID context
                         |> Async.AwaitPromise) |> Async.Parallel
                 return String.concat "\n---\n" (List.ofArray reports)
@@ -58,7 +59,8 @@ let greperTool (ctx: obj) : obj =
             async {
                 let! reports =
                     intents |> Array.map (fun intent ->
-                        runSubagent client (AgentRole.toString Greper) "Greper" intent
+                        let prompt = formatGreperUserPrompt intent
+                        runSubagent client (AgentRole.toString Greper) "Greper" prompt
                             (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
                         |> Async.AwaitPromise) |> Async.Parallel
                 return String.concat "\n---\n" (List.ofArray reports)
@@ -108,7 +110,7 @@ let executorTool (ctx: obj) : obj =
                 let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
                 if not (shouldSummarize output) then return output
                 else
-                    let prompt = buildSummaryPrompt options result
+                    let prompt = formatExecutorSummarizerUserPrompt output
                     return! runSubagentWithCleanup client "summarizer" "Executor summary" prompt
                                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
                             |> Async.AwaitPromise
@@ -121,7 +123,7 @@ let browserTool (ctx: obj) : obj =
         (box {| intent = strReq Params.browserIntent |})
         (fun args context ->
             let tc = extractToolContext context (Dyn.str ctx "directory")
-            runSubagent client (AgentRole.toString Browser) "Browser" (Dyn.str args "intent")
+            runSubagent client (AgentRole.toString Browser) "Browser" (formatBrowserUserPrompt (Dyn.str args "intent"))
                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context)
 
 /// The fuzzy_find tool.

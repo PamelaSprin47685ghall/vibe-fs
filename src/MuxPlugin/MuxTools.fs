@@ -11,4 +11,4 @@ open VibeFs.MuxPlugin.MuxTools.ReviewTool
 let createToolCatalog (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : ToolDefinition array =
     [| editorTool deps; greperTool deps; reverieTool deps; browserTool deps; executorTool deps
        submitReviewTool deps reviewStore; websearchTool; webfetchTool
-       fuzzyGrepTool; fuzzyFindTool; writeTool; readTool |]
+       fuzzyGrepTool; fuzzyFindTool; writeTool deps; readTool deps |]

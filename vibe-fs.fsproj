@@ -14,7 +14,10 @@
   <ItemGroup>
     <!-- Kernel: domain types & pure logic -->
     <Compile Include="src/Kernel/Dyn.fs" />
+    <Compile Include="src/Kernel/DomainError.fs" />
+    <Compile Include="src/Kernel/JsBoundary.fs" />
     <Compile Include="src/Kernel/Boundary.fs" />
+    <Compile Include="src/Kernel/WorkspaceState.fs" />
     <Compile Include="src/Kernel/RecordValidator.fs" />
     <Compile Include="src/Kernel/Schema.fs" />
     <Compile Include="src/Kernel/Prompts.fs" />
@@ -36,11 +39,10 @@
     <Compile Include="src/Kernel/HeadTail.fs" />
     <Compile Include="src/Kernel/ExecutorKernel.fs" />
     <Compile Include="src/Kernel/CapsFormat.fs" />
+    <Compile Include="src/Kernel/MuxPolicy.fs" />
     <Compile Include="src/Kernel/HostKernel.fs" />
     <Compile Include="src/Kernel/NudgeEvents.fs" />
-    <Compile Include="src/Kernel/MuxPolicy.fs" />
     <Compile Include="src/Kernel/OllamaFormat.fs" />
-    <Compile Include="src/Kernel/AbortKernel.fs" />
     <Compile Include="src/Kernel/UnifiedContext.fs" />
     <Compile Include="src/Kernel/UtilPath.fs" />
     <Compile Include="src/Kernel/ExcludedDirs.fs" />
@@ -52,6 +54,8 @@
     <Compile Include="src/Shell/CapsShell.fs" />
     <Compile Include="src/Shell/FileReadCache.fs" />
     <Compile Include="src/Shell/ReverieFiles.fs" />
+    <Compile Include="src/Shell/Path.fs" />
+    <Compile Include="src/Shell/Read.fs" />
     <Compile Include="src/Shell/ExecutorPaths.fs" />
     <Compile Include="src/Shell/ExecutorProcess.fs" />
     <Compile Include="src/Shell/ExecutorScript.fs" />
@@ -59,7 +63,9 @@
     <Compile Include="src/Shell/ExecutorShell.fs" />
     <Compile Include="src/Shell/SecureFetch.fs" />
     <Compile Include="src/Shell/OllamaClient.fs" />
+    <Compile Include="src/Shell/TreeSitterSyntax.fs" />
     <Compile Include="src/Shell/TreeSitterShell.fs" />
+    <Compile Include="src/Shell/Write.fs" />
     <Compile Include="src/Shell/FuzzyFinderShell.fs" />
     <Compile Include="src/Shell/FuzzyCoordinator.fs" />
     <Compile Include="src/Shell/FuzzyRawMapping.fs" />

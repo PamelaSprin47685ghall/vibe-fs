@@ -6,21 +6,22 @@ open VibeFs.Kernel.HeadTail
 [<Emit("Buffer.byteLength($0, 'utf8')")>]
 let private byteLength (s: string) : int = jsNative
 
-[<Emit("""
-(function (s, maxBytes) {
-  const encoder = new TextEncoder();
-  let result = "";
-  let bytes = 0;
-  for (const codePoint of s) {
-    const cpBytes = encoder.encode(codePoint).length;
-    if (bytes + cpBytes > maxBytes) break;
-    result += codePoint;
-    bytes += cpBytes;
-  }
-  return result;
-})($0, $1)
-""")>]
-let private truncateToBytes (s: string) (maxBytes: int) : string = jsNative
+let private truncateToBytes (s: string) (maxBytes: int) : string =
+    let mutable result = ""
+    let mutable bytes = 0
+    let mutable i = 0
+    while i < s.Length do
+        let high = int s.[i]
+        let charLen =
+            if high >= 0xD800 && high <= 0xDBFF && i + 1 < s.Length then 2 else 1
+        let codePoint = s.Substring(i, charLen)
+        let cpBytes = byteLength codePoint
+        if bytes + cpBytes > maxBytes then i <- s.Length
+        else
+            result <- result + codePoint
+            bytes <- bytes + cpBytes
+            i <- i + charLen
+    result
 
 /// Languages the executor can spawn.  A closed set: adding one is a compile
 /// error at every match site.

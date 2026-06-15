@@ -2,10 +2,11 @@ module VibeFs.Opencode.NudgeHook
 
 open System
 open System.Collections.Generic
-open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.DomainError
+open VibeFs.Kernel.JsBoundary
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeEvents
 open VibeFs.Kernel.Prompts
@@ -56,27 +57,10 @@ let isCompletedAssistantMessage (info: obj) : bool =
                 let timeCompleted = Dyn.get (Dyn.get info "time") "completed"
                 not (Dyn.isNullish timeCompleted) && Dyn.typeIs timeCompleted "number"
 
-let isAbortError (error: obj) : bool =
-    let rec check (error: obj) =
-        if Dyn.isNullish error then false
-        elif Dyn.typeIs error "string" then
-            Regex.IsMatch(string error, @"\babort(?:ed)?\b", RegexOptions.IgnoreCase)
-        elif not (Dyn.typeIs error "object") then false
-        else
-            let name = Dyn.str error "name"
-            if name = "AbortError" || name = "MessageAbortedError" then true
-            else
-                let nested = Dyn.get error "error"
-                if not (Dyn.isNullish nested) && not (obj.ReferenceEquals(nested, error)) && check nested then true
-                else
-                    let data = Dyn.get error "data"
-                    if not (Dyn.isNullish data) && Dyn.typeIs data "object" then
-                        let dataMessage = Dyn.str data "message"
-                        dataMessage <> "" && Regex.IsMatch(dataMessage, @"\babort(?:ed)?\b", RegexOptions.IgnoreCase)
-                    else
-                        let message = Dyn.str error "message"
-                        message <> "" && Regex.IsMatch(message, @"\babort(?:ed)?\b", RegexOptions.IgnoreCase)
-    check error
+let private isAbortDomainError (error: obj) : bool =
+    match translateJsError error with
+    | MessageAborted -> true
+    | _ -> false
 
 // ── Immutable shell state ──
 
@@ -220,9 +204,6 @@ let private selectNudgePromptText (action: string) : string option =
     elif action = "nudge-loop" then Some loopNudgePrompt
     else None
 
-let private isSessionBusyError (error: obj) : bool =
-    Dyn.str (box error) "_tag" = "SessionBusyError"
-
 let private sendNudge (client: obj) (sessionID: string) (agentOpt: string option) (promptText: string) : Async<unit> =
     async {
         let body = createPromptBody agentOpt promptText
@@ -271,12 +252,10 @@ let private nudgeIfNeeded (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntim
                                     | None -> state
                                 return deleteNudgedSession state sessionID
                             with error ->
-                                if isAbortError error then
-                                    return stopSession state sessionID
-                                elif isSessionBusyError error then
-                                    return deleteNudgedSession state sessionID
-                                else
-                                    return addRetryPendingSession (deleteNudgedSession state sessionID) sessionID
+                                match translateJsError error with
+                                | MessageAborted -> return stopSession state sessionID
+                                | SessionBusy -> return deleteNudgedSession state sessionID
+                                | _ -> return addRetryPendingSession (deleteNudgedSession state sessionID) sessionID
     }
 
 // ── Event handlers ──
@@ -294,7 +273,7 @@ let private handleSessionNextRetried state sessionID = addRetryPendingSession st
 let private handleMessageUpdated client reviewStore state (props: obj) sessionID =
     async {
         let info = Dyn.get props "info"
-        if isAbortError (Dyn.get info "error") then
+        if isAbortDomainError (Dyn.get info "error") then
             return stopSession state sessionID
         elif isCompletedAssistantMessage info then
             return! nudgeIfNeeded client reviewStore state sessionID
@@ -306,17 +285,17 @@ let private handleMessagePartUpdated state (props: obj) sessionID =
     let part = Dyn.get props "part"
     if Dyn.str part "type" = "retry" then
         addRetryPendingSession state sessionID
-    elif isAbortError (Dyn.get part "error") || isAbortError (Dyn.get part "state") then
+    elif isAbortDomainError (Dyn.get part "error") || isAbortDomainError (Dyn.get part "state") then
         stopSession state sessionID
     elif isRetryProgressPart (Dyn.str part "type") then
         deleteRetryPendingSession state sessionID
     else state
 
 let private handleSessionNextStepFailed state (props: obj) sessionID =
-    if isAbortError (Dyn.get props "error") then stopSession state sessionID else state
+    if isAbortDomainError (Dyn.get props "error") then stopSession state sessionID else state
 
 let private handleSessionNextToolFailed state (props: obj) sessionID =
-    if isAbortError (Dyn.get props "error") then
+    if isAbortDomainError (Dyn.get props "error") then
         stopSession state sessionID
     else
         deleteRetryPendingSession state sessionID
@@ -341,7 +320,7 @@ let private handleSessionBusy state sessionID =
     { state with lastNudgedSession = None }
 
 let private handleSessionError state (props: obj) sessionID =
-    if isAbortError (Dyn.get props "error") then
+    if isAbortDomainError (Dyn.get props "error") then
         stopSession state sessionID
     else
         addRetryPendingSession state sessionID

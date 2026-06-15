@@ -65,6 +65,12 @@ let checkIpAllowlist (ip: string) : SsrfResolution =
     | 6 -> if isPrivateIPv6 ip then BlockedIp(ip, "private or blocked IP range") else AllowlistedIp ip
     | _ -> BlockedIp(ip, "unrecognised address family")
 
+/// Convenience predicate: true when the IP is public/allowlisted.
+let isIpAllowed (ip: string) : bool =
+    match checkIpAllowlist ip with
+    | AllowlistedIp _ -> true
+    | BlockedIp _ -> false
+
 /// Validate a hostname: localhost and private IPs are refused; public IPs and
 /// domain names are allowed.
 let validateHostname (hostname: string) : bool =

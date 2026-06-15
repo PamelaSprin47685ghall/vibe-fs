@@ -9,55 +9,19 @@ let todoNudgePrompt =
     + "If stuck or blocked, explain the situation and ask for guidance. "
     + "If you want to skip this check, respond with <skip-todo-check />"
 
-let readOnlyWorkspaceConstraint =
-    "This sub-agent has read-only access to the workspace. Do not create, modify, or delete files. Do not run commands that change workspace state. Output reports only."
+let readOnlyRules =
+    "READ-ONLY: You may only use read, search, and discovery tools. "
+    + "You must NOT write, edit, patch, or create files. "
+    + "You must NOT run commands or call todo_write or any mutating tool. "
+    + "You must NOT change workspace state. Output reports only."
 
 let loopNudgePrompt =
     "You are in loop mode. You must call the submit_review tool to\n"
     + "submit your detailed report and list of modified files for review\n"
     + "before finishing. Do not end the conversation without calling submit_review."
 
-let editorSystemPrompt =
-    "You are a code editing assistant. Given a task description, implement the necessary code changes in the workspace. "
-    + "You can read files, edit files, and write new files. "
-    + "IMPORTANT: You must only statically verify code correctness by reading and reasoning — never actually run, execute, or test any code. "
-    + "When done, describe what you changed and why."
-
-let greperSystemPrompt =
-    readOnlyWorkspaceConstraint + " "
-    + "You are a code exploration agent. Given a search query, explore the codebase to find relevant code in the workspace. "
-    + "Use the `fuzzy_find` tool for fuzzy file discovery and the built-in `glob` tool when you need strict path-pattern filtering. "
-    + "Use the `fuzzy_grep` tool to search file contents for keywords, patterns, or code snippets. "
-    + "After locating relevant files, use the `read` tool to read their contents. "
-    + "Provide a detailed summary of what you found, including file paths and key code sections. "
-    + "The summary must end with a block formatted exactly as `relatedFiles: [file_path_1, file_path_2, ...]`, listing every concrete file path you read or that is directly relevant to the search result. "
-    + "This block serves as evidence for the findings and as input for downstream steps (e.g. an editor). "
-    + "You have access to executor for read-only exploration commands (e.g. listing files, checking git status). "
-    + "Do NOT use executor to modify files — if you need to make changes, stop and report back."
-
-let reverieSystemPrompt =
-    readOnlyWorkspaceConstraint + "\n"
-    + "You are in a quiet room with the texts and the question.\n"
-    + "No tools, no distractions — just you and the problem.\n\n"
-    + "Read carefully. Turn it over in your mind.\n"
-    + "When you are ready, answer with clarity and depth."
-
-let browserSystemPrompt =
-    readOnlyWorkspaceConstraint + " "
-    + "You are a browser automation agent. Given a natural-language intent describing a web task, use browser tools to interact with web pages. "
-    + "You can navigate to URLs, query DOM elements, click elements, type text, extract page content, take screenshots, manage cookies, and handle network requests. "
-    + "Execute the task step by step and return the results clearly."
-
 let orchestratorSystemPrompt =
     "You are the orchestrator agent. Coordinate the overall task, decide when to delegate to subagents, and synthesize their outputs into a final answer that satisfies the user's original goal."
-
-let executorSummarizerSystemPrompt =
-    readOnlyWorkspaceConstraint + "\n"
-    + "You are the output summarizer for a one-shot executor tool.\n"
-    + "A command was already executed synchronously with a strict timeout. You receive its full raw output.\n"
-    + "Your ONLY job: produce a concise natural-language summary that helps the caller answer the original request.\n"
-    + "You CANNOT call any tools that read or write files, list directories, or run further commands.\n"
-    + "When done, reply with a single Markdown report — no tool calls."
 
 let reviewCriteria =
     """# Evaluation Criteria
@@ -70,6 +34,8 @@ let reviewCriteria =
 6. Are there design flaws, logic errors, or best-practice violations?
 7. Is the result natural and intuitive for the user or caller?
 8. Does it fully satisfy the original task without cutting corners?"""
+
+let readOnlyWorkspaceConstraint = readOnlyRules
 
 let reviewInstructions =
     readOnlyWorkspaceConstraint + "\n\n"
@@ -90,3 +56,62 @@ let reviewerNudgePrompt =
     + "  submit_review_result({ \"feedback\": null })          // Accept\n"
     + "  submit_review_result({ \"feedback\": \"details...\" })  // Reject\n\n"
     + "Do not explain what you plan to do — call the tool immediately."
+
+let agentReportInstruction =
+    "When you have finished the task, you MUST call the agent_report tool. "
+    + "Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings."
+
+let formatEditorUserPrompt (intent: string) (affectedFiles: string list) : string =
+    let fileList = affectedFiles |> List.map (fun f -> $"- {f}") |> String.concat "\n"
+    "You are an implementation agent (editor). Your job is to implement the intent below in the affected files.\n\n"
+    + "Intent:\n" + intent + "\n\n"
+    + "Affected files:\n" + fileList + "\n\n"
+    + "Instructions:\n"
+    + "1. Read the affected files and any related code you need to understand the change.\n"
+    + "2. Edit or create files to implement the intent.\n"
+    + "3. Run tests or static checks if they are available and cheap.\n"
+    + "4. Finish by calling agent_report with a summary of changes and verification results.\n\n"
+    + agentReportInstruction
+
+let formatGreperUserPrompt (intent: string) : string =
+    "You are a codebase search agent (greper). Explore the workspace and report what you find.\n\n"
+    + readOnlyRules + "\n\n"
+    + "Search query:\n" + intent + "\n\n"
+    + "Instructions:\n"
+    + "1. Use fuzzy_find, glob, fuzzy_grep, and read tools to locate relevant code.\n"
+    + "2. Report concrete file paths and line-number references.\n"
+    + "3. Finish by calling agent_report with structuredOutput containing relatedFiles and relatedCode.\n\n"
+    + agentReportInstruction
+
+let formatReverieUserPrompt (intent: string) (files: string list) : string =
+    let fileList = files |> List.map (fun f -> $"- {f}") |> String.concat "\n"
+    "You are a deep-reasoning agent (reverie). Read and analyze the files below, then answer the question.\n\n"
+    + readOnlyRules + "\n\n"
+    + "Files to analyze:\n" + fileList + "\n\n"
+    + "Question:\n" + intent + "\n\n"
+    + "Instructions:\n"
+    + "1. The file contents are provided above; read and analyze every listed file carefully.\n"
+    + "2. Produce a thorough analysis covering tradeoffs, risks, and concrete recommendations.\n"
+    + "3. Finish by calling agent_report with structuredOutput containing relatedFiles and relatedCode.\n\n"
+    + agentReportInstruction
+
+let formatBrowserUserPrompt (intent: string) : string =
+    "You are a browser automation agent. Complete the web task described below.\n\n"
+    + readOnlyRules + "\n\n"
+    + "Web task:\n" + intent + "\n\n"
+    + "Instructions:\n"
+    + "1. Use only stealth-browser-mcp tools to interact with web pages.\n"
+    + "2. Do not write files or run shell commands.\n"
+    + "3. Finish by calling agent_report with a clear summary of what you found or did.\n\n"
+    + agentReportInstruction
+
+let formatExecutorSummarizerUserPrompt (output: string) : string =
+    "You are a summarizer for executor (shell) output. Condense the raw output below into an actionable summary.\n\n"
+    + readOnlyRules + "\n\n"
+    + "Instructions:\n"
+    + "1. Preserve errors, non-zero exit status, and key paths or values.\n"
+    + "2. Omit noise, repeated lines, and progress banners.\n"
+    + "3. Do not invent details that are not in the output.\n"
+    + "4. Finish by calling agent_report with the summary.\n\n"
+    + "Raw output:\n" + output
+

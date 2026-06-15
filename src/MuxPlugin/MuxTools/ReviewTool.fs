@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.AgentRole
+open VibeFs.Kernel.AgentPolicy
 open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.Prompts
 open VibeFs.Mux.Contract

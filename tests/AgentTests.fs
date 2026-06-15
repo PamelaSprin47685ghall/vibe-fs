@@ -4,6 +4,7 @@ open VibeFs.Tests.Assert
 open VibeFs.Kernel.AgentRole
 open VibeFs.Kernel.Permission
 open VibeFs.Kernel.AgentPolicy
+open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.Nudge
 
 let role () =
@@ -60,6 +61,11 @@ let effectivePolicyDeniedToolsCrossValidation () =
         let union = Set.ofList (policy.allowedTools @ policy.deniedTools)
         check $"{roleLabel role} allowed+denied disjoint" (union.Count = policy.allowedTools.Length + policy.deniedTools.Length)
         check $"{roleLabel role} covers canonical tools" (union.Count = canonicalToolNames.Length))
+
+let subagentToolPolicyMatchesDeniedTools () =
+  allRoles
+  |> List.iter (fun role ->
+    equal $"{roleLabel role} subagent disabledTools" (effectivePolicy role).deniedTools (subagentToolPolicy role).disabledTools)
 
 
 let private nudgeContext todos msg runner loopActive =

@@ -1,63 +1,62 @@
 module VibeFs.Opencode.ChildAgent
 
-open Fable.Core
-open VibeFs.Kernel
+open VibeFs.Kernel.Boundary
+open VibeFs.Kernel.WorkspaceState
 
-/// In-memory registry mapping a child session id to the agent that owns it and
-/// the parent session it was spawned from.  This lets nested subagents resolve
-/// their lineage and lets hooks identify which agent is running in a session.
-let private records = System.Collections.Generic.Dictionary<string, obj>()
+let private workspace = ref empty
 
-type private Record =
-    { agent: string
-      parentSessionID: string option }
+let private parseChildId input =
+    match Id.childId input with
+    | Ok id -> Some id
+    | Error _ -> None
 
-let private toRecord (o: obj) : Record =
-    let parent = Dyn.get o "parentSessionID"
-    { agent = string (Dyn.get o "agent")
-      parentSessionID = if Dyn.isNullish parent then None else Some (string parent) }
+let private parseSessionId input =
+    match Id.sessionId input with
+    | Ok id -> Some id
+    | Error _ -> None
 
-/// Register a newly-created child session so future lookups know its agent and
-/// its parent.
-let registerChildAgent (sessionID: string) (agent: string) (parentSessionID: string option) : unit =
-    records.[sessionID] <- box {| agent = agent; parentSessionID = (match parentSessionID with Some s -> box s | None -> box null) |}
+let registerChildAgent sessionID agent parentSessionID =
+    match parseChildId sessionID with
+    | None -> ()
+    | Some childId ->
+        let meta =
+            { agent = agent
+              parentSessionId = Option.bind parseSessionId parentSessionID }
+        workspace.Value <- reduce workspace.Value (ChildRegistered(childId, meta))
 
-/// Look up the agent name associated with a session id.
-let lookupChildAgent (sessionID: string) : string option =
-    match records.TryGetValue(sessionID) with
-    | true, o -> Some (toRecord o).agent
-    | false, _ -> None
+let lookupChildAgent sessionID =
+    parseChildId sessionID
+    |> Option.bind (fun childId -> Map.tryFind childId (workspace.Value).childSessions)
+    |> Option.map (fun meta -> meta.agent)
 
-/// Resolve the ultimate parent session id for a subagent.  If the session is
-/// not a known child, the session itself is the parent.  This is the id that
-/// must be passed to `client.session.create` as `parentID`.
-let resolveSubsessionParentID (sessionID: string option) : string option =
+let resolveSubsessionParentID sessionID =
+    let rec resolve visited current resolved =
+        if Set.contains current visited then
+            Some (Id.sessionIdValue resolved)
+        else
+            match parseChildId (Id.sessionIdValue current) with
+            | None -> Some (Id.sessionIdValue resolved)
+            | Some childId ->
+                match Map.tryFind childId (workspace.Value).childSessions with
+                | None -> Some (Id.sessionIdValue resolved)
+                | Some meta ->
+                    match meta.parentSessionId with
+                    | None -> Some (Id.sessionIdValue current)
+                    | Some parent -> resolve (Set.add current visited) parent parent
+
     match sessionID with
     | None -> None
-    | Some id when id = "" -> None
-    | Some id ->
-        if not (records.ContainsKey(id)) then Some id
-        else
-            let visited = System.Collections.Generic.HashSet<string>()
-            let mutable current = id
-            let mutable resolved = id
-            let mutable cycling = false
-            while not cycling && not (visited.Contains(current)) do
-                visited.Add(current) |> ignore
-                match records.TryGetValue(current) with
-                | true, o ->
-                    let parent = (toRecord o).parentSessionID
-                    match parent with
-                    | None -> cycling <- true
-                    | Some p ->
-                        resolved <- p
-                        if not (records.ContainsKey(p)) then
-                            cycling <- true
-                        else
-                            current <- p
-                | false, _ -> cycling <- true
-            Some resolved
+    | Some raw ->
+        match parseSessionId raw with
+        | None -> None
+        | Some sid ->
+            match parseChildId raw with
+            | Some childId when Map.containsKey childId (workspace.Value).childSessions ->
+                resolve Set.empty sid sid
+            | _ -> Some raw
 
-/// Remove a child session record (used when a session is aborted/destroyed).
-let unregisterChildAgent (sessionID: string) : unit =
-    records.Remove(sessionID) |> ignore
+let unregisterChildAgent sessionID =
+    match parseChildId sessionID with
+    | None -> ()
+    | Some childId ->
+        workspace.Value <- reduce workspace.Value (ChildUnregistered childId)

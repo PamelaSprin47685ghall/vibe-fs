@@ -16,22 +16,12 @@ let private mergeObj (a: obj) (b: obj) : obj = jsNative
 
 let private emptyMcps : obj = [||] :> obj
 
-/// The policy engine reasons over 'stealth_browser_mcp_star' but opencode
-/// exposes the browser MCP toolkit as 'stealth-browser-mcp_*'.  Copy any value
-/// from either internal key to the opencode key so agent configs match the host.
-let private migrateBrowserKey (o: obj) : obj =
-    let v = Dyn.get o "stealth_browser_mcp_star"
-    if not (Dyn.isNullish v) then setKey o "stealth-browser-mcp_*" v
-    let v2 = Dyn.get o "stealth-browser-mcp_star"
-    if not (Dyn.isNullish v2) then setKey o "stealth-browser-mcp_*" v2
-    o
-
 /// Build a plain-JS permission map {name: "allow"|"deny"} from a role's defaults.
 let private permissionDefaults (role: AgentRole) : obj =
     let o = emptyObj ()
     defaultPermissions role |> Map.iter (fun name p ->
         setKey o name (box (match p with Allow -> "allow" | Deny -> "deny")))
-    migrateBrowserKey o
+    o
 
 /// Build a plain-JS tool map {name: bool} from a role's tool policy.
 let toolDefaults (role: AgentRole) : obj =
@@ -39,16 +29,12 @@ let toolDefaults (role: AgentRole) : obj =
     toolMapFor role |> Map.iter (fun name p -> setKey o name (box (p = Allow)))
     o
 
-let private defaultPromptFor (name: string) : string =
+/// Built-in subagent system prompts are intentionally empty; role instructions live in user/tool prompts.
+let private systemPromptForBuiltin (name: string) : string =
     match name with
-    | "editor" -> Prompts.editorSystemPrompt
-    | "greper" -> Prompts.greperSystemPrompt
-    | "reverie" -> Prompts.reverieSystemPrompt
+    | "editor" | "greper" | "reverie" | "browser" | "summarizer" | "orchestrator" -> ""
     | "reviewer" -> Prompts.reviewInstructions
-    | "browser" -> Prompts.browserSystemPrompt
-    | "summarizer" -> Prompts.executorSummarizerSystemPrompt
-    | "orchestrator" -> Prompts.orchestratorSystemPrompt
-    | _ -> Prompts.reverieSystemPrompt
+    | _ -> ""
 
 let private browserPermissionBase (o: obj) : unit =
     setKey o "read" (box "allow")
@@ -107,7 +93,7 @@ let private withRoleDefaults (name: string) (userAgent: obj) : obj =
     let roleResult = AgentRole.ofString name
     let role = match roleResult with Ok r -> r | Error _ -> Reverie
     let userPrompt = Dyn.str userAgent "prompt"
-    let prompt = if userPrompt <> "" then userPrompt else defaultPromptFor name
+    let prompt = if userPrompt <> "" then userPrompt else systemPromptForBuiltin name
     let defaultMode = if name = "orchestrator" then "primary" else "subagent"
     let userMode = Dyn.str userAgent "mode"
     let mode = if userMode <> "" then userMode else defaultMode

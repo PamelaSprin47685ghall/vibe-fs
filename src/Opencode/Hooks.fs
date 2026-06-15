@@ -159,6 +159,8 @@ let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.N
         do! nudgeHook.handleToolExecuteAfter input output |> Async.AwaitPromise
     } |> Async.StartAsPromise
 
+open VibeFs.Kernel.Dedup
+
 /// Deduplicate repeated `read` tool outputs across messages to reduce token use.
 /// Mutates `state.output` in place; never swaps part/state/array references.
 /// The opencode host keys internal bookkeeping off those references and ignores
@@ -167,7 +169,7 @@ let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.N
 let private applyReadDedup (messages: obj array) : unit =
     if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
     else
-        let mutable seenByPath : Map<string, string list> = Map.empty
+        let mutable seenByPath : Map<string, DedupState> = Map.empty
 
         for i = 0 to messages.Length - 1 do
             let message = messages.[i]
@@ -190,11 +192,13 @@ let private applyReadDedup (messages: obj array) : unit =
                                         match extractFilePaths (Dyn.get state "input") with
                                         | path :: _ -> path
                                         | [] -> ""
-                                    let pathSeen = seenByPath |> Map.tryFind pathKey |> Option.defaultValue []
-                                    let result = Dedup.deduplicate pathSeen currentOutput
-                                    seenByPath <- seenByPath |> Map.add pathKey result.seenOutputs
-                                    if result.output <> currentOutput then
-                                        setOutput state result.output
+                                    let payload = { path = pathKey; content = currentOutput }
+                                    let pathState = Map.tryFind pathKey seenByPath |> Option.defaultValue { seenContents = [] }
+                                    let verdict, nextState = processDedup pathState payload
+                                    seenByPath <- Map.add pathKey nextState seenByPath
+                                    match verdict with
+                                    | AlreadySeen -> setOutput state dedupMarker
+                                    | NewContent _ -> ()
 
 /// messages.transform: synthesise a user+assistant read pair from CAPS files.
 /// Mutates output.messages in place so the host never sees a swapped array reference.

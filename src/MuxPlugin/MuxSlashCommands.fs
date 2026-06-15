@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.AgentRole
+open VibeFs.Kernel.AgentPolicy
 open VibeFs.Kernel.HostKernel
 open VibeFs.MuxPlugin.Delegate
 
@@ -42,9 +43,6 @@ let private pluginConfigForSlash (deps: obj) (workspaceId: string) : JS.Promise<
     else
         let p = Dyn.call2 resolver (box workspaceId) (box null) :?> JS.Promise<obj>
         promiseThen p (fun ctx -> slashConfigFromCtx deps workspaceId ctx)
-
-[<Emit("Promise.race([$0.then(r => ({ kind: 'report', value: r })), new Promise(resolve => setTimeout(() => resolve({ kind: 'timeout' }), $1))])")>]
-let private raceDelegateWithTimeout (delegatePromise: JS.Promise<string>) (ms: int) : JS.Promise<obj> = jsNative
 
 let private loopFooter =
     [ "- report: a detailed description of what you did and why"
@@ -91,18 +89,17 @@ let createLoopReviewCommand (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntim
                 elif reviewStore.isReviewActive workspaceId then
                     (async { return "Loop mode is already active. Submit your work via submit_review." } |> Async.StartAsPromise)
                 else
-                    let! config = pluginConfigForSlash deps workspaceId |> Async.AwaitPromise
-                    let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box ((subagentToolPolicy Reviewer).disabledTools |> Array.ofList) ]) ]
-                    let reviewPrompt = reviewPromptFor task
                     async {
+                        let! config = pluginConfigForSlash deps workspaceId |> Async.AwaitPromise
+                        let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box ((subagentToolPolicy Reviewer).disabledTools |> Array.ofList) ]) ]
+                        let reviewPrompt = reviewPromptFor task
                         let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
-                        let delegatePromise = delegateToSubAgent deps config "explore" reviewPrompt "Pre-review" (Some opts)
-                        let! result = raceDelegateWithTimeout delegatePromise 300000 |> Async.AwaitPromise
-                        reviewStore.activateReview(workspaceId, task, dateNow ())
-                        if Dyn.str result "kind" = "timeout" then
-                            return buildLoopMessage task [ "Loop mode is active. Pre-review timed out; proceeding without feedback. Complete the task above, then call submit_review with:" ]
-                        else
-                            let report = Dyn.str result "value"
+                        let! outcome = delegateWithTimeout deps config "explore" reviewPrompt "Pre-review" (Some opts) 300000
+                        match outcome with
+                        | TimedOut ->
+                            return buildLoopMessage task [ "Loop mode was NOT activated because the pre-review timed out. Please retry /loop-review." ]
+                        | Report report ->
+                            reviewStore.activateReview(workspaceId, task, dateNow ())
                             let trimmed = report.Trim()
                             let isReject = System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"\b(REJECT|FAIL|DENIED|DO NOT ACCEPT)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
                             let passMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"\bPASS\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)

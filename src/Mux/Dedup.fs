@@ -31,24 +31,16 @@ let private extractReadPathFromPart (part: obj) : string =
         if Dyn.isNullish state then ""
         else fromInput (Dyn.get state "input")
 
-/// Flatten per-path seen lists into the legacy global list (order: paths then outputs per path).
-let private flattenSeenByPath (seenByPath: Map<string, string list>) : string list =
-    seenByPath |> Map.toList |> List.collect (fun (_, outputs) -> outputs)
-
-/// Seed per-path state from a flat legacy `seenOutputs` list (content-only history).
-let private seedSeenByPath (seenOutputs: string list) : Map<string, string list> =
-    if List.isEmpty seenOutputs then Map.empty
-    else Map.add "" seenOutputs Map.empty
-
 /// Dedup within one path scope; returns updated map entry for that path.
-/// Falls back to the legacy "" bucket so old flat seen lists still affect path-scoped reads.
 let private dedupForPath (seenByPath: Map<string, string list>) (pathKey: string) (current: string) =
     let pathSeen = Map.tryFind pathKey seenByPath |> Option.defaultValue []
-    let legacySeen = if pathKey = "" then [] else Map.tryFind "" seenByPath |> Option.defaultValue []
-    let combinedSeen = pathSeen @ legacySeen
-    let result = deduplicate combinedSeen current
-    let nextPathSeen = if result.output = current then pathSeen @ [ current ] else pathSeen
-    (Map.add pathKey nextPathSeen seenByPath, result.output)
+    let verdict, nextState =
+        processDedup { seenContents = pathSeen } { path = pathKey; content = current }
+    let nextOutput =
+        match verdict with
+        | AlreadySeen -> dedupMarker
+        | NewContent payload -> payload.content
+    (Map.add pathKey nextState.seenContents seenByPath, nextOutput, verdict)
 
 /// Fold read-output keys from Mux dynamic-tool parts into per-path seen state (message order).
 let private foldMuxReadPartsIntoSeenByPath (seenByPath: Map<string, string list>) (messages: obj array) : Map<string, string list> =
@@ -67,17 +59,17 @@ let private foldMuxReadPartsIntoSeenByPath (seenByPath: Map<string, string list>
                     if ty = "dynamic-tool" && Set.contains toolName readToolNames && state = "output-available"
                        && key.Length > 0 then
                         let pathKey = extractReadPathFromPart part
-                        let nextSeen, _ = dedupForPath acc pathKey key
+                        let nextSeen, _, _ = dedupForPath acc pathKey key
                         acc <- nextSeen
     acc
 
 /// Pure: fold read-output dedup over messages, scoped by file path when known.
-/// When path is missing, uses "" so behavior matches legacy content-only dedup.
 let deduplicateReadOutputsWithSeenByPath
     (seenByPath: Map<string, string list>)
     (messages: obj array)
     : string list * obj array =
     let mutable seenByPath = seenByPath
+    let mutable seenOutputs = []
     let mutable anyChanged = false
     let result =
         messages |> Array.map (fun msg ->
@@ -100,24 +92,30 @@ let deduplicateReadOutputsWithSeenByPath
                             if ty = "dynamic-tool" && Set.contains toolName readToolNames && state = "output-available"
                                && current.Length > 0 then
                                 let pathKey = extractReadPathFromPart part
-                                let nextSeen, nextOutput = dedupForPath seenByPath pathKey current
+                                let nextSeen, nextOutput, verdict = dedupForPath seenByPath pathKey current
                                 seenByPath <- nextSeen
                                 if nextOutput = current then newParts.Add(part)
                                 else
                                     newParts.Add(Dyn.withKey part "output" (box nextOutput))
                                     partChanged <- true
+                                match verdict with
+                                | NewContent _ -> seenOutputs <- current :: seenOutputs
+                                | AlreadySeen -> ()
                             else newParts.Add(part)
                         if not partChanged then msg
                         else
                             anyChanged <- true
                             Dyn.withKey msg "parts" (box (Array.ofSeq newParts)))
-    flattenSeenByPath seenByPath, if anyChanged then result else messages
+    List.rev seenOutputs, if anyChanged then result else messages
 
 let deduplicateReadOutputsWithSeen
     (seenOutputs: string list)
     (messages: obj array)
     : string list * obj array =
-    deduplicateReadOutputsWithSeenByPath (seedSeenByPath seenOutputs) messages
+    let seenByPath =
+        if List.isEmpty seenOutputs then Map.empty
+        else Map.add "" seenOutputs Map.empty
+    deduplicateReadOutputsWithSeenByPath seenByPath messages
 
 /// Extract the dedup key from a tool-result part in the Vercel AI SDK
 /// ModelMessage shape.  Text outputs keep their value; JSON outputs are
@@ -144,10 +142,13 @@ let private extractModelReadPath (part: obj) : string =
 /// provided messages.  This handles the AI SDK `ToolResultPart` shape where the
 /// useful payload lives at `output.value` rather than directly on `output`.
 let deduplicateModelReadOutputsWithSeen
-    (seenOutputs: string list)
+    (previouslySeenOutputs: string list)
     (messages: obj array)
     : string list * obj array =
-    let mutable seenByPath = seedSeenByPath seenOutputs
+    let mutable seenByPath =
+        if List.isEmpty previouslySeenOutputs then Map.empty
+        else Map.add "" previouslySeenOutputs Map.empty
+    let mutable seenOutputs = []
     let mutable anyChanged = false
     let result =
         messages |> Array.map (fun msg ->
@@ -169,7 +170,7 @@ let deduplicateModelReadOutputsWithSeen
                             let current = extractModelReadOutputKey part
                             if ty = "tool-result" && Set.contains toolName readToolNames && current.Length > 0 then
                                 let pathKey = extractModelReadPath part
-                                let nextSeen, nextOutput = dedupForPath seenByPath pathKey current
+                                let nextSeen, nextOutput, verdict = dedupForPath seenByPath pathKey current
                                 seenByPath <- nextSeen
                                 if nextOutput = current then newContent.Add(part)
                                 else
@@ -180,12 +181,15 @@ let deduplicateModelReadOutputsWithSeen
                                             (box nextOutput)
                                     newContent.Add(Dyn.withKey part "output" (box newOutput))
                                     partChanged <- true
+                                match verdict with
+                                | NewContent _ -> seenOutputs <- current :: seenOutputs
+                                | AlreadySeen -> ()
                             else newContent.Add(part)
                         if not partChanged then msg
                         else
                             anyChanged <- true
                             Dyn.withKey msg "content" (box (Array.ofSeq newContent)))
-    flattenSeenByPath seenByPath, if anyChanged then result else messages
+    List.rev seenOutputs, if anyChanged then result else messages
 
 /// Backwards-compatible one-shot deduplication: only compares read outputs
 /// against each other within the supplied messages.

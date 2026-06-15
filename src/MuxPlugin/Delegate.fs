@@ -3,6 +3,8 @@ module VibeFs.MuxPlugin.Delegate
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.DomainError
+open VibeFs.Kernel.JsBoundary
 open VibeFs.MuxPlugin.ResolveAiSettings
 
 [<Emit("Promise.resolve($0)")>]
@@ -22,8 +24,10 @@ let private requireWorkspaceId (config: obj) (title: string) : string =
 let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> = jsNative
 [<Emit("$0.waitForAgentReport($1, $2)")>]
 let private taskWait (taskService: obj) (taskId: string) (opts: obj) : JS.Promise<obj> = jsNative
-[<Emit("($0 != null && $0 !== undefined)")>]
-let private isNotNullish (o: obj) : bool = jsNative
+
+type DelegateOutcome =
+    | Report of string
+    | TimedOut
 
 /// Match mux `coerceThinkingLevel` / task tool parent-runtime hint (med → medium).
 let internal coerceThinkingLevel (value: string) : string option =
@@ -156,12 +160,58 @@ let delegateToSubAgent
                         let! report = taskWait taskService taskId waitOpts |> Async.AwaitPromise
                         return Dyn.str report "reportMarkdown"
                     with err ->
-                        let errName = if isNotNullish err then Dyn.str err "name" else ""
-
-                        if errName = "ForegroundWaitBackgroundedError" then
+                        match translateJsError err with
+                        | TaskWaitBackgrounded ->
                             return
                                 $"{title} task ({taskId}) moved to background. Use task tools to monitor it."
-                        else
-                            return raise err
+                        | _ -> return raise err
             }
             |> Async.StartAsPromise
+
+/// Host taskService delegation for mux plugin tools (not Opencode Session).
+let runMuxSubagent
+    (deps: obj)
+    (config: obj)
+    (agentId: string)
+    (prompt: string)
+    (title: string)
+    (options: obj option)
+    : JS.Promise<string> =
+    delegateToSubAgent deps config agentId prompt title options
+
+let private raceFirst (work: Async<'T>) (timeout: Async<'T>) : Async<'T> =
+    Async.FromContinuations(fun (success, error, cancel) ->
+        let mutable finished = false
+        let finish result =
+            if not finished then
+                finished <- true
+                success result
+        let fail ex =
+            if not finished then
+                finished <- true
+                error ex
+        Async.StartWithContinuations(work, finish, fail, cancel)
+        Async.StartWithContinuations(timeout, finish, fail, cancel))
+
+let delegateWithTimeout
+    (deps: obj)
+    (config: obj)
+    (agentId: string)
+    (prompt: string)
+    (title: string)
+    (options: obj option)
+    (timeoutMs: int)
+    : Async<DelegateOutcome> =
+    let work =
+        async {
+            let! report = delegateToSubAgent deps config agentId prompt title options |> Async.AwaitPromise
+            return Report report
+        }
+
+    let timeout =
+        async {
+            do! Async.Sleep timeoutMs
+            return TimedOut
+        }
+
+    raceFirst work timeout

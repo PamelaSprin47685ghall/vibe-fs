@@ -1,8 +1,8 @@
 import plugin from '../build/src/Opencode/Plugin.js';
-import { createRegistration, getPluginToolPolicy, buildCapsFileReadData, deduplicateReadOutputs, deduplicateReadOutputsWithSeen, deduplicateReadOutputsAgainstHistory, deduplicateModelReadOutputsWithSeen, collectReadOutputs } from '../build/src/Index.js';
+import { createRegistration, getPluginToolPolicy, buildCapsFileReadData, deduplicateReadOutputs, deduplicateReadOutputsAgainstHistory, deduplicateModelReadOutputsWithSeen, collectReadOutputs } from '../build/src/Index.js';
 import { runSubagent } from '../build/src/Opencode/Session.js';
 import { registerChildAgent, unregisterChildAgent } from '../build/src/Opencode/ChildAgent.js';
-import checkSyntax from '../build/src/Shell/TreeSitterSyntax.mjs';
+import { checkSyntax } from '../build/src/Shell/TreeSitterSyntax.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -38,8 +38,8 @@ check('mux.getToolPolicy shape', Array.isArray(policy?.add) && Array.isArray(pol
 
 const syntax = await checkSyntax('const x = 1;', 'test.js');
 check('tree-sitter returns a result', typeof syntax === 'object');
-check('tree-sitter ok', syntax.ok === true);
-check('tree-sitter no errors', Array.isArray(syntax.errors) && syntax.errors.length === 0);
+check('tree-sitter ok', syntax.tag === 0);
+check('tree-sitter no errors', Array.isArray(syntax.fields[1]) && syntax.fields[1].length === 0);
 
 // ── Fix #1: getPluginToolPolicy(agentId, role) two-arg signature ──
 const pol1 = getPluginToolPolicy('some-agent', 'orchestrator');
@@ -267,7 +267,7 @@ const fileReadOutput = (content) => ({ success: true, file_size: content.length,
   check('dedupRead empty: empty array', Array.isArray(r) && r.length === 0);
 }
 
-// ── collectReadOutputs + deduplicateReadOutputsWithSeen ──
+// ── collectReadOutputs ──
 {
   const seen = collectReadOutputs([readMsg('read', 'seen before', 'h1')]);
   check('collectReadOutputs: returns array', Array.isArray(seen) && seen.length === 1 && seen[0] === 'seen before');
@@ -275,19 +275,6 @@ const fileReadOutput = (content) => ({ success: true, file_size: content.length,
 {
   const seen = collectReadOutputs([readMsg('file_read', fileReadOutput('historical'), 'h1')]);
   check('collectReadOutputs object: extracts content', Array.isArray(seen) && seen.length === 1 && seen[0] === 'historical');
-}
-{
-  const seeded = deduplicateReadOutputsWithSeen(['seen before'], [readMsg('file_read', 'seen before', 'n1')]);
-  check('deduplicateReadOutputsWithSeen: replaces historical repeat', seeded[0]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
-}
-// Legacy flat seen seed applies to path-scoped reads
-{
-  const readMsgWithPath = (toolName, filePath, output, toolCallId) => ({
-    parts: [{ type: 'dynamic-tool', toolName, state: 'output-available', input: { path: filePath }, output, toolCallId }],
-  });
-  const shared = fileReadOutput('legacy seed content');
-  const seeded = deduplicateReadOutputsWithSeen(['legacy seed content'], [readMsgWithPath('file_read', 'a.ts', shared, 'n1')]);
-  check('deduplicateReadOutputsWithSeen legacy seed: path-scoped repeat marked', seeded[0]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
 }
 // collectReadOutputs preserves message order, not path-sorted order
 {
@@ -333,6 +320,24 @@ const fileReadOutput = (content) => ({ success: true, file_size: content.length,
   const window = [readMsgWithPath('file_read', 'x.ts', out, 'w1')];
   const r = deduplicateReadOutputsAgainstHistory(history, window);
   check('againstHistory per-path: same path repeat vs history marked', r[0]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+}
+// History string output seeds window object-output dedup
+{
+  const history = [readMsg('read', 'seen before', 'h1')];
+  const window = [readMsg('file_read', 'seen before', 'n1')];
+  const r = deduplicateReadOutputsAgainstHistory(history, window);
+  check('againstHistory history+window: content repeat marked', r[0]?.parts?.[0]?.output === '[No Change Since Previous Read/Write]');
+}
+// History string output does not seed window path-scoped dedup (legacy "" bucket removed)
+{
+  const readMsgWithPath = (toolName, filePath, output, toolCallId) => ({
+    parts: [{ type: 'dynamic-tool', toolName, state: 'output-available', input: { path: filePath }, output, toolCallId }],
+  });
+  const shared = fileReadOutput('legacy seed content');
+  const history = [readMsg('read', 'legacy seed content', 'h1')];
+  const window = [readMsgWithPath('file_read', 'a.ts', shared, 'n1')];
+  const r = deduplicateReadOutputsAgainstHistory(history, window);
+  check('againstHistory history+window: path-scoped different path not deduped', r[0]?.parts?.[0]?.output?.content === 'legacy seed content');
 }
 
 // ── deduplicateModelReadOutputsWithSeen (AI SDK ModelMessage) ──
@@ -452,13 +457,13 @@ check('loop resolve is string with task', typeof loopResolved === 'string' && lo
 const agentCfgResult = await p.config({ agent: { browser: { model: 'kimi-for-coding/k2p7' }, summarizer: { model: 'opencode-go/deepseek-v4-flash' }, plan: { disable: true }, custom: { model: 'custom-model' } } });
 check('agent config returns object', typeof agentCfgResult === 'object');
 const browserAgent = agentCfgResult?.agent?.browser;
-check('browser has prompt', typeof browserAgent?.prompt === 'string' && browserAgent.prompt.includes('browser automation'));
+check('browser builtin system prompt empty', browserAgent?.prompt === '');
 check('browser mode is subagent', browserAgent?.mode === 'subagent');
 check('browser mcps includes stealth-browser-mcp', Array.isArray(browserAgent?.mcps) && browserAgent.mcps.includes('stealth-browser-mcp'));
-check('browser permission allows stealth-browser-mcp', browserAgent?.permission?.['stealth-browser-mcp_*'] === 'allow');
-check('browser tools enables stealth-browser-mcp', browserAgent?.tools?.['stealth_browser_mcp_star'] === true);
+check('browser permission allows stealth-browser-mcp_*', browserAgent?.permission?.['stealth-browser-mcp_*'] === 'allow');
+check('browser tools enables stealth-browser-mcp_*', browserAgent?.tools?.['stealth-browser-mcp_*'] === true);
 const summarizerAgent = agentCfgResult?.agent?.summarizer;
-check('summarizer has prompt', typeof summarizerAgent?.prompt === 'string' && summarizerAgent.prompt.includes('output summarizer'));
+check('summarizer builtin system prompt empty', summarizerAgent?.prompt === '');
 check('summarizer mode is subagent', summarizerAgent?.mode === 'subagent');
 check('summarizer tools only agent_report', summarizerAgent?.tools?.agent_report === true && summarizerAgent?.tools?.read === false);
 check('user plan disable preserved', agentCfgResult?.agent?.plan?.disable === true);

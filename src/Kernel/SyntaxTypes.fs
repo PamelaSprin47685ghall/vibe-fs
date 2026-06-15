@@ -9,8 +9,8 @@ type SyntaxDiagnostic =
       severity: string
       message: string }
 
-/// The outcome of checking a file's syntax — either a list of diagnostics with
+/// The outcome of checking a file's syntax — either an array of diagnostics with
 /// the detected language, or a failure reason.
 type SyntaxCheckResult =
-    | Ok of lang: string * errors: SyntaxDiagnostic list
+    | Ok of lang: string * errors: SyntaxDiagnostic array
     | Failed of lang: string * reason: string

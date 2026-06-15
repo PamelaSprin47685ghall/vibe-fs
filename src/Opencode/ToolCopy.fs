@@ -1,13 +1,21 @@
 module VibeFs.Opencode.ToolCopy
 
 /// Tool descriptions — pure strings (the agent-facing surface).
-let editor = "Execute code changes from natural-language intents. Provide multiple independent change intents as [intent, affectFiles] tuples; each tuple spawns its own editor subagent session and runs independently in parallel. IMPORTANT: Do NOT assume the editor agent knows the project background. You must provide all necessary context explicitly in each intent."
+let editor =
+    "Execute code changes from natural-language intents. Provide multiple independent change intents as [intent, affectFiles] tuples; each tuple spawns its own editor subagent session and runs independently in parallel — pass as many tuples as you can at once so they execute concurrently. "
+    + "IMPORTANT: Subagents do not receive role instructions in their system prompt; each subagent gets its task as a user message built from your intent and file list. You (the parent) must put full project context, design rationale, and requirements into every intent. Do NOT assume the editor knows the repo background."
 
-let greper = "Search the codebase from natural-language intents. Each intent spawns its own search subagent session and runs independently in parallel. IMPORTANT: Do NOT assume the search agent knows the project background. The agent must include a `relatedFiles: [...]` field in its returned report."
+let greper =
+    "Search the codebase from natural-language intents. Each intent in the array spawns its own search subagent session and runs independently in parallel — pass as many intents as you can at once so they execute concurrently. "
+    + "IMPORTANT: Subagents do not receive role instructions in their system prompt; each subagent gets its task as a user message from your intent string. You (the parent) must put full context into every intent. Do NOT assume the search agent knows the project background. Reports must include concrete file paths (for example via agent_report structuredOutput relatedFiles)."
 
-let reverie = "Receive a natural-language intent or question for deep reasoning and delegate to the reverie agent. IMPORTANT: Do NOT assume the reverie agent knows the project background."
+let reverie =
+    "Receive a natural-language intent or question for deep reasoning and delegate to the reverie agent. "
+    + "IMPORTANT: Subagents do not receive role instructions in their system prompt; the reverie agent gets its task as a user message built from your intent and files. You (the parent) must put full context into the intent and list every file path the agent needs. Do NOT assume the reverie agent knows the project background."
 
-let browser = "Receive a natural-language intent for a web task and delegate to the browser agent. IMPORTANT: Do NOT assume the browser agent knows the project background."
+let browser =
+    "Receive a natural-language intent for a web task and delegate to the browser agent. "
+    + "IMPORTANT: Subagents do not receive role instructions in their system prompt; the browser agent gets its task as a user message from your intent. You (the parent) must put full context (URLs, goals, constraints) into the intent. Do NOT assume the browser agent knows the project background."
 
 let executor = "Executes a shell command, Python code, or JavaScript/TypeScript program synchronously with a strict timeout budget. On completion (or timeout) the captured output is either returned directly or summarized when it exceeds 8192 bytes. If executing Python or JavaScript, specify dependencies in the \"dependencies\" argument."
 
@@ -21,11 +29,16 @@ let webfetch = "Fetch a URL with better extraction for static/docs pages. Suppor
 
 /// Param docs (inline strings used by schema builders).
 module Params =
-    let editorIntents = "Array of [intent, affectFiles] tuples. Each runs its own editor subagent in parallel."
-    let greperIntents = "Array of independent code-search intents, each run in parallel."
-    let reverieIntent = "A natural-language intent or question to contemplate."
-    let reverieFiles = "File paths to provide as context."
-    let browserIntent = "A natural-language intent describing the desired web task."
+    let editorIntents =
+        "Array of [intent, affectFiles] tuples. Each tuple is a natural-language change request plus affected file paths; each tuple runs in parallel via its own editor subagent. The intent string is delivered to the subagent as the user message — include all background, design rationale, and requirements there."
+    let greperIntents =
+        "Array of independent code-search intent strings, each run in parallel via its own search subagent. Each string becomes the subagent user message — include background, paths, symbols, and what to find."
+    let reverieIntent =
+        "Natural-language intent or question for deep reasoning. Becomes part of the subagent user message — include all background, design rationale, and specific requirements; do not assume the agent knows project context."
+    let reverieFiles =
+        "File paths listed in the subagent user message for context. Include design docs, relevant code, or background material the agent must read."
+    let browserIntent =
+        "Natural-language intent for the web task. Becomes the subagent user message — include URLs, goals, constraints, and any project context the browser agent needs."
     let executorLanguage = "Execution language: shell, python, or javascript"
     let executorProgram = "The program to execute."
     let executorDeps = "Dependencies to install (for python or javascript)."
