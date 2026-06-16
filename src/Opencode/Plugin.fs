@@ -92,7 +92,7 @@ let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<ob
 
 /// The legacy opencode plugin hook builder.
 [<ExportDefault>]
-let private plugin (ctx: obj) : JS.Promise<obj> =
+let plugin (ctx: obj) : JS.Promise<obj> =
     async {
         let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
         let childAgentRegistry = ChildAgentRegistry.Create()

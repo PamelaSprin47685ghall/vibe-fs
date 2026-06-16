@@ -1,0 +1,169 @@
+module VibeFs.Tests.IntegrationToolTests
+
+open Fable.Core
+open Fable.Core.JsInterop
+open VibeFs.Tests.Assert
+open VibeFs.Kernel.Dyn
+open VibeFs.Index
+open VibeFs.Opencode.Plugin
+
+[<Import("createRequire", "node:module")>]
+let private createRequire' : string -> (string -> obj) = jsNative
+
+[<Global("import.meta")>]
+let private importMeta : obj = jsNative
+
+let private requireFn : string -> obj = createRequire'(string importMeta?url)
+
+let private fsAsync : obj = requireFn("fs")?promises
+let private pathModule : obj = requireFn("path")
+
+let private mkdtempAsync (prefix: string) : JS.Promise<string> =
+    unbox (fsAsync?mkdtemp(pathModule?join("/tmp", prefix)))
+
+let private writeFileAsync (p: string) (content: string) : JS.Promise<unit> =
+    unbox (fsAsync?writeFile(p, content))
+
+let private rmAsync (p: string) : JS.Promise<unit> =
+    unbox (fsAsync?rm(p, box {| recursive = true; force = true |}))
+
+let private unlinkAsync (p: string) : JS.Promise<unit> =
+    unbox (fsAsync?unlink(p))
+
+let wrapperSpec (reg: obj) =
+    let wrappers = unbox<obj[]> (get reg "wrappers")
+    let targets = wrappers |> Array.map (fun w -> str w "targetTool") |> Array.sort
+    let expected = [| "agent_report"; "file_edit_insert"; "file_edit_replace_string"; "file_read"; "todo_write"; "web_fetch"; "web_search" |] |> Array.sort
+    check "wrapper targets correct" (targets = expected)
+    let ar = wrappers |> Array.find (fun w -> str w "targetTool" = "agent_report")
+    check "agent_report wrapper exists" (not (isNullish ar))
+    let ws = wrappers |> Array.find (fun w -> str w "targetTool" = "web_search")
+    let wsWrapped = (get ws "wrapper") $ (null, createObj [ "cwd", box "/tmp"; "workspaceId", box "ws1" ])
+    check "web_search wrapper has execute" (typeIs (get wsWrapped "execute") "function")
+
+let computeCountSpec (reg: obj) =
+    let tools = unbox<obj[]> (get reg "tools")
+    let names = tools |> Array.map (fun t -> str t "name")
+    check "has coder tool" (names |> Array.contains "coder")
+    check "has webfetch tool" (names |> Array.contains "webfetch")
+    check "has write tool" (names |> Array.contains "write")
+    check "has read tool" (names |> Array.contains "read")
+    check "has submit_review tool" (names |> Array.contains "submit_review")
+
+let buildCapsFileReadDataSpec () = async {
+    let! tmpDir = mkdtempAsync "caps-test-" |> Async.AwaitPromise
+    do! writeFileAsync (unbox<string> (pathModule?join(tmpDir, "CAPS.md"))) "# Capabilities\nTest content" |> Async.AwaitPromise
+    let! entries = buildCapsFileReadData tmpDir |> Async.AwaitPromise
+    check "buildCapsFileReadData finds caps file" (entries.Length = 1)
+    check "caps entry has path" (entries.[0].path = "CAPS.md")
+    check "caps entry callId prefix" (entries.[0].callId.StartsWith "caps-fr-")
+    check "caps entry output has content" (entries.[0].output.content.Contains "Test content")
+    do! rmAsync tmpDir |> Async.AwaitPromise
+}
+
+let capsTransformSpec () = async {
+    do! writeFileAsync "/tmp/vibe/CAPS.md" "# Capabilities\nTest content" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    let tf = get p "experimental.chat.messages.transform"
+    let originalMsg =
+        box {| info = createObj [ "id", box "msg-1"; "agent", box "manager" ]
+               parts = [||] |}
+    let out = createObj [ "messages", box [| originalMsg |] ]
+    do! tf $ (createObj [], out) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let msgs = unbox<obj[]> (get out "messages")
+    check "caps transform injects two messages" (msgs.Length = 3)
+    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[2], originalMsg))
+    do! unlinkAsync "/tmp/vibe/CAPS.md" |> Async.AwaitPromise
+}
+
+let capsTransformInPlaceSpec () = async {
+    let freshOut = createObj [ "messages", box [| box {| info = createObj [ "id", box "msg-1"; "agent", box "manager" ]; parts = [||] |} |] ]
+    let freshRef = get freshOut "messages"
+    do! writeFileAsync "/tmp/vibe/CAPS.md" "# Capabilities\nTest content" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    do! (get p "experimental.chat.messages.transform") $ (createObj [], freshOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "caps transform mutates array in place" (obj.ReferenceEquals(get freshOut "messages", freshRef))
+    do! unlinkAsync "/tmp/vibe/CAPS.md" |> Async.AwaitPromise
+}
+
+let writeToolSpec (reg: obj) = async {
+    let tools = unbox<obj[]> (get reg "tools")
+    let writeDef = tools |> Array.find (fun t -> str t "name" = "write")
+    let! missingPath = (get writeDef "execute") $ (createObj [ "cwd", box "/tmp" ], createObj [ "content", box "x" ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
+    check "write missing file_path error" (missingPath.Contains "file_path")
+    let! tmpDir = mkdtempAsync "write-test-" |> Async.AwaitPromise
+    let! writeResult = (get writeDef "execute") $ (createObj [ "cwd", box tmpDir ], createObj [ "file_path", box "empty.txt"; "content", box "" ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
+    check "write empty string succeeds" (writeResult.Contains "Successfully wrote")
+    do! rmAsync tmpDir |> Async.AwaitPromise
+}
+
+let loopCommandSpec (reg: obj) = async {
+    let cmds = unbox<obj[]> (get reg "slashCommands")
+    let loopCmd = cmds |> Array.find (fun c -> str c "key" = "loop")
+    let! result = (get loopCmd "execute") $ ("test-ws", "some task") |> unbox<JS.Promise<string>> |> Async.AwaitPromise
+    check "loop resolve includes task" (result.Contains "some task")
+}
+
+let agentConfigSpec () = async {
+    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    let cfgInput =
+        box {|
+            agent = box {|
+                browser = box {| model = "kimi-for-coding/k2p7" |}
+                executor = box {| model = "opencode-go/deepseek-v4-flash" |}
+                custom = box {| model = "custom-model" |}
+            |}
+        |}
+    let! cfg = (get p "config") $ cfgInput |> unbox<JS.Promise<obj>> |> Async.AwaitPromise
+    let agents = get cfg "agent"
+    let browser = get agents "browser"
+    check "browser prompt empty" (str browser "prompt" = "")
+    check "browser mode subagent" (str browser "mode" = "subagent")
+    let executor = get agents "executor"
+    check "executor mode subagent" (str executor "mode" = "subagent")
+    let custom = get agents "custom"
+    check "custom model preserved" (str custom "model" = "custom-model")
+    let manager = get agents "manager"
+    check "manager mode primary" (str manager "mode" = "primary")
+}
+
+let toolDefinitionSpec () = async {
+    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    let td = get p "tool.definition"
+    let editorDef = createObj [ "parameters", box (createObj [
+        "properties", box (createObj [ "intents", box (createObj [ "type", box "array" ]); "_ui", box (createObj [ "type", box "string" ]) ])
+        "required", box [| "intents"; "_ui" |]
+    ]) ]
+    do! td $ (createObj [ "toolID", box "coder" ], editorDef) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let props = get (get editorDef "parameters") "properties"
+    check "tool.definition strips editor _ui property" (isNullish (get props "_ui"))
+    check "tool.definition keeps editor intents" (not (isNullish (get props "intents")))
+}
+
+let toolExecuteBeforeSpec () = async {
+    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    let teb = get p "tool.execute.before"
+    let intents : obj array = [|
+        box [| box "fix bug"; box [| "a.ts" |] |]
+        box [| box "add feature"; box [| "b.ts" |] |]
+    |]
+    let execOut = createObj [ "args", box (createObj [ "intents", box intents ]) ]
+    do! teb $ (createObj [ "tool", box "coder"; "sessionID", box "s1"; "callID", box "c1" ], execOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "tool.execute.before populates _ui" (str (get execOut "args") "_ui" = "fix bug; add feature")
+}
+
+let run () : JS.Promise<unit> =
+    async {
+        let reg = createRegistration (createObj [])
+        wrapperSpec reg
+        computeCountSpec reg
+        do! buildCapsFileReadDataSpec ()
+        do! capsTransformSpec ()
+        do! capsTransformInPlaceSpec ()
+        do! writeToolSpec reg
+        do! loopCommandSpec reg
+        do! agentConfigSpec ()
+        do! toolDefinitionSpec ()
+        do! toolExecuteBeforeSpec ()
+    }
+    |> Async.StartAsPromise

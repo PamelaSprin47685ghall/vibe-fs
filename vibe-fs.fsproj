@@ -125,6 +125,11 @@
     <Compile Include="tests/DynTests.fs" />
     <Compile Include="tests/DelegateTests.fs" />
     <Compile Include="tests/ResolveAiSettingsTests.fs" />
+    <Compile Include="tests/IntegrationPluginTests.fs" />
+    <Compile Include="tests/IntegrationEventTests.fs" />
+    <Compile Include="tests/IntegrationDedupTests.fs" />
+    <Compile Include="tests/IntegrationToolTests.fs" />
+    <Compile Include="tests/IntegrationChatTests.fs" />
     <Compile Include="tests/Tests.fs" />
   </ItemGroup>
 

@@ -22,7 +22,7 @@
     "clean": "rm -rf build",
     "build": "dotnet fable vibe-fs.fsproj --outDir build --noCache && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && cp build/src/Index.js build/index.js",
     "watch": "dotnet fable watch vibe-fs.fsproj --outDir build",
-    "test": "node build/tests/Tests.js && node tests/integration.mjs"
+    "test": "node tests/runner.js"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.1.1",
