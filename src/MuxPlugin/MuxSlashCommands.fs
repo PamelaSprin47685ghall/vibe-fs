@@ -93,7 +93,7 @@ let private submissionFooter (toolName: string) (callId: string) =
     + "Use callId `" + callId + "`. Do not write files, run commands, or modify the workspace."
 
 let private loopReviewExecute
-    (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (workspaceId: string) (args: string) : JS.Promise<string> =
     let task = args.Trim()
     if task = "" then
@@ -106,7 +106,7 @@ let private loopReviewExecute
             let! config = pluginConfigForSlash deps workspaceId |> Async.AwaitPromise
             let disabledTools = deniedTools "reviewer" (Array.toList registeredToolNames) |> Array.ofList
             let callId = workspaceId + "-loop-review-" + string (dateNow ())
-            let verdictPromise = registerCallWithTimeout callId 300000
+            let verdictPromise = registerCallWithTimeout callStore callId 300000
             let experiments =
                 createObj
                     [ "subagentRole", box "reviewer"
@@ -138,11 +138,11 @@ let private loopReviewExecute
                         buildLoopMessage task [ "Pre-review feedback:"; ""; feedback; ""; "Loop mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
         } |> Async.StartAsPromise
 
-let createLoopReviewCommand (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let createLoopReviewCommand (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     box {| key = "loop-review"
            description = "Pre-review task description with a reviewer sub-agent, then activate review loop mode."
            inputHint = "<task description>"
-           execute = System.Func<string, string, JS.Promise<string>>(loopReviewExecute deps reviewStore) |}
+           execute = System.Func<string, string, JS.Promise<string>>(loopReviewExecute deps callStore reviewStore) |}
 
-let createSlashCommands (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj array =
-    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps reviewStore |]
+let createSlashCommands (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj array =
+    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps callStore reviewStore |]

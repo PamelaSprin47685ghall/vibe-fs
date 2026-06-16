@@ -25,7 +25,7 @@ let private reviewVerdictInstructions =
 let private disabledToolsForReviewer () : string array =
     deniedTools "reviewer" (Array.toList registeredToolNames) |> Array.ofList
 
-let submitReviewTool (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : ToolDefinition =
+let submitReviewTool (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : ToolDefinition =
     { name = "submit_review"
       description = "Submit completed work for review. Creates a reviewer sub-agent that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active loop mode."
       parameters = mkSchema (createObj [ "report", box (strProp "Detailed report of what was done"); "affectedFiles", box (strArrayProp "List of file paths that were modified or created") ]) [| "report"; "affectedFiles" |]
@@ -44,7 +44,7 @@ let submitReviewTool (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.Review
                           let originalTask = defaultArg (reviewStore.getReviewTask workspaceId) ""
                           let taskSection = if originalTask = "" then "" else "\n=== Original Task ===\n\n" + originalTask
                           let callId = workspaceId + "-review-" + string (dateNow ())
-                          let verdictPromise = registerCallWithTimeout callId 300000
+                          let verdictPromise = registerCallWithTimeout callStore callId 300000
                           let reviewPrompt =
                               reviewVerdictInstructions
                               + "\n\n=== Change Report ===\n\n" + report

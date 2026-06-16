@@ -42,26 +42,34 @@ let private dedupForPath (seenByPath: Map<string, string list>) (pathKey: string
         | NewContent payload -> payload.content
     (Map.add pathKey nextState.seenContents seenByPath, nextOutput, verdict)
 
+let private classifyMuxReadPart (part: obj) =
+    let partType = Dyn.str part "type"
+    let toolName = Dyn.str part "toolName"
+    let state = Dyn.str part "state"
+    let output = Dyn.get part "output"
+    let key = extractReadOutputKey output
+    if partType = "dynamic-tool" && Set.contains toolName readToolNames && state = "output-available" && key.Length > 0 then
+        Some(extractReadPathFromPart part, key)
+    else
+        None
+
 /// Fold read-output keys from Mux dynamic-tool parts into per-path seen state (message order).
 let private foldMuxReadPartsIntoSeenByPath (seenByPath: Map<string, string list>) (messages: obj array) : Map<string, string list> =
-    let mutable acc = seenByPath
-    for msg in messages do
-        if not (Dyn.isNullish msg) then
+    let foldPart acc part =
+        match classifyMuxReadPart part with
+        | Some(pathKey, key) ->
+            let nextSeen, _, _ = dedupForPath acc pathKey key
+            nextSeen
+        | None -> acc
+
+    let foldMessage acc msg =
+        if Dyn.isNullish msg then acc
+        else
             let parts = Dyn.get msg "parts"
-            if not (Dyn.isNullish parts) then
-                let partsArr = parts :?> obj array
-                for part in partsArr do
-                    let ty = Dyn.str part "type"
-                    let toolName = Dyn.str part "toolName"
-                    let state = Dyn.str part "state"
-                    let output = Dyn.get part "output"
-                    let key = extractReadOutputKey output
-                    if ty = "dynamic-tool" && Set.contains toolName readToolNames && state = "output-available"
-                       && key.Length > 0 then
-                        let pathKey = extractReadPathFromPart part
-                        let nextSeen, _, _ = dedupForPath acc pathKey key
-                        acc <- nextSeen
-    acc
+            if Dyn.isNullish parts then acc
+            else (parts :?> obj array) |> Array.fold foldPart acc
+
+    messages |> Array.fold foldMessage seenByPath
 
 /// Pure: fold read-output dedup over messages, scoped by file path when known.
 let deduplicateReadOutputsWithSeenByPath

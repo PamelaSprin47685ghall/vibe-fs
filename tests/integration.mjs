@@ -1,10 +1,12 @@
 import plugin from '../build/src/Opencode/Plugin.js';
 import { createRegistration, getPluginToolPolicy, buildCapsFileReadData, deduplicateReadOutputs, deduplicateReadOutputsAgainstHistory, deduplicateModelReadOutputsWithSeen, collectReadOutputs } from '../build/src/Index.js';
 import { runSubagent } from '../build/src/Opencode/Session.js';
-import { registerChildAgent, unregisterChildAgent } from '../build/src/Opencode/ChildAgent.js';
+import { ChildAgentRegistry_Create, ChildAgentRegistry__RegisterChildAgent_Z2FC25A28, ChildAgentRegistry__UnregisterChildAgent_Z721C83C5 } from '../build/src/Opencode/ChildAgent.js';
 import { checkSyntax } from '../build/src/Shell/TreeSitterSyntax.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+
+const childAgentRegistry = ChildAgentRegistry_Create();
 
 function check(label, condition) {
   if (!condition) {
@@ -729,17 +731,23 @@ check('browser stealth-browser-mcp_* preserved', browserChat.message.tools['stea
 check('browser stealth-browser-mcp_foo preserved', browserChat.message.tools['stealth-browser-mcp_foo'] === true);
 check('browser read preserved', browserChat.message.tools['read'] === true);
 
-registerChildAgent('child-browser-session', 'browser', undefined);
+const childAwarePlugin = await plugin({
+  directory: '/tmp/vibe',
+  client: {
+    session: {
+      create: async () => ({ data: { id: 'child-browser-session' } }),
+      prompt: async () => {},
+      messages: async () => ({ data: [] }),
+    },
+  },
+});
 const childChat = { message: { tools: { 'stealth-browser-mcp_*': true } } };
-await p['chat.message']({ sessionID: 'child-browser-session' }, childChat);
+await childAwarePlugin['chat.message']({ sessionID: 'child-browser-session', agent: 'browser' }, childChat);
 check('child session resolves to browser', childChat.message.tools['stealth-browser-mcp_*'] === true);
-unregisterChildAgent('child-browser-session');
 
 const childOrchChat = { message: { tools: { 'stealth-browser-mcp_*': true } } };
-registerChildAgent('child-orch-session', 'manager', undefined);
-await p['chat.message']({ sessionID: 'child-orch-session' }, childOrchChat);
+await childAwarePlugin['chat.message']({ sessionID: 'child-orch-session', agent: 'manager' }, childOrchChat);
 check('child session resolves to orchestrator', childOrchChat.message.tools['stealth-browser-mcp_*'] === false);
-unregisterChildAgent('child-orch-session');
 
 // ── chat.message websearch/webfetch tool boundaries ──
 const orchWebChat = { message: { tools: { websearch: true, webfetch: true, read: true } } };
@@ -828,7 +836,8 @@ const mockClient = {
     abort: async () => {}
   }
 };
-const subResult = await runSubagent(mockClient, 'browser', 'Browser', 'navigate to example.com', '/tmp/vibe', 'parent-session-456', { abort: null });
+const subagentRegistry = ChildAgentRegistry_Create();
+const subResult = await runSubagent(subagentRegistry, mockClient, 'browser', 'Browser', 'navigate to example.com', '/tmp/vibe', 'parent-session-456', { abort: null }, null);
 check('runSubagent returns string', typeof subResult === 'string');
 check('session.create received parentID', createCalls[0]?.body?.parentID === 'parent-session-456');
 check('session.prompt uses child id', promptCalls[0]?.path?.id === 'child-session-123');
@@ -848,6 +857,7 @@ const mockClient2 = {
     abort: async () => {}
   }
 };
-await runSubagent(mockClient2, 'browser', 'Browser', 'first', '/tmp/vibe', 'root-session', { abort: null });
-await runSubagent(mockClient2, 'coder', 'Editor', 'second', '/tmp/vibe', 'child-1', { abort: null });
+const nestedRegistry = ChildAgentRegistry_Create();
+await runSubagent(nestedRegistry, mockClient2, 'browser', 'Browser', 'first', '/tmp/vibe', 'root-session', { abort: null }, null);
+await runSubagent(nestedRegistry, mockClient2, 'coder', 'Editor', 'second', '/tmp/vibe', 'child-1', { abort: null }, null);
 check('nested subagent resolves to root parent', createCalls2[1]?.body?.parentID === 'root-session');

@@ -10,6 +10,11 @@ open VibeFs.MuxPlugin.MuxPrompts
 open VibeFs.MuxPlugin.MuxTools.Shared
 open VibeFs.Opencode.ToolCopy
 
+[<Global>]
+type AbortController() =
+    member _.signal: obj = jsNative
+    member _.abort(): unit = jsNative
+
 let private experimentsFor (role: string) : obj =
     let disabled = deniedTools role (Array.toList registeredToolNames) |> Array.ofList
     createObj [
@@ -27,6 +32,8 @@ let private requireWorkspace (config: obj) (toolName: string) : string option =
 
 let private joinReports (reports: string array) : string =
     reports |> Array.map (fun r -> r.Trim()) |> String.concat "\n\n"
+
+let private abortableConfig (config: obj) (signal: obj) = Dyn.withKey config "abortSignal" signal
 
 module Tool =
     let bind
@@ -67,15 +74,17 @@ module Tool =
                     if prompts.Length = 0 then
                         return "Error: `intents` must be a non-empty array."
                     else
+                        let controller = AbortController()
                         let opts = Some (optionsFor aiSettingsAgentId role)
                         let! reports =
                             prompts
                             |> Array.map (fun prompt ->
                                 async {
                                     try
-                                        let! r = runMuxSubagent deps config agentId prompt title opts |> Async.AwaitPromise
+                                        let! r = runMuxSubagent deps (abortableConfig config controller.signal) agentId prompt title opts |> Async.AwaitPromise
                                         return Some r
                                     with _ ->
+                                        controller.abort()
                                         return None
                                 })
                             |> Async.Parallel

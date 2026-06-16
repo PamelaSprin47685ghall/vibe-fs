@@ -7,8 +7,9 @@ open VibeFs.Mux.Contract
 open VibeFs.MuxPlugin.MuxTools.Shared
 open VibeFs.Opencode.ToolCopy
 open VibeFs.Shell.FuzzyCoordinator
+open VibeFs.Shell.FuzzyFinderShell
 
-let fuzzyFindTool : ToolDefinition =
+let fuzzyFindTool (finderCache: FinderCache) : ToolDefinition =
     { name = "fuzzy-find"
       description = fuzzyFind
       parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyFindPattern); "path", box (strProp Params.fuzzyFindPath); "limit", box (numProp Params.fuzzyFindLimit); "iterator", box (strProp Params.fuzzyFindIterator) ]) [||]
@@ -17,14 +18,14 @@ let fuzzyFindTool : ToolDefinition =
           if scopeId = "" then resolveStr "fuzzy-find requires workspaceId"
           else
               let p : FuzzyFindParams = { pattern = strField args "pattern"; path = strField args "path"; limit = optInt args "limit"; iterator = strField args "iterator" }
-              let o : SearchOptions = { cwd = Dyn.str config "cwd"; scopeId = scopeId; store = None }
+              let o : SearchOptions = { cwd = Dyn.str config "cwd"; scopeId = scopeId; store = None; finderCache = finderCache }
               async {
                   let! r = VibeFs.Shell.FuzzyFindCmd.fuzzyFind p o |> Async.AwaitPromise
                   return r.output
               } |> Async.StartAsPromise
       condition = None }
 
-let fuzzyGrepTool : ToolDefinition =
+let fuzzyGrepTool (finderCache: FinderCache) : ToolDefinition =
     { name = "fuzzy-grep"
       description = fuzzyGrep
       parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyGrepPattern); "path", box (strProp Params.fuzzyGrepPath); "exclude", box (strProp Params.fuzzyGrepExclude); "caseSensitive", box (boolProp Params.fuzzyGrepCaseSensitive); "context", box (numProp Params.fuzzyGrepContext); "limit", box (numProp Params.fuzzyGrepLimit); "iterator", box (strProp Params.fuzzyGrepIterator) ]) [||]
@@ -33,7 +34,7 @@ let fuzzyGrepTool : ToolDefinition =
           if scopeId = "" then resolveStr "fuzzy-grep requires workspaceId"
           else
               let p : FuzzyGrepParams = { pattern = strField args "pattern"; path = strField args "path"; exclude = parseExcludeField args; caseSensitive = optBool args "caseSensitive"; context = optInt args "context"; limit = optInt args "limit"; iterator = strField args "iterator" }
-              let o : SearchOptions = { cwd = Dyn.str config "cwd"; scopeId = scopeId; store = None }
+              let o : SearchOptions = { cwd = Dyn.str config "cwd"; scopeId = scopeId; store = None; finderCache = finderCache }
               async {
                   let! r = VibeFs.Shell.FuzzyGrepCmd.fuzzyGrep p o |> Async.AwaitPromise
                   return r.output

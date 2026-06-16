@@ -37,6 +37,20 @@ type private AgentPair =
       hostname: string
       ip: string }
 
+type private CachedAgentPair =
+    { pair: AgentPair
+      expiresAt: int64 }
+
+type private RetryState =
+    { failureCount: int
+      retryAfter: int64 }
+
+let private cacheTtlMs = 60000L
+let private initialRetryDelayMs = 1000L
+let private maxRetryDelayMs = 30000L
+
+let private nowMs () = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+
 let private makeLookup (hostname: string) (ip: string) : LookupCallback =
     fun h _ cb ->
         if h <> hostname then
@@ -77,17 +91,46 @@ let private resolveAll (hostname: string) : Async<string> =
             | None -> return List.head ips
     }
 
-let private cache = System.Collections.Generic.Dictionary<string, AgentPair>()
+let private cache = System.Collections.Generic.Dictionary<string, CachedAgentPair>()
+let private retries = System.Collections.Generic.Dictionary<string, RetryState>()
 
-let private getAgentPair (hostname: string) : Async<AgentPair> =
+let private nextRetryState hostname =
+    let delayMs =
+        match retries.TryGetValue hostname with
+        | true, retryState -> min maxRetryDelayMs (initialRetryDelayMs * int64 (pown 2 retryState.failureCount))
+        | _ -> initialRetryDelayMs
+    { failureCount = (match retries.TryGetValue hostname with | true, retryState -> retryState.failureCount + 1 | _ -> 1)
+      retryAfter = nowMs () + delayMs }
+
+let private clearRetryState hostname =
+    retries.Remove(hostname) |> ignore
+
+let private ensureRetryWindow hostname =
+    match retries.TryGetValue hostname with
+    | true, retryState when retryState.retryAfter > nowMs () ->
+        failwith $"DNS resolution backoff active for {hostname}"
+    | true, _ ->
+        retries.Remove(hostname) |> ignore
+    | _ -> ()
+
+let rec private getAgentPair (hostname: string) : Async<AgentPair> =
     async {
         match cache.TryGetValue hostname with
-        | true, pair -> return pair
+        | true, cached when cached.expiresAt > nowMs () -> return cached.pair
+        | true, _ ->
+            cache.Remove(hostname) |> ignore
+            return! getAgentPair hostname
         | false, _ ->
-            let! ip = resolveAll hostname
-            let pair = makeAgentPair hostname ip
-            cache.[hostname] <- pair
-            return pair
+            ensureRetryWindow hostname
+            try
+                let! ip = resolveAll hostname
+                let pair = makeAgentPair hostname ip
+                cache.[hostname] <- { pair = pair; expiresAt = nowMs () + cacheTtlMs }
+                clearRetryState hostname
+                return pair
+            with error ->
+                retries.[hostname] <- nextRetryState hostname
+                return raise error
     }
 
 [<Global>]

@@ -5,52 +5,60 @@ open Fable.Core.JsInterop
 open System.Collections.Generic
 open VibeFs.Mux.Contract
 
-type private PendingCall =
+type PendingCall =
     { resolve: obj -> unit
       reject: exn -> unit
       createdAt: int64 }
 
-let private pendingCalls = Dictionary<string, PendingCall>()
+type CallStore private (pendingCalls: Dictionary<string, PendingCall>) =
+
+    member internal _.PendingCalls = pendingCalls
+
+    static member Create() =
+        CallStore(Dictionary<string, PendingCall>())
+
+let createCallStore () = CallStore.Create()
+
 let private ttlMs = 600000L
 
 let private nowMs () = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
 
-let private cleanupOld () =
+let private cleanupOld (store: CallStore) =
     let cutoff = nowMs () - ttlMs
-    let keys = pendingCalls.Keys |> Seq.filter (fun k -> pendingCalls.[k].createdAt < cutoff) |> Seq.toArray
+    let keys = store.PendingCalls.Keys |> Seq.filter (fun k -> store.PendingCalls.[k].createdAt < cutoff) |> Seq.toArray
     for k in keys do
-        try pendingCalls.[k].reject (System.TimeoutException("Call expired"))
+        try store.PendingCalls.[k].reject (System.TimeoutException("Call expired"))
         with _ -> ()
-        pendingCalls.Remove(k) |> ignore
+        store.PendingCalls.Remove(k) |> ignore
 
-let registerCallWithTimeout (callId: string) (timeoutMs: int64) : JS.Promise<obj> =
+let registerCallWithTimeout (store: CallStore) (callId: string) (timeoutMs: int64) : JS.Promise<obj> =
     async {
-        cleanupOld ()
+        cleanupOld store
         let! result =
             Async.FromContinuations (fun (cont, econt, _) ->
                 let entry =
                     { resolve = cont
                       reject = econt
                       createdAt = nowMs () }
-                pendingCalls.[callId] <- entry
+                store.PendingCalls.[callId] <- entry
                 JS.setTimeout (fun () ->
-                    match pendingCalls.TryGetValue(callId) with
+                    match store.PendingCalls.TryGetValue(callId) with
                     | true, pending ->
                         pending.reject (System.TimeoutException($"Call {callId} timed out"))
-                        pendingCalls.Remove(callId) |> ignore
+                        store.PendingCalls.Remove(callId) |> ignore
                     | _ -> ()) (int timeoutMs) |> ignore)
-        pendingCalls.Remove(callId) |> ignore
+        store.PendingCalls.Remove(callId) |> ignore
         return result
     }
     |> Async.StartAsPromise
 
-let registerCall (callId: string) : JS.Promise<obj> = registerCallWithTimeout callId ttlMs
+let registerCall (store: CallStore) (callId: string) : JS.Promise<obj> = registerCallWithTimeout store callId ttlMs
 
-let hasCall (callId: string) : bool =
-    pendingCalls.ContainsKey(callId)
+let hasCall (store: CallStore) (callId: string) : bool =
+    store.PendingCalls.ContainsKey(callId)
 
-let resolveCall (callId: string) (arguments: obj) : bool =
-    match pendingCalls.TryGetValue(callId) with
+let resolveCall (store: CallStore) (callId: string) (arguments: obj) : bool =
+    match store.PendingCalls.TryGetValue(callId) with
     | true, pending ->
         pending.resolve arguments
         true
@@ -65,7 +73,7 @@ let private resolveStr (s: string) : JS.Promise<string> = async { return s } |> 
 let private requireCallId (args: obj) : string =
     defaultArg (strField args "callId") ""
 
-let agentReportDefinition : ToolDefinition =
+let agentReportDefinition (store: CallStore) : ToolDefinition =
     { name = "agent_report"
       description = "Submit structured work results. Provide callId plus the stage fields; the plugin forwards a markdown rendering to the upstream UI."
       parameters =
@@ -82,7 +90,7 @@ let agentReportDefinition : ToolDefinition =
           let callId = requireCallId args
           if callId = "" then
               resolveStr (defaultArg (strField args "reportMarkdown") "")
-          elif resolveCall callId args then
+          elif resolveCall store callId args then
               resolveStr "Submitted."
           else
               resolveStr $"No pending call for {callId}"

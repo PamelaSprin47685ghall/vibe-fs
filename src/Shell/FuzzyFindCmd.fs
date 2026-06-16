@@ -32,7 +32,7 @@ let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<Sear
         match resolveFindSearchState params' opts with
         | Error msg -> return { output = msg; isError = true }
         | Ok state ->
-            let! finderResult = acquireFinder state.externalBasePath opts.cwd |> Async.AwaitPromise
+            let! finderResult = acquireFinderFromOptions state.externalBasePath opts |> Async.AwaitPromise
             match finderResult with
             | Error msg -> return { output = msg; isError = true }
             | Ok finder ->

@@ -36,7 +36,11 @@ let killTree (childProcess: obj) : unit =
         try
             if platform = "win32" then
                 spawn "taskkill" [| "/F"; "/T"; "/PID"; string pidNum |] (box {| stdio = "ignore" |}) |> ignore
-            else processKill (-pidNum) "SIGKILL"
+            else
+                // Never target the negative process group id here: detached runners may
+                // share a parent-controlled group, and killing the group can take the
+                // host down with the child. Prefer a direct child kill.
+                processKill pidNum "SIGKILL"
         with _ ->
             try ((childProcess :?> SpawnedChild).kill "SIGKILL") |> ignore with _ -> ()
 

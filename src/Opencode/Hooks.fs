@@ -4,13 +4,15 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.OpencodeHooks
 open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.TreeSitterKernel
+open VibeFs.Opencode.ChildAgent
+open VibeFs.Opencode.HookSchema
 open VibeFs.Shell.TreeSitterShell
 
-let private defaultExcludedAgents = [ "browser"; "reader"; "executor"; "title" ]
-
 let private emptyObj () : obj = createObj []
+
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
 let private resolvedUnit : JS.Promise<unit> = async { return () } |> Async.StartAsPromise
@@ -28,78 +30,18 @@ let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
 
 let private jsTypeof (o: obj) : string = Dyn.jsType o
 
-let private isStringArray (value: obj) : bool =
-    if not (Dyn.isArray value) then false
-    else
-        let items: obj array = unbox value
-        let mutable allStrings = true
-        let mutable index = 0
-        while allStrings && index < items.Length do
-            allStrings <- Dyn.typeIs items.[index] "string"
-            index <- index + 1
-        allStrings
-
-let private joinReaderIntents (intents: obj) : Result<string, string> =
-    if not (Dyn.isArray intents) || not (isStringArray intents) then
-        Error "Invalid LLM input for reader: intents must be an array of strings"
-    else
-        let items: obj array = unbox intents
-        let texts = Array.zeroCreate<string> items.Length
-        for index = 0 to items.Length - 1 do
-            texts.[index] <- string items.[index]
-        Ok (String.concat "; " texts)
-
-let private joinCoderIntents (intents: obj) : Result<string, string> =
-    if not (Dyn.isArray intents) then
-        Error "Invalid LLM input for coder: intents must be an array"
-    else
-        let items: obj array = unbox intents
-        let firstItems = Array.zeroCreate<string> items.Length
-        let mutable invalid = false
-        let mutable index = 0
-        while not invalid && index < items.Length do
-            let firstItem = Dyn.get items.[index] "0"
-            if not (Dyn.typeIs firstItem "string") then invalid <- true
-            else firstItems.[index] <- string firstItem
-            index <- index + 1
-        if invalid then
-            Error "Invalid LLM input for coder: each intent must start with a string"
-        else
-            Ok (String.concat "; " firstItems)
-
-let private stripUiParameter (parameters: obj) : unit =
-    let properties = Dyn.get parameters "properties"
-    if Dyn.isNullish properties then ()
-    else
-        let nextProps = emptyObj ()
-        for key in objectKeys properties do
-            if key <> "_ui" then setKey nextProps key (Dyn.get properties key)
-        let required = Dyn.get parameters "required"
-        let nextRequired =
-            if Dyn.isArray required then
-                let requiredKeys: obj array = unbox required
-                let kept = ResizeArray<string>()
-                for keyObj in requiredKeys do
-                    let key = string keyObj
-                    if key <> "_ui" then kept.Add key
-                box (kept.ToArray())
-            else
-                required
-        setKey parameters "properties" nextProps
-        setKey parameters "required" nextRequired
-
-let private resolveAgent (input: obj) : string =
+let private resolveAgent (registry: ChildAgentRegistry) (input: obj) : string =
     let explicit = Dyn.str input "agent"
     if explicit <> "" then explicit
     else
-        match ChildAgent.lookupChildAgent (Dyn.str input "sessionID") with
+        match registry.LookupChildAgent(Dyn.str input "sessionID") with
         | Some a -> a
         | None -> "manager"
 
 /// Filter tools at runtime by `canUse`.  Denied tools are forced false;
 /// allowed tools keep their existing value so users may opt out.
 let private resolveChatTools (agent: string) (existingTools: obj) : obj =
-    let next = emptyObj ()
+    let next = createObj []
     if not (Dyn.isNullish existingTools) then
         for key in objectKeys existingTools do
             if canUse agent key then
@@ -109,9 +51,9 @@ let private resolveChatTools (agent: string) (existingTools: obj) : obj =
     next
 
 /// chat.message: enforce per-agent tool boundaries at runtime.
-let chatMessage (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
+let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
-        let agent = resolveAgent input
+        let agent = resolveAgent registry input
         let sessionID = Dyn.str input "sessionID"
         do! nudgeHook.handleChatMessage(sessionID, agent, Dyn.get output "parts") |> Async.AwaitPromise
         let message = Dyn.get output "message"
@@ -186,12 +128,12 @@ let private applyReadDedup (messages: obj array) : unit =
                                     | AlreadySeen -> setOutput state dedupMarker
                                     | NewContent _ -> ()
 
-let messagesTransform (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let messages = Dyn.get output "messages"
         if not (Dyn.isNullish messages) && Dyn.isArray messages then
             let messagesArr = messages :?> obj array
-            let agent = resolveAgent input
+            let agent = resolveAgent registry input
             if not (defaultExcludedAgents |> List.contains agent) then
                 let! capsFiles = VibeFs.Shell.CapsShell.findCapsFiles directory |> Async.AwaitPromise
                 let next =
@@ -211,7 +153,7 @@ let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
         let toolID = Dyn.str input "toolID"
         if toolID = "coder" || toolID = "reader" then
             let parameters = Dyn.get output "parameters"
-            if not (Dyn.isNullish parameters) then stripUiParameter parameters
+            if not (Dyn.isNullish parameters) then setKey output "parameters" (withUiParameterStripped parameters)
     } |> Async.StartAsPromise
 
 /// tool.execute.before: populate `_ui` from joined intents so the UI labels the call.
@@ -221,17 +163,7 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
         if Dyn.isNullish args then ()
         else
             let tool = Dyn.str input "tool"
-            let existingUi = Dyn.get args "_ui"
-            if not (Dyn.isNullish existingUi) && not (Dyn.typeIs existingUi "string") then
-                setKey args "_ui" (box $"Invalid LLM input for {tool}: _ui must be a string, received {jsTypeof existingUi}")
-            elif tool = "coder" then
-                match joinCoderIntents (Dyn.get args "intents") with
-                | Error e -> setKey args "_ui" (box e)
-                | Ok ui -> setKey args "_ui" (box ui)
-            elif tool = "reader" then
-                match joinReaderIntents (Dyn.get args "intents") with
-                | Error e -> setKey args "_ui" (box e)
-                | Ok ui -> setKey args "_ui" (box ui)
+            setUiLabel args tool
     } |> Async.StartAsPromise
 
 /// event: deactivate review on stream-abort.

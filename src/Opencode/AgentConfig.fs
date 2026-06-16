@@ -15,6 +15,23 @@ let private mergeObj (a: obj) (b: obj) : obj =
 
 let private emptyMcps : obj = [||] :> obj
 
+type private BuiltinAgentSpec =
+    { name: string
+      defaultMode: string
+      systemPrompt: string
+      defaultMcps: string array }
+
+let private builtinAgentSpecs =
+    [ { name = "manager"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
+      { name = "coder"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
+      { name = "reader"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
+      { name = "meditator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
+      { name = "reviewer"; defaultMode = "subagent"; systemPrompt = Prompts.reviewInstructions; defaultMcps = [||] }
+      { name = "browser"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [| "stealth-browser-mcp" |] }
+      { name = "executor"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] } ]
+
+let private builtinAgentByName = builtinAgentSpecs |> List.map (fun spec -> spec.name, spec) |> Map.ofList
+
 /// All tool names the plugin registers plus common host tool patterns that
 /// canUse has opinions about — kept in sync with Tools.createTools.
 let private allToolNames =
@@ -39,24 +56,24 @@ let private permissionDefaults (agentName: string) : obj =
         setKey o name (box (if canUse agentName name then "allow" else "deny"))
     o
 
-let private systemPromptForBuiltin (name: string) : string =
-    match name with
-    | "reviewer" -> Prompts.reviewInstructions
-    | _ -> ""
-
 let private withRoleDefaults (name: string) (userAgent: obj) : obj =
+    let spec = Map.tryFind name builtinAgentByName
     let userPrompt = Dyn.str userAgent "prompt"
-    let prompt = if userPrompt <> "" then userPrompt else systemPromptForBuiltin name
-    let defaultMode = if name = "manager" then "primary" else "subagent"
+    let prompt =
+        if userPrompt <> "" then userPrompt
+        else spec |> Option.map (fun value -> value.systemPrompt) |> Option.defaultValue ""
     let userMode = Dyn.str userAgent "mode"
-    let mode = if userMode <> "" then userMode else defaultMode
+    let mode = if userMode <> "" then userMode else spec |> Option.map (fun value -> value.defaultMode) |> Option.defaultValue "subagent"
     let userPerm = Dyn.get userAgent "permission"
     let userTools = Dyn.get userAgent "tools"
     let userMcps = Dyn.get userAgent "mcps"
     let mcps =
-        match name with
-        | "browser" -> if Dyn.isNullish userMcps then box [| "stealth-browser-mcp" |] else userMcps
-        | _ -> if Dyn.isNullish userMcps then emptyMcps else userMcps
+        if Dyn.isNullish userMcps then
+            spec
+            |> Option.map (fun value -> if value.defaultMcps.Length = 0 then emptyMcps else box value.defaultMcps)
+            |> Option.defaultValue emptyMcps
+        else
+            userMcps
 
     let perm = mergeObj (permissionDefaults name) userPerm
     let tools = mergeObj (toolDefaults name) userTools
@@ -71,16 +88,13 @@ let private withRoleDefaults (name: string) (userAgent: obj) : obj =
 let private objectKeys (o: obj) : string array =
     JS.Constructors.Object.keys(o) |> Seq.toArray
 
-let private builtinAgents = [ "coder"; "reader"; "meditator"; "reviewer"; "browser"; "executor" ]
-
 let applyAgentConfig (opencodeConfig: obj) (mcps: obj) : obj =
     let userAgent = if Dyn.isNullish (Dyn.get opencodeConfig "agent") then emptyObj () else Dyn.get opencodeConfig "agent"
     let configMcp = Dyn.get opencodeConfig "mcp"
     let mergedMcp = if Dyn.isNullish configMcp then mcps else mergeObj configMcp mcps
     let agents = mergeObj userAgent (emptyObj ())
-    for name in builtinAgents do
+    for name in builtinAgentSpecs |> List.map (fun spec -> spec.name) do
         if Dyn.isNullish (Dyn.get agents name) then setKey agents name (emptyObj ())
-    if Dyn.isNullish (Dyn.get agents "manager") then setKey agents "manager" (emptyObj ())
     let finalAgents = emptyObj ()
     for name in objectKeys agents do
         if name = "basher" || name = "runner" then ()

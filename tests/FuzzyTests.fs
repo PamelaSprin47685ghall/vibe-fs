@@ -72,7 +72,7 @@ let fuzzyFallbackNotice () =
 /// totalMatched yields NO next iterator (mirrors find-output.ts).
 let findPagingDefault () =
     let store = createIteratorStore 10
-    let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = Some store }
+    let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = Some store; finderCache = FinderCache() }
     let state : FuzzyFindState = { query = "q"; pageSize = 30; pageIndex = 0; externalBasePath = None }
     // Absent totalMatched → default 0 → no next page iterator.
     equal "no totalMatched → no iterator" "" (findNextIterator state store opts 0)

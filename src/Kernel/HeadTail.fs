@@ -64,37 +64,37 @@ let private readHashComment (s: string) (i: int) =
     match s.IndexOf("\n", i) with -1 -> None | finish -> Some(s.[i..finish], finish + 1)
 
 /// One scan pass over the script: copy through quotes/comments, cut head/tail pipes.
+let private trimTrailingWhitespace (chars: char list) =
+    chars |> List.rev |> List.skipWhile isWhitespace |> List.rev
+
+let private appendSlice (chars: char list) (slice: string) =
+    slice.ToCharArray() |> Array.fold (fun acc ch -> acc @ [ ch ]) chars
+
 let private scan (script: string) : string * StrippedPipe list =
-    let stripped = ResizeArray<StrippedPipe>()
-    let buf = ResizeArray<char>()
-    let appendStr (s: string) = s.ToCharArray() |> Array.iter buf.Add
-    let trimTrailingWhitespace () =
-        while buf.Count > 0 && isWhitespace buf.[buf.Count - 1] do buf.RemoveAt(buf.Count - 1)
-    let len = script.Length
-    let mutable i = 0
-    while i < len do
-        let ch = script.[i]
-        if ch = '\'' then
-            match readSingleQuoted script i with
-            | Some(slice, next) -> appendStr slice; i <- next
-            | None -> appendStr script.[i..]; i <- len
-        elif ch = '"' then
-            let slice, next = readDoubleQuoted script i
-            appendStr slice; i <- next
-        elif ch = '#' then
-            match readHashComment script i with
-            | Some(slice, next) -> appendStr slice; i <- next
-            | None -> appendStr script.[i..]; i <- len
-        elif ch = '|' then
-            match parsePipe script i with
-            | Some(finish, pipe) ->
-                trimTrailingWhitespace ()
-                stripped.Add(pipe)
-                i <- finish
-            | None -> buf.Add(ch); i <- i + 1
+    let rec loop index buffered stripped =
+        if index >= script.Length then
+            System.String(List.toArray buffered), List.rev stripped
         else
-            buf.Add(ch); i <- i + 1
-    (System.String(buf.ToArray())), List.ofSeq stripped
+            let ch = script.[index]
+            if ch = '\'' then
+                match readSingleQuoted script index with
+                | Some(slice, next) -> loop next (appendSlice buffered slice) stripped
+                | None -> loop script.Length (appendSlice buffered script.[index..]) stripped
+            elif ch = '"' then
+                let slice, next = readDoubleQuoted script index
+                loop next (appendSlice buffered slice) stripped
+            elif ch = '#' then
+                match readHashComment script index with
+                | Some(slice, next) -> loop next (appendSlice buffered slice) stripped
+                | None -> loop script.Length (appendSlice buffered script.[index..]) stripped
+            elif ch = '|' then
+                match parsePipe script index with
+                | Some(finish, pipe) -> loop finish (trimTrailingWhitespace buffered) (pipe :: stripped)
+                | None -> loop (index + 1) (buffered @ [ ch ]) stripped
+            else
+                loop (index + 1) (buffered @ [ ch ]) stripped
+
+    loop 0 [] []
 
 /// Repeatedly scan until no more head/tail pipes remain (they may be nested).
 /// Pipes are prepended so the first-stripped (outermost) comes last, matching

@@ -10,7 +10,9 @@ open VibeFs.Shell.OllamaClient
 open VibeFs.Opencode.Sdk
 open VibeFs.Opencode.ToolCopy
 open VibeFs.Opencode.Session
+open VibeFs.Opencode.ChildAgent
 open VibeFs.Kernel.Prompts
+open VibeFs.Shell.FuzzyFinderShell
 
 [<Global("Buffer")>]
 let private nodeBuffer : obj = jsNative
@@ -31,7 +33,7 @@ let private optInt (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullis
 let private optBool (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<bool> v)
 let private optField (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some v
 
-let coderTool (ctx: obj) : obj =
+let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client = Dyn.get ctx "client"
     define coder
         (box {| intents = intentsSchema Params.coderIntents; _ui = uiParam |})
@@ -50,12 +52,12 @@ let coderTool (ctx: obj) : obj =
                             if Dyn.typeIs filesRaw "string" then [string filesRaw]
                             else filesRaw :?> obj array |> Array.map string |> List.ofArray
                         let prompt = formatCoderUserPrompt intentText files
-                        runSubagent client "coder" "Coder" prompt directory sessionID context (box null)
+                        runSubagent registry client "coder" "Coder" prompt directory sessionID context (box null)
                         |> Async.AwaitPromise) |> Async.Parallel
                 return String.concat "\n---\n" (List.ofArray reports)
             } |> Async.StartAsPromise)
 
-let readerTool (ctx: obj) : obj =
+let readerTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client = Dyn.get ctx "client"
     define reader
         (box {| intents = call1 (call1 (arr (strMin 1 "")) "min" (box 1)) "describe" (box Params.readerIntents)
@@ -67,13 +69,13 @@ let readerTool (ctx: obj) : obj =
                 let! reports =
                     intents |> Array.map (fun intent ->
                         let prompt = formatReaderUserPrompt intent
-                        runSubagent client "reader" "Reader" prompt
+                        runSubagent registry client "reader" "Reader" prompt
                             (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null)
                         |> Async.AwaitPromise) |> Async.Parallel
                 return String.concat "\n---\n" (List.ofArray reports)
             } |> Async.StartAsPromise)
 
-let meditatorTool (ctx: obj) : obj =
+let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client = Dyn.get ctx "client"
     define meditator
         (box {| intent = strReq Params.meditatorIntent; files = strArrayOpt Params.meditatorFiles |})
@@ -91,12 +93,12 @@ let meditatorTool (ctx: obj) : obj =
                         files (List.toArray readResults)
                     |> List.ofArray
                 let prompt = HostKernel.buildMeditatorPrompt sections intent
-                return! runSubagent client "meditator" "Meditator" prompt
+                return! runSubagent registry client "meditator" "Meditator" prompt
                     directory sessionID context (box null)
                     |> Async.AwaitPromise
             } |> Async.StartAsPromise)
 
-let executorTool (ctx: obj) : obj =
+let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client = Dyn.get ctx "client"
     define executor
         (box {| language = strReq Params.executorLanguage; program = strReq Params.executorProgram
@@ -115,21 +117,21 @@ let executorTool (ctx: obj) : obj =
                 if not (shouldSummarize byteLength output) then return output
                 else
                     let prompt = formatExecutorSummarizerUserPrompt output
-                    return! runSubagentWithCleanup client "executor" "Executor summary" prompt
+                    return! runSubagentWithCleanup registry client "executor" "Executor summary" prompt
                                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
                             |> Async.AwaitPromise
             } |> Async.StartAsPromise)
 
-let browserTool (ctx: obj) : obj =
+let browserTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client = Dyn.get ctx "client"
     define browser
         (box {| intent = strReq Params.browserIntent |})
         (fun args context ->
             let tc = extractToolContext context (Dyn.str ctx "directory")
-            runSubagent client "browser" "Browser" (formatBrowserUserPrompt (Dyn.str args "intent"))
+            runSubagent registry client "browser" "Browser" (formatBrowserUserPrompt (Dyn.str args "intent"))
                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null))
 
-let fuzzyFindTool () : obj =
+let fuzzyFindTool (finderCache: FinderCache) : obj =
     define fuzzyFind
         (box {| pattern = strMinNullish 1 Params.fuzzyFindPattern; path = strOpt Params.fuzzyFindPath
                 limit = intMinNullish 1 Params.fuzzyFindLimit; iterator = strOpt Params.fuzzyFindIterator |})
@@ -140,10 +142,10 @@ let fuzzyFindTool () : obj =
                 let p : VibeFs.Shell.FuzzyCoordinator.FuzzyFindParams =
                     { pattern = optStr args "pattern"; path = optStr args "path"
                       limit = optInt args "limit"; iterator = optStr args "iterator" }
-                let o : VibeFs.Shell.FuzzyCoordinator.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None }
+                let o : VibeFs.Shell.FuzzyCoordinator.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
                 async { let! r = VibeFs.Shell.FuzzyFindCmd.fuzzyFind p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
 
-let fuzzyGrepTool () : obj =
+let fuzzyGrepTool (finderCache: FinderCache) : obj =
     define fuzzyGrep
         (box {| pattern = strMinNullish 1 Params.fuzzyGrepPattern; path = strOpt Params.fuzzyGrepPath
                 exclude = excludeOpt Params.fuzzyGrepExclude; caseSensitive = boolOpt Params.fuzzyGrepCaseSensitive
@@ -157,7 +159,7 @@ let fuzzyGrepTool () : obj =
                     { pattern = optStr args "pattern"; path = optStr args "path"; exclude = VibeFs.Shell.FuzzyCoordinator.parseExcludeField args
                       caseSensitive = optBool args "caseSensitive"; context = optInt args "context"
                       limit = optInt args "limit"; iterator = optStr args "iterator" }
-                let o : VibeFs.Shell.FuzzyCoordinator.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None }
+                let o : VibeFs.Shell.FuzzyCoordinator.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
                 async { let! r = VibeFs.Shell.FuzzyGrepCmd.fuzzyGrep p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
 
 let private abortSignal (context: obj) : obj =
@@ -228,7 +230,7 @@ let private formatReviewResult (result: VibeFs.Kernel.ReviewSession.ReviewResult
         "Review feedback:\n\n" + feedback
         + "\n\nAddress the feedback above. loop mode is still active — fix the issues and call submit_review again."
 
-let submitReviewTool (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     let client = Dyn.get ctx "client"
     define "Submit your work for review (loop mode)."
         (box {| report = strReq "Detailed report of what you did"; affectedFiles = strArrayOpt "Files you modified" |})
@@ -248,7 +250,7 @@ let submitReviewTool (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) 
                 async {
                     try
                         let task = defaultArg (store.getReviewTask sessionID) ""
-                        let! result = runSubmitReview client store (Dyn.str tc "directory") sessionID report affectedFiles task abort |> Async.AwaitPromise
+                        let! result = runSubmitReview registry client store (Dyn.str tc "directory") sessionID report affectedFiles task abort |> Async.AwaitPromise
                         match result with
                         | VibeFs.Kernel.ReviewSession.Accepted
                         | VibeFs.Kernel.ReviewSession.Terminated ->
@@ -274,13 +276,13 @@ let submitReviewResultTool (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj
                     if trimmed = "" then Accepted else Rejected trimmed
             async { return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve." } |> Async.StartAsPromise)
 
-let createTools (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     mergeObjects [|
-        entry "coder" (coderTool ctx); entry "reader" (readerTool ctx)
-        entry "meditator" (meditatorTool ctx); entry "browser" (browserTool ctx)
-        entry "executor" (executorTool ctx)
-        entry "fuzzy-find" (fuzzyFindTool ()); entry "fuzzy-grep" (fuzzyGrepTool ())
+        entry "coder" (coderTool registry ctx); entry "reader" (readerTool registry ctx)
+        entry "meditator" (meditatorTool registry ctx); entry "browser" (browserTool registry ctx)
+        entry "executor" (executorTool registry ctx)
+        entry "fuzzy-find" (fuzzyFindTool finderCache); entry "fuzzy-grep" (fuzzyGrepTool finderCache)
         entry "websearch" (websearchTool ()); entry "webfetch" (webfetchTool ())
-        entry "submit_review" (submitReviewTool ctx reviewStore)
+        entry "submit_review" (submitReviewTool registry ctx reviewStore)
         entry "return-reviewer" (submitReviewResultTool reviewStore)
     |]

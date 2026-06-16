@@ -11,6 +11,7 @@ type ReviewResult = Accepted | Rejected of feedback: string | Terminated
 /// render and link sessions.  Immutable: every mutation produces a new record.
 type ReviewSession =
     { id: string
+      version: int
       state: ReviewState
       createdAt: int64
       originalTask: string option
@@ -19,20 +20,25 @@ type ReviewSession =
       childIds: string list }
 
 let empty id createdAt : ReviewSession =
-    { id = id; state = ReviewState.Inactive; createdAt = createdAt
+    { id = id; version = 0; state = ReviewState.Inactive; createdAt = createdAt
       originalTask = None; lastFeedback = None; parentId = None; childIds = [] }
 
 /// Apply a command through the pure transition, returning a new session when the
 /// state actually changes.  Structural equality lets us skip no-op writes.
 let applyCommand (session: ReviewSession) (command: ReviewCommand) : ReviewSession =
     let nextState, _ = transition session.state command
-    if nextState = session.state then session else { session with state = nextState }
+    if nextState = session.state then session
+    else { session with state = nextState; version = session.version + 1 }
 
 let withTask (task: string) (session: ReviewSession) : ReviewSession =
-    { session with originalTask = Some task }
+    if session.originalTask = Some task then session
+    else { session with originalTask = Some task; version = session.version + 1 }
 let withFeedback (session: ReviewSession) (feedback: string) : ReviewSession =
-    { session with lastFeedback = Some feedback }
-let addChild session childId = { session with childIds = session.childIds @ [ childId ] }
+    if session.lastFeedback = Some feedback then session
+    else { session with lastFeedback = Some feedback; version = session.version + 1 }
+let addChild session childId =
+    if List.contains childId session.childIds then session
+    else { session with childIds = session.childIds @ [ childId ]; version = session.version + 1 }
 
 /// The registry is a fold over session-level actions — the event-sourcing
 /// reduce.  Every action is data; `reduce` is the single interpreter.
@@ -119,3 +125,11 @@ let canTransition registry id command =
     | Some session ->
         let nextState, _ = transition session.state command
         nextState <> session.state
+
+let versionOf registry id =
+    Map.tryFind id registry |> Option.map (fun session -> session.version)
+
+let reduceIfVersionMatches (registry: Registry) (id: string) (expectedVersion: int) (action: RegistryAction) : Registry option =
+    match Map.tryFind id registry with
+    | Some session when session.version = expectedVersion -> Some(reduce registry action)
+    | _ -> None

@@ -3,60 +3,63 @@ module VibeFs.Opencode.ChildAgent
 open VibeFs.Kernel.Boundary
 open VibeFs.Kernel.WorkspaceState
 
-let private workspace = ref empty
+type ChildAgentRegistry private (state: WorkspaceState ref) =
 
-let private parseChildId input =
-    match Id.childId input with
-    | Ok id -> Some id
-    | Error _ -> None
+    static member Create() =
+        ChildAgentRegistry({ contents = empty })
 
-let private parseSessionId input =
-    match Id.sessionId input with
-    | Ok id -> Some id
-    | Error _ -> None
+    member private _.parseChildId(input: string) =
+        match Id.childId input with
+        | Ok id -> Some id
+        | Error _ -> None
 
-let registerChildAgent sessionID agent parentSessionID =
-    match parseChildId sessionID with
-    | None -> ()
-    | Some childId ->
-        let meta =
-            { agent = agent
-              parentSessionId = Option.bind parseSessionId parentSessionID }
-        workspace.Value <- reduce workspace.Value (ChildRegistered(childId, meta))
+    member private _.parseSessionId(input: string) =
+        match Id.sessionId input with
+        | Ok id -> Some id
+        | Error _ -> None
 
-let lookupChildAgent sessionID =
-    parseChildId sessionID
-    |> Option.bind (fun childId -> Map.tryFind childId (workspace.Value).childSessions)
-    |> Option.map (fun meta -> meta.agent)
+    member this.RegisterChildAgent(sessionID: string, agent: string, parentSessionID: string option) =
+        match this.parseChildId sessionID with
+        | None -> ()
+        | Some childId ->
+            let meta =
+                { agent = agent
+                  parentSessionId = Option.bind this.parseSessionId parentSessionID }
+            state.Value <- reduce state.Value (ChildRegistered(childId, meta))
 
-let resolveSubsessionParentID sessionID =
-    let rec resolve visited current resolved =
-        if Set.contains current visited then
-            Some (Id.sessionIdValue resolved)
-        else
-            match parseChildId (Id.sessionIdValue current) with
-            | None -> Some (Id.sessionIdValue resolved)
-            | Some childId ->
-                match Map.tryFind childId (workspace.Value).childSessions with
+    member this.LookupChildAgent(sessionID: string) =
+        this.parseChildId sessionID
+        |> Option.bind (fun childId -> Map.tryFind childId state.Value.childSessions)
+        |> Option.map (fun meta -> meta.agent)
+
+    member this.ResolveSubsessionParentID(sessionID: string option) =
+        let rec resolve visited current resolved =
+            if Set.contains current visited then
+                Some (Id.sessionIdValue resolved)
+            else
+                match this.parseChildId (Id.sessionIdValue current) with
                 | None -> Some (Id.sessionIdValue resolved)
-                | Some meta ->
-                    match meta.parentSessionId with
-                    | None -> Some (Id.sessionIdValue current)
-                    | Some parent -> resolve (Set.add current visited) parent parent
+                | Some childId ->
+                    match Map.tryFind childId state.Value.childSessions with
+                    | None -> Some (Id.sessionIdValue resolved)
+                    | Some meta ->
+                        match meta.parentSessionId with
+                        | None -> Some (Id.sessionIdValue current)
+                        | Some parent -> resolve (Set.add current visited) parent parent
 
-    match sessionID with
-    | None -> None
-    | Some raw ->
-        match parseSessionId raw with
+        match sessionID with
         | None -> None
-        | Some sid ->
-            match parseChildId raw with
-            | Some childId when Map.containsKey childId (workspace.Value).childSessions ->
-                resolve Set.empty sid sid
-            | _ -> Some raw
+        | Some raw ->
+            match this.parseSessionId raw with
+            | None -> None
+            | Some sid ->
+                match this.parseChildId raw with
+                | Some childId when Map.containsKey childId state.Value.childSessions ->
+                    resolve Set.empty sid sid
+                | _ -> Some raw
 
-let unregisterChildAgent sessionID =
-    match parseChildId sessionID with
-    | None -> ()
-    | Some childId ->
-        workspace.Value <- reduce workspace.Value (ChildUnregistered childId)
+    member this.UnregisterChildAgent(sessionID: string) =
+        match this.parseChildId sessionID with
+        | None -> ()
+        | Some childId ->
+            state.Value <- reduce state.Value (ChildUnregistered childId)

@@ -51,26 +51,37 @@ let internal coerceThinkingLevel (value: string) : string option =
     else
         None
 
+type internal ParentRuntimeAiSettings =
+    { modelString: string option
+      thinkingLevel: string option }
+
+let private trimToOption (value: string) =
+    let trimmed = value.Trim()
+    if trimmed = "" then None else Some trimmed
+
+let private readMuxEnvSettings (muxEnv: obj) : ParentRuntimeAiSettings =
+    { modelString = Dyn.str muxEnv "MUX_MODEL_STRING" |> trimToOption
+      thinkingLevel = Dyn.str muxEnv "MUX_THINKING_LEVEL" |> coerceThinkingLevel }
+
+let private toRuntimeAiSettingsObj (settings: ParentRuntimeAiSettings) : obj =
+    match settings.modelString, settings.thinkingLevel with
+    | None, None -> null
+    | _ ->
+        let o = createObj []
+        match settings.modelString with
+        | Some modelString -> o?modelString <- modelString
+        | None -> ()
+        match settings.thinkingLevel with
+        | Some thinkingLevel -> o?thinkingLevel <- thinkingLevel
+        | None -> ()
+        o
+
 let internal buildParentRuntimeAiSettings (config: obj) : obj =
     let muxEnv = Dyn.get config "muxEnv"
     if Dyn.isNullish muxEnv then
         null
     else
-        let modelRaw = Dyn.str muxEnv "MUX_MODEL_STRING"
-        let modelOpt = if modelRaw.Trim() = "" then None else Some modelRaw
-        let thinkingOpt = coerceThinkingLevel (Dyn.str muxEnv "MUX_THINKING_LEVEL")
-
-        match modelOpt, thinkingOpt with
-        | None, None -> null
-        | _ ->
-            let o = createObj []
-            match modelOpt with
-            | Some m -> o?modelString <- m
-            | None -> ()
-            match thinkingOpt with
-            | Some t -> o?thinkingLevel <- t
-            | None -> ()
-            o
+        muxEnv |> readMuxEnvSettings |> toRuntimeAiSettingsObj
 
 let private createInput
     (workspaceId: string)

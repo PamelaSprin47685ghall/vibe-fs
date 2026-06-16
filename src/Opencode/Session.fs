@@ -134,11 +134,11 @@ let private promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise
 
 /// Core subagent runner. The `cleanup` flag controls whether the child session
 /// is aborted and unregistered after the prompt finishes.
-let private runSubagentCore (client: obj) (agent: string) (title: string) (prompt: string)
+let private runSubagentCore (registry: ChildAgent.ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                             (directory: string) (sessionID: string) (context: obj)
                             (tools: obj) (cleanup: bool) : JS.Promise<string> =
     async {
-        let parentID = ChildAgent.resolveSubsessionParentID (if sessionID = "" then None else Some sessionID)
+        let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
         let session = Dyn.get client "session"
         let createBody =
             box {|
@@ -159,8 +159,8 @@ let private runSubagentCore (client: obj) (agent: string) (title: string) (promp
                 if cleanup then
                     let abortPromise : JS.Promise<obj> = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
                     abortPromise |> ignore
-                    ChildAgent.unregisterChildAgent childID
-            ChildAgent.registerChildAgent childID agent parentID
+                    registry.UnregisterChildAgent(childID)
+            registry.RegisterChildAgent(childID, agent, parentID)
             try
                 try
                     let promptBody =
@@ -188,27 +188,28 @@ let private runSubagentCore (client: obj) (agent: string) (title: string) (promp
     |> Async.StartAsPromise
 
 /// Run a subagent and keep the child session registered after return.
-let runSubagent (client: obj) (agent: string) (title: string) (prompt: string)
+let runSubagent (registry: ChildAgent.ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                 (directory: string) (sessionID: string) (context: obj)
                 (tools: obj) : JS.Promise<string> =
-    runSubagentCore client agent title prompt directory sessionID context tools false
+    runSubagentCore registry client agent title prompt directory sessionID context tools false
 
 /// Run a subagent and clean up the child session afterwards. Used for
 /// short-lived analysis subagents such as the executor summarizer.
-let runSubagentWithCleanup (client: obj) (agent: string) (title: string) (prompt: string)
+let runSubagentWithCleanup (registry: ChildAgent.ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                            (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
-    runSubagentCore client agent title prompt directory sessionID context (box null) true
+    runSubagentCore registry client agent title prompt directory sessionID context (box null) true
 
 /// Run a subagent with an explicit tool set and clean up afterwards.
 let runSubagentWithTools
+    (registry: ChildAgent.ChildAgentRegistry)
     (client: obj) (agent: string) (title: string) (prompt: string)
     (directory: string) (sessionID: string) (context: obj)
     (tools: obj) : JS.Promise<string> =
-    runSubagentCore client agent title prompt directory sessionID context tools true
+    runSubagentCore registry client agent title prompt directory sessionID context tools true
 
 /// Create a reviewer child session under the given parent, register it, and
 /// return the child id (empty string on failure).
-let createReviewerChild (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+let createReviewerChild (registry: ChildAgent.ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                         (directory: string) (parentID: string option)
                         (sessionID: string) (title: string) : JS.Promise<string> =
     async {
@@ -227,7 +228,7 @@ let createReviewerChild (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.R
         let childID = Dyn.str (Dyn.get createResult "data") "id"
         if childID <> "" then
             reviewStore.addChild(sessionID, childID)
-            ChildAgent.registerChildAgent childID "reviewer" parentID
+            registry.RegisterChildAgent(childID, "reviewer", parentID)
         return childID
     }
     |> Async.StartAsPromise
@@ -271,12 +272,12 @@ let runReviewerLoop (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.Revie
 
 /// Run a pre-review session (used by /loop-review): create a reviewer child,
 /// prompt it with review instructions + task, wait for the verdict.
-let runReviewerSession (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+let runReviewerSession (registry: ChildAgent.ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                        (directory: string) (sessionID: string) (task: string)
                        : JS.Promise<VibeFs.Kernel.ReviewSession.ReviewResult> =
     async {
-        let parentID = ChildAgent.resolveSubsessionParentID (if sessionID = "" then None else Some sessionID)
-        let! childID = createReviewerChild client reviewStore directory parentID sessionID "Pre-Reviewer" |> Async.AwaitPromise
+        let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
+        let! childID = createReviewerChild registry client reviewStore directory parentID sessionID "Pre-Reviewer" |> Async.AwaitPromise
         if childID = "" then return VibeFs.Kernel.ReviewSession.Terminated
         else
             let parts =
@@ -289,14 +290,14 @@ let runReviewerSession (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.Re
 /// Run a submit-review (used by the submit_review tool): create a reviewer
 /// child, prompt it with review instructions + change report + affected files +
 /// original task, wait for the verdict.
-let runSubmitReview (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+let runSubmitReview (registry: ChildAgent.ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                     (directory: string) (sessionID: string)
                     (report: string) (affectedFiles: string list)
                     (task: string) (abortSignal: obj)
                     : JS.Promise<VibeFs.Kernel.ReviewSession.ReviewResult> =
     async {
-        let parentID = ChildAgent.resolveSubsessionParentID (Some sessionID)
-        let! childID = createReviewerChild client reviewStore directory parentID sessionID "Reviewer" |> Async.AwaitPromise
+        let parentID = registry.ResolveSubsessionParentID(Some sessionID)
+        let! childID = createReviewerChild registry client reviewStore directory parentID sessionID "Reviewer" |> Async.AwaitPromise
         if childID = "" then return VibeFs.Kernel.ReviewSession.Terminated
         else
             let filesText = String.concat "\n" affectedFiles

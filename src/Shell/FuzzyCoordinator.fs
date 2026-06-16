@@ -12,7 +12,11 @@ type FuzzyFindParams = { pattern: string option; path: string option; limit: int
 type FuzzyGrepParams =
     { pattern: string option; path: string option; exclude: string list
       caseSensitive: bool option; context: int option; limit: int option; iterator: string option }
-type SearchOptions = { cwd: string; scopeId: string; store: obj option }
+type SearchOptions =
+    { cwd: string
+      scopeId: string
+      store: obj option
+      finderCache: FinderCache }
 
 type FuzzyFindState = { query: string; pageSize: int; pageIndex: int; externalBasePath: string option }
 type FuzzyGrepState =
@@ -78,11 +82,10 @@ let resolveGrepSearchState (params': FuzzyGrepParams) (opts: SearchOptions)
                      externalBasePath = externalBasePath
                      cursor = None }
 
-/// Acquire a finder — a fresh one for external paths, the cached one for cwd.
-let acquireFinder externalBasePath cwd =
+let acquireFinderFromOptions externalBasePath (opts: SearchOptions) =
     match externalBasePath with
     | Some basep -> createFinder basep
-    | None -> getCachedFinder cwd
+    | None -> opts.finderCache.Get opts.cwd
 
 /// Release a finder — only external (fresh) finders are destroyed.
 let releaseFinder (finder: FinderLike) externalBasePath =

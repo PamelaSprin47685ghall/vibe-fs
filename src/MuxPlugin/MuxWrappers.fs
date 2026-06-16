@@ -109,15 +109,15 @@ let private mkWebOverride (sourceToolName: string) (tools: obj) (targetTool: str
                         "execute", box execFn ])
     createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
 
-let private mkAgentReportOverride () : obj =
+let private mkAgentReportOverride (callStore: CallStore) : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (tool: obj) (_config: obj) ->
             let execFn =
                 System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
                     async {
                         let callId = Dyn.str args "callId"
-                        if callId <> "" && hasCall callId then
-                            resolveCall callId args |> ignore
+                        if callId <> "" && hasCall callStore callId then
+                            resolveCall callStore callId args |> ignore
                             let upstreamArgs = createObj [ "reportMarkdown", box (formatAgentReportMarkdown args) ]
                             let raw = tool?execute(upstreamArgs, opts)
                             return!
@@ -134,16 +134,17 @@ let private mkAgentReportOverride () : obj =
                                     async { return raw }
                     }
                     |> Async.StartAsPromise)
-            createObj [ "description", box agentReportDefinition.description
-                        "parameters", box agentReportDefinition.parameters
+            let definition = agentReportDefinition callStore
+            createObj [ "description", box definition.description
+                        "parameters", box definition.parameters
                         "execute", box execFn ])
     createObj [ "targetTool", box "agent_report"; "wrapper", box wrapperFn ]
 
-let createAllWrappers (tools: obj) (hostReadExec: HostReadExec) : obj array =
+let createAllWrappers (tools: obj) (hostReadExec: HostReadExec) (callStore: CallStore) : obj array =
     Array.append
         (mkSyntaxWrappers ())
         [| mkFileReadCapture hostReadExec
            mkTodoNudgeWrapper ()
-           mkAgentReportOverride ()
+           mkAgentReportOverride callStore
            mkWebOverride "websearch" tools "web_search"
            mkWebOverride "webfetch" tools "web_fetch" |]

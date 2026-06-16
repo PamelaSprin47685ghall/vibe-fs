@@ -9,6 +9,8 @@ open VibeFs.Opencode.Hooks
 open VibeFs.Opencode.NudgeHook
 open VibeFs.Opencode.Session
 open VibeFs.Opencode.AgentConfig
+open VibeFs.Opencode.ChildAgent
+open VibeFs.Shell.FuzzyFinderShell
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -43,7 +45,7 @@ let private ensureParts (output: obj) : obj =
         parts
 
 /// Handle /loop and /loop-review slash commands.
-let private commandExecuteBefore (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let command = Dyn.str input "command"
@@ -64,7 +66,7 @@ let private commandExecuteBefore (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRun
                 pushPart parts (box {| ``type`` = "text"; text = msg |})
             else
                 let directory = Dyn.str ctx "directory"
-                let! result = runReviewerSession (Dyn.get ctx "client") reviewStore directory sessionID task |> Async.AwaitPromise
+                let! result = runReviewerSession childAgentRegistry (Dyn.get ctx "client") reviewStore directory sessionID task |> Async.AwaitPromise
                 match result with
                 | ReviewSession.Accepted ->
                     pushPart parts (box {| ``type`` = "text"; text = $"Pre-review passed. Task \"{task}\" already meets all criteria — no changes needed." |})
@@ -93,9 +95,11 @@ let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<ob
 let private plugin (ctx: obj) : JS.Promise<obj> =
     async {
         let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
-        let nudgeHook = createNudgeHook ctx reviewStore
+        let childAgentRegistry = ChildAgentRegistry.Create()
+        let finderCache = FinderCache()
+        let nudgeHook = createNudgeHook ctx reviewStore childAgentRegistry
         let directory = Dyn.str ctx "directory"
-        let tools = createTools ctx reviewStore
+        let tools = createTools childAgentRegistry finderCache ctx reviewStore
         let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.McpConfig.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
         let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
         let result = emptyObj ()
@@ -109,15 +113,15 @@ let private plugin (ctx: obj) : JS.Promise<obj> =
                 registerCommands cfg
                 return assignInto cfg next
             } |> Async.StartAsPromise)))
-        setKey result "chat.message" (twoArgHook (fun input output -> chatMessage nudgeHook input output))
+        setKey result "chat.message" (twoArgHook (fun input output -> chatMessage childAgentRegistry nudgeHook input output))
         setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinition input output))
         setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBefore input output))
         setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfter directory nudgeHook input output))
-        setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform directory input output))
+        setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform childAgentRegistry directory input output))
         setKey result "command.execute.before" (twoArgHook (fun input output ->
             async {
                 do! nudgeHook.handleCommandExecuteBefore input output |> Async.AwaitPromise
-                do! commandExecuteBefore ctx reviewStore input output |> Async.AwaitPromise
+                do! commandExecuteBefore childAgentRegistry ctx reviewStore input output |> Async.AwaitPromise
             } |> Async.StartAsPromise))
         setKey result "event" (box (fun (input: obj) ->
             async {
