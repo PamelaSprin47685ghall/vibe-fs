@@ -47,20 +47,13 @@ let internal namedSettingsFromRecord (source: obj) (agentId: string) : Delegated
 
 /// First non-blank value per field wins (same order as vibe-me-mux `mergeNamedSettings`).
 let internal mergeNamedSettings (sources: DelegatedAiSettings option list) : DelegatedAiSettings =
-    let mutable modelString = None
-    let mutable thinkingLevel = None
-
-    for source in sources do
+    sources
+    |> List.fold (fun acc source ->
         match source with
         | Some s ->
-            if modelString.IsNone then
-                modelString <- s.modelString
-
-            if thinkingLevel.IsNone then
-                thinkingLevel <- s.thinkingLevel
-        | None -> ()
-
-    { modelString = modelString; thinkingLevel = thinkingLevel }
+            { modelString = acc.modelString |> Option.orElse s.modelString
+              thinkingLevel = acc.thinkingLevel |> Option.orElse s.thinkingLevel }
+        | None -> acc) emptySettings
 
 let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) : JS.Promise<DelegatedAiSettings> =
     async {

@@ -26,7 +26,6 @@
     <Compile Include="src/Kernel/Review.fs" />
     <Compile Include="src/Kernel/ReviewSession.fs" />
     <Compile Include="src/Kernel/ReviewerLoop.fs" />
-    <Compile Include="src/Kernel/ReviewRuntime.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />
     <Compile Include="src/Kernel/FuzzyQuery.fs" />
     <Compile Include="src/Kernel/FuzzyFormat.fs" />
@@ -41,13 +40,18 @@
     <Compile Include="src/Kernel/NudgeEvents.fs" />
     <Compile Include="src/Kernel/OllamaFormat.fs" />
     <Compile Include="src/Kernel/UnifiedContext.fs" />
-    <Compile Include="src/Kernel/UtilPath.fs" />
+
     <Compile Include="src/Kernel/ExcludedDirs.fs" />
     <Compile Include="src/Kernel/SyntaxTypes.fs" />
     <Compile Include="src/Kernel/TreeSitterKernel.fs" />
     <Compile Include="src/Kernel/SessionText.fs" />
-    <Compile Include="src/Kernel/IteratorStore.fs" />
     <!-- Shell: effectful boundary -->
+    <Compile Include="src/Shell/Crypto.fs" />
+    <Compile Include="src/Shell/IteratorStore.fs" />
+    <Compile Include="src/Shell/NudgeStore.fs" />
+    <Compile Include="src/Shell/ReviewRuntime.fs" />
+    <Compile Include="src/Shell/CapsFilter.fs" />
+    <Compile Include="src/Shell/CapsBudget.fs" />
     <Compile Include="src/Shell/CapsShell.fs" />
     <Compile Include="src/Shell/FileReadCache.fs" />
     <Compile Include="src/Shell/ReverieFiles.fs" />
@@ -78,6 +82,7 @@
     <Compile Include="src/Opencode/ToolCopy.fs" />
     <Compile Include="src/Opencode/Sdk.fs" />
     <Compile Include="src/Opencode/ChildAgent.fs" />
+    <Compile Include="src/Opencode/NudgePolicy.fs" />
     <Compile Include="src/Opencode/NudgeHook.fs" />
     <Compile Include="src/Opencode/Session.fs" />
     <Compile Include="src/Opencode/Tools.fs" />

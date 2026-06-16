@@ -6,23 +6,19 @@ open VibeFs.Kernel
 open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Shell.ReviewRuntime
 open VibeFs.MuxPlugin.Delegate
 open VibeFs.MuxPlugin.CallStore
 open VibeFs.MuxPlugin.MuxTools.Shared
 
-let mutable private dateNowSource = fun () -> System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-let private dateNow () : int64 = dateNowSource ()
-
-let setDateNowSource (source: unit -> int64) : unit = dateNowSource <- source
+let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
 
-let private processCwd () : string = nodeProcess?cwd()
-
 let private fallbackSlashConfig (deps: obj) (workspaceId: string) : obj =
     createObj
-        [ "cwd", box (processCwd ())
+        [ "cwd", box (nodeProcess?cwd())
           "workspaceId", box workspaceId
           "taskService", box (Dyn.get deps "taskService") ]
 
@@ -59,7 +55,7 @@ let private buildLoopMessage (task: string) (bodyLines: string list) : string =
     let header = [ "Task (loop): " + task; "" ]
     (header @ bodyLines @ loopFooter) |> String.concat "\n"
 
-let createLoopOnlyCommand (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
+let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     box {| key = "loop"
            description = "Activate review loop mode. AI completes task, submits for review."
            inputHint = "<task description>"
@@ -97,7 +93,7 @@ let private submissionFooter (toolName: string) (callId: string) =
     + "Use callId `" + callId + "`. Do not write files, run commands, or modify the workspace."
 
 let private loopReviewExecute
-    (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+    (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (workspaceId: string) (args: string) : JS.Promise<string> =
     let task = args.Trim()
     if task = "" then
@@ -142,11 +138,11 @@ let private loopReviewExecute
                         buildLoopMessage task [ "Pre-review feedback:"; ""; feedback; ""; "Loop mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
         } |> Async.StartAsPromise
 
-let createLoopReviewCommand (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
+let createLoopReviewCommand (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     box {| key = "loop-review"
            description = "Pre-review task description with a reviewer sub-agent, then activate review loop mode."
            inputHint = "<task description>"
            execute = System.Func<string, string, JS.Promise<string>>(loopReviewExecute deps reviewStore) |}
 
-let createSlashCommands (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj array =
+let createSlashCommands (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj array =
     [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps reviewStore |]

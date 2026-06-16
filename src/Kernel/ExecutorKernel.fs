@@ -1,45 +1,8 @@
 module VibeFs.Kernel.ExecutorKernel
 
 open Fable.Core
+open System
 open VibeFs.Kernel.HeadTail
-
-let private byteLength (s: string) : int =
-    if System.String.IsNullOrEmpty s then 0
-    else
-        let mutable count = 0
-        let mutable i = 0
-        while i < s.Length do
-            let high = int s.[i]
-            if high >= 0xD800 && high <= 0xDBFF && i + 1 < s.Length then
-                let low = int s.[i + 1]
-                let cp = 0x10000 + ((high - 0xD800) <<< 10) + (low - 0xDC00)
-                if cp < 0x110000 then count <- count + 4
-                i <- i + 2
-            else
-                count <-
-                    count +
-                    if high < 0x80 then 1
-                    elif high < 0x800 then 2
-                    else 3
-                i <- i + 1
-        count
-
-let private truncateToBytes (s: string) (maxBytes: int) : string =
-    let mutable result = ""
-    let mutable bytes = 0
-    let mutable i = 0
-    while i < s.Length do
-        let high = int s.[i]
-        let charLen =
-            if high >= 0xD800 && high <= 0xDBFF && i + 1 < s.Length then 2 else 1
-        let codePoint = s.Substring(i, charLen)
-        let cpBytes = byteLength codePoint
-        if bytes + cpBytes > maxBytes then i <- s.Length
-        else
-            result <- result + codePoint
-            bytes <- bytes + cpBytes
-            i <- i + charLen
-    result
 
 /// Languages the executor can spawn.  A closed set: adding one is a compile
 /// error at every match site.
@@ -78,11 +41,13 @@ let readOnlyWarning =
     "// 绝对禁止使用 executor 工具仅仅用于查找或者读写文件，请使用专门工具例如 read/greper/editor 代替！"
 
 /// Prepend the read-only warning when a shell command starts with a file-reading
-/// verb.  Other languages pass through unchanged.
+/// verb.  Strips leading env vars, comments, and pipes before checking.
 let formatSafetyWarning (output: string) (program: string) (language: ExecutorLanguage) : string =
     match language with
     | Shell ->
-        match program.Trim().Split([| ' '; '\t'; '\n' |]) |> Array.tryHead with
+        let stripped = (strip program).script
+        let words = stripped.TrimStart().Split([| ' '; '\t'; '\n'; '|' |], StringSplitOptions.RemoveEmptyEntries)
+        match words |> Array.tryHead with
         | None -> output
         | Some first ->
             let bare = first.Split('/') |> Array.tryLast |> Option.defaultValue ""
@@ -90,7 +55,8 @@ let formatSafetyWarning (output: string) (program: string) (language: ExecutorLa
     | _ -> output
 
 /// Should the output be sent to a summariser instead of shown raw?
-let shouldSummarize (output: string) : bool =
+/// Accepts a byte-length function injected by the Shell (e.g. Buffer.byteLength).
+let shouldSummarize (byteLength: string -> int) (output: string) : bool =
     byteLength output > summaryThresholdBytes
 
 /// Strip head/tail pipes before executing a shell script.
@@ -106,7 +72,8 @@ let describeResultTag (result: ExecuteResult) (timeoutType: ExecutorTimeoutType)
     | MissingExecutable(executable, _) -> $"The following program could not start because '{executable}' was not found."
 
 /// Build the prompt handed to the summariser agent.
-let buildSummaryPrompt (options: ExecuteOptions) (result: ExecuteResult) : string =
+/// Accepts byte-length and truncation functions injected by the Shell.
+let buildSummaryPrompt (byteLength: string -> int) (truncateToBytes: string -> int -> string) (options: ExecuteOptions) (result: ExecuteResult) : string =
     let rawOutput =
         match result with
         | Completed o | Truncated(o, _) | Failed o -> o

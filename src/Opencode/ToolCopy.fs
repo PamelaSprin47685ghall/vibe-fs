@@ -20,7 +20,7 @@ let executor = "Executes a shell command, Python code, or JavaScript/TypeScript 
 
 let fuzzyFind = "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported. Every result ends with iterator=\"...\"; iteration is finished when it becomes iterator=\"\"."
 
-let fuzzyGrep = "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked. Supports automatic regex mode and automatic fuzzy fallback when no exact matches are found. Every result ends with iterator=\"...\"; iteration is finished when it becomes iterator=\"\"."
+let fuzzyGrep = "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked. Supports automatic regex mode detection. Use mode=fuzzy explicitly for fuzzy matching when exact regex yields no results. Every result ends with iterator=\"...\"; iteration is finished when it becomes iterator=\"\"."
 
 let websearch = "Search the web for any topic and get clean, ready-to-use content."
 

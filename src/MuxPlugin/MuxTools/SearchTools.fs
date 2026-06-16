@@ -32,7 +32,7 @@ let fuzzyGrepTool : ToolDefinition =
           let scopeId = Dyn.str config "workspaceId"
           if scopeId = "" then resolveStr "fuzzy-grep requires workspaceId"
           else
-              let p : FuzzyGrepParams = { pattern = strField args "pattern"; path = strField args "path"; exclude = optField args "exclude"; caseSensitive = optBool args "caseSensitive"; context = optInt args "context"; limit = optInt args "limit"; iterator = strField args "iterator" }
+              let p : FuzzyGrepParams = { pattern = strField args "pattern"; path = strField args "path"; exclude = parseExcludeField args; caseSensitive = optBool args "caseSensitive"; context = optInt args "context"; limit = optInt args "limit"; iterator = strField args "iterator" }
               let o : SearchOptions = { cwd = Dyn.str config "cwd"; scopeId = scopeId; store = None }
               async {
                   let! r = VibeFs.Shell.FuzzyGrepCmd.fuzzyGrep p o |> Async.AwaitPromise

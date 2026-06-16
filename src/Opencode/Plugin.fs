@@ -10,6 +10,13 @@ open VibeFs.Opencode.NudgeHook
 open VibeFs.Opencode.Session
 open VibeFs.Opencode.AgentConfig
 
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
+
+let private envVar (name: string) : string =
+    let v = nodeProcess?env?(name)
+    if isNull v then "" else string v
+
 let private emptyObj () : obj = createObj []
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private assignInto (target: obj) (source: obj) : obj = Dyn.assignInto target source
@@ -36,7 +43,7 @@ let private ensureParts (output: obj) : obj =
         parts
 
 /// Handle /loop and /loop-review slash commands.
-let private commandExecuteBefore (ctx: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+let private commandExecuteBefore (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let command = Dyn.str input "command"
@@ -85,11 +92,11 @@ let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<ob
 [<ExportDefault>]
 let private plugin (ctx: obj) : JS.Promise<obj> =
     async {
-        let reviewStore = VibeFs.Kernel.ReviewRuntime.createReviewStore ()
+        let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
         let nudgeHook = createNudgeHook ctx reviewStore
         let directory = Dyn.str ctx "directory"
         let tools = createTools ctx reviewStore
-        let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.McpConfig.getStealthBrowserMcpLocalConfig().command |}
+        let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.McpConfig.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
         let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
         let result = emptyObj ()
         setKey result "id" (box "kunwei")

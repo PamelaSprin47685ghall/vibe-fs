@@ -1,4 +1,4 @@
-module VibeFs.Kernel.IteratorStore
+module VibeFs.Shell.IteratorStore
 
 open System.Collections.Generic
 

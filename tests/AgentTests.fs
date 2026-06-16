@@ -4,6 +4,7 @@ open VibeFs.Tests.Assert
 open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.Nudge
+open VibeFs.Shell.NudgeStore
 
 let canUse' () =
     check "agent_report for manager" (canUse "manager" "agent_report")

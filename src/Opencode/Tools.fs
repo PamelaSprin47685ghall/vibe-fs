@@ -12,6 +12,10 @@ open VibeFs.Opencode.ToolCopy
 open VibeFs.Opencode.Session
 open VibeFs.Kernel.Prompts
 
+[<Global("Buffer")>]
+let private nodeBuffer : obj = jsNative
+let private byteLength (s: string) : int = nodeBuffer?byteLength(s, "utf-8")
+
 let private entry (key: string) (value: obj) : obj = createObj [ key, value ]
 
 let private mergeObjects (objs: obj array) : obj =
@@ -108,7 +112,7 @@ let executorTool (ctx: obj) : obj =
             async {
                 let! result = VibeFs.Shell.ExecutorShell.execute options (Dyn.str tc "sessionID") |> Async.AwaitPromise
                 let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
-                if not (shouldSummarize output) then return output
+                if not (shouldSummarize byteLength output) then return output
                 else
                     let prompt = formatExecutorSummarizerUserPrompt output
                     return! runSubagentWithCleanup client "executor" "Executor summary" prompt
@@ -150,7 +154,7 @@ let fuzzyGrepTool () : obj =
             if scopeId = "" then resolveStr "Error: fuzzy-grep requires an active session"
             else
                 let p : VibeFs.Shell.FuzzyCoordinator.FuzzyGrepParams =
-                    { pattern = optStr args "pattern"; path = optStr args "path"; exclude = optField args "exclude"
+                    { pattern = optStr args "pattern"; path = optStr args "path"; exclude = VibeFs.Shell.FuzzyCoordinator.parseExcludeField args
                       caseSensitive = optBool args "caseSensitive"; context = optInt args "context"
                       limit = optInt args "limit"; iterator = optStr args "iterator" }
                 let o : VibeFs.Shell.FuzzyCoordinator.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None }
@@ -224,7 +228,7 @@ let private formatReviewResult (result: VibeFs.Kernel.ReviewSession.ReviewResult
         "Review feedback:\n\n" + feedback
         + "\n\nAddress the feedback above. loop mode is still active — fix the issues and call submit_review again."
 
-let submitReviewTool (ctx: obj) (store: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
+let submitReviewTool (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     let client = Dyn.get ctx "client"
     define "Submit your work for review (loop mode)."
         (box {| report = strReq "Detailed report of what you did"; affectedFiles = strArrayOpt "Files you modified" |})
@@ -255,7 +259,7 @@ let submitReviewTool (ctx: obj) (store: VibeFs.Kernel.ReviewRuntime.ReviewStore)
                         store.unlockReview sessionID
                 } |> Async.StartAsPromise)
 
-let submitReviewResultTool (store: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
+let submitReviewResultTool (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     define "Submit your review verdict."
         (box {| feedback = strOpt "null to accept, or specific rejection feedback" |})
         (fun args context ->
@@ -270,7 +274,7 @@ let submitReviewResultTool (store: VibeFs.Kernel.ReviewRuntime.ReviewStore) : ob
                     if trimmed = "" then Accepted else Rejected trimmed
             async { return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve." } |> Async.StartAsPromise)
 
-let createTools (ctx: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
+let createTools (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     mergeObjects [|
         entry "coder" (coderTool ctx); entry "reader" (readerTool ctx)
         entry "meditator" (meditatorTool ctx); entry "browser" (browserTool ctx)

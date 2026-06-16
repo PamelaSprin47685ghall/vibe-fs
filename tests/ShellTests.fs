@@ -59,7 +59,7 @@ let capsContextFormat () =
     check "caps content raw" (ctx.Contains "body text")
 
 let capsFileSizeLimit () =
-    equal "caps file size limit 4MB" (4 * 1_048_576) VibeFs.Shell.CapsShell.maxFileSize
+    equal "caps file size limit 4MB" (4 * 1_048_576) VibeFs.Shell.CapsBudget.maxFileSize
 
 let ollamaFormat () =
     let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]
@@ -68,15 +68,17 @@ let ollamaFormat () =
     equal "empty search" "No results found." (VibeFs.Kernel.OllamaFormat.formatSearchResults [])
 
 let summarizerInputCap () =
+    let bl (s: string) : int = s.Length
+    let trunc (s: string) (maxBytes: int) : string = if s.Length <= maxBytes then s else s.[..maxBytes - 1]
     let opts : ExecuteOptions =
         { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; cwd = None }
     let small = String.replicate 100 "x"
-    let smallPrompt = buildSummaryPrompt opts (Completed small)
+    let smallPrompt = buildSummaryPrompt bl trunc opts (Completed small)
     check "small output kept whole" (smallPrompt.Contains small)
     check "small output not truncated" (not (smallPrompt.Contains "[Output truncated to 1MB for summarization]"))
     let marker = "END_OF_OUTPUT_TAIL"
     let large = String.replicate (1_048_576 + 100 - marker.Length) "x" + marker
     let tail = marker
-    let largePrompt = buildSummaryPrompt opts (Completed large)
+    let largePrompt = buildSummaryPrompt bl trunc opts (Completed large)
     check "large output truncated message" (largePrompt.Contains "[Output truncated to 1MB for summarization]")
     check "large output tail absent" (not (largePrompt.Contains tail))

@@ -85,10 +85,10 @@ let private mkSyntaxWrappers () : obj array =
 let private mkTodoNudgeWrapper () : obj =
     mkSyncResultWrapper "todo_write" (fun result -> appendMeditatorNudge result)
 
-let private mkFileReadCapture () : obj =
+let private mkFileReadCapture (hostReadExec: HostReadExec) : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (hostTool: obj) (_config: obj) ->
-            hostFileReadExecute <- Some (bindExecute hostTool)
+            hostReadExec.Value <- Some (bindExecute hostTool)
             let execFn =
                 System.Func<obj, obj, JS.Promise<string>>(fun (_args: obj) (_opts: obj) ->
                     disabledResult ())
@@ -139,10 +139,10 @@ let private mkAgentReportOverride () : obj =
                         "execute", box execFn ])
     createObj [ "targetTool", box "agent_report"; "wrapper", box wrapperFn ]
 
-let createAllWrappers (tools: obj) : obj array =
+let createAllWrappers (tools: obj) (hostReadExec: HostReadExec) : obj array =
     Array.append
         (mkSyntaxWrappers ())
-        [| mkFileReadCapture ()
+        [| mkFileReadCapture hostReadExec
            mkTodoNudgeWrapper ()
            mkAgentReportOverride ()
            mkWebOverride "websearch" tools "web_search"

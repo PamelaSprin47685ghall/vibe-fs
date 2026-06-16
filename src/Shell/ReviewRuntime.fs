@@ -1,4 +1,4 @@
-module VibeFs.Kernel.ReviewRuntime
+module VibeFs.Shell.ReviewRuntime
 
 open VibeFs.Kernel.Review
 open VibeFs.Kernel.ReviewSession

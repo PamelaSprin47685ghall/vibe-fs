@@ -23,23 +23,13 @@ let buildCapitalsContext (files: CapsFile list) : string =
 let private capsUserPrefix = "caps-synth-user-"
 let private capsAssistantPrefix = "caps-synth-assistant-"
 
-[<Import("createHash", "node:crypto")>]
-let private createHash (algorithm: string) : obj = jsNative
-
-let private hashUpdate (hash: obj) (data: string) : unit =
-    hash?update(data) |> ignore
-
-let private hashDigestHexSlice (hash: obj) (startIndex: int) (endIndex: int) : string =
-    hash?digest("hex")?slice(startIndex, endIndex)
-
-let stableFingerprint (capsFiles: CapsFile list) : string =
-    let hash = createHash "sha256"
-    for cap in capsFiles do
-        hashUpdate hash cap.filePath
-        hashUpdate hash "\u0000"
-        hashUpdate hash cap.content
-        hashUpdate hash "\u0000"
-    hashDigestHexSlice hash 0 16
+/// Stable fingerprint over caps files — kernel decides WHAT to hash, the
+/// injected `hashFn` decides HOW (e.g. Shell.Crypto.sha256HexTruncated).
+let stableFingerprint (hashFn: string -> string) (capsFiles: CapsFile list) : string =
+    capsFiles
+    |> List.collect (fun cap -> [ cap.filePath; "\u0000"; cap.content; "\u0000" ])
+    |> String.concat ""
+    |> hashFn
 
 let formatReadOutput (filePath: string) (content: string) : string =
     let lines = content.Split('\n')
@@ -135,6 +125,7 @@ let private findFirstRealMessage (messages: obj array) : obj option =
         id <> "" && not (id.StartsWith capsUserPrefix) && not (id.StartsWith capsAssistantPrefix))
 
 let buildCapsMessages
+    (hashFn: string -> string)
     (messages: obj array)
     (projectRoot: string)
     (excludedAgents: string list)
@@ -147,13 +138,15 @@ let buildCapsMessages
 
     if shouldSkip then messages
     else
-        let existingStripped = if hasExistingCapsMessages messages then messages.[2..] else messages
+        let existingStripped =
+            if hasExistingCapsMessages messages && messages.Length >= 2 then messages.[2..]
+            else messages
         if existingStripped.Length = 0 then messages
         elif capsFiles.IsEmpty then existingStripped
         else
             let sessionID = messageSessionID existingStripped.[0]
             let sessionOpt = if sessionID = "" then None else Some sessionID
-            let fp = stableFingerprint capsFiles
+            let fp = stableFingerprint hashFn capsFiles
             let userId = $"{capsUserPrefix}{fp}"
             let assistantId = $"{capsAssistantPrefix}{fp}"
             let toolParts = buildToolParts capsFiles fp sessionOpt assistantId

@@ -72,12 +72,14 @@ module Tool =
                             prompts
                             |> Array.map (fun prompt ->
                                 async {
-                                    return!
-                                        runMuxSubagent deps config agentId prompt title opts
-                                        |> Async.AwaitPromise
+                                    try
+                                        let! r = runMuxSubagent deps config agentId prompt title opts |> Async.AwaitPromise
+                                        return Some r
+                                    with _ ->
+                                        return None
                                 })
                             |> Async.Parallel
-                        return joinReports reports
+                        return joinReports (reports |> Array.choose id)
             }
             |> Async.StartAsPromise
 

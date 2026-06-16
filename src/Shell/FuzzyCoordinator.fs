@@ -4,13 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.FuzzyQuery
 open VibeFs.Kernel.FuzzyGrepDetect
-open VibeFs.Kernel.IteratorStore
+open VibeFs.Shell.IteratorStore
 open VibeFs.Kernel
 open VibeFs.Shell.FuzzyFinderShell
 
 type FuzzyFindParams = { pattern: string option; path: string option; limit: int option; iterator: string option }
 type FuzzyGrepParams =
-    { pattern: string option; path: string option; exclude: obj option
+    { pattern: string option; path: string option; exclude: string list
       caseSensitive: bool option; context: int option; limit: int option; iterator: string option }
 type SearchOptions = { cwd: string; scopeId: string; store: obj option }
 
@@ -22,6 +22,13 @@ type FuzzyGrepState =
 type SearchOutcome = { output: string; isError: bool }
 
 let resolveStore (opts: SearchOptions) = defaultArg opts.store globalIteratorStore
+
+/// Parse raw exclude field (string or string array from JS tool args) into a typed string list.
+let parseExcludeField (args: obj) : string list =
+    let v = Dyn.get args "exclude"
+    if Dyn.isNullish v then []
+    elif Dyn.isArray v then v :?> obj array |> Array.map string |> List.ofArray
+    else [ string v ]
 
 /// Resolve the find search state — either from an iterator or built fresh.
 let resolveFindSearchState (params': FuzzyFindParams) (opts: SearchOptions)
@@ -36,9 +43,9 @@ let resolveFindSearchState (params': FuzzyFindParams) (opts: SearchOptions)
         match params'.pattern with
         | None | Some "" -> Error "pattern is required on the first call"
         | Some pattern ->
-            let searchPath = resolveFuzzySearchPath params'.path (Some opts.cwd)
+            let searchPath = resolveFuzzySearchPath params'.path opts.cwd
             let externalBasePath = if searchPath.external then Some searchPath.basePath else None
-            Ok { query = buildQuery searchPath.pathConstraint pattern None (Some searchPath.basePath) searchPath.external
+            Ok { query = buildQuery searchPath.pathConstraint pattern [] searchPath.basePath searchPath.external
                  pageSize = defaultArg params'.limit 30
                  pageIndex = 0
                  externalBasePath = externalBasePath }
@@ -56,13 +63,13 @@ let resolveGrepSearchState (params': FuzzyGrepParams) (opts: SearchOptions)
         match params'.pattern with
         | None | Some "" -> Error "pattern is required on the first call"
         | Some pattern ->
-            let searchPath = resolveFuzzySearchPath params'.path (Some opts.cwd)
+            let searchPath = resolveFuzzySearchPath params'.path opts.cwd
             let externalBasePath = if searchPath.external then Some searchPath.basePath else None
             let mode = detectGrepMode pattern
             if checkWildcardOnly pattern mode then
                 Error $"Pattern '{pattern}' matches everything - fuzzy_grep needs a concrete substring or identifier."
             else
-                Ok { query = buildQuery searchPath.pathConstraint pattern params'.exclude (Some searchPath.basePath) searchPath.external
+                Ok { query = buildQuery searchPath.pathConstraint pattern params'.exclude searchPath.basePath searchPath.external
                      mode = mode
                      smartCase = defaultArg params'.caseSensitive false |> not
                      beforeContext = defaultArg params'.context 0

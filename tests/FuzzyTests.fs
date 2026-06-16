@@ -2,7 +2,7 @@ module VibeFs.Tests.FuzzyTests
 
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.FuzzyGrepDetect
-open VibeFs.Kernel.IteratorStore
+open VibeFs.Shell.IteratorStore
 open VibeFs.Kernel.FuzzyFormat
 open VibeFs.Kernel
 open VibeFs.Shell.FuzzyCoordinator
@@ -54,39 +54,19 @@ let formatFull () =
     check "grep context-after" (grepOut.Contains "6- ctx-after")
     check "grep long line truncated" (grepOut.Contains "...")
 
-/// A mock finder whose grep returns a canned result depending on the requested mode.
-type private MockFinder(plainItems: obj array, fuzzyItems: obj array) =
-    interface FinderLike with
-        member _.fileSearch (_, _) = box {| ok = true; value = box {| |} |}
-        member _.grep (_, opts) =
-            let mode = Dyn.str opts "mode"
-            let items = if mode = "fuzzy" then fuzzyItems else plainItems
-            box {| ok = true; value = box {| items = items; totalMatched = items.Length; nextCursor = null |} |}
-        member _.destroy () = ()
-        member _.isDestroyed = false
-
 let fuzzyFallbackNotice () =
     let plainMatch = box {| relativePath = "b.ts"; lineNumber = 2; lineContent = "y" |}
-    let fuzzyMatch = box {| relativePath = "a.ts"; lineNumber = 1; lineContent = "x" |}
     let state : FuzzyGrepState =
         { query = "q"; mode = "plain"; smartCase = true; beforeContext = 5; afterContext = 5
           pageSize = 50; externalBasePath = None; cursor = None }
-    let params' : FuzzyGrepParams =
-        { pattern = Some "q"; path = None; exclude = None; caseSensitive = None; context = None; limit = None; iterator = None }
-    // Plain empty → fuzzy fallback fires → notice + state.mode=fuzzy + context cleared.
-    let emptyFinder = new MockFinder([||], [| fuzzyMatch |])
+    // Plain empty → no implicit fallback, returns empty.
     let rawEmpty = box {| ok = true; value = box {| items = [||]; totalMatched = 0; nextCursor = null |} |}
-    let r = resolveResult emptyFinder state params' rawEmpty
-    check "fuzzy notice present" (r.fuzzyNotice = Some fuzzyMatchNotice)
-    equal "fuzzy state.mode" "fuzzy" r.state.mode
-    equal "fuzzy context cleared" 0 r.state.beforeContext
-    check "fuzzy found one match" (r.matches.Length = 1)
-    // Plain with matches → no fallback, no notice, state unchanged.
-    let plainFinder = new MockFinder([| plainMatch |], [||])
+    let r = resolveResult rawEmpty
+    check "no implicit fuzzy fallback" (r.matches.Length = 0)
+    // Plain with matches → returns the matches.
     let rawPlain = box {| ok = true; value = box {| items = [| plainMatch |]; totalMatched = 1; nextCursor = null |} |}
-    let r2 = resolveResult plainFinder state params' rawPlain
-    check "no fallback notice when plain matches" r2.fuzzyNotice.IsNone
-    equal "state unchanged plain" "plain" r2.state.mode
+    let r2 = resolveResult rawPlain
+    check "plain matches returned" (r2.matches.Length = 1)
 
 /// find paging uses totalMatched ?? 0 for the next-page decision — so an absent
 /// totalMatched yields NO next iterator (mirrors find-output.ts).

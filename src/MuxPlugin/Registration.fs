@@ -5,20 +5,29 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.ToolPolicy
 open VibeFs.MuxPlugin.MuxTools
+open VibeFs.MuxPlugin.MuxTools.IoTools
 open VibeFs.MuxPlugin.MuxWrappers
 open VibeFs.MuxPlugin.MuxEventHook
 open VibeFs.MuxPlugin.MuxSlashCommands
+
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
+
+let private envVar (name: string) : string =
+    let v = nodeProcess?env?(name)
+    if isNull v then "" else string v
 
 let private toolsToObject (tools: VibeFs.Mux.Contract.ToolDefinition array) : obj =
     createObj [ for t in tools -> t.name, box t ]
 
 let createRegistration (_deps: obj) : obj =
-    let reviewStore = VibeFs.Kernel.ReviewRuntime.createReviewStore ()
-    let tools = createToolCatalog _deps reviewStore
+    let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
+    let hostReadExec : HostReadExec = { contents = None }
+    let tools = createToolCatalog _deps reviewStore hostReadExec
     let toolNames = tools |> Array.map (fun t -> t.name)
     let toolsObj = toolsToObject tools
-    let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.McpConfig.getStealthBrowserMcpCommand () |}
-    let wrappers = createAllWrappers toolsObj
+    let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.McpConfig.getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
+    let wrappers = createAllWrappers toolsObj hostReadExec
     let eventHook = createEventHook reviewStore
     let slashCommands = createSlashCommands _deps reviewStore
     box {| toolNames = toolNames

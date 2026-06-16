@@ -12,6 +12,10 @@ open VibeFs.Opencode.ToolCopy
 open VibeFs.Shell.Read
 open VibeFs.Shell.Write
 
+[<Global("Buffer")>]
+let private nodeBuffer : obj = jsNative
+let private byteLength (s: string) : int = nodeBuffer?byteLength(s, "utf-8")
+
 let private getCwd (config: obj) : string =
     match strField config "cwd" with
     | Some v when not (System.String.IsNullOrWhiteSpace v) -> v
@@ -40,7 +44,7 @@ let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
 
 let private summarizeWhenNeeded (deps: obj) (config: obj) (output: string) : Async<string> =
     async {
-        if not (shouldSummarize output) then
+        if not (shouldSummarize byteLength output) then
             return output
         else
             let prompt = formatMuxExecutorSummarizerUserPrompt output
@@ -73,11 +77,10 @@ let executorTool (deps: obj) : ToolDefinition =
             |> Async.StartAsPromise
       condition = None }
 
-/// When the host provides a richer native file_read implementation, wrappers can
-/// capture it here so the plugin read tool delegates instead of re-implementing.
-let mutable hostFileReadExecute : obj option = None
+/// Per-instance ref for the host-provided file_read executor, captured by wrappers.
+type HostReadExec = obj option ref
 
-let readTool (_deps: obj) : ToolDefinition =
+let readTool (_deps: obj) (hostReadExec: HostReadExec) : ToolDefinition =
     { name = "read"
       description =
         "If path is a directory, returns a formatted directory listing (equivalent to ls -la). Use this instead of running `ls` via runner."
@@ -94,7 +97,7 @@ let readTool (_deps: obj) : ToolDefinition =
                 let path = Dyn.str args "path"
                 let offset = optInt args "offset"
                 let limit = optInt args "limit"
-                match hostFileReadExecute with
+                match hostReadExec.Value with
                 | Some hostExec ->
                     let hostFn = hostExec :?> obj -> obj -> JS.Promise<obj>
                     let! result = hostFn args config |> Async.AwaitPromise
@@ -128,7 +131,10 @@ let writeTool (_deps: obj) : ToolDefinition =
                     if System.String.IsNullOrWhiteSpace filePath then
                         return "Error: 'file_path' must not be empty"
                     else
-                        return! write (Some (getCwd config)) filePath content
+                        try
+                            return! write (Some (getCwd config)) filePath content
+                        with ex ->
+                            return $"Error writing '{filePath}': {ex.Message}"
             }
             |> Async.StartAsPromise
       condition = None }

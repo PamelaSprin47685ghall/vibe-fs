@@ -22,24 +22,10 @@ let private reviewVerdictInstructions =
     + "- callId: the callId supplied in this prompt\n\n"
     + "Do not output free-form text as your final answer; the tool call is required."
 
-let private fallbackParseVerdict (report: string) : ReviewResult =
-    let trimmed = report.Trim()
-    if System.String.IsNullOrWhiteSpace trimmed then Rejected "Reviewer produced no response."
-    else
-        let rejectMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"\b(REJECT|FAIL|DENIED|DO NOT ACCEPT)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
-        let passMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"\bPASS\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
-        if rejectMatch.Success then Rejected "Review rejected based on textual response."
-        elif passMatch.Success && passMatch.Index < 200 then
-            let afterPass = trimmed.Substring(passMatch.Index + 4).Trim()
-            if System.Text.RegularExpressions.Regex.IsMatch(afterPass, @"\bFAIL\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase) then
-                Rejected "Review rejected based on textual response."
-            else Accepted
-        else Rejected "Review did not return a clear PASS verdict."
-
 let private disabledToolsForReviewer () : string array =
     deniedTools "reviewer" (Array.toList registeredToolNames) |> Array.ofList
 
-let submitReviewTool (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : ToolDefinition =
+let submitReviewTool (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : ToolDefinition =
     { name = "submit_review"
       description = "Submit completed work for review. Creates a reviewer sub-agent that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active loop mode."
       parameters = mkSchema (createObj [ "report", box (strProp "Detailed report of what was done"); "affectedFiles", box (strArrayProp "List of file paths that were modified or created") ]) [| "report"; "affectedFiles" |]
@@ -70,7 +56,7 @@ let submitReviewTool (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.Revie
                                   [ "subagentRole", box "reviewer"
                                     "toolPolicy", box (createObj [ "disabledTools", box disabledTools ]) ]
                           let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
-                          let! reviewReport = delegateToSubAgent deps config "explore" reviewPrompt "Review" (Some opts) |> Async.AwaitPromise
+                          let! _ = delegateToSubAgent deps config "explore" reviewPrompt "Review" (Some opts) |> Async.AwaitPromise
                           let! verdict =
                               async {
                                   try
@@ -79,9 +65,9 @@ let submitReviewTool (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.Revie
                                       let feedback = defaultArg (strField args "feedback") ""
                                       if v = "pass" then return Accepted
                                       elif v = "reject" then return Rejected feedback
-                                      else return fallbackParseVerdict reviewReport
-                                  with _ ->
-                                      return fallbackParseVerdict reviewReport
+                                      else return Rejected $"Reviewer returned unclear verdict: \"{v}\". Expected \"pass\" or \"reject\"."
+                                  with ex ->
+                                      return Rejected $"Reviewer timed out or failed: {ex.Message}"
                               }
                           match verdict with
                           | Accepted ->

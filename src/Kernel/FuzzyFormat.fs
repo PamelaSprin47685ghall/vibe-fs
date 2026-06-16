@@ -45,32 +45,24 @@ let formatGrepOutput (result: GrepResult option) : string =
         else
             let total = defaultArg r.totalMatched r.items.Length
             let plural = if total = 1 then "match" else "matches"
-            let header = [ $"{total} {plural}"; "" ]
-            let body =
-                r.items
-                |> List.fold
-                    (fun (currentFile, lines) (m: GrepMatch) ->
-                        let lines = if m.relativePath <> currentFile && currentFile <> "" then lines @ [ "" ] else lines
-                        let lines =
-                            if m.relativePath <> currentFile then
-                                lines @ [ $"{m.relativePath}{fileAnnotation m.annotation}" ]
-                            else lines
-                        let ctxLen = m.contextBefore.Length
-                        let before =
-                            m.contextBefore
-                            |> List.mapi (fun i line ->
-                                let lineNum = m.lineNumber - ctxLen + i
-                                $" {lineNum}- {truncateLine line grepMaxLineLength}")
-                        let main = [ $" {m.lineNumber}: {truncateLine m.lineContent grepMaxLineLength}" ]
-                        let after =
-                            m.contextAfter
-                            |> List.mapi (fun i line ->
-                                let lineNum = m.lineNumber + 1 + i
-                                $" {lineNum}- {truncateLine line grepMaxLineLength}")
-                        m.relativePath, lines @ before @ main @ after)
-                    ("", header)
-                |> snd
-            String.concat "\n" body
+            let sb = System.Text.StringBuilder()
+            sb.Append($"{total} {plural}\n\n") |> ignore
+            let mutable currentFile = ""
+            for m in r.items do
+                if m.relativePath <> currentFile && currentFile <> "" then
+                    sb.Append('\n') |> ignore
+                if m.relativePath <> currentFile then
+                    sb.Append($"{m.relativePath}{fileAnnotation m.annotation}\n") |> ignore
+                    currentFile <- m.relativePath
+                let ctxLen = m.contextBefore.Length
+                m.contextBefore |> List.iteri (fun i line ->
+                    let lineNum = m.lineNumber - ctxLen + i
+                    sb.Append($" {lineNum}- {truncateLine line grepMaxLineLength}\n") |> ignore)
+                sb.Append($" {m.lineNumber}: {truncateLine m.lineContent grepMaxLineLength}\n") |> ignore
+                m.contextAfter |> List.iteri (fun i line ->
+                    let lineNum = m.lineNumber + 1 + i
+                    sb.Append($" {lineNum}- {truncateLine line grepMaxLineLength}\n") |> ignore)
+            sb.ToString().TrimEnd('\n')
 
 type FindMatch =
     { relativePath: string; annotation: FileAnnotation option }

@@ -2,24 +2,21 @@ module VibeFs.Shell.FuzzyGrepCmd
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.IteratorStore
+open VibeFs.Shell.IteratorStore
 open VibeFs.Kernel.FuzzyFormat
 open VibeFs.Kernel
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzyCoordinator
 open VibeFs.Shell.FuzzyRawMapping
 
-let fuzzyMatchNotice = "0 exact matches. Maybe you meant this?"
-
 /// Run a grep (with optional mode override) against a finder and return the raw obj.
 let private runGrep (finder: FinderLike) (s: FuzzyGrepState) (modeOverride: string option) : obj =
     let mode = defaultArg modeOverride s.mode
-    let sameMode = mode = s.mode
     let opts = box {| mode = mode; smartCase = s.smartCase; maxMatchesPerFile = min s.pageSize 50;
                        pageSize = s.pageSize;
-                       cursor = (if sameMode then s.cursor else None);
-                       beforeContext = (if sameMode then s.beforeContext else 0);
-                       afterContext = (if sameMode then s.afterContext else 0);
+                       cursor = s.cursor;
+                       beforeContext = s.beforeContext;
+                       afterContext = s.afterContext;
                        classifyDefinitions = true |}
     finder.grep(s.query, opts)
 
@@ -32,50 +29,31 @@ let private typedOf (result: obj) : GrepMatch list * int option * string option 
     let matches = itemsOf result |> Array.map toGrepMatch |> List.ofArray
     (matches, optInt result "totalMatched", optStr result "regexFallbackError", Dyn.get result "nextCursor")
 
-/// The full resolution of a grep round: typed matches, the (possibly fuzzy-updated)
-/// search state, the next cursor, and a notice when fuzzy fallback fired.
+/// The full resolution of a grep round: typed matches, the next cursor, and
+/// optional regex error.
 type ResolvedGrep =
-    { matches: GrepMatch list; total: int option; regexError: string option
-      cursor: obj; fuzzyNotice: string option; state: FuzzyGrepState }
+    { matches: GrepMatch list; total: int option; regexError: string option; cursor: obj }
 
-/// From a raw grep result (with optional fuzzy fallback), resolve the typed
-/// matches.  When fuzzy fallback succeeds, return the notice AND the rewritten
-/// search state (mode=fuzzy, context cleared, cursor reset) — matching tryFuzzyFallback.
-/// Public so the fuzzy-fallback semantics can be regression-tested with a mock finder.
-let resolveResult (finder: FinderLike) (state: FuzzyGrepState) (params': FuzzyGrepParams) (raw: obj)
-    : ResolvedGrep =
+/// Resolve the typed matches from a raw grep result — no implicit fallback.
+let resolveResult (raw: obj) : ResolvedGrep =
     let value = Dyn.get raw "value"
-    let baseResolved () : ResolvedGrep =
-        let (m, t, re, c) = typedOf value
-        { matches = m; total = t; regexError = re; cursor = c; fuzzyNotice = None; state = state }
-    if not (Array.isEmpty (itemsOf value)) then baseResolved ()
-    elif Option.isSome params'.iterator || state.mode = "regex" then baseResolved ()
-    else
-        let fuzzyRaw = runGrep finder state (Some "fuzzy")
-        if Dyn.truthy (Dyn.get fuzzyRaw "ok") && not (Array.isEmpty (itemsOf (Dyn.get fuzzyRaw "value"))) then
-            let (m, t, re, _) = typedOf (Dyn.get fuzzyRaw "value")
-            let fuzzyState = { state with mode = "fuzzy"; beforeContext = 0; afterContext = 0; cursor = None }
-            { matches = m; total = t; regexError = re
-              cursor = (Dyn.get (Dyn.get fuzzyRaw "value") "nextCursor")
-              fuzzyNotice = Some fuzzyMatchNotice; state = fuzzyState }
-        else baseResolved ()
+    let (m, t, re, c) = typedOf value
+    { matches = m; total = t; regexError = re; cursor = c }
 
 let private grepNextIterator (state: FuzzyGrepState) (store: obj) (opts: SearchOptions) (cursor: obj) : string =
     if Dyn.isNullish cursor then ""
     else storeIterator<FuzzyGrepState> store opts.scopeId "ffi_i" { state with cursor = Some cursor }
 
-/// Pure: build the final grep output — formatted body + regex/iterator notices +
-/// optional fuzzy-match banner.  Extracted so the shaping logic is testable.
-let buildGrepOutput (body: string) (regexError: string option) (nextIterator: string) (fuzzyNotice: string option) : string =
+/// Pure: build the final grep output — formatted body + regex/iterator notices.
+let buildGrepOutput (body: string) (regexError: string option) (nextIterator: string) : string =
     let regexNotice = regexError |> Option.map (fun e -> sprintf "Invalid regex: %s, used literal match" e)
     let iteratorNotice = sprintf "iterator=\"%s\"" nextIterator
     let notices = (regexNotice |> Option.toList) @ [ iteratorNotice ]
-    let annotated = sprintf "%s\n\n[%s]" body (String.concat ". " notices)
-    match fuzzyNotice with Some n -> sprintf "[%s]\n%s" n annotated | None -> annotated
+    sprintf "%s\n\n[%s]" body (String.concat ". " notices)
 
-/// Run a fuzzy content search with regex/fuzzy fallback.  Reuses
-/// FuzzyFormat.formatGrepOutput; threads the fuzzy-updated state into the
-/// pagination iterator so "continue" resumes in the right mode.
+/// Run a fuzzy content search.  No implicit fuzzy fallback — if regex mode
+/// yields no results, the output reflects that and the LLM may retry with
+/// mode=fuzzy explicitly.
 let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     async {
         let store = resolveStore opts
@@ -91,10 +69,10 @@ let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<Sear
                     if not (Dyn.truthy (Dyn.get raw "ok")) then
                         return { output = errorMsg raw "fuzzy_grep failed"; isError = true }
                     else
-                        let r = resolveResult finder state params' raw
+                        let r = resolveResult raw
                         let body = formatGrepOutput (Some { items = r.matches; totalMatched = r.total; regexFallbackError = r.regexError })
-                        let nextIterator = grepNextIterator r.state store opts r.cursor
-                        return { output = buildGrepOutput body r.regexError nextIterator r.fuzzyNotice; isError = false }
+                        let nextIterator = grepNextIterator state store opts r.cursor
+                        return { output = buildGrepOutput body r.regexError nextIterator; isError = false }
                 finally
                     releaseFinder finder state.externalBasePath
     }

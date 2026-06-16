@@ -27,9 +27,24 @@ let skipTodoRe = Regex(@"<skip-todo-check\s*\/?>", RegexOptions.IgnoreCase)
 let skipLoopRe = Regex(@"<skip-loop-check\s*\/?>", RegexOptions.IgnoreCase)
 let questionRe = Regex(@"\?\s*$")
 
-let private isQuestion (text: string) = questionRe.IsMatch text
-let private skipsTodo (text: string) = skipTodoRe.IsMatch text
-let private skipsLoop (text: string) = skipLoopRe.IsMatch text
+/// Detect whether position is inside a markdown code fence (``` or ~~~).
+let private isInsideCodeFence (text: string) : bool =
+    let lines = text.Split('\n')
+    let mutable fenceCount = 0
+    let mutable inFence = false
+    for line in lines do
+        let trimmed = line.TrimStart()
+        if trimmed.StartsWith("```") || trimmed.StartsWith("~~~") then
+            fenceCount <- fenceCount + 1
+            inFence <- fenceCount % 2 = 1
+    inFence
+
+let private isQuestion (text: string) =
+    not (isInsideCodeFence text) && questionRe.IsMatch text
+let private skipsTodo (text: string) =
+    not (isInsideCodeFence text) && skipTodoRe.IsMatch text
+let private skipsLoop (text: string) =
+    not (isInsideCodeFence text) && skipLoopRe.IsMatch text
 
 /// Priority: open todos → active runner → active loop → none.  A question or
 /// explicit skip tag suppresses the todo/loop nudges so the agent can wait for
@@ -104,35 +119,3 @@ let isTerminal (s: TodoStatus) : bool =
 
 /// Set of terminal statuses for backward compatibility with string-based checks.
 let terminalTodoStatuses: Set<string> = Set.ofList [ "completed"; "cancelled"; "abandoned" ]
-
-/// The host-facing coordinator: wraps the pure decision in mutable per-session
-/// state and a one-shot suppress set.  Effects only through `shouldNudge`.
-type NudgeCoordinator() =
-    let mutable state = freshCoordinator
-    let mutable suppressed = Set.empty<string>
-
-    /// Decide and record the nudge for a session, unless it was suppressed this
-    /// round (a suppress consumes itself — a single free pass).
-    member _.shouldNudge(sessionId, context: NudgeContext) : string =
-        if Set.contains sessionId suppressed then
-            suppressed <- Set.remove sessionId suppressed
-            "none"
-        else
-            let next, action = update state sessionId context
-            state <- next
-            toString action
-
-    /// Grant `sessionId` a one-shot suppression.
-    member _.suppress(sessionId) = suppressed <- Set.add sessionId suppressed
-
-    /// Forget a session's nudge history and any pending suppression.
-    member _.clearSession(sessionId) =
-        state <- { state with sessions = Map.remove sessionId state.sessions }
-        suppressed <- Set.remove sessionId suppressed
-
-    /// Reset the whole coordinator.
-    member _.clear() =
-        state <- freshCoordinator
-        suppressed <- Set.empty
-
-let defaultCoordinator = NudgeCoordinator()

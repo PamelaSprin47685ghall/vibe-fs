@@ -1,5 +1,5 @@
 import plugin from '../build/src/Opencode/Plugin.js';
-import { createRegistration, getPluginToolPolicy, setCapsFileReadTimestampSource, buildCapsFileReadData, deduplicateReadOutputs, deduplicateReadOutputsAgainstHistory, deduplicateModelReadOutputsWithSeen, collectReadOutputs } from '../build/src/Index.js';
+import { createRegistration, getPluginToolPolicy, buildCapsFileReadData, deduplicateReadOutputs, deduplicateReadOutputsAgainstHistory, deduplicateModelReadOutputsWithSeen, collectReadOutputs } from '../build/src/Index.js';
 import { runSubagent } from '../build/src/Opencode/Session.js';
 import { registerChildAgent, unregisterChildAgent } from '../build/src/Opencode/ChildAgent.js';
 import { checkSyntax } from '../build/src/Shell/TreeSitterSyntax.js';
@@ -336,14 +336,13 @@ check('web_search override has execute', typeof wsWrapped.execute === 'function'
 
 // ── buildCapsFileReadData returns real array ──
 const tmpDir = await fs.mkdtemp(path.join('/tmp', 'caps-test-'));
-setCapsFileReadTimestampSource(() => 1704067200000);
 await fs.writeFile(path.join(tmpDir, 'CAPS.md'), '# Capabilities\nTest content');
 const capsEntries = await buildCapsFileReadData(tmpDir);
 check('buildCapsFileReadData returns array', Array.isArray(capsEntries));
 check('buildCapsFileReadData finds caps file', capsEntries.length === 1);
 check('caps entry has path', capsEntries[0]?.path === 'CAPS.md');
-check('caps entry has deterministic callId', capsEntries[0]?.callId === 'caps-fr-1704067200000-0');
-check('caps entry has deterministic modifiedTime', capsEntries[0]?.output?.modifiedTime === '2024-01-01T00:00:00.000Z');
+check('caps entry has callId prefix', capsEntries[0]?.callId?.startsWith('caps-fr-'));
+check('caps entry has modifiedTime', typeof capsEntries[0]?.output?.modifiedTime === 'string');
 check('caps entry output has content', typeof capsEntries[0]?.output?.content === 'string');
 await fs.rm(tmpDir, { recursive: true });
 
@@ -636,8 +635,8 @@ check('opencode dedup keeps second state ref (host bookkeeping)', dedupInPlace.m
 check('opencode dedup keeps first read output', dedupInPlace.messages[0].parts[0].state.output === stableContent);
 check('opencode dedup replaces exact duplicate with marker', dedupInPlace.messages[1].parts[0].state.output === '[No Change Since Previous Read/Write]');
 
-// Same contract under the substring-repeat shape: second read appends new
-// content to the first. Still must mutate state.output in place.
+// Superset content (previous output + new content) is NOT a duplicate —
+// exact-match-only dedup avoids hiding new content from the model.
 const supersetState = { output: `${stableContent}${'new content\n'.repeat(8)}` };
 const supersetPart = { type: 'tool', tool: 'read', state: supersetState };
 const dedupSuperset = {
@@ -648,7 +647,7 @@ const dedupSuperset = {
 };
 await p['experimental.chat.messages.transform']({}, dedupSuperset);
 check('opencode dedup superset keeps state ref', dedupSuperset.messages[1].parts[0].state === supersetState);
-check('opencode dedup superset replaces with marker', dedupSuperset.messages[1].parts[0].state.output === '[No Change Since Previous Read/Write]');
+check('opencode dedup superset NOT replaced (exact-match only)', dedupSuperset.messages[1].parts[0].state.output === supersetState.output);
 
 // ── writeTool field-missing vs empty-string semantics ──
 const writeDef = reg.tools.find(t => t.name === 'write');

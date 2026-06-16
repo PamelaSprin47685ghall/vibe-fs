@@ -2,7 +2,7 @@ module VibeFs.Shell.FuzzyFindCmd
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.IteratorStore
+open VibeFs.Shell.IteratorStore
 open VibeFs.Kernel.FuzzyFormat
 open VibeFs.Kernel
 open VibeFs.Shell.FuzzyFinderShell

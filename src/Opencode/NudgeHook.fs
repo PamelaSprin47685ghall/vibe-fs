@@ -236,7 +236,7 @@ type private NudgeDecision =
     | StandDown
     | Send of promptText: string * agentOpt: string option * messageCount: int option
 
-let private decideNudge (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+let private decideNudge (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                         (state: NudgeShellState) (sessionID: string)
                         (snapshot: SessionSnapshot) : NudgeShellState * NudgeDecision =
     // The claim may have been dropped while we did I/O (user resumed, session
@@ -284,7 +284,7 @@ let private recordSend (state: NudgeShellState) (sessionID: string) (outcome: Se
 /// The detached nudge flow: all client I/O happens here, never under the lock.
 /// Each lock re-entry (`Mutate`) is a pure, instant transition.
 let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
-                         (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+                         (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                          (sessionID: string) : Async<unit> =
     async {
         try
@@ -315,7 +315,7 @@ let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
 /// which is non-blocking) before yielding, so the hook returns at once and the
 /// rest of the flow — including any `session.prompt` — never blocks the lock.
 let private startNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
-                           (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+                           (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                            (sessionID: string) : unit =
     Async.StartImmediate(runNudgeFlow holder client reviewStore sessionID)
 
@@ -427,7 +427,7 @@ let private dispatchEvent state eventType (props: obj) sessionID : NudgeShellSta
 
 // ── Hook class ──
 
-type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
+type NudgeHook(ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) =
     let client = Dyn.get ctx "client"
     let holder = StateHolder<NudgeShellState>(emptyState ())
 
@@ -474,5 +474,5 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
         | None -> ()
         resolvedUnitPromise ()
 
-let createNudgeHook (ctx: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : NudgeHook =
+let createNudgeHook (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : NudgeHook =
     NudgeHook(ctx, reviewStore)

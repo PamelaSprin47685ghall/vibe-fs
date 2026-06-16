@@ -208,7 +208,7 @@ let runSubagentWithTools
 
 /// Create a reviewer child session under the given parent, register it, and
 /// return the child id (empty string on failure).
-let createReviewerChild (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+let createReviewerChild (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                         (directory: string) (parentID: string option)
                         (sessionID: string) (title: string) : JS.Promise<string> =
     async {
@@ -235,7 +235,7 @@ let createReviewerChild (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.
 /// Run the reviewer prompt-nudge loop on an existing child session: prompt with
 /// the review instructions, wait for the verdict via submit_review_result,
 /// nudging up to maxNudges times if the reviewer hasn't submitted.
-let runReviewerLoop (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+let runReviewerLoop (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                     (childID: string) (initialParts: obj array) (abortSignal: obj)
                     : JS.Promise<VibeFs.Kernel.ReviewSession.ReviewResult> =
     async {
@@ -271,7 +271,7 @@ let runReviewerLoop (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.Revi
 
 /// Run a pre-review session (used by /loop-review): create a reviewer child,
 /// prompt it with review instructions + task, wait for the verdict.
-let runReviewerSession (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+let runReviewerSession (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                        (directory: string) (sessionID: string) (task: string)
                        : JS.Promise<VibeFs.Kernel.ReviewSession.ReviewResult> =
     async {
@@ -289,7 +289,7 @@ let runReviewerSession (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.R
 /// Run a submit-review (used by the submit_review tool): create a reviewer
 /// child, prompt it with review instructions + change report + affected files +
 /// original task, wait for the verdict.
-let runSubmitReview (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+let runSubmitReview (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                     (directory: string) (sessionID: string)
                     (report: string) (affectedFiles: string list)
                     (task: string) (abortSignal: obj)

@@ -6,7 +6,7 @@ type LruStore<'t> = { cache: Map<string, 't>; order: string list; maxSize: int }
 
 let create (maxSize: int) : LruStore<'t> = { cache = Map.empty; order = []; maxSize = maxSize }
 
-let private removeKey key order = order |> List.filter (fun k -> k <> key)
+let private removeKey key order = List.except [ key ] order
 let private trimHead order maxSize =
     if List.length order > maxSize then List.tail order else order
 

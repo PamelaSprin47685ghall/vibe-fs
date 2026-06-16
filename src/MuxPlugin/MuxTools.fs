@@ -12,7 +12,7 @@ open VibeFs.MuxPlugin.MuxTools.ReviewTool
 let mutable registeredToolNames: string array = [||]
 
 /// Build the full ordered tool list for createRegistration.
-let createToolCatalog (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : ToolDefinition array =
+let createToolCatalog (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (hostReadExec: HostReadExec) : ToolDefinition array =
     let tools =
         [| coderTool deps
            readerTool deps
@@ -25,6 +25,6 @@ let createToolCatalog (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.Revi
            fuzzyGrepTool
            fuzzyFindTool
            writeTool deps
-           readTool deps |]
+           readTool deps hostReadExec |]
     registeredToolNames <- tools |> Array.map (fun t -> t.name)
     tools

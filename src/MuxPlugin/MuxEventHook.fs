@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.Prompts
 open VibeFs.Mux.StreamEnd
+open VibeFs.Shell.NudgeStore
 
 /// Extract the last assistant text from event properties.parts.
 let private getLastAssistantText (properties: obj) : string =
@@ -20,7 +21,7 @@ let private getLastAssistantText (properties: obj) : string =
             |> String.concat "\n"
 
 /// The inner async logic for the event hook.
-let private handleEvent (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
+let private handleEvent (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                          (state: StreamEndState) (coordinator: NudgeCoordinator)
                          (event: obj) (helpers: obj) : JS.Promise<unit> =
     async {
@@ -91,7 +92,7 @@ let private handleEvent (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore)
 /// Create the event hook as a proper two-argument JS function.
 /// Uses Func<_,_,_> delegate so Fable emits `function(event, helpers) { ... }`
 /// instead of a curried `(event) => (helpers) => ...`.
-let createEventHook (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : obj =
+let createEventHook (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     let state = createStreamEndState ()
     let coordinator = NudgeCoordinator()
     let fn = System.Func<obj, obj, JS.Promise<unit>>(fun event helpers ->

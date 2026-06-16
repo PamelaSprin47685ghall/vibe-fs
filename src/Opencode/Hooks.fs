@@ -196,6 +196,7 @@ let messagesTransform (directory: string) (input: obj) (output: obj) : JS.Promis
                 let! capsFiles = VibeFs.Shell.CapsShell.findCapsFiles directory |> Async.AwaitPromise
                 let next =
                     VibeFs.Kernel.CapsFormat.buildCapsMessages
+                        VibeFs.Shell.Crypto.sha256HexTruncated
                         messagesArr
                         directory
                         defaultExcludedAgents
@@ -234,7 +235,7 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
     } |> Async.StartAsPromise
 
 /// event: deactivate review on stream-abort.
-let eventHandler (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
+let eventHandler (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
     async {
         let event = Dyn.get input "event"
         if Dyn.str event "type" = "stream-abort" then

@@ -4,7 +4,7 @@ open VibeFs.Tests.Assert
 open VibeFs.Kernel.Review
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.ReviewerLoop
-open VibeFs.Kernel.ReviewRuntime
+open VibeFs.Shell.ReviewRuntime
 
 let transition' () =
     let task = "review-task"

@@ -23,9 +23,6 @@ let getPluginToolPolicy (_agentId: string) (role: string) : obj =
     let remove = pluginToolNames |> Array.filter (fun t -> not (canUse agent t))
     box {| add = [||]; remove = remove |}
 
-let setCapsFileReadTimestampSource (source: unit -> obj) : unit =
-    VibeFs.Mux.CapsFileRead.setTimestampSource source
-
 let buildCapsFileReadData (projectRoot: string) : JS.Promise<VibeFs.Mux.CapsFileRead.CapsFileReadEntry[]> =
     VibeFs.Mux.CapsFileRead.buildCapsFileReadData projectRoot
 
