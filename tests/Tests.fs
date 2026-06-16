@@ -9,7 +9,6 @@ open VibeFs.Tests.ShellTests
 open VibeFs.Tests.DynTests
 open VibeFs.Tests.DelegateTests
 open VibeFs.Tests.ResolveAiSettingsTests
-open VibeFs.Tests.PlanTests
 
 [<EntryPoint>]
 let main _ =
@@ -18,10 +17,8 @@ let main _ =
     ReviewTests.resultMapping ()
     ReviewTests.reviewerLoop ()
     ReviewTests.runtime ()
-    AgentTests.role ()
-    AgentTests.policy ()
-    AgentTests.effectivePolicyDeniedToolsCrossValidation ()
-    AgentTests.subagentToolPolicyUsesHostToolNames ()
+    AgentTests.canUse' ()
+    AgentTests.deniedTools' ()
     AgentTests.decision ()
     AgentTests.updateState ()
     AgentTests.coordinator ()
@@ -31,10 +28,9 @@ let main _ =
     KernelTests.lru' ()
     KernelTests.ipAllowlist' ()
     KernelTests.ipStrict ()
-    KernelTests.muxPolicy' ()
-    KernelTests.hostKernel' ()
     KernelTests.excludedDirs' ()
     KernelTests.jsBoundary' ()
+    KernelTests.hostKernel' ()
     FuzzyTests.grepDetect ()
     FuzzyTests.iteratorRoundTrip ()
     FuzzyTests.finderConversion ()
@@ -54,17 +50,4 @@ let main _ =
     DynTests.nullish ()
     DelegateTests.run ()
     ResolveAiSettingsTests.run ()
-    PlanTests.normalize ()
-    PlanTests.fileName ()
-    PlanTests.lenses ()
-    PlanTests.lensSelection ()
-    PlanTests.hypotheses ()
-    PlanTests.hypothesesToolCall ()
-    PlanTests.branchToolCall ()
-    PlanTests.judgeToolCall ()
-    PlanTests.revisionToolCall ()
-    PlanTests.poolToolCall ()
-    PlanTests.poolToolCallError ()
-    PlanTests.critiqueToolCall ()
-    PlanTests.critiqueToolCallError ()
     summary ()

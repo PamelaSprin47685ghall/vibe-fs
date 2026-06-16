@@ -44,7 +44,7 @@ let private summarizeWhenNeeded (deps: obj) (config: obj) (output: string) : Asy
             return output
         else
             let prompt = formatMuxExecutorSummarizerUserPrompt output
-            let! report = runMuxSubagent deps config "summarizer" prompt "Executor summary" None |> Async.AwaitPromise
+            let! report = runMuxSubagent deps config "executor" prompt "Executor summary" None |> Async.AwaitPromise
             return report
     }
 

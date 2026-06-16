@@ -1,13 +1,27 @@
 module VibeFs.Index
 
 open Fable.Core
+open VibeFs.Kernel.ToolPolicy
 
 let createRegistration (deps: obj) : obj =
     VibeFs.MuxPlugin.Registration.createRegistration deps
 
-let getPluginToolPolicy (_agentId: string) (role: string) : VibeFs.Kernel.MuxPolicy.MuxPluginToolPolicy option =
-    let roleOpt = if System.String.IsNullOrEmpty role then None else Some role
-    VibeFs.Kernel.MuxPolicy.getPluginToolPolicy roleOpt
+/// Plugin tool names — kept in sync with MuxTools.createToolCatalog.
+let private pluginToolNames =
+    [| "coder"; "reader"; "meditator"; "browser"; "executor"
+       "submit_review"; "websearch"; "webfetch"
+       "fuzzy-find"; "fuzzy-grep"; "write"; "read" |]
+
+/// Export canUse so the host can filter any tool name directly.
+let canUseTool (agent: string) (tool: string) : bool =
+    canUse agent tool
+
+/// Return {add, remove} for the mux host's regex-filter pipeline.
+/// Denied plugin tools are listed in `remove` so they never appear available.
+let getPluginToolPolicy (_agentId: string) (role: string) : obj =
+    let agent = if System.String.IsNullOrEmpty role then "manager" else role
+    let remove = pluginToolNames |> Array.filter (fun t -> not (canUse agent t))
+    box {| add = [||]; remove = remove |}
 
 let setCapsFileReadTimestampSource (source: unit -> obj) : unit =
     VibeFs.Mux.CapsFileRead.setTimestampSource source

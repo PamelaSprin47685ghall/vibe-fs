@@ -451,8 +451,8 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) =
                 let out = Dyn.get output "output"
                 if not (Dyn.isNullish out) && Dyn.typeIs out "string" then
                     let s = string out
-                    if not (s.Contains reverieNudge) then
-                        setOutput output (s + "\n" + reverieNudge)
+                    if not (s.Contains meditatorNudge) then
+                        setOutput output (s + "\n" + meditatorNudge)
         } |> Async.StartAsPromise
 
     member _.handleEvent(input: obj) : JS.Promise<unit> =

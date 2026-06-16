@@ -6,9 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.DomainError
 open VibeFs.Kernel.JsBoundary
-open VibeFs.Kernel.PlanEngine
 open VibeFs.Kernel.SessionText
-open VibeFs.Kernel.PlanTypes
 
 let private firstString (ctx: obj) (keys: string list) : string option =
     keys
@@ -255,7 +253,7 @@ let runReviewerLoop (client: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.Revi
                     let promptBody =
                         box {|
                             path = box {| id = childID |}
-                            body = box {| agent = "reviewer"; parts = parts; tools = box {| submit_review_result = true |} |}
+                            body = box {| agent = "reviewer"; parts = parts; tools = box (createObj [ "return-reviewer", box true ]) |}
                         |}
                     let! caught = Async.Catch (promptWithAbort client promptBody abortSignal |> Async.AwaitPromise)
                     match caught with

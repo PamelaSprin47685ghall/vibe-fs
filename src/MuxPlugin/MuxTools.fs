@@ -1,25 +1,30 @@
 module VibeFs.MuxPlugin.MuxTools
 
 open VibeFs.Mux.Contract
-open VibeFs.MuxPlugin.PlanTools
 open VibeFs.MuxPlugin.MuxTools.AgentTools
 open VibeFs.MuxPlugin.MuxTools.IoTools
 open VibeFs.MuxPlugin.MuxTools.SearchTools
 open VibeFs.MuxPlugin.MuxTools.WebTools
 open VibeFs.MuxPlugin.MuxTools.ReviewTool
 
+/// Tool names populated by `createToolCatalog` so that `experimentsFor` can
+/// compute the disabled-tool list via `canUse`.  Set once at registration time.
+let mutable registeredToolNames: string array = [||]
+
 /// Build the full ordered tool list for createRegistration.
 let createToolCatalog (deps: obj) (reviewStore: VibeFs.Kernel.ReviewRuntime.ReviewStore) : ToolDefinition array =
-    [| yield! allPlanTools
-       editorTool deps
-       greperTool deps
-       reverieTool deps
-       browserTool deps
-       executorTool deps
-       submitReviewTool deps reviewStore
-       websearchTool
-       webfetchTool
-       fuzzyGrepTool
-       fuzzyFindTool
-       writeTool deps
-       readTool deps |]
+    let tools =
+        [| coderTool deps
+           readerTool deps
+           meditatorTool deps
+           browserTool deps
+           executorTool deps
+           submitReviewTool deps reviewStore
+           websearchTool
+           webfetchTool
+           fuzzyGrepTool
+           fuzzyFindTool
+           writeTool deps
+           readTool deps |]
+    registeredToolNames <- tools |> Array.map (fun t -> t.name)
+    tools

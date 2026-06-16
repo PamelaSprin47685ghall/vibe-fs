@@ -1,8 +1,8 @@
 module VibeFs.Kernel.Prompts
 
-/// Reverie nudge injected to encourage deeper reasoning before acting.
-let reverieNudge =
-    "// Think thrice before acting — NOW consider calling reverie tool to improve reasoning"
+/// Meditator nudge injected to encourage deeper reasoning before acting.
+let meditatorNudge =
+    "// Think thrice before acting — NOW consider calling meditator tool to improve reasoning"
 
 let todoNudgePrompt =
     "There are still incomplete todos. Continue working through the remaining items. "
@@ -20,8 +20,8 @@ let loopNudgePrompt =
     + "submit your detailed report and list of modified files for review\n"
     + "before finishing. Do not end the conversation without calling submit_review."
 
-let orchestratorSystemPrompt =
-    "You are the orchestrator agent. Coordinate the overall task, decide when to delegate to subagents, and synthesize their outputs into a final answer that satisfies the user's original goal."
+let managerSystemPrompt =
+    "You are the manager agent. Coordinate the overall task, decide when to delegate to subagents, and synthesize their outputs into a final answer that satisfies the user's original goal."
 
 let reviewCriteria =
     """# Evaluation Criteria
@@ -41,18 +41,18 @@ let reviewInstructions =
     readOnlyWorkspaceConstraint + "\n\n"
     + "You are a code reviewer performing a rigorous review of submitted work.\n\n"
     + reviewCriteria
-    + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\nsubmit_review_result({ \"feedback\": null })          // Accept — pass with no feedback\nsubmit_review_result({ \"feedback\": \"specific...\" }) // Reject — provide detailed, actionable feedback\n\nIMPORTANT: If you accept, feedback MUST be null. Do not write praise or any other text — it will be misinterpreted as rejection feedback.\n\nYou MUST call submit_review_result before finishing. Do not end the conversation without submitting your verdict."
+    + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\nreturn-reviewer({ \"feedback\": null })          // Accept — pass with no feedback\nreturn-reviewer({ \"feedback\": \"specific...\" }) // Reject — provide detailed, actionable feedback\n\nIMPORTANT: If you accept, feedback MUST be null. Do not write praise or any other text — it will be misinterpreted as rejection feedback.\n\nYou MUST call return-reviewer before finishing. Do not end the conversation without submitting your verdict."
 
 let reviewerNudgePrompt =
     "You have not submitted your review verdict yet.\n\n"
-    + "You must call submit_review_result to submit your verdict:\n"
-    + "  submit_review_result({ \"feedback\": null })          // Accept\n"
-    + "  submit_review_result({ \"feedback\": \"details...\" })  // Reject\n\n"
+    + "You must call return-reviewer to submit your verdict:\n"
+    + "  return-reviewer({ \"feedback\": null })          // Accept\n"
+    + "  return-reviewer({ \"feedback\": \"details...\" })  // Reject\n\n"
     + "Do not explain what you plan to do — call the tool immediately."
 
-let editorPromptBody (intent: string) (affectedFiles: string list) : string =
+let coderPromptBody (intent: string) (affectedFiles: string list) : string =
     let fileList = affectedFiles |> List.map (fun f -> $"- {f}") |> String.concat "\n"
-    "You are an implementation agent (editor). Your job is to implement the intent below in the affected files.\n\n"
+    "You are an implementation agent (coder). Your job is to implement the intent below in the affected files.\n\n"
     + "Intent:\n" + intent + "\n\n"
     + "Affected files:\n" + fileList + "\n\n"
     + "Instructions:\n"
@@ -60,25 +60,25 @@ let editorPromptBody (intent: string) (affectedFiles: string list) : string =
     + "2. Edit or create files to implement the intent.\n"
     + "3. Perform static verification only (read, inspect, type-check). Do NOT run tests, execute code, or run any commands.\n"
 
-let formatEditorUserPrompt (intent: string) (affectedFiles: string list) : string =
-    editorPromptBody intent affectedFiles
+let formatCoderUserPrompt (intent: string) (affectedFiles: string list) : string =
+    coderPromptBody intent affectedFiles
     + "4. Return a concise summary of changes and verification results.\n\n"
 
-let greperPromptBody (intent: string) : string =
-    "You are a codebase search agent (greper). Explore the workspace and report what you find.\n\n"
+let readerPromptBody (intent: string) : string =
+    "You are a codebase search agent (reader). Explore the workspace and report what you find.\n\n"
     + readOnlyRules + "\n\n"
     + "Search query:\n" + intent + "\n\n"
     + "Instructions:\n"
-    + "1. Use fuzzy_find, glob, fuzzy_grep, and read tools to locate relevant code.\n"
+    + "1. Use fuzzy-find, glob, fuzzy-grep, and read tools to locate relevant code.\n"
     + "2. Report concrete file paths and line-number references.\n"
 
-let formatGreperUserPrompt (intent: string) : string =
-    greperPromptBody intent
+let formatReaderUserPrompt (intent: string) : string =
+    readerPromptBody intent
     + "3. Return a structured report with relatedFiles and relatedCode.\n\n"
 
-let reveriePromptBody (intent: string) (files: string list) : string =
+let meditatorPromptBody (intent: string) (files: string list) : string =
     let fileList = files |> List.map (fun f -> $"- {f}") |> String.concat "\n"
-    "You are a deep-reasoning agent (reverie). Read and analyze the files below, then answer the question.\n\n"
+    "You are a deep-reasoning agent (meditator). Read and analyze the files below, then answer the question.\n\n"
     + readOnlyRules + "\n\n"
     + "Files to analyze:\n" + fileList + "\n\n"
     + "Question:\n" + intent + "\n\n"
@@ -86,8 +86,8 @@ let reveriePromptBody (intent: string) (files: string list) : string =
     + "1. The file contents are provided above; read and analyze every listed file carefully.\n"
     + "2. Produce a thorough analysis covering tradeoffs, risks, and concrete recommendations.\n"
 
-let formatReverieUserPrompt (intent: string) (files: string list) : string =
-    reveriePromptBody intent files
+let formatMeditatorUserPrompt (intent: string) (files: string list) : string =
+    meditatorPromptBody intent files
     + "3. Return a structured report with relatedFiles and relatedCode.\n\n"
 
 let browserPromptBody (intent: string) : string =

@@ -3,9 +3,7 @@ module VibeFs.Opencode.AgentConfig
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.AgentRole
-open VibeFs.Kernel.Permission
-open VibeFs.Kernel.AgentPolicy
+open VibeFs.Kernel.ToolPolicy
 
 let private emptyObj () : obj = createObj []
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
@@ -17,133 +15,52 @@ let private mergeObj (a: obj) (b: obj) : obj =
 
 let private emptyMcps : obj = [||] :> obj
 
-let private restrictedPlanToolNames =
-    [ "submit_plan_hypotheses"
-      "submit_plan_branch"
-      "submit_plan_critique"
-      "submit_plan_pool"
-      "submit_plan_revision"
-      "submit_plan_judge" ]
+/// All tool names the plugin registers plus common host tool patterns that
+/// canUse has opinions about — kept in sync with Tools.createTools.
+let private allToolNames =
+    [ "coder"; "reader"; "meditator"; "browser"; "executor"
+      "fuzzy-find"; "fuzzy-grep"; "websearch"; "webfetch"
+      "submit_review"; "return-reviewer"; "read"; "write"
+      "bash"; "task"; "grep"; "edit"; "patch"; "apply_patch"
+      "todowrite"; "todo_write"; "stealth-browser-mcp_*"
+      "ask_user_question"; "agent_report" ]
 
-let private applyRestrictedPlanPermissions (o: obj) : unit =
-    for name in restrictedPlanToolNames do
-        setKey o name (box "deny")
-
-let private applyRestrictedPlanTools (o: obj) : unit =
-    for name in restrictedPlanToolNames do
-        setKey o name (box false)
-
-/// Build a plain-JS permission map {name: "allow"|"deny"} from a role's defaults.
-let private permissionDefaults (role: AgentRole) : obj =
+/// Build {tool: bool} map from canUse so denied tools never appear available.
+let private toolDefaults (agentName: string) : obj =
     let o = emptyObj ()
-    for KeyValue(name, p) in defaultPermissions role do
-        setKey o name (box (match p with Allow -> "allow" | Deny -> "deny"))
-    applyRestrictedPlanPermissions o
+    for name in allToolNames do
+        setKey o name (box (canUse agentName name))
     o
 
-/// Build a plain-JS tool map {name: bool} from a role's tool policy.
-let toolDefaults (role: AgentRole) : obj =
+/// Build {tool: "allow"|"deny"} map from canUse.
+let private permissionDefaults (agentName: string) : obj =
     let o = emptyObj ()
-    for KeyValue(name, p) in toolMapFor role do
-        setKey o name (box (p = Allow))
-    applyRestrictedPlanTools o
+    for name in allToolNames do
+        setKey o name (box (if canUse agentName name then "allow" else "deny"))
     o
 
-/// Built-in subagent system prompts are intentionally empty; role instructions live in user/tool prompts.
 let private systemPromptForBuiltin (name: string) : string =
     match name with
-    | "editor" | "greper" | "reverie" | "browser" | "summarizer" | "orchestrator" -> ""
     | "reviewer" -> Prompts.reviewInstructions
     | _ -> ""
 
-let private browserPermissionBase (o: obj) : unit =
-    setKey o "read" (box "allow")
-    setKey o "stealth-browser-mcp_*" (box "allow")
-    setKey o "bash" (box "deny")
-    setKey o "write" (box "deny")
-    setKey o "edit" (box "deny")
-    setKey o "glob" (box "deny")
-    setKey o "grep" (box "deny")
-    setKey o "fuzzy_find" (box "deny")
-    setKey o "fuzzy_grep" (box "deny")
-    setKey o "task" (box "deny")
-
-let private browserToolsBase (o: obj) : unit =
-    setKey o "read" (box true)
-    setKey o "stealth-browser-mcp_*" (box true)
-
-let private summarizerPermissionBase (o: obj) : unit =
-    setKey o "edit" (box "deny")
-    setKey o "write" (box "deny")
-    setKey o "glob" (box "deny")
-    setKey o "grep" (box "deny")
-    setKey o "fuzzy_find" (box "deny")
-    setKey o "fuzzy_grep" (box "deny")
-    setKey o "task" (box "deny")
-    setKey o "read" (box "deny")
-    setKey o "executor" (box "deny")
-    setKey o "webfetch" (box "deny")
-    setKey o "websearch" (box "deny")
-    setKey o "browser" (box "deny")
-    setKey o "bash" (box "deny")
-
-let private summarizerToolsBase (o: obj) : unit =
-    setKey o "read" (box false)
-    setKey o "write" (box false)
-    setKey o "edit" (box false)
-    setKey o "glob" (box false)
-    setKey o "grep" (box false)
-    setKey o "fuzzy_find" (box false)
-    setKey o "fuzzy_grep" (box false)
-    setKey o "webfetch" (box false)
-    setKey o "websearch" (box false)
-    setKey o "browser" (box false)
-    setKey o "executor" (box false)
-    setKey o "task" (box false)
-
-let private withBase (init: obj -> unit) : obj =
-    let o = emptyObj ()
-    init o
-    o
-
-/// Apply role permission/tool defaults to a single agent entry, preserving any
-/// user-provided fields (disable, model, etc.).  User values override defaults.
 let private withRoleDefaults (name: string) (userAgent: obj) : obj =
-    let roleResult = AgentRole.ofString name
-    let role = match roleResult with Ok r -> r | Error _ -> Reverie
     let userPrompt = Dyn.str userAgent "prompt"
     let prompt = if userPrompt <> "" then userPrompt else systemPromptForBuiltin name
-    let defaultMode = if name = "orchestrator" then "primary" else "subagent"
+    let defaultMode = if name = "manager" then "primary" else "subagent"
     let userMode = Dyn.str userAgent "mode"
     let mode = if userMode <> "" then userMode else defaultMode
     let userPerm = Dyn.get userAgent "permission"
     let userTools = Dyn.get userAgent "tools"
     let userMcps = Dyn.get userAgent "mcps"
-
-    let perm, tools, mcps =
+    let mcps =
         match name with
-        | "browser" ->
-            let p = mergeObj (permissionDefaults role) (mergeObj (withBase browserPermissionBase) userPerm)
-            let t = mergeObj (toolDefaults role) (mergeObj (withBase browserToolsBase) userTools)
-            let m = if Dyn.isNullish userMcps then box [| "stealth-browser-mcp" |] else userMcps
-            p, t, m
-        | "summarizer" ->
-            let p = mergeObj (permissionDefaults role) (mergeObj (withBase summarizerPermissionBase) userPerm)
-            let t = mergeObj (toolDefaults role) (mergeObj (withBase summarizerToolsBase) userTools)
-            let m = if Dyn.isNullish userMcps then emptyMcps else userMcps
-            p, t, m
-        | _ ->
-            let tools =
-                match roleResult with
-                | Ok _ -> mergeObj (toolDefaults role) userTools
-                | Error _ -> if Dyn.isNullish userTools then emptyObj () else userTools
-            mergeObj (permissionDefaults role) userPerm,
-            tools,
-            if Dyn.isNullish userMcps then emptyMcps else userMcps
+        | "browser" -> if Dyn.isNullish userMcps then box [| "stealth-browser-mcp" |] else userMcps
+        | _ -> if Dyn.isNullish userMcps then emptyMcps else userMcps
 
+    let perm = mergeObj (permissionDefaults name) userPerm
+    let tools = mergeObj (toolDefaults name) userTools
     let result = mergeObj (emptyObj ()) userAgent
-    applyRestrictedPlanPermissions perm
-    applyRestrictedPlanTools tools
     setKey result "prompt" (box prompt)
     setKey result "mode" (box mode)
     setKey result "permission" perm
@@ -154,21 +71,16 @@ let private withRoleDefaults (name: string) (userAgent: obj) : obj =
 let private objectKeys (o: obj) : string array =
     JS.Constructors.Object.keys(o) |> Seq.toArray
 
-let private builtinAgents = [ "editor"; "greper"; "reverie"; "reviewer"; "browser"; "summarizer" ]
+let private builtinAgents = [ "coder"; "reader"; "meditator"; "reviewer"; "browser"; "executor" ]
 
-/// Apply agent config: merge permission/tool defaults for every agent, add
-/// built-in subagents, preserve all user-defined agents, merge mcp servers.
-/// Returns the updated config object.
 let applyAgentConfig (opencodeConfig: obj) (mcps: obj) : obj =
     let userAgent = if Dyn.isNullish (Dyn.get opencodeConfig "agent") then emptyObj () else Dyn.get opencodeConfig "agent"
     let configMcp = Dyn.get opencodeConfig "mcp"
     let mergedMcp = if Dyn.isNullish configMcp then mcps else mergeObj configMcp mcps
-    // Start from the user's existing agents so non-builtin entries (plan, title,
-    // etc.) are preserved, then ensure every agent gets role defaults applied.
     let agents = mergeObj userAgent (emptyObj ())
     for name in builtinAgents do
         if Dyn.isNullish (Dyn.get agents name) then setKey agents name (emptyObj ())
-    if Dyn.isNullish (Dyn.get agents "orchestrator") then setKey agents "orchestrator" (emptyObj ())
+    if Dyn.isNullish (Dyn.get agents "manager") then setKey agents "manager" (emptyObj ())
     let finalAgents = emptyObj ()
     for name in objectKeys agents do
         if name = "basher" || name = "runner" then ()

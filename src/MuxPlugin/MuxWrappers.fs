@@ -5,8 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Mux.TodoWriteNudge
-open VibeFs.MuxPlugin.PlanTools
-open VibeFs.MuxPlugin.PlanToolStore
+open VibeFs.MuxPlugin.CallStore
 open VibeFs.MuxPlugin.MuxTools.IoTools
 open VibeFs.Shell.TreeSitterShell
 
@@ -15,7 +14,6 @@ let private bindExecute (tool: obj) : obj = tool?execute
 let private disabledResult () : JS.Promise<string> =
     async { return "disabled" } |> Async.StartAsPromise
 
-/// Append syntax-check diagnostics to a tool result after a file edit.
 let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promise<obj> =
     async {
         match extractFilePath args with
@@ -35,7 +33,6 @@ let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promis
 
 let private isThenable (value: obj) : bool =
     not (Dyn.isNullish value) && Dyn.typeIs (Dyn.get value "then") "function"
-
 
 let private mkResultWrapper (targetTool: string) (callback: obj -> obj -> obj -> JS.Promise<obj>) : obj =
     let wrapperFn =
@@ -81,16 +78,13 @@ let private mkSyncResultWrapper (targetTool: string) (callback: obj -> obj) : ob
                 Dyn.withKey tool "execute" (box executeFn))
     createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
 
-/// Create the syntax-check wrappers for file_edit tools.
 let private mkSyntaxWrappers () : obj array =
     [| mkResultWrapper "file_edit_replace_string" (fun result args config -> applySyntaxCheck result args config)
        mkResultWrapper "file_edit_insert" (fun result args config -> applySyntaxCheck result args config) |]
 
-/// Create the todo_write nudge wrapper.
 let private mkTodoNudgeWrapper () : obj =
-    mkSyncResultWrapper "todo_write" (fun result -> appendReverieNudge result)
+    mkSyncResultWrapper "todo_write" (fun result -> appendMeditatorNudge result)
 
-/// Capture the host file_read tool so the plugin read tool can delegate to it.
 let private mkFileReadCapture () : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (hostTool: obj) (_config: obj) ->
@@ -101,8 +95,6 @@ let private mkFileReadCapture () : obj =
             createObj [ "execute", box execFn ])
     createObj [ "targetTool", box "file_read"; "wrapper", box wrapperFn ]
 
-/// Create a web-override wrapper that replaces a host tool with the plugin definition.
-/// Uses Func delegate so it emits a real two-arg JS function.
 let private mkWebOverride (sourceToolName: string) (tools: obj) (targetTool: string) : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (_tool: obj) (config: obj) ->
@@ -117,9 +109,6 @@ let private mkWebOverride (sourceToolName: string) (tools: obj) (targetTool: str
                         "execute", box execFn ])
     createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
 
-let private isPlanCallId (callId: string) : bool =
-    callId.Contains("-plan-")
-
 let private mkAgentReportOverride () : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (tool: obj) (_config: obj) ->
@@ -127,7 +116,7 @@ let private mkAgentReportOverride () : obj =
                 System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
                     async {
                         let callId = Dyn.str args "callId"
-                        if callId <> "" && isPlanCallId callId && hasCall callId then
+                        if callId <> "" && hasCall callId then
                             resolveCall callId args |> ignore
                             let upstreamArgs = createObj [ "reportMarkdown", box (formatAgentReportMarkdown args) ]
                             let raw = tool?execute(upstreamArgs, opts)
@@ -145,12 +134,11 @@ let private mkAgentReportOverride () : obj =
                                     async { return raw }
                     }
                     |> Async.StartAsPromise)
-            createObj [ "description", box fakeAgentReportDefinition.description
-                        "parameters", box fakeAgentReportDefinition.parameters
+            createObj [ "description", box agentReportDefinition.description
+                        "parameters", box agentReportDefinition.parameters
                         "execute", box execFn ])
     createObj [ "targetTool", box "agent_report"; "wrapper", box wrapperFn ]
 
-/// Build all wrappers.
 let createAllWrappers (tools: obj) : obj array =
     Array.append
         (mkSyntaxWrappers ())

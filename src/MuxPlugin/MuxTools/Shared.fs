@@ -5,6 +5,10 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Mux.Contract
 
+/// Populated by `MuxTools.createToolCatalog` at registration time so that
+/// `experimentsFor` can compute the disabled-tool list via `canUse`.
+let mutable registeredToolNames: string array = [||]
+
 let resolveStr (s: string) : JS.Promise<string> = async { return s } |> Async.StartAsPromise
 
 let jsonStringify (o: obj) : string = JS.JSON.stringify(o)

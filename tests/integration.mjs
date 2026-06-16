@@ -32,10 +32,10 @@ check('mux.toolNames', Array.isArray(reg.toolNames));
 check('mux.tools', Array.isArray(reg.tools));
 check('mux.mcpServers', typeof reg.mcpServers === 'object');
 check('mux.contextInjector', typeof reg.contextInjector === 'object');
-const policy = reg.getToolPolicy('x', 'orchestrator');
+const policy = reg.getToolPolicy('x', 'manager');
 check('mux.getToolPolicy non-null', policy !== null && typeof policy === 'object');
 check('mux.getToolPolicy shape', Array.isArray(policy?.add) && Array.isArray(policy?.remove));
-check('mux.getToolPolicy orchestrator removes apply_patch', policy?.remove?.includes('apply_patch'));
+check('mux.getToolPolicy manager removes write', policy?.remove?.includes('write'));
 
 const syntax = await checkSyntax('const x = 1;', 'test.js');
 check('tree-sitter returns a result', typeof syntax === 'object');
@@ -43,13 +43,13 @@ check('tree-sitter ok', syntax.tag === 0);
 check('tree-sitter no errors', Array.isArray(syntax.fields[1]) && syntax.fields[1].length === 0);
 
 // ── Fix #1: getPluginToolPolicy(agentId, role) two-arg signature ──
-const pol1 = getPluginToolPolicy('some-agent', 'orchestrator');
+const pol1 = getPluginToolPolicy('some-agent', 'manager');
 check('getPluginToolPolicy(agentId, role) returns policy', pol1 !== undefined && Array.isArray(pol1.remove));
-check('getPluginToolPolicy orchestrator removes apply_patch', pol1?.remove?.includes('apply_patch'));
+check('getPluginToolPolicy manager removes write', pol1?.remove?.includes('write'));
 const pol2 = getPluginToolPolicy('some-agent');
 check('getPluginToolPolicy(agentId) with undefined role returns policy', pol2 !== undefined);
-const pol3 = getPluginToolPolicy('some-agent', 'editor');
-check('getPluginToolPolicy editor keeps apply_patch', pol3 !== undefined && !pol3.remove.includes('apply_patch'));
+const pol3 = getPluginToolPolicy('some-agent', 'coder');
+check('getPluginToolPolicy coder keeps write', pol3 !== undefined && !pol3.remove.includes('write'));
 
 // ── Fix #2: eventHook is a two-argument JS function ──
 check('eventHook.length === 2', reg.eventHook.length === 2);
@@ -145,7 +145,7 @@ const resumePlugin = await plugin({
           {
             info: {
               role: 'assistant',
-              agent: 'orchestrator',
+              agent: 'manager',
               finish: 'stop',
               time: { completed: 1 },
             },
@@ -190,7 +190,7 @@ let repeatedAssistantMessages = [
   {
     info: {
       role: 'assistant',
-      agent: 'orchestrator',
+      agent: 'manager',
       finish: 'stop',
       time: { completed: 1 },
     },
@@ -223,7 +223,7 @@ repeatedAssistantMessages = [
   {
     info: {
       role: 'assistant',
-      agent: 'orchestrator',
+      agent: 'manager',
       finish: 'stop',
       time: { completed: 2 },
     },
@@ -239,7 +239,7 @@ let recycledSessionMessages = [
   {
     info: {
       role: 'assistant',
-      agent: 'orchestrator',
+      agent: 'manager',
       finish: 'stop',
       time: { completed: 1 },
     },
@@ -273,7 +273,7 @@ recycledSessionMessages = [
   {
     info: {
       role: 'assistant',
-      agent: 'orchestrator',
+      agent: 'manager',
       finish: 'stop',
       time: { completed: 1 },
     },
@@ -296,7 +296,7 @@ check('webfetch schema has timeout', !!wfParams.timeout);
 check('webfetch execute is function', typeof webfetchDef.execute === 'function');
 
 // ── Fix #5: slash commands ──
-check('slash commands count', reg.slashCommands.length === 3);
+check('slash commands count', reg.slashCommands.length === 2);
 const loopCmd = reg.slashCommands.find(c => c.key === 'loop');
 check('loop command exists', !!loopCmd);
 check('loop command has execute', typeof loopCmd.execute === 'function');
@@ -305,10 +305,6 @@ check('loop with empty args cancels', loopResult === 'Loop mode cancelled.');
 const loopReviewCmd = reg.slashCommands.find(c => c.key === 'loop-review');
 check('loop-review command exists', !!loopReviewCmd);
 check('loop-review execute.length === 2', loopReviewCmd.execute.length === 2);
-const planCmd = reg.slashCommands.find(c => c.key === 'plan');
-check('plan command exists', !!planCmd);
-check('plan command has execute', typeof planCmd.execute === 'function');
-check('plan execute.length === 2', planCmd.execute.length === 2);
 
 // ── Wrapper completeness ──
 check('wrapper count === 7', reg.wrappers.length === 7);
@@ -316,30 +312,19 @@ const wrapperTargets = reg.wrappers.map(w => w.targetTool).sort();
 check('wrapper targets correct', JSON.stringify(wrapperTargets) === JSON.stringify(['agent_report', 'file_edit_insert', 'file_edit_replace_string', 'file_read', 'todo_write', 'web_fetch', 'web_search']));
 
 // ── Tool completeness ──
-check('tool count === 18', reg.tools.length === 18);
+check('tool count === 12', reg.tools.length === 12);
 const toolNames = reg.tools.map(t => t.name).sort();
-check('has editor tool', toolNames.includes('editor'));
+check('has coder tool', toolNames.includes('coder'));
 check('has webfetch tool', toolNames.includes('webfetch'));
 check('has write tool', toolNames.includes('write'));
 check('has read tool', toolNames.includes('read'));
 check('has submit_review tool', toolNames.includes('submit_review'));
-check('has submit_plan_branch tool', toolNames.includes('submit_plan_branch'));
-
-// ── Plan tool schema shape ──
-const planBranch = reg.tools.find(t => t.name === 'submit_plan_branch');
-check('plan branch parameters type object', planBranch?.parameters?.type === 'object');
-check('plan branch parameters has branchId', planBranch?.parameters?.properties?.branchId?.type === 'string');
-check('plan branch parameters has candidatePlanMarkdown', planBranch?.parameters?.properties?.candidatePlanMarkdown?.type === 'string');
-check('plan branch parameters has callId', planBranch?.parameters?.properties?.callId?.type === 'string');
-check('plan branch required includes callId', planBranch?.parameters?.required?.includes('callId'));
-check('plan branch no nested schema', planBranch?.parameters?.properties?.type === undefined);
 
 // ── agent_report wrapper forwards plan fields ──
 const arOverride = reg.wrappers.find(w => w.targetTool === 'agent_report');
 check('agent_report wrapper exists', !!arOverride);
 const arWrapped = arOverride.wrapper({ execute: async args => args }, { cwd: '/tmp', workspaceId: 'ws1' });
 check('agent_report wrapper has callId property', arWrapped?.parameters?.properties?.callId?.type === 'string');
-check('agent_report wrapper has branchId property', arWrapped?.parameters?.properties?.branchId?.type === 'string');
 
 // ── web_search override wrapper forwards config ──
 const wsOverride = reg.wrappers.find(w => w.targetTool === 'web_search');
@@ -363,7 +348,7 @@ check('caps entry output has content', typeof capsEntries[0]?.output?.content ==
 await fs.rm(tmpDir, { recursive: true });
 
 // ── messages.transform CAPS injection ──
-const makeMessage = (info = {}, parts = []) => ({ info: { id: 'msg-1', sessionID: 'sess-1', agent: 'orchestrator', ...info }, parts });
+const makeMessage = (info = {}, parts = []) => ({ info: { id: 'msg-1', sessionID: 'sess-1', agent: 'manager', ...info }, parts });
 
 await fs.mkdir('/tmp/vibe', { recursive: true });
 
@@ -395,8 +380,8 @@ check('caps transform preserves original message', normalOut.messages[2] === ori
 
 const existingCapsOut = {
   messages: [
-    { info: { id: 'caps-synth-user-old', agent: 'orchestrator' }, parts: [] },
-    { info: { id: 'caps-synth-assistant-old', agent: 'orchestrator' }, parts: [] },
+    { info: { id: 'caps-synth-user-old', agent: 'manager' }, parts: [] },
+    { info: { id: 'caps-synth-assistant-old', agent: 'manager' }, parts: [] },
     makeMessage()
   ]
 };
@@ -413,8 +398,8 @@ check('caps transform mutates array in place (fresh inject)', inPlaceFresh.messa
 
 const inPlaceReplace = {
   messages: [
-    { info: { id: 'caps-synth-user-stale', agent: 'orchestrator' }, parts: [] },
-    { info: { id: 'caps-synth-assistant-stale', agent: 'orchestrator' }, parts: [] },
+    { info: { id: 'caps-synth-user-stale', agent: 'manager' }, parts: [] },
+    { info: { id: 'caps-synth-assistant-stale', agent: 'manager' }, parts: [] },
     makeMessage()
   ]
 };
@@ -636,8 +621,8 @@ const readPartA = { type: 'tool', tool: 'read', state: readStateA };
 const readPartB = { type: 'tool', tool: 'read', state: readStateB };
 const dedupInPlace = {
   messages: [
-    { info: { id: 'dedup-m1', agent: 'orchestrator' }, parts: [readPartA] },
-    { info: { id: 'dedup-m2', agent: 'orchestrator' }, parts: [readPartB] },
+    { info: { id: 'dedup-m1', agent: 'manager' }, parts: [readPartA] },
+    { info: { id: 'dedup-m2', agent: 'manager' }, parts: [readPartB] },
   ],
 };
 const dedupMessagesRef = dedupInPlace.messages;
@@ -657,8 +642,8 @@ const supersetState = { output: `${stableContent}${'new content\n'.repeat(8)}` }
 const supersetPart = { type: 'tool', tool: 'read', state: supersetState };
 const dedupSuperset = {
   messages: [
-    { info: { id: 'dedup-s1', agent: 'orchestrator' }, parts: [readPartA] },
-    { info: { id: 'dedup-s2', agent: 'orchestrator' }, parts: [supersetPart] },
+    { info: { id: 'dedup-s1', agent: 'manager' }, parts: [readPartA] },
+    { info: { id: 'dedup-s2', agent: 'manager' }, parts: [supersetPart] },
   ],
 };
 await p['experimental.chat.messages.transform']({}, dedupSuperset);
@@ -689,8 +674,8 @@ check('loop execute returns Promise', loopExecResult && typeof loopExecResult.th
 const loopResolved = await loopExecResult;
 check('loop resolve is string with task', typeof loopResolved === 'string' && loopResolved.includes('some task'));
 
-// ── Agent config: browser/summarizer get proper builtin parent config ──
-const agentCfgResult = await p.config({ agent: { browser: { model: 'kimi-for-coding/k2p7' }, summarizer: { model: 'opencode-go/deepseek-v4-flash' }, plan: { disable: true }, custom: { model: 'custom-model' } } });
+// ── Agent config: browser/executor get proper builtin config ──
+const agentCfgResult = await p.config({ agent: { browser: { model: 'kimi-for-coding/k2p7' }, executor: { model: 'opencode-go/deepseek-v4-flash' }, custom: { model: 'custom-model' } } });
 check('agent config returns object', typeof agentCfgResult === 'object');
 const browserAgent = agentCfgResult?.agent?.browser;
 check('browser builtin system prompt empty', browserAgent?.prompt === '');
@@ -698,32 +683,25 @@ check('browser mode is subagent', browserAgent?.mode === 'subagent');
 check('browser mcps includes stealth-browser-mcp', Array.isArray(browserAgent?.mcps) && browserAgent.mcps.includes('stealth-browser-mcp'));
 check('browser permission allows stealth-browser-mcp_*', browserAgent?.permission?.['stealth-browser-mcp_*'] === 'allow');
 check('browser tools enables stealth-browser-mcp_*', browserAgent?.tools?.['stealth-browser-mcp_*'] === true);
-const summarizerAgent = agentCfgResult?.agent?.summarizer;
-check('summarizer builtin system prompt empty', summarizerAgent?.prompt === '');
-check('summarizer mode is subagent', summarizerAgent?.mode === 'subagent');
-check('summarizer tools disabled', summarizerAgent?.tools?.agent_report !== true && summarizerAgent?.tools?.read === false);
-check('user plan disable preserved', agentCfgResult?.agent?.plan?.disable === true);
+const executorAgent = agentCfgResult?.agent?.executor;
+check('executor builtin system prompt empty', executorAgent?.prompt === '');
+check('executor mode is subagent', executorAgent?.mode === 'subagent');
+check('executor tools agent_report true', executorAgent?.tools?.agent_report === true);
+check('executor tools read false', executorAgent?.tools?.read === false);
 
 // ── Role defaults applied to all agents, preserving user fields ──
 const customAgent = agentCfgResult?.agent?.custom;
 check('custom agent exists', typeof customAgent === 'object');
 check('custom agent model preserved', customAgent?.model === 'custom-model');
-check('custom agent gets reverie bash deny', customAgent?.permission?.bash === 'deny');
-check('custom agent gets reverie stealth-browser deny', customAgent?.permission?.['stealth-browser-mcp_*'] === 'deny');
+check('custom agent bash deny', customAgent?.permission?.bash === 'deny');
+check('custom agent stealth-browser deny', customAgent?.permission?.['stealth-browser-mcp_*'] === 'deny');
 check('custom agent mode subagent', customAgent?.mode === 'subagent');
 
-const planAgent = agentCfgResult?.agent?.plan;
-check('plan disable preserved', planAgent?.disable === true);
-check('plan gets reverie bash deny', planAgent?.permission?.bash === 'deny');
-check('plan gets reverie stealth-browser deny', planAgent?.permission?.['stealth-browser-mcp_*'] === 'deny');
-check('plan submit_plan_branch permission denied', planAgent?.permission?.submit_plan_branch === 'deny');
-check('plan submit_plan_branch tool disabled', planAgent?.tools?.submit_plan_branch === false);
-check('plan mode subagent', planAgent?.mode === 'subagent');
-
-const orchestratorAgent = agentCfgResult?.agent?.orchestrator;
-check('orchestrator exists', typeof orchestratorAgent === 'object');
-check('orchestrator stealth-browser denied', orchestratorAgent?.permission?.['stealth-browser-mcp_*'] === 'deny');
-check('orchestrator mcps empty', Array.isArray(orchestratorAgent?.mcps) && orchestratorAgent.mcps.length === 0);
+const managerAgent = agentCfgResult?.agent?.manager;
+check('manager exists', typeof managerAgent === 'object');
+check('manager stealth-browser denied', managerAgent?.permission?.['stealth-browser-mcp_*'] === 'deny');
+check('manager mcps empty', Array.isArray(managerAgent?.mcps) && managerAgent.mcps.length === 0);
+check('manager mode primary', managerAgent?.mode === 'primary');
 
 // ── Legacy agents dropped ──
 const legacyResult = await p.config({ agent: { basher: { customField: 'from-basher' }, runner: { customField: 'from-runner' } } });
@@ -733,18 +711,18 @@ check('runner dropped', legacyResult?.agent?.runner === undefined);
 // ── chat.message enforces tool boundaries ──
 check('plugin.chat.message', typeof p['chat.message'] === 'function');
 
-const orchChat = { message: { tools: { 'stealth-browser-mcp_*': true, 'stealth-browser-mcp_foo': true, 'submit_plan_branch': true, 'read': true } } };
-await p['chat.message']({ sessionID: 'root', agent: 'orchestrator' }, orchChat);
-check('orch stealth-browser-mcp_* disabled', orchChat.message.tools['stealth-browser-mcp_*'] === false);
-check('orch stealth-browser-mcp_foo disabled', orchChat.message.tools['stealth-browser-mcp_foo'] === false);
-check('orch submit_plan_branch disabled', orchChat.message.tools['submit_plan_branch'] === false);
-check('orch read preserved', orchChat.message.tools['read'] === true);
+const orchChat = { message: { tools: { 'stealth-browser-mcp_*': true, 'stealth-browser-mcp_foo': true, 'write': true, 'read': true } } };
+await p['chat.message']({ sessionID: 'root', agent: 'manager' }, orchChat);
+check('manager stealth-browser-mcp_* disabled', orchChat.message.tools['stealth-browser-mcp_*'] === false);
+check('manager stealth-browser-mcp_foo disabled', orchChat.message.tools['stealth-browser-mcp_foo'] === false);
+check('manager write disabled', orchChat.message.tools['write'] === false);
+check('manager read preserved', orchChat.message.tools['read'] === true);
 
-const editorChat = { message: { tools: { 'stealth-browser-mcp_bar': true, 'patch': true } } };
-await p['chat.message']({ sessionID: 'root', agent: 'editor' }, editorChat);
-check('editor stealth-browser-mcp_bar disabled', editorChat.message.tools['stealth-browser-mcp_bar'] === false);
-check('editor stealth-browser-mcp_* disabled', editorChat.message.tools['stealth-browser-mcp_*'] === false);
-check('editor patch preserved', editorChat.message.tools['patch'] === true);
+const coderChat = { message: { tools: { 'stealth-browser-mcp_bar': true, 'stealth-browser-mcp_*': true, 'patch': true } } };
+await p['chat.message']({ sessionID: 'root', agent: 'coder' }, coderChat);
+check('coder stealth-browser-mcp_bar disabled', coderChat.message.tools['stealth-browser-mcp_bar'] === false);
+check('coder stealth-browser-mcp_* disabled', coderChat.message.tools['stealth-browser-mcp_*'] === false);
+check('coder patch preserved', coderChat.message.tools['patch'] === true);
 
 const browserChat = { message: { tools: { 'stealth-browser-mcp_*': true, 'stealth-browser-mcp_foo': true, 'read': true } } };
 await p['chat.message']({ sessionID: 'root', agent: 'browser' }, browserChat);
@@ -759,32 +737,32 @@ check('child session resolves to browser', childChat.message.tools['stealth-brow
 unregisterChildAgent('child-browser-session');
 
 const childOrchChat = { message: { tools: { 'stealth-browser-mcp_*': true } } };
-registerChildAgent('child-orch-session', 'orchestrator', undefined);
+registerChildAgent('child-orch-session', 'manager', undefined);
 await p['chat.message']({ sessionID: 'child-orch-session' }, childOrchChat);
 check('child session resolves to orchestrator', childOrchChat.message.tools['stealth-browser-mcp_*'] === false);
 unregisterChildAgent('child-orch-session');
 
 // ── chat.message websearch/webfetch tool boundaries ──
 const orchWebChat = { message: { tools: { websearch: true, webfetch: true, read: true } } };
-await p['chat.message']({ sessionID: 'root', agent: 'orchestrator' }, orchWebChat);
+await p['chat.message']({ sessionID: 'root', agent: 'manager' }, orchWebChat);
 check('orch websearch preserved', orchWebChat.message.tools.websearch === true);
 check('orch webfetch preserved', orchWebChat.message.tools.webfetch === true);
 check('orch read preserved alongside web tools', orchWebChat.message.tools.read === true);
 
 const editorWebChat = { message: { tools: { websearch: true, webfetch: true, patch: true } } };
-await p['chat.message']({ sessionID: 'root', agent: 'editor' }, editorWebChat);
+await p['chat.message']({ sessionID: 'root', agent: 'coder' }, editorWebChat);
 check('editor websearch forced false', editorWebChat.message.tools.websearch === false);
 check('editor webfetch forced false', editorWebChat.message.tools.webfetch === false);
 check('editor patch preserved', editorWebChat.message.tools.patch === true);
 
-const greperWebChat = { message: { tools: { websearch: true, webfetch: true, fuzzy_find: true } } };
-await p['chat.message']({ sessionID: 'root', agent: 'greper' }, greperWebChat);
-check('greper websearch forced false', greperWebChat.message.tools.websearch === false);
-check('greper webfetch forced false', greperWebChat.message.tools.webfetch === false);
-check('greper fuzzy_find preserved', greperWebChat.message.tools.fuzzy_find === true);
+const readerWebChat = { message: { tools: { websearch: true, webfetch: true, 'fuzzy-find': true } } };
+await p['chat.message']({ sessionID: 'root', agent: 'reader' }, readerWebChat);
+check('reader websearch forced false', readerWebChat.message.tools.websearch === false);
+check('reader webfetch forced false', readerWebChat.message.tools.webfetch === false);
+check('reader fuzzy-find preserved', readerWebChat.message.tools['fuzzy-find'] === true);
 
 const reverieWebChat = { message: { tools: { websearch: true, webfetch: true } } };
-await p['chat.message']({ sessionID: 'root', agent: 'reverie' }, reverieWebChat);
+await p['chat.message']({ sessionID: 'root', agent: 'meditator' }, reverieWebChat);
 check('reverie websearch forced false', reverieWebChat.message.tools.websearch === false);
 check('reverie webfetch forced false', reverieWebChat.message.tools.webfetch === false);
 
@@ -799,13 +777,13 @@ check('plugin.tool.execute.before', typeof p['tool.execute.before'] === 'functio
 
 // tool.definition: strip internal `_ui` from editor/greper schemas
 const editorDefOut = { parameters: { properties: { intents: { type: 'array' }, _ui: { type: 'string' } }, required: ['intents', '_ui'] } };
-await p['tool.definition']({ toolID: 'editor' }, editorDefOut);
+await p['tool.definition']({ toolID: 'coder' }, editorDefOut);
 check('tool.definition strips editor _ui property', editorDefOut.parameters.properties._ui === undefined);
 check('tool.definition strips editor _ui required', !editorDefOut.parameters.required.includes('_ui'));
 check('tool.definition keeps editor intents property', editorDefOut.parameters.properties.intents !== undefined);
 
 const greperDefOut = { parameters: { properties: { intents: { type: 'array' }, _ui: { type: 'string' } }, required: ['intents', '_ui'] } };
-await p['tool.definition']({ toolID: 'greper' }, greperDefOut);
+await p['tool.definition']({ toolID: 'reader' }, greperDefOut);
 check('tool.definition strips greper _ui property', greperDefOut.parameters.properties._ui === undefined);
 check('tool.definition strips greper _ui required', !greperDefOut.parameters.required.includes('_ui'));
 
@@ -815,19 +793,19 @@ check('tool.definition leaves other tools alone', otherDefOut.parameters.propert
 
 // tool.execute.before: populate `_ui` from joined intents
 const editorExecOut = { args: { intents: [['fix bug', ['a.ts']], ['add feature', ['b.ts']]] } };
-await p['tool.execute.before']({ tool: 'editor', sessionID: 's1', callID: 'c1' }, editorExecOut);
+await p['tool.execute.before']({ tool: 'coder', sessionID: 's1', callID: 'c1' }, editorExecOut);
 check('tool.execute.before populates editor _ui', editorExecOut.args._ui === 'fix bug; add feature');
 
 const editorObjOut = { args: { intents: [{ 0: 'fix bug', 1: ['a.ts'] }, { 0: 'add feature', 1: ['b.ts'] }] } };
-await p['tool.execute.before']({ tool: 'editor', sessionID: 's1', callID: 'c1' }, editorObjOut);
+await p['tool.execute.before']({ tool: 'coder', sessionID: 's1', callID: 'c1' }, editorObjOut);
 check('tool.execute.before populates editor _ui from object tuples', editorObjOut.args._ui === 'fix bug; add feature');
 
 const greperExecOut = { args: { intents: ['find usages', 'list exports'] } };
-await p['tool.execute.before']({ tool: 'greper', sessionID: 's1', callID: 'c2' }, greperExecOut);
+await p['tool.execute.before']({ tool: 'reader', sessionID: 's1', callID: 'c2' }, greperExecOut);
 check('tool.execute.before populates greper _ui', greperExecOut.args._ui === 'find usages; list exports');
 
 const invalidUiOut = { args: { intents: ['x'], _ui: 123 } };
-await p['tool.execute.before']({ tool: 'greper', sessionID: 's1', callID: 'c3' }, invalidUiOut);
+await p['tool.execute.before']({ tool: 'reader', sessionID: 's1', callID: 'c3' }, invalidUiOut);
 check('tool.execute.before rejects non-string _ui', typeof invalidUiOut.args._ui === 'string' && invalidUiOut.args._ui.includes('must be a string'));
 
 // ── Subagent parent relationship: child sessions must receive parentID ──
@@ -872,5 +850,5 @@ const mockClient2 = {
   }
 };
 await runSubagent(mockClient2, 'browser', 'Browser', 'first', '/tmp/vibe', 'root-session', { abort: null });
-await runSubagent(mockClient2, 'editor', 'Editor', 'second', '/tmp/vibe', 'child-1', { abort: null });
+await runSubagent(mockClient2, 'coder', 'Editor', 'second', '/tmp/vibe', 'child-1', { abort: null });
 check('nested subagent resolves to root parent', createCalls2[1]?.body?.parentID === 'root-session');

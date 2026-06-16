@@ -1,80 +1,79 @@
 module VibeFs.Tests.AgentTests
 
 open VibeFs.Tests.Assert
-open VibeFs.Kernel.AgentRole
-open VibeFs.Kernel.Permission
-open VibeFs.Kernel.AgentPolicy
+open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.HostKernel
-open VibeFs.Kernel.MuxPolicy
 open VibeFs.Kernel.Nudge
 
-let role () =
-    let parse = VibeFs.Kernel.AgentRole.ofString
-    let show = VibeFs.Kernel.AgentRole.toString
-    equal "parse orchestrator" (Ok Orchestrator) (parse "orchestrator")
-    equal "parse editor" (Ok Editor) (parse "editor")
-    check "invalid role errors" (parse "nope" |> Result.isError)
-    allRoles |> List.iter (fun r -> equal "role roundtrip" r (show r |> parse |> Result.defaultValue r))
+let canUse' () =
+    check "agent_report for manager" (canUse "manager" "agent_report")
+    check "agent_report for reader" (canUse "reader" "agent_report")
+    check "agent_report for coder" (canUse "coder" "agent_report")
 
-let policy () =
-    let orchestrator = effectivePolicy Orchestrator
-    check "orchestrator can read" (List.contains "read" orchestrator.allowedTools)
-    check "orchestrator can todowrite" (List.contains "todowrite" orchestrator.allowedTools)
-    check "orchestrator fuzzy_find allowed" (List.contains "fuzzy_find" orchestrator.allowedTools)
-    check "orchestrator fuzzy_find not in deniedTools" (not (List.contains "fuzzy_find" orchestrator.deniedTools))
-    check "orchestrator fuzzy_grep denied" (List.contains "fuzzy_grep" orchestrator.deniedTools)
-    check "orchestrator fuzzy_grep not allowed" (not (List.contains "fuzzy_grep" orchestrator.allowedTools))
-    check "editor can write" (List.contains "write" (effectivePolicy Editor).allowedTools)
-    check "reviewer submit_review_result" (List.contains "submit_review_result" (effectivePolicy Reviewer).allowedTools)
-    check "greper fuzzy_grep" (List.contains "fuzzy_grep" (effectivePolicy Greper).allowedTools)
-    equal "bash denied" (Some Deny) (Map.tryFind "bash" orchestrator.permissions)
-    check "question denied for editor" (Map.tryFind "question" (effectivePolicy Editor).permissions = Some Deny)
+    check "bash denied for manager" (not (canUse "manager" "bash"))
+    check "bash_.* denied for coder" (not (canUse "coder" "bash_run"))
+    check "task denied for reader" (not (canUse "reader" "task"))
+    check "grep denied exact" (not (canUse "manager" "grep"))
+    check "fuzzy-grep not caught by grep rule" (canUse "reader" "fuzzy-grep")
 
-let private toolPermissionLabel = function Allow -> "allow" | Deny -> "deny"
+    check "stealth for browser" (canUse "browser" "stealth-browser-mcp_navigate")
+    check "stealth denied for manager" (not (canUse "manager" "stealth-browser-mcp_navigate"))
 
-let private roleLabel (role: AgentRole) = VibeFs.Kernel.AgentRole.toString role
+    check "return-reviewer for reviewer" (canUse "reviewer" "return-reviewer")
+    check "return-reviewer denied for manager" (not (canUse "manager" "return-reviewer"))
 
-let private expectedAllowedDenied (role: AgentRole) =
-    let tools = toolMapFor role
-    canonicalToolNames
-    |> List.choose (fun name -> Map.tryFind name tools |> Option.map (fun p -> name, p))
-    |> List.partition (fun (_, p) -> p = Allow)
-    |> fun (allowed, denied) -> List.map fst allowed, List.map fst denied
+    check "meditator denied read" (not (canUse "meditator" "read"))
+    check "executor denied read" (not (canUse "executor" "read"))
+    check "meditator agent_report ok" (canUse "meditator" "agent_report")
 
-let effectivePolicyDeniedToolsCrossValidation () =
-    allRoles
-    |> List.iter (fun role ->
-        let policy = effectivePolicy role
-        let tools = toolMapFor role
-        let permissions = defaultPermissions role
-        let expectedAllowed, expectedDenied =
-            expectedAllowedDenied role
-        let expectedDeniedPermissions =
-            permissions
-            |> Map.toList
-            |> List.choose (fun (n, p) -> if p = Deny then Some n else None)
-        equal $"{roleLabel role} role" role policy.role
-        equal $"{roleLabel role} tools" tools policy.tools
-        equal $"{roleLabel role} permissions" permissions policy.permissions
-        equal $"{roleLabel role} allowedTools" expectedAllowed policy.allowedTools
-        equal $"{roleLabel role} deniedTools" expectedDenied policy.deniedTools
-        equal $"{roleLabel role} deniedPermissions" expectedDeniedPermissions policy.deniedPermissions
-        let union = Set.ofList (policy.allowedTools @ policy.deniedTools)
-        check $"{roleLabel role} allowed+denied disjoint" (union.Count = policy.allowedTools.Length + policy.deniedTools.Length)
-        check $"{roleLabel role} covers canonical tools" (union.Count = canonicalToolNames.Length))
+    check "reviewer can read" (canUse "reviewer" "read")
+    check "reviewer denied coder" (not (canUse "reviewer" "coder"))
+    check "reviewer denied fuzzy-find" (not (canUse "reviewer" "fuzzy-find"))
 
-let subagentToolPolicyUsesHostToolNames () =
-  allRoles
-  |> List.iter (fun role ->
-    equal $"{roleLabel role} subagent disabledTools"
-      (expandPatterns ((effectivePolicy role).deniedTools))
-      (subagentToolPolicy role).disabledTools)
+    check "browser can read" (canUse "browser" "read")
+    check "browser denied coder" (not (canUse "browser" "coder"))
 
-  check "orchestrator subagent disables apply_patch"
-    (List.contains "apply_patch" (subagentToolPolicy Orchestrator).disabledTools)
-  check "editor subagent keeps apply_patch"
-    (not (List.contains "apply_patch" (subagentToolPolicy Editor).disabledTools))
+    check "reader can read" (canUse "reader" "read")
+    check "reader can executor" (canUse "reader" "executor")
+    check "reader can fuzzy-find" (canUse "reader" "fuzzy-find")
+    check "reader can fuzzy-grep" (canUse "reader" "fuzzy-grep")
+    check "reader denied write" (not (canUse "reader" "write"))
+    check "reader denied coder dispatch" (not (canUse "reader" "coder"))
+    check "reader denied todo" (not (canUse "reader" "todowrite"))
 
+    check "coder can read" (canUse "coder" "read")
+    check "coder can write" (canUse "coder" "write")
+    check "coder can edit" (canUse "coder" "edit")
+    check "coder can fuzzy-find" (canUse "coder" "fuzzy-find")
+    check "coder can fuzzy-grep" (canUse "coder" "fuzzy-grep")
+    check "coder denied reader dispatch" (not (canUse "coder" "reader"))
+    check "coder denied todo" (not (canUse "coder" "todowrite"))
+
+    check "manager can read" (canUse "manager" "read")
+    check "manager can coder dispatch" (canUse "manager" "coder")
+    check "manager can reader dispatch" (canUse "manager" "reader")
+    check "manager can meditator dispatch" (canUse "manager" "meditator")
+    check "manager can todo" (canUse "manager" "todowrite")
+    check "manager can fuzzy-find" (canUse "manager" "fuzzy-find")
+    check "manager denied fuzzy-grep" (not (canUse "manager" "fuzzy-grep"))
+    check "manager denied write" (not (canUse "manager" "write"))
+    check "manager denied edit" (not (canUse "manager" "edit"))
+
+    check "unknown agent can read" (canUse "build" "read")
+    check "unknown agent can write" (canUse "build" "write")
+    check "unknown agent can coder dispatch" (canUse "build" "coder")
+    check "unknown agent can reader dispatch" (canUse "build" "reader")
+
+let deniedTools' () =
+    let tools = [ "coder"; "reader"; "read"; "write"; "bash"; "fuzzy-find"; "fuzzy-grep"; "agent_report" ]
+    let denied = deniedTools "reader" tools |> Set.ofList
+    check "reader denied write" (Set.contains "write" denied)
+    check "reader denied bash" (Set.contains "bash" denied)
+    check "reader denied coder dispatch" (Set.contains "coder" denied)
+    check "reader keeps read" (not (Set.contains "read" denied))
+    check "reader keeps fuzzy-find" (not (Set.contains "fuzzy-find" denied))
+    check "reader keeps fuzzy-grep" (not (Set.contains "fuzzy-grep" denied))
+    check "reader keeps agent_report" (not (Set.contains "agent_report" denied))
 
 let private nudgeContext todos msg runner loopActive =
     { todos = todos; lastAssistantMessage = msg; hasActiveRunner = runner; isLoopActive = loopActive }

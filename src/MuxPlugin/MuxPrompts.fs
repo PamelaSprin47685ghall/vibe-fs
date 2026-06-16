@@ -6,18 +6,18 @@ let private agentReportClosing =
     "When you have finished the task, you MUST call the agent_report tool. "
     + "Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings."
 
-let formatMuxEditorUserPrompt (intent: string) (affectedFiles: string list) : string =
-    editorPromptBody intent affectedFiles
+let formatMuxCoderUserPrompt (intent: string) (affectedFiles: string list) : string =
+    coderPromptBody intent affectedFiles
     + "4. Finish by calling agent_report with a summary of changes and verification results.\n\n"
     + agentReportClosing + "\n\n"
 
-let formatMuxGreperUserPrompt (intent: string) : string =
-    greperPromptBody intent
+let formatMuxReaderUserPrompt (intent: string) : string =
+    readerPromptBody intent
     + "3. Finish by calling agent_report with structuredOutput containing relatedFiles and relatedCode.\n\n"
     + agentReportClosing + "\n\n"
 
-let formatMuxReverieUserPrompt (intent: string) (files: string list) : string =
-    reveriePromptBody intent files
+let formatMuxMeditatorUserPrompt (intent: string) (files: string list) : string =
+    meditatorPromptBody intent files
     + "3. Finish by calling agent_report with structuredOutput containing relatedFiles and relatedCode.\n\n"
     + agentReportClosing + "\n\n"
 

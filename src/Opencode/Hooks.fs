@@ -4,18 +4,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Shell.TreeSitterShell
 
-let private defaultExcludedAgents = [ "browser"; "greper"; "summarizer"; "title" ]
-
-let private restrictedPlanToolNames =
-    [ "submit_plan_hypotheses"
-      "submit_plan_branch"
-      "submit_plan_critique"
-      "submit_plan_pool"
-      "submit_plan_revision"
-      "submit_plan_judge" ]
+let private defaultExcludedAgents = [ "browser"; "reader"; "executor"; "title" ]
 
 let private emptyObj () : obj = createObj []
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
@@ -46,9 +39,9 @@ let private isStringArray (value: obj) : bool =
             index <- index + 1
         allStrings
 
-let private joinGreperIntents (intents: obj) : Result<string, string> =
+let private joinReaderIntents (intents: obj) : Result<string, string> =
     if not (Dyn.isArray intents) || not (isStringArray intents) then
-        Error "Invalid LLM input for greper: intents must be an array of strings"
+        Error "Invalid LLM input for reader: intents must be an array of strings"
     else
         let items: obj array = unbox intents
         let texts = Array.zeroCreate<string> items.Length
@@ -56,9 +49,9 @@ let private joinGreperIntents (intents: obj) : Result<string, string> =
             texts.[index] <- string items.[index]
         Ok (String.concat "; " texts)
 
-let private joinEditorIntents (intents: obj) : Result<string, string> =
+let private joinCoderIntents (intents: obj) : Result<string, string> =
     if not (Dyn.isArray intents) then
-        Error "Invalid LLM input for editor: intents must be an array"
+        Error "Invalid LLM input for coder: intents must be an array"
     else
         let items: obj array = unbox intents
         let firstItems = Array.zeroCreate<string> items.Length
@@ -70,7 +63,7 @@ let private joinEditorIntents (intents: obj) : Result<string, string> =
             else firstItems.[index] <- string firstItem
             index <- index + 1
         if invalid then
-            Error "Invalid LLM input for editor: each intent must start with a string"
+            Error "Invalid LLM input for coder: each intent must start with a string"
         else
             Ok (String.concat "; " firstItems)
 
@@ -95,69 +88,25 @@ let private stripUiParameter (parameters: obj) : unit =
         setKey parameters "properties" nextProps
         setKey parameters "required" nextRequired
 
-/// Resolve the effective agent for a chat message: explicit agent, registered
-/// child session, or orchestrator.
 let private resolveAgent (input: obj) : string =
     let explicit = Dyn.str input "agent"
     if explicit <> "" then explicit
     else
         match ChildAgent.lookupChildAgent (Dyn.str input "sessionID") with
         | Some a -> a
-        | None -> "orchestrator"
+        | None -> "manager"
 
-/// Merge user tool overrides onto defaults. Defaults are authoritative: an
-/// explicit false in current can disable a default-true tool, but an explicit
-/// true cannot enable a tool that defaults to false. Extra keys in current
-/// (dynamic tools such as stealth-browser-mcp_foo) are preserved only when
-/// their value is a boolean.
-let private mergeTools (current: obj) (defaults: obj) : obj =
-    let merged = emptyObj ()
-    for key in objectKeys defaults do
-        setKey merged key (Dyn.get defaults key)
-    if not (Dyn.isNullish current) then
-        for key in objectKeys current do
-            let currentValue = Dyn.get current key
-            let defaultValue = Dyn.get defaults key
-            if Dyn.isNullish defaultValue then
-                if Dyn.typeIs currentValue "boolean" then
-                    setKey merged key currentValue
-            else
-                if Dyn.typeIs defaultValue "boolean" && Dyn.typeIs currentValue "boolean" then
-                    if defaultValue :?> bool then
-                        setKey merged key currentValue
-                    elif not (currentValue :?> bool) then
-                        setKey merged key (box false)
-    merged
-
-/// For non-browser agents, strip every stealth-browser-mcp tool.
-let private applyStealthBrowserRestrictions (tools: obj) (agent: string) : obj =
-    if agent = "browser" then tools
-    else
-        let next = emptyObj ()
-        for key in objectKeys tools do
-            if key.StartsWith("stealth-browser-mcp_") then
-                setKey next key (box false)
-            else
-                setKey next key (Dyn.get tools key)
-        setKey next "stealth-browser-mcp_*" (box false)
-        next
-
-let private applyPlanToolRestrictions (tools: obj) : obj =
+/// Filter tools at runtime by `canUse`.  Denied tools are forced false;
+/// allowed tools keep their existing value so users may opt out.
+let private resolveChatTools (agent: string) (existingTools: obj) : obj =
     let next = emptyObj ()
-    for key in objectKeys tools do
-        setKey next key (Dyn.get tools key)
-    for name in restrictedPlanToolNames do
-        setKey next name (box false)
+    if not (Dyn.isNullish existingTools) then
+        for key in objectKeys existingTools do
+            if canUse agent key then
+                setKey next key (Dyn.get existingTools key)
+            else
+                setKey next key (box false)
     next
-
-/// Re-apply an agent's tool defaults and enforce browser-MCP boundaries.
-let private resolveChatTools (agent: string) (existingTools: obj) : obj option =
-    match AgentRole.ofString agent with
-    | Error _ -> None
-    | Ok role ->
-        let defaults = AgentConfig.toolDefaults role
-        let merged = mergeTools existingTools defaults
-        Some (applyPlanToolRestrictions (applyStealthBrowserRestrictions merged agent))
 
 /// chat.message: enforce per-agent tool boundaries at runtime.
 let chatMessage (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
@@ -168,9 +117,8 @@ let chatMessage (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (o
         let message = Dyn.get output "message"
         if not (Dyn.isNullish message) then
             let tools = Dyn.get message "tools"
-            match resolveChatTools agent tools with
-            | Some next -> setKey message "tools" next
-            | None -> ()
+            if not (Dyn.isNullish tools) then
+                setKey message "tools" (resolveChatTools agent tools)
     } |> Async.StartAsPromise
 
 /// tool.execute.after: syntax-check file edits and delegate to the nudge hook.
@@ -201,11 +149,6 @@ let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.N
 
 open VibeFs.Kernel.Dedup
 
-/// Deduplicate repeated `read` tool outputs across messages to reduce token use.
-/// Mutates `state.output` in place; never swaps part/state/array references.
-/// The opencode host keys internal bookkeeping off those references and ignores
-/// replacements, so building a new object chain (Dyn.withKey / Array.copy)
-/// silently no-ops.
 let private applyReadDedup (messages: obj array) : unit =
     if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
     else
@@ -243,9 +186,6 @@ let private applyReadDedup (messages: obj array) : unit =
                                     | AlreadySeen -> setOutput state dedupMarker
                                     | NewContent _ -> ()
 
-/// messages.transform: synthesise a user+assistant read pair from CAPS files.
-/// Mutates output.messages in place so the host never sees a swapped array reference.
-/// CAPS context is only injected for non-title agents; title-agent sessions are skipped.
 let messagesTransform (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let messages = Dyn.get output "messages"
@@ -264,11 +204,11 @@ let messagesTransform (directory: string) (input: obj) (output: obj) : JS.Promis
             applyReadDedup messagesArr
     } |> Async.StartAsPromise
 
-/// tool.definition: hide the internal `_ui` parameter from editor/greper schemas.
+/// tool.definition: hide the internal `_ui` parameter from coder/reader schemas.
 let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let toolID = Dyn.str input "toolID"
-        if toolID = "editor" || toolID = "greper" then
+        if toolID = "coder" || toolID = "reader" then
             let parameters = Dyn.get output "parameters"
             if not (Dyn.isNullish parameters) then stripUiParameter parameters
     } |> Async.StartAsPromise
@@ -283,12 +223,12 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
             let existingUi = Dyn.get args "_ui"
             if not (Dyn.isNullish existingUi) && not (Dyn.typeIs existingUi "string") then
                 setKey args "_ui" (box $"Invalid LLM input for {tool}: _ui must be a string, received {jsTypeof existingUi}")
-            elif tool = "editor" then
-                match joinEditorIntents (Dyn.get args "intents") with
+            elif tool = "coder" then
+                match joinCoderIntents (Dyn.get args "intents") with
                 | Error e -> setKey args "_ui" (box e)
                 | Ok ui -> setKey args "_ui" (box ui)
-            elif tool = "greper" then
-                match joinGreperIntents (Dyn.get args "intents") with
+            elif tool = "reader" then
+                match joinReaderIntents (Dyn.get args "intents") with
                 | Error e -> setKey args "_ui" (box e)
                 | Ok ui -> setKey args "_ui" (box ui)
     } |> Async.StartAsPromise

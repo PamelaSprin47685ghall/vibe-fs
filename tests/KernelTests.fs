@@ -7,7 +7,6 @@ open VibeFs.Kernel.Dedup
 open VibeFs.Kernel.HeadTail
 open VibeFs.Kernel.IpAllowlist
 open VibeFs.Kernel.Lru
-open VibeFs.Kernel.MuxPolicy
 open VibeFs.Kernel.ExcludedDirs
 open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.Prompts
@@ -44,13 +43,6 @@ let ipStrict () =
     let r = isIpAllowed "8.8.8.8"
     check "public allowed" r
 
-let muxPolicy' () =
-    let editor = resolveMuxToolPolicy "editor"
-    let orchestrator = resolveMuxToolPolicy "orchestrator"
-    check "editor disables task" (List.contains "task" editor.disabledTools)
-    check "editor keeps apply_patch" (not (List.contains "apply_patch" editor.disabledTools))
-    check "orchestrator disables apply_patch" (List.contains "apply_patch" orchestrator.disabledTools)
-
 let excludedDirs' () =
     let r = isExcludedDir "node_modules"
     check "node_modules excluded" r
@@ -67,12 +59,12 @@ let jsBoundary' () =
     check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = MessageAborted)
 
 let hostKernel' () =
-    let intent = formatEditorUserPrompt "fix bug" [ "a.ts"; "b.ts" ]
-    check "editor has file" (intent.IndexOf("a.ts") >= 0)
-    let prompt = buildReveriePrompt [ { file = "x.fs"; content = Some "let x = 1" } ] "why?"
-    check "reverie has question" (prompt.IndexOf("why?") >= 0)
-    check "reverie has content" (prompt.IndexOf("let x = 1") >= 0)
-    check "reverie read-only" (prompt.IndexOf("READ-ONLY") >= 0)
-    let greper = formatGreperUserPrompt "find auth"
-    check "greper has intent" (greper.IndexOf("find auth") >= 0)
-    check "greper read-only" (greper.IndexOf("READ-ONLY") >= 0)
+    let intent = formatCoderUserPrompt "fix bug" [ "a.ts"; "b.ts" ]
+    check "coder has file" (intent.IndexOf("a.ts") >= 0)
+    let prompt = buildMeditatorPrompt [ { file = "x.fs"; content = Some "let x = 1" } ] "why?"
+    check "meditator has question" (prompt.IndexOf("why?") >= 0)
+    check "meditator has content" (prompt.IndexOf("let x = 1") >= 0)
+    check "meditator read-only" (prompt.IndexOf("READ-ONLY") >= 0)
+    let readerPrompt = formatReaderUserPrompt "find auth"
+    check "reader has intent" (readerPrompt.IndexOf("find auth") >= 0)
+    check "reader read-only" (readerPrompt.IndexOf("READ-ONLY") >= 0)
