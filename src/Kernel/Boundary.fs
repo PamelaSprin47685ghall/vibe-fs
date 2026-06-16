@@ -30,3 +30,16 @@ module Id =
     let toolIdValue (ToolId v) = v
     let callIdValue (CallId v) = v
     let childIdValue (ChildId v) = v
+
+    let sessionIdQuick (input: string) : SessionId = SessionId input
+    let workspaceIdQuick (input: string) : WorkspaceId = WorkspaceId input
+    let agentIdQuick (input: string) : AgentId = AgentId input
+
+    let trySessionId (input: string) : SessionId option =
+        match parse "SessionId" input with Ok v -> Some(SessionId v) | _ -> None
+
+    let tryWorkspaceId (input: string) : WorkspaceId option =
+        match parse "WorkspaceId" input with Ok v -> Some(WorkspaceId v) | _ -> None
+
+    let tryAgentId (input: string) : AgentId option =
+        match parse "AgentId" input with Ok v -> Some(AgentId v) | _ -> None

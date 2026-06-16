@@ -19,13 +19,9 @@ let isFileEditTool (tool: string) : bool = Set.contains (tool.ToLowerInvariant (
 let extractFilePaths (args: obj) : string list =
     if Dyn.isNullish args then []
     else
-        let candidate = Dyn.get args "path"
-        let candidate =
-            if Dyn.isNullish candidate then Dyn.get args "file_path" else candidate
-        let candidate =
-            if Dyn.isNullish candidate then Dyn.get args "filePath" else candidate
-        if not (Dyn.isNullish candidate) && string candidate <> "" then [ string candidate ]
-        else
+        match MessageDecoder.firstPresent [ "path"; "file_path"; "filePath" ] args with
+        | Some path when path <> "" -> [ path ]
+        | _ ->
             let patchText = Dyn.get args "patchText"
             if not (Dyn.isNullish patchText) && string patchText <> "" then
                 (string patchText).Split('\n')

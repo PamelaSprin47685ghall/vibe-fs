@@ -45,16 +45,16 @@ let formatReadOutput (filePath: string) (content: string) : string =
     ]
 
 let private messageId (msg: obj) : string =
-    let info = Dyn.get msg "info"
-    if Dyn.isNullish info then "" else Dyn.str info "id"
+    let info = MessageDecoder.messageInfo msg
+    if Dyn.isNullish info then "" else MessageDecoder.infoId info
 
 let private messageAgent (msg: obj) : string =
-    let info = Dyn.get msg "info"
-    if Dyn.isNullish info then "" else Dyn.str info "agent"
+    let info = MessageDecoder.messageInfo msg
+    if Dyn.isNullish info then "" else MessageDecoder.infoAgent info
 
 let private messageSessionID (msg: obj) : string =
-    let info = Dyn.get msg "info"
-    if Dyn.isNullish info then "" else Dyn.str info "sessionID"
+    let info = MessageDecoder.messageInfo msg
+    if Dyn.isNullish info then "" else MessageDecoder.infoSessionID info
 
 let hasExistingCapsMessages (messages: obj array) : bool =
     messages.Length >= 2 &&

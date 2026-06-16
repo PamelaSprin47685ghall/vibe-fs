@@ -13,6 +13,16 @@ let emptySettings : DelegatedAiSettings =
     { modelString = None
       thinkingLevel = None }
 
+type AiConfigRecord =
+    { workspaceId: string
+      runtime: obj
+      cwd: string }
+
+let private decodeAiConfig (config: obj) : AiConfigRecord =
+    { workspaceId = Dyn.str config "workspaceId"
+      runtime = let r = Dyn.get config "runtime" in if Dyn.isNullish r then null else r
+      cwd = Dyn.str config "cwd" }
+
 let private loadConfigOrDefault (deps: obj) : obj = deps?loadConfigOrDefault()
 
 let private findWorkspaceEntry (deps: obj) (configFile: obj) (workspaceId: string) : obj =
@@ -57,13 +67,13 @@ let internal mergeNamedSettings (sources: DelegatedAiSettings option list) : Del
 
 let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) : JS.Promise<DelegatedAiSettings> =
     async {
+        let cfg = decodeAiConfig config
         let configFile = loadConfigOrDefault deps
 
-        let workspaceId = Dyn.str config "workspaceId"
         let workspace =
-            if workspaceId = "" then null
+            if cfg.workspaceId = "" then null
             else
-                let result = findWorkspaceEntry deps configFile workspaceId
+                let result = findWorkspaceEntry deps configFile cfg.workspaceId
                 Dyn.get result "workspace"
 
         let byAgent = Dyn.get workspace "aiSettingsByAgent"
@@ -71,10 +81,7 @@ let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) 
         let! descriptorSettings =
             async {
                 try
-                    let runtimeObj = Dyn.get config "runtime"
-                    let runtime = if Dyn.isNullish runtimeObj then null else runtimeObj
-                    let cwd = Dyn.str config "cwd"
-                    let! fm = resolveAgentFrontmatter deps runtime cwd agentId |> Async.AwaitPromise
+                    let! fm = resolveAgentFrontmatter deps cfg.runtime cfg.cwd agentId |> Async.AwaitPromise
                     let ai = Dyn.get fm "ai"
                     return
                         { modelString = normalizeStr (Dyn.get ai "model")

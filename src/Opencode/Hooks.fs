@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.Boundary
 open VibeFs.Kernel.OpencodeHooks
 open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.TreeSitterKernel
@@ -54,7 +55,7 @@ let private resolveChatTools (agent: string) (existingTools: obj) : obj =
 let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let agent = resolveAgent registry input
-        let sessionID = Dyn.str input "sessionID"
+        let sessionID = Id.sessionIdQuick (Dyn.str input "sessionID")
         do! nudgeHook.handleChatMessage(sessionID, agent, Dyn.get output "parts") |> Async.AwaitPromise
         let message = Dyn.get output "message"
         if not (Dyn.isNullish message) then

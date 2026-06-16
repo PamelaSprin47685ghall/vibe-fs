@@ -98,31 +98,34 @@ let resolveJavascriptSpecifier (cwd: string) (specifier: string) : string =
         $"{(pathToFileURL (resolve cwd basePath))?href}{suffix}"
 
 /// Rewrite relative import specifiers in a JS program to absolute file:// URLs.
+/// Uses es-module-lexer parse results to build output from non-overlapping segments
+/// rather than string-index replacement, avoiding sourcemap/edge-case fragility.
 let rewriteJavascriptModuleSpecifiers (program: string) (cwd: string) : JS.Promise<string> =
     async {
         let! imports = parseImports program |> Async.AwaitPromise
         if Dyn.isNullish imports || Array.isEmpty imports then return program
         else
-            let replacements =
-                imports |> Array.choose (fun imp ->
-                    let n = Dyn.get imp "n"
-                    if Dyn.isNullish n then None
-                    else
-                        let ns = string n
-                        if not (Regex.IsMatch(ns, @"^\.\.?/")) then None
-                        else
-                            let d = Dyn.get imp "d"
-                            let isDynamic = not (Dyn.isNullish d) && unbox<int> d <> -1
-                            let s = unbox<int> (Dyn.get imp "s")
-                            let e = unbox<int> (Dyn.get imp "e")
-                            Some((if isDynamic then s + 1 else s), (if isDynamic then e - 1 else e),
-                                 resolveJavascriptSpecifier cwd ns))
-            if Array.isEmpty replacements then return program
-            else
-                let mutable result = program
-                for (s, e, replacement) in replacements |> Array.sortByDescending (fun (s, _, _) -> s) do
-                    result <- result.[.. s - 1] + replacement + result.[e..]
-                return result
+            let segments = ResizeArray<string>()
+            let mutable lastEnd = 0
+            for imp in imports do
+                let n = Dyn.get imp "n"
+                if not (Dyn.isNullish n) then
+                    let ns = string n
+                    if Regex.IsMatch(ns, @"^\.\.?/") then
+                        let d = Dyn.get imp "d"
+                        let isDynamic = not (Dyn.isNullish d) && unbox<int> d <> -1
+                        let s = unbox<int> (Dyn.get imp "s")
+                        let e = unbox<int> (Dyn.get imp "e")
+                        let sAdj = if isDynamic then s + 1 else s
+                        let eAdj = if isDynamic then e - 1 else e
+                        if sAdj > lastEnd then
+                            segments.Add(program.[lastEnd .. sAdj - 1])
+                        segments.Add(resolveJavascriptSpecifier cwd ns)
+                        lastEnd <- eAdj
+            if lastEnd < program.Length then
+                segments.Add(program.[lastEnd ..])
+            if segments.Count > 0 then return String.concat "" segments
+            else return program
     }
     |> Async.StartAsPromise
 

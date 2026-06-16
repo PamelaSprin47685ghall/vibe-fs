@@ -7,6 +7,7 @@ open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.Prompts
 open VibeFs.Mux.StreamEnd
 open VibeFs.Shell.NudgeStore
+open VibeFs.MuxPlugin.EventDecoder
 
 type private NudgeRequest =
     { workspaceId: string
@@ -19,26 +20,14 @@ type private HookEvent =
     | StreamAbort of workspaceId: string
     | AbortedError of workspaceId: string
 
-/// Extract the last assistant text from event properties.parts.
-let private getLastAssistantText (properties: obj) : string =
-    if Dyn.isNullish properties then ""
-    else
-        let parts = Dyn.get properties "parts"
-        if Dyn.isNullish parts || not (Dyn.isArray parts) then ""
-        else
-            (parts :?> obj array)
-            |> Array.filter (fun p -> Dyn.str p "type" = "text")
-            |> Array.map (fun p -> Dyn.str p "text")
-            |> String.concat "\n"
-
 let private parseHookEvent (event: obj) : HookEvent =
-    let workspaceId = Dyn.str event "workspaceId"
-    if workspaceId = "" then Ignore
+    let decoded = decodeHookEvent event
+    if decoded.workspaceId = "" then Ignore
     else
-        match Dyn.str event "type" with
-        | "stream-end" -> StreamEnd(Dyn.get event "properties")
-        | "stream-abort" -> StreamAbort workspaceId
-        | "error" when Dyn.str (Dyn.get event "properties") "errorType" = "aborted" -> AbortedError workspaceId
+        match decoded.eventType with
+        | "stream-end" -> StreamEnd decoded.properties
+        | "stream-abort" -> StreamAbort decoded.workspaceId
+        | "error" when decoded.errorType = "aborted" -> AbortedError decoded.workspaceId
         | _ -> Ignore
 
 let private tryGetTodos (helpers: obj) (workspaceId: string) : Async<string list> =
@@ -107,17 +96,14 @@ let private handleEvent (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
         match parseHookEvent event with
         | Ignore -> ()
         | StreamEnd properties ->
-            let workspaceId = Dyn.str event "workspaceId"
-            if Dyn.isNullish helpers || state.stoppedWorkspaces.Contains(workspaceId) then ()
+            let decoded = decodeHookEvent event
+            if Dyn.isNullish helpers || state.stoppedWorkspaces.Contains(decoded.workspaceId) then ()
+            elif decoded.stopReason = "queued-message" then ()
             else
-                let metadata = Dyn.get properties "metadata"
-                let stopReason = Dyn.str metadata "muxStopReason"
-                if stopReason = "queued-message" then ()
-                else
-                    let lastMessage = getLastAssistantText properties
-                    let! todos = tryGetTodos helpers workspaceId
-                    let request = buildNudgeRequest reviewStore state workspaceId todos lastMessage
-                    do! handleNudgeRequest state coordinator helpers request
+                let lastMessage = getLastAssistantText properties
+                let! todos = tryGetTodos helpers decoded.workspaceId
+                let request = buildNudgeRequest reviewStore state decoded.workspaceId todos lastMessage
+                do! handleNudgeRequest state coordinator helpers request
         | StreamAbort workspaceId ->
             reviewStore.deactivateReview workspaceId
             coordinator.clearSession(workspaceId)

@@ -17,6 +17,7 @@
     <Compile Include="src/Kernel/DomainError.fs" />
     <Compile Include="src/Kernel/JsBoundary.fs" />
     <Compile Include="src/Kernel/Boundary.fs" />
+    <Compile Include="src/Kernel/MessageDecoder.fs" />
     <Compile Include="src/Kernel/WorkspaceState.fs" />
     <Compile Include="src/Kernel/RecordValidator.fs" />
     <Compile Include="src/Kernel/Schema.fs" />
@@ -78,6 +79,7 @@
     <Compile Include="src/Mux/Contract.fs" />
     <Compile Include="src/Mux/StreamEnd.fs" />
     <Compile Include="src/Mux/TodoWriteNudge.fs" />
+    <Compile Include="src/Mux/PartDecoder.fs" />
     <Compile Include="src/Mux/Dedup.fs" />
     <Compile Include="src/Mux/CapsFileRead.fs" />
     <!-- Opencode plugin adapter (F# → JS, default export) -->
@@ -86,6 +88,7 @@
     <Compile Include="src/Opencode/ChildAgent.fs" />
     <Compile Include="src/Opencode/HookSchema.fs" />
     <Compile Include="src/Opencode/NudgePolicy.fs" />
+    <Compile Include="src/Opencode/SessionSnapshotDecoder.fs" />
     <Compile Include="src/Opencode/NudgeHook.fs" />
     <Compile Include="src/Opencode/Session.fs" />
     <Compile Include="src/Opencode/Tools.fs" />
@@ -105,6 +108,7 @@
     <Compile Include="src/MuxPlugin/MuxTools/ReviewTool.fs" />
     <Compile Include="src/MuxPlugin/MuxTools.fs" />
     <Compile Include="src/MuxPlugin/MuxWrappers.fs" />
+    <Compile Include="src/MuxPlugin/EventDecoder.fs" />
     <Compile Include="src/MuxPlugin/MuxEventHook.fs" />
     <Compile Include="src/MuxPlugin/MuxSlashCommands.fs" />
     <Compile Include="src/MuxPlugin/Registration.fs" />

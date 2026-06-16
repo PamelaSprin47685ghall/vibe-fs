@@ -3,33 +3,18 @@ module VibeFs.Mux.Dedup
 open VibeFs.Kernel.Dedup
 open VibeFs.Kernel
 open VibeFs.Kernel.TreeSitterKernel
+open VibeFs.Mux.PartDecoder
 
 /// Tool names that represent a file-read operation across hosts.  The OpenCode
 /// host names the tool `read`; the Mux host names it `file_read`.
 let readToolNames = Set [ "read"; "file_read" ]
 
-/// Extract the dedup key from a read-tool output.  Mux's `file_read` returns an
-/// object `{ success, content, ... }`; OpenCode's `read` returns a string.
-/// Returns "" when no usable key can be extracted.
-let private extractReadOutputKey (output: obj) : string =
-    if Dyn.isNullish output then ""
-    elif Dyn.typeIs output "string" then string output
-    else
-        let content = Dyn.get output "content"
-        if Dyn.isNullish content then "" else string content
-
-/// Read path from a dynamic-tool part (`input`) or OpenCode tool part (`state.input`).
-let private extractReadPathFromPart (part: obj) : string =
-    let fromInput (input: obj) =
-        match extractFilePaths input with
-        | path :: _ -> path
-        | [] -> ""
-    let direct = Dyn.get part "input"
-    if not (Dyn.isNullish direct) then fromInput direct
-    else
-        let state = Dyn.get part "state"
-        if Dyn.isNullish state then ""
-        else fromInput (Dyn.get state "input")
+let private classifyMuxReadPart (part: obj) =
+    match tryDecodeReadPart part with
+    | Some rp when rp.partType = "dynamic-tool" && Set.contains rp.toolName readToolNames && rp.state = "output-available" ->
+        let key = readPartOutputKey rp.output
+        if key.Length > 0 then Some(readPartPath rp, key) else None
+    | _ -> None
 
 /// Dedup within one path scope; returns updated map entry for that path.
 let private dedupForPath (seenByPath: Map<string, string list>) (pathKey: string) (current: string) =
@@ -41,17 +26,6 @@ let private dedupForPath (seenByPath: Map<string, string list>) (pathKey: string
         | AlreadySeen -> dedupMarker
         | NewContent payload -> payload.content
     (Map.add pathKey nextState.seenContents seenByPath, nextOutput, verdict)
-
-let private classifyMuxReadPart (part: obj) =
-    let partType = Dyn.str part "type"
-    let toolName = Dyn.str part "toolName"
-    let state = Dyn.str part "state"
-    let output = Dyn.get part "output"
-    let key = extractReadOutputKey output
-    if partType = "dynamic-tool" && Set.contains toolName readToolNames && state = "output-available" && key.Length > 0 then
-        Some(extractReadPathFromPart part, key)
-    else
-        None
 
 /// Fold read-output keys from Mux dynamic-tool parts into per-path seen state (message order).
 let private foldMuxReadPartsIntoSeenByPath (seenByPath: Map<string, string list>) (messages: obj array) : Map<string, string list> =
@@ -65,7 +39,7 @@ let private foldMuxReadPartsIntoSeenByPath (seenByPath: Map<string, string list>
     let foldMessage acc msg =
         if Dyn.isNullish msg then acc
         else
-            let parts = Dyn.get msg "parts"
+            let parts = messageParts msg
             if Dyn.isNullish parts then acc
             else (parts :?> obj array) |> Array.fold foldPart acc
 
@@ -83,7 +57,7 @@ let deduplicateReadOutputsWithSeenByPath
         messages |> Array.map (fun msg ->
             if Dyn.isNullish msg then msg
             else
-                let parts = Dyn.get msg "parts"
+                let parts = messageParts msg
                 if Dyn.isNullish parts then msg
                 else
                     let partsArr = parts :?> obj array
@@ -92,24 +66,22 @@ let deduplicateReadOutputsWithSeenByPath
                         let newParts = ResizeArray<obj>()
                         let mutable partChanged = false
                         for part in partsArr do
-                            let ty = Dyn.str part "type"
-                            let toolName = Dyn.str part "toolName"
-                            let state = Dyn.str part "state"
-                            let output = Dyn.get part "output"
-                            let current = extractReadOutputKey output
-                            if ty = "dynamic-tool" && Set.contains toolName readToolNames && state = "output-available"
-                               && current.Length > 0 then
-                                let pathKey = extractReadPathFromPart part
-                                let nextSeen, nextOutput, verdict = dedupForPath seenByPath pathKey current
-                                seenByPath <- nextSeen
-                                if nextOutput = current then newParts.Add(part)
-                                else
-                                    newParts.Add(Dyn.withKey part "output" (box nextOutput))
-                                    partChanged <- true
-                                match verdict with
-                                | NewContent _ -> seenOutputs <- current :: seenOutputs
-                                | AlreadySeen -> ()
-                            else newParts.Add(part)
+                            match tryDecodeReadPart part with
+                            | Some rp when rp.partType = "dynamic-tool" && Set.contains rp.toolName readToolNames && rp.state = "output-available" ->
+                                let current = readPartOutputKey rp.output
+                                if current.Length > 0 then
+                                    let pathKey = readPartPath rp
+                                    let nextSeen, nextOutput, verdict = dedupForPath seenByPath pathKey current
+                                    seenByPath <- nextSeen
+                                    if nextOutput = current then newParts.Add(part)
+                                    else
+                                        newParts.Add(Dyn.withKey part "output" (box nextOutput))
+                                        partChanged <- true
+                                    match verdict with
+                                    | NewContent _ -> seenOutputs <- current :: seenOutputs
+                                    | AlreadySeen -> ()
+                                else newParts.Add(part)
+                            | _ -> newParts.Add(part)
                         if not partChanged then msg
                         else
                             anyChanged <- true
@@ -124,26 +96,6 @@ let deduplicateReadOutputsWithSeen
         if List.isEmpty seenOutputs then Map.empty
         else Map.add "" seenOutputs Map.empty
     deduplicateReadOutputsWithSeenByPath seenByPath messages
-
-/// Extract the dedup key from a tool-result part in the Vercel AI SDK
-/// ModelMessage shape.  Text outputs keep their value; JSON outputs are
-/// delegated to the Mux-message extractor so file_read `{ content }` objects
-/// are handled without duplicating the parsing rule.
-let private extractModelReadOutputKey (part: obj) : string =
-    let output = Dyn.get part "output"
-    if Dyn.isNullish output then ""
-    else
-        let outputType = Dyn.str output "type"
-        let value = Dyn.get output "value"
-        if outputType = "text" && not (Dyn.isNullish value) then string value
-        elif outputType = "json" && not (Dyn.isNullish value) then extractReadOutputKey value
-        else ""
-
-/// Path for AI SDK tool-result parts when `input` is present on the part.
-let private extractModelReadPath (part: obj) : string =
-    match extractFilePaths (Dyn.get part "input") with
-    | path :: _ -> path
-    | [] -> ""
 
 /// Pure: fold `deduplicate` over read tool-result parts inside ModelMessage
 /// arrays, returning the final `seenOutputs` and any replacements in the
@@ -162,7 +114,7 @@ let deduplicateModelReadOutputsWithSeen
         messages |> Array.map (fun msg ->
             if Dyn.isNullish msg then msg
             else
-                let content = Dyn.get msg "content"
+                let content = messageContent msg
                 if Dyn.isNullish content then msg
                 elif Dyn.typeIs content "string" then msg
                 elif not (Dyn.isArray content) then msg
@@ -173,26 +125,27 @@ let deduplicateModelReadOutputsWithSeen
                         let newContent = ResizeArray<obj>()
                         let mutable partChanged = false
                         for part in contentArr do
-                            let ty = Dyn.str part "type"
-                            let toolName = Dyn.str part "toolName"
-                            let current = extractModelReadOutputKey part
-                            if ty = "tool-result" && Set.contains toolName readToolNames && current.Length > 0 then
-                                let pathKey = extractModelReadPath part
-                                let nextSeen, nextOutput, verdict = dedupForPath seenByPath pathKey current
-                                seenByPath <- nextSeen
-                                if nextOutput = current then newContent.Add(part)
-                                else
-                                    let newOutput =
-                                        Dyn.withKey
-                                            (Dyn.withKey (Dyn.get part "output") "type" (box "text"))
-                                            "value"
-                                            (box nextOutput)
-                                    newContent.Add(Dyn.withKey part "output" (box newOutput))
-                                    partChanged <- true
-                                match verdict with
-                                | NewContent _ -> seenOutputs <- current :: seenOutputs
-                                | AlreadySeen -> ()
-                            else newContent.Add(part)
+                            match tryDecodeModelReadPart part with
+                            | Some rp when rp.partType = "tool-result" && Set.contains rp.toolName readToolNames ->
+                                let current = modelReadPartOutputKey rp
+                                if current.Length > 0 then
+                                    let pathKey = modelReadPartPath rp
+                                    let nextSeen, nextOutput, verdict = dedupForPath seenByPath pathKey current
+                                    seenByPath <- nextSeen
+                                    if nextOutput = current then newContent.Add(part)
+                                    else
+                                        let newOutput =
+                                            Dyn.withKey
+                                                (Dyn.withKey rp.output "type" (box "text"))
+                                                "value"
+                                                (box nextOutput)
+                                        newContent.Add(Dyn.withKey part "output" (box newOutput))
+                                        partChanged <- true
+                                    match verdict with
+                                    | NewContent _ -> seenOutputs <- current :: seenOutputs
+                                    | AlreadySeen -> ()
+                                else newContent.Add(part)
+                            | _ -> newContent.Add(part)
                         if not partChanged then msg
                         else
                             anyChanged <- true
@@ -213,18 +166,15 @@ let private collectMuxReadOutputsInOrder (messages: obj array) : string list =
     let mutable outputs = []
     for msg in messages do
         if not (Dyn.isNullish msg) then
-            let parts = Dyn.get msg "parts"
+            let parts = messageParts msg
             if not (Dyn.isNullish parts) then
                 let partsArr = parts :?> obj array
                 for part in partsArr do
-                    let ty = Dyn.str part "type"
-                    let toolName = Dyn.str part "toolName"
-                    let state = Dyn.str part "state"
-                    let output = Dyn.get part "output"
-                    let key = extractReadOutputKey output
-                    if ty = "dynamic-tool" && Set.contains toolName readToolNames && state = "output-available"
-                       && key.Length > 0 then
-                        outputs <- key :: outputs
+                    match tryDecodeReadPart part with
+                    | Some rp when rp.partType = "dynamic-tool" && Set.contains rp.toolName readToolNames && rp.state = "output-available" ->
+                        let key = readPartOutputKey rp.output
+                        if key.Length > 0 then outputs <- key :: outputs
+                    | _ -> ()
     List.rev outputs
 
 /// Collect per-path read-output seen state from history (Mux dynamic-tool shape).

@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.DomainError
 open VibeFs.Kernel.JsBoundary
+open VibeFs.Kernel.Boundary
 open VibeFs.MuxPlugin.ResolveAiSettings
 
 [<Global>]
@@ -27,9 +28,9 @@ let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
 let private taskWait (taskService: obj) (taskId: string) (opts: obj) : JS.Promise<obj> =
     unbox<JS.Promise<obj>>(taskService?waitForAgentReport(taskId, opts))
 
-let private requireWorkspaceId (config: obj) (title: string) : string =
+let private requireWorkspaceId (config: obj) (title: string) : WorkspaceId option =
     let wid = Dyn.str config "workspaceId"
-    if wid = "" then "" else wid
+    Id.tryWorkspaceId wid
 
 type DelegateOutcome =
     | Report of string
@@ -84,7 +85,7 @@ let internal buildParentRuntimeAiSettings (config: obj) : obj =
         muxEnv |> readMuxEnvSettings |> toRuntimeAiSettingsObj
 
 let private createInput
-    (workspaceId: string)
+    (workspaceId: WorkspaceId)
     (agentId: string)
     (prompt: string)
     (title: string)
@@ -94,7 +95,7 @@ let private createInput
     (experiments: obj)
     : obj =
     let o = createObj []
-    o?parentWorkspaceId <- workspaceId
+    o?parentWorkspaceId <- Id.workspaceIdValue workspaceId
     o?kind <- "agent"
     o?agentId <- agentId
     o?prompt <- prompt
@@ -123,9 +124,9 @@ let delegateToSubAgent
     (options: obj option)
     : JS.Promise<string> =
     let workspaceId = requireWorkspaceId config title
-    if workspaceId = "" then
-        resolveStr $"{title.ToLower()} requires workspaceId"
-    else
+    match workspaceId with
+    | None -> resolveStr $"{title.ToLower()} requires workspaceId"
+    | Some wid ->
         let taskService = Dyn.get config "taskService"
         if isNull taskService then
             resolveStr $"No task service for {title.ToLower()}"
@@ -142,7 +143,7 @@ let delegateToSubAgent
 
                 let input =
                     createInput
-                        workspaceId
+                        wid
                         agentId
                         prompt
                         title
@@ -163,7 +164,7 @@ let delegateToSubAgent
 
                     let waitOpts =
                         box
-                            {| requestingWorkspaceId = workspaceId
+                            {| requestingWorkspaceId = Id.workspaceIdValue wid
                                abortSignal = abortSignal
                                backgroundOnMessageQueued = false |}
 

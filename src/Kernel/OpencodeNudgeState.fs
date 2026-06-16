@@ -129,6 +129,17 @@ let recordSend state sessionID outcome =
     | Busy -> deleteNudgedSession state sessionID
     | Failed -> addRetryPendingSession (deleteNudgedSession state sessionID) sessionID
 
+/// Try to record a send outcome, but only if the session still exists in state.
+/// Returns None if the session was cleared during I/O (guard against stale write-back).
+let tryRecordSend state sessionID outcome : NudgeShellState option =
+    if Set.contains sessionID state.nudgedSessions
+       || Set.contains sessionID state.stoppedSessions
+       || Set.contains sessionID state.retryPendingSessions
+       || Map.containsKey sessionID state.sessionAgents
+       || Map.containsKey sessionID state.deliveredCounts
+    then Some(recordSend state sessionID outcome)
+    else None
+
 let handleSessionNextPrompted state promptText sessionID =
     if isNudgePrompt promptText then state else resumeSession state sessionID
 

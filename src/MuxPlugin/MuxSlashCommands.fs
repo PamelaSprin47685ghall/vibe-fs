@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.Boundary
 open VibeFs.Shell.ReviewRuntime
 open VibeFs.MuxPlugin.Delegate
 open VibeFs.MuxPlugin.CallStore
@@ -16,13 +17,13 @@ let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMillisec
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
 
-let private fallbackSlashConfig (deps: obj) (workspaceId: string) : obj =
+let private fallbackSlashConfig (deps: obj) (workspaceId: WorkspaceId) : obj =
     createObj
         [ "cwd", box (nodeProcess?cwd())
-          "workspaceId", box workspaceId
+          "workspaceId", box (Id.workspaceIdValue workspaceId)
           "taskService", box (Dyn.get deps "taskService") ]
 
-let private slashConfigFromCtx (deps: obj) (workspaceId: string) (ctx: obj) : obj =
+let private slashConfigFromCtx (deps: obj) (workspaceId: WorkspaceId) (ctx: obj) : obj =
     if Dyn.isNullish ctx then
         fallbackSlashConfig deps workspaceId
     else
@@ -30,18 +31,18 @@ let private slashConfigFromCtx (deps: obj) (workspaceId: string) (ctx: obj) : ob
         let runtime = if Dyn.isNullish runtimeObj then null else runtimeObj
         createObj
             [ "cwd", box (Dyn.str ctx "cwd")
-              "workspaceId", box workspaceId
+              "workspaceId", box (Id.workspaceIdValue workspaceId)
               "runtime", box runtime
               "muxEnv", box (Dyn.get ctx "muxEnv")
               "taskService", box (Dyn.get deps "taskService") ]
 
-let private pluginConfigForSlash (deps: obj) (workspaceId: string) : JS.Promise<obj> =
+let private pluginConfigForSlash (deps: obj) (workspaceId: WorkspaceId) : JS.Promise<obj> =
     async {
         let resolver = Dyn.get deps "resolveWorkspacePluginContext"
         if not (Dyn.typeIs resolver "function") then
             return fallbackSlashConfig deps workspaceId
         else
-            let! ctx = Dyn.call2 resolver (box workspaceId) (box null) :?> JS.Promise<obj> |> Async.AwaitPromise
+            let! ctx = Dyn.call2 resolver (box (Id.workspaceIdValue workspaceId)) (box null) :?> JS.Promise<obj> |> Async.AwaitPromise
             return slashConfigFromCtx deps workspaceId ctx
     } |> Async.StartAsPromise
 
@@ -59,16 +60,19 @@ let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) 
     box {| key = "loop"
            description = "Activate review loop mode. AI completes task, submits for review."
            inputHint = "<task description>"
-           execute = System.Func<string, string, JS.Promise<string>>(fun workspaceId args ->
-                let task = args.Trim()
-                if task = "" then
-                    reviewStore.deactivateReview workspaceId
-                    (async { return "Loop mode cancelled." } |> Async.StartAsPromise)
-                elif reviewStore.isReviewActive workspaceId then
-                    (async { return "Loop mode is already active. Submit your work via submit_review." } |> Async.StartAsPromise)
-                else
-                    reviewStore.activateReview(workspaceId, task, dateNow ())
-                    (async { return buildLoopMessage task [ "Loop mode is active. Complete the task above, then call submit_review with:" ] } |> Async.StartAsPromise)) |}
+           execute = System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
+                match Id.tryWorkspaceId workspaceIdStr with
+                | None -> (async { return "Invalid workspaceId" } |> Async.StartAsPromise)
+                | Some wid ->
+                    let task = args.Trim()
+                    if task = "" then
+                        reviewStore.deactivateReview (Id.workspaceIdValue wid)
+                        (async { return "Loop mode cancelled." } |> Async.StartAsPromise)
+                    elif reviewStore.isReviewActive (Id.workspaceIdValue wid) then
+                        (async { return "Loop mode is already active. Submit your work via submit_review." } |> Async.StartAsPromise)
+                    else
+                        reviewStore.activateReview(Id.workspaceIdValue wid, task, dateNow ())
+                        (async { return buildLoopMessage task [ "Loop mode is active. Complete the task above, then call submit_review with:" ] } |> Async.StartAsPromise)) |}
 
 let private loopReviewVerdictInstructions =
     "You are a reviewer evaluating whether a task description is clear and actionable enough to begin work.\n\n"
@@ -94,18 +98,19 @@ let private submissionFooter (toolName: string) (callId: string) =
 
 let private loopReviewExecute
     (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
-    (workspaceId: string) (args: string) : JS.Promise<string> =
+    (workspaceId: WorkspaceId) (args: string) : JS.Promise<string> =
     let task = args.Trim()
+    let workspaceIdStr = Id.workspaceIdValue workspaceId
     if task = "" then
-        reviewStore.deactivateReview workspaceId
+        reviewStore.deactivateReview workspaceIdStr
         (async { return "Loop mode cancelled." } |> Async.StartAsPromise)
-    elif reviewStore.isReviewActive workspaceId then
+    elif reviewStore.isReviewActive workspaceIdStr then
         (async { return "Loop mode is already active. Submit your work via submit_review." } |> Async.StartAsPromise)
     else
         async {
             let! config = pluginConfigForSlash deps workspaceId |> Async.AwaitPromise
             let disabledTools = deniedTools "reviewer" (Array.toList registeredToolNames) |> Array.ofList
-            let callId = workspaceId + "-loop-review-" + string (dateNow ())
+            let callId = workspaceIdStr + "-loop-review-" + string (dateNow ())
             let verdictPromise = registerCallWithTimeout callStore callId 300000
             let experiments =
                 createObj
@@ -130,7 +135,7 @@ let private loopReviewExecute
             | TimedOut ->
                 return buildLoopMessage task [ "Loop mode was NOT activated because the pre-review timed out. Please retry /loop-review." ]
             | Report _ ->
-                reviewStore.activateReview(workspaceId, task, dateNow ())
+                reviewStore.activateReview(workspaceIdStr, task, dateNow ())
                 return
                     if isPass then
                         buildLoopMessage task [ "Loop mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
@@ -142,7 +147,10 @@ let createLoopReviewCommand (deps: obj) (callStore: CallStore) (reviewStore: Vib
     box {| key = "loop-review"
            description = "Pre-review task description with a reviewer sub-agent, then activate review loop mode."
            inputHint = "<task description>"
-           execute = System.Func<string, string, JS.Promise<string>>(loopReviewExecute deps callStore reviewStore) |}
+           execute = System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
+                match Id.tryWorkspaceId workspaceIdStr with
+                | None -> (async { return "Invalid workspaceId" } |> Async.StartAsPromise)
+                | Some wid -> loopReviewExecute deps callStore reviewStore wid args) |}
 
 let createSlashCommands (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj array =
     [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps callStore reviewStore |]
