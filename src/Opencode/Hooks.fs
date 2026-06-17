@@ -221,10 +221,10 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (backtr
                 let cleaned = stripSyntheticMessages messagesArr
                 if cleaned.Length = 0 then ()
                 else
-                    applyReadDedup cleaned
                     let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
                     let projected = BacktrackProjector.project cleaned
                     let afterMagic = MagicProjector.projectMagic projected backlog false sessionID
+                    applyReadDedup afterMagic
                     let withPrelude = injectPrelude afterMagic directory sessionID
                     let! final =
                         if defaultExcludedAgents |> List.contains agent then

@@ -5,6 +5,8 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.BacktrackCodec
+open VibeFs.Kernel.MagicTypes
 open VibeFs.Index
 open VibeFs.Opencode.Plugin
 
@@ -139,6 +141,50 @@ let dedupModelEmptySpec () =
 let private findMsgById (msgs: obj[]) (idPrefix: string) : obj =
     msgs |> Array.find (fun m -> str (get m "info") "id" = idPrefix)
 
+let private info (id: string) (sessionID: string) : obj =
+    createObj [
+        "id", box id
+        "agent", box "manager"
+        "role", box "assistant"
+        "sessionID", box sessionID
+    ]
+
+let private readToolPart (output: string) : obj =
+    createObj [
+        "type", box "tool"
+        "tool", box "read"
+        "state", box (createObj [ "status", box "completed"; "output", box output ])
+    ]
+
+let private backtrackToolPart (anchor: int) (note: string) : obj =
+    createObj [
+        "type", box "tool"
+        "tool", box "backtrack"
+        "state", box (createObj [
+            "status", box "completed"
+            "input", box (createObj [ "anchor", box anchor; "note", box note ])
+        ])
+    ]
+
+let private todoToolPart (report: string) : obj =
+    createObj [
+        "type", box "tool"
+        "tool", box magicTodoToolName
+        "state", box (createObj [
+            "status", box "completed"
+            "input", box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
+            "output", box "Todos updated."
+        ])
+    ]
+
+let private assistantMsg (id: string) (sessionID: string) (parts: obj array) : obj =
+    createObj [ "info", box (info id sessionID); "parts", box parts ]
+
+let private readOutputOf (msg: obj) : string =
+    let part = get msg "parts" |> unbox<obj[]> |> Array.item 0
+    let state = get part "state"
+    str state "output"
+
 let opencodeDedupInPlaceSpec () = async {
     let! workspaceDir = mkdtempAsync "dedup-plugin-" |> Async.AwaitPromise
     let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
@@ -190,6 +236,48 @@ let opencodeDedupInPlaceSpec () = async {
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
+let opencodeDedupIgnoresBacktrackedReadsSpec () = async {
+    let! workspaceDir = mkdtempAsync "dedup-backtrack-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let sessionID = "dedup-backtrack-session"
+    let encodedSame = encodeId 1 "same"
+    let messages =
+        createObj [ "messages", box [|
+            assistantMsg "bt-m1" sessionID [| readToolPart encodedSame |]
+            assistantMsg "bt-m2" sessionID [| backtrackToolPart 1 "rewritten" |]
+            assistantMsg "bt-m3" sessionID [| readToolPart "same" |]
+        |] ]
+    let messagesRef = get messages "messages"
+    do! (get p "experimental.chat.messages.transform") $ (box {| sessionID = sessionID |}, messages) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let msgs = unbox<obj[]> messagesRef
+    check "opencode dedup ignores backtracked reads: keeps messages ref" (obj.ReferenceEquals(msgs, unbox<obj[]> (get messages "messages")))
+    let latest = findMsgById msgs "bt-m3"
+    check "opencode dedup ignores backtracked reads: latest read kept" (readOutputOf latest = "same")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
+let opencodeDedupIgnoresMagicFoldedReadsSpec () = async {
+    let! workspaceDir = mkdtempAsync "dedup-magic-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let sessionID = "dedup-magic-session"
+    let messages =
+        createObj [ "messages", box [|
+            assistantMsg "mg-m1" sessionID [| readToolPart "same" |]
+            assistantMsg "mg-m2" sessionID [| todoToolPart "first" |]
+            assistantMsg "mg-m3" sessionID [| readToolPart "same" |]
+            assistantMsg "mg-m4" sessionID [| todoToolPart "second" |]
+            assistantMsg "mg-m5" sessionID [| todoToolPart "third" |]
+            assistantMsg "mg-m6" sessionID [| readToolPart "same" |]
+        |] ]
+    let messagesRef = get messages "messages"
+    do! (get p "experimental.chat.messages.transform") $ (box {| sessionID = sessionID |}, messages) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let msgs = unbox<obj[]> messagesRef
+    check "opencode dedup ignores magic folded reads: keeps messages ref" (obj.ReferenceEquals(msgs, unbox<obj[]> (get messages "messages")))
+    let latest = findMsgById msgs "mg-m6"
+    check "opencode dedup ignores magic folded reads: latest read kept" (readOutputOf latest = "same")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
 let run () : JS.Promise<unit> =
     async {
         dedupStringOutputSpec ()
@@ -210,5 +298,7 @@ let run () : JS.Promise<unit> =
         dedupModelNonReadSpec ()
         dedupModelEmptySpec ()
         do! opencodeDedupInPlaceSpec ()
+        do! opencodeDedupIgnoresBacktrackedReadsSpec ()
+        do! opencodeDedupIgnoresMagicFoldedReadsSpec ()
     }
     |> Async.StartAsPromise

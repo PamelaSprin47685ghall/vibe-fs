@@ -16,6 +16,7 @@ let private createRequire' : string -> (string -> obj) = jsNative
 let private importMeta : obj = jsNative
 
 let private requireFn : string -> obj = createRequire'(string importMeta?url)
+let private fsAsync : obj = requireFn("fs")?promises
 let private pathModule : obj = requireFn("path")
 
 let private unlinkAsync (p: string) : JS.Promise<unit> =
