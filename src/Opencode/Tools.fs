@@ -10,6 +10,7 @@ open VibeFs.Shell.OllamaClient
 open VibeFs.Opencode.Sdk
 open VibeFs.Opencode.ToolCopy
 open VibeFs.Opencode.Session
+open VibeFs.Opencode.ExecutorActor
 open VibeFs.Opencode.ChildAgent
 open VibeFs.Opencode.HookSchema
 open VibeFs.Kernel.Prompts
@@ -112,22 +113,24 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                 dependencies = strArrayOpt Params.executorDeps; timeout_type = strReq Params.executorTimeout |})
         (fun args context ->
             let tc = extractToolContext context (Dyn.str ctx "directory")
-            let lang = match Dyn.str args "language" with "python" -> Python | "javascript" -> Javascript | _ -> Shell
-            let timeout = match Dyn.str args "timeout_type" with "long" -> Long | "last-resort" -> LastResort | _ -> Short
-            let deps = if Dyn.isNullish (Dyn.get args "dependencies") then [] else Dyn.get args "dependencies" :?> obj array |> Array.map string |> List.ofArray
-            let options : ExecuteOptions =
-                { program = Dyn.str args "program"; language = lang; dependencies = deps
-                  timeoutType = timeout; cwd = Some (Dyn.str tc "directory") }
-            async {
-                let! result = VibeFs.Shell.ExecutorShell.execute options (Dyn.str tc "sessionID") |> Async.AwaitPromise
-                let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
-                if not (shouldSummarize byteLength output) then return output
-                else
-                    let prompt = formatExecutorSummarizerUserPrompt output
-                    return! runSubagentWithCleanup registry client "executor" "Executor summary" prompt
-                                (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
-                            |> Async.AwaitPromise
-            } |> Async.StartAsPromise)
+            let sessionID = Dyn.str tc "sessionID"
+            post sessionID (fun () ->
+                let lang = match Dyn.str args "language" with "python" -> Python | "javascript" -> Javascript | _ -> Shell
+                let timeout = match Dyn.str args "timeout_type" with "long" -> Long | "last-resort" -> LastResort | _ -> Short
+                let deps = if Dyn.isNullish (Dyn.get args "dependencies") then [] else Dyn.get args "dependencies" :?> obj array |> Array.map string |> List.ofArray
+                let options : ExecuteOptions =
+                    { program = Dyn.str args "program"; language = lang; dependencies = deps
+                      timeoutType = timeout; cwd = Some (Dyn.str tc "directory") }
+                async {
+                    let! result = VibeFs.Shell.ExecutorShell.execute options sessionID |> Async.AwaitPromise
+                    let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
+                    if not (shouldSummarize byteLength output) then return output
+                    else
+                        let prompt = formatExecutorSummarizerUserPrompt output
+                        return! runSubagentWithCleanup registry client "executor" "Executor summary" prompt
+                                    (Dyn.str tc "directory") sessionID context
+                                |> Async.AwaitPromise
+                } |> Async.StartAsPromise))
 
 let browserTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client = Dyn.get ctx "client"

@@ -12,9 +12,6 @@ let private knownAgents =
 /// `manager + coder + reader`.
 let canUse (agent: Agent) (tool: Tool) : bool =
     let toolHas (subs: string list) = subs |> List.exists tool.Contains
-    match tool with
-    | "backtrack" -> true
-    | _ ->
     match agent with
     | _ when toolHas [ "agent_report" ] -> true
     | _ when toolHas [ "bash"; "task" ] || tool = "grep" -> false

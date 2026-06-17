@@ -163,11 +163,11 @@ let joinCoderIntents (intents: obj) : Result<string, string> =
 
         for item in intents :?> obj array do
             if error.IsNone then
-                let firstItem = get item "0"
-                if not (typeIs firstItem "string") then
+                let pair = item :?> obj array
+                if pair.Length = 0 || not (typeIs pair.[0] "string") then
                     error <- Some "Invalid LLM input for coder: each intent must start with a string"
                 else
-                    labels.Add(string firstItem)
+                    labels.Add(string pair.[0])
 
         match error with
         | Some message -> Error message

@@ -7,6 +7,7 @@ open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
 open VibeFs.Index
 open VibeFs.Opencode.Plugin
+open VibeFs.Opencode.ExecutorActor
 
 
 [<Import("createRequire", "node:module")>]
@@ -64,8 +65,8 @@ let capsTransformSpec () = async {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [], out) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     let msgs = unbox<obj[]> (get out "messages")
-    check "caps transform injects four messages" (msgs.Length = 5)
-    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[4], originalMsg))
+    check "caps transform injects two messages" (msgs.Length = 3)
+    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[2], originalMsg))
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
@@ -185,6 +186,26 @@ let toolExecuteBeforeSpec () = async {
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
+let executorActorSpec () = async {
+    let seen = System.Collections.Generic.List<string>()
+    let first = post "session-1" (fun () ->
+        async {
+            seen.Add "first-start"
+            do! Async.Sleep 50
+            seen.Add "first-end"
+            return "one"
+        } |> Async.StartAsPromise)
+    let second = post "session-1" (fun () ->
+        async {
+            seen.Add "second-start"
+            seen.Add "second-end"
+            return "two"
+        } |> Async.StartAsPromise)
+    let! _ = first |> Async.AwaitPromise
+    let! _ = second |> Async.AwaitPromise
+    check "executor actor preserves order" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
+}
+
 let run () : JS.Promise<unit> =
     async {
         let reg = createRegistration (createObj [])
@@ -198,5 +219,6 @@ let run () : JS.Promise<unit> =
         do! agentConfigSpec ()
         do! toolDefinitionSpec ()
         do! toolExecuteBeforeSpec ()
+        do! executorActorSpec ()
     }
     |> Async.StartAsPromise

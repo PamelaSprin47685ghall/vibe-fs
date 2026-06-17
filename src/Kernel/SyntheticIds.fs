@@ -5,14 +5,11 @@ open VibeFs.Kernel.MessageDecoder
 
 let capsSynthUserPrefix = "caps-synth-user-"
 let capsSynthAssistantPrefix = "caps-synth-assistant-"
-let rewritePreludeUserPrefix = "rewrite-prelude-user-"
-let rewritePreludeAssistantPrefix = "rewrite-prelude-assistant-"
 let magicTodoProjectionPrefix = "magic-todo-projection-"
 let magicTodoPrefixPrefix = "magic-todo-prefix-"
 
 let private allPrefixes =
     [ capsSynthUserPrefix; capsSynthAssistantPrefix
-      rewritePreludeUserPrefix; rewritePreludeAssistantPrefix
       magicTodoProjectionPrefix; magicTodoPrefixPrefix ]
 
 let isSyntheticId (id: string) : bool =
