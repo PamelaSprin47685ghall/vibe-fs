@@ -79,6 +79,9 @@ let configSpec () = async {
     check "config manager mode primary" (str manager "mode" = "primary")
     let tools = get manager "tools"
     check "config manager tools.bash false" (unbox<bool> (get tools "bash") = false)
+    let coder = get agents "coder"
+    let coderTools = get coder "tools"
+    check "config coder tools.question false" (not (unbox<bool> (get coderTools "question")))
     let permission = get manager "permission"
     check "config manager permission.bash deny" (str permission "bash" = "deny")
     do! rmAsync workspaceDir |> Async.AwaitPromise

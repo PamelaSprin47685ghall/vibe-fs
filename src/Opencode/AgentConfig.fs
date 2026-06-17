@@ -44,7 +44,7 @@ let private allToolNames =
       "submit_review"; "return-reviewer"; "read"; "write"
       "bash"; "task"; "grep"; "edit"; "patch"; "apply_patch"
       "todowrite"; "todo_write"; "stealth-browser-mcp_*"
-      "ask_user_question"; "agent_report" ]
+      "question"; "ask_user_question"; "agent_report" ]
 
 /// Build {tool: bool} map from canUse so denied tools never appear available.
 let private toolDefaults (agentName: string) : obj =
