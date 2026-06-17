@@ -1,0 +1,109 @@
+import { isTodoToolResult, projectMagicTodoCompactionMessages } from "./context.js";
+
+async function importOfficialCompaction() {
+  // Try canonical package first, then known fallbacks. The import order
+  // reflects production naming — pi-coding-agent is the primary package.
+  const candidates = ["@gsd/pi-coding-agent", "@mariozechner/pi-coding-agent", "pi-coding-agent"];
+  for (const spec of candidates) {
+    try { return await import(spec); }
+    catch { continue; }
+  }
+  return null;
+}
+
+function countTodoResultsInBranch(branchEntries) {
+  let count = 0;
+  for (const entry of branchEntries || []) {
+    if (entry?.type === "message" && isTodoToolResult(entry.message)) count++;
+  }
+  return count;
+}
+
+function sameArrayItems(left, right) {
+  if (left.length !== right.length) return false;
+  return left.every((item, index) => {
+    const other = right[index];
+    if (item === other) return true;
+    if (typeof item === "object" && typeof other === "object") {
+      return JSON.stringify(item) === JSON.stringify(other);
+    }
+    return false;
+  });
+}
+
+function projectMessages(messages, backlog, branchHasFoldableTodoHistory) {
+  return projectMagicTodoCompactionMessages(messages || [], backlog, {
+    foldAfterFirstTodoResult: branchHasFoldableTodoHistory,
+  });
+}
+
+export function createProjectedCompactionPreparation(preparation, backlog, branchEntries) {
+  if (!preparation || !Array.isArray(backlog) || backlog.length === 0) return null;
+
+  const branchHasFoldableTodoHistory = countTodoResultsInBranch(branchEntries) >= 2;
+  const messagesToSummarize = projectMessages(
+    preparation.messagesToSummarize,
+    backlog,
+    branchHasFoldableTodoHistory,
+  );
+  const turnPrefixMessages = projectMessages(
+    preparation.turnPrefixMessages,
+    backlog,
+    branchHasFoldableTodoHistory,
+  );
+
+  if (
+    sameArrayItems(messagesToSummarize, preparation.messagesToSummarize || []) &&
+    sameArrayItems(turnPrefixMessages, preparation.turnPrefixMessages || [])
+  ) {
+    return null;
+  }
+
+  return {
+    ...preparation,
+    messagesToSummarize,
+    turnPrefixMessages,
+    details: {
+      ...(preparation.details || {}),
+      magicTodoProjected: true,
+      magicTodoBacklogEntries: backlog.length,
+    },
+  };
+}
+
+export async function runProjectedOfficialCompaction(event, ctx, backlog) {
+  const preparation = createProjectedCompactionPreparation(event?.preparation, backlog, event?.branchEntries);
+  if (!preparation) return undefined;
+
+  const official = await importOfficialCompaction();
+  if (typeof official?.compact !== "function") {
+    ctx?.ui?.notify?.("magic-todo: official compact() is unavailable; falling back to normal compaction.", "warning");
+    return undefined;
+  }
+
+  const model = ctx?.model;
+  if (!model) {
+    ctx?.ui?.notify?.("magic-todo: model unavailable for projected compaction; falling back to normal compaction.", "warning");
+    return undefined;
+  }
+
+  const apiKey = await ctx?.modelRegistry?.getApiKey?.(model);
+  const result = await official.compact(
+    preparation,
+    model,
+    apiKey,
+    event?.customInstructions,
+    event?.signal,
+  );
+
+  return {
+    compaction: {
+      ...result,
+      details: {
+        ...(result.details || {}),
+        magicTodoProjected: true,
+        magicTodoBacklogEntries: backlog.length,
+      },
+    },
+  };
+}
