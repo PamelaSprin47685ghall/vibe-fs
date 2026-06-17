@@ -3,6 +3,7 @@ module VibeFs.Tests.IntegrationPluginTests
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
+open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
 open VibeFs.Index
 open VibeFs.Opencode.Plugin
@@ -67,7 +68,8 @@ let countsSpec (reg: obj) =
     check "tool count" (tools.Length = 12)
 
 let configSpec () = async {
-    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    let! workspaceDir = mkdtempAsync "plugin-config-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>> |> Async.AwaitPromise
     let agents = get cfg "agent"
     check "config manager exists" (not (isNullish (get agents "manager")))
@@ -79,11 +81,13 @@ let configSpec () = async {
     check "config manager tools.bash false" (unbox<bool> (get tools "bash") = false)
     let permission = get manager "permission"
     check "config manager permission.bash deny" (str permission "bash" = "deny")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
 let run () : JS.Promise<unit> =
     async {
-        let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+        let! workspaceDir = mkdtempAsync "plugin-run-" |> Async.AwaitPromise
+        let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
         pluginShape p
         let reg = createRegistration (createObj [])
         registrationShape reg
@@ -93,5 +97,6 @@ let run () : JS.Promise<unit> =
         slashCommandsSpec reg
         countsSpec reg
         do! configSpec ()
+        do! rmAsync workspaceDir |> Async.AwaitPromise
     }
     |> Async.StartAsPromise

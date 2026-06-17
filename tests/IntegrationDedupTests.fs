@@ -3,6 +3,7 @@ module VibeFs.Tests.IntegrationDedupTests
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
+open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
 open VibeFs.Index
 open VibeFs.Opencode.Plugin
@@ -139,7 +140,8 @@ let private findMsgById (msgs: obj[]) (idPrefix: string) : obj =
     msgs |> Array.find (fun m -> str (get m "info") "id" = idPrefix)
 
 let opencodeDedupInPlaceSpec () = async {
-    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    let! workspaceDir = mkdtempAsync "dedup-plugin-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     let stableContent = String.replicate 8 "line of stable content\n"
     let readStateA = createObj [ "output", box stableContent ]
     let readStateB = createObj [ "output", box stableContent ]
@@ -185,6 +187,7 @@ let opencodeDedupInPlaceSpec () = async {
     let supState = get supPart "state"
     check "opencode dedup superset keeps state ref" (obj.ReferenceEquals(supState, supersetState))
     check "opencode dedup superset not replaced" (str supState "output" = supersetContent)
+    do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
 let run () : JS.Promise<unit> =

@@ -3,9 +3,11 @@ module VibeFs.Tests.IntegrationToolTests
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
+open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
 open VibeFs.Index
 open VibeFs.Opencode.Plugin
+
 
 [<Import("createRequire", "node:module")>]
 let private createRequire' : string -> (string -> obj) = jsNative
@@ -14,18 +16,7 @@ let private createRequire' : string -> (string -> obj) = jsNative
 let private importMeta : obj = jsNative
 
 let private requireFn : string -> obj = createRequire'(string importMeta?url)
-
-let private fsAsync : obj = requireFn("fs")?promises
 let private pathModule : obj = requireFn("path")
-
-let private mkdtempAsync (prefix: string) : JS.Promise<string> =
-    unbox (fsAsync?mkdtemp(pathModule?join("/tmp", prefix)))
-
-let private writeFileAsync (p: string) (content: string) : JS.Promise<unit> =
-    unbox (fsAsync?writeFile(p, content))
-
-let private rmAsync (p: string) : JS.Promise<unit> =
-    unbox (fsAsync?rm(p, box {| recursive = true; force = true |}))
 
 let private unlinkAsync (p: string) : JS.Promise<unit> =
     unbox (fsAsync?unlink(p))
@@ -62,8 +53,9 @@ let buildCapsFileReadDataSpec () = async {
 }
 
 let capsTransformSpec () = async {
-    do! writeFileAsync "/tmp/vibe/CAPS.md" "# Capabilities\nTest content" |> Async.AwaitPromise
-    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    let! workspaceDir = mkdtempAsync "caps-transform-" |> Async.AwaitPromise
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     let tf = get p "experimental.chat.messages.transform"
     let originalMsg =
         box {| info = createObj [ "id", box "msg-1"; "agent", box "manager" ]
@@ -73,17 +65,18 @@ let capsTransformSpec () = async {
     let msgs = unbox<obj[]> (get out "messages")
     check "caps transform injects four messages" (msgs.Length = 5)
     check "caps transform preserves original" (obj.ReferenceEquals(msgs.[4], originalMsg))
-    do! unlinkAsync "/tmp/vibe/CAPS.md" |> Async.AwaitPromise
+    do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
 let capsTransformInPlaceSpec () = async {
+    let! workspaceDir = mkdtempAsync "caps-in-place-" |> Async.AwaitPromise
     let freshOut = createObj [ "messages", box [| box {| info = createObj [ "id", box "msg-1"; "agent", box "manager" ]; parts = [||] |} |] ]
     let freshRef = get freshOut "messages"
-    do! writeFileAsync "/tmp/vibe/CAPS.md" "# Capabilities\nTest content" |> Async.AwaitPromise
-    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     do! (get p "experimental.chat.messages.transform") $ (createObj [], freshOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     check "caps transform mutates array in place" (obj.ReferenceEquals(get freshOut "messages", freshRef))
-    do! unlinkAsync "/tmp/vibe/CAPS.md" |> Async.AwaitPromise
+    do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
 let writeToolSpec (reg: obj) = async {
@@ -105,7 +98,8 @@ let loopCommandSpec (reg: obj) = async {
 }
 
 let agentConfigSpec () = async {
-    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    let! workspaceDir = mkdtempAsync "agent-config-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     let cfgInput =
         box {|
             agent = box {|
@@ -125,10 +119,12 @@ let agentConfigSpec () = async {
     check "custom model preserved" (str custom "model" = "custom-model")
     let manager = get agents "manager"
     check "manager mode primary" (str manager "mode" = "primary")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
 let toolDefinitionSpec () = async {
-    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    let! workspaceDir = mkdtempAsync "tool-definition-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     let td = get p "tool.definition"
     let coderDef = createObj [ "jsonSchema", box (createObj [
         "properties", box (createObj [ "intents", box (createObj [ "type", box "array" ]); "_ui", box (createObj [ "type", box "string" ]) ])
@@ -171,10 +167,12 @@ let toolDefinitionSpec () = async {
     check "tool.definition rewrites todo content description" (str (get todoItemProps "content") "description" = VibeFs.Kernel.MagicPrompts.todoContentDesc)
     check "tool.definition rewrites todo status description" (str (get todoItemProps "status") "description" = VibeFs.Kernel.MagicPrompts.todoStatusDesc)
     check "tool.definition rewrites todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Kernel.MagicPrompts.todoPriorityDesc)
+    do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
 let toolExecuteBeforeSpec () = async {
-    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    let! workspaceDir = mkdtempAsync "tool-execute-before-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     let teb = get p "tool.execute.before"
     let intents : obj array = [|
         box [| box "fix bug"; box [| "a.ts" |] |]
@@ -183,6 +181,7 @@ let toolExecuteBeforeSpec () = async {
     let execOut = createObj [ "args", box (createObj [ "intents", box intents ]) ]
     do! teb $ (createObj [ "tool", box "coder"; "sessionID", box "s1"; "callID", box "c1" ], execOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     check "tool.execute.before populates _ui" (str (get execOut "args") "_ui" = "fix bug; add feature")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
 let run () : JS.Promise<unit> =

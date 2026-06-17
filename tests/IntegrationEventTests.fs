@@ -3,6 +3,7 @@ module VibeFs.Tests.IntegrationEventTests
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
+open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
 open VibeFs.Index
 open VibeFs.Opencode.Plugin
@@ -79,7 +80,8 @@ let abortedRetrySpec () = async {
             "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
                 (async { promptCalls.Add(arg) } |> Async.StartAsPromise)))
         ]) ]
-    let! p = plugin (box {| directory = "/tmp/vibe"; client = mkClient () |}) |> Async.AwaitPromise
+    let! workspaceDir = mkdtempAsync "aborted-retry-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir; client = mkClient () |}) |> Async.AwaitPromise
     let eventHook = get p "event"
     let mkEvent typ props =
         box {| event = box {| ``type`` = typ; properties = props |} |}
@@ -89,6 +91,7 @@ let abortedRetrySpec () = async {
     do! eventHook $ (mkEvent "session.next.prompted" (box {| sessionID = "resume-ws"; prompt = box {| text = "continue" |} |})) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     do! eventHook $ (mkEvent "session.idle" (box {| sessionID = "resume-ws" |})) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     check "session.next.prompted resumes todo nudge" (promptCalls.Count = 1)
+    do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
 let repeatedAssistantSpec () = async {
@@ -106,16 +109,18 @@ let repeatedAssistantSpec () = async {
             "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
                 (async { promptCalls.Add(arg) } |> Async.StartAsPromise)))
         ]) ]
-    let! p = plugin (box {| directory = "/tmp/vibe"; client = mkClient () |}) |> Async.AwaitPromise
+    let! workspaceDir = mkdtempAsync "repeated-assistant-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir; client = mkClient () |}) |> Async.AwaitPromise
     do! (get p "event") $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = "same-text-ws" |} |} |}) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     check "same text first assistant turn nudges" (promptCalls.Count = 1)
     messages <- Array.append messages [|
         box {| info = box {| role = "assistant"; agent = "manager"; finish = "stop"; time = box {| completed = 2 |} |}
                parts = [| box {| ``type`` = "text"; text = "still working" |} |] |}
     |]
-    let! p2 = plugin (box {| directory = "/tmp/vibe"; client = mkClient () |}) |> Async.AwaitPromise
+    let! p2 = plugin (box {| directory = workspaceDir; client = mkClient () |}) |> Async.AwaitPromise
     do! (get p2 "event") $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = "same-text-ws" |} |} |}) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     check "same text new assistant turn nudges again" (promptCalls.Count = 2)
+    do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
 let reusedSessionSpec () = async {
@@ -133,7 +138,8 @@ let reusedSessionSpec () = async {
             "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
                 (async { promptCalls.Add(arg) } |> Async.StartAsPromise)))
         ]) ]
-    let! p = plugin (box {| directory = "/tmp/vibe"; client = mkClient () |}) |> Async.AwaitPromise
+    let! workspaceDir = mkdtempAsync "reused-session-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir; client = mkClient () |}) |> Async.AwaitPromise
     let eventHook = get p "event"
     do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = "reused-session" |} |} |}) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     do! eventHook $ (box {| event = box {| ``type`` = "session.deleted"; properties = box {| info = box {| id = "reused-session" |} |} |} |}) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
@@ -141,9 +147,10 @@ let reusedSessionSpec () = async {
         box {| info = box {| role = "assistant"; agent = "manager"; finish = "stop"; time = box {| completed = 1 |} |}
                parts = [| box {| ``type`` = "text"; text = "reopened work" |} |] |}
     |]
-    let! p2 = plugin (box {| directory = "/tmp/vibe"; client = mkClient () |}) |> Async.AwaitPromise
+    let! p2 = plugin (box {| directory = workspaceDir; client = mkClient () |}) |> Async.AwaitPromise
     do! (get p2 "event") $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = "reused-session" |} |} |}) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     check "reused session nudges after session.deleted" (promptCalls.Count = 2)
+    do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
 let run () : JS.Promise<unit> =
@@ -153,8 +160,10 @@ let run () : JS.Promise<unit> =
         do! repeatedTodoNudgeSpec reg
         do! syntaxWrapperSpec reg
         do! todoWriteWrapperSpec reg
-        let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+        let! workspaceDir = mkdtempAsync "tool-execute-after-" |> Async.AwaitPromise
+        let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
         do! toolExecuteAfterSpec p
+        do! rmAsync workspaceDir |> Async.AwaitPromise
         do! abortedRetrySpec ()
         do! repeatedAssistantSpec ()
         do! reusedSessionSpec ()
