@@ -22,7 +22,7 @@ let fuzzyFind = "Search for files by fuzzy path text matching. Returns file path
 
 let fuzzyGrep = "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked. Supports automatic regex mode detection. Use mode=fuzzy explicitly for fuzzy matching when exact regex yields no results. Every result ends with iterator=\"...\"; iteration is finished when it becomes iterator=\"\"."
 
-let websearch = "Search the web for any topic and get clean, ready-to-use content."
+let websearch = "Search the web for any topic; raw results are rewritten by a summarizer subagent focused on what_to_summarize, returning clean, ready-to-use content."
 
 let webfetch = "Fetch a URL with better extraction for static/docs pages. Supports llms.txt probing, content-focused HTML extraction, metadata, and redirects."
 
@@ -54,6 +54,7 @@ module Params =
     let fuzzyGrepIterator = "Opaque single-use iterator from a previous fuzzy-grep result."
     let websearchQuery = "Natural language search query. Should be a semantically rich description of the ideal page, not just keywords."
     let websearchNumResults = "Number of search results to return (default: 10)"
+    let websearchWhatToSummarize = "The question or intent the search should answer. The summarizer subagent focuses on extracting and synthesizing content relevant to this."
     let webfetchUrl = "The URL to fetch"
     let webfetchExtractMain = "Extract main content from the page, removing navigation, ads, etc. (default: true)"
     let webfetchPreferLlmsTxt = "Probe for llms.txt files before fetching full page (default: auto)"

@@ -30,28 +30,32 @@ type ExecuteResult =
     | Failed of output: string
     | MissingExecutable of executable: string * output: string
 
-/// Shell commands that only read — the executor is not a file browser.  When the
-/// first word of a shell command is one of these, prepend a usage warning.
+/// Shell commands that only read — the executor is not a file browser.  When any
+/// word of a shell command is one of these, prepend a usage warning.
 let readOnlyReadCommands: Set<string> =
     Set.ofList
         [ "head"; "tail"; "sed"; "cat"; "grep"; "rg"; "find"; "less"; "more"
           "diff"; "wc"; "ls"; "tree" ]
 
 let readOnlyWarning =
-    "// 绝对禁止使用 executor 工具仅仅用于查找或者读写文件，请使用专门工具例如 read/greper/editor 代替！"
+    "// 绝对禁止使用 executor 工具仅仅用于查找或者读写文件，请使用 read/reader/coder 代替！"
 
-/// Prepend the read-only warning when a shell command starts with a file-reading
-/// verb.  Strips leading env vars, comments, and pipes before checking.
+/// Prepend the read-only warning when a shell command contains a file-reading
+/// verb anywhere, not just as the leading word.  Splits on shell separators
+/// (space, tab, newline, |, &, ;) so verbs chained after &&, ||, ;, or a pipe
+/// are caught, while a bare substring inside another word (e.g. "cat" in
+/// "concat") is not.
 let formatSafetyWarning (output: string) (program: string) (language: ExecutorLanguage) : string =
     match language with
     | Shell ->
         let stripped = (strip program).script
-        let words = stripped.TrimStart().Split([| ' '; '\t'; '\n'; '|' |], StringSplitOptions.RemoveEmptyEntries)
-        match words |> Array.tryHead with
-        | None -> output
-        | Some first ->
-            let bare = first.Split('/') |> Array.tryLast |> Option.defaultValue ""
-            if Set.contains bare readOnlyReadCommands then $"{readOnlyWarning}\n{output}" else output
+        let words = stripped.Split([| ' '; '\t'; '\n'; '|'; '&'; ';' |], StringSplitOptions.RemoveEmptyEntries)
+        let triggers =
+            words
+            |> Array.exists (fun word ->
+                let bare = word.Split('/') |> Array.tryLast |> Option.defaultValue ""
+                Set.contains bare readOnlyReadCommands)
+        if triggers then $"{readOnlyWarning}\n{output}" else output
     | _ -> output
 
 /// Should the output be sent to a summariser instead of shown raw?

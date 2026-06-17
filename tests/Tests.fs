@@ -15,6 +15,8 @@ open VibeFs.Tests.IntegrationEventTests
 open VibeFs.Tests.IntegrationDedupTests
 open VibeFs.Tests.IntegrationToolTests
 open VibeFs.Tests.IntegrationChatTests
+open VibeFs.Tests.BacktrackTests
+open VibeFs.Tests.MagicTests
 
 let runAll (_args: string array) : JS.Promise<int> =
     async {
@@ -47,6 +49,7 @@ let runAll (_args: string array) : JS.Promise<int> =
         ShellTests.ollamaFetchInit ()
         ShellTests.ollamaResponseMethodCall ()
         ShellTests.executorMapping ()
+        ShellTests.safetyWarning ()
         ShellTests.recordValidator ()
         ShellTests.capsFileShape ()
         ShellTests.capsContextFormat ()
@@ -61,6 +64,8 @@ let runAll (_args: string array) : JS.Promise<int> =
         do! IntegrationDedupTests.run () |> Async.AwaitPromise
         do! IntegrationToolTests.run () |> Async.AwaitPromise
         do! IntegrationChatTests.run () |> Async.AwaitPromise
+        BacktrackTests.run ()
+        MagicTests.run ()
         return summary ()
     }
     |> Async.StartAsPromise

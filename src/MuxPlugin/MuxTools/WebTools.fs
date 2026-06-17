@@ -5,17 +5,21 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.OllamaFormat
 open VibeFs.Mux.Contract
+open VibeFs.MuxPlugin.Delegate
+open VibeFs.MuxPlugin.MuxPrompts
 open VibeFs.MuxPlugin.MuxTools.Shared
 open VibeFs.Opencode.ToolCopy
 open VibeFs.Shell.OllamaClient
 
-let websearchTool : ToolDefinition =
+let websearchTool (deps: obj) : ToolDefinition =
     { name = "websearch"
       description = websearch
-      parameters = mkSchema (createObj [ "query", box (strProp Params.websearchQuery); "numResults", box (numProp Params.websearchNumResults) ]) [| "query" |]
+      parameters = mkSchema (createObj [ "query", box (strProp Params.websearchQuery); "numResults", box (numProp Params.websearchNumResults); "what_to_summarize", box (strProp Params.websearchWhatToSummarize) ]) [| "query"; "what_to_summarize" |]
       execute = fun config args ->
+          let whatToSummarize = defaultArg (strField args "what_to_summarize") ""
           match strField args "query" with
           | None -> resolveStr "Error: `query` must be a string"
+          | Some query when whatToSummarize = "" -> resolveStr "Error: `what_to_summarize` is required"
           | Some query ->
               let abortSignal = Dyn.get config "abortSignal"
               async {
@@ -27,7 +31,12 @@ let websearchTool : ToolDefinition =
                       let items =
                           if Dyn.isNullish results || not (Dyn.isArray results) then []
                           else (results :?> obj array) |> Array.map (fun r -> { title = Dyn.str r "title"; url = Dyn.str r "url"; content = Dyn.str r "content" }) |> List.ofArray
-                      return formatSearchResults items
+                      let rawResults = formatSearchResults items
+                      if items.IsEmpty then return rawResults
+                      else
+                          let prompt = formatMuxWebsearchSummarizerUserPrompt whatToSummarize rawResults
+                          let! report = runMuxSubagent deps config "executor" prompt "Web search summary" None |> Async.AwaitPromise
+                          return report
                   with ex -> return jsonStringify (createObj [ "success", box false; "error", box ("Web search failed: " + ex.Message) ])
               } |> Async.StartAsPromise
       condition = None }

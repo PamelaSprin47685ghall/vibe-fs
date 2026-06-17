@@ -8,8 +8,20 @@ open VibeFs.Kernel.Boundary
 open VibeFs.Kernel.OpencodeHooks
 open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.TreeSitterKernel
+open VibeFs.Kernel.MessageDecoder
+open VibeFs.Kernel.SyntheticIds
+open VibeFs.Kernel.BacktrackCodec
+open VibeFs.Kernel.BacktrackProjector
+open VibeFs.Kernel.BacktrackPrompts
+open VibeFs.Kernel.MagicTypes
+open VibeFs.Kernel.MagicPrompts
+open VibeFs.Kernel.MagicProjector
+open VibeFs.Kernel.MagicReplay
+open VibeFs.Kernel.CapsFormat
 open VibeFs.Opencode.ChildAgent
 open VibeFs.Opencode.HookSchema
+open VibeFs.Opencode.BacktrackSession
+open VibeFs.Opencode.MagicSession
 open VibeFs.Shell.TreeSitterShell
 
 let private emptyObj () : obj = createObj []
@@ -39,8 +51,16 @@ let private resolveAgent (registry: ChildAgentRegistry) (input: obj) : string =
         | Some a -> a
         | None -> "manager"
 
-/// Filter tools at runtime by `canUse`.  Denied tools are forced false;
-/// allowed tools keep their existing value so users may opt out.
+let private messageId (msg: obj) : string =
+    let info = messageInfo msg
+    if Dyn.isNullish info then "" else infoId info
+
+let private extractSessionID (messages: obj array) : string =
+    if messages.Length = 0 then ""
+    else
+        let info = messageInfo messages.[0]
+        if Dyn.isNullish info then "" else infoSessionID info
+
 let private resolveChatTools (agent: string) (existingTools: obj) : obj =
     let next = createObj []
     if not (Dyn.isNullish existingTools) then
@@ -51,7 +71,6 @@ let private resolveChatTools (agent: string) (existingTools: obj) : obj =
                 setKey next key (box false)
     next
 
-/// chat.message: enforce per-agent tool boundaries at runtime.
 let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let agent = resolveAgent registry input
@@ -64,10 +83,18 @@ let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.Nudge
                 setKey message "tools" (resolveChatTools agent tools)
     } |> Async.StartAsPromise
 
-/// tool.execute.after: syntax-check file edits and delegate to the nudge hook.
-let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
+let toolExecuteAfter (directory: string) (backtrackSession: BacktrackSession) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let tool = Dyn.str input "tool"
+        let callID = Dyn.str input "callID"
+        if tool <> BacktrackProjector.backtrackToolName then
+            match backtrackSession.TryGetAllocated callID with
+            | Some id ->
+                let out = Dyn.get output "output"
+                if not (Dyn.isNullish out) && Dyn.typeIs out "string" then
+                    setOutput output (encodeId id (string out))
+                backtrackSession.ClearCall callID
+            | None -> ()
         if isFileEditTool tool then
             let out = Dyn.get output "output"
             if not (Dyn.isNullish out) && Dyn.typeIs out "string" then
@@ -96,14 +123,12 @@ let private applyReadDedup (messages: obj array) : unit =
     if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
     else
         let seenByPath = emptyObj ()
-
         for i = 0 to messages.Length - 1 do
             let message = messages.[i]
             if not (Dyn.isNullish message) then
                 let parts = Dyn.get message "parts"
                 if not (Dyn.isNullish parts) && Dyn.isArray parts then
                     let partsArr = parts :?> obj array
-
                     for j = 0 to partsArr.Length - 1 do
                         let part = partsArr.[j]
                         if not (Dyn.isNullish part)
@@ -113,7 +138,7 @@ let private applyReadDedup (messages: obj array) : unit =
                             if not (Dyn.isNullish state) then
                                 let output = Dyn.get state "output"
                                 if not (Dyn.isNullish output) && Dyn.typeIs output "string" then
-                                    let currentOutput = string output
+                                    let currentOutput = stripIdPrefix (string output)
                                     let pathKey =
                                         match extractFilePaths (Dyn.get state "input") with
                                         | path :: _ -> path
@@ -129,45 +154,130 @@ let private applyReadDedup (messages: obj array) : unit =
                                     | AlreadySeen -> setOutput state dedupMarker
                                     | NewContent _ -> ()
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
+let private preludeUserId = rewritePreludeUserPrefix + "v1"
+let private preludeAssistantId = rewritePreludeAssistantPrefix + "v1"
+
+let private buildPreludeUserMessage (sessionID: string) : obj =
+    box (createObj [
+        "info", box (createObj [
+            "id", box preludeUserId
+            "sessionID", box sessionID
+            "role", box "user"
+            "time", box (createObj [ "created", box 0 ])
+            "agent", box "orchestrator"
+            "model", box (createObj [ "providerID", box ""; "modelID", box "" ])
+        ])
+        "parts", box [| box {| ``type`` = "text"; text = preludeText |} |]
+    ])
+
+let private buildPreludeAssistantMessage (sessionID: string) (projectRoot: string) : obj =
+    box (createObj [
+        "info", box (createObj [
+            "id", box preludeAssistantId
+            "sessionID", box sessionID
+            "role", box "assistant"
+            "time", box (createObj [ "created", box 0; "completed", box 1 ])
+            "parentID", box preludeUserId
+            "modelID", box ""
+            "providerID", box ""
+            "mode", box "code"
+            "path", box (createObj [ "cwd", box projectRoot; "root", box projectRoot ])
+            "cost", box 0
+            "tokens", box (createObj [
+                "input", box 0; "output", box 0; "reasoning", box 0
+                "cache", box (createObj [ "read", box 0; "write", box 0 ])
+            ])
+        ])
+        "parts", box [| box {| ``type`` = "text"; text = "Understood." |} |]
+    ])
+
+let private hasExistingPrelude (messages: obj array) : bool =
+    messages.Length >= 2 &&
+    let id0 = messageId messages.[0] in id0 <> "" && id0.StartsWith(rewritePreludeUserPrefix) &&
+    let id1 = messageId messages.[1] in id1 <> "" && id1.StartsWith(rewritePreludeAssistantPrefix)
+
+let private injectPrelude (messages: obj array) (projectRoot: string) (sessionID: string) : obj array =
+    let sessionOpt = if sessionID = "" then None else Some sessionID
+    let existingStripped =
+        if hasExistingPrelude messages && messages.Length >= 2 then messages.[2..]
+        else messages
+    if existingStripped.Length = 0 then messages
+    else
+        let userMsg = buildPreludeUserMessage sessionID
+        let assistantMsg = buildPreludeAssistantMessage sessionID projectRoot
+        Array.concat [| [| userMsg; assistantMsg |]; existingStripped |]
+
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (backtrackSession: BacktrackSession) (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let messages = Dyn.get output "messages"
-        if not (Dyn.isNullish messages) && Dyn.isArray messages then
+        if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
+        else
             let messagesArr = messages :?> obj array
-            let agent = resolveAgent registry input
-            if not (defaultExcludedAgents |> List.contains agent) then
-                let! capsFiles = VibeFs.Shell.CapsShell.findCapsFiles directory |> Async.AwaitPromise
-                let next =
-                    VibeFs.Kernel.CapsFormat.buildCapsMessages
-                        VibeFs.Shell.Crypto.sha256HexTruncated
-                        messagesArr
-                        directory
-                        defaultExcludedAgents
-                        capsFiles
-                replaceArrayInPlace messagesArr next
-            applyReadDedup messagesArr
+            if messagesArr.Length = 0 then ()
+            else
+                let agent = resolveAgent registry input
+                let sessionID = extractSessionID messagesArr
+                backtrackSession.SyncFromMessages(sessionID, messagesArr)
+                let cleaned = stripSyntheticMessages messagesArr
+                if cleaned.Length = 0 then ()
+                else
+                    applyReadDedup cleaned
+                    let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
+                    let projected = BacktrackProjector.project cleaned
+                    let afterMagic = MagicProjector.projectMagic projected backlog false sessionID
+                    let withPrelude = injectPrelude afterMagic directory sessionID
+                    let! final =
+                        if defaultExcludedAgents |> List.contains agent then
+                            async { return withPrelude }
+                        else
+                            async {
+                                let! capsFiles = VibeFs.Shell.CapsShell.findCapsFiles directory |> Async.AwaitPromise
+                                return buildCapsMessages
+                                    VibeFs.Shell.Crypto.sha256HexTruncated
+                                    withPrelude
+                                    directory
+                                    defaultExcludedAgents
+                                    capsFiles
+                            }
+                    replaceArrayInPlace messagesArr final
     } |> Async.StartAsPromise
 
-/// tool.definition: hide the internal `_ui` parameter from coder/reader schemas.
+let compactingHandler (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
+    async {
+        let sessionID = Dyn.str input "sessionID"
+        let backlog = magicSession.GetOrRebuildBacklog(sessionID, [||])
+        if backlog.IsEmpty then ()
+        else
+            let context = Dyn.get output "context"
+            if not (Dyn.isNullish context) && Dyn.isArray context then
+                let hint = "Preserve the latest todowrite result and the complete Magic Todo backlog in the summary."
+                (box context)?push(box hint) |> ignore
+    } |> Async.StartAsPromise
+
 let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let toolID = Dyn.str input "toolID"
         if toolID = "coder" || toolID = "reader" then
-            let parameters = Dyn.get output "parameters"
-            if not (Dyn.isNullish parameters) then setKey output "parameters" (withUiParameterStripped parameters)
+            rewriteToolJsonSchema stripUiFromJsonSchema output
+        elif toolID = MagicTypes.magicTodoToolName then
+            setKey output "description" (box toolDescription)
+            rewriteToolJsonSchema enrichMagicTodoSchema output
     } |> Async.StartAsPromise
 
-/// tool.execute.before: populate `_ui` from joined intents so the UI labels the call.
-let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
+let toolExecuteBefore (backtrackSession: BacktrackSession) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let args = Dyn.get output "args"
         if Dyn.isNullish args then ()
         else
             let tool = Dyn.str input "tool"
             setUiLabel args tool
+            if tool <> BacktrackProjector.backtrackToolName then
+                let sessionID = Dyn.str input "sessionID"
+                let callID = Dyn.str input "callID"
+                if sessionID <> "" && callID <> "" then
+                    backtrackSession.Allocate(sessionID, callID) |> ignore
     } |> Async.StartAsPromise
 
-/// event: deactivate review on stream-abort.
 let eventHandler (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
     async {
         let event = Dyn.get input "event"

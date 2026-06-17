@@ -10,6 +10,9 @@ open VibeFs.Opencode.NudgeHook
 open VibeFs.Opencode.Session
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.ChildAgent
+open VibeFs.Opencode.BacktrackSession
+open VibeFs.Opencode.MagicSession
+open VibeFs.Opencode.BacktrackTools
 open VibeFs.Shell.FuzzyFinderShell
 
 [<Global("process")>]
@@ -99,7 +102,12 @@ let plugin (ctx: obj) : JS.Promise<obj> =
         let finderCache = FinderCache()
         let nudgeHook = createNudgeHook ctx reviewStore childAgentRegistry
         let directory = Dyn.str ctx "directory"
+        let backtrackSession = BacktrackSession()
+        let magicSession = MagicSession()
         let tools = createTools childAgentRegistry finderCache ctx reviewStore
+        assignInto tools (createObj [
+            "backtrack", box (backtrackTool backtrackSession)
+        ]) |> ignore
         let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.McpConfig.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
         let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
         let result = emptyObj ()
@@ -115,9 +123,9 @@ let plugin (ctx: obj) : JS.Promise<obj> =
             } |> Async.StartAsPromise)))
         setKey result "chat.message" (twoArgHook (fun input output -> chatMessage childAgentRegistry nudgeHook input output))
         setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinition input output))
-        setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBefore input output))
-        setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfter directory nudgeHook input output))
-        setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform childAgentRegistry directory input output))
+        setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBefore backtrackSession input output))
+        setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfter directory backtrackSession nudgeHook input output))
+        setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform childAgentRegistry directory backtrackSession magicSession input output))
         setKey result "command.execute.before" (twoArgHook (fun input output ->
             async {
                 do! nudgeHook.handleCommandExecuteBefore input output |> Async.AwaitPromise
@@ -128,6 +136,7 @@ let plugin (ctx: obj) : JS.Promise<obj> =
                 do! Hooks.eventHandler reviewStore input |> Async.AwaitPromise
                 do! nudgeHook.handleEvent input |> Async.AwaitPromise
             } |> Async.StartAsPromise))
+        setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandler magicSession input output))
         return result
     }
     |> Async.StartAsPromise

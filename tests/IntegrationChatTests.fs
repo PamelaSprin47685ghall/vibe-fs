@@ -76,14 +76,14 @@ let childAgentChatSpec () = async {
 let websearchBoundariesSpec () = async {
     let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
     let chatMsg = get p "chat.message"
-    let editorChat = createObj [ "message", box (createObj [ "tools", box (createObj [
+    let coderChat = createObj [ "message", box (createObj [ "tools", box (createObj [
         "websearch", box true
         "webfetch", box true
     ]) ]) ]
-    do! chatMsg $ (box {| sessionID = "root"; agent = "coder" |}, editorChat) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
-    let tools = get (get editorChat "message") "tools"
-    check "editor websearch forced false" (not (unbox<bool> (get tools "websearch")))
-    check "editor webfetch forced false" (not (unbox<bool> (get tools "webfetch")))
+    do! chatMsg $ (box {| sessionID = "root"; agent = "coder" |}, coderChat) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let tools = get (get coderChat "message") "tools"
+    check "coder websearch forced false" (not (unbox<bool> (get tools "websearch")))
+    check "coder webfetch forced false" (not (unbox<bool> (get tools "webfetch")))
 }
 
 let subagentParentSpec () = async {
@@ -126,7 +126,7 @@ let nestedSubagentSpec () = async {
         ]) ]
     let registry = ChildAgentRegistry.Create()
     do! runSubagent registry (mkClient ()) "browser" "Browser" "first" "/tmp/vibe" "root-session" (createObj [ "abort", box null ]) null |> Async.AwaitPromise |> Async.Ignore
-    do! runSubagent registry (mkClient ()) "coder" "Editor" "second" "/tmp/vibe" "child-1" (createObj [ "abort", box null ]) null |> Async.AwaitPromise |> Async.Ignore
+    do! runSubagent registry (mkClient ()) "coder" "Coder" "second" "/tmp/vibe" "child-1" (createObj [ "abort", box null ]) null |> Async.AwaitPromise |> Async.Ignore
     check "nested subagent resolves to root parent" (str (get createCalls.[1] "body") "parentID" = "root-session")
 }
 

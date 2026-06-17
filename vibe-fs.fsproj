@@ -43,6 +43,16 @@
     <Compile Include="src/Kernel/OllamaFormat.fs" />
     <Compile Include="src/Kernel/UnifiedContext.fs" />
 
+    <Compile Include="src/Kernel/SyntheticIds.fs" />
+    <Compile Include="src/Kernel/BacktrackCodec.fs" />
+    <Compile Include="src/Kernel/BacktrackPrompts.fs" />
+    <Compile Include="src/Kernel/PartStream.fs" />
+    <Compile Include="src/Kernel/BacktrackProjector.fs" />
+    <Compile Include="src/Kernel/MagicTypes.fs" />
+    <Compile Include="src/Kernel/MagicPrompts.fs" />
+    <Compile Include="src/Kernel/MagicProjector.fs" />
+    <Compile Include="src/Kernel/MagicReplay.fs" />
+
     <Compile Include="src/Kernel/ExcludedDirs.fs" />
     <Compile Include="src/Kernel/SyntaxTypes.fs" />
     <Compile Include="src/Kernel/TreeSitterKernel.fs" />
@@ -91,6 +101,9 @@
     <Compile Include="src/Opencode/SessionSnapshotDecoder.fs" />
     <Compile Include="src/Opencode/NudgeHook.fs" />
     <Compile Include="src/Opencode/Session.fs" />
+    <Compile Include="src/Opencode/BacktrackSession.fs" />
+    <Compile Include="src/Opencode/MagicSession.fs" />
+    <Compile Include="src/Opencode/BacktrackTools.fs" />
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/AgentConfig.fs" />
     <Compile Include="src/Opencode/Hooks.fs" />
@@ -130,6 +143,8 @@
     <Compile Include="tests/IntegrationDedupTests.fs" />
     <Compile Include="tests/IntegrationToolTests.fs" />
     <Compile Include="tests/IntegrationChatTests.fs" />
+    <Compile Include="tests/BacktrackTests.fs" />
+    <Compile Include="tests/MagicTests.fs" />
     <Compile Include="tests/Tests.fs" />
   </ItemGroup>
 

@@ -83,7 +83,7 @@ type HostReadExec = obj option ref
 let readTool (_deps: obj) (hostReadExec: HostReadExec) : ToolDefinition =
     { name = "read"
       description =
-        "If path is a directory, returns a formatted directory listing (equivalent to ls -la). Use this instead of running `ls` via runner."
+        "If path is a directory, returns a formatted directory listing (equivalent to ls -la). Use this instead of running `ls` via executor."
       parameters =
         mkSchema
             (createObj

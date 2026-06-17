@@ -11,6 +11,7 @@ open VibeFs.Opencode.Sdk
 open VibeFs.Opencode.ToolCopy
 open VibeFs.Opencode.Session
 open VibeFs.Opencode.ChildAgent
+open VibeFs.Opencode.HookSchema
 open VibeFs.Kernel.Prompts
 open VibeFs.Shell.FuzzyFinderShell
 
@@ -38,24 +39,27 @@ let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     define coder
         (box {| intents = intentsSchema Params.coderIntents; _ui = uiParam |})
         (fun args context ->
-            let tc = extractToolContext context (Dyn.str ctx "directory")
-            let directory = Dyn.str tc "directory"
-            let sessionID = Dyn.str tc "sessionID"
-            let intents = Dyn.get args "intents" :?> obj array
-            async {
-                let! reports =
-                    intents |> Array.map (fun intent ->
-                        let pair = intent :?> obj array
-                        let intentText = string pair.[0]
-                        let files =
-                            let filesRaw = pair.[1]
-                            if Dyn.typeIs filesRaw "string" then [string filesRaw]
-                            else filesRaw :?> obj array |> Array.map string |> List.ofArray
-                        let prompt = formatCoderUserPrompt intentText files
-                        runSubagent registry client "coder" "Coder" prompt directory sessionID context (box null)
-                        |> Async.AwaitPromise) |> Async.Parallel
-                return String.concat "\n---\n" (List.ofArray reports)
-            } |> Async.StartAsPromise)
+            match joinCoderIntents (Dyn.get args "intents") with
+            | Error message -> resolveStr message
+            | Ok _ ->
+                let tc = extractToolContext context (Dyn.str ctx "directory")
+                let directory = Dyn.str tc "directory"
+                let sessionID = Dyn.str tc "sessionID"
+                let intents = Dyn.get args "intents" :?> obj array
+                async {
+                    let! reports =
+                        intents |> Array.map (fun intent ->
+                            let pair = intent :?> obj array
+                            let intentText = string pair.[0]
+                            let files =
+                                let filesRaw = pair.[1]
+                                if Dyn.typeIs filesRaw "string" then [string filesRaw]
+                                else filesRaw :?> obj array |> Array.map string |> List.ofArray
+                            let prompt = formatCoderUserPrompt intentText files
+                            runSubagent registry client "coder" "Coder" prompt directory sessionID context (box null)
+                            |> Async.AwaitPromise) |> Async.Parallel
+                    return String.concat "\n---\n" (List.ofArray reports)
+                } |> Async.StartAsPromise)
 
 let readerTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client = Dyn.get ctx "client"
@@ -63,17 +67,20 @@ let readerTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
         (box {| intents = call1 (call1 (arr (strMin 1 "")) "min" (box 1)) "describe" (box Params.readerIntents)
                 _ui = uiParam |})
         (fun args context ->
-            let tc = extractToolContext context (Dyn.str ctx "directory")
-            let intents = Dyn.get args "intents" :?> obj array |> Array.map string
-            async {
-                let! reports =
-                    intents |> Array.map (fun intent ->
-                        let prompt = formatReaderUserPrompt intent
-                        runSubagent registry client "reader" "Reader" prompt
-                            (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null)
-                        |> Async.AwaitPromise) |> Async.Parallel
-                return String.concat "\n---\n" (List.ofArray reports)
-            } |> Async.StartAsPromise)
+            match joinReaderIntents (Dyn.get args "intents") with
+            | Error message -> resolveStr message
+            | Ok _ ->
+                let tc = extractToolContext context (Dyn.str ctx "directory")
+                let intents = Dyn.get args "intents" :?> obj array |> Array.map string
+                async {
+                    let! reports =
+                        intents |> Array.map (fun intent ->
+                            let prompt = formatReaderUserPrompt intent
+                            runSubagent registry client "reader" "Reader" prompt
+                                (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null)
+                            |> Async.AwaitPromise) |> Async.Parallel
+                    return String.concat "\n---\n" (List.ofArray reports)
+                } |> Async.StartAsPromise)
 
 let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client = Dyn.get ctx "client"
@@ -165,13 +172,17 @@ let fuzzyGrepTool (finderCache: FinderCache) : obj =
 let private abortSignal (context: obj) : obj =
     if Dyn.isNullish context then null else Dyn.get context "abort"
 
-let websearchTool () : obj =
+let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
+    let client = Dyn.get ctx "client"
     define websearch
         (box {| query = strReq Params.websearchQuery
-                numResults = numOpt Params.websearchNumResults |})
+                numResults = numOpt Params.websearchNumResults
+                what_to_summarize = strReq Params.websearchWhatToSummarize |})
         (fun args context ->
             let query = Dyn.str args "query"
+            let whatToSummarize = Dyn.str args "what_to_summarize"
             if query = "" then resolveStr "Error: query is required"
+            elif whatToSummarize = "" then resolveStr "Error: what_to_summarize is required"
             else
                 let signal = abortSignal context
                 async {
@@ -183,7 +194,14 @@ let websearchTool () : obj =
                         let items =
                             if Dyn.isNullish results || not (Dyn.isArray results) then []
                             else (results :?> obj array) |> Array.map (fun r -> { title = Dyn.str r "title"; url = Dyn.str r "url"; content = Dyn.str r "content" }) |> List.ofArray
-                        return formatSearchResults items
+                        let rawResults = formatSearchResults items
+                        if items.IsEmpty then return rawResults
+                        else
+                            let tc = extractToolContext context (Dyn.str ctx "directory")
+                            let prompt = formatWebsearchSummarizerUserPrompt whatToSummarize rawResults
+                            return! runSubagentWithCleanup registry client "executor" "Web search summary" prompt
+                                        (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
+                                    |> Async.AwaitPromise
                     with ex -> return $"Search failed: {ex.Message}"
                 } |> Async.StartAsPromise)
 
@@ -282,7 +300,7 @@ let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: 
         entry "meditator" (meditatorTool registry ctx); entry "browser" (browserTool registry ctx)
         entry "executor" (executorTool registry ctx)
         entry "fuzzy-find" (fuzzyFindTool finderCache); entry "fuzzy-grep" (fuzzyGrepTool finderCache)
-        entry "websearch" (websearchTool ()); entry "webfetch" (webfetchTool ())
+        entry "websearch" (websearchTool registry ctx); entry "webfetch" (webfetchTool ())
         entry "submit_review" (submitReviewTool registry ctx reviewStore)
         entry "return-reviewer" (submitReviewResultTool reviewStore)
     |]

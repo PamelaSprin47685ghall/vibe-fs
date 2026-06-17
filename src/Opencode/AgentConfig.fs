@@ -24,7 +24,7 @@ type private BuiltinAgentSpec =
 let private defaultPrimaryAliases = [ "manager"; "build"; "plan" ]
 
 let private builtinAgentSpecs =
-    [ { name = "manager"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
+    [ { name = "manager"; defaultMode = "primary"; systemPrompt = Prompts.managerSystemPrompt; defaultMcps = [||] }
       { name = "build"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
       { name = "plan"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
       { name = "coder"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
@@ -105,9 +105,7 @@ let applyAgentConfig (opencodeConfig: obj) (mcps: obj) : obj =
         if Dyn.isNullish (Dyn.get agents name) then setKey agents name (emptyObj ())
     let finalAgents = emptyObj ()
     for name in objectKeys agents do
-        if name = "basher" || name = "runner" then ()
-        else
-            let ua = Dyn.get agents name
-            let uaObj = if Dyn.isNullish ua then emptyObj () else ua
-            setKey finalAgents name (withRoleDefaults name uaObj)
+        let ua = Dyn.get agents name
+        let uaObj = if Dyn.isNullish ua then emptyObj () else ua
+        setKey finalAgents name (withRoleDefaults name uaObj)
     mergeObj opencodeConfig (box {| agent = finalAgents; mcp = mergedMcp |})

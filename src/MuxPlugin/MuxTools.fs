@@ -28,7 +28,7 @@ let createToolCatalog
            browserTool deps
            executorTool deps
            submitReviewTool deps callStore reviewStore
-           websearchTool
+           websearchTool deps
            webfetchTool
            fuzzyGrepTool finderCache
            fuzzyFindTool finderCache

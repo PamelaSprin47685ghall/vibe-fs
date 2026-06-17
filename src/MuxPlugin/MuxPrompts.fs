@@ -31,6 +31,11 @@ let formatMuxExecutorSummarizerUserPrompt (output: string) : string =
     + "\n4. Finish by calling agent_report with the summary.\n\n"
     + agentReportClosing + "\n\n"
 
+let formatMuxWebsearchSummarizerUserPrompt (whatToSummarize: string) (rawResults: string) : string =
+    websearchSummarizerPromptBody whatToSummarize rawResults
+    + "\n5. Finish by calling agent_report with the focused answer.\n\n"
+    + agentReportClosing + "\n\n"
+
 let agentReportReviewInstructions =
     readOnlyWorkspaceConstraint + "\n\n"
     + "You are a code reviewer performing a rigorous review of submitted work.\n\n"

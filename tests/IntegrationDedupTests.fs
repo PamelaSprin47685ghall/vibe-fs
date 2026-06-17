@@ -135,6 +135,9 @@ let dedupModelEmptySpec () =
     let _, msgs = deduplicateModelReadOutputsWithSeen [||] [||]
     check "ModelMessage empty: empty array" (msgs.Length = 0)
 
+let private findMsgById (msgs: obj[]) (idPrefix: string) : obj =
+    msgs |> Array.find (fun m -> str (get m "info") "id" = idPrefix)
+
 let opencodeDedupInPlaceSpec () = async {
     let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
     let stableContent = String.replicate 8 "line of stable content\n"
@@ -144,17 +147,19 @@ let opencodeDedupInPlaceSpec () = async {
     let readPartB = createObj [ "type", box "tool"; "tool", box "read"; "state", box readStateB ]
     let dedupInPlace =
         createObj [ "messages", box [|
-            createObj [ "info", box (createObj [ "id", box "dedup-m1"; "agent", box "manager" ])
+            createObj [ "info", box (createObj [ "id", box "dedup-m1"; "agent", box "manager"; "role", box "assistant"; "sessionID", box "dedup-session" ])
                         "parts", box [| readPartA |] ]
-            createObj [ "info", box (createObj [ "id", box "dedup-m2"; "agent", box "manager" ])
+            createObj [ "info", box (createObj [ "id", box "dedup-m2"; "agent", box "manager"; "role", box "assistant"; "sessionID", box "dedup-session" ])
                         "parts", box [| readPartB |] ]
         |] ]
     let dedupMessagesRef = get dedupInPlace "messages"
-    do! (get p "experimental.chat.messages.transform") $ (box null, dedupInPlace) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    do! (get p "experimental.chat.messages.transform") $ (box {| sessionID = "dedup-session" |}, dedupInPlace) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     let msgs = unbox<obj[]> dedupMessagesRef
     check "opencode dedup keeps messages array ref" (obj.ReferenceEquals(msgs, unbox<obj[]> (get dedupInPlace "messages")))
-    let partA = get (unbox<obj> msgs.[0]) "parts" |> unbox<obj[]> |> Array.item 0
-    let partB = get (unbox<obj> msgs.[1]) "parts" |> unbox<obj[]> |> Array.item 0
+    let msg1 = findMsgById msgs "dedup-m1"
+    let msg2 = findMsgById msgs "dedup-m2"
+    let partA = get msg1 "parts" |> unbox<obj[]> |> Array.item 0
+    let partB = get msg2 "parts" |> unbox<obj[]> |> Array.item 0
     check "opencode dedup keeps first part ref" (obj.ReferenceEquals(partA, readPartA))
     check "opencode dedup keeps second part ref" (obj.ReferenceEquals(partB, readPartB))
     let stateA = get partA "state"
@@ -168,13 +173,15 @@ let opencodeDedupInPlaceSpec () = async {
     let supersetPart = createObj [ "type", box "tool"; "tool", box "read"; "state", box supersetState ]
     let dedupSuperset =
         createObj [ "messages", box [|
-            createObj [ "info", box (createObj [ "id", box "dedup-s1"; "agent", box "manager" ])
+            createObj [ "info", box (createObj [ "id", box "dedup-s1"; "agent", box "manager"; "role", box "assistant"; "sessionID", box "dedup-session2" ])
                         "parts", box [| readPartA |] ]
-            createObj [ "info", box (createObj [ "id", box "dedup-s2"; "agent", box "manager" ])
+            createObj [ "info", box (createObj [ "id", box "dedup-s2"; "agent", box "manager"; "role", box "assistant"; "sessionID", box "dedup-session2" ])
                         "parts", box [| supersetPart |] ]
         |] ]
-    do! (get p "experimental.chat.messages.transform") $ (box null, dedupSuperset) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
-    let supPart = get (unbox<obj> (unbox<obj[]> (get dedupSuperset "messages")).[1]) "parts" |> unbox<obj[]> |> Array.item 0
+    do! (get p "experimental.chat.messages.transform") $ (box {| sessionID = "dedup-session2" |}, dedupSuperset) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let supMsgs = unbox<obj[]> (get dedupSuperset "messages")
+    let supMsg = findMsgById supMsgs "dedup-s2"
+    let supPart = get supMsg "parts" |> unbox<obj[]> |> Array.item 0
     let supState = get supPart "state"
     check "opencode dedup superset keeps state ref" (obj.ReferenceEquals(supState, supersetState))
     check "opencode dedup superset not replaced" (str supState "output" = supersetContent)

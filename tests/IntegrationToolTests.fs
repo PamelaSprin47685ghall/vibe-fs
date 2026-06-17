@@ -71,8 +71,8 @@ let capsTransformSpec () = async {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [], out) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     let msgs = unbox<obj[]> (get out "messages")
-    check "caps transform injects two messages" (msgs.Length = 3)
-    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[2], originalMsg))
+    check "caps transform injects four messages" (msgs.Length = 5)
+    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[4], originalMsg))
     do! unlinkAsync "/tmp/vibe/CAPS.md" |> Async.AwaitPromise
 }
 
@@ -130,14 +130,47 @@ let agentConfigSpec () = async {
 let toolDefinitionSpec () = async {
     let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
     let td = get p "tool.definition"
-    let editorDef = createObj [ "parameters", box (createObj [
+    let coderDef = createObj [ "jsonSchema", box (createObj [
         "properties", box (createObj [ "intents", box (createObj [ "type", box "array" ]); "_ui", box (createObj [ "type", box "string" ]) ])
         "required", box [| "intents"; "_ui" |]
     ]) ]
-    do! td $ (createObj [ "toolID", box "coder" ], editorDef) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
-    let props = get (get editorDef "parameters") "properties"
-    check "tool.definition strips editor _ui property" (isNullish (get props "_ui"))
-    check "tool.definition keeps editor intents" (not (isNullish (get props "intents")))
+    do! td $ (createObj [ "toolID", box "coder" ], coderDef) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let props = get (get coderDef "jsonSchema") "properties"
+    check "tool.definition strips coder _ui property" (isNullish (get props "_ui"))
+    check "tool.definition keeps coder intents" (not (isNullish (get props "intents")))
+
+    let todoDef = createObj [ "jsonSchema", box (createObj [
+        "type", box "object"
+        "properties", box (createObj [
+            "todos", box (createObj [
+                "type", box "array"
+                "description", box "old todos"
+                "items", box (createObj [
+                    "type", box "object"
+                    "properties", box (createObj [
+                        "content", box (createObj [ "type", box "string"; "description", box "old content" ])
+                        "status", box (createObj [ "type", box "string"; "description", box "old status" ])
+                        "priority", box (createObj [ "type", box "string"; "description", box "old priority" ])
+                    ])
+                ])
+            ])
+        ])
+        "required", box [| "todos" |]
+    ]) ]
+    do! td $ (createObj [ "toolID", box "todowrite" ], todoDef) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "tool.definition rewrites todo description" (str todoDef "description" |> fun text -> text.Contains "append-only work backlog")
+    let todoSchema = get todoDef "jsonSchema"
+    let todoProps = get todoSchema "properties"
+    let reportSchema = get todoProps "completedWorkReport"
+    let required = unbox<obj[]> (get todoSchema "required") |> Array.map string
+    check "tool.definition adds todo report field" (str reportSchema "type" = "string")
+    check "tool.definition adds todo report description" (str reportSchema "description" = VibeFs.Kernel.MagicPrompts.reportDesc)
+    check "tool.definition requires todo report" (required |> Array.contains "completedWorkReport")
+    check "tool.definition rewrites todos description" (str (get todoProps "todos") "description" = VibeFs.Kernel.MagicPrompts.todosDesc)
+    let todoItemProps = get (get (get todoProps "todos") "items") "properties"
+    check "tool.definition rewrites todo content description" (str (get todoItemProps "content") "description" = VibeFs.Kernel.MagicPrompts.todoContentDesc)
+    check "tool.definition rewrites todo status description" (str (get todoItemProps "status") "description" = VibeFs.Kernel.MagicPrompts.todoStatusDesc)
+    check "tool.definition rewrites todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Kernel.MagicPrompts.todoPriorityDesc)
 }
 
 let toolExecuteBeforeSpec () = async {

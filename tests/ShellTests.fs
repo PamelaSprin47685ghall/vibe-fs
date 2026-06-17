@@ -82,3 +82,14 @@ let summarizerInputCap () =
     let largePrompt = buildSummaryPrompt bl trunc opts (Completed large)
     check "large output truncated message" (largePrompt.Contains "[Output truncated to 1MB for summarization]")
     check "large output tail absent" (not (largePrompt.Contains tail))
+
+let safetyWarning () =
+    let warn program = formatSafetyWarning "OUT" program Shell
+    check "leading grep warns" ((warn "grep foo").Contains readOnlyWarning)
+    check "grep after && warns" ((warn "cd src && grep foo").Contains readOnlyWarning)
+    check "grep in pipe warns" ((warn "ls a | grep b").Contains readOnlyWarning)
+    check "ls after semicolon warns" ((warn "echo ok; ls -la").Contains readOnlyWarning)
+    check "prefixed path warns" ((warn "/usr/bin/grep foo").Contains readOnlyWarning)
+    check "plain echo passes" (not ((warn "echo hi").Contains readOnlyWarning))
+    check "substring inside word ignored" (not ((warn "echo concatenate").Contains readOnlyWarning))
+    check "non-shell language ignored" (not ((formatSafetyWarning "OUT" "grep foo" Python).Contains readOnlyWarning))

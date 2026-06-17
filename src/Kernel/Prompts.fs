@@ -21,7 +21,8 @@ let loopNudgePrompt =
     + "before finishing. Do not end the conversation without calling submit_review."
 
 let managerSystemPrompt =
-    "You are the manager agent. Coordinate the overall task, decide when to delegate to subagents, and synthesize their outputs into a final answer that satisfies the user's original goal."
+    "You are the manager agent. Coordinate the overall task, decide when to delegate to subagents, and synthesize their outputs into a final answer that satisfies the user's original goal.\n\n"
+    + "For multi-step work, keep todowrite current. Every todowrite call must provide the full todos list plus a detailed completedWorkReport that can survive context folding."
 
 let reviewCriteria =
     """# Evaluation Criteria
@@ -114,3 +115,17 @@ let executorSummarizerPromptBody (output: string) : string =
 let formatExecutorSummarizerUserPrompt (output: string) : string =
     executorSummarizerPromptBody output
     + "\n4. Return a concise, actionable summary.\n\n"
+let websearchSummarizerPromptBody (whatToSummarize: string) (rawResults: string) : string =
+    "You are a summarizer for web search results. The caller searched the web and needs you to extract and synthesize content focused on a specific question.\n\n"
+    + readOnlyRules + "\n\n"
+    + "Question to answer:\n" + whatToSummarize + "\n\n"
+    + "Instructions:\n"
+    + "1. Focus on answering the question above using the raw search results below.\n"
+    + "2. Preserve concrete facts: URLs, names, version numbers, code samples, and exact values.\n"
+    + "3. Omit boilerplate, navigation noise, and results unrelated to the question.\n"
+    + "4. Do not invent details not present in the results.\n"
+    + "Raw search results:\n" + rawResults
+
+let formatWebsearchSummarizerUserPrompt (whatToSummarize: string) (rawResults: string) : string =
+    websearchSummarizerPromptBody whatToSummarize rawResults
+    + "\n5. Return a focused, ready-to-use answer.\n\n"
