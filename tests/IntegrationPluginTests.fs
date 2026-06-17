@@ -66,6 +66,21 @@ let countsSpec (reg: obj) =
     check "wrapper count" (wrappers.Length = 7)
     check "tool count" (tools.Length = 12)
 
+let configSpec () = async {
+    let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
+    let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>> |> Async.AwaitPromise
+    let agents = get cfg "agent"
+    check "config manager exists" (not (isNullish (get agents "manager")))
+    check "config build exists" (not (isNullish (get agents "build")))
+    check "config plan exists" (not (isNullish (get agents "plan")))
+    let manager = get agents "manager"
+    check "config manager mode primary" (str manager "mode" = "primary")
+    let tools = get manager "tools"
+    check "config manager tools.bash false" (unbox<bool> (get tools "bash") = false)
+    let permission = get manager "permission"
+    check "config manager permission.bash deny" (str permission "bash" = "deny")
+}
+
 let run () : JS.Promise<unit> =
     async {
         let! p = plugin (box {| directory = "/tmp/vibe" |}) |> Async.AwaitPromise
@@ -77,5 +92,6 @@ let run () : JS.Promise<unit> =
         webfetchSchemaSpec reg
         slashCommandsSpec reg
         countsSpec reg
+        do! configSpec ()
     }
     |> Async.StartAsPromise

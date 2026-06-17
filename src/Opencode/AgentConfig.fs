@@ -21,8 +21,12 @@ type private BuiltinAgentSpec =
       systemPrompt: string
       defaultMcps: string array }
 
+let private defaultPrimaryAliases = [ "manager"; "build"; "plan" ]
+
 let private builtinAgentSpecs =
     [ { name = "manager"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
+      { name = "build"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
+      { name = "plan"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
       { name = "coder"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "reader"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "meditator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
@@ -63,7 +67,11 @@ let private withRoleDefaults (name: string) (userAgent: obj) : obj =
         if userPrompt <> "" then userPrompt
         else spec |> Option.map (fun value -> value.systemPrompt) |> Option.defaultValue ""
     let userMode = Dyn.str userAgent "mode"
-    let mode = if userMode <> "" then userMode else spec |> Option.map (fun value -> value.defaultMode) |> Option.defaultValue "subagent"
+    let mode =
+        if userMode <> "" then userMode
+        else spec |> Option.map (fun value -> value.defaultMode) |> Option.defaultValue "subagent"
+    let primaryDefaultMode = if defaultPrimaryAliases |> List.contains name then "primary" else "subagent"
+    let effectiveMode = if mode <> "" then mode else primaryDefaultMode
     let userPerm = Dyn.get userAgent "permission"
     let userTools = Dyn.get userAgent "tools"
     let userMcps = Dyn.get userAgent "mcps"
@@ -79,7 +87,7 @@ let private withRoleDefaults (name: string) (userAgent: obj) : obj =
     let tools = mergeObj (toolDefaults name) userTools
     let result = mergeObj (emptyObj ()) userAgent
     setKey result "prompt" (box prompt)
-    setKey result "mode" (box mode)
+    setKey result "mode" (box effectiveMode)
     setKey result "permission" perm
     setKey result "tools" tools
     setKey result "mcps" mcps
