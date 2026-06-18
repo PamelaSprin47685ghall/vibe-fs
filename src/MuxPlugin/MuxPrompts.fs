@@ -2,6 +2,16 @@ module VibeFs.MuxPlugin.MuxPrompts
 
 open VibeFs.Kernel.Prompts
 
+let private loopFooter =
+    [ "- report: a detailed description of what you did and why"
+      "- affectedFiles: list of every file you modified or created"
+      ""
+      "A reviewer will examine your submission. If accepted, you are done. If rejected, you will receive specific feedback to address." ]
+
+let buildLoopMessage (task: string) (bodyLines: string list) : string =
+    let header = [ "Task (loop): " + task; "" ]
+    (header @ bodyLines @ loopFooter) |> String.concat "\n"
+
 let private agentReportClosing =
     "When you have finished the task, you MUST call the agent_report tool. "
     + "Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings."

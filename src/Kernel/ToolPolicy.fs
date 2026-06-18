@@ -25,7 +25,7 @@ let canUse (agent: Agent) (tool: Tool) : bool =
         agent <> "reader" && agent <> "coder"
     | _ when toolHas [ "write"; "edit"; "patch" ] ->
         agent <> "reader" && agent <> "manager"
-    | "manager" -> tool <> "fuzzy-grep"
+    | "manager" -> tool <> "fuzzy_grep"
     | _ -> true
 
 /// Return the subset of `tools` that `agent` is NOT allowed to use.

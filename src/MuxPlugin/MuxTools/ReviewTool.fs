@@ -4,7 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.ToolPolicy
-open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Mux.Contract
 open VibeFs.MuxPlugin.Delegate

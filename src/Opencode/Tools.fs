@@ -98,10 +98,10 @@ let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                 let! readResults = VibeFs.Shell.ReverieFiles.readReverieFiles directory (List.ofArray files) |> Async.AwaitPromise
                 let sections =
                     Array.map2 (fun file (r: VibeFs.Shell.ReverieFiles.ReverieFileResult) ->
-                        { file = file; content = r.content } : HostKernel.MeditatorFileSection)
+                        { file = file; content = r.content } : MeditatorFileSection)
                         files (List.toArray readResults)
                     |> List.ofArray
-                let prompt = HostKernel.buildMeditatorPrompt sections intent
+                let prompt = buildMeditatorPrompt sections intent
                 return! runSubagent registry client "meditator" "Meditator" prompt
                     directory sessionID context (box null)
                     |> Async.AwaitPromise
@@ -148,7 +148,7 @@ let fuzzyFindTool (finderCache: FinderCache) : obj =
                 limit = intMinNullish 1 Params.fuzzyFindLimit; iterator = strOpt Params.fuzzyFindIterator |})
         (fun args context ->
             let scopeId = Dyn.str context "sessionID"
-            if scopeId = "" then resolveStr "Error: fuzzy-find requires an active session"
+            if scopeId = "" then resolveStr "Error: fuzzy_find requires an active session"
             else
                 let p : FuzzyFindParams =
                     { pattern = optStr args "pattern"; path = optStr args "path"
@@ -164,7 +164,7 @@ let fuzzyGrepTool (finderCache: FinderCache) : obj =
                 iterator = strOpt Params.fuzzyGrepIterator |})
         (fun args context ->
             let scopeId = Dyn.str context "sessionID"
-            if scopeId = "" then resolveStr "Error: fuzzy-grep requires an active session"
+            if scopeId = "" then resolveStr "Error: fuzzy_grep requires an active session"
             else
                 let p : FuzzyGrepParams =
                     { pattern = optStr args "pattern"; path = optStr args "path"; exclude = parseExcludeField args
@@ -303,8 +303,8 @@ let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: 
         entry "coder" (coderTool registry ctx); entry "reader" (readerTool registry ctx)
         entry "meditator" (meditatorTool registry ctx); entry "browser" (browserTool registry ctx)
         entry "executor" (executorTool registry ctx)
-        entry "fuzzy-find" (fuzzyFindTool finderCache); entry "fuzzy-grep" (fuzzyGrepTool finderCache)
+        entry "fuzzy_find" (fuzzyFindTool finderCache); entry "fuzzy_grep" (fuzzyGrepTool finderCache)
         entry "websearch" (websearchTool registry ctx); entry "webfetch" (webfetchTool ())
         entry "submit_review" (submitReviewTool registry ctx reviewStore)
-        entry "return-reviewer" (submitReviewResultTool reviewStore)
+        entry "return_reviewer" (submitReviewResultTool reviewStore)
     |]

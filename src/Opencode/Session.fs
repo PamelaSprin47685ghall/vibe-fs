@@ -253,7 +253,7 @@ let runReviewerLoop (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.Revie
                     let promptBody =
                         box {|
                             path = box {| id = childID |}
-                            body = box {| agent = "reviewer"; parts = parts; tools = box (createObj [ "return-reviewer", box true ]) |}
+                            body = box {| agent = "reviewer"; parts = parts; tools = box (createObj [ "return_reviewer", box true ]) |}
                         |}
                     let! caught = Async.Catch (promptWithAbort client promptBody abortSignal |> Async.AwaitPromise)
                     match caught with

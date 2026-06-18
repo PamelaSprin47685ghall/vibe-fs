@@ -42,13 +42,13 @@ let reviewInstructions =
     readOnlyWorkspaceConstraint + "\n\n"
     + "You are a code reviewer performing a rigorous review of submitted work.\n\n"
     + reviewCriteria
-    + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\nreturn-reviewer({ \"feedback\": null })          // Accept — pass with no feedback\nreturn-reviewer({ \"feedback\": \"specific...\" }) // Reject — provide detailed, actionable feedback\n\nIMPORTANT: If you accept, feedback MUST be null. Do not write praise or any other text — it will be misinterpreted as rejection feedback.\n\nYou MUST call return-reviewer before finishing. Do not end the conversation without submitting your verdict."
+    + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\nreturn_reviewer({ \"feedback\": null })          // Accept — pass with no feedback\nreturn_reviewer({ \"feedback\": \"specific...\" }) // Reject — provide detailed, actionable feedback\n\nIMPORTANT: If you accept, feedback MUST be null. Do not write praise or any other text — it will be misinterpreted as rejection feedback.\n\nYou MUST call return_reviewer before finishing. Do not end the conversation without submitting your verdict."
 
 let reviewerNudgePrompt =
     "You have not submitted your review verdict yet.\n\n"
-    + "You must call return-reviewer to submit your verdict:\n"
-    + "  return-reviewer({ \"feedback\": null })          // Accept\n"
-    + "  return-reviewer({ \"feedback\": \"details...\" })  // Reject\n\n"
+    + "You must call return_reviewer to submit your verdict:\n"
+    + "  return_reviewer({ \"feedback\": null })          // Accept\n"
+    + "  return_reviewer({ \"feedback\": \"details...\" })  // Reject\n\n"
     + "Do not explain what you plan to do — call the tool immediately."
 
 let coderPromptBody (intent: string) (affectedFiles: string list) : string =
@@ -70,7 +70,7 @@ let readerPromptBody (intent: string) : string =
     + readOnlyRules + "\n\n"
     + "Search query:\n" + intent + "\n\n"
     + "Instructions:\n"
-    + "1. Use fuzzy-find, glob, fuzzy-grep, and read tools to locate relevant code.\n"
+    + "1. Use fuzzy_find, glob, fuzzy_grep, and read tools to locate relevant code.\n"
     + "2. Report concrete file paths and line-number references.\n"
 
 let formatReaderUserPrompt (intent: string) : string =
@@ -90,6 +90,27 @@ let meditatorPromptBody (intent: string) (files: string list) : string =
 let formatMeditatorUserPrompt (intent: string) (files: string list) : string =
     meditatorPromptBody intent files
     + "3. Return a structured report with relatedFiles and relatedCode.\n\n"
+
+let meditatorSectionSeparator = "\n---\n"
+
+type MeditatorFileSection = { file: string; content: string option }
+
+type private PromptSection =
+    | FileSection of fileName: string * body: string
+    | InstructionSection of body: string
+
+let private renderPromptSection = function
+    | FileSection(fileName, body) -> $"=== {fileName} ===\n\n{body}"
+    | InstructionSection body -> body
+
+let buildMeditatorPrompt (sections: MeditatorFileSection list) (intent: string) : string =
+    let skipped = "(skipped)"
+    let promptSections =
+        sections
+        |> List.map (fun section -> FileSection(section.file, Option.defaultValue skipped section.content))
+    let files = sections |> List.map (fun s -> s.file)
+    let allSections = promptSections @ [ InstructionSection(formatMeditatorUserPrompt intent files) ]
+    allSections |> List.map renderPromptSection |> String.concat "\n\n"
 
 let browserPromptBody (intent: string) : string =
     "You are a browser automation agent. Complete the web task described below.\n\n"

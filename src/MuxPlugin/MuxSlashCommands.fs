@@ -4,12 +4,12 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.ToolPolicy
-open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.Boundary
 open VibeFs.Shell.ReviewRuntime
 open VibeFs.MuxPlugin.Delegate
 open VibeFs.MuxPlugin.CallStore
+open VibeFs.MuxPlugin.MuxPrompts
 open VibeFs.MuxPlugin.MuxTools.Shared
 
 let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
@@ -45,16 +45,6 @@ let private pluginConfigForSlash (deps: obj) (workspaceId: WorkspaceId) : JS.Pro
             let! ctx = Dyn.call2 resolver (box (Id.workspaceIdValue workspaceId)) (box null) :?> JS.Promise<obj> |> Async.AwaitPromise
             return slashConfigFromCtx deps workspaceId ctx
     } |> Async.StartAsPromise
-
-let private loopFooter =
-    [ "- report: a detailed description of what you did and why"
-      "- affectedFiles: list of every file you modified or created"
-      ""
-      "A reviewer will examine your submission. If accepted, you are done. If rejected, you will receive specific feedback to address." ]
-
-let private buildLoopMessage (task: string) (bodyLines: string list) : string =
-    let header = [ "Task (loop): " + task; "" ]
-    (header @ bodyLines @ loopFooter) |> String.concat "\n"
 
 let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     box {| key = "loop"

@@ -40,8 +40,8 @@ let private builtinAgentByName = builtinAgentSpecs |> List.map (fun spec -> spec
 /// canUse has opinions about — kept in sync with Tools.createTools.
 let private allToolNames =
     [ "coder"; "reader"; "meditator"; "browser"; "executor"
-      "fuzzy-find"; "fuzzy-grep"; "websearch"; "webfetch"
-      "submit_review"; "return-reviewer"; "read"; "write"
+      "fuzzy_find"; "fuzzy_grep"; "websearch"; "webfetch"
+      "submit_review"; "return_reviewer"; "read"; "write"
       "bash"; "task"; "grep"; "edit"; "patch"; "apply_patch"
       "todowrite"; "todo_write"; "stealth-browser-mcp_*"
       "question"; "ask_user_question"; "agent_report"

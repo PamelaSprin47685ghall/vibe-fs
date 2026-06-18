@@ -1,2 +1,1 @@
-$ pnpm build
-$ pnpm test
+$ pnpm build && pnpm test

@@ -119,7 +119,7 @@ let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcom
                : ExecuteResult =
     if outcome.timedOut then
         let partial = if output = "" then "(no output before timeout)" else output
-        let suffix = $"\n[executor] Timed out after {timeout}ms ({options.timeoutType}). Partial output returned."
+        let suffix = $"\n[executor] Killed after {timeout}ms ({options.timeoutType}). Partial output returned."
         Truncated(output = (partial + suffix).Trim(), timeoutType = options.timeoutType)
     else
         match outcome.code with

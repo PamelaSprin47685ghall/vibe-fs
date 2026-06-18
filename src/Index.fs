@@ -10,7 +10,7 @@ let createRegistration (deps: obj) : obj =
 let private pluginToolNames =
     [| "coder"; "reader"; "meditator"; "browser"; "executor"
        "submit_review"; "websearch"; "webfetch"
-       "fuzzy-find"; "fuzzy-grep"; "write"; "read" |]
+       "fuzzy_find"; "fuzzy_grep"; "write"; "read" |]
 
 /// Export canUse so the host can filter any tool name directly.
 let canUseTool (agent: string) (tool: string) : bool =

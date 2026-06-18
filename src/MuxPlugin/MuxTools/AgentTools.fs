@@ -3,6 +3,7 @@ module VibeFs.MuxPlugin.MuxTools.AgentTools
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.ToolPolicy
 open VibeFs.Mux.Contract
 open VibeFs.MuxPlugin.Delegate
@@ -146,7 +147,7 @@ let private meditatorPromptFromArgs (config: obj) (args: obj) : Async<string> =
         let! results = VibeFs.Shell.ReverieFiles.readReverieFiles cwd files |> Async.AwaitPromise
         let sections =
             results
-            |> List.map (fun r -> { file = r.filePath; content = r.content } : HostKernel.MeditatorFileSection)
+            |> List.map (fun r -> { file = r.filePath; content = r.content } : MeditatorFileSection)
         let skipped = "(skipped)"
         let rendered =
             sections

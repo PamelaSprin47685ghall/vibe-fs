@@ -7,8 +7,7 @@ open VibeFs.Kernel.Dedup
 open VibeFs.Kernel.HeadTail
 open VibeFs.Kernel.IpAllowlist
 open VibeFs.Kernel.Lru
-open VibeFs.Kernel.ExcludedDirs
-open VibeFs.Kernel.HostKernel
+open VibeFs.Shell.CapsFilter
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.JsBoundary
 
