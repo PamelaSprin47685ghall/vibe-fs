@@ -96,7 +96,7 @@ let configSpec () = async {
 
 let mimoConfigSpec () = async {
     let! workspaceDir = mkdtempAsync "mimo-plugin-config-" |> Async.AwaitPromise
-    let! p = VibeFs.Opencode.MimoPlugin.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     pluginShape p
     let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>> |> Async.AwaitPromise
     let agents = get cfg "agent"

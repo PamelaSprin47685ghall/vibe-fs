@@ -59,8 +59,9 @@
     <Compile Include="src/Opencode/Session.fs" />
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/Hooks.fs" />
+    <Compile Include="src/Opencode/PluginCore.fs" />
     <Compile Include="src/Opencode/Plugin.fs" />
-    <Compile Include="src/Opencode/MimoPlugin.fs" />
+    <Compile Include="src/Opencode/PluginMimo.fs" />
 
     <Compile Include="tests/Assert.fs" />
     <Compile Include="tests/TempWorkspace.fs" />

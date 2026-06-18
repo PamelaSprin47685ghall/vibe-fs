@@ -1,8 +1,8 @@
-module VibeFs.Opencode.MimoPlugin
+module VibeFs.Opencode.PluginMimo
 
 open Fable.Core
 open VibeFs.Kernel.HostTools
-open VibeFs.Opencode.Plugin
+open VibeFs.Opencode.PluginCore
 
 [<ExportDefault>]
 let plugin (ctx: obj) = pluginFor mimocode ctx
