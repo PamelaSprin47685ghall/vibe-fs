@@ -4,9 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.MagicTypes
-open VibeFs.Kernel.MagicProjector
-open VibeFs.Kernel.MagicReplay
+open VibeFs.Opencode.MagicTypes
+open VibeFs.Opencode.MagicProjector
+open VibeFs.Opencode.MagicReplay
+open VibeFs.Kernel.MessageDecoder
 open VibeFs.Kernel.SyntheticIds
 open VibeFs.Opencode.MagicSession
 
@@ -14,6 +15,24 @@ let private userMsg (id: string) (text: string) : obj =
     createObj [
         "info", box (createObj [ "id", box id; "role", box "user"; "sessionID", box "test" ])
         "parts", box [| box {| ``type`` = "text"; text = text |} |]
+    ]
+
+let private timedTodoWriteMsg (id: string) (callID: string) (report: string) (created: int) (completed: int) : obj =
+    createObj [
+        "info", box (createObj [
+            "id", box id
+            "role", box "assistant"
+            "sessionID", box "test"
+            "time", box (createObj [ "created", box created; "completed", box completed ])
+        ])
+        "parts", box [| createObj [
+            "type", box "tool"; "tool", box magicTodoToolName; "callID", box callID
+            "state", box (createObj [
+                "status", box "completed"
+                "input", box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
+                "output", box "Todos updated."
+            ])
+        ] |]
     ]
 
 let private todoWriteMsg (id: string) (callID: string) (report: string) : obj =
@@ -135,7 +154,8 @@ let projectMagicDropsFoldedUserMessages () =
     let r = projectMagic msgs backlog false "test"
     let allJson : string = Fable.Core.JS.JSON.stringify(r)
     check "magic fold: hides original folded users" (r.Length = 4)
-    check "magic fold: keeps folded user text in projection" (allJson.Contains("please fix this bug"))
+    check "magic fold: marks folded users as summary" (allJson.Contains("工作期间收到的用户消息摘要"))
+    check "magic fold: keeps folded user content in projection" (allJson.Contains("please fix this bug"))
 
 let projectMagicKeepsReviewInFold () =
     let msgs = [|
@@ -151,6 +171,21 @@ let projectMagicKeepsReviewInFold () =
     check "magic review: tool name kept" (allJson.Contains(magicReviewToolName))
     check "magic review: output kept" (allJson.Contains("Review accepted the work"))
     check "magic review: not fully folded away" (r.Length > 4)
+
+let projectMagicPrefixUsesTodoTime () =
+    let msgs = [|
+        userMsg "u1" "start"
+        timedTodoWriteMsg "m1" "c1" "R1" 111 222
+        userMsg "u2" "please fix this bug"
+        todoWriteMsg "m2" "c2" "R2"
+        todoWriteMsg "m3" "c3" "R3"
+    |]
+    let backlog = [backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3"]
+    let r = projectMagic msgs backlog false "test"
+    let prefixInfo = messageInfo r.[0]
+    let prefixTime = get prefixInfo "time"
+    check "magic prefix: keeps folded todo created time" (unbox<int> (get prefixTime "created") = 111)
+    check "magic prefix: keeps folded todo completed time" (unbox<int> (get prefixTime "completed") = 222)
 
 let magicSessionRefreshesBacklog () =
     let session = MagicSession()
@@ -176,5 +211,6 @@ let run () =
     projectMagicHidesErrors ()
     projectMagicDropsFoldedUserMessages ()
     projectMagicKeepsReviewInFold ()
+    projectMagicPrefixUsesTodoTime ()
     magicSessionRefreshesBacklog ()
     buildBacklogTextTest ()

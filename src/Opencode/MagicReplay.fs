@@ -1,7 +1,7 @@
-module VibeFs.Kernel.MagicReplay
+module VibeFs.Opencode.MagicReplay
 
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.MagicTypes
+open VibeFs.Opencode.MagicTypes
 open VibeFs.Kernel.PartStream
 
 let private isCompletedTodo (part: obj) : bool =

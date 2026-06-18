@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.MagicTypes
+open VibeFs.Opencode.MagicTypes
 open VibeFs.Index
 open VibeFs.Opencode.Plugin
 

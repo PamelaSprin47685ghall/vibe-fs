@@ -10,10 +10,10 @@ open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Kernel.MessageDecoder
 open VibeFs.Kernel.SyntheticIds
-open VibeFs.Kernel.MagicTypes
-open VibeFs.Kernel.MagicPrompts
-open VibeFs.Kernel.MagicProjector
-open VibeFs.Kernel.MagicReplay
+open VibeFs.Opencode.MagicTypes
+open VibeFs.Opencode.MagicPrompts
+open VibeFs.Opencode.MagicProjector
+open VibeFs.Opencode.MagicReplay
 open VibeFs.Kernel.CapsFormat
 open VibeFs.Opencode.ChildAgent
 open VibeFs.Opencode.Core
@@ -181,7 +181,7 @@ let compactingHandler (magicSession: MagicSession) (input: obj) (output: obj) : 
         else
             let context = Dyn.get output "context"
             if not (Dyn.isNullish context) && Dyn.isArray context then
-                let hint = "Preserve the latest todowrite result and the complete Magic Todo backlog in the summary."
+                let hint = "Preserve the latest todowrite result and the complete Magic Todo backlog in the summary. If earlier user messages are folded, rewrite them into that todo summary as work-period user updates instead of preserving raw user messages verbatim."
                 (box context)?push(box hint) |> ignore
     } |> Async.StartAsPromise
 

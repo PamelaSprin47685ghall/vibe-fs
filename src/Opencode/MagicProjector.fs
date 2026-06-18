@@ -1,9 +1,9 @@
-module VibeFs.Kernel.MagicProjector
+module VibeFs.Opencode.MagicProjector
 
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.MessageDecoder
-open VibeFs.Kernel.MagicTypes
+open VibeFs.Opencode.MagicTypes
 open VibeFs.Kernel.PartStream
 open VibeFs.Kernel.SyntheticIds
 
@@ -17,7 +17,7 @@ let isReviewTool (part: obj) : bool =
     partIsTool part && partToolName part = magicReviewToolName
 
 let private emptyBacklogText = "\u3010Magic Todo Backlog\u3011\n\u5f53\u524d\u8fd8\u6ca1\u6709\u5df2\u5b8c\u6210\u5de5\u4f5c\u62a5\u544a\u3002"
-let private userMsgHeader = "[\u7528\u6237\u5728\u5de5\u4f5c\u671f\u95f4\u53d1\u9001\u7684\u6d88\u606f]"
+let private userMsgHeader = "[\u5de5\u4f5c\u671f\u95f4\u6536\u5230\u7684\u7528\u6237\u6d88\u606f\u6458\u8981] \u8fd9\u4e9b\u662f\u5de5\u4f5c\u8fc7\u7a0b\u4e2d\u6536\u5230\u7684\u7528\u6237\u65b0\u6d88\u606f\uff0c\u5df2\u6298\u53e0\u8fdb todo \u603b\u7ed3"
 let private foldHeader = "[\u5df2\u5b8c\u6210\u5e76\u6298\u53e0\u7684\u5de5\u4f5c\u8bb0\u5f55] \u4ee5\u4e0b\u62a5\u544a\u6765\u81ea\u88ab\u6298\u53e0\u7684\u65e7\u8f6e\u6b21\uff0c\u76f8\u5173\u6587\u4ef6\u5df2\u5199\u5165\u78c1\u76d8"
 let private sectionSep = "\n\n---\n\n"
 let private lineSep = "\n\n"
@@ -29,7 +29,10 @@ let buildBacklogText (backlog: BacklogEntry list) (userPrompts: string list) : s
     else
         let parts = ResizeArray<string>()
         if userPrompts.Length > 0 then
-            let joined = String.concat lineSep userPrompts
+            let joined =
+                userPrompts
+                |> List.mapi (fun index text -> string (index + 1) + ". " + text.Trim())
+                |> String.concat lineSep
             parts.Add(userMsgHeader + "\n" + joined)
         if not backlog.IsEmpty then
             let reports = backlog |> List.map (fun entry ->
@@ -44,6 +47,10 @@ let private lastTodoErrorText (flat: FlatPart list) : string option =
         if isTodoError fp.part then
             last <- Some (partToolError fp.part)
     last
+
+let private messageTimeOrNull (msg: obj) : obj =
+    let info = messageInfo msg
+    if isNullish info then null else get info "time"
 
 let private collectUserText (flat: FlatPart list) (fromIdx: int) (toIdx: int) : string list =
     let result = ResizeArray<string>()
@@ -68,13 +75,13 @@ let findFoldRange (flat: FlatPart list) (foldAfterFirst: bool) : FoldRange optio
         if secondToLast <= firstResult then None
         else Some { firstResult = firstResult; secondToLast = secondToLast }
 
-let private buildPrefixUserMessage (text: string) (sessionID: string) : obj =
+let private buildPrefixUserMessage (text: string) (sessionID: string) (time: obj) : obj =
     box (createObj [
         "info", box (createObj [
             "id", box (magicTodoPrefixPrefix + "1")
             "sessionID", box sessionID
             "role", box "user"
-            "time", box (createObj [ "created", box 0 ])
+            "time", if isNullish time then box (createObj [ "created", box 0 ]) else time
             "agent", box "orchestrator"
             "model", box (createObj [ "providerID", box ""; "modelID", box "" ])
         ])
@@ -122,6 +129,7 @@ let projectMagic (messages: obj array) (backlog: BacklogEntry list) (foldAfterFi
             let middleUserText = collectUserText flat (range.firstResult + 1) (range.secondToLast - 1)
             let projectionText = buildBacklogText foldedBacklog middleUserText
             let projectionPart = setPartOutput flat.[range.firstResult].part projectionText
+            let prefixTime = messageTimeOrNull messages.[flat.[range.firstResult].msgIndex]
             let prefixUserText = collectUserText flat 0 (range.firstResult - 1)
             let errorNotice = lastTodoErrorText flat
             let hasPrefix = range.firstResult > 0 && not foldedBacklog.IsEmpty && not prefixUserText.IsEmpty
@@ -142,5 +150,5 @@ let projectMagic (messages: obj array) (backlog: BacklogEntry list) (foldAfterFi
                 match errorNotice with
                 | Some err when err <> "" -> prefixParts.Add(errorPrefix + err)
                 | _ -> ()
-                let prefixMsg = buildPrefixUserMessage (String.concat sectionSep prefixParts) sessionID
+                let prefixMsg = buildPrefixUserMessage (String.concat sectionSep prefixParts) sessionID prefixTime
                 Array.concat [| [| prefixMsg |]; rebuilt |]

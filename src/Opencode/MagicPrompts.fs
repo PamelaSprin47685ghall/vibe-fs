@@ -1,4 +1,4 @@
-module VibeFs.Kernel.MagicPrompts
+module VibeFs.Opencode.MagicPrompts
 
 let toolDescription =
     "Manage a structured todo list and preserve a compact append-only work backlog. "

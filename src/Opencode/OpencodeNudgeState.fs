@@ -1,4 +1,4 @@
-module VibeFs.Kernel.OpencodeNudgeState
+module VibeFs.Opencode.OpencodeNudgeState
 
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeEvents

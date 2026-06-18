@@ -8,7 +8,7 @@ open VibeFs.Kernel.JsBoundary
 open VibeFs.Kernel.Boundary
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeEvents
-open VibeFs.Kernel.OpencodeNudgeState
+open VibeFs.Opencode.OpencodeNudgeState
 open VibeFs.Kernel.Prompts
 open VibeFs.Opencode.ChildAgent
 open VibeFs.Opencode.NudgePolicy
@@ -74,12 +74,12 @@ let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string opt
         do! invoke1 promptArg "prompt" session |> Async.AwaitPromise |> Async.Ignore
     }
 
-let private dispatchEventState state eventType (props: obj) sessionID : VibeFs.Kernel.OpencodeNudgeState.NudgeShellState * bool =
+let private dispatchEventState state eventType (props: obj) sessionID : VibeFs.Opencode.OpencodeNudgeState.NudgeShellState * bool =
     let sid = Id.sessionIdValue sessionID
     match eventType with
-    | "stream-abort" -> VibeFs.Kernel.OpencodeNudgeState.clearSession state sid, false
+    | "stream-abort" -> VibeFs.Opencode.OpencodeNudgeState.clearSession state sid, false
     | "session.delete" | "session.close" | "session.remove" | "session.deleted" ->
-        VibeFs.Kernel.OpencodeNudgeState.clearSession state sid, false
+        VibeFs.Opencode.OpencodeNudgeState.clearSession state sid, false
     | "session.next.prompted" ->
         let prompt = Dyn.get props "prompt"
         let promptText = Dyn.str prompt "text"
@@ -88,41 +88,41 @@ let private dispatchEventState state eventType (props: obj) sessionID : VibeFs.K
             else
                 let partsText = getPartsText (Dyn.get props "parts")
                 if partsText <> "" then partsText else Dyn.str props "text"
-        VibeFs.Kernel.OpencodeNudgeState.handleSessionNextPrompted state text sid, false
+        VibeFs.Opencode.OpencodeNudgeState.handleSessionNextPrompted state text sid, false
     | "session.next.retried" ->
-        VibeFs.Kernel.OpencodeNudgeState.addRetryPendingSession state sid, false
+        VibeFs.Opencode.OpencodeNudgeState.addRetryPendingSession state sid, false
     | "message.updated" ->
-        VibeFs.Kernel.OpencodeNudgeState.handleMessageUpdated state isAbortDomainError isCompletedAssistantMessage (Dyn.get (Dyn.get props "info") "error") (Dyn.get props "info") sid
+        VibeFs.Opencode.OpencodeNudgeState.handleMessageUpdated state isAbortDomainError isCompletedAssistantMessage (Dyn.get (Dyn.get props "info") "error") (Dyn.get props "info") sid
     | "message.part.updated" ->
         let part = Dyn.get props "part"
-        VibeFs.Kernel.OpencodeNudgeState.handleMessagePartUpdated state isAbortDomainError (Dyn.str part "type") (Dyn.get part "error") (Dyn.get part "state") sid, false
+        VibeFs.Opencode.OpencodeNudgeState.handleMessagePartUpdated state isAbortDomainError (Dyn.str part "type") (Dyn.get part "error") (Dyn.get part "state") sid, false
     | "session.next.step.failed" ->
-        VibeFs.Kernel.OpencodeNudgeState.handleSessionNextStepFailed state isAbortDomainError (Dyn.get props "error") sid, false
+        VibeFs.Opencode.OpencodeNudgeState.handleSessionNextStepFailed state isAbortDomainError (Dyn.get props "error") sid, false
     | "session.next.tool.failed" ->
-        VibeFs.Kernel.OpencodeNudgeState.handleSessionNextToolFailed state isAbortDomainError (Dyn.get props "error") sid, false
+        VibeFs.Opencode.OpencodeNudgeState.handleSessionNextToolFailed state isAbortDomainError (Dyn.get props "error") sid, false
     | "session.next.step.ended" ->
         let direct = Dyn.str props "finish"
         let finish = if direct <> "" then direct else Dyn.str (Dyn.get props "info") "finish"
-        VibeFs.Kernel.OpencodeNudgeState.handleSessionNextStepEnded state finish sid
+        VibeFs.Opencode.OpencodeNudgeState.handleSessionNextStepEnded state finish sid
     | "session.idle" ->
-        VibeFs.Kernel.OpencodeNudgeState.tryClaimNudge state sid
+        VibeFs.Opencode.OpencodeNudgeState.tryClaimNudge state sid
     | "session.error" ->
-        VibeFs.Kernel.OpencodeNudgeState.handleSessionError state isAbortDomainError (Dyn.get props "error") sid, false
+        VibeFs.Opencode.OpencodeNudgeState.handleSessionError state isAbortDomainError (Dyn.get props "error") sid, false
     | "session.status" ->
         match Dyn.str (Dyn.get props "status") "type" with
-        | "idle" -> VibeFs.Kernel.OpencodeNudgeState.tryClaimNudge state sid
-        | "busy" -> VibeFs.Kernel.OpencodeNudgeState.handleSessionBusy state sid, false
-        | "retry" -> VibeFs.Kernel.OpencodeNudgeState.addRetryPendingSession state sid, false
+        | "idle" -> VibeFs.Opencode.OpencodeNudgeState.tryClaimNudge state sid
+        | "busy" -> VibeFs.Opencode.OpencodeNudgeState.handleSessionBusy state sid, false
+        | "retry" -> VibeFs.Opencode.OpencodeNudgeState.addRetryPendingSession state sid, false
         | _ -> state, false
     | _ ->
         if isRetryProgressEvent eventType then
-            VibeFs.Kernel.OpencodeNudgeState.deleteRetryPendingSession state sid, false
+            VibeFs.Opencode.OpencodeNudgeState.deleteRetryPendingSession state sid, false
         else
             state, false
 
 /// The detached nudge flow: all client I/O happens here, never under the lock.
 /// Each lock re-entry (`Mutate`) is a pure, instant transition.
-let private runNudgeFlow (holder: StateHolder<VibeFs.Kernel.OpencodeNudgeState.NudgeShellState>) (client: obj)
+let private runNudgeFlow (holder: StateHolder<VibeFs.Opencode.OpencodeNudgeState.NudgeShellState>) (client: obj)
                           (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                           (registry: ChildAgentRegistry)
                           (sessionID: SessionId) : Async<unit> =
@@ -130,34 +130,34 @@ let private runNudgeFlow (holder: StateHolder<VibeFs.Kernel.OpencodeNudgeState.N
         try
             let! snapshotOpt = collectSnapshot client sessionID
             match snapshotOpt with
-            | None -> holder.Mutate(fun (state: VibeFs.Kernel.OpencodeNudgeState.NudgeShellState) -> VibeFs.Kernel.OpencodeNudgeState.clearSession state (Id.sessionIdValue sessionID), ())
+            | None -> holder.Mutate(fun (state: VibeFs.Opencode.OpencodeNudgeState.NudgeShellState) -> VibeFs.Opencode.OpencodeNudgeState.clearSession state (Id.sessionIdValue sessionID), ())
             | Some snapshot ->
                 let sid = Id.sessionIdValue sessionID
-                match holder.Mutate(fun (state: VibeFs.Kernel.OpencodeNudgeState.NudgeShellState) -> VibeFs.Kernel.OpencodeNudgeState.decideNudge reviewStore.isReviewActive registry.LookupChildAgent state sid snapshot) with
-                | VibeFs.Kernel.OpencodeNudgeState.StandDown -> ()
-                | VibeFs.Kernel.OpencodeNudgeState.Send(promptText, agentOpt, messageCount) ->
+                match holder.Mutate(fun (state: VibeFs.Opencode.OpencodeNudgeState.NudgeShellState) -> VibeFs.Opencode.OpencodeNudgeState.decideNudge reviewStore.isReviewActive registry.LookupChildAgent state sid snapshot) with
+                | VibeFs.Opencode.OpencodeNudgeState.StandDown -> ()
+                | VibeFs.Opencode.OpencodeNudgeState.Send(promptText, agentOpt, messageCount) ->
                     let! caught = Async.Catch(sendNudge client sessionID agentOpt promptText)
                     let outcome =
                         match caught with
-                        | Choice1Of2 () -> VibeFs.Kernel.OpencodeNudgeState.Delivered messageCount
+                        | Choice1Of2 () -> VibeFs.Opencode.OpencodeNudgeState.Delivered messageCount
                         | Choice2Of2 error ->
                             match translateJsError error with
-                            | MessageAborted -> VibeFs.Kernel.OpencodeNudgeState.Aborted
-                            | SessionBusy -> VibeFs.Kernel.OpencodeNudgeState.Busy
-                            | _ -> VibeFs.Kernel.OpencodeNudgeState.Failed
-                    holder.Mutate(fun (state: VibeFs.Kernel.OpencodeNudgeState.NudgeShellState) ->
-                        match VibeFs.Kernel.OpencodeNudgeState.tryRecordSend state sid outcome with
+                            | MessageAborted -> VibeFs.Opencode.OpencodeNudgeState.Aborted
+                            | SessionBusy -> VibeFs.Opencode.OpencodeNudgeState.Busy
+                            | _ -> VibeFs.Opencode.OpencodeNudgeState.Failed
+                    holder.Mutate(fun (state: VibeFs.Opencode.OpencodeNudgeState.NudgeShellState) ->
+                        match VibeFs.Opencode.OpencodeNudgeState.tryRecordSend state sid outcome with
                         | Some nextState -> nextState, ()
                         | None -> state, ())
         with _ ->
-            holder.Mutate(fun (state: VibeFs.Kernel.OpencodeNudgeState.NudgeShellState) -> VibeFs.Kernel.OpencodeNudgeState.clearSession state (Id.sessionIdValue sessionID), ())
+            holder.Mutate(fun (state: VibeFs.Opencode.OpencodeNudgeState.NudgeShellState) -> VibeFs.Opencode.OpencodeNudgeState.clearSession state (Id.sessionIdValue sessionID), ())
     }
 
 /// Fire the nudge flow detached from the caller's hook promise.  `StartImmediate`
 /// runs only up to the first `AwaitPromise` (kicking off the snapshot SDK call,
 /// which is non-blocking) before yielding, so the hook returns at once and the
 /// rest of the flow — including any `session.prompt` — never blocks the lock.
-let private startNudgeFlow (holder: StateHolder<VibeFs.Kernel.OpencodeNudgeState.NudgeShellState>) (client: obj)
+let private startNudgeFlow (holder: StateHolder<VibeFs.Opencode.OpencodeNudgeState.NudgeShellState>) (client: obj)
                             (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                             (registry: ChildAgentRegistry)
                             (sessionID: SessionId) : unit =
@@ -167,7 +167,7 @@ let private startNudgeFlow (holder: StateHolder<VibeFs.Kernel.OpencodeNudgeState
 
 type NudgeHook(ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore, registry: ChildAgentRegistry) =
     let client = Dyn.get ctx "client"
-    let holder = StateHolder<VibeFs.Kernel.OpencodeNudgeState.NudgeShellState>(VibeFs.Kernel.OpencodeNudgeState.emptyState)
+    let holder = StateHolder<VibeFs.Opencode.OpencodeNudgeState.NudgeShellState>(VibeFs.Opencode.OpencodeNudgeState.emptyState)
 
     member _.handleChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
         holder.Mutate(fun state ->
@@ -176,12 +176,12 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore, re
             if isNudgePrompt text then state, ()
             else
                 let agentOpt = if agent <> "" then Some agent else None
-                VibeFs.Kernel.OpencodeNudgeState.resumeSession (VibeFs.Kernel.OpencodeNudgeState.rememberAgent state sid agentOpt) sid, ())
+                VibeFs.Opencode.OpencodeNudgeState.resumeSession (VibeFs.Opencode.OpencodeNudgeState.rememberAgent state sid agentOpt) sid, ())
         resolvedUnitPromise ()
 
     member _.handleCommandExecuteBefore(input: obj) (_output: obj) : JS.Promise<unit> =
         let sessionIDStr = Dyn.str input "sessionID"
-        holder.Mutate(fun (state: VibeFs.Kernel.OpencodeNudgeState.NudgeShellState) -> VibeFs.Kernel.OpencodeNudgeState.resumeSession state sessionIDStr, ())
+        holder.Mutate(fun (state: VibeFs.Opencode.OpencodeNudgeState.NudgeShellState) -> VibeFs.Opencode.OpencodeNudgeState.resumeSession state sessionIDStr, ())
         resolvedUnitPromise ()
 
     member _.handleToolExecuteAfter(input: obj) (output: obj) : JS.Promise<unit> =

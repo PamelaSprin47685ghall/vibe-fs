@@ -34,16 +34,11 @@
     <Compile Include="src/Kernel/ExecutorKernel.fs" />
     <Compile Include="src/Kernel/CapsFormat.fs" />
     <Compile Include="src/Kernel/NudgeEvents.fs" />
-    <Compile Include="src/Kernel/OpencodeNudgeState.fs" />
     <Compile Include="src/Kernel/OllamaFormat.fs" />
     <Compile Include="src/Kernel/UnifiedContext.fs" />
 
     <Compile Include="src/Kernel/SyntheticIds.fs" />
     <Compile Include="src/Kernel/PartStream.fs" />
-    <Compile Include="src/Kernel/MagicTypes.fs" />
-    <Compile Include="src/Kernel/MagicPrompts.fs" />
-    <Compile Include="src/Kernel/MagicProjector.fs" />
-    <Compile Include="src/Kernel/MagicReplay.fs" />
 
     <Compile Include="src/Kernel/TreeSitterKernel.fs" />
     <Compile Include="src/Kernel/SessionText.fs" />
@@ -85,12 +80,17 @@
     <Compile Include="src/Opencode/ToolCopy.fs" />
     <Compile Include="src/Opencode/Sdk.fs" />
     <Compile Include="src/Opencode/ChildAgent.fs" />
+    <Compile Include="src/Opencode/OpencodeNudgeState.fs" />
+    <Compile Include="src/Opencode/MagicTypes.fs" />
+    <Compile Include="src/Opencode/MagicPrompts.fs" />
     <Compile Include="src/Opencode/HookSchema.fs" />
     <Compile Include="src/Opencode/Core.fs" />
     <Compile Include="src/Opencode/NudgePolicy.fs" />
     <Compile Include="src/Opencode/NudgeHook.fs" />
     <Compile Include="src/Opencode/Session.fs" />
     <Compile Include="src/Opencode/ExecutorActor.fs" />
+    <Compile Include="src/Opencode/MagicProjector.fs" />
+    <Compile Include="src/Opencode/MagicReplay.fs" />
     <Compile Include="src/Opencode/MagicSession.fs" />
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/AgentConfig.fs" />

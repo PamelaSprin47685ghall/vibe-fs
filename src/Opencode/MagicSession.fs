@@ -1,8 +1,8 @@
 module VibeFs.Opencode.MagicSession
 
 open System.Collections.Generic
-open VibeFs.Kernel.MagicTypes
-open VibeFs.Kernel.MagicReplay
+open VibeFs.Opencode.MagicTypes
+open VibeFs.Opencode.MagicReplay
 
 type MagicSession() =
     let cache = Dictionary<string, BacklogEntry list>()

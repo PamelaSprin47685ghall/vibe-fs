@@ -162,13 +162,13 @@ let toolDefinitionSpec () = async {
     let reportSchema = get todoProps "completedWorkReport"
     let required = unbox<obj[]> (get todoSchema "required") |> Array.map string
     check "tool.definition adds todo report field" (str reportSchema "type" = "string")
-    check "tool.definition adds todo report description" (str reportSchema "description" = VibeFs.Kernel.MagicPrompts.reportDesc)
+    check "tool.definition adds todo report description" (str reportSchema "description" = VibeFs.Opencode.MagicPrompts.reportDesc)
     check "tool.definition requires todo report" (required |> Array.contains "completedWorkReport")
-    check "tool.definition rewrites todos description" (str (get todoProps "todos") "description" = VibeFs.Kernel.MagicPrompts.todosDesc)
+    check "tool.definition rewrites todos description" (str (get todoProps "todos") "description" = VibeFs.Opencode.MagicPrompts.todosDesc)
     let todoItemProps = get (get (get todoProps "todos") "items") "properties"
-    check "tool.definition rewrites todo content description" (str (get todoItemProps "content") "description" = VibeFs.Kernel.MagicPrompts.todoContentDesc)
-    check "tool.definition rewrites todo status description" (str (get todoItemProps "status") "description" = VibeFs.Kernel.MagicPrompts.todoStatusDesc)
-    check "tool.definition rewrites todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Kernel.MagicPrompts.todoPriorityDesc)
+    check "tool.definition rewrites todo content description" (str (get todoItemProps "content") "description" = VibeFs.Opencode.MagicPrompts.todoContentDesc)
+    check "tool.definition rewrites todo status description" (str (get todoItemProps "status") "description" = VibeFs.Opencode.MagicPrompts.todoStatusDesc)
+    check "tool.definition rewrites todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Opencode.MagicPrompts.todoPriorityDesc)
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 

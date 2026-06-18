@@ -1,4 +1,4 @@
-module VibeFs.Kernel.MagicTypes
+module VibeFs.Opencode.MagicTypes
 
 let magicTodoToolName = "todowrite"
 let magicReviewToolName = "submit_review"

@@ -3,7 +3,7 @@ module VibeFs.Opencode.HookSchema
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.MagicPrompts
+open VibeFs.Opencode.MagicPrompts
 
 let private setKey (target: obj) (key: string) (value: obj) : unit = target?(key) <- value
 
