@@ -118,9 +118,6 @@ let isTerminal (s: TodoStatus) : bool =
     | Completed | Cancelled | Abandoned -> true
     | InProgress | Pending -> false
 
-/// Set of terminal statuses for backward compatibility with string-based checks.
-let terminalTodoStatuses: Set<string> = Set.ofList [ "completed"; "cancelled"; "abandoned" ]
-
 let retryProgressEvents: Set<string> =
     Set.ofList
         [ "session.next.step.started"; "session.next.step.ended"

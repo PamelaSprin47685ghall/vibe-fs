@@ -27,6 +27,11 @@ let private lineSep = "\n\n"
 let private dotSep = " . "
 let private errorPrefix = "[上次操作失败] "
 
+let private todoIndexes (flat: FlatPart list) : int list =
+    flat
+    |> List.indexed
+    |> List.choose (fun (index, fp) -> if isTodoResult fp.part then Some index else None)
+
 let buildBacklogText (backlog: BacklogEntry list) (userPrompts: string list) : string =
     if backlog.IsEmpty && userPrompts.IsEmpty then
         emptyBacklogText
@@ -88,10 +93,7 @@ let private collectUserText (flat: FlatPart list) (fromIdx: int) (toIdx: int) : 
 type FoldRange = { firstResult: int; secondToLast: int }
 
 let findFoldRange (flat: FlatPart list) (foldAfterFirst: bool) : FoldRange option =
-    let todoIdxs =
-        flat
-        |> List.indexed
-        |> List.choose (fun (i, fp) -> if isTodoResult fp.part then Some i else None)
+    let todoIdxs = todoIndexes flat
 
     let minResults = if foldAfterFirst then 2 else 3
 
@@ -108,25 +110,66 @@ let findFoldRange (flat: FlatPart list) (foldAfterFirst: bool) : FoldRange optio
                 { firstResult = firstResult
                   secondToLast = secondToLast }
 
-let private buildPrefixUserMessage (text: string) (sessionID: string) (time: obj) : obj =
-    box (
+let private buildPrefixUserMessage (id: string) (text: string) (sessionID: string) (time: obj) : obj =
+    let messageTime =
+        if isNullish time then
+            box (createObj [ "created", box 0 ])
+        else
+            time
+
+    let info =
         createObj
-            [ "info",
-              box (
-                  createObj
-                      [ "id", box (magicTodoPrefixPrefix + "1")
-                        "sessionID", box sessionID
-                        "role", box "user"
-                        "time",
-                        if isNullish time then
-                            box (createObj [ "created", box 0 ])
-                        else
-                            time
-                        "agent", box "orchestrator"
-                        "model", box (createObj [ "providerID", box ""; "modelID", box "" ]) ]
-              )
-              "parts", box [| box {| ``type`` = "text"; text = text |} |] ]
+            [ "id", box id
+              "sessionID", box sessionID
+              "role", box "user"
+              "time", messageTime
+              "agent", box "orchestrator"
+              "model", box (createObj [ "providerID", box ""; "modelID", box "" ]) ]
+
+    box (
+        createObj [ "info", box info; "parts", box [| box {| ``type`` = "text"; text = text |} |] ]
     )
+
+let private buildSyntheticPrefixMessages
+    (messages: obj array)
+    (flat: FlatPart list)
+    (foldedBacklog: BacklogEntry list)
+    (sessionID: string)
+    (errorNotice: string option)
+    : obj array =
+    let todoIdxs = todoIndexes flat
+    let result = ResizeArray<obj>()
+
+    for index = 0 to foldedBacklog.Length - 1 do
+        let fromIdx = if index = 0 then 0 else todoIdxs.[index - 1] + 1
+        let toIdx = todoIdxs.[index] - 1
+        let userText = collectUserText flat fromIdx toIdx
+        let messageText = buildBacklogText [ foldedBacklog.[index] ] userText
+
+        let finalText =
+            if index = foldedBacklog.Length - 1 then
+                match errorNotice with
+                | Some err when err <> "" -> messageText + sectionSep + errorPrefix + err
+                | _ -> messageText
+            else
+                messageText
+
+        let todoMessage = messages.[flat.[todoIdxs.[index]].msgIndex]
+        let todoInfo = messageInfo todoMessage
+        let todoTime = messageTimeOrNull todoMessage
+        let syntheticId =
+            if index = 0 then magicTodoPrefixPrefix + string (index + 1)
+            else magicTodoProjectionPrefix + string (index + 1)
+
+        result.Add(
+            buildPrefixUserMessage
+                syntheticId
+                finalText
+                (if isNullish todoInfo then sessionID else infoSessionID todoInfo)
+                todoTime
+        )
+
+    result.ToArray()
 
 let private rebuildVisibleOnly (messages: obj array) (visible: FlatPart list) : obj array =
     let byMessage = visible |> List.groupBy (fun entry -> entry.msgIndex) |> Map.ofList
@@ -189,12 +232,13 @@ let projectMagic
 
             let projectionText = buildBacklogText foldedBacklog middleUserText
             let projectionPart = setPartOutput flat.[range.firstResult].part projectionText
-            let prefixTime = messageTimeOrNull messages.[flat.[range.firstResult].msgIndex]
-            let prefixUserText = collectUserText flat 0 (range.firstResult - 1)
             let errorNotice = lastTodoErrorText flat
 
-            let hasPrefix =
-                range.firstResult > 0 && not foldedBacklog.IsEmpty && not prefixUserText.IsEmpty
+            let syntheticPrefixMessages =
+                if foldedBacklog.IsEmpty then
+                    [||]
+                else
+                    buildSyntheticPrefixMessages messages flat foldedBacklog sessionID errorNotice
 
             let visible = ResizeArray<FlatPart>()
 
@@ -214,17 +258,7 @@ let projectMagic
 
             let rebuilt = rebuildVisibleOnly messages (List.ofSeq visible)
 
-            if not hasPrefix then
+            if syntheticPrefixMessages.Length = 0 then
                 rebuilt
             else
-                let prefixParts = ResizeArray<string>()
-                prefixParts.Add(buildBacklogText [ foldedBacklog.[0] ] prefixUserText)
-
-                match errorNotice with
-                | Some err when err <> "" -> prefixParts.Add(errorPrefix + err)
-                | _ -> ()
-
-                let prefixMsg =
-                    buildPrefixUserMessage (String.concat sectionSep prefixParts) sessionID prefixTime
-
-                Array.concat [| [| prefixMsg |]; rebuilt |]
+                Array.concat [| syntheticPrefixMessages; rebuilt |]

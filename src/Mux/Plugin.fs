@@ -52,9 +52,6 @@ let createRegistration (deps: obj) : obj =
                let remove = toolNames |> Array.filter (fun t -> not (canUse agent t))
                box {| add = [||]; remove = remove |}) |}
 
-let canUseTool (agent: string) (tool: string) : bool =
-    canUse agent tool
-
 let getPluginToolPolicy (_agentId: string) (role: string) : obj =
     let agent = if System.String.IsNullOrEmpty role then "manager" else role
     let remove = [| "coder"; "reader"; "meditator"; "browser"; "executor"; "submit_review"; "websearch"; "webfetch"; "fuzzy_find"; "fuzzy_grep"; "write"; "read" |]

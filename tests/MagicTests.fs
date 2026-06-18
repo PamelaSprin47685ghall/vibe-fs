@@ -168,7 +168,7 @@ let projectMagicDropsFoldedUserMessages () =
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3" ]
     let r = projectMagic msgs backlog false "test"
     let allJson: string = Fable.Core.JS.JSON.stringify (r)
-    check "magic fold: hides original folded users" (r.Length = 4)
+    check "magic fold: hides original folded users" (not (allJson.Contains("\"id\":\"u2\"")))
     check "magic fold: marks folded users as summary" (allJson.Contains("工作期间收到的用户消息"))
     check "magic fold: keeps folded user content in projection" (allJson.Contains("please fix this bug"))
 
@@ -202,6 +202,44 @@ let projectMagicPrefixUsesTodoTime () =
     check "magic prefix: keeps folded todo created time" (unbox<int> (get prefixTime "created") = 111)
     check "magic prefix: keeps folded todo completed time" (unbox<int> (get prefixTime "completed") = 222)
 
+let projectMagicPrefixStaysStableWhenGrowing () =
+    let msgs3 =
+        [| userMsg "u1" "start"
+           userMsg "u2" "between 1 and 2"
+           todoWriteMsg "m1" "c1" "R1"
+           userMsg "u3" "between 2 and 3"
+           todoWriteMsg "m2" "c2" "R2"
+           userMsg "u4" "between 3 and 4"
+           todoWriteMsg "m3" "c3" "R3"
+           todoWriteMsg "m4" "c4" "R4" |]
+
+    let backlog3 = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3"; backlogEntry 4 "R4" ]
+    let projected3 = projectMagic msgs3 backlog3 false "test"
+
+    let msgs4 =
+        [| userMsg "u1" "start"
+           userMsg "u2" "between 1 and 2"
+           todoWriteMsg "m1" "c1" "R1"
+           userMsg "u3" "between 2 and 3"
+           todoWriteMsg "m2" "c2" "R2"
+           userMsg "u4" "between 3 and 4"
+           todoWriteMsg "m3" "c3" "R3"
+           userMsg "u5" "between 4 and 5"
+           todoWriteMsg "m4" "c4" "R4"
+           todoWriteMsg "m5" "c5" "R5" |]
+
+    let backlog4 =
+        [ backlogEntry 1 "R1"
+          backlogEntry 2 "R2"
+          backlogEntry 3 "R3"
+          backlogEntry 4 "R4"
+          backlogEntry 5 "R5" ]
+    let projected4 = projectMagic msgs4 backlog4 false "test"
+
+    let sharedPrefix3: string = Fable.Core.JS.JSON.stringify (projected3.[0..2])
+    let sharedPrefix4: string = Fable.Core.JS.JSON.stringify (projected4.[0..2])
+    check "magic prefix: stable growth keeps shared prefix JSON identical" (sharedPrefix3 = sharedPrefix4)
+
 let magicSessionRefreshesBacklog () =
     let session = MagicSession()
     let first = [| todoWriteMsg "m1" "c1" "R1" |]
@@ -227,5 +265,6 @@ let run () =
     projectMagicDropsFoldedUserMessages ()
     projectMagicKeepsReviewInFold ()
     projectMagicPrefixUsesTodoTime ()
+    projectMagicPrefixStaysStableWhenGrowing ()
     magicSessionRefreshesBacklog ()
     buildBacklogTextTest ()
