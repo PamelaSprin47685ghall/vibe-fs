@@ -164,7 +164,7 @@ let private startNudgeFlow (holder: StateHolder<VibeFs.Opencode.NudgeState.Nudge
 // ── Hook class ──
 
 type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore, registry: ChildAgentRegistry) =
-    let client = Dyn.get ctx "client"
+    let client () = Dyn.get ctx "client"
     let holder = StateHolder<VibeFs.Opencode.NudgeState.NudgeShellState>(VibeFs.Opencode.NudgeState.emptyState)
 
     member _.handleChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
@@ -208,7 +208,7 @@ type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.Rev
                         nextState, (if wantsNudge then Some sessionID else None)
                 with _ -> state, None)
         match claimed with
-        | Some sessionID -> startNudgeFlow holder client reviewStore registry sessionID
+        | Some sessionID -> startNudgeFlow holder (client ()) reviewStore registry sessionID
         | None -> ()
         resolvedUnitPromise ()
 

@@ -136,7 +136,7 @@ let private promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise
 /// is aborted and unregistered after the prompt finishes.
 let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                             (directory: string) (sessionID: string) (context: obj)
-                            (tools: obj) (cleanup: bool) : JS.Promise<string> =
+    (tools: obj) (cleanup: bool) : JS.Promise<string> =
     async {
         let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
         let session = Dyn.get client "session"

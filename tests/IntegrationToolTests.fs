@@ -229,6 +229,69 @@ let toolExecuteBeforeSpec () = async {
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
+let readerToolMissingClientSpec () = async {
+    let! workspaceDir = mkdtempAsync "reader-missing-client-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let reader = get (get p "tool") "reader"
+    let! result = (get reader "execute") $ (createObj [ "intents", box [| box "find reader registration" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "reader-test" ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
+    check "reader without client returns readable error" (result.Contains("ctx.client.session"))
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
+let readerToolSpec () = async {
+    let createCalls = ResizeArray<obj>()
+    let promptCalls = ResizeArray<obj>()
+    let mockClient =
+        createObj [ "session", box (createObj [
+            "create", box (System.Func<obj, JS.Promise<obj>>(fun arg ->
+                (async { createCalls.Add(arg); return box {| data = box {| id = "child-reader-session" |} |} } |> Async.StartAsPromise)))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                (async { promptCalls.Add(arg) } |> Async.StartAsPromise)))
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (async { return box {| data = [|
+                    box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "text"; text = "Found src/Opencode/Tools.fs" |} |] |}
+                |] |} } |> Async.StartAsPromise)))
+            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ ->
+                (async { () } |> Async.StartAsPromise)))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "reader-tool-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient |}) |> Async.AwaitPromise
+    let reader = get (get p "tool") "reader"
+    let! result = (get reader "execute") $ (createObj [ "intents", box [| box "find reader registration" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "reader-parent"; "abort", box null ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
+    check "reader tool returns subagent output" (result.Contains("src/Opencode/Tools.fs"))
+    check "reader tool creates child session under parent" (str (get createCalls.[0] "body") "parentID" = "reader-parent")
+    check "reader tool prompts child reader agent" (str (get promptCalls.[0] "body") "agent" = "reader")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
+let readerToolLateClientInjectionSpec () = async {
+    let createCalls = ResizeArray<obj>()
+    let promptCalls = ResizeArray<obj>()
+    let mockClient =
+        createObj [ "session", box (createObj [
+            "create", box (System.Func<obj, JS.Promise<obj>>(fun arg ->
+                (async { createCalls.Add(arg); return box {| data = box {| id = "child-reader-session-late" |} |} } |> Async.StartAsPromise)))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                (async { promptCalls.Add(arg) } |> Async.StartAsPromise)))
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (async { return box {| data = [|
+                    box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "text"; text = "Late client injection worked" |} |] |}
+                |] |} } |> Async.StartAsPromise)))
+            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ ->
+                (async { () } |> Async.StartAsPromise)))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "reader-tool-late-client-" |> Async.AwaitPromise
+    let ctx = createObj [ "directory", box workspaceDir ]
+    let! p = plugin ctx |> Async.AwaitPromise
+    ctx?("client") <- mockClient
+    let reader = get (get p "tool") "reader"
+    let! result = (get reader "execute") $ (createObj [ "intents", box [| box "find reader registration" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "reader-parent-late"; "abort", box null ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
+    check "reader tool sees client injected after plugin init" (result.Contains("Late client injection worked"))
+    check "reader tool late injection creates child session under parent" (str (get createCalls.[0] "body") "parentID" = "reader-parent-late")
+    check "reader tool late injection prompts child reader agent" (str (get promptCalls.[0] "body") "agent" = "reader")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
 let executorActorSpec () = async {
     let seen = System.Collections.Generic.List<string>()
     let first = post "session-1" (fun () ->
@@ -263,6 +326,8 @@ let run () : JS.Promise<unit> =
         do! agentConfigSpec ()
         do! toolDefinitionSpec ()
         do! toolExecuteBeforeSpec ()
+        do! readerToolSpec ()
+        do! readerToolLateClientInjectionSpec ()
         do! executorActorSpec ()
     }
     |> Async.StartAsPromise

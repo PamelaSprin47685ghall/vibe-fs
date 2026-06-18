@@ -55,7 +55,7 @@ let private joinCoderIntents (intents: obj) : Result<string, string> =
         | None -> labels.ToArray() |> Array.toList |> String.concat "; " |> Result.Ok
 
 let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
-    let client = Dyn.get ctx "client"
+    let client () = Dyn.get ctx "client"
     define coder
         (box {| intents = intentsSchema Params.coderIntents; _ui = uiParam |})
         (fun args context ->
@@ -76,13 +76,13 @@ let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                                 if Dyn.typeIs filesRaw "string" then [string filesRaw]
                                 else filesRaw :?> obj array |> Array.map string |> List.ofArray
                             let prompt = formatCoderUserPrompt intentText files
-                            runSubagent registry client "coder" "Coder" prompt directory sessionID context (box null)
+                            runSubagent registry (client ()) "coder" "Coder" prompt directory sessionID context (box null)
                             |> Async.AwaitPromise) |> Async.Parallel
                     return String.concat "\n---\n" (List.ofArray reports)
                 } |> Async.StartAsPromise)
 
 let readerTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
-    let client = Dyn.get ctx "client"
+    let client () = Dyn.get ctx "client"
     define reader
         (box {| intents = strArrayReq Params.readerIntents
                 _ui = uiParam |})
@@ -96,14 +96,14 @@ let readerTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                     let! reports =
                         intents |> Array.map (fun intent ->
                             let prompt = formatReaderUserPrompt intent
-                            runSubagent registry client "reader" "Reader" prompt
+                            runSubagent registry (client ()) "reader" "Reader" prompt
                                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null)
                             |> Async.AwaitPromise) |> Async.Parallel
                     return String.concat "\n---\n" (List.ofArray reports)
                 } |> Async.StartAsPromise)
 
 let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
-    let client = Dyn.get ctx "client"
+    let client () = Dyn.get ctx "client"
     define meditator
         (box {| intent = strReq Params.meditatorIntent; files = strArrayOpt Params.meditatorFiles |})
         (fun args context ->
@@ -120,13 +120,13 @@ let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                         files (List.toArray readResults)
                     |> List.ofArray
                 let prompt = buildMeditatorPrompt sections intent
-                return! runSubagent registry client "meditator" "Meditator" prompt
+                return! runSubagent registry (client ()) "meditator" "Meditator" prompt
                     directory sessionID context (box null)
                     |> Async.AwaitPromise
             } |> Async.StartAsPromise)
 
 let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
-    let client = Dyn.get ctx "client"
+    let client () = Dyn.get ctx "client"
     define executor
         (box {| language = strReq Params.executorLanguage; program = strReq Params.executorProgram
                 dependencies = strArrayOpt Params.executorDeps; timeout_type = strReq Params.executorTimeout |})
@@ -147,19 +147,19 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                     else
                         let prompt = formatExecutorSummarizerUserPrompt output
                         let! summary =
-                            runSubagentWithCleanup registry client "executor" "Executor summary" prompt
+                            runSubagentWithCleanup registry (client ()) "executor" "Executor summary" prompt
                                 (Dyn.str tc "directory") sessionID context
                             |> Async.AwaitPromise
                         return prependSafetyWarning summary options.program options.language
                 } |> Async.StartAsPromise))
 
 let browserTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
-    let client = Dyn.get ctx "client"
+    let client () = Dyn.get ctx "client"
     define browser
         (box {| intent = strReq Params.browserIntent |})
         (fun args context ->
             let tc = extractToolContext context (Dyn.str ctx "directory")
-            runSubagent registry client "browser" "Browser" (formatBrowserUserPrompt (Dyn.str args "intent"))
+            runSubagent registry (client ()) "browser" "Browser" (formatBrowserUserPrompt (Dyn.str args "intent"))
                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null))
 
 let fuzzyFindTool (finderCache: FinderCache) : obj =
@@ -219,7 +219,7 @@ let private abortSignal (context: obj) : obj =
     if Dyn.isNullish context then null else Dyn.get context "abort"
 
 let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
-    let client = Dyn.get ctx "client"
+    let client () = Dyn.get ctx "client"
     define websearch
         (box {| query = strReq Params.websearchQuery
                 numResults = numOpt Params.websearchNumResults
@@ -245,7 +245,7 @@ let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                         else
                             let tc = extractToolContext context (Dyn.str ctx "directory")
                             let prompt = formatWebsearchSummarizerUserPrompt whatToSummarize rawResults
-                            return! runSubagentWithCleanup registry client "executor" "Web search summary" prompt
+                            return! runSubagentWithCleanup registry (client ()) "executor" "Web search summary" prompt
                                         (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
                                     |> Async.AwaitPromise
                     with ex -> return $"Search failed: {ex.Message}"
@@ -291,7 +291,7 @@ let private formatReviewResult (result: ReviewResult) : string =
         + "\n\nAddress the feedback above. loop mode is still active — fix the issues and call submit_review again."
 
 let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
-    let client = Dyn.get ctx "client"
+    let client () = Dyn.get ctx "client"
     define "Submit your work for review (loop mode)."
         (box {| report = strReq "Detailed report of what you did"; affectedFiles = strArrayOpt "Files you modified" |})
         (fun args context ->
@@ -310,7 +310,7 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Sh
                 async {
                     try
                         let task = defaultArg (store.getReviewTask sessionID) ""
-                        let! result = runSubmitReview registry client store (Dyn.str tc "directory") sessionID report affectedFiles task abort |> Async.AwaitPromise
+                        let! result = runSubmitReview registry (client ()) store (Dyn.str tc "directory") sessionID report affectedFiles task abort |> Async.AwaitPromise
                         match result with
                         | Accepted
                         | Terminated ->
