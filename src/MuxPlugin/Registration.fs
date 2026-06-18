@@ -10,7 +10,7 @@ open VibeFs.MuxPlugin.MuxTools.IoTools
 open VibeFs.MuxPlugin.MuxWrappers
 open VibeFs.MuxPlugin.MuxEventHook
 open VibeFs.MuxPlugin.MuxSlashCommands
-open VibeFs.Shell.FuzzySearch
+open VibeFs.Shell.FuzzyFinderShell
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative

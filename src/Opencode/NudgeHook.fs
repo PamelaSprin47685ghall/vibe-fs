@@ -4,7 +4,6 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.DomainError
 open VibeFs.Kernel.JsBoundary
 open VibeFs.Kernel.Boundary
 open VibeFs.Kernel.Nudge

@@ -6,7 +6,10 @@ open VibeFs.Kernel
 open VibeFs.Mux.Contract
 open VibeFs.MuxPlugin.MuxTools.Shared
 open VibeFs.Opencode.Core
-open VibeFs.Shell.FuzzySearch
+open VibeFs.Shell.FuzzyFinderShell
+open VibeFs.Shell.FuzzyCoordinator
+open VibeFs.Shell.FuzzyFindCmd
+open VibeFs.Shell.FuzzyGrepCmd
 
 let fuzzyFindTool (finderCache: FinderCache) : ToolDefinition =
     { name = "fuzzy-find"
@@ -19,7 +22,7 @@ let fuzzyFindTool (finderCache: FinderCache) : ToolDefinition =
               let p : FuzzyFindParams = { pattern = strField args "pattern"; path = strField args "path"; limit = optInt args "limit"; iterator = strField args "iterator" }
               let o : SearchOptions = { cwd = Dyn.str config "cwd"; scopeId = scopeId; store = None; finderCache = finderCache }
               async {
-                  let! r = VibeFs.Shell.FuzzySearch.fuzzyFind p o |> Async.AwaitPromise
+                  let! r = VibeFs.Shell.FuzzyFindCmd.fuzzyFind p o |> Async.AwaitPromise
                   return r.output
               } |> Async.StartAsPromise
       condition = None }
@@ -35,7 +38,7 @@ let fuzzyGrepTool (finderCache: FinderCache) : ToolDefinition =
               let p : FuzzyGrepParams = { pattern = strField args "pattern"; path = strField args "path"; exclude = parseExcludeField args; caseSensitive = optBool args "caseSensitive"; context = optInt args "context"; limit = optInt args "limit"; iterator = strField args "iterator" }
               let o : SearchOptions = { cwd = Dyn.str config "cwd"; scopeId = scopeId; store = None; finderCache = finderCache }
               async {
-                  let! r = VibeFs.Shell.FuzzySearch.fuzzyGrep p o |> Async.AwaitPromise
+                  let! r = VibeFs.Shell.FuzzyGrepCmd.fuzzyGrep p o |> Async.AwaitPromise
                   return r.output
               } |> Async.StartAsPromise
       condition = None }

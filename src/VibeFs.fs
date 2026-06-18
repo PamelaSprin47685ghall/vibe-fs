@@ -5,17 +5,17 @@ module VibeFs
 
 module Boundary = VibeFs.Kernel.Boundary
 module RecordValidator = VibeFs.Kernel.RecordValidator
-module Schema = VibeFs.Kernel.Schema
 module Prompts = VibeFs.Kernel.Prompts
 module McpConfig = VibeFs.Kernel.McpConfig
 module ToolPolicy = VibeFs.Kernel.ToolPolicy
-module DomainError = VibeFs.Kernel.DomainError
 module JsBoundary = VibeFs.Kernel.JsBoundary
 module WorkspaceState = VibeFs.Kernel.WorkspaceState
 module ReviewSession = VibeFs.Kernel.ReviewSession
 module ReviewRuntime = VibeFs.Shell.ReviewRuntime
 module Nudge = VibeFs.Kernel.Nudge
-module FuzzySearch = VibeFs.Kernel.FuzzySearch
+module FuzzyQuery = VibeFs.Kernel.FuzzyQuery
+module FuzzyFormat = VibeFs.Kernel.FuzzyFormat
+module FuzzyGrepDetect = VibeFs.Kernel.FuzzyGrepDetect
 module IpAllowlist = VibeFs.Kernel.IpAllowlist
 module Dedup = VibeFs.Kernel.Dedup
 module Lru = VibeFs.Kernel.Lru
@@ -38,7 +38,11 @@ module Shell =
     module SecureFetch = VibeFs.Shell.SecureFetch
     module OllamaClient = VibeFs.Shell.OllamaClient
     module TreeSitter = VibeFs.Shell.TreeSitterShell
-    module Fuzzy = VibeFs.Shell.FuzzySearch
+    module FuzzyFinder = VibeFs.Shell.FuzzyFinderShell
+    module FuzzyCoordinator = VibeFs.Shell.FuzzyCoordinator
+    module FuzzyRawMapping = VibeFs.Shell.FuzzyRawMapping
+    module FuzzyFindCmd = VibeFs.Shell.FuzzyFindCmd
+    module FuzzyGrepCmd = VibeFs.Shell.FuzzyGrepCmd
 
 module Mux =
     module Contract = VibeFs.Mux.Contract

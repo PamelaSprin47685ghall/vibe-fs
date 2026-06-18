@@ -1,10 +1,15 @@
 module VibeFs.Tests.FuzzyTests
 
 open VibeFs.Tests.Assert
-open VibeFs.Kernel.FuzzySearch
+open VibeFs.Kernel.FuzzyQuery
+open VibeFs.Kernel.FuzzyFormat
+open VibeFs.Kernel.FuzzyGrepDetect
 open VibeFs.Shell.IteratorStore
 open VibeFs.Kernel
-open VibeFs.Shell.FuzzySearch
+open VibeFs.Shell.FuzzyFinderShell
+open VibeFs.Shell.FuzzyCoordinator
+open VibeFs.Shell.FuzzyGrepCmd
+open VibeFs.Shell.FuzzyFindCmd
 
 let grepDetect () =
     equal "plain word" "plain" (detectGrepMode "foo")
@@ -26,7 +31,7 @@ let iteratorRoundTrip () =
     check "single-use" ((consumeIterator<FuzzyFindState> store id).IsNone)
 
 let finderConversion () =
-    let mockFinder = box {| fileSearch = (fun _ _ -> box {| |}) |}
+    let mockFinder = box {| fileSearch = (fun _ _ -> box {| ok = true; value = box {| items = [||]; totalMatched = 0; totalFiles = 0 |} |}) |}
     let okResult = resultFromRaw (box {| ok = true; value = mockFinder |})
     check "ok → Ok" (match okResult with Ok _ -> true | _ -> false)
     let errResult = resultFromRaw (box {| ok = false; error = "scan failed" |})

@@ -14,24 +14,20 @@
   <ItemGroup>
     <!-- Kernel: domain types & pure logic -->
     <Compile Include="src/Kernel/Dyn.fs" />
-    <Compile Include="src/Kernel/DomainError.fs" />
     <Compile Include="src/Kernel/JsBoundary.fs" />
     <Compile Include="src/Kernel/Boundary.fs" />
     <Compile Include="src/Kernel/MessageDecoder.fs" />
     <Compile Include="src/Kernel/WorkspaceState.fs" />
     <Compile Include="src/Kernel/RecordValidator.fs" />
-    <Compile Include="src/Kernel/Schema.fs" />
     <Compile Include="src/Kernel/Prompts.fs" />
     <Compile Include="src/Kernel/McpConfig.fs" />
     <Compile Include="src/Kernel/ToolPolicy.fs" />
-    <Compile Include="src/Kernel/Review.fs" />
     <Compile Include="src/Kernel/ReviewSession.fs" />
     <Compile Include="src/Kernel/ReviewerLoop.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />
     <Compile Include="src/Kernel/FuzzyQuery.fs" />
     <Compile Include="src/Kernel/FuzzyFormat.fs" />
     <Compile Include="src/Kernel/FuzzyGrepDetect.fs" />
-    <Compile Include="src/Kernel/FuzzySearch.fs" />
     <Compile Include="src/Kernel/IpAllowlist.fs" />
     <Compile Include="src/Kernel/Dedup.fs" />
     <Compile Include="src/Kernel/Lru.fs" />
@@ -75,7 +71,6 @@
     <Compile Include="src/Shell/ExecutorShell.fs" />
     <Compile Include="src/Shell/SecureFetch.fs" />
     <Compile Include="src/Shell/OllamaClient.fs" />
-    <Compile Include="src/Shell/TreeSitterSyntax.fs" />
     <Compile Include="src/Shell/TreeSitterShell.fs" />
     <Compile Include="src/Shell/Write.fs" />
     <Compile Include="src/Shell/FuzzyFinderShell.fs" />
@@ -83,7 +78,6 @@
     <Compile Include="src/Shell/FuzzyRawMapping.fs" />
     <Compile Include="src/Shell/FuzzyFindCmd.fs" />
     <Compile Include="src/Shell/FuzzyGrepCmd.fs" />
-    <Compile Include="src/Shell/FuzzySearch.fs" />
     <!-- Mux: host-adapter pure contracts -->
     <Compile Include="src/Mux/Contract.fs" />
     <Compile Include="src/Mux/StreamEnd.fs" />

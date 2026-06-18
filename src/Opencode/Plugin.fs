@@ -12,7 +12,7 @@ open VibeFs.Opencode.Session
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.ChildAgent
 open VibeFs.Opencode.MagicSession
-open VibeFs.Shell.FuzzySearch
+open VibeFs.Shell.FuzzyFinderShell
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative

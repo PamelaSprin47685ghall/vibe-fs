@@ -11,7 +11,6 @@ open VibeFs.Kernel.ExcludedDirs
 open VibeFs.Kernel.HostKernel
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.JsBoundary
-open VibeFs.Kernel.DomainError
 
 let headTail' () =
     let r = headTail "hello" 2 2

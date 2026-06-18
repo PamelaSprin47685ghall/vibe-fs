@@ -12,7 +12,10 @@ open VibeFs.Opencode.Session
 open VibeFs.Opencode.ExecutorActor
 open VibeFs.Opencode.ChildAgent
 open VibeFs.Kernel.Prompts
-open VibeFs.Shell.FuzzySearch
+open VibeFs.Shell.FuzzyFinderShell
+open VibeFs.Shell.FuzzyCoordinator
+open VibeFs.Shell.FuzzyFindCmd
+open VibeFs.Shell.FuzzyGrepCmd
 
 [<Global("Buffer")>]
 let private nodeBuffer : obj = jsNative
@@ -147,11 +150,11 @@ let fuzzyFindTool (finderCache: FinderCache) : obj =
             let scopeId = Dyn.str context "sessionID"
             if scopeId = "" then resolveStr "Error: fuzzy-find requires an active session"
             else
-                let p : VibeFs.Shell.FuzzySearch.FuzzyFindParams =
+                let p : FuzzyFindParams =
                     { pattern = optStr args "pattern"; path = optStr args "path"
                       limit = optInt args "limit"; iterator = optStr args "iterator" }
-                let o : VibeFs.Shell.FuzzySearch.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
-                async { let! r = VibeFs.Shell.FuzzySearch.fuzzyFind p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
+                let o : SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
+                async { let! r = VibeFs.Shell.FuzzyFindCmd.fuzzyFind p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
 
 let fuzzyGrepTool (finderCache: FinderCache) : obj =
     define VibeFs.Opencode.Core.fuzzyGrep
@@ -163,12 +166,12 @@ let fuzzyGrepTool (finderCache: FinderCache) : obj =
             let scopeId = Dyn.str context "sessionID"
             if scopeId = "" then resolveStr "Error: fuzzy-grep requires an active session"
             else
-                let p : VibeFs.Shell.FuzzySearch.FuzzyGrepParams =
-                    { pattern = optStr args "pattern"; path = optStr args "path"; exclude = VibeFs.Shell.FuzzySearch.parseExcludeField args
+                let p : FuzzyGrepParams =
+                    { pattern = optStr args "pattern"; path = optStr args "path"; exclude = parseExcludeField args
                       caseSensitive = optBool args "caseSensitive"; context = optInt args "context"
                       limit = optInt args "limit"; iterator = optStr args "iterator" }
-                let o : VibeFs.Shell.FuzzySearch.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
-                async { let! r = VibeFs.Shell.FuzzySearch.fuzzyGrep p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
+                let o : SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
+                async { let! r = VibeFs.Shell.FuzzyGrepCmd.fuzzyGrep p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
 
 let private abortSignal (context: obj) : obj =
     if Dyn.isNullish context then null else Dyn.get context "abort"

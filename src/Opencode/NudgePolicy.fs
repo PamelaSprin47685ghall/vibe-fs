@@ -2,7 +2,6 @@ module VibeFs.Opencode.NudgePolicy
 
 open System
 open VibeFs.Kernel
-open VibeFs.Kernel.DomainError
 open VibeFs.Kernel.JsBoundary
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeEvents

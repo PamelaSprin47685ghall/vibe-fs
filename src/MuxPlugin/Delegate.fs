@@ -3,7 +3,6 @@ module VibeFs.MuxPlugin.Delegate
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.DomainError
 open VibeFs.Kernel.JsBoundary
 open VibeFs.Kernel.Boundary
 open VibeFs.MuxPlugin.ResolveAiSettings
