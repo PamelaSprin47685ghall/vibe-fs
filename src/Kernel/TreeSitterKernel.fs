@@ -33,7 +33,7 @@ let isFileEditTool (tool: string) : bool = Set.contains (tool.ToLowerInvariant (
 let extractFilePaths (args: obj) : string list =
     if Dyn.isNullish args then []
     else
-        match MessageDecoder.firstPresent [ "path"; "file_path"; "filePath" ] args with
+        match VibeFs.Kernel.Message.firstPresent [ "path"; "file_path"; "filePath" ] args with
         | Some path when path <> "" -> [ path ]
         | _ ->
             let patchText = Dyn.get args "patchText"

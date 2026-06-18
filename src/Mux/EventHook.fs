@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.Prompts
-open VibeFs.Shell.NudgeStore
 
 type private NudgeRequest =
     { workspaceId: string

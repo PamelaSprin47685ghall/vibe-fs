@@ -1,9 +1,30 @@
-module VibeFs.Shell.Read
+module VibeFs.Shell.FileSys
 
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Shell.Path
+open VibeFs.Kernel.TreeSitterKernel
+open VibeFs.Shell.TreeSitterShell
+
+[<Import("createHash", "node:crypto")>]
+let private createHash (algorithm: string) : obj = jsNative
+
+let sha256HexTruncated (input: string) : string =
+    let hash = createHash "sha256"
+    hash?update(input) |> ignore
+    hash?digest("hex")?slice(0, 16)
+
+[<Import("resolve", "node:path")>]
+let resolve (cwd: string) (filePath: string) : string = jsNative
+
+[<Import("basename", "node:path")>]
+let basename (filePath: string) : string = jsNative
+
+[<Import("extname", "node:path")>]
+let extname (filePath: string) : string = jsNative
+
+[<Import("dirname", "node:path")>]
+let dirname (filePath: string) : string = jsNative
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -18,11 +39,6 @@ let private readFileAsync (p: string) : JS.Promise<string> =
 
 let private readdir (p: string) : JS.Promise<obj[]> =
     fsPromises?readdir(p, {| withFileTypes = true |}) |> asPromise<obj[]>
-
-let private formatSize (bytes: int) : string =
-    if bytes < 1024 then $"{bytes}B"
-    elif bytes < 1024 * 1024 then sprintf "%.1fK" (float bytes / 1024.0)
-    else sprintf "%.1fM" (float bytes / (1024.0 * 1024.0))
 
 let private formatMtime (mtime: obj) : string =
     try
@@ -61,7 +77,6 @@ let private readFileWithLineNumbers (filePath: string) (offset: int option) (lim
         return String.concat "\n" numbered
     }
 
-/// Read a file (with optional offset/limit) or format a directory listing for `path`.
 let read (cwd: string option) (path: string) (offset: int option) (limit: int option) : Async<string> =
     async {
         let cwd' = defaultArg cwd (nodeProcess?cwd())
@@ -72,4 +87,48 @@ let read (cwd: string option) (path: string) (offset: int option) (limit: int op
             return! listDirectoryEntries resolved
         else
             return! readFileWithLineNumbers resolved offset limit
+    }
+
+let private mkdir (p: string) : JS.Promise<unit> =
+    fsPromises?mkdir(p, {| recursive = true |}) |> asPromise<unit>
+
+let private writeFile (p: string) (content: string) : JS.Promise<unit> =
+    fsPromises?writeFile(p, content, "utf-8") |> asPromise<unit>
+
+[<Import("access", "node:fs/promises")>]
+let private accessAsync (p: string) (mode: int) : JS.Promise<unit> = jsNative
+
+let private fileExistsAsync (p: string) : Async<bool> =
+    async {
+        try
+            do! accessAsync p 0 |> Async.AwaitPromise
+            return true
+        with _ ->
+            return false
+    }
+
+let private formatSyntaxDiagnostics (filePath: string) (result: SyntaxCheckResult) : string =
+    match result with
+    | Ok (lang, [||]) ->
+        $"Successfully wrote to {filePath}"
+    | Ok (lang, errors) ->
+        let header = $"[syntax-check] Syntax check failed for {filePath} ({lang}):"
+        let body =
+            errors
+            |> Array.map (fun e -> $"  line {e.line}, col {e.column}: {e.message}")
+            |> String.concat "\n"
+        header + "\n" + body
+    | Failed (lang, reason) ->
+        $"[syntax-check] Syntax check failed for {filePath} ({lang}): {reason}"
+
+let write (cwd: string option) (file_path: string) (content: string) : Async<string> =
+    async {
+        let cwd' = defaultArg cwd (nodeProcess?cwd())
+        let resolved = resolve cwd' file_path
+        let parent = dirname resolved
+        if not (System.String.IsNullOrEmpty parent) then
+            do! mkdir parent |> Async.AwaitPromise
+        do! writeFile resolved content |> Async.AwaitPromise
+        let! syntax = checkSyntax content resolved |> Async.AwaitPromise
+        return formatSyntaxDiagnostics resolved syntax
     }

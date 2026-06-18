@@ -4,8 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Prompts
-open VibeFs.Kernel.JsBoundary
-open VibeFs.Kernel.MessageDecoder
+open VibeFs.Kernel.Domain
+open VibeFs.Kernel.Message
+open VibeFs.Opencode.Actors
 
 let private firstString (ctx: obj) (keys: string list) : string option =
     keys
@@ -133,7 +134,7 @@ let private promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise
 
 /// Core subagent runner. The `cleanup` flag controls whether the child session
 /// is aborted and unregistered after the prompt finishes.
-let private runSubagentCore (registry: ChildAgent.ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
+let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                             (directory: string) (sessionID: string) (context: obj)
                             (tools: obj) (cleanup: bool) : JS.Promise<string> =
     async {
@@ -187,20 +188,20 @@ let private runSubagentCore (registry: ChildAgent.ChildAgentRegistry) (client: o
     |> Async.StartAsPromise
 
 /// Run a subagent and keep the child session registered after return.
-let runSubagent (registry: ChildAgent.ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
+let runSubagent (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                 (directory: string) (sessionID: string) (context: obj)
                 (tools: obj) : JS.Promise<string> =
     runSubagentCore registry client agent title prompt directory sessionID context tools false
 
 /// Run a subagent and clean up the child session afterwards. Used for
 /// short-lived analysis subagents such as the executor summarizer.
-let runSubagentWithCleanup (registry: ChildAgent.ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
+let runSubagentWithCleanup (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                            (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
     runSubagentCore registry client agent title prompt directory sessionID context (box null) true
 
 /// Run a subagent with an explicit tool set and clean up afterwards.
 let runSubagentWithTools
-    (registry: ChildAgent.ChildAgentRegistry)
+    (registry: ChildAgentRegistry)
     (client: obj) (agent: string) (title: string) (prompt: string)
     (directory: string) (sessionID: string) (context: obj)
     (tools: obj) : JS.Promise<string> =
@@ -208,7 +209,7 @@ let runSubagentWithTools
 
 /// Create a reviewer child session under the given parent, register it, and
 /// return the child id (empty string on failure).
-let createReviewerChild (registry: ChildAgent.ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+let createReviewerChild (registry: ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                         (directory: string) (parentID: string option)
                         (sessionID: string) (title: string) : JS.Promise<string> =
     async {
@@ -271,7 +272,7 @@ let runReviewerLoop (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.Revie
 
 /// Run a pre-review session (used by /loop-review): create a reviewer child,
 /// prompt it with review instructions + task, wait for the verdict.
-let runReviewerSession (registry: ChildAgent.ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+let runReviewerSession (registry: ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                        (directory: string) (sessionID: string) (task: string)
                        : JS.Promise<VibeFs.Kernel.ReviewSession.ReviewResult> =
     async {
@@ -289,7 +290,7 @@ let runReviewerSession (registry: ChildAgent.ChildAgentRegistry) (client: obj) (
 /// Run a submit-review (used by the submit_review tool): create a reviewer
 /// child, prompt it with review instructions + change report + affected files +
 /// original task, wait for the verdict.
-let runSubmitReview (registry: ChildAgent.ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+let runSubmitReview (registry: ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                     (directory: string) (sessionID: string)
                     (report: string) (affectedFiles: string list)
                     (task: string) (abortSignal: obj)

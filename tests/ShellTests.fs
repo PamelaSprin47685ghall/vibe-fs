@@ -3,8 +3,8 @@ module VibeFs.Tests.ShellTests
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
-open VibeFs.Kernel.ExecutorKernel
-open VibeFs.Kernel.OllamaFormat
+open VibeFs.Kernel.Executor
+open VibeFs.Kernel.Prompts
 
 let ollamaFetchInit () =
     let init = VibeFs.Shell.OllamaClient.postInitNoSignal "KEY123" "{\"a\":1}"
@@ -30,11 +30,11 @@ let ollamaResponseMethodCall () =
 let executorMapping () =
     let opts : ExecuteOptions =
         { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; cwd = None }
-    let run o = VibeFs.Shell.ExecutorShell.mapOutcome opts 10000 "out" o
+    let run o = VibeFs.Shell.Executor.mapOutcome opts 10000 "out" o
     check "exit0→Completed" (match run { stdout=""; stderr=""; code=Some 0; timedOut=false } with Completed _ -> true | _ -> false)
     check "nonzero→Failed" (match run { stdout=""; stderr=""; code=Some 2; timedOut=false } with Failed _ -> true | _ -> false)
     check "timeout→Truncated" (match run { stdout=""; stderr=""; code=None; timedOut=true } with Truncated _ -> true | _ -> false)
-    equal "python exe uvx" "uvx" (VibeFs.Shell.ExecutorShell.missingExecutableFor Python)
+    equal "python exe uvx" "uvx" (VibeFs.Shell.Executor.missingExecutableFor Python)
 
 let capsFileShape () =
     let f : VibeFs.Kernel.CapsFormat.CapsFile = { filePath = "/abs/HERE.md"; label = "HERE.md"; content = "x" }
@@ -48,13 +48,13 @@ let capsContextFormat () =
     check "caps content raw" (ctx.Contains "body text")
 
 let capsFileSizeLimit () =
-    equal "caps file size limit 4MB" (4 * 1_048_576) VibeFs.Shell.Caps.maxFileSize
+    equal "caps file size limit 4MB" (4 * 1_048_576) VibeFs.Shell.WorkspaceFiles.maxFileSize
 
 let ollamaFormat () =
     let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]
-    let formatted = VibeFs.Kernel.OllamaFormat.formatSearchResults results
+    let formatted = VibeFs.Kernel.Prompts.formatSearchResults results
     check "search numbering" (formatted.Contains "1. A" && formatted.Contains "2. B")
-    equal "empty search" "No results found." (VibeFs.Kernel.OllamaFormat.formatSearchResults [])
+    equal "empty search" "No results found." (VibeFs.Kernel.Prompts.formatSearchResults [])
 
 let summarizerInputCap () =
     let bl (s: string) : int = s.Length

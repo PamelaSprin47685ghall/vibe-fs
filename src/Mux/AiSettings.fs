@@ -1,9 +1,8 @@
-module VibeFs.Mux.ResolveAiSettings
+module VibeFs.Mux.AiSettings
 
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
 
 type DelegatedAiSettings =
     { modelString: string option
@@ -37,24 +36,21 @@ let private normalizeStr (v: obj) : string option =
         let s = (string v).Trim()
         if s = "" then None else Some s
 
-let internal modelFromEntry (entry: obj) : string option =
+let modelFromEntry (entry: obj) : string option =
     normalizeStr (Dyn.get entry "model")
     |> Option.orElseWith (fun () -> normalizeStr (Dyn.get entry "modelString"))
 
 let private thinkingFromEntry (entry: obj) : string option =
     normalizeStr (Dyn.get entry "thinkingLevel")
 
-let internal namedSettingsFromRecord (source: obj) (agentId: string) : DelegatedAiSettings option =
+let namedSettingsFromRecord (source: obj) (agentId: string) : DelegatedAiSettings option =
     if Dyn.isNullish source then None
     else
         let entry = Dyn.get source agentId
         if Dyn.isNullish entry then None
-        else
-            Some
-                { modelString = modelFromEntry entry
-                  thinkingLevel = thinkingFromEntry entry }
+        else Some { modelString = modelFromEntry entry; thinkingLevel = thinkingFromEntry entry }
 
-let internal mergeNamedSettings (sources: DelegatedAiSettings option list) : DelegatedAiSettings =
+let mergeNamedSettings (sources: DelegatedAiSettings option list) : DelegatedAiSettings =
     sources
     |> List.fold (fun acc source ->
         match source with
@@ -67,34 +63,63 @@ let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) 
     async {
         let cfg = decodeAiConfig config
         let configFile = loadConfigOrDefault deps
-
         let workspace =
             if cfg.workspaceId = "" then null
             else
                 let result = findWorkspaceEntry deps configFile cfg.workspaceId
                 Dyn.get result "workspace"
-
         let byAgent = Dyn.get workspace "aiSettingsByAgent"
-
         let! descriptorSettings =
             async {
                 try
                     let! fm = resolveAgentFrontmatter deps cfg.runtime cfg.cwd agentId |> Async.AwaitPromise
                     let ai = Dyn.get fm "ai"
-                    return
-                        { modelString = normalizeStr (Dyn.get ai "model")
-                          thinkingLevel = thinkingFromEntry ai }
-                with _ ->
-                    return emptySettings
+                    return { modelString = normalizeStr (Dyn.get ai "model"); thinkingLevel = thinkingFromEntry ai }
+                with _ -> return emptySettings
             }
-
-        let sources = [
-            namedSettingsFromRecord byAgent agentId
-            namedSettingsFromRecord (Dyn.get configFile "subagentAiDefaults") agentId
-            namedSettingsFromRecord (Dyn.get configFile "agentAiDefaults") agentId
-            Some descriptorSettings
-            if agentId = "exec" then namedSettingsFromRecord byAgent "exec" else None
-        ]
-
-        return mergeNamedSettings sources
+        return
+            mergeNamedSettings [
+                namedSettingsFromRecord byAgent agentId
+                namedSettingsFromRecord (Dyn.get configFile "subagentAiDefaults") agentId
+                namedSettingsFromRecord (Dyn.get configFile "agentAiDefaults") agentId
+                Some descriptorSettings
+                if agentId = "exec" then namedSettingsFromRecord byAgent "exec" else None
+            ]
     } |> Async.StartAsPromise
+
+let internal coerceThinkingLevel (value: string) : string option =
+    let trimmed = value.Trim()
+    if trimmed = "" then None
+    elif trimmed = "med" then Some "medium"
+    elif trimmed = "off" || trimmed = "low" || trimmed = "medium" || trimmed = "high" || trimmed = "xhigh" || trimmed = "max" then Some trimmed
+    else None
+
+type ParentRuntimeAiSettings =
+    { modelString: string option
+      thinkingLevel: string option }
+
+let private trimToOption (value: string) =
+    let trimmed = value.Trim()
+    if trimmed = "" then None else Some trimmed
+
+let private readMuxEnvSettings (muxEnv: obj) : ParentRuntimeAiSettings =
+    { modelString = Dyn.str muxEnv "MUX_MODEL_STRING" |> trimToOption
+      thinkingLevel = Dyn.str muxEnv "MUX_THINKING_LEVEL" |> coerceThinkingLevel }
+
+let private toRuntimeAiSettingsObj (settings: ParentRuntimeAiSettings) : obj =
+    match settings.modelString, settings.thinkingLevel with
+    | None, None -> null
+    | _ ->
+        let o = createObj []
+        match settings.modelString with
+        | Some modelString -> o?("modelString") <- modelString
+        | None -> ()
+        match settings.thinkingLevel with
+        | Some thinkingLevel -> o?("thinkingLevel") <- thinkingLevel
+        | None -> ()
+        o
+
+let buildParentRuntimeAiSettings (config: obj) : obj =
+    let muxEnv = Dyn.get config "muxEnv"
+    if Dyn.isNullish muxEnv then null
+    else muxEnv |> readMuxEnvSettings |> toRuntimeAiSettingsObj

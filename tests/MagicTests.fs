@@ -4,9 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dyn
-open VibeFs.Opencode.Magic
-open VibeFs.Opencode.MagicProjector
-open VibeFs.Kernel.MessageDecoder
+open VibeFs.Opencode.MagicCore
+open VibeFs.Opencode.MagicProjection
+open VibeFs.Opencode.MagicTodo
+open VibeFs.Kernel.Message
 
 let private userMsg (id: string) (text: string) : obj =
     createObj
@@ -109,7 +110,7 @@ let replaySkipsEmpty () =
 
 let findFoldRangeTest () =
     let flat =
-        VibeFs.Kernel.PartStream.flatten (
+        VibeFs.Kernel.Message.flatten (
             [| userMsg "u1" "start"
                todoWriteMsg "m1" "c1" "R1"
                todoWriteMsg "m2" "c2" "R2"

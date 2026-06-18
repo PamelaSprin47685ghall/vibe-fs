@@ -6,7 +6,7 @@ open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
 open VibeFs.Opencode.Plugin
-open VibeFs.Opencode.ChildAgent
+open VibeFs.Opencode.Actors
 open VibeFs.Opencode.Session
 
 let chatMessageSpec () = async {

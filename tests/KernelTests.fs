@@ -4,11 +4,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dedup
-open VibeFs.Kernel.HeadTail
-open VibeFs.Shell.Caps
+open VibeFs.Kernel.Executor
+open VibeFs.Shell.WorkspaceFiles
 open VibeFs.Kernel.Prompts
-open VibeFs.Kernel.JsBoundary
-open VibeFs.Kernel.MessageDecoder
+open VibeFs.Kernel.Domain
+open VibeFs.Kernel.Message
 
 let headTail' () =
     let r = headTail "hello" 2 2
@@ -26,7 +26,7 @@ let excludedDirs' () =
     check "node_modules excluded" r
 
 let jsBoundary' () =
-    check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = VibeFs.Kernel.JsBoundary.MessageAborted)
+    check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = VibeFs.Kernel.Domain.MessageAborted)
     let text = readAssistantText [| box {| ``type`` = "message"; message = box {| role = "assistant"; content = [| box {| ``type`` = "text"; text = "hello" |} |] |} |} |] None
     check "assistant text read" (text = Some "hello")
 

@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Shell.Path
 
 type private Position = { row: int; column: int }
 
@@ -28,6 +27,9 @@ let private getOrCall1 (o: obj) (key: string) (arg: obj) : obj =
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
+
+[<Import("resolve", "node:path")>]
+let private pathResolve (cwd: string) (filePath: string) : string = jsNative
 
 let private processPlatform () : string = nodeProcess?platform
 let private processArch () : string = nodeProcess?arch
@@ -168,7 +170,7 @@ let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
 let readAndCheckSyntax (filePath: string) (cwd: string) (includeOk: bool) : JS.Promise<string option> =
     async {
         try
-            let abs = resolve cwd filePath
+            let abs = pathResolve cwd filePath
             let! content = fsPromises?readFile(abs, "utf-8") |> asPromise<string> |> Async.AwaitPromise
             let! result = checkSyntax content filePath |> Async.AwaitPromise
             return formatSyntaxDiagnostics filePath result includeOk

@@ -1,19 +1,150 @@
-module VibeFs.Mux.WebSearchTools
+module VibeFs.Mux.HostTools
 
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.OllamaFormat
-open VibeFs.Mux.Contract
+open VibeFs.Kernel.Executor
+open VibeFs.Kernel.Prompts
 open VibeFs.Mux.Delegate
-open VibeFs.Mux.Prompts
+open VibeFs.Mux.Wrappers
 open VibeFs.Opencode.ToolSchema
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.FuzzyCoordinator
-open VibeFs.Shell.FuzzyCommands
 module ToolSchemaModule = VibeFs.Opencode.ToolSchema
-module FuzzyCommandsModule = VibeFs.Shell.FuzzyCommands
+open VibeFs.Shell.FileSys
+open VibeFs.Shell.FuzzyFinderShell
+open VibeFs.Shell.FuzzySearch
 open VibeFs.Shell.OllamaClient
+
+module FuzzyCommandsModule = VibeFs.Shell.FuzzySearch
+
+[<Global("Buffer")>]
+let private nodeBuffer : obj = jsNative
+let private byteLength (s: string) : int = nodeBuffer?byteLength(s, "utf-8")
+
+let private getCwd (config: obj) : string =
+    match strField config "cwd" with
+    | Some v when not (System.String.IsNullOrWhiteSpace v) -> v
+    | _ -> defaultArg (strField config "directory") ""
+
+let private parseLanguage (value: string) : ExecutorLanguage =
+    match value.ToLowerInvariant() with
+    | "python" -> Python
+    | "javascript" -> Javascript
+    | _ -> Shell
+
+let private parseTimeout (value: string) : ExecutorTimeoutType =
+    match value.ToLowerInvariant() with
+    | "long" -> Long
+    | "last-resort" -> LastResort
+    | _ -> Short
+
+let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
+    { language = parseLanguage (Dyn.str args "language")
+      program = Dyn.str args "program"
+      dependencies =
+          let v = Dyn.get args "dependencies"
+          if Dyn.isNullish v then [] else unbox<obj array> v |> Array.map string |> List.ofArray
+      timeoutType = parseTimeout (Dyn.str args "timeout_type")
+      cwd = Some (getCwd config) }
+
+let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptions) (output: string) : Async<string> =
+    async {
+        if not (shouldSummarize byteLength output) then
+            return prependSafetyWarning output options.program options.language
+        else
+            let prompt = formatMuxExecutorSummarizerUserPrompt output
+            let! report = runMuxSubagent deps config "executor" prompt "Executor summary" None |> Async.AwaitPromise
+            return prependSafetyWarning report options.program options.language
+    }
+
+let executorTool (deps: obj) : ToolDefinition =
+    { name = "executor"
+      description = ToolSchemaModule.executor
+      parameters =
+        mkSchema
+            (createObj
+                [ "language", box (strEnumProp Params.executorLanguage [| "shell"; "python"; "javascript" |])
+                  "program", box (strProp Params.executorProgram)
+                  "dependencies", box (strArrayProp Params.executorDeps)
+                  "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |]) ])
+            [| "language"; "program"; "timeout_type" |]
+      execute =
+        fun config args ->
+            async {
+                let opts = buildExecutorOptions args config
+                let sessionId = Dyn.str config "sessionID"
+                let! execResult = VibeFs.Shell.Executor.execute opts sessionId |> Async.AwaitPromise
+                let output =
+                    match execResult with
+                    | Completed o | Truncated(o, _) | Failed o | MissingExecutable(_, o) -> o
+                return! summarizeWhenNeeded deps config opts output
+            }
+            |> Async.StartAsPromise
+      condition = None }
+
+let readTool (_deps: obj) (hostReadExec: HostReadExec) : ToolDefinition =
+    { name = "read"
+      description =
+        "If path is a directory, returns a formatted directory listing (equivalent to ls -la). Use this instead of running `ls` via executor."
+      parameters =
+        mkSchema
+            (createObj
+                [ "path", box (strProp "The absolute or relative path to read")
+                  "offset", box (numProp "Line to start from, 1-indexed")
+                  "limit", box (numProp "Maximum lines to read") ])
+            [| "path" |]
+      execute =
+        fun config args ->
+            async {
+                let path = Dyn.str args "path"
+                let offset = optInt args "offset"
+                let limit = optInt args "limit"
+                match hostReadExec.Value with
+                | Some hostExec ->
+                    let hostFn = hostExec :?> obj -> obj -> JS.Promise<obj>
+                    let! result = hostFn args config |> Async.AwaitPromise
+                    return string result
+                | None ->
+                    return! read (Some (getCwd config)) path offset limit
+            }
+            |> Async.StartAsPromise
+      condition = None }
+
+let writeTool (_deps: obj) : ToolDefinition =
+    { name = "write"
+      description =
+        "Write content to a file. Resolves relative paths against the current working directory, creates parent directories if they don't exist, and runs syntax checking on the written content."
+      parameters =
+        mkSchema
+            (createObj
+                [ "file_path", box (strProp "The absolute or relative path of the file to write")
+                  "content", box (strProp "The content to write to the file") ])
+            [| "file_path"; "content" |]
+      execute =
+        fun config args ->
+            async {
+                if not (Dyn.has args "file_path") then
+                    return "Error: missing required parameter 'file_path'"
+                elif not (Dyn.has args "content") then
+                    return "Error: missing required parameter 'content'"
+                else
+                    let filePath = Dyn.str args "file_path"
+                    let content = Dyn.str args "content"
+                    if System.String.IsNullOrWhiteSpace filePath then
+                        return "Error: 'file_path' must not be empty"
+                    else
+                        try
+                            return! write (Some (getCwd config)) filePath content
+                        with ex ->
+                            return $"Error writing '{filePath}': {ex.Message}"
+            }
+            |> Async.StartAsPromise
+      condition = None }
+
+let private buildFinderOptions (config: obj) (finderCache: FinderCache) : SearchOptions =
+    { cwd = Dyn.str config "cwd"
+      scopeId = Dyn.str config "workspaceId"
+      store = None
+      finderCache = finderCache }
 
 let fuzzyFindTool (finderCache: FinderCache) : ToolDefinition =
     { name = "fuzzy_find"
@@ -28,11 +159,7 @@ let fuzzyFindTool (finderCache: FinderCache) : ToolDefinition =
                     path = strField args "path"
                     limit = optInt args "limit"
                     iterator = strField args "iterator" }
-              let o : SearchOptions =
-                  { cwd = Dyn.str config "cwd"
-                    scopeId = scopeId
-                    store = None
-                    finderCache = finderCache }
+              let o = buildFinderOptions config finderCache
               async {
                   let! r = FuzzyCommandsModule.fuzzyFind p o |> Async.AwaitPromise
                   return r.output
@@ -56,11 +183,7 @@ let fuzzyGrepTool (finderCache: FinderCache) : ToolDefinition =
                     context = optInt args "context"
                     limit = optInt args "limit"
                     iterator = strField args "iterator" }
-              let o : SearchOptions =
-                  { cwd = Dyn.str config "cwd"
-                    scopeId = scopeId
-                    store = None
-                    finderCache = finderCache }
+              let o = buildFinderOptions config finderCache
               async {
                   let! r = FuzzyCommandsModule.fuzzyGrep p o |> Async.AwaitPromise
                   return r.output
@@ -70,7 +193,7 @@ let fuzzyGrepTool (finderCache: FinderCache) : ToolDefinition =
 
 let websearchTool (deps: obj) : ToolDefinition =
     { name = "websearch"
-      description = websearch
+      description = ToolSchemaModule.websearch
       parameters = mkSchema (createObj [ "query", box (strProp Params.websearchQuery); "numResults", box (numProp Params.websearchNumResults); "what_to_summarize", box (strProp Params.websearchWhatToSummarize) ]) [| "query"; "what_to_summarize" |]
       execute = fun config args ->
           let whatToSummarize = defaultArg (strField args "what_to_summarize") ""
@@ -102,7 +225,7 @@ let websearchTool (deps: obj) : ToolDefinition =
 
 let webfetchTool : ToolDefinition =
     { name = "webfetch"
-      description = webfetch
+      description = ToolSchemaModule.webfetch
       parameters = mkSchema (createObj [ "url", box (strProp Params.webfetchUrl); "extract_main", box (boolProp Params.webfetchExtractMain); "prefer_llms_txt", box (strEnumProp Params.webfetchPreferLlmsTxt [| "auto"; "always"; "never" |]); "prompt", box (strProp Params.webfetchPrompt); "timeout", box (numProp Params.webfetchTimeout) ]) [| "url" |]
       execute = fun config args ->
           match strField args "url" with

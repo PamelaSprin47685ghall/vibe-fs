@@ -3,14 +3,14 @@ module VibeFs.Mux.SlashCommands
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.ToolPolicy
+open VibeFs.Kernel.Config
 open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.Boundary
+open VibeFs.Kernel.Domain
 open VibeFs.Shell.ReviewRuntime
-open VibeFs.Mux.Delegate
 open VibeFs.Mux.CallStore
-open VibeFs.Mux.Prompts
-open VibeFs.Mux.Contract
+open VibeFs.Mux.Delegate
+open VibeFs.Mux.Wrappers
+open VibeFs.Mux.SubagentTools
 
 let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
 

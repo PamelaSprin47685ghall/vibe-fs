@@ -5,10 +5,10 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.MessageDecoder
+open VibeFs.Kernel.Message
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
-open VibeFs.Opencode.ExecutorActor
+open VibeFs.Opencode.Actors
 
 
 [<Import("createRequire", "node:module")>]
@@ -204,14 +204,14 @@ let toolDefinitionSpec () = async {
     let reportSchema = get todoProps "completedWorkReport"
     let required = unbox<obj[]> (get todoSchema "required") |> Array.map string
     check "tool.definition builds todo report field" (str reportSchema "type" = "string")
-    check "tool.definition builds todo report description" (str reportSchema "description" = VibeFs.Opencode.Magic.reportDesc)
+    check "tool.definition builds todo report description" (str reportSchema "description" = VibeFs.Opencode.MagicTodo.reportDesc)
     check "tool.definition requires todo report" (required |> Array.contains "completedWorkReport")
     check "tool.definition requires todos" (required |> Array.contains "todos")
-    check "tool.definition builds todos description" (str (get todoProps "todos") "description" = VibeFs.Opencode.Magic.todosDesc)
+    check "tool.definition builds todos description" (str (get todoProps "todos") "description" = VibeFs.Opencode.MagicTodo.todosDesc)
     let todoItemProps = get (get (get todoProps "todos") "items") "properties"
-    check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = VibeFs.Opencode.Magic.todoContentDesc)
-    check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = VibeFs.Opencode.Magic.todoStatusDesc)
-    check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Opencode.Magic.todoPriorityDesc)
+    check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = VibeFs.Opencode.MagicTodo.todoContentDesc)
+    check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = VibeFs.Opencode.MagicTodo.todoStatusDesc)
+    check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Opencode.MagicTodo.todoPriorityDesc)
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 

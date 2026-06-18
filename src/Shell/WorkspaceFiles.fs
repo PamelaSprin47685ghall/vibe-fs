@@ -1,4 +1,4 @@
-module VibeFs.Shell.Caps
+module VibeFs.Shell.WorkspaceFiles
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -161,3 +161,44 @@ let findCapsFiles (projectRoot: string) : JS.Promise<CapsFile list> =
         return finalBudget.results |> Seq.toList |> List.sortBy (fun file -> file.filePath)
     }
     |> Async.StartAsPromise
+
+let maxReverieFileBytes = 1_048_576
+
+type ReverieFileResult =
+    { filePath: string
+      content: string option
+      skipReason: string option }
+
+[<Import("resolve", "node:path")>]
+let private pathResolve (cwd: string) (file: string) : string = jsNative
+
+let private statSize2 (s: obj) : int = s?size
+let private statIsFile2 (s: obj) : bool = s?isFile ()
+
+let readOne (cwd: string) (file: string) : JS.Promise<ReverieFileResult> =
+    async {
+        let absolute = pathResolve cwd file
+        try
+            let! s = stat absolute |> Async.AwaitPromise
+            if not (statIsFile2 s) then
+                return { filePath = file; content = None; skipReason = Some "not-file" }
+            elif statSize2 s > maxReverieFileBytes then
+                return { filePath = file; content = None; skipReason = Some "too-large" }
+            else
+                let! content = readFile absolute |> Async.AwaitPromise
+                return { filePath = absolute; content = Some content; skipReason = None }
+        with _ ->
+            return { filePath = file; content = None; skipReason = Some "unreadable" }
+    }
+    |> Async.StartAsPromise
+
+let readReverieFiles (cwd: string) (files: string list) : JS.Promise<ReverieFileResult list> =
+    let rec loop remaining acc =
+        async {
+            match remaining with
+            | [] -> return List.rev acc
+            | file :: rest ->
+                let! r = readOne cwd file |> Async.AwaitPromise
+                return! loop rest (r :: acc)
+        }
+    loop files [] |> Async.StartAsPromise

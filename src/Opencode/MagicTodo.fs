@@ -1,22 +1,9 @@
-module VibeFs.Opencode.Magic
+module VibeFs.Opencode.MagicTodo
 
 open System.Collections.Generic
+open VibeFs.Kernel.Message
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.PartStream
-
-let magicTodoToolName = "todowrite"
-let magicReviewToolName = "submit_review"
-
-type BacklogEntry =
-    { sequence: int
-      timestamp: string
-      report: string }
-
-type MagicState = { backlog: BacklogEntry list }
-let emptyMagicState = { backlog = [] }
-
-let private isCompletedTodo (part: obj) : bool =
-    partIsTool part && partToolName part = magicTodoToolName && partToolStatus part = "completed"
+open VibeFs.Opencode.MagicCore
 
 let replayBacklog (messages: obj array) : BacklogEntry list =
     if isNullish messages then []
@@ -24,7 +11,7 @@ let replayBacklog (messages: obj array) : BacklogEntry list =
         let flat = flatten messages
         let backlog = ResizeArray<BacklogEntry>()
         for fp in flat do
-            if isCompletedTodo fp.part then
+            if isTodoResult fp.part then
                 let input = partToolInput fp.part
                 if not (isNullish input) then
                     let report = str input "completedWorkReport"
@@ -77,6 +64,3 @@ type MagicSession() =
             match cache.TryGetValue sessionID with
             | true, backlog -> backlog
             | false, _ -> []
-
-    member _.Invalidate(sessionID: string) =
-        cache.Remove(sessionID) |> ignore

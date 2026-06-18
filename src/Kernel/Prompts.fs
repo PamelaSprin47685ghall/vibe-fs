@@ -1,6 +1,16 @@
 module VibeFs.Kernel.Prompts
 
-/// Meditator nudge injected to encourage deeper reasoning before acting.
+type SearchResult =
+    { title: string
+      url: string
+      content: string }
+
+type FetchResponse =
+    { title: string option
+      byline: string option
+      length: int option
+      content: string option }
+
 let meditatorNudge =
     "// Think thrice before acting — NOW consider calling meditator tool to improve reasoning"
 
@@ -93,7 +103,9 @@ let formatMeditatorUserPrompt (intent: string) (files: string list) : string =
 
 let meditatorSectionSeparator = "\n---\n"
 
-type MeditatorFileSection = { file: string; content: string option }
+type MeditatorFileSection =
+    { file: string
+      content: string option }
 
 type private PromptSection =
     | FileSection of fileName: string * body: string
@@ -136,6 +148,7 @@ let executorSummarizerPromptBody (output: string) : string =
 let formatExecutorSummarizerUserPrompt (output: string) : string =
     executorSummarizerPromptBody output
     + "\n4. Return a concise, actionable summary.\n\n"
+
 let websearchSummarizerPromptBody (whatToSummarize: string) (rawResults: string) : string =
     "You are a summarizer for web search results. The caller searched the web and needs you to extract and synthesize content focused on a specific question.\n\n"
     + readOnlyRules + "\n\n"
@@ -150,3 +163,65 @@ let websearchSummarizerPromptBody (whatToSummarize: string) (rawResults: string)
 let formatWebsearchSummarizerUserPrompt (whatToSummarize: string) (rawResults: string) : string =
     websearchSummarizerPromptBody whatToSummarize rawResults
     + "\n5. Return a focused, ready-to-use answer.\n\n"
+
+let formatMuxCoderUserPrompt (intent: string) (affectedFiles: string list) : string =
+    coderPromptBody intent affectedFiles
+    + "4. Finish by calling agent_report with a summary of changes and verification results.\n\n"
+    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
+
+let formatMuxReaderUserPrompt (intent: string) : string =
+    readerPromptBody intent
+    + "3. Finish by calling agent_report with structuredOutput containing relatedFiles and relatedCode.\n\n"
+    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
+
+let formatMuxMeditatorUserPrompt (intent: string) (files: string list) : string =
+    meditatorPromptBody intent files
+    + "3. Finish by calling agent_report with structuredOutput containing relatedFiles and relatedCode.\n\n"
+    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
+
+let formatMuxBrowserUserPrompt (intent: string) : string =
+    browserPromptBody intent
+    + "3. Finish by calling agent_report with a clear summary of what you found or did.\n\n"
+    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
+
+let formatMuxExecutorSummarizerUserPrompt (output: string) : string =
+    executorSummarizerPromptBody output
+    + "\n4. Finish by calling agent_report with the summary.\n\n"
+    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
+
+let formatMuxWebsearchSummarizerUserPrompt (whatToSummarize: string) (rawResults: string) : string =
+    websearchSummarizerPromptBody whatToSummarize rawResults
+    + "\n5. Finish by calling agent_report with the focused answer.\n\n"
+    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
+
+let agentReportReviewInstructions =
+    readOnlyWorkspaceConstraint + "\n\n"
+    + "You are a code reviewer performing a rigorous review of submitted work.\n\n"
+    + reviewCriteria
+    + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\n"
+    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable). The reportMarkdown must be exactly one of:\n\nPASS\n\nor\n\nREJECT: <detailed, actionable feedback>\n\n"
+    + "IMPORTANT: If you accept, reportMarkdown MUST be exactly \"PASS\". Do not write ACCEPT, praise, JSON, or any other text — it will be misinterpreted as rejection feedback."
+
+let formatSearchResults (results: SearchResult list) : string =
+    if results.IsEmpty then "No results found."
+    else
+        results
+        |> List.mapi (fun i r -> $"{i + 1}. {r.title}\n   URL: {r.url}\n   {r.content}")
+        |> String.concat "\n\n"
+
+let formatFetchResponse (data: FetchResponse) : string =
+    let nonEmpty (s: string) = not (System.String.IsNullOrEmpty s)
+
+    let title = defaultArg data.title ""
+
+    [ yield $"Title: {title}"
+      match data.byline with
+      | Some b when nonEmpty b -> yield $"By: {b}"
+      | _ -> ()
+      match data.length with
+      | Some l -> yield $"Length: {l}"
+      | None -> ()
+      match data.content with
+      | Some c when nonEmpty c -> yield c
+      | _ -> () ]
+    |> String.concat "\n"

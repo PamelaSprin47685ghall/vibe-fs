@@ -12,78 +12,54 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Kernel: domain types & pure logic -->
     <Compile Include="src/Kernel/Dyn.fs" />
-    <Compile Include="src/Kernel/JsBoundary.fs" />
-    <Compile Include="src/Kernel/Boundary.fs" />
-    <Compile Include="src/Kernel/MessageDecoder.fs" />
-    <Compile Include="src/Kernel/WorkspaceState.fs" />
     <Compile Include="src/Kernel/Prompts.fs" />
-    <Compile Include="src/Kernel/McpConfig.fs" />
-    <Compile Include="src/Kernel/ToolPolicy.fs" />
     <Compile Include="src/Kernel/ReviewSession.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />
-    <Compile Include="src/Kernel/FuzzyQuery.fs" />
-    <Compile Include="src/Kernel/FuzzyFormat.fs" />
-    <Compile Include="src/Kernel/FuzzyGrepDetect.fs" />
     <Compile Include="src/Kernel/Dedup.fs" />
-    <Compile Include="src/Kernel/HeadTail.fs" />
-    <Compile Include="src/Kernel/ExecutorKernel.fs" />
+    <Compile Include="src/Kernel/Message.fs" />
     <Compile Include="src/Kernel/CapsFormat.fs" />
-    <Compile Include="src/Kernel/OllamaFormat.fs" />
-    <Compile Include="src/Kernel/PartStream.fs" />
+    <Compile Include="src/Kernel/TreeSitterKernel.fs" />
+    <Compile Include="src/Kernel/Domain.fs" />
+    <Compile Include="src/Kernel/Config.fs" />
+    <Compile Include="src/Kernel/Fuzzy.fs" />
+    <Compile Include="src/Kernel/Executor.fs" />
 
-     <Compile Include="src/Kernel/TreeSitterKernel.fs" />
-    <!-- Shell: effectful boundary -->
-    <Compile Include="src/Shell/Crypto.fs" />
-    <Compile Include="src/Shell/IteratorStore.fs" />
-    <Compile Include="src/Shell/NudgeStore.fs" />
     <Compile Include="src/Shell/ReviewRuntime.fs" />
-    <Compile Include="src/Shell/Caps.fs" />
-    <Compile Include="src/Shell/ReverieFiles.fs" />
-    <Compile Include="src/Shell/Path.fs" />
-    <Compile Include="src/Shell/Read.fs" />
-    <Compile Include="src/Shell/ExecutorHost.fs" />
     <Compile Include="src/Shell/ExecutorJavascript.fs" />
-    <Compile Include="src/Shell/ExecutorShell.fs" />
     <Compile Include="src/Shell/OllamaClient.fs" />
     <Compile Include="src/Shell/TreeSitterShell.fs" />
-    <Compile Include="src/Shell/Write.fs" />
     <Compile Include="src/Shell/FuzzyFinderShell.fs" />
-    <Compile Include="src/Shell/FuzzyCoordinator.fs" />
-    <Compile Include="src/Shell/FuzzyCommands.fs" />
-    <!-- Mux: host-adapter pure contracts -->
-    <Compile Include="src/Mux/Contract.fs" />
-    <Compile Include="src/Mux/Dedup.fs" />
-    <Compile Include="src/Mux/CapsFileRead.fs" />
-    <!-- Opencode plugin adapter (F# → JS, default export) -->
-    <Compile Include="src/Opencode/ChildAgent.fs" />
-    <Compile Include="src/Opencode/Magic.fs" />
+    <Compile Include="src/Shell/FileSys.fs" />
+    <Compile Include="src/Shell/WorkspaceFiles.fs" />
+    <Compile Include="src/Shell/Executor.fs" />
+    <Compile Include="src/Shell/FuzzySearch.fs" />
+
+    <Compile Include="src/Mux/CallStore.fs" />
+    <Compile Include="src/Mux/AiSettings.fs" />
+    <Compile Include="src/Opencode/Actors.fs" />
+    <Compile Include="src/Opencode/MagicCore.fs" />
+    <Compile Include="src/Opencode/MagicProjection.fs" />
+    <Compile Include="src/Opencode/MagicTodo.fs" />
     <Compile Include="src/Opencode/ToolSchema.fs" />
     <Compile Include="src/Opencode/HookSchema.fs" />
-    <Compile Include="src/Opencode/NudgeState.fs" />
-    <Compile Include="src/Opencode/NudgeHook.fs" />
-    <Compile Include="src/Opencode/Session.fs" />
-    <Compile Include="src/Opencode/ExecutorActor.fs" />
-    <Compile Include="src/Opencode/MagicProjector.fs" />
-    <Compile Include="src/Opencode/Tools.fs" />
-    <Compile Include="src/Opencode/AgentConfig.fs" />
-    <Compile Include="src/Opencode/Hooks.fs" />
-    <Compile Include="src/Opencode/Plugin.fs" />
-    <!-- Mux plugin adapter (F# → JS, createRegistration export) -->
-    <Compile Include="src/Mux/ResolveAiSettings.fs" />
-    <Compile Include="src/Mux/Delegate.fs" />
-    <Compile Include="src/Mux/Prompts.fs" />
-    <Compile Include="src/Mux/CallStore.fs" />
-    <Compile Include="src/Mux/AgentTools.fs" />
-    <Compile Include="src/Mux/IoTools.fs" />
-    <Compile Include="src/Mux/WebSearchTools.fs" />
-    <Compile Include="src/Mux/ReviewTool.fs" />
-    <Compile Include="src/Mux/ToolCatalog.fs" />
+
     <Compile Include="src/Mux/Wrappers.fs" />
+    <Compile Include="src/Mux/Delegate.fs" />
+    <Compile Include="src/Mux/SubagentTools.fs" />
+    <Compile Include="src/Mux/HostTools.fs" />
+    <Compile Include="src/Mux/Dedup.fs" />
     <Compile Include="src/Mux/EventHook.fs" />
     <Compile Include="src/Mux/SlashCommands.fs" />
     <Compile Include="src/Mux/Plugin.fs" />
+
+    <Compile Include="src/Opencode/NudgeState.fs" />
+    <Compile Include="src/Opencode/NudgeHook.fs" />
+    <Compile Include="src/Opencode/Session.fs" />
+    <Compile Include="src/Opencode/Tools.fs" />
+    <Compile Include="src/Opencode/Hooks.fs" />
+    <Compile Include="src/Opencode/Plugin.fs" />
+
     <Compile Include="tests/Assert.fs" />
     <Compile Include="tests/TempWorkspace.fs" />
     <Compile Include="tests/ReviewTests.fs" />

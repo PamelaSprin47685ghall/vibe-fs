@@ -4,13 +4,13 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.JsBoundary
-open VibeFs.Kernel.Boundary
+open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Nudge
 open VibeFs.Opencode.NudgeState
 open VibeFs.Kernel.Prompts
-open VibeFs.Opencode.ChildAgent
-open VibeFs.Opencode.Magic
+open VibeFs.Opencode.MagicCore
+open VibeFs.Opencode.Actors
+open VibeFs.Opencode.MagicTodo
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
     unbox (target?(method)(arg))

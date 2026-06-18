@@ -45,16 +45,16 @@ let formatReadOutput (filePath: string) (content: string) : string =
     ]
 
 let private messageId (msg: obj) : string =
-    let info = MessageDecoder.messageInfo msg
-    if Dyn.isNullish info then "" else MessageDecoder.infoId info
+    let info = VibeFs.Kernel.Message.messageInfo msg
+    if Dyn.isNullish info then "" else VibeFs.Kernel.Message.infoId info
 
 let private messageAgent (msg: obj) : string =
-    let info = MessageDecoder.messageInfo msg
-    if Dyn.isNullish info then "" else MessageDecoder.infoAgent info
+    let info = VibeFs.Kernel.Message.messageInfo msg
+    if Dyn.isNullish info then "" else VibeFs.Kernel.Message.infoAgent info
 
 let private messageSessionID (msg: obj) : string =
-    let info = MessageDecoder.messageInfo msg
-    if Dyn.isNullish info then "" else MessageDecoder.infoSessionID info
+    let info = VibeFs.Kernel.Message.messageInfo msg
+    if Dyn.isNullish info then "" else VibeFs.Kernel.Message.infoSessionID info
 
 let hasExistingCapsMessages (messages: obj array) : bool =
     messages.Length >= 2 &&

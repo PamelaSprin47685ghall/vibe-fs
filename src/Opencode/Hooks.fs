@@ -4,15 +4,16 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.Boundary
-open VibeFs.Kernel.ToolPolicy
+open VibeFs.Kernel.Domain
+open VibeFs.Kernel.Config
 open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Kernel.MessageDecoder
-open VibeFs.Opencode.Magic
+open VibeFs.Kernel.Message
 open VibeFs.Opencode.HookSchema
-open VibeFs.Opencode.MagicProjector
+open VibeFs.Opencode.MagicCore
+open VibeFs.Opencode.MagicProjection
+open VibeFs.Opencode.MagicTodo
+open VibeFs.Opencode.Actors
 open VibeFs.Kernel.CapsFormat
-open VibeFs.Opencode.ChildAgent
 open VibeFs.Opencode.NudgeState
 open VibeFs.Shell.TreeSitterShell
 
@@ -24,44 +25,6 @@ let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
 let private resolvedUnit : JS.Promise<unit> = async { return () } |> Async.StartAsPromise
 
-let private joinReaderIntents (intents: obj) : Result<string, string> =
-    if not (Dyn.isArray intents) then Result.Error "Invalid LLM input for reader: intents must be an array of strings"
-    else
-        intents :?> obj array
-        |> Array.map string
-        |> Array.toList
-        |> String.concat "; "
-        |> Result.Ok
-
-let private joinCoderIntents (intents: obj) : Result<string, string> =
-    if not (Dyn.isArray intents) then Result.Error "Invalid LLM input for coder: intents must be an array"
-    else
-        let labels = ResizeArray<string>()
-        let mutable error = None
-        for item in intents :?> obj array do
-            if error.IsNone then
-                let pair = item :?> obj array
-                if pair.Length = 0 || not (Dyn.typeIs pair.[0] "string") then
-                    error <- Some "Invalid LLM input for coder: each intent must start with a string"
-                else
-                    labels.Add(string pair.[0])
-        match error with
-        | Some message -> Result.Error message
-        | None -> labels.ToArray() |> Array.toList |> String.concat "; " |> Result.Ok
-
-let private setUiLabel (args: obj) (tool: string) : unit =
-    let labelResult =
-        match tool with
-        | "coder" -> joinCoderIntents (Dyn.get args "intents")
-        | "reader" -> joinReaderIntents (Dyn.get args "intents")
-        | _ -> Result.Error ""
-    match labelResult with
-    | Result.Ok label when label <> "" -> setKey args "_ui" (box label)
-    | _ -> ()
-
-let private objectKeys (o: obj) : string array =
-    JS.Constructors.Object.keys(o) |> Seq.toArray
-
 let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
     if System.Object.ReferenceEquals(target, source) then ()
     else
@@ -69,6 +32,9 @@ let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
         targetObj?length <- 0
         for item in source do
             targetObj?push(item) |> ignore
+
+let private objectKeys (o: obj) : string array =
+    JS.Constructors.Object.keys(o) |> Seq.toArray
 
 let private jsTypeof (o: obj) : string = Dyn.jsType o
 
@@ -187,23 +153,23 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                 let cleaned = stripSyntheticMessages messagesArr
                 if cleaned.Length = 0 then ()
                 else
-                let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
-                let afterMagic = MagicProjector.projectMagic cleaned backlog false sessionID
-                applyReadDedup afterMagic
-                let! final =
-                    if defaultExcludedAgents |> List.contains agent then
-                        async { return afterMagic }
-                    else
-                        async {
-                            let! capsFiles = VibeFs.Shell.Caps.findCapsFiles directory |> Async.AwaitPromise
-                            return buildCapsMessages
-                                VibeFs.Shell.Crypto.sha256HexTruncated
-                                afterMagic
-                                directory
-                                defaultExcludedAgents
-                                capsFiles
-                        }
-                replaceArrayInPlace messagesArr final
+                    let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
+                    let afterMagic = projectMagic cleaned backlog false sessionID
+                    applyReadDedup afterMagic
+                    let! final =
+                        if defaultExcludedAgents |> List.contains agent then
+                            async { return afterMagic }
+                        else
+                            async {
+                                let! capsFiles = VibeFs.Shell.WorkspaceFiles.findCapsFiles directory |> Async.AwaitPromise
+                                return buildCapsMessages
+                                    VibeFs.Shell.FileSys.sha256HexTruncated
+                                    afterMagic
+                                    directory
+                                    defaultExcludedAgents
+                                    capsFiles
+                            }
+                    replaceArrayInPlace messagesArr final
     } |> Async.StartAsPromise
 
 let compactingHandler (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
@@ -222,7 +188,7 @@ let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let toolID = Dyn.str input "toolID"
         if toolID = "coder" || toolID = "reader" then
-            rewriteToolJsonSchema stripUiFromJsonSchema output
+            rewriteToolJsonSchema setKey stripUiFromJsonSchema output
         elif toolID = magicTodoToolName then
             setKey output "description" (box toolDescription)
             setKey output "jsonSchema" (buildMagicTodoSchema ())
@@ -234,7 +200,7 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
         if Dyn.isNullish args then ()
         else
             let tool = Dyn.str input "tool"
-            setUiLabel args tool
+            setUiLabel setKey args tool
     } |> Async.StartAsPromise
 
 let eventHandler (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =

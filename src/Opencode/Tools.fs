@@ -3,20 +3,17 @@ module VibeFs.Opencode.Tools
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.ExecutorKernel
-open VibeFs.Kernel.OllamaFormat
+open VibeFs.Kernel.Executor
+open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Shell.OllamaClient
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.Session
-open VibeFs.Opencode.ExecutorActor
-open VibeFs.Opencode.ChildAgent
-open VibeFs.Kernel.Prompts
+open VibeFs.Opencode.Actors
 open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.FuzzyCoordinator
-open VibeFs.Shell.FuzzyCommands
+open VibeFs.Shell.FuzzySearch
 module ToolSchemaModule = VibeFs.Opencode.ToolSchema
-module FuzzyCommandsModule = VibeFs.Shell.FuzzyCommands
+module FuzzyCommandsModule = VibeFs.Shell.FuzzySearch
 
 [<Global("Buffer")>]
 let private nodeBuffer : obj = jsNative
@@ -116,9 +113,9 @@ let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
             let intent = Dyn.str args "intent"
             let files = if Dyn.isNullish (Dyn.get args "files") then [||] else Dyn.get args "files" :?> obj array |> Array.map string
             async {
-                let! readResults = VibeFs.Shell.ReverieFiles.readReverieFiles directory (List.ofArray files) |> Async.AwaitPromise
+                let! readResults = VibeFs.Shell.WorkspaceFiles.readReverieFiles directory (List.ofArray files) |> Async.AwaitPromise
                 let sections =
-                    Array.map2 (fun file (r: VibeFs.Shell.ReverieFiles.ReverieFileResult) ->
+                    Array.map2 (fun file (r: VibeFs.Shell.WorkspaceFiles.ReverieFileResult) ->
                         { file = file; content = r.content } : MeditatorFileSection)
                         files (List.toArray readResults)
                     |> List.ofArray
@@ -144,7 +141,7 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                     { program = Dyn.str args "program"; language = lang; dependencies = deps
                       timeoutType = timeout; cwd = Some (Dyn.str tc "directory") }
                 async {
-                    let! result = VibeFs.Shell.ExecutorShell.execute options sessionID |> Async.AwaitPromise
+                    let! result = VibeFs.Shell.Executor.execute options sessionID |> Async.AwaitPromise
                     let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
                     if not (shouldSummarize byteLength output) then return prependSafetyWarning output options.program options.language
                     else

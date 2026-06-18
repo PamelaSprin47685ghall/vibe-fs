@@ -1,19 +1,94 @@
-module VibeFs.Shell.ExecutorShell
+module VibeFs.Shell.Executor
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.ExecutorKernel
-open VibeFs.Kernel.HeadTail
-open VibeFs.Shell.ExecutorHost
+open System.Text.RegularExpressions
+open VibeFs.Kernel
+open VibeFs.Kernel.Executor
 open VibeFs.Shell.ExecutorJavascript
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
 
+let private platform : string = nodeProcess?platform
+
+let private processKill (pid: int) (signal: string) : unit = nodeProcess?kill(pid, signal) |> ignore
+
+let private env () : obj =
+    let copy = createObj []
+    Dyn.assignInto copy nodeProcess?env |> ignore
+    copy
+
+[<Import("spawn", "node:child_process")>]
+let private spawn (cmd: string) (args: string array) (opts: obj) : obj = jsNative
+
+type SpawnedChild =
+    abstract member stdout: obj with get
+    abstract member stderr: obj with get
+    abstract member on: event: string * handler: obj -> unit
+    abstract member kill: signal: string -> bool
+
+let killTree (childProcess: obj) : unit =
+    let pid = childProcess?("pid")
+    if isNull pid then ()
+    else
+        let pidNum = unbox<int> pid
+        try
+            if platform = "win32" then
+                spawn "taskkill" [| "/F"; "/T"; "/PID"; string pidNum |] (box {| stdio = "ignore" |}) |> ignore
+            else
+                processKill pidNum "SIGKILL"
+        with _ ->
+            try ((childProcess :?> SpawnedChild).kill "SIGKILL") |> ignore with _ -> ()
+
+let spawnChild (command: string) (args: string array) (cwd: string) : SpawnedChild =
+    let opts =
+        box {| cwd = cwd
+               env = env ()
+               stdio = [| "ignore"; "pipe"; "pipe" |]
+               detached = platform <> "win32"
+               windowsHide = true |}
+    spawn command args opts :?> SpawnedChild
+
+let isWindows () : bool = platform = "win32"
+
+[<Import("writeFileSync", "node:fs")>]
+let private writeFileSync (path: string) (content: string) (encoding: string) : unit = jsNative
+[<Import("chmodSync", "node:fs")>]
+let private chmodSync (path: string) (mode: int) : unit = jsNative
+
+[<Import("tmpdir", "node:os")>]
+let private tmpdir () : string = jsNative
+[<Import("join", "node:path")>]
+let private join (a: string) (b: string) : string = jsNative
+[<Import("mkdirSync", "node:fs")>]
+let private mkdirSync (dir: string) (opts: obj) : unit = jsNative
+
+let executorLogDir : string = join (tmpdir ()) "omp-kunwei-executor"
+
+let private sanitizeId (id: string) : string = Regex.Replace(id, "/", "-")
+
+let createTempScript (scriptPath: string) (program: string) : string =
+    writeFileSync scriptPath program "utf-8"
+    if platform <> "win32" then chmodSync scriptPath 0o755
+    scriptPath
+
+let getExecutorProjectDir (sessionId: string option) : string =
+    match sessionId with
+    | None ->
+        let dir = join executorLogDir "executor"
+        mkdirSync dir (box {| recursive = true |})
+        dir
+    | Some sid ->
+        let dir = join executorLogDir $"executor-{sanitizeId sid}"
+        mkdirSync dir (box {| recursive = true |})
+        dir
+
+let getExecutorTempScriptPath (sessionId: string) (extension: string) : string =
+    $"{getExecutorProjectDir (Some sessionId)}/script.{extension}"
+
 type RunOutcome = { stdout: string; stderr: string; code: int option; timedOut: bool }
 
-/// Await a spawned child's completion, collecting stdout/stderr and enforcing a
-/// timeout by killing the tree.
 let private awaitChild (child: SpawnedChild) (kill: SpawnedChild -> unit) (timeoutMs: int option) : JS.Promise<RunOutcome> =
     let work =
         Async.FromContinuations(fun (resolve, reject, _) ->
@@ -49,14 +124,11 @@ let private awaitChild (child: SpawnedChild) (kill: SpawnedChild -> unit) (timeo
         )
     work |> Async.StartAsPromise
 
-
-/// Spawn a command and await it with a timeout, killing the tree on expiry.
 let spawnAndRun (command: string) (args: string array) (cwd: string) (timeoutMs: int option)
                 : JS.Promise<RunOutcome> =
     let child = spawnChild command args cwd
     awaitChild child killTree timeoutMs
 
-/// Write a program to a temp script and run it with the given interpreter.
 let runScript (interpreter: string) (interpreterArgs: string array) (cwd: string)
               (scriptPath: string) (timeoutMs: int option) : JS.Promise<RunOutcome> =
     spawnAndRun interpreter (Array.append interpreterArgs [| scriptPath |]) cwd timeoutMs
@@ -104,15 +176,12 @@ let private runJavascriptProgram (program: string) (dependencies: string list) (
 let private isErrnoException (error: obj) : bool =
     not (isNull error) && string error?("code") = "ENOENT"
 
-/// The executable name reported when a spawn fails with ENOENT.
 let missingExecutableFor (language: ExecutorLanguage) : string =
     match language with
     | Python -> "uvx"
     | Javascript -> "npx"
     | Shell -> if isWindows () then "powershell.exe" else "bash"
 
-/// Pure mapping from a raw run outcome to the typed ExecuteResult.  Extracted so
-/// the result-shaping logic is directly testable without spawning processes.
 let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcome: RunOutcome)
                : ExecuteResult =
     if outcome.timedOut then
@@ -125,13 +194,10 @@ let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcom
         | Some code -> Failed(output = if output = "" then $"exited with code {code}" else output)
         | None -> Failed(output = if output = "" then "exited with no code" else output)
 
-/// Host-injectable program runner — mirrors the original `deps.runProgram`
-/// so tests and hosts can substitute execution.
 type ExecuteDeps = {
     runProgram: string -> ExecutorLanguage -> string list -> string -> string -> int -> JS.Promise<RunOutcome>
 }
 
-/// Default deps dispatch to the language-specific runners.
 let private defaultRunProgram (program: string) (language: ExecutorLanguage) (dependencies: string list)
                               (cwd: string) (sessionId: string) (timeout: int) : JS.Promise<RunOutcome> =
     match language with
@@ -141,8 +207,6 @@ let private defaultRunProgram (program: string) (language: ExecutorLanguage) (de
 
 let defaultExecuteDeps : ExecuteDeps = { runProgram = defaultRunProgram }
 
-/// Run a program, mapping the raw outcome into the typed ExecuteResult DU.
-/// `executeWith` accepts injectable deps for testing; `execute` uses the defaults.
 let executeWith (deps: ExecuteDeps) (options: ExecuteOptions) (sessionId: string)
                 : JS.Promise<ExecuteResult> =
     async {
@@ -164,6 +228,5 @@ let executeWith (deps: ExecuteDeps) (options: ExecuteOptions) (sessionId: string
     }
     |> Async.StartAsPromise
 
-/// Run a program with the default (real) runners.
 let execute (options: ExecuteOptions) (sessionId: string) : JS.Promise<ExecuteResult> =
     executeWith defaultExecuteDeps options sessionId

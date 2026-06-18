@@ -1,14 +1,11 @@
 module VibeFs.Tests.FuzzyTests
 
 open VibeFs.Tests.Assert
-open VibeFs.Kernel.FuzzyQuery
-open VibeFs.Kernel.FuzzyFormat
-open VibeFs.Kernel.FuzzyGrepDetect
-open VibeFs.Shell.IteratorStore
+open VibeFs.Kernel.Fuzzy
+open VibeFs.Shell.FuzzySearch
 open VibeFs.Kernel
 open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.FuzzyCoordinator
-open VibeFs.Shell.FuzzyCommands
+open VibeFs.Shell.FuzzySearch
 
 let grepDetect () =
     equal "plain word" "plain" (detectGrepMode "foo")

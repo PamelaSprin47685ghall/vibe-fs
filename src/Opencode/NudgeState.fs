@@ -1,8 +1,7 @@
 module VibeFs.Opencode.NudgeState
 
 open VibeFs.Kernel
-open VibeFs.Kernel.Boundary
-open VibeFs.Kernel.JsBoundary
+open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.Prompts
 

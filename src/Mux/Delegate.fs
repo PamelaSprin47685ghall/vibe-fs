@@ -3,9 +3,9 @@ module VibeFs.Mux.Delegate
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.JsBoundary
-open VibeFs.Kernel.Boundary
-open VibeFs.Mux.ResolveAiSettings
+open VibeFs.Kernel.Domain
+open VibeFs.Mux.AiSettings
+open VibeFs.Mux.Wrappers
 
 [<Global>]
 type AbortController() =
@@ -35,53 +35,6 @@ type DelegateOutcome =
     | Report of string
     | TimedOut
 
-let internal coerceThinkingLevel (value: string) : string option =
-    let trimmed = value.Trim()
-    if trimmed = "" then None
-    elif trimmed = "med" then Some "medium"
-    elif
-        trimmed = "off"
-        || trimmed = "low"
-        || trimmed = "medium"
-        || trimmed = "high"
-        || trimmed = "xhigh"
-        || trimmed = "max"
-    then
-        Some trimmed
-    else
-        None
-
-type internal ParentRuntimeAiSettings =
-    { modelString: string option
-      thinkingLevel: string option }
-
-let private trimToOption (value: string) =
-    let trimmed = value.Trim()
-    if trimmed = "" then None else Some trimmed
-
-let private readMuxEnvSettings (muxEnv: obj) : ParentRuntimeAiSettings =
-    { modelString = Dyn.str muxEnv "MUX_MODEL_STRING" |> trimToOption
-      thinkingLevel = Dyn.str muxEnv "MUX_THINKING_LEVEL" |> coerceThinkingLevel }
-
-let private toRuntimeAiSettingsObj (settings: ParentRuntimeAiSettings) : obj =
-    match settings.modelString, settings.thinkingLevel with
-    | None, None -> null
-    | _ ->
-        let o = createObj []
-        match settings.modelString with
-        | Some modelString -> o?("modelString") <- modelString
-        | None -> ()
-        match settings.thinkingLevel with
-        | Some thinkingLevel -> o?("thinkingLevel") <- thinkingLevel
-        | None -> ()
-        o
-
-let internal buildParentRuntimeAiSettings (config: obj) : obj =
-    let muxEnv = Dyn.get config "muxEnv"
-    if Dyn.isNullish muxEnv then
-        null
-    else
-        muxEnv |> readMuxEnvSettings |> toRuntimeAiSettingsObj
 
 let private createInput
     (workspaceId: WorkspaceId)
@@ -134,7 +87,7 @@ let delegateToSubAgent
                 let opts = defaultArg options (box null)
                 let experiments = Dyn.get opts "experiments"
                 let aiSettingsAgentId = Dyn.str opts "aiSettingsAgentId"
-                let! aiSettings =
+                let! aiSettings : DelegatedAiSettings =
                     if aiSettingsAgentId = "" then
                         async { return emptySettings }
                     else
@@ -173,8 +126,7 @@ let delegateToSubAgent
                     with err ->
                         match translateJsError err with
                         | TaskWaitBackgrounded ->
-                            return
-                                $"{title} task ({taskId}) moved to background. Use task tools to monitor it."
+                            return $"{title} task ({taskId}) moved to background. Use task tools to monitor it."
                         | _ -> return raise err
             }
             |> Async.StartAsPromise
