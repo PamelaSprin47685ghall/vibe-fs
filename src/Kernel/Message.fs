@@ -1,6 +1,7 @@
 module VibeFs.Kernel.Message
 
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.HostTools
 
 let capsSynthUserPrefix = "caps-synth-user-"
 let capsSynthAssistantPrefix = "caps-synth-assistant-"
@@ -58,7 +59,7 @@ let readAssistantText (entries: obj array) (options: AssistantTextOptions option
                             if not (Dyn.isNullish text) && string text <> "" then chunks.Add(string text)
     if chunks.Count > 0 then Some(String.concat opts.joiner chunks) else None
 
-let getLatestTodoPhasesFromEntries (entries: obj array) : obj =
+let getLatestTodoPhasesFromEntriesFor (isTodoToolResult: string -> bool) (entries: obj array) : obj =
     let rec scan index =
         if index < 0 then box [||]
         else
@@ -71,13 +72,19 @@ let getLatestTodoPhasesFromEntries (entries: obj array) : obj =
             elif entryType entry <> "message" then scan (index - 1)
             else
                 let message = entryMessage entry
-                if Dyn.isNullish message || infoRole message <> "toolResult" || infoToolName message <> "todowrite" then scan (index - 1)
+                if Dyn.isNullish message || infoRole message <> "toolResult" || not (isTodoToolResult (infoToolName message)) then scan (index - 1)
                 elif infoIsError message then scan (index - 1)
                 else
                     let details = infoDetails message
                     let phases = if Dyn.isNullish details then null else Dyn.get details "phases"
                     if not (Dyn.isNullish phases) && Dyn.isArray phases then Dyn.clone phases else scan (index - 1)
     scan (entries.Length - 1)
+
+let getLatestTodoPhasesFromEntries (entries: obj array) : obj =
+    getLatestTodoPhasesFromEntriesFor (fun toolName -> toolName = "todowrite") entries
+
+let getLatestTodoPhasesFromEntriesForHost (host: Host) (entries: obj array) : obj =
+    getLatestTodoPhasesFromEntriesFor (fun toolName -> toolName = todoWriteToolName host) entries
 
 let firstPresent (keys: string list) (source: obj) : string option =
     keys |> List.tryPick (fun key -> let value = Dyn.get source key in if Dyn.isNullish value then None else Some (string value))

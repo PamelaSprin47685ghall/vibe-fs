@@ -1,5 +1,7 @@
 module VibeFs.Kernel.Prompts
 
+open VibeFs.Kernel.HostTools
+
 type SearchResult =
     { title: string
       url: string
@@ -19,20 +21,24 @@ let todoNudgePrompt =
     + "If stuck or blocked, explain the situation and ask for guidance. "
     + "If you want to skip this check, respond with <skip-todo-check />"
 
-let readOnlyRules =
+let readOnlyRulesFor (host: Host) =
     "READ-ONLY: You may only use read, search, and discovery tools. "
     + "You must NOT write, edit, patch, or create files. "
-    + "You must NOT run commands or call todo_write or any mutating tool. "
+    + "You must NOT run commands or call " + todoWritePromptName host + " or any mutating tool. "
     + "You must NOT change workspace state. Output reports only."
+
+let readOnlyRules = readOnlyRulesFor opencode
 
 let loopNudgePrompt =
     "You are in loop mode. You must call the submit_review tool to\n"
     + "submit your detailed report and list of modified files for review\n"
     + "before finishing. Do not end the conversation without calling submit_review."
 
-let managerSystemPrompt =
+let managerSystemPromptFor (host: Host) =
     "You are the manager agent. Coordinate the overall task, decide when to delegate to subagents, and synthesize their outputs into a final answer that satisfies the user's original goal.\n\n"
-    + "For multi-step work, keep todowrite current. Every todowrite call must provide the full todos list plus a detailed completedWorkReport that can survive context folding."
+    + "For multi-step work, keep " + todoWriteToolName host + " current. Every " + todoWriteToolName host + " call must provide the full todos list plus a detailed completedWorkReport that can survive context folding."
+
+let managerSystemPrompt = managerSystemPromptFor opencode
 
 let reviewCriteria =
     """# Evaluation Criteria

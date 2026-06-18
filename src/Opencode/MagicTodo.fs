@@ -1,23 +1,27 @@
 module VibeFs.Opencode.MagicTodo
 
 open System.Collections.Generic
+open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Message
 open VibeFs.Kernel.Dyn
 open VibeFs.Opencode.MagicCore
 
-let replayBacklog (messages: obj array) : BacklogEntry list =
+let replayBacklogFor (host: Host) (messages: obj array) : BacklogEntry list =
     if isNullish messages then []
     else
         let flat = flatten messages
         let backlog = ResizeArray<BacklogEntry>()
         for fp in flat do
-            if isTodoResult fp.part then
+            if isTodoResultFor host fp.part then
                 let input = partToolInput fp.part
                 if not (isNullish input) then
                     let report = str input "completedWorkReport"
                     if report.Trim() <> "" then
                         backlog.Add({ sequence = backlog.Count + 1; timestamp = ""; report = report.Trim() })
         List.ofSeq backlog
+
+let replayBacklog (messages: obj array) : BacklogEntry list =
+    replayBacklogFor opencode messages
 
 let toolDescription =
     "Manage a structured todo list and preserve a compact append-only work backlog. "
@@ -52,12 +56,14 @@ let reportDesc =
     + "Verbosity is encouraged - this report is preserved in an append-only backlog that "
     + "survives context folding, so it must contain everything future turns need."
 
-type MagicSession() =
+type MagicSession(host: Host) =
     let cache = Dictionary<string, BacklogEntry list>()
+
+    member _.Host = host
 
     member _.GetOrRebuildBacklog(sessionID: string, messages: obj array) : BacklogEntry list =
         if messages.Length > 0 then
-            let backlog = replayBacklog messages
+            let backlog = replayBacklogFor host messages
             cache.[sessionID] <- backlog
             backlog
         else

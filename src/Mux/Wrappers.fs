@@ -3,6 +3,7 @@ module VibeFs.Mux.Wrappers
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Shell.TreeSitterShell
@@ -173,8 +174,8 @@ let private mkSyntaxWrappers () : obj array =
     [| mkResultWrapper "file_edit_replace_string" (fun result args config -> applySyntaxCheck result args config)
        mkResultWrapper "file_edit_insert" (fun result args config -> applySyntaxCheck result args config) |]
 
-let private mkTodoNudgeWrapper () : obj =
-    mkSyncResultWrapper "todo_write" (fun result -> appendMeditatorNudge result)
+let private mkTodoNudgeWrapper (host: Host) : obj =
+    mkSyncResultWrapper (todoWritePromptName host) (fun result -> appendMeditatorNudge result)
 
 let private mkFileReadCapture (hostReadExec: HostReadExec) : obj =
     let wrapperFn =
@@ -232,11 +233,14 @@ let private mkAgentReportOverride (callStore: CallStore) : obj =
     createObj [ "targetTool", box "agent_report"; "wrapper", box wrapperFn ]
 
 
-let createAllWrappers (tools: obj) (hostReadExec: HostReadExec) (callStore: CallStore) : obj array =
+let createAllWrappersFor (host: Host) (tools: obj) (hostReadExec: HostReadExec) (callStore: CallStore) : obj array =
     Array.append
         (mkSyntaxWrappers ())
         [| mkFileReadCapture hostReadExec
-           mkTodoNudgeWrapper ()
+           mkTodoNudgeWrapper host
            mkAgentReportOverride callStore
            mkWebOverride "websearch" tools "web_search"
            mkWebOverride "webfetch" tools "web_fetch" |]
+
+let createAllWrappers (tools: obj) (hostReadExec: HostReadExec) (callStore: CallStore) : obj array =
+    createAllWrappersFor opencode tools hostReadExec callStore

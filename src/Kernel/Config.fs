@@ -1,5 +1,7 @@
 module VibeFs.Kernel.Config
 
+open VibeFs.Kernel.HostTools
+
 let private repo = "https://github.com/vibheksoni/stealth-browser-mcp.git"
 
 let stealthBrowserMcpRef (envValue: string) : string = if envValue = "" then "master" else envValue
@@ -11,7 +13,7 @@ type Tool = string
 
 let private knownAgents = [ "manager"; "reader"; "coder"; "reviewer"; "browser"; "meditator"; "executor" ]
 
-let canUse (agent: Agent) (tool: Tool) : bool =
+let private canUseCanonical (agent: Agent) (tool: Tool) : bool =
     let toolHas (subs: string list) = subs |> List.exists tool.Contains
     match agent with
     | _ when toolHas [ "agent_report" ] -> true
@@ -27,4 +29,12 @@ let canUse (agent: Agent) (tool: Tool) : bool =
     | "manager" -> tool <> "fuzzy_grep"
     | _ -> true
 
-let deniedTools (agent: Agent) (tools: Tool seq) : Tool list = tools |> Seq.filter (fun t -> not (canUse agent t)) |> Seq.toList
+let canUseForHost (host: Host) (agent: Agent) (tool: Tool) : bool =
+    canUseCanonical agent (normalizeToolName host tool)
+
+let canUse (agent: Agent) (tool: Tool) : bool = canUseForHost opencode agent tool
+
+let deniedToolsForHost (host: Host) (agent: Agent) (tools: Tool seq) : Tool list =
+    tools |> Seq.filter (fun tool -> not (canUseForHost host agent tool)) |> Seq.toList
+
+let deniedTools (agent: Agent) (tools: Tool seq) : Tool list = deniedToolsForHost opencode agent tools

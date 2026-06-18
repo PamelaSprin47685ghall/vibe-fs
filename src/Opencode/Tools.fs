@@ -84,7 +84,7 @@ let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
 let readerTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client = Dyn.get ctx "client"
     define reader
-        (box {| intents = call1 (call1 (arr (strMin 1 "")) "min" (box 1)) "describe" (box Params.readerIntents)
+        (box {| intents = strArrayReq Params.readerIntents
                 _ui = uiParam |})
         (fun args context ->
             match joinReaderIntents (Dyn.get args "intents") with

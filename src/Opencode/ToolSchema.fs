@@ -45,6 +45,7 @@ let intentsSchema (desc: string) : obj =
     call1 (call1 (arr inner) "min" (box 1)) "describe" (box desc)
 
 let uiParam : obj = call1 (call0 (str ()) "optional") "describe" (box "Internal: populated by hook")
+let strArrayReq (desc: string) : obj = call1 (arr (strMin 1 "")) "describe" (box desc)
 let strArrayOpt (desc: string) : obj = call1 (call0 (arr (strMin 1 "")) "optional") "describe" (box desc)
 
 let numOpt (desc: string) : obj =

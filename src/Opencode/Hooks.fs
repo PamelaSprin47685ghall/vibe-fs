@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Config
+open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Kernel.Message
 open VibeFs.Opencode.HookSchema
@@ -56,17 +57,17 @@ let private extractSessionID (messages: obj array) : string =
         let info = messageInfo messages.[0]
         if Dyn.isNullish info then "" else infoSessionID info
 
-let private resolveChatTools (agent: string) (existingTools: obj) : obj =
+let private resolveChatTools (host: Host) (agent: string) (existingTools: obj) : obj =
     let next = createObj []
     if not (Dyn.isNullish existingTools) then
         for key in objectKeys existingTools do
-            if canUse agent key then
+            if canUseForHost host agent key then
                 setKey next key (Dyn.get existingTools key)
             else
                 setKey next key (box false)
     next
 
-let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
+let chatMessageFor (host: Host) (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let agent = resolveAgent registry input
         let sessionID = Id.sessionIdQuick (Dyn.str input "sessionID")
@@ -75,8 +76,11 @@ let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.Nudge
         if not (Dyn.isNullish message) then
             let tools = Dyn.get message "tools"
             if not (Dyn.isNullish tools) then
-                setKey message "tools" (resolveChatTools agent tools)
+                setKey message "tools" (resolveChatTools host agent tools)
     } |> Async.StartAsPromise
+
+let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
+    chatMessageFor opencode registry nudgeHook input output
 
 let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
@@ -154,7 +158,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                 if cleaned.Length = 0 then ()
                 else
                     let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
-                    let afterMagic = projectMagic cleaned backlog false sessionID
+                    let afterMagic = projectMagicFor magicSession.Host cleaned backlog false sessionID
                     applyReadDedup afterMagic
                     let! final =
                         if defaultExcludedAgents |> List.contains agent then
@@ -172,7 +176,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                     replaceArrayInPlace messagesArr final
     } |> Async.StartAsPromise
 
-let compactingHandler (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
+let compactingHandlerFor (host: Host) (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let sessionID = Dyn.str input "sessionID"
         let backlog = magicSession.GetOrRebuildBacklog(sessionID, [||])
@@ -180,19 +184,25 @@ let compactingHandler (magicSession: MagicSession) (input: obj) (output: obj) : 
         else
             let context = Dyn.get output "context"
             if not (Dyn.isNullish context) && Dyn.isArray context then
-                let hint = "Preserve the latest todowrite result and the complete Magic Todo backlog in the summary. If earlier user messages are folded, rewrite them into that todo summary as work-period user updates instead of preserving raw user messages verbatim."
+                let hint = "Preserve the latest " + magicTodoToolNameFor host + " result and the complete Magic Todo backlog in the summary. If earlier user messages are folded, rewrite them into that todo summary as work-period user updates instead of preserving raw user messages verbatim."
                 (box context)?push(box hint) |> ignore
     } |> Async.StartAsPromise
 
-let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
+let compactingHandler (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
+    compactingHandlerFor opencode magicSession input output
+
+let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let toolID = Dyn.str input "toolID"
         if toolID = "coder" || toolID = "reader" then
             rewriteToolJsonSchema setKey stripUiFromJsonSchema output
-        elif toolID = magicTodoToolName then
+        elif toolID = magicTodoToolNameFor host then
             setKey output "description" (box toolDescription)
             setKey output "jsonSchema" (buildMagicTodoSchema ())
     } |> Async.StartAsPromise
+
+let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
+    toolDefinitionFor opencode input output
 
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
     async {

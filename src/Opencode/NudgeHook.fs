@@ -8,6 +8,7 @@ open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Nudge
 open VibeFs.Opencode.NudgeState
 open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.HostTools
 open VibeFs.Opencode.MagicCore
 open VibeFs.Opencode.Actors
 open VibeFs.Opencode.MagicTodo
@@ -162,7 +163,7 @@ let private startNudgeFlow (holder: StateHolder<VibeFs.Opencode.NudgeState.Nudge
 
 // ── Hook class ──
 
-type NudgeHook(ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore, registry: ChildAgentRegistry) =
+type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore, registry: ChildAgentRegistry) =
     let client = Dyn.get ctx "client"
     let holder = StateHolder<VibeFs.Opencode.NudgeState.NudgeShellState>(VibeFs.Opencode.NudgeState.emptyState)
 
@@ -183,7 +184,7 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore, re
 
     member _.handleToolExecuteAfter(input: obj) (output: obj) : JS.Promise<unit> =
         async {
-            if Dyn.str input "tool" = magicTodoToolName then
+            if normalizeToolName host (Dyn.str input "tool") = "todowrite" then
                 let out = Dyn.get output "output"
                 if not (Dyn.isNullish out) && Dyn.typeIs out "string" then
                     let s = string out
@@ -211,5 +212,5 @@ type NudgeHook(ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore, re
         | None -> ()
         resolvedUnitPromise ()
 
-let createNudgeHook (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (registry: ChildAgentRegistry) : NudgeHook =
-    NudgeHook(ctx, reviewStore, registry)
+let createNudgeHook (host: Host) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (registry: ChildAgentRegistry) : NudgeHook =
+    NudgeHook(host, ctx, reviewStore, registry)

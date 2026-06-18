@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.HostTools
 open VibeFs.Opencode.MagicCore
 open VibeFs.Opencode.MagicProjection
 open VibeFs.Opencode.MagicTodo
@@ -79,9 +80,26 @@ let private reviewMsg (id: string) (callID: string) (output: string) : obj =
                        "state",
                        box (
                            createObj
+                                [ "status", box "completed"
+                                  "input", box (createObj [ "review", box "looks good" ])
+                                  "output", box output ]
+                        ) ] |] ]
+
+let private toolMsg (toolName: string) (id: string) (callID: string) (report: string) : obj =
+    createObj
+        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
+          "parts",
+          box
+              [| createObj
+                     [ "type", box "tool"
+                       "tool", box toolName
+                       "callID", box callID
+                       "state",
+                       box (
+                           createObj
                                [ "status", box "completed"
-                                 "input", box (createObj [ "review", box "looks good" ])
-                                 "output", box output ]
+                                 "input", box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
+                                 "output", box "Todos updated." ]
                        ) ] |] ]
 
 let private backlogEntry (seq: int) (report: string) : BacklogEntry =
@@ -107,6 +125,17 @@ let replaySkipsEmpty () =
     let msgs = [| todoWriteMsg "m1" "c1" "Report A"; todoWriteMsg "m2" "c2" "" |]
     let backlog = replayBacklog msgs
     check "replay skips empty: only 1" (backlog.Length = 1)
+
+let replayBacklogForMimocodeUsesTask () =
+    let msgs = [| toolMsg "task" "m1" "c1" "Implemented parser" |]
+    let backlog = replayBacklogFor Mimocode msgs
+    check "mimocode replay: task enters backlog" (backlog.Length = 1)
+    check "mimocode replay: task report preserved" (backlog.[0].report = "Implemented parser")
+
+let replayBacklogForMimocodeIgnoresActor () =
+    let msgs = [| toolMsg "actor" "m1" "c1" "Implemented parser" |]
+    let backlog = replayBacklogFor Mimocode msgs
+    check "mimocode replay: actor does not enter backlog" (backlog.IsEmpty)
 
 let findFoldRangeTest () =
     let flat =
@@ -144,6 +173,21 @@ let projectMagicNoFold () =
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2" ]
     let r = projectMagic msgs backlog false "test"
     check "magic no fold: passthrough" (obj.ReferenceEquals(r, msgs))
+
+let projectMagicForMimocodeUsesTask () =
+    let msgs =
+        [| userMsg "u1" "start"
+           toolMsg "task" "m1" "c1" "Report 1"
+           toolMsg "task" "m2" "c2" "Report 2"
+           toolMsg "task" "m3" "c3" "Report 3" |]
+
+    let backlog = [ backlogEntry 1 "Report 1"; backlogEntry 2 "Report 2"; backlogEntry 3 "Report 3" ]
+    let r = projectMagicFor Mimocode msgs backlog false "test"
+    let allJson: string = Fable.Core.JS.JSON.stringify (r)
+    check "mimocode project: has prefix" (allJson.Contains(magicTodoPrefixPrefix))
+    check "mimocode project: has Report 1" (allJson.Contains("Report 1"))
+    check "mimocode project: latest report present" (allJson.Contains("Report 3"))
+    check "mimocode project: does not rely on todowrite" (not (allJson.Contains("todowrite")))
 
 let projectMagicHidesErrors () =
     let msgs =
@@ -241,8 +285,16 @@ let projectMagicPrefixStaysStableWhenGrowing () =
     let sharedPrefix4: string = Fable.Core.JS.JSON.stringify (projected4.[0..2])
     check "magic prefix: stable growth keeps shared prefix JSON identical" (sharedPrefix3 = sharedPrefix4)
 
+let magicSessionRefreshesBacklogForMimocode () =
+    let session = MagicSession(Mimocode)
+    let first = [| toolMsg "task" "m1" "c1" "R1" |]
+    let second = [| toolMsg "task" "m1" "c1" "R1"; toolMsg "task" "m2" "c2" "R2" |]
+    let _ = session.GetOrRebuildBacklog("test", first)
+    let backlog = session.GetOrRebuildBacklog("test", second)
+    check "mimocode session: rebuilds refreshed backlog" (backlog.Length = 2)
+
 let magicSessionRefreshesBacklog () =
-    let session = MagicSession()
+    let session = MagicSession(Opencode)
     let first = [| todoWriteMsg "m1" "c1" "R1" |]
     let second = [| todoWriteMsg "m1" "c1" "R1"; todoWriteMsg "m2" "c2" "R2" |]
     let _ = session.GetOrRebuildBacklog("test", first)
@@ -259,13 +311,17 @@ let run () =
     replayBacklogTest ()
     replayEmpty ()
     replaySkipsEmpty ()
+    replayBacklogForMimocodeUsesTask ()
+    replayBacklogForMimocodeIgnoresActor ()
     findFoldRangeTest ()
     projectMagicFolds ()
     projectMagicNoFold ()
+    projectMagicForMimocodeUsesTask ()
     projectMagicHidesErrors ()
     projectMagicDropsFoldedUserMessages ()
     projectMagicKeepsReviewInFold ()
     projectMagicPrefixUsesTodoTime ()
     projectMagicPrefixStaysStableWhenGrowing ()
     magicSessionRefreshesBacklog ()
+    magicSessionRefreshesBacklogForMimocode ()
     buildBacklogTextTest ()

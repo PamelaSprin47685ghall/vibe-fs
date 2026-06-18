@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <Compile Include="src/Kernel/Dyn.fs" />
+    <Compile Include="src/Kernel/HostTools.fs" />
     <Compile Include="src/Kernel/Prompts.fs" />
     <Compile Include="src/Kernel/ReviewSession.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />
@@ -59,6 +60,7 @@
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/Hooks.fs" />
     <Compile Include="src/Opencode/Plugin.fs" />
+    <Compile Include="src/Opencode/MimoPlugin.fs" />
 
     <Compile Include="tests/Assert.fs" />
     <Compile Include="tests/TempWorkspace.fs" />

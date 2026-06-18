@@ -94,6 +94,98 @@ let configSpec () = async {
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
+let mimoConfigSpec () = async {
+    let! workspaceDir = mkdtempAsync "mimo-plugin-config-" |> Async.AwaitPromise
+    let! p = VibeFs.Opencode.MimoPlugin.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    pluginShape p
+    let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>> |> Async.AwaitPromise
+    let agents = get cfg "agent"
+    let manager = get agents "manager"
+    let managerPermissions = get manager "permission"
+    check "mimo manager permission.task allow" (str managerPermissions "task" = "allow")
+    check "mimo manager permission.actor deny" (str managerPermissions "actor" = "deny")
+    let managerTools = get manager "tools"
+    check "mimo manager tools.task present" (not (isNullish (get managerTools "task")))
+    check "mimo manager tools.actor false" (unbox<bool> (get managerTools "actor") = false)
+    let todoDef = createObj [ "description", box "old desc"; "parameters", box (createObj []) ]
+    do! (get p "tool.definition") $ (createObj [ "toolID", box "task" ], todoDef) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo tool.definition rewrites task description" (str todoDef "description" |> fun text -> text.Contains("append-only work backlog"))
+
+    let sessionID = "mimo-session-1"
+    let makeTaskMessage id report =
+        box (createObj [
+            "info", box (createObj [
+                "id", box id
+                "sessionID", box sessionID
+                "role", box "toolResult"
+                "time", box (createObj [ "created", box 0 ])
+                "agent", box "orchestrator"
+                "model", box (createObj [ "providerID", box ""; "modelID", box "" ])
+            ])
+            "parts", box [|
+                box (createObj [
+                    "type", box "tool"
+                    "tool", box "task"
+                    "state", box (createObj [
+                        "status", box "completed"
+                        "input", box (createObj [ "completedWorkReport", box report ])
+                        "output", box report
+                    ])
+                ])
+            |]
+        ])
+    let makeUserMessage id text =
+        box (createObj [
+            "info", box (createObj [
+                "id", box id
+                "sessionID", box sessionID
+                "role", box "user"
+                "time", box (createObj [ "created", box 0 ])
+                "agent", box "orchestrator"
+                "model", box (createObj [ "providerID", box ""; "modelID", box "" ])
+            ])
+            "parts", box [| box (createObj [ "type", box "text"; "text", box text ]) |]
+        ])
+
+    let messages = [|
+        makeTaskMessage "mimo-msg-1" "First report from the first task."
+        makeUserMessage "mimo-user-1" "Fold this user note into the summary."
+        makeTaskMessage "mimo-msg-2" "Second report from the second task."
+        makeUserMessage "mimo-user-2" "Keep this user detail in the projection."
+        makeTaskMessage "mimo-msg-3" "Third report from the final task."
+    |]
+    let output = createObj [ "messages", box messages ]
+    do! (get p "experimental.chat.messages.transform") $ (createObj [ "agent", box "reader" ], output) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let transformedMessages = unbox<obj[]> (get output "messages")
+    let prefixMessages = transformedMessages |> Array.filter (fun message -> str (get message "info") "id" |> fun id -> id.StartsWith("magic-todo-prefix-"))
+    check "mimo messages.transform emits folded prefix messages" (prefixMessages.Length = 2)
+    check "mimo messages.transform prefix keeps folded user note" (
+        prefixMessages
+        |> Array.exists (fun message ->
+            let parts = unbox<obj[]> (get message "parts")
+            str parts.[0] "text" |> fun text -> text.Contains("Fold this user note"))
+    )
+    let projectedMessage = transformedMessages |> Array.find (fun message -> str (get message "info") "id" = "mimo-msg-1")
+    let projectedParts = unbox<obj[]> (get projectedMessage "parts")
+    let projectedOutput = str (get projectedParts.[0] "state") "output"
+    check "mimo messages.transform projects backlog content" (
+        projectedOutput.Contains("First report from the first task.")
+        && projectedOutput.Contains("Second report from the second task.")
+        && projectedOutput.Contains("Fold this user note into the summary.")
+    )
+
+    let compactingContext = [||]
+    let compactingOutput = createObj [ "context", box compactingContext ]
+    do! (get p "experimental.session.compacting") $ (createObj [ "sessionID", box sessionID ], compactingOutput) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let compactingContextAfter = unbox<obj[]> (get compactingOutput "context")
+    check "mimo session.compacting uses task naming" (
+        compactingContextAfter.Length = 1
+        && (string compactingContextAfter.[0]).Contains("task")
+        && not ((string compactingContextAfter.[0]).Contains("todowrite"))
+    )
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
 let run () : JS.Promise<unit> =
     async {
         let! workspaceDir = mkdtempAsync "plugin-run-" |> Async.AwaitPromise
@@ -107,6 +199,7 @@ let run () : JS.Promise<unit> =
         slashCommandsSpec reg
         countsSpec reg
         do! configSpec ()
+        do! mimoConfigSpec ()
         do! rmAsync workspaceDir |> Async.AwaitPromise
     }
     |> Async.StartAsPromise

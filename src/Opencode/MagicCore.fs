@@ -2,9 +2,11 @@ module VibeFs.Opencode.MagicCore
 
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Message
 
-let magicTodoToolName = "todowrite"
+let magicTodoToolNameFor (host: Host) : string = todoWriteToolName host
+let magicTodoToolName = magicTodoToolNameFor opencode
 let magicReviewToolName = "submit_review"
 
 type BacklogEntry =
@@ -12,15 +14,28 @@ type BacklogEntry =
       timestamp: string
       report: string }
 
-let isTodoResult (part: obj) : bool =
+let isTodoResultFor (host: Host) (part: obj) : bool =
     partIsTool part
-    && partToolName part = magicTodoToolName
+    && partToolName part = magicTodoToolNameFor host
     && partToolStatus part = "completed"
 
-let isTodoError (part: obj) : bool =
+let isTodoResult (part: obj) : bool =
+    isTodoResultFor opencode part
+
+let isTodoErrorFor (host: Host) (part: obj) : bool =
     partIsTool part
-    && partToolName part = magicTodoToolName
+    && partToolName part = magicTodoToolNameFor host
     && partToolStatus part = "error"
+
+let isTodoError (part: obj) : bool =
+    isTodoErrorFor opencode part
+
+let lastTodoErrorTextFor (host: Host) (flat: FlatPart list) : string option =
+    let mutable last = None
+    for fp in flat do
+        if isTodoErrorFor host fp.part then
+            last <- Some(partToolError fp.part)
+    last
 
 let isReviewTool (part: obj) : bool =
     partIsTool part && partToolName part = magicReviewToolName
@@ -53,8 +68,4 @@ let buildBacklogText (backlog: BacklogEntry list) (userPrompts: string list) : s
         String.concat sectionSep parts
 
 let lastTodoErrorText (flat: FlatPart list) : string option =
-    let mutable last = None
-    for fp in flat do
-        if isTodoError fp.part then
-            last <- Some(partToolError fp.part)
-    last
+    lastTodoErrorTextFor opencode flat

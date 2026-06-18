@@ -14,6 +14,7 @@ open VibeFs.Opencode.Session
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Opencode.Actors
 open VibeFs.Opencode.MagicTodo
+open VibeFs.Kernel.HostTools
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -52,34 +53,25 @@ let private builtinAgentSpecs =
 let private tryFindBuiltinAgent name =
     builtinAgentSpecs |> List.tryFind (fun spec -> spec.name = name)
 
-let private allToolNames =
-    [ "coder"; "reader"; "meditator"; "browser"; "executor"
-      "fuzzy_find"; "fuzzy_grep"; "websearch"; "webfetch"
-      "submit_review"; "return_reviewer"; "read"; "write"
-      "bash"; "task"; "grep"; "edit"; "patch"; "apply_patch"
-      "todowrite"; "todo_write"; "stealth-browser-mcp_*"
-      "question"; "ask_user_question"; "agent_report"
-      "glob"; "skill" ]
-
 let private mergeObj (a: obj) (b: obj) : obj =
     let result = emptyObj ()
     Dyn.assignInto result a |> ignore
     Dyn.assignInto result b |> ignore
     result
 
-let private toolDefaults (agentName: string) : obj =
+let private toolDefaultsFor (host: Host) (agentName: string) : obj =
     let o = emptyObj ()
-    for name in allToolNames do
-        setKey o name (box (canUse agentName name))
+    for name in allToolNames host do
+        setKey o name (box (canUseForHost host agentName name))
     o
 
-let private permissionDefaults (agentName: string) : obj =
+let private permissionDefaultsFor (host: Host) (agentName: string) : obj =
     let o = emptyObj ()
-    for name in allToolNames do
-        setKey o name (box (if canUse agentName name then "allow" else "deny"))
+    for name in allToolNames host do
+        setKey o name (box (if canUseForHost host agentName name then "allow" else "deny"))
     o
 
-let private withRoleDefaults (name: string) (userAgent: obj) : obj =
+let private withRoleDefaultsFor (host: Host) (name: string) (userAgent: obj) : obj =
     let spec = tryFindBuiltinAgent name
     let userPrompt = Dyn.str userAgent "prompt"
     let prompt =
@@ -102,8 +94,8 @@ let private withRoleDefaults (name: string) (userAgent: obj) : obj =
         else
             userMcps
 
-    let perm = mergeObj (permissionDefaults name) userPerm
-    let tools = mergeObj (toolDefaults name) userTools
+    let perm = mergeObj (permissionDefaultsFor host name) userPerm
+    let tools = mergeObj (toolDefaultsFor host name) userTools
     let result = mergeObj (emptyObj ()) userAgent
     setKey result "prompt" (box prompt)
     setKey result "mode" (box effectiveMode)
@@ -115,7 +107,7 @@ let private withRoleDefaults (name: string) (userAgent: obj) : obj =
 let private objectKeys (o: obj) : string array =
     JS.Constructors.Object.keys(o) |> Seq.toArray
 
-let applyAgentConfig (opencodeConfig: obj) (mcps: obj) : obj =
+let applyAgentConfigFor (host: Host) (opencodeConfig: obj) (mcps: obj) : obj =
     let userAgent = if Dyn.isNullish (Dyn.get opencodeConfig "agent") then emptyObj () else Dyn.get opencodeConfig "agent"
     let configMcp = Dyn.get opencodeConfig "mcp"
     let mergedMcp = if Dyn.isNullish configMcp then mcps else mergeObj configMcp mcps
@@ -126,7 +118,7 @@ let applyAgentConfig (opencodeConfig: obj) (mcps: obj) : obj =
     for name in objectKeys agents do
         let ua = Dyn.get agents name
         let uaObj = if Dyn.isNullish ua then emptyObj () else ua
-        setKey finalAgents name (withRoleDefaults name uaObj)
+        setKey finalAgents name (withRoleDefaultsFor host name uaObj)
     mergeObj opencodeConfig (box {| agent = finalAgents; mcp = mergedMcp |})
 
 let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
@@ -194,16 +186,14 @@ let private registerCommands (cfg: obj) : unit =
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<obj, obj, JS.Promise<unit>>(f))
 
-/// The legacy opencode plugin hook builder.
-[<ExportDefault>]
-let plugin (ctx: obj) : JS.Promise<obj> =
+let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
     async {
         let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
         let childAgentRegistry = ChildAgentRegistry.Create()
         let finderCache = FinderCache()
-        let nudgeHook = createNudgeHook ctx reviewStore childAgentRegistry
+        let nudgeHook = createNudgeHook host ctx reviewStore childAgentRegistry
         let directory = Dyn.str ctx "directory"
-        let magicSession = MagicSession()
+        let magicSession = MagicSession host
         let tools = createTools childAgentRegistry finderCache ctx reviewStore
         let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
         let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
@@ -214,12 +204,12 @@ let plugin (ctx: obj) : JS.Promise<obj> =
         setKey result "tool" tools
         setKey result "config" (box (fun (cfg: obj) ->
             (async {
-                let next = applyAgentConfig cfg mcpMap
+                let next = applyAgentConfigFor host cfg mcpMap
                 registerCommands cfg
                 return assignInto cfg next
             } |> Async.StartAsPromise)))
-        setKey result "chat.message" (twoArgHook (fun input output -> chatMessage childAgentRegistry nudgeHook input output))
-        setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinition input output))
+        setKey result "chat.message" (twoArgHook (fun input output -> chatMessageFor host childAgentRegistry nudgeHook input output))
+        setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
         setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBefore input output))
         setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfter directory nudgeHook input output))
         setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform childAgentRegistry directory magicSession input output))
@@ -233,7 +223,12 @@ let plugin (ctx: obj) : JS.Promise<obj> =
                 do! Hooks.eventHandler reviewStore input |> Async.AwaitPromise
                 do! nudgeHook.handleEvent input |> Async.AwaitPromise
             } |> Async.StartAsPromise))
-        setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandler magicSession input output))
+        setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host magicSession input output))
         return result
     }
     |> Async.StartAsPromise
+
+/// The legacy opencode plugin hook builder.
+[<ExportDefault>]
+let plugin (ctx: obj) : JS.Promise<obj> =
+    pluginFor opencode ctx
