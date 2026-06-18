@@ -164,14 +164,9 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
             try
                 try
                     let promptBody =
-                        box {|
-                            path = box {| id = childID |}
-                            body = box {|
-                                agent = agent
-                                parts = [| box {| ``type`` = "text"; text = prompt |} |]
-                                tools = tools
-                            |}
-                        |}
+                        let body = box {| agent = agent; parts = [| box {| ``type`` = "text"; text = prompt |} |] |}
+                        let body = if Dyn.isNullish tools then body else Dyn.withKey body "tools" tools
+                        box {| path = box {| id = childID |}; body = body |}
                     do! promptWithAbort client promptBody (getAbortSignal context) |> Async.AwaitPromise
                     let! text = extractSessionText client childID directory |> Async.AwaitPromise
                     return if text = "" then "(no output)" else text
