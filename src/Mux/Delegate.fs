@@ -1,11 +1,11 @@
-module VibeFs.MuxPlugin.Delegate
+module VibeFs.Mux.Delegate
 
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.JsBoundary
 open VibeFs.Kernel.Boundary
-open VibeFs.MuxPlugin.ResolveAiSettings
+open VibeFs.Mux.ResolveAiSettings
 
 [<Global>]
 type AbortController() =
@@ -69,10 +69,10 @@ let private toRuntimeAiSettingsObj (settings: ParentRuntimeAiSettings) : obj =
     | _ ->
         let o = createObj []
         match settings.modelString with
-        | Some modelString -> o?modelString <- modelString
+        | Some modelString -> o?("modelString") <- modelString
         | None -> ()
         match settings.thinkingLevel with
-        | Some thinkingLevel -> o?thinkingLevel <- thinkingLevel
+        | Some thinkingLevel -> o?("thinkingLevel") <- thinkingLevel
         | None -> ()
         o
 
@@ -94,23 +94,23 @@ let private createInput
     (experiments: obj)
     : obj =
     let o = createObj []
-    o?parentWorkspaceId <- Id.workspaceIdValue workspaceId
-    o?kind <- "agent"
-    o?agentId <- agentId
-    o?prompt <- prompt
-    o?title <- title
-    o?experiments <- experiments
+    o?("parentWorkspaceId") <- Id.workspaceIdValue workspaceId
+    o?("kind") <- "agent"
+    o?("agentId") <- agentId
+    o?("prompt") <- prompt
+    o?("title") <- title
+    o?("experiments") <- experiments
 
     match modelString with
-    | Some m when m.Trim() <> "" -> o?modelString <- m
+    | Some m when m.Trim() <> "" -> o?("modelString") <- m
     | _ -> ()
 
     match thinkingLevel with
-    | Some t when t.Trim() <> "" -> o?thinkingLevel <- t
+    | Some t when t.Trim() <> "" -> o?("thinkingLevel") <- t
     | _ -> ()
 
     if not (Dyn.isNullish parentRuntimeAiSettings) then
-        o?parentRuntimeAiSettings <- parentRuntimeAiSettings
+        o?("parentRuntimeAiSettings") <- parentRuntimeAiSettings
 
     o
 

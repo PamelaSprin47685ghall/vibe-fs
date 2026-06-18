@@ -3,7 +3,77 @@ module VibeFs.Mux.Dedup
 open VibeFs.Kernel.Dedup
 open VibeFs.Kernel
 open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Mux.PartDecoder
+
+type ReadPart =
+    { output: obj
+      input: obj
+      toolName: string
+      state: string
+      partType: string }
+
+let tryDecodeReadPart (part: obj) : ReadPart option =
+    let toolName = Dyn.str part "toolName"
+    let partType = Dyn.str part "type"
+    let state = Dyn.str part "state"
+    let output = Dyn.get part "output"
+    if Dyn.isNullish output then None
+    else
+        let input = Dyn.get part "input"
+        if not (Dyn.isNullish input) then
+            Some { output = output; input = input; toolName = toolName; state = state; partType = partType }
+        else
+            let st = Dyn.get part "state"
+            if Dyn.isNullish st then None
+            else
+                let inp = Dyn.get st "input"
+                Some { output = output; input = inp; toolName = toolName; state = state; partType = partType }
+
+let readPartOutputKey (output: obj) : string =
+    if Dyn.isNullish output then ""
+    elif Dyn.typeIs output "string" then string output
+    else
+        let content = Dyn.get output "content"
+        if Dyn.isNullish content then "" else string content
+
+let readPartPath (rp: ReadPart) : string =
+    match extractFilePaths rp.input with
+    | path :: _ -> path
+    | [] -> ""
+
+type ModelReadPart =
+    { output: obj
+      input: obj
+      toolName: string
+      partType: string
+      outputType: string
+      outputValue: obj }
+
+let tryDecodeModelReadPart (part: obj) : ModelReadPart option =
+    let toolName = Dyn.str part "toolName"
+    let partType = Dyn.str part "type"
+    let output = Dyn.get part "output"
+    if Dyn.isNullish output then None
+    else
+        let outputType = Dyn.str output "type"
+        let outputValue = Dyn.get output "value"
+        let input = Dyn.get part "input"
+        Some { output = output; input = input; toolName = toolName; partType = partType
+               outputType = outputType; outputValue = outputValue }
+
+let modelReadPartOutputKey (part: ModelReadPart) : string =
+    let value = part.outputValue
+    if part.outputType = "text" && not (Dyn.isNullish value) then string value
+    elif part.outputType = "json" && not (Dyn.isNullish value) then readPartOutputKey value
+    else ""
+
+let modelReadPartPath (part: ModelReadPart) : string =
+    match extractFilePaths part.input with
+    | path :: _ -> path
+    | [] -> ""
+
+let messageParts (msg: obj) : obj = Dyn.get msg "parts"
+
+let messageContent (msg: obj) : obj = Dyn.get msg "content"
 
 /// Tool names that represent a file-read operation across hosts.  The OpenCode
 /// host names the tool `read`; the Mux host names it `file_read`.
@@ -16,7 +86,6 @@ let private classifyMuxReadPart (part: obj) =
         if key.Length > 0 then Some(readPartPath rp, key) else None
     | _ -> None
 
-/// Dedup within one path scope; returns updated map entry for that path.
 let private dedupForPath (seenByPath: Map<string, string list>) (pathKey: string) (current: string) =
     let pathSeen = Map.tryFind pathKey seenByPath |> Option.defaultValue []
     let verdict, nextState =
@@ -27,7 +96,6 @@ let private dedupForPath (seenByPath: Map<string, string list>) (pathKey: string
         | NewContent payload -> payload.content
     (Map.add pathKey nextState.seenContents seenByPath, nextOutput, verdict)
 
-/// Fold read-output keys from Mux dynamic-tool parts into per-path seen state (message order).
 let private foldMuxReadPartsIntoSeenByPath (seenByPath: Map<string, string list>) (messages: obj array) : Map<string, string list> =
     let foldPart acc part =
         match classifyMuxReadPart part with
@@ -45,7 +113,6 @@ let private foldMuxReadPartsIntoSeenByPath (seenByPath: Map<string, string list>
 
     messages |> Array.fold foldMessage seenByPath
 
-/// Pure: fold read-output dedup over messages, scoped by file path when known.
 let deduplicateReadOutputsWithSeenByPath
     (seenByPath: Map<string, string list>)
     (messages: obj array)
@@ -97,10 +164,6 @@ let deduplicateReadOutputsWithSeen
         else Map.add "" seenOutputs Map.empty
     deduplicateReadOutputsWithSeenByPath seenByPath messages
 
-/// Pure: fold `deduplicate` over read tool-result parts inside ModelMessage
-/// arrays, returning the final `seenOutputs` and any replacements in the
-/// provided messages.  This handles the AI SDK `ToolResultPart` shape where the
-/// useful payload lives at `output.value` rather than directly on `output`.
 let deduplicateModelReadOutputsWithSeen
     (previouslySeenOutputs: string list)
     (messages: obj array)
@@ -152,16 +215,12 @@ let deduplicateModelReadOutputsWithSeen
                             Dyn.withKey msg "content" (box (Array.ofSeq newContent)))
     List.rev seenOutputs, if anyChanged then result else messages
 
-/// Backwards-compatible one-shot deduplication: only compares read outputs
-/// against each other within the supplied messages.
 let deduplicateReadOutputs (messages: obj array) : obj array =
     deduplicateReadOutputsWithSeen [] messages |> snd
 
-/// One-shot deduplication for AI SDK ModelMessage arrays.
 let deduplicateModelReadOutputs (messages: obj array) : obj array =
     deduplicateModelReadOutputsWithSeen [] messages |> snd
 
-/// Extract read-output keys from Mux dynamic-tool parts in message order.
 let private collectMuxReadOutputsInOrder (messages: obj array) : string list =
     let mutable outputs = []
     for msg in messages do
@@ -177,12 +236,8 @@ let private collectMuxReadOutputsInOrder (messages: obj array) : string list =
                     | _ -> ()
     List.rev outputs
 
-/// Collect per-path read-output seen state from history (Mux dynamic-tool shape).
-/// Used to seed `deduplicateReadOutputsWithSeenByPath` before folding the active window.
 let collectReadOutputsByPath (messages: obj array) : Map<string, string list> =
     foldMuxReadPartsIntoSeenByPath Map.empty messages
 
-/// Collect read outputs from an arbitrary message array as a flat list (legacy API).
-/// Prefer `collectReadOutputsByPath` when history includes path-scoped reads.
 let collectReadOutputs (messages: obj array) : string list =
     collectMuxReadOutputsInOrder messages

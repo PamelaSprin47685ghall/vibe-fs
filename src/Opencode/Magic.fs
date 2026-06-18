@@ -1,4 +1,36 @@
-module VibeFs.Opencode.MagicPrompts
+module VibeFs.Opencode.Magic
+
+open System.Collections.Generic
+open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.PartStream
+
+let magicTodoToolName = "todowrite"
+let magicReviewToolName = "submit_review"
+
+type BacklogEntry =
+    { sequence: int
+      timestamp: string
+      report: string }
+
+type MagicState = { backlog: BacklogEntry list }
+let emptyMagicState = { backlog = [] }
+
+let private isCompletedTodo (part: obj) : bool =
+    partIsTool part && partToolName part = magicTodoToolName && partToolStatus part = "completed"
+
+let replayBacklog (messages: obj array) : BacklogEntry list =
+    if isNullish messages then []
+    else
+        let flat = flatten messages
+        let backlog = ResizeArray<BacklogEntry>()
+        for fp in flat do
+            if isCompletedTodo fp.part then
+                let input = partToolInput fp.part
+                if not (isNullish input) then
+                    let report = str input "completedWorkReport"
+                    if report.Trim() <> "" then
+                        backlog.Add({ sequence = backlog.Count + 1; timestamp = ""; report = report.Trim() })
+        List.ofSeq backlog
 
 let toolDescription =
     "Manage a structured todo list and preserve a compact append-only work backlog. "
@@ -30,5 +62,21 @@ let reportDesc =
     + "Must include: 1) what work was done and why, 2) key files read or written (full paths), "
     + "3) any gotchas or non-obvious issues discovered, 4) lessons learned for future developers. "
     + "For initial planning, explicitly say that no implementation work has completed yet and summarize the planning change. "
-    + "Verbosity is encouraged — this report is preserved in an append-only backlog that "
+    + "Verbosity is encouraged - this report is preserved in an append-only backlog that "
     + "survives context folding, so it must contain everything future turns need."
+
+type MagicSession() =
+    let cache = Dictionary<string, BacklogEntry list>()
+
+    member _.GetOrRebuildBacklog(sessionID: string, messages: obj array) : BacklogEntry list =
+        if messages.Length > 0 then
+            let backlog = replayBacklog messages
+            cache.[sessionID] <- backlog
+            backlog
+        else
+            match cache.TryGetValue sessionID with
+            | true, backlog -> backlog
+            | false, _ -> []
+
+    member _.Invalidate(sessionID: string) =
+        cache.Remove(sessionID) |> ignore

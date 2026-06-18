@@ -3,9 +3,8 @@ module VibeFs.Opencode.MagicProjector
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.MessageDecoder
-open VibeFs.Opencode.MagicTypes
+open VibeFs.Opencode.Magic
 open VibeFs.Kernel.PartStream
-open VibeFs.Kernel.SyntheticIds
 
 let isTodoResult (part: obj) : bool =
     partIsTool part

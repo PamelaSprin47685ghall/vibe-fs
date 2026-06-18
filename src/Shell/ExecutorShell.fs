@@ -4,9 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.ExecutorKernel
 open VibeFs.Kernel.HeadTail
-open VibeFs.Shell.ExecutorProcess
-open VibeFs.Shell.ExecutorScript
-open VibeFs.Shell.ExecutorPaths
+open VibeFs.Shell.ExecutorHost
 open VibeFs.Shell.ExecutorJavascript
 
 [<Global("process")>]
@@ -65,14 +63,14 @@ let runScript (interpreter: string) (interpreterArgs: string array) (cwd: string
 
 let private runShellProgram (program: string) (cwd: string) (sessionId: string) (timeoutMs: int) : JS.Promise<RunOutcome> =
     let extension = if isWindows () then "ps1" else "sh"
-    let scriptPath = createTempScript (getTempScriptPath sessionId extension) program
+    let scriptPath = createTempScript (getExecutorTempScriptPath sessionId extension) program
     if isWindows ()
     then runScript "powershell.exe" [| "-ExecutionPolicy"; "Bypass"; "-File" |] cwd scriptPath (Some timeoutMs)
     else runScript "bash" [||] cwd scriptPath (Some timeoutMs)
 
 let private runPythonProgram (program: string) (dependencies: string list) (cwd: string)
                              (sessionId: string) (timeoutMs: int) : JS.Promise<RunOutcome> =
-    let scriptPath = createTempScript (getTempScriptPath sessionId "py") program
+    let scriptPath = createTempScript (getExecutorTempScriptPath sessionId "py") program
     let baseArgs = ResizeArray([ "--isolated" ])
     dependencies |> List.iter (fun dep -> baseArgs.Add "--with"; baseArgs.Add dep)
     let warmup () =
@@ -155,8 +153,7 @@ let executeWith (deps: ExecuteDeps) (options: ExecuteOptions) (sessionId: string
             let! outcome =
                 deps.runProgram program options.language options.dependencies cwd sessionId timeout
                 |> Async.AwaitPromise
-            let combined = (outcome.stdout + outcome.stderr).Trim()
-            let output = formatSafetyWarning combined options.program options.language
+            let output = (outcome.stdout + outcome.stderr).Trim()
             return mapOutcome options timeout output outcome
         with error ->
             if isErrnoException error then

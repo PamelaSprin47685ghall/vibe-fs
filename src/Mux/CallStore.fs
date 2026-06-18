@@ -1,4 +1,4 @@
-module VibeFs.MuxPlugin.CallStore
+module VibeFs.Mux.CallStore
 
 open Fable.Core
 open Fable.Core.JsInterop

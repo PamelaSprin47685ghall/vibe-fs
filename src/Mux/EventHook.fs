@@ -1,24 +1,69 @@
-module VibeFs.MuxPlugin.MuxEventHook
+module VibeFs.Mux.EventHook
 
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.Prompts
-open VibeFs.Mux.StreamEnd
 open VibeFs.Shell.NudgeStore
-open VibeFs.MuxPlugin.EventDecoder
 
 type private NudgeRequest =
     { workspaceId: string
       context: NudgeContext
       previousAction: NudgeAction option }
 
+type private DecodedHookEvent =
+    { eventType: string
+      workspaceId: string
+      properties: obj
+      metadata: obj
+      stopReason: string
+      errorType: string }
+
 type private HookEvent =
     | Ignore
     | StreamEnd of properties: obj
     | StreamAbort of workspaceId: string
     | AbortedError of workspaceId: string
+
+type private StreamEndState =
+    { stoppedWorkspaces: System.Collections.Generic.HashSet<string>
+      retryPendingWorkspaces: System.Collections.Generic.HashSet<string>
+      deliveredCounts: System.Collections.Generic.Dictionary<string, int>
+      lastNudgeActions: System.Collections.Generic.Dictionary<string, NudgeAction> }
+
+let private selectNudgePrompt (action: string) (todoPrompt: string) (loopPrompt: string) : string option =
+    match action with
+    | "nudge-todo" -> Some todoPrompt
+    | "nudge-loop" -> Some loopPrompt
+    | _ -> None
+
+let private createStreamEndState () : StreamEndState =
+    { stoppedWorkspaces = System.Collections.Generic.HashSet<string>()
+      retryPendingWorkspaces = System.Collections.Generic.HashSet<string>()
+      deliveredCounts = System.Collections.Generic.Dictionary<string, int>()
+      lastNudgeActions = System.Collections.Generic.Dictionary<string, NudgeAction>() }
+
+let private decodeHookEvent (event: obj) : DecodedHookEvent =
+    let props = Dyn.get event "properties"
+    let meta = if Dyn.isNullish props then null else Dyn.get props "metadata"
+    { eventType = if Dyn.isNullish event then "" else Dyn.str event "type"
+      workspaceId = Dyn.str event "workspaceId"
+      properties = if Dyn.isNullish props then null else props
+      metadata = meta
+      stopReason = if Dyn.isNullish meta then "" else Dyn.str meta "muxStopReason"
+      errorType = if Dyn.isNullish props then "" else Dyn.str props "errorType" }
+
+let private getLastAssistantText (properties: obj) : string =
+    if Dyn.isNullish properties then ""
+    else
+        let parts = Dyn.get properties "parts"
+        if Dyn.isNullish parts || not (Dyn.isArray parts) then ""
+        else
+            (parts :?> obj array)
+            |> Array.filter (fun p -> Dyn.str p "type" = "text")
+            |> Array.map (fun p -> Dyn.str p "text")
+            |> String.concat "\n"
 
 let private parseHookEvent (event: obj) : HookEvent =
     let decoded = decodeHookEvent event
@@ -88,7 +133,6 @@ let private handleNudgeRequest (state: StreamEndState) (coordinator: NudgeCoordi
                     coordinator.clearSession(request.workspaceId)
     }
 
-/// The inner async logic for the event hook.
 let private handleEvent (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                          (state: StreamEndState) (coordinator: NudgeCoordinator)
                          (event: obj) (helpers: obj) : JS.Promise<unit> =
@@ -112,9 +156,6 @@ let private handleEvent (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
             suppressWorkspace state coordinator workspaceId
     } |> Async.StartAsPromise
 
-/// Create the event hook as a proper two-argument JS function.
-/// Uses Func<_,_,_> delegate so Fable emits `function(event, helpers) { ... }`
-/// instead of a curried `(event) => (helpers) => ...`.
 let createEventHook (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     let state = createStreamEndState ()
     let coordinator = NudgeCoordinator()

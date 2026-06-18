@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.JsBoundary
-open VibeFs.Kernel.SessionText
+open VibeFs.Kernel.MessageDecoder
 
 let private firstString (ctx: obj) (keys: string list) : string option =
     keys

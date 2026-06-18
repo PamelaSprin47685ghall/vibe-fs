@@ -1,19 +1,13 @@
-module VibeFs.MuxPlugin.MuxTools
+module VibeFs.Mux.ToolCatalog
 
 open VibeFs.Mux.Contract
-open VibeFs.MuxPlugin.CallStore
-open VibeFs.MuxPlugin.MuxTools.AgentTools
-open VibeFs.MuxPlugin.MuxTools.IoTools
-open VibeFs.MuxPlugin.MuxTools.SearchTools
-open VibeFs.MuxPlugin.MuxTools.WebTools
-open VibeFs.MuxPlugin.MuxTools.ReviewTool
+open VibeFs.Mux.CallStore
+open VibeFs.Mux.AgentTools
+open VibeFs.Mux.IoTools
+open VibeFs.Mux.WebSearchTools
+open VibeFs.Mux.ReviewTool
 open VibeFs.Shell.FuzzyFinderShell
 
-/// Tool names populated by `createToolCatalog` so that `experimentsFor` can
-/// compute the disabled-tool list via `canUse`.  Set once at registration time.
-let mutable registeredToolNames: string array = [||]
-
-/// Build the full ordered tool list for createRegistration.
 let createToolCatalog
     (deps: obj)
     (callStore: CallStore)

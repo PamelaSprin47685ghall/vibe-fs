@@ -36,17 +36,6 @@ let executorMapping () =
     check "timeout→Truncated" (match run { stdout=""; stderr=""; code=None; timedOut=true } with Truncated _ -> true | _ -> false)
     equal "python exe uvx" "uvx" (VibeFs.Shell.ExecutorShell.missingExecutableFor Python)
 
-let recordValidator () =
-    let parsePath (o: obj) = if string o = "" then Error "path required" else Ok o
-    let result = VibeFs.Kernel.RecordValidator.validateRecord [ "path", parsePath ] (box {| path = "src/x.fs" |})
-    check "valid ok" (Result.isOk result)
-    let okObj = result |> Result.defaultValue (createObj [])
-    equal "valid .path" "src/x.fs" (string (VibeFs.Kernel.Dyn.get okObj "path"))
-    let bad = VibeFs.Kernel.RecordValidator.validateRecord [ "path", parsePath ] (box {| path = "" |})
-    check "invalid errors" (Result.isError bad)
-    let errObj = match bad with Error e -> e | _ -> createObj []
-    equal "error .path message" "path required" (string (VibeFs.Kernel.Dyn.get errObj "path"))
-
 let capsFileShape () =
     let f : VibeFs.Kernel.CapsFormat.CapsFile = { filePath = "/abs/HERE.md"; label = "HERE.md"; content = "x" }
     equal "capsFile filePath" "/abs/HERE.md" f.filePath
@@ -59,7 +48,7 @@ let capsContextFormat () =
     check "caps content raw" (ctx.Contains "body text")
 
 let capsFileSizeLimit () =
-    equal "caps file size limit 4MB" (4 * 1_048_576) VibeFs.Shell.CapsBudget.maxFileSize
+    equal "caps file size limit 4MB" (4 * 1_048_576) VibeFs.Shell.Caps.maxFileSize
 
 let ollamaFormat () =
     let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]
@@ -84,7 +73,7 @@ let summarizerInputCap () =
     check "large output tail absent" (not (largePrompt.Contains tail))
 
 let safetyWarning () =
-    let warn program = formatSafetyWarning "OUT" program Shell
+    let warn program = prependSafetyWarning "OUT" program Shell
     check "leading grep warns" ((warn "grep foo").Contains readOnlyWarning)
     check "grep after && warns" ((warn "cd src && grep foo").Contains readOnlyWarning)
     check "grep in pipe warns" ((warn "ls a | grep b").Contains readOnlyWarning)
@@ -92,4 +81,4 @@ let safetyWarning () =
     check "prefixed path warns" ((warn "/usr/bin/grep foo").Contains readOnlyWarning)
     check "plain echo passes" (not ((warn "echo hi").Contains readOnlyWarning))
     check "substring inside word ignored" (not ((warn "echo concatenate").Contains readOnlyWarning))
-    check "non-shell language ignored" (not ((formatSafetyWarning "OUT" "grep foo" Python).Contains readOnlyWarning))
+    check "non-shell language ignored" (not ((prependSafetyWarning "OUT" "grep foo" Python).Contains readOnlyWarning))

@@ -5,26 +5,59 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Boundary
-open VibeFs.Kernel.OpencodeHooks
 open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Kernel.MessageDecoder
-open VibeFs.Kernel.SyntheticIds
-open VibeFs.Opencode.MagicTypes
-open VibeFs.Opencode.MagicPrompts
+open VibeFs.Opencode.Magic
+open VibeFs.Opencode.HookSchema
 open VibeFs.Opencode.MagicProjector
-open VibeFs.Opencode.MagicReplay
 open VibeFs.Kernel.CapsFormat
 open VibeFs.Opencode.ChildAgent
-open VibeFs.Opencode.Core
-open VibeFs.Opencode.MagicSession
+open VibeFs.Opencode.NudgeState
 open VibeFs.Shell.TreeSitterShell
+
+let private defaultExcludedAgents = [ "browser"; "reader"; "executor"; "title" ]
 
 let private emptyObj () : obj = createObj []
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
 let private resolvedUnit : JS.Promise<unit> = async { return () } |> Async.StartAsPromise
+
+let private joinReaderIntents (intents: obj) : Result<string, string> =
+    if not (Dyn.isArray intents) then Result.Error "Invalid LLM input for reader: intents must be an array of strings"
+    else
+        intents :?> obj array
+        |> Array.map string
+        |> Array.toList
+        |> String.concat "; "
+        |> Result.Ok
+
+let private joinCoderIntents (intents: obj) : Result<string, string> =
+    if not (Dyn.isArray intents) then Result.Error "Invalid LLM input for coder: intents must be an array"
+    else
+        let labels = ResizeArray<string>()
+        let mutable error = None
+        for item in intents :?> obj array do
+            if error.IsNone then
+                let pair = item :?> obj array
+                if pair.Length = 0 || not (Dyn.typeIs pair.[0] "string") then
+                    error <- Some "Invalid LLM input for coder: each intent must start with a string"
+                else
+                    labels.Add(string pair.[0])
+        match error with
+        | Some message -> Result.Error message
+        | None -> labels.ToArray() |> Array.toList |> String.concat "; " |> Result.Ok
+
+let private setUiLabel (args: obj) (tool: string) : unit =
+    let labelResult =
+        match tool with
+        | "coder" -> joinCoderIntents (Dyn.get args "intents")
+        | "reader" -> joinReaderIntents (Dyn.get args "intents")
+        | _ -> Result.Error ""
+    match labelResult with
+    | Result.Ok label when label <> "" -> setKey args "_ui" (box label)
+    | _ -> ()
 
 let private objectKeys (o: obj) : string array =
     JS.Constructors.Object.keys(o) |> Seq.toArray
@@ -162,7 +195,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                         async { return afterMagic }
                     else
                         async {
-                            let! capsFiles = VibeFs.Shell.CapsShell.findCapsFiles directory |> Async.AwaitPromise
+                            let! capsFiles = VibeFs.Shell.Caps.findCapsFiles directory |> Async.AwaitPromise
                             return buildCapsMessages
                                 VibeFs.Shell.Crypto.sha256HexTruncated
                                 afterMagic
@@ -190,7 +223,7 @@ let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
         let toolID = Dyn.str input "toolID"
         if toolID = "coder" || toolID = "reader" then
             rewriteToolJsonSchema stripUiFromJsonSchema output
-        elif toolID = MagicTypes.magicTodoToolName then
+        elif toolID = magicTodoToolName then
             setKey output "description" (box toolDescription)
             setKey output "jsonSchema" (buildMagicTodoSchema ())
     } |> Async.StartAsPromise

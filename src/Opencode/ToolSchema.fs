@@ -1,11 +1,74 @@
-module VibeFs.Opencode.ToolCopy
+module VibeFs.Opencode.ToolSchema
+
+open Fable.Core
+open Fable.Core.JsInterop
+open VibeFs.Kernel
+open VibeFs.Opencode.Magic
+
+/// The opencode plugin SDK's `tool` factory + `tool.schema` (Zod-like) builder.
+[<Import("tool", "@opencode-ai/plugin/tool")>]
+let toolFactory : obj = jsNative
+let schema : obj = Dyn.get toolFactory "schema"
+
+/// `o.method()` and `o.method(arg)` - explicit object-first, no pipelines.
+let call0 (o: obj) (method: string) : obj = o?(method)()
+let call1 (o: obj) (method: string) (arg: obj) : obj = o?(method)(arg)
+
+let private invokeTool (factory: obj) (config: obj) : obj = factory $ config
+
+let private str () = call0 schema "string"
+let arr (item: obj) : obj = call1 schema "array" item
+let private tuple (items: obj array) : obj = call1 schema "tuple" items
+let private union' (items: obj array) : obj = call1 schema "union" items
+
+let strMin (minLen: int) (desc: string) : obj =
+    call1 (call1 (str ()) "min" (box minLen)) "describe" (box desc)
+
+let strMinNullish (minLen: int) (desc: string) : obj =
+    call1 (call0 (call1 (str ()) "min" (box minLen)) "nullish") "describe" (box desc)
+
+let strReq (desc: string) : obj = call1 (str ()) "describe" (box desc)
+let strOpt (desc: string) : obj = call1 (call0 (str ()) "nullish") "describe" (box desc)
+
+let intMinNullish (minVal: int) (desc: string) : obj =
+    let n = call1 (call0 schema "number") "int" (box 0)
+    let n = call1 n "min" (box minVal)
+    call1 (call0 n "nullish") "describe" (box desc)
+
+let boolOpt (desc: string) : obj = call1 (call0 (call0 schema "boolean") "nullish") "describe" (box desc)
+
+let excludeOpt (desc: string) : obj =
+    let s = str ()
+    call1 (call0 (union' [| s; arr s |]) "nullish") "describe" (box desc)
+
+let intentsSchema (desc: string) : obj =
+    let inner = tuple [| strMin 1 ""; call1 (arr (strMin 1 "")) "min" (box 1) |]
+    call1 (call1 (arr inner) "min" (box 1)) "describe" (box desc)
+
+let uiParam : obj = call1 (call0 (str ()) "optional") "describe" (box "Internal: populated by hook")
+let strArrayOpt (desc: string) : obj = call1 (call0 (arr (strMin 1 "")) "optional") "describe" (box desc)
+
+let numOpt (desc: string) : obj =
+    let n = call0 schema "number"
+    let n = call0 n "int"
+    let n = call0 n "positive"
+    call1 (call0 n "optional") "describe" (box desc)
+
+let enumOpt (values: string array) (desc: string) : obj =
+    let e = call1 schema "enum" values
+    call1 (call0 e "optional") "describe" (box desc)
+
+let obj (shape: obj) : obj = call1 schema "object" shape
+
+let define (description: string) (args: obj) (execute: obj -> obj -> JS.Promise<string>) : obj =
+    invokeTool toolFactory (box {| description = description; args = args; execute = execute |})
 
 let coder =
-    "Execute code changes from natural-language intents. Provide multiple independent change intents as [intent, affectFiles] tuples; each tuple spawns its own coder subagent session and runs independently in parallel — pass as many tuples as you can at once so they execute concurrently. "
+    "Execute code changes from natural-language intents. Provide multiple independent change intents as [intent, affectFiles] tuples; each tuple spawns its own coder subagent session and runs independently in parallel - pass as many tuples as you can at once so they execute concurrently. "
     + "IMPORTANT: Subagents do not receive role instructions in their system prompt; each subagent gets its task as a user message built from your intent and file list. You (the parent) must put full project context, design rationale, and requirements into every intent. Do NOT assume the coder knows the repo background."
 
 let reader =
-    "Search the codebase from natural-language intents. Each intent in the array spawns its own search subagent session and runs independently in parallel — pass as many intents as you can at once so they execute concurrently. "
+    "Search the codebase from natural-language intents. Each intent in the array spawns its own search subagent session and runs independently in parallel - pass as many intents as you can at once so they execute concurrently. "
     + "IMPORTANT: Subagents do not receive role instructions in their system prompt; each subagent gets its task as a user message from your intent string. You (the parent) must put full context into every intent. Do NOT assume the search agent knows the project background. Reports must include concrete file paths."
 
 let meditator =
@@ -28,15 +91,20 @@ let webfetch = "Fetch a URL with better extraction for static/docs pages. Suppor
 
 module Params =
     let coderIntents =
-        "Array of [intent, affectFiles] tuples. Each tuple is a natural-language change request plus an array of affected file paths; each tuple runs in parallel via its own coder subagent. The intent string is delivered to the subagent as the user message — include all background, design rationale, and requirements there. Example tuple: `[\"Fix login\", [\"src/auth.ts\", \"src/login.ts\"]]`."
+        "Array of [intent, affectFiles] tuples. Each tuple is a natural-language change request plus an array of affected file paths; each tuple runs in parallel via its own coder subagent. The intent string is delivered to the subagent as the user message - include all background, design rationale, and requirements there. Example tuple: `[\"Fix login\", [\"src/auth.ts\", \"src/login.ts\"]]`."
+
     let readerIntents =
-        "Array of independent code-search intent strings, each run in parallel via its own search subagent. Each string becomes the subagent user message — include background, paths, symbols, and what to find."
+        "Array of independent code-search intent strings, each run in parallel via its own search subagent. Each string becomes the subagent user message - include background, paths, symbols, and what to find."
+
     let meditatorIntent =
-        "Natural-language intent or question for deep reasoning. Becomes part of the subagent user message — include all background, design rationale, and specific requirements; do not assume the agent knows project context."
+        "Natural-language intent or question for deep reasoning. Becomes part of the subagent user message - include all background, design rationale, and specific requirements; do not assume the agent knows project context."
+
     let meditatorFiles =
         "File paths listed in the subagent user message for context. Include design docs, relevant code, or background material the agent must read."
+
     let browserIntent =
-        "Natural-language intent for the web task. Becomes the subagent user message — include URLs, goals, constraints, and any project context the browser agent needs."
+        "Natural-language intent for the web task. Becomes the subagent user message - include URLs, goals, constraints, and any project context the browser agent needs."
+
     let executorLanguage = "Execution language: shell, python, or javascript"
     let executorProgram = "The program to execute."
     let executorDeps = "Dependencies to install (for python or javascript)."

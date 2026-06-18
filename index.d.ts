@@ -1,4 +1,4 @@
-export interface MuxPluginToolPolicy {
+export interface MuxToolPolicy {
   readonly add?: string[];
   readonly remove?: string[];
 }
@@ -258,11 +258,11 @@ export interface PluginRegistration {
   contextInjector: { inject: (projectPath: string) => Promise<unknown> };
   eventHook: (event: PluginEvent, helpers: PluginEventHelpers) => Promise<void>;
   slashCommands: PluginSlashCommandDefinition[];
-  getToolPolicy: (agentId: string, role?: string) => MuxPluginToolPolicy | null;
+  getToolPolicy: (agentId: string, role?: string) => MuxToolPolicy | null;
 }
 
 export function createRegistration(deps: unknown): PluginRegistration;
-export function getPluginToolPolicy(agentId: string, role?: string): MuxPluginToolPolicy | undefined;
+export function getPluginToolPolicy(agentId: string, role?: string): MuxToolPolicy | undefined;
 export function buildCapsFileReadData(projectRoot: string): Promise<CapsFileReadEntry[]>;
 export function deduplicateReadOutputs<T extends MuxMessageLike>(messages: readonly T[]): T[];
 export function deduplicateReadOutputsWithSeen<T extends MuxMessageLike>(

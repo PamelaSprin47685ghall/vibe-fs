@@ -7,15 +7,16 @@ open VibeFs.Kernel.ExecutorKernel
 open VibeFs.Kernel.OllamaFormat
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Shell.OllamaClient
-open VibeFs.Opencode.Core
+open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.Session
 open VibeFs.Opencode.ExecutorActor
 open VibeFs.Opencode.ChildAgent
 open VibeFs.Kernel.Prompts
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzyCoordinator
-open VibeFs.Shell.FuzzyFindCmd
-open VibeFs.Shell.FuzzyGrepCmd
+open VibeFs.Shell.FuzzyCommands
+module ToolSchemaModule = VibeFs.Opencode.ToolSchema
+module FuzzyCommandsModule = VibeFs.Shell.FuzzyCommands
 
 [<Global("Buffer")>]
 let private nodeBuffer : obj = jsNative
@@ -35,6 +36,26 @@ let private optStr (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullis
 let private optInt (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<int> v)
 let private optBool (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<bool> v)
 let private optField (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some v
+
+let private joinReaderIntents (intents: obj) : Result<string, string> =
+    if not (Dyn.isArray intents) then Result.Error "Invalid LLM input for reader: intents must be an array of strings"
+    else intents :?> obj array |> Array.map string |> Array.toList |> String.concat "; " |> Result.Ok
+
+let private joinCoderIntents (intents: obj) : Result<string, string> =
+    if not (Dyn.isArray intents) then Result.Error "Invalid LLM input for coder: intents must be an array"
+    else
+        let labels = ResizeArray<string>()
+        let mutable error = None
+        for item in intents :?> obj array do
+            if error.IsNone then
+                let pair = item :?> obj array
+                if pair.Length = 0 || not (Dyn.typeIs pair.[0] "string") then
+                    error <- Some "Invalid LLM input for coder: each intent must start with a string"
+                else
+                    labels.Add(string pair.[0])
+        match error with
+        | Some message -> Result.Error message
+        | None -> labels.ToArray() |> Array.toList |> String.concat "; " |> Result.Ok
 
 let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client = Dyn.get ctx "client"
@@ -125,12 +146,14 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                 async {
                     let! result = VibeFs.Shell.ExecutorShell.execute options sessionID |> Async.AwaitPromise
                     let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
-                    if not (shouldSummarize byteLength output) then return output
+                    if not (shouldSummarize byteLength output) then return prependSafetyWarning output options.program options.language
                     else
                         let prompt = formatExecutorSummarizerUserPrompt output
-                        return! runSubagentWithCleanup registry client "executor" "Executor summary" prompt
-                                    (Dyn.str tc "directory") sessionID context
-                                |> Async.AwaitPromise
+                        let! summary =
+                            runSubagentWithCleanup registry client "executor" "Executor summary" prompt
+                                (Dyn.str tc "directory") sessionID context
+                            |> Async.AwaitPromise
+                        return prependSafetyWarning summary options.program options.language
                 } |> Async.StartAsPromise))
 
 let browserTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
@@ -143,7 +166,7 @@ let browserTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null))
 
 let fuzzyFindTool (finderCache: FinderCache) : obj =
-    define VibeFs.Opencode.Core.fuzzyFind
+    define ToolSchemaModule.fuzzyFind
         (box {| pattern = strMinNullish 1 Params.fuzzyFindPattern; path = strOpt Params.fuzzyFindPath
                 limit = intMinNullish 1 Params.fuzzyFindLimit; iterator = strOpt Params.fuzzyFindIterator |})
         (fun args context ->
@@ -151,13 +174,23 @@ let fuzzyFindTool (finderCache: FinderCache) : obj =
             if scopeId = "" then resolveStr "Error: fuzzy_find requires an active session"
             else
                 let p : FuzzyFindParams =
-                    { pattern = optStr args "pattern"; path = optStr args "path"
-                      limit = optInt args "limit"; iterator = optStr args "iterator" }
-                let o : SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
-                async { let! r = VibeFs.Shell.FuzzyFindCmd.fuzzyFind p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
+                    { pattern = optStr args "pattern"
+                      path = optStr args "path"
+                      limit = optInt args "limit"
+                      iterator = optStr args "iterator" }
+                let o : SearchOptions =
+                    { cwd = Dyn.str context "directory"
+                      scopeId = scopeId
+                      store = None
+                      finderCache = finderCache }
+                async {
+                    let! r = FuzzyCommandsModule.fuzzyFind p o |> Async.AwaitPromise
+                    return r.output
+                }
+                |> Async.StartAsPromise)
 
 let fuzzyGrepTool (finderCache: FinderCache) : obj =
-    define VibeFs.Opencode.Core.fuzzyGrep
+    define ToolSchemaModule.fuzzyGrep
         (box {| pattern = strMinNullish 1 Params.fuzzyGrepPattern; path = strOpt Params.fuzzyGrepPath
                 exclude = excludeOpt Params.fuzzyGrepExclude; caseSensitive = boolOpt Params.fuzzyGrepCaseSensitive
                 context = intMinNullish 0 Params.fuzzyGrepContext; limit = intMinNullish 1 Params.fuzzyGrepLimit
@@ -167,11 +200,23 @@ let fuzzyGrepTool (finderCache: FinderCache) : obj =
             if scopeId = "" then resolveStr "Error: fuzzy_grep requires an active session"
             else
                 let p : FuzzyGrepParams =
-                    { pattern = optStr args "pattern"; path = optStr args "path"; exclude = parseExcludeField args
-                      caseSensitive = optBool args "caseSensitive"; context = optInt args "context"
-                      limit = optInt args "limit"; iterator = optStr args "iterator" }
-                let o : SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
-                async { let! r = VibeFs.Shell.FuzzyGrepCmd.fuzzyGrep p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
+                    { pattern = optStr args "pattern"
+                      path = optStr args "path"
+                      exclude = parseExcludeField args
+                      caseSensitive = optBool args "caseSensitive"
+                      context = optInt args "context"
+                      limit = optInt args "limit"
+                      iterator = optStr args "iterator" }
+                let o : SearchOptions =
+                    { cwd = Dyn.str context "directory"
+                      scopeId = scopeId
+                      store = None
+                      finderCache = finderCache }
+                async {
+                    let! r = FuzzyCommandsModule.fuzzyGrep p o |> Async.AwaitPromise
+                    return r.output
+                }
+                |> Async.StartAsPromise)
 
 let private abortSignal (context: obj) : obj =
     if Dyn.isNullish context then null else Dyn.get context "abort"

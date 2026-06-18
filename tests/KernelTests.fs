@@ -5,10 +5,10 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dedup
 open VibeFs.Kernel.HeadTail
-open VibeFs.Kernel.Lru
-open VibeFs.Shell.CapsFilter
+open VibeFs.Shell.Caps
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.JsBoundary
+open VibeFs.Kernel.MessageDecoder
 
 let headTail' () =
     let r = headTail "hello" 2 2
@@ -21,29 +21,14 @@ let dedup' () =
     check "dedup first" (r1.output = "same")
     check "dedup second" (r2.output = dedupMarker)
 
-let lru' () =
-    let cache = create 2
-    let c1 = set cache "a" 1
-    let c2 = set c1 "b" 2
-    let c3 = set c2 "c" 3
-    check "lru evicts" (Map.count c3.cache = 2)
-    check "lru has b" (Map.containsKey "b" c3.cache)
-    check "lru has c" (Map.containsKey "c" c3.cache)
-
 let excludedDirs' () =
     let r = isExcludedDir "node_modules"
     check "node_modules excluded" r
 
 let jsBoundary' () =
-    let r = parseJsBoundary "42"
-    check "parse int" (r = Some 42)
-    let s = parseJsBoundary "x"
-    check "parse fail" (s.IsNone)
-    let arr = parseJsBoundaryArray [| box 1; box "2" |]
-    check "parse array" (arr = [| 1; 2 |])
-    let obj = parseJsBoundaryObj (createObj [ "a", box 1 ])
-    check "parse obj" (Map.find "a" obj = 1)
     check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = VibeFs.Kernel.JsBoundary.MessageAborted)
+    let text = readAssistantText [| box {| ``type`` = "message"; message = box {| role = "assistant"; content = [| box {| ``type`` = "text"; text = "hello" |} |] |} |} |] None
+    check "assistant text read" (text = Some "hello")
 
 let hostKernel' () =
     let intent = formatCoderUserPrompt "fix bug" [ "a.ts"; "b.ts" ]

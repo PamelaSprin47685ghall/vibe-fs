@@ -1,4 +1,4 @@
-module VibeFs.MuxPlugin.MuxTools.AgentTools
+module VibeFs.Mux.AgentTools
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -6,10 +6,9 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.ToolPolicy
 open VibeFs.Mux.Contract
-open VibeFs.MuxPlugin.Delegate
-open VibeFs.MuxPlugin.MuxPrompts
-open VibeFs.MuxPlugin.MuxTools.Shared
-open VibeFs.Opencode.Core
+open VibeFs.Mux.Delegate
+open VibeFs.Mux.Prompts
+open VibeFs.Opencode.ToolSchema
 
 [<Global>]
 type AbortController() =

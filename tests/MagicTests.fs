@@ -4,12 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dyn
-open VibeFs.Opencode.MagicTypes
+open VibeFs.Opencode.Magic
 open VibeFs.Opencode.MagicProjector
-open VibeFs.Opencode.MagicReplay
 open VibeFs.Kernel.MessageDecoder
-open VibeFs.Kernel.SyntheticIds
-open VibeFs.Opencode.MagicSession
 
 let private userMsg (id: string) (text: string) : obj =
     createObj

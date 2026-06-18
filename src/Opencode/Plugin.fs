@@ -11,7 +11,7 @@ open VibeFs.Opencode.NudgeHook
 open VibeFs.Opencode.Session
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.ChildAgent
-open VibeFs.Opencode.MagicSession
+open VibeFs.Opencode.Magic
 open VibeFs.Shell.FuzzyFinderShell
 
 [<Global("process")>]

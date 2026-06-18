@@ -1,4 +1,4 @@
-module VibeFs.MuxPlugin.MuxPrompts
+module VibeFs.Mux.Prompts
 
 open VibeFs.Kernel.Prompts
 

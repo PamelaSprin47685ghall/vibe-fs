@@ -3,15 +3,12 @@ module VibeFs.Opencode.HookSchema
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Dyn
-open VibeFs.Opencode.MagicPrompts
+open VibeFs.Opencode.Magic
 
 let private setKey (target: obj) (key: string) (value: obj) : unit = target?(key) <- value
 
 let private objectKeys (value: obj) : string array =
     JS.Constructors.Object.keys(value) |> Seq.toArray
-
-let private isStringArray (value: obj) : bool =
-    isArray value && ((value :?> obj array) |> Array.forall (fun item -> typeIs item "string"))
 
 let private requiredWithoutUi (required: obj) : obj =
     if not (isArray required) then required
@@ -84,48 +81,3 @@ let buildMagicTodoSchema () : obj =
         ]
         "required", box [| box "todos"; box "completedWorkReport" |]
     ]
-
-let joinReaderIntents (intents: obj) : Result<string, string> =
-    if not (isArray intents) || not (isStringArray intents) then
-        Error "Invalid LLM input for reader: intents must be an array of strings"
-    else
-        intents
-        :?> obj array
-        |> Array.map string
-        |> Array.toList
-        |> String.concat "; "
-        |> Ok
-
-let joinCoderIntents (intents: obj) : Result<string, string> =
-    if not (isArray intents) then
-        Error "Invalid LLM input for coder: intents must be an array"
-    else
-        let labels = ResizeArray<string>()
-        let mutable error = None
-
-        for item in intents :?> obj array do
-            if error.IsNone then
-                let pair = item :?> obj array
-                if pair.Length = 0 || not (typeIs pair.[0] "string") then
-                    error <- Some "Invalid LLM input for coder: each intent must start with a string"
-                else
-                    labels.Add(string pair.[0])
-
-        match error with
-        | Some message -> Error message
-        | None -> labels.ToArray() |> Array.toList |> String.concat "; " |> Ok
-
-/// UI label is cosmetic (stripped before the LLM sees the schema). Validation
-/// errors must surface to the LLM via the tool result, so never emit them here.
-let uiLabelForTool (tool: string) (args: obj) : string option =
-    if tool = "coder" then
-        match joinCoderIntents (get args "intents") with Ok label -> Some label | Error _ -> None
-    elif tool = "reader" then
-        match joinReaderIntents (get args "intents") with Ok label -> Some label | Error _ -> None
-    else
-        None
-
-let setUiLabel (args: obj) (tool: string) : unit =
-    match uiLabelForTool tool args with
-    | Some label -> setKey args "_ui" (box label)
-    | None -> ()

@@ -1,15 +1,72 @@
-module VibeFs.MuxPlugin.MuxTools.WebTools
+module VibeFs.Mux.WebSearchTools
 
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.OllamaFormat
 open VibeFs.Mux.Contract
-open VibeFs.MuxPlugin.Delegate
-open VibeFs.MuxPlugin.MuxPrompts
-open VibeFs.MuxPlugin.MuxTools.Shared
-open VibeFs.Opencode.Core
+open VibeFs.Mux.Delegate
+open VibeFs.Mux.Prompts
+open VibeFs.Opencode.ToolSchema
+open VibeFs.Shell.FuzzyFinderShell
+open VibeFs.Shell.FuzzyCoordinator
+open VibeFs.Shell.FuzzyCommands
+module ToolSchemaModule = VibeFs.Opencode.ToolSchema
+module FuzzyCommandsModule = VibeFs.Shell.FuzzyCommands
 open VibeFs.Shell.OllamaClient
+
+let fuzzyFindTool (finderCache: FinderCache) : ToolDefinition =
+    { name = "fuzzy_find"
+      description = ToolSchemaModule.fuzzyFind
+      parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyFindPattern); "path", box (strProp Params.fuzzyFindPath); "limit", box (numProp Params.fuzzyFindLimit); "iterator", box (strProp Params.fuzzyFindIterator) ]) [||]
+      execute = fun config args ->
+          let scopeId = Dyn.str config "workspaceId"
+          if scopeId = "" then resolveStr "fuzzy_find requires workspaceId"
+          else
+              let p : FuzzyFindParams =
+                  { pattern = strField args "pattern"
+                    path = strField args "path"
+                    limit = optInt args "limit"
+                    iterator = strField args "iterator" }
+              let o : SearchOptions =
+                  { cwd = Dyn.str config "cwd"
+                    scopeId = scopeId
+                    store = None
+                    finderCache = finderCache }
+              async {
+                  let! r = FuzzyCommandsModule.fuzzyFind p o |> Async.AwaitPromise
+                  return r.output
+              }
+              |> Async.StartAsPromise
+      condition = None }
+
+let fuzzyGrepTool (finderCache: FinderCache) : ToolDefinition =
+    { name = "fuzzy_grep"
+      description = ToolSchemaModule.fuzzyGrep
+      parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyGrepPattern); "path", box (strProp Params.fuzzyGrepPath); "exclude", box (strProp Params.fuzzyGrepExclude); "caseSensitive", box (boolProp Params.fuzzyGrepCaseSensitive); "context", box (numProp Params.fuzzyGrepContext); "limit", box (numProp Params.fuzzyGrepLimit); "iterator", box (strProp Params.fuzzyGrepIterator) ]) [||]
+      execute = fun config args ->
+          let scopeId = Dyn.str config "workspaceId"
+          if scopeId = "" then resolveStr "fuzzy_grep requires workspaceId"
+          else
+              let p : FuzzyGrepParams =
+                  { pattern = strField args "pattern"
+                    path = strField args "path"
+                    exclude = parseExcludeField args
+                    caseSensitive = optBool args "caseSensitive"
+                    context = optInt args "context"
+                    limit = optInt args "limit"
+                    iterator = strField args "iterator" }
+              let o : SearchOptions =
+                  { cwd = Dyn.str config "cwd"
+                    scopeId = scopeId
+                    store = None
+                    finderCache = finderCache }
+              async {
+                  let! r = FuzzyCommandsModule.fuzzyGrep p o |> Async.AwaitPromise
+                  return r.output
+              }
+              |> Async.StartAsPromise
+      condition = None }
 
 let websearchTool (deps: obj) : ToolDefinition =
     { name = "websearch"
@@ -19,7 +76,7 @@ let websearchTool (deps: obj) : ToolDefinition =
           let whatToSummarize = defaultArg (strField args "what_to_summarize") ""
           match strField args "query" with
           | None -> resolveStr "Error: `query` must be a string"
-          | Some query when whatToSummarize = "" -> resolveStr "Error: `what_to_summarize` is required"
+          | Some _ when whatToSummarize = "" -> resolveStr "Error: `what_to_summarize` is required"
           | Some query ->
               let abortSignal = Dyn.get config "abortSignal"
               async {
@@ -37,8 +94,10 @@ let websearchTool (deps: obj) : ToolDefinition =
                           let prompt = formatMuxWebsearchSummarizerUserPrompt whatToSummarize rawResults
                           let! report = runMuxSubagent deps config "executor" prompt "Web search summary" None |> Async.AwaitPromise
                           return report
-                  with ex -> return jsonStringify (createObj [ "success", box false; "error", box ("Web search failed: " + ex.Message) ])
-              } |> Async.StartAsPromise
+                  with ex ->
+                      return jsonStringify (createObj [ "success", box false; "error", box ("Web search failed: " + ex.Message) ])
+              }
+              |> Async.StartAsPromise
       condition = None }
 
 let webfetchTool : ToolDefinition =
@@ -66,7 +125,7 @@ let webfetchTool : ToolDefinition =
                       let content = if Dyn.isNullish (Dyn.get data "content") then None else Some (Dyn.str data "content")
                       return formatFetchResponse { title = title; byline = byline; length = length_; content = content }
                   with ex ->
-                      let msg = ex.Message
-                      return jsonStringify (createObj [ "success", box false; "error", box ("Web fetch failed: " + msg) ])
-              } |> Async.StartAsPromise
+                      return jsonStringify (createObj [ "success", box false; "error", box ("Web fetch failed: " + ex.Message) ])
+              }
+              |> Async.StartAsPromise
       condition = None }

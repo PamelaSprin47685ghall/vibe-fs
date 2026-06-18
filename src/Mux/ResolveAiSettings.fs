@@ -1,4 +1,4 @@
-module VibeFs.MuxPlugin.ResolveAiSettings
+module VibeFs.Mux.ResolveAiSettings
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -37,7 +37,6 @@ let private normalizeStr (v: obj) : string option =
         let s = (string v).Trim()
         if s = "" then None else Some s
 
-/// Workspace `aiSettingsByAgent` uses `model`; config defaults use `modelString`.
 let internal modelFromEntry (entry: obj) : string option =
     normalizeStr (Dyn.get entry "model")
     |> Option.orElseWith (fun () -> normalizeStr (Dyn.get entry "modelString"))
@@ -55,7 +54,6 @@ let internal namedSettingsFromRecord (source: obj) (agentId: string) : Delegated
                 { modelString = modelFromEntry entry
                   thinkingLevel = thinkingFromEntry entry }
 
-/// First non-blank value per field wins (same order as vibe-me-mux `mergeNamedSettings`).
 let internal mergeNamedSettings (sources: DelegatedAiSettings option list) : DelegatedAiSettings =
     sources
     |> List.fold (fun acc source ->

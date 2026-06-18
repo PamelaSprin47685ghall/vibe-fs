@@ -3,7 +3,7 @@ module VibeFs.Tests.DelegateTests
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dyn
-open VibeFs.MuxPlugin.Delegate
+open VibeFs.Mux.Delegate
 
 let private muxEnv (pairs: (string * string) list) : obj =
     createObj [ for k, v in pairs -> k, box v ]

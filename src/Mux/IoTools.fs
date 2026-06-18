@@ -1,14 +1,13 @@
-module VibeFs.MuxPlugin.MuxTools.IoTools
+module VibeFs.Mux.IoTools
 
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.ExecutorKernel
 open VibeFs.Mux.Contract
-open VibeFs.MuxPlugin.Delegate
-open VibeFs.MuxPlugin.MuxPrompts
-open VibeFs.MuxPlugin.MuxTools.Shared
-open VibeFs.Opencode.Core
+open VibeFs.Mux.Delegate
+open VibeFs.Mux.Prompts
+open VibeFs.Opencode.ToolSchema
 open VibeFs.Shell.Read
 open VibeFs.Shell.Write
 
@@ -42,14 +41,14 @@ let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
       timeoutType = parseTimeout (Dyn.str args "timeout")
       cwd = Some (getCwd config) }
 
-let private summarizeWhenNeeded (deps: obj) (config: obj) (output: string) : Async<string> =
+let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptions) (output: string) : Async<string> =
     async {
         if not (shouldSummarize byteLength output) then
-            return output
+            return prependSafetyWarning output options.program options.language
         else
             let prompt = formatMuxExecutorSummarizerUserPrompt output
             let! report = runMuxSubagent deps config "executor" prompt "Executor summary" None |> Async.AwaitPromise
-            return report
+            return prependSafetyWarning report options.program options.language
     }
 
 let executorTool (deps: obj) : ToolDefinition =
@@ -72,12 +71,11 @@ let executorTool (deps: obj) : ToolDefinition =
                 let output =
                     match execResult with
                     | Completed o | Truncated(o, _) | Failed o | MissingExecutable(_, o) -> o
-                return! summarizeWhenNeeded deps config output
+                return! summarizeWhenNeeded deps config opts output
             }
             |> Async.StartAsPromise
       condition = None }
 
-/// Per-instance ref for the host-provided file_read executor, captured by wrappers.
 type HostReadExec = obj option ref
 
 let readTool (_deps: obj) (hostReadExec: HostReadExec) : ToolDefinition =

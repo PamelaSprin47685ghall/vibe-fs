@@ -1,4 +1,4 @@
-module VibeFs.MuxPlugin.MuxSlashCommands
+module VibeFs.Mux.SlashCommands
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -7,10 +7,10 @@ open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.Boundary
 open VibeFs.Shell.ReviewRuntime
-open VibeFs.MuxPlugin.Delegate
-open VibeFs.MuxPlugin.CallStore
-open VibeFs.MuxPlugin.MuxPrompts
-open VibeFs.MuxPlugin.MuxTools.Shared
+open VibeFs.Mux.Delegate
+open VibeFs.Mux.CallStore
+open VibeFs.Mux.Prompts
+open VibeFs.Mux.Contract
 
 let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
 
@@ -75,8 +75,8 @@ let private loopReviewVerdictInstructions =
 let private parseLoopReviewVerdict (args: obj option) (report: string) : bool * string =
     match args with
     | Some a ->
-        let v = defaultArg (VibeFs.MuxPlugin.MuxTools.Shared.strField a "verdict") "" |> fun s -> s.Trim().ToLowerInvariant()
-        let feedback = defaultArg (VibeFs.MuxPlugin.MuxTools.Shared.strField a "feedback") ""
+        let v = defaultArg (strField a "verdict") "" |> fun s -> s.Trim().ToLowerInvariant()
+        let feedback = defaultArg (strField a "feedback") ""
         if v = "pass" then true, ""
         elif v = "reject" then false, feedback
         else false, report

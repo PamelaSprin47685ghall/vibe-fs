@@ -45,18 +45,19 @@ let readOnlyWarning =
 /// (space, tab, newline, |, &, ;) so verbs chained after &&, ||, ;, or a pipe
 /// are caught, while a bare substring inside another word (e.g. "cat" in
 /// "concat") is not.
-let formatSafetyWarning (output: string) (program: string) (language: ExecutorLanguage) : string =
+let shouldAppendReadOnlyWarning (program: string) (language: ExecutorLanguage) : bool =
     match language with
     | Shell ->
         let stripped = (strip program).script
         let words = stripped.Split([| ' '; '\t'; '\n'; '|'; '&'; ';' |], StringSplitOptions.RemoveEmptyEntries)
-        let triggers =
-            words
-            |> Array.exists (fun word ->
-                let bare = word.Split('/') |> Array.tryLast |> Option.defaultValue ""
-                Set.contains bare readOnlyReadCommands)
-        if triggers then $"{readOnlyWarning}\n{output}" else output
-    | _ -> output
+        words
+        |> Array.exists (fun word ->
+            let bare = word.Split('/') |> Array.tryLast |> Option.defaultValue ""
+            Set.contains bare readOnlyReadCommands)
+    | _ -> false
+
+let prependSafetyWarning (output: string) (program: string) (language: ExecutorLanguage) : string =
+    if shouldAppendReadOnlyWarning program language then $"{readOnlyWarning}\n{output}" else output
 
 /// Should the output be sent to a summariser instead of shown raw?
 /// Accepts a byte-length function injected by the Shell (e.g. Buffer.byteLength).

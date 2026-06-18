@@ -1,18 +1,33 @@
-module VibeFs.MuxPlugin.MuxWrappers
+module VibeFs.Mux.Wrappers
 
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Mux.TodoWriteNudge
-open VibeFs.MuxPlugin.CallStore
-open VibeFs.MuxPlugin.MuxTools.IoTools
+open VibeFs.Kernel.Prompts
+open VibeFs.Mux.CallStore
 open VibeFs.Shell.TreeSitterShell
 
 let private bindExecute (tool: obj) : obj = tool?execute
 
 let private disabledResult () : JS.Promise<string> =
     async { return "disabled" } |> Async.StartAsPromise
+
+let private appendMeditatorNudge (result: obj) : obj =
+    if Dyn.isNullish result then result
+    elif Dyn.typeIs result "string" then
+        let s = string result
+        if s.Contains(meditatorNudge : string) then result else box $"{s}\n\n{meditatorNudge}"
+    elif Dyn.typeIs result "object" then
+        let success = Dyn.get result "success"
+        if not (Dyn.isNullish success) && unbox<bool> success then
+            let existingNudge = Dyn.get result "nudge"
+            if not (Dyn.isNullish existingNudge) && (string existingNudge).Contains(meditatorNudge : string) then result
+            else Dyn.withKey result "nudge" (box meditatorNudge)
+        else result
+    else result
+
+type HostReadExec = obj option ref
 
 let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promise<obj> =
     async {

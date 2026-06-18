@@ -1,6 +1,7 @@
 module VibeFs.Kernel.Nudge
 
 open System.Text.RegularExpressions
+open VibeFs.Kernel.Prompts
 
 /// Which kind of nudge, if any, a session needs right now.
 type NudgeAction = NudgeTodo | NudgeLoop | NudgeRunner | NudgeNone
@@ -119,3 +120,30 @@ let isTerminal (s: TodoStatus) : bool =
 
 /// Set of terminal statuses for backward compatibility with string-based checks.
 let terminalTodoStatuses: Set<string> = Set.ofList [ "completed"; "cancelled"; "abandoned" ]
+
+let retryProgressEvents: Set<string> =
+    Set.ofList
+        [ "session.next.step.started"; "session.next.step.ended"
+          "session.next.text.started"; "session.next.text.delta"; "session.next.text.ended"
+          "session.next.reasoning.started"; "session.next.reasoning.delta"; "session.next.reasoning.ended"
+          "session.next.tool.input.started"; "session.next.tool.input.delta"; "session.next.tool.input.ended"
+          "session.next.tool.called"; "session.next.tool.progress"; "session.next.tool.success" ]
+
+let retryProgressParts: Set<string> =
+    Set.ofList
+        [ "step-start"; "step-finish"; "text"; "reasoning"; "tool"; "agent"
+          "subtask"; "file"; "snapshot"; "patch" ]
+
+let isRetryProgressEvent (eventType: string) : bool = Set.contains eventType retryProgressEvents
+let isRetryProgressPart (partType: string) : bool = Set.contains partType retryProgressParts
+
+let isTerminalAssistantFinish (finish: string) : bool =
+    let normalized = finish.ToLower().Replace("-", "").Replace("_", "").Replace(" ", "")
+    not (normalized.Contains("tool")) && not (normalized.Contains("abort"))
+
+let isNudgePrompt (text: string) : bool = text = todoNudgePrompt || text = loopNudgePrompt
+
+let createPromptBody (agent: string option) (text: string) : obj =
+    match agent with
+    | Some a -> box {| agent = a; parts = [| box {| ``type`` = "text"; text = text |} |] |}
+    | None -> box {| parts = [| box {| ``type`` = "text"; text = text |} |] |}

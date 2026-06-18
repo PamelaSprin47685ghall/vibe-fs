@@ -2,8 +2,8 @@
   "name": "vibe-fs",
   "version": "0.1.0",
   "type": "module",
-  "main": "src/Index.js",
+  "main": "index.js",
   "exports": {
-    ".": "./src/Index.js"
+    ".": "./index.js"
   }
 }

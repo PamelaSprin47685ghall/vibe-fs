@@ -2,7 +2,7 @@ module VibeFs.Mux.CapsFileRead
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell.CapsShell
+open VibeFs.Shell.Caps
 
 let private timestampMs () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
 let private nowToken (timestamp: int64) : string = string timestamp

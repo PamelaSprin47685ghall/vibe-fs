@@ -5,8 +5,8 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
-open VibeFs.Opencode.MagicTypes
-open VibeFs.Index
+open VibeFs.Opencode.Magic
+open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 
 let private fileReadOutput (content: string) : obj =

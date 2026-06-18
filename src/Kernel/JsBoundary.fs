@@ -1,7 +1,7 @@
 module VibeFs.Kernel.JsBoundary
 
-open Fable.Core
 open Fable.Core.JsInterop
+open Fable.Core
 
 /// Strongly-typed domain failures.  Sealed union so every consumer must handle
 /// each case explicitly; no hidden catch-all can swallow a new error kind.
@@ -54,32 +54,9 @@ let translateJsError (error: obj) : DomainError =
                     if not (Dyn.isNullish data) && Dyn.typeIs data "object" then
                         classify data seenNext
                     else
-                    let cause = Dyn.get value "cause"
-                    if not (Dyn.isNullish cause) then classify cause seenNext
+                        let cause = Dyn.get value "cause"
+                        if not (Dyn.isNullish cause) then classify cause seenNext
                         else
                             let message = Dyn.str value "message"
                             if containsAbortText message then MessageAborted else UnknownJsError(message)
     classify error []
-
-/// Parse a string boundary value into an int when possible.
-let parseJsBoundary (s: string) : int option =
-    match System.Int32.TryParse s with
-    | true, n -> Some n
-    | _ -> None
-
-/// Parse every element of an array as an int, dropping unparseable values.
-let parseJsBoundaryArray (arr: obj array) : int array =
-    arr |> Array.choose (fun x -> parseJsBoundary (string x))
-
-let private objectKeys (o: obj) : string array =
-    JS.Constructors.Object.keys(o) |> Seq.toArray
-
-/// Parse a plain JS object into a string->int map, dropping non-numeric values.
-let parseJsBoundaryObj (o: obj) : Map<string, int> =
-    objectKeys o
-    |> Array.choose (fun key ->
-        let v = Dyn.get o key
-        match System.Int32.TryParse (string v) with
-        | true, n -> Some (key, n)
-        | _ -> None)
-    |> Map.ofArray

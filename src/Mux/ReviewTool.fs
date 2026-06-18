@@ -1,4 +1,4 @@
-module VibeFs.MuxPlugin.MuxTools.ReviewTool
+module VibeFs.Mux.ReviewTool
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -6,10 +6,9 @@ open VibeFs.Kernel
 open VibeFs.Kernel.ToolPolicy
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Mux.Contract
-open VibeFs.MuxPlugin.Delegate
-open VibeFs.MuxPlugin.CallStore
-open VibeFs.MuxPlugin.MuxPrompts
-open VibeFs.MuxPlugin.MuxTools.Shared
+open VibeFs.Mux.Delegate
+open VibeFs.Mux.CallStore
+open VibeFs.Mux.Prompts
 
 let private dateNow () = int (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
 

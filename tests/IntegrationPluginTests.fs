@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
-open VibeFs.Index
+open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 open VibeFs.Shell.TreeSitterShell
 open VibeFs.Kernel.TreeSitterKernel

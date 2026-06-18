@@ -8,8 +8,7 @@ open VibeFs.Shell.IteratorStore
 open VibeFs.Kernel
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzyCoordinator
-open VibeFs.Shell.FuzzyGrepCmd
-open VibeFs.Shell.FuzzyFindCmd
+open VibeFs.Shell.FuzzyCommands
 
 let grepDetect () =
     equal "plain word" "plain" (detectGrepMode "foo")
