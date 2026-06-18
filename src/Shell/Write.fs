@@ -3,7 +3,7 @@ module VibeFs.Shell.Write
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.SyntaxTypes
+open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Shell.Path
 open VibeFs.Shell.TreeSitterShell
 

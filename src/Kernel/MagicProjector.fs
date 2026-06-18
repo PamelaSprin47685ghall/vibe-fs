@@ -13,6 +13,9 @@ let isTodoResult (part: obj) : bool =
 let isTodoError (part: obj) : bool =
     partIsTool part && partToolName part = magicTodoToolName && partToolStatus part = "error"
 
+let isReviewTool (part: obj) : bool =
+    partIsTool part && partToolName part = magicReviewToolName
+
 let private emptyBacklogText = "\u3010Magic Todo Backlog\u3011\n\u5f53\u524d\u8fd8\u6ca1\u6709\u5df2\u5b8c\u6210\u5de5\u4f5c\u62a5\u544a\u3002"
 let private userMsgHeader = "[\u7528\u6237\u5728\u5de5\u4f5c\u671f\u95f4\u53d1\u9001\u7684\u6d88\u606f]"
 let private foldHeader = "[\u5df2\u5b8c\u6210\u5e76\u6298\u53e0\u7684\u5de5\u4f5c\u8bb0\u5f55] \u4ee5\u4e0b\u62a5\u544a\u6765\u81ea\u88ab\u6298\u53e0\u7684\u65e7\u8f6e\u6b21\uff0c\u76f8\u5173\u6587\u4ef6\u5df2\u5199\u5165\u78c1\u76d8"
@@ -127,7 +130,8 @@ let projectMagic (messages: obj array) (backlog: BacklogEntry list) (foldAfterFi
                 let fp = flat.[i]
                 if i < range.firstResult then ()
                 elif i = range.firstResult then visible.Add { fp with part = projectionPart }
-                elif i < range.secondToLast then ()
+                elif i < range.secondToLast then
+                    if isReviewTool fp.part then visible.Add fp else ()
                 elif isTodoError fp.part then ()
                 else visible.Add fp
             let rebuilt = rebuildVisibleOnly messages (List.ofSeq visible)

@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Core.JS
 open VibeFs.Kernel
+open VibeFs.Kernel.ReviewSession
 open VibeFs.Opencode.Tools
 open VibeFs.Opencode.Hooks
 open VibeFs.Opencode.NudgeHook
@@ -11,7 +12,7 @@ open VibeFs.Opencode.Session
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.ChildAgent
 open VibeFs.Opencode.MagicSession
-open VibeFs.Shell.FuzzyFinderShell
+open VibeFs.Shell.FuzzySearch
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -69,11 +70,11 @@ let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: 
                 let directory = Dyn.str ctx "directory"
                 let! result = runReviewerSession childAgentRegistry (Dyn.get ctx "client") reviewStore directory sessionID task |> Async.AwaitPromise
                 match result with
-                | ReviewSession.Accepted ->
+                | Accepted ->
                     pushPart parts (box {| ``type`` = "text"; text = $"Pre-review passed. Task \"{task}\" already meets all criteria — no changes needed." |})
-                | ReviewSession.Terminated ->
+                | Terminated ->
                     pushPart parts (box {| ``type`` = "text"; text = "Pre-review could not complete." |})
-                | ReviewSession.Rejected feedback ->
+                | Rejected feedback ->
                     reviewStore.activateReview(sessionID, task, dateNow ())
                     let msg = $"Task (loop-review): {task}\n\n=== Pre-review Feedback ===\n\n{feedback}\n\nAddress the feedback above, then call submit_review with:\n{loopFooter}"
                     pushPart parts (box {| ``type`` = "text"; text = msg |})

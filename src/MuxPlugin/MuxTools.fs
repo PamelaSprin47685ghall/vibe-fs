@@ -7,7 +7,7 @@ open VibeFs.MuxPlugin.MuxTools.IoTools
 open VibeFs.MuxPlugin.MuxTools.SearchTools
 open VibeFs.MuxPlugin.MuxTools.WebTools
 open VibeFs.MuxPlugin.MuxTools.ReviewTool
-open VibeFs.Shell.FuzzyFinderShell
+open VibeFs.Shell.FuzzySearch
 
 /// Tool names populated by `createToolCatalog` so that `experimentsFor` can
 /// compute the disabled-tool list via `canUse`.  Set once at registration time.

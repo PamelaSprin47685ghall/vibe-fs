@@ -7,8 +7,8 @@ open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
 open VibeFs.Index
 open VibeFs.Opencode.Plugin
-open VibeFs.Shell.TreeSitterSyntax
-open VibeFs.Kernel.SyntaxTypes
+open VibeFs.Shell.TreeSitterShell
+open VibeFs.Kernel.TreeSitterKernel
 
 let pluginShape (p: obj) =
     check "plugin.name" (str p "name" = "kunwei")
@@ -82,6 +82,7 @@ let configSpec () = async {
     let coder = get agents "coder"
     let coderTools = get coder "tools"
     check "config coder tools.question false" (not (unbox<bool> (get coderTools "question")))
+    check "config coder tools.submit_review false" (not (unbox<bool> (get coderTools "submit_review")))
     let permission = get manager "permission"
     check "config manager permission.bash deny" (str permission "bash" = "deny")
     do! rmAsync workspaceDir |> Async.AwaitPromise

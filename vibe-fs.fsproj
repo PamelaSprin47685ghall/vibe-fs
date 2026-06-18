@@ -31,6 +31,7 @@
     <Compile Include="src/Kernel/FuzzyQuery.fs" />
     <Compile Include="src/Kernel/FuzzyFormat.fs" />
     <Compile Include="src/Kernel/FuzzyGrepDetect.fs" />
+    <Compile Include="src/Kernel/FuzzySearch.fs" />
     <Compile Include="src/Kernel/IpAllowlist.fs" />
     <Compile Include="src/Kernel/Dedup.fs" />
     <Compile Include="src/Kernel/Lru.fs" />
@@ -82,6 +83,7 @@
     <Compile Include="src/Shell/FuzzyRawMapping.fs" />
     <Compile Include="src/Shell/FuzzyFindCmd.fs" />
     <Compile Include="src/Shell/FuzzyGrepCmd.fs" />
+    <Compile Include="src/Shell/FuzzySearch.fs" />
     <!-- Mux: host-adapter pure contracts -->
     <Compile Include="src/Mux/Contract.fs" />
     <Compile Include="src/Mux/StreamEnd.fs" />
@@ -94,6 +96,7 @@
     <Compile Include="src/Opencode/Sdk.fs" />
     <Compile Include="src/Opencode/ChildAgent.fs" />
     <Compile Include="src/Opencode/HookSchema.fs" />
+    <Compile Include="src/Opencode/Core.fs" />
     <Compile Include="src/Opencode/NudgePolicy.fs" />
     <Compile Include="src/Opencode/SessionSnapshotDecoder.fs" />
     <Compile Include="src/Opencode/NudgeHook.fs" />

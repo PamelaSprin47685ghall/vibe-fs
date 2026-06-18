@@ -13,7 +13,6 @@ open VibeFs.Kernel.OpencodeNudgeState
 open VibeFs.Kernel.Prompts
 open VibeFs.Opencode.ChildAgent
 open VibeFs.Opencode.NudgePolicy
-open VibeFs.Opencode.SessionSnapshotDecoder
 
 let private opencodeTodoWriteToolName = "todowrite"
 

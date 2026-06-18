@@ -1,6 +1,5 @@
 module VibeFs.Shell.ReviewRuntime
 
-open VibeFs.Kernel.Review
 open VibeFs.Kernel.ReviewSession
 
 /// Pending review resolutions and their abort suppressors, keyed by session.

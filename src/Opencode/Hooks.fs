@@ -16,7 +16,7 @@ open VibeFs.Kernel.MagicProjector
 open VibeFs.Kernel.MagicReplay
 open VibeFs.Kernel.CapsFormat
 open VibeFs.Opencode.ChildAgent
-open VibeFs.Opencode.HookSchema
+open VibeFs.Opencode.Core
 open VibeFs.Opencode.MagicSession
 open VibeFs.Shell.TreeSitterShell
 
@@ -30,7 +30,7 @@ let private objectKeys (o: obj) : string array =
     JS.Constructors.Object.keys(o) |> Seq.toArray
 
 let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
-    if obj.ReferenceEquals(target, source) then ()
+    if System.Object.ReferenceEquals(target, source) then ()
     else
         let targetObj = box target
         targetObj?length <- 0

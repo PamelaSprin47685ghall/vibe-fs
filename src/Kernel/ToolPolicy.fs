@@ -16,6 +16,7 @@ let canUse (agent: Agent) (tool: Tool) : bool =
     | _ when toolHas [ "agent_report" ] -> true
     | _ when toolHas [ "bash"; "task" ] || tool = "grep" -> false
     | _ when toolHas [ "stealth" ] -> agent = "browser"
+    | _ when tool = "submit_review" -> agent = "manager"
     | _ when toolHas [ "return" ] -> toolHas [ agent ]
     | "meditator" | "executor" -> false
     | _ when tool = "read" -> true

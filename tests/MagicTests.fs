@@ -38,6 +38,19 @@ let private todoWriteErrorMsg (id: string) (callID: string) (errorText: string) 
         ] |]
     ]
 
+let private reviewMsg (id: string) (callID: string) (output: string) : obj =
+    createObj [
+        "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
+        "parts", box [| createObj [
+            "type", box "tool"; "tool", box magicReviewToolName; "callID", box callID
+            "state", box (createObj [
+                "status", box "completed"
+                "input", box (createObj [ "review", box "looks good" ])
+                "output", box output
+            ])
+        ] |]
+    ]
+
 let private backlogEntry (seq: int) (report: string) : BacklogEntry =
     { sequence = seq; timestamp = ""; report = report }
 
@@ -124,6 +137,21 @@ let projectMagicDropsFoldedUserMessages () =
     check "magic fold: hides original folded users" (r.Length = 4)
     check "magic fold: keeps folded user text in projection" (allJson.Contains("please fix this bug"))
 
+let projectMagicKeepsReviewInFold () =
+    let msgs = [|
+        userMsg "u1" "start"
+        todoWriteMsg "m1" "c1" "R1"
+        reviewMsg "rv1" "cr1" "Review accepted the work"
+        todoWriteMsg "m2" "c2" "R2"
+        todoWriteMsg "m3" "c3" "R3"
+    |]
+    let backlog = [backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3"]
+    let r = projectMagic msgs backlog false "test"
+    let allJson : string = Fable.Core.JS.JSON.stringify(r)
+    check "magic review: tool name kept" (allJson.Contains(magicReviewToolName))
+    check "magic review: output kept" (allJson.Contains("Review accepted the work"))
+    check "magic review: not fully folded away" (r.Length > 4)
+
 let magicSessionRefreshesBacklog () =
     let session = MagicSession()
     let first = [| todoWriteMsg "m1" "c1" "R1" |]
@@ -147,5 +175,6 @@ let run () =
     projectMagicNoFold ()
     projectMagicHidesErrors ()
     projectMagicDropsFoldedUserMessages ()
+    projectMagicKeepsReviewInFold ()
     magicSessionRefreshesBacklog ()
     buildBacklogTextTest ()

@@ -8,7 +8,7 @@ open VibeFs.Mux.Contract
 open VibeFs.MuxPlugin.Delegate
 open VibeFs.MuxPlugin.MuxPrompts
 open VibeFs.MuxPlugin.MuxTools.Shared
-open VibeFs.Opencode.ToolCopy
+open VibeFs.Opencode.Core
 
 [<Global>]
 type AbortController() =

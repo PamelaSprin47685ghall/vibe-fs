@@ -1,8 +1,22 @@
 module VibeFs.Kernel.TreeSitterKernel
 
 open System.Text.RegularExpressions
-open VibeFs.Kernel.SyntaxTypes
 open VibeFs.Kernel
+
+/// One syntax problem located in a source file.
+type SyntaxDiagnostic =
+    { line: int
+      column: int
+      endLine: int
+      endColumn: int
+      severity: string
+      message: string }
+
+/// The outcome of checking a file's syntax — either an array of diagnostics with
+/// the detected language, or a failure reason.
+type SyntaxCheckResult =
+    | Ok of lang: string * errors: SyntaxDiagnostic array
+    | Failed of lang: string * reason: string
 
 /// Tools whose results should be syntax-checked after a write.
 let private fileEditTools: Set<string> =

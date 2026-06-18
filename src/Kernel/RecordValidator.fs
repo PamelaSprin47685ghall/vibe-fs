@@ -3,6 +3,25 @@ module VibeFs.Kernel.RecordValidator
 open Fable.Core
 open Fable.Core.JsInterop
 
+/// A field-level schema for tool metadata — declarative validation data.
+type SchemaType =
+    | StringType | NumberType | BooleanType | EnumType
+    | ArrayType | ObjectType | UnionType
+
+type SchemaField =
+    { ``type``: SchemaType
+      description: string option
+      optional: bool
+      enumValues: string list
+      items: SchemaField option
+      properties: Map<string, SchemaField>
+      anyOf: SchemaField list }
+
+type ToolMetadata =
+    { name: string
+      description: string
+      parameters: Map<string, SchemaField> }
+
 /// A parser turns an unknown JS value into a typed Result.
 type Parser<'t> = obj -> Result<'t, string>
 

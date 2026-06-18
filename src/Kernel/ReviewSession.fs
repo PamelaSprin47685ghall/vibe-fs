@@ -1,6 +1,61 @@
 module VibeFs.Kernel.ReviewSession
 
-open VibeFs.Kernel.Review
+[<RequireQualifiedAccess>]
+type ReviewState =
+    | Inactive
+    | Active of task: string
+    | Locked of task: string * reviewerId: string
+    | Accepted
+    | Rejected of feedback: string
+
+type ReviewCommand =
+    | Activate of task: string
+    | Submit
+    | Lock of reviewerId: string
+    | Unlock
+    | Accept
+    | Reject of feedback: string
+
+[<RequireQualifiedAccess>]
+type ReviewEvent =
+    | Activated of task: string
+    | Submitted
+    | LockAcquired of reviewerId: string
+    | LockReleased
+    | Accepted
+    | Rejected of feedback: string
+
+let transition (state: ReviewState) (command: ReviewCommand) : ReviewState * ReviewEvent option =
+    match state with
+    | ReviewState.Inactive ->
+        match command with
+        | Activate task -> ReviewState.Active task, Some(ReviewEvent.Activated task)
+        | _ -> state, None
+    | ReviewState.Active task ->
+        match command with
+        | Submit -> state, Some ReviewEvent.Submitted
+        | Lock reviewerId -> ReviewState.Locked(task, reviewerId), Some(ReviewEvent.LockAcquired reviewerId)
+        | Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
+        | Reject feedback -> ReviewState.Rejected feedback, Some(ReviewEvent.Rejected feedback)
+        | _ -> state, None
+    | ReviewState.Locked(task, _) ->
+        match command with
+        | Unlock -> ReviewState.Active task, Some ReviewEvent.LockReleased
+        | Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
+        | Reject feedback -> ReviewState.Rejected feedback, Some(ReviewEvent.Rejected feedback)
+        | _ -> state, None
+    | ReviewState.Accepted -> state, None
+    | ReviewState.Rejected _ -> state, None
+
+let isActive (state: ReviewState) : bool =
+    match state with
+    | ReviewState.Inactive -> false
+    | ReviewState.Active _ -> true
+    | ReviewState.Locked _ -> true
+    | ReviewState.Accepted -> false
+    | ReviewState.Rejected _ -> false
+
+let initialState = ReviewState.Inactive
 
 /// The terminal outcome of a review round, distinguishable from the ongoing
 /// state machine: Accepted and Rejected echo the verdict, Terminated means the
@@ -133,3 +188,30 @@ let reduceIfVersionMatches (registry: Registry) (id: string) (expectedVersion: i
     match Map.tryFind id registry with
     | Some session when session.version = expectedVersion -> Some(reduce registry action)
     | _ -> None
+
+// ── Reviewer loop ─────────────────────────────────────────────────────────────
+
+/// What happened in a single reviewer round.
+type RoundOutcome =
+    | Resolved of result: ReviewResult
+    | PromptFailed
+    | NoResult
+
+/// What the orchestrator should do after a round: stop with a result, or nudge.
+type LoopDecision =
+    | Finish of result: ReviewResult
+    | Nudge of nudgeCount: int
+
+/// Decide the next move after a round.  Resolved ends the loop; a failed prompt
+/// terminates; running out of nudges terminates; otherwise nudge and retry.
+let decideAfterRound (nudgeCount: int) (outcome: RoundOutcome) (maxNudges: int) : LoopDecision =
+    match outcome with
+    | Resolved result -> Finish result
+    | PromptFailed -> Finish Terminated
+    | NoResult ->
+        let next = nudgeCount + 1
+        if next >= maxNudges then Finish Terminated else Nudge next
+
+/// Initial round uses the task prompt; every retry uses the short nudge prompt.
+let promptParts (nudgeCount: int) (initialParts: string list) (nudgePrompt: string) : string list =
+    if nudgeCount = 0 then initialParts else [ nudgePrompt ]

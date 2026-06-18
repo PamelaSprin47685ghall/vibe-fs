@@ -7,14 +7,12 @@ open VibeFs.Kernel.ExecutorKernel
 open VibeFs.Kernel.OllamaFormat
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Shell.OllamaClient
-open VibeFs.Opencode.Sdk
-open VibeFs.Opencode.ToolCopy
+open VibeFs.Opencode.Core
 open VibeFs.Opencode.Session
 open VibeFs.Opencode.ExecutorActor
 open VibeFs.Opencode.ChildAgent
-open VibeFs.Opencode.HookSchema
 open VibeFs.Kernel.Prompts
-open VibeFs.Shell.FuzzyFinderShell
+open VibeFs.Shell.FuzzySearch
 
 [<Global("Buffer")>]
 let private nodeBuffer : obj = jsNative
@@ -142,21 +140,21 @@ let browserTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null))
 
 let fuzzyFindTool (finderCache: FinderCache) : obj =
-    define fuzzyFind
+    define VibeFs.Opencode.Core.fuzzyFind
         (box {| pattern = strMinNullish 1 Params.fuzzyFindPattern; path = strOpt Params.fuzzyFindPath
                 limit = intMinNullish 1 Params.fuzzyFindLimit; iterator = strOpt Params.fuzzyFindIterator |})
         (fun args context ->
             let scopeId = Dyn.str context "sessionID"
             if scopeId = "" then resolveStr "Error: fuzzy-find requires an active session"
             else
-                let p : VibeFs.Shell.FuzzyCoordinator.FuzzyFindParams =
+                let p : VibeFs.Shell.FuzzySearch.FuzzyFindParams =
                     { pattern = optStr args "pattern"; path = optStr args "path"
                       limit = optInt args "limit"; iterator = optStr args "iterator" }
-                let o : VibeFs.Shell.FuzzyCoordinator.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
-                async { let! r = VibeFs.Shell.FuzzyFindCmd.fuzzyFind p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
+                let o : VibeFs.Shell.FuzzySearch.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
+                async { let! r = VibeFs.Shell.FuzzySearch.fuzzyFind p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
 
 let fuzzyGrepTool (finderCache: FinderCache) : obj =
-    define fuzzyGrep
+    define VibeFs.Opencode.Core.fuzzyGrep
         (box {| pattern = strMinNullish 1 Params.fuzzyGrepPattern; path = strOpt Params.fuzzyGrepPath
                 exclude = excludeOpt Params.fuzzyGrepExclude; caseSensitive = boolOpt Params.fuzzyGrepCaseSensitive
                 context = intMinNullish 0 Params.fuzzyGrepContext; limit = intMinNullish 1 Params.fuzzyGrepLimit
@@ -165,12 +163,12 @@ let fuzzyGrepTool (finderCache: FinderCache) : obj =
             let scopeId = Dyn.str context "sessionID"
             if scopeId = "" then resolveStr "Error: fuzzy-grep requires an active session"
             else
-                let p : VibeFs.Shell.FuzzyCoordinator.FuzzyGrepParams =
-                    { pattern = optStr args "pattern"; path = optStr args "path"; exclude = VibeFs.Shell.FuzzyCoordinator.parseExcludeField args
+                let p : VibeFs.Shell.FuzzySearch.FuzzyGrepParams =
+                    { pattern = optStr args "pattern"; path = optStr args "path"; exclude = VibeFs.Shell.FuzzySearch.parseExcludeField args
                       caseSensitive = optBool args "caseSensitive"; context = optInt args "context"
                       limit = optInt args "limit"; iterator = optStr args "iterator" }
-                let o : VibeFs.Shell.FuzzyCoordinator.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
-                async { let! r = VibeFs.Shell.FuzzyGrepCmd.fuzzyGrep p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
+                let o : VibeFs.Shell.FuzzySearch.SearchOptions = { cwd = Dyn.str context "directory"; scopeId = scopeId; store = None; finderCache = finderCache }
+                async { let! r = VibeFs.Shell.FuzzySearch.fuzzyGrep p o |> Async.AwaitPromise in return r.output } |> Async.StartAsPromise)
 
 let private abortSignal (context: obj) : obj =
     if Dyn.isNullish context then null else Dyn.get context "abort"
@@ -242,12 +240,12 @@ let webfetchTool () : obj =
                         with ex -> return $"Web fetch failed: {ex.Message}"
                 } |> Async.StartAsPromise)
 
-let private formatReviewResult (result: VibeFs.Kernel.ReviewSession.ReviewResult) : string =
+let private formatReviewResult (result: ReviewResult) : string =
     match result with
-    | VibeFs.Kernel.ReviewSession.Accepted ->
+    | Accepted ->
         "Review passed. Your changes have been accepted. loop mode has ended."
-    | VibeFs.Kernel.ReviewSession.Terminated -> "Review terminated."
-    | VibeFs.Kernel.ReviewSession.Rejected feedback ->
+    | Terminated -> "Review terminated."
+    | Rejected feedback ->
         "Review feedback:\n\n" + feedback
         + "\n\nAddress the feedback above. loop mode is still active — fix the issues and call submit_review again."
 
@@ -273,10 +271,10 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Sh
                         let task = defaultArg (store.getReviewTask sessionID) ""
                         let! result = runSubmitReview registry client store (Dyn.str tc "directory") sessionID report affectedFiles task abort |> Async.AwaitPromise
                         match result with
-                        | VibeFs.Kernel.ReviewSession.Accepted
-                        | VibeFs.Kernel.ReviewSession.Terminated ->
+                        | Accepted
+                        | Terminated ->
                             store.deactivateReview sessionID
-                        | VibeFs.Kernel.ReviewSession.Rejected _ -> ()
+                        | Rejected _ -> ()
                         return formatReviewResult result
                     finally
                         store.unlockReview sessionID

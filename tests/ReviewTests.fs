@@ -1,9 +1,7 @@
 module VibeFs.Tests.ReviewTests
 
 open VibeFs.Tests.Assert
-open VibeFs.Kernel.Review
 open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewerLoop
 open VibeFs.Shell.ReviewRuntime
 
 let transition' () =

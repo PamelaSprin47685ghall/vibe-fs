@@ -22,6 +22,9 @@ let canUse' () =
 
     check "return-reviewer for reviewer" (canUse "reviewer" "return-reviewer")
     check "return-reviewer denied for manager" (not (canUse "manager" "return-reviewer"))
+    check "submit_review for manager" (canUse "manager" "submit_review")
+    check "submit_review denied for coder" (not (canUse "coder" "submit_review"))
+    check "submit_review denied for reader" (not (canUse "reader" "submit_review"))
 
     check "meditator denied read" (not (canUse "meditator" "read"))
     check "executor denied read" (not (canUse "executor" "read"))

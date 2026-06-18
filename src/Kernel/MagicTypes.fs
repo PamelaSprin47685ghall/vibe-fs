@@ -1,6 +1,7 @@
 module VibeFs.Kernel.MagicTypes
 
 let magicTodoToolName = "todowrite"
+let magicReviewToolName = "submit_review"
 
 type BacklogEntry = {
     sequence: int

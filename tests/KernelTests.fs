@@ -56,7 +56,7 @@ let jsBoundary' () =
     check "parse array" (arr = [| 1; 2 |])
     let obj = parseJsBoundaryObj (createObj [ "a", box 1 ])
     check "parse obj" (Map.find "a" obj = 1)
-    check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = MessageAborted)
+    check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = VibeFs.Kernel.JsBoundary.MessageAborted)
 
 let hostKernel' () =
     let intent = formatCoderUserPrompt "fix bug" [ "a.ts"; "b.ts" ]
