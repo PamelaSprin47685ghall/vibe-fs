@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.SyntheticIds
 open VibeFs.Index
 open VibeFs.Opencode.Plugin
 open VibeFs.Opencode.ExecutorActor
@@ -78,6 +79,62 @@ let capsTransformInPlaceSpec () = async {
     let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     do! (get p "experimental.chat.messages.transform") $ (createObj [], freshOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     check "caps transform mutates array in place" (obj.ReferenceEquals(get freshOut "messages", freshRef))
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
+let capsAndMagicOrderSpec () = async {
+    let! workspaceDir = mkdtempAsync "caps-magic-order-" |> Async.AwaitPromise
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let tf = get p "experimental.chat.messages.transform"
+    let messages = createObj [ "messages", box [|
+        box {| info = createObj [ "id", box "u1"; "role", box "user"; "sessionID", box "test" ]
+               parts = [| box {| ``type`` = "text"; text = "start" |} |] |}
+        box {| info = createObj [ "id", box "m1"; "role", box "assistant"; "sessionID", box "test"; "time", box (createObj [ "created", box 123; "completed", box 456 ]) ]
+               parts = [| createObj [
+                   "type", box "tool"
+                   "tool", box "todowrite"
+                   "callID", box "c1"
+                   "state", box (createObj [
+                       "status", box "completed"
+                       "input", box (createObj [ "completedWorkReport", box "R1"; "todos", box [||] ])
+                       "output", box "Todos updated."
+                   ])
+               ] |] |}
+        box {| info = createObj [ "id", box "u2"; "role", box "user"; "sessionID", box "test" ]
+               parts = [| box {| ``type`` = "text"; text = "please fix this bug" |} |] |}
+        box {| info = createObj [ "id", box "m2"; "role", box "assistant"; "sessionID", box "test"; "time", box (createObj [ "created", box 789; "completed", box 790 ]) ]
+               parts = [| createObj [
+                   "type", box "tool"
+                   "tool", box "todowrite"
+                   "callID", box "c2"
+                   "state", box (createObj [
+                       "status", box "completed"
+                       "input", box (createObj [ "completedWorkReport", box "R2"; "todos", box [||] ])
+                       "output", box "Todos updated."
+                   ])
+               ] |] |}
+        box {| info = createObj [ "id", box "m3"; "role", box "assistant"; "sessionID", box "test"; "time", box (createObj [ "created", box 791; "completed", box 792 ]) ]
+               parts = [| createObj [
+                   "type", box "tool"
+                   "tool", box "todowrite"
+                   "callID", box "c3"
+                   "state", box (createObj [
+                       "status", box "completed"
+                       "input", box (createObj [ "completedWorkReport", box "R3"; "todos", box [||] ])
+                       "output", box "Todos updated."
+                   ])
+               ] |] |}
+    |] ]
+    do! tf $ (createObj [], messages) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let result = unbox<obj[]> (get messages "messages")
+    let capsParts = unbox<obj[]> (get result.[0] "parts")
+    let capsAssistantInfo = get result.[1] "info"
+    let magicInfo = get result.[2] "info"
+    let magicId : string = str magicInfo "id"
+    check "caps/magic order: caps user first" (str capsParts.[0] "text" = "你好")
+    check "caps/magic order: caps assistant second" ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
+    check "caps/magic order: magic prefix third" (magicId.StartsWith(magicTodoPrefixPrefix : string))
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
@@ -214,6 +271,7 @@ let run () : JS.Promise<unit> =
         do! buildCapsFileReadDataSpec ()
         do! capsTransformSpec ()
         do! capsTransformInPlaceSpec ()
+        do! capsAndMagicOrderSpec ()
         do! writeToolSpec reg
         do! loopCommandSpec reg
         do! agentConfigSpec ()
