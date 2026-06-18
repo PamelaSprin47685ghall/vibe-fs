@@ -217,7 +217,7 @@ let buildBacklogTextTest () =
     let text: string = buildBacklogText [ backlogEntry 1 "Did work" ] []
     check "backlog text: has report" (text.Contains("Did work"))
     let empty: string = buildBacklogText [] []
-    check "backlog text: empty message" (empty.Contains("Backlog"))
+    check "backlog text: empty message" (empty.Contains("已完成工作报告"))
 
 let run () =
     replayBacklogTest ()
