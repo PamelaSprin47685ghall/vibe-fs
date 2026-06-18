@@ -33,8 +33,6 @@ let runAll (_args: string array) : JS.Promise<int> =
         KernelTests.headTail' ()
         KernelTests.dedup' ()
         KernelTests.lru' ()
-        KernelTests.ipAllowlist' ()
-        KernelTests.ipStrict ()
         KernelTests.excludedDirs' ()
         KernelTests.jsBoundary' ()
         KernelTests.hostKernel' ()

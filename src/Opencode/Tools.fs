@@ -222,25 +222,21 @@ let webfetchTool () : obj =
             else
                 let signal = abortSignal context
                 async {
-                    let! urlError = validateFetchUrl url |> Async.AwaitPromise
-                    match urlError with
-                    | Some e -> return e
-                    | None ->
-                        let bodyEntries = ResizeArray<(string * obj)>()
-                        bodyEntries.Add("url", box url)
-                        match optBool args "extract_main" with Some v -> bodyEntries.Add("extract_main", box v) | None -> ()
-                        match optStr args "prefer_llms_txt" with Some v -> bodyEntries.Add("prefer_llms_txt", box v) | None -> ()
-                        match optStr args "prompt" with Some v -> bodyEntries.Add("prompt", box v) | None -> ()
-                        match optInt args "timeout" with Some v -> bodyEntries.Add("timeout", box v) | None -> ()
-                        let body = createObj (Seq.toList bodyEntries)
-                        try
-                            let! data = ollamaPost "web_fetch" body (if Dyn.isNullish signal then None else Some signal) |> Async.AwaitPromise
-                            let title = if Dyn.isNullish (Dyn.get data "title") then None else Some (Dyn.str data "title")
-                            let byline = if Dyn.isNullish (Dyn.get data "byline") then None else Some (Dyn.str data "byline")
-                            let length_ = if Dyn.isNullish (Dyn.get data "length") then None else Some (unbox<int> (Dyn.get data "length"))
-                            let content = if Dyn.isNullish (Dyn.get data "content") then None else Some (Dyn.str data "content")
-                            return formatFetchResponse { title = title; byline = byline; length = length_; content = content }
-                        with ex -> return $"Web fetch failed: {ex.Message}"
+                    let bodyEntries = ResizeArray<(string * obj)>()
+                    bodyEntries.Add("url", box url)
+                    match optBool args "extract_main" with Some v -> bodyEntries.Add("extract_main", box v) | None -> ()
+                    match optStr args "prefer_llms_txt" with Some v -> bodyEntries.Add("prefer_llms_txt", box v) | None -> ()
+                    match optStr args "prompt" with Some v -> bodyEntries.Add("prompt", box v) | None -> ()
+                    match optInt args "timeout" with Some v -> bodyEntries.Add("timeout", box v) | None -> ()
+                    let body = createObj (Seq.toList bodyEntries)
+                    try
+                        let! data = ollamaPost "web_fetch" body (if Dyn.isNullish signal then None else Some signal) |> Async.AwaitPromise
+                        let title = if Dyn.isNullish (Dyn.get data "title") then None else Some (Dyn.str data "title")
+                        let byline = if Dyn.isNullish (Dyn.get data "byline") then None else Some (Dyn.str data "byline")
+                        let length_ = if Dyn.isNullish (Dyn.get data "length") then None else Some (unbox<int> (Dyn.get data "length"))
+                        let content = if Dyn.isNullish (Dyn.get data "content") then None else Some (Dyn.str data "content")
+                        return formatFetchResponse { title = title; byline = byline; length = length_; content = content }
+                    with ex -> return $"Web fetch failed: {ex.Message}"
                 } |> Async.StartAsPromise)
 
 let private formatReviewResult (result: ReviewResult) : string =

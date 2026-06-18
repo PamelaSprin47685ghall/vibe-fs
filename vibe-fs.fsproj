@@ -27,7 +27,6 @@
     <Compile Include="src/Kernel/FuzzyQuery.fs" />
     <Compile Include="src/Kernel/FuzzyFormat.fs" />
     <Compile Include="src/Kernel/FuzzyGrepDetect.fs" />
-    <Compile Include="src/Kernel/IpAllowlist.fs" />
     <Compile Include="src/Kernel/Dedup.fs" />
     <Compile Include="src/Kernel/Lru.fs" />
     <Compile Include="src/Kernel/HeadTail.fs" />
@@ -60,7 +59,6 @@
     <Compile Include="src/Shell/ExecutorScript.fs" />
     <Compile Include="src/Shell/ExecutorJavascript.fs" />
     <Compile Include="src/Shell/ExecutorShell.fs" />
-    <Compile Include="src/Shell/SecureFetch.fs" />
     <Compile Include="src/Shell/OllamaClient.fs" />
     <Compile Include="src/Shell/TreeSitterShell.fs" />
     <Compile Include="src/Shell/Write.fs" />

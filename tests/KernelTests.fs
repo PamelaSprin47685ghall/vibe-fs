@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dedup
 open VibeFs.Kernel.HeadTail
-open VibeFs.Kernel.IpAllowlist
 open VibeFs.Kernel.Lru
 open VibeFs.Shell.CapsFilter
 open VibeFs.Kernel.Prompts
@@ -30,16 +29,6 @@ let lru' () =
     check "lru evicts" (Map.count c3.cache = 2)
     check "lru has b" (Map.containsKey "b" c3.cache)
     check "lru has c" (Map.containsKey "c" c3.cache)
-
-let ipAllowlist' () =
-    let r1 = isIpAllowed "127.0.0.1"
-    let r2 = isIpAllowed "10.0.0.1"
-    check "loopback blocked" (not r1)
-    check "private blocked" (not r2)
-
-let ipStrict () =
-    let r = isIpAllowed "8.8.8.8"
-    check "public allowed" r
 
 let excludedDirs' () =
     let r = isExcludedDir "node_modules"

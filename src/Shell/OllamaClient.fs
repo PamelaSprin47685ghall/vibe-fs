@@ -3,16 +3,12 @@ module VibeFs.Shell.OllamaClient
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.IpAllowlist
-open VibeFs.Shell.SecureFetch
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
 
 [<Global>]
-type URL(url: string) =
-    member _.protocol : string = jsNative
-    member _.hostname : string = jsNative
+let private fetch (url: string) (init: obj) : JS.Promise<obj> = jsNative
 
 let postInitNoSignal (apiKey: string) (body: string) : obj =
     createObj [
@@ -50,22 +46,7 @@ let getOllamaApiKey () : string =
 let private normalizeOllamaPath (pathname: string) : string =
     if pathname.StartsWith("/") then pathname else $"/{pathname}"
 
-/// Validate a fetch URL: must be http(s) and on an allowed (non-private) host.
 let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
-
-let validateFetchUrl (url: string) : JS.Promise<string option> =
-    async {
-        try
-            let parsed = URL(url)
-            let protocol = parsed.protocol
-            if protocol <> "http:" && protocol <> "https:" then
-                return Some($"unsupported URL scheme: {protocol}")
-            else
-                let hostname = parsed.hostname
-                return if validateHostname hostname then None else Some "host not allowed"
-        with _ -> return Some "invalid URL"
-    }
-    |> Async.StartAsPromise
 
 /// POST JSON to the Ollama API with the bearer key, returning parsed JSON.
 let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Promise<obj> =
@@ -76,7 +57,7 @@ let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
             match abortSignal with
             | Some signal -> postInitWithSignal (getOllamaApiKey ()) bodyStr signal
             | None -> postInitNoSignal (getOllamaApiKey ()) bodyStr
-        let! response = secureFetch url init |> Async.AwaitPromise
+        let! response = fetch url init |> Async.AwaitPromise
         let ok = Dyn.truthy (Dyn.get response "ok")
         if not ok then
             let! text =
