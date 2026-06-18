@@ -60,11 +60,9 @@ let enumOpt = Sdk.enumOpt
 let obj = Sdk.obj
 let define = Sdk.define
 
-let withUiParameterStripped = HookSchema.withUiParameterStripped
 let stripUiFromJsonSchema = HookSchema.stripUiFromJsonSchema
-let withRequiredStringProperty = HookSchema.withRequiredStringProperty
 let rewriteToolJsonSchema = HookSchema.rewriteToolJsonSchema
-let enrichMagicTodoSchema = HookSchema.enrichMagicTodoSchema
+let buildMagicTodoSchema = HookSchema.buildMagicTodoSchema
 let joinReaderIntents = HookSchema.joinReaderIntents
 let joinCoderIntents = HookSchema.joinCoderIntents
 let uiLabelForTool = HookSchema.uiLabelForTool

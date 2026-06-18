@@ -192,7 +192,7 @@ let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
             rewriteToolJsonSchema stripUiFromJsonSchema output
         elif toolID = MagicTypes.magicTodoToolName then
             setKey output "description" (box toolDescription)
-            rewriteToolJsonSchema enrichMagicTodoSchema output
+            setKey output "jsonSchema" (buildMagicTodoSchema ())
     } |> Async.StartAsPromise
 
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =

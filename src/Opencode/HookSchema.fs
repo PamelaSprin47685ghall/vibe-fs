@@ -10,9 +10,6 @@ let private setKey (target: obj) (key: string) (value: obj) : unit = target?(key
 let private objectKeys (value: obj) : string array =
     JS.Constructors.Object.keys(value) |> Seq.toArray
 
-let private cloneObject (value: obj) : obj =
-    createObj [ for key in objectKeys value do key, get value key ]
-
 let private isStringArray (value: obj) : bool =
     isArray value && ((value :?> obj array) |> Array.forall (fun item -> typeIs item "string"))
 
@@ -25,38 +22,6 @@ let private requiredWithoutUi (required: obj) : obj =
             let key = string item
             if key = "_ui" then None else Some (box key))
         |> box
-
-let withUiParameterStripped (parameters: obj) : obj =
-    let properties = get parameters "properties"
-    if isNullish properties then parameters
-    else
-        let nextProperties =
-            objectKeys properties
-            |> Array.choose (fun key ->
-                if key = "_ui" then None
-                else Some (key, get properties key))
-            |> createObj
-
-        createObj
-            [ for key in objectKeys parameters do
-                  if key = "properties" then
-                      yield key, nextProperties
-                  elif key = "required" then
-                      yield key, requiredWithoutUi (get parameters "required")
-                  else
-                      yield key, get parameters key ]
-
-let private requiredWithField (field: string) (required: obj) : obj =
-    if isNullish required then
-        box [| box field |]
-    elif not (isArray required) then
-        required
-    else
-        let items = required :?> obj array |> Array.map string
-        if items |> Array.contains field then
-            box (items |> Array.map box)
-        else
-            box (Array.append (items |> Array.map box) [| box field |])
 
 let stripUiFromJsonSchema (schema: obj) : obj =
     if isNullish schema then schema
@@ -80,19 +45,6 @@ let stripUiFromJsonSchema (schema: obj) : obj =
                       else
                           yield key, get schema key ]
 
-let withRequiredStringProperty (field: string) (description: string) (schema: obj) : obj =
-    if isNullish schema then schema
-    else
-        let next = cloneObject schema
-        let properties = get schema "properties"
-        let nextProperties =
-            if isNullish properties then createObj []
-            else cloneObject properties
-        setKey nextProperties field (createObj [ "type", box "string"; "description", box description ])
-        setKey next "properties" nextProperties
-        setKey next "required" (requiredWithField field (get schema "required"))
-        next
-
 let rewriteToolJsonSchema (rewrite: obj -> obj) (output: obj) : unit =
     let jsonSchema = get output "jsonSchema"
     if not (isNullish jsonSchema) then
@@ -102,46 +54,36 @@ let rewriteToolJsonSchema (rewrite: obj -> obj) (output: obj) : unit =
         if not (isNullish parameters) then
             setKey output "parameters" (rewrite parameters)
 
-let private rewriteNestedProperty (propertyName: string) (rewrite: obj -> obj) (schema: obj) : obj =
-    if isNullish schema then schema
-    else
-        let properties = get schema "properties"
-        if isNullish properties then schema
-        else
-            let target = get properties propertyName
-            if isNullish target then schema
-            else
-                let next = cloneObject schema
-                let nextProperties = cloneObject properties
-                setKey nextProperties propertyName (rewrite target)
-                setKey next "properties" nextProperties
-                next
+let private stringProperty (description: string) : obj =
+    createObj [ "type", box "string"; "description", box description ]
 
-let private rewriteItems (rewrite: obj -> obj) (schema: obj) : obj =
-    if isNullish schema then schema
-    else
-        let items = get schema "items"
-        if isNullish items then schema
-        else
-            let next = cloneObject schema
-            setKey next "items" (rewrite items)
-            next
-
-let private setDescription (description: string) (schema: obj) : obj =
-    if isNullish schema then schema
-    else
-        let next = cloneObject schema
-        setKey next "description" (box description)
-        next
-
-let enrichMagicTodoSchema (schema: obj) : obj =
-    schema
-    |> rewriteNestedProperty "todos" (fun todosSchema ->
-        let withTodoDesc = setDescription todosDesc todosSchema
-        let withItemContent = rewriteItems (rewriteNestedProperty "content" (setDescription todoContentDesc)) withTodoDesc
-        let withItemStatus = rewriteItems (rewriteNestedProperty "status" (setDescription todoStatusDesc)) withItemContent
-        rewriteItems (rewriteNestedProperty "priority" (setDescription todoPriorityDesc)) withItemStatus)
-    |> withRequiredStringProperty "completedWorkReport" reportDesc
+// Built-in `todowrite` ships its schema as an Effect Schema (output.parameters)
+// with output.jsonSchema undefined, and tool/registry only forwards a custom
+// schema to the model when output.jsonSchema changes. So we hand it a complete
+// JSON Schema via output.jsonSchema and leave output.parameters untouched.
+let buildMagicTodoSchema () : obj =
+    let todoItem =
+        createObj [
+            "type", box "object"
+            "properties", createObj [
+                "content", stringProperty todoContentDesc
+                "status", stringProperty todoStatusDesc
+                "priority", stringProperty todoPriorityDesc
+            ]
+            "required", box [| box "content"; box "status"; box "priority" |]
+        ]
+    createObj [
+        "type", box "object"
+        "properties", createObj [
+            "todos", createObj [
+                "type", box "array"
+                "description", box todosDesc
+                "items", todoItem
+            ]
+            "completedWorkReport", stringProperty reportDesc
+        ]
+        "required", box [| box "todos"; box "completedWorkReport" |]
+    ]
 
 let joinReaderIntents (intents: obj) : Result<string, string> =
     if not (isArray intents) || not (isStringArray intents) then
