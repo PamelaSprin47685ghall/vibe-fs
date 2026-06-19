@@ -45,40 +45,48 @@ let defaultOptions = { startIndex = 0; joiner = "\n\n" }
 
 let readAssistantText (entries: obj array) (options: AssistantTextOptions option) : string option =
     let opts = defaultArg options defaultOptions
-    let chunks = ResizeArray<string>()
-    for index in opts.startIndex .. entries.Length - 1 do
-        let entry = entries.[index]
-        if not (Dyn.isNullish entry) && entryType entry = "message" then
-            let message = entryMessage entry
-            if not (Dyn.isNullish message) && infoRole message = "assistant" then
-                let content = infoContent message
-                if not (Dyn.isNullish content) && Dyn.isArray content then
-                    for part in content :?> obj array do
-                        if not (Dyn.isNullish part) && partType part = "text" then
-                            let text = partText part
-                            if not (Dyn.isNullish text) && string text <> "" then chunks.Add(string text)
-    if chunks.Count > 0 then Some(String.concat opts.joiner chunks) else None
+    let chunks =
+        if opts.startIndex >= entries.Length then [||]
+        else
+            entries.[opts.startIndex..]
+            |> Array.choose (fun entry ->
+                if isNullish entry || entryType entry <> "message" then None
+                else
+                    let message = entryMessage entry
+                    if isNullish message || infoRole message <> "assistant" then None
+                    else
+                        let content = infoContent message
+                        if isNullish content || not (isArray content) then None
+                        else Some (content :?> obj array))
+            |> Array.collect id
+            |> Array.choose (fun part ->
+                if isNullish part || partType part <> "text" then None
+                else
+                    let text = partText part
+                    if isNullish text || string text = "" then None else Some (string text))
+    if chunks.Length > 0 then Some(String.concat opts.joiner chunks) else None
 
 let getLatestTodoPhasesFromEntriesFor (isTodoToolResult: string -> bool) (entries: obj array) : obj =
-    let rec scan index =
-        if index < 0 then box [||]
+    let phasesOf entry =
+        if isNullish entry then None
+        elif entryType entry = "custom" && entryCustomType entry = "user_todo_edit" then
+            let data = entryData entry
+            let phases = if isNullish data then null else Dyn.get data "phases"
+            if not (isNullish phases) && isArray phases then Some phases else None
+        elif entryType entry <> "message" then None
         else
-            let entry = entries.[index]
-            if Dyn.isNullish entry then scan (index - 1)
-            elif entryType entry = "custom" && entryCustomType entry = "user_todo_edit" then
-                let data = entryData entry
-                let phases = if Dyn.isNullish data then null else Dyn.get data "phases"
-                if not (Dyn.isNullish phases) && Dyn.isArray phases then Dyn.clone phases else scan (index - 1)
-            elif entryType entry <> "message" then scan (index - 1)
+            let message = entryMessage entry
+            if isNullish message || infoRole message <> "toolResult" || not (isTodoToolResult (infoToolName message)) then None
+            elif infoIsError message then None
             else
-                let message = entryMessage entry
-                if Dyn.isNullish message || infoRole message <> "toolResult" || not (isTodoToolResult (infoToolName message)) then scan (index - 1)
-                elif infoIsError message then scan (index - 1)
-                else
-                    let details = infoDetails message
-                    let phases = if Dyn.isNullish details then null else Dyn.get details "phases"
-                    if not (Dyn.isNullish phases) && Dyn.isArray phases then Dyn.clone phases else scan (index - 1)
-    scan (entries.Length - 1)
+                let details = infoDetails message
+                let phases = if isNullish details then null else Dyn.get details "phases"
+                if not (isNullish phases) && isArray phases then Some phases else None
+    entries
+    |> Array.tryFindBack (fun entry -> phasesOf entry |> Option.isSome)
+    |> Option.bind phasesOf
+    |> Option.map Dyn.clone
+    |> Option.defaultValue (box [||])
 
 let getLatestTodoPhasesFromEntries (entries: obj array) : obj =
     getLatestTodoPhasesFromEntriesFor (fun toolName -> toolName = "todowrite") entries
@@ -110,42 +118,42 @@ let setPartOutput (part: obj) (newOutput: string) : obj =
         clonedPart
 
 let flatten (messages: obj array) : FlatPart list =
-    let entries = ResizeArray<FlatPart>()
-    for msgIdx = 0 to messages.Length - 1 do
-        let msg = messages.[msgIdx]
-        if not (isNullish msg) then
+    messages
+    |> Array.indexed
+    |> Array.collect (fun (msgIdx, msg) ->
+        if isNullish msg then [||]
+        else
             let isUser = messageIsUser msg
             let parts = messageParts msg
-            if not (isNullish parts) && isArray parts then
-                let partsArr = parts :?> obj array
-                for partIdx = 0 to partsArr.Length - 1 do
-                    let part = partsArr.[partIdx]
-                    if not (isNullish part) then entries.Add { msgIndex = msgIdx; partIndex = partIdx; isUser = isUser; part = part }
-    List.ofSeq entries
+            if isNullish parts || not (isArray parts) then [||]
+            else
+                (parts :?> obj array)
+                |> Array.indexed
+                |> Array.choose (fun (partIdx, part) ->
+                    if isNullish part then None
+                    else Some { msgIndex = msgIdx; partIndex = partIdx; isUser = isUser; part = part }))
+    |> List.ofArray
 
 let rebuild (messages: obj array) (visible: FlatPart list) : obj array =
     let byMessage = visible |> List.groupBy (fun e -> e.msgIndex) |> Map.ofList
-    let result = ResizeArray<obj>()
-    for msgIdx = 0 to messages.Length - 1 do
-        let msg = messages.[msgIdx]
-        if not (isNullish msg) then
+    messages
+    |> Array.indexed
+    |> Array.choose (fun (msgIdx, msg) ->
+        if isNullish msg then None
+        else
             let isUser = messageIsUser msg
             match Map.tryFind msgIdx byMessage with
-            | None -> if isUser then result.Add msg
+            | None -> if isUser then Some msg else None
             | Some entries ->
-                if isUser then result.Add msg
+                if isUser then Some msg
                 else
                     let partMap = entries |> List.map (fun e -> e.partIndex, e.part) |> Map.ofList
                     let originalParts = messageParts msg
-                    if isNullish originalParts || not (isArray originalParts) then result.Add msg
+                    if isNullish originalParts || not (isArray originalParts) then Some msg
                     else
                         let partsArr = originalParts :?> obj array
-                        let newParts = ResizeArray<obj>()
-                        for partIdx = 0 to partsArr.Length - 1 do
-                            match Map.tryFind partIdx partMap with
-                            | Some part -> newParts.Add part
-                            | None -> ()
-                        if newParts.Count > 0 then
-                            let clonedMessage = Dyn.withKey msg "parts" (box (newParts.ToArray()))
-                            result.Add clonedMessage
-    result.ToArray()
+                        let newParts =
+                            partsArr
+                            |> Array.indexed
+                            |> Array.choose (fun (partIdx, _) -> Map.tryFind partIdx partMap)
+                        if newParts.Length > 0 then Some (Dyn.withKey msg "parts" (box newParts)) else None)

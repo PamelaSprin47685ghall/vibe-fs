@@ -49,16 +49,17 @@ let private formatMtime (mtime: obj) : string =
 let private listDirectoryEntries (dirPath: string) : Async<string> =
     async {
         let! entries = readdir dirPath |> Async.AwaitPromise
-        let lines = ResizeArray<string>()
-        lines.Add($"total {entries.Length}")
-        for entry in entries do
-            let name = unbox<string> (entry?name)
-            let isDir = unbox<bool> (entry?isDirectory())
-            let kind = if isDir then "d" else "-"
-            let size = if isDir then 0 else unbox<int> (entry?size)
-            let mtime = formatMtime (entry?mtime)
-            lines.Add(sprintf "%s %8d %s %s" kind size mtime name)
-        return String.concat "\n" lines
+        let header = $"total {entries.Length}"
+        let lines =
+            entries
+            |> Array.map (fun entry ->
+                let name = unbox<string> (entry?name)
+                let isDir = unbox<bool> (entry?isDirectory())
+                let kind = if isDir then "d" else "-"
+                let size = if isDir then 0 else unbox<int> (entry?size)
+                let mtime = formatMtime (entry?mtime)
+                sprintf "%s %8d %s %s" kind size mtime name)
+        return String.concat "\n" (header :: Array.toList lines)
     }
 
 let private readFileWithLineNumbers (filePath: string) (offset: int option) (limit: int option) : Async<string> =

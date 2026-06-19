@@ -23,9 +23,10 @@ let fileAnnotation (item: FileAnnotation option) : string =
         | Some g when g <> "clean" && g <> "unknown" && g <> "" -> $"  [{g} in git]"
         | _ ->
             let frecency = i.totalFrecencyScore |> Option.orElse i.accessFrecencyScore |> Option.defaultValue 0
-            if frecency >= hotFrecency then "  [VERY often touched file]"
-            elif frecency >= warmFrecency then "  [often touched file]"
-            else ""
+            match frecency with
+            | f when f >= hotFrecency -> "  [VERY often touched file]"
+            | f when f >= warmFrecency -> "  [often touched file]"
+            | _ -> ""
 
 type GrepMatch =
     { relativePath: string
@@ -40,6 +41,17 @@ type GrepResult =
       totalMatched: int option
       regexFallbackError: string option }
 
+let private grepMatchLines (m: GrepMatch) : string list =
+    let contextOffset = m.contextBefore.Length
+    let before =
+        m.contextBefore
+        |> List.mapi (fun i line -> $" {m.lineNumber - contextOffset + i}- {truncateLine line grepMaxLineLength}")
+    let matchLine = $" {m.lineNumber}: {truncateLine m.lineContent grepMaxLineLength}"
+    let after =
+        m.contextAfter
+        |> List.mapi (fun i line -> $" {m.lineNumber + 1 + i}- {truncateLine line grepMaxLineLength}")
+    before @ [ matchLine ] @ after
+
 let formatGrepOutput (result: GrepResult option) : string =
     match result with
     | None -> "No matches found"
@@ -49,21 +61,21 @@ let formatGrepOutput (result: GrepResult option) : string =
         else
             let total = defaultArg r.totalMatched r.items.Length
             let plural = if total = 1 then "match" else "matches"
-            let sb = System.Text.StringBuilder()
-            sb.Append($"{total} {plural}\n\n") |> ignore
-            let mutable currentFile = ""
-            for m in r.items do
-                if m.relativePath <> currentFile && currentFile <> "" then sb.Append('\n') |> ignore
-                if m.relativePath <> currentFile then
-                    sb.Append($"{m.relativePath}{fileAnnotation m.annotation}\n") |> ignore
-                    currentFile <- m.relativePath
-                let contextOffset = m.contextBefore.Length
-                m.contextBefore
-                |> List.iteri (fun i line -> sb.Append($" {m.lineNumber - contextOffset + i}- {truncateLine line grepMaxLineLength}\n") |> ignore)
-                sb.Append($" {m.lineNumber}: {truncateLine m.lineContent grepMaxLineLength}\n") |> ignore
-                m.contextAfter
-                |> List.iteri (fun i line -> sb.Append($" {m.lineNumber + 1 + i}- {truncateLine line grepMaxLineLength}\n") |> ignore)
-            sb.ToString().TrimEnd('\n')
+            let lines, _ =
+                r.items
+                |> List.fold
+                    (fun (lines, currentFile) m ->
+                        let lines =
+                            if m.relativePath <> currentFile && currentFile <> "" then lines @ [ "" ]
+                            else lines
+                        let lines, currentFile =
+                            if m.relativePath <> currentFile then
+                                lines @ [ $"{m.relativePath}{fileAnnotation m.annotation}" ], m.relativePath
+                            else
+                                lines, currentFile
+                        lines @ grepMatchLines m, currentFile)
+                    ([ $"{total} {plural}"; "" ], "")
+            (lines |> String.concat "\n").TrimEnd('\n')
 
 type FindMatch = { relativePath: string; annotation: FileAnnotation option }
 

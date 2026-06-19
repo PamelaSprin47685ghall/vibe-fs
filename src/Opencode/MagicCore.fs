@@ -31,11 +31,14 @@ let isTodoError (part: obj) : bool =
     isTodoErrorFor opencode part
 
 let lastTodoErrorTextFor (host: Host) (flat: FlatPart list) : string option =
-    let mutable last = None
-    for fp in flat do
-        if isTodoErrorFor host fp.part then
-            last <- Some(partToolError fp.part)
-    last
+    flat
+    |> List.tryFindBack (fun fp -> isTodoErrorFor host fp.part)
+    |> Option.map (fun fp -> partToolError fp.part)
+
+/// Mimocode 连续 task 调用 burst 的打断判定：用户消息（插话/输入）或其他工具调用会打断；
+/// assistant 文本输出、reasoning 思考、进度 part 不打断。
+let breaksTodoBurstFor (host: Host) (fp: FlatPart) : bool =
+    fp.isUser || (partIsTool fp.part && partToolName fp.part <> magicTodoToolNameFor host)
 
 let isReviewTool (part: obj) : bool =
     partIsTool part && partToolName part = magicReviewToolName
@@ -54,18 +57,26 @@ let buildBacklogText (backlog: BacklogEntry list) (userPrompts: string list) : s
     if backlog.IsEmpty && userPrompts.IsEmpty then
         emptyBacklogText
     else
-        let parts = ResizeArray<string>()
-        if userPrompts.Length > 0 then
-            let joined = userPrompts |> List.mapi (fun index text -> string (index + 1) + ". " + text.Trim()) |> String.concat lineSep
-            parts.Add(userMsgHeader + "\n" + joined)
-        if not backlog.IsEmpty then
-            let reports =
-                backlog
-                |> List.map (fun entry ->
-                    let ts = if entry.timestamp <> "" then dotSep + entry.timestamp else ""
-                    "#" + string entry.sequence + ts + "\n" + entry.report)
-            parts.Add(foldHeader + "\n" + String.concat sectionSep reports)
-        String.concat sectionSep parts
+        let userBlock =
+            if userPrompts.IsEmpty then
+                []
+            else
+                let joined =
+                    userPrompts
+                    |> List.mapi (fun index text -> string (index + 1) + ". " + text.Trim())
+                    |> String.concat lineSep
+                [ userMsgHeader + "\n" + joined ]
+        let backlogBlock =
+            if backlog.IsEmpty then
+                []
+            else
+                let reports =
+                    backlog
+                    |> List.map (fun entry ->
+                        let ts = if entry.timestamp <> "" then dotSep + entry.timestamp else ""
+                        "#" + string entry.sequence + ts + "\n" + entry.report)
+                [ foldHeader + "\n" + String.concat sectionSep reports ]
+        userBlock @ backlogBlock |> String.concat sectionSep
 
 let lastTodoErrorText (flat: FlatPart list) : string option =
     lastTodoErrorTextFor opencode flat

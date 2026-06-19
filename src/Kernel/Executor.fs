@@ -63,35 +63,35 @@ let private readHashComment (s: string) (i: int) =
     | -1 -> None
     | finish -> Some(s.[i..finish], finish + 1)
 
-let private trimTrailingWhitespace (chars: char list) =
-    chars |> List.rev |> List.skipWhile isWhitespace |> List.rev
+let private trimTrailingWhitespaceRev (bufferedRev: char list) =
+    List.skipWhile isWhitespace bufferedRev
 
-let private appendSlice (chars: char list) (slice: string) =
-    slice.ToCharArray() |> Array.fold (fun acc ch -> acc @ [ ch ]) chars
+let private appendSliceRev (bufferedRev: char list) (slice: string) =
+    (slice.ToCharArray() |> Array.toList |> List.rev) @ bufferedRev
 
 let private scan (script: string) : string * StrippedPipe list =
-    let rec loop index buffered stripped =
+    let rec loop index bufferedRev stripped =
         if index >= script.Length then
-            System.String(List.toArray buffered), List.rev stripped
+            System.String(List.toArray (List.rev bufferedRev)), List.rev stripped
         else
             let ch = script.[index]
             if ch = '\'' then
                 match readSingleQuoted script index with
-                | Some(slice, next) -> loop next (appendSlice buffered slice) stripped
-                | None -> loop script.Length (appendSlice buffered script.[index..]) stripped
+                | Some(slice, next) -> loop next (appendSliceRev bufferedRev slice) stripped
+                | None -> loop script.Length (appendSliceRev bufferedRev script.[index..]) stripped
             elif ch = '"' then
                 let slice, next = readDoubleQuoted script index
-                loop next (appendSlice buffered slice) stripped
+                loop next (appendSliceRev bufferedRev slice) stripped
             elif ch = '#' then
                 match readHashComment script index with
-                | Some(slice, next) -> loop next (appendSlice buffered slice) stripped
-                | None -> loop script.Length (appendSlice buffered script.[index..]) stripped
+                | Some(slice, next) -> loop next (appendSliceRev bufferedRev slice) stripped
+                | None -> loop script.Length (appendSliceRev bufferedRev script.[index..]) stripped
             elif ch = '|' then
                 match parsePipe script index with
-                | Some(finish, pipe) -> loop finish (trimTrailingWhitespace buffered) (pipe :: stripped)
-                | None -> loop (index + 1) (buffered @ [ ch ]) stripped
+                | Some(finish, pipe) -> loop finish (trimTrailingWhitespaceRev bufferedRev) (pipe :: stripped)
+                | None -> loop (index + 1) (ch :: bufferedRev) stripped
             else
-                loop (index + 1) (buffered @ [ ch ]) stripped
+                loop (index + 1) (ch :: bufferedRev) stripped
 
     loop 0 [] []
 

@@ -66,7 +66,17 @@ let private todoWriteErrorMsg (id: string) (callID: string) (errorText: string) 
                        "tool", box magicTodoToolName
                        "callID", box callID
                        "state",
-                       box (createObj [ "status", box "error"; "input", box (createObj []); "error", box errorText ]) ] |] ]
+                        box (createObj [ "status", box "error"; "input", box (createObj []); "error", box errorText ]) ] |] ]
+
+let private assistantTextMsg (id: string) (text: string) : obj =
+    createObj
+        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
+          "parts", box [| box {| ``type`` = "text"; text = text |} |] ]
+
+let private reasoningMsg (id: string) (text: string) : obj =
+    createObj
+        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
+          "parts", box [| box {| ``type`` = "reasoning"; text = text |} |] ]
 
 let private reviewMsg (id: string) (callID: string) (output: string) : obj =
     createObj
@@ -229,6 +239,36 @@ let replayBacklogForMimocodeSplitsBurstsOnGap () =
     check "mimocode gap: two backlog entries" (backlog.Length = 2)
     check "mimocode gap: preserves order" (backlog.[0].report.Contains("A") && backlog.[1].report.Contains("B"))
 
+let replayBacklogForMimocodeIgnoresAssistantTextBetweenTasks () =
+    let msgs =
+        [| taskMsgWithReport "m1" "c1" "Work A"
+           assistantTextMsg "a1" "let me continue"
+           taskMsgWithReport "m2" "c2" "Work B" |]
+    let backlog = replayBacklogFor Mimocode msgs
+    check "mimocode assistant text: stays one burst" (backlog.Length = 1)
+    check "mimocode assistant text: merges reports" (
+        backlog.[0].report.Contains("Work A") && backlog.[0].report.Contains("Work B"))
+
+let replayBacklogForMimocodeIgnoresReasoningBetweenTasks () =
+    let msgs =
+        [| taskMsgWithReport "m1" "c1" "Work A"
+           reasoningMsg "r1" "thinking through next step"
+           taskMsgWithReport "m2" "c2" "Work B" |]
+    let backlog = replayBacklogFor Mimocode msgs
+    check "mimocode reasoning: stays one burst" (backlog.Length = 1)
+    check "mimocode reasoning: merges reports" (
+        backlog.[0].report.Contains("Work A") && backlog.[0].report.Contains("Work B"))
+
+let replayBacklogForMimocodeSplitsOnOtherToolCall () =
+    let msgs =
+        [| taskMsgWithReport "m1" "c1" "Work A"
+           toolMsg "read" "r1" "rc1" "reading"
+           taskMsgWithReport "m2" "c2" "Work B" |]
+    let backlog = replayBacklogFor Mimocode msgs
+    check "mimocode other tool: splits burst" (backlog.Length = 2)
+    check "mimocode other tool: preserves order" (
+        backlog.[0].report.Contains("Work A") && backlog.[1].report.Contains("Work B"))
+
 let findFoldRangeTest () =
     let flat =
         VibeFs.Kernel.Message.flatten (
@@ -304,6 +344,26 @@ let findFoldRangeForMimocodeUsesLastProgressCallInBurst () =
         |> Option.exists (fun range ->
             partCallID flat.[range.firstResult].part = "c1"
             && partCallID flat.[range.secondToLast].part = "c3"))
+
+let findFoldRangeForMimocodeAssistantTextKeepsBurst () =
+    let flat =
+        flatten (
+            [| userMsg "u1" "start"
+               taskMsgWithActionAndReport "start" "m1" "c1" "Work 1"
+               assistantTextMsg "a1" "thinking aloud"
+               taskMsgWithActionAndReport "done" "m2" "c2" "Work 2"
+               userMsg "u2" "gap"
+               taskMsgWithActionAndReport "start" "m3" "c3" "Work 3"
+               assistantTextMsg "a2" "more thinking"
+               taskMsgWithActionAndReport "done" "m4" "c4" "Work 4"
+               userMsg "u3" "gap"
+               taskMsgWithActionAndReport "done" "m5" "c5" "Work 5" |]
+        )
+    match findFoldRangeFor Mimocode flat false with
+    | None -> check "mimocode assistant text in burst: fold found" false
+    | Some range ->
+        check "mimocode assistant text in burst: first segment ends after text" (
+            partCallID flat.[range.firstResult].part = "c2")
 
 let projectMagicFolds () =
     let msgs =
@@ -476,11 +536,15 @@ let run () =
     replayBacklogForMimocodeMergesConsecutiveWorkReports ()
     replayBacklogForMimocodeMergesConsecutiveTaskBurst ()
     replayBacklogForMimocodeSplitsBurstsOnGap ()
+    replayBacklogForMimocodeIgnoresAssistantTextBetweenTasks ()
+    replayBacklogForMimocodeIgnoresReasoningBetweenTasks ()
+    replayBacklogForMimocodeSplitsOnOtherToolCall ()
     findFoldRangeTest ()
     findFoldRangeOpencodePerCallMimocodePerBurst ()
     findFoldRangeForMimocodeIgnoresReadOnlyTaskCalls ()
     findFoldRangeForMimocodeRequiresThreeProgressBursts ()
     findFoldRangeForMimocodeUsesLastProgressCallInBurst ()
+    findFoldRangeForMimocodeAssistantTextKeepsBurst ()
     projectMagicFolds ()
     projectMagicNoFold ()
     projectMagicForMimocodeUsesTask ()

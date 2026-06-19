@@ -27,28 +27,32 @@ let private optionalStrArray (o: obj) (key: string) : string array =
     if Dyn.isNullish v || not (Dyn.isArray v) then [||]
     else v :?> obj array |> Array.map string
 
+let private foldArrayResult<'T> (decode: obj -> Result<'T, string>) (arr: obj array) : Result<'T list, string> =
+    arr
+    |> Array.fold
+        (fun acc item ->
+            acc
+            |> Result.bind (fun xs -> decode item |> Result.map (fun x -> x :: xs)))
+        (Ok [])
+    |> Result.map List.rev
+
+let private decodeCoderTarget (t: obj) : Result<CoderTarget, string> =
+    if not (Dyn.typeIs t "object") then
+        Result.Error "Invalid LLM input for coder: each target must be an object with file and guide"
+    else
+        let file = Dyn.str t "file"
+        let guide = Dyn.str t "guide"
+        if file = "" then Result.Error "Invalid LLM input for coder: each target requires file"
+        elif guide = "" then Result.Error "Invalid LLM input for coder: each target requires guide"
+        else Result.Ok { file = file; guide = guide }
+
 let private parseCoderTargets (targets: obj) : Result<CoderTarget list, string> =
     if Dyn.isNullish targets || not (Dyn.isArray targets) then
         Result.Error "Invalid LLM input for coder: targets must be a non-empty array"
     else
         let arr = targets :?> obj array
         if arr.Length = 0 then Result.Error "Invalid LLM input for coder: targets must be a non-empty array"
-        else
-            let mutable err = None
-            let results = ResizeArray<CoderTarget>()
-            for t in arr do
-                if err.IsNone then
-                    if not (Dyn.typeIs t "object") then
-                        err <- Some "Invalid LLM input for coder: each target must be an object with file and guide"
-                    else
-                        let file = Dyn.str t "file"
-                        let guide = Dyn.str t "guide"
-                        if file = "" then err <- Some "Invalid LLM input for coder: each target requires file"
-                        elif guide = "" then err <- Some "Invalid LLM input for coder: each target requires guide"
-                        else results.Add({ file = file; guide = guide })
-            match err with
-            | Some m -> Result.Error m
-            | None -> Result.Ok (results |> Seq.toList)
+        else foldArrayResult decodeCoderTarget arr
 
 let parseCoderIntent (item: obj) : Result<CoderIntent, string> =
     if not (Dyn.typeIs item "object") then Result.Error "Invalid LLM input for coder: each intent must be an object"
@@ -86,34 +90,14 @@ let parseCoderIntents (intents: obj) : Result<CoderIntent list, string> =
     else
         let arr = intents :?> obj array
         if arr.Length = 0 then Result.Error "Invalid LLM input for coder: intents must be a non-empty array"
-        else
-            let mutable err = None
-            let parsed = ResizeArray<CoderIntent>()
-            for item in arr do
-                if err.IsNone then
-                    match parseCoderIntent item with
-                    | Ok i -> parsed.Add i
-                    | Error m -> err <- Some m
-            match err with
-            | Some m -> Result.Error m
-            | None -> Result.Ok (parsed |> Seq.toList)
+        else foldArrayResult parseCoderIntent arr
 
 let parseInvestigatorIntents (intents: obj) : Result<InvestigatorIntent list, string> =
     if not (Dyn.isArray intents) then Result.Error "Invalid LLM input for investigator: intents must be an array"
     else
         let arr = intents :?> obj array
         if arr.Length = 0 then Result.Error "Invalid LLM input for investigator: intents must be a non-empty array"
-        else
-            let mutable err = None
-            let parsed = ResizeArray<InvestigatorIntent>()
-            for item in arr do
-                if err.IsNone then
-                    match parseInvestigatorIntent item with
-                    | Ok i -> parsed.Add i
-                    | Error m -> err <- Some m
-            match err with
-            | Some m -> Result.Error m
-            | None -> Result.Ok (parsed |> Seq.toList)
+        else foldArrayResult parseInvestigatorIntent arr
 
 let joinCoderUiLabel (intents: obj) : Result<string, string> =
     parseCoderIntents intents |> Result.map (fun list -> list |> List.map (fun i -> i.objective) |> String.concat "; ")

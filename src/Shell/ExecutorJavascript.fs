@@ -105,27 +105,29 @@ let rewriteJavascriptModuleSpecifiers (program: string) (cwd: string) : JS.Promi
         let! imports = parseImports program |> Async.AwaitPromise
         if Dyn.isNullish imports || Array.isEmpty imports then return program
         else
-            let segments = ResizeArray<string>()
-            let mutable lastEnd = 0
-            for imp in imports do
-                let n = Dyn.get imp "n"
-                if not (Dyn.isNullish n) then
-                    let ns = string n
-                    if Regex.IsMatch(ns, @"^\.\.?/") then
-                        let d = Dyn.get imp "d"
-                        let isDynamic = not (Dyn.isNullish d) && unbox<int> d <> -1
-                        let s = unbox<int> (Dyn.get imp "s")
-                        let e = unbox<int> (Dyn.get imp "e")
-                        let sAdj = if isDynamic then s + 1 else s
-                        let eAdj = if isDynamic then e - 1 else e
-                        if sAdj > lastEnd then
-                            segments.Add(program.[lastEnd .. sAdj - 1])
-                        segments.Add(resolveJavascriptSpecifier cwd ns)
-                        lastEnd <- eAdj
-            if lastEnd < program.Length then
-                segments.Add(program.[lastEnd ..])
-            if segments.Count > 0 then return String.concat "" segments
-            else return program
+            let lastEnd, segmentsRev =
+                imports |> Array.fold (fun (lastEnd, segmentsRev) imp ->
+                    let n = Dyn.get imp "n"
+                    if Dyn.isNullish n then (lastEnd, segmentsRev)
+                    else
+                        let ns = string n
+                        if not (Regex.IsMatch(ns, @"^\.\.?/")) then (lastEnd, segmentsRev)
+                        else
+                            let d = Dyn.get imp "d"
+                            let isDynamic = not (Dyn.isNullish d) && unbox<int> d <> -1
+                            let s = unbox<int> (Dyn.get imp "s")
+                            let e = unbox<int> (Dyn.get imp "e")
+                            let sAdj = if isDynamic then s + 1 else s
+                            let eAdj = if isDynamic then e - 1 else e
+                            let withPrefix =
+                                if sAdj > lastEnd then program.[lastEnd .. sAdj - 1] :: segmentsRev
+                                else segmentsRev
+                            (eAdj, resolveJavascriptSpecifier cwd ns :: withPrefix))
+                    (0, [])
+            let segmentsRev =
+                if lastEnd < program.Length then program.[lastEnd ..] :: segmentsRev else segmentsRev
+            if List.isEmpty segmentsRev then return program
+            else return String.concat "" (List.rev segmentsRev)
     }
     |> Async.StartAsPromise
 

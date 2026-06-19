@@ -60,16 +60,14 @@ let private mergeObj (a: obj) (b: obj) : obj =
     result
 
 let private toolDefaultsFor (host: Host) (agentName: string) : obj =
-    let o = emptyObj ()
-    for name in allToolNames host do
-        setKey o name (box (canUseForHost host agentName name))
-    o
+    allToolNames host
+    |> Seq.map (fun name -> name, box (canUseForHost host agentName name))
+    |> createObj
 
 let private permissionDefaultsFor (host: Host) (agentName: string) : obj =
-    let o = emptyObj ()
-    for name in allToolNames host do
-        setKey o name (box (if canUseForHost host agentName name then "allow" else "deny"))
-    o
+    allToolNames host
+    |> Seq.map (fun name -> name, box (if canUseForHost host agentName name then "allow" else "deny"))
+    |> createObj
 
 let private withRoleDefaultsFor (host: Host) (name: string) (userAgent: obj) : obj =
     let spec = tryFindBuiltinAgent name
@@ -114,11 +112,13 @@ let private applyAgentConfigFor (host: Host) (opencodeConfig: obj) (mcps: obj) :
     let agents = mergeObj userAgent (emptyObj ())
     for name in builtinAgentSpecs |> List.map (fun spec -> spec.name) do
         if Dyn.isNullish (Dyn.get agents name) then setKey agents name (emptyObj ())
-    let finalAgents = emptyObj ()
-    for name in objectKeys agents do
-        let ua = Dyn.get agents name
-        let uaObj = if Dyn.isNullish ua then emptyObj () else ua
-        setKey finalAgents name (withRoleDefaultsFor host name uaObj)
+    let finalAgents =
+        objectKeys agents
+        |> Seq.map (fun name ->
+            let ua = Dyn.get agents name
+            let uaObj = if Dyn.isNullish ua then emptyObj () else ua
+            name, withRoleDefaultsFor host name uaObj)
+        |> createObj
     mergeObj opencodeConfig (box {| agent = finalAgents; mcp = mergedMcp |})
 
 let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()

@@ -37,19 +37,21 @@ let private todoSegmentEndIndexesFor (host: Host) (flat: FlatPart list) : int li
     | Mimocode ->
         if flat.IsEmpty then []
         else
-            let ends = ResizeArray<int>()
-            let mutable inBurst = false
-            let mutable lastAnchor = -1
-            for i = 0 to flat.Length - 1 do
-                if isTodoResultFor host flat.[i].part then
-                    inBurst <- true
-                    if isFoldAnchorFor host flat.[i].part then lastAnchor <- i
-                elif inBurst then
-                    if lastAnchor >= 0 then ends.Add(lastAnchor)
-                    inBurst <- false
-                    lastAnchor <- -1
-            if inBurst && lastAnchor >= 0 then ends.Add(lastAnchor)
-            List.ofSeq ends
+            let inBurst, lastAnchor, endsRev =
+                flat
+                |> List.indexed
+                |> List.fold
+                    (fun (inBurst, lastAnchor, endsRev) (i, fp) ->
+                        if isTodoResultFor host fp.part then
+                            (true, (if isFoldAnchorFor host fp.part then i else lastAnchor), endsRev)
+                        elif inBurst && breaksTodoBurstFor host fp then
+                            (false, -1, (if lastAnchor >= 0 then lastAnchor :: endsRev else endsRev))
+                        else
+                            (inBurst, lastAnchor, endsRev))
+                    (false, -1, [])
+            let endsRev =
+                if inBurst && lastAnchor >= 0 then lastAnchor :: endsRev else endsRev
+            List.rev endsRev
 
 let private foldTodoAnchorsFor (host: Host) (flat: FlatPart list) : int list =
     todoSegmentEndIndexesFor host flat
@@ -62,14 +64,17 @@ let private messageTimeOrNull (msg: obj) : obj =
     if isNullish info then null else get info "time"
 
 let private collectUserText (flat: FlatPart list) (fromIdx: int) (toIdx: int) : string list =
-    let result = ResizeArray<string>()
-    for i = fromIdx to toIdx do
-        if i >= 0 && i < flat.Length then
-            let fp = flat.[i]
+    let lo = max 0 fromIdx
+    let hi = min (flat.Length - 1) toIdx
+    if lo > hi then []
+    else
+        flat.[lo..hi]
+        |> List.choose (fun fp ->
             if fp.isUser && partIsText fp.part then
-                let text = partTextStr fp.part
-                if text.Trim() <> "" then result.Add(text.Trim())
-    List.ofSeq result
+                let t = (partTextStr fp.part).Trim()
+                if t <> "" then Some t else None
+            else
+                None)
 
 let findFoldRangeFor (host: Host) (flat: FlatPart list) (foldAfterFirst: bool) : FoldRange option =
     let todoIdxs = foldTodoAnchorsFor host flat
@@ -90,49 +95,54 @@ let private buildPrefixUserMessage (id: string) (text: string) (sessionID: strin
 
 let private buildSyntheticPrefixMessages (host: Host) (messages: obj array) (flat: FlatPart list) (foldedBacklog: BacklogEntry list) (sessionID: string) (errorNotice: string option) : obj array =
     let todoIdxs = foldTodoAnchorsFor host flat
-    let result = ResizeArray<obj>()
-    for index = 0 to foldedBacklog.Length - 1 do
-        let fromIdx = if index = 0 then 0 else todoIdxs.[index - 1] + 1
-        let toIdx = todoIdxs.[index] - 1
-        let userText = collectUserText flat fromIdx toIdx
-        let messageText = buildBacklogText [ foldedBacklog.[index] ] userText
-        let finalText =
-            if index = foldedBacklog.Length - 1 then
-                match errorNotice with
-                | Some err when err <> "" -> messageText + sectionSep + errorPrefix + err
-                | _ -> messageText
-            else
-                messageText
-        let todoMessage = messages.[flat.[todoIdxs.[index]].msgIndex]
-        let todoInfo = messageInfo todoMessage
-        let todoTime = messageTimeOrNull todoMessage
-        let syntheticId = magicTodoPrefixPrefix + string (index + 1)
-        result.Add(buildPrefixUserMessage syntheticId finalText (if isNullish todoInfo then sessionID else infoSessionID todoInfo) todoTime)
-    result.ToArray()
+    [ for index in 0 .. foldedBacklog.Length - 1 do
+          let fromIdx = if index = 0 then 0 else todoIdxs.[index - 1] + 1
+          let toIdx = todoIdxs.[index] - 1
+          let userText = collectUserText flat fromIdx toIdx
+          let messageText = buildBacklogText [ foldedBacklog.[index] ] userText
+          let finalText =
+              if index = foldedBacklog.Length - 1 then
+                  match errorNotice with
+                  | Some err when err <> "" -> messageText + sectionSep + errorPrefix + err
+                  | _ -> messageText
+              else
+                  messageText
+          let todoMessage = messages.[flat.[todoIdxs.[index]].msgIndex]
+          let todoInfo = messageInfo todoMessage
+          let todoTime = messageTimeOrNull todoMessage
+          let syntheticId = magicTodoPrefixPrefix + string (index + 1)
+          yield
+              buildPrefixUserMessage
+                  syntheticId
+                  finalText
+                  (if isNullish todoInfo then sessionID else infoSessionID todoInfo)
+                  todoTime ]
+    |> List.toArray
 
 let private rebuildVisibleOnly (messages: obj array) (visible: FlatPart list) : obj array =
     let byMessage = visible |> List.groupBy (fun entry -> entry.msgIndex) |> Map.ofList
-    let result = ResizeArray<obj>()
-    for msgIdx = 0 to messages.Length - 1 do
-        match Map.tryFind msgIdx byMessage with
-        | None -> ()
-        | Some entries ->
-            let msg = messages.[msgIdx]
-            if isNullish msg then ()
-            else
-                let originalParts = messageParts msg
-                if isNullish originalParts || not (isArray originalParts) then
-                    result.Add msg
-                else
-                    let partMap = entries |> List.map (fun entry -> entry.partIndex, entry.part) |> Map.ofList
-                    let partsArr = originalParts :?> obj array
-                    let newParts = ResizeArray<obj>()
-                    for partIdx = 0 to partsArr.Length - 1 do
-                        match Map.tryFind partIdx partMap with
-                        | Some part -> newParts.Add part
-                        | None -> ()
-                    if newParts.Count > 0 then result.Add(withKey msg "parts" (box (newParts.ToArray())))
-    result.ToArray()
+    [ for msgIdx in 0 .. messages.Length - 1 do
+          match Map.tryFind msgIdx byMessage with
+          | None -> ()
+          | Some entries ->
+              let msg = messages.[msgIdx]
+              if isNullish msg then ()
+              else
+                  let originalParts = messageParts msg
+                  if isNullish originalParts || not (isArray originalParts) then
+                      yield msg
+                  else
+                      let partMap =
+                          entries |> List.map (fun entry -> entry.partIndex, entry.part) |> Map.ofList
+                      let partsArr = originalParts :?> obj array
+                      let newParts =
+                          [ for partIdx in 0 .. partsArr.Length - 1 do
+                                match Map.tryFind partIdx partMap with
+                                | Some part -> yield part
+                                | None -> () ]
+                      if not newParts.IsEmpty then
+                          yield withKey msg "parts" (box (List.toArray newParts)) ]
+    |> List.toArray
 
 let projectMagicFor (host: Host) (messages: obj array) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : obj array =
     if isNullish messages then [||]
@@ -147,17 +157,16 @@ let projectMagicFor (host: Host) (messages: obj array) (backlog: BacklogEntry li
             let projectionPart = setPartOutput flat.[range.firstResult].part projectionText
             let errorNotice = lastTodoErrorTextFor host flat
             let syntheticPrefixMessages = if foldedBacklog.IsEmpty then [||] else buildSyntheticPrefixMessages host messages flat foldedBacklog sessionID errorNotice
-            let visible = ResizeArray<FlatPart>()
-            for i = 0 to flat.Length - 1 do
-                let fp = flat.[i]
-                if i < range.firstResult then ()
-                elif i = range.firstResult then visible.Add { fp with part = projectionPart }
-                elif i < range.secondToLast then
-                    if isReviewTool fp.part then
-                        visible.Add fp
-                elif isTodoErrorFor host fp.part then ()
-                else visible.Add fp
-            let rebuilt = rebuildVisibleOnly messages (List.ofSeq visible)
+            let visible =
+                flat
+                |> List.indexed
+                |> List.choose (fun (i, fp) ->
+                    if i < range.firstResult then None
+                    elif i = range.firstResult then Some { fp with part = projectionPart }
+                    elif i < range.secondToLast then if isReviewTool fp.part then Some fp else None
+                    elif isTodoErrorFor host fp.part then None
+                    else Some fp)
+            let rebuilt = rebuildVisibleOnly messages visible
             if syntheticPrefixMessages.Length = 0 then rebuilt else Array.concat [| syntheticPrefixMessages; rebuilt |]
 
 let projectMagic (messages: obj array) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : obj array =

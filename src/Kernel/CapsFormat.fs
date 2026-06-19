@@ -14,11 +14,9 @@ type CapsFile = { filePath: string; label: string; content: string }
 /// Wrap already-discovered capability files in `<caps-context>` blocks.  Pure:
 /// file discovery lives in the shell; this only formats.
 let buildCapitalsContext (files: CapsFile list) : string =
-    if files.IsEmpty then ""
-    else
-        files
-        |> List.map (fun f -> $"<caps-context file=\"{escapeXmlAttr f.label}\">\n{f.content}\n</caps-context>")
-        |> String.concat "\n\n"
+    files
+    |> List.map (fun f -> $"<caps-context file=\"{escapeXmlAttr f.label}\">\n{f.content}\n</caps-context>")
+    |> String.concat "\n\n"
 
 let private capsUserPrefix = "caps-synth-user-"
 let private capsAssistantPrefix = "caps-synth-assistant-"
@@ -44,22 +42,26 @@ let formatReadOutput (filePath: string) (content: string) : string =
         "</content>"
     ]
 
-let private messageId (msg: obj) : string =
+let private messageInfoField (field: obj -> string) (msg: obj) : string =
     let info = VibeFs.Kernel.Message.messageInfo msg
-    if Dyn.isNullish info then "" else VibeFs.Kernel.Message.infoId info
+    if Dyn.isNullish info then "" else field info
+
+let private messageId (msg: obj) : string =
+    messageInfoField VibeFs.Kernel.Message.infoId msg
 
 let private messageAgent (msg: obj) : string =
-    let info = VibeFs.Kernel.Message.messageInfo msg
-    if Dyn.isNullish info then "" else VibeFs.Kernel.Message.infoAgent info
+    messageInfoField VibeFs.Kernel.Message.infoAgent msg
 
 let private messageSessionID (msg: obj) : string =
-    let info = VibeFs.Kernel.Message.messageInfo msg
-    if Dyn.isNullish info then "" else VibeFs.Kernel.Message.infoSessionID info
+    messageInfoField VibeFs.Kernel.Message.infoSessionID msg
 
 let hasExistingCapsMessages (messages: obj array) : bool =
-    messages.Length >= 2 &&
-    let id0 = messageId messages.[0] in id0 <> "" && id0.StartsWith capsUserPrefix &&
-    let id1 = messageId messages.[1] in id1 <> "" && id1.StartsWith capsAssistantPrefix
+    match messages |> List.ofArray with
+    | m0 :: m1 :: _ ->
+        let id0 = messageId m0
+        id0 <> "" && id0.StartsWith capsUserPrefix &&
+        (let id1 = messageId m1 in id1 <> "" && id1.StartsWith capsAssistantPrefix)
+    | _ -> false
 
 let private buildToolParts (capsFiles: CapsFile list) (fp: string) (sessionID: string option) (assistantId: string) : obj array =
     capsFiles

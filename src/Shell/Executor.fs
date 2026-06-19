@@ -143,19 +143,22 @@ let private runShellProgram (program: string) (cwd: string) (sessionId: string) 
 let private runPythonProgram (program: string) (dependencies: string list) (cwd: string)
                              (sessionId: string) (timeoutMs: int) : JS.Promise<RunOutcome> =
     let scriptPath = createTempScript (getExecutorTempScriptPath sessionId "py") program
-    let baseArgs = ResizeArray([ "--isolated" ])
-    dependencies |> List.iter (fun dep -> baseArgs.Add "--with"; baseArgs.Add dep)
+    let baseArgs =
+        [| yield "--isolated"
+           for dep in dependencies do
+               yield "--with"
+               yield dep |]
     let warmup () =
-        spawnAndRun "uvx" (Array.append (baseArgs.ToArray()) [| "--from"; "python"; "python"; "-c"; "pass" |]) cwd None
+        spawnAndRun "uvx" (Array.append baseArgs [| "--from"; "python"; "python"; "-c"; "pass" |]) cwd None
     async {
         if not dependencies.IsEmpty then
             let! warm = warmup () |> Async.AwaitPromise
             if warm.code <> Some 0 then return warm
             else
-                return! runScript "uvx" (Array.append (baseArgs.ToArray()) [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs)
+                return! runScript "uvx" (Array.append baseArgs [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs)
                           |> Async.AwaitPromise
         else
-            return! runScript "uvx" (Array.append (baseArgs.ToArray()) [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs)
+            return! runScript "uvx" (Array.append baseArgs [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs)
                       |> Async.AwaitPromise
     }
     |> Async.StartAsPromise

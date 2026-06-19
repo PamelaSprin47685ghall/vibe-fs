@@ -30,15 +30,11 @@ let questionRe = Regex(@"\?\s*$")
 
 /// Detect whether position is inside a markdown code fence (``` or ~~~).
 let private isInsideCodeFence (text: string) : bool =
-    let lines = text.Split('\n')
-    let mutable fenceCount = 0
-    let mutable inFence = false
-    for line in lines do
+    text.Split('\n')
+    |> Array.fold (fun inFence line ->
         let trimmed = line.TrimStart()
-        if trimmed.StartsWith("```") || trimmed.StartsWith("~~~") then
-            fenceCount <- fenceCount + 1
-            inFence <- fenceCount % 2 = 1
-    inFence
+        if trimmed.StartsWith("```") || trimmed.StartsWith("~~~") then not inFence
+        else inFence) false
 
 let private isQuestion (text: string) =
     not (isInsideCodeFence text) && questionRe.IsMatch text

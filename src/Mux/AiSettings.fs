@@ -89,10 +89,11 @@ let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) 
 
 let internal coerceThinkingLevel (value: string) : string option =
     let trimmed = value.Trim()
-    if trimmed = "" then None
-    elif trimmed = "med" then Some "medium"
-    elif trimmed = "off" || trimmed = "low" || trimmed = "medium" || trimmed = "high" || trimmed = "xhigh" || trimmed = "max" then Some trimmed
-    else None
+    match trimmed with
+    | "med" -> Some "medium"
+    | "off" | "low" | "medium" | "high" | "xhigh" | "max" -> Some trimmed
+    | "" -> None
+    | _ -> None
 
 type ParentRuntimeAiSettings =
     { modelString: string option
@@ -107,17 +108,16 @@ let private readMuxEnvSettings (muxEnv: obj) : ParentRuntimeAiSettings =
       thinkingLevel = Dyn.str muxEnv "MUX_THINKING_LEVEL" |> coerceThinkingLevel }
 
 let private toRuntimeAiSettingsObj (settings: ParentRuntimeAiSettings) : obj =
-    match settings.modelString, settings.thinkingLevel with
-    | None, None -> null
-    | _ ->
-        let o = createObj []
-        match settings.modelString with
-        | Some modelString -> o?("modelString") <- modelString
-        | None -> ()
-        match settings.thinkingLevel with
-        | Some thinkingLevel -> o?("thinkingLevel") <- thinkingLevel
-        | None -> ()
-        o
+    let fields =
+        [ match settings.modelString with
+          | Some v -> yield ("modelString", box v)
+          | None -> ()
+          match settings.thinkingLevel with
+          | Some v -> yield ("thinkingLevel", box v)
+          | None -> () ]
+    match fields with
+    | [] -> null
+    | _ -> createObj fields
 
 let buildParentRuntimeAiSettings (config: obj) : obj =
     let muxEnv = Dyn.get config "muxEnv"

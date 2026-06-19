@@ -61,27 +61,30 @@ let private tryGetPack () : Result<obj, string> =
             Result.Error $"native pack load failed: {e.Message}"
 
 let private detectLanguage (pack: obj) (content: string) (filePath: string) : string =
-    let fromPath =
+    let probePath () : string option =
         try
             let r = getOrCall1 pack "detectLanguageFromPath" filePath
-            if isNullish r then "" else string r
-        with _ -> ""
-    if fromPath <> "" then fromPath
-    else
-        let fromContent =
-            try
-                let r = getOrCall1 pack "detectLanguageFromContent" content
-                if isNullish r then "" else string r
-            with _ -> ""
-        if fromContent <> "" then fromContent
-        else
-            try
-                let hl = hljs.highlightAuto content
-                if not (isNullish hl) && not (isNullish hl.language) && hl.relevance >= 5.0 then
-                    let hasLang = getOrCall1 pack "hasLanguage" hl.language
-                    if truthy hasLang then string hl.language else ""
-                else ""
-            with _ -> ""
+            if isNullish r then None else Some (string r)
+        with _ -> None
+
+    let probeContent () : string option =
+        try
+            let r = getOrCall1 pack "detectLanguageFromContent" content
+            if isNullish r then None else Some (string r)
+        with _ -> None
+
+    let probeHljs () : string option =
+        try
+            let hl = hljs.highlightAuto content
+            if not (isNullish hl) && not (isNullish hl.language) && hl.relevance >= 5.0 then
+                let hasLang = getOrCall1 pack "hasLanguage" hl.language
+                if truthy hasLang then Some (string hl.language) else None
+            else None
+        with _ -> None
+
+    [ probePath; probeContent; probeHljs ]
+    |> List.tryPick (fun probe -> probe ())
+    |> Option.defaultValue ""
 
 let private nodeChildCount (node: obj) : int =
     let v = getOrCall0 node "childCount"

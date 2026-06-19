@@ -60,6 +60,15 @@ let isAbort (error: DomainError) : bool =
 let private containsAbortText (message: string) : bool =
     not (System.String.IsNullOrWhiteSpace message) && message.ToLowerInvariant().Contains("abort")
 
+let private (|AbortError|_|) (name: string, tag: string) =
+    if name = "AbortError" || name = "MessageAbortedError" || tag = "MessageAborted" then Some () else None
+
+let private (|SessionBusyError|_|) (name: string, tag: string) =
+    if name = "SessionBusyError" || tag = "SessionBusy" then Some () else None
+
+let private (|ForegroundWaitBackgroundedError|_|) (name: string, tag: string) =
+    if name = "ForegroundWaitBackgroundedError" || tag = "TaskWaitBackgrounded" then Some () else None
+
 let translateJsError (error: obj) : DomainError =
     let rec classify (value: obj) (seen: obj list) =
         if Dyn.isNullish value then SystemPanic "Null error context"
@@ -71,10 +80,11 @@ let translateJsError (error: obj) : DomainError =
             let seenNext = value :: seen
             let name = Dyn.str value "name"
             let tag = Dyn.str value "_tag"
-            if name = "AbortError" || name = "MessageAbortedError" || tag = "MessageAborted" then MessageAborted
-            elif name = "SessionBusyError" || tag = "SessionBusy" then SessionBusy
-            elif name = "ForegroundWaitBackgroundedError" || tag = "TaskWaitBackgrounded" then TaskWaitBackgrounded
-            else
+            match name, tag with
+            | AbortError -> MessageAborted
+            | SessionBusyError -> SessionBusy
+            | ForegroundWaitBackgroundedError -> TaskWaitBackgrounded
+            | _ ->
                 let nested = Dyn.get value "error"
                 if not (Dyn.isNullish nested) then classify nested seenNext
                 else

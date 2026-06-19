@@ -62,10 +62,13 @@ let formatSyntaxDiagnostics (filePath: string) (result: SyntaxCheckResult)
         if Array.isEmpty errors then
             if includeOk then Some($"{syntaxCheckMarker} {filePath}: ok ({lang})") else None
         else
-            let lines =
-                errors |> Array.map (fun e ->
+            let header = $"{syntaxCheckMarker}\n{errors.Length} syntax issue(s) in {filePath} ({lang})"
+            let body =
+                errors
+                |> Array.map (fun e ->
                     $"  L{e.line}:{e.column}-{e.endLine}:{e.endColumn} [{e.severity}] {e.message}")
-            Some(String.concat "\n" ($"{syntaxCheckMarker}\n{errors.Length} syntax issue(s) in {filePath} ({lang})" :: (lines |> Array.toList)))
+                |> Array.toList
+            Some(String.concat "\n" (header :: body))
 
 /// Append a syntax annotation to tool output, skipping when already marked.
 let appendSyntaxDiagnosticsToOutput (currentOutput: string) (filePath: string)

@@ -50,43 +50,57 @@ let private backlogReportFromTodoInput (host: Host) (input: obj) : string =
                 | _ -> ""
     else ""
 
-let private appendBacklogReport (backlog: ResizeArray<BacklogEntry>) (report: string) =
-    backlog.Add({ sequence = backlog.Count + 1; timestamp = ""; report = report })
+let private consEntry (revAcc: BacklogEntry list) (report: string) : BacklogEntry list =
+    { sequence = revAcc.Length + 1; timestamp = ""; report = report } :: revAcc
 
-let private flushMimocodeBurst (backlog: ResizeArray<BacklogEntry>) (lines: ResizeArray<string>) =
-    if lines.Count = 0 then ()
-    else
+let private flushBurst (revAcc: BacklogEntry list) (revBurst: string list) : BacklogEntry list =
+    match revBurst with
+    | [] -> revAcc
+    | _ ->
+        let burst = List.rev revBurst
         let merged =
-            if lines.Count = 1 then lines.[0]
-            else lines |> Seq.toArray |> Array.mapi (fun i line -> string (i + 1) + ". " + line) |> String.concat "\n"
-        appendBacklogReport backlog merged
-        lines.Clear()
+            match burst with
+            | [ single ] -> single
+            | _ -> burst |> List.mapi (fun i line -> string (i + 1) + ". " + line) |> String.concat "\n"
+        consEntry revAcc merged
 
 let replayBacklogFor (host: Host) (messages: obj array) : BacklogEntry list =
     if isNullish messages then []
     else
         let flat = flatten messages
-        let backlog = ResizeArray<BacklogEntry>()
         match host with
         | Opencode ->
-            for fp in flat do
-                if isTodoResultFor host fp.part then
-                    let input = backlogInputForPart host fp
-                    if not (isNullish input) then
-                        let report = backlogReportFromTodoInput host input
-                        if report <> "" then appendBacklogReport backlog report
+            let revAcc =
+                flat
+                |> List.fold
+                    (fun acc fp ->
+                        if isTodoResultFor host fp.part then
+                            let input = backlogInputForPart host fp
+                            if isNullish input then acc
+                            else
+                                let report = backlogReportFromTodoInput host input
+                                if report <> "" then consEntry acc report else acc
+                        else acc)
+                    []
+            List.rev revAcc
         | Mimocode ->
-            let burst = ResizeArray<string>()
-            for fp in flat do
-                if isTodoResultFor host fp.part then
-                    let input = backlogInputForPart host fp
-                    if not (isNullish input) then
-                        let report = backlogReportFromTodoInput host input
-                        if report <> "" then burst.Add(report)
-                else
-                    flushMimocodeBurst backlog burst
-            flushMimocodeBurst backlog burst
-        List.ofSeq backlog
+            let revAcc, revBurst =
+                flat
+                |> List.fold
+                    (fun (revAcc, revBurst) fp ->
+                        if isTodoResultFor host fp.part then
+                            let input = backlogInputForPart host fp
+                            if isNullish input then (revAcc, revBurst)
+                            else
+                                let report = backlogReportFromTodoInput host input
+                                if report <> "" then (revAcc, report :: revBurst) else (revAcc, revBurst)
+                        elif breaksTodoBurstFor host fp then
+                            let revAcc' = flushBurst revAcc revBurst
+                            (revAcc', [])
+                        else
+                            (revAcc, revBurst))
+                    ([], [])
+            flushBurst revAcc revBurst |> List.rev
 
 let replayBacklog (messages: obj array) : BacklogEntry list =
     replayBacklogFor opencode messages

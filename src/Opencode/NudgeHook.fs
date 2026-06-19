@@ -47,16 +47,15 @@ let private collectSnapshot (client: obj) (sessionID: SessionId) : Async<Session
             let session = Dyn.get client "session"
             let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session |> Async.AwaitPromise
             let openTodos = decodeTodos (Dyn.get todoResp "data")
-            let mutable lastAssistantMessage = ""
-            let mutable messageCount : int option = None
-            let mutable agentFromMessage : string option = None
-            try
-                let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session |> Async.AwaitPromise
-                let text, agent, count = decodeLastAssistant (Dyn.get messagesResp "data")
-                lastAssistantMessage <- text
-                agentFromMessage <- agent
-                messageCount <- count
-            with _ -> ()
+            let! (lastAssistantMessage, agentFromMessage, messageCount) =
+                async {
+                    try
+                        let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session |> Async.AwaitPromise
+                        let text, agent, count = decodeLastAssistant (Dyn.get messagesResp "data")
+                        return (text, agent, count)
+                    with _ ->
+                        return ("", None, None)
+                }
             return Some { todos = openTodos
                           lastAssistantMessage = lastAssistantMessage
                           messageCount = messageCount
