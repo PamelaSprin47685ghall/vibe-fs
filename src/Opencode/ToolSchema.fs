@@ -79,6 +79,10 @@ let numOpt (desc: string) : obj =
     let n = call0 n "positive"
     call1 (call0 n "optional") "describe" (box desc)
 
+let enumReq (values: string array) (desc: string) : obj =
+    let e = call1 schema "enum" values
+    call1 e "describe" (box desc)
+
 let enumOpt (values: string array) (desc: string) : obj =
     let e = call1 schema "enum" values
     call1 (call0 e "optional") "describe" (box desc)
@@ -117,6 +121,11 @@ let webfetch = "Fetch a URL with better extraction for static/docs pages. Suppor
 module Params =
     let coderIntents =
         "Non-empty array of coder intents. Each item: objective (what to implement), background (why and prior context), optional do_not_touch[] constraints, and targets[] with file and guide per path. One subagent per item, all parallel."
+
+    let coderTdd =
+        "TDD phase for this coder call. red = this edit is the RED phase: write the failing test, or the code that fails it; the result must leave tests failing. green = this edit is the GREEN phase: make the failing tests pass. "
+        + "Discipline: for a new requirement the requirement comes first; for a bug fix the regression comes first. Always go red before green for any unit of work. "
+        + "You MUST issue a tdd=red coder call before any tdd=green coder call for the same work; a green call with no preceding red in the session is a violation and will be rejected. Declare the phase truthfully."
 
     let investigatorIntents =
         "Non-empty array of investigator intents. Each item: objective, background, questions[] (required KPIs for the report), optional entries[] (paths/symbols to start from). One subagent per item, all parallel."

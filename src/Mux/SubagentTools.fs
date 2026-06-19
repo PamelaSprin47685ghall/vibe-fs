@@ -107,7 +107,7 @@ let private buildCoderPrompts (_config: obj) (args: obj) : Async<string array> =
 let coderTool (deps: obj) : ToolDefinition =
     { name = "coder"
       description = coder
-      parameters = mkSchema (createObj [ "intents", box (muxCoderIntentsSchema Params.coderIntents) ]) [| "intents" |]
+      parameters = mkSchema (createObj [ "intents", box (muxCoderIntentsSchema Params.coderIntents); "tdd", box (strEnumProp Params.coderTdd [| "red"; "green" |]) ]) [| "intents"; "tdd" |]
       execute = Tool.bindParallel deps "exec" "Coder" "exec" "coder" buildCoderPrompts
       condition = None }
 

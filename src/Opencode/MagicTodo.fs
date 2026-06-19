@@ -135,6 +135,11 @@ let reportDesc =
     + "Verbosity is encouraged - this report is preserved in an append-only backlog that "
     + "survives context folding, so it must contain everything future turns need."
 
+let mimoReportFieldDesc =
+    reportDesc
+    + " CRITICAL: place `completedWorkReport` as a TOP-LEVEL argument, a sibling of `operation`. "
+    + "Never nest it inside the `operation` object."
+
 type MagicSession(host: Host) =
     let cache = Dictionary<string, BacklogEntry list>()
 

@@ -318,6 +318,32 @@ let mimoTaskExecuteRoundTripSpec () = async {
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
+let mimoTaskExecuteNestedReportSpec () = async {
+    let! workspaceDir = mkdtempAsync "mimo-task-nested-report-" |> Async.AwaitPromise
+    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let teb = get p "tool.execute.before"
+    let tea = get p "tool.execute.after"
+
+    let operation = createObj [ "action", box "create"; "summary", box "Build feature"; "completedWorkReport", box "Misplaced backlog report" ]
+    let originalArgs = createObj [ "operation", operation ]
+    let beforeOut = createObj [ "args", box originalArgs ]
+    let hookInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "cn1" ]
+
+    do! teb $ (hookInput, beforeOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let sanitizedArgs = get beforeOut "args"
+    let sanitizedOperation = get sanitizedArgs "operation"
+    check "mimo task execute.before keeps operation when report nested inside" (not (isNullish sanitizedOperation))
+    check "mimo task execute.before keeps real operation fields" (str sanitizedOperation "summary" = "Build feature")
+    check "mimo task execute.before strips report nested inside operation" (isNullish (get sanitizedOperation "completedWorkReport"))
+    check "mimo task execute.before leaves no top-level report" (isNullish (get sanitizedArgs "completedWorkReport"))
+
+    let afterInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "cn1"; "args", box sanitizedArgs ]
+    let afterOut = createObj [ "output", box "ok" ]
+    do! tea $ (afterInput, afterOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo task execute.after restores nested report to top level for backlog" (str (get afterInput "args") "completedWorkReport" = "Misplaced backlog report")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
 let mimoTaskDefinitionHandlesZodLikeParametersSpec () = async {
     let! workspaceDir = mkdtempAsync "mimo-task-zod-params-" |> Async.AwaitPromise
     let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
@@ -351,10 +377,10 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () = async {
     check "mimo task.definition rewrites zod-like parameters" (string (get (get taskDef "parameters") "kind") = "extended")
     check "mimo task.definition adds report field through safeExtend" (
         string (get (get extendCalls.[0] "completedWorkReport") "kind") = "optional-string"
-        && string (get (get extendCalls.[0] "completedWorkReport") "description") = VibeFs.Opencode.MagicTodo.reportDesc)
+        && string (get (get extendCalls.[0] "completedWorkReport") "description") = VibeFs.Opencode.MagicTodo.mimoReportFieldDesc)
     check "mimo task.definition derives report field from host zod schema" (
         describeCalls.Count = 1
-        && describeCalls.[0] = VibeFs.Opencode.MagicTodo.reportDesc
+        && describeCalls.[0] = VibeFs.Opencode.MagicTodo.mimoReportFieldDesc
         && optionalCalls.Count = 1)
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
@@ -492,6 +518,7 @@ let run () : JS.Promise<unit> =
         do! toolExecuteBeforeSpec ()
         do! mimoApplyPatchExecuteBeforeSpec ()
         do! mimoTaskExecuteRoundTripSpec ()
+        do! mimoTaskExecuteNestedReportSpec ()
         do! mimoTaskDefinitionHandlesZodLikeParametersSpec ()
         do! coderToolSpec ()
         do! investigatorToolSpec ()

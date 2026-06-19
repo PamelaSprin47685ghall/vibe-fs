@@ -87,10 +87,17 @@ let private stripMimocodeTaskArgsForExecute (output: obj) (input: obj) (args: ob
     if tool <> "todowrite" then ()
     else
         let callID = Dyn.str input "callID"
-        let report = Dyn.str args "completedWorkReport"
-        if report <> "" then captureCompletedWorkReport callID report
         let operation = Dyn.get args "operation"
-        if not (Dyn.isNullish operation) then setKey output "args" (createObj [ "operation", operation ])
+        let topReport = Dyn.str args "completedWorkReport"
+        let nestedReport = Dyn.str operation "completedWorkReport"
+        let report = if topReport <> "" then topReport else nestedReport
+        if report <> "" then captureCompletedWorkReport callID report
+        if not (Dyn.isNullish operation) then
+            let cleanOperation =
+                Dyn.keys operation
+                |> Array.filter (fun key -> key <> "completedWorkReport")
+                |> Array.fold (fun acc key -> Dyn.withKey acc key (Dyn.get operation key)) (createObj [])
+            setKey output "args" (createObj [ "operation", cleanOperation ])
 
 let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) =
     if Dyn.str input "tool" <> "apply_patch" then ()

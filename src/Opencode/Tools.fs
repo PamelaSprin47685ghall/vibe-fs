@@ -38,7 +38,7 @@ let private optField (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNull
 let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"
     define coder
-        (box {| intents = coderIntentsSchema Params.coderIntents; _ui = uiParam |})
+        (box {| intents = coderIntentsSchema Params.coderIntents; tdd = enumReq [| "red"; "green" |] Params.coderTdd; _ui = uiParam |})
         (fun args context ->
             match parseCoderIntents (Dyn.get args "intents") with
             | Error message -> resolveStr message
