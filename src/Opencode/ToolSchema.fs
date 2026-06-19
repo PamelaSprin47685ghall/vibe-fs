@@ -50,7 +50,8 @@ let private arrayMin (item: obj) (minCount: int) (desc: string) : obj =
 let coderIntentsSchema (desc: string) : obj =
     let fileField = strMin 1 "File path to modify."
     let guideField = strMin 1 "Implementation constraints for this file."
-    let targetShape = strictObject (createObj [ "file", fileField; "guide", guideField ])
+    let draftField = strOpt "Optional minimal draft for the coder to reference. Prefer leaving this empty; use only when strict quality needs a concrete sketch. No patch or special format required."
+    let targetShape = strictObject (createObj [ "file", fileField; "guide", guideField; "draft", draftField ])
     let targetsField = arrayMin targetShape 1 "Non-empty per-file implementation guides."
     let objectiveField = strMin 1 "Concrete code-change goal for this subagent."
     let backgroundField = strMin 1 "Why this change is needed; prior findings and user context."
@@ -93,7 +94,7 @@ let define (description: string) (args: obj) (execute: obj -> obj -> JS.Promise<
     invokeTool toolFactory (box {| description = description; args = args; execute = execute |})
 
 let coder =
-    "Execute code changes from structured intents. Each intents[] element spawns its own coder subagent in parallel. Every element must include objective, background, and targets (file + guide per file); do_not_touch is optional per subagent. "
+    "Execute code changes from structured intents. Each intents[] element spawns its own coder subagent in parallel. Every element must include objective, background, and targets (file + guide per file; optional draft per file); do_not_touch is optional per subagent. "
     + "IMPORTANT: Subagents start in a fresh session with no manager history. Pack all context into background, do_not_touch, and per-file guide fields. Do NOT assume the coder knows the repo."
 
 let investigator =
@@ -120,7 +121,7 @@ let webfetch = "Fetch a URL with better extraction for static/docs pages. Suppor
 
 module Params =
     let coderIntents =
-        "Non-empty array of coder intents. Each item: objective (what to implement), background (why and prior context), optional do_not_touch[] constraints, and targets[] with file and guide per path. One subagent per item, all parallel."
+        "Non-empty array of coder intents. Each item: objective (what to implement), background (why and prior context), optional do_not_touch[] constraints, and targets[] with file, guide, and optional draft per path. One subagent per item, all parallel."
 
     let coderTdd =
         "TDD phase for this coder call. red = this edit is the RED phase: write the failing test, or the code that fails it; the result must leave tests failing. green = this edit is the GREEN phase: make the failing tests pass. "

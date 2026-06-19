@@ -82,15 +82,21 @@ let private bulletLines (items: string seq) =
 let coderPromptBody (intent: CoderIntent) : string =
     let targets =
         intent.targets
-        |> List.map (fun t -> $"- {t.file}\n  Guide: {t.guide}")
+        |> List.map (fun t ->
+            match t.draft with
+            | Some draft -> $"- {t.file}\n  Guide: {t.guide}\n  Draft: {draft}"
+            | None -> $"- {t.file}\n  Guide: {t.guide}")
         |> String.concat "\n"
+    let targetInstruction =
+        "Targets:\n" + targets + "\n\n"
+        + "`draft` is optional. Prefer leaving it empty; when present, treat it only as a concise quality sketch to reference, not as a required literal implementation.\n\n"
     let doNotTouch =
         if intent.doNotTouch.Length = 0 then ""
         else "Do not touch:\n" + bulletLines intent.doNotTouch + "\n\n"
     "You are an implementation agent (coder). Implement the objective using the background and per-file guides below.\n\n"
     + "Objective:\n" + intent.objective + "\n\n"
     + "Background:\n" + intent.background + "\n\n"
-    + "Targets:\n" + targets + "\n\n"
+    + targetInstruction
     + doNotTouch
     + "Instructions:\n"
     + "1. Read the listed files and related code needed for the change.\n"

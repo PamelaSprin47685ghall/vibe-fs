@@ -31,7 +31,7 @@ let hostKernel' () =
     let coderIntent =
         { objective = "fix bug"
           background = "user reported failure"
-          targets = [ { file = "a.ts"; guide = "fix root cause" }; { file = "b.ts"; guide = "align types" } ]
+          targets = [ { file = "a.ts"; guide = "fix root cause"; draft = None }; { file = "b.ts"; guide = "align types"; draft = None } ]
           doNotTouch = [| "shared.ts" |] }
     let intent = formatCoderUserPrompt coderIntent
     check "coder has file" (intent.IndexOf("a.ts") >= 0)

@@ -43,6 +43,15 @@ let getOllamaApiKey () : string =
         let key = env?("OLLAMA_API_KEY")
         if Dyn.isNullish key then "" else string key
 
+let requireOllamaApiKey (apiKey: string) : Result<string, string> =
+    let trimmed = apiKey.Trim()
+    if trimmed = "" then Error "Missing OLLAMA_API_KEY environment variable." else Ok trimmed
+
+let private validatedOllamaApiKey () : string =
+    match requireOllamaApiKey (getOllamaApiKey ()) with
+    | Ok apiKey -> apiKey
+    | Error message -> raise (exn message)
+
 let private normalizeOllamaPath (pathname: string) : string =
     if pathname.StartsWith("/") then pathname else $"/{pathname}"
 
@@ -51,12 +60,13 @@ let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
 /// POST JSON to the Ollama API with the bearer key, returning parsed JSON.
 let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Promise<obj> =
     async {
+        let apiKey = validatedOllamaApiKey ()
         let url = $"{ollamaApiBase}{normalizeOllamaPath pathname}"
         let bodyStr = JS.JSON.stringify(body)
         let init =
             match abortSignal with
-            | Some signal -> postInitWithSignal (getOllamaApiKey ()) bodyStr signal
-            | None -> postInitNoSignal (getOllamaApiKey ()) bodyStr
+            | Some signal -> postInitWithSignal apiKey bodyStr signal
+            | None -> postInitNoSignal apiKey bodyStr
         let! response = fetch url init |> Async.AwaitPromise
         let ok = Dyn.truthy (Dyn.get response "ok")
         if not ok then

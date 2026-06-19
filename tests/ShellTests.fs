@@ -3,8 +3,18 @@ module VibeFs.Tests.ShellTests
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
+open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.Prompts
+
+[<Import("createRequire", "node:module")>]
+let private createRequire' : string -> (string -> obj) = jsNative
+
+[<Global("import.meta")>]
+let private importMeta : obj = jsNative
+
+let private requireFn : string -> obj = createRequire'(string importMeta?url)
+let private pathModule : obj = requireFn("path")
 
 let ollamaFetchInit () =
     let init = VibeFs.Shell.OllamaClient.postInitNoSignal "KEY123" "{\"a\":1}"
@@ -26,6 +36,11 @@ let ollamaResponseMethodCall () =
     equal "response.text() invoked" "body" (unbox<string> (VibeFs.Shell.OllamaClient.responseMethod0 response "text"))
     let json = VibeFs.Shell.OllamaClient.responseMethod0 response "json"
     equal "response.json() invoked" "yes" (VibeFs.Kernel.Dyn.str json "ok")
+
+let ollamaApiKeyValidation () =
+    equal "requireOllamaApiKey trims" (Ok "KEY123") (VibeFs.Shell.OllamaClient.requireOllamaApiKey "  KEY123  ")
+    equal "requireOllamaApiKey rejects missing" (Error "Missing OLLAMA_API_KEY environment variable.") (VibeFs.Shell.OllamaClient.requireOllamaApiKey "")
+    equal "requireOllamaApiKey rejects empty" (Error "Missing OLLAMA_API_KEY environment variable.") (VibeFs.Shell.OllamaClient.requireOllamaApiKey "   ")
 
 let executorMapping () =
     let opts : ExecuteOptions =
@@ -49,6 +64,31 @@ let capsContextFormat () =
 
 let capsFileSizeLimit () =
     equal "caps file size limit 4MB" (4 * 1_048_576) VibeFs.Shell.WorkspaceFiles.maxFileSize
+
+let readDirectoryListing () = async {
+    let! workspaceDir = mkdtempAsync "read-dir-" |> Async.AwaitPromise
+    let nestedDir = unbox<string> (pathModule?join(workspaceDir, "nested"))
+    let filePath = unbox<string> (pathModule?join(workspaceDir, "note.txt"))
+    do! writeFileAsync filePath "hello" |> Async.AwaitPromise
+    let fsAsync : obj = requireFn("fs")?promises
+    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(nestedDir)) |> Async.AwaitPromise
+    let! listing = VibeFs.Shell.FileSys.read None workspaceDir None None
+    check "directory listing contains file" (listing.Contains "note.txt")
+    check "directory listing contains directory" (listing.Contains "nested")
+    check "directory listing has total header" (listing.Contains "total 2")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
+let ensureJavascriptProjectRepairsModuleType () = async {
+    let! projectDir = mkdtempAsync "executor-js-project-" |> Async.AwaitPromise
+    let packageJsonPath = unbox<string> (pathModule?join(projectDir, "package.json"))
+    do! writeFileAsync packageJsonPath "{\n  \"dependencies\": {\n    \"tsx\": \"*\"\n  }\n}\n" |> Async.AwaitPromise
+    do! VibeFs.Shell.ExecutorJavascript.ensureJavascriptProject projectDir [] |> Async.AwaitPromise
+    let fsAsync : obj = requireFn("fs")?promises
+    let! packageJson = unbox<JS.Promise<string>> (fsAsync?readFile(packageJsonPath, "utf-8")) |> Async.AwaitPromise
+    check "ensureJavascriptProject writes type module" (packageJson.Contains "\"type\": \"module\"")
+    do! rmAsync projectDir |> Async.AwaitPromise
+}
 
 let ollamaFormat () =
     let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]

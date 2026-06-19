@@ -60,10 +60,6 @@ let private jsonStringify (value: obj) : string =
 let private jsonEscape (s: string) : string =
     JS.JSON.stringify(s)
 
-/// Force `type: "module"` onto a package object (type is reserved in F#).
-let private setTypeModule (pkg: obj) : unit =
-    pkg?("type") <- "module"
-
 /// Spawn `npx npm install` in the project dir, resolving on a clean exit.
 let private npmInstall (projectDir: string) (packages: string array) : JS.Promise<unit> =
     let args' = Array.append [| "--yes"; "npm@latest"; "install"; "--prefix"; projectDir |] packages
@@ -132,23 +128,20 @@ let rewriteJavascriptModuleSpecifiers (program: string) (cwd: string) : JS.Promi
     |> Async.StartAsPromise
 
 /// Ensure the temp project dir is an ESM project with tsx + dependencies.
-/// Always guarantees `type: "module"` is present (even when deps are satisfied),
-/// matching the original "ensure is ESM project" semantics.
+/// Always guarantees `type: "module"` is present, repairing a pre-existing
+/// package.json that lacks it even when no dependencies need installation.
 let ensureJavascriptProject (projectDir: string) (dependencies: string list) : JS.Promise<unit> =
     async {
         mkdirSync projectDir (box {| recursive = true |})
         let pkgPath = $"{projectDir}/package.json"
-        let pkg = if existsSync pkgPath then parsePkgJson (readFileSync pkgPath "utf8") else box {| |}
+        let pkg =
+            if existsSync pkgPath then parsePkgJson (readFileSync pkgPath "utf8")
+            else parsePkgJson "{}"
         let deps = Dyn.get pkg "dependencies"
-        let deps = if Dyn.isNullish deps then box {| |} else deps
-        // Always (re)assert type:module so a pre-existing file lacking it is repaired.
-        setTypeModule pkg
         let required = "tsx" :: dependencies |> List.distinct
         let toInstall = required |> List.filter (fun pkgName -> Dyn.isNullish (Dyn.get deps pkgName))
         for pkgName in toInstall do setDep deps pkgName "*"
-        // Write back whenever there are packages to install OR the file is freshly created.
-        if not (existsSync pkgPath) || not toInstall.IsEmpty then
-            writeFileSync pkgPath $"{jsonStringify pkg}\n" "utf-8"
+        writeFileSync pkgPath $"{jsonStringify pkg}\n" "utf-8"
         if not toInstall.IsEmpty then
             do! npmInstall projectDir (Array.ofList toInstall) |> Async.AwaitPromise
     }

@@ -40,9 +40,12 @@ let private readFileAsync (p: string) : JS.Promise<string> =
 let private readdir (p: string) : JS.Promise<obj[]> =
     fsPromises?readdir(p, {| withFileTypes = true |}) |> asPromise<obj[]>
 
+let private statAsync (p: string) : JS.Promise<obj> =
+    fsPromises?stat(p) |> asPromise<obj>
+
 let private formatMtime (mtime: obj) : string =
     try
-        let d = unbox<string> (mtime?ToISOString())
+        let d = unbox<string> (mtime?toISOString())
         d.Substring(0, 19).Replace("T", " ")
     with _ -> ""
 
@@ -50,15 +53,20 @@ let private listDirectoryEntries (dirPath: string) : Async<string> =
     async {
         let! entries = readdir dirPath |> Async.AwaitPromise
         let header = $"total {entries.Length}"
-        let lines =
+        let! lines =
             entries
             |> Array.map (fun entry ->
-                let name = unbox<string> (entry?name)
-                let isDir = unbox<bool> (entry?isDirectory())
-                let kind = if isDir then "d" else "-"
-                let size = if isDir then 0 else unbox<int> (entry?size)
-                let mtime = formatMtime (entry?mtime)
-                sprintf "%s %8d %s %s" kind size mtime name)
+                async {
+                    let name = unbox<string> (entry?name)
+                    let fullPath = resolve dirPath name
+                    let! details = statAsync fullPath |> Async.AwaitPromise
+                    let isDir = unbox<bool> (details?isDirectory())
+                    let kind = if isDir then "d" else "-"
+                    let size = if isDir then 0 else unbox<int> (details?size)
+                    let mtime = formatMtime (details?mtime)
+                    return sprintf "%s %8d %s %s" kind size mtime name
+                })
+            |> Async.Parallel
         return String.concat "\n" (header :: Array.toList lines)
     }
 

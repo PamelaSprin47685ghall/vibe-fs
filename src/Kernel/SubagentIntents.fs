@@ -4,7 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 
-type CoderTarget = { file: string; guide: string }
+type CoderTarget =
+    { file: string
+      guide: string
+      draft: string option }
 
 type CoderIntent =
     { objective: string
@@ -42,9 +45,15 @@ let private decodeCoderTarget (t: obj) : Result<CoderTarget, string> =
     else
         let file = Dyn.str t "file"
         let guide = Dyn.str t "guide"
+        let draft =
+            match Dyn.opt t "draft" with
+            | Some value ->
+                let text = string value
+                if System.String.IsNullOrWhiteSpace text then None else Some text
+            | None -> None
         if file = "" then Result.Error "Invalid LLM input for coder: each target requires file"
         elif guide = "" then Result.Error "Invalid LLM input for coder: each target requires guide"
-        else Result.Ok { file = file; guide = guide }
+        else Result.Ok { file = file; guide = guide; draft = draft }
 
 let private parseCoderTargets (targets: obj) : Result<CoderTarget list, string> =
     if Dyn.isNullish targets || not (Dyn.isArray targets) then
@@ -133,7 +142,9 @@ let private muxObjectSchema (properties: obj) (required: string array) : obj =
 let muxCoderIntentsSchema (intentsDesc: string) : obj =
     let targetItem =
         muxObjectSchema
-            (createObj [ "file", muxStrReq "File path to modify."; "guide", muxStrReq "Implementation constraints for this file." ])
+            (createObj [ "file", muxStrReq "File path to modify."
+                         "guide", muxStrReq "Implementation constraints for this file."
+                         "draft", createObj [ "type", box "string"; "description", box "Optional minimal draft for the coder to reference. Prefer leaving this empty; use only when strict quality needs a concrete sketch. No patch or special format required." ] ])
             [| "file"; "guide" |]
     let intentItem =
         muxObjectSchema
