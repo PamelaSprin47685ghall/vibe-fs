@@ -157,13 +157,13 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                 let cleaned = stripSyntheticMessages messagesArr
                 if cleaned.Length = 0 then ()
                 else
-                    let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
-                    let afterMagic = projectMagicFor magicSession.Host cleaned backlog false sessionID
-                    applyReadDedup afterMagic
-                    let! final =
-                        if defaultExcludedAgents |> List.contains agent then
-                            async { return afterMagic }
-                        else
+                    if defaultExcludedAgents |> List.contains agent then
+                        replaceArrayInPlace messagesArr cleaned
+                    else
+                        let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
+                        let afterMagic = projectMagicFor magicSession.Host cleaned backlog false sessionID
+                        applyReadDedup afterMagic
+                        let! final =
                             async {
                                 let! capsFiles = VibeFs.Shell.WorkspaceFiles.findCapsFiles directory |> Async.AwaitPromise
                                 return buildCapsMessages
@@ -173,7 +173,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                                     defaultExcludedAgents
                                     capsFiles
                             }
-                    replaceArrayInPlace messagesArr final
+                        replaceArrayInPlace messagesArr final
     } |> Async.StartAsPromise
 
 let compactingHandlerFor (host: Host) (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
