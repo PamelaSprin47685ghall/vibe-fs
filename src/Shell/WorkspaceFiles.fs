@@ -2,40 +2,25 @@ module VibeFs.Shell.WorkspaceFiles
 
 open Fable.Core
 open Fable.Core.JsInterop
-open System.Text.RegularExpressions
 open VibeFs.Kernel.CapsFormat
 
 let maxFileSize = 4 * 1_048_576
-let maxTotalContextBytes = 8 * 1_048_576
-let maxCapsFiles = 2000
 
 type Budget = { results: CapsFile ResizeArray; totalBytes: int; count: int }
 
 let fresh () : Budget = { results = ResizeArray (); totalBytes = 0; count = 0 }
 
-let isFull (budget: Budget) : bool = budget.count >= maxCapsFiles || budget.totalBytes >= maxTotalContextBytes
+let isFull (budget: Budget) : bool = budget.count >= 2000 || budget.totalBytes >= (8 * 1_048_576)
 
 let absorb (file: CapsFile) (budget: Budget) : Budget =
     let nextTotal = budget.totalBytes + file.content.Length
-    if nextTotal > maxTotalContextBytes then budget
+    if nextTotal > (8 * 1_048_576) then budget
     else
         budget.results.Add file
         { results = budget.results; totalBytes = nextTotal; count = budget.count + 1 }
 
-let capsFileRe = Regex(@"^[A-Z][A-Z0-9_]*\.md$")
-let capsDirRe = Regex(@"^[A-Z][A-Z0-9_]*$")
-let capsDotDirRe = Regex(@"^\.[A-Z][A-Z0-9_]*$")
-
-let excludedFileNames = set [ "AGENTS.md"; "CLAUDE.md"; "README.md" ]
-let excludedDirNames =
-    set [ "AGENTS"; "CLAUDE"; "NODE_MODULES"; ".GIT"; "TARGET"; "DIST"; "OUT"; ".VENV"; "VENV"; "__PYCACHE__"; ".CACHE"; ".NEXT"; ".TURBO"; ".PARCEL-CACHE" ]
-
-let isExcludedDir (name: string) : bool =
-    Set.contains (name.ToUpperInvariant ()) excludedDirNames || (name.StartsWith "." && not (capsDotDirRe.IsMatch name))
-
-let isCapsFile (name: string) : bool = capsFileRe.IsMatch name && not (Set.contains name excludedFileNames)
-
-let isCapsDir (name: string) : bool = not (isExcludedDir name) && (capsDirRe.IsMatch name || capsDotDirRe.IsMatch name)
+[<Import("parse", "yaml")>]
+let private yamlParse (text: string) : obj = jsNative
 
 [<Import("promises", "node:fs")>]
 let private fsPromises : obj = jsNative
@@ -44,19 +29,20 @@ let private asPromise<'T> (value: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> 
 let private readdir (dir: string) : JS.Promise<obj[]> = fsPromises?readdir(dir, {| withFileTypes = true |}) |> asPromise<obj[]>
 let private stat (path: string) : JS.Promise<obj> = fsPromises?stat(path) |> asPromise<obj>
 let private readFile (path: string) : JS.Promise<string> = fsPromises?readFile(path, "utf-8") |> asPromise<string>
-let private realpath (path: string) : JS.Promise<string> = fsPromises?realpath(path) |> asPromise<string>
-let private entryName (entry: obj) : string = entry?name
-let private entryIsFile (entry: obj) : bool = entry?isFile ()
-let private entryIsDirectory (entry: obj) : bool = entry?isDirectory ()
 let private statSize (s: obj) : int = s?size
 let private statIsFile (s: obj) : bool = s?isFile ()
+let private statIsDirectory (s: obj) : bool = s?isDirectory ()
 
 [<Import("join", "node:path")>]
 let private pathJoin (a: string) (b: string) : string = jsNative
 [<Import("relative", "node:path")>]
 let private pathRelative (a: string) (b: string) : string = jsNative
+[<Import("resolve", "node:path")>]
+let private pathResolve (cwd: string) (file: string) : string = jsNative
 
-let maxDirDepth = 5
+let private entryName (entry: obj) : string = entry?name
+let private entryIsFile (entry: obj) : bool = entry?isFile ()
+let private entryIsDirectory (entry: obj) : bool = entry?isDirectory ()
 
 let private tryReadFileAsync (filePath: string) (label: string) : Async<CapsFile option> =
     async {
@@ -79,86 +65,102 @@ let private absorbFileAsync (filePath: string) (label: string) (budget: Budget) 
             | Some file -> return absorb file budget
     }
 
-let rec private discoverFilesInDirAsync (dirPath: string) (depth: int) (visited: Set<string>) : Async<string list * Set<string>> =
+let rec private collectDirAsync (dirPath: string) (projectRoot: string) (budget: Budget) : Async<Budget> =
     async {
-        if depth >= maxDirDepth then return ([], visited)
+        if isFull budget then return budget
         else
             try
-                let! realPath = realpath dirPath |> Async.AwaitPromise
-                if Set.contains realPath visited then return ([], visited)
-                else
-                    let! entries = readdir dirPath |> Async.AwaitPromise
-                    let visited' = Set.add realPath visited
-                    let rec processEntry index acc currentVisited =
-                        async {
-                            if index >= entries.Length then return (acc, currentVisited)
+                let! entries = readdir dirPath |> Async.AwaitPromise
+                let rec processEntry index currentBudget =
+                    async {
+                        if index >= entries.Length || isFull currentBudget then return currentBudget
+                        else
+                            let entry = entries.[index]
+                            let name = entryName entry
+                            let fullPath = pathJoin dirPath name
+                            if entryIsFile entry then
+                                let! nextBudget = absorbFileAsync fullPath (pathRelative projectRoot fullPath) currentBudget
+                                return! processEntry (index + 1) nextBudget
+                            elif entryIsDirectory entry then
+                                let! nextBudget = collectDirAsync fullPath projectRoot currentBudget
+                                return! processEntry (index + 1) nextBudget
                             else
-                                let entry = entries.[index]
-                                let name = entryName entry
-                                let fullPath = pathJoin dirPath name
-                                if entryIsFile entry then
-                                    return! processEntry (index + 1) (fullPath :: acc) currentVisited
-                                elif entryIsDirectory entry && not (isExcludedDir name) then
-                                    let! (subFiles, visited'') = discoverFilesInDirAsync fullPath (depth + 1) currentVisited
-                                    return! processEntry (index + 1) (acc @ subFiles) visited''
-                                else
-                                    return! processEntry (index + 1) acc currentVisited
-                        }
-                    return! processEntry 0 [] visited'
-            with _ -> return ([], visited)
+                                return! processEntry (index + 1) currentBudget
+                    }
+                return! processEntry 0 budget
+            with _ -> return budget
     }
 
-let private absorbFilesAsync (files: string list) (projectRoot: string) (budget: Budget) : Async<Budget> =
+let private readImportEntryAsync (projectRoot: string) (entry: string) (budget: Budget) : Async<Budget> =
     async {
-        let rec loop remaining currentBudget =
-            async {
-                match remaining with
-                | [] -> return currentBudget
-                | filePath :: rest ->
-                    if isFull currentBudget then return currentBudget
-                    else
-                        let! nextBudget = absorbFileAsync filePath (pathRelative projectRoot filePath) currentBudget
-                        return! loop rest nextBudget
-            }
-        return! loop files budget
-    }
-
-let private discoverRootAsync (projectRoot: string) (budget: Budget) : Async<Budget> =
-    async {
-        let! entries =
-            async {
-                try return! readdir projectRoot |> Async.AwaitPromise
-                with _ -> return [||]
-            }
-        let rec processEntry index currentBudget =
-            async {
-                if index >= entries.Length || isFull currentBudget then return currentBudget
+        if isFull budget then return budget
+        else
+            let absPath = pathResolve projectRoot entry
+            try
+                let! s = stat absPath |> Async.AwaitPromise
+                if statIsFile s then
+                    return! absorbFileAsync absPath (pathRelative projectRoot absPath) budget
+                elif statIsDirectory s then
+                    return! collectDirAsync absPath projectRoot budget
                 else
-                    let entry = entries.[index]
-                    let name = entryName entry
-                    let fullPath = pathJoin projectRoot name
-                    if entryIsFile entry && isCapsFile name then
-                        let! nextBudget = absorbFileAsync fullPath name currentBudget
-                        return! processEntry (index + 1) nextBudget
-                    elif entryIsDirectory entry && isCapsDir name then
-                        let! (subFiles, _) = discoverFilesInDirAsync fullPath 0 Set.empty
-                        let! nextBudget = absorbFilesAsync subFiles projectRoot currentBudget
-                        return! processEntry (index + 1) nextBudget
-                    else
-                        return! processEntry (index + 1) currentBudget
-            }
-        return! processEntry 0 budget
+                    return budget
+            with _ -> return budget
     }
 
-let tryReadFile (filePath: string) (label: string) : JS.Promise<CapsFile option> = tryReadFileAsync filePath label |> Async.StartAsPromise
+let private readImportsAsync (projectRoot: string) (entries: string list) (budget: Budget) : Async<Budget> =
+    let rec loop remaining currentBudget =
+        async {
+            match remaining with
+            | [] -> return currentBudget
+            | entry :: rest ->
+                if isFull currentBudget then return currentBudget
+                else
+                    let! nextBudget = readImportEntryAsync projectRoot entry currentBudget
+                    return! loop rest nextBudget
+        }
+    loop entries budget
 
-let discoverFilesInDir (dirPath: string) (depth: int) (visited: Set<string>) : JS.Promise<string list * Set<string>> =
-    discoverFilesInDirAsync dirPath depth visited |> Async.StartAsPromise
+let private splitFrontMatter (content: string) : string * obj option =
+    let trimmed = content.TrimStart('\r', '\n')
+    if not (trimmed.StartsWith("---")) then (content, None)
+    else
+        let afterFirst = trimmed.[3..].TrimStart('\r', '\n')
+        match afterFirst.IndexOf("---") with
+        | -1 -> (content, None)
+        | closeIdx ->
+            let yamlText = afterFirst.[.. closeIdx - 1]
+            let body = afterFirst.[closeIdx + 3 ..].TrimStart('\r', '\n')
+            let fm =
+                try
+                    Some (yamlParse yamlText)
+                with _ -> None
+            (body, fm)
+
+let private extractImportList (frontmatter: obj option) : string list =
+    match frontmatter with
+    | None -> []
+    | Some fm ->
+        if VibeFs.Kernel.Dyn.isNullish fm then []
+        else
+            let importVal = VibeFs.Kernel.Dyn.get fm "import"
+            if VibeFs.Kernel.Dyn.isNullish importVal then []
+            elif VibeFs.Kernel.Dyn.isArray importVal then importVal :?> obj array |> Array.map string |> List.ofArray
+            else [ string importVal ]
 
 let findCapsFiles (projectRoot: string) : JS.Promise<CapsFile list> =
     async {
-        let! finalBudget = discoverRootAsync projectRoot (fresh ())
-        return finalBudget.results |> Seq.toList |> List.sortBy (fun file -> file.filePath)
+        let agentsPath = pathJoin projectRoot "AGENTS.md"
+        let! agentsFile = tryReadFileAsync agentsPath "AGENTS.md"
+        match agentsFile with
+        | None -> return []
+        | Some agents ->
+            let body, fm = splitFrontMatter agents.content
+            let importList = extractImportList fm
+            let initial =
+                if System.String.IsNullOrWhiteSpace body then fresh ()
+                else absorb { filePath = agentsPath; label = "AGENTS.md"; content = body } (fresh ())
+            let! finalBudget = readImportsAsync projectRoot importList initial
+            return finalBudget.results |> Seq.toList |> List.sortBy (fun file -> file.filePath)
     }
     |> Async.StartAsPromise
 
@@ -168,9 +170,6 @@ type ReverieFileResult =
     { filePath: string
       content: string option
       skipReason: string option }
-
-[<Import("resolve", "node:path")>]
-let private pathResolve (cwd: string) (file: string) : string = jsNative
 
 let private statSize2 (s: obj) : int = s?size
 let private statIsFile2 (s: obj) : bool = s?isFile ()

@@ -1,10 +1,10 @@
-module VibeFs.Opencode.MagicProjection
+module VibeFs.Kernel.MagicProjection
 
 open Fable.Core.JsInterop
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Message
-open VibeFs.Opencode.MagicCore
+open VibeFs.Kernel.MagicCore
 
 let private isReadOnlyMimocodeTaskResult (part: obj) : bool =
     if not (isTodoResultFor Mimocode part) then false

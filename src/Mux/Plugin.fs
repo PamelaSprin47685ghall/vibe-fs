@@ -113,18 +113,18 @@ let getPluginToolPolicy (_agentId: string) (role: string) : obj =
     box {| add = [||]; remove = remove |}
 
 let deduplicateReadOutputs (messages: obj array) : obj array =
-    VibeFs.Mux.Dedup.deduplicateReadOutputs messages
+    VibeFs.Kernel.MessageDedup.deduplicateReadOutputs messages
 
 let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : obj array =
-    VibeFs.Mux.Dedup.deduplicateReadOutputsWithSeen (List.ofArray seenOutputs) messages |> snd
+    VibeFs.Kernel.MessageDedup.deduplicateReadOutputsWithSeen (List.ofArray seenOutputs) messages |> snd
 
 let deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj array =
-    let seen, result = VibeFs.Mux.Dedup.deduplicateModelReadOutputsWithSeen (List.ofArray seenOutputs) messages
+    let seen, result = VibeFs.Kernel.MessageDedup.deduplicateModelReadOutputsWithSeen (List.ofArray seenOutputs) messages
     Array.ofList seen, result
 
 let deduplicateReadOutputsAgainstHistory (history: obj array) (messages: obj array) : obj array =
-    let seenByPath = VibeFs.Mux.Dedup.collectReadOutputsByPath history
-    VibeFs.Mux.Dedup.deduplicateReadOutputsWithSeenByPath seenByPath messages |> snd
+    let seenByPath = VibeFs.Kernel.MessageDedup.collectReadOutputsByPath history
+    VibeFs.Kernel.MessageDedup.deduplicateReadOutputsWithSeenByPath seenByPath messages |> snd
 
 let collectReadOutputs (messages: obj array) : string[] =
-    VibeFs.Mux.Dedup.collectReadOutputs messages |> Array.ofList
+    VibeFs.Kernel.MessageDedup.collectReadOutputs messages |> Array.ofList

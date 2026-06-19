@@ -108,20 +108,6 @@ let private fileExistsAsync (p: string) : Async<bool> =
             return false
     }
 
-let private formatSyntaxDiagnostics (filePath: string) (result: SyntaxCheckResult) : string =
-    match result with
-    | Ok (lang, [||]) ->
-        $"Successfully wrote to {filePath}"
-    | Ok (lang, errors) ->
-        let header = $"[syntax-check] Syntax check failed for {filePath} ({lang}):"
-        let body =
-            errors
-            |> Array.map (fun e -> $"  line {e.line}, col {e.column}: {e.message}")
-            |> String.concat "\n"
-        header + "\n" + body
-    | Failed (lang, reason) ->
-        $"[syntax-check] Syntax check failed for {filePath} ({lang}): {reason}"
-
 let write (cwd: string option) (file_path: string) (content: string) : Async<string> =
     async {
         let cwd' = defaultArg cwd (nodeProcess?cwd())
@@ -131,5 +117,5 @@ let write (cwd: string option) (file_path: string) (content: string) : Async<str
             do! mkdir parent |> Async.AwaitPromise
         do! writeFile resolved content |> Async.AwaitPromise
         let! syntax = checkSyntax content resolved |> Async.AwaitPromise
-        return formatSyntaxDiagnostics resolved syntax
+        return formatWriteSyntaxResult resolved syntax
     }

@@ -215,3 +215,39 @@ let decideAfterRound (nudgeCount: int) (outcome: RoundOutcome) (maxNudges: int) 
 /// Initial round uses the task prompt; every retry uses the short nudge prompt.
 let promptParts (nudgeCount: int) (initialParts: string list) (nudgePrompt: string) : string list =
     if nudgeCount = 0 then initialParts else [ nudgePrompt ]
+
+/// Pending review resolutions and their abort suppressors, keyed by session.
+type SessionEffects =
+    { pendingResolutions: Map<string, ReviewResult -> unit>
+      abortSuppressors: Map<string, unit -> unit> }
+
+let emptyEffects : SessionEffects =
+    { pendingResolutions = Map.empty; abortSuppressors = Map.empty }
+
+let setPending effects sessionId resolve =
+    { effects with pendingResolutions = Map.add sessionId resolve effects.pendingResolutions }
+
+/// Fire the pending resolver for a session, then clean up its suppressor.
+/// Returns true when a resolver was actually waiting.
+let resolvePending (effects: SessionEffects) sessionId result : SessionEffects * bool =
+    match Map.tryFind sessionId effects.pendingResolutions with
+    | None -> effects, false
+    | Some resolve ->
+        resolve result
+        let without = { effects with pendingResolutions = Map.remove sessionId effects.pendingResolutions }
+        match Map.tryFind sessionId effects.abortSuppressors with
+        | Some suppress -> suppress(); { without with abortSuppressors = Map.remove sessionId without.abortSuppressors }, true
+        | None -> without, true
+
+/// Resolve every pending session in a tree as Terminated, firing suppressors.
+let disposeSessionTree (effects: SessionEffects) sessionIds : SessionEffects =
+    sessionIds
+    |> List.fold (fun acc id ->
+        match Map.tryFind id acc.pendingResolutions with
+        | Some resolve ->
+            resolve Terminated
+            let cleared = { acc with pendingResolutions = Map.remove id acc.pendingResolutions }
+            match Map.tryFind id cleared.abortSuppressors with
+            | Some suppress -> suppress(); { cleared with abortSuppressors = Map.remove id cleared.abortSuppressors }
+            | None -> cleared
+        | None -> acc) effects

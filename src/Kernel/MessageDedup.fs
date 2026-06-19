@@ -1,4 +1,4 @@
-module VibeFs.Mux.Dedup
+module VibeFs.Kernel.MessageDedup
 
 open VibeFs.Kernel.Dedup
 open VibeFs.Kernel

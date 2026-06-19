@@ -10,12 +10,13 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Kernel.Message
 open VibeFs.Opencode.HookSchema
-open VibeFs.Opencode.MagicCore
-open VibeFs.Opencode.MagicProjection
+open VibeFs.Kernel.MagicCore
+open VibeFs.Kernel.MagicProjection
+open VibeFs.Kernel.MagicTodo
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Opencode.Actors
 open VibeFs.Kernel.CapsFormat
-open VibeFs.Opencode.NudgeState
+open VibeFs.Kernel.NudgeState
 open VibeFs.Shell.TreeSitterShell
 
 let private defaultExcludedAgents = [ "browser"; "investigator"; "executor"; "title" ]

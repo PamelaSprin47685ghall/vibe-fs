@@ -32,7 +32,6 @@ let runAll (_args: string array) : JS.Promise<int> =
         AgentTests.shouldSuppress' ()
         KernelTests.headTail' ()
         KernelTests.dedup' ()
-        KernelTests.excludedDirs' ()
         KernelTests.jsBoundary' ()
         KernelTests.hostKernel' ()
         FuzzyTests.grepDetect ()

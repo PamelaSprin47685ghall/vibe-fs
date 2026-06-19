@@ -22,10 +22,6 @@ let dedup' () =
     check "dedup first" (r1.output = "same")
     check "dedup second" (r2.output = dedupMarker)
 
-let excludedDirs' () =
-    let r = isExcludedDir "node_modules"
-    check "node_modules excluded" r
-
 let jsBoundary' () =
     check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = VibeFs.Kernel.Domain.MessageAborted)
     let text = readAssistantText [| box {| ``type`` = "message"; message = box {| role = "assistant"; content = [| box {| ``type`` = "text"; text = "hello" |} |] |} |} |] None

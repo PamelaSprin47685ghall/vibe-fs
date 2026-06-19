@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Executor
+open VibeFs.Kernel.Fuzzy
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.ReviewSession
@@ -111,8 +112,8 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
             let tc = extractToolContext context (Dyn.str ctx "directory")
             let sessionID = Dyn.str tc "sessionID"
             post sessionID (fun () ->
-                let lang = match Dyn.str args "language" with "python" -> Python | "javascript" -> Javascript | _ -> Shell
-                let timeout = match Dyn.str args "timeout_type" with "long" -> Long | "last-resort" -> LastResort | _ -> Short
+                let lang = parseLanguage (Dyn.str args "language")
+                let timeout = parseTimeout (Dyn.str args "timeout_type")
                 let deps = if Dyn.isNullish (Dyn.get args "dependencies") then [] else Dyn.get args "dependencies" :?> obj array |> Array.map string |> List.ofArray
                 let options : ExecuteOptions =
                     { program = Dyn.str args "program"; language = lang; dependencies = deps

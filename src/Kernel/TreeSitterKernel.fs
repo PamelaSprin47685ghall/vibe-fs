@@ -78,3 +78,17 @@ let appendSyntaxDiagnosticsToOutput (currentOutput: string) (filePath: string)
         match formatSyntaxDiagnostics filePath result false with
         | Some formatted -> $"{currentOutput}\n\n{formatted}"
         | None -> currentOutput
+
+let formatWriteSyntaxResult (filePath: string) (result: SyntaxCheckResult) : string =
+    match result with
+    | Ok (_, [||]) ->
+        $"Successfully wrote to {filePath}"
+    | Ok (lang, errors) ->
+        let header = $"[syntax-check] Syntax check failed for {filePath} ({lang}):"
+        let body =
+            errors
+            |> Array.map (fun e -> $"  line {e.line}, col {e.column}: {e.message}")
+            |> String.concat "\n"
+        header + "\n" + body
+    | Failed (lang, reason) ->
+        $"[syntax-check] Syntax check failed for {filePath} ({lang}): {reason}"

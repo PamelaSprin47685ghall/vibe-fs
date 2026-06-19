@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Executor
+open VibeFs.Kernel.Fuzzy
 open VibeFs.Kernel.Prompts
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
@@ -24,18 +25,6 @@ let private getCwd (config: obj) : string =
     match strField config "cwd" with
     | Some v when not (System.String.IsNullOrWhiteSpace v) -> v
     | _ -> defaultArg (strField config "directory") ""
-
-let private parseLanguage (value: string) : ExecutorLanguage =
-    match value.ToLowerInvariant() with
-    | "python" -> Python
-    | "javascript" -> Javascript
-    | _ -> Shell
-
-let private parseTimeout (value: string) : ExecutorTimeoutType =
-    match value.ToLowerInvariant() with
-    | "long" -> Long
-    | "last-resort" -> LastResort
-    | _ -> Short
 
 let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
     { language = parseLanguage (Dyn.str args "language")

@@ -47,6 +47,7 @@ let computeCountSpec (reg: obj) =
 let buildCapsFileReadDataSpec () = async {
     let! tmpDir = mkdtempAsync "caps-test-" |> Async.AwaitPromise
     do! writeFileAsync (unbox<string> (pathModule?join(tmpDir, "CAPS.md"))) "# Capabilities\nTest content" |> Async.AwaitPromise
+    do! writeFileAsync (unbox<string> (pathModule?join(tmpDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n" |> Async.AwaitPromise
     let! entries = buildCapsFileReadData tmpDir |> Async.AwaitPromise
     check "buildCapsFileReadData finds caps file" (entries.Length = 1)
     check "caps entry has path" (entries.[0].path = "CAPS.md")
@@ -58,6 +59,7 @@ let buildCapsFileReadDataSpec () = async {
 let capsTransformSpec () = async {
     let! workspaceDir = mkdtempAsync "caps-transform-" |> Async.AwaitPromise
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content" |> Async.AwaitPromise
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n" |> Async.AwaitPromise
     let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     let tf = get p "experimental.chat.messages.transform"
     let originalMsg =
@@ -76,6 +78,7 @@ let capsTransformInPlaceSpec () = async {
     let freshOut = createObj [ "messages", box [| box {| info = createObj [ "id", box "msg-1"; "agent", box "manager" ]; parts = [||] |} |] ]
     let freshRef = get freshOut "messages"
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content" |> Async.AwaitPromise
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n" |> Async.AwaitPromise
     let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     do! (get p "experimental.chat.messages.transform") $ (createObj [], freshOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     check "caps transform mutates array in place" (obj.ReferenceEquals(get freshOut "messages", freshRef))
@@ -85,6 +88,7 @@ let capsTransformInPlaceSpec () = async {
 let capsAndMagicOrderSpec () = async {
     let! workspaceDir = mkdtempAsync "caps-magic-order-" |> Async.AwaitPromise
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content" |> Async.AwaitPromise
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n" |> Async.AwaitPromise
     let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     let tf = get p "experimental.chat.messages.transform"
     let messages = createObj [ "messages", box [|
@@ -204,14 +208,14 @@ let toolDefinitionSpec () = async {
     let reportSchema = get todoProps "completedWorkReport"
     let required = unbox<obj[]> (get todoSchema "required") |> Array.map string
     check "tool.definition builds todo report field" (str reportSchema "type" = "string")
-    check "tool.definition builds todo report description" (str reportSchema "description" = VibeFs.Opencode.MagicTodo.reportDesc)
+    check "tool.definition builds todo report description" (str reportSchema "description" = VibeFs.Kernel.MagicTodo.reportDesc)
     check "tool.definition requires todo report" (required |> Array.contains "completedWorkReport")
     check "tool.definition requires todos" (required |> Array.contains "todos")
-    check "tool.definition builds todos description" (str (get todoProps "todos") "description" = VibeFs.Opencode.MagicTodo.todosDesc)
+    check "tool.definition builds todos description" (str (get todoProps "todos") "description" = VibeFs.Kernel.MagicTodo.todosDesc)
     let todoItemProps = get (get (get todoProps "todos") "items") "properties"
-    check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = VibeFs.Opencode.MagicTodo.todoContentDesc)
-    check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = VibeFs.Opencode.MagicTodo.todoStatusDesc)
-    check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Opencode.MagicTodo.todoPriorityDesc)
+    check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = VibeFs.Kernel.MagicTodo.todoContentDesc)
+    check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = VibeFs.Kernel.MagicTodo.todoStatusDesc)
+    check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Kernel.MagicTodo.todoPriorityDesc)
 
     let! mimoP = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     let mimoTd = get mimoP "tool.definition"
@@ -400,10 +404,10 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () = async {
     check "mimo task.definition rewrites zod-like parameters" (string (get (get taskDef "parameters") "kind") = "extended")
     check "mimo task.definition adds report field through safeExtend" (
         string (get (get extendCalls.[0] "completedWorkReport") "kind") = "optional-string"
-        && string (get (get extendCalls.[0] "completedWorkReport") "description") = VibeFs.Opencode.MagicTodo.mimoReportFieldDesc)
+        && string (get (get extendCalls.[0] "completedWorkReport") "description") = VibeFs.Kernel.MagicTodo.mimoReportFieldDesc)
     check "mimo task.definition derives report field from host zod schema" (
         describeCalls.Count = 1
-        && describeCalls.[0] = VibeFs.Opencode.MagicTodo.mimoReportFieldDesc
+        && describeCalls.[0] = VibeFs.Kernel.MagicTodo.mimoReportFieldDesc
         && optionalCalls.Count = 1)
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }

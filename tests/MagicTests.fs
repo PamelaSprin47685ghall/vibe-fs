@@ -5,8 +5,8 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.HostTools
-open VibeFs.Opencode.MagicCore
-open VibeFs.Opencode.MagicProjection
+open VibeFs.Kernel.MagicCore
+open VibeFs.Kernel.MagicProjection
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Kernel.Message
 

@@ -56,41 +56,13 @@ let clearIteratorStore (store: obj) : unit =
     s.Iterators.Clear()
     s.Counter <- 0
 
-type FuzzyFindParams =
-    { pattern: string option
-      path: string option
-      limit: int option
-      iterator: string option }
-
-type FuzzyGrepParams =
-    { pattern: string option
-      path: string option
-      exclude: string list
-      caseSensitive: bool option
-      context: int option
-      limit: int option
-      iterator: string option }
-
 type SearchOptions =
     { cwd: string
       scopeId: string
       store: obj option
       finderCache: FinderCache }
 
-type FuzzyFindState = { query: string; pageSize: int; pageIndex: int; externalBasePath: string option }
-type FuzzyGrepState =
-    { query: string; mode: string; smartCase: bool; beforeContext: int; afterContext: int
-      pageSize: int; externalBasePath: string option; cursor: obj option }
-
-type SearchOutcome = { output: string; isError: bool }
-
 let resolveStore (opts: SearchOptions) = defaultArg opts.store globalIteratorStore
-
-let parseExcludeField (args: obj) : string list =
-    let v = Dyn.get args "exclude"
-    if Dyn.isNullish v then []
-    elif Dyn.isArray v then v :?> obj array |> Array.map string |> List.ofArray
-    else [ string v ]
 
 let resolveFindSearchState (params': FuzzyFindParams) (opts: SearchOptions)
     : Result<FuzzyFindState, string> =
@@ -224,8 +196,6 @@ let private typedOf (result: obj) : GrepMatch list * int option * string option 
     let matches = itemsOf result |> Array.map toGrepMatch |> List.ofArray
     (matches, optInt result "totalMatched", optStr result "regexFallbackError", Dyn.get result "nextCursor")
 
-type ResolvedGrep = { matches: GrepMatch list; total: int option; regexError: string option; cursor: obj }
-
 let resolveResult (raw: obj) : ResolvedGrep =
     let value = Dyn.get raw "value"
     let (matches, total, regexError, cursor) = typedOf value
@@ -233,12 +203,6 @@ let resolveResult (raw: obj) : ResolvedGrep =
 
 let private grepNextIterator (state: FuzzyGrepState) (store: obj) (opts: SearchOptions) (cursor: obj) : string =
     if Dyn.isNullish cursor then "" else storeIterator<FuzzyGrepState> store opts.scopeId "ffi_i" { state with cursor = Some cursor }
-
-let buildGrepOutput (body: string) (regexError: string option) (nextIterator: string) : string =
-    let regexNotice = regexError |> Option.map (fun error -> sprintf "Invalid regex: %s, used literal match" error)
-    let iteratorNotice = sprintf "iterator=\"%s\"" nextIterator
-    let notices = (regexNotice |> Option.toList) @ [ iteratorNotice ]
-    sprintf "%s\n\n[%s]" body (String.concat ". " notices)
 
 let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     async {

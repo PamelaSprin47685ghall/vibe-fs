@@ -22,7 +22,12 @@
     <Compile Include="src/Kernel/Message.fs" />
     <Compile Include="src/Kernel/CapsFormat.fs" />
     <Compile Include="src/Kernel/TreeSitterKernel.fs" />
+    <Compile Include="src/Kernel/MessageDedup.fs" />
+    <Compile Include="src/Kernel/MagicCore.fs" />
+    <Compile Include="src/Kernel/MagicProjection.fs" />
+    <Compile Include="src/Kernel/MagicTodo.fs" />
     <Compile Include="src/Kernel/Domain.fs" />
+    <Compile Include="src/Kernel/NudgeState.fs" />
     <Compile Include="src/Kernel/Config.fs" />
     <Compile Include="src/Kernel/Fuzzy.fs" />
     <Compile Include="src/Kernel/Executor.fs" />
@@ -40,22 +45,16 @@
     <Compile Include="src/Mux/CallStore.fs" />
     <Compile Include="src/Mux/AiSettings.fs" />
     <Compile Include="src/Opencode/Actors.fs" />
-    <Compile Include="src/Opencode/MagicCore.fs" />
-    <Compile Include="src/Opencode/MagicProjection.fs" />
     <Compile Include="src/Opencode/MagicTodo.fs" />
     <Compile Include="src/Opencode/ToolSchema.fs" />
     <Compile Include="src/Opencode/HookSchema.fs" />
-
     <Compile Include="src/Mux/Wrappers.fs" />
     <Compile Include="src/Mux/Delegate.fs" />
     <Compile Include="src/Mux/SubagentTools.fs" />
     <Compile Include="src/Mux/HostTools.fs" />
-    <Compile Include="src/Mux/Dedup.fs" />
     <Compile Include="src/Mux/EventHook.fs" />
     <Compile Include="src/Mux/SlashCommands.fs" />
     <Compile Include="src/Mux/Plugin.fs" />
-
-    <Compile Include="src/Opencode/NudgeState.fs" />
     <Compile Include="src/Opencode/NudgeHook.fs" />
     <Compile Include="src/Opencode/Session.fs" />
     <Compile Include="src/Opencode/Tools.fs" />

@@ -6,7 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.SubagentIntents
-open VibeFs.Opencode.MagicTodo
+open VibeFs.Kernel.MagicTodo
 open VibeFs.Opencode.ToolSchema
 
 let setUiLabel (setKey: obj -> string -> obj -> unit) (args: obj) (tool: string) : unit =

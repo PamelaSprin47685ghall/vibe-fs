@@ -1,6 +1,8 @@
 module VibeFs.Kernel.Fuzzy
 
 open System.Text.RegularExpressions
+open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.Dyn
 
 type FileAnnotation =
     { gitStatus: string option
@@ -243,3 +245,46 @@ let resolveExternalPath (inputPath: string option) (cwd: string) : string option
     let resolved = resolveFuzzySearchPath inputPath cwd
     if not resolved.external then None, None
     else Some resolved.basePath, resolved.pathConstraint
+
+type FuzzyFindParams =
+    { pattern: string option
+      path: string option
+      limit: int option
+      iterator: string option }
+
+type FuzzyGrepParams =
+    { pattern: string option
+      path: string option
+      exclude: string list
+      caseSensitive: bool option
+      context: int option
+      limit: int option
+      iterator: string option }
+
+type FuzzyFindState = { query: string; pageSize: int; pageIndex: int; externalBasePath: string option }
+
+type FuzzyGrepState =
+    { query: string
+      mode: string
+      smartCase: bool
+      beforeContext: int
+      afterContext: int
+      pageSize: int
+      externalBasePath: string option
+      cursor: obj option }
+
+type SearchOutcome = { output: string; isError: bool }
+
+type ResolvedGrep = { matches: GrepMatch list; total: int option; regexError: string option; cursor: obj }
+
+let parseExcludeField (args: obj) : string list =
+    let v = Dyn.get args "exclude"
+    if Dyn.isNullish v then []
+    elif Dyn.isArray v then v :?> obj array |> Array.map string |> List.ofArray
+    else [ string v ]
+
+let buildGrepOutput (body: string) (regexError: string option) (nextIterator: string) : string =
+    let regexNotice = regexError |> Option.map (fun error -> sprintf "Invalid regex: %s, used literal match" error)
+    let iteratorNotice = sprintf "iterator=\"%s\"" nextIterator
+    let notices = (regexNotice |> Option.toList) @ [ iteratorNotice ]
+    sprintf "%s\n\n[%s]" body (String.concat ". " notices)

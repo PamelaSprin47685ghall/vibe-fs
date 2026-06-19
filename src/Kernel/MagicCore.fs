@@ -1,4 +1,4 @@
-module VibeFs.Opencode.MagicCore
+module VibeFs.Kernel.MagicCore
 
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Dyn

@@ -199,3 +199,15 @@ let buildSummaryPrompt (byteLength: string -> int) (truncateToBytes: string -> i
       outputForSummary ]
     |> List.choose (fun s -> if System.String.IsNullOrEmpty(s) then None else Some s)
     |> String.concat "\n"
+
+let parseLanguage (value: string) : ExecutorLanguage =
+    match value.ToLowerInvariant() with
+    | "python" -> Python
+    | "javascript" -> Javascript
+    | _ -> Shell
+
+let parseTimeout (value: string) : ExecutorTimeoutType =
+    match value.ToLowerInvariant() with
+    | "long" -> Long
+    | "last-resort" -> LastResort
+    | _ -> Short
