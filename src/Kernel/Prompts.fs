@@ -84,10 +84,14 @@ let coderPromptBody (intent: CoderIntent) : string =
         intent.targets
         |> List.map (fun t -> $"- {t.file}\n  Guide: {t.guide}")
         |> String.concat "\n"
+    let doNotTouch =
+        if intent.doNotTouch.Length = 0 then ""
+        else "Do not touch:\n" + bulletLines intent.doNotTouch + "\n\n"
     "You are an implementation agent (coder). Implement the objective using the background and per-file guides below.\n\n"
     + "Objective:\n" + intent.objective + "\n\n"
     + "Background:\n" + intent.background + "\n\n"
     + "Targets:\n" + targets + "\n\n"
+    + doNotTouch
     + "Instructions:\n"
     + "1. Read the listed files and related code needed for the change.\n"
     + "2. Edit or create files to satisfy the objective and each file guide.\n"

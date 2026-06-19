@@ -35,10 +35,12 @@ let hostKernel' () =
     let coderIntent =
         { objective = "fix bug"
           background = "user reported failure"
-          targets = [ { file = "a.ts"; guide = "fix root cause" }; { file = "b.ts"; guide = "align types" } ] }
+          targets = [ { file = "a.ts"; guide = "fix root cause" }; { file = "b.ts"; guide = "align types" } ]
+          doNotTouch = [| "shared.ts" |] }
     let intent = formatCoderUserPrompt coderIntent
     check "coder has file" (intent.IndexOf("a.ts") >= 0)
     check "coder has objective" (intent.IndexOf("fix bug") >= 0)
+    check "coder has do_not_touch" (intent.IndexOf("shared.ts") >= 0)
     let prompt = buildMeditatorPrompt [ { file = "x.fs"; content = Some "let x = 1" } ] "why?"
     check "meditator has question" (prompt.IndexOf("why?") >= 0)
     check "meditator has content" (prompt.IndexOf("let x = 1") >= 0)

@@ -54,7 +54,8 @@ let coderIntentsSchema (desc: string) : obj =
     let targetsField = arrayMin targetShape 1 "Non-empty per-file implementation guides."
     let objectiveField = strMin 1 "Concrete code-change goal for this subagent."
     let backgroundField = strMin 1 "Why this change is needed; prior findings and user context."
-    let inner = strictObject (createObj [ "objective", objectiveField; "background", backgroundField; "targets", targetsField ])
+    let doNotTouchField = call1 (call0 (arr (strMin 1 "Do-not-touch path, symbol, or constraint.")) "optional") "describe" (box "Optional list of files, directories, symbols, or constraints this subagent must not modify.")
+    let inner = strictObject (createObj [ "objective", objectiveField; "background", backgroundField; "do_not_touch", doNotTouchField; "targets", targetsField ])
     arrayMin inner 1 desc
 
 let investigatorIntentsSchema (desc: string) : obj =
@@ -88,8 +89,8 @@ let define (description: string) (args: obj) (execute: obj -> obj -> JS.Promise<
     invokeTool toolFactory (box {| description = description; args = args; execute = execute |})
 
 let coder =
-    "Execute code changes from structured intents. Each intents[] element spawns its own coder subagent in parallel. Every element must include objective, background, and targets (file + guide per file). "
-    + "IMPORTANT: Subagents start in a fresh session with no manager history. Pack all context into background and per-file guide fields. Do NOT assume the coder knows the repo."
+    "Execute code changes from structured intents. Each intents[] element spawns its own coder subagent in parallel. Every element must include objective, background, and targets (file + guide per file); do_not_touch is optional per subagent. "
+    + "IMPORTANT: Subagents start in a fresh session with no manager history. Pack all context into background, do_not_touch, and per-file guide fields. Do NOT assume the coder knows the repo."
 
 let investigator =
     "Search the codebase from structured intents. Each intents[] element spawns its own investigator subagent in parallel. Every element must include objective, background, and questions[]; entries[] is optional. "
@@ -115,7 +116,7 @@ let webfetch = "Fetch a URL with better extraction for static/docs pages. Suppor
 
 module Params =
     let coderIntents =
-        "Non-empty array of coder intents. Each item: objective (what to implement), background (why and prior context), targets[] with file and guide per path. One subagent per item, all parallel."
+        "Non-empty array of coder intents. Each item: objective (what to implement), background (why and prior context), optional do_not_touch[] constraints, and targets[] with file and guide per path. One subagent per item, all parallel."
 
     let investigatorIntents =
         "Non-empty array of investigator intents. Each item: objective, background, questions[] (required KPIs for the report), optional entries[] (paths/symbols to start from). One subagent per item, all parallel."

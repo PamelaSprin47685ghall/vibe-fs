@@ -249,6 +249,13 @@ let private sampleCoderIntent (objective: string) (file: string) : obj =
           "background", box "test background"
           "targets", box [| createObj [ "file", box file; "guide", box "test guide" ] |] ]
 
+let private sampleCoderIntentWithDoNotTouch (objective: string) (file: string) (doNotTouch: string array) : obj =
+    createObj
+        [ "objective", box objective
+          "background", box "test background"
+          "do_not_touch", box doNotTouch
+          "targets", box [| createObj [ "file", box file; "guide", box "test guide" ] |] ]
+
 let private sampleInvestigatorIntent (objective: string) : obj =
     createObj
         [ "objective", box objective
@@ -387,6 +394,40 @@ let investigatorToolSpec () = async {
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
+let coderToolSpec () = async {
+    let createCalls = ResizeArray<obj>()
+    let promptCalls = ResizeArray<obj>()
+    let mockClient =
+        createObj [ "session", box (createObj [
+            "create", box (System.Func<obj, JS.Promise<obj>>(fun arg ->
+                (async { createCalls.Add(arg); return box {| data = box {| id = "child-coder-session" |} |} } |> Async.StartAsPromise)))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                (async { promptCalls.Add(arg) } |> Async.StartAsPromise)))
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (async { return box {| data = [|
+                    box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "text"; text = "Coder finished" |} |] |}
+                |] |} } |> Async.StartAsPromise)))
+            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ ->
+                (async { () } |> Async.StartAsPromise)))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "coder-tool-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient |}) |> Async.AwaitPromise
+    let coder = get (get p "tool") "coder"
+    let intents : obj array = [|
+        sampleCoderIntentWithDoNotTouch "fix bug" "a.ts" [| "src/shared.fs"; "Do not rename public API" |]
+        sampleCoderIntent "add feature" "b.ts"
+    |]
+    let! result = (get coder "execute") $ (createObj [ "intents", box intents ], createObj [ "directory", box workspaceDir; "sessionID", box "coder-parent"; "abort", box null ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
+    check "coder tool returns subagent output" (result.Contains("Coder finished"))
+    check "coder tool creates one child per intent" (createCalls.Count = 2)
+    check "coder tool prompts child coder agent" (str (get promptCalls.[0] "body") "agent" = "coder")
+    let firstPrompt = str (unbox<obj[]> (get (get promptCalls.[0] "body") "parts")).[0] "text"
+    let secondPrompt = str (unbox<obj[]> (get (get promptCalls.[1] "body") "parts")).[0] "text"
+    check "coder prompt includes first intent do_not_touch" (firstPrompt.Contains("Do not touch:") && firstPrompt.Contains("src/shared.fs") && firstPrompt.Contains("Do not rename public API"))
+    check "coder prompt omits do_not_touch section when absent" (not (secondPrompt.Contains("Do not touch:")))
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
 let investigatorToolLateClientInjectionSpec () = async {
     let createCalls = ResizeArray<obj>()
     let promptCalls = ResizeArray<obj>()
@@ -452,6 +493,7 @@ let run () : JS.Promise<unit> =
         do! mimoApplyPatchExecuteBeforeSpec ()
         do! mimoTaskExecuteRoundTripSpec ()
         do! mimoTaskDefinitionHandlesZodLikeParametersSpec ()
+        do! coderToolSpec ()
         do! investigatorToolSpec ()
         do! investigatorToolLateClientInjectionSpec ()
         do! executorActorSpec ()

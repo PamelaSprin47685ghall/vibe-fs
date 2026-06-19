@@ -9,7 +9,8 @@ type CoderTarget = { file: string; guide: string }
 type CoderIntent =
     { objective: string
       background: string
-      targets: CoderTarget list }
+      targets: CoderTarget list
+      doNotTouch: string array }
 
 type InvestigatorIntent =
     { objective: string
@@ -58,7 +59,10 @@ let parseCoderIntent (item: obj) : Result<CoderIntent, string> =
             |> Result.bind (fun background ->
                 parseCoderTargets (Dyn.get item "targets")
                 |> Result.map (fun targets ->
-                    { objective = objective; background = background; targets = targets })))
+                    { objective = objective
+                      background = background
+                      targets = targets
+                      doNotTouch = optionalStrArray item "do_not_touch" })))
 
 let parseInvestigatorIntent (item: obj) : Result<InvestigatorIntent, string> =
     if not (Dyn.typeIs item "object") then Result.Error "Invalid LLM input for investigator: each intent must be an object"
@@ -152,6 +156,7 @@ let muxCoderIntentsSchema (intentsDesc: string) : obj =
             (createObj
                 [ "objective", muxStrReq "Concrete code-change goal for this subagent."
                   "background", muxStrReq "Why this change is needed; prior findings and user context."
+                  "do_not_touch", muxStrArrayOpt "Optional list of files, directories, symbols, or constraints this subagent must not modify."
                   "targets",
                   createObj
                       [ "type", box "array"
