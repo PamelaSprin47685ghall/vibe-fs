@@ -120,14 +120,14 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                 async {
                     let! result = VibeFs.Shell.Executor.execute options sessionID |> Async.AwaitPromise
                     let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
-                    if not (shouldSummarize byteLength output) then return prependSafetyWarning output options.program options.language
+                    if not (shouldSummarize byteLength output) then return prependSafetyWarningForExecution output options
                     else
                         let prompt = formatExecutorSummarizerUserPrompt output
                         let! summary =
                             runSubagentWithCleanup registry (client ()) "executor" "Executor summary" prompt
                                 (Dyn.str tc "directory") sessionID context
                             |> Async.AwaitPromise
-                        return prependSafetyWarning summary options.program options.language
+                        return prependSafetyWarningForExecution summary options
                 } |> Async.StartAsPromise))
 
 let browserTool (registry: ChildAgentRegistry) (ctx: obj) : obj =

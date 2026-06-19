@@ -49,11 +49,11 @@ let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
 let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptions) (output: string) : Async<string> =
     async {
         if not (shouldSummarize byteLength output) then
-            return prependSafetyWarning output options.program options.language
+            return prependSafetyWarningForExecution output options
         else
             let prompt = formatMuxExecutorSummarizerUserPrompt output
             let! report = runMuxSubagent deps config "executor" prompt "Executor summary" None |> Async.AwaitPromise
-            return prependSafetyWarning report options.program options.language
+            return prependSafetyWarningForExecution report options
     }
 
 let executorTool (deps: obj) : ToolDefinition =

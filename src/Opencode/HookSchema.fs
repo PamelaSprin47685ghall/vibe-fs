@@ -3,6 +3,7 @@ module VibeFs.Opencode.HookSchema
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Opencode.MagicTodo
@@ -153,7 +154,7 @@ let mergeMagicReportIntoTaskSchema (schema: obj) : obj =
             else schema
 
 let fusedTaskToolDescription =
-    toolDescription
+    toolDescriptionFor Mimocode
     + "\n\n"
     + "This host also exposes the native session task registry: every call must include an `operation` object "
     + "(actions: create, list, get, start, block, unblock, done, abandon, rename). "

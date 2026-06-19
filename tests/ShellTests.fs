@@ -74,9 +74,14 @@ let summarizerInputCap () =
 
 let safetyWarning () =
     let warn program = prependSafetyWarning "OUT" program Shell
+    let warnForExecution program =
+        prependSafetyWarningForExecution "OUT" { program = program; language = Shell; dependencies = []; timeoutType = Short; cwd = None }
     check "leading grep warns" ((warn "grep foo").Contains readOnlyWarning)
     check "grep after && warns" ((warn "cd src && grep foo").Contains readOnlyWarning)
     check "grep in pipe warns" ((warn "ls a | grep b").Contains readOnlyWarning)
+    check "stripped head pipe passes" (not ((warn "printf hi | head -n 1").Contains readOnlyWarning))
+    check "execution warning uses prepared program" (not ((warnForExecution "printf hi | head -n 1").Contains readOnlyWarning))
+    check "real head command warns" ((warn "head -n 1 file.txt").Contains readOnlyWarning)
     check "ls after semicolon warns" ((warn "echo ok; ls -la").Contains readOnlyWarning)
     check "prefixed path warns" ((warn "/usr/bin/grep foo").Contains readOnlyWarning)
     check "plain echo passes" (not ((warn "echo hi").Contains readOnlyWarning))

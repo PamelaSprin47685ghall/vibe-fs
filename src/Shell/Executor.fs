@@ -212,7 +212,7 @@ let executeWith (deps: ExecuteDeps) (options: ExecuteOptions) (sessionId: string
     async {
         let timeout = timeoutMs options.timeoutType
         let cwd = defaultArg options.cwd (nodeProcess?cwd())
-        let program = if options.language = Shell then prepareShellProgram options.program else options.program
+        let program = prepareProgramForExecution options
         try
             let! outcome =
                 deps.runProgram program options.language options.dependencies cwd sessionId timeout

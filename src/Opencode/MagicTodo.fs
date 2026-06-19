@@ -91,18 +91,29 @@ let replayBacklogFor (host: Host) (messages: obj array) : BacklogEntry list =
 let replayBacklog (messages: obj array) : BacklogEntry list =
     replayBacklogFor opencode messages
 
-let toolDescription =
+let private toolDescriptionHeader =
     "Manage a structured todo list and preserve a compact append-only work backlog. "
-    + "Use this tool for multi-step coding work. Every call replaces the entire todo list, appends a detailed completed-work report, "
-    + "and keeps future context folding informed.\n\n"
+    + "Use this tool for multi-step coding work, appending a detailed completed-work report "
+    + "to keep future context folding informed.\n\n"
     + "Critical write rules:\n"
     + "- Every call MUST include completedWorkReport.\n"
     + "- completedWorkReport is stored forever in Magic Todo's append-only backlog. It must capture what changed and why, key files read or written (full paths), gotchas discovered, and lessons or conventions future developers should keep.\n"
-    + "- Do not batch many completed tasks into one vague report; write after meaningful progress.\n"
-    + "- Always provide the full todos list. Partial updates are not supported.\n\n"
-    + "Context folding behavior:\n"
+    + "- Do not batch many completed tasks into one vague report; write after meaningful progress."
+
+let private toolDescriptionTail =
+    "Context folding behavior:\n"
     + "- Later turns may see backlog projections instead of older raw todo updates.\n"
     + "- Detailed context between older todo writes can be folded away, so completedWorkReport must preserve anything future turns need."
+
+let toolDescriptionFor (host: Host) =
+    match host with
+    | Opencode ->
+        toolDescriptionHeader + "\n- Always provide the full todos list. Partial updates are not supported.\n\n"
+        + toolDescriptionTail
+    | Mimocode ->
+        toolDescriptionHeader + "\n\n" + toolDescriptionTail
+
+let toolDescription = toolDescriptionFor opencode
 
 let todosDesc =
     "Complete replacement todo list. Re-send every remaining item, not just the ones that changed, and keep exactly one in_progress item while active work remains whenever possible."

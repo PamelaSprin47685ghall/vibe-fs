@@ -39,8 +39,9 @@ let private parsePipe (s: string) (index: int) : (int * StrippedPipe) option =
         else
             let countEnd, countStr = takeWhile isDigit s afterFlag
             let afterCount = skipWhile (fun c -> isWhitespace c && c <> '\n') s countEnd
-            if afterCount >= s.Length || not (isTerminator s.[afterCount]) then None
-            else Some(countEnd, { pipe = s.[index..countEnd - 1].Trim(); name = name; count = int countStr })
+            if afterCount >= s.Length || isTerminator s.[afterCount] then
+                Some(countEnd, { pipe = s.[index..countEnd - 1].Trim(); name = name; count = int countStr })
+            else None
 
 let private readSingleQuoted (s: string) (i: int) =
     match s.IndexOf("'", i + 1) with
@@ -153,6 +154,14 @@ let shouldSummarize (byteLength: string -> int) (output: string) : bool =
 
 let prepareShellProgram (program: string) : string =
     (strip program).script
+
+let prepareProgramForExecution (options: ExecuteOptions) : string =
+    match options.language with
+    | Shell -> prepareShellProgram options.program
+    | _ -> options.program
+
+let prependSafetyWarningForExecution (output: string) (options: ExecuteOptions) : string =
+    prependSafetyWarning output (prepareProgramForExecution options) options.language
 
 let describeResultTag (result: ExecuteResult) (timeoutType: ExecutorTimeoutType) : string =
     match result with
