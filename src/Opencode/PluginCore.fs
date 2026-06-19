@@ -8,9 +8,10 @@ open VibeFs.Kernel.Config
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Opencode.Tools
-open VibeFs.Opencode.Hooks
+open VibeFs.Opencode.HookExecute
+open VibeFs.Opencode.HookTransform
 open VibeFs.Opencode.NudgeHook
-open VibeFs.Opencode.Session
+open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Opencode.Actors
 open VibeFs.Opencode.MagicTodo
@@ -220,7 +221,7 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
             } |> Async.StartAsPromise))
         setKey result "event" (box (fun (input: obj) ->
             async {
-                do! Hooks.eventHandler reviewStore input |> Async.AwaitPromise
+                do! eventHandler reviewStore input |> Async.AwaitPromise
                 do! nudgeHook.handleEvent input |> Async.AwaitPromise
             } |> Async.StartAsPromise))
         setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host magicSession input output))

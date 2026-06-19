@@ -5,12 +5,15 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.Fuzzy
+open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Shell.OllamaClient
 open VibeFs.Opencode.ToolSchema
-open VibeFs.Opencode.Session
+open VibeFs.Opencode.SessionIo
+open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Opencode.Actors
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzySearch
@@ -47,15 +50,15 @@ let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                 let tc = extractToolContext context (Dyn.str ctx "directory")
                 let directory = Dyn.str tc "directory"
                 let sessionID = Dyn.str tc "sessionID"
+                let prompts = formatPrompt opencode (Coder intents)
                 async {
                     let! reports =
-                        intents
-                        |> List.map (fun intent ->
-                            let prompt = formatCoderUserPrompt intent
+                        prompts
+                        |> List.map (fun prompt ->
                             runSubagent registry (client ()) "coder" "Coder" prompt directory sessionID context (box null)
                             |> Async.AwaitPromise)
                         |> Async.Parallel
-                    return String.concat "\n---\n" (List.ofArray reports)
+                    return joinReports reports
                 } |> Async.StartAsPromise)
 
 let investigatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
@@ -68,16 +71,16 @@ let investigatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
             | Error message -> resolveStr message
             | Ok intents ->
                 let tc = extractToolContext context (Dyn.str ctx "directory")
+                let prompts = formatPrompt opencode (Investigator intents)
                 async {
                     let! reports =
-                        intents
-                        |> List.map (fun intent ->
-                            let prompt = formatInvestigatorUserPrompt intent
+                        prompts
+                        |> List.map (fun prompt ->
                             runSubagent registry (client ()) "investigator" "Investigator" prompt
                                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null)
                             |> Async.AwaitPromise)
                         |> Async.Parallel
-                    return String.concat "\n---\n" (List.ofArray reports)
+                    return joinReports reports
                 } |> Async.StartAsPromise)
 
 let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
@@ -97,7 +100,7 @@ let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                         { file = file; content = r.content } : MeditatorFileSection)
                         files (List.toArray readResults)
                     |> List.ofArray
-                let prompt = buildMeditatorPrompt sections intent
+                let prompt = formatPrompt opencode (Meditator(intent, sections)) |> List.head
                 return! runSubagent registry (client ()) "meditator" "Meditator" prompt
                     directory sessionID context (box null)
                     |> Async.AwaitPromise
@@ -123,7 +126,7 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                     let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
                     if not (shouldSummarize byteLength output) then return prependSafetyWarningForExecution output options
                     else
-                        let prompt = formatExecutorSummarizerUserPrompt output
+                        let prompt = formatPrompt opencode (ExecutorSummary output) |> List.head
                         let! summary =
                             runSubagentWithCleanup registry (client ()) "executor" "Executor summary" prompt
                                 (Dyn.str tc "directory") sessionID context
@@ -137,7 +140,7 @@ let browserTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
         (box {| intent = strReq Params.browserIntent |})
         (fun args context ->
             let tc = extractToolContext context (Dyn.str ctx "directory")
-            runSubagent registry (client ()) "browser" "Browser" (formatBrowserUserPrompt (Dyn.str args "intent"))
+            runSubagent registry (client ()) "browser" "Browser" (formatPrompt opencode (Browser(Dyn.str args "intent")) |> List.head)
                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null))
 
 let fuzzyFindTool (finderCache: FinderCache) : obj =
@@ -222,7 +225,7 @@ let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                         if items.IsEmpty then return rawResults
                         else
                             let tc = extractToolContext context (Dyn.str ctx "directory")
-                            let prompt = formatWebsearchSummarizerUserPrompt whatToSummarize rawResults
+                            let prompt = formatPrompt opencode (WebsearchSummary(whatToSummarize, rawResults)) |> List.head
                             return! runSubagentWithCleanup registry (client ()) "executor" "Web search summary" prompt
                                         (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
                                     |> Async.AwaitPromise

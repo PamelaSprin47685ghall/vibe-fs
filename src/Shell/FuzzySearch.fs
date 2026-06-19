@@ -7,54 +7,102 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Fuzzy
 open VibeFs.Shell.FuzzyFinderShell
 
-type private Store(maxIterators: int) =
-    let iterators = Dictionary<string, obj>()
-    let mutable counter = 0
-    member _.Iterators = iterators
-    member _.Counter
-        with get () = counter
-        and set value = counter <- value
-    member val MaxIterators = maxIterators with get
+let findIteratorNamespace = "ffi_f"
+let grepIteratorNamespace = "ffi_i"
+
+type TypedIteratorStore =
+    private
+        { findIterators: Dictionary<string, FuzzyFindState>
+          grepIterators: Dictionary<string, FuzzyGrepState>
+          mutable counter: int
+          maxIterators: int }
+
+let createTypedIteratorStore (maxIterators: int) : TypedIteratorStore =
+    { findIterators = Dictionary<string, FuzzyFindState>()
+      grepIterators = Dictionary<string, FuzzyGrepState>()
+      counter = 0
+      maxIterators = if maxIterators > 0 then maxIterators else 200 }
+
+let private nextId (store: TypedIteratorStore) (scopeId: string) (namespace': string) : string =
+    store.counter <- store.counter + 1
+    if scopeId = "global" then namespace' + string store.counter
+    else scopeId + ":" + namespace' + ":" + string store.counter
+
+let private trim<'t> (dict: Dictionary<string, 't>) (max: int) : unit =
+    if dict.Count > max then
+        let first = Seq.head dict.Keys
+        dict.Remove(first) |> ignore
+
+let storeFindIterator (store: TypedIteratorStore) (scopeId: string) (state: FuzzyFindState) : string =
+    let id = nextId store scopeId findIteratorNamespace
+    store.findIterators.[id] <- state
+    trim store.findIterators store.maxIterators
+    id
+
+let storeGrepIterator (store: TypedIteratorStore) (scopeId: string) (state: FuzzyGrepState) : string =
+    let id = nextId store scopeId grepIteratorNamespace
+    store.grepIterators.[id] <- state
+    trim store.grepIterators store.maxIterators
+    id
+
+let consumeFindIterator (store: TypedIteratorStore) (id: string) : FuzzyFindState option =
+    match store.findIterators.TryGetValue id with
+    | true, state -> store.findIterators.Remove id |> ignore; Some state
+    | false, _ -> None
+
+let consumeGrepIterator (store: TypedIteratorStore) (id: string) : FuzzyGrepState option =
+    match store.grepIterators.TryGetValue id with
+    | true, state -> store.grepIterators.Remove id |> ignore; Some state
+    | false, _ -> None
+
+let clearTypedIteratorScope (store: TypedIteratorStore) (scopeId: string) : unit =
+    let prefix = scopeId + ":"
+    let dropFrom (dict: Dictionary<string, _>) =
+        let keys = dict.Keys |> Seq.filter (fun k -> k.StartsWith prefix) |> Seq.toArray
+        for key in keys do dict.Remove key |> ignore
+    dropFrom store.findIterators
+    dropFrom store.grepIterators
+
+let clearTypedIteratorStore (store: TypedIteratorStore) : unit =
+    store.findIterators.Clear()
+    store.grepIterators.Clear()
+    store.counter <- 0
+
+// ─── Compatibility wrappers ─────────────────────────────────────────────────
+// The original API stored arbitrary values keyed by (scopeId, namespace).  The
+// typed store only holds the two state types fuzzy_find/fuzzy_grep need; these
+// wrappers route legacy calls to the appropriate typed bucket by namespace.
 
 let createIteratorStore (maxIterators: int) : obj =
-    let cap = if maxIterators > 0 then maxIterators else 200
-    Store(cap) |> box
+    box (createTypedIteratorStore maxIterators)
 
 let globalIteratorStore : obj = createIteratorStore 200
 
 let storeIterator<'t> (store: obj) (scopeId: string) (namespace': string) (value: 't) : string =
-    let s = unbox<Store> store
-    s.Counter <- s.Counter + 1
-    let id =
-        if scopeId = "global" then
-            namespace' + string s.Counter
-        else
-            scopeId + ":" + namespace' + ":" + string s.Counter
-    s.Iterators.[id] <- box value
-    if s.Iterators.Count > s.MaxIterators then
-        let first = Seq.head s.Iterators.Keys
-        s.Iterators.Remove(first) |> ignore
-    id
+    let typed = unbox<TypedIteratorStore> store
+    if namespace' = findIteratorNamespace then
+        storeFindIterator typed scopeId (unbox<FuzzyFindState> (box value))
+    elif namespace' = grepIteratorNamespace then
+        storeGrepIterator typed scopeId (unbox<FuzzyGrepState> (box value))
+    else
+        failwithf "Unknown iterator namespace: %s" namespace'
 
 let consumeIterator<'t> (store: obj) (id: string) : 't option =
-    let s = unbox<Store> store
-    match s.Iterators.TryGetValue(id) with
-    | true, v ->
-        s.Iterators.Remove(id) |> ignore
-        Some(unbox<'t> v)
-    | false, _ -> None
+    let typed = unbox<TypedIteratorStore> store
+    match consumeFindIterator typed id with
+    | Some state -> Some (unbox<'t> (box state))
+    | None ->
+        match consumeGrepIterator typed id with
+        | Some state -> Some (unbox<'t> (box state))
+        | None -> None
 
 let clearIteratorScope (store: obj) (scopeId: string) : unit =
-    let s = unbox<Store> store
-    let prefix = scopeId + ":"
-    let keys = s.Iterators.Keys |> Seq.filter (fun k -> k.StartsWith(prefix)) |> Seq.toArray
-    for key in keys do
-        s.Iterators.Remove(key) |> ignore
+    clearTypedIteratorScope (unbox<TypedIteratorStore> store) scopeId
 
 let clearIteratorStore (store: obj) : unit =
-    let s = unbox<Store> store
-    s.Iterators.Clear()
-    s.Counter <- 0
+    clearTypedIteratorStore (unbox<TypedIteratorStore> store)
+
+// ─── Search options & state resolution ──────────────────────────────────────
 
 type SearchOptions =
     { cwd: string
@@ -62,14 +110,17 @@ type SearchOptions =
       store: obj option
       finderCache: FinderCache }
 
-let resolveStore (opts: SearchOptions) = defaultArg opts.store globalIteratorStore
+let resolveStore (opts: SearchOptions) : TypedIteratorStore =
+    match opts.store with
+    | Some s -> unbox<TypedIteratorStore> s
+    | None -> unbox<TypedIteratorStore> globalIteratorStore
 
 let resolveFindSearchState (params': FuzzyFindParams) (opts: SearchOptions)
     : Result<FuzzyFindState, string> =
     let store = resolveStore opts
     match params'.iterator with
     | Some it ->
-        match consumeIterator<FuzzyFindState> store it with
+        match consumeFindIterator store it with
         | Some state -> Ok state
         | None -> Error $"fuzzy_find iterator error: unknown, expired, or already consumed iterator \"{it}\""
     | None ->
@@ -88,7 +139,7 @@ let resolveGrepSearchState (params': FuzzyGrepParams) (opts: SearchOptions)
     let store = resolveStore opts
     match params'.iterator with
     | Some it ->
-        match consumeIterator<FuzzyGrepState> store it with
+        match consumeGrepIterator store it with
         | Some state -> Ok state
         | None -> Error $"fuzzy_grep iterator error: unknown, expired, or already consumed iterator \"{it}\""
     | None ->
@@ -110,6 +161,8 @@ let resolveGrepSearchState (params': FuzzyGrepParams) (opts: SearchOptions)
                      externalBasePath = externalBasePath
                      cursor = None }
 
+// ─── Finder acquisition / release ───────────────────────────────────────────
+
 let acquireFinderFromOptions externalBasePath (opts: SearchOptions) =
     match externalBasePath with
     | Some basep -> createFinder basep
@@ -119,6 +172,22 @@ let releaseFinder (finder: FinderLike) externalBasePath =
     match externalBasePath with
     | Some _ -> finder.destroy()
     | None -> ()
+
+/// Run `body` against an already-acquired finder, releasing external finders
+/// even when `body` throws.  External basePath = caller-owned finder we must
+/// destroy; cached basePath = pooled finder we must NOT destroy.
+let runWithFinder
+    (finderResult: Result<FinderLike, string>)
+    (externalBasePath: string option)
+    (body: FinderLike -> SearchOutcome)
+    : SearchOutcome =
+    match finderResult with
+    | Error msg -> { output = msg; isError = true }
+    | Ok finder ->
+        try body finder
+        finally releaseFinder finder externalBasePath
+
+// ─── JSON helpers ───────────────────────────────────────────────────────────
 
 let optStr (o: obj) (key: string) : string option =
     let value = Dyn.get o key
@@ -152,14 +221,29 @@ let toGrepMatch (item: obj) : GrepMatch =
       contextAfter = stringListOf item "contextAfter"
       annotation = annotationOf item }
 
-let private errorMsg (raw: obj) (fallback: string) : string = if Dyn.isNullish (Dyn.get raw "error") then fallback else Dyn.str raw "error"
+let private errorMsg (raw: obj) (fallback: string) : string =
+    if Dyn.isNullish (Dyn.get raw "error") then fallback else Dyn.str raw "error"
+
+// ─── Find pipeline ──────────────────────────────────────────────────────────
 
 let findNextIterator (state: FuzzyFindState) (store: obj) (opts: SearchOptions) (totalForPaging: int) : string =
     let nextPageIndex = state.pageIndex + 1
     if totalForPaging > nextPageIndex * state.pageSize then
-        let nextState : FuzzyFindState = { query = state.query; pageSize = state.pageSize; pageIndex = nextPageIndex; externalBasePath = state.externalBasePath }
-        storeIterator<FuzzyFindState> store opts.scopeId "ffi_f" nextState
+        let nextState : FuzzyFindState = { state with pageIndex = nextPageIndex }
+        storeFindIterator (unbox<TypedIteratorStore> store) opts.scopeId nextState
     else ""
+
+let private runFind (state: FuzzyFindState) (store: TypedIteratorStore) (opts: SearchOptions) (finder: FinderLike) : SearchOutcome =
+    let raw = finder.fileSearch(state.query, box {| pageIndex = state.pageIndex; pageSize = state.pageSize |})
+    if not (Dyn.truthy (Dyn.get raw "ok")) then { output = errorMsg raw "fuzzy_find failed"; isError = true }
+    else
+        let value = Dyn.get raw "value"
+        let matches = itemsOf value |> Array.map toFindMatch |> List.ofArray
+        let totalOpt = optInt value "totalMatched"
+        let totalForPaging = totalOpt |> Option.defaultValue 0
+        let totalFiles = optInt value "totalFiles" |> Option.defaultValue 0
+        let body = formatFindOutput (Some { items = matches; totalMatched = totalOpt; totalFiles = totalFiles })
+        { output = sprintf "%s\n\n[iterator=\"%s\"]" body (findNextIterator state (box store) opts totalForPaging); isError = false }
 
 let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     async {
@@ -168,24 +252,11 @@ let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<Sear
         | Error msg -> return { output = msg; isError = true }
         | Ok state ->
             let! finderResult = acquireFinderFromOptions state.externalBasePath opts |> Async.AwaitPromise
-            match finderResult with
-            | Error msg -> return { output = msg; isError = true }
-            | Ok finder ->
-                try
-                    let raw = finder.fileSearch(state.query, box {| pageIndex = state.pageIndex; pageSize = state.pageSize |})
-                    if not (Dyn.truthy (Dyn.get raw "ok")) then return { output = errorMsg raw "fuzzy_find failed"; isError = true }
-                    else
-                        let value = Dyn.get raw "value"
-                        let matches = itemsOf value |> Array.map toFindMatch |> List.ofArray
-                        let totalOpt = optInt value "totalMatched"
-                        let totalForPaging = totalOpt |> Option.defaultValue 0
-                        let totalFiles = optInt value "totalFiles" |> Option.defaultValue 0
-                        let body = formatFindOutput (Some { items = matches; totalMatched = totalOpt; totalFiles = totalFiles })
-                        return { output = sprintf "%s\n\n[iterator=\"%s\"]" body (findNextIterator state store opts totalForPaging); isError = false }
-                finally
-                    releaseFinder finder state.externalBasePath
+            return runWithFinder finderResult state.externalBasePath (runFind state store opts)
     }
     |> Async.StartAsPromise
+
+// ─── Grep pipeline ──────────────────────────────────────────────────────────
 
 let private runGrep (finder: FinderLike) (state: FuzzyGrepState) (modeOverride: string option) : obj =
     let mode = defaultArg modeOverride state.mode
@@ -201,8 +272,18 @@ let resolveResult (raw: obj) : ResolvedGrep =
     let (matches, total, regexError, cursor) = typedOf value
     { matches = matches; total = total; regexError = regexError; cursor = cursor }
 
-let private grepNextIterator (state: FuzzyGrepState) (store: obj) (opts: SearchOptions) (cursor: obj) : string =
-    if Dyn.isNullish cursor then "" else storeIterator<FuzzyGrepState> store opts.scopeId "ffi_i" { state with cursor = Some cursor }
+let private grepNextIterator (state: FuzzyGrepState) (store: TypedIteratorStore) (opts: SearchOptions) (cursor: obj) : string =
+    if Dyn.isNullish cursor then ""
+    else storeGrepIterator store opts.scopeId { state with cursor = Some cursor }
+
+let private runGrepWithFinder (state: FuzzyGrepState) (store: TypedIteratorStore) (opts: SearchOptions) (finder: FinderLike) : SearchOutcome =
+    let raw = runGrep finder state None
+    if not (Dyn.truthy (Dyn.get raw "ok")) then { output = errorMsg raw "fuzzy_grep failed"; isError = true }
+    else
+        let resolved = resolveResult raw
+        let body = formatGrepOutput (Some { items = resolved.matches; totalMatched = resolved.total; regexFallbackError = resolved.regexError })
+        let nextIterator = grepNextIterator state store opts resolved.cursor
+        { output = buildGrepOutput body resolved.regexError nextIterator; isError = false }
 
 let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     async {
@@ -211,18 +292,6 @@ let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<Sear
         | Error msg -> return { output = msg; isError = true }
         | Ok state ->
             let! finderResult = acquireFinderFromOptions state.externalBasePath opts |> Async.AwaitPromise
-            match finderResult with
-            | Error msg -> return { output = msg; isError = true }
-            | Ok finder ->
-                try
-                    let raw = runGrep finder state None
-                    if not (Dyn.truthy (Dyn.get raw "ok")) then return { output = errorMsg raw "fuzzy_grep failed"; isError = true }
-                    else
-                        let resolved = resolveResult raw
-                        let body = formatGrepOutput (Some { items = resolved.matches; totalMatched = resolved.total; regexFallbackError = resolved.regexError })
-                        let nextIterator = grepNextIterator state store opts resolved.cursor
-                        return { output = buildGrepOutput body resolved.regexError nextIterator; isError = false }
-                finally
-                    releaseFinder finder state.externalBasePath
+            return runWithFinder finderResult state.externalBasePath (runGrepWithFinder state store opts)
     }
     |> Async.StartAsPromise

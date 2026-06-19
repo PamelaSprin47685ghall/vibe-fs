@@ -3,9 +3,11 @@ module VibeFs.Mux.HostTools
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.Fuzzy
 open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.Subagent
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Opencode.ToolSchema
@@ -40,7 +42,7 @@ let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptio
         if not (shouldSummarize byteLength output) then
             return prependSafetyWarningForExecution output options
         else
-            let prompt = formatMuxExecutorSummarizerUserPrompt output
+            let prompt = formatPrompt mimocode (ExecutorSummary output) |> List.head
             let! report = runMuxSubagent deps config "executor" prompt "Executor summary" None |> Async.AwaitPromise
             return prependSafetyWarningForExecution report options
     }
@@ -203,7 +205,7 @@ let websearchTool (deps: obj) : ToolDefinition =
                       let rawResults = formatSearchResults items
                       if items.IsEmpty then return rawResults
                       else
-                          let prompt = formatMuxWebsearchSummarizerUserPrompt whatToSummarize rawResults
+                          let prompt = formatPrompt mimocode (WebsearchSummary(whatToSummarize, rawResults)) |> List.head
                           let! report = runMuxSubagent deps config "executor" prompt "Web search summary" None |> Async.AwaitPromise
                           return report
                   with ex ->

@@ -102,3 +102,74 @@ let totalMatchedSemantics () =
     equal "grep None header" "1 match" grepNone
     let findNone = formatFindOutput (Some { items = [ fm ]; totalMatched = None; totalFiles = 5 }) |> header
     equal "find None header" "1 matching file (5 total indexed)" findNone
+
+/// P2-2: iterator namespaces must come from named module-level constants, not
+/// magic strings sprinkled in the call sites.  The refactored FuzzySearch must
+/// expose them so callers (and these tests) stop depending on literal "ffi_f"
+/// / "ffi_i" duplication.
+let iteratorNamespaceConstants () =
+    equal "find namespace constant" "ffi_f" VibeFs.Shell.FuzzySearch.findIteratorNamespace
+    equal "grep namespace constant" "ffi_i" VibeFs.Shell.FuzzySearch.grepIteratorNamespace
+
+/// P2-2: the iterator store must be strongly typed per-state.  Storing a
+/// FuzzyFindState under the find namespace and consuming it as a FuzzyGrepState
+/// MUST fail (return None / raise) — that's the whole point of replacing the
+/// `obj`-based store with one keyed by state type.
+let iteratorStoreStronglyTyped () =
+    let store = VibeFs.Shell.FuzzySearch.createTypedIteratorStore 10
+    let findState : FuzzyFindState = { query = "q"; pageSize = 30; pageIndex = 0; externalBasePath = None }
+    let grepState : FuzzyGrepState =
+        { query = "q"; mode = "plain"; smartCase = true; beforeContext = 0; afterContext = 0
+          pageSize = 50; externalBasePath = None; cursor = None }
+
+    let findId = VibeFs.Shell.FuzzySearch.storeFindIterator store "scope" findState
+    check "find id carries scope" (findId.Contains "scope")
+    check "find id carries namespace" (findId.Contains VibeFs.Shell.FuzzySearch.findIteratorNamespace)
+
+    let grepId = VibeFs.Shell.FuzzySearch.storeGrepIterator store "scope" grepState
+    check "grep id carries namespace" (grepId.Contains VibeFs.Shell.FuzzySearch.grepIteratorNamespace)
+
+    let resumed = VibeFs.Shell.FuzzySearch.consumeFindIterator store findId
+    check "find resume" resumed.IsSome
+    check "find single-use after typed consume" ((VibeFs.Shell.FuzzySearch.consumeFindIterator store findId).IsNone)
+
+    // Cross-namespace consumption is a category error, not a silent miss.
+    let crossed = VibeFs.Shell.FuzzySearch.consumeFindIterator store grepId
+    check "cross-namespace consume returns None" crossed.IsNone
+
+/// P2-2: fuzzyFind / fuzzyGrep must share a `runWithFinder` finder-acquisition
+/// pipeline that releases external finders even on error paths.  We assert the
+/// helper exists and that it dispatches release calls regardless of outcome.
+let runWithFinderSharedPipeline () =
+    let mutable released = 0
+    let fakeFinder =
+        { new VibeFs.Shell.FuzzyFinderShell.FinderLike with
+            member _.fileSearch(_, _) = box null
+            member _.grep(_, _) = box null
+            member _.destroy() = released <- released + 1
+            member _.isDestroyed = false }
+    let outcome =
+        VibeFs.Shell.FuzzySearch.runWithFinder
+            (Ok fakeFinder)
+            (Some "/external/path")
+            (fun _ -> { output = "ok"; isError = false })
+    equal "outcome propagated" "ok" outcome.output
+    equal "external finder released exactly once" 1 released
+
+    let mutable releasedOnError = 0
+    let fakeFinder2 =
+        { new VibeFs.Shell.FuzzyFinderShell.FinderLike with
+            member _.fileSearch(_, _) = box null
+            member _.grep(_, _) = box null
+            member _.destroy() = releasedOnError <- releasedOnError + 1
+            member _.isDestroyed = false }
+    let mutable raised = false
+    try
+        VibeFs.Shell.FuzzySearch.runWithFinder
+            (Ok fakeFinder2)
+            (Some "/external/path")
+            (fun _ -> failwith "boom")
+        |> ignore
+    with _ -> raised <- true
+    check "exception bubbled" raised
+    equal "external finder released even on throw" 1 releasedOnError

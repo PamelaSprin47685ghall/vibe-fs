@@ -206,6 +206,48 @@ let mimocodeTaskReportCaptureRoundTrip () =
     check "capture report: round trip" (taken = "backlog text")
     check "capture report: consumed" (takeCompletedWorkReport "call-1" = "")
 
+let magicSessionCaptureRoundTrip () =
+    let session = MagicSession(Mimocode)
+    session.CaptureReport("session-call-1", "  scoped text  ")
+    check "session capture: round trip" (session.TakeReport "session-call-1" = "scoped text")
+    check "session capture: consumed" (session.TakeReport "session-call-1" = "")
+
+let magicSessionShareReportTableAcrossInstances () =
+    let producer = MagicSession(Mimocode)
+    let consumer = MagicSession(Mimocode)
+    producer.CaptureReport("shared-call", "carry over")
+    check "session capture: visible across mimocode instances" (consumer.TakeReport "shared-call" = "carry over")
+
+let private taskCreateMsg (id: string) (callID: string) : obj =
+    createObj
+        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
+          "parts",
+          box
+              [| createObj
+                     [ "type", box "tool"
+                       "tool", box "task"
+                       "callID", box callID
+                       "state",
+                       box (
+                           createObj
+                               [ "status", box "completed"
+                                 "input",
+                                 box (
+                                     createObj
+                                         [ "operation",
+                                           box (createObj [ "action", box "create"; "summary", box "ignored" ]) ]
+                                 )
+                                 "output", box "ok" ]
+                       ) ] |] ]
+
+let magicSessionRestoresMimocodeReportDuringBacklogRebuild () =
+    let session = MagicSession(Mimocode)
+    let msgs = [| taskCreateMsg "m1" "restore-c1" |]
+    session.CaptureReport("restore-c1", "captured before execute")
+    let backlog = session.GetOrRebuildBacklog("test", msgs)
+    check "session rebuild: restored report enters backlog" (backlog.Length = 1 && backlog.[0].report = "captured before execute")
+    check "session rebuild: report consumed during replay" (session.TakeReport "restore-c1" = "")
+
 let replayBacklogForMimocodeMergesConsecutiveWorkReports () =
     let msgs =
         [| taskMsgWithReport "m1" "c1" "Work A"
@@ -533,6 +575,9 @@ let run () =
     replayBacklogForMimocodeUsesTask ()
     replayBacklogForMimocodeIgnoresActor ()
     mimocodeTaskReportCaptureRoundTrip ()
+    magicSessionCaptureRoundTrip ()
+    magicSessionShareReportTableAcrossInstances ()
+    magicSessionRestoresMimocodeReportDuringBacklogRebuild ()
     replayBacklogForMimocodeMergesConsecutiveWorkReports ()
     replayBacklogForMimocodeMergesConsecutiveTaskBurst ()
     replayBacklogForMimocodeSplitsBurstsOnGap ()

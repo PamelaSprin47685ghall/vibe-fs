@@ -7,7 +7,7 @@ open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
 open VibeFs.Opencode.Plugin
 open VibeFs.Opencode.Actors
-open VibeFs.Opencode.Session
+open VibeFs.Opencode.SessionIo
 
 let chatMessageSpec () = async {
     let! workspaceDir = mkdtempAsync "chat-message-" |> Async.AwaitPromise

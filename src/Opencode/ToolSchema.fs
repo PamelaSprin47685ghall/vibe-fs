@@ -3,6 +3,7 @@ module VibeFs.Opencode.ToolSchema
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.ToolCatalog
 
 /// The opencode plugin SDK's `tool` factory + `tool.schema` (Zod-like) builder.
 [<Import("tool", "@opencode-ai/plugin/tool")>]
@@ -93,73 +94,53 @@ let obj (shape: obj) : obj = call1 schema "object" shape
 let define (description: string) (args: obj) (execute: obj -> obj -> JS.Promise<string>) : obj =
     invokeTool toolFactory (box {| description = description; args = args; execute = execute |})
 
-let coder =
-    "Execute code changes from structured intents. Each intents[] element spawns its own coder subagent in parallel. Every element must include objective, background, and targets (file + guide per file; optional draft per file); do_not_touch is optional per subagent. "
-    + "IMPORTANT: Subagents start in a fresh session with no manager history. Pack all context into background, do_not_touch, and per-file guide fields. Do NOT assume the coder knows the repo."
+let coder = description "coder"
 
-let investigator =
-    "Search the codebase from structured intents. Each intents[] element spawns its own investigator subagent in parallel. Every element must include objective, background, and questions[]; entries[] is optional. "
-    + "IMPORTANT: Subagents start in a fresh session with no manager history. Pack context into background and list concrete questions the report must answer. Reports must include file paths."
+let investigator = description "investigator"
 
-let meditator =
-    "Receive a natural-language intent or question for deep reasoning and delegate to the meditator agent. "
-    + "IMPORTANT: Subagents do not receive role instructions in their system prompt; the meditator agent gets its task as a user message built from your intent and files. You (the parent) must put full context into the intent and list every file path the agent needs. Do NOT assume the meditator agent knows the project background."
+let meditator = description "meditator"
 
-let browser =
-    "Receive a natural-language intent for a web task and delegate to the browser agent. "
-    + "IMPORTANT: Subagents do not receive role instructions in their system prompt; the browser agent gets its task as a user message from your intent. You (the parent) must put full context (URLs, goals, constraints) into the intent. Do NOT assume the browser agent knows the project background."
+let browser = description "browser"
 
-let executor = "Executes a shell command, Python code, or JavaScript/TypeScript program synchronously with a strict timeout budget. On completion (or timeout) the captured output is either returned directly or summarized when it exceeds 8192 bytes. If executing Python or JavaScript, specify dependencies in the \"dependencies\" argument."
+let executor = description "executor"
 
-let fuzzyFind = "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported. Every result ends with iterator=\"...\"; iteration is finished when it becomes iterator=\"\"."
+let fuzzyFind = description "fuzzy_find"
 
-let fuzzyGrep = "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked. Supports automatic regex mode detection. Use mode=fuzzy explicitly for fuzzy matching when exact regex yields no results. Every result ends with iterator=\"...\"; iteration is finished when it becomes iterator=\"\"."
+let fuzzyGrep = description "fuzzy_grep"
 
-let websearch = "Search the web for any topic; raw results are rewritten by a summarizer subagent focused on what_to_summarize, returning clean, ready-to-use content."
+let websearch = description "websearch"
 
-let webfetch = "Fetch a URL with better extraction for static/docs pages. Supports llms.txt probing, content-focused HTML extraction, metadata, and redirects."
+let webfetch = description "webfetch"
 
 module Params =
-    let coderIntents =
-        "Non-empty array of coder intents. Each item: objective (what to implement), background (why and prior context), optional do_not_touch[] constraints, and targets[] with file, guide, and optional draft per path. One subagent per item, all parallel."
+    let private doc tool field = paramDoc tool field
 
-    let coderTdd =
-        "TDD phase for this coder call. red = this edit is the RED phase: write the failing test, or the code that fails it; the result must leave tests failing. green = this edit is the GREEN phase: make the failing tests pass. "
-        + "Discipline: for a new requirement the requirement comes first; for a bug fix the regression comes first. Always go red before green for any unit of work. "
-        + "You MUST issue a tdd=red coder call before any tdd=green coder call for the same work; a green call with no preceding red in the session is a violation and will be rejected. Declare the phase truthfully."
-
-    let investigatorIntents =
-        "Non-empty array of investigator intents. Each item: objective, background, questions[] (required KPIs for the report), optional entries[] (paths/symbols to start from). One subagent per item, all parallel."
-
-    let meditatorIntent =
-        "Natural-language intent or question for deep reasoning. Becomes part of the subagent user message - include all background, design rationale, and specific requirements; do not assume the agent knows project context."
-
-    let meditatorFiles =
-        "File paths listed in the subagent user message for context. Include design docs, relevant code, or background material the agent must read."
-
-    let browserIntent =
-        "Natural-language intent for the web task. Becomes the subagent user message - include URLs, goals, constraints, and any project context the browser agent needs."
-
-    let executorLanguage = "Execution language: shell, python, or javascript"
-    let executorProgram = "The program to execute."
-    let executorDeps = "Dependencies to install (for python or javascript)."
-    let executorTimeout = "Execution timeout budget: 'short' (1s), 'long' (10s), or 'last-resort' (100s). Use 'last-resort' only when absolutely necessary."
-    let fuzzyFindPattern = "Initial plain fuzzy file path text to search for."
-    let fuzzyFindPath = "Initial optional path constraint to narrow search scope"
-    let fuzzyFindLimit = "Maximum number of results to return per call (default: 30)"
-    let fuzzyFindIterator = "Opaque single-use iterator from a previous fuzzy_find result."
-    let fuzzyGrepPattern = "Initial search pattern. Required on the first call."
-    let fuzzyGrepPath = "Initial path constraint."
-    let fuzzyGrepExclude = "Initial exclude paths (e.g. 'test/,*.min.js')"
-    let fuzzyGrepCaseSensitive = "Case-sensitivity override (smart-case by default)."
-    let fuzzyGrepContext = "Number of context lines before and after each match"
-    let fuzzyGrepLimit = "Maximum number of matches to return per call"
-    let fuzzyGrepIterator = "Opaque single-use iterator from a previous fuzzy_grep result."
-    let websearchQuery = "Natural language search query. Should be a semantically rich description of the ideal page, not just keywords."
-    let websearchNumResults = "Number of search results to return (default: 10)"
-    let websearchWhatToSummarize = "The question or intent the search should answer. The summarizer subagent focuses on extracting and synthesizing content relevant to this."
-    let webfetchUrl = "The URL to fetch"
-    let webfetchExtractMain = "Extract main content from the page, removing navigation, ads, etc. (default: true)"
-    let webfetchPreferLlmsTxt = "Probe for llms.txt files before fetching full page (default: auto)"
-    let webfetchPrompt = "Optional extraction task to run on the fetched content using a cheap secondary model"
-    let webfetchTimeout = "Timeout in seconds (max: 120)"
+    let coderIntents = doc "coder" "intents"
+    let coderTdd = doc "coder" "tdd"
+    let investigatorIntents = doc "investigator" "intents"
+    let meditatorIntent = doc "meditator" "intent"
+    let meditatorFiles = doc "meditator" "files"
+    let browserIntent = doc "browser" "intent"
+    let executorLanguage = doc "executor" "language"
+    let executorProgram = doc "executor" "program"
+    let executorDeps = doc "executor" "dependencies"
+    let executorTimeout = doc "executor" "timeout_type"
+    let fuzzyFindPattern = doc "fuzzy_find" "pattern"
+    let fuzzyFindPath = doc "fuzzy_find" "path"
+    let fuzzyFindLimit = doc "fuzzy_find" "limit"
+    let fuzzyFindIterator = doc "fuzzy_find" "iterator"
+    let fuzzyGrepPattern = doc "fuzzy_grep" "pattern"
+    let fuzzyGrepPath = doc "fuzzy_grep" "path"
+    let fuzzyGrepExclude = doc "fuzzy_grep" "exclude"
+    let fuzzyGrepCaseSensitive = doc "fuzzy_grep" "caseSensitive"
+    let fuzzyGrepContext = doc "fuzzy_grep" "context"
+    let fuzzyGrepLimit = doc "fuzzy_grep" "limit"
+    let fuzzyGrepIterator = doc "fuzzy_grep" "iterator"
+    let websearchQuery = doc "websearch" "query"
+    let websearchNumResults = doc "websearch" "numResults"
+    let websearchWhatToSummarize = doc "websearch" "what_to_summarize"
+    let webfetchUrl = doc "webfetch" "url"
+    let webfetchExtractMain = doc "webfetch" "extract_main"
+    let webfetchPreferLlmsTxt = doc "webfetch" "prefer_llms_txt"
+    let webfetchPrompt = doc "webfetch" "prompt"
+    let webfetchTimeout = doc "webfetch" "timeout"

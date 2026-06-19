@@ -64,3 +64,73 @@ let runtime () =
     check "callback called" fired
     store.clearReviewSessions ()
     check "cleared" (not (store.isReviewActive "w1"))
+
+/// P2-3: pure reviewer-loop primitives.  promptParts must hand out the initial
+/// task prompt on the first attempt and the short nudge prompt on every retry.
+let promptPartsBranches () =
+    let initial = [ "task body"; "extra detail" ]
+    let nudge = "please answer"
+    let first = promptParts 0 initial nudge
+    equal "first attempt uses initial parts" initial first
+    let retry1 = promptParts 1 initial nudge
+    equal "retry 1 uses nudge" [ nudge ] retry1
+    let retry5 = promptParts 5 initial nudge
+    equal "retry 5 uses nudge" [ nudge ] retry5
+
+/// resolvePending must (a) fire the resolver, (b) clear the abort suppressor,
+/// and (c) report whether anything was actually waiting.  The suppressor side
+/// effect is what guarantees an aborted reviewer doesn't double-fire.
+let resolvePendingClearsSuppressor () =
+    let mutable resolved : ReviewResult option = None
+    let mutable suppressed = 0
+    let effects =
+        emptyEffects
+        |> fun e -> setPending e "child-1" (fun result -> resolved <- Some result)
+        |> fun e -> { e with abortSuppressors = Map.add "child-1" (fun () -> suppressed <- suppressed + 1) e.abortSuppressors }
+
+    let next, fired = resolvePending effects "child-1" Accepted
+    check "fired flag true" fired
+    equal "resolver received verdict" (Some Accepted) resolved
+    equal "suppressor invoked exactly once" 1 suppressed
+    check "pending cleared" (not (Map.containsKey "child-1" next.pendingResolutions))
+    check "suppressor cleared" (not (Map.containsKey "child-1" next.abortSuppressors))
+
+    // Resolving an unknown id is a no-op that reports false, never throws.
+    let next2, fired2 = resolvePending next "nonexistent" Accepted
+    check "unknown id → fired false" (not fired2)
+    equal "pending count untouched on unknown id" next.pendingResolutions.Count next2.pendingResolutions.Count
+    equal "suppressor count untouched on unknown id" next.abortSuppressors.Count next2.abortSuppressors.Count
+
+/// disposeSessionTree must terminate every listed id, fire each suppressor, and
+/// remove the entries — even when only some ids carry pending resolvers.  This
+/// is the single path the host uses to clean up a whole reviewer subtree on
+/// abort.
+let disposeSessionTreeTerminatesAll () =
+    let mutable verdicts : (string * ReviewResult) list = []
+    let mutable suppressedOrder : string list = []
+    let resolverFor id = fun result -> verdicts <- (id, result) :: verdicts
+    let suppressorFor id = fun () -> suppressedOrder <- id :: suppressedOrder
+    let effects =
+        emptyEffects
+        |> fun e -> setPending e "root" (resolverFor "root")
+        |> fun e -> setPending e "child-a" (resolverFor "child-a")
+        |> fun e -> setPending e "child-b" (resolverFor "child-b")
+        |> fun e ->
+            { e with
+                abortSuppressors =
+                    e.abortSuppressors
+                    |> Map.add "root" (suppressorFor "root")
+                    |> Map.add "child-a" (suppressorFor "child-a") }
+
+    // Note: child-b has no suppressor — disposal must still remove it cleanly.
+    let next = disposeSessionTree effects [ "root"; "child-a"; "child-b" ]
+    check "all resolvers fired" (verdicts |> List.length = 3)
+    check "all verdicts are Terminated" (verdicts |> List.forall (fun (_, r) -> r = Terminated))
+    check "suppressors fired only where present" (suppressedOrder |> List.length = 2)
+    check "no pending resolvers remain" next.pendingResolutions.IsEmpty
+    check "no suppressors remain" next.abortSuppressors.IsEmpty
+
+    // Ids that were never registered are ignored, not faulted.
+    let next2 = disposeSessionTree next [ "ghost-1"; "ghost-2" ]
+    check "disposing absent ids leaves pending empty" next2.pendingResolutions.IsEmpty
+    check "disposing absent ids leaves suppressors empty" next2.abortSuppressors.IsEmpty

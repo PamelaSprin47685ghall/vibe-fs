@@ -89,7 +89,6 @@ let coderPromptBody (intent: CoderIntent) : string =
         |> String.concat "\n"
     let targetInstruction =
         "Targets:\n" + targets + "\n\n"
-        + "`draft` is optional. Prefer leaving it empty; when present, treat it only as a concise quality sketch to reference, not as a required literal implementation.\n\n"
     let doNotTouch =
         if intent.doNotTouch.Length = 0 then ""
         else "Do not touch:\n" + bulletLines intent.doNotTouch + "\n\n"
@@ -202,36 +201,6 @@ let websearchSummarizerPromptBody (whatToSummarize: string) (rawResults: string)
 let formatWebsearchSummarizerUserPrompt (whatToSummarize: string) (rawResults: string) : string =
     websearchSummarizerPromptBody whatToSummarize rawResults
     + "\n5. Return a focused, ready-to-use answer.\n\n"
-
-let formatMuxCoderUserPrompt (intent: CoderIntent) : string =
-    coderPromptBody intent
-    + "4. Finish by calling agent_report with a summary of changes and verification results.\n\n"
-    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
-
-let formatMuxInvestigatorUserPrompt (intent: InvestigatorIntent) : string =
-    investigatorPromptBody intent
-    + "5. Finish by calling agent_report with structuredOutput containing relatedFiles and relatedCode.\n\n"
-    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
-
-let formatMuxMeditatorUserPrompt (intent: string) (files: string list) : string =
-    meditatorPromptBody intent files
-    + "3. Finish by calling agent_report with structuredOutput containing relatedFiles and relatedCode.\n\n"
-    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
-
-let formatMuxBrowserUserPrompt (intent: string) : string =
-    browserPromptBody intent
-    + "3. Finish by calling agent_report with a clear summary of what you found or did.\n\n"
-    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
-
-let formatMuxExecutorSummarizerUserPrompt (output: string) : string =
-    executorSummarizerPromptBody output
-    + "\n4. Finish by calling agent_report with the summary.\n\n"
-    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
-
-let formatMuxWebsearchSummarizerUserPrompt (whatToSummarize: string) (rawResults: string) : string =
-    websearchSummarizerPromptBody whatToSummarize rawResults
-    + "\n5. Finish by calling agent_report with the focused answer.\n\n"
-    + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
 
 let agentReportReviewInstructions =
     readOnlyWorkspaceConstraint + "\n\n"

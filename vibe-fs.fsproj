@@ -16,6 +16,8 @@
     <Compile Include="src/Kernel/HostTools.fs" />
     <Compile Include="src/Kernel/SubagentIntents.fs" />
     <Compile Include="src/Kernel/Prompts.fs" />
+    <Compile Include="src/Kernel/Subagent.fs" />
+    <Compile Include="src/Kernel/ToolCatalog.fs" />
     <Compile Include="src/Kernel/ReviewSession.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />
     <Compile Include="src/Kernel/Dedup.fs" />
@@ -56,9 +58,11 @@
     <Compile Include="src/Mux/SlashCommands.fs" />
     <Compile Include="src/Mux/Plugin.fs" />
     <Compile Include="src/Opencode/NudgeHook.fs" />
-    <Compile Include="src/Opencode/Session.fs" />
+    <Compile Include="src/Opencode/SessionIo.fs" />
+    <Compile Include="src/Opencode/ReviewerLoop.fs" />
     <Compile Include="src/Opencode/Tools.fs" />
-    <Compile Include="src/Opencode/Hooks.fs" />
+    <Compile Include="src/Opencode/HookExecute.fs" />
+    <Compile Include="src/Opencode/HookTransform.fs" />
     <Compile Include="src/Opencode/PluginCore.fs" />
     <Compile Include="src/Opencode/Plugin.fs" />
     <Compile Include="src/Opencode/PluginMimo.fs" />

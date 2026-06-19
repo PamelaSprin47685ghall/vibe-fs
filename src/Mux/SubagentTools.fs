@@ -3,7 +3,9 @@ module VibeFs.Mux.SubagentTools
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.ReviewSession
@@ -34,9 +36,6 @@ let private reviewVerdictInstructions =
 
 let private disabledToolsForReviewer () : string array =
     deniedTools "reviewer" (Array.toList registeredToolNames) |> Array.ofList
-
-let private joinReports (reports: string array) : string =
-    reports |> Array.map (fun r -> r.Trim()) |> String.concat "\n\n"
 
 let private abortableConfig (config: obj) (signal: obj) = Dyn.withKey config "abortSignal" signal
 
@@ -93,7 +92,7 @@ module Tool =
                                         return None
                                 })
                             |> Async.Parallel
-                        return joinReports (reports |> Array.choose id)
+                        return joinReports (reports |> Array.choose id |> Array.toList)
             }
             |> Async.StartAsPromise
 
@@ -101,7 +100,7 @@ let private buildCoderPrompts (_config: obj) (args: obj) : Async<string array> =
     async {
         match parseCoderIntents (Dyn.get args "intents") with
         | Error _ -> return [||]
-        | Ok intents -> return intents |> List.map formatMuxCoderUserPrompt |> List.toArray
+        | Ok intents -> return formatPrompt mimocode (Coder intents) |> List.toArray
     }
 
 let coderTool (deps: obj) : ToolDefinition =
@@ -115,7 +114,7 @@ let private buildInvestigatorPrompts (_config: obj) (args: obj) : Async<string a
     async {
         match parseInvestigatorIntents (Dyn.get args "intents") with
         | Error _ -> return [||]
-        | Ok intents -> return intents |> List.map formatMuxInvestigatorUserPrompt |> List.toArray
+        | Ok intents -> return formatPrompt mimocode (Investigator intents) |> List.toArray
     }
 
 let investigatorTool (deps: obj) : ToolDefinition =
@@ -134,13 +133,7 @@ let private meditatorPromptFromArgs (config: obj) (args: obj) : Async<string> =
         let sections =
             results
             |> List.map (fun r -> { file = r.filePath; content = r.content } : MeditatorFileSection)
-        let skipped = "(skipped)"
-        let rendered =
-            sections
-            |> List.map (fun s -> $"=== {s.file} ===\n\n{Option.defaultValue skipped s.content}")
-        let body = rendered |> String.concat "\n\n"
-        let basePrompt = formatMuxMeditatorUserPrompt intent (sections |> List.map (fun s -> s.file))
-        return if body = "" then basePrompt else $"{body}\n\n{basePrompt}"
+        return formatPrompt mimocode (Meditator(intent, sections)) |> List.head
     }
 
 let meditatorTool (deps: obj) : ToolDefinition =
@@ -156,7 +149,7 @@ let meditatorTool (deps: obj) : ToolDefinition =
 let private buildBrowserPrompt (_config: obj) (args: obj) : Async<string> =
     async {
         let intent = defaultArg (strField args "intent") ""
-        return formatMuxBrowserUserPrompt intent
+        return formatPrompt mimocode (Browser intent) |> List.head
     }
 
 let browserTool (deps: obj) : ToolDefinition =
