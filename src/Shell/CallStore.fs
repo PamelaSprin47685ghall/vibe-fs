@@ -1,9 +1,8 @@
-module VibeFs.Mux.CallStore
+module VibeFs.Shell.CallStore
 
 open Fable.Core
 open Fable.Core.JsInterop
 open System.Collections.Generic
-open VibeFs.Kernel
 
 type PendingCall =
     { resolve: obj -> unit

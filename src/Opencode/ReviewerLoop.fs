@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.ReviewSession
-open VibeFs.Opencode.Actors
+open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Opencode.SessionIo
 
 let private maxNudges = 3

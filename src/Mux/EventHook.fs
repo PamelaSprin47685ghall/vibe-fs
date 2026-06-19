@@ -26,10 +26,8 @@ type private HookEvent =
     | AbortedError of workspaceId: string
 
 type private StreamEndState =
-    { stoppedWorkspaces: System.Collections.Generic.HashSet<string>
-      retryPendingWorkspaces: System.Collections.Generic.HashSet<string>
-      deliveredCounts: System.Collections.Generic.Dictionary<string, int>
-      lastNudgeActions: System.Collections.Generic.Dictionary<string, NudgeAction> }
+    { stoppedWorkspaces: Set<string>
+      lastNudgeActions: Map<string, NudgeAction> }
 
 let private selectNudgePrompt (action: string) (todoPrompt: string) (loopPrompt: string) : string option =
     match action with
@@ -38,10 +36,8 @@ let private selectNudgePrompt (action: string) (todoPrompt: string) (loopPrompt:
     | _ -> None
 
 let private createStreamEndState () : StreamEndState =
-    { stoppedWorkspaces = System.Collections.Generic.HashSet<string>()
-      retryPendingWorkspaces = System.Collections.Generic.HashSet<string>()
-      deliveredCounts = System.Collections.Generic.Dictionary<string, int>()
-      lastNudgeActions = System.Collections.Generic.Dictionary<string, NudgeAction>() }
+    { stoppedWorkspaces = Set.empty
+      lastNudgeActions = Map.empty }
 
 let private decodeHookEvent (event: obj) : DecodedHookEvent =
     let props = Dyn.get event "properties"
@@ -85,9 +81,7 @@ let private tryGetTodos (helpers: obj) (workspaceId: string) : Async<string list
     }
 
 let private previousActionFor (state: StreamEndState) (workspaceId: string) =
-    match state.lastNudgeActions.TryGetValue(workspaceId) with
-    | true, previous -> Some previous
-    | _ -> None
+    Map.tryFind workspaceId state.lastNudgeActions
 
 let private buildNudgeRequest (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (state: StreamEndState) (workspaceId: string) (todos: string list) (lastMessage: string) =
     { workspaceId = workspaceId
@@ -98,66 +92,70 @@ let private buildNudgeRequest (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewSto
           isLoopActive = reviewStore.isReviewActive workspaceId }
       previousAction = previousActionFor state workspaceId }
 
-let private rememberAction (state: StreamEndState) (workspaceId: string) (action: string) =
+let private rememberAction (state: StreamEndState) (workspaceId: string) (action: string) : StreamEndState =
     match ofString action with
-    | Ok parsed -> state.lastNudgeActions.[workspaceId] <- parsed
-    | Error _ -> ()
+    | Ok parsed -> { state with lastNudgeActions = Map.add workspaceId parsed state.lastNudgeActions }
+    | Error _ -> state
 
-let private clearWorkspaceState (state: StreamEndState) (workspaceId: string) =
-    state.stoppedWorkspaces.Add(workspaceId) |> ignore
-    state.retryPendingWorkspaces.Remove(workspaceId) |> ignore
-    state.lastNudgeActions.Remove(workspaceId) |> ignore
+let private clearWorkspaceState (state: StreamEndState) (workspaceId: string) : StreamEndState =
+    { state with
+        stoppedWorkspaces = Set.add workspaceId state.stoppedWorkspaces
+        lastNudgeActions = Map.remove workspaceId state.lastNudgeActions }
 
-let private suppressWorkspace (state: StreamEndState) (coordinator: NudgeCoordinator) (workspaceId: string) =
-    coordinator.suppress workspaceId
-    state.stoppedWorkspaces.Add(workspaceId) |> ignore
-    state.lastNudgeActions.Remove(workspaceId) |> ignore
+let private suppressWorkspace (state: StreamEndState) (coordinator: CoordinatorRuntimeState ref) (workspaceId: string) : StreamEndState =
+    coordinator.Value <- suppressSession coordinator.Value workspaceId
+    { state with
+        stoppedWorkspaces = Set.add workspaceId state.stoppedWorkspaces
+        lastNudgeActions = Map.remove workspaceId state.lastNudgeActions }
 
-let private handleNudgeRequest (state: StreamEndState) (coordinator: NudgeCoordinator) (helpers: obj) (request: NudgeRequest) : Async<unit> =
+let private handleNudgeRequest (state: StreamEndState) (coordinator: CoordinatorRuntimeState ref) (helpers: obj) (request: NudgeRequest) : Async<StreamEndState> =
     async {
-        let action = coordinator.shouldNudge(request.workspaceId, request.context)
+        let nextCoordinator, action = decideRuntimeAction coordinator.Value request.workspaceId request.context
+        coordinator.Value <- nextCoordinator
         if shouldSuppressNudge request.workspaceId request.context request.previousAction then
-            ()
+            return state
         else
             match selectNudgePrompt action todoNudgePrompt loopNudgePrompt with
-            | None -> rememberAction state request.workspaceId action
+            | None -> return rememberAction state request.workspaceId action
             | Some prompt ->
                 try
                     let nudgeFn = Dyn.get helpers "nudge"
                     let! _ = (Dyn.call2 nudgeFn request.workspaceId prompt :?> JS.Promise<bool>) |> Async.AwaitPromise
-                    let previousCount = if state.deliveredCounts.ContainsKey(request.workspaceId) then state.deliveredCounts.[request.workspaceId] else 0
-                    state.deliveredCounts.[request.workspaceId] <- previousCount + 1
-                    rememberAction state request.workspaceId action
+                    return rememberAction state request.workspaceId action
                 with _ ->
-                    coordinator.clearSession(request.workspaceId)
+                    coordinator.Value <- clearRuntimeSession coordinator.Value request.workspaceId
+                    return state
     }
 
 let private handleEvent (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
-                         (state: StreamEndState) (coordinator: NudgeCoordinator)
-                         (event: obj) (helpers: obj) : JS.Promise<unit> =
+                          (state: StreamEndState) (coordinator: CoordinatorRuntimeState ref)
+                          (event: obj) (helpers: obj) : JS.Promise<StreamEndState> =
     async {
         match parseHookEvent event with
-        | Ignore -> ()
+        | Ignore -> return state
         | StreamEnd properties ->
             let decoded = decodeHookEvent event
-            if Dyn.isNullish helpers || state.stoppedWorkspaces.Contains(decoded.workspaceId) then ()
-            elif decoded.stopReason = "queued-message" then ()
+            if Dyn.isNullish helpers || Set.contains decoded.workspaceId state.stoppedWorkspaces then return state
+            elif decoded.stopReason = "queued-message" then return state
             else
                 let lastMessage = getLastAssistantText properties
                 let! todos = tryGetTodos helpers decoded.workspaceId
                 let request = buildNudgeRequest reviewStore state decoded.workspaceId todos lastMessage
-                do! handleNudgeRequest state coordinator helpers request
+                return! handleNudgeRequest state coordinator helpers request
         | StreamAbort workspaceId ->
             reviewStore.deactivateReview workspaceId
-            coordinator.clearSession(workspaceId)
-            clearWorkspaceState state workspaceId
+            coordinator.Value <- clearRuntimeSession coordinator.Value workspaceId
+            return clearWorkspaceState state workspaceId
         | AbortedError workspaceId ->
-            suppressWorkspace state coordinator workspaceId
+            return suppressWorkspace state coordinator workspaceId
     } |> Async.StartAsPromise
 
 let createEventHook (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
-    let state = createStreamEndState ()
-    let coordinator = NudgeCoordinator()
+    let mutable state = createStreamEndState ()
+    let coordinator = ref freshCoordinatorRuntime
     let fn = System.Func<obj, obj, JS.Promise<unit>>(fun event helpers ->
-        handleEvent reviewStore state coordinator event helpers)
+        async {
+            let! nextState = handleEvent reviewStore state coordinator event helpers |> Async.AwaitPromise
+            state <- nextState
+        } |> Async.StartAsPromise)
     box fn

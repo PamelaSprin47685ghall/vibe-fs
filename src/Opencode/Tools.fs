@@ -10,11 +10,12 @@ open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ToolCatalog
 open VibeFs.Shell.OllamaClient
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ReviewerLoop
-open VibeFs.Opencode.Actors
+open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzySearch
 module ToolSchemaModule = VibeFs.Opencode.ToolSchema
@@ -262,14 +263,7 @@ let webfetchTool () : obj =
                     with ex -> return $"Web fetch failed: {ex.Message}"
                 } |> Async.StartAsPromise)
 
-let private formatReviewResult (result: ReviewResult) : string =
-    match result with
-    | Accepted ->
-        "Review passed. Your changes have been accepted. loop mode has ended."
-    | Terminated -> "Review terminated."
-    | Rejected feedback ->
-        "Review feedback:\n\n" + feedback
-        + "\n\nAddress the feedback above. loop mode is still active — fix the issues and call submit_review again."
+let private formatReviewResult = VibeFs.Kernel.Prompts.formatReviewResult
 
 let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     let client () = Dyn.get ctx "client"

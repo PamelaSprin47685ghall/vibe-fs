@@ -29,15 +29,9 @@ let registrationShape (reg: obj) =
     check "mux.getToolPolicy non-null" (not (isNullish policy) && typeIs policy "object")
     let removes = unbox<string[]> (get policy "remove")
     check "mux.getToolPolicy manager removes write" (removes |> Array.contains "write")
-
-let policySpec () =
-    let pol1 = getPluginToolPolicy "some-agent" "manager"
-    let removes = unbox<string[]> (get pol1 "remove")
-    check "getPluginToolPolicy manager removes write" (removes |> Array.contains "write")
-    let pol2 = getPluginToolPolicy "some-agent"
-    check "getPluginToolPolicy without role returns policy" (not (isNullish pol2))
-    let pol3 = getPluginToolPolicy "some-agent" "coder"
-    check "getPluginToolPolicy coder keeps write" (not ((unbox<string[]> (get pol3 "remove")) |> Array.contains "write"))
+    let coderPolicy = (get reg "getToolPolicy") $ ("x", "coder")
+    let coderRemoves = unbox<string[]> (get coderPolicy "remove")
+    check "mux.getToolPolicy coder keeps write" (not (coderRemoves |> Array.contains "write"))
 
 let syntaxSpec () = async {
     let! result = checkSyntax "const x = 1;" "test.js" |> Async.AwaitPromise
@@ -206,7 +200,6 @@ let run () : JS.Promise<unit> =
         pluginShape p
         let reg = createRegistration (createObj [])
         registrationShape reg
-        policySpec ()
         do! syntaxSpec ()
         webfetchSchemaSpec reg
         slashCommandsSpec reg

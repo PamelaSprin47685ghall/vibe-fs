@@ -1,7 +1,5 @@
 module VibeFs.Kernel.SubagentIntents
 
-open Fable.Core
-open Fable.Core.JsInterop
 open VibeFs.Kernel
 
 type CoderTarget =
@@ -20,6 +18,21 @@ type InvestigatorIntent =
       background: string
       questions: string array
       entries: string array }
+
+let coderTargetFileDesc = "File path to modify."
+let coderTargetGuideDesc = "Implementation constraints for this file."
+let coderTargetDraftDesc = "Optional minimal draft for the coder to reference. Prefer leaving this empty; use only when strict quality needs a concrete sketch. No patch or special format required."
+let coderTargetsDesc = "Non-empty per-file implementation guides."
+let coderObjectiveDesc = "Concrete code-change goal for this subagent."
+let coderBackgroundDesc = "Why this change is needed; prior findings and user context."
+let coderDoNotTouchItemDesc = "Do-not-touch path, symbol, or constraint."
+let coderDoNotTouchDesc = "Optional list of files, directories, symbols, or constraints this subagent must not modify."
+let investigatorQuestionItemDesc = "Question the report must answer."
+let investigatorQuestionsDesc = "Non-empty list of questions the report must answer explicitly."
+let investigatorEntryItemDesc = "Optional entry path, symbol, or file."
+let investigatorEntriesDesc = "Optional entry paths, symbols, or files to start from."
+let investigatorObjectiveDesc = "What to investigate in the codebase."
+let investigatorBackgroundDesc = "Why this investigation is needed; blockers and prior context."
 
 let private requireNonEmpty (field: string) (value: string) (tool: string) : Result<string, string> =
     if System.String.IsNullOrWhiteSpace value then Result.Error $"Invalid LLM input for {tool}: {field} is required"
@@ -115,67 +128,3 @@ let joinInvestigatorUiLabel (intents: obj) : Result<string, string> =
     parseInvestigatorIntents intents |> Result.map (fun list -> list |> List.map (fun i -> i.objective) |> String.concat "; ")
 
 let coderTargetFiles (intent: CoderIntent) : string list = intent.targets |> List.map (fun t -> t.file)
-
-let private muxStrReq (desc: string) : obj =
-    createObj [ "type", box "string"; "minLength", box 1; "description", box desc ]
-
-let private muxStrArrayReq (desc: string) : obj =
-    createObj
-        [ "type", box "array"
-          "minItems", box 1
-          "items", createObj [ "type", box "string"; "minLength", box 1 ]
-          "description", box desc ]
-
-let private muxStrArrayOpt (desc: string) : obj =
-    createObj
-        [ "type", box "array"
-          "items", createObj [ "type", box "string"; "minLength", box 1 ]
-          "description", box desc ]
-
-let private muxObjectSchema (properties: obj) (required: string array) : obj =
-    createObj
-        [ "type", box "object"
-          "properties", properties
-          "required", box required
-          "additionalProperties", box false ]
-
-let muxCoderIntentsSchema (intentsDesc: string) : obj =
-    let targetItem =
-        muxObjectSchema
-            (createObj [ "file", muxStrReq "File path to modify."
-                         "guide", muxStrReq "Implementation constraints for this file."
-                         "draft", createObj [ "type", box "string"; "description", box "Optional minimal draft for the coder to reference. Prefer leaving this empty; use only when strict quality needs a concrete sketch. No patch or special format required." ] ])
-            [| "file"; "guide" |]
-    let intentItem =
-        muxObjectSchema
-            (createObj
-                [ "objective", muxStrReq "Concrete code-change goal for this subagent."
-                  "background", muxStrReq "Why this change is needed; prior findings and user context."
-                  "do_not_touch", muxStrArrayOpt "Optional list of files, directories, symbols, or constraints this subagent must not modify."
-                  "targets",
-                  createObj
-                      [ "type", box "array"
-                        "minItems", box 1
-                        "items", targetItem
-                        "description", box "Non-empty per-file implementation guides." ] ])
-            [| "objective"; "background"; "targets" |]
-    createObj
-        [ "type", box "array"
-          "minItems", box 1
-          "items", intentItem
-          "description", box intentsDesc ]
-
-let muxInvestigatorIntentsSchema (intentsDesc: string) : obj =
-    let intentItem =
-        muxObjectSchema
-            (createObj
-                [ "objective", muxStrReq "What to investigate in the codebase."
-                  "background", muxStrReq "Why this investigation is needed; blockers and prior context."
-                  "questions", muxStrArrayReq "Non-empty list of questions the report must answer explicitly."
-                  "entries", muxStrArrayOpt "Optional entry paths, symbols, or files to start from." ])
-            [| "objective"; "background"; "questions" |]
-    createObj
-        [ "type", box "array"
-          "minItems", box 1
-          "items", intentItem
-          "description", box intentsDesc ]

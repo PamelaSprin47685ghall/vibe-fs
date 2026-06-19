@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Fable.Core.JS
 open VibeFs.Kernel
 open VibeFs.Kernel.Config
+open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Opencode.Tools
@@ -13,7 +14,7 @@ open VibeFs.Opencode.HookTransform
 open VibeFs.Opencode.NudgeHook
 open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Opencode.Actors
+open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Kernel.HostTools
 
@@ -124,14 +125,6 @@ let private applyAgentConfigFor (host: Host) (opencodeConfig: obj) (mcps: obj) :
 
 let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
 
-let private loopFooter =
-    "- report: a detailed description of what you did and why\n"
-    + "- affectedFiles: list of every file you modified or created\n\n"
-    + "A reviewer will examine your submission. If accepted, you are done. If rejected, you will receive specific feedback to address."
-
-let private buildLoopMessage (task: string) (intro: string) : string =
-    $"Task (loop): {task}\n\n{intro}\n{loopFooter}"
-
 let private ensureParts (output: obj) : obj =
     let parts = Dyn.get output "parts"
     if Dyn.isNullish parts then
@@ -159,7 +152,7 @@ let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: 
                 pushPart parts (box {| ``type`` = "text"; text = "loop mode is already active. Submit your work via submit_review." |})
             elif command = "loop" then
                 reviewStore.activateReview(sessionID, task, dateNow ())
-                let msg = buildLoopMessage task "loop mode is active. Complete the task above, then call submit_review with:"
+                let msg = buildLoopMessage task [ "loop mode is active. Complete the task above, then call submit_review with:" ]
                 pushPart parts (box {| ``type`` = "text"; text = msg |})
             else
                 let directory = Dyn.str ctx "directory"
@@ -171,7 +164,7 @@ let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: 
                     pushPart parts (box {| ``type`` = "text"; text = "Pre-review could not complete." |})
                 | Rejected feedback ->
                     reviewStore.activateReview(sessionID, task, dateNow ())
-                    let msg = $"Task (loop-review): {task}\n\n=== Pre-review Feedback ===\n\n{feedback}\n\nAddress the feedback above, then call submit_review with:\n{loopFooter}"
+                    let msg = buildLoopMessage task [ "=== Pre-review Feedback ==="; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]
                     pushPart parts (box {| ``type`` = "text"; text = msg |})
     } |> Async.StartAsPromise
 

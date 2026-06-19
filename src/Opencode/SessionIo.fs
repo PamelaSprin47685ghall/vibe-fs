@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Message
-open VibeFs.Opencode.Actors
+open VibeFs.Shell.ChildAgentRegistry
 
 let private firstString (ctx: obj) (keys: string list) : string option =
     keys

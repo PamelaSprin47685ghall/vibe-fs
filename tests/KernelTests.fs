@@ -140,28 +140,65 @@ let subagentJoinReports () =
     check "joinReports trims left" (joined.StartsWith "first")
     check "joinReports trims right" (joined.EndsWith "second")
 
-/// P2-1: hook arg rewrites become pure data (`ArgsPatch`) plus one boundary
-/// applier.  These tests pin the in-place mutation contract: setKeys must land
-/// before deleteKeys is honoured, both must mutate the SAME reference (the
-/// host re-parses it), and a null target is a silent no-op.
-let argsPatchAppliesInPlace () =
-    let target = createObj [ "keep", box "yes"; "drop", box "bye"; "old", box 1 ]
-    let alias = target
-    let patch = { setKeys = [ "old", box 42; "fresh", box "new" ]; deleteKeys = [ "drop" ] }
-    applyPatch target patch
-    check "applyPatch mutates same reference" (obj.ReferenceEquals(target, alias))
-    check "applyPatch keeps untouched key" (str alias "keep" = "yes")
-    check "applyPatch overwrites set key" (unbox<int> (get alias "old") = 42)
-    check "applyPatch installs new set key" (str alias "fresh" = "new")
-    check "applyPatch deletes drop key" (isNullish (get alias "drop"))
+/// `Dyn.deleteKey` is the primitive HookExecute leans on to clear Mimocode
+/// task extras off the original args reference. Confirm it removes keys in
+/// place and silently tolerates a null target.
+let dynDeleteKey () =
+    let target = createObj [ "keep", box "yes"; "drop", box "bye" ]
+    deleteKey target "drop"
+    check "deleteKey removes key" (isNullish (get target "drop"))
+    check "deleteKey preserves siblings" (str target "keep" = "yes")
+    deleteKey null "missing"
+    check "deleteKey null is a no-op" true
 
-let argsPatchSkipsNullTarget () =
-    // A null target must be tolerated: nested objects (e.g. an absent
-    // `operation`) frequently show up as null and must not throw.
-    applyPatch null { setKeys = [ "x", box 1 ]; deleteKeys = [ "y" ] }
-    check "applyPatch null target is a no-op" true
+/// S1 SSOT: the loop submission message must be authored once in the Kernel,
+/// not copy-pasted between Mux/SubagentTools.fs and Opencode/PluginCore.fs.
+/// The shared API is `Kernel.LoopMessages.buildLoopMessage` returning a single
+/// canonical string; both hosts (and slash commands) must consume that exact
+/// string verbatim — no re-interpretation, no per-host wording drift.
+let loopMessagesShared () =
+    let task = "ship S1 refactor"
+    let intro = "Loop mode is active. Complete the task above, then call submit_review with:"
+    let kernelMsg = VibeFs.Kernel.LoopMessages.buildLoopMessage task [ intro ]
+    check "loop message embeds task" (kernelMsg.Contains task)
+    check "loop message embeds intro" (kernelMsg.Contains intro)
+    check "loop message mentions submit_review" (kernelMsg.Contains "submit_review")
+    check "loop message lists report field" (kernelMsg.Contains "report")
+    check "loop message lists affectedFiles field" (kernelMsg.Contains "affectedFiles")
+    check "loop message names reviewer" (kernelMsg.Contains "reviewer")
 
-let argsPatchEmptyIsNoop () =
-    let target = createObj [ "x", box 1 ]
-    applyPatch target emptyPatch
-    check "emptyPatch leaves keys alone" (unbox<int> (get target "x") = 1)
+/// S1 SSOT: the reviewer's "submit a PASS/REJECT verdict via agent_report"
+/// instruction template lives once in the Kernel, not duplicated between
+/// Mux/SubagentTools.fs (review verdict) and Mux/SlashCommands.fs (loop-review
+/// pre-check). Pin the shared API: `Kernel.Prompts.reviewerVerdictInstructions`
+/// and `Kernel.Prompts.loopReviewVerdictInstructions` — both authored once,
+/// both Kernel-pure, both host-agnostic.
+let reviewerVerdictPromptsShared () =
+    let verdict = VibeFs.Kernel.Prompts.reviewerVerdictInstructions
+    check "reviewer verdict mentions agent_report" (verdict.Contains "agent_report")
+    check "reviewer verdict mentions PASS" (verdict.Contains "PASS")
+    check "reviewer verdict mentions REJECT" (verdict.Contains "REJECT")
+    check "reviewer verdict mentions feedback" (verdict.Contains "feedback")
+    check "reviewer verdict mentions callId" (verdict.Contains "callId")
+
+    let preReview = VibeFs.Kernel.Prompts.loopReviewVerdictInstructions
+    check "loop-review verdict mentions agent_report" (preReview.Contains "agent_report")
+    check "loop-review verdict mentions PASS" (preReview.Contains "PASS")
+    check "loop-review verdict mentions REJECT" (preReview.Contains "REJECT")
+    check "loop-review verdict mentions actionable" (preReview.Contains "actionable")
+
+/// S1 SSOT: the user-facing review-result rendering (Accepted/Rejected/Terminated
+/// → human-readable string) lives once in the Kernel. Today it lives only in
+/// `Opencode/Tools.fs::formatReviewResult` and the Mux side open-codes a
+/// near-identical message. Pin a single Kernel formatter both hosts call.
+let reviewResultFormattingShared () =
+    let accepted = VibeFs.Kernel.Prompts.formatReviewResult VibeFs.Kernel.ReviewSession.ReviewResult.Accepted
+    check "accepted text mentions passed" (accepted.ToLower().Contains "passed" || accepted.ToLower().Contains "accepted")
+    check "accepted text mentions loop ended" (accepted.ToLower().Contains "loop")
+
+    let rejected = VibeFs.Kernel.Prompts.formatReviewResult (VibeFs.Kernel.ReviewSession.ReviewResult.Rejected "missing tests")
+    check "rejected text embeds feedback" (rejected.Contains "missing tests")
+    check "rejected text instructs to retry" (rejected.Contains "submit_review")
+
+    let terminated = VibeFs.Kernel.Prompts.formatReviewResult VibeFs.Kernel.ReviewSession.ReviewResult.Terminated
+    check "terminated text mentions terminated" (terminated.ToLower().Contains "terminat")

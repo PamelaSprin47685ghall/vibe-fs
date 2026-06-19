@@ -155,3 +155,36 @@ let paramDoc (name: string) (field: string) : string =
     | None -> failwithf "ToolCatalog: unknown param %s.%s" name field
 
 let description (name: string) : string = (specOf name).description
+
+module Params =
+    let private doc tool field = paramDoc tool field
+
+    let coderIntents = doc "coder" "intents"
+    let coderTdd = doc "coder" "tdd"
+    let investigatorIntents = doc "investigator" "intents"
+    let meditatorIntent = doc "meditator" "intent"
+    let meditatorFiles = doc "meditator" "files"
+    let browserIntent = doc "browser" "intent"
+    let executorLanguage = doc "executor" "language"
+    let executorProgram = doc "executor" "program"
+    let executorDeps = doc "executor" "dependencies"
+    let executorTimeout = doc "executor" "timeout_type"
+    let fuzzyFindPattern = doc "fuzzy_find" "pattern"
+    let fuzzyFindPath = doc "fuzzy_find" "path"
+    let fuzzyFindLimit = doc "fuzzy_find" "limit"
+    let fuzzyFindIterator = doc "fuzzy_find" "iterator"
+    let fuzzyGrepPattern = doc "fuzzy_grep" "pattern"
+    let fuzzyGrepPath = doc "fuzzy_grep" "path"
+    let fuzzyGrepExclude = doc "fuzzy_grep" "exclude"
+    let fuzzyGrepCaseSensitive = doc "fuzzy_grep" "caseSensitive"
+    let fuzzyGrepContext = doc "fuzzy_grep" "context"
+    let fuzzyGrepLimit = doc "fuzzy_grep" "limit"
+    let fuzzyGrepIterator = doc "fuzzy_grep" "iterator"
+    let websearchQuery = doc "websearch" "query"
+    let websearchNumResults = doc "websearch" "numResults"
+    let websearchWhatToSummarize = doc "websearch" "what_to_summarize"
+    let webfetchUrl = doc "webfetch" "url"
+    let webfetchExtractMain = doc "webfetch" "extract_main"
+    let webfetchPreferLlmsTxt = doc "webfetch" "prefer_llms_txt"
+    let webfetchPrompt = doc "webfetch" "prompt"
+    let webfetchTimeout = doc "webfetch" "timeout"

@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.ToolCatalog
+open VibeFs.Kernel.SubagentIntents
 
 /// The opencode plugin SDK's `tool` factory + `tool.schema` (Zod-like) builder.
 [<Import("tool", "@opencode-ai/plugin/tool")>]
@@ -49,24 +50,24 @@ let private arrayMin (item: obj) (minCount: int) (desc: string) : obj =
     call1 (call1 (arr item) "min" (box minCount)) "describe" (box desc)
 
 let coderIntentsSchema (desc: string) : obj =
-    let fileField = strMin 1 "File path to modify."
-    let guideField = strMin 1 "Implementation constraints for this file."
-    let draftField = strOpt "Optional minimal draft for the coder to reference. Prefer leaving this empty; use only when strict quality needs a concrete sketch. No patch or special format required."
+    let fileField = strMin 1 coderTargetFileDesc
+    let guideField = strMin 1 coderTargetGuideDesc
+    let draftField = strOpt coderTargetDraftDesc
     let targetShape = strictObject (createObj [ "file", fileField; "guide", guideField; "draft", draftField ])
-    let targetsField = arrayMin targetShape 1 "Non-empty per-file implementation guides."
-    let objectiveField = strMin 1 "Concrete code-change goal for this subagent."
-    let backgroundField = strMin 1 "Why this change is needed; prior findings and user context."
-    let doNotTouchField = call1 (call0 (arr (strMin 1 "Do-not-touch path, symbol, or constraint.")) "optional") "describe" (box "Optional list of files, directories, symbols, or constraints this subagent must not modify.")
+    let targetsField = arrayMin targetShape 1 coderTargetsDesc
+    let objectiveField = strMin 1 coderObjectiveDesc
+    let backgroundField = strMin 1 coderBackgroundDesc
+    let doNotTouchField = call1 (call0 (arr (strMin 1 coderDoNotTouchItemDesc)) "optional") "describe" (box coderDoNotTouchDesc)
     let inner = strictObject (createObj [ "objective", objectiveField; "background", backgroundField; "do_not_touch", doNotTouchField; "targets", targetsField ])
     arrayMin inner 1 desc
 
 let investigatorIntentsSchema (desc: string) : obj =
-    let questionItem = strMin 1 "Question the report must answer."
-    let questionsField = arrayMin questionItem 1 "Non-empty list of questions the report must answer explicitly."
-    let entryItem = strMin 1 "Optional entry path, symbol, or file."
-    let entriesField = call1 (call0 (arr entryItem) "optional") "describe" (box "Optional entry paths, symbols, or files to start from.")
-    let objectiveField = strMin 1 "What to investigate in the codebase."
-    let backgroundField = strMin 1 "Why this investigation is needed; blockers and prior context."
+    let questionItem = strMin 1 investigatorQuestionItemDesc
+    let questionsField = arrayMin questionItem 1 investigatorQuestionsDesc
+    let entryItem = strMin 1 investigatorEntryItemDesc
+    let entriesField = call1 (call0 (arr entryItem) "optional") "describe" (box investigatorEntriesDesc)
+    let objectiveField = strMin 1 investigatorObjectiveDesc
+    let backgroundField = strMin 1 investigatorBackgroundDesc
     let inner =
         strictObject (createObj [ "objective", objectiveField; "background", backgroundField; "questions", questionsField; "entries", entriesField ])
     arrayMin inner 1 desc
@@ -112,35 +113,4 @@ let websearch = description "websearch"
 
 let webfetch = description "webfetch"
 
-module Params =
-    let private doc tool field = paramDoc tool field
-
-    let coderIntents = doc "coder" "intents"
-    let coderTdd = doc "coder" "tdd"
-    let investigatorIntents = doc "investigator" "intents"
-    let meditatorIntent = doc "meditator" "intent"
-    let meditatorFiles = doc "meditator" "files"
-    let browserIntent = doc "browser" "intent"
-    let executorLanguage = doc "executor" "language"
-    let executorProgram = doc "executor" "program"
-    let executorDeps = doc "executor" "dependencies"
-    let executorTimeout = doc "executor" "timeout_type"
-    let fuzzyFindPattern = doc "fuzzy_find" "pattern"
-    let fuzzyFindPath = doc "fuzzy_find" "path"
-    let fuzzyFindLimit = doc "fuzzy_find" "limit"
-    let fuzzyFindIterator = doc "fuzzy_find" "iterator"
-    let fuzzyGrepPattern = doc "fuzzy_grep" "pattern"
-    let fuzzyGrepPath = doc "fuzzy_grep" "path"
-    let fuzzyGrepExclude = doc "fuzzy_grep" "exclude"
-    let fuzzyGrepCaseSensitive = doc "fuzzy_grep" "caseSensitive"
-    let fuzzyGrepContext = doc "fuzzy_grep" "context"
-    let fuzzyGrepLimit = doc "fuzzy_grep" "limit"
-    let fuzzyGrepIterator = doc "fuzzy_grep" "iterator"
-    let websearchQuery = doc "websearch" "query"
-    let websearchNumResults = doc "websearch" "numResults"
-    let websearchWhatToSummarize = doc "websearch" "what_to_summarize"
-    let webfetchUrl = doc "webfetch" "url"
-    let webfetchExtractMain = doc "webfetch" "extract_main"
-    let webfetchPreferLlmsTxt = doc "webfetch" "prefer_llms_txt"
-    let webfetchPrompt = doc "webfetch" "prompt"
-    let webfetchTimeout = doc "webfetch" "timeout"
+module Params = VibeFs.Kernel.ToolCatalog.Params

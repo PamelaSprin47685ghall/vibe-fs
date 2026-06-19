@@ -6,8 +6,21 @@ open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.MagicCore
-open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
+
+let private deduplicateReadOutputs (messages: obj array) : obj array =
+    VibeFs.Kernel.MessageDedup.deduplicateReadOutputs messages
+
+let private deduplicateReadOutputsAgainstHistory (history: obj array) (messages: obj array) : obj array =
+    let seenByPath = VibeFs.Kernel.MessageDedup.collectReadOutputsByPath history
+    VibeFs.Kernel.MessageDedup.deduplicateReadOutputsWithSeenByPath seenByPath messages |> snd
+
+let private deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj array =
+    let seen, result = VibeFs.Kernel.MessageDedup.deduplicateModelReadOutputsWithSeen (List.ofArray seenOutputs) messages
+    Array.ofList seen, result
+
+let private collectReadOutputs (messages: obj array) : string[] =
+    VibeFs.Kernel.MessageDedup.collectReadOutputs messages |> Array.ofList
 
 let private fileReadOutput (content: string) : obj =
     box {| success = true; file_size = content.Length; modifiedTime = "2024-01-01T00:00:00.000Z"; lines_read = 1; content = content |}

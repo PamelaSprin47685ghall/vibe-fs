@@ -8,10 +8,9 @@ open VibeFs.Kernel.Executor
 open VibeFs.Kernel.Fuzzy
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.Subagent
+open VibeFs.Kernel.ToolCatalog
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
-open VibeFs.Opencode.ToolSchema
-module ToolSchemaModule = VibeFs.Opencode.ToolSchema
 open VibeFs.Shell.FileSys
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzySearch
@@ -49,7 +48,7 @@ let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptio
 
 let executorTool (deps: obj) : ToolDefinition =
     { name = "executor"
-      description = ToolSchemaModule.executor
+      description = description "executor"
       parameters =
         mkSchema
             (createObj
@@ -139,7 +138,7 @@ let private buildFinderOptions (config: obj) (finderCache: FinderCache) : Search
 
 let fuzzyFindTool (finderCache: FinderCache) : ToolDefinition =
     { name = "fuzzy_find"
-      description = ToolSchemaModule.fuzzyFind
+      description = description "fuzzy_find"
       parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyFindPattern); "path", box (strProp Params.fuzzyFindPath); "limit", box (numProp Params.fuzzyFindLimit); "iterator", box (strProp Params.fuzzyFindIterator) ]) [||]
       execute = fun config args ->
           let scopeId = Dyn.str config "workspaceId"
@@ -160,7 +159,7 @@ let fuzzyFindTool (finderCache: FinderCache) : ToolDefinition =
 
 let fuzzyGrepTool (finderCache: FinderCache) : ToolDefinition =
     { name = "fuzzy_grep"
-      description = ToolSchemaModule.fuzzyGrep
+      description = description "fuzzy_grep"
       parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyGrepPattern); "path", box (strProp Params.fuzzyGrepPath); "exclude", box (strProp Params.fuzzyGrepExclude); "caseSensitive", box (boolProp Params.fuzzyGrepCaseSensitive); "context", box (numProp Params.fuzzyGrepContext); "limit", box (numProp Params.fuzzyGrepLimit); "iterator", box (strProp Params.fuzzyGrepIterator) ]) [||]
       execute = fun config args ->
           let scopeId = Dyn.str config "workspaceId"
@@ -184,7 +183,7 @@ let fuzzyGrepTool (finderCache: FinderCache) : ToolDefinition =
 
 let websearchTool (deps: obj) : ToolDefinition =
     { name = "websearch"
-      description = ToolSchemaModule.websearch
+      description = description "websearch"
       parameters = mkSchema (createObj [ "query", box (strProp Params.websearchQuery); "numResults", box (numProp Params.websearchNumResults); "what_to_summarize", box (strProp Params.websearchWhatToSummarize) ]) [| "query"; "what_to_summarize" |]
       execute = fun config args ->
           let whatToSummarize = defaultArg (strField args "what_to_summarize") ""
@@ -216,7 +215,7 @@ let websearchTool (deps: obj) : ToolDefinition =
 
 let webfetchTool : ToolDefinition =
     { name = "webfetch"
-      description = ToolSchemaModule.webfetch
+      description = description "webfetch"
       parameters = mkSchema (createObj [ "url", box (strProp Params.webfetchUrl); "extract_main", box (boolProp Params.webfetchExtractMain); "prefer_llms_txt", box (strEnumProp Params.webfetchPreferLlmsTxt [| "auto"; "always"; "never" |]); "prompt", box (strProp Params.webfetchPrompt); "timeout", box (numProp Params.webfetchTimeout) ]) [| "url" |]
       execute = fun config args ->
           match strField args "url" with

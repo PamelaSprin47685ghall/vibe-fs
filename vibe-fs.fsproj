@@ -15,10 +15,11 @@
     <Compile Include="src/Kernel/Dyn.fs" />
     <Compile Include="src/Kernel/HostTools.fs" />
     <Compile Include="src/Kernel/SubagentIntents.fs" />
+    <Compile Include="src/Kernel/ReviewSession.fs" />
     <Compile Include="src/Kernel/Prompts.fs" />
+    <Compile Include="src/Kernel/LoopMessages.fs" />
     <Compile Include="src/Kernel/Subagent.fs" />
     <Compile Include="src/Kernel/ToolCatalog.fs" />
-    <Compile Include="src/Kernel/ReviewSession.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />
     <Compile Include="src/Kernel/Dedup.fs" />
     <Compile Include="src/Kernel/Message.fs" />
@@ -35,6 +36,8 @@
     <Compile Include="src/Kernel/Executor.fs" />
 
     <Compile Include="src/Shell/ReviewRuntime.fs" />
+    <Compile Include="src/Shell/CallStore.fs" />
+    <Compile Include="src/Shell/MagicSessionStore.fs" />
     <Compile Include="src/Shell/ExecutorJavascript.fs" />
     <Compile Include="src/Shell/OllamaClient.fs" />
     <Compile Include="src/Shell/TreeSitterShell.fs" />
@@ -43,10 +46,9 @@
     <Compile Include="src/Shell/WorkspaceFiles.fs" />
     <Compile Include="src/Shell/Executor.fs" />
     <Compile Include="src/Shell/FuzzySearch.fs" />
+    <Compile Include="src/Shell/ChildAgentRegistry.fs" />
 
-    <Compile Include="src/Mux/CallStore.fs" />
     <Compile Include="src/Mux/AiSettings.fs" />
-    <Compile Include="src/Opencode/Actors.fs" />
     <Compile Include="src/Opencode/MagicTodo.fs" />
     <Compile Include="src/Opencode/ToolSchema.fs" />
     <Compile Include="src/Opencode/HookSchema.fs" />

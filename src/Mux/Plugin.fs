@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Config
-open VibeFs.Mux.CallStore
+open VibeFs.Shell.CallStore
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
@@ -56,25 +56,25 @@ let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]
 
 let createToolCatalog
     (deps: obj)
+    (toolNames: string array)
     (callStore: CallStore)
     (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (hostReadExec: HostReadExec)
     (finderCache: FinderCache)
     : ToolDefinition array =
     let tools =
-        [| coderTool deps
-           investigatorTool deps
-           meditatorTool deps
-           browserTool deps
+        [| coderTool deps toolNames
+           investigatorTool deps toolNames
+           meditatorTool deps toolNames
+           browserTool deps toolNames
            executorTool deps
-           submitReviewTool deps callStore reviewStore
+           submitReviewTool deps toolNames callStore reviewStore
            websearchTool deps
            webfetchTool
            fuzzyGrepTool finderCache
            fuzzyFindTool finderCache
            writeTool deps
            readTool deps hostReadExec |]
-    registeredToolNames <- tools |> Array.map (fun t -> t.name)
     tools
 
 let createRegistration (deps: obj) : obj =
@@ -82,13 +82,15 @@ let createRegistration (deps: obj) : obj =
     let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
     let hostReadExec : HostReadExec = { contents = None }
     let finderCache = FinderCache()
-    let tools = createToolCatalog deps callStore reviewStore hostReadExec finderCache
-    let toolNames = tools |> Array.map (fun t -> t.name)
+    let toolNames =
+        [| "coder"; "investigator"; "meditator"; "browser"; "executor"
+           "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read" |]
+    let tools = createToolCatalog deps toolNames callStore reviewStore hostReadExec finderCache
     let toolsObj = toolsToObject tools
     let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.Config.getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
     let wrappers = createAllWrappers toolsObj hostReadExec callStore
     let eventHook = createEventHook reviewStore
-    let slashCommands = createSlashCommands deps callStore reviewStore
+    let slashCommands = createSlashCommands deps toolNames callStore reviewStore
     box {| toolNames = toolNames
            tools = tools
            wrappers = wrappers
@@ -105,26 +107,3 @@ let createRegistration (deps: obj) : obj =
                let agent = if Dyn.isNullish role then "manager" else string role
                let remove = toolNames |> Array.filter (fun t -> not (canUse agent t))
                box {| add = [||]; remove = remove |}) |}
-
-let getPluginToolPolicy (_agentId: string) (role: string) : obj =
-    let agent = if System.String.IsNullOrEmpty role then "manager" else role
-    let remove = [| "coder"; "investigator"; "meditator"; "browser"; "executor"; "submit_review"; "websearch"; "webfetch"; "fuzzy_find"; "fuzzy_grep"; "write"; "read" |]
-                  |> Array.filter (fun t -> not (canUse agent t))
-    box {| add = [||]; remove = remove |}
-
-let deduplicateReadOutputs (messages: obj array) : obj array =
-    VibeFs.Kernel.MessageDedup.deduplicateReadOutputs messages
-
-let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : obj array =
-    VibeFs.Kernel.MessageDedup.deduplicateReadOutputsWithSeen (List.ofArray seenOutputs) messages |> snd
-
-let deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj array =
-    let seen, result = VibeFs.Kernel.MessageDedup.deduplicateModelReadOutputsWithSeen (List.ofArray seenOutputs) messages
-    Array.ofList seen, result
-
-let deduplicateReadOutputsAgainstHistory (history: obj array) (messages: obj array) : obj array =
-    let seenByPath = VibeFs.Kernel.MessageDedup.collectReadOutputsByPath history
-    VibeFs.Kernel.MessageDedup.deduplicateReadOutputsWithSeenByPath seenByPath messages |> snd
-
-let collectReadOutputs (messages: obj array) : string[] =
-    VibeFs.Kernel.MessageDedup.collectReadOutputs messages |> Array.ofList

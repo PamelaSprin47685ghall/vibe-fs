@@ -2,6 +2,7 @@ module VibeFs.Kernel.Prompts
 
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.SubagentIntents
+open VibeFs.Kernel.ReviewSession
 
 type SearchResult =
     { title: string
@@ -233,3 +234,32 @@ let formatFetchResponse (data: FetchResponse) : string =
       | Some c when nonEmpty c -> yield c
       | _ -> () ]
     |> String.concat "\n"
+
+let private verdictPrologue (subject: string) =
+    $"You are a reviewer evaluating {subject}.\n\n"
+    + "Call the agent_report tool to submit your verdict. Use exactly these fields:\n"
+    + "- verdict: \"PASS\" if the changes are acceptable, \"REJECT\" otherwise\n"
+    + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n"
+    + "- callId: the callId supplied in this prompt\n\n"
+    + "Do not output free-form text as your final answer; the tool call is required."
+
+let reviewerVerdictInstructions =
+    verdictPrologue "whether the reported changes satisfy the original task"
+
+let loopReviewVerdictInstructions =
+    "You are a reviewer evaluating whether a task description is clear and actionable enough to begin work.\n\n"
+    + "Call the agent_report tool to submit your verdict. Use exactly these fields:\n"
+    + "- verdict: \"PASS\" if the task is clear, specific, and actionable, \"REJECT\" otherwise\n"
+    + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n"
+    + "- callId: the callId supplied in this prompt\n\n"
+    + "Do not output free-form text as your final answer; the tool call is required."
+
+let formatReviewResult (result: ReviewResult) : string =
+    match result with
+    | Accepted ->
+        "Review passed. Your changes have been accepted. loop mode has ended."
+    | Terminated ->
+        "Review terminated without verdict. loop mode is still active; fix the issues and call submit_review again."
+    | Rejected feedback ->
+        "Review feedback:\n\n" + feedback
+        + "\n\nAddress the feedback above. loop mode is still active — fix the issues and call submit_review again."

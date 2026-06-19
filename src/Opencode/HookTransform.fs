@@ -14,7 +14,7 @@ open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.MagicProjection
 open VibeFs.Kernel.MagicTodo
 open VibeFs.Opencode.MagicTodo
-open VibeFs.Opencode.Actors
+open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Kernel.CapsFormat
 open VibeFs.Kernel.Dedup
 

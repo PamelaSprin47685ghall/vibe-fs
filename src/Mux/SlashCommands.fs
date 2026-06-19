@@ -4,10 +4,12 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Config
+open VibeFs.Kernel.LoopMessages
+open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.Domain
 open VibeFs.Shell.ReviewRuntime
-open VibeFs.Mux.CallStore
+open VibeFs.Shell.CallStore
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
@@ -64,14 +66,6 @@ let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) 
                         reviewStore.activateReview(Id.workspaceIdValue wid, task, dateNow ())
                         (async { return buildLoopMessage task [ "Loop mode is active. Complete the task above, then call submit_review with:" ] } |> Async.StartAsPromise)) |}
 
-let private loopReviewVerdictInstructions =
-    "You are a reviewer evaluating whether a task description is clear and actionable enough to begin work.\n\n"
-    + "Call the agent_report tool to submit your verdict. Use exactly these fields:\n"
-    + "- verdict: \"PASS\" if the task is clear, specific, and actionable, \"REJECT\" otherwise\n"
-    + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n"
-    + "- callId: the callId supplied in this prompt\n\n"
-    + "Do not output free-form text as your final answer; the tool call is required."
-
 let private parseLoopReviewVerdict (args: obj option) (report: string) : bool * string =
     match args with
     | Some a ->
@@ -87,7 +81,7 @@ let private submissionFooter (toolName: string) (callId: string) =
     + "Use callId `" + callId + "`. Do not write files, run commands, or modify the workspace."
 
 let private loopReviewExecute
-    (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (workspaceId: WorkspaceId) (args: string) : JS.Promise<string> =
     let task = args.Trim()
     let workspaceIdStr = Id.workspaceIdValue workspaceId
@@ -99,7 +93,7 @@ let private loopReviewExecute
     else
         async {
             let! config = pluginConfigForSlash deps workspaceId |> Async.AwaitPromise
-            let disabledTools = deniedTools "reviewer" (Array.toList registeredToolNames) |> Array.ofList
+            let disabledTools = deniedTools "reviewer" (Array.toList toolNames) |> Array.ofList
             let callId = workspaceIdStr + "-loop-review-" + string (dateNow ())
             let verdictPromise = registerCallWithTimeout callStore callId 300000
             let experiments =
@@ -133,14 +127,16 @@ let private loopReviewExecute
                         buildLoopMessage task [ "Pre-review feedback:"; ""; feedback; ""; "Loop mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
         } |> Async.StartAsPromise
 
-let createLoopReviewCommand (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
-    box {| key = "loop-review"
+let createLoopReviewCommand (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+    box
+        {| key = "loop-review"
            description = "Pre-review task description with a reviewer sub-agent, then activate review loop mode."
            inputHint = "<task description>"
-           execute = System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
-                match Id.tryWorkspaceId workspaceIdStr with
-                | None -> (async { return "Invalid workspaceId" } |> Async.StartAsPromise)
-                | Some wid -> loopReviewExecute deps callStore reviewStore wid args) |}
+           execute =
+               System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
+                   match Id.tryWorkspaceId workspaceIdStr with
+                   | None -> (async { return "Invalid workspaceId" } |> Async.StartAsPromise)
+                   | Some wid -> loopReviewExecute deps toolNames callStore reviewStore wid args) |}
 
-let createSlashCommands (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj array =
-    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps callStore reviewStore |]
+let createSlashCommands (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj array =
+    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps toolNames callStore reviewStore |]

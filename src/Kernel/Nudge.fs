@@ -68,6 +68,14 @@ type CoordinatorState = { sessions: Map<string, SessionNudgeState> }
 
 let freshCoordinator : CoordinatorState = { sessions = Map.empty }
 
+type CoordinatorRuntimeState =
+    { coordinator: CoordinatorState
+      suppressedSessions: Set<string> }
+
+let freshCoordinatorRuntime : CoordinatorRuntimeState =
+    { coordinator = freshCoordinator
+      suppressedSessions = Set.empty }
+
 /// Pure state transition: decide the action; suppress only if the same action
 /// would repeat for the same assistant message (concurrent events for one idle
 /// transition).  A different message means the agent did new work — allow it.
@@ -96,6 +104,27 @@ let shouldSuppressNudge (_sessionId: string) (context: NudgeContext) (previousAc
         match previousAction with
         | Some previous when previous <> NudgeNone -> decide context = previous
         | _ -> false
+
+let consumeSuppression (state: CoordinatorRuntimeState) (sessionId: string) : CoordinatorRuntimeState * bool =
+    if Set.contains sessionId state.suppressedSessions then
+        { state with suppressedSessions = Set.remove sessionId state.suppressedSessions }, true
+    else
+        state, false
+
+let suppressSession (state: CoordinatorRuntimeState) (sessionId: string) : CoordinatorRuntimeState =
+    { state with suppressedSessions = Set.add sessionId state.suppressedSessions }
+
+let clearRuntimeSession (state: CoordinatorRuntimeState) (sessionId: string) : CoordinatorRuntimeState =
+    { coordinator = { state.coordinator with sessions = Map.remove sessionId state.coordinator.sessions }
+      suppressedSessions = Set.remove sessionId state.suppressedSessions }
+
+let decideRuntimeAction (state: CoordinatorRuntimeState) (sessionId: string) (context: NudgeContext)
+    : CoordinatorRuntimeState * string =
+    let nextState, wasSuppressed = consumeSuppression state sessionId
+    if wasSuppressed then nextState, "none"
+    else
+        let nextCoordinator, action = update nextState.coordinator sessionId context
+        { nextState with coordinator = nextCoordinator }, toString action
 
 /// Terminal todo statuses that should NOT count as open work.
 type TodoStatus = Completed | Cancelled | Abandoned | InProgress | Pending
@@ -140,28 +169,3 @@ let createPromptBody (agent: string option) (text: string) : obj =
     match agent with
     | Some a -> box {| agent = a; parts = [| box {| ``type`` = "text"; text = text |} |] |}
     | None -> box {| parts = [| box {| ``type`` = "text"; text = text |} |] |}
-
-type NudgeCoordinator() =
-    let mutable state = freshCoordinator
-    let mutable suppressed = Set.empty<string>
-
-    member _.shouldNudge(sessionId, context: NudgeContext) : string =
-        if Set.contains sessionId suppressed then
-            suppressed <- Set.remove sessionId suppressed
-            "none"
-        else
-            let next, action = update state sessionId context
-            state <- next
-            toString action
-
-    member _.suppress(sessionId) = suppressed <- Set.add sessionId suppressed
-
-    member _.clearSession(sessionId) =
-        state <- { state with sessions = Map.remove sessionId state.sessions }
-        suppressed <- Set.remove sessionId suppressed
-
-    member _.clear() =
-        state <- freshCoordinator
-        suppressed <- Set.empty
-
-let defaultCoordinator = NudgeCoordinator()

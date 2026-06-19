@@ -13,19 +13,9 @@ open VibeFs.Shell.TreeSitterShell
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
 
-/// Patch describing the Mimocode task arg cleanup for the OUTER args object:
-/// strip `completedWorkReport` and `task_id` so the strict task schema parses.
-let private outerTaskArgsCleanup : ArgsPatch =
-    { setKeys = []; deleteKeys = [ "completedWorkReport"; "task_id" ] }
-
-/// Patch describing the cleanup for the NESTED `operation` object: strip a
-/// misplaced `completedWorkReport` that the model sometimes nests there.
-let private nestedTaskOperationCleanup : ArgsPatch =
-    { setKeys = []; deleteKeys = [ "completedWorkReport" ] }
-
 /// Stash the report keyed by callID for `tool.execute.after` to restore.
-/// Pure in spirit: we capture before mutating so the cleanup is reversible at
-/// the after-hook boundary.
+/// Capture must happen before the cleanup deletes the field so the after-hook
+/// can put it back on the same args reference.
 let private captureMimocodeReport (input: obj) (args: obj) : unit =
     let callID = Dyn.str input "callID"
     let operation = Dyn.get args "operation"
@@ -34,17 +24,19 @@ let private captureMimocodeReport (input: obj) (args: obj) : unit =
     let report = if topReport <> "" then topReport else nestedReport
     if report <> "" then captureCompletedWorkReport callID report
 
-/// Apply the args/operation cleanup contract for Mimocode `task` calls.  The
-/// host re-parses the ORIGINAL args reference against a strict schema, so the
-/// mutation MUST land on those very objects: `applyPatch` does that at one
-/// boundary instead of every hook open-coding deletes.
+/// Strip Mimocode `task` extras from the original args reference so the host's
+/// strict task schema parses. The host re-parses this very reference, so the
+/// deletes MUST land on it (and on the nested `operation` object) in place.
 let private stripMimocodeTaskArgsForExecute (input: obj) (args: obj) : unit =
     let tool = normalizeToolName Mimocode (Dyn.str input "tool")
     if tool <> "todowrite" then ()
     else
         captureMimocodeReport input args
-        applyPatch args outerTaskArgsCleanup
-        applyPatch (Dyn.get args "operation") nestedTaskOperationCleanup
+        Dyn.deleteKey args "completedWorkReport"
+        Dyn.deleteKey args "task_id"
+        let operation = Dyn.get args "operation"
+        if not (Dyn.isNullish operation) then
+            Dyn.deleteKey operation "completedWorkReport"
 
 let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) : unit =
     if Dyn.str input "tool" <> "apply_patch" then ()
@@ -71,7 +63,7 @@ let private restoreMimocodeTaskArgsAfterExecute (host: Host) (input: obj) (args:
         else
             let callID = Dyn.str input "callID"
             let cached = takeCompletedWorkReport callID
-            if cached <> "" then applyPatch args { emptyPatch with setKeys = [ "completedWorkReport", box cached ] }
+            if cached <> "" then setKey args "completedWorkReport" (box cached)
 
 let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     async {

@@ -7,7 +7,7 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Shell.TreeSitterShell
-open VibeFs.Mux.CallStore
+open VibeFs.Shell.CallStore
 
 type JsonSchema =
     { ``type``: string
@@ -21,8 +21,6 @@ type ToolDefinition =
       parameters: JsonSchema
       execute: obj -> obj -> JS.Promise<string>
       condition: (obj -> bool) option }
-
-let mutable registeredToolNames: string array = [||]
 
 let resolveStr (s: string) : JS.Promise<string> = async { return s } |> Async.StartAsPromise
 

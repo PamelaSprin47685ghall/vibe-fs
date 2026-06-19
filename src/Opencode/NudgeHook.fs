@@ -10,7 +10,7 @@ open VibeFs.Kernel.NudgeState
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicCore
-open VibeFs.Opencode.Actors
+open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Opencode.MagicTodo
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =

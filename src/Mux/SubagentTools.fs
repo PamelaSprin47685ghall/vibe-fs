@@ -4,44 +4,98 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.HostTools
+open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.SubagentIntents
+open VibeFs.Kernel.ToolCatalog
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.ReviewSession
-open VibeFs.Mux.CallStore
+open VibeFs.Shell.CallStore
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
-open VibeFs.Opencode.ToolSchema
-
-let private loopFooter =
-    [ "- report: a detailed description of what you did and why"
-      "- affectedFiles: list of every file you modified or created"
-      ""
-      "A reviewer will examine your submission. If accepted, you are done. If rejected, you will receive specific feedback to address." ]
-
-let buildLoopMessage (task: string) (bodyLines: string list) : string =
-    let header = [ "Task (loop): " + task; "" ]
-    (header @ bodyLines @ loopFooter) |> String.concat "\n"
 
 let private dateNow () = int (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
 
-let private reviewVerdictInstructions =
-    "You are a reviewer evaluating whether the reported changes satisfy the original task.\n\n"
-    + "Call the agent_report tool to submit your verdict. Use exactly these fields:\n"
-    + "- verdict: \"PASS\" if the changes are acceptable, \"REJECT\" otherwise\n"
-    + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n"
-    + "- callId: the callId supplied in this prompt\n\n"
-    + "Do not output free-form text as your final answer; the tool call is required."
+let private disabledToolsForReviewer (toolNames: string array) : string array =
+    deniedTools "reviewer" (Array.toList toolNames) |> Array.ofList
 
-let private disabledToolsForReviewer () : string array =
-    deniedTools "reviewer" (Array.toList registeredToolNames) |> Array.ofList
+let private toolOptions (toolNames: string array) (role: string) (aiSettingsAgentId: string) : obj option =
+    Some (
+        createObj
+            [ "experiments", box (createObj [ "subagentRole", box role; "toolPolicy", box (createObj [ "disabledTools", box (deniedTools role (Array.toList toolNames) |> Array.ofList) ]) ])
+              "aiSettingsAgentId", box aiSettingsAgentId ])
 
 let private abortableConfig (config: obj) (signal: obj) = Dyn.withKey config "abortSignal" signal
+
+let private muxStrReq (desc: string) : obj =
+    createObj [ "type", box "string"; "minLength", box 1; "description", box desc ]
+
+let private muxStrArrayReq (desc: string) : obj =
+    createObj
+        [ "type", box "array"
+          "minItems", box 1
+          "items", createObj [ "type", box "string"; "minLength", box 1 ]
+          "description", box desc ]
+
+let private muxStrArrayOpt (desc: string) : obj =
+    createObj
+        [ "type", box "array"
+          "items", createObj [ "type", box "string"; "minLength", box 1 ]
+          "description", box desc ]
+
+let private muxObjectSchema (properties: obj) (required: string array) : obj =
+    createObj
+        [ "type", box "object"
+          "properties", properties
+          "required", box required
+          "additionalProperties", box false ]
+
+let private muxCoderIntentsSchema (intentsDesc: string) : obj =
+    let targetItem =
+        muxObjectSchema
+            (createObj [ "file", muxStrReq coderTargetFileDesc
+                         "guide", muxStrReq coderTargetGuideDesc
+                         "draft", createObj [ "type", box "string"; "description", box coderTargetDraftDesc ] ])
+            [| "file"; "guide" |]
+    let intentItem =
+        muxObjectSchema
+            (createObj
+                [ "objective", muxStrReq coderObjectiveDesc
+                  "background", muxStrReq coderBackgroundDesc
+                  "do_not_touch", muxStrArrayOpt coderDoNotTouchDesc
+                  "targets",
+                  createObj
+                      [ "type", box "array"
+                        "minItems", box 1
+                        "items", targetItem
+                        "description", box coderTargetsDesc ] ])
+            [| "objective"; "background"; "targets" |]
+    createObj
+        [ "type", box "array"
+          "minItems", box 1
+          "items", intentItem
+          "description", box intentsDesc ]
+
+let private muxInvestigatorIntentsSchema (intentsDesc: string) : obj =
+    let intentItem =
+        muxObjectSchema
+            (createObj
+                [ "objective", muxStrReq investigatorObjectiveDesc
+                  "background", muxStrReq investigatorBackgroundDesc
+                  "questions", muxStrArrayReq investigatorQuestionsDesc
+                  "entries", muxStrArrayOpt investigatorEntriesDesc ])
+            [| "objective"; "background"; "questions" |]
+    createObj
+        [ "type", box "array"
+          "minItems", box 1
+          "items", intentItem
+          "description", box intentsDesc ]
 
 module Tool =
     let bind
         (deps: obj)
+        (toolNames: string array)
         (agentId: string)
         (title: string)
         (aiSettingsAgentId: string)
@@ -54,7 +108,7 @@ module Tool =
                 | None -> return $"{title} requires workspaceId"
                 | Some _ ->
                     let! prompt = buildPrompt config args
-                    let opts = Some (createObj [ "experiments", box (createObj [ "subagentRole", box role; "toolPolicy", box (createObj [ "disabledTools", box (deniedTools role (Array.toList registeredToolNames) |> Array.ofList) ]) ]); "aiSettingsAgentId", box aiSettingsAgentId ])
+                    let opts = toolOptions toolNames role aiSettingsAgentId
                     return!
                         runMuxSubagent deps config agentId prompt title opts
                         |> Async.AwaitPromise
@@ -63,6 +117,7 @@ module Tool =
 
     let bindParallel
         (deps: obj)
+        (toolNames: string array)
         (agentId: string)
         (title: string)
         (aiSettingsAgentId: string)
@@ -79,7 +134,7 @@ module Tool =
                         return "Error: `intents` must be a non-empty array."
                     else
                         let controller = AbortController()
-                        let opts = Some (createObj [ "experiments", box (createObj [ "subagentRole", box role; "toolPolicy", box (createObj [ "disabledTools", box (deniedTools role (Array.toList registeredToolNames) |> Array.ofList) ]) ]); "aiSettingsAgentId", box aiSettingsAgentId ])
+                        let opts = toolOptions toolNames role aiSettingsAgentId
                         let! reports =
                             prompts
                             |> Array.map (fun prompt ->
@@ -103,11 +158,11 @@ let private buildCoderPrompts (_config: obj) (args: obj) : Async<string array> =
         | Ok intents -> return formatPrompt mimocode (Coder intents) |> List.toArray
     }
 
-let coderTool (deps: obj) : ToolDefinition =
+let coderTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = "coder"
-      description = coder
+      description = description "coder"
       parameters = mkSchema (createObj [ "intents", box (muxCoderIntentsSchema Params.coderIntents); "tdd", box (strEnumProp Params.coderTdd [| "red"; "green" |]) ]) [| "intents"; "tdd" |]
-      execute = Tool.bindParallel deps "exec" "Coder" "exec" "coder" buildCoderPrompts
+      execute = Tool.bindParallel deps toolNames "exec" "Coder" "exec" "coder" buildCoderPrompts
       condition = None }
 
 let private buildInvestigatorPrompts (_config: obj) (args: obj) : Async<string array> =
@@ -117,11 +172,11 @@ let private buildInvestigatorPrompts (_config: obj) (args: obj) : Async<string a
         | Ok intents -> return formatPrompt mimocode (Investigator intents) |> List.toArray
     }
 
-let investigatorTool (deps: obj) : ToolDefinition =
+let investigatorTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = "investigator"
-      description = investigator
+      description = description "investigator"
       parameters = mkSchema (createObj [ "intents", box (muxInvestigatorIntentsSchema Params.investigatorIntents) ]) [| "intents" |]
-      execute = Tool.bindParallel deps "explore" "Investigator" "explore" "investigator" buildInvestigatorPrompts
+      execute = Tool.bindParallel deps toolNames "explore" "Investigator" "explore" "investigator" buildInvestigatorPrompts
       condition = None }
 
 let private meditatorPromptFromArgs (config: obj) (args: obj) : Async<string> =
@@ -136,14 +191,14 @@ let private meditatorPromptFromArgs (config: obj) (args: obj) : Async<string> =
         return formatPrompt mimocode (Meditator(intent, sections)) |> List.head
     }
 
-let meditatorTool (deps: obj) : ToolDefinition =
+let meditatorTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = "meditator"
-      description = meditator
+      description = description "meditator"
       parameters =
         mkSchema
             (createObj [ "intent", box (strProp Params.meditatorIntent); "files", box (strArrayProp Params.meditatorFiles) ])
             [| "intent"; "files" |]
-      execute = Tool.bind deps "explore" "Meditator" "exec" "meditator" meditatorPromptFromArgs
+      execute = Tool.bind deps toolNames "explore" "Meditator" "exec" "meditator" meditatorPromptFromArgs
       condition = None }
 
 let private buildBrowserPrompt (_config: obj) (args: obj) : Async<string> =
@@ -152,14 +207,14 @@ let private buildBrowserPrompt (_config: obj) (args: obj) : Async<string> =
         return formatPrompt mimocode (Browser intent) |> List.head
     }
 
-let browserTool (deps: obj) : ToolDefinition =
+let browserTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = "browser"
-      description = browser
+      description = description "browser"
       parameters = mkSchema (createObj [ "intent", box (strProp Params.browserIntent) ]) [| "intent" |]
-      execute = Tool.bind deps "explore" "Browser" "explore" "browser" buildBrowserPrompt
+      execute = Tool.bind deps toolNames "explore" "Browser" "explore" "browser" buildBrowserPrompt
       condition = None }
 
-let submitReviewTool (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : ToolDefinition =
+let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : ToolDefinition =
     { name = "submit_review"
       description = "Submit completed work for review. Creates a reviewer sub-agent that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active loop mode."
       parameters = mkSchema (createObj [ "report", box (strProp "Detailed report of what was done"); "affectedFiles", box (strArrayProp "List of file paths that were modified or created") ]) [| "report"; "affectedFiles" |]
@@ -180,11 +235,11 @@ let submitReviewTool (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.She
                           let callId = workspaceId + "-review-" + string (dateNow ())
                           let verdictPromise = registerCallWithTimeout callStore callId 300000
                           let reviewPrompt =
-                              reviewVerdictInstructions
+                              reviewerVerdictInstructions
                               + "\n\n=== Change Report ===\n\n" + report
                               + "\n\n=== Affected Files ===\n\n" + String.concat "\n" affectedFiles
                               + "\n" + taskSection
-                          let disabledTools = disabledToolsForReviewer ()
+                          let disabledTools = disabledToolsForReviewer toolNames
                           let experiments =
                               createObj
                                   [ "subagentRole", box "reviewer"

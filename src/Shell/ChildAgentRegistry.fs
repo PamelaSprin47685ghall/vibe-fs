@@ -1,4 +1,4 @@
-module VibeFs.Opencode.Actors
+module VibeFs.Shell.ChildAgentRegistry
 
 open Fable.Core
 open VibeFs.Kernel.Domain

@@ -8,7 +8,7 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Message
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
-open VibeFs.Opencode.Actors
+open VibeFs.Shell.ChildAgentRegistry
 
 
 [<Import("createRequire", "node:module")>]

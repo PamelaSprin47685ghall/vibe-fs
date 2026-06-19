@@ -3,7 +3,6 @@ module VibeFs.Tests.AgentTests
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.Nudge
 
 let canUse' () =
     check "agent_report for manager" (canUse "manager" "agent_report")
@@ -102,17 +101,26 @@ let updateState () =
     let _, action3 = update state "sess" ctxNew
     equal "new message allowed → NudgeTodo" NudgeTodo action3
 
-let coordinator () =
-    let coord = NudgeCoordinator()
+let coordinatorRuntime () =
+    let mutable coord = freshCoordinatorRuntime
     let ctx : NudgeContext = { todos = [ "a" ]; lastAssistantMessage = "working"; hasActiveRunner = false; isLoopActive = false }
-    equal "first nudge todo" "nudge-todo" (coord.shouldNudge ("s", ctx))
-    equal "same message suppressed" "none" (coord.shouldNudge ("s", ctx))
+    let next1, action1 = decideRuntimeAction coord "s" ctx
+    coord <- next1
+    equal "first nudge todo" "nudge-todo" action1
+    let next2, action2 = decideRuntimeAction coord "s" ctx
+    coord <- next2
+    equal "same message suppressed" "none" action2
     let ctxNew = { ctx with lastAssistantMessage = "new output" }
-    equal "new message re-nudge" "nudge-todo" (coord.shouldNudge ("s", ctxNew))
-    coord.suppress "s"
-    equal "explicit suppress none" "none" (coord.shouldNudge ("s", ctxNew))
-    coord.clearSession "s"
-    equal "after clear todo" "nudge-todo" (coord.shouldNudge ("s", ctx))
+    let next3, action3 = decideRuntimeAction coord "s" ctxNew
+    coord <- next3
+    equal "new message re-nudge" "nudge-todo" action3
+    coord <- suppressSession coord "s"
+    let next4, action4 = decideRuntimeAction coord "s" ctxNew
+    coord <- next4
+    equal "explicit suppress none" "none" action4
+    coord <- clearRuntimeSession coord "s"
+    let _, action5 = decideRuntimeAction coord "s" ctx
+    equal "after clear todo" "nudge-todo" action5
 
 let shouldSuppress' () =
     let previous = Some NudgeTodo
