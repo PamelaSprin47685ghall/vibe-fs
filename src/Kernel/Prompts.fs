@@ -1,6 +1,7 @@
 module VibeFs.Kernel.Prompts
 
 open VibeFs.Kernel.HostTools
+open VibeFs.Kernel.SubagentIntents
 
 type SearchResult =
     { title: string
@@ -35,8 +36,16 @@ let loopNudgePrompt =
     + "before finishing. Do not end the conversation without calling submit_review."
 
 let managerSystemPromptFor (host: Host) =
+    let todoLine =
+        match host with
+        | Opencode ->
+            "For multi-step work, keep " + todoWriteToolName host + " current. Every " + todoWriteToolName host
+            + " call must provide the full todos list plus a detailed completedWorkReport that can survive context folding."
+        | Mimocode ->
+            "For multi-step work, drive the session task registry via the " + todoWriteToolName host
+            + " tool (`operation` with create/list/start/done/…). On calls where you make or plan meaningful progress, also include a detailed completedWorkReport so Magic Todo can survive context folding."
     "You are the manager agent. Coordinate the overall task, decide when to delegate to subagents, and synthesize their outputs into a final answer that satisfies the user's original goal.\n\n"
-    + "For multi-step work, keep " + todoWriteToolName host + " current. Every " + todoWriteToolName host + " call must provide the full todos list plus a detailed completedWorkReport that can survive context folding."
+    + todoLine
 
 let managerSystemPrompt = managerSystemPromptFor opencode
 
@@ -67,31 +76,45 @@ let reviewerNudgePrompt =
     + "  return_reviewer({ \"feedback\": \"details...\" })  // Reject\n\n"
     + "Do not explain what you plan to do — call the tool immediately."
 
-let coderPromptBody (intent: string) (affectedFiles: string list) : string =
-    let fileList = affectedFiles |> List.map (fun f -> $"- {f}") |> String.concat "\n"
-    "You are an implementation agent (coder). Your job is to implement the intent below in the affected files.\n\n"
-    + "Intent:\n" + intent + "\n\n"
-    + "Affected files:\n" + fileList + "\n\n"
+let private bulletLines (items: string seq) =
+    items |> Seq.map (fun s -> $"- {s}") |> String.concat "\n"
+
+let coderPromptBody (intent: CoderIntent) : string =
+    let targets =
+        intent.targets
+        |> List.map (fun t -> $"- {t.file}\n  Guide: {t.guide}")
+        |> String.concat "\n"
+    "You are an implementation agent (coder). Implement the objective using the background and per-file guides below.\n\n"
+    + "Objective:\n" + intent.objective + "\n\n"
+    + "Background:\n" + intent.background + "\n\n"
+    + "Targets:\n" + targets + "\n\n"
     + "Instructions:\n"
-    + "1. Read the affected files and any related code you need to understand the change.\n"
-    + "2. Edit or create files to implement the intent.\n"
+    + "1. Read the listed files and related code needed for the change.\n"
+    + "2. Edit or create files to satisfy the objective and each file guide.\n"
     + "3. Perform static verification only (read, inspect, type-check). Do NOT run tests, execute code, or run any commands.\n"
 
-let formatCoderUserPrompt (intent: string) (affectedFiles: string list) : string =
-    coderPromptBody intent affectedFiles
+let formatCoderUserPrompt (intent: CoderIntent) : string =
+    coderPromptBody intent
     + "4. Return a concise summary of changes and verification results.\n\n"
 
-let readerPromptBody (intent: string) : string =
-    "You are a codebase search agent (reader). Explore the workspace and report what you find.\n\n"
+let investigatorPromptBody (intent: InvestigatorIntent) : string =
+    let entries =
+        if intent.entries.Length = 0 then "(none — choose entry points from the codebase)"
+        else bulletLines intent.entries
+    "You are a codebase search agent (investigator). Explore the workspace and answer every required question.\n\n"
     + readOnlyRules + "\n\n"
-    + "Search query:\n" + intent + "\n\n"
+    + "Objective:\n" + intent.objective + "\n\n"
+    + "Background:\n" + intent.background + "\n\n"
+    + "Questions you must answer:\n" + bulletLines intent.questions + "\n\n"
+    + "Suggested entries:\n" + entries + "\n\n"
     + "Instructions:\n"
     + "1. Use fuzzy_find, glob, fuzzy_grep, and read tools to locate relevant code.\n"
     + "2. Report concrete file paths and line-number references.\n"
+    + "3. Answer each required question explicitly in your report.\n"
 
-let formatReaderUserPrompt (intent: string) : string =
-    readerPromptBody intent
-    + "3. Return a structured report with relatedFiles and relatedCode.\n\n"
+let formatInvestigatorUserPrompt (intent: InvestigatorIntent) : string =
+    investigatorPromptBody intent
+    + "4. Return a structured report with relatedFiles and relatedCode.\n\n"
 
 let meditatorPromptBody (intent: string) (files: string list) : string =
     let fileList = files |> List.map (fun f -> $"- {f}") |> String.concat "\n"
@@ -170,14 +193,14 @@ let formatWebsearchSummarizerUserPrompt (whatToSummarize: string) (rawResults: s
     websearchSummarizerPromptBody whatToSummarize rawResults
     + "\n5. Return a focused, ready-to-use answer.\n\n"
 
-let formatMuxCoderUserPrompt (intent: string) (affectedFiles: string list) : string =
-    coderPromptBody intent affectedFiles
+let formatMuxCoderUserPrompt (intent: CoderIntent) : string =
+    coderPromptBody intent
     + "4. Finish by calling agent_report with a summary of changes and verification results.\n\n"
     + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
 
-let formatMuxReaderUserPrompt (intent: string) : string =
-    readerPromptBody intent
-    + "3. Finish by calling agent_report with structuredOutput containing relatedFiles and relatedCode.\n\n"
+let formatMuxInvestigatorUserPrompt (intent: InvestigatorIntent) : string =
+    investigatorPromptBody intent
+    + "5. Finish by calling agent_report with structuredOutput containing relatedFiles and relatedCode.\n\n"
     + "When you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings.\n\n"
 
 let formatMuxMeditatorUserPrompt (intent: string) (files: string list) : string =

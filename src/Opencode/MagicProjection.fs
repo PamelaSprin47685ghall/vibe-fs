@@ -6,13 +6,56 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Message
 open VibeFs.Opencode.MagicCore
 
+let private isReadOnlyMimocodeTaskResult (part: obj) : bool =
+    if not (isTodoResultFor Mimocode part) then false
+    else
+        let state = get part "state"
+        let input = if isNullish state then null else get state "input"
+        let operation = if isNullish input then null else get input "operation"
+        match (if isNullish operation then "" else str operation "action") with
+        | "list"
+        | "get" -> true
+        | _ -> false
+
+let private isFoldAnchorFor (host: Host) (part: obj) : bool =
+    isTodoResultFor host part
+    && (host <> Mimocode || not (isReadOnlyMimocodeTaskResult part))
+
 type FoldRange = { firstResult: int; secondToLast: int }
 
 let private todoIndexesFor (host: Host) (flat: FlatPart list) : int list =
-    flat |> List.indexed |> List.choose (fun (index, fp) -> if isTodoResultFor host fp.part then Some index else None)
+    flat
+    |> List.indexed
+    |> List.choose (fun (index, fp) -> if isFoldAnchorFor host fp.part then Some index else None)
 
 let private todoIndexes (flat: FlatPart list) : int list =
     todoIndexesFor opencode flat
+
+let private todoSegmentEndIndexesFor (host: Host) (flat: FlatPart list) : int list =
+    match host with
+    | Opencode -> todoIndexesFor host flat
+    | Mimocode ->
+        if flat.IsEmpty then []
+        else
+            let ends = ResizeArray<int>()
+            let mutable inBurst = false
+            let mutable lastAnchor = -1
+            for i = 0 to flat.Length - 1 do
+                if isTodoResultFor host flat.[i].part then
+                    inBurst <- true
+                    if isFoldAnchorFor host flat.[i].part then lastAnchor <- i
+                elif inBurst then
+                    if lastAnchor >= 0 then ends.Add(lastAnchor)
+                    inBurst <- false
+                    lastAnchor <- -1
+            if inBurst && lastAnchor >= 0 then ends.Add(lastAnchor)
+            List.ofSeq ends
+
+let private foldTodoAnchorsFor (host: Host) (flat: FlatPart list) : int list =
+    todoSegmentEndIndexesFor host flat
+
+let private requiredFoldAnchorCount (foldAfterFirst: bool) : int =
+    if foldAfterFirst then 2 else 3
 
 let private messageTimeOrNull (msg: obj) : obj =
     let info = messageInfo msg
@@ -29,8 +72,8 @@ let private collectUserText (flat: FlatPart list) (fromIdx: int) (toIdx: int) : 
     List.ofSeq result
 
 let findFoldRangeFor (host: Host) (flat: FlatPart list) (foldAfterFirst: bool) : FoldRange option =
-    let todoIdxs = todoIndexesFor host flat
-    let minResults = if foldAfterFirst then 2 else 3
+    let todoIdxs = foldTodoAnchorsFor host flat
+    let minResults = requiredFoldAnchorCount foldAfterFirst
     if todoIdxs.Length < minResults then None
     else
         let firstResult = todoIdxs.[0]
@@ -46,7 +89,7 @@ let private buildPrefixUserMessage (id: string) (text: string) (sessionID: strin
     box (createObj [ "info", box info; "parts", box [| box {| ``type`` = "text"; text = text |} |] ])
 
 let private buildSyntheticPrefixMessages (host: Host) (messages: obj array) (flat: FlatPart list) (foldedBacklog: BacklogEntry list) (sessionID: string) (errorNotice: string option) : obj array =
-    let todoIdxs = todoIndexesFor host flat
+    let todoIdxs = foldTodoAnchorsFor host flat
     let result = ResizeArray<obj>()
     for index = 0 to foldedBacklog.Length - 1 do
         let fromIdx = if index = 0 then 0 else todoIdxs.[index - 1] + 1

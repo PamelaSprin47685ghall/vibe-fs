@@ -63,7 +63,7 @@ let createToolCatalog
     : ToolDefinition array =
     let tools =
         [| coderTool deps
-           readerTool deps
+           investigatorTool deps
            meditatorTool deps
            browserTool deps
            executorTool deps
@@ -108,7 +108,7 @@ let createRegistration (deps: obj) : obj =
 
 let getPluginToolPolicy (_agentId: string) (role: string) : obj =
     let agent = if System.String.IsNullOrEmpty role then "manager" else role
-    let remove = [| "coder"; "reader"; "meditator"; "browser"; "executor"; "submit_review"; "websearch"; "webfetch"; "fuzzy_find"; "fuzzy_grep"; "write"; "read" |]
+    let remove = [| "coder"; "investigator"; "meditator"; "browser"; "executor"; "submit_review"; "websearch"; "webfetch"; "fuzzy_find"; "fuzzy_grep"; "write"; "read" |]
                   |> Array.filter (fun t -> not (canUse agent t))
     box {| add = [||]; remove = remove |}
 

@@ -40,9 +40,33 @@ let excludeOpt (desc: string) : obj =
     let s = str ()
     call1 (call0 (union' [| s; arr s |]) "nullish") "describe" (box desc)
 
-let intentsSchema (desc: string) : obj =
-    let inner = tuple [| strMin 1 ""; call1 (arr (strMin 1 "")) "min" (box 1) |]
-    call1 (call1 (arr inner) "min" (box 1)) "describe" (box desc)
+let private schemaObject (shape: obj) : obj = call1 schema "object" shape
+
+let private strictObject (shape: obj) : obj = call0 (schemaObject shape) "strict"
+
+let private arrayMin (item: obj) (minCount: int) (desc: string) : obj =
+    call1 (call1 (arr item) "min" (box minCount)) "describe" (box desc)
+
+let coderIntentsSchema (desc: string) : obj =
+    let fileField = strMin 1 "File path to modify."
+    let guideField = strMin 1 "Implementation constraints for this file."
+    let targetShape = strictObject (createObj [ "file", fileField; "guide", guideField ])
+    let targetsField = arrayMin targetShape 1 "Non-empty per-file implementation guides."
+    let objectiveField = strMin 1 "Concrete code-change goal for this subagent."
+    let backgroundField = strMin 1 "Why this change is needed; prior findings and user context."
+    let inner = strictObject (createObj [ "objective", objectiveField; "background", backgroundField; "targets", targetsField ])
+    arrayMin inner 1 desc
+
+let investigatorIntentsSchema (desc: string) : obj =
+    let questionItem = strMin 1 "Question the report must answer."
+    let questionsField = arrayMin questionItem 1 "Non-empty list of questions the report must answer explicitly."
+    let entryItem = strMin 1 "Optional entry path, symbol, or file."
+    let entriesField = call1 (call0 (arr entryItem) "optional") "describe" (box "Optional entry paths, symbols, or files to start from.")
+    let objectiveField = strMin 1 "What to investigate in the codebase."
+    let backgroundField = strMin 1 "Why this investigation is needed; blockers and prior context."
+    let inner =
+        strictObject (createObj [ "objective", objectiveField; "background", backgroundField; "questions", questionsField; "entries", entriesField ])
+    arrayMin inner 1 desc
 
 let uiParam : obj = call1 (call0 (str ()) "optional") "describe" (box "Internal: populated by hook")
 let strArrayReq (desc: string) : obj = call1 (arr (strMin 1 "")) "describe" (box desc)
@@ -64,12 +88,12 @@ let define (description: string) (args: obj) (execute: obj -> obj -> JS.Promise<
     invokeTool toolFactory (box {| description = description; args = args; execute = execute |})
 
 let coder =
-    "Execute code changes from natural-language intents. Provide multiple independent change intents as [intent, affectFiles] tuples; each tuple spawns its own coder subagent session and runs independently in parallel - pass as many tuples as you can at once so they execute concurrently. "
-    + "IMPORTANT: Subagents do not receive role instructions in their system prompt; each subagent gets its task as a user message built from your intent and file list. You (the parent) must put full project context, design rationale, and requirements into every intent. Do NOT assume the coder knows the repo background."
+    "Execute code changes from structured intents. Each intents[] element spawns its own coder subagent in parallel. Every element must include objective, background, and targets (file + guide per file). "
+    + "IMPORTANT: Subagents start in a fresh session with no manager history. Pack all context into background and per-file guide fields. Do NOT assume the coder knows the repo."
 
-let reader =
-    "Search the codebase from natural-language intents. Each intent in the array spawns its own search subagent session and runs independently in parallel - pass as many intents as you can at once so they execute concurrently. "
-    + "IMPORTANT: Subagents do not receive role instructions in their system prompt; each subagent gets its task as a user message from your intent string. You (the parent) must put full context into every intent. Do NOT assume the search agent knows the project background. Reports must include concrete file paths."
+let investigator =
+    "Search the codebase from structured intents. Each intents[] element spawns its own investigator subagent in parallel. Every element must include objective, background, and questions[]; entries[] is optional. "
+    + "IMPORTANT: Subagents start in a fresh session with no manager history. Pack context into background and list concrete questions the report must answer. Reports must include file paths."
 
 let meditator =
     "Receive a natural-language intent or question for deep reasoning and delegate to the meditator agent. "
@@ -91,10 +115,10 @@ let webfetch = "Fetch a URL with better extraction for static/docs pages. Suppor
 
 module Params =
     let coderIntents =
-        "Array of [intent, affectFiles] tuples. Each tuple is a natural-language change request plus an array of affected file paths; each tuple runs in parallel via its own coder subagent. The intent string is delivered to the subagent as the user message - include all background, design rationale, and requirements there. Example tuple: `[\"Fix login\", [\"src/auth.ts\", \"src/login.ts\"]]`."
+        "Non-empty array of coder intents. Each item: objective (what to implement), background (why and prior context), targets[] with file and guide per path. One subagent per item, all parallel."
 
-    let readerIntents =
-        "Array of independent code-search intent strings, each run in parallel via its own search subagent. Each string becomes the subagent user message - include background, paths, symbols, and what to find."
+    let investigatorIntents =
+        "Non-empty array of investigator intents. Each item: objective, background, questions[] (required KPIs for the report), optional entries[] (paths/symbols to start from). One subagent per item, all parallel."
 
     let meditatorIntent =
         "Natural-language intent or question for deep reasoning. Becomes part of the subagent user message - include all background, design rationale, and specific requirements; do not assume the agent knows project context."

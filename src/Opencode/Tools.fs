@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Shell.OllamaClient
 open VibeFs.Opencode.ToolSchema
@@ -34,71 +35,47 @@ let private optInt (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullis
 let private optBool (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<bool> v)
 let private optField (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some v
 
-let private joinReaderIntents (intents: obj) : Result<string, string> =
-    if not (Dyn.isArray intents) then Result.Error "Invalid LLM input for reader: intents must be an array of strings"
-    else intents :?> obj array |> Array.map string |> Array.toList |> String.concat "; " |> Result.Ok
-
-let private joinCoderIntents (intents: obj) : Result<string, string> =
-    if not (Dyn.isArray intents) then Result.Error "Invalid LLM input for coder: intents must be an array"
-    else
-        let labels = ResizeArray<string>()
-        let mutable error = None
-        for item in intents :?> obj array do
-            if error.IsNone then
-                let pair = item :?> obj array
-                if pair.Length = 0 || not (Dyn.typeIs pair.[0] "string") then
-                    error <- Some "Invalid LLM input for coder: each intent must start with a string"
-                else
-                    labels.Add(string pair.[0])
-        match error with
-        | Some message -> Result.Error message
-        | None -> labels.ToArray() |> Array.toList |> String.concat "; " |> Result.Ok
-
 let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"
     define coder
-        (box {| intents = intentsSchema Params.coderIntents; _ui = uiParam |})
+        (box {| intents = coderIntentsSchema Params.coderIntents; _ui = uiParam |})
         (fun args context ->
-            match joinCoderIntents (Dyn.get args "intents") with
+            match parseCoderIntents (Dyn.get args "intents") with
             | Error message -> resolveStr message
-            | Ok _ ->
+            | Ok intents ->
                 let tc = extractToolContext context (Dyn.str ctx "directory")
                 let directory = Dyn.str tc "directory"
                 let sessionID = Dyn.str tc "sessionID"
-                let intents = Dyn.get args "intents" :?> obj array
                 async {
                     let! reports =
-                        intents |> Array.map (fun intent ->
-                            let pair = intent :?> obj array
-                            let intentText = string pair.[0]
-                            let files =
-                                let filesRaw = pair.[1]
-                                if Dyn.typeIs filesRaw "string" then [string filesRaw]
-                                else filesRaw :?> obj array |> Array.map string |> List.ofArray
-                            let prompt = formatCoderUserPrompt intentText files
+                        intents
+                        |> List.map (fun intent ->
+                            let prompt = formatCoderUserPrompt intent
                             runSubagent registry (client ()) "coder" "Coder" prompt directory sessionID context (box null)
-                            |> Async.AwaitPromise) |> Async.Parallel
+                            |> Async.AwaitPromise)
+                        |> Async.Parallel
                     return String.concat "\n---\n" (List.ofArray reports)
                 } |> Async.StartAsPromise)
 
-let readerTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
+let investigatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"
-    define reader
-        (box {| intents = strArrayReq Params.readerIntents
+    define investigator
+        (box {| intents = investigatorIntentsSchema Params.investigatorIntents
                 _ui = uiParam |})
         (fun args context ->
-            match joinReaderIntents (Dyn.get args "intents") with
+            match parseInvestigatorIntents (Dyn.get args "intents") with
             | Error message -> resolveStr message
-            | Ok _ ->
+            | Ok intents ->
                 let tc = extractToolContext context (Dyn.str ctx "directory")
-                let intents = Dyn.get args "intents" :?> obj array |> Array.map string
                 async {
                     let! reports =
-                        intents |> Array.map (fun intent ->
-                            let prompt = formatReaderUserPrompt intent
-                            runSubagent registry (client ()) "reader" "Reader" prompt
+                        intents
+                        |> List.map (fun intent ->
+                            let prompt = formatInvestigatorUserPrompt intent
+                            runSubagent registry (client ()) "investigator" "Investigator" prompt
                                 (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null)
-                            |> Async.AwaitPromise) |> Async.Parallel
+                            |> Async.AwaitPromise)
+                        |> Async.Parallel
                     return String.concat "\n---\n" (List.ofArray reports)
                 } |> Async.StartAsPromise)
 
@@ -338,7 +315,7 @@ let submitReviewResultTool (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj
 
 let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     mergeObjects [|
-        entry "coder" (coderTool registry ctx); entry "reader" (readerTool registry ctx)
+        entry "coder" (coderTool registry ctx); entry "investigator" (investigatorTool registry ctx)
         entry "meditator" (meditatorTool registry ctx); entry "browser" (browserTool registry ctx)
         entry "executor" (executorTool registry ctx)
         entry "fuzzy_find" (fuzzyFindTool finderCache); entry "fuzzy_grep" (fuzzyGrepTool finderCache)

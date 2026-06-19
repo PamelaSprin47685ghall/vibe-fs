@@ -212,16 +212,56 @@ let toolDefinitionSpec () = async {
     check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = VibeFs.Opencode.MagicTodo.todoContentDesc)
     check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = VibeFs.Opencode.MagicTodo.todoStatusDesc)
     check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Opencode.MagicTodo.todoPriorityDesc)
+
+    let! mimoP = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let mimoTd = get mimoP "tool.definition"
+    let taskParams =
+        createObj [
+            "type", box "object"
+            "properties", box (createObj [ "operation", box (createObj [ "type", box "object" ]) ])
+            "required", box [| box "operation" |]
+        ]
+    let taskDef = createObj [ "description", box "native"; "parameters", box taskParams ]
+    do! mimoTd $ (createObj [ "toolID", box "task" ], taskDef) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo task.definition keeps parameters not jsonSchema" (isNullish (get taskDef "jsonSchema"))
+    check "mimo task.definition fuses report into parameters" (not (isNullish (get (get (get taskDef "parameters") "properties") "completedWorkReport")))
+    check "mimo task.definition removes host task_id from schema" (isNullish (get (get (get taskDef "parameters") "properties") "task_id"))
+    check "mimo task.definition preserves operation" (not (isNullish (get (get (get taskDef "parameters") "properties") "operation")))
+
+    let taskJsonSchema = createObj [
+        "type", box "object"
+        "properties", box (createObj [ "operation", box (createObj [ "type", box "object" ]); "task_id", box (createObj [ "type", box "string" ]) ])
+        "required", box [| box "operation"; box "task_id" |]
+    ]
+    let taskJsonDef = createObj [ "description", box "native"; "jsonSchema", box taskJsonSchema ]
+    do! mimoTd $ (createObj [ "toolID", box "task" ], taskJsonDef) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo task.definition rewrites jsonSchema when that is the exposed path" (not (isNullish (get (get (get taskJsonDef "jsonSchema") "properties") "completedWorkReport")))
+    check "mimo task.definition strips task_id from jsonSchema" (isNullish (get (get (get taskJsonDef "jsonSchema") "properties") "task_id"))
+    let jsonRequired = unbox<obj[]> (get (get taskJsonDef "jsonSchema") "required") |> Array.map string
+    check "mimo task.definition keeps operation required in jsonSchema" (jsonRequired |> Array.contains "operation")
+    check "mimo task.definition drops task_id required in jsonSchema" (not (jsonRequired |> Array.contains "task_id"))
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
+
+let private sampleCoderIntent (objective: string) (file: string) : obj =
+    createObj
+        [ "objective", box objective
+          "background", box "test background"
+          "targets", box [| createObj [ "file", box file; "guide", box "test guide" ] |] ]
+
+let private sampleInvestigatorIntent (objective: string) : obj =
+    createObj
+        [ "objective", box objective
+          "background", box "test background"
+          "questions", box [| box "What did you find?" |] ]
 
 let toolExecuteBeforeSpec () = async {
     let! workspaceDir = mkdtempAsync "tool-execute-before-" |> Async.AwaitPromise
     let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
     let teb = get p "tool.execute.before"
     let intents : obj array = [|
-        box [| box "fix bug"; box [| "a.ts" |] |]
-        box [| box "add feature"; box [| "b.ts" |] |]
+        sampleCoderIntent "fix bug" "a.ts"
+        sampleCoderIntent "add feature" "b.ts"
     |]
     let execOut = createObj [ "args", box (createObj [ "intents", box intents ]) ]
     do! teb $ (createObj [ "tool", box "coder"; "sessionID", box "s1"; "callID", box "c1" ], execOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
@@ -229,22 +269,105 @@ let toolExecuteBeforeSpec () = async {
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
-let readerToolMissingClientSpec () = async {
-    let! workspaceDir = mkdtempAsync "reader-missing-client-" |> Async.AwaitPromise
-    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
-    let reader = get (get p "tool") "reader"
-    let! result = (get reader "execute") $ (createObj [ "intents", box [| box "find reader registration" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "reader-test" ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
-    check "reader without client returns readable error" (result.Contains("ctx.client.session"))
+let mimoApplyPatchExecuteBeforeSpec () = async {
+    let! workspaceDir = mkdtempAsync "mimo-apply-patch-before-" |> Async.AwaitPromise
+    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let teb = get p "tool.execute.before"
+
+    let stringArgsOut = createObj [ "args", box "*** Begin Patch\n*** End Patch" ]
+    do! teb $ (createObj [ "tool", box "apply_patch"; "sessionID", box "s1"; "callID", box "c1" ], stringArgsOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo apply_patch execute.before wraps string args" (str (get stringArgsOut "args") "patchText" = "*** Begin Patch\n*** End Patch")
+
+    let patchArgsOut = createObj [ "args", box (createObj [ "patch", box "*** Begin Patch\n*** End Patch" ]) ]
+    do! teb $ (createObj [ "tool", box "apply_patch"; "sessionID", box "s1"; "callID", box "c2" ], patchArgsOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo apply_patch execute.before rewrites patch field" (str (get patchArgsOut "args") "patchText" = "*** Begin Patch\n*** End Patch")
+
+    let correctArgsOut = createObj [ "args", box (createObj [ "patchText", box "already-correct" ]) ]
+    do! teb $ (createObj [ "tool", box "apply_patch"; "sessionID", box "s1"; "callID", box "c3" ], correctArgsOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo apply_patch execute.before preserves patchText" (str (get correctArgsOut "args") "patchText" = "already-correct")
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
-let readerToolSpec () = async {
+let mimoTaskExecuteRoundTripSpec () = async {
+    let! workspaceDir = mkdtempAsync "mimo-task-before-after-" |> Async.AwaitPromise
+    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let teb = get p "tool.execute.before"
+    let tea = get p "tool.execute.after"
+
+    let operation = createObj [ "action", box "done"; "id", box "T1"; "event_summary", box "Finished parser fix" ]
+    let originalArgs = createObj [ "operation", operation; "completedWorkReport", box "Detailed backlog report" ]
+    let beforeOut = createObj [ "args", box originalArgs ]
+    let hookInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "c1" ]
+
+    do! teb $ (hookInput, beforeOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    let sanitizedArgs = get beforeOut "args"
+    check "mimo task execute.before keeps operation" (not (isNullish (get sanitizedArgs "operation")))
+    check "mimo task execute.before strips report before host call" (isNullish (get sanitizedArgs "completedWorkReport"))
+
+    let afterInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "c1"; "args", box sanitizedArgs ]
+    let afterOut = createObj [ "output", box "ok" ]
+    do! tea $ (afterInput, afterOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo task execute.after restores report for backlog" (str (get afterInput "args") "completedWorkReport" = "Detailed backlog report")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
+let mimoTaskDefinitionHandlesZodLikeParametersSpec () = async {
+    let! workspaceDir = mkdtempAsync "mimo-task-zod-params-" |> Async.AwaitPromise
+    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let td = get p "tool.definition"
+
+    let extendCalls = ResizeArray<obj>()
+    let describeCalls = ResizeArray<string>()
+    let optionalCalls = ResizeArray<string>()
+    let summaryField = createObj [
+        "describe", box (System.Func<obj, obj>(fun desc ->
+            describeCalls.Add(string desc)
+            createObj [
+                "optional", box (System.Func<obj>(fun () ->
+                    optionalCalls.Add("optional")
+                    createObj [ "kind", box "optional-string"; "description", desc ]))
+            ]))
+    ]
+    let zodLikeParams = createObj [
+        "safeExtend", box (System.Func<obj, obj>(fun arg ->
+            extendCalls.Add(arg)
+            createObj [ "kind", box "extended" ]))
+        "shape", box (createObj [
+            "operation", box (createObj [
+                "options", box [| createObj [ "shape", box (createObj [ "summary", box summaryField ]) ] |]
+            ])
+        ])
+    ]
+    let taskDef = createObj [ "description", box "native"; "parameters", box zodLikeParams ]
+
+    do! td $ (createObj [ "toolID", box "task" ], taskDef) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo task.definition rewrites zod-like parameters" (string (get (get taskDef "parameters") "kind") = "extended")
+    check "mimo task.definition adds report field through safeExtend" (
+        string (get (get extendCalls.[0] "completedWorkReport") "kind") = "optional-string"
+        && string (get (get extendCalls.[0] "completedWorkReport") "description") = VibeFs.Opencode.MagicTodo.reportDesc)
+    check "mimo task.definition derives report field from host zod schema" (
+        describeCalls.Count = 1
+        && describeCalls.[0] = VibeFs.Opencode.MagicTodo.reportDesc
+        && optionalCalls.Count = 1)
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
+let investigatorToolMissingClientSpec () = async {
+    let! workspaceDir = mkdtempAsync "investigator-missing-client-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let investigator = get (get p "tool") "investigator"
+    let! result = (get investigator "execute") $ (createObj [ "intents", box [| sampleInvestigatorIntent "find investigator registration" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "investigator-test" ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
+    check "investigator without client returns readable error" (result.Contains("ctx.client.session"))
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
+let investigatorToolSpec () = async {
     let createCalls = ResizeArray<obj>()
     let promptCalls = ResizeArray<obj>()
     let mockClient =
         createObj [ "session", box (createObj [
             "create", box (System.Func<obj, JS.Promise<obj>>(fun arg ->
-                (async { createCalls.Add(arg); return box {| data = box {| id = "child-reader-session" |} |} } |> Async.StartAsPromise)))
+                (async { createCalls.Add(arg); return box {| data = box {| id = "child-investigator-session" |} |} } |> Async.StartAsPromise)))
             "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
                 (async { promptCalls.Add(arg) } |> Async.StartAsPromise)))
             "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -254,23 +377,23 @@ let readerToolSpec () = async {
             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ ->
                 (async { () } |> Async.StartAsPromise)))
         ]) ]
-    let! workspaceDir = mkdtempAsync "reader-tool-" |> Async.AwaitPromise
+    let! workspaceDir = mkdtempAsync "investigator-tool-" |> Async.AwaitPromise
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |}) |> Async.AwaitPromise
-    let reader = get (get p "tool") "reader"
-    let! result = (get reader "execute") $ (createObj [ "intents", box [| box "find reader registration" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "reader-parent"; "abort", box null ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
-    check "reader tool returns subagent output" (result.Contains("src/Opencode/Tools.fs"))
-    check "reader tool creates child session under parent" (str (get createCalls.[0] "body") "parentID" = "reader-parent")
-    check "reader tool prompts child reader agent" (str (get promptCalls.[0] "body") "agent" = "reader")
+    let investigator = get (get p "tool") "investigator"
+    let! result = (get investigator "execute") $ (createObj [ "intents", box [| sampleInvestigatorIntent "find investigator registration" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "investigator-parent"; "abort", box null ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
+    check "investigator tool returns subagent output" (result.Contains("src/Opencode/Tools.fs"))
+    check "investigator tool creates child session under parent" (str (get createCalls.[0] "body") "parentID" = "investigator-parent")
+    check "investigator tool prompts child investigator agent" (str (get promptCalls.[0] "body") "agent" = "investigator")
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
-let readerToolLateClientInjectionSpec () = async {
+let investigatorToolLateClientInjectionSpec () = async {
     let createCalls = ResizeArray<obj>()
     let promptCalls = ResizeArray<obj>()
     let mockClient =
         createObj [ "session", box (createObj [
             "create", box (System.Func<obj, JS.Promise<obj>>(fun arg ->
-                (async { createCalls.Add(arg); return box {| data = box {| id = "child-reader-session-late" |} |} } |> Async.StartAsPromise)))
+                (async { createCalls.Add(arg); return box {| data = box {| id = "child-investigator-session-late" |} |} } |> Async.StartAsPromise)))
             "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
                 (async { promptCalls.Add(arg) } |> Async.StartAsPromise)))
             "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -280,15 +403,15 @@ let readerToolLateClientInjectionSpec () = async {
             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ ->
                 (async { () } |> Async.StartAsPromise)))
         ]) ]
-    let! workspaceDir = mkdtempAsync "reader-tool-late-client-" |> Async.AwaitPromise
+    let! workspaceDir = mkdtempAsync "investigator-tool-late-client-" |> Async.AwaitPromise
     let ctx = createObj [ "directory", box workspaceDir ]
     let! p = plugin ctx |> Async.AwaitPromise
     ctx?("client") <- mockClient
-    let reader = get (get p "tool") "reader"
-    let! result = (get reader "execute") $ (createObj [ "intents", box [| box "find reader registration" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "reader-parent-late"; "abort", box null ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
-    check "reader tool sees client injected after plugin init" (result.Contains("Late client injection worked"))
-    check "reader tool late injection creates child session under parent" (str (get createCalls.[0] "body") "parentID" = "reader-parent-late")
-    check "reader tool late injection prompts child reader agent" (str (get promptCalls.[0] "body") "agent" = "reader")
+    let investigator = get (get p "tool") "investigator"
+    let! result = (get investigator "execute") $ (createObj [ "intents", box [| sampleInvestigatorIntent "find investigator registration" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "investigator-parent-late"; "abort", box null ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
+    check "investigator tool sees client injected after plugin init" (result.Contains("Late client injection worked"))
+    check "investigator tool late injection creates child session under parent" (str (get createCalls.[0] "body") "parentID" = "investigator-parent-late")
+    check "investigator tool late injection prompts child investigator agent" (str (get promptCalls.[0] "body") "agent" = "investigator")
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
@@ -326,8 +449,11 @@ let run () : JS.Promise<unit> =
         do! agentConfigSpec ()
         do! toolDefinitionSpec ()
         do! toolExecuteBeforeSpec ()
-        do! readerToolSpec ()
-        do! readerToolLateClientInjectionSpec ()
+        do! mimoApplyPatchExecuteBeforeSpec ()
+        do! mimoTaskExecuteRoundTripSpec ()
+        do! mimoTaskDefinitionHandlesZodLikeParametersSpec ()
+        do! investigatorToolSpec ()
+        do! investigatorToolLateClientInjectionSpec ()
         do! executorActorSpec ()
     }
     |> Async.StartAsPromise

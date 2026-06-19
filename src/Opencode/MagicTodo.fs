@@ -1,23 +1,91 @@
 module VibeFs.Opencode.MagicTodo
 
 open System.Collections.Generic
+open Fable.Core.JsInterop
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Message
 open VibeFs.Kernel.Dyn
 open VibeFs.Opencode.MagicCore
+
+let private completedWorkReportByCall = Dictionary<string, string>()
+
+let captureCompletedWorkReport (callID: string) (report: string) =
+    if callID <> "" && report.Trim() <> "" then completedWorkReportByCall.[callID] <- report.Trim()
+
+let takeCompletedWorkReport (callID: string) : string =
+    if callID = "" then ""
+    else
+        match completedWorkReportByCall.TryGetValue callID with
+        | true, report ->
+            completedWorkReportByCall.Remove callID |> ignore
+            report
+        | false, _ -> ""
+
+let private backlogInputForPart (host: Host) (fp: FlatPart) : obj =
+    let input = partToolInput fp.part
+    if host <> Mimocode then input
+    else
+        let callID = partCallID fp.part
+        let cached = takeCompletedWorkReport callID
+        if cached = "" then input
+        elif isNullish input then createObj [ "completedWorkReport", box cached ]
+        else
+            input?("completedWorkReport") <- box cached
+            input
+
+let private backlogReportFromTodoInput (host: Host) (input: obj) : string =
+    let explicit = str input "completedWorkReport"
+    if explicit.Trim() <> "" then explicit.Trim()
+    elif host = Mimocode then
+        let operation = get input "operation"
+        if isNullish operation then ""
+        else
+            let eventSummary = str operation "event_summary"
+            if eventSummary.Trim() <> "" then eventSummary.Trim()
+            else
+                match str operation "action" with
+                | "create" ->
+                    let summary = str operation "summary"
+                    if summary.Trim() = "" then "" else "Created task: " + summary.Trim()
+                | _ -> ""
+    else ""
+
+let private appendBacklogReport (backlog: ResizeArray<BacklogEntry>) (report: string) =
+    backlog.Add({ sequence = backlog.Count + 1; timestamp = ""; report = report })
+
+let private flushMimocodeBurst (backlog: ResizeArray<BacklogEntry>) (lines: ResizeArray<string>) =
+    if lines.Count = 0 then ()
+    else
+        let merged =
+            if lines.Count = 1 then lines.[0]
+            else lines |> Seq.toArray |> Array.mapi (fun i line -> string (i + 1) + ". " + line) |> String.concat "\n"
+        appendBacklogReport backlog merged
+        lines.Clear()
 
 let replayBacklogFor (host: Host) (messages: obj array) : BacklogEntry list =
     if isNullish messages then []
     else
         let flat = flatten messages
         let backlog = ResizeArray<BacklogEntry>()
-        for fp in flat do
-            if isTodoResultFor host fp.part then
-                let input = partToolInput fp.part
-                if not (isNullish input) then
-                    let report = str input "completedWorkReport"
-                    if report.Trim() <> "" then
-                        backlog.Add({ sequence = backlog.Count + 1; timestamp = ""; report = report.Trim() })
+        match host with
+        | Opencode ->
+            for fp in flat do
+                if isTodoResultFor host fp.part then
+                    let input = backlogInputForPart host fp
+                    if not (isNullish input) then
+                        let report = backlogReportFromTodoInput host input
+                        if report <> "" then appendBacklogReport backlog report
+        | Mimocode ->
+            let burst = ResizeArray<string>()
+            for fp in flat do
+                if isTodoResultFor host fp.part then
+                    let input = backlogInputForPart host fp
+                    if not (isNullish input) then
+                        let report = backlogReportFromTodoInput host input
+                        if report <> "" then burst.Add(report)
+                else
+                    flushMimocodeBurst backlog burst
+            flushMimocodeBurst backlog burst
         List.ofSeq backlog
 
 let replayBacklog (messages: obj array) : BacklogEntry list =

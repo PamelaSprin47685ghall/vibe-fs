@@ -7,14 +7,14 @@ open VibeFs.Kernel.Nudge
 
 let canUse' () =
     check "agent_report for manager" (canUse "manager" "agent_report")
-    check "agent_report for reader" (canUse "reader" "agent_report")
+    check "agent_report for investigator" (canUse "investigator" "agent_report")
     check "agent_report for coder" (canUse "coder" "agent_report")
 
     check "bash denied for manager" (not (canUse "manager" "bash"))
     check "bash_.* denied for coder" (not (canUse "coder" "bash_run"))
-    check "task denied for reader" (not (canUse "reader" "task"))
+    check "task denied for investigator" (not (canUse "investigator" "task"))
     check "grep denied exact" (not (canUse "manager" "grep"))
-    check "fuzzy_grep not caught by grep rule" (canUse "reader" "fuzzy_grep")
+    check "fuzzy_grep not caught by grep rule" (canUse "investigator" "fuzzy_grep")
 
     check "stealth for browser" (canUse "browser" "stealth-browser-mcp_navigate")
     check "stealth denied for manager" (not (canUse "manager" "stealth-browser-mcp_navigate"))
@@ -23,7 +23,7 @@ let canUse' () =
     check "return_reviewer denied for manager" (not (canUse "manager" "return_reviewer"))
     check "submit_review for manager" (canUse "manager" "submit_review")
     check "submit_review denied for coder" (not (canUse "coder" "submit_review"))
-    check "submit_review denied for reader" (not (canUse "reader" "submit_review"))
+    check "submit_review denied for investigator" (not (canUse "investigator" "submit_review"))
 
     check "meditator denied read" (not (canUse "meditator" "read"))
     check "executor denied read" (not (canUse "executor" "read"))
@@ -36,25 +36,25 @@ let canUse' () =
     check "browser can read" (canUse "browser" "read")
     check "browser denied coder" (not (canUse "browser" "coder"))
 
-    check "reader can read" (canUse "reader" "read")
-    check "reader can executor" (canUse "reader" "executor")
-    check "reader can fuzzy_find" (canUse "reader" "fuzzy_find")
-    check "reader can fuzzy_grep" (canUse "reader" "fuzzy_grep")
-    check "reader denied write" (not (canUse "reader" "write"))
-    check "reader denied coder dispatch" (not (canUse "reader" "coder"))
-    check "reader denied todo" (not (canUse "reader" "todowrite"))
+    check "investigator can read" (canUse "investigator" "read")
+    check "investigator can executor" (canUse "investigator" "executor")
+    check "investigator can fuzzy_find" (canUse "investigator" "fuzzy_find")
+    check "investigator can fuzzy_grep" (canUse "investigator" "fuzzy_grep")
+    check "investigator denied write" (not (canUse "investigator" "write"))
+    check "investigator denied coder dispatch" (not (canUse "investigator" "coder"))
+    check "investigator denied todo" (not (canUse "investigator" "todowrite"))
 
     check "coder can read" (canUse "coder" "read")
     check "coder can write" (canUse "coder" "write")
     check "coder can edit" (canUse "coder" "edit")
     check "coder can fuzzy_find" (canUse "coder" "fuzzy_find")
     check "coder can fuzzy_grep" (canUse "coder" "fuzzy_grep")
-    check "coder denied reader dispatch" (not (canUse "coder" "reader"))
+    check "coder denied investigator dispatch" (not (canUse "coder" "investigator"))
     check "coder denied todo" (not (canUse "coder" "todowrite"))
 
     check "manager can read" (canUse "manager" "read")
     check "manager can coder dispatch" (canUse "manager" "coder")
-    check "manager can reader dispatch" (canUse "manager" "reader")
+    check "manager can investigator dispatch" (canUse "manager" "investigator")
     check "manager can meditator dispatch" (canUse "manager" "meditator")
     check "manager can manage_todo_list" (canUse "manager" "manage_todo_list")
     check "manager allowed todowrite" (canUse "manager" "todowrite")
@@ -66,18 +66,18 @@ let canUse' () =
     check "unknown agent can read" (canUse "build" "read")
     check "unknown agent can write" (canUse "build" "write")
     check "unknown agent can coder dispatch" (canUse "build" "coder")
-    check "unknown agent can reader dispatch" (canUse "build" "reader")
+    check "unknown agent can investigator dispatch" (canUse "build" "investigator")
 
 let deniedTools' () =
-    let tools = [ "coder"; "reader"; "read"; "write"; "bash"; "fuzzy_find"; "fuzzy_grep"; "agent_report" ]
-    let denied = deniedTools "reader" tools |> Set.ofList
-    check "reader denied write" (Set.contains "write" denied)
-    check "reader denied bash" (Set.contains "bash" denied)
-    check "reader denied coder dispatch" (Set.contains "coder" denied)
-    check "reader keeps read" (not (Set.contains "read" denied))
-    check "reader keeps fuzzy_find" (not (Set.contains "fuzzy_find" denied))
-    check "reader keeps fuzzy_grep" (not (Set.contains "fuzzy_grep" denied))
-    check "reader keeps agent_report" (not (Set.contains "agent_report" denied))
+    let tools = [ "coder"; "investigator"; "read"; "write"; "bash"; "fuzzy_find"; "fuzzy_grep"; "agent_report" ]
+    let denied = deniedTools "investigator" tools |> Set.ofList
+    check "investigator denied write" (Set.contains "write" denied)
+    check "investigator denied bash" (Set.contains "bash" denied)
+    check "investigator denied coder dispatch" (Set.contains "coder" denied)
+    check "investigator keeps read" (not (Set.contains "read" denied))
+    check "investigator keeps fuzzy_find" (not (Set.contains "fuzzy_find" denied))
+    check "investigator keeps fuzzy_grep" (not (Set.contains "fuzzy_grep" denied))
+    check "investigator keeps agent_report" (not (Set.contains "agent_report" denied))
 
 let private nudgeContext todos msg runner loopActive =
     { todos = todos; lastAssistantMessage = msg; hasActiveRunner = runner; isLoopActive = loopActive }

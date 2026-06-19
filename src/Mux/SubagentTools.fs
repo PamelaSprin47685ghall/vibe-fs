@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Mux.CallStore
@@ -98,48 +99,30 @@ module Tool =
 
 let private buildCoderPrompts (_config: obj) (args: obj) : Async<string array> =
     async {
-        let intents = Dyn.get args "intents"
-        if Dyn.isNullish intents || not (Dyn.isArray intents) then return [||]
-        else
-            let intentsArr = intents :?> obj array
-            if intentsArr.Length = 0 then return [||]
-            else
-                return
-                    intentsArr
-                    |> Array.map (fun intent ->
-                        let pair = intent :?> obj array
-                        let intentText = string pair.[0]
-                        let files =
-                            let filesRaw = pair.[1]
-                            if Dyn.typeIs filesRaw "string" then [string filesRaw]
-                            else filesRaw :?> obj array |> Array.map string |> List.ofArray
-                        formatMuxCoderUserPrompt intentText files)
+        match parseCoderIntents (Dyn.get args "intents") with
+        | Error _ -> return [||]
+        | Ok intents -> return intents |> List.map formatMuxCoderUserPrompt |> List.toArray
     }
 
 let coderTool (deps: obj) : ToolDefinition =
-    let prefixItems = [| strProp "The code-change intent."; strArrayProp "The list of affected files." |]
-    let itemSchema =
-        createObj [ "type", box "array"; "minItems", box 2; "maxItems", box 2; "prefixItems", box prefixItems ]
-    let intentsSchema =
-        createObj [ "type", box "array"; "items", box itemSchema; "description", box Params.coderIntents ]
     { name = "coder"
       description = coder
-      parameters = mkSchema (createObj [ "intents", box intentsSchema ]) [| "intents" |]
+      parameters = mkSchema (createObj [ "intents", box (muxCoderIntentsSchema Params.coderIntents) ]) [| "intents" |]
       execute = Tool.bindParallel deps "exec" "Coder" "exec" "coder" buildCoderPrompts
       condition = None }
 
-let private buildReaderPrompts (_config: obj) (args: obj) : Async<string array> =
+let private buildInvestigatorPrompts (_config: obj) (args: obj) : Async<string array> =
     async {
-        let intents = requireStrArray args "intents"
-        if Array.isEmpty intents then return [||]
-        else return intents |> Array.map formatMuxReaderUserPrompt
+        match parseInvestigatorIntents (Dyn.get args "intents") with
+        | Error _ -> return [||]
+        | Ok intents -> return intents |> List.map formatMuxInvestigatorUserPrompt |> List.toArray
     }
 
-let readerTool (deps: obj) : ToolDefinition =
-    { name = "reader"
-      description = reader
-      parameters = mkSchema (createObj [ "intents", box (strArrayProp Params.readerIntents) ]) [| "intents" |]
-      execute = Tool.bindParallel deps "explore" "Reader" "explore" "reader" buildReaderPrompts
+let investigatorTool (deps: obj) : ToolDefinition =
+    { name = "investigator"
+      description = investigator
+      parameters = mkSchema (createObj [ "intents", box (muxInvestigatorIntentsSchema Params.investigatorIntents) ]) [| "intents" |]
+      execute = Tool.bindParallel deps "explore" "Investigator" "explore" "investigator" buildInvestigatorPrompts
       condition = None }
 
 let private meditatorPromptFromArgs (config: obj) (args: obj) : Async<string> =

@@ -18,7 +18,7 @@ open VibeFs.Kernel.CapsFormat
 open VibeFs.Opencode.NudgeState
 open VibeFs.Shell.TreeSitterShell
 
-let private defaultExcludedAgents = [ "browser"; "reader"; "executor"; "title" ]
+let private defaultExcludedAgents = [ "browser"; "investigator"; "executor"; "title" ]
 
 let private emptyObj () : obj = createObj []
 
@@ -82,8 +82,45 @@ let chatMessageFor (host: Host) (registry: ChildAgentRegistry) (nudgeHook: VibeF
 let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     chatMessageFor opencode registry nudgeHook input output
 
-let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
+let private stripMimocodeTaskArgsForExecute (output: obj) (input: obj) (args: obj) =
+    let tool = normalizeToolName Mimocode (Dyn.str input "tool")
+    if tool <> "todowrite" then ()
+    else
+        let callID = Dyn.str input "callID"
+        let report = Dyn.str args "completedWorkReport"
+        if report <> "" then captureCompletedWorkReport callID report
+        let operation = Dyn.get args "operation"
+        if not (Dyn.isNullish operation) then setKey output "args" (createObj [ "operation", operation ])
+
+let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) =
+    if Dyn.str input "tool" <> "apply_patch" then ()
+    elif Dyn.typeIs args "string" then
+        setKey output "args" (createObj [ "patchText", args ])
+    else
+        let patchText = Dyn.str args "patchText"
+        if patchText <> "" then ()
+        else
+            let patch = Dyn.str args "patch"
+            if patch <> "" then
+                setKey output "args" (createObj [ "patchText", box patch ])
+            else
+                let text = Dyn.str args "text"
+                if text <> "" then setKey output "args" (createObj [ "patchText", box text ])
+
+let private restoreMimocodeTaskArgsAfterExecute (host: Host) (input: obj) (args: obj) =
+    if host <> Mimocode then ()
+    else
+        let tool = normalizeToolName host (Dyn.str input "tool")
+        if tool <> "todowrite" then ()
+        else
+            let callID = Dyn.str input "callID"
+            let cached = takeCompletedWorkReport callID
+            if cached <> "" then setKey args "completedWorkReport" (box cached)
+
+let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
+        let args = Dyn.get input "args"
+        if not (Dyn.isNullish args) then restoreMimocodeTaskArgsAfterExecute host input args
         let tool = Dyn.str input "tool"
         if isFileEditTool tool then
             let out = Dyn.get output "output"
@@ -106,6 +143,9 @@ let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.N
                     if formatted <> "" then setOutput output (s + "\n\n" + formatted)
         do! nudgeHook.handleToolExecuteAfter input output |> Async.AwaitPromise
     } |> Async.StartAsPromise
+
+let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
+    toolExecuteAfterFor opencode directory nudgeHook input output
 
 open VibeFs.Kernel.Dedup
 
@@ -194,24 +234,35 @@ let compactingHandler (magicSession: MagicSession) (input: obj) (output: obj) : 
 let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let toolID = Dyn.str input "toolID"
-        if toolID = "coder" || toolID = "reader" then
+        if toolID = "coder" || toolID = "investigator" then
             rewriteToolJsonSchema setKey stripUiFromJsonSchema output
         elif toolID = magicTodoToolNameFor host then
-            setKey output "description" (box toolDescription)
-            setKey output "jsonSchema" (buildMagicTodoSchema ())
+            match host with
+            | Opencode ->
+                setKey output "description" (box toolDescription)
+                setKey output "jsonSchema" (buildMagicTodoSchema ())
+            | Mimocode ->
+                setKey output "description" (box fusedTaskToolDescription)
+                rewriteToolJsonSchema setKey mergeMagicReportIntoTaskSchema output
     } |> Async.StartAsPromise
 
 let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
     toolDefinitionFor opencode input output
 
-let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
+let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let args = Dyn.get output "args"
         if Dyn.isNullish args then ()
         else
             let tool = Dyn.str input "tool"
             setUiLabel setKey args tool
+            if host = Mimocode then
+                stripMimocodeTaskArgsForExecute output input args
+                rewriteMimocodeApplyPatchArgsForExecute output input args
     } |> Async.StartAsPromise
+
+let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
+    toolExecuteBeforeFor opencode input output
 
 let eventHandler (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
     async {

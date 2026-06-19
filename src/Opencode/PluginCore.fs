@@ -44,7 +44,7 @@ let private builtinAgentSpecs =
       { name = "build"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
       { name = "plan"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
       { name = "coder"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "reader"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
+      { name = "investigator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "meditator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "reviewer"; defaultMode = "subagent"; systemPrompt = Prompts.reviewInstructions; defaultMcps = [||] }
       { name = "browser"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [| "stealth-browser-mcp" |] }
@@ -210,8 +210,8 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
             } |> Async.StartAsPromise)))
         setKey result "chat.message" (twoArgHook (fun input output -> chatMessageFor host childAgentRegistry nudgeHook input output))
         setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
-        setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBefore input output))
-        setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfter directory nudgeHook input output))
+        setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBeforeFor host input output))
+        setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host directory nudgeHook input output))
         setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform childAgentRegistry directory magicSession input output))
         setKey result "command.execute.before" (twoArgHook (fun input output ->
             async {

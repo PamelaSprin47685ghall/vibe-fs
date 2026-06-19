@@ -85,6 +85,50 @@ let private reviewMsg (id: string) (callID: string) (output: string) : obj =
                                   "output", box output ]
                         ) ] |] ]
 
+let private taskMsgWithReport (id: string) (callID: string) (report: string) : obj =
+    createObj
+        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
+          "parts",
+          box
+              [| createObj
+                     [ "type", box "tool"
+                       "tool", box "task"
+                       "callID", box callID
+                       "state",
+                       box (
+                           createObj
+                               [ "status", box "completed"
+                                 "input",
+                                 box (
+                                     createObj
+                                         [ "operation", box (createObj [ "action", box "list" ])
+                                           "completedWorkReport", box report ]
+                                 )
+                                 "output", box "ok" ]
+                        ) ] |] ]
+
+let private taskMsgWithActionAndReport (action: string) (id: string) (callID: string) (report: string) : obj =
+    createObj
+        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
+          "parts",
+          box
+              [| createObj
+                     [ "type", box "tool"
+                       "tool", box "task"
+                       "callID", box callID
+                       "state",
+                       box (
+                           createObj
+                               [ "status", box "completed"
+                                 "input",
+                                 box (
+                                     createObj
+                                         [ "operation", box (createObj [ "action", box action ])
+                                           "completedWorkReport", box report ]
+                                 )
+                                 "output", box "ok" ]
+                       ) ] |] ]
+
 let private toolMsg (toolName: string) (id: string) (callID: string) (report: string) : obj =
     createObj
         [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
@@ -106,6 +150,15 @@ let private backlogEntry (seq: int) (report: string) : BacklogEntry =
     { sequence = seq
       timestamp = ""
       report = report }
+
+let replayBacklogOpencodeDoesNotMergeConsecutiveTodoWrite () =
+    let msgs =
+        [| todoWriteMsg "m1" "c1" "W1"
+           todoWriteMsg "m2" "c2" "W2"
+           todoWriteMsg "m3" "c3" "W3" |]
+    let backlog = replayBacklogFor Opencode msgs
+    check "opencode: each todowrite is one backlog entry" (backlog.Length = 3)
+    check "opencode: reports not merged" (backlog.[0].report = "W1" && backlog.[1].report = "W2" && backlog.[2].report = "W3")
 
 let replayBacklogTest () =
     let msgs =
@@ -137,6 +190,45 @@ let replayBacklogForMimocodeIgnoresActor () =
     let backlog = replayBacklogFor Mimocode msgs
     check "mimocode replay: actor does not enter backlog" (backlog.IsEmpty)
 
+let mimocodeTaskReportCaptureRoundTrip () =
+    captureCompletedWorkReport "call-1" "  backlog text  "
+    let taken = takeCompletedWorkReport "call-1"
+    check "capture report: round trip" (taken = "backlog text")
+    check "capture report: consumed" (takeCompletedWorkReport "call-1" = "")
+
+let replayBacklogForMimocodeMergesConsecutiveWorkReports () =
+    let msgs =
+        [| taskMsgWithReport "m1" "c1" "Work A"
+           taskMsgWithReport "m2" "c2" "Work B"
+           taskMsgWithReport "m3" "c3" "Work C" |]
+    let backlog = replayBacklogFor Mimocode msgs
+    check "mimocode work reports: one merged entry" (backlog.Length = 1)
+    check "mimocode work reports: all present" (
+        backlog.[0].report.Contains("Work A")
+        && backlog.[0].report.Contains("Work B")
+        && backlog.[0].report.Contains("Work C"))
+
+let replayBacklogForMimocodeMergesConsecutiveTaskBurst () =
+    let msgs =
+        [| toolMsg "task" "m1" "c1" "R1"
+           toolMsg "task" "m2" "c2" "R2"
+           toolMsg "task" "m3" "c3" "R3" |]
+    let backlog = replayBacklogFor Mimocode msgs
+    check "mimocode burst: one backlog entry" (backlog.Length = 1)
+    check "mimocode burst: merges reports" (
+        backlog.[0].report.Contains("R1")
+        && backlog.[0].report.Contains("R2")
+        && backlog.[0].report.Contains("R3"))
+
+let replayBacklogForMimocodeSplitsBurstsOnGap () =
+    let msgs =
+        [| toolMsg "task" "m1" "c1" "A"
+           userMsg "u1" "gap"
+           toolMsg "task" "m2" "c2" "B" |]
+    let backlog = replayBacklogFor Mimocode msgs
+    check "mimocode gap: two backlog entries" (backlog.Length = 2)
+    check "mimocode gap: preserves order" (backlog.[0].report.Contains("A") && backlog.[1].report.Contains("B"))
+
 let findFoldRangeTest () =
     let flat =
         VibeFs.Kernel.Message.flatten (
@@ -149,6 +241,69 @@ let findFoldRangeTest () =
     match findFoldRange flat false with
     | None -> check "fold range: found" false
     | Some r -> check "fold range: secondToLast > first" (r.secondToLast > r.firstResult)
+
+let findFoldRangeOpencodePerCallMimocodePerBurst () =
+    let flatOpencode =
+        flatten (
+            [| userMsg "u1" "start"
+               todoWriteMsg "m1" "c1" "R1"
+               todoWriteMsg "m2" "c2" "R2"
+               todoWriteMsg "m3" "c3" "R3" |]
+        )
+    check "opencode: three todowrites enable fold" (findFoldRangeFor Opencode flatOpencode false |> Option.isSome)
+    let flatMimo =
+        flatten (
+            [| userMsg "u1" "start"
+               taskMsgWithReport "m1" "c1" "A"
+               taskMsgWithReport "m2" "c2" "B"
+               taskMsgWithReport "m3" "c3" "C" |]
+        )
+    check "mimocode: three consecutive task calls are one burst (no 3-anchor fold)" (
+        findFoldRangeFor Mimocode flatMimo false |> Option.isNone)
+
+let findFoldRangeForMimocodeIgnoresReadOnlyTaskCalls () =
+    let flat =
+        flatten (
+            [| userMsg "u1" "start"
+               taskMsgWithActionAndReport "list" "m1" "c1" "Read 1"
+               taskMsgWithActionAndReport "get" "m2" "c2" "Read 2"
+               taskMsgWithActionAndReport "list" "m3" "c3" "Read 3" |]
+        )
+    check "mimocode: read-only task calls do not become fold anchors" (
+        findFoldRangeFor Mimocode flat false |> Option.isNone)
+
+let findFoldRangeForMimocodeRequiresThreeProgressBursts () =
+    let flat =
+        flatten (
+            [| userMsg "u1" "start"
+               taskMsgWithActionAndReport "list" "m1" "c1" "Read 1"
+               taskMsgWithActionAndReport "start" "m2" "c2" "Work 1"
+               taskMsgWithActionAndReport "get" "m3" "c3" "Read 2"
+               taskMsgWithActionAndReport "done" "m4" "c4" "Work 2"
+               userMsg "u2" "gap"
+               taskMsgWithActionAndReport "block" "m5" "c5" "Work 3" |]
+        )
+    check "mimocode: two progress bursts still do not satisfy 3-anchor fold" (
+        findFoldRangeFor Mimocode flat false |> Option.isNone)
+
+let findFoldRangeForMimocodeUsesLastProgressCallInBurst () =
+    let flat =
+        flatten (
+            [| userMsg "u1" "start"
+               taskMsgWithActionAndReport "start" "m1" "c1" "Work 1"
+               taskMsgWithActionAndReport "list" "m2" "c2" "Read 1"
+               userMsg "u2" "gap"
+               taskMsgWithActionAndReport "done" "m3" "c3" "Work 2"
+               taskMsgWithActionAndReport "get" "m4" "c4" "Read 2"
+               userMsg "u3" "gap"
+               taskMsgWithActionAndReport "block" "m5" "c5" "Work 3"
+               taskMsgWithActionAndReport "list" "m6" "c6" "Read 3" |]
+        )
+    check "mimocode: burst anchor uses last progress call, not trailing read-only call" (
+        findFoldRangeFor Mimocode flat false
+        |> Option.exists (fun range ->
+            partCallID flat.[range.firstResult].part = "c1"
+            && partCallID flat.[range.secondToLast].part = "c3"))
 
 let projectMagicFolds () =
     let msgs =
@@ -178,15 +333,18 @@ let projectMagicForMimocodeUsesTask () =
     let msgs =
         [| userMsg "u1" "start"
            toolMsg "task" "m1" "c1" "Report 1"
+           userMsg "u2" "gap"
            toolMsg "task" "m2" "c2" "Report 2"
-           toolMsg "task" "m3" "c3" "Report 3" |]
+           userMsg "u3" "gap"
+           toolMsg "task" "m3" "c3" "Report 3a"
+           toolMsg "task" "m4" "c4" "Report 3b" |]
 
-    let backlog = [ backlogEntry 1 "Report 1"; backlogEntry 2 "Report 2"; backlogEntry 3 "Report 3" ]
+    let backlog = replayBacklogFor Mimocode msgs
     let r = projectMagicFor Mimocode msgs backlog false "test"
     let allJson: string = Fable.Core.JS.JSON.stringify (r)
     check "mimocode project: has prefix" (allJson.Contains(magicTodoPrefixPrefix))
     check "mimocode project: has Report 1" (allJson.Contains("Report 1"))
-    check "mimocode project: latest report present" (allJson.Contains("Report 3"))
+    check "mimocode project: latest burst present" (allJson.Contains("Report 3a") && allJson.Contains("Report 3b"))
     check "mimocode project: does not rely on todowrite" (not (allJson.Contains("todowrite")))
 
 let projectMagicHidesErrors () =
@@ -291,7 +449,7 @@ let magicSessionRefreshesBacklogForMimocode () =
     let second = [| toolMsg "task" "m1" "c1" "R1"; toolMsg "task" "m2" "c2" "R2" |]
     let _ = session.GetOrRebuildBacklog("test", first)
     let backlog = session.GetOrRebuildBacklog("test", second)
-    check "mimocode session: rebuilds refreshed backlog" (backlog.Length = 2)
+    check "mimocode session: consecutive tasks count as one backlog entry" (backlog.Length = 1)
 
 let magicSessionRefreshesBacklog () =
     let session = MagicSession(Opencode)
@@ -308,12 +466,21 @@ let buildBacklogTextTest () =
     check "backlog text: empty message" (empty.Contains("已完成工作报告"))
 
 let run () =
+    replayBacklogOpencodeDoesNotMergeConsecutiveTodoWrite ()
     replayBacklogTest ()
     replayEmpty ()
     replaySkipsEmpty ()
     replayBacklogForMimocodeUsesTask ()
     replayBacklogForMimocodeIgnoresActor ()
+    mimocodeTaskReportCaptureRoundTrip ()
+    replayBacklogForMimocodeMergesConsecutiveWorkReports ()
+    replayBacklogForMimocodeMergesConsecutiveTaskBurst ()
+    replayBacklogForMimocodeSplitsBurstsOnGap ()
     findFoldRangeTest ()
+    findFoldRangeOpencodePerCallMimocodePerBurst ()
+    findFoldRangeForMimocodeIgnoresReadOnlyTaskCalls ()
+    findFoldRangeForMimocodeRequiresThreeProgressBursts ()
+    findFoldRangeForMimocodeUsesLastProgressCallInBurst ()
     projectMagicFolds ()
     projectMagicNoFold ()
     projectMagicForMimocodeUsesTask ()

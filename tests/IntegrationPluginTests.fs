@@ -107,9 +107,19 @@ let mimoConfigSpec () = async {
     let managerTools = get manager "tools"
     check "mimo manager tools.task present" (not (isNullish (get managerTools "task")))
     check "mimo manager tools.actor false" (unbox<bool> (get managerTools "actor") = false)
-    let todoDef = createObj [ "description", box "old desc"; "parameters", box (createObj []) ]
+    let taskParams =
+        createObj [
+            "type", box "object"
+            "properties", box (createObj [ "operation", box (createObj [ "type", box "object" ]) ])
+            "required", box [| box "operation" |]
+            "additionalProperties", box false
+        ]
+    let todoDef = createObj [ "description", box "old desc"; "parameters", box taskParams ]
     do! (get p "tool.definition") $ (createObj [ "toolID", box "task" ], todoDef) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
-    check "mimo tool.definition rewrites task description" (str todoDef "description" |> fun text -> text.Contains("append-only work backlog"))
+    check "mimo tool.definition rewrites task description" (str todoDef "description" |> fun text -> text.Contains("append-only work backlog") && text.Contains("operation"))
+    check "mimo tool.definition merges completedWorkReport into parameters" (not (isNullish (get (get (get todoDef "parameters") "properties") "completedWorkReport")))
+    check "mimo tool.definition removes host task_id from schema" (isNullish (get (get (get todoDef "parameters") "properties") "task_id"))
+    check "mimo tool.definition leaves task operation schema" (not (isNullish (get (get (get todoDef "parameters") "properties") "operation")))
 
     let sessionID = "mimo-session-1"
     let makeTaskMessage id report =
@@ -128,7 +138,10 @@ let mimoConfigSpec () = async {
                     "tool", box "task"
                     "state", box (createObj [
                         "status", box "completed"
-                        "input", box (createObj [ "completedWorkReport", box report ])
+                        "input", box (createObj [
+                            "operation", box (createObj [ "action", box "done"; "id", box "T1"; "event_summary", box report ])
+                            "completedWorkReport", box report
+                        ])
                         "output", box report
                     ])
                 ])
@@ -155,7 +168,7 @@ let mimoConfigSpec () = async {
         makeTaskMessage "mimo-msg-3" "Third report from the final task."
     |]
     let output = createObj [ "messages", box messages ]
-    do! (get p "experimental.chat.messages.transform") $ (createObj [ "agent", box "reader" ], output) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    do! (get p "experimental.chat.messages.transform") $ (createObj [ "agent", box "manager" ], output) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     let transformedMessages = unbox<obj[]> (get output "messages")
     let prefixMessages = transformedMessages |> Array.filter (fun message -> str (get message "info") "id" |> fun id -> id.StartsWith("magic-todo-prefix-"))
     check "mimo messages.transform emits folded prefix messages" (prefixMessages.Length = 2)

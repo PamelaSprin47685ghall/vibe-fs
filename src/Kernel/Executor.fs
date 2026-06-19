@@ -132,7 +132,7 @@ let readOnlyReadCommands: Set<string> =
           "diff"; "wc"; "ls"; "tree" ]
 
 let readOnlyWarning =
-    "// 绝对禁止使用 executor 工具仅仅用于查找或者读写文件，请使用 read/reader/coder 代替！"
+    "// 绝对禁止使用 executor 工具仅仅用于查找或者读写文件，请使用 read/investigator/coder 代替！"
 
 let shouldAppendReadOnlyWarning (program: string) (language: ExecutorLanguage) : bool =
     match language with
