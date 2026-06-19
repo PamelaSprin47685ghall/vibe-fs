@@ -23,10 +23,22 @@ let private numField (o: obj) (parent: string) (child: string) : float =
         let v = Dyn.get p child
         if Dyn.isNullish v then 0.0 else unbox<float> v
 
+let private checkpointWriterTitlePrefix = "checkpoint-writer:"
+
+let private isVisibleSubagent (child: obj) : bool =
+    let title = Dyn.str child "title"
+    not (title.StartsWith checkpointWriterTitlePrefix)
+
+let private childLabel (child: obj) : string =
+    let title = Dyn.str child "title"
+    if title = "" then Dyn.str child "id" else title
+
+let private isCheckpointWriterSession (child: obj) : bool =
+    (childLabel child).StartsWith("checkpoint-writer:")
+
 let private toOption (child: obj) : obj =
     let id = Dyn.str child "id"
-    let title = Dyn.str child "title"
-    let label = if title = "" then id else title
+    let label = childLabel child
     box {| title = label; value = id; description = relTime (numField child "time" "updated") |}
 
 let private awaitObj (p: obj) : Async<obj> =
@@ -54,12 +66,16 @@ let private openSubagents (api: obj) : unit =
                 let rootID = if parentID = "" then sessionID else parentID
                 let! childRes = awaitObj (api?client?session?children(box {| sessionID = rootID; directory = directory |}))
                 let data = Dyn.get childRes "data"
-                let children = if Dyn.isNullish data then [||] else unbox<obj[]> data
-                if children.Length = 0 then
+                let children =
+                    if Dyn.isNullish data then [||]
+                    else unbox<obj[]> data |> Array.filter isVisibleSubagent
+                let visible =
+                    children |> Array.filter (fun c -> not (isCheckpointWriterSession c))
+                if visible.Length = 0 then
                     toast api "info" "No subagents running yet"
                 else
                     let options =
-                        children
+                        visible
                         |> Array.sortBy (fun c -> numField c "time" "created")
                         |> Array.map toOption
                     let onSelect =

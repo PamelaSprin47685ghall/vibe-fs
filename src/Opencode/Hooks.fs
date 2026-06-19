@@ -95,9 +95,10 @@ let private stripMimocodeTaskArgsForExecute (input: obj) (args: obj) =
         if report <> "" then captureCompletedWorkReport callID report
         // Must delete in place on the shared args/operation objects, never reassign output.args:
         // the host's wrapped execute re-parses the ORIGINAL args reference against the strict
-        // task schema, so a replacement object is ignored and the stray completedWorkReport key
-        // survives into validation (unrecognized_keys at path []).
+        // task schema, so a replacement object is ignored and stray keys survive into validation
+        // (unrecognized_keys at path []).
         Dyn.deleteKey args "completedWorkReport"
+        Dyn.deleteKey args "task_id"
         Dyn.deleteKey operation "completedWorkReport"
 
 let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) =
@@ -192,6 +193,19 @@ let private applyReadDedup (messages: obj array) : unit =
                                     | AlreadySeen -> setOutput state dedupMarker
                                     | NewContent _ -> ()
 
+module private CapsFileCache =
+    let private cache = System.Collections.Generic.Dictionary<string, VibeFs.Kernel.CapsFormat.CapsFile list>()
+
+    let getOrLoad (sessionID: string) (directory: string) : JS.Promise<VibeFs.Kernel.CapsFormat.CapsFile list> =
+        match cache.TryGetValue sessionID with
+        | true, files -> async { return files } |> Async.StartAsPromise
+        | false, _ ->
+            async {
+                let! files = VibeFs.Shell.WorkspaceFiles.findCapsFiles directory |> Async.AwaitPromise
+                if not (cache.ContainsKey sessionID) then cache.[sessionID] <- files
+                return files
+            } |> Async.StartAsPromise
+
 let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let messages = Dyn.get output "messages"
@@ -211,16 +225,14 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                         let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
                         let afterMagic = projectMagicFor magicSession.Host cleaned backlog false sessionID
                         applyReadDedup afterMagic
-                        let! final =
-                            async {
-                                let! capsFiles = VibeFs.Shell.WorkspaceFiles.findCapsFiles directory |> Async.AwaitPromise
-                                return buildCapsMessages
-                                    VibeFs.Shell.FileSys.sha256HexTruncated
-                                    afterMagic
-                                    directory
-                                    defaultExcludedAgents
-                                    capsFiles
-                            }
+                        let! capsFiles = CapsFileCache.getOrLoad sessionID directory |> Async.AwaitPromise
+                        let final =
+                            buildCapsMessages
+                                VibeFs.Shell.FileSys.sha256HexTruncated
+                                afterMagic
+                                directory
+                                defaultExcludedAgents
+                                capsFiles
                         replaceArrayInPlace messagesArr final
     } |> Async.StartAsPromise
 

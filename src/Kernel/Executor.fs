@@ -207,7 +207,7 @@ let parseLanguage (value: string) : ExecutorLanguage =
     | _ -> Shell
 
 let parseTimeout (value: string) : ExecutorTimeoutType =
-    match value.ToLowerInvariant() with
+    match value.Replace("-", "").ToLowerInvariant() with
     | "long" -> Long
-    | "last-resort" -> LastResort
+    | "lastresort" -> LastResort
     | _ -> Short

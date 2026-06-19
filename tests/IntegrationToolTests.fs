@@ -354,12 +354,13 @@ let mimoTaskExecuteInPlaceStripSpec () = async {
     let teb = get p "tool.execute.before"
 
     let operation = createObj [ "action", box "create"; "summary", box "test task tool" ]
-    let originalArgs = createObj [ "operation", operation; "completedWorkReport", box "top-level report text" ]
+    let originalArgs = createObj [ "operation", operation; "completedWorkReport", box "top-level report text"; "task_id", box "T99" ]
     let beforeOut = createObj [ "args", box originalArgs ]
     let hookInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ci1" ]
 
     do! teb $ (hookInput, beforeOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     check "mimo task strip mutates the original args reference in place" (isNullish (get originalArgs "completedWorkReport"))
+    check "mimo task strip removes stray task_id on original args reference" (isNullish (get originalArgs "task_id"))
     check "mimo task strip preserves operation on original args reference" (not (isNullish (get originalArgs "operation")))
 
     let nestedOperation = createObj [ "action", box "create"; "summary", box "nested case"; "completedWorkReport", box "nested report text" ]
@@ -368,6 +369,20 @@ let mimoTaskExecuteInPlaceStripSpec () = async {
     do! teb $ (createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ci2" ], nestedBeforeOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
     check "mimo task strip mutates the original operation reference in place" (isNullish (get nestedOperation "completedWorkReport"))
     check "mimo task strip keeps real fields on original operation reference" (str nestedOperation "summary" = "nested case")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
+let mimoTaskExecuteStripsTaskIdSpec () = async {
+    let! workspaceDir = mkdtempAsync "mimo-task-strip-task-id-" |> Async.AwaitPromise
+    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let teb = get p "tool.execute.before"
+
+    let operation = createObj [ "action", box "list" ]
+    let originalArgs = createObj [ "operation", operation; "task_id", box "T4"; "completedWorkReport", box "noop report" ]
+    let beforeOut = createObj [ "args", box originalArgs ]
+    do! teb $ (createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ctid" ], beforeOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo task execute.before strips task_id in place" (isNullish (get originalArgs "task_id"))
+    check "mimo task execute.before keeps operation after task_id strip" (not (isNullish (get originalArgs "operation")))
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
@@ -547,6 +562,7 @@ let run () : JS.Promise<unit> =
         do! mimoTaskExecuteRoundTripSpec ()
         do! mimoTaskExecuteNestedReportSpec ()
         do! mimoTaskExecuteInPlaceStripSpec ()
+        do! mimoTaskExecuteStripsTaskIdSpec ()
         do! mimoTaskDefinitionHandlesZodLikeParametersSpec ()
         do! coderToolSpec ()
         do! investigatorToolSpec ()
