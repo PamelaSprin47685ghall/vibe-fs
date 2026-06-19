@@ -48,6 +48,9 @@ let withKey (o: obj) (key: string) (v: obj) : obj =
     copy?(key) <- v
     copy
 
+let deleteKey (o: obj) (key: string) : unit =
+    if not (isNullish o) then emitJsExpr (o, key) "delete $0[$1]" |> ignore
+
 let isArray (o: obj) : bool = JS.Constructors.Array.isArray(o)
 
 let truthy (o: obj) : bool =

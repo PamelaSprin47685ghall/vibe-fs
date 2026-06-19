@@ -344,6 +344,29 @@ let mimoTaskExecuteNestedReportSpec () = async {
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
+let mimoTaskExecuteInPlaceStripSpec () = async {
+    let! workspaceDir = mkdtempAsync "mimo-task-inplace-" |> Async.AwaitPromise
+    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let teb = get p "tool.execute.before"
+
+    let operation = createObj [ "action", box "create"; "summary", box "test task tool" ]
+    let originalArgs = createObj [ "operation", operation; "completedWorkReport", box "top-level report text" ]
+    let beforeOut = createObj [ "args", box originalArgs ]
+    let hookInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ci1" ]
+
+    do! teb $ (hookInput, beforeOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo task strip mutates the original args reference in place" (isNullish (get originalArgs "completedWorkReport"))
+    check "mimo task strip preserves operation on original args reference" (not (isNullish (get originalArgs "operation")))
+
+    let nestedOperation = createObj [ "action", box "create"; "summary", box "nested case"; "completedWorkReport", box "nested report text" ]
+    let nestedArgs = createObj [ "operation", nestedOperation ]
+    let nestedBeforeOut = createObj [ "args", box nestedArgs ]
+    do! teb $ (createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ci2" ], nestedBeforeOut) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    check "mimo task strip mutates the original operation reference in place" (isNullish (get nestedOperation "completedWorkReport"))
+    check "mimo task strip keeps real fields on original operation reference" (str nestedOperation "summary" = "nested case")
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
 let mimoTaskDefinitionHandlesZodLikeParametersSpec () = async {
     let! workspaceDir = mkdtempAsync "mimo-task-zod-params-" |> Async.AwaitPromise
     let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
@@ -519,6 +542,7 @@ let run () : JS.Promise<unit> =
         do! mimoApplyPatchExecuteBeforeSpec ()
         do! mimoTaskExecuteRoundTripSpec ()
         do! mimoTaskExecuteNestedReportSpec ()
+        do! mimoTaskExecuteInPlaceStripSpec ()
         do! mimoTaskDefinitionHandlesZodLikeParametersSpec ()
         do! coderToolSpec ()
         do! investigatorToolSpec ()

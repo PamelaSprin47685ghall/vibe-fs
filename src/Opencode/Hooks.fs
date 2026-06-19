@@ -82,7 +82,7 @@ let chatMessageFor (host: Host) (registry: ChildAgentRegistry) (nudgeHook: VibeF
 let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     chatMessageFor opencode registry nudgeHook input output
 
-let private stripMimocodeTaskArgsForExecute (output: obj) (input: obj) (args: obj) =
+let private stripMimocodeTaskArgsForExecute (input: obj) (args: obj) =
     let tool = normalizeToolName Mimocode (Dyn.str input "tool")
     if tool <> "todowrite" then ()
     else
@@ -92,12 +92,12 @@ let private stripMimocodeTaskArgsForExecute (output: obj) (input: obj) (args: ob
         let nestedReport = Dyn.str operation "completedWorkReport"
         let report = if topReport <> "" then topReport else nestedReport
         if report <> "" then captureCompletedWorkReport callID report
-        if not (Dyn.isNullish operation) then
-            let cleanOperation =
-                Dyn.keys operation
-                |> Array.filter (fun key -> key <> "completedWorkReport")
-                |> Array.fold (fun acc key -> Dyn.withKey acc key (Dyn.get operation key)) (createObj [])
-            setKey output "args" (createObj [ "operation", cleanOperation ])
+        // Must delete in place on the shared args/operation objects, never reassign output.args:
+        // the host's wrapped execute re-parses the ORIGINAL args reference against the strict
+        // task schema, so a replacement object is ignored and the stray completedWorkReport key
+        // survives into validation (unrecognized_keys at path []).
+        Dyn.deleteKey args "completedWorkReport"
+        Dyn.deleteKey operation "completedWorkReport"
 
 let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) =
     if Dyn.str input "tool" <> "apply_patch" then ()
@@ -264,7 +264,7 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
             let tool = Dyn.str input "tool"
             setUiLabel setKey args tool
             if host = Mimocode then
-                stripMimocodeTaskArgsForExecute output input args
+                stripMimocodeTaskArgsForExecute input args
                 rewriteMimocodeApplyPatchArgsForExecute output input args
     } |> Async.StartAsPromise
 
