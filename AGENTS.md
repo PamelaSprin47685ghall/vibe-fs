@@ -5,103 +5,94 @@ import:
 
 $ pnpm build && pnpm test
 
-# 异步并发宪法：全面拥抱 Task
+# 异步并发宪法：全面拥抱 Fable.Promise
 
-> ⏸ **状态：本宪法当前暂缓执行（S6 挂起）。**
-> 经用户裁决（见 `REFACTOR.md` §12 与 §10 S6），全库**目前**仍以 `async { }` + `JS.Promise<'T>` + `Async.AwaitPromise`/`Async.StartAsPromise` + `MailboxProcessor` 为异步货币。下文的"铁律 / 禁用词清单 / 必须立刻重写"描述的是**目标方向**，不是当下强制法；在 Task 迁移单独开阶段之前，**不**据此把现有 `async`/`Promise`/`MailboxProcessor` 代码判为 Bug 去重写。新增代码可遵循此方向，但不得与既有 `async`/`Promise` 货币混用导致无谓装箱。
->
-> **铁律（目标态）：本代码库最终将禁止出现 `Async` 和 `JS.Promise`。**
-> Fable 5 已经完美支持 F# 的 `Task<'T>`，并在底层 1:1 编译为原生 JavaScript `Promise`。
-> 为了彻底消除层层装箱/拆箱的样板代码，我们确立 `Task<'T>` 为全库唯一的异步货币。
+> **铁律：本代码库中绝对禁止出现 `Async` 和 `Task`。**
+> 在 Fable 编译到 JS 的环境下，与 Node.js 交互的最优解是 `Fable.Promise`。它在底层 100% 对应原生的 JS `Promise`，没有任何状态机装箱/拆箱的运行时开销和方法缺失问题。
+> 我们确立 `JS.Promise<'T>` 为全库唯一的异步货币。
 
 ## 1. 禁用词清单 (Kill List)
 
-在任何新代码、重构代码中，**看到以下关键字，即视为目标态的待迁移项（⚠️ 当前暂缓，见上方状态条与 `REFACTOR.md` §12；勿据此重写既有代码）**：
+在任何新代码、重构代码中，**看到以下关键字，即视为 Bug，必须立刻重写**：
 
 🚫 **禁止使用：**
-- `async { ... }` （替换为 `task { ... }`）
-- `JS.Promise<'T>` （替换为 `Task<'T>`）
-- `Async<'T>` （替换为 `Task<'T>`）
+- `async { ... }` （替换为 `promise { ... }`）
+- `task { ... }` / `Task<'T>` （彻底禁用，严禁将 JS Promise 强转为 Task）
+- `Async<'T>` （替换为 `JS.Promise<'T>`）
 - `Async.AwaitPromise` / `Async.StartAsPromise` / `Async.StartImmediate` （直接删除，不再需要）
-- `Async.Parallel` （替换为 `Task.WhenAll`）
-- `Async.Sleep` （替换为 `Task.Delay`）
-- `Async.Catch` （替换为 `task { try ... with ex -> ... }`）
-- `MailboxProcessor` / `Agent` （见第 3 节，替换为 Task 队列）
+- `Async.Parallel` （替换为 `Promise.all`）
+- `Async.Sleep` （替换为 `Promise.sleep`）
+- `MailboxProcessor` / `Agent` （见第 3 节，替换为 Promise 队列）
 
 ✅ **唯一合法用法：**
 ```fsharp
-open System.Threading.Tasks
+open Fable.Core.JS
+// 必须安装并引用 Fable.Promise 库
 
-let doSomethingAsync () : Task<string> =
-    task {
-        do! Task.Delay(100)
+let doSomethingAsync () : JS.Promise<string> =
+    promise {
+        do! Promise.sleep 100
         return "success"
     }
 ```
 
 ## 2. 边界交互法则 (FFI)
 
-当调用外部 Node.js 库或宿主平台（Mux / Opencode）的异步 API 时，它们在 JS 中返回的是 `Promise`。
-在 F# 中，**不需要**做任何转换，直接用 `task { }` 加上 `unbox<Task<'T>>` 即可“白嫖”原生 Promise：
+当调用外部 Node.js 库或宿主平台（Mux / Opencode）的异步 API 时，它们在 JS 中返回的是原生 `Promise`。
+在使用 `Fable.Promise` 时，**不需要任何 unbox 或转换**，直接用 `promise { }` 原生接收：
 
 ```fsharp
-// 错误（旧时代遗毒）：
-let readFile path = fsPromises?readFile(path) |> asPromise<string> |> Async.AwaitPromise
-
-// 正确：
-let readFile (path: string) : Task<string> =
-    task {
-        // 直接 let! 解析原生 JS Promise
-        let! content = unbox<Task<string>> (fsPromises?readFile(path, "utf-8"))
+// 正确：原生 JS Promise 完美融入 promise { }
+let readFile (path: string) : JS.Promise<string> =
+    promise {
+        // 直接 let! 解析原生 JS Promise，无需任何强转
+        let! content = fsPromises?readFile(path, "utf-8")
         return content
     }
 ```
 
-任何需要向外暴露给宿主 JS 调用的 API（例如 Plugin 的 Hook），其签名直接写成返回 `Task<unit>` 或 `Task<obj>`，Fable 会自动将其编译为返回 `Promise` 的 JS 函数。
+向外暴露给宿主 JS 调用的 API（例如 Plugin 的 Hook），签名直接写为 `JS.Promise<unit>` 或 `JS.Promise<obj>`。
 
 ## 3. Actor 模式的 Node.js 适配 (替代 MailboxProcessor)
 
 由于 `MailboxProcessor` 强制依赖 F# `Async`，我们将其彻底从代码库开除。
-在 JS 单线程环境下，所谓的 Actor 串行化，本质上就是一个 **Promise Chain（Task 队列）**。
+在 JS 单线程环境下，所谓的 Actor 串行化，本质上就是一个 **Promise Chain**。
 
-当你需要保护可变状态或实现端口锁（WikiPortLock）、执行器（ExecutorActor）的串行排队时，请使用以下极简模式：
+当你需要保护可变状态或实现执行器串行排队时，请使用以下极简模式：
 
 ```fsharp
-open System.Threading.Tasks
+open Fable.Core.JS
 
 /// 单线程下的无锁异步串行队列
 type SerialQueue() =
-    let mutable tail : Task<unit> = Task.FromResult()
+    let mutable tail : JS.Promise<unit> = Promise.resolve()
 
-    /// 将任务排入队列，并返回该任务的 Task 结果
-    member _.Enqueue(work: unit -> Task<'T>) : Task<'T> =
-        let completionSource = TaskCompletionSource<'T>()
-        
-        let runNext () = task {
-            try
-                let! result = work ()
-                completionSource.SetResult(result)
-            with ex ->
-                completionSource.SetException(ex)
-        }
+    /// 将任务排入队列，并返回该任务的 Promise 结果
+    member _.Enqueue(work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        Promise.create (fun resolve reject ->
+            let runNext () = 
+                promise {
+                    try
+                        let! result = work ()
+                        resolve result
+                    with ex ->
+                        reject ex
+                }
 
-        // 把 runNext 挂在队尾
-        tail <- task {
-            try do! tail with _ -> () // 吞掉前面任务的异常，防止队列卡死
-            do! runNext ()
-        }
-
-        completionSource.Task
+            // 把 runNext 挂在队尾，吞掉前面的异常防止队列断裂
+            tail <- tail 
+                    |> Promise.catch (fun _ -> ())
+                    |> Promise.bind (fun _ -> runNext () |> Promise.map ignore)
+        )
 ```
 
-**用法示例（代替旧版的 ExecutorActor/WikiActor）：**
-
+**用法示例：**
 ```fsharp
 let private queue = SerialQueue()
 
-let postWork (sessionID: string) : Task<string> =
-    queue.Enqueue(fun () -> task {
-        do! Task.Delay(50)
+let postWork (sessionID: string) : JS.Promise<string> =
+    queue.Enqueue(fun () -> promise {
+        do! Promise.sleep 50
         return $"Done {sessionID}"
     })
 ```
@@ -110,20 +101,20 @@ let postWork (sessionID: string) : Task<string> =
 
 ### 4.1 并发执行 (原 Async.Parallel)
 ```fsharp
-let runParallel (items: string list) : Task<string array> =
-    task {
-        let tasks = items |> List.map (fun item -> task { return item.ToUpper() })
-        let! results = Task.WhenAll(tasks)
+let runParallel (items: string list) : JS.Promise<string array> =
+    promise {
+        let promises = items |> List.map (fun item -> promise { return item.ToUpper() })
+        let! results = Promise.all promises
         return results
     }
 ```
 
 ### 4.2 捕获异常 (原 Async.Catch)
-永远使用带有领域语义的 `Result` (如 `DomainError`) 代替裸抛异常，在 `task` 内部就地捕获：
+永远使用带有领域语义的 `Result` (如 `DomainError`) 代替裸抛异常，在 `promise` 内部就地捕获：
 
 ```fsharp
-let safeCall () : Task<Result<string, DomainError>> =
-    task {
+let safeCall () : JS.Promise<Result<string, DomainError>> =
+    promise {
         try
             let! res = riskyCall()
             return Ok res
@@ -132,21 +123,18 @@ let safeCall () : Task<Result<string, DomainError>> =
     }
 ```
 
-### 4.3 竞速超时 (原 Promise.race)
-利用 `Task.WhenAny` 实现 `race`：
+### 4.3 竞速超时 (原 JS 补丁的 promiseRace)
+直接使用 `Fable.Promise` 提供的机制或原生 `Promise.race` 包装：
 
 ```fsharp
-let withTimeout (timeoutMs: int) (work: Task<'T>) : Task<'T option> =
-    task {
-        let timeoutTask = task { do! Task.Delay(timeoutMs) }
-        let! winner = Task.WhenAny(work, timeoutTask)
-        
-        if winner.Id = work.Id then
-            let! res = work
-            return Some res
-        else
-            return None // 超时
+let withTimeout (timeoutMs: int) (work: JS.Promise<'T>) : JS.Promise<'T option> =
+    let timeoutPromise = promise {
+        do! Promise.sleep timeoutMs
+        return None
     }
+    let workPromise = promise {
+        let! res = work
+        return Some res
+    }
+    Promise.race [ timeoutPromise; workPromise ]
 ```
-
-遵守以上法则，我们将获得一个没有包装开销、堆栈跟踪清晰、与 JS 宿主生态 100% 融合的纯净内核。
