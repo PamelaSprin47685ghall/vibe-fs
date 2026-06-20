@@ -28,6 +28,7 @@
     <Compile Include="src/Kernel/Wiki.fs" />
     <Compile Include="src/Kernel/WikiPrompts.fs" />
     <Compile Include="src/Kernel/WikiMaintenance.fs" />
+    <Compile Include="src/Kernel/WikiRuntimeState.fs" />
     <Compile Include="src/Kernel/CapsFormat.fs" />
     <Compile Include="src/Kernel/TreeSitterKernel.fs" />
     <Compile Include="src/Kernel/MessageDedup.fs" />
@@ -71,6 +72,7 @@
     <Compile Include="src/Opencode/NudgeHook.fs" />
     <Compile Include="src/Opencode/SessionIo.fs" />
     <Compile Include="src/Opencode/ReviewerLoop.fs" />
+    <Compile Include="src/Opencode/WikiRuntimeIO.fs" />
     <Compile Include="src/Opencode/WikiRuntime.fs" />
     <Compile Include="src/Opencode/WikiTools.fs" />
     <Compile Include="src/Opencode/Tools.fs" />

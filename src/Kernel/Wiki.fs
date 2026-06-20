@@ -26,6 +26,19 @@ type WikiFile = { header: WikiHeader; entries: WikiEntry list }
 
 type WikiProjection = Map<WikiId, WikiEntry>
 
+// Lives in Kernel.Wiki (not the sibling WikiRuntimeState module) because F#
+// union cases / records are not re-exported transitively by `open`: existing
+// callers reach `AppendAfterWork` and the `WikiJobContext` record through
+// `open VibeFs.Kernel.Wiki`, and the pure state module references them too.
+type WikiJobKind =
+    | AppendAfterWork
+    | DailyRewrite of date: string
+    | WeeklyRewrite of throughDate: string
+
+type WikiJobContext =
+    { workspaceRoot: string
+      kind: WikiJobKind }
+
 let tryParseId (s: string) : WikiId option =
     if idRe.IsMatch s then Some(WikiId s) else None
 
