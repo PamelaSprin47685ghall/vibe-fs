@@ -72,12 +72,10 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
         if Dyn.isNullish args then ()
         else
             let tool = Dyn.str input "tool"
-            let labeledArgs = setUiLabel args tool
-            if not (obj.ReferenceEquals(labeledArgs, args)) then
-                setKey output "args" labeledArgs
+            setUiLabel args tool
             if host = Mimocode then
-                stripMimocodeTaskArgsForExecute input output labeledArgs
-                rewriteMimocodeApplyPatchArgsForExecute output input labeledArgs
+                stripMimocodeTaskArgsForExecute input output args
+                rewriteMimocodeApplyPatchArgsForExecute output input args
     }
 
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =

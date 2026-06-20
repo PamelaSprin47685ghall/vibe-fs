@@ -913,9 +913,12 @@ let toolExecuteBeforeSpec () = promise {
         sampleCoderIntent "fix bug" "a.ts"
         sampleCoderIntent "add feature" "b.ts"
     |]
-    let execOut = createObj [ "args", box (createObj [ "intents", box intents ]) ]
+    let originalArgs = createObj [ "intents", box intents ]
+    let execOut = createObj [ "args", box originalArgs ]
     do! teb $ (createObj [ "tool", box "coder"; "sessionID", box "s1"; "callID", box "c1" ], execOut) |> unbox<JS.Promise<unit>>
     check "tool.execute.before populates _ui" (str (get execOut "args") "_ui" = "fix bug; add feature")
+    check "tool.execute.before mutates args in place" (obj.ReferenceEquals(get execOut "args", originalArgs))
+    check "tool.execute.before writes _ui onto host args reference" (str originalArgs "_ui" = "fix bug; add feature")
     do! rmAsync workspaceDir
 }
 

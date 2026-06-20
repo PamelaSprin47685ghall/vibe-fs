@@ -9,19 +9,19 @@ open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.MagicTodo
 open VibeFs.Opencode.ToolSchema
 
-/// Build a fresh args object carrying `_ui` when the tool exposes a UI label
-/// (coder/investigator). Returns the original args reference unchanged
-/// otherwise — never mutates the host's args in place (P48: the before-hook
-/// produces a new record rather than setKey-ing the inbound reference).
-let setUiLabel (args: obj) (tool: string) : obj =
+/// Write `_ui` directly onto the host's args reference when the tool exposes a
+/// UI label (coder/investigator). The host keeps the same args object it passed
+/// in, so the label survives into the message history the UI reads. Replacing
+/// the reference dropped `_ui` — the host never saw the new object.
+let setUiLabel (args: obj) (tool: string) : unit =
     let labelResult =
         match tool with
         | "coder" -> joinCoderUiLabel (Dyn.get args "intents")
         | "investigator" -> joinInvestigatorUiLabel (Dyn.get args "intents")
         | _ -> Result.Error ""
     match labelResult with
-    | Result.Ok label when label <> "" -> Dyn.withKey args "_ui" (box label)
-    | _ -> args
+    | Result.Ok label when label <> "" -> args?("_ui") <- box label
+    | _ -> ()
 
 let private objectKeys (o: obj) : string array =
     JS.Constructors.Object.keys(o) |> Seq.toArray
