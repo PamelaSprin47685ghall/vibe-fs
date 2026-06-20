@@ -306,8 +306,8 @@ let wikiPreludeWithoutCapsSpec () = promise {
     let contextParts = unbox<obj[]> (get msgs.[2] "parts")
     let firstText = str firstParts.[0] "text"
     check "wiki prelude keeps hello prefix" (firstText.StartsWith "你好")
-    check "wiki prelude includes history header" (firstText.Contains "[项目背景和历史]")
-    check "wiki prelude includes question" (firstText.Contains "0a3f 项目插件入口在哪里？")
+    check "wiki prelude is front matter" (firstText.Contains "---\nwiki:")
+    check "wiki prelude includes question" (firstText.Contains "0a3f" && firstText.Contains "项目插件入口在哪里？")
     check "wiki prelude hides answers" (not (firstText.Contains "src/Opencode/Plugin.fs"))
     check "wiki prelude injects thinking" (str thinkingParts.[0] "type" = "reasoning" && str thinkingParts.[0] "text" = thinkText)
     check "wiki prelude injects llm text" (str contextParts.[0] "type" = "text" && str contextParts.[0] "text" = llmText)
@@ -329,8 +329,8 @@ let coderReceivesWikiPreludeSpec () = promise {
     let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
     check "coder wiki prelude injects synthetic messages" (msgs.Length = 4)
     check "coder wiki prelude keeps hello prefix" (firstText.StartsWith "你好")
-    check "coder wiki prelude includes history header" (firstText.Contains "[项目背景和历史]")
-    check "coder wiki prelude includes question" (firstText.Contains "0a3f 项目插件入口在哪里？")
+    check "coder wiki prelude is front matter" (firstText.Contains "---\nwiki:")
+    check "coder wiki prelude includes question" (firstText.Contains "0a3f" && firstText.Contains "项目插件入口在哪里？")
     check "coder wiki prelude hides answers" (not (firstText.Contains "src/Opencode/Plugin.fs"))
     check "coder wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
     do! rmAsync workspaceDir
@@ -347,8 +347,36 @@ let browserDoesNotReceiveWikiPreludeSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "browser" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "browser wiki prelude does not inject synthetic messages" (msgs.Length = 1)
-    check "browser wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[0], originalMsg))
+    check "browser still receives thinking+assistant injection" (msgs.Length = 4)
+    let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
+    check "browser injection omits wiki prelude" (not (firstText.Contains "[项目背景和历史]"))
+    let thinkingParts = unbox<obj[]> (get msgs.[1] "parts")
+    let contextParts = unbox<obj[]> (get msgs.[2] "parts")
+    check "browser injection has thinking" (str thinkingParts.[0] "type" = "reasoning" && str thinkingParts.[0] "text" = thinkText)
+    check "browser injection has llm text" (str contextParts.[0] "type" = "text" && str contextParts.[0] "text" = llmText)
+    check "browser injection preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
+    do! rmAsync workspaceDir
+}
+
+let bookkeeperDoesNotReceiveCapsSpec () = promise {
+    let! workspaceDir = mkdtempAsync "caps-bookkeeper-"
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content"
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n"
+    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
+    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
+    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ])
+    let! p = plugin (box {| directory = workspaceDir |})
+    let tf = get p "experimental.chat.messages.transform"
+    let originalMsg = box {| info = createObj [ "id", box "msg-bk-1"; "agent", box "bookkeeper"; "sessionID", box "caps-bk-session" ]; parts = [||] |}
+    let out = createObj [ "messages", box [| originalMsg |] ]
+    do! tf $ (createObj [ "agent", box "bookkeeper" ], out) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    check "bookkeeper still receives thinking+assistant injection without caps files" (msgs.Length = 4)
+    let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
+    check "bookkeeper injection omits wiki prelude" (not (firstText.Contains "[项目背景和历史]"))
+    check "bookkeeper injection has thinking" (str (unbox<obj[]> (get msgs.[1] "parts")).[0] "type" = "reasoning")
+    check "bookkeeper injection has llm text" (str (unbox<obj[]> (get msgs.[2] "parts")).[0] "type" = "text")
+    check "bookkeeper injection preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -543,6 +571,25 @@ let afterHookSkipsChildSessionSpec () = promise {
 }
 
 
+
+let afterHookSkipsFailedToolSpec () = promise {
+    let! workspaceDir = mkdtempAsync "after-hook-failed-"
+    do! ensureWikiDir workspaceDir
+    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "fail-turn" "noted" |]
+    let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient |})
+    let toolExecuteAfter = get pluginObject "tool.execute.after"
+    let writeInput =
+        createObj [ "tool", box "write"
+                    "sessionID", box "fail-turn"
+                    "callID", box "write-fail-1"
+                    "args", box (createObj [ "file_path", box "src/fail.fs"; "content", box "boom" ]) ]
+    let failedOutput = createObj [ "output", box ""; "error", box "permission denied" ]
+    do! toolExecuteAfter $ (writeInput, failedOutput) |> unbox<JS.Promise<unit>>
+    do! waitForBackgroundJobsForTesting pluginObject
+    let launches = takeBookkeeperLaunchesForTesting pluginObject
+    check "after-hook skips bookkeeping when tool reports an error" (launches.Length = 0)
+    do! rmAsync workspaceDir
+}
 
 let submitWikiAppendSpec () = promise {
     let! workspaceDir = mkdtempAsync "submit-wiki-append-"
@@ -1196,8 +1243,8 @@ let coderToolSpec () = promise {
     check "coder tool prompts child coder agent" (str (get promptCalls.[0] "body") "agent" = "coder")
     let firstPrompt = str (unbox<obj[]> (get (get promptCalls.[0] "body") "parts")).[0] "text"
     let secondPrompt = str (unbox<obj[]> (get (get promptCalls.[1] "body") "parts")).[0] "text"
-    check "coder prompt includes first intent do_not_touch" (firstPrompt.Contains("Do not touch:") && firstPrompt.Contains("src/shared.fs") && firstPrompt.Contains("Do not rename public API"))
-    check "coder prompt omits do_not_touch section when absent" (not (secondPrompt.Contains("Do not touch:")))
+    check "coder prompt includes first intent do_not_touch" (firstPrompt.Contains("do_not_touch:") && firstPrompt.Contains("src/shared.fs") && firstPrompt.Contains("Do not rename public API"))
+    check "coder prompt omits do_not_touch section when absent" (not (secondPrompt.Contains("do_not_touch:")))
     do! rmAsync workspaceDir
 }
 
@@ -1420,6 +1467,7 @@ let run () : JS.Promise<unit> =
         do! wikiPreludeWithoutCapsSpec ()
         do! coderReceivesWikiPreludeSpec ()
         do! browserDoesNotReceiveWikiPreludeSpec ()
+        do! bookkeeperDoesNotReceiveCapsSpec ()
         do! fetchWikiSnapshotSpec ()
         do! afterHookRecordsDirectWriteSpec ()
         do! dailyMaintenanceLaunchSpec ()
@@ -1427,6 +1475,7 @@ let run () : JS.Promise<unit> =
         do! weeklyMaintenanceUsesLastSundaySpec ()
         do! weeklyMaintenanceWithoutSnapshotFileSpec ()
         do! afterHookSkipsChildSessionSpec ()
+        do! afterHookSkipsFailedToolSpec ()
         do! submitWikiAppendSpec ()
         do! submitWikiAppendEmptySpec ()
         do! submitWikiSchemaAllowsEmptySpec ()

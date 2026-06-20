@@ -20,7 +20,7 @@ open VibeFs.Opencode.CapsCodec
 open VibeFs.Opencode.WikiRuntime
 open VibeFs.Shell.ChildAgentRegistry
 
-let private defaultExcludedAgents = [ "browser"; "investigator"; "executor"; "title" ]
+let private defaultExcludedAgents = [ "browser"; "investigator"; "executor"; "title"; "bookkeeper" ]
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
@@ -133,28 +133,27 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                 let cleaned = Messaging.stripSyntheticBySource messagesList
                 if cleaned.IsEmpty then ()
                 else
-                    if defaultExcludedAgents |> List.contains agent then
-                        replaceArrayInPlace messagesArr (MessagingCodec.encodeMessages cleaned)
-                    else
-                        let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
-                        let afterMagic = projectMagicFor magicSession.Host cleaned backlog false sessionID
-                        let encoded = MessagingCodec.encodeMessages afterMagic
-                        applyReadDedup encoded
-                        if agent = "manager" then
-                            do! wikiRuntime.StartMaintenanceIfDue(directory)
-                        let! capsFiles = CapsFileCache.getOrLoad sessionID directory
-                        let! wikiPrelude =
-                            if canUse agent "fuzzy_find" then wikiRuntime.BuildPreludeForSession(sessionID, directory)
-                            else Promise.lift (None: string option)
-                        let final =
-                            buildCapsMessages
-                                VibeFs.Shell.FileSys.sha256HexTruncated
-                                encoded
-                                directory
-                                defaultExcludedAgents
-                                capsFiles
-                                wikiPrelude
-                        replaceArrayInPlace messagesArr final
+                    let excluded = defaultExcludedAgents |> List.contains agent
+                    let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
+                    let afterMagic = if excluded then cleaned else projectMagicFor magicSession.Host cleaned backlog false sessionID
+                    let encoded = MessagingCodec.encodeMessages afterMagic
+                    if not excluded then applyReadDedup encoded
+                    if agent = "manager" then
+                        do! wikiRuntime.StartMaintenanceIfDue(directory)
+                    let! capsFiles =
+                        if excluded then Promise.lift ([]: CapsFile list)
+                        else CapsFileCache.getOrLoad sessionID directory
+                    let! wikiPrelude =
+                        if not excluded && canUse agent "fetch_wiki" then wikiRuntime.BuildPreludeForSession(sessionID, directory)
+                        else Promise.lift (None: string option)
+                    let final =
+                        buildCapsMessages
+                            VibeFs.Shell.FileSys.sha256HexTruncated
+                            encoded
+                            directory
+                            capsFiles
+                            wikiPrelude
+                    replaceArrayInPlace messagesArr final
     }
 
 let compactingHandlerFor (host: Host) (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =

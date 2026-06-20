@@ -5,6 +5,7 @@ open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.PromptFrontMatter
 
 let private idRe = Regex("^[0-9a-f]{4}$")
 
@@ -177,19 +178,21 @@ let projectLatestWins (files: WikiFile list) : WikiProjection =
     |> List.collect (fun f -> f.entries)
     |> List.fold (fun m e -> Map.add e.id e m) Map.empty
 
-let preludeLines (projection: WikiProjection) : string list =
-    projection
-    |> Map.toList
-    |> List.sortBy (fun (id, _) -> idValue id)
-    |> List.map (fun (id, e) -> "- " + idValue id + " " + truncateTo e.q 160)
-
 let buildPreludeSection (projection: WikiProjection) : string option =
     if Map.isEmpty projection then None
     else
+        let entries =
+            projection
+            |> Map.toList
+            |> List.sortBy (fun (id, _) -> idValue id)
+            |> List.map (fun (id, e) ->
+                String.concat "\n" [
+                    "  - id: " + idValue id
+                    "    q: " + yamlScalar (truncateTo e.q 160) ])
         Some(
-            "[项目背景和历史]" + "\n\n"
-            + String.concat "\n" (preludeLines projection)
-            + "\n\n" + "需要某条历史答案时，调用 fetch_wiki(id)。")
+            frontMatterPrompt
+                [ yamlSeqField "wiki" entries ]
+                "Call fetch_wiki(id) to expand a historical entry's full answer.")
 
 let validateDraft (draft: WikiDraft) : Result<WikiDraft, string> =
     match draft.id with

@@ -8,7 +8,7 @@ open VibeFs.Opencode.CapsPrelude
 
 /// The obj-boundary layer for caps message synthesis: reads info fields off
 /// host message objects and constructs the synthetic user/assistant prefix
-/// objects. Pure formatting (escapeXmlAttr/buildCapitalsContext/etc.) stays in
+/// objects. Pure formatting (buildCapitalsContext/etc.) stays in
 /// Kernel.CapsFormat; this module is the only site that touches host objects.
 
 let private capsUserPrefix = "caps-synth-user-"
@@ -26,9 +26,6 @@ let messageId (msg: obj) : string =
 let private isPrefixed (prefix: string) (msg: obj) : bool =
     let id = messageId msg
     id <> "" && id.StartsWith prefix
-
-let messageAgent (msg: obj) : string =
-    messageInfoField (fun info -> str info "agent") msg
 
 let messageSessionID (msg: obj) : string =
     messageInfoField (fun info -> str info "sessionID") msg
@@ -137,21 +134,21 @@ let private findFirstRealMessage (messages: obj array) : obj option =
         let id = messageId msg
         id <> "" && not (id.StartsWith capsUserPrefix) && not (id.StartsWith capsAssistantPrefix))
 
+/// Build the synthetic caps prefix (user 你好 + thinking + assistant context,
+/// then optional caps-file tool reads). The caller decides suppression by
+/// passing an empty `capsFiles` (no file reads) and/or `None` prelude; this
+/// keeps a single decision point in `MessageTransform`. The only guard here is
+/// structural: nothing to anchor onto when there is no real message.
 let buildCapsMessages
     (hashFn: string -> string)
     (messages: obj array)
     (projectRoot: string)
-    (excludedAgents: string list)
     (capsFiles: CapsFile list)
     (preludeText: string option)
     : obj array =
-    let shouldSkip =
-        match findFirstRealMessage messages with
-        | None -> true
-        | Some firstReal -> excludedAgents |> List.contains (messageAgent firstReal)
-
-    if shouldSkip then messages
-    else
+    match findFirstRealMessage messages with
+    | None -> messages
+    | Some _ ->
         let existingStripped =
             stripExistingCapsMessages messages
         if existingStripped.Length = 0 then messages

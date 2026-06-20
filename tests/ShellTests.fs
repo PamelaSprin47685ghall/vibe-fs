@@ -59,7 +59,8 @@ let capsFileShape () =
 let capsContextFormat () =
     let ctx = VibeFs.Kernel.CapsFormat.buildCapitalsContext
                 [ { filePath = "/abs/A & B.md"; label = "A & B.md"; content = "body text" } ]
-    check "caps file= label escaped" (ctx.Contains "file=\"A &amp; B.md\"")
+    check "caps context is front matter" (ctx.StartsWith "---\ncaps:")
+    check "caps label present" (ctx.Contains "A & B.md")
     check "caps content raw" (ctx.Contains "body text")
 
 let capsFileSizeLimit () =
@@ -141,7 +142,9 @@ let wikiPortSerialSpec () = promise {
 let ollamaFormat () =
     let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]
     let formatted = VibeFs.Kernel.Prompts.formatSearchResults results
-    check "search numbering" (formatted.Contains "1. A" && formatted.Contains "2. B")
+    check "search results front matter" (formatted.StartsWith "---\nresults:")
+    check "search embeds title A" (formatted.Contains "title: \"A\"")
+    check "search embeds title B" (formatted.Contains "title: \"B\"")
     equal "empty search" "No results found." (VibeFs.Kernel.Prompts.formatSearchResults [])
 
 let summarizerInputCap () =

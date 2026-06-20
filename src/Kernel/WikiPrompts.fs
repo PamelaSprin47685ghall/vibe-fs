@@ -2,22 +2,28 @@ module VibeFs.Kernel.WikiPrompts
 
 open System
 open VibeFs.Kernel.Wiki
+open VibeFs.Kernel.PromptFrontMatter
 
-/// Pure wiki prompt assembly. These are string builders over Kernel wiki
-/// types (projection / files / entries); they were inlined in the Shell-side
-/// `WikiRuntime` class but carry no IO or mutable state, so they belong in the
-/// Kernel layer (REFACTOR.md §2 / D12).
+/// Pure wiki prompt assembly over Kernel wiki types. Front-matter helpers live
+/// in the shared Kernel.PromptFrontMatter module; only wiki-specific entry
+/// rendering stays here.
 
-let private projectionLines (projection: WikiProjection) : string list =
-    projection |> Map.toList |> List.map (fun (_, entry) -> renderEntry entry)
+let private entrySeqLines (entries: WikiEntry list) : string list =
+    entries
+    |> List.map (fun entry ->
+        String.concat "\n" [
+            "  - id: " + idValue entry.id
+            "    q: " + yamlScalar entry.q
+            "    a: " + yamlScalar entry.a ])
+
+let yamlSeqField (key: string) (entries: WikiEntry list) : string =
+    PromptFrontMatter.yamlSeqField key (entrySeqLines entries)
 
 let projectionText (projection: WikiProjection) : string =
-    let lines = projectionLines projection
-    if lines.IsEmpty then "(empty)" else String.concat "\n" lines
+    yamlSeqField "wiki" (projection |> Map.toList |> List.map snd)
 
 let filesText (entries: WikiEntry list) : string =
-    let lines = entries |> List.map renderEntry
-    if lines.IsEmpty then "(empty)" else String.concat "\n" lines
+    yamlSeqField "entries" entries
 
 let entriesForDay (files: WikiFile list) (date: string) : WikiEntry list =
     files
@@ -43,40 +49,44 @@ let private snapshotEntries (files: WikiFile list) : WikiEntry list =
         | _ -> None)
     |> Option.defaultValue []
 
+let private bookkeeperQualityRules = [
+    "Write every recorded Q&A in modern compressed Chinese: drop filler, keep concepts and exact identifiers."
+    "Record only stable project knowledge. Do not record temporary errors, progress chatter, command noise, or low-value test details (test names, fixture bodies, assertion counts) unless they encode a durable invariant."
+]
+
+/// Daily/weekly rewrites also prune the existing wiki: judge each entry by
+/// whether a future reader will act on it, and keep the wiki short and
+/// high-signal rather than exhaustive.
+let private rewritePruneRules = [
+    "Actively filter out low-value content already in the wiki: drop trivia no future reader will act on, remove transient details that have since stopped mattering, and merge overlapping facts into single canonical entries. Use judgment — prefer a shorter, higher-signal wiki over exhaustive preservation."
+]
+
 let buildAppendPrompt (title: string) (workInput: string) (workOutput: string) (projection: WikiProjection) : string =
-    String.concat "\n\n" [
-        "You are the project wiki bookkeeper."
-        "Submit exactly one `return_bookkeeper` call. Reuse existing ids when facts update, omit ids for new durable facts, and return `[]` if nothing durable should be recorded."
-        "=== Existing Wiki ==="
-        projectionText projection
-        "=== Work Title ==="
-        title
-        "=== Work Input ==="
-        workInput
-        "=== Work Output ==="
-        workOutput
-        "=== Output Rules ==="
-        "Record only stable project knowledge. Do not record temporary errors, progress chatter, or command noise."
-    ]
+    frontMatterPrompt [
+        yamlSeqField "existing_wiki" (projection |> Map.toList |> List.map snd)
+        yamlScalarField "work_title" title
+        yamlBlockField "work_input" workInput
+        yamlBlockField "work_output" workOutput
+    ] (String.concat "\n\n" (
+        [ "You are the project wiki bookkeeper."
+          "Submit exactly one `return_bookkeeper` call. Reuse existing ids when facts update, omit ids for new durable facts, and return `[]` if nothing durable should be recorded." ]
+        @ bookkeeperQualityRules))
 
 let buildDailyPrompt (date: string) (files: WikiFile list) (projection: WikiProjection) : string =
-    String.concat "\n\n"
+    frontMatterPrompt [
+        yamlSeqField "current_wiki" (projection |> Map.toList |> List.map snd)
+        yamlSeqField "target_day" (entriesForDay files date)
+    ] (String.concat "\n\n" (
         [ "You are rewriting one day of the project wiki."
-          "Submit exactly one `return_bookkeeper` call. Replace the target day with durable canonical entries. It is valid to return `[]`."
-          "=== Current Wiki ==="
-          projectionText projection
-          "=== Target Day ==="
-          filesText (entriesForDay files date) ]
+          "Submit exactly one `return_bookkeeper` call. Replace the target day with durable canonical entries. It is valid to return `[]`." ]
+        @ bookkeeperQualityRules @ rewritePruneRules))
 
 let buildWeeklyPrompt (throughDate: string) (files: WikiFile list) (projection: WikiProjection) : string =
-    let snapshotText = filesText (snapshotEntries files)
-    let dayEntries = filesText (entriesThroughCutoff files throughDate)
-    String.concat "\n\n"
+    frontMatterPrompt [
+        yamlSeqField "current_wiki" (projection |> Map.toList |> List.map snd)
+        yamlSeqField "previous_snapshot" (snapshotEntries files)
+        yamlSeqField "day_files_through_cutoff" (entriesThroughCutoff files throughDate)
+    ] (String.concat "\n\n" (
         [ "You are rewriting the project wiki snapshot."
-          "Submit exactly one `return_bookkeeper` call. Preserve surviving ids when possible, merge duplicates, omit ids only for genuinely new facts, and return `[]` if nothing durable remains."
-          "=== Current Wiki ==="
-          projectionText projection
-          "=== Previous Snapshot ==="
-          snapshotText
-          "=== Day Files Through Cutoff ==="
-          dayEntries ]
+          "Submit exactly one `return_bookkeeper` call. Preserve surviving ids when possible, merge duplicates, omit ids only for genuinely new facts, and return `[]` if nothing durable remains." ]
+        @ bookkeeperQualityRules @ rewritePruneRules))

@@ -21,7 +21,6 @@ let private knownAgents = [ "manager"; "investigator"; "coder"; "reviewer"; "bro
 let canUseCanonical (agent: Agent) (tool: Tool) : bool =
     let toolMatches (subs: string list) = subs |> List.exists tool.Contains
     match agent, tool with
-    | _, "fetch_wiki" -> agent = "manager"
     | _, _ when toolMatches [ "agent_report" ] -> true
     | _, _ when toolMatches [ "bash"; "task" ] || tool = "grep" -> false
     | _, _ when toolMatches [ "stealth" ] -> agent = "browser"

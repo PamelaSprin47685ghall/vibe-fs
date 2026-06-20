@@ -122,16 +122,13 @@ let private bookkeeperInput (input: obj) : string =
     let args = Dyn.get input "args"
     if Dyn.isNullish args then "" else JS.JSON.stringify args
 
-let private bookkeeperResult (output: obj) : string =
-    let text = Dyn.str output "output"
-    if text <> "" then text else Dyn.str output "error"
-
 let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (wikiRuntime: WikiRuntime) (registry: ChildAgentRegistry) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         do! appendSyntaxDiagnostics directory input output
         let tool = Dyn.str input "tool"
         let sessionID = Dyn.str input "sessionID"
-        if recordsToBookkeeper tool && (registry.LookupChildAgent sessionID).IsNone then
-            wikiRuntime.StartBookkeeperAppend(bookkeeperInput input, bookkeeperResult output, tool, parentSessionID = sessionID)
+        let succeeded = Dyn.str output "error" = ""
+        if succeeded && recordsToBookkeeper tool && (registry.LookupChildAgent sessionID).IsNone then
+            wikiRuntime.StartBookkeeperAppend(bookkeeperInput input, Dyn.str output "output", tool, parentSessionID = sessionID)
         do! nudgeHook.handleToolExecuteAfter input output
     }

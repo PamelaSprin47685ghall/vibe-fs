@@ -25,45 +25,18 @@ let private withReportTail (host: Host) (body: string) : string =
     | Opencode -> body
     | Mimocode -> body + agentReportTail
 
-let private coderBody (intent: CoderIntent) : string =
-    coderPromptBody intent + "4. Return a concise summary of changes and verification results.\n\n"
-
-let private investigatorBody (intent: InvestigatorIntent) : string =
-    investigatorPromptBody intent + "4. Return a structured report with relatedFiles and relatedCode.\n\n"
-
-let private meditatorBody (intent: string) (files: string list) : string =
-    meditatorPromptBody intent files + "3. Return a structured report with relatedFiles and relatedCode.\n\n"
-
-let private browserBody (intent: string) : string =
-    browserPromptBody intent + "3. Return a clear summary of what you found or did.\n\n"
-
-let private executorBody (output: string) : string =
-    executorSummarizerPromptBody output + "\n4. Return a concise, actionable summary.\n\n"
-
-let private websearchBody (question: string) (raw: string) : string =
-    websearchSummarizerPromptBody question raw + "\n5. Return a focused, ready-to-use answer.\n\n"
-
 /// Produce one prompt per parallel intent for coder/investigator, exactly one
 /// prompt for the singleton task kinds.  Host decides whether to append the
 /// agent_report tail; otherwise prompt body is identical between hosts.
 let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
+    let wrap = withReportTail host
     match kind with
-    | Coder intents -> intents |> List.map (coderBody >> withReportTail host)
-    | Investigator intents -> intents |> List.map (investigatorBody >> withReportTail host)
-    | Meditator(intent, sections) ->
-        let files = sections |> List.map (fun s -> s.file)
-        let prelude =
-            sections
-            |> List.map (fun s ->
-                let body = Option.defaultValue meditatorSkippedSection s.content
-                $"=== {s.file} ===\n\n{body}")
-            |> String.concat "\n\n"
-        let instructions = withReportTail host (meditatorBody intent files)
-        let combined = if prelude = "" then instructions else $"{prelude}\n\n{instructions}"
-        [ combined ]
-    | Browser intent -> [ withReportTail host (browserBody intent) ]
-    | ExecutorSummary output -> [ withReportTail host (executorBody output) ]
-    | WebsearchSummary(question, raw) -> [ withReportTail host (websearchBody question raw) ]
+    | Coder intents -> intents |> List.map (coderPrompt >> wrap)
+    | Investigator intents -> intents |> List.map (investigatorPrompt >> wrap)
+    | Meditator(intent, sections) -> [ meditatorPrompt sections intent |> wrap ]
+    | Browser intent -> [ browserPrompt intent |> wrap ]
+    | ExecutorSummary output -> [ executorSummarizerPrompt output |> wrap ]
+    | WebsearchSummary(question, raw) -> [ websearchSummarizerPrompt question raw |> wrap ]
 
 let reportSeparator = "\n---\n"
 

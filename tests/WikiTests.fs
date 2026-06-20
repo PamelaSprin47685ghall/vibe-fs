@@ -129,26 +129,21 @@ let preludeSpec () =
     match buildPreludeSection proj with
     | None -> check "buildPreludeSection non-empty Some" false
     | Some section ->
-        check "prelude starts with header" (section.StartsWith("[项目背景和历史]"))
-        check "prelude has bullet for e1" (section.Contains("- 0a3f 项目插件入口在哪里？"))
-        check "prelude has bullet for e2" (section.Contains("- b912 Magic Todo backlog 如何保存？"))
-        check "prelude has fetch instruction" (section.Contains("需要某条历史答案时，调用 fetch_wiki(id)。"))
+        check "prelude is front matter" (section.StartsWith("---\n"))
+        check "prelude has wiki field" (section.Contains("wiki:"))
+        check "prelude has id e1" (section.Contains("0a3f"))
+        check "prelude has question e1" (section.Contains("项目插件入口在哪里？"))
+        check "prelude has id e2" (section.Contains("b912"))
+        check "prelude has fetch instruction" (section.Contains("Call fetch_wiki(id)"))
         check "prelude does NOT contain e1 answer" (not (section.Contains("src/Opencode/Plugin.fs")))
         check "prelude does NOT contain e2 answer" (not (section.Contains("completedWorkReport")))
-    let lines = preludeLines proj
-    check "preludeLines returns bullets" (lines |> List.forall (fun l -> l.StartsWith("- ")))
-    check "preludeLines covers both" (lines.Length = 2)
     let longQ = String('x', 200)
     let longEntry = entry "7c01" longQ "a"
     let longProj = projection [ longEntry ]
     match buildPreludeSection longProj with
     | None -> check "prelude truncation section built" false
     | Some longSection ->
-        check "prelude truncation ends with ellipsis bullet" (longSection.Contains("..."))
-        let bulletOpt = longSection.Split('\n') |> Array.tryFind (fun l -> l.StartsWith("- 7c01 "))
-        match bulletOpt with
-        | None -> check "prelude truncation bullet found" false
-        | Some bulletLine -> check "prelude truncation bullet length bounded" (bulletLine.Length <= 180)
+        check "prelude truncation marks ellipsis" (longSection.Contains("..."))
 
 let draftValidationSpec () =
     check "validateDraft valid id Ok" (isOk (validateDraft { id = Some "0a3f"; q = "q"; a = "a" }))

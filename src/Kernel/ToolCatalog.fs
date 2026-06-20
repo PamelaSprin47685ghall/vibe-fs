@@ -72,7 +72,7 @@ let private executorSpec : ToolSpec =
               "dependencies", "Dependencies to install (for python or javascript)."
               "timeout_type",
               "Execution timeout budget: 'short' (1s), 'long' (10s), or 'last-resort' (100s). Use 'last-resort' only when absolutely necessary."
-              "mode", "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files." ]
+              "mode", "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying generated files)." ]
       requiredFields = [ "language"; "program"; "timeout_type"; "mode" ] }
 
 let private fetchWikiSpec : ToolSpec =

@@ -140,15 +140,14 @@ let disposeSessionTreeTerminatesAll () =
 /// fragments (assistant text + tool output), in chronological order.  This is
 /// the single source of truth after an opencode restart: the in-memory store is
 /// gone, but the dialogue still carries the activate/cancel/accept markers.
-///   activate  -> line starting with taskActivatePrefix
+///   activate  -> YAML front-matter with a `task` field
 ///   cancel    -> contains cancelledMarker
 ///   accept    -> contains acceptedEndMarker
 /// reject/terminated keep the session active (they say "still active", which
 /// must NOT be mistaken for an end marker).
 let inferReviewTaskFromTexts' () =
     let activate task =
-        taskActivatePrefix + task
-        + "\n\nWith-Review Mode is active. Complete the task above, then call submit_review with:\n- report: ..."
+        buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
     let accept = "Review passed. Your changes have been accepted. " + acceptedEndMarker
     let cancel = cancelledMarker
     let rejected =

@@ -4,6 +4,7 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.LoopMessages
+open VibeFs.Kernel.PromptFrontMatter
 
 type SearchResult =
     { title: string
@@ -78,135 +79,98 @@ let reviewerNudgePrompt =
     + "  return_reviewer({ \"feedback\": \"details...\" })  // Reject\n\n"
     + "Do not explain what you plan to do — call the tool immediately."
 
-let private bulletLines (items: string seq) =
-    items |> Seq.map (fun s -> $"- {s}") |> String.concat "\n"
-
-let coderPromptBody (intent: CoderIntent) : string =
-    let targets =
-        intent.targets
-        |> List.map (fun t ->
-            match t.draft with
-            | Some draft -> $"- {t.file}\n  Guide: {t.guide}\n  Draft: {draft}"
-            | None -> $"- {t.file}\n  Guide: {t.guide}")
-        |> String.concat "\n"
-    let targetInstruction =
-        "Targets:\n" + targets + "\n\n"
-    let doNotTouch =
-        if intent.doNotTouch.Length = 0 then ""
-        else "Do not touch:\n" + bulletLines intent.doNotTouch + "\n\n"
-    "You are an implementation agent (coder). Implement the objective using the background and per-file guides below.\n\n"
-    + "Objective:\n" + intent.objective + "\n\n"
-    + "Background:\n" + intent.background + "\n\n"
-    + targetInstruction
-    + doNotTouch
-    + "Instructions:\n"
-    + "1. Read the listed files and related code needed for the change.\n"
-    + "2. Edit or create files to satisfy the objective and each file guide.\n"
-    + "3. Perform static verification only (read, inspect, type-check). Do NOT run tests, execute code, or run any commands.\n"
-
-let formatCoderUserPrompt (intent: CoderIntent) : string =
-    coderPromptBody intent
-    + "4. Return a concise summary of changes and verification results.\n\n"
-
-let investigatorPromptBody (intent: InvestigatorIntent) : string =
-    let entries =
-        if intent.entries.Length = 0 then "(none — choose entry points from the codebase)"
-        else bulletLines intent.entries
-    "You are a codebase search agent (investigator). Explore the workspace and answer every required question.\n\n"
-    + readOnlyRules + "\n\n"
-    + "Objective:\n" + intent.objective + "\n\n"
-    + "Background:\n" + intent.background + "\n\n"
-    + "Questions you must answer:\n" + bulletLines intent.questions + "\n\n"
-    + "Suggested entries:\n" + entries + "\n\n"
-    + "Instructions:\n"
-    + "1. Use fuzzy_find, glob, fuzzy_grep, and read tools to locate relevant code.\n"
-    + "2. Report concrete file paths and line-number references.\n"
-    + "3. Answer each required question explicitly in your report.\n"
-
-let formatInvestigatorUserPrompt (intent: InvestigatorIntent) : string =
-    investigatorPromptBody intent
-    + "4. Return a structured report with relatedFiles and relatedCode.\n\n"
-
-let meditatorPromptBody (intent: string) (files: string list) : string =
-    let fileList = files |> List.map (fun f -> $"- {f}") |> String.concat "\n"
-    "You are a deep-reasoning agent (meditator). Read and analyze the files below, then answer the question.\n\n"
-    + readOnlyRules + "\n\n"
-    + "Files to analyze:\n" + fileList + "\n\n"
-    + "Question:\n" + intent + "\n\n"
-    + "Instructions:\n"
-    + "1. The file contents are provided above; read and analyze every listed file carefully.\n"
-    + "2. Produce a thorough analysis covering tradeoffs, risks, and concrete recommendations.\n"
-
-let formatMeditatorUserPrompt (intent: string) (files: string list) : string =
-    meditatorPromptBody intent files
-    + "3. Return a structured report with relatedFiles and relatedCode.\n\n"
-
-let meditatorSectionSeparator = "\n---\n"
-
 /// Placeholder rendered for a meditator file section whose content could not be
-/// read. Single SSOT — consumed by both `buildMeditatorPrompt` here and the
-/// Subagent prompt builder (REFACTOR.md §0 / §11: one fact, one definition).
+/// read. Single SSOT — consumed by the Subagent prompt builder.
 let meditatorSkippedSection = "(skipped)"
 
 type MeditatorFileSection =
     { file: string
       content: string option }
 
-type private PromptSection =
-    | FileSection of fileName: string * body: string
-    | InstructionSection of body: string
+let private coderTargetItem (t: CoderTarget) : string =
+    let guideLines = t.guide.Split('\n') |> Array.map (fun line -> "      " + line)
+    let draftLines =
+        match t.draft with
+        | Some draft when not (System.String.IsNullOrWhiteSpace draft) ->
+            Array.append [|"    draft: |"|] (draft.Split('\n') |> Array.map (fun line -> "      " + line))
+        | _ -> [||]
+    Array.concat [
+        [| "  - file: " + yamlScalar t.file; "    guide: |" |]
+        guideLines
+        draftLines
+    ] |> String.concat "\n"
 
-let private renderPromptSection = function
-    | FileSection(fileName, body) -> $"=== {fileName} ===\n\n{body}"
-    | InstructionSection body -> body
+let coderPrompt (intent: CoderIntent) : string =
+    let fields =
+        [ yamlBlockField "objective" intent.objective
+          yamlBlockField "background" intent.background
+          yamlSeqField "targets" (intent.targets |> List.map coderTargetItem) ]
+        @ (if intent.doNotTouch.Length = 0 then []
+           else [ yamlStringSeqField "do_not_touch" (List.ofArray intent.doNotTouch) ])
+    frontMatterPrompt fields (String.concat "\n\n" [
+        "You are an implementation agent. Read the listed files and related code, then edit or create files to satisfy the objective and each target guide."
+        "Static verification only (read, inspect, type-check). Do NOT run tests or execute code."
+        "Return a concise summary of changes and verification results."
+    ])
 
-let buildMeditatorPrompt (sections: MeditatorFileSection list) (intent: string) : string =
-    let promptSections =
-        sections
-        |> List.map (fun section -> FileSection(section.file, Option.defaultValue meditatorSkippedSection section.content))
-    let files = sections |> List.map (fun s -> s.file)
-    let allSections = promptSections @ [ InstructionSection(formatMeditatorUserPrompt intent files) ]
-    allSections |> List.map renderPromptSection |> String.concat "\n\n"
+let investigatorPrompt (intent: InvestigatorIntent) : string =
+    frontMatterPrompt [
+        yamlBlockField "objective" intent.objective
+        yamlBlockField "background" intent.background
+        yamlStringSeqField "questions" (List.ofArray intent.questions)
+        yamlStringSeqField "entries" (List.ofArray intent.entries)
+    ] (String.concat "\n\n" [
+        readOnlyRules
+        "You are a codebase search agent. Explore the workspace and answer every question in `questions`."
+        "Use fuzzy_find, glob, fuzzy_grep, and read. Report concrete file paths and line-number references, and answer each question explicitly."
+        "Return a structured report with relatedFiles and relatedCode."
+    ])
 
-let browserPromptBody (intent: string) : string =
-    "You are a browser automation agent. Complete the web task described below.\n\n"
-    + readOnlyRules + "\n\n"
-    + "Web task:\n" + intent + "\n\n"
-    + "Instructions:\n"
-    + "1. Use only stealth-browser-mcp tools to interact with web pages.\n"
-    + "2. Do not write files or run shell commands.\n"
+let meditatorPrompt (sections: MeditatorFileSection list) (intent: string) : string =
+    let fileItem (s: MeditatorFileSection) : string =
+        let body = Option.defaultValue meditatorSkippedSection s.content
+        let contentLines = body.Split('\n') |> Array.map (fun line -> "      " + line)
+        Array.concat [
+            [| "  - path: " + yamlScalar s.file; "    content: |" |]
+            contentLines
+        ] |> String.concat "\n"
+    frontMatterPrompt [
+        yamlSeqField "files" (sections |> List.map fileItem)
+        yamlBlockField "question" intent
+    ] (String.concat "\n\n" [
+        readOnlyRules
+        "You are a deep-reasoning agent. The file contents are provided above; analyze every listed file carefully."
+        "Produce a thorough analysis covering tradeoffs, risks, and concrete recommendations."
+        "Return a structured report with relatedFiles and relatedCode."
+    ])
 
-let formatBrowserUserPrompt (intent: string) : string =
-    browserPromptBody intent
-    + "3. Return a clear summary of what you found or did.\n\n"
+let browserPrompt (intent: string) : string =
+    frontMatterPrompt [
+        yamlBlockField "task" intent
+    ] (String.concat "\n\n" [
+        readOnlyRules
+        "You are a browser automation agent. Use only stealth-browser-mcp tools to interact with web pages. Do not write files or run shell commands."
+        "Return a clear summary of what you found or did."
+    ])
 
-let executorSummarizerPromptBody (output: string) : string =
-    "You are a summarizer for executor (shell) output. Condense the raw output below into an actionable summary.\n\n"
-    + readOnlyRules + "\n\n"
-    + "Instructions:\n"
-    + "1. Preserve errors, non-zero exit status, and key paths or values.\n"
-    + "2. Omit noise, repeated lines, and progress banners.\n"
-    + "3. Do not invent details that are not in the output.\n"
-    + "Raw output:\n" + output
+let executorSummarizerPrompt (output: string) : string =
+    frontMatterPrompt [
+        yamlBlockField "raw_output" output
+    ] (String.concat "\n\n" [
+        readOnlyRules
+        "You are a summarizer for executor (shell) output. Preserve errors, non-zero exit status, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output."
+        "Return a concise, actionable summary."
+    ])
 
-let formatExecutorSummarizerUserPrompt (output: string) : string =
-    executorSummarizerPromptBody output
-    + "\n4. Return a concise, actionable summary.\n\n"
-
-let websearchSummarizerPromptBody (whatToSummarize: string) (rawResults: string) : string =
-    "You are a summarizer for web search results. The caller searched the web and needs you to extract and synthesize content focused on a specific question.\n\n"
-    + readOnlyRules + "\n\n"
-    + "Question to answer:\n" + whatToSummarize + "\n\n"
-    + "Instructions:\n"
-    + "1. Focus on answering the question above using the raw search results below.\n"
-    + "2. Preserve concrete facts: URLs, names, version numbers, code samples, and exact values.\n"
-    + "3. Omit boilerplate, navigation noise, and results unrelated to the question.\n"
-    + "4. Do not invent details not present in the results.\n"
-    + "Raw search results:\n" + rawResults
-
-let formatWebsearchSummarizerUserPrompt (whatToSummarize: string) (rawResults: string) : string =
-    websearchSummarizerPromptBody whatToSummarize rawResults
-    + "\n5. Return a focused, ready-to-use answer.\n\n"
+let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =
+    frontMatterPrompt [
+        yamlBlockField "question" whatToSummarize
+        yamlBlockField "raw_results" rawResults
+    ] (String.concat "\n\n" [
+        readOnlyRules
+        "You are a summarizer for web search results. Focus on answering the question above using the raw results. Preserve concrete facts: URLs, names, version numbers, code samples, and exact values. Omit boilerplate and unrelated results. Do not invent details not present in the results."
+        "Return a focused, ready-to-use answer."
+    ])
 
 let agentReportReviewInstructions =
     readOnlyWorkspaceConstraint + "\n\n"
@@ -219,26 +183,23 @@ let agentReportReviewInstructions =
 let formatSearchResults (results: SearchResult list) : string =
     if results.IsEmpty then "No results found."
     else
-        results
-        |> List.mapi (fun i r -> $"{i + 1}. {r.title}\n   URL: {r.url}\n   {r.content}")
-        |> String.concat "\n\n"
+        let items =
+            results |> List.map (fun r ->
+                let contentLines = r.content.Split('\n') |> Array.map (fun line -> "      " + line)
+                Array.concat [
+                    [| "  - title: " + yamlScalar r.title; "    url: " + yamlScalar r.url; "    content: |" |]
+                    contentLines
+                ] |> String.concat "\n")
+        frontMatter [ yamlSeqField "results" items ]
 
 let formatFetchResponse (data: FetchResponse) : string =
     let nonEmpty (s: string) = not (System.String.IsNullOrEmpty s)
-
-    let title = defaultArg data.title ""
-
-    [ yield $"Title: {title}"
-      match data.byline with
-      | Some b when nonEmpty b -> yield $"By: {b}"
-      | _ -> ()
-      match data.length with
-      | Some l -> yield $"Length: {l}"
-      | None -> ()
-      match data.content with
-      | Some c when nonEmpty c -> yield c
-      | _ -> () ]
-    |> String.concat "\n"
+    let scalarIf (key: string) = function Some v when nonEmpty v -> [ yamlScalarField key v ] | _ -> []
+    let title = scalarIf "title" data.title
+    let byline = scalarIf "byline" data.byline
+    let length = match data.length with Some l -> [ yamlScalarField "length" (string l) ] | None -> []
+    let content = match data.content with Some c when nonEmpty c -> [ yamlBlockField "content" c ] | _ -> []
+    frontMatter (title @ byline @ length @ content)
 
 module ReviewerVerdictPrompts =
     let private verdictPrologue (subject: string) =
@@ -263,9 +224,13 @@ module ReviewerVerdictPrompts =
 let formatReviewResult (result: ReviewResult) : string =
     match result with
     | Accepted ->
-        "Review passed. Your changes have been accepted. " + acceptedEndMarker
+        frontMatterPrompt [ yamlScalarField "verdict" "accepted" ]
+            ("Review passed. Your changes have been accepted. " + acceptedEndMarker)
     | Terminated ->
-        "Review terminated without verdict. With-Review Mode is still active; fix the issues and call submit_review again."
+        frontMatterPrompt [ yamlScalarField "verdict" "terminated" ]
+            "Review terminated without verdict. With-Review Mode is still active; fix the issues and call submit_review again."
     | Rejected feedback ->
-        "Review feedback:\n\n" + feedback
-        + "\n\nAddress the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."
+        frontMatterPrompt [
+            yamlScalarField "verdict" "rejected"
+            yamlBlockField "feedback" feedback
+        ] "Address the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."

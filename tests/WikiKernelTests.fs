@@ -25,14 +25,14 @@ let private projectionOf (entries: WikiEntry list) : WikiProjection =
 // ── WikiPrompts (pure prompt assembly) ──────────────────────────────────────
 
 let projectionTextSpec () =
-    check "projectionText empty is placeholder" (projectionText Map.empty = "(empty)")
+    check "projectionText empty renders empty yaml seq" (projectionText Map.empty = "wiki: []")
     let proj = projectionOf [ entry "0a3f" "q1" "a1" ]
     let text = projectionText proj
     check "projectionText non-empty renders id" (text.Contains "0a3f")
     check "projectionText non-empty renders q" (text.Contains "q1")
 
 let filesTextSpec () =
-    check "filesText empty is placeholder" (filesText [] = "(empty)")
+    check "filesText empty renders empty yaml seq" (filesText [] = "entries: []")
     let text = filesText [ entry "0a3f" "q" "a" ]
     check "filesText renders entry" (text.Contains "0a3f")
 
@@ -59,13 +59,16 @@ let appendPromptSpec () =
     check "append prompt embeds work input" (prompt.Contains "do work")
     check "append prompt embeds work output" (prompt.Contains "got result")
     check "append prompt embeds existing wiki" (prompt.Contains "existing q")
+    check "append prompt is yaml-frontmatter markdown" (prompt.StartsWith "---\n")
+    check "append prompt has existing_wiki field" (prompt.Contains "existing_wiki:")
 
 let dailyPromptSpec () =
     let files = [ dayFile "2026-06-19" false [ entry "0a3f" "target q" "target a" ] ]
     let prompt = buildDailyPrompt "2026-06-19" files Map.empty
     check "daily prompt names rewrite role" (prompt.Contains "rewriting one day")
-    check "daily prompt has target day section" (prompt.Contains "=== Target Day ===")
+    check "daily prompt has target day field" (prompt.Contains "target_day:")
     check "daily prompt includes target entry" (prompt.Contains "target q")
+    check "daily prompt is yaml-frontmatter markdown" (prompt.StartsWith "---\n")
 
 let weeklyPromptSpec () =
     let files =
@@ -73,8 +76,8 @@ let weeklyPromptSpec () =
           dayFile "2026-06-10" false [ entry "2222" "day q" "day a" ] ]
     let prompt = buildWeeklyPrompt "2026-06-14" files Map.empty
     check "weekly prompt names snapshot rewrite role" (prompt.Contains "rewriting the project wiki snapshot")
-    check "weekly prompt has previous snapshot section" (prompt.Contains "=== Previous Snapshot ===")
-    check "weekly prompt has day-through-cutoff section" (prompt.Contains "=== Day Files Through Cutoff ===")
+    check "weekly prompt has previous snapshot field" (prompt.Contains "previous_snapshot:")
+    check "weekly prompt has day-through-cutoff field" (prompt.Contains "day_files_through_cutoff:")
     check "weekly prompt includes previous snapshot entry" (prompt.Contains "snap q")
     check "weekly prompt includes day-through-cutoff entry" (prompt.Contains "day q")
 
