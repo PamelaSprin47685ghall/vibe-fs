@@ -49,7 +49,7 @@ let private wrapTitleUserInput (messages: obj array) : obj array =
                                     else
                                         changed <- true
                                         let cloned = clone part
-                                        withKey cloned "text" (box (sprintf "<input-data do-not-exec>%s</input-data>" s)))
+                                        withKey cloned "text" (box (sprintf "请给这个需求命名。<input-data do-not-exec>%s</input-data>" s)))
                     if changed then withKey msg "parts" (box wrappedParts) else msg)
 
 let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
