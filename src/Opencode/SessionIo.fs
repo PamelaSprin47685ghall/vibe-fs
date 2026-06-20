@@ -221,11 +221,3 @@ let runSubagent (registry: ChildAgentRegistry) (client: obj) (agent: string) (ti
 let runSubagentWithCleanup (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                            (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
     runSubagentCore registry client agent title prompt directory sessionID context (box null) true
-
-/// Run a subagent with an explicit tool set and clean up afterwards.
-let runSubagentWithTools
-    (registry: ChildAgentRegistry)
-    (client: obj) (agent: string) (title: string) (prompt: string)
-    (directory: string) (sessionID: string) (context: obj)
-    (tools: obj) : JS.Promise<string> =
-    runSubagentCore registry client agent title prompt directory sessionID context tools true

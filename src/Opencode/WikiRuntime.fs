@@ -27,6 +27,12 @@ open VibeFs.Mux.AiSettings
 type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> System.DateTime, registry: ChildAgentRegistry) =
     let mutable state = initialWikiState
     let commandQueue = SerialQueue()
+    // Background bookkeeper launches run their full LLM round-trip here, off the
+    // latency-critical `commandQueue`. Otherwise a fire-and-forget launch would
+    // chain ahead of `EnsureSessionSnapshot`/`StartMaintenanceIfDue` on the same
+    // serial queue and stall the parent agent's next turn until the bookkeeper
+    // reply lands — defeating fire-and-forget.
+    let launchQueue = SerialQueue()
     let writeQueues = Dictionary<string, SerialQueue>()
     let registeredJobs = Dictionary<string, WikiJobContext>()
     let workspaceRoot = initialWorkspaceRoot
@@ -53,7 +59,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         applyCmd (UpdateLatestLaunchResultCmd (title, result))
 
     let launchBg root parentID kind title buildPrompt aiSettings maintenanceKey =
-        queueBackgroundLaunch client commandQueue (recordBackgroundResult title) root parentID kind title buildPrompt aiSettings maintenanceKey registry
+        queueBackgroundLaunch client launchQueue (recordBackgroundResult title) root parentID kind title buildPrompt aiSettings maintenanceKey registry
 
     member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<WikiProjection> =
         if sessionID = "" then Promise.lift Map.empty
@@ -185,4 +191,10 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         launches |> List.map box |> List.toArray
 
     member _.WaitForBackgroundJobsForTesting() : JS.Promise<unit> =
-        commandQueue.Enqueue(fun () -> Promise.lift ())
+        promise {
+            // Maintenance enqueues launches from inside a commandQueue task, so
+            // drain commandQueue first to schedule every launch, then drain
+            // launchQueue to await their background LLM round-trips.
+            do! commandQueue.Enqueue(fun () -> Promise.lift ())
+            do! launchQueue.Enqueue(fun () -> Promise.lift ())
+        }
