@@ -18,10 +18,12 @@ let headTail' () =
 
 let dedup' () =
     let s = createDedupState ()
-    let r1 = deduplicate s.seenContents "same"
-    let r2 = deduplicate r1.seenOutputs "same"
-    check "dedup first" (r1.output = "same")
+    let r1 = deduplicate s.seenContents "same string"
+    let r2 = deduplicate r1.seenOutputs "same string"
+    let r3 = deduplicate r1.seenOutputs "same"
+    check "dedup first" (r1.output = "same string")
     check "dedup second" (r2.output = dedupMarker)
+    check "dedup substring" (r3.output = dedupMarker)
 
 let jsBoundary' () =
     check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = VibeFs.Kernel.Domain.MessageAborted)

@@ -236,14 +236,10 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
             "__wikiRuntime"
             (box (
                 createObj [
+                    "rawInstance", box wikiRuntime
                     "registerJobForTesting",
                     box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
                         wikiRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
-                    "takeJobForTesting",
-                    box (System.Func<string, obj>(fun sessionID ->
-                        match wikiRuntime.TakeJob(sessionID) with
-                        | Some ctx -> box ctx
-                        | None -> null))
                     "takeBookkeeperLaunchesForTesting",
                     box (System.Func<obj array>(fun () -> wikiRuntime.TakeBookkeeperLaunchesForTesting()))
                     "waitForBackgroundJobsForTesting",

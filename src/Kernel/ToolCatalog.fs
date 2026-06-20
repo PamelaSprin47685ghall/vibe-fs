@@ -23,7 +23,7 @@ let private coderSpec : ToolSpec =
               "tdd",
               "TDD phase for this coder call. red = this edit is the RED phase: write the failing test, or the code that fails it; the result must leave tests failing. green = this edit is the GREEN phase: make the failing tests pass. "
               + "Discipline: for a new requirement the requirement comes first; for a bug fix the regression comes first. Always go red before green for any unit of work. "
-              + "You MUST issue a tdd=red coder call before any tdd=green coder call for the same work; a green call with no preceding red in the session is a violation and will be rejected. Declare the phase truthfully." ]
+              + "You MUST issue a tdd=red coder call before any tdd=green coder call for the same work; a green call with no preceding red in the session is usually a violation and tends to be rejected. Declare the phase truthfully." ]
       requiredFields = [ "intents"; "tdd" ] }
 
 let private investigatorSpec : ToolSpec =

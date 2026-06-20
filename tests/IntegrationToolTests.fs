@@ -1076,7 +1076,7 @@ let executorActorSpec () = async {
     let gateAsync =
         Async.FromContinuations(fun (resolve, _, _) ->
             gateResolve.Value <- resolve
-            if !releaseRequested then resolve ())
+            if releaseRequested.Value then resolve ())
     let first = post "session-1" (fun () ->
         async {
             seen.Add "first-start"
@@ -1105,7 +1105,7 @@ let wikiActorSpec () = async {
     let gateAsync =
         Async.FromContinuations(fun (resolve, _, _) ->
             gateResolve.Value <- resolve
-            if !releaseRequested then resolve ())
+            if releaseRequested.Value then resolve ())
     actor.Post("ws-1", fun () -> async {
         seen.Add "first-start"
         do! gateAsync
@@ -1124,15 +1124,11 @@ let wikiActorSpec () = async {
 let jobContextCleanupOnAbortOrDeleteSpec () = async {
     let! workspaceDir = mkdtempAsync "job-cleanup-" |> Async.AwaitPromise
     let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
-    let wikiRuntime = pluginWikiRuntime p
-    let register = get wikiRuntime "registerJobForTesting" :?> System.Func<string, string, string, obj, unit>
-    let take = get wikiRuntime "takeJobForTesting" :?> System.Func<string, obj>
-    
-    // Register a mock job
-    register.Invoke("session-to-abort", workspaceDir, "append", box null)
-    check "job exists initially" (not (isNullish (take.Invoke "session-to-abort")))
-    
-    // Dispatch stream-abort event
+    let wikiRuntime = get (pluginWikiRuntime p) "rawInstance" :?> WikiRuntime
+
+    wikiRuntime.RegisterJob("session-to-abort", { workspaceRoot = workspaceDir; kind = AppendAfterWork })
+    check "job exists initially" (wikiRuntime.TakeJob("session-to-abort").IsSome)
+
     let eventHandler = get p "event" :?> System.Func<obj, JS.Promise<unit>>
     let abortEvent =
         box {|
@@ -1144,13 +1140,11 @@ let jobContextCleanupOnAbortOrDeleteSpec () = async {
             |}
         |}
     do! eventHandler.Invoke(abortEvent) |> Async.AwaitPromise
-    check "job is removed after stream-abort" (isNullish (take.Invoke "session-to-abort"))
+    check "job is removed after stream-abort" (wikiRuntime.TakeJob("session-to-abort").IsNone)
 
-    // Register another job
-    register.Invoke("session-to-delete", workspaceDir, "append", box null)
-    check "second job exists initially" (not (isNullish (take.Invoke "session-to-delete")))
-    
-    // Dispatch session.delete event
+    wikiRuntime.RegisterJob("session-to-delete", { workspaceRoot = workspaceDir; kind = AppendAfterWork })
+    check "second job exists initially" (wikiRuntime.TakeJob("session-to-delete").IsSome)
+
     let deleteEvent =
         box {|
             event = box {|
@@ -1163,8 +1157,8 @@ let jobContextCleanupOnAbortOrDeleteSpec () = async {
             |}
         |}
     do! eventHandler.Invoke(deleteEvent) |> Async.AwaitPromise
-    check "second job is removed after session.delete" (isNullish (take.Invoke "session-to-delete"))
-    
+    check "second job is removed after session.delete" (wikiRuntime.TakeJob("session-to-delete").IsNone)
+
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 

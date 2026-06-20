@@ -59,6 +59,12 @@ let dedupPerPathSameSpec () =
     let r = deduplicateReadOutputs msgs
     check "dedup same path: second marked" (unbox<string> (firstOutput r.[1]) = "[No Change Since Previous Read/Write]")
 
+let dedupSubstringSpec () =
+    let msgs = [| readMsg "read" (box "hello world foo bar") "1"; readMsg "read" (box "hello world") "2" |]
+    let r = deduplicateReadOutputs msgs
+    check "dedup substring: keeps first longer output" (unbox<string> (firstOutput r.[0]) = "hello world foo bar")
+    check "dedup substring: marks substring against longer seen" (unbox<string> (firstOutput r.[1]) = "[No Change Since Previous Read/Write]")
+
 let dedupDifferentSpec () =
     let msgs = [| readMsg "read" (box "unique a") "1"; readMsg "read" (box "unique b") "2" |]
     let r = deduplicateReadOutputs msgs
@@ -266,6 +272,7 @@ let run () : JS.Promise<unit> =
         dedupObjectOutputSpec ()
         dedupPerPathDifferentSpec ()
         dedupPerPathSameSpec ()
+        dedupSubstringSpec ()
         dedupDifferentSpec ()
         dedupNonReadSpec ()
         dedupEmptySpec ()
