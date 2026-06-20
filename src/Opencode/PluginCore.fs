@@ -225,7 +225,7 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
             let nowMs = Dyn.get ctx "nowMs"
             if Dyn.isNullish nowMs then System.DateTime.UtcNow
             else System.DateTimeOffset.FromUnixTimeMilliseconds(int64 (unbox<float> nowMs)).UtcDateTime
-        let wikiRuntime = WikiRuntime(Dyn.get ctx "client", directory, nowUtc)
+        let wikiRuntime = WikiRuntime(Dyn.get ctx "client", directory, nowUtc, childAgentRegistry)
         let magicSession = MagicSession host
         let tools = createTools childAgentRegistry finderCache ctx wikiRuntime reviewStore
         let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}

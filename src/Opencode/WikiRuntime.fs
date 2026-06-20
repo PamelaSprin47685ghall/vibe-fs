@@ -10,6 +10,7 @@ open VibeFs.Kernel.WikiMaintenance
 open VibeFs.Shell.WikiFiles
 open VibeFs.Shell.WikiPortLock
 open VibeFs.Shell.PromiseQueue
+open VibeFs.Shell.ChildAgentRegistry
 
 type BookkeeperLaunch =
     { agent: string
@@ -118,7 +119,7 @@ let private reducer (state: WikiState) (cmd: WikiCommand) : WikiState =
 let private invoke1 (target: obj) (methodName: string) (arg: obj) : JS.Promise<obj> =
     unbox (target?(methodName)(arg))
 
-type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> System.DateTime) =
+type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> System.DateTime, registry: ChildAgentRegistry) =
     let mutable state = initialWikiState
     let commandQueue = SerialQueue()
     let writeQueues = Dictionary<string, SerialQueue>()
@@ -174,6 +175,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                     if childId <> "" then
                         sessionId <- childId
                         state <- reducer state (RegisterJobCmd (childId, { workspaceRoot = root; kind = kind }))
+                        registry.RegisterChildAgent(childId, "bookkeeper", None)
                         let promptBody =
                             box {| path = box {| id = childId |}
                                    body = box {| agent = "bookkeeper"
@@ -181,7 +183,9 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                                                  tools = box (createObj [ "submit_wiki", box true ]) |} |}
                         do! invoke1 session "prompt" promptBody |> Promise.map ignore
                 with _ ->
-                    if sessionId <> "" then state <- reducer state (RemoveJobCmd sessionId)
+                    if sessionId <> "" then
+                        registry.UnregisterChildAgent(sessionId)
+                        state <- reducer state (RemoveJobCmd sessionId)
         }
 
     let queueBackgroundLaunch (root: string) (kind: WikiJobKind) (title: string) (buildPrompt: unit -> JS.Promise<string>) : unit =
@@ -272,6 +276,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         tryJob state sessionID
 
     member _.DeleteJob(sessionID: string) : unit =
+        registry.UnregisterChildAgent(sessionID)
         state <- reducer state (RemoveJobCmd sessionID)
 
     member _.Submit(sessionID: string, drafts: WikiDraft list) : JS.Promise<string> =
@@ -284,6 +289,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                         let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind ctx.workspaceRoot ctx.kind drafts)
                         return result
                     finally
+                        registry.UnregisterChildAgent(sessionID)
                         state <- reducer state (RemoveJobCmd sessionID)
             })
 

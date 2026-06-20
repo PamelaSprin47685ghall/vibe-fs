@@ -1232,6 +1232,46 @@ let jobContextCleanupOnAbortOrDeleteSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let bookkeeperSessionRegisteredInChildAgentRegistrySpec () = promise {
+    let mockClient =
+        createObj [ "session", box (createObj [
+            "create", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (promise { return box {| data = box {| id = "child-bk-session" |} |} })))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ())))
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (promise { return box {| data = [|
+                    box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "text"; text = "Coder finished" |} |] |}
+                |] |} })))
+            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ())))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "bookkeeper-registry-"
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
+    let coder = get (get p "tool") "coder"
+    let intents : obj array = [|
+        createObj [
+            "objective", box "fix bug"
+            "background", box "test background"
+            "targets", box [| createObj [ "file", box "a.ts"; "guide", box "test guide" ] |]
+        ]
+    |]
+    let! _coderResult =
+        ((get coder "execute")
+            $ (createObj [ "intents", box intents ], createObj [ "directory", box workspaceDir; "sessionID", box "bk-parent"; "abort", box null ])
+        |> unbox<JS.Promise<string>>)
+    do! waitForBackgroundJobsForTesting p
+
+    let chatMessage = get p "chat.message"
+    let tools = createObj [ "submit_wiki", box true ]
+    let message = createObj [ "tools", box tools ]
+    let output = createObj [ "message", box message; "parts", box [||] ]
+    let input = createObj [ "sessionID", box "child-bk-session" ]
+    do! chatMessage $ (input, output) |> unbox<JS.Promise<unit>>
+
+    let resolvedTools = get (get output "message") "tools"
+    check "bookkeeper session keeps submit_wiki enabled" (unbox<bool> (get resolvedTools "submit_wiki") = true)
+    do! rmAsync workspaceDir
+}
+
 let run () : JS.Promise<unit> =
     promise {
         let reg = createRegistration (createObj [])
@@ -1276,4 +1316,5 @@ let run () : JS.Promise<unit> =
         do! executorActorSpec ()
         do! wikiWorkspaceSerializationSpec ()
         do! jobContextCleanupOnAbortOrDeleteSpec ()
+        do! bookkeeperSessionRegisteredInChildAgentRegistrySpec ()
     }
