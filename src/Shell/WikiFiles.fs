@@ -78,11 +78,12 @@ let ensureTodayFile (workspaceRoot: string) (today: string) : JS.Promise<unit> =
 
 let appendEntries (workspaceRoot: string) (today: string) (entries: WikiEntry list) : JS.Promise<unit> =
     async {
-        do! ensureTodayFile workspaceRoot today |> Async.AwaitPromise
-        let p = dayPath workspaceRoot today
-        let data = entries |> List.map (fun e -> renderEntry e + "\n") |> String.concat ""
-        if data <> "" then
-            do! (fsPromises?appendFile(p, data, "utf-8") |> asPromise<unit>) |> Async.AwaitPromise
+        if not entries.IsEmpty then
+            do! ensureTodayFile workspaceRoot today |> Async.AwaitPromise
+            let p = dayPath workspaceRoot today
+            let data = entries |> List.map (fun e -> renderEntry e + "\n") |> String.concat ""
+            if data <> "" then
+                do! (fsPromises?appendFile(p, data, "utf-8") |> asPromise<unit>) |> Async.AwaitPromise
     }
     |> Async.StartAsPromise
 

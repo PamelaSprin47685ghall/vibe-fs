@@ -12,7 +12,8 @@ type BookkeeperLaunch =
     { agent: string
       title: string
       prompt: string
-      result: string }
+      result: string
+      rwSummary: string }
 
 type WikiJobKind =
     | AppendAfterWork
@@ -156,20 +157,30 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
             | DayHeader(day, _) when day <= throughDate -> file.entries
             | _ -> [])
 
-    let buildAppendPrompt (title: string) (workInput: string) (workOutput: string) (projection: WikiProjection) : string =
-        String.concat "\n\n"
-            [ "You are the project wiki bookkeeper."
-              "Submit exactly one `submit_wiki` call. Reuse existing ids when facts update, omit ids for new durable facts, and submit `[]` if nothing durable should be recorded."
-              "=== Existing Wiki ==="
-              projectionText projection
-              "=== Work Title ==="
-              title
-              "=== Work Input ==="
-              workInput
-              "=== Work Output ==="
-              workOutput
-              "=== Output Rules ==="
-              "Record only stable project knowledge. Do not record temporary errors, progress chatter, or command noise." ]
+    let buildAppendPrompt (title: string) (workInput: string) (workOutput: string) (rwSummary: string) (projection: WikiProjection) : string =
+        let rwSection =
+            if System.String.IsNullOrWhiteSpace rwSummary then None
+            else Some ("=== RW Tool Summary ===\n" + rwSummary.Trim())
+        let coreSections = [
+            "You are the project wiki bookkeeper."
+            "Submit exactly one `submit_wiki` call. Reuse existing ids when facts update, omit ids for new durable facts, and submit `[]` if nothing durable should be recorded."
+            "=== Existing Wiki ==="
+            projectionText projection
+            "=== Work Title ==="
+            title
+            "=== Work Input ==="
+            workInput
+            "=== Work Output ==="
+            workOutput
+        ]
+        let withRw =
+            match rwSection with
+            | Some section -> coreSections @ [ section ]
+            | None -> coreSections
+        String.concat "\n\n" (withRw @ [
+            "=== Output Rules ==="
+            "Record only stable project knowledge. Do not record temporary errors, progress chatter, or command noise."
+        ])
 
     let buildDailyPrompt (date: string) (files: WikiFile list) (projection: WikiProjection) : string =
         String.concat "\n\n"
@@ -264,7 +275,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
     let recordLaunchOnce (root: string) (kind: string) (value: string) (title: string) (prompt: string) (result: string) : bool =
         let key = root + "|" + kind + "|" + value
         if scheduledMaintenance.Add key then
-            bookkeeperLaunches.Add { agent = "bookkeeper"; title = title; prompt = prompt; result = result }
+            bookkeeperLaunches.Add { agent = "bookkeeper"; title = title; prompt = prompt; result = result; rwSummary = "" }
             true
         else
             false
@@ -377,7 +388,8 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         match directWriteTurns.TryGetValue sessionID with
         | true, (summaries, true) ->
             directWriteTurns.Remove sessionID |> ignore
-            this.StartBookkeeperAppend(String.concat "\n" (summaries |> Seq.toList), assistantText, "Direct write tools")
+            let rwSummary = String.concat "\n" (summaries |> Seq.toList)
+            this.StartBookkeeperAppend(rwSummary, assistantText, "Direct write tools", rwSummary)
         | _ -> ()
 
     member _.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
@@ -433,15 +445,15 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         }
         |> Async.StartAsPromise
 
-    member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string) : unit =
-        bookkeeperLaunches.Add { agent = agent; title = title; prompt = prompt; result = result }
+    member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string, rwSummary: string) : unit =
+        bookkeeperLaunches.Add { agent = agent; title = title; prompt = prompt; result = result; rwSummary = rwSummary }
 
-    member this.StartBookkeeperAppend(prompt: string, result: string, title: string) : unit =
-        this.RecordBookkeeperLaunch("bookkeeper", title, prompt, result)
+    member this.StartBookkeeperAppend(prompt: string, result: string, title: string, rwSummary: string) : unit =
+        this.RecordBookkeeperLaunch("bookkeeper", title, prompt, result, rwSummary)
         let root = effectiveWorkspaceRoot workspaceRoot
         queueBackgroundLaunch root AppendAfterWork title (fun () -> async {
             let! projection = readProjection root |> Async.AwaitPromise
-            return buildAppendPrompt title prompt result projection
+            return buildAppendPrompt title prompt result rwSummary projection
         })
 
     member _.TakeBookkeeperLaunchesForTesting() : obj array =
