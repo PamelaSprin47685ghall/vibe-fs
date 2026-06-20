@@ -546,6 +546,29 @@ let submitWikiAppendEmptySpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let submitWikiSchemaAllowsEmptySpec () = promise {
+    let! workspaceDir = mkdtempAsync "submit-wiki-schema-empty-"
+    let! p = plugin (box {| directory = workspaceDir |})
+    let submitDef = submitWikiTool p
+    let argsSchema = get submitDef "args"
+    let entriesSchema =
+        let direct = get argsSchema "entries"
+        if not (isNullish direct) then direct
+        else
+            let shape = get argsSchema "shape"
+            if not (isNullish shape) then get shape "entries" else null
+    check "submit_wiki entries schema is exposed" (not (isNullish entriesSchema))
+    let empty : obj = box (Array.empty<obj>)
+    let parsed = entriesSchema?safeParse(empty)
+    let success = unbox<bool> (get parsed "success")
+    check "submit_wiki entries schema accepts empty array" success
+    let filled : obj = box [| wikiDraftEntry None "q" "a" |]
+    let parsedFilled = entriesSchema?safeParse(filled)
+    let successFilled = unbox<bool> (get parsedFilled "success")
+    check "submit_wiki entries schema still accepts a valid entry" successFilled
+    do! rmAsync workspaceDir
+}
+
 let submitWikiDailyRewriteSpec () = promise {
     let! workspaceDir = mkdtempAsync "submit-wiki-daily-"
     do! ensureWikiDir workspaceDir
@@ -1228,6 +1251,7 @@ let run () : JS.Promise<unit> =
         do! directPatchWriteAggregationSpec ()
         do! submitWikiAppendSpec ()
         do! submitWikiAppendEmptySpec ()
+        do! submitWikiSchemaAllowsEmptySpec ()
         do! submitWikiDailyRewriteSpec ()
         do! submitWikiWeeklyRewriteSpec ()
         do! writeToolSpec reg

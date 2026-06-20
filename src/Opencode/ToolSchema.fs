@@ -84,7 +84,7 @@ let wikiDraftEntriesReq (desc: string) : obj =
                 "q", strReq "Wiki question"
                 "a", strReq "Wiki answer"
             ])
-    arrayMin entryShape 1 desc
+    call1 (arr entryShape) "describe" (box desc)
 
 let numOpt (desc: string) : obj =
     let n = call0 schema "number"
