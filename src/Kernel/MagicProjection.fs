@@ -31,27 +31,25 @@ let private todoIndexesFor (host: Host) (flat: FlatPart list) : int list =
 let private todoIndexes (flat: FlatPart list) : int list =
     todoIndexesFor opencode flat
 
+let private splitOn (isBreak: 'a -> bool) (xs: 'a list) : 'a list list =
+    let rec go revSegs revCur = function
+        | x :: rest when isBreak x -> go (List.rev revCur :: revSegs) [] rest
+        | x :: rest -> go revSegs (x :: revCur) rest
+        | [] -> List.rev revCur :: revSegs |> List.rev
+    go [] [] xs
+
 let private todoSegmentEndIndexesFor (host: Host) (flat: FlatPart list) : int list =
     match host with
     | Opencode -> todoIndexesFor host flat
     | Mimocode ->
-        if flat.IsEmpty then []
-        else
-            let inBurst, lastAnchor, endsRev =
-                flat
-                |> List.indexed
-                |> List.fold
-                    (fun (inBurst, lastAnchor, endsRev) (i, fp) ->
-                        if isTodoResultFor host fp.part then
-                            (true, (if isFoldAnchorFor host fp.part then i else lastAnchor), endsRev)
-                        elif inBurst && breaksTodoBurstFor host fp then
-                            (false, -1, (if lastAnchor >= 0 then lastAnchor :: endsRev else endsRev))
-                        else
-                            (inBurst, lastAnchor, endsRev))
-                    (false, -1, [])
-            let endsRev =
-                if inBurst && lastAnchor >= 0 then lastAnchor :: endsRev else endsRev
-            List.rev endsRev
+        flat
+        |> List.indexed
+        |> splitOn (fun (_, fp) -> breaksTodoBurstFor host fp)
+        |> List.choose (fun segment ->
+            segment
+            |> List.filter (fun (_, fp) -> isFoldAnchorFor host fp.part)
+            |> List.tryLast
+            |> Option.map fst)
 
 let private foldTodoAnchorsFor (host: Host) (flat: FlatPart list) : int list =
     todoSegmentEndIndexesFor host flat
