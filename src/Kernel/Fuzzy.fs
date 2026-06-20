@@ -284,7 +284,13 @@ let parseExcludeField (args: obj) : string list =
     else [ string v ]
 
 let buildGrepOutput (body: string) (regexError: string option) (nextIterator: string) : string =
-    let regexNotice = regexError |> Option.map (fun error -> sprintf "Invalid regex: %s, used literal match" error)
-    let iteratorNotice = if nextIterator = "" then None else Some(sprintf "iterator=\"%s\"" nextIterator)
-    let notices = (regexNotice |> Option.toList) @ (iteratorNotice |> Option.toList)
-    if notices.IsEmpty then body else sprintf "%s\n\n[%s]" body (String.concat ". " notices)
+    let notices =
+        [
+            regexError |> Option.map (fun error -> sprintf "Invalid regex: %s, used literal match" error)
+            if nextIterator <> "" then Some(sprintf "iterator=\"%s\"" nextIterator) else None
+        ]
+        |> List.choose id
+    if notices.IsEmpty then body
+    else
+        let joined = String.concat ". " notices
+        sprintf "%s\n\n[%s]" body joined

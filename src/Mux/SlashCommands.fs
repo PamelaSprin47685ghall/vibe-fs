@@ -50,7 +50,7 @@ let private pluginConfigForSlash (deps: obj) (workspaceId: WorkspaceId) : JS.Pro
 
 let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     box {| key = "loop"
-           description = "Activate review loop mode. AI completes task, submits for review."
+           description = "Activate review With-Review Mode. AI completes task, submits for review."
            inputHint = "<task description>"
            execute = System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
                 match Id.tryWorkspaceId workspaceIdStr with
@@ -59,12 +59,12 @@ let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) 
                     let task = args.Trim()
                     if task = "" then
                         reviewStore.deactivateReview (Id.workspaceIdValue wid)
-                        Promise.lift "Loop mode cancelled."
+                        Promise.lift "With-Review Mode cancelled."
                     elif reviewStore.isReviewActive (Id.workspaceIdValue wid) then
-                        Promise.lift "Loop mode is already active. Submit your work via submit_review."
+                        Promise.lift "With-Review Mode is already active. Submit your work via submit_review."
                     else
                         reviewStore.activateReview(Id.workspaceIdValue wid, task, dateNow ())
-                        Promise.lift (buildLoopMessage task [ "Loop mode is active. Complete the task above, then call submit_review with:" ])) |}
+                        Promise.lift (buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ])) |}
 
 let private parseLoopReviewVerdict (args: obj option) (report: string) : bool * string =
     match args with
@@ -87,9 +87,9 @@ let private loopReviewExecute
     let workspaceIdStr = Id.workspaceIdValue workspaceId
     if task = "" then
         reviewStore.deactivateReview workspaceIdStr
-        Promise.lift "Loop mode cancelled."
+        Promise.lift "With-Review Mode cancelled."
     elif reviewStore.isReviewActive workspaceIdStr then
-        Promise.lift "Loop mode is already active. Submit your work via submit_review."
+        Promise.lift "With-Review Mode is already active. Submit your work via submit_review."
     else
         promise {
             let! config = pluginConfigForSlash deps workspaceId
@@ -117,20 +117,20 @@ let private loopReviewExecute
             let isPass, feedback = parseLoopReviewVerdict verdictArgs reportText
             match outcome with
             | TimedOut ->
-                return buildLoopMessage task [ "Loop mode was NOT activated because the pre-review timed out. Please retry /loop-review." ]
+                return buildLoopMessage task [ "With-Review Mode was NOT activated because the pre-review timed out. Please retry /loop-review." ]
             | Report _ ->
                 reviewStore.activateReview(workspaceIdStr, task, dateNow ())
                 return
                     if isPass then
-                        buildLoopMessage task [ "Loop mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
+                        buildLoopMessage task [ "With-Review Mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
                     else
-                        buildLoopMessage task [ "Pre-review feedback:"; ""; feedback; ""; "Loop mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
+                        buildLoopMessage task [ "Pre-review feedback:"; ""; feedback; ""; "With-Review Mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
         }
 
 let createLoopReviewCommand (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     box
         {| key = "loop-review"
-           description = "Pre-review task description with a reviewer sub-agent, then activate review loop mode."
+           description = "Pre-review task description with a reviewer sub-agent, then activate review With-Review Mode."
            inputHint = "<task description>"
            execute =
                System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->

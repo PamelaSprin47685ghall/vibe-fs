@@ -26,26 +26,19 @@ type ReviewEvent =
     | Rejected of feedback: string
 
 let transition (state: ReviewState) (command: ReviewCommand) : ReviewState * ReviewEvent option =
-    match state with
-    | ReviewState.Inactive ->
-        match command with
-        | Activate task -> ReviewState.Active task, Some(ReviewEvent.Activated task)
-        | _ -> state, None
-    | ReviewState.Active task ->
-        match command with
-        | Submit -> state, Some ReviewEvent.Submitted
-        | Lock reviewerId -> ReviewState.Locked(task, reviewerId), Some(ReviewEvent.LockAcquired reviewerId)
-        | Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
-        | Reject feedback -> ReviewState.Rejected feedback, Some(ReviewEvent.Rejected feedback)
-        | _ -> state, None
-    | ReviewState.Locked(task, _) ->
-        match command with
-        | Unlock -> ReviewState.Active task, Some ReviewEvent.LockReleased
-        | Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
-        | Reject feedback -> ReviewState.Rejected feedback, Some(ReviewEvent.Rejected feedback)
-        | _ -> state, None
-    | ReviewState.Accepted -> state, None
-    | ReviewState.Rejected _ -> state, None
+    match state, command with
+    | ReviewState.Inactive, Activate task ->
+        ReviewState.Active task, Some(ReviewEvent.Activated task)
+    | ReviewState.Active task, Submit ->
+        ReviewState.Active task, Some ReviewEvent.Submitted
+    | ReviewState.Active task, Lock reviewerId ->
+        ReviewState.Locked(task, reviewerId), Some(ReviewEvent.LockAcquired reviewerId)
+    | ReviewState.Active _, Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
+    | ReviewState.Active _, Reject feedback -> ReviewState.Rejected feedback, Some(ReviewEvent.Rejected feedback)
+    | ReviewState.Locked(task, _), Unlock -> ReviewState.Active task, Some ReviewEvent.LockReleased
+    | ReviewState.Locked _, Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
+    | ReviewState.Locked _, Reject feedback -> ReviewState.Rejected feedback, Some(ReviewEvent.Rejected feedback)
+    | _ -> state, None
 
 let isActive (state: ReviewState) : bool =
     match state with
@@ -115,17 +108,18 @@ let emptyRegistry : Registry = Map.empty
 
 let private set registry id session = Map.add id session registry
 
-let private transitionIn registry id command (extra: ReviewSession -> ReviewSession) =
-    match Map.tryFind id registry with
-    | None -> registry
-    | Some session ->
-        let updated = applyCommand session command
-        if updated = session then registry else set registry id (extra updated)
-
-let private patch registry id f =
+let private updateSession registry id f =
     match Map.tryFind id registry with
     | None -> registry
     | Some session -> set registry id (f session)
+
+/// Apply a review command to the session at `id`, then run `extra` on the
+/// result only when the state actually changed. Structural equality makes the
+/// no-op case a no-write (REFACTOR.md §2).
+let private transitionSession registry id command extra =
+    updateSession registry id (fun session ->
+        let updated = applyCommand session command
+        if updated = session then session else extra updated)
 
 let private evictStale registry cutoff : Registry =
     let changed =
@@ -145,17 +139,17 @@ let reduce (registry: Registry) (action: RegistryAction) : Registry =
             |> withTask task
         set registry id (applyCommand seed (ReviewCommand.Activate task))
     | RegistryAction.Lock (id, reviewerId) ->
-        transitionIn registry id (ReviewCommand.Lock reviewerId) (fun s -> s)
+        transitionSession registry id (ReviewCommand.Lock reviewerId) (fun s -> s)
     | RegistryAction.Unlock id ->
-        transitionIn registry id ReviewCommand.Unlock (fun s -> s)
+        transitionSession registry id ReviewCommand.Unlock (fun s -> s)
     | RegistryAction.Accept id ->
-        transitionIn registry id ReviewCommand.Accept (fun s -> s)
+        transitionSession registry id ReviewCommand.Accept (fun s -> s)
     | RegistryAction.Reject (id, feedback) ->
-        transitionIn registry id (ReviewCommand.Reject feedback) (fun s -> withFeedback s feedback)
+        transitionSession registry id (ReviewCommand.Reject feedback) (fun s -> withFeedback s feedback)
     | RegistryAction.Deactivate id -> Map.remove id registry
     | RegistryAction.Evict cutoff -> evictStale registry cutoff
     | RegistryAction.AddChild (parentId, childId) ->
-        patch registry parentId (fun s -> addChild s childId)
+        updateSession registry parentId (fun s -> addChild s childId)
     | RegistryAction.Clear -> emptyRegistry
 
 // ── Queries ──────────────────────────────────────────────────────────────────

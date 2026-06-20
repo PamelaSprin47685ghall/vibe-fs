@@ -80,6 +80,16 @@ let findPagingDefault () =
 let emptyIteratorNotRendered () =
     equal "empty iterator omitted" "body" (buildGrepOutput "body" None "")
 
+/// characterization: lock the exact notice-block output of buildGrepOutput for
+/// the combined (regex + iterator) and regex-only cases before refactoring.
+let grepOutputNotices () =
+    equal "combined regex and iterator notice"
+        "body\n\n[Invalid regex: bad regex, used literal match. iterator=\"iter1\"]"
+        (buildGrepOutput "body" (Some "bad regex") "iter1")
+    equal "regex-only notice"
+        "body\n\n[Invalid regex: bad regex, used literal match]"
+        (buildGrepOutput "body" (Some "bad regex") "")
+
 /// totalMatched has three semantics, all guarded here with exact header lines:
 ///   Some n (n ≠ items.Length) — header uses n verbatim
 ///   Some 0                   — header is "0 matches" / "0 matching files" (not items.Length)

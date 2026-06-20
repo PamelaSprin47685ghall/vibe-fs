@@ -297,7 +297,7 @@ let private formatReviewResult = VibeFs.Kernel.Prompts.formatReviewResult
 
 let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     let client () = Dyn.get ctx "client"
-    define "Submit your work for review (loop mode)."
+    define "Submit your work for review (With-Review Mode)."
         (box {| report = strReq "Detailed report of what you did"; affectedFiles = strArrayOpt "Files you modified" |})
         (fun args context ->
             let tc = extractToolContext context (Dyn.str ctx "directory")

@@ -61,6 +61,7 @@ let runAll (_args: string array) : JS.Promise<int> =
         FuzzyTests.findPagingDefault ()
         FuzzyTests.emptyIteratorNotRendered ()
         FuzzyTests.totalMatchedSemantics ()
+        FuzzyTests.grepOutputNotices ()
         FuzzyTests.iteratorNamespaceConstants ()
         FuzzyTests.iteratorStoreStronglyTyped ()
         FuzzyTests.runWithFinderSharedPipeline ()
