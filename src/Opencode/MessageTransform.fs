@@ -12,6 +12,7 @@ open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.MagicProjection
 open VibeFs.Kernel.Dedup
 open VibeFs.Kernel.CapsFormat
+open VibeFs.Kernel.Config
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Opencode.MessagingCodec
@@ -143,7 +144,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                             do! wikiRuntime.StartMaintenanceIfDue(directory)
                         let! capsFiles = CapsFileCache.getOrLoad sessionID directory
                         let! wikiPrelude =
-                            if agent = "manager" then wikiRuntime.BuildPreludeForSession(sessionID, directory)
+                            if canUse agent "fuzzy_find" then wikiRuntime.BuildPreludeForSession(sessionID, directory)
                             else Promise.lift (None: string option)
                         let final =
                             buildCapsMessages

@@ -41,10 +41,26 @@ let rec private acquireLoop (port: int) : JS.Promise<obj> =
             return! acquireLoop port
     }
 
+let private acquireTimeoutMs = 30000L
+
+let rec private acquireLoopUntil (port: int) (deadlineMs: int64) : JS.Promise<obj> =
+    promise {
+        try
+            let! server = listenServer port
+            return server
+        with _ ->
+            if System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() >= deadlineMs then
+                return raise (exn ($"Timed out acquiring wiki port lock on 127.0.0.1:{port}"))
+            else
+                do! Promise.sleep 1000
+                return! acquireLoopUntil port deadlineMs
+    }
+
 let withWikiPortLock (workspaceRoot: string) (work: unit -> JS.Promise<'a>) : JS.Promise<'a> =
     promise {
         let port = lockPortForPath workspaceRoot
-        let! server = acquireLoop port
+        let deadlineMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + acquireTimeoutMs
+        let! server = acquireLoopUntil port deadlineMs
         try
             let! result = work ()
             do! closeServer server

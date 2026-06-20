@@ -23,26 +23,15 @@ type DirectWriteTurn = { rwSummaries: string list; dirty: bool }
 /// maintenance cycle may retrigger the same triple.
 type WikiState =
     { sessionSnapshots: Map<string, WikiProjection>
-      jobContexts: Map<string, WikiJobContext>
       bookkeeperLaunches: BookkeeperLaunch list
       directWriteTurns: Map<string, DirectWriteTurn>
       scheduledMaintenance: Set<string> }
 
 let initialWikiState : WikiState =
     { sessionSnapshots = Map.empty
-      jobContexts = Map.empty
       bookkeeperLaunches = []
       directWriteTurns = Map.empty
       scheduledMaintenance = Set.empty }
-
-let private registerJob (state: WikiState) (sessionID: string) (ctx: WikiJobContext) : WikiState =
-    { state with jobContexts = Map.add sessionID ctx state.jobContexts }
-
-let private removeJob (state: WikiState) (sessionID: string) : WikiState =
-    { state with jobContexts = Map.remove sessionID state.jobContexts }
-
-let tryJob (state: WikiState) (sessionID: string) : WikiJobContext option =
-    Map.tryFind sessionID state.jobContexts
 
 let private cacheSnapshot (state: WikiState) (sessionID: string) (projection: WikiProjection) : WikiState =
     { state with sessionSnapshots = Map.add sessionID projection state.sessionSnapshots }
@@ -62,6 +51,20 @@ let consumeDirtyTurn (state: WikiState) (sessionID: string) : string option * Wi
 
 let private recordLaunch (state: WikiState) (launch: BookkeeperLaunch) : WikiState =
     { state with bookkeeperLaunches = state.bookkeeperLaunches @ [ launch ] }
+
+let private updateLatestLaunchResult (state: WikiState) (title: string) (result: string) : WikiState =
+    let rec loop rev remaining =
+        match remaining with
+        | [] -> List.rev rev
+        | launch :: rest ->
+            let tail = List.rev rev
+            if List.exists (fun candidate -> candidate.title = title) (launch :: rest) then
+                loop (launch :: rev) rest
+            else if launch.title = title then
+                List.rev ({ launch with result = result } :: rev) @ rest
+            else
+                List.rev rev @ remaining
+    { state with bookkeeperLaunches = loop [] state.bookkeeperLaunches }
 
 /// Dedup by workspace+kind+value triple: returns whether this is the first
 /// launch for the triple (caller queues the job only then) and the next state.
@@ -90,11 +93,10 @@ let normalizeDraftIds (projection: WikiProjection) (drafts: WikiDraft list) : Wi
 /// (consumeDirtyTurn/recordLaunchOnce/drainLaunches) stay available as standalone
 /// functions so callers needing their extra return value read it in the same tick.
 type WikiCommand =
-    | RegisterJobCmd of sessionID: string * ctx: WikiJobContext
-    | RemoveJobCmd of sessionID: string
     | CacheSnapshotCmd of sessionID: string * projection: WikiProjection
     | MarkRwToolCmd of sessionID: string * entry: string
     | RecordLaunchCmd of launch: BookkeeperLaunch
+    | UpdateLatestLaunchResultCmd of title: string * result: string
     | RecordLaunchOnceCmd of key: string * launch: BookkeeperLaunch
     | DrainLaunchesCmd
     | ConsumeTurnCmd of sessionID: string
@@ -102,11 +104,10 @@ type WikiCommand =
 
 let reducer (state: WikiState) (cmd: WikiCommand) : WikiState =
     match cmd with
-    | RegisterJobCmd (sessionID, ctx) -> registerJob state sessionID ctx
-    | RemoveJobCmd sessionID -> removeJob state sessionID
     | CacheSnapshotCmd (sessionID, projection) -> cacheSnapshot state sessionID projection
     | MarkRwToolCmd (sessionID, entry) -> markRwTool state sessionID entry
     | RecordLaunchCmd launch -> recordLaunch state launch
+    | UpdateLatestLaunchResultCmd (title, result) -> updateLatestLaunchResult state title result
     | RecordLaunchOnceCmd (key, launch) -> recordLaunchOnce state key launch |> snd
     | DrainLaunchesCmd -> drainLaunches state |> snd
     | ConsumeTurnCmd sessionID -> consumeDirtyTurn state sessionID |> snd

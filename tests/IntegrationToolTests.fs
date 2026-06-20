@@ -11,6 +11,7 @@ open VibeFs.Mux.Plugin
 open VibeFs.Opencode.CapsPrelude
 open VibeFs.Opencode.Plugin
 open VibeFs.Opencode.WikiRuntime
+open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.WikiFiles
 
@@ -79,6 +80,10 @@ let private writeWikiFileAsync (filePath: string) (header: WikiHeader) (entries:
 
 let private assistantCompletionMessage (sessionID: string) (text: string) : obj =
     box {| info = createObj [ "id", box (sessionID + "-assistant"); "agent", box "manager"; "sessionID", box sessionID; "role", box "assistant"; "finish", box "stop"; "time", box (createObj [ "created", box 1; "completed", box 2 ]) ]
+           parts = [| box {| ``type`` = "text"; text = text |} |] |}
+
+let private userTextMessage (sessionID: string) (text: string) : obj =
+    box {| info = createObj [ "id", box (sessionID + "-user"); "agent", box "bookkeeper"; "sessionID", box sessionID; "role", box "user" ]
            parts = [| box {| ``type`` = "text"; text = text |} |] |}
 
 let private managerSessionMessage (sessionID: string) : obj =
@@ -310,6 +315,43 @@ let wikiPreludeWithoutCapsSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let coderReceivesWikiPreludeSpec () = promise {
+    let! workspaceDir = mkdtempAsync "wiki-prelude-coder-"
+    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
+    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
+    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ])
+    let! p = plugin (box {| directory = workspaceDir |})
+    let tf = get p "experimental.chat.messages.transform"
+    let originalMsg = box {| info = createObj [ "id", box "msg-coder-1"; "agent", box "coder"; "sessionID", box "wiki-coder-session" ]; parts = [||] |}
+    let out = createObj [ "messages", box [| originalMsg |] ]
+    do! tf $ (createObj [ "agent", box "coder" ], out) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
+    check "coder wiki prelude injects synthetic messages" (msgs.Length = 4)
+    check "coder wiki prelude keeps hello prefix" (firstText.StartsWith "你好")
+    check "coder wiki prelude includes history header" (firstText.Contains "[项目背景和历史]")
+    check "coder wiki prelude includes question" (firstText.Contains "0a3f 项目插件入口在哪里？")
+    check "coder wiki prelude hides answers" (not (firstText.Contains "src/Opencode/Plugin.fs"))
+    check "coder wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
+    do! rmAsync workspaceDir
+}
+
+let browserDoesNotReceiveWikiPreludeSpec () = promise {
+    let! workspaceDir = mkdtempAsync "wiki-prelude-browser-"
+    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
+    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
+    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ])
+    let! p = plugin (box {| directory = workspaceDir |})
+    let tf = get p "experimental.chat.messages.transform"
+    let originalMsg = box {| info = createObj [ "id", box "msg-browser-1"; "agent", box "browser"; "sessionID", box "wiki-browser-session" ]; parts = [||] |}
+    let out = createObj [ "messages", box [| originalMsg |] ]
+    do! tf $ (createObj [ "agent", box "browser" ], out) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    check "browser wiki prelude does not inject synthetic messages" (msgs.Length = 1)
+    check "browser wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[0], originalMsg))
+    do! rmAsync workspaceDir
+}
+
 let fetchWikiSnapshotSpec () = promise {
     let! workspaceDir = mkdtempAsync "wiki-fetch-"
     do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
@@ -373,6 +415,11 @@ let directWriteTurnAggregationSpec () = promise {
     let launches = takeBookkeeperLaunchesForTesting pluginObject
     check "direct write turn aggregation launches exactly one bookkeeper job" (launches.Length = 1)
     check "direct write turn aggregation uses bookkeeper agent" (str launches.[0] "agent" = "bookkeeper")
+    check "direct write turn aggregation prompt includes write input" (
+        let prompt = str launches.[0] "prompt"
+        prompt.Contains "src/turn.fs" && prompt.Contains "let turn = 1" && prompt.Contains "*** Update File: src/turn.fs")
+    check "direct write turn aggregation background result is visible" (
+        launches |> Array.exists (fun launch -> (str launch "result") = "Patched files" && (str launch "prompt").Contains "src/turn.fs"))
     do! rmAsync workspaceDir
 }
 
@@ -765,7 +812,38 @@ let coderTriggersBookkeeperSpec () = promise {
     check "coder tool still launches bookkeeper hook" (launches.Length = 1)
     check "coder bookkeeper launch agent" (str launches.[0] "agent" = "bookkeeper")
     check "coder bookkeeper launch records prompt" (not (isNullish (get launches.[0] "prompt")) && str launches.[0] "prompt" <> "")
+    check "coder bookkeeper child session keeps parentID" (
+        createCalls |> Seq.exists (fun call ->
+            let body = get call "body"
+            str body "parentID" = "coder-parent"))
     do! waitForBackgroundJobsForTesting p
+    do! rmAsync workspaceDir
+}
+
+let bookkeeperLaunchCarriesAiSettingsSpec () = promise {
+    let createCalls = ResizeArray<obj>()
+    let promptCalls = ResizeArray<obj>()
+    let mockClient =
+        createObj [ "session", box (createObj [
+            "create", box (System.Func<obj, JS.Promise<obj>>(fun arg ->
+                (promise { createCalls.Add(arg); return box {| data = box {| id = "child-bk-ai-session" |} |} })))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                (promise { promptCalls.Add(arg) })))
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (promise { return box {| data = [| userTextMessage "child-bk-ai-session" "[vibe-wiki-job] {\"type\":\"vibe_wiki_job\",\"workspaceRoot\":\"/tmp\",\"kind\":\"append\"}"; box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "tool"; tool = "submit_wiki" |} |] |} |] |} })))
+            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ()))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "bookkeeper-ai-settings-"
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
+    let wikiRuntime = get (pluginWikiRuntime p) "rawInstance" :?> WikiRuntime
+    let aiSettings : DelegatedAiSettings = { modelString = Some "openai/gpt-5"; thinkingLevel = Some "high" }
+    wikiRuntime.StartBookkeeperAppend("input", "result", "Title", "rw", parentSessionID = "parent-session", aiSettings = aiSettings)
+    do! waitForBackgroundJobsForTesting p
+    check "bookkeeper aiSettings create keeps parentID" (str (get createCalls.[0] "body") "parentID" = "parent-session")
+    let promptBody = get promptCalls.[0] "body"
+    let modelObj = get promptBody "model"
+    check "bookkeeper aiSettings prompt carries model" (str modelObj "providerID" = "openai" && str modelObj "modelID" = "gpt-5")
+    check "bookkeeper aiSettings prompt carries thinking variant" (str promptBody "variant" = "high")
     do! rmAsync workspaceDir
 }
 
@@ -1222,44 +1300,53 @@ let wikiWorkspaceSerializationSpec () = promise {
     check "wiki workspace serialization preserves order" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
 }
 
-let jobContextCleanupOnAbortOrDeleteSpec () = promise {
-    let! workspaceDir = mkdtempAsync "job-cleanup-"
-    let! p = plugin (box {| directory = workspaceDir |})
-    let wikiRuntime = get (pluginWikiRuntime p) "rawInstance" :?> WikiRuntime
+let submitWikiReconstructsJobFromHistorySpec () = promise {
+    let! workspaceDir = mkdtempAsync "wiki-job-history-"
+    do! ensureWikiDir workspaceDir
+    let sessionID = "wiki-history-session"
+    let marker = renderJobMarker { workspaceRoot = workspaceDir; kind = AppendAfterWork }
+    let mockClient =
+        createObj [ "session", box (createObj [
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (promise { return box {| data = [| userTextMessage sessionID marker |] |} })))
+        ]) ]
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-20" |})
+    let submitTool = submitWikiTool p
+    let! result =
+        ((get submitTool "execute")
+            $ (createObj [ "entries", box [| wikiDraftEntry None "历史重建问题" "历史重建答案" |] ], createObj [ "directory", box workspaceDir; "sessionID", box sessionID ]))
+        |> unbox<JS.Promise<string>>
+    check "submit_wiki reconstructs job from history" (result.Contains "Appended 1 wiki entries")
+    let! projection = readProjectionAsync workspaceDir
+    check "submit_wiki history reconstruction persists entry" (projection |> Map.toList |> List.exists (fun (_, entry) -> entry.q = "历史重建问题" && entry.a = "历史重建答案"))
+    do! rmAsync workspaceDir
+}
 
-    wikiRuntime.RegisterJob("session-to-abort", { workspaceRoot = workspaceDir; kind = AppendAfterWork })
-    check "job exists initially" (wikiRuntime.TakeJob("session-to-abort").IsSome)
-
-    let eventHandler = get p "event" :?> System.Func<obj, JS.Promise<unit>>
-    let abortEvent =
-        box {|
-            event = box {|
-                ``type`` = box "stream-abort"
-                properties = box {|
-                    sessionID = box "session-to-abort"
-                |}
-            |}
-        |}
-    do! eventHandler.Invoke(abortEvent)
-    check "job is removed after stream-abort" (wikiRuntime.TakeJob("session-to-abort").IsNone)
-
-    wikiRuntime.RegisterJob("session-to-delete", { workspaceRoot = workspaceDir; kind = AppendAfterWork })
-    check "second job exists initially" (wikiRuntime.TakeJob("session-to-delete").IsSome)
-
-    let deleteEvent =
-        box {|
-            event = box {|
-                ``type`` = box "session.delete"
-                properties = box {|
-                    info = box {|
-                        id = box "session-to-delete"
-                    |}
-                |}
-            |}
-        |}
-    do! eventHandler.Invoke(deleteEvent)
-    check "second job is removed after session.delete" (wikiRuntime.TakeJob("session-to-delete").IsNone)
-
+let wikiPortLockTimeoutSpec () = promise {
+    let! workspaceDir = mkdtempAsync "wiki-port-lock-timeout-"
+    let port = VibeFs.Shell.WikiPortLock.lockPortForPath workspaceDir
+    let net = requireFn("node:net")
+    let server = net?createServer()
+    do! Promise.create(fun resolve reject ->
+        server?once("listening", System.Func<unit>(fun () -> resolve ())) |> ignore
+        server?once("error", System.Func<obj, unit>(fun error -> reject (exn (string error)))) |> ignore
+        server?listen(port, "127.0.0.1") |> ignore)
+    let wikiRuntime = WikiRuntime(null, workspaceDir, (fun () -> System.DateTime.UtcNow), ChildAgentRegistry.Create())
+    let marker = renderJobMarker { workspaceRoot = workspaceDir; kind = AppendAfterWork }
+    let sessionID = "wiki-lock-session"
+    let lockClient =
+        createObj [ "session", box (createObj [
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (promise { return box {| data = [| userTextMessage sessionID marker |] |} })))
+        ]) ]
+    let lockRuntime = WikiRuntime(lockClient, workspaceDir, (fun () -> System.DateTime.UtcNow), ChildAgentRegistry.Create())
+    let submitAttempt = lockRuntime.SubmitFromHistory(sessionID, workspaceDir, [])
+    let! errorText =
+        submitAttempt
+        |> Promise.map (fun _ -> "unexpected-success")
+        |> Promise.catch (fun err -> string err)
+    check "wiki port lock timeout surfaces explicit error" (errorText.Contains "Timed out acquiring wiki port lock")
+    do! Promise.create(fun resolve _ -> server?close(System.Func<unit>(fun () -> resolve ())) |> ignore)
     do! rmAsync workspaceDir
 }
 
@@ -1314,6 +1401,8 @@ let run () : JS.Promise<unit> =
         do! defaultPreludeWithoutCapsSpec ()
         do! capsAndMagicOrderSpec ()
         do! wikiPreludeWithoutCapsSpec ()
+        do! coderReceivesWikiPreludeSpec ()
+        do! browserDoesNotReceiveWikiPreludeSpec ()
         do! fetchWikiSnapshotSpec ()
         do! directWriteTurnAggregationSpec ()
         do! dailyMaintenanceLaunchSpec ()
@@ -1340,6 +1429,7 @@ let run () : JS.Promise<unit> =
         do! bookkeeperAgentConfigSpec ()
         do! executorModeSchemaSpec ()
         do! coderTriggersBookkeeperSpec ()
+        do! bookkeeperLaunchCarriesAiSettingsSpec ()
         do! bookkeeperFireAndForgetSpec ()
         do! executorRoRwBookkeeperSpec ()
         do! coderToolSpec ()
@@ -1347,6 +1437,7 @@ let run () : JS.Promise<unit> =
         do! investigatorToolLateClientInjectionSpec ()
         do! executorActorSpec ()
         do! wikiWorkspaceSerializationSpec ()
-        do! jobContextCleanupOnAbortOrDeleteSpec ()
+        do! submitWikiReconstructsJobFromHistorySpec ()
+        do! wikiPortLockTimeoutSpec ()
         do! bookkeeperSessionRegisteredInChildAgentRegistrySpec ()
     }

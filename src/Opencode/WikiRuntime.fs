@@ -12,6 +12,7 @@ open VibeFs.Shell.WikiFiles
 open VibeFs.Shell.PromiseQueue
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Opencode.WikiRuntimeIO
+open VibeFs.Mux.AiSettings
 
 /// Wiki host IO shell (P53/P72): holds the single mutable state cell and
 /// serializes every state+IO change through `commandQueue`. All pure state
@@ -27,6 +28,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
     let mutable state = initialWikiState
     let commandQueue = SerialQueue()
     let writeQueues = Dictionary<string, SerialQueue>()
+    let registeredJobs = Dictionary<string, WikiJobContext>()
     let workspaceRoot = initialWorkspaceRoot
 
     let today () = (nowUtc ()).ToString("yyyy-MM-dd")
@@ -47,8 +49,11 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
     let effectiveWorkspaceRoot (value: string) : string =
         if System.String.IsNullOrWhiteSpace value then workspaceRoot else value
 
-    let launchBg root kind title buildPrompt maintenanceKey =
-        queueBackgroundLaunch client commandQueue applyCmd root kind title buildPrompt maintenanceKey registry
+    let recordBackgroundResult title result =
+        applyCmd (UpdateLatestLaunchResultCmd (title, result))
+
+    let launchBg root parentID kind title buildPrompt aiSettings maintenanceKey =
+        queueBackgroundLaunch client commandQueue (recordBackgroundResult title) root parentID kind title buildPrompt aiSettings maintenanceKey registry
 
     member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<WikiProjection> =
         if sessionID = "" then Promise.lift Map.empty
@@ -63,8 +68,8 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                         return projection
                 })
 
-    member _.RegisterJob(sessionID: string, ctx: WikiJobContext) : unit =
-        applyCmd (RegisterJobCmd (sessionID, ctx))
+    member _.RegisterJob(_sessionID: string, _ctx: WikiJobContext) : unit =
+        registeredJobs.[_sessionID] <- _ctx
 
     member this.RegisterJobForTesting(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =
         let payloadObj: obj = payload
@@ -82,17 +87,27 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
             | other -> failwith $"Unknown wiki job kind: {other}"
         this.RegisterJob(sessionID, { workspaceRoot = workspaceRoot; kind = kind })
 
-    member _.TakeJob(sessionID: string) : WikiJobContext option =
-        tryJob state sessionID
+    member _.TakeJob(_sessionID: string) : WikiJobContext option =
+        match registeredJobs.TryGetValue _sessionID with
+        | true, ctx -> Some ctx
+        | false, _ -> None
 
     member _.DeleteJob(sessionID: string) : unit =
         registry.UnregisterChildAgent(sessionID)
-        applyCmd (RemoveJobCmd sessionID)
+        registeredJobs.Remove(sessionID) |> ignore
 
-    member _.Submit(sessionID: string, drafts: WikiDraft list) : JS.Promise<string> =
+    member this.Submit(sessionID: string, drafts: WikiDraft list) : JS.Promise<string> =
+        this.SubmitFromHistory(sessionID, "", drafts)
+
+    member _.SubmitFromHistory(sessionID: string, directory: string, drafts: WikiDraft list) : JS.Promise<string> =
         commandQueue.Enqueue(fun () ->
             promise {
-                match tryJob state sessionID with
+                let root = effectiveWorkspaceRoot directory
+                let! reconstructed = tryResolveJobContext client root sessionID
+                match reconstructed |> Option.orElseWith (fun () ->
+                    match registeredJobs.TryGetValue sessionID with
+                    | true, ctx -> Some ctx
+                    | false, _ -> None) with
                 | None -> return "No active wiki job for this session."
                 | Some ctx ->
                     try
@@ -100,7 +115,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                         return result
                     finally
                         registry.UnregisterChildAgent(sessionID)
-                        applyCmd (RemoveJobCmd sessionID)
+                        registeredJobs.Remove(sessionID) |> ignore
             })
 
     member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
@@ -147,7 +162,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                     let first, nextState = recordLaunchOnce state key launch
                     state <- nextState
                     if first then
-                        launchBg root (DailyRewrite date) "Daily wiki rewrite" (fun () -> Promise.lift (buildDailyPrompt date files projection)) (Some key))
+                        launchBg root None (DailyRewrite date) "Daily wiki rewrite" (fun () -> Promise.lift (buildDailyPrompt date files projection)) emptySettings (Some key))
 
                 weeklyDue
                 |> Option.iter (fun cutoff ->
@@ -156,20 +171,21 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                     let first, nextState = recordLaunchOnce state key launch
                     state <- nextState
                     if first then
-                        launchBg root (WeeklyRewrite cutoff) "Weekly wiki snapshot rewrite" (fun () -> Promise.lift (buildWeeklyPrompt cutoff files projection)) (Some key))
+                        launchBg root None (WeeklyRewrite cutoff) "Weekly wiki snapshot rewrite" (fun () -> Promise.lift (buildWeeklyPrompt cutoff files projection)) emptySettings (Some key))
             })
 
     member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string, rwSummary: string) : unit =
         applyCmd (RecordLaunchCmd { agent = agent; title = title; prompt = prompt; result = result; rwSummary = rwSummary })
 
-    member this.StartBookkeeperAppend(prompt: string, result: string, title: string, rwSummary: string) : unit =
+    member this.StartBookkeeperAppend(prompt: string, result: string, title: string, rwSummary: string, ?parentSessionID: string, ?aiSettings: DelegatedAiSettings) : unit =
         this.RecordBookkeeperLaunch("bookkeeper", title, prompt, result, rwSummary)
         let root = effectiveWorkspaceRoot workspaceRoot
-        launchBg root AppendAfterWork title (fun () ->
+        let settings = defaultArg aiSettings emptySettings
+        launchBg root parentSessionID AppendAfterWork title (fun () ->
             promise {
                 let! projection = readProjection root
                 return buildAppendPrompt title prompt result rwSummary projection
-            }) None
+            }) settings None
 
     /// Test-only projection: drains recorded bookkeeper launches so integration
     /// tests can assert what the runtime would have fired. Kept on the production

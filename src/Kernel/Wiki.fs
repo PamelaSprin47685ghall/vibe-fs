@@ -39,6 +39,49 @@ type WikiJobContext =
     { workspaceRoot: string
       kind: WikiJobKind }
 
+let private jobKindTag (kind: WikiJobKind) : string * string option =
+    match kind with
+    | AppendAfterWork -> "append", None
+    | DailyRewrite date -> "daily", Some date
+    | WeeklyRewrite throughDate -> "weekly", Some throughDate
+
+let renderJobMarker (ctx: WikiJobContext) : string =
+    let kind, value = jobKindTag ctx.kind
+    let fields =
+        [ "type", box "vibe_wiki_job"
+          "workspaceRoot", box ctx.workspaceRoot
+          "kind", box kind
+          match value with
+          | Some date when kind = "daily" -> "date", box date
+          | Some throughDate when kind = "weekly" -> "through", box throughDate
+          | _ -> () ]
+    "[vibe-wiki-job] " + jsonStringify (createObj fields)
+
+let tryParseJobMarker (text: string) : WikiJobContext option =
+    let prefix = "[vibe-wiki-job] "
+    let markerLine =
+        text.Split('\n')
+        |> Array.tryFind (fun line -> line.StartsWith prefix)
+    match markerLine with
+    | None -> None
+    | Some line ->
+        try
+            let payload = jsonParse (line.Substring(prefix.Length))
+            let workspaceRoot = Dyn.str payload "workspaceRoot"
+            let kind = Dyn.str payload "kind"
+            if workspaceRoot.Trim() = "" then None
+            else
+                match kind with
+                | "append" -> Some { workspaceRoot = workspaceRoot; kind = AppendAfterWork }
+                | "daily" ->
+                    let date = Dyn.str payload "date"
+                    if date.Trim() = "" then None else Some { workspaceRoot = workspaceRoot; kind = DailyRewrite date }
+                | "weekly" ->
+                    let throughDate = Dyn.str payload "through"
+                    if throughDate.Trim() = "" then None else Some { workspaceRoot = workspaceRoot; kind = WeeklyRewrite throughDate }
+                | _ -> None
+        with _ -> None
+
 let tryParseId (s: string) : WikiId option =
     if idRe.IsMatch s then Some(WikiId s) else None
 

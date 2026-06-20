@@ -107,10 +107,38 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
 let private isDirectWriteTool (tool: string) : bool =
     tool = "write" || tool = "apply_patch" || tool = "patch" || isFileEditTool tool
 
-let private buildRwSummary (tool: string) (output: obj) : string =
-    let text = Dyn.str output "output"
-    let summary = if text = "" then Dyn.str output "error" else text
-    if summary = "" then tool else summary
+let private summarizeWriteArgs (args: obj) : string option =
+    let filePath =
+        let direct = Dyn.str args "file_path"
+        if direct <> "" then direct else Dyn.str args "filePath"
+    let content = Dyn.str args "content"
+    if filePath = "" && content = "" then None
+    elif content = "" then Some filePath
+    else Some ($"{filePath}\n{content}")
+
+let private summarizePatchArgs (args: obj) : string option =
+    let patchText = Dyn.str args "patchText"
+    if patchText <> "" then Some patchText
+    else
+        let patch = Dyn.str args "patch"
+        if patch <> "" then Some patch
+        else
+            let text = Dyn.str args "text"
+            if text <> "" then Some text else None
+
+let private buildRwSummary (tool: string) (input: obj) (output: obj) : string =
+    let args = Dyn.get input "args"
+    let fromInput =
+        if Dyn.isNullish args then None
+        elif tool = "write" then summarizeWriteArgs args
+        elif tool = "apply_patch" || tool = "patch" then summarizePatchArgs args
+        else None
+    match fromInput with
+    | Some summary when summary.Trim() <> "" -> summary
+    | _ ->
+        let text = Dyn.str output "output"
+        let summary = if text = "" then Dyn.str output "error" else text
+        if summary = "" then tool else summary
 
 let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (wikiRuntime: WikiRuntime) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
@@ -118,7 +146,7 @@ let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Open
         let tool = Dyn.str input "tool"
         if isDirectWriteTool tool then
             let sessionID = Dyn.str input "sessionID"
-            wikiRuntime.MarkRwTool(sessionID, tool, buildRwSummary tool output)
+            wikiRuntime.MarkRwTool(sessionID, tool, buildRwSummary tool input output)
         do! nudgeHook.handleToolExecuteAfter input output
     }
 
