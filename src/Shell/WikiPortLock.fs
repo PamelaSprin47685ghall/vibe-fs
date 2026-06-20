@@ -18,7 +18,9 @@ let private listenServer (port: int) : Async<obj> =
     Async.FromContinuations(fun (resolve, reject, _) ->
         let server = createServer ()
         let listeningHandler = System.Func<unit>(fun () -> resolve server)
-        let errorHandler = System.Func<obj, unit>(fun error -> reject (exn (string error)))
+        let errorHandler = System.Func<obj, unit>(fun error ->
+            try server?close() |> ignore with _ -> ()
+            reject (exn (string error)))
         server?once("listening", listeningHandler) |> ignore
         server?once("error", errorHandler) |> ignore
         server?listen(port, "127.0.0.1") |> ignore)

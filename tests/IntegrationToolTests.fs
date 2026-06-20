@@ -9,6 +9,7 @@ open VibeFs.Kernel.Message
 open VibeFs.Kernel.Wiki
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
+open VibeFs.Opencode.WikiRuntime
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.WikiFiles
 
@@ -1120,6 +1121,53 @@ let wikiActorSpec () = async {
     check "wiki actor preserves order" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
 }
 
+let jobContextCleanupOnAbortOrDeleteSpec () = async {
+    let! workspaceDir = mkdtempAsync "job-cleanup-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    let wikiRuntime = pluginWikiRuntime p
+    let register = get wikiRuntime "registerJobForTesting" :?> System.Func<string, string, string, obj, unit>
+    let take = get wikiRuntime "takeJobForTesting" :?> System.Func<string, obj>
+    
+    // Register a mock job
+    register.Invoke("session-to-abort", workspaceDir, "append", box null)
+    check "job exists initially" (not (isNullish (take.Invoke "session-to-abort")))
+    
+    // Dispatch stream-abort event
+    let eventHandler = get p "event" :?> System.Func<obj, JS.Promise<unit>>
+    let abortEvent =
+        box {|
+            event = box {|
+                ``type`` = box "stream-abort"
+                properties = box {|
+                    sessionID = box "session-to-abort"
+                |}
+            |}
+        |}
+    do! eventHandler.Invoke(abortEvent) |> Async.AwaitPromise
+    check "job is removed after stream-abort" (isNullish (take.Invoke "session-to-abort"))
+
+    // Register another job
+    register.Invoke("session-to-delete", workspaceDir, "append", box null)
+    check "second job exists initially" (not (isNullish (take.Invoke "session-to-delete")))
+    
+    // Dispatch session.delete event
+    let deleteEvent =
+        box {|
+            event = box {|
+                ``type`` = box "session.delete"
+                properties = box {|
+                    info = box {|
+                        id = box "session-to-delete"
+                    |}
+                |}
+            |}
+        |}
+    do! eventHandler.Invoke(deleteEvent) |> Async.AwaitPromise
+    check "second job is removed after session.delete" (isNullish (take.Invoke "session-to-delete"))
+    
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
 let run () : JS.Promise<unit> =
     async {
         let reg = createRegistration (createObj [])
@@ -1160,5 +1208,6 @@ let run () : JS.Promise<unit> =
         do! investigatorToolLateClientInjectionSpec ()
         do! executorActorSpec ()
         do! wikiActorSpec ()
+        do! jobContextCleanupOnAbortOrDeleteSpec ()
     }
     |> Async.StartAsPromise

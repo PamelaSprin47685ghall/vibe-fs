@@ -332,6 +332,9 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         | true, ctx -> Some ctx
         | false, _ -> None
 
+    member _.DeleteJob(sessionID: string) : unit =
+        jobContexts.Remove sessionID |> ignore
+
     member this.Submit(sessionID: string, drafts: WikiDraft list) : JS.Promise<string> =
         match this.TakeJob sessionID with
         | None -> async { return "No active wiki job for this session." } |> Async.StartAsPromise

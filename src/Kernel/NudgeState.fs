@@ -188,7 +188,7 @@ let getSessionID (eventType: string) (props: obj) : string =
         [ Dyn.str props "sessionID"
           Dyn.str part "sessionID"
           Dyn.str info "sessionID"
-          if eventType = "session.created" || eventType = "session.updated" || eventType = "session.deleted" then
+          if eventType = "session.created" || eventType = "session.updated" || eventType = "session.deleted" || eventType = "session.delete" || eventType = "session.close" || eventType = "session.remove" then
               Dyn.str info "id"
           else "" ]
     candidates |> List.tryFind (fun s -> s <> "") |> Option.defaultValue ""

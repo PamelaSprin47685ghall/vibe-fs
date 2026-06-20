@@ -50,6 +50,16 @@ let private flushDirectWriteTurnIfCompleted (wikiRuntime: WikiRuntime) (input: o
             if sessionID <> "" then
                 wikiRuntime.FlushTurnIfNeeded(sessionID, getEventAssistantText event)
 
+let private cleanUpJobContextIfAbortedOrDeleted (wikiRuntime: WikiRuntime) (input: obj) : unit =
+    let event = Dyn.get input "event"
+    let eventType = Dyn.str event "type"
+    if eventType = "stream-abort" || eventType = "session.delete" || eventType = "session.close" || eventType = "session.remove" || eventType = "session.deleted" then
+        let rawProps = Dyn.get event "properties"
+        let props = if Dyn.isNullish rawProps then event else rawProps
+        let sessionID = getSessionID eventType props
+        if sessionID <> "" then
+            wikiRuntime.DeleteJob(sessionID)
+
 let private emptyMcps : obj = [||] :> obj
 
 type private BuiltinAgentSpec =
@@ -229,6 +239,11 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
                     "registerJobForTesting",
                     box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
                         wikiRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
+                    "takeJobForTesting",
+                    box (System.Func<string, obj>(fun sessionID ->
+                        match wikiRuntime.TakeJob(sessionID) with
+                        | Some ctx -> box ctx
+                        | None -> null))
                     "takeBookkeeperLaunchesForTesting",
                     box (System.Func<obj array>(fun () -> wikiRuntime.TakeBookkeeperLaunchesForTesting()))
                     "waitForBackgroundJobsForTesting",
@@ -253,6 +268,7 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         setKey result "event" (box (fun (input: obj) ->
             async {
                 do! eventHandler reviewStore input |> Async.AwaitPromise
+                cleanUpJobContextIfAbortedOrDeleted wikiRuntime input
                 flushDirectWriteTurnIfCompleted wikiRuntime input
                 do! nudgeHook.handleEvent input |> Async.AwaitPromise
             } |> Async.StartAsPromise))
