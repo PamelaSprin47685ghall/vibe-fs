@@ -219,14 +219,14 @@ let loopMessagesShared () =
 /// and `Kernel.Prompts.loopReviewVerdictInstructions` — both authored once,
 /// both Kernel-pure, both host-agnostic.
 let reviewerVerdictPromptsShared () =
-    let verdict = VibeFs.Kernel.Prompts.reviewerVerdictInstructions
+    let verdict = VibeFs.Kernel.Prompts.ReviewerVerdictPrompts.reviewerVerdictInstructions
     check "reviewer verdict mentions agent_report" (verdict.Contains "agent_report")
     check "reviewer verdict mentions PASS" (verdict.Contains "PASS")
     check "reviewer verdict mentions REJECT" (verdict.Contains "REJECT")
     check "reviewer verdict mentions feedback" (verdict.Contains "feedback")
     check "reviewer verdict mentions callId" (verdict.Contains "callId")
 
-    let preReview = VibeFs.Kernel.Prompts.loopReviewVerdictInstructions
+    let preReview = VibeFs.Kernel.Prompts.ReviewerVerdictPrompts.loopReviewVerdictInstructions
     check "loop-review verdict mentions agent_report" (preReview.Contains "agent_report")
     check "loop-review verdict mentions PASS" (preReview.Contains "PASS")
     check "loop-review verdict mentions REJECT" (preReview.Contains "REJECT")
@@ -247,3 +247,22 @@ let reviewResultFormattingShared () =
 
     let terminated = VibeFs.Kernel.Prompts.formatReviewResult VibeFs.Kernel.ReviewSession.ReviewResult.Terminated
     check "terminated text mentions terminated" (terminated.ToLower().Contains "terminat")
+
+/// S2 red: pin the extended DomainError union before the Kernel rewrite lands.
+/// ExecutorExecutableMissing now carries the offending executable name, and the
+/// new branches (ParseError / ToolNotPermitted / InvalidIntent / UpstreamTimeout
+/// / UpstreamRefused) replace ad-hoc string errors at IO edges.  This test goes
+/// red against today's DomainError and turns green once Domain.fs is extended.
+let domainErrorsShared () =
+    let err1 = VibeFs.Kernel.Domain.DomainError.ExecutorExecutableMissing "npm"
+    let err2 = VibeFs.Kernel.Domain.DomainError.ParseError("json", "missing bracket")
+    let err3 = VibeFs.Kernel.Domain.DomainError.ToolNotPermitted("coder", "bash")
+    let err4 = VibeFs.Kernel.Domain.DomainError.InvalidIntent("coder", "tdd", "unknown phase")
+    let err5 = VibeFs.Kernel.Domain.DomainError.UpstreamTimeout 30
+    let err6 = VibeFs.Kernel.Domain.DomainError.UpstreamRefused "rate limit"
+    check "err1 is executable missing" (match err1 with VibeFs.Kernel.Domain.DomainError.ExecutorExecutableMissing "npm" -> true | _ -> false)
+    check "err2 is parse error" (match err2 with VibeFs.Kernel.Domain.DomainError.ParseError("json", "missing bracket") -> true | _ -> false)
+    check "err3 is tool not permitted" (match err3 with VibeFs.Kernel.Domain.DomainError.ToolNotPermitted("coder", "bash") -> true | _ -> false)
+    check "err4 is invalid intent" (match err4 with VibeFs.Kernel.Domain.DomainError.InvalidIntent("coder", "tdd", "unknown phase") -> true | _ -> false)
+    check "err5 is upstream timeout" (match err5 with VibeFs.Kernel.Domain.DomainError.UpstreamTimeout 30 -> true | _ -> false)
+    check "err6 is upstream refused" (match err6 with VibeFs.Kernel.Domain.DomainError.UpstreamRefused "rate limit" -> true | _ -> false)

@@ -3,6 +3,7 @@ module VibeFs.Mux.HostTools
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.Domain
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.Fuzzy
@@ -46,6 +47,20 @@ let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptio
             return prependSafetyWarningForExecution report options
     }
 
+let private describeDomainError (error: DomainError) : string =
+    match error with
+    | UpstreamTimeout seconds -> $"upstream timed out after {seconds}s"
+    | UpstreamRefused reason -> $"upstream refused: {reason}"
+    | UnknownJsError message -> message
+    | SystemPanic message -> message
+    | MessageAborted -> "request aborted"
+    | SessionBusy -> "session busy"
+    | TaskWaitBackgrounded -> "task moved to background"
+    | ExecutorExecutableMissing executable -> $"missing executable: {executable}"
+    | ParseError(context, detail) -> $"parse error in {context}: {detail}"
+    | ToolNotPermitted(agent, tool) -> $"tool '{tool}' not permitted for '{agent}'"
+    | InvalidIntent(tool, field, detail) -> $"invalid {tool}.{field}: {detail}"
+
 let executorTool (deps: obj) : ToolDefinition =
     { name = "executor"
       description = description "executor"
@@ -88,7 +103,7 @@ let readTool (_deps: obj) (hostReadExec: HostReadExec) : ToolDefinition =
                 let path = Dyn.str args "path"
                 let offset = optInt args "offset"
                 let limit = optInt args "limit"
-                match hostReadExec.Value with
+                match hostReadExec.TryGet() with
                 | Some hostExec ->
                     let hostFn = hostExec :?> obj -> obj -> JS.Promise<obj>
                     let! result = hostFn args config |> Async.AwaitPromise
@@ -113,19 +128,19 @@ let writeTool (_deps: obj) : ToolDefinition =
         fun config args ->
             async {
                 if not (Dyn.has args "file_path") then
-                    return "Error: missing required parameter 'file_path'"
+                    return describeDomainError (InvalidIntent ("write", "file_path", "missing required parameter"))
                 elif not (Dyn.has args "content") then
-                    return "Error: missing required parameter 'content'"
+                    return describeDomainError (InvalidIntent ("write", "content", "missing required parameter"))
                 else
                     let filePath = Dyn.str args "file_path"
                     let content = Dyn.str args "content"
                     if System.String.IsNullOrWhiteSpace filePath then
-                        return "Error: 'file_path' must not be empty"
+                        return describeDomainError (InvalidIntent ("write", "file_path", "must not be empty"))
                     else
-                        try
-                            return! write (Some (getCwd config)) filePath content
-                        with ex ->
-                            return $"Error writing '{filePath}': {ex.Message}"
+                        let! result = write (Some (getCwd config)) filePath content
+                        match result with
+                        | Ok msg -> return msg
+                        | Error e -> return describeDomainError e
             }
             |> Async.StartAsPromise
       condition = None }
@@ -193,10 +208,12 @@ let websearchTool (deps: obj) : ToolDefinition =
           | Some query ->
               let abortSignal = Dyn.get config "abortSignal"
               async {
-                  try
-                      let numResults = defaultArg (optInt args "numResults") 10
-                      let body = createObj [ "query", box query; "max_results", box numResults ]
-                      let! data = ollamaPost "web_search" body (if Dyn.isNullish abortSignal then None else Some abortSignal) |> Async.AwaitPromise
+                  let numResults = defaultArg (optInt args "numResults") 10
+                  let body = createObj [ "query", box query; "max_results", box numResults ]
+                  let! result = ollamaPost "web_search" body (if Dyn.isNullish abortSignal then None else Some abortSignal) |> Async.AwaitPromise
+                  match result with
+                  | Error e -> return "Web search failed: " + describeDomainError e
+                  | Ok data ->
                       let results = Dyn.get data "results"
                       let items =
                           if Dyn.isNullish results || not (Dyn.isArray results) then []
@@ -205,10 +222,7 @@ let websearchTool (deps: obj) : ToolDefinition =
                       if items.IsEmpty then return rawResults
                       else
                           let prompt = formatPrompt mimocode (WebsearchSummary(whatToSummarize, rawResults)) |> List.head
-                          let! report = runMuxSubagent deps config "executor" prompt "Web search summary" None |> Async.AwaitPromise
-                          return report
-                  with ex ->
-                      return jsonStringify (createObj [ "success", box false; "error", box ("Web search failed: " + ex.Message) ])
+                          return! runMuxSubagent deps config "executor" prompt "Web search summary" None |> Async.AwaitPromise
               }
               |> Async.StartAsPromise
       condition = None }
@@ -230,15 +244,15 @@ let webfetchTool : ToolDefinition =
                   match strField args "prompt" with Some v -> bodyEntries.Add("prompt", box v) | None -> ()
                   match optInt args "timeout" with Some v -> bodyEntries.Add("timeout", box v) | None -> ()
                   let body = createObj (Seq.toList bodyEntries)
-                  try
-                      let! data = ollamaPost "web_fetch" body (if Dyn.isNullish abortSignal then None else Some abortSignal) |> Async.AwaitPromise
+                  let! result = ollamaPost "web_fetch" body (if Dyn.isNullish abortSignal then None else Some abortSignal) |> Async.AwaitPromise
+                  match result with
+                  | Error e -> return "Web fetch failed: " + describeDomainError e
+                  | Ok data ->
                       let title = if Dyn.isNullish (Dyn.get data "title") then None else Some (Dyn.str data "title")
                       let byline = if Dyn.isNullish (Dyn.get data "byline") then None else Some (Dyn.str data "byline")
                       let length_ = if Dyn.isNullish (Dyn.get data "length") then None else Some (unbox<int> (Dyn.get data "length"))
                       let content = if Dyn.isNullish (Dyn.get data "content") then None else Some (Dyn.str data "content")
                       return formatFetchResponse { title = title; byline = byline; length = length_; content = content }
-                  with ex ->
-                      return jsonStringify (createObj [ "success", box false; "error", box ("Web fetch failed: " + ex.Message) ])
               }
               |> Async.StartAsPromise
       condition = None }

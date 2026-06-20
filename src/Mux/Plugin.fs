@@ -80,7 +80,7 @@ let createToolCatalog
 let createRegistration (deps: obj) : obj =
     let callStore = createCallStore ()
     let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
-    let hostReadExec : HostReadExec = { contents = None }
+    let hostReadExec = HostReadExec()
     let finderCache = FinderCache()
     let toolNames =
         [| "coder"; "investigator"; "meditator"; "browser"; "executor"

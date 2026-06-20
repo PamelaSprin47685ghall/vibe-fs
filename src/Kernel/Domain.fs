@@ -44,7 +44,12 @@ type DomainError =
     | MessageAborted
     | SessionBusy
     | TaskWaitBackgrounded
-    | ExecutorExecutableMissing
+    | ExecutorExecutableMissing of executable: string
+    | ParseError of context: string * detail: string
+    | ToolNotPermitted of agent: string * tool: string
+    | InvalidIntent of tool: string * field: string * detail: string
+    | UpstreamTimeout of seconds: int
+    | UpstreamRefused of reason: string
     | SystemPanic of message: string
     | UnknownJsError of message: string
 
@@ -53,7 +58,12 @@ let isAbort (error: DomainError) : bool =
     | MessageAborted -> true
     | SessionBusy
     | TaskWaitBackgrounded
-    | ExecutorExecutableMissing
+    | ExecutorExecutableMissing _
+    | ParseError _
+    | ToolNotPermitted _
+    | InvalidIntent _
+    | UpstreamTimeout _
+    | UpstreamRefused _
     | SystemPanic _
     | UnknownJsError _ -> false
 

@@ -29,6 +29,26 @@ type SendOutcome =
     | Busy
     | Failed
 
+/// Decoded host event ready for exhaustive nudge state transition. Host adapters
+/// decode their native event shapes into this DU; NudgeState owns the transitions.
+type NudgeHostEvent =
+    | StreamAbort
+    | SessionDeleted
+    | SessionNextPrompted of promptText: string
+    | SessionNextRetried
+    | MessageUpdated of isAbortError: bool * isCompletedAssistant: bool
+    | MessagePartUpdated of partType: string * isAbortError: bool * isAbortState: bool
+    | SessionNextStepFailed of isAbortError: bool
+    | SessionNextToolFailed of isAbortError: bool
+    | SessionNextStepEnded of finish: string
+    | SessionIdle
+    | SessionError of isAbortError: bool
+    | SessionStatusIdle
+    | SessionStatusBusy
+    | SessionStatusRetry
+    | RetryProgress
+    | Other
+
 let emptyState =
     { nudgedSessions = Set.empty
       stoppedSessions = Set.empty
@@ -180,6 +200,37 @@ let handleSessionBusy state sessionID =
 
 let handleSessionError state isAbortError errorValue sessionID =
     if isAbortError errorValue then stopSession state sessionID else addRetryPendingSession state sessionID
+
+/// Exhaustive transition over NudgeHostEvent. Replaces the host-layer string
+/// match: the compiler now enforces that every event kind is handled.
+let handleEvent (state: NudgeShellState) (sessionID: string) (event: NudgeHostEvent) : NudgeShellState * bool =
+    match event with
+    | StreamAbort -> clearSession state sessionID, false
+    | SessionDeleted -> clearSession state sessionID, false
+    | SessionNextPrompted promptText -> handleSessionNextPrompted state promptText sessionID, false
+    | SessionNextRetried -> addRetryPendingSession state sessionID, false
+    | MessageUpdated(isAbortError, isCompletedAssistant) ->
+        if isAbortError then stopSession state sessionID, false
+        elif isCompletedAssistant then tryClaimNudge state sessionID
+        else state, false
+    | MessagePartUpdated(partType, isAbortError, isAbortState) ->
+        if partType = "retry" then addRetryPendingSession state sessionID, false
+        elif isAbortError || isAbortState then stopSession state sessionID, false
+        elif isRetryProgressPart partType then deleteRetryPendingSession state sessionID, false
+        else state, false
+    | SessionNextStepFailed isAbortError ->
+        if isAbortError then stopSession state sessionID, false else state, false
+    | SessionNextToolFailed isAbortError ->
+        if isAbortError then stopSession state sessionID, false else deleteRetryPendingSession state sessionID, false
+    | SessionNextStepEnded finish -> handleSessionNextStepEnded state finish sessionID
+    | SessionIdle -> tryClaimNudge state sessionID
+    | SessionError isAbortError ->
+        if isAbortError then stopSession state sessionID, false else addRetryPendingSession state sessionID, false
+    | SessionStatusIdle -> tryClaimNudge state sessionID
+    | SessionStatusBusy -> handleSessionBusy state sessionID, false
+    | SessionStatusRetry -> addRetryPendingSession state sessionID, false
+    | RetryProgress -> deleteRetryPendingSession state sessionID, false
+    | Other -> state, false
 
 let getSessionID (eventType: string) (props: obj) : string =
     let part = Dyn.get props "part"

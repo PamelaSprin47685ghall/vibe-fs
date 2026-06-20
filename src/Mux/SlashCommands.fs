@@ -101,7 +101,7 @@ let private loopReviewExecute
                     [ "subagentRole", box "reviewer"
                       "toolPolicy", box (createObj [ "disabledTools", box disabledTools ]) ]
             let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
-            let promptText = loopReviewVerdictInstructions + "\n\n=== Task Description ===\n\n" + task + "\n\n" + submissionFooter "agent_report" callId
+            let promptText = ReviewerVerdictPrompts.loopReviewVerdictInstructions + "\n\n=== Task Description ===\n\n" + task + "\n\n" + submissionFooter "agent_report" callId
             let! outcome = delegateWithTimeout deps config "explore" promptText "Pre-review" (Some opts) 300000
             let! verdictArgs =
                 async {

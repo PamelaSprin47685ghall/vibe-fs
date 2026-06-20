@@ -90,7 +90,13 @@ let private appendMeditatorNudge (result: obj) : obj =
         else result
     else result
 
-type HostReadExec = obj option ref
+/// Encapsulates the host's native file_read execute function captured during
+/// wrapper registration. Replaces the old `obj option ref` pseudo-interface
+/// (REFACTOR.md §12): the mutable slot is private, callers go through methods.
+type HostReadExec() =
+    let mutable captured : obj option = None
+    member _.Capture(fn: obj) : unit = captured <- Some fn
+    member _.TryGet() : obj option = captured
 
 let agentReportDefinition (_store: CallStore) : ToolDefinition =
     { name = "agent_report"
@@ -178,26 +184,12 @@ let private mkTodoNudgeWrapper (host: Host) : obj =
 let private mkFileReadCapture (hostReadExec: HostReadExec) : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (hostTool: obj) (_config: obj) ->
-            hostReadExec.Value <- Some (bindExecute hostTool)
+            hostReadExec.Capture(bindExecute hostTool)
             let execFn =
                 System.Func<obj, obj, JS.Promise<string>>(fun (_args: obj) (_opts: obj) ->
                     disabledResult ())
             createObj [ "execute", box execFn ])
     createObj [ "targetTool", box "file_read"; "wrapper", box wrapperFn ]
-
-let private mkWebOverride (sourceToolName: string) (tools: obj) (targetTool: string) : obj =
-    let wrapperFn =
-        System.Func<obj, obj, obj>(fun (_tool: obj) (config: obj) ->
-            let def = Dyn.get tools sourceToolName
-            let execFn =
-                System.Func<obj, obj, JS.Promise<string>>(fun (args: obj) (opts: obj) ->
-                    let abortSignal = if Dyn.isNullish opts then unbox null else Dyn.get opts "abortSignal"
-                    let mergedConfig = Dyn.withKey config "abortSignal" abortSignal
-                    Dyn.call2 (Dyn.get def "execute") mergedConfig args :?> JS.Promise<string>)
-            createObj [ "description", box (Dyn.str def "description")
-                        "parameters", box (Dyn.get def "parameters")
-                        "execute", box execFn ])
-    createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
 
 let private mkAgentReportOverride (callStore: CallStore) : obj =
     let wrapperFn =
@@ -236,9 +228,7 @@ let createAllWrappersFor (host: Host) (tools: obj) (hostReadExec: HostReadExec) 
         (mkSyntaxWrappers ())
         [| mkFileReadCapture hostReadExec
            mkTodoNudgeWrapper host
-           mkAgentReportOverride callStore
-           mkWebOverride "websearch" tools "web_search"
-           mkWebOverride "webfetch" tools "web_fetch" |]
+           mkAgentReportOverride callStore |]
 
 let createAllWrappers (tools: obj) (hostReadExec: HostReadExec) (callStore: CallStore) : obj array =
     createAllWrappersFor opencode tools hostReadExec callStore

@@ -49,6 +49,7 @@ let runAll (_args: string array) : JS.Promise<int> =
         KernelTests.loopMessagesShared ()
         KernelTests.reviewerVerdictPromptsShared ()
         KernelTests.reviewResultFormattingShared ()
+        KernelTests.domainErrorsShared ()
         FuzzyTests.grepDetect ()
         FuzzyTests.iteratorRoundTrip ()
         FuzzyTests.finderConversion ()

@@ -3,6 +3,7 @@ module VibeFs.Shell.FileSys
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.Domain
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Shell.TreeSitterShell
 
@@ -116,14 +117,17 @@ let private fileExistsAsync (p: string) : Async<bool> =
             return false
     }
 
-let write (cwd: string option) (file_path: string) (content: string) : Async<string> =
+let write (cwd: string option) (file_path: string) (content: string) : Async<Result<string, DomainError>> =
     async {
         let cwd' = defaultArg cwd (nodeProcess?cwd())
         let resolved = resolve cwd' file_path
         let parent = dirname resolved
-        if not (System.String.IsNullOrEmpty parent) then
-            do! mkdir parent |> Async.AwaitPromise
-        do! writeFile resolved content |> Async.AwaitPromise
-        let! syntax = checkSyntax content resolved |> Async.AwaitPromise
-        return formatWriteSyntaxResult resolved syntax
+        try
+            if not (System.String.IsNullOrEmpty parent) then
+                do! mkdir parent |> Async.AwaitPromise
+            do! writeFile resolved content |> Async.AwaitPromise
+            let! syntax = checkSyntax content resolved |> Async.AwaitPromise
+            return Result.Ok (formatWriteSyntaxResult resolved syntax)
+        with ex ->
+            return Error (UnknownJsError ex.Message)
     }

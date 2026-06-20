@@ -227,7 +227,7 @@ let executeWith (deps: ExecuteDeps) (options: ExecuteOptions) (sessionId: string
                 let executable = missingExecutableFor options.language
                 return MissingExecutable(executable = executable,
                                          output = $"Error: '{executable}' executable not found. Please ensure '{executable}' is installed and available on your PATH.")
-            else return raise error
+            else return Failed(output = $"Error: {error.Message}")
     }
     |> Async.StartAsPromise
 

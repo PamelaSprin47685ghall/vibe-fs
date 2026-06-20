@@ -235,7 +235,7 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                           let callId = workspaceId + "-review-" + string (dateNow ())
                           let verdictPromise = registerCallWithTimeout callStore callId 300000
                           let reviewPrompt =
-                              reviewerVerdictInstructions
+                              ReviewerVerdictPrompts.reviewerVerdictInstructions
                               + "\n\n=== Change Report ===\n\n" + report
                               + "\n\n=== Affected Files ===\n\n" + String.concat "\n" affectedFiles
                               + "\n" + taskSection
@@ -259,13 +259,9 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                                       return Rejected $"Reviewer timed out or failed: {ex.Message}"
                               }
                           match verdict with
-                          | Accepted ->
-                              reviewStore.deactivateReview workspaceId
-                              return "Review passed. Loop mode ended."
-                          | Rejected feedback ->
-                              return "Review feedback:\n\n" + feedback + "\n\nAddress the feedback above. loop mode is still active; fix the issues and call submit_review again."
-                          | Terminated ->
-                              return "Review terminated without verdict. loop mode is still active; fix the issues and call submit_review again."
+                          | Accepted -> reviewStore.deactivateReview workspaceId
+                          | _ -> ()
+                          return formatReviewResult verdict
                       finally
                           reviewStore.unlockReview workspaceId
                   } |> Async.StartAsPromise

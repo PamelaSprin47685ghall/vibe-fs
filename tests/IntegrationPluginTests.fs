@@ -58,7 +58,7 @@ let slashCommandsSpec (reg: obj) =
 let countsSpec (reg: obj) =
     let wrappers = unbox<obj[]> (get reg "wrappers")
     let tools = unbox<obj[]> (get reg "tools")
-    check "wrapper count" (wrappers.Length = 7)
+    check "wrapper count" (wrappers.Length = 5)
     check "tool count" (tools.Length = 12)
 
 let configSpec () = async {

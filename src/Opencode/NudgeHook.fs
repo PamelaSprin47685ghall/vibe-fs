@@ -71,12 +71,10 @@ let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string opt
         do! invoke1 promptArg "prompt" session |> Async.AwaitPromise |> Async.Ignore
     }
 
-let private dispatchEventState state eventType (props: obj) sessionID : VibeFs.Kernel.NudgeState.NudgeShellState * bool =
-    let sid = Id.sessionIdValue sessionID
+let private decodeNudgeHostEvent (eventType: string) (props: obj) : NudgeHostEvent =
     match eventType with
-    | "stream-abort" -> VibeFs.Kernel.NudgeState.clearSession state sid, false
-    | "session.delete" | "session.close" | "session.remove" | "session.deleted" ->
-        VibeFs.Kernel.NudgeState.clearSession state sid, false
+    | "stream-abort" -> StreamAbort
+    | "session.delete" | "session.close" | "session.remove" | "session.deleted" -> SessionDeleted
     | "session.next.prompted" ->
         let prompt = Dyn.get props "prompt"
         let promptText = Dyn.str prompt "text"
@@ -85,37 +83,37 @@ let private dispatchEventState state eventType (props: obj) sessionID : VibeFs.K
             else
                 let partsText = getPartsText (Dyn.get props "parts")
                 if partsText <> "" then partsText else Dyn.str props "text"
-        VibeFs.Kernel.NudgeState.handleSessionNextPrompted state text sid, false
-    | "session.next.retried" ->
-        VibeFs.Kernel.NudgeState.addRetryPendingSession state sid, false
+        SessionNextPrompted text
+    | "session.next.retried" -> SessionNextRetried
     | "message.updated" ->
-        VibeFs.Kernel.NudgeState.handleMessageUpdated state isAbortDomainError isCompletedAssistantMessage (Dyn.get (Dyn.get props "info") "error") props sid
+        let info = Dyn.get props "info"
+        let errorValue = Dyn.get info "error"
+        MessageUpdated(isAbortDomainError errorValue, isCompletedAssistantMessage info)
     | "message.part.updated" ->
         let part = Dyn.get props "part"
-        VibeFs.Kernel.NudgeState.handleMessagePartUpdated state isAbortDomainError (Dyn.str part "type") (Dyn.get part "error") (Dyn.get part "state") sid, false
+        let partType = Dyn.str part "type"
+        let errorValue = Dyn.get part "error"
+        let stateValue = Dyn.get part "state"
+        MessagePartUpdated(partType, isAbortDomainError errorValue, isAbortDomainError stateValue)
     | "session.next.step.failed" ->
-        VibeFs.Kernel.NudgeState.handleSessionNextStepFailed state isAbortDomainError (Dyn.get props "error") sid, false
+        SessionNextStepFailed(isAbortDomainError (Dyn.get props "error"))
     | "session.next.tool.failed" ->
-        VibeFs.Kernel.NudgeState.handleSessionNextToolFailed state isAbortDomainError (Dyn.get props "error") sid, false
+        SessionNextToolFailed(isAbortDomainError (Dyn.get props "error"))
     | "session.next.step.ended" ->
         let direct = Dyn.str props "finish"
         let finish = if direct <> "" then direct else Dyn.str (Dyn.get props "info") "finish"
-        VibeFs.Kernel.NudgeState.handleSessionNextStepEnded state finish sid
-    | "session.idle" ->
-        VibeFs.Kernel.NudgeState.tryClaimNudge state sid
+        SessionNextStepEnded finish
+    | "session.idle" -> SessionIdle
     | "session.error" ->
-        VibeFs.Kernel.NudgeState.handleSessionError state isAbortDomainError (Dyn.get props "error") sid, false
+        SessionError(isAbortDomainError (Dyn.get props "error"))
     | "session.status" ->
         match Dyn.str (Dyn.get props "status") "type" with
-        | "idle" -> VibeFs.Kernel.NudgeState.tryClaimNudge state sid
-        | "busy" -> VibeFs.Kernel.NudgeState.handleSessionBusy state sid, false
-        | "retry" -> VibeFs.Kernel.NudgeState.addRetryPendingSession state sid, false
-        | _ -> state, false
+        | "idle" -> SessionStatusIdle
+        | "busy" -> SessionStatusBusy
+        | "retry" -> SessionStatusRetry
+        | _ -> Other
     | _ ->
-        if isRetryProgressEvent eventType then
-            VibeFs.Kernel.NudgeState.deleteRetryPendingSession state sid, false
-        else
-            state, false
+        if isRetryProgressEvent eventType then RetryProgress else Other
 
 /// The detached nudge flow: all client I/O happens here, never under the lock.
 /// Each lock re-entry (`Mutate`) is a pure, instant transition.
@@ -203,7 +201,8 @@ type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.Rev
                     match Id.trySessionId sessionIDStr with
                     | None -> state, None
                     | Some sessionID ->
-                        let nextState, wantsNudge = dispatchEventState state eventType props sessionID
+                        let nudgeEvent = decodeNudgeHostEvent eventType props
+                        let nextState, wantsNudge = NudgeState.handleEvent state (Id.sessionIdValue sessionID) nudgeEvent
                         nextState, (if wantsNudge then Some sessionID else None)
                 with _ -> state, None)
         match claimed with

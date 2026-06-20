@@ -3,6 +3,7 @@ module VibeFs.Opencode.Tools
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.Fuzzy
 open VibeFs.Kernel.HostTools
@@ -35,6 +36,20 @@ let private mergeObjects (objs: obj array) : obj =
     merged
 
 let private resolveStr (s: string) : JS.Promise<string> = async { return s } |> Async.StartAsPromise
+
+let private formatDomainError (context: string) (error: DomainError) : string =
+    match error with
+    | UpstreamRefused reason -> $"{context} failed: {reason}"
+    | UpstreamTimeout seconds -> $"{context} timed out after {seconds}s"
+    | UnknownJsError message -> $"{context} failed: {message}"
+    | SystemPanic message -> $"{context} failed: {message}"
+    | MessageAborted -> $"{context} aborted"
+    | SessionBusy -> $"{context} blocked: session busy"
+    | TaskWaitBackgrounded -> $"{context} moved to background"
+    | ExecutorExecutableMissing executable -> $"{context} failed: {executable} not found"
+    | ParseError(location, detail) -> $"{context} failed: parse error in {location}: {detail}"
+    | ToolNotPermitted(agent, tool) -> $"{context} failed: {tool} not permitted for {agent}"
+    | InvalidIntent(tool, field, detail) -> $"{context} failed: invalid {field} for {tool}: {detail}"
 
 let private optStr (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(string v)
 let private optInt (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<int> v)
@@ -170,7 +185,7 @@ let fuzzyFindTool (finderCache: FinderCache) : obj =
                 limit = intMinNullish 1 Params.fuzzyFindLimit; iterator = strOpt Params.fuzzyFindIterator |})
         (fun args context ->
             let scopeId = Dyn.str context "sessionID"
-            if scopeId = "" then resolveStr "Error: fuzzy_find requires an active session"
+            if scopeId = "" then resolveStr (formatDomainError "fuzzy_find" (InvalidIntent ("fuzzy_find", "session", "requires an active session")))
             else
                 let p : FuzzyFindParams =
                     { pattern = optStr args "pattern"
@@ -196,7 +211,7 @@ let fuzzyGrepTool (finderCache: FinderCache) : obj =
                 iterator = strOpt Params.fuzzyGrepIterator |})
         (fun args context ->
             let scopeId = Dyn.str context "sessionID"
-            if scopeId = "" then resolveStr "Error: fuzzy_grep requires an active session"
+            if scopeId = "" then resolveStr (formatDomainError "fuzzy_grep" (InvalidIntent ("fuzzy_grep", "session", "requires an active session")))
             else
                 let p : FuzzyGrepParams =
                     { pattern = optStr args "pattern"
@@ -229,15 +244,17 @@ let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
         (fun args context ->
             let query = Dyn.str args "query"
             let whatToSummarize = Dyn.str args "what_to_summarize"
-            if query = "" then resolveStr "Error: query is required"
-            elif whatToSummarize = "" then resolveStr "Error: what_to_summarize is required"
+            if query = "" then resolveStr (formatDomainError "Web search" (InvalidIntent ("websearch", "query", "required")))
+            elif whatToSummarize = "" then resolveStr (formatDomainError "Web search" (InvalidIntent ("websearch", "what_to_summarize", "required")))
             else
                 let signal = abortSignal context
                 async {
-                    try
-                        let numResults = defaultArg (optInt args "numResults") 10
-                        let body = createObj [ "query", box query; "max_results", box numResults ]
-                        let! data = ollamaPost "web_search" body (if Dyn.isNullish signal then None else Some signal) |> Async.AwaitPromise
+                    let numResults = defaultArg (optInt args "numResults") 10
+                    let body = createObj [ "query", box query; "max_results", box numResults ]
+                    let! result = ollamaPost "web_search" body (if Dyn.isNullish signal then None else Some signal) |> Async.AwaitPromise
+                    match result with
+                    | Error e -> return formatDomainError "Web search" e
+                    | Ok data ->
                         let results = Dyn.get data "results"
                         let items =
                             if Dyn.isNullish results || not (Dyn.isArray results) then []
@@ -250,7 +267,6 @@ let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                             return! runSubagentWithCleanup registry (client ()) "executor" "Web search summary" prompt
                                         (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
                                     |> Async.AwaitPromise
-                    with ex -> return $"Search failed: {ex.Message}"
                 } |> Async.StartAsPromise)
 
 let webfetchTool () : obj =
@@ -262,7 +278,7 @@ let webfetchTool () : obj =
                 timeout = numOpt Params.webfetchTimeout |})
         (fun args context ->
             let url = Dyn.str args "url"
-            if url = "" then resolveStr "Error: url is required"
+            if url = "" then resolveStr (formatDomainError "Web fetch" (InvalidIntent ("webfetch", "url", "required")))
             else
                 let signal = abortSignal context
                 async {
@@ -273,14 +289,15 @@ let webfetchTool () : obj =
                     match optStr args "prompt" with Some v -> bodyEntries.Add("prompt", box v) | None -> ()
                     match optInt args "timeout" with Some v -> bodyEntries.Add("timeout", box v) | None -> ()
                     let body = createObj (Seq.toList bodyEntries)
-                    try
-                        let! data = ollamaPost "web_fetch" body (if Dyn.isNullish signal then None else Some signal) |> Async.AwaitPromise
+                    let! result = ollamaPost "web_fetch" body (if Dyn.isNullish signal then None else Some signal) |> Async.AwaitPromise
+                    match result with
+                    | Error e -> return formatDomainError "Web fetch" e
+                    | Ok data ->
                         let title = if Dyn.isNullish (Dyn.get data "title") then None else Some (Dyn.str data "title")
                         let byline = if Dyn.isNullish (Dyn.get data "byline") then None else Some (Dyn.str data "byline")
                         let length_ = if Dyn.isNullish (Dyn.get data "length") then None else Some (unbox<int> (Dyn.get data "length"))
                         let content = if Dyn.isNullish (Dyn.get data "content") then None else Some (Dyn.str data "content")
                         return formatFetchResponse { title = title; byline = byline; length = length_; content = content }
-                    with ex -> return $"Web fetch failed: {ex.Message}"
                 } |> Async.StartAsPromise)
 
 let private formatReviewResult = VibeFs.Kernel.Prompts.formatReviewResult

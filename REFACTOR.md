@@ -357,6 +357,7 @@ Kernel 拿到这种类型决策；host 仅做翻译。`dispatchEventState` 的 1
 - **不为了预算机械拆文件、拆函数**。一个 220 行但语义单一的文件，胜过 4 个来回跳转的空壳文件；一个 55 行但顺读的纯解释器，胜过 6 个只有包装价值的小函数。
 - **不接受 `// TODO`**。要么实现，要么删掉；TODO 就是债务伪装成谦虚。
 - **不接受 fallback / default-value / 兜底**。任何 fallback 都是把 bug 推迟到看不见的地方。看到 `defaultArg ... ""`、`if isNull then "" else ...` 用于业务字段都要给原因或改成 `Result.Error InvalidIntent`。
+- **不做 `Task<'T>` 迁移**。AGENTS.md 的 Task 宪法对当前工具链不成立：实测 Fable 5.2.0 不支持 `task { }` CE（`TaskBuilder.Run` / `Task.Delay` / `Task.GetAwaiter` 均报 "not supported by Fable"）。本次重构沿用全库既有的 `async { }` + `JS.Promise<'T>` + `Async.AwaitPromise` / `Async.StartAsPromise` 桥接，不引入 `task` / `Task<'T>`。待 Fable 确实支持后再单独迁移。
 
 ---
 

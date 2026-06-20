@@ -148,13 +148,10 @@ let private readProjectionAsync (workspaceRoot: string) : JS.Promise<WikiProject
 let wrapperSpec (reg: obj) =
     let wrappers = unbox<obj[]> (get reg "wrappers")
     let targets = wrappers |> Array.map (fun w -> str w "targetTool") |> Array.sort
-    let expected = [| "agent_report"; "file_edit_insert"; "file_edit_replace_string"; "file_read"; "todo_write"; "web_fetch"; "web_search" |] |> Array.sort
+    let expected = [| "agent_report"; "file_edit_insert"; "file_edit_replace_string"; "file_read"; "todo_write" |] |> Array.sort
     check "wrapper targets correct" (targets = expected)
     let ar = wrappers |> Array.find (fun w -> str w "targetTool" = "agent_report")
     check "agent_report wrapper exists" (not (isNullish ar))
-    let ws = wrappers |> Array.find (fun w -> str w "targetTool" = "web_search")
-    let wsWrapped = (get ws "wrapper") $ (null, createObj [ "cwd", box "/tmp"; "workspaceId", box "ws1" ])
-    check "web_search wrapper has execute" (typeIs (get wsWrapped "execute") "function")
 
 let computeCountSpec (reg: obj) =
     let tools = unbox<obj[]> (get reg "tools")

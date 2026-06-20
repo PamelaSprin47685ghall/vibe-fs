@@ -50,6 +50,7 @@
     <Compile Include="src/Shell/Executor.fs" />
     <Compile Include="src/Shell/FuzzySearch.fs" />
     <Compile Include="src/Shell/ChildAgentRegistry.fs" />
+    <Compile Include="src/Shell/NudgeRuntime.fs" />
 
     <Compile Include="src/Mux/AiSettings.fs" />
     <Compile Include="src/Opencode/MagicTodo.fs" />

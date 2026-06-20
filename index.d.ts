@@ -23,20 +23,6 @@ export interface CapsFileReadEntry {
   };
 }
 
-export interface DynamicToolPart {
-  type: "dynamic-tool";
-  toolName: string;
-  state: string;
-  output?: unknown;
-  toolCallId: string;
-  [key: string]: unknown;
-}
-
-export interface MuxMessageLike {
-  parts?: readonly DynamicToolPart[];
-  [key: string]: unknown;
-}
-
 export interface ToolLike {
   name?: string;
   description?: string;
@@ -262,19 +248,4 @@ export interface PluginRegistration {
 }
 
 export function createRegistration(deps: unknown): PluginRegistration;
-export function getPluginToolPolicy(agentId: string, role?: string): MuxToolPolicy | undefined;
 export function buildCapsFileReadData(projectRoot: string): Promise<CapsFileReadEntry[]>;
-export function deduplicateReadOutputs<T extends MuxMessageLike>(messages: readonly T[]): T[];
-export function deduplicateReadOutputsWithSeen<T extends MuxMessageLike>(
-  seenOutputs: readonly string[],
-  messages: readonly T[],
-): T[];
-export function deduplicateReadOutputsAgainstHistory<T extends MuxMessageLike>(
-  history: readonly T[],
-  messages: readonly T[],
-): T[];
-export function deduplicateModelReadOutputsWithSeen(
-  seenOutputs: readonly string[],
-  messages: readonly unknown[],
-): [string[], unknown[]];
-export function collectReadOutputs<T extends MuxMessageLike>(messages: readonly T[]): string[];
