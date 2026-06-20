@@ -187,8 +187,8 @@ let capsTransformSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "manager" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "caps transform injects two messages" (msgs.Length = 3)
-    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[2], originalMsg))
+    check "caps transform injects four messages" (msgs.Length = 5)
+    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[4], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -201,6 +201,25 @@ let capsTransformInPlaceSpec () = promise {
     let! p = plugin (box {| directory = workspaceDir |})
     do! (get p "experimental.chat.messages.transform") $ (createObj [], freshOut) |> unbox<JS.Promise<unit>>
     check "caps transform mutates array in place" (obj.ReferenceEquals(get freshOut "messages", freshRef))
+    do! rmAsync workspaceDir
+}
+
+let defaultPreludeWithoutCapsSpec () = promise {
+    let! workspaceDir = mkdtempAsync "caps-default-prelude-"
+    let! p = plugin (box {| directory = workspaceDir |})
+    let tf = get p "experimental.chat.messages.transform"
+    let originalMsg =
+        box {| info = createObj [ "id", box "msg-default"; "agent", box "manager"; "sessionID", box "default-session" ]
+               parts = [||] |}
+    let out = createObj [ "messages", box [| originalMsg |] ]
+    do! tf $ (createObj [ "agent", box "manager" ], out) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    check "default prelude injects synthetic messages without caps or wiki" (msgs.Length = 4)
+    let thinkingParts = unbox<obj[]> (get msgs.[1] "parts")
+    let contextParts = unbox<obj[]> (get msgs.[2] "parts")
+    check "default prelude injects thinking without caps or wiki" (str thinkingParts.[0] "type" = "reasoning" && str thinkingParts.[0] "text" = thinkText)
+    check "default prelude injects llm text without caps or wiki" (str contextParts.[0] "type" = "text" && str contextParts.[0] "text" = llmText)
+    check "default prelude preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -252,16 +271,16 @@ let capsAndMagicOrderSpec () = promise {
     do! tf $ (createObj [], messages) |> unbox<JS.Promise<unit>>
     let result = unbox<obj[]> (get messages "messages")
     let capsParts = unbox<obj[]> (get result.[0] "parts")
-    let mergedAssistantParts = unbox<obj[]> (get result.[1] "parts")
-    let mergedAssistantInfo = get result.[1] "info"
-    let magicInfo = get result.[2] "info"
+    let thinkingParts = unbox<obj[]> (get result.[1] "parts")
+    let contextParts = unbox<obj[]> (get result.[2] "parts")
+    let capsAssistantInfo = get result.[3] "info"
+    let magicInfo = get result.[4] "info"
     let magicId : string = str magicInfo "id"
     check "caps/magic order: caps user first" ((str capsParts.[0] "text").StartsWith "你好")
-    check "caps/magic order: merged assistant reasoning" (str mergedAssistantParts.[0] "type" = "reasoning" && str mergedAssistantParts.[0] "text" = thinkText)
-    check "caps/magic order: merged assistant text" (str mergedAssistantParts.[1] "type" = "text" && str mergedAssistantParts.[1] "text" = llmText)
-    check "caps/magic order: merged assistant tool" (str mergedAssistantParts.[2] "type" = "tool" && str mergedAssistantParts.[2] "tool" = "read")
-    check "caps/magic order: caps assistant id" ((str mergedAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
-    check "caps/magic order: magic prefix second" (magicId.StartsWith(magicTodoPrefixPrefix : string))
+    check "caps/magic order: thinking second" (str thinkingParts.[0] "type" = "reasoning" && str thinkingParts.[0] "text" = thinkText)
+    check "caps/magic order: llm text third" (str contextParts.[0] "type" = "text" && str contextParts.[0] "text" = llmText)
+    check "caps/magic order: caps read assistant fourth" ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
+    check "caps/magic order: magic prefix fifth" (magicId.StartsWith(magicTodoPrefixPrefix : string))
     do! rmAsync workspaceDir
 }
 
@@ -276,17 +295,18 @@ let wikiPreludeWithoutCapsSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "manager" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "wiki prelude injects synthetic messages without caps" (msgs.Length = 3)
+    check "wiki prelude injects synthetic messages without caps" (msgs.Length = 4)
     let firstParts = unbox<obj[]> (get msgs.[0] "parts")
-    let mergedAssistantParts = unbox<obj[]> (get msgs.[1] "parts")
+    let thinkingParts = unbox<obj[]> (get msgs.[1] "parts")
+    let contextParts = unbox<obj[]> (get msgs.[2] "parts")
     let firstText = str firstParts.[0] "text"
     check "wiki prelude keeps hello prefix" (firstText.StartsWith "你好")
     check "wiki prelude includes history header" (firstText.Contains "[项目背景和历史]")
     check "wiki prelude includes question" (firstText.Contains "0a3f 项目插件入口在哪里？")
     check "wiki prelude hides answers" (not (firstText.Contains "src/Opencode/Plugin.fs"))
-    check "wiki prelude injects thinking" (str mergedAssistantParts.[0] "type" = "reasoning" && str mergedAssistantParts.[0] "text" = thinkText)
-    check "wiki prelude injects llm text" (str mergedAssistantParts.[1] "type" = "text" && str mergedAssistantParts.[1] "text" = llmText)
-    check "wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[2], originalMsg))
+    check "wiki prelude injects thinking" (str thinkingParts.[0] "type" = "reasoning" && str thinkingParts.[0] "text" = thinkText)
+    check "wiki prelude injects llm text" (str contextParts.[0] "type" = "text" && str contextParts.[0] "text" = llmText)
+    check "wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -1288,6 +1308,7 @@ let run () : JS.Promise<unit> =
         do! buildCapsFileReadDataSpec ()
         do! capsTransformSpec ()
         do! capsTransformInPlaceSpec ()
+        do! defaultPreludeWithoutCapsSpec ()
         do! capsAndMagicOrderSpec ()
         do! wikiPreludeWithoutCapsSpec ()
         do! fetchWikiSnapshotSpec ()

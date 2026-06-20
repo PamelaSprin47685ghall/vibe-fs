@@ -13,6 +13,8 @@ open VibeFs.Opencode.CapsPrelude
 
 let private capsUserPrefix = "caps-synth-user-"
 let private capsAssistantPrefix = "caps-synth-assistant-"
+let private capsThinkingPrefix = "caps-synth-thinking-"
+let private capsContextPrefix = "caps-synth-context-"
 
 let private messageInfoField (field: obj -> string) (msg: obj) : string =
     let info = get msg "info"
@@ -33,14 +35,16 @@ let messageSessionID (msg: obj) : string =
 
 let hasExistingCapsMessages (messages: obj array) : bool =
     match messages |> List.ofArray with
-    | m0 :: m1 :: _ ->
+    | m0 :: m1 :: m2 :: _ ->
         isPrefixed capsUserPrefix m0
-        && isPrefixed capsAssistantPrefix m1
+        && isPrefixed capsThinkingPrefix m1
+        && isPrefixed capsContextPrefix m2
     | _ -> false
 
 let private stripExistingCapsMessages (messages: obj array) : obj array =
     if not (hasExistingCapsMessages messages) then messages
-    else messages.[2..]
+    elif messages.Length >= 4 && isPrefixed capsAssistantPrefix messages.[3] then messages.[4..]
+    else messages.[3..]
 
 let private sessionBox (sessionID: string option) : obj =
     match sessionID with Some s -> box s | None -> box null
@@ -150,22 +154,20 @@ let buildCapsMessages
     else
         let existingStripped =
             stripExistingCapsMessages messages
-        let hasPrelude = match preludeText with Some text when text.Trim() <> "" -> true | _ -> false
         if existingStripped.Length = 0 then messages
-        elif capsFiles.IsEmpty && not hasPrelude then existingStripped
         else
             let sessionID = messageSessionID existingStripped.[0]
             let sessionOpt = if sessionID = "" then None else Some sessionID
             let fp = stableFingerprint hashFn capsFiles
             let userId = $"{capsUserPrefix}{fp}"
+            let thinkingId = $"{capsThinkingPrefix}{fp}"
+            let contextId = $"{capsContextPrefix}{fp}"
             let assistantId = $"{capsAssistantPrefix}{fp}"
-            let mergedParts =
-                Array.append
-                    [|
-                        reasoningPart $"caps-reasoning-{fp}" sessionOpt assistantId thinkText
-                        textPart $"caps-text-{fp}" sessionOpt assistantId llmText
-                    |]
-                    (if capsFiles.IsEmpty then [||] else buildToolParts capsFiles fp sessionOpt assistantId)
+            let thinkingParts = [| reasoningPart $"caps-reasoning-{fp}" sessionOpt thinkingId thinkText |]
+            let contextParts = [| textPart $"caps-text-{fp}" sessionOpt contextId llmText |]
+            let toolParts = if capsFiles.IsEmpty then [||] else buildToolParts capsFiles fp sessionOpt assistantId
             let userMsg = buildUserMessage userId sessionOpt preludeText
-            let mergedAssistantMsg = buildAssistantMessage assistantId userId sessionOpt projectRoot mergedParts
-            Array.concat [| [| userMsg |]; [| mergedAssistantMsg |]; existingStripped |]
+            let thinkingMsg = buildAssistantMessage thinkingId userId sessionOpt projectRoot thinkingParts
+            let contextMsg = buildAssistantMessage contextId thinkingId sessionOpt projectRoot contextParts
+            let assistantMessages = if capsFiles.IsEmpty then [||] else [| buildAssistantMessage assistantId contextId sessionOpt projectRoot toolParts |]
+            Array.concat [| [| userMsg |]; [| thinkingMsg |]; [| contextMsg |]; assistantMessages; existingStripped |]
