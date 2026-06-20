@@ -18,6 +18,7 @@ open VibeFs.Tests.IntegrationChatTests
 open VibeFs.Tests.MagicTests
 open VibeFs.Tests.WikiTests
 open VibeFs.Tests.WikiFileTests
+open VibeFs.Tests.WikiKernelTests
 open VibeFs.Tests.TitleFetchGuardTests
 
 let runAll (_args: string array) : JS.Promise<int> =
@@ -31,6 +32,7 @@ let runAll (_args: string array) : JS.Promise<int> =
         ReviewTests.resolvePendingClearsSuppressor ()
         ReviewTests.disposeSessionTreeTerminatesAll ()
         AgentTests.canUse' ()
+        AgentTests.canUseMatrix ()
         AgentTests.deniedTools' ()
         AgentTests.decision ()
         AgentTests.updateState ()
@@ -86,6 +88,7 @@ let runAll (_args: string array) : JS.Promise<int> =
         do! IntegrationChatTests.run () |> Async.AwaitPromise
         do! WikiTests.run () |> Async.AwaitPromise
         do! WikiFileTests.run () |> Async.AwaitPromise
+        do! WikiKernelTests.run () |> Async.AwaitPromise
         MagicTests.run ()
         TitleFetchGuardTests.signature ()
         TitleFetchGuardTests.wrap ()

@@ -6,17 +6,12 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Mux.AiSettings
 open VibeFs.Mux.Wrappers
+open VibeFs.Shell.PromiseRace
 
 [<Global>]
 type AbortController() =
     member _.signal: obj = jsNative
     member _.abort(): unit = jsNative
-
-[<Global("Promise")>]
-let private PromiseCtor : obj = jsNative
-
-let private promiseRace<'T> (promises: JS.Promise<'T> array) : JS.Promise<'T> =
-    unbox<JS.Promise<'T>> (PromiseCtor?race(promises))
 
 let private resolveStr (s: string) : JS.Promise<string> =
     async { return s } |> Async.StartAsPromise

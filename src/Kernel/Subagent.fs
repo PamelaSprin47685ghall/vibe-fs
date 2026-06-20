@@ -55,7 +55,7 @@ let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
         let prelude =
             sections
             |> List.map (fun s ->
-                let body = Option.defaultValue "(skipped)" s.content
+                let body = Option.defaultValue meditatorSkippedSection s.content
                 $"=== {s.file} ===\n\n{body}")
             |> String.concat "\n\n"
         let instructions = withReportTail host (meditatorBody intent files)

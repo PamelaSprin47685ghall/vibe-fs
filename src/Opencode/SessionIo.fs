@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Message
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Shell.PromiseRace
 
 type WorkspaceEffect = Ro | Rw
 
@@ -14,6 +15,12 @@ type WikiRecordRequest =
       prompt: string
       result: string
       agent: string }
+
+/// Placeholder for a subagent session that produced no assistant text. Distinct
+/// from the executor's "(no output)" (shell stdout): same string, different
+/// domain fact, so each stays local to its own module (REFACTOR.md §0).
+let private noOutputText = "(no output)"
+let private abortedPrefix = "(aborted)"
 
 let private firstString (ctx: obj) (keys: string list) : string option =
     keys
@@ -76,22 +83,16 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) : J
                     box {| path = box {| id = sessionId |}; query = box {| directory = directory |} |}
             let! result = invoke1 arg "messages" (Dyn.get client "session") |> Async.AwaitPromise
             let data = Dyn.get result "data"
-            if Dyn.isNullish data then return "(no output)"
+            if Dyn.isNullish data then return noOutputText
             else
                 match readAssistantText (toEntries data) None with
                 | Some text -> return text
-                | None -> return "(no output)"
-        with _ -> return "(no output)"
+                | None -> return noOutputText
+        with _ -> return noOutputText
     }
     |> Async.StartAsPromise
 
 let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
-
-[<Global("Promise")>]
-let private PromiseCtor : obj = jsNative
-
-let private promiseRace<'T> (promises: JS.Promise<'T> array) : JS.Promise<'T> =
-    unbox<JS.Promise<'T>> (PromiseCtor?race(promises))
 
 [<Global>]
 type DOMException(message: string, name: string) =
@@ -181,7 +182,7 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
                     match workspaceEffect, wikiRecorder with
                     | Rw, Some record when text <> "" -> record { title = title; prompt = prompt; result = text; agent = agent }
                     | _ -> ()
-                    return if text = "" then "(no output)" else text
+                    return if text = "" then noOutputText else text
                 finally
                     abortAndUnregister ()
             with err ->
@@ -189,7 +190,7 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
                 | MessageAborted ->
                     abortAndUnregister ()
                     let! text = extractSessionText client childID directory |> Async.AwaitPromise
-                    return if text = "" then "(aborted)" else $"(aborted) {text}"
+                    return if text = "" then abortedPrefix else $"{abortedPrefix} {text}"
                 | _ -> return (raise err)
     }
     |> Async.StartAsPromise

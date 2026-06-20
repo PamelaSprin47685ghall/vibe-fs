@@ -24,6 +24,8 @@
     <Compile Include="src/Kernel/Dedup.fs" />
     <Compile Include="src/Kernel/Message.fs" />
     <Compile Include="src/Kernel/Wiki.fs" />
+    <Compile Include="src/Kernel/WikiPrompts.fs" />
+    <Compile Include="src/Kernel/WikiMaintenance.fs" />
     <Compile Include="src/Kernel/CapsFormat.fs" />
     <Compile Include="src/Kernel/TreeSitterKernel.fs" />
     <Compile Include="src/Kernel/MessageDedup.fs" />
@@ -51,6 +53,7 @@
     <Compile Include="src/Shell/FuzzySearch.fs" />
     <Compile Include="src/Shell/ChildAgentRegistry.fs" />
     <Compile Include="src/Shell/NudgeRuntime.fs" />
+    <Compile Include="src/Shell/PromiseRace.fs" />
 
     <Compile Include="src/Mux/AiSettings.fs" />
     <Compile Include="src/Opencode/MagicTodo.fs" />
@@ -95,6 +98,7 @@
     <Compile Include="tests/MagicTests.fs" />
     <Compile Include="tests/WikiTests.fs" />
     <Compile Include="tests/WikiFileTests.fs" />
+    <Compile Include="tests/WikiKernelTests.fs" />
     <Compile Include="tests/TitleFetchGuardTests.fs" />
     <Compile Include="tests/Tests.fs" />
   </ItemGroup>

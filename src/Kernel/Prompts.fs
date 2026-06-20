@@ -142,6 +142,11 @@ let formatMeditatorUserPrompt (intent: string) (files: string list) : string =
 
 let meditatorSectionSeparator = "\n---\n"
 
+/// Placeholder rendered for a meditator file section whose content could not be
+/// read. Single SSOT — consumed by both `buildMeditatorPrompt` here and the
+/// Subagent prompt builder (REFACTOR.md §0 / §11: one fact, one definition).
+let meditatorSkippedSection = "(skipped)"
+
 type MeditatorFileSection =
     { file: string
       content: string option }
@@ -155,10 +160,9 @@ let private renderPromptSection = function
     | InstructionSection body -> body
 
 let buildMeditatorPrompt (sections: MeditatorFileSection list) (intent: string) : string =
-    let skipped = "(skipped)"
     let promptSections =
         sections
-        |> List.map (fun section -> FileSection(section.file, Option.defaultValue skipped section.content))
+        |> List.map (fun section -> FileSection(section.file, Option.defaultValue meditatorSkippedSection section.content))
     let files = sections |> List.map (fun s -> s.file)
     let allSections = promptSections @ [ InstructionSection(formatMeditatorUserPrompt intent files) ]
     allSections |> List.map renderPromptSection |> String.concat "\n\n"

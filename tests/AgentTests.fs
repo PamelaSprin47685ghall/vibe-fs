@@ -87,6 +87,58 @@ let deniedTools' () =
     check "investigator keeps fuzzy_grep" (not (Set.contains "fuzzy_grep" denied))
     check "investigator keeps agent_report" (not (Set.contains "agent_report" denied))
 
+/// Full permission characterization: snapshot `canUse agent tool` for every
+/// known agent across a tool set that exercises each permission rule (reserved
+/// tools, agent_report, shell/grep, stealth, return_<role>, read, terminal
+/// roles, dispatch/planning/web/todo/skill, mutating file tools, fuzzy_grep).
+/// Order matters — this is the lock that lets Config.canUseCanonical be
+/// reshaped without drifting behavior (REFACTOR.md §1 D8).
+let canUseMatrix () =
+    let agents =
+        [ "manager"; "investigator"; "coder"; "reviewer"; "browser"; "meditator"; "executor"; "bookkeeper" ]
+    // (tool, expected-allow per agent in `agents` order)
+    let matrix : (string * (bool list)) list = [
+        "fetch_wiki",                    [ true;  false; false; false; false; false; false; false ]
+        "submit_wiki",                   [ false; false; false; false; false; false; false; true  ]
+        "agent_report",                  [ true;  true;  true;  true;  true;  true;  true;  true  ]
+        "bash",                          [ false; false; false; false; false; false; false; false ]
+        "bash_run",                      [ false; false; false; false; false; false; false; false ]
+        "task",                          [ false; false; false; false; false; false; false; false ]
+        "grep",                          [ false; false; false; false; false; false; false; false ]
+        "grep_x",                        [ true;  true;  true;  false; false; false; false; false ]
+        "fuzzy_grep",                    [ false; true;  true;  false; false; false; false; false ]
+        "fuzzy_find",                    [ true;  true;  true;  false; false; false; false; false ]
+        "glob",                          [ true;  true;  true;  false; false; false; false; false ]
+        "read",                          [ true;  true;  true;  true;  true;  false; false; false ]
+        "write",                         [ false; false; true;  false; false; false; false; false ]
+        "edit",                          [ false; false; true;  false; false; false; false; false ]
+        "patch",                         [ false; false; true;  false; false; false; false; false ]
+        "ast_edit",                      [ false; false; true;  false; false; false; false; false ]
+        "apply_patch",                   [ false; false; true;  false; false; false; false; false ]
+        "websearch",                     [ true;  false; false; false; false; false; false; false ]
+        "webfetch",                      [ true;  false; false; false; false; false; false; false ]
+        "submit_review",                 [ true;  false; false; false; false; false; false; false ]
+        "todowrite",                     [ true;  false; false; false; false; false; false; false ]
+        "todo_write",                    [ true;  false; false; false; false; false; false; false ]
+        "question",                      [ true;  false; false; false; false; false; false; false ]
+        "ask_user_question",             [ true;  false; false; false; false; false; false; false ]
+        "skill",                         [ true;  false; false; false; false; false; false; false ]
+        "coder",                         [ true;  false; false; false; false; false; false; false ]
+        "investigator",                  [ true;  false; false; false; false; false; false; false ]
+        "meditator",                     [ true;  false; false; false; false; false; false; false ]
+        "browser",                       [ true;  false; false; false; false; false; false; false ]
+        "manager",                       [ true;  false; false; false; false; false; false; false ]
+        "executor",                      [ true;  true;  false; false; false; false; false; false ]
+        "stealth-browser-mcp_navigate",  [ false; false; false; false; true;  false; false; false ]
+        "return_reviewer",               [ false; false; false; true;  false; false; false; false ]
+        "return_coder",                  [ false; false; true;  false; false; false; false; false ]
+        "manage_todo_list",              [ true;  false; false; false; false; false; false; false ]
+    ]
+    matrix
+    |> List.iter (fun (tool, expected) ->
+        let actual = agents |> List.map (fun agent -> canUse agent tool)
+        check $"matrix: {tool}" (actual = expected))
+
 let private nudgeContext todos msg runner loopActive =
     { todos = todos; lastAssistantMessage = msg; hasActiveRunner = runner; isLoopActive = loopActive }
 
