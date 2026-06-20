@@ -5,200 +5,21 @@ open Fable.Core.JsInterop
 open Fable.Core.JS
 open VibeFs.Kernel
 open VibeFs.Kernel.Config
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.Prompts
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.NudgeState
-open VibeFs.Kernel.Message
+open VibeFs.Kernel.HostTools
+open VibeFs.Opencode.AgentConfig
+open VibeFs.Opencode.CommandHooks
+open VibeFs.Opencode.ChatHooks
+open VibeFs.Opencode.MessageTransform
+open VibeFs.Opencode.ToolDefinitionHooks
+open VibeFs.Opencode.EventHooks
 open VibeFs.Opencode.Tools
 open VibeFs.Opencode.HookExecute
-open VibeFs.Opencode.HookTransform
 open VibeFs.Opencode.TitleFetchGuard
 open VibeFs.Opencode.NudgeHook
-open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Opencode.WikiRuntime
+open VibeFs.Opencode.MagicTodo
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Opencode.MagicTodo
-open VibeFs.Kernel.HostTools
-
-[<Global("process")>]
-let private nodeProcess : obj = jsNative
-
-let private envVar (name: string) : string =
-    let v = nodeProcess?env?(name)
-    if isNull v then "" else string v
-
-let private emptyObj () : obj = createObj []
-let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
-let private assignInto (target: obj) (source: obj) : obj = Dyn.assignInto target source
-
-let private getEventAssistantText (event: obj) : string =
-    let properties = Dyn.get event "properties"
-    getPartsText (Dyn.get properties "parts")
-
-let private flushDirectWriteTurnIfCompleted (wikiRuntime: WikiRuntime) (input: obj) : unit =
-    let event = Dyn.get input "event"
-    if Dyn.str event "type" = "message.updated" then
-        let properties = Dyn.get event "properties"
-        let info = Dyn.get properties "info"
-        if isCompletedAssistantMessage info then
-            let sessionID =
-                let fromProps = Dyn.str properties "sessionID"
-                if fromProps <> "" then fromProps else Dyn.str info "sessionID"
-            if sessionID <> "" then
-                wikiRuntime.FlushTurnIfNeeded(sessionID, getEventAssistantText event)
-
-let private cleanUpJobContextIfAbortedOrDeleted (wikiRuntime: WikiRuntime) (input: obj) : unit =
-    let event = Dyn.get input "event"
-    let eventType = Dyn.str event "type"
-    if eventType = "stream-abort" || eventType = "session.delete" || eventType = "session.close" || eventType = "session.remove" || eventType = "session.deleted" then
-        let rawProps = Dyn.get event "properties"
-        let props = if Dyn.isNullish rawProps then event else rawProps
-        let sessionID = getSessionID eventType props
-        if sessionID <> "" then
-            wikiRuntime.DeleteJob(sessionID)
-
-let private emptyMcps : obj = [||] :> obj
-
-type private BuiltinAgentSpec =
-    { name: string
-      defaultMode: string
-      systemPrompt: string
-      defaultMcps: string array }
-
-let private defaultPrimaryAliases = [ "manager"; "build"; "plan" ]
-
-let private builtinAgentSpecs =
-    [ { name = "manager"; defaultMode = "primary"; systemPrompt = Prompts.managerSystemPrompt; defaultMcps = [||] }
-      { name = "build"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "plan"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "coder"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "investigator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "meditator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "bookkeeper"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "reviewer"; defaultMode = "subagent"; systemPrompt = Prompts.reviewInstructions; defaultMcps = [||] }
-      { name = "browser"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [| "stealth-browser-mcp" |] }
-      { name = "executor"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] } ]
-
-let private tryFindBuiltinAgent name =
-    builtinAgentSpecs |> List.tryFind (fun spec -> spec.name = name)
-
-let private mergeObj (a: obj) (b: obj) : obj =
-    let result = emptyObj ()
-    Dyn.assignInto result a |> ignore
-    Dyn.assignInto result b |> ignore
-    result
-
-let private toolDefaultsFor (host: Host) (agentName: string) : obj =
-    allToolNames host
-    |> Seq.map (fun name -> name, box (canUseForHost host agentName name))
-    |> createObj
-
-let private permissionDefaultsFor (host: Host) (agentName: string) : obj =
-    allToolNames host
-    |> Seq.map (fun name -> name, box (if canUseForHost host agentName name then "allow" else "deny"))
-    |> createObj
-
-let private withRoleDefaultsFor (host: Host) (name: string) (userAgent: obj) : obj =
-    let spec = tryFindBuiltinAgent name
-    let userPrompt = Dyn.str userAgent "prompt"
-    let prompt =
-        if userPrompt <> "" then userPrompt
-        else spec |> Option.map (fun value -> value.systemPrompt) |> Option.defaultValue ""
-    let userMode = Dyn.str userAgent "mode"
-    let mode =
-        if userMode <> "" then userMode
-        else spec |> Option.map (fun value -> value.defaultMode) |> Option.defaultValue "subagent"
-    let primaryDefaultMode = if defaultPrimaryAliases |> List.contains name then "primary" else "subagent"
-    let effectiveMode = if mode <> "" then mode else primaryDefaultMode
-    let userPerm = Dyn.get userAgent "permission"
-    let userTools = Dyn.get userAgent "tools"
-    let userMcps = Dyn.get userAgent "mcps"
-    let mcps =
-        if Dyn.isNullish userMcps then
-            spec
-            |> Option.map (fun value -> if value.defaultMcps.Length = 0 then emptyMcps else box value.defaultMcps)
-            |> Option.defaultValue emptyMcps
-        else
-            userMcps
-
-    let perm = mergeObj (permissionDefaultsFor host name) userPerm
-    let tools = mergeObj (toolDefaultsFor host name) userTools
-    let result = mergeObj (emptyObj ()) userAgent
-    setKey result "prompt" (box prompt)
-    setKey result "mode" (box effectiveMode)
-    setKey result "permission" perm
-    setKey result "tools" tools
-    setKey result "mcps" mcps
-    result
-
-let private objectKeys (o: obj) : string array =
-    JS.Constructors.Object.keys(o) |> Seq.toArray
-
-let private applyAgentConfigFor (host: Host) (opencodeConfig: obj) (mcps: obj) : obj =
-    let userAgent = if Dyn.isNullish (Dyn.get opencodeConfig "agent") then emptyObj () else Dyn.get opencodeConfig "agent"
-    let configMcp = Dyn.get opencodeConfig "mcp"
-    let mergedMcp = if Dyn.isNullish configMcp then mcps else mergeObj configMcp mcps
-    let agents = mergeObj userAgent (emptyObj ())
-    for name in builtinAgentSpecs |> List.map (fun spec -> spec.name) do
-        if Dyn.isNullish (Dyn.get agents name) then setKey agents name (emptyObj ())
-    let finalAgents =
-        objectKeys agents
-        |> Seq.map (fun name ->
-            let ua = Dyn.get agents name
-            let uaObj = if Dyn.isNullish ua then emptyObj () else ua
-            name, withRoleDefaultsFor host name uaObj)
-        |> createObj
-    mergeObj opencodeConfig (box {| agent = finalAgents; mcp = mergedMcp |})
-
-let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-
-/// Handle /loop and /loop-review slash commands.
-let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
-    (input: obj) (output: obj) : JS.Promise<unit> =
-    promise {
-        let command = Dyn.str input "command"
-        if command = "loop" || command = "loop-review" then
-            let sessionID = Dyn.str input "sessionID"
-            let task = (Dyn.str input "arguments").Trim()
-            let parts = ResizeArray<obj>()
-            if task = "" then
-                reviewStore.deactivateReview sessionID
-                parts.Add(box {| ``type`` = "text"; text = cancelledMarker |})
-            elif reviewStore.isReviewActive sessionID then
-                parts.Add(box {| ``type`` = "text"; text = "With-Review Mode is already active. Submit your work via submit_review." |})
-            elif command = "loop" then
-                reviewStore.activateReview(sessionID, task, dateNow ())
-                let msg = buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
-                parts.Add(box {| ``type`` = "text"; text = msg |})
-            else
-                let directory = Dyn.str ctx "directory"
-                let! result = runReviewerSession childAgentRegistry (Dyn.get ctx "client") reviewStore directory sessionID task
-                match result with
-                | Accepted ->
-                    parts.Add(box {| ``type`` = "text"; text = $"Pre-review passed. Task \"{task}\" already meets all criteria — no changes needed." |})
-                | Terminated ->
-                    parts.Add(box {| ``type`` = "text"; text = "Pre-review could not complete." |})
-                | Rejected feedback ->
-                    reviewStore.activateReview(sessionID, task, dateNow ())
-                    let msg = buildLoopMessage task [ "=== Pre-review Feedback ==="; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]
-                    parts.Add(box {| ``type`` = "text"; text = msg |})
-            /// Assign a fresh parts array rather than clearing the host's array
-            /// in place then pushing (P65): the hook builds the replacement and
-            /// overwrites `output.parts` once at the boundary.
-            setKey output "parts" (box parts)
-    }
-
-/// Register /loop and /loop-review command templates in the opencode config.
-let private registerCommands (cfg: obj) : unit =
-    let cmd = Dyn.get cfg "command"
-    let cmdObj = if Dyn.isNullish cmd then emptyObj () else cmd
-    if Dyn.isNullish (Dyn.get cmdObj "loop") then
-        setKey cmdObj "loop" (box {| template = "Enable With-Review Mode."; description = "Enable With-Review Mode — the next submission must pass through a reviewer before being accepted" |})
-    if Dyn.isNullish (Dyn.get cmdObj "loop-review") then
-        setKey cmdObj "loop-review" (box {| template = "Enable With-Review Mode with pre-review."; description = "Enable With-Review Mode with pre-review — the task is pre-reviewed immediately, and reviewer feedback is prepended to your prompt before any work begins" |})
-    setKey cfg "command" cmdObj
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<obj, obj, JS.Promise<unit>>(f))
 

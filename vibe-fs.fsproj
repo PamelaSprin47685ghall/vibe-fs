@@ -77,6 +77,17 @@
     <Compile Include="src/Opencode/WikiRuntimeIO.fs" />
     <Compile Include="src/Opencode/WikiRuntime.fs" />
     <Compile Include="src/Opencode/WikiTools.fs" />
+    <Compile Include="src/Opencode/AgentConfig.fs" />
+    <Compile Include="src/Opencode/CommandHooks.fs" />
+    <Compile Include="src/Opencode/ChatHooks.fs" />
+    <Compile Include="src/Opencode/ToolDefinitionHooks.fs" />
+    <Compile Include="src/Opencode/EventHooks.fs" />
+    <Compile Include="src/Opencode/MessageTransform.fs" />
+    <Compile Include="src/Opencode/ToolHelpers.fs" />
+    <Compile Include="src/Opencode/SubagentTools.fs" />
+    <Compile Include="src/Opencode/ExecutorTool.fs" />
+    <Compile Include="src/Opencode/SearchTools.fs" />
+    <Compile Include="src/Opencode/ReviewTools.fs" />
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/HookExecute.fs" />
     <Compile Include="src/Opencode/HookTransform.fs" />

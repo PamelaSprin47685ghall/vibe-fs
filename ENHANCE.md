@@ -73,7 +73,14 @@
 | 48 | Opencode/HookSchema.fs + HookExecute.fs | setUiLabel 改为返回带 _ui 的新 args(Dyn.withKey 浅拷贝),不再原地 setKey mutate 入参 args;toolExecuteBeforeFor 赋 output.args 新对象 |
 | 72(部分) | Opencode/PluginCore.fs | 删除死代码 clearArray/pushPart/ensureParts |
 
-### 评估保留 / 后续专项(第四轮复核)
+### 第五轮新增完成(基线 926 passed → 926 passed,零回归)
+
+| 点 | 文件 | 改造 |
+|---|---|---|
+| 72 | Opencode/PluginCore.fs(87) + HookTransform.fs(36) + Tools.fs(31) + 11 新文件(AgentConfig 113/CommandHooks 83/ChatHooks 49/MessageTransform 172/SubagentTools 99/ExecutorTool 55/SearchTools 138/ReviewTools 60/ToolDefinitionHooks 32/EventHooks 19/ToolHelpers 31) | P72 文件拆分:PluginCore/HookTransform/Tools 按职责分离为 DomainTypes/CommandHandlers/HostAdapter 等 11 个文件,全部 < 200 行。public API 签名不变 |
+| 46-48 | Opencode/MagicTodo.fs | BacklogInputForPart 的 `input?()` 原地 mutate → `Dyn.withKey` 返回新对象 |
+
+### 评估保留 / 后续专项(第五轮复核)
 
 下列点经评估后判定「保留现状」或「属架构级多日改造,单次安全重构不可行」,理由附后。判定遵循铁律:不为追求数量把读者注意力引向新的偶然复杂度。
 

@@ -2,7 +2,6 @@ module VibeFs.Kernel.Fuzzy
 
 open System.Text.RegularExpressions
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.Dyn
 
 type FileAnnotation =
     { gitStatus: string option
@@ -121,7 +120,7 @@ let private normalizeSeparators (p: string) = p.Replace("\\", "/")
 let private isPathAbsolute (p: string) = normalizeSeparators p |> fun n -> n.StartsWith("/")
 
 let private normalizeSegments (segments: string list) : string list =
-    (segments, [])
+    ([], segments)
     ||> List.fold (fun acc seg ->
         match seg, acc with
         | ".", _ -> acc
@@ -140,7 +139,7 @@ let private resolveAgainst (basePath: string) (p: string) : string =
 let private relativePath (fromPath: string) (toPath: string) : string =
     let splitAbs p = resolveAgainst "/" p |> fun s -> s.Split('/') |> Array.filter ((<>) "") |> List.ofArray
     let fromParts, toParts = splitAbs fromPath, splitAbs toPath
-    let commonLen = List.zip fromParts toParts |> List.takeWhile (fun (a, b) -> a = b) |> List.length
+    let commonLen = Seq.zip fromParts toParts |> Seq.takeWhile (fun (a, b) -> a = b) |> Seq.length
     let remainingFrom = List.skip commonLen fromParts
     let remainingTo = List.skip commonLen toParts
     let result = (remainingFrom |> List.map (fun _ -> "..")) @ remainingTo
