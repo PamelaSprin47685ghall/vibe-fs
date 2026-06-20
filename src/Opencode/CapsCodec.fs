@@ -160,11 +160,12 @@ let buildCapsMessages
             let userId = $"{capsUserPrefix}{fp}"
             let assistantId = $"{capsAssistantPrefix}{fp}"
             let mergedParts =
-                [|
-                    reasoningPart $"caps-reasoning-{fp}" sessionOpt assistantId thinkText
-                    textPart $"caps-text-{fp}" sessionOpt assistantId llmText
-                |]
-                |> Array.append (if capsFiles.IsEmpty then [||] else buildToolParts capsFiles fp sessionOpt assistantId)
+                Array.append
+                    [|
+                        reasoningPart $"caps-reasoning-{fp}" sessionOpt assistantId thinkText
+                        textPart $"caps-text-{fp}" sessionOpt assistantId llmText
+                    |]
+                    (if capsFiles.IsEmpty then [||] else buildToolParts capsFiles fp sessionOpt assistantId)
             let userMsg = buildUserMessage userId sessionOpt preludeText
             let mergedAssistantMsg = buildAssistantMessage assistantId userId sessionOpt projectRoot mergedParts
             Array.concat [| [| userMsg |]; [| mergedAssistantMsg |]; existingStripped |]
