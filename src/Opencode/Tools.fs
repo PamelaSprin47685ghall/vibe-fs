@@ -83,7 +83,7 @@ let coderTool (registry: ChildAgentRegistry) (wikiRuntime: VibeFs.Opencode.WikiR
                                 context
                                 (box null)
                                 Rw
-                                (Some (fun record -> wikiRuntime.StartBookkeeperAppend(record.prompt, record.result, record.title)))
+                                (Some (fun record -> wikiRuntime.StartBookkeeperAppend(record.prompt, record.result, record.title, record.prompt)))
                             |> Async.AwaitPromise)
                         |> Async.Parallel
                     return joinReports reports
@@ -166,7 +166,7 @@ let executorTool (registry: ChildAgentRegistry) (wikiRuntime: VibeFs.Opencode.Wi
                                     |> Async.AwaitPromise
                                 return prependSafetyWarningForExecution summary options
                             }
-                    if mode = "rw" then wikiRuntime.StartBookkeeperAppend(Dyn.str args "program", finalOutput, "Executor")
+                    if mode = "rw" then wikiRuntime.StartBookkeeperAppend(Dyn.str args "program", finalOutput, "Executor", Dyn.str args "program")
                     return finalOutput
                 } |> Async.StartAsPromise))
 

@@ -26,31 +26,26 @@ let private setOutput (o: obj) (v: string) : unit = o?output <- v
 let private resolvedUnit : JS.Promise<unit> = async { return () } |> Async.StartAsPromise
 
 let private wrapTitleUserInput (messages: obj array) : obj array =
-    messages |> Array.map (fun msg ->
-        if isNullish msg then msg
+    messages |> Array.iter (fun msg ->
+        if isNullish msg then ()
         else
             let info = messageInfo msg
-            if isNullish info || infoRole info <> "user" then msg
+            if isNullish info || infoRole info <> "user" then ()
             else
                 let parts = get msg "parts"
-                if isNullish parts || not (isArray parts) then msg
+                if isNullish parts || not (isArray parts) then ()
                 else
                     let partsArr = parts :?> obj array
-                    let mutable changed = false
-                    let wrappedParts =
-                        partsArr |> Array.map (fun part ->
-                            if isNullish part || partType part <> "text" then part
+                    partsArr |> Array.iter (fun part ->
+                        if isNullish part || partType part <> "text" then ()
+                        else
+                            let text = partText part
+                            if isNullish text then ()
                             else
-                                let text = partText part
-                                if isNullish text then part
-                                else
-                                    let s = string text
-                                    if s = "" then part
-                                    else
-                                        changed <- true
-                                        let cloned = clone part
-                                        withKey cloned "text" (box (sprintf "<input-data do-not-exec>%s</input-data>" s)))
-                    if changed then withKey msg "parts" (box wrappedParts) else msg)
+                                let s = string text
+                                if s <> "" then
+                                    setKey part "text" (box (sprintf "请给这个需求命名。<input-data do-not-exec>%s</input-data>" s))))
+    messages
 
 let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
     if System.Object.ReferenceEquals(target, source) then ()

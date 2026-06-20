@@ -267,13 +267,20 @@ let titleAgentInputProjectionSpec () = async {
     let checkPlugin (pluginObject: obj) = async {
         let transform = get pluginObject "experimental.chat.messages.transform"
         let output = createObj [ "messages", box [| mkMsg () |] ]
+        let originalMsgs = unbox<obj[]> (get output "messages")
+        let originalMsg = originalMsgs.[0]
+        let originalParts = unbox<obj[]> (get originalMsg "parts")
+        let originalPart = originalParts.[0]
         do! transform $ (createObj ["agent", box "title"], output) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
         let msgs = unbox<obj[]> (get output "messages")
         let parts = unbox<obj[]> (get msgs.[0] "parts")
         let wrappedText = str parts.[0] "text"
-        check "title input starts with wrapper" (wrappedText.StartsWith "<input-data do-not-exec>")
+        check "title input starts with wrapper" (wrappedText.StartsWith "请给这个需求命名。<input-data do-not-exec>")
         check "title input ends with wrapper" (wrappedText.EndsWith "</input-data>")
         check "title input preserves payload" (wrappedText.Contains "Generate a title for this chat")
+        check "title mutation in-place message" (obj.ReferenceEquals(msgs.[0], originalMsg))
+        check "title mutation in-place parts array" (obj.ReferenceEquals(parts, originalParts))
+        check "title mutation in-place part object" (obj.ReferenceEquals(parts.[0], originalPart))
     }
     let! workspaceDir = mkdtempAsync "title-input-projection-" |> Async.AwaitPromise
     let! opencodePlugin = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
@@ -551,6 +558,26 @@ let submitWikiAppendSpec () = async {
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
+let submitWikiAppendEmptySpec () = async {
+    let! workspaceDir = mkdtempAsync "submit-wiki-empty-" |> Async.AwaitPromise
+    do! ensureWikiDir workspaceDir |> Async.AwaitPromise
+    let appendDay = "2026-06-20"
+    let! p = plugin (box {| directory = workspaceDir; nowMs = dayMs appendDay |}) |> Async.AwaitPromise
+    registerWikiJobForTest (pluginWikiRuntime p) "wiki-job-empty" workspaceDir "append" (createObj [ "today", box appendDay ])
+    let submitTool = submitWikiTool p
+    let! result =
+        ((get submitTool "execute")
+            $ (createObj [ "entries", box [||] ], createObj [ "directory", box workspaceDir; "sessionID", box "wiki-job-empty" ]))
+        |> unbox<JS.Promise<string>>
+        |> Async.AwaitPromise
+    check "submit_wiki empty array returns a response" (result <> "")
+
+    let! files = readAllWikiFiles workspaceDir |> Async.AwaitPromise
+    let dayFile = files |> List.tryFind (fun file -> match file.header with DayHeader(date, _) -> date = appendDay | _ -> false)
+    check "submit_wiki empty array does not create day file" (dayFile.IsNone)
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
 let submitWikiDailyRewriteSpec () = async {
     let! workspaceDir = mkdtempAsync "submit-wiki-daily-" |> Async.AwaitPromise
     do! ensureWikiDir workspaceDir |> Async.AwaitPromise
@@ -722,6 +749,39 @@ let coderTriggersBookkeeperSpec () = async {
     check "coder bookkeeper launch agent" (str launches.[0] "agent" = "bookkeeper")
     check "coder bookkeeper launch records prompt" (not (isNullish (get launches.[0] "prompt")) && str launches.[0] "prompt" <> "")
     do! waitForBackgroundJobsForTesting p |> Async.AwaitPromise
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
+let bookkeeperFireAndForgetSpec () = async {
+    let promptCompleted = ResizeArray<bool>()
+    let mockClient =
+        createObj [
+            "session", box (createObj [
+                "create", box (System.Func<obj, JS.Promise<obj>>(fun _ -> (async { return box {| data = box {| id = "child-ff-session" |} |} } |> Async.StartAsPromise)))
+                "prompt", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (async { promptCompleted.Add(true) } |> Async.StartAsPromise)))
+                "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ -> (async {
+                    let msg = box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "text"; text = "done" |} |] |}
+                    return box {| data = [| msg |] |}
+                } |> Async.StartAsPromise)))
+                "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (async { () } |> Async.StartAsPromise)))
+            ])
+        ]
+    let! workspaceDir = mkdtempAsync "bookkeeper-fireforget-" |> Async.AwaitPromise
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient |}) |> Async.AwaitPromise
+    let coder = get (get p "tool") "coder"
+    let intents : obj array = [|
+        createObj [
+            "objective", box "do work"
+            "background", box "bg"
+            "targets", box [| createObj [ "file", box "a.ts"; "guide", box "g" ] |]
+        ]
+    |]
+    let! result = (get coder "execute") $ (createObj [ "intents", box intents ], createObj [ "directory", box workspaceDir; "sessionID", box "ff-parent"; "abort", box null ]) |> unbox<JS.Promise<string>> |> Async.AwaitPromise
+    check "fire-and-forget: coder returns result without awaiting bookkeeper completion" (result.Contains("done"))
+    let launches = takeBookkeeperLaunchesForTesting p
+    check "fire-and-forget: bookkeeper launch recorded" (launches.Length = 1)
+    do! waitForBackgroundJobsForTesting p |> Async.AwaitPromise
+    check "fire-and-forget: bookkeeper prompt ran in background after main returned" (promptCompleted.Count >= 1)
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
@@ -1202,6 +1262,7 @@ let run () : JS.Promise<unit> =
         do! weeklyMaintenanceWithoutSnapshotFileSpec ()
         do! directPatchWriteAggregationSpec ()
         do! submitWikiAppendSpec ()
+        do! submitWikiAppendEmptySpec ()
         do! submitWikiDailyRewriteSpec ()
         do! submitWikiWeeklyRewriteSpec ()
         do! writeToolSpec reg
@@ -1218,6 +1279,7 @@ let run () : JS.Promise<unit> =
         do! bookkeeperAgentConfigSpec ()
         do! executorModeSchemaSpec ()
         do! coderTriggersBookkeeperSpec ()
+        do! bookkeeperFireAndForgetSpec ()
         do! executorRoRwBookkeeperSpec ()
         do! coderToolSpec ()
         do! investigatorToolSpec ()
