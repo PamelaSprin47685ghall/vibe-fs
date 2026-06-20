@@ -1,7 +1,7 @@
 module VibeFs.Kernel.MagicCore
 
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Message
+open VibeFs.Kernel.Messaging
 
 let magicTodoToolNameFor (host: Host) : string = todoWriteToolName host
 let magicTodoToolName = magicTodoToolNameFor opencode
@@ -12,34 +12,42 @@ type BacklogEntry =
       timestamp: string
       report: string }
 
-let isTodoResultFor (host: Host) (part: obj) : bool =
-    partIsTool part
-    && partToolName part = magicTodoToolNameFor host
-    && partToolStatus part = "completed"
+let isTodoResultFor (host: Host) (part: Part) : bool =
+    match part with
+    | ToolPart(toolName, _, Some state, _) when toolName = magicTodoToolNameFor host && state.status = "completed" -> true
+    | _ -> false
 
-let isTodoResult (part: obj) : bool =
+let isTodoResult (part: Part) : bool =
     isTodoResultFor opencode part
 
-let isTodoErrorFor (host: Host) (part: obj) : bool =
-    partIsTool part
-    && partToolName part = magicTodoToolNameFor host
-    && partToolStatus part = "error"
+let isTodoErrorFor (host: Host) (part: Part) : bool =
+    match part with
+    | ToolPart(toolName, _, Some state, _) when toolName = magicTodoToolNameFor host && state.status = "error" -> true
+    | _ -> false
 
-let isTodoError (part: obj) : bool =
+let isTodoError (part: Part) : bool =
     isTodoErrorFor opencode part
 
 let lastTodoErrorTextFor (host: Host) (flat: FlatPart list) : string option =
     flat
     |> List.tryFindBack (fun fp -> isTodoErrorFor host fp.part)
-    |> Option.map (fun fp -> partToolError fp.part)
+    |> Option.map (fun fp ->
+        match fp.part with
+        | ToolPart(_, _, Some state, _) -> state.error
+        | _ -> "")
 
 /// Mimocode 连续 task 调用 burst 的打断判定：用户消息（插话/输入）或其他工具调用会打断；
 /// assistant 文本输出、reasoning 思考、进度 part 不打断。
 let breaksTodoBurstFor (host: Host) (fp: FlatPart) : bool =
-    fp.isUser || (partIsTool fp.part && partToolName fp.part <> magicTodoToolNameFor host)
+    fp.isUser
+    || (match fp.part with
+        | ToolPart(toolName, _, _, _) when toolName <> magicTodoToolNameFor host -> true
+        | _ -> false)
 
-let isReviewTool (part: obj) : bool =
-    partIsTool part && partToolName part = magicReviewToolName
+let isReviewTool (part: Part) : bool =
+    match part with
+    | ToolPart(toolName, _, _, _) when toolName = magicReviewToolName -> true
+    | _ -> false
 
 let emptyBacklogText = "[当前还没有已完成工作报告]"
 let userMsgHeader = "[工作期间收到的用户消息]"

@@ -50,8 +50,13 @@ let pathsFromPatchText (patchText: string) : string list =
 let extractFilePaths (args: obj) : string list =
     if Dyn.isNullish args then []
     else
-        match VibeFs.Kernel.Message.firstPresent [ "path"; "file_path"; "filePath" ] args with
-        | Some path when path <> "" -> [ path ]
+        let path =
+            [ "path"; "file_path"; "filePath" ]
+            |> List.tryPick (fun key ->
+                let value = Dyn.get args key
+                if Dyn.isNullish value then None else Some(string value))
+        match path with
+        | Some p when p <> "" -> [ p ]
         | _ ->
             let patchText = Dyn.get args "patchText"
             if Dyn.isNullish patchText then []

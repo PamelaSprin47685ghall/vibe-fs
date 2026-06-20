@@ -8,13 +8,15 @@ open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Kernel.Message
+open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Opencode.HookSchema
 open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.MagicProjection
 open VibeFs.Kernel.MagicTodo
 open VibeFs.Opencode.MagicTodo
+open VibeFs.Opencode.MessagingCodec
+open VibeFs.Opencode.CapsCodec
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Kernel.CapsFormat
 open VibeFs.Kernel.Dedup
@@ -45,11 +47,8 @@ let private resolveAgent (registry: ChildAgentRegistry) (input: obj) : string =
         | Some a -> a
         | None -> "manager"
 
-let private extractSessionID (messages: obj array) : string =
-    if messages.Length = 0 then ""
-    else
-        let info = messageInfo messages.[0]
-        if Dyn.isNullish info then "" else infoSessionID info
+let private extractSessionID (messages: Message list) : string =
+    match messages with m :: _ -> m.info.sessionID | [] -> ""
 
 let private resolveChatTools (host: Host) (agent: string) (existingTools: obj) : obj =
     let next = createObj []
@@ -124,14 +123,14 @@ module private CapsFileCache =
                 return files
             }
 
-let private extractHistoryTexts (messages: obj array) =
+let private extractHistoryTexts (messages: Message list) =
     messages
-    |> Message.flatten
+    |> Messaging.flatten
     |> List.map (fun fp ->
-        let part = fp.part
-        if Message.partIsText part then Message.partTextStr part
-        elif Message.partIsTool part then Message.partToolOutput part
-        else "")
+        match fp.part with
+        | TextPart text -> text
+        | ToolPart(_, _, Some state, _) -> state.output
+        | _ -> "")
 
 /// After an opencode restart the in-memory review store is empty, but the
 /// dialogue history still carries the activation / cancel / accept markers.
@@ -139,7 +138,7 @@ let private extractHistoryTexts (messages: obj array) =
 /// yet — never clobber a live (possibly locked) review with a rebuild.  The
 /// history is the single source of truth; the store is its re-buildable
 /// projection.
-let private reconstructReviewState (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (sessionID: string) (messages: obj array) : unit =
+let private reconstructReviewState (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (sessionID: string) (messages: Message list) : unit =
     if sessionID = "" then ()
     else
         match reviewStore.getReviewState sessionID with
@@ -159,17 +158,19 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
             if messagesArr.Length = 0 then ()
             else
                 let agent = resolveAgent registry input
-                let sessionID = extractSessionID messagesArr
-                reconstructReviewState reviewStore sessionID messagesArr
-                let cleaned = stripSyntheticMessages messagesArr
-                if cleaned.Length = 0 then ()
+                let messagesList = MessagingCodec.decodeMessages messagesArr
+                let sessionID = extractSessionID messagesList
+                reconstructReviewState reviewStore sessionID messagesList
+                let cleaned = Messaging.stripSyntheticBySource messagesList
+                if cleaned.IsEmpty then ()
                 else
                     if defaultExcludedAgents |> List.contains agent then
-                        replaceArrayInPlace messagesArr cleaned
+                        replaceArrayInPlace messagesArr (MessagingCodec.encodeMessages cleaned)
                     else
                         let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
                         let afterMagic = projectMagicFor magicSession.Host cleaned backlog false sessionID
-                        applyReadDedup afterMagic
+                        let encoded = MessagingCodec.encodeMessages afterMagic
+                        applyReadDedup encoded
                         if agent = "manager" then
                             do! wikiRuntime.StartMaintenanceIfDue(directory)
                         let! capsFiles = CapsFileCache.getOrLoad sessionID directory
@@ -179,7 +180,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                         let final =
                             buildCapsMessages
                                 VibeFs.Shell.FileSys.sha256HexTruncated
-                                afterMagic
+                                encoded
                                 directory
                                 defaultExcludedAgents
                                 capsFiles
@@ -190,7 +191,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
 let compactingHandlerFor (host: Host) (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let sessionID = Dyn.str input "sessionID"
-        let backlog = magicSession.GetOrRebuildBacklog(sessionID, [||])
+        let backlog = magicSession.GetOrRebuildBacklog(sessionID, [])
         if backlog.IsEmpty then ()
         else
             let context = Dyn.get output "context"

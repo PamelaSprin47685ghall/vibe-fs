@@ -9,7 +9,7 @@ open VibeFs.Shell.WorkspaceFiles
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Message
+open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.Dyn
 
 let headTail' () =
@@ -102,7 +102,14 @@ let dedup' () =
 
 let jsBoundary' () =
     check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = VibeFs.Kernel.Domain.MessageAborted)
-    let text = readAssistantText [| box {| ``type`` = "message"; message = box {| role = "assistant"; content = [| box {| ``type`` = "text"; text = "hello" |} |] |} |} |] None
+    let msgs : Message list =
+        [ { info =
+                { id = ""; sessionID = ""; role = Assistant; agent = ""
+                  isError = false; toolName = ""; details = null; time = null }
+            parts = [ TextPart "hello" ]
+            source = Native
+            raw = null } ]
+    let text = readAssistantText msgs 0 "\n\n"
     check "assistant text read" (text = Some "hello")
 
 let hostKernel' () =

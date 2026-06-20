@@ -32,8 +32,6 @@ let private envVar (name: string) : string =
 let private emptyObj () : obj = createObj []
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private assignInto (target: obj) (source: obj) : obj = Dyn.assignInto target source
-let private clearArray (arr: obj) : unit = (arr :?> ResizeArray<obj>).Clear()
-let private pushPart (arr: obj) (part: obj) : unit = (arr :?> ResizeArray<obj>).Add(part)
 
 let private getEventAssistantText (event: obj) : string =
     let properties = Dyn.get event "properties"
@@ -47,7 +45,7 @@ let private flushDirectWriteTurnIfCompleted (wikiRuntime: WikiRuntime) (input: o
         if isCompletedAssistantMessage info then
             let sessionID =
                 let fromProps = Dyn.str properties "sessionID"
-                if fromProps <> "" then fromProps else infoSessionID info
+                if fromProps <> "" then fromProps else Dyn.str info "sessionID"
             if sessionID <> "" then
                 wikiRuntime.FlushTurnIfNeeded(sessionID, getEventAssistantText event)
 
@@ -155,15 +153,6 @@ let private applyAgentConfigFor (host: Host) (opencodeConfig: obj) (mcps: obj) :
     mergeObj opencodeConfig (box {| agent = finalAgents; mcp = mergedMcp |})
 
 let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-
-let private ensureParts (output: obj) : obj =
-    let parts = Dyn.get output "parts"
-    if Dyn.isNullish parts then
-        let arr = ResizeArray<obj>()
-        setKey output "parts" (box arr)
-        box arr
-    else
-        parts
 
 /// Handle /loop and /loop-review slash commands.
 let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)

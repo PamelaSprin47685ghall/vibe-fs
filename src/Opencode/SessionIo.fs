@@ -4,7 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Message
+open VibeFs.Kernel.Messaging
+open VibeFs.Opencode.MessagingCodec
 open VibeFs.Shell.ChildAgentRegistry
 
 type WorkspaceEffect = Ro | Rw
@@ -57,20 +58,6 @@ let extractToolContext (context: obj) (pluginDirectory: string) : obj =
 let invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
     unbox (target?(method)(arg))
 
-/// Convert opencode's message shape `{ info: { role }, parts: [...] }` into the
-/// session-entry shape expected by `readAssistantText`.
-let private toEntries (messages: obj) : obj array =
-    if Dyn.isNullish messages then [||]
-    else
-        (unbox<obj[]> messages)
-        |> Array.map (fun m ->
-            let info = Dyn.get m "info"
-            let role = if Dyn.isNullish info then null else Dyn.get info "role"
-            let parts = Dyn.get m "parts"
-            let content = if Dyn.isNullish parts then [||] else unbox<obj[]> parts
-            let message = box {| role = role; content = content |}
-            box {| ``type`` = "message"; message = message |})
-
 /// Pull the latest assistant text from a session's messages.
 let extractSessionText (client: obj) (sessionId: string) (directory: string) : JS.Promise<string> =
     promise {
@@ -84,7 +71,8 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) : J
             let data = Dyn.get result "data"
             if Dyn.isNullish data then return noOutputText
             else
-                match readAssistantText (toEntries data) None with
+                let messagesList = MessagingCodec.decodeMessages (unbox<obj[]> data)
+                match Messaging.readAssistantText messagesList 0 "\n\n" with
                 | Some text -> return text
                 | None -> return noOutputText
         with _ -> return noOutputText

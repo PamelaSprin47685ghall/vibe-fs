@@ -5,198 +5,111 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.HostTools
+open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.MagicProjection
 open VibeFs.Opencode.MagicTodo
-open VibeFs.Kernel.Message
+open VibeFs.Opencode.MessagingCodec
 
-let private userMsg (id: string) (text: string) : obj =
-    createObj
-        [ "info", box (createObj [ "id", box id; "role", box "user"; "sessionID", box "test" ])
-          "parts", box [| box {| ``type`` = "text"; text = text |} |] ]
+let private mkInfo (id: string) (role: Role) : MessageInfo =
+    { id = id; sessionID = "test"; role = role; agent = ""; isError = false
+      toolName = ""; details = null; time = null }
 
-let private timedTodoWriteMsg (id: string) (callID: string) (report: string) (created: int) (completed: int) : obj =
-    createObj
-        [ "info",
-          box (
-              createObj
-                  [ "id", box id
-                    "role", box "assistant"
-                    "sessionID", box "test"
-                    "time", box (createObj [ "created", box created; "completed", box completed ]) ]
-          )
-          "parts",
-          box
-              [| createObj
-                     [ "type", box "tool"
-                       "tool", box magicTodoToolName
-                       "callID", box callID
-                       "state",
-                       box (
-                           createObj
-                               [ "status", box "completed"
-                                 "input", box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
-                                 "output", box "Todos updated." ]
-                       ) ] |] ]
+let private mkState (status: string) (output: string) (input: obj) : ToolState =
+    { status = status; output = output; error = ""; input = input; operationAction = "" }
 
-let private todoWriteMsg (id: string) (callID: string) (report: string) : obj =
-    createObj
-        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
-          "parts",
-          box
-              [| createObj
-                     [ "type", box "tool"
-                       "tool", box magicTodoToolName
-                       "callID", box callID
-                       "state",
-                       box (
-                           createObj
-                               [ "status", box "completed"
-                                 "input", box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
-                                 "output", box "Todos updated." ]
-                       ) ] |] ]
+let private userMsg (id: string) (text: string) : Message =
+    { info = mkInfo id User; parts = [ TextPart text ]; source = Native; raw = null }
 
-let private todoWriteErrorMsg (id: string) (callID: string) (errorText: string) : obj =
-    createObj
-        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
-          "parts",
-          box
-              [| createObj
-                     [ "type", box "tool"
-                       "tool", box magicTodoToolName
-                       "callID", box callID
-                       "state",
-                        box (createObj [ "status", box "error"; "input", box (createObj []); "error", box errorText ]) ] |] ]
+let private timedTodoWriteMsg (id: string) (callID: string) (report: string) (created: int) (completed: int) : Message =
+    let input = box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
+    let time = box (createObj [ "created", box created; "completed", box completed ])
+    { info = { mkInfo id Assistant with time = time }
+      parts = [ ToolPart(magicTodoToolName, callID, Some (mkState "completed" "Todos updated." input), null) ]
+      source = Native; raw = null }
 
-let private assistantTextMsg (id: string) (text: string) : obj =
-    createObj
-        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
-          "parts", box [| box {| ``type`` = "text"; text = text |} |] ]
+let private todoWriteMsg (id: string) (callID: string) (report: string) : Message =
+    let input = box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
+    { info = mkInfo id Assistant
+      parts = [ ToolPart(magicTodoToolName, callID, Some (mkState "completed" "Todos updated." input), null) ]
+      source = Native; raw = null }
 
-let private reasoningMsg (id: string) (text: string) : obj =
-    createObj
-        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
-          "parts", box [| box {| ``type`` = "reasoning"; text = text |} |] ]
+let private todoWriteErrorMsg (id: string) (callID: string) (errorText: string) : Message =
+    { info = mkInfo id Assistant
+      parts = [ ToolPart(magicTodoToolName, callID, Some ({ status = "error"; output = ""; error = errorText; input = box (createObj []); operationAction = "" }), null) ]
+      source = Native; raw = null }
 
-let private reviewMsg (id: string) (callID: string) (output: string) : obj =
-    createObj
-        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
-          "parts",
-          box
-              [| createObj
-                     [ "type", box "tool"
-                       "tool", box magicReviewToolName
-                       "callID", box callID
-                       "state",
-                       box (
-                           createObj
-                                [ "status", box "completed"
-                                  "input", box (createObj [ "review", box "looks good" ])
-                                  "output", box output ]
-                        ) ] |] ]
+let private assistantTextMsg (id: string) (text: string) : Message =
+    { info = mkInfo id Assistant; parts = [ TextPart text ]; source = Native; raw = null }
 
-let private taskMsgWithReport (id: string) (callID: string) (report: string) : obj =
-    createObj
-        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
-          "parts",
-          box
-              [| createObj
-                     [ "type", box "tool"
-                       "tool", box "task"
-                       "callID", box callID
-                       "state",
-                       box (
-                           createObj
-                               [ "status", box "completed"
-                                 "input",
-                                 box (
-                                     createObj
-                                         [ "operation", box (createObj [ "action", box "list" ])
-                                           "completedWorkReport", box report ]
-                                 )
-                                 "output", box "ok" ]
-                        ) ] |] ]
+let private reasoningMsg (id: string) (text: string) : Message =
+    { info = mkInfo id Assistant
+      parts = [ RawPart (box (createObj [ "type", box "reasoning"; "text", box text ])) ]
+      source = Native; raw = null }
 
-let private taskMsgWithActionAndReport (action: string) (id: string) (callID: string) (report: string) : obj =
-    createObj
-        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
-          "parts",
-          box
-              [| createObj
-                     [ "type", box "tool"
-                       "tool", box "task"
-                       "callID", box callID
-                       "state",
-                       box (
-                           createObj
-                               [ "status", box "completed"
-                                 "input",
-                                 box (
-                                     createObj
-                                         [ "operation", box (createObj [ "action", box action ])
-                                           "completedWorkReport", box report ]
-                                 )
-                                 "output", box "ok" ]
-                       ) ] |] ]
+let private reviewMsg (id: string) (callID: string) (output: string) : Message =
+    let input = box (createObj [ "review", box "looks good" ])
+    { info = mkInfo id Assistant
+      parts = [ ToolPart(magicReviewToolName, callID, Some (mkState "completed" output input), null) ]
+      source = Native; raw = null }
 
-let private toolMsg (toolName: string) (id: string) (callID: string) (report: string) : obj =
-    createObj
-        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
-          "parts",
-          box
-              [| createObj
-                     [ "type", box "tool"
-                       "tool", box toolName
-                       "callID", box callID
-                       "state",
-                       box (
-                           createObj
-                               [ "status", box "completed"
-                                 "input", box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
-                                 "output", box "Todos updated." ]
-                       ) ] |] ]
+let private taskMsgWithReport (id: string) (callID: string) (report: string) : Message =
+    let input = box (createObj [ "operation", box (createObj [ "action", box "list" ]); "completedWorkReport", box report ])
+    { info = mkInfo id Assistant
+      parts = [ ToolPart("task", callID, Some ({ status = "completed"; output = "ok"; error = ""; input = input; operationAction = "list" }), null) ]
+      source = Native; raw = null }
+
+let private taskMsgWithActionAndReport (action: string) (id: string) (callID: string) (report: string) : Message =
+    let input = box (createObj [ "operation", box (createObj [ "action", box action ]); "completedWorkReport", box report ])
+    { info = mkInfo id Assistant
+      parts = [ ToolPart("task", callID, Some ({ status = "completed"; output = "ok"; error = ""; input = input; operationAction = action }), null) ]
+      source = Native; raw = null }
+
+let private taskCreateMsg (id: string) (callID: string) : Message =
+    let input = box (createObj [ "operation", box (createObj [ "action", box "create"; "summary", box "ignored" ]) ])
+    { info = mkInfo id Assistant
+      parts = [ ToolPart("task", callID, Some ({ status = "completed"; output = "ok"; error = ""; input = input; operationAction = "create" }), null) ]
+      source = Native; raw = null }
+
+let private toolMsg (toolName: string) (id: string) (callID: string) (report: string) : Message =
+    let input = box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
+    { info = mkInfo id Assistant
+      parts = [ ToolPart(toolName, callID, Some (mkState "completed" "Todos updated." input), null) ]
+      source = Native; raw = null }
 
 let private backlogEntry (seq: int) (report: string) : BacklogEntry =
-    { sequence = seq
-      timestamp = ""
-      report = report }
+    { sequence = seq; timestamp = ""; report = report }
 
 let replayBacklogOpencodeDoesNotMergeConsecutiveTodoWrite () =
-    let msgs =
-        [| todoWriteMsg "m1" "c1" "W1"
-           todoWriteMsg "m2" "c2" "W2"
-           todoWriteMsg "m3" "c3" "W3" |]
+    let msgs = [ todoWriteMsg "m1" "c1" "W1"; todoWriteMsg "m2" "c2" "W2"; todoWriteMsg "m3" "c3" "W3" ]
     let backlog = replayBacklogFor Opencode msgs
     check "opencode: each todowrite is one backlog entry" (backlog.Length = 3)
     check "opencode: reports not merged" (backlog.[0].report = "W1" && backlog.[1].report = "W2" && backlog.[2].report = "W3")
 
 let replayBacklogTest () =
-    let msgs =
-        [| todoWriteMsg "m1" "c1" "Implemented parser"
-           todoWriteMsg "m2" "c2" "Fixed critical bug" |]
-
+    let msgs = [ todoWriteMsg "m1" "c1" "Implemented parser"; todoWriteMsg "m2" "c2" "Fixed critical bug" ]
     let backlog = replayBacklog msgs
     check "replay: backlog count" (backlog.Length = 2)
     check "replay: entry 1 report" (backlog.[0].report = "Implemented parser")
     check "replay: entry 2 report" (backlog.[1].report = "Fixed critical bug")
 
 let replayEmpty () =
-    let backlog = replayBacklog [||]
+    let backlog = replayBacklog []
     check "replay empty: no backlog" (backlog.IsEmpty)
 
 let replaySkipsEmpty () =
-    let msgs = [| todoWriteMsg "m1" "c1" "Report A"; todoWriteMsg "m2" "c2" "" |]
+    let msgs = [ todoWriteMsg "m1" "c1" "Report A"; todoWriteMsg "m2" "c2" "" ]
     let backlog = replayBacklog msgs
     check "replay skips empty: only 1" (backlog.Length = 1)
 
 let replayBacklogForMimocodeUsesTask () =
-    let msgs = [| toolMsg "task" "m1" "c1" "Implemented parser" |]
+    let msgs = [ toolMsg "task" "m1" "c1" "Implemented parser" ]
     let backlog = replayBacklogFor Mimocode msgs
     check "mimocode replay: task enters backlog" (backlog.Length = 1)
     check "mimocode replay: task report preserved" (backlog.[0].report = "Implemented parser")
 
 let replayBacklogForMimocodeIgnoresActor () =
-    let msgs = [| toolMsg "actor" "m1" "c1" "Implemented parser" |]
+    let msgs = [ toolMsg "actor" "m1" "c1" "Implemented parser" ]
     let backlog = replayBacklogFor Mimocode msgs
     check "mimocode replay: actor does not enter backlog" (backlog.IsEmpty)
 
@@ -218,41 +131,16 @@ let magicSessionShareReportTableAcrossInstances () =
     producer.CaptureReport("shared-call", "carry over")
     check "session capture: visible across mimocode instances" (consumer.TakeReport "shared-call" = "carry over")
 
-let private taskCreateMsg (id: string) (callID: string) : obj =
-    createObj
-        [ "info", box (createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test" ])
-          "parts",
-          box
-              [| createObj
-                     [ "type", box "tool"
-                       "tool", box "task"
-                       "callID", box callID
-                       "state",
-                       box (
-                           createObj
-                               [ "status", box "completed"
-                                 "input",
-                                 box (
-                                     createObj
-                                         [ "operation",
-                                           box (createObj [ "action", box "create"; "summary", box "ignored" ]) ]
-                                 )
-                                 "output", box "ok" ]
-                       ) ] |] ]
-
 let magicSessionRestoresMimocodeReportDuringBacklogRebuild () =
     let session = MagicSession(Mimocode)
-    let msgs = [| taskCreateMsg "m1" "restore-c1" |]
+    let msgs = [ taskCreateMsg "m1" "restore-c1" ]
     session.CaptureReport("restore-c1", "captured before execute")
     let backlog = session.GetOrRebuildBacklog("test", msgs)
     check "session rebuild: restored report enters backlog" (backlog.Length = 1 && backlog.[0].report = "captured before execute")
     check "session rebuild: report consumed during replay" (session.TakeReport "restore-c1" = "")
 
 let replayBacklogForMimocodeMergesConsecutiveWorkReports () =
-    let msgs =
-        [| taskMsgWithReport "m1" "c1" "Work A"
-           taskMsgWithReport "m2" "c2" "Work B"
-           taskMsgWithReport "m3" "c3" "Work C" |]
+    let msgs = [ taskMsgWithReport "m1" "c1" "Work A"; taskMsgWithReport "m2" "c2" "Work B"; taskMsgWithReport "m3" "c3" "Work C" ]
     let backlog = replayBacklogFor Mimocode msgs
     check "mimocode work reports: one merged entry" (backlog.Length = 1)
     check "mimocode work reports: all present" (
@@ -261,10 +149,7 @@ let replayBacklogForMimocodeMergesConsecutiveWorkReports () =
         && backlog.[0].report.Contains("Work C"))
 
 let replayBacklogForMimocodeMergesConsecutiveTaskBurst () =
-    let msgs =
-        [| toolMsg "task" "m1" "c1" "R1"
-           toolMsg "task" "m2" "c2" "R2"
-           toolMsg "task" "m3" "c3" "R3" |]
+    let msgs = [ toolMsg "task" "m1" "c1" "R1"; toolMsg "task" "m2" "c2" "R2"; toolMsg "task" "m3" "c3" "R3" ]
     let backlog = replayBacklogFor Mimocode msgs
     check "mimocode burst: one backlog entry" (backlog.Length = 1)
     check "mimocode burst: merges reports" (
@@ -273,39 +158,27 @@ let replayBacklogForMimocodeMergesConsecutiveTaskBurst () =
         && backlog.[0].report.Contains("R3"))
 
 let replayBacklogForMimocodeSplitsBurstsOnGap () =
-    let msgs =
-        [| toolMsg "task" "m1" "c1" "A"
-           userMsg "u1" "gap"
-           toolMsg "task" "m2" "c2" "B" |]
+    let msgs = [ toolMsg "task" "m1" "c1" "A"; userMsg "u1" "gap"; toolMsg "task" "m2" "c2" "B" ]
     let backlog = replayBacklogFor Mimocode msgs
     check "mimocode gap: two backlog entries" (backlog.Length = 2)
     check "mimocode gap: preserves order" (backlog.[0].report.Contains("A") && backlog.[1].report.Contains("B"))
 
 let replayBacklogForMimocodeIgnoresAssistantTextBetweenTasks () =
-    let msgs =
-        [| taskMsgWithReport "m1" "c1" "Work A"
-           assistantTextMsg "a1" "let me continue"
-           taskMsgWithReport "m2" "c2" "Work B" |]
+    let msgs = [ taskMsgWithReport "m1" "c1" "Work A"; assistantTextMsg "a1" "let me continue"; taskMsgWithReport "m2" "c2" "Work B" ]
     let backlog = replayBacklogFor Mimocode msgs
     check "mimocode assistant text: stays one burst" (backlog.Length = 1)
     check "mimocode assistant text: merges reports" (
         backlog.[0].report.Contains("Work A") && backlog.[0].report.Contains("Work B"))
 
 let replayBacklogForMimocodeIgnoresReasoningBetweenTasks () =
-    let msgs =
-        [| taskMsgWithReport "m1" "c1" "Work A"
-           reasoningMsg "r1" "thinking through next step"
-           taskMsgWithReport "m2" "c2" "Work B" |]
+    let msgs = [ taskMsgWithReport "m1" "c1" "Work A"; reasoningMsg "r1" "thinking through next step"; taskMsgWithReport "m2" "c2" "Work B" ]
     let backlog = replayBacklogFor Mimocode msgs
     check "mimocode reasoning: stays one burst" (backlog.Length = 1)
     check "mimocode reasoning: merges reports" (
         backlog.[0].report.Contains("Work A") && backlog.[0].report.Contains("Work B"))
 
 let replayBacklogForMimocodeSplitsOnOtherToolCall () =
-    let msgs =
-        [| taskMsgWithReport "m1" "c1" "Work A"
-           toolMsg "read" "r1" "rc1" "reading"
-           taskMsgWithReport "m2" "c2" "Work B" |]
+    let msgs = [ taskMsgWithReport "m1" "c1" "Work A"; toolMsg "read" "r1" "rc1" "reading"; taskMsgWithReport "m2" "c2" "Work B" ]
     let backlog = replayBacklogFor Mimocode msgs
     check "mimocode other tool: splits burst" (backlog.Length = 2)
     check "mimocode other tool: preserves order" (
@@ -313,74 +186,73 @@ let replayBacklogForMimocodeSplitsOnOtherToolCall () =
 
 let findFoldRangeTest () =
     let flat =
-        VibeFs.Kernel.Message.flatten (
-            [| userMsg "u1" "start"
-               todoWriteMsg "m1" "c1" "R1"
-               todoWriteMsg "m2" "c2" "R2"
-               todoWriteMsg "m3" "c3" "R3" |]
-        )
-
+        flatten [
+            userMsg "u1" "start"
+            todoWriteMsg "m1" "c1" "R1"
+            todoWriteMsg "m2" "c2" "R2"
+            todoWriteMsg "m3" "c3" "R3"
+        ]
     match findFoldRange flat false with
     | None -> check "fold range: found" false
     | Some r -> check "fold range: secondToLast > first" (r.secondToLast > r.firstResult)
 
-let findFoldRangeOpencodePerCallMimocodePerBurst () =
+let findFoldRangeOpencodePerCallMimicodePerBurst () =
     let flatOpencode =
-        flatten (
-            [| userMsg "u1" "start"
-               todoWriteMsg "m1" "c1" "R1"
-               todoWriteMsg "m2" "c2" "R2"
-               todoWriteMsg "m3" "c3" "R3" |]
-        )
+        flatten [
+            userMsg "u1" "start"
+            todoWriteMsg "m1" "c1" "R1"
+            todoWriteMsg "m2" "c2" "R2"
+            todoWriteMsg "m3" "c3" "R3"
+        ]
     check "opencode: three todowrites enable fold" (findFoldRangeFor Opencode flatOpencode false |> Option.isSome)
     let flatMimo =
-        flatten (
-            [| userMsg "u1" "start"
-               taskMsgWithReport "m1" "c1" "A"
-               taskMsgWithReport "m2" "c2" "B"
-               taskMsgWithReport "m3" "c3" "C" |]
-        )
+        flatten [
+            userMsg "u1" "start"
+            taskMsgWithReport "m1" "c1" "A"
+            taskMsgWithReport "m2" "c2" "B"
+            taskMsgWithReport "m3" "c3" "C"
+        ]
     check "mimocode: three consecutive task calls are one burst (no 3-anchor fold)" (
         findFoldRangeFor Mimocode flatMimo false |> Option.isNone)
 
 let findFoldRangeForMimocodeIgnoresReadOnlyTaskCalls () =
     let flat =
-        flatten (
-            [| userMsg "u1" "start"
-               taskMsgWithActionAndReport "list" "m1" "c1" "Read 1"
-               taskMsgWithActionAndReport "get" "m2" "c2" "Read 2"
-               taskMsgWithActionAndReport "list" "m3" "c3" "Read 3" |]
-        )
+        flatten [
+            userMsg "u1" "start"
+            taskMsgWithActionAndReport "list" "m1" "c1" "Read 1"
+            taskMsgWithActionAndReport "get" "m2" "c2" "Read 2"
+            taskMsgWithActionAndReport "list" "m3" "c3" "Read 3"
+        ]
     check "mimocode: read-only task calls do not become fold anchors" (
         findFoldRangeFor Mimocode flat false |> Option.isNone)
 
 let findFoldRangeForMimocodeRequiresThreeProgressBursts () =
     let flat =
-        flatten (
-            [| userMsg "u1" "start"
-               taskMsgWithActionAndReport "list" "m1" "c1" "Read 1"
-               taskMsgWithActionAndReport "start" "m2" "c2" "Work 1"
-               taskMsgWithActionAndReport "get" "m3" "c3" "Read 2"
-               taskMsgWithActionAndReport "done" "m4" "c4" "Work 2"
-               userMsg "u2" "gap"
-               taskMsgWithActionAndReport "block" "m5" "c5" "Work 3" |]
-        )
+        flatten [
+            userMsg "u1" "start"
+            taskMsgWithActionAndReport "list" "m1" "c1" "Read 1"
+            taskMsgWithActionAndReport "start" "m2" "c2" "Work 1"
+            taskMsgWithActionAndReport "get" "m3" "c3" "Read 2"
+            taskMsgWithActionAndReport "done" "m4" "c4" "Work 2"
+            userMsg "u2" "gap"
+            taskMsgWithActionAndReport "block" "m5" "c5" "Work 3"
+        ]
     check "mimocode: two progress bursts still do not satisfy 3-anchor fold" (
         findFoldRangeFor Mimocode flat false |> Option.isNone)
 
 let findFoldRangeForMimocodeUsesLastProgressCallInBurst () =
     let flat =
-        flatten (
-            [| userMsg "u1" "start"
-               taskMsgWithActionAndReport "start" "m1" "c1" "Work 1"
-               taskMsgWithActionAndReport "list" "m2" "c2" "Read 1"
-               userMsg "u2" "gap"
-               taskMsgWithActionAndReport "done" "m3" "c3" "Work 2"
-               taskMsgWithActionAndReport "get" "m4" "c4" "Read 2"
-               userMsg "u3" "gap"
-               taskMsgWithActionAndReport "block" "m5" "c5" "Work 3"
-               taskMsgWithActionAndReport "list" "m6" "c6" "Read 3" |]
-        )
+        flatten [
+            userMsg "u1" "start"
+            taskMsgWithActionAndReport "start" "m1" "c1" "Work 1"
+            taskMsgWithActionAndReport "list" "m2" "c2" "Read 1"
+            userMsg "u2" "gap"
+            taskMsgWithActionAndReport "done" "m3" "c3" "Work 2"
+            taskMsgWithActionAndReport "get" "m4" "c4" "Read 2"
+            userMsg "u3" "gap"
+            taskMsgWithActionAndReport "block" "m5" "c5" "Work 3"
+            taskMsgWithActionAndReport "list" "m6" "c6" "Read 3"
+        ]
     check "mimocode: burst anchor uses last progress call, not trailing read-only call" (
         findFoldRangeFor Mimocode flat false
         |> Option.exists (fun range ->
@@ -389,18 +261,18 @@ let findFoldRangeForMimocodeUsesLastProgressCallInBurst () =
 
 let findFoldRangeForMimocodeAssistantTextKeepsBurst () =
     let flat =
-        flatten (
-            [| userMsg "u1" "start"
-               taskMsgWithActionAndReport "start" "m1" "c1" "Work 1"
-               assistantTextMsg "a1" "thinking aloud"
-               taskMsgWithActionAndReport "done" "m2" "c2" "Work 2"
-               userMsg "u2" "gap"
-               taskMsgWithActionAndReport "start" "m3" "c3" "Work 3"
-               assistantTextMsg "a2" "more thinking"
-               taskMsgWithActionAndReport "done" "m4" "c4" "Work 4"
-               userMsg "u3" "gap"
-               taskMsgWithActionAndReport "done" "m5" "c5" "Work 5" |]
-        )
+        flatten [
+            userMsg "u1" "start"
+            taskMsgWithActionAndReport "start" "m1" "c1" "Work 1"
+            assistantTextMsg "a1" "thinking aloud"
+            taskMsgWithActionAndReport "done" "m2" "c2" "Work 2"
+            userMsg "u2" "gap"
+            taskMsgWithActionAndReport "start" "m3" "c3" "Work 3"
+            assistantTextMsg "a2" "more thinking"
+            taskMsgWithActionAndReport "done" "m4" "c4" "Work 4"
+            userMsg "u3" "gap"
+            taskMsgWithActionAndReport "done" "m5" "c5" "Work 5"
+        ]
     match findFoldRangeFor Mimocode flat false with
     | None -> check "mimocode assistant text in burst: fold found" false
     | Some range ->
@@ -409,41 +281,35 @@ let findFoldRangeForMimocodeAssistantTextKeepsBurst () =
 
 let projectMagicFolds () =
     let msgs =
-        [| userMsg "u1" "start project"
-           todoWriteMsg "m1" "c1" "Report 1"
-           todoWriteMsg "m2" "c2" "Report 2"
-           todoWriteMsg "m3" "c3" "Report 3" |]
-
-    let backlog =
-        [ backlogEntry 1 "Report 1"
-          backlogEntry 2 "Report 2"
-          backlogEntry 3 "Report 3" ]
-
+        [ userMsg "u1" "start project"
+          todoWriteMsg "m1" "c1" "Report 1"
+          todoWriteMsg "m2" "c2" "Report 2"
+          todoWriteMsg "m3" "c3" "Report 3" ]
+    let backlog = [ backlogEntry 1 "Report 1"; backlogEntry 2 "Report 2"; backlogEntry 3 "Report 3" ]
     let r = projectMagic msgs backlog false "test"
-    let allJson: string = Fable.Core.JS.JSON.stringify (r)
+    let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
     check "magic fold: has prefix" (allJson.Contains(magicTodoPrefixPrefix))
     check "magic fold: has Report 1" (allJson.Contains("Report 1"))
     check "magic fold: latest report present" (allJson.Contains("Report 3"))
 
 let projectMagicNoFold () =
-    let msgs = [| todoWriteMsg "m1" "c1" "R1"; todoWriteMsg "m2" "c2" "R2" |]
+    let msgs = [ todoWriteMsg "m1" "c1" "R1"; todoWriteMsg "m2" "c2" "R2" ]
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2" ]
     let r = projectMagic msgs backlog false "test"
     check "magic no fold: passthrough" (obj.ReferenceEquals(r, msgs))
 
 let projectMagicForMimocodeUsesTask () =
     let msgs =
-        [| userMsg "u1" "start"
-           toolMsg "task" "m1" "c1" "Report 1"
-           userMsg "u2" "gap"
-           toolMsg "task" "m2" "c2" "Report 2"
-           userMsg "u3" "gap"
-           toolMsg "task" "m3" "c3" "Report 3a"
-           toolMsg "task" "m4" "c4" "Report 3b" |]
-
+        [ userMsg "u1" "start"
+          toolMsg "task" "m1" "c1" "Report 1"
+          userMsg "u2" "gap"
+          toolMsg "task" "m2" "c2" "Report 2"
+          userMsg "u3" "gap"
+          toolMsg "task" "m3" "c3" "Report 3a"
+          toolMsg "task" "m4" "c4" "Report 3b" ]
     let backlog = replayBacklogFor Mimocode msgs
     let r = projectMagicFor Mimocode msgs backlog false "test"
-    let allJson: string = Fable.Core.JS.JSON.stringify (r)
+    let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
     check "mimocode project: has prefix" (allJson.Contains(magicTodoPrefixPrefix))
     check "mimocode project: has Report 1" (allJson.Contains("Report 1"))
     check "mimocode project: latest burst present" (allJson.Contains("Report 3a") && allJson.Contains("Report 3b"))
@@ -451,112 +317,101 @@ let projectMagicForMimocodeUsesTask () =
 
 let projectMagicHidesErrors () =
     let msgs =
-        [| userMsg "u1" "start"
-           todoWriteMsg "m1" "c1" "R1"
-           todoWriteErrorMsg "me" "ce" "Validation failed"
-           todoWriteMsg "m2" "c2" "R2"
-           todoWriteMsg "m3" "c3" "R3" |]
-
+        [ userMsg "u1" "start"
+          todoWriteMsg "m1" "c1" "R1"
+          todoWriteErrorMsg "me" "ce" "Validation failed"
+          todoWriteMsg "m2" "c2" "R2"
+          todoWriteMsg "m3" "c3" "R3" ]
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3" ]
     let r = projectMagic msgs backlog false "test"
-    let allJson: string = Fable.Core.JS.JSON.stringify (r)
+    let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
     check "magic errors: error surfaced in notice" (allJson.Contains("Validation failed"))
 
 let projectMagicDropsFoldedUserMessages () =
     let msgs =
-        [| userMsg "u1" "start"
-           todoWriteMsg "m1" "c1" "R1"
-           userMsg "u2" "please fix this bug"
-           todoWriteMsg "m2" "c2" "R2"
-           todoWriteMsg "m3" "c3" "R3" |]
-
+        [ userMsg "u1" "start"
+          todoWriteMsg "m1" "c1" "R1"
+          userMsg "u2" "please fix this bug"
+          todoWriteMsg "m2" "c2" "R2"
+          todoWriteMsg "m3" "c3" "R3" ]
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3" ]
     let r = projectMagic msgs backlog false "test"
-    let allJson: string = Fable.Core.JS.JSON.stringify (r)
+    let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
     check "magic fold: hides original folded users" (not (allJson.Contains("\"id\":\"u2\"")))
     check "magic fold: marks folded users as summary" (allJson.Contains("工作期间收到的用户消息"))
     check "magic fold: keeps folded user content in projection" (allJson.Contains("please fix this bug"))
 
 let projectMagicKeepsReviewInFold () =
     let msgs =
-        [| userMsg "u1" "start"
-           todoWriteMsg "m1" "c1" "R1"
-           reviewMsg "rv1" "cr1" "Review accepted the work"
-           todoWriteMsg "m2" "c2" "R2"
-           todoWriteMsg "m3" "c3" "R3" |]
-
+        [ userMsg "u1" "start"
+          todoWriteMsg "m1" "c1" "R1"
+          reviewMsg "rv1" "cr1" "Review accepted the work"
+          todoWriteMsg "m2" "c2" "R2"
+          todoWriteMsg "m3" "c3" "R3" ]
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3" ]
     let r = projectMagic msgs backlog false "test"
-    let allJson: string = Fable.Core.JS.JSON.stringify (r)
+    let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
     check "magic review: tool name kept" (allJson.Contains(magicReviewToolName))
     check "magic review: output kept" (allJson.Contains("Review accepted the work"))
     check "magic review: not fully folded away" (r.Length > 4)
 
 let projectMagicPrefixUsesTodoTime () =
     let msgs =
-        [| userMsg "u1" "start"
-           timedTodoWriteMsg "m1" "c1" "R1" 111 222
-           userMsg "u2" "please fix this bug"
-           todoWriteMsg "m2" "c2" "R2"
-           todoWriteMsg "m3" "c3" "R3" |]
-
+        [ userMsg "u1" "start"
+          timedTodoWriteMsg "m1" "c1" "R1" 111 222
+          userMsg "u2" "please fix this bug"
+          todoWriteMsg "m2" "c2" "R2"
+          todoWriteMsg "m3" "c3" "R3" ]
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3" ]
     let r = projectMagic msgs backlog false "test"
-    let prefixInfo = messageInfo r.[0]
-    let prefixTime = get prefixInfo "time"
+    let prefixTime = r.[0].info.time
     check "magic prefix: keeps folded todo created time" (unbox<int> (get prefixTime "created") = 111)
     check "magic prefix: keeps folded todo completed time" (unbox<int> (get prefixTime "completed") = 222)
 
 let projectMagicPrefixStaysStableWhenGrowing () =
     let msgs3 =
-        [| userMsg "u1" "start"
-           userMsg "u2" "between 1 and 2"
-           todoWriteMsg "m1" "c1" "R1"
-           userMsg "u3" "between 2 and 3"
-           todoWriteMsg "m2" "c2" "R2"
-           userMsg "u4" "between 3 and 4"
-           todoWriteMsg "m3" "c3" "R3"
-           todoWriteMsg "m4" "c4" "R4" |]
-
+        [ userMsg "u1" "start"
+          userMsg "u2" "between 1 and 2"
+          todoWriteMsg "m1" "c1" "R1"
+          userMsg "u3" "between 2 and 3"
+          todoWriteMsg "m2" "c2" "R2"
+          userMsg "u4" "between 3 and 4"
+          todoWriteMsg "m3" "c3" "R3"
+          todoWriteMsg "m4" "c4" "R4" ]
     let backlog3 = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3"; backlogEntry 4 "R4" ]
     let projected3 = projectMagic msgs3 backlog3 false "test"
 
     let msgs4 =
-        [| userMsg "u1" "start"
-           userMsg "u2" "between 1 and 2"
-           todoWriteMsg "m1" "c1" "R1"
-           userMsg "u3" "between 2 and 3"
-           todoWriteMsg "m2" "c2" "R2"
-           userMsg "u4" "between 3 and 4"
-           todoWriteMsg "m3" "c3" "R3"
-           userMsg "u5" "between 4 and 5"
-           todoWriteMsg "m4" "c4" "R4"
-           todoWriteMsg "m5" "c5" "R5" |]
-
+        [ userMsg "u1" "start"
+          userMsg "u2" "between 1 and 2"
+          todoWriteMsg "m1" "c1" "R1"
+          userMsg "u3" "between 2 and 3"
+          todoWriteMsg "m2" "c2" "R2"
+          userMsg "u4" "between 3 and 4"
+          todoWriteMsg "m3" "c3" "R3"
+          userMsg "u5" "between 4 and 5"
+          todoWriteMsg "m4" "c4" "R4"
+          todoWriteMsg "m5" "c5" "R5" ]
     let backlog4 =
-        [ backlogEntry 1 "R1"
-          backlogEntry 2 "R2"
-          backlogEntry 3 "R3"
-          backlogEntry 4 "R4"
-          backlogEntry 5 "R5" ]
+        [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3"; backlogEntry 4 "R4"; backlogEntry 5 "R5" ]
     let projected4 = projectMagic msgs4 backlog4 false "test"
 
-    let sharedPrefix3: string = Fable.Core.JS.JSON.stringify (projected3.[0..2])
-    let sharedPrefix4: string = Fable.Core.JS.JSON.stringify (projected4.[0..2])
+    let sharedPrefix3: string = Fable.Core.JS.JSON.stringify (encodeMessages projected3.[0..2])
+    let sharedPrefix4: string = Fable.Core.JS.JSON.stringify (encodeMessages projected4.[0..2])
     check "magic prefix: stable growth keeps shared prefix JSON identical" (sharedPrefix3 = sharedPrefix4)
 
 let magicSessionRefreshesBacklogForMimocode () =
     let session = MagicSession(Mimocode)
-    let first = [| toolMsg "task" "m1" "c1" "R1" |]
-    let second = [| toolMsg "task" "m1" "c1" "R1"; toolMsg "task" "m2" "c2" "R2" |]
+    let first = [ toolMsg "task" "m1" "c1" "R1" ]
+    let second = [ toolMsg "task" "m1" "c1" "R1"; toolMsg "task" "m2" "c2" "R2" ]
     let _ = session.GetOrRebuildBacklog("test", first)
     let backlog = session.GetOrRebuildBacklog("test", second)
     check "mimocode session: consecutive tasks count as one backlog entry" (backlog.Length = 1)
 
 let magicSessionRefreshesBacklog () =
     let session = MagicSession(Opencode)
-    let first = [| todoWriteMsg "m1" "c1" "R1" |]
-    let second = [| todoWriteMsg "m1" "c1" "R1"; todoWriteMsg "m2" "c2" "R2" |]
+    let first = [ todoWriteMsg "m1" "c1" "R1" ]
+    let second = [ todoWriteMsg "m1" "c1" "R1"; todoWriteMsg "m2" "c2" "R2" ]
     let _ = session.GetOrRebuildBacklog("test", first)
     let backlog = session.GetOrRebuildBacklog("test", second)
     check "magic session: rebuilds stale backlog" (backlog.Length = 2)
@@ -585,7 +440,7 @@ let run () =
     replayBacklogForMimocodeIgnoresReasoningBetweenTasks ()
     replayBacklogForMimocodeSplitsOnOtherToolCall ()
     findFoldRangeTest ()
-    findFoldRangeOpencodePerCallMimocodePerBurst ()
+    findFoldRangeOpencodePerCallMimicodePerBurst ()
     findFoldRangeForMimocodeIgnoresReadOnlyTaskCalls ()
     findFoldRangeForMimocodeRequiresThreeProgressBursts ()
     findFoldRangeForMimocodeUsesLastProgressCallInBurst ()

@@ -1,25 +1,18 @@
 module VibeFs.Kernel.MagicProjection
 
-open Fable.Core.JsInterop
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.Message
+open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.MagicCore
 
-let private isReadOnlyMimocodeTaskResult (part: obj) : bool =
-    if not (isTodoResultFor Mimocode part) then false
-    else
-        let state = get part "state"
-        let input = if isNullish state then null else get state "input"
-        let operation = if isNullish input then null else get input "operation"
-        match (if isNullish operation then "" else str operation "action") with
-        | "list"
-        | "get" -> true
-        | _ -> false
+let private isReadOnlyMimicodeTaskResult (part: Part) : bool =
+    match part with
+    | ToolPart(_, _, Some state, _) ->
+        state.operationAction = "list" || state.operationAction = "get"
+    | _ -> false
 
-let private isFoldAnchorFor (host: Host) (part: obj) : bool =
+let private isFoldAnchorFor (host: Host) (part: Part) : bool =
     isTodoResultFor host part
-    && (host <> Mimocode || not (isReadOnlyMimocodeTaskResult part))
+    && (host <> Mimocode || not (isReadOnlyMimicodeTaskResult part))
 
 type FoldRange = { firstResult: int; secondToLast: int }
 
@@ -57,9 +50,7 @@ let private foldTodoAnchorsFor (host: Host) (flat: FlatPart list) : int list =
 let private requiredFoldAnchorCount (foldAfterFirst: bool) : int =
     if foldAfterFirst then 2 else 3
 
-let private messageTimeOrNull (msg: obj) : obj =
-    let info = messageInfo msg
-    if isNullish info then null else get info "time"
+let private messageTimeOrNull (msg: Message) : obj = msg.info.time
 
 let private collectUserText (flat: FlatPart list) (fromIdx: int) (toIdx: int) : string list =
     let lo = max 0 fromIdx
@@ -86,12 +77,21 @@ let findFoldRangeFor (host: Host) (flat: FlatPart list) (foldAfterFirst: bool) :
 let findFoldRange (flat: FlatPart list) (foldAfterFirst: bool) : FoldRange option =
     findFoldRangeFor opencode flat foldAfterFirst
 
-let private buildPrefixUserMessage (id: string) (text: string) (sessionID: string) (time: obj) : obj =
-    let messageTime = if isNullish time then box (createObj [ "created", box 0 ]) else time
-    let info = createObj [ "id", box id; "sessionID", box sessionID; "role", box "user"; "time", messageTime; "agent", box "orchestrator"; "model", box (createObj [ "providerID", box ""; "modelID", box "" ]) ]
-    box (createObj [ "info", box info; "parts", box [| box {| ``type`` = "text"; text = text |} |] ])
+let private buildPrefixUserMessage (id: string) (text: string) (sessionID: string) (time: obj) : Message =
+    { info =
+          { id = id
+            sessionID = sessionID
+            role = User
+            agent = "orchestrator"
+            isError = false
+            toolName = ""
+            details = null
+            time = time }
+      parts = [ TextPart text ]
+      source = Native
+      raw = null }
 
-let private buildSyntheticPrefixMessages (host: Host) (messages: obj array) (flat: FlatPart list) (foldedBacklog: BacklogEntry list) (sessionID: string) (errorNotice: string option) : obj array =
+let private buildSyntheticPrefixMessages (host: Host) (messages: Message list) (flat: FlatPart list) (foldedBacklog: BacklogEntry list) (sessionID: string) (errorNotice: string option) : Message list =
     let todoIdxs = foldTodoAnchorsFor host flat
     [ for index in 0 .. foldedBacklog.Length - 1 do
           let fromIdx = if index = 0 then 0 else todoIdxs.[index - 1] + 1
@@ -106,44 +106,27 @@ let private buildSyntheticPrefixMessages (host: Host) (messages: obj array) (fla
               else
                   messageText
           let todoMessage = messages.[flat.[todoIdxs.[index]].msgIndex]
-          let todoInfo = messageInfo todoMessage
           let todoTime = messageTimeOrNull todoMessage
           let syntheticId = magicTodoPrefixPrefix + string (index + 1)
-          yield
-              buildPrefixUserMessage
-                  syntheticId
-                  finalText
-                  (if isNullish todoInfo then sessionID else infoSessionID todoInfo)
-                  todoTime ]
-    |> List.toArray
+          yield buildPrefixUserMessage syntheticId finalText todoMessage.info.sessionID todoTime ]
 
-let private rebuildVisibleOnly (messages: obj array) (visible: FlatPart list) : obj array =
+let private rebuildVisibleOnly (messages: Message list) (visible: FlatPart list) : Message list =
     let byMessage = visible |> List.groupBy (fun entry -> entry.msgIndex) |> Map.ofList
-    [ for msgIdx in 0 .. messages.Length - 1 do
-          match Map.tryFind msgIdx byMessage with
-          | None -> ()
-          | Some entries ->
-              let msg = messages.[msgIdx]
-              if isNullish msg then ()
-              else
-                  let originalParts = messageParts msg
-                  if isNullish originalParts || not (isArray originalParts) then
-                      yield msg
-                  else
-                      let partMap =
-                          entries |> List.map (fun entry -> entry.partIndex, entry.part) |> Map.ofList
-                      let partsArr = originalParts :?> obj array
-                      let newParts =
-                          [ for partIdx in 0 .. partsArr.Length - 1 do
-                                match Map.tryFind partIdx partMap with
-                                | Some part -> yield part
-                                | None -> () ]
-                      if not newParts.IsEmpty then
-                          yield withKey msg "parts" (box (List.toArray newParts)) ]
-    |> List.toArray
+    messages
+    |> List.indexed
+    |> List.choose (fun (msgIdx, msg) ->
+        match Map.tryFind msgIdx byMessage with
+        | None -> None
+        | Some entries ->
+            let partMap = entries |> List.map (fun entry -> entry.partIndex, entry.part) |> Map.ofList
+            let newParts =
+                msg.parts
+                |> List.indexed
+                |> List.choose (fun (partIdx, part) -> Map.tryFind partIdx partMap)
+            if newParts.IsEmpty then None else Some { msg with parts = newParts })
 
-let projectMagicFor (host: Host) (messages: obj array) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : obj array =
-    if isNullish messages then [||]
+let projectMagicFor (host: Host) (messages: Message list) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : Message list =
+    if messages.IsEmpty then messages
     else
         let flat = flatten messages
         match findFoldRangeFor host flat foldAfterFirst with
@@ -152,9 +135,9 @@ let projectMagicFor (host: Host) (messages: obj array) (backlog: BacklogEntry li
             let foldedBacklog = if backlog.Length > 0 then backlog.[.. backlog.Length - 2] else []
             let middleUserText = collectUserText flat (range.firstResult + 1) (range.secondToLast - 1)
             let projectionText = buildBacklogText foldedBacklog middleUserText
-            let projectionPart = setPartOutput flat.[range.firstResult].part projectionText
+            let projectionPart = setPartOutputTyped flat.[range.firstResult].part projectionText
             let errorNotice = lastTodoErrorTextFor host flat
-            let syntheticPrefixMessages = if foldedBacklog.IsEmpty then [||] else buildSyntheticPrefixMessages host messages flat foldedBacklog sessionID errorNotice
+            let syntheticPrefixMessages = if foldedBacklog.IsEmpty then [] else buildSyntheticPrefixMessages host messages flat foldedBacklog sessionID errorNotice
             let visible =
                 flat
                 |> List.indexed
@@ -165,7 +148,7 @@ let projectMagicFor (host: Host) (messages: obj array) (backlog: BacklogEntry li
                     elif isTodoErrorFor host fp.part then None
                     else Some fp)
             let rebuilt = rebuildVisibleOnly messages visible
-            if syntheticPrefixMessages.Length = 0 then rebuilt else Array.concat [| syntheticPrefixMessages; rebuilt |]
+            if syntheticPrefixMessages.IsEmpty then rebuilt else syntheticPrefixMessages @ rebuilt
 
-let projectMagic (messages: obj array) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : obj array =
+let projectMagic (messages: Message list) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : Message list =
     projectMagicFor opencode messages backlog foldAfterFirst sessionID

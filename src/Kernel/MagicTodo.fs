@@ -1,9 +1,7 @@
 module VibeFs.Kernel.MagicTodo
 
-open Fable.Core.JsInterop
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Message
-open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.MagicCore
 
 let private toolDescriptionHeader =
@@ -55,23 +53,6 @@ let mimoReportFieldDesc =
     + " CRITICAL: place `completedWorkReport` as a TOP-LEVEL argument, a sibling of `operation`. "
     + "Never nest it inside the `operation` object."
 
-let backlogReportFromTodoInput (host: Host) (input: obj) : string =
-    let explicit = str input "completedWorkReport"
-    if explicit.Trim() <> "" then explicit.Trim()
-    elif host = Mimocode then
-        let operation = get input "operation"
-        if isNullish operation then ""
-        else
-            let eventSummary = str operation "event_summary"
-            if eventSummary.Trim() <> "" then eventSummary.Trim()
-            else
-                match str operation "action" with
-                | "create" ->
-                    let summary = str operation "summary"
-                    if summary.Trim() = "" then "" else "Created task: " + summary.Trim()
-                | _ -> ""
-    else ""
-
 let private consEntry (revAcc: BacklogEntry list) (report: string) : BacklogEntry list =
     { sequence = revAcc.Length + 1; timestamp = ""; report = report } :: revAcc
 
@@ -86,8 +67,11 @@ let private flushBurst (revAcc: BacklogEntry list) (revBurst: string list) : Bac
             | _ -> burst |> List.mapi (fun i line -> string (i + 1) + ". " + line) |> String.concat "\n"
         consEntry revAcc merged
 
-let replayBacklogWith (host: Host) (inputForPart: FlatPart -> obj) (messages: obj array) : BacklogEntry list =
-    if isNullish messages then []
+/// Replay the message stream into a backlog. `reportOf` extracts the completed-
+/// work report string for a given flat tool-result part (host-specific Dyn
+/// reading is injected by the caller, keeping this function pure).
+let replayBacklogWith (host: Host) (reportOf: FlatPart -> string) (messages: Message list) : BacklogEntry list =
+    if messages.IsEmpty then []
     else
         let flat = flatten messages
         match host with
@@ -97,11 +81,8 @@ let replayBacklogWith (host: Host) (inputForPart: FlatPart -> obj) (messages: ob
                 |> List.fold
                     (fun acc fp ->
                         if isTodoResultFor host fp.part then
-                            let input = inputForPart fp
-                            if isNullish input then acc
-                            else
-                                let report = backlogReportFromTodoInput host input
-                                if report <> "" then consEntry acc report else acc
+                            let report = reportOf fp
+                            if report <> "" then consEntry acc report else acc
                         else acc)
                     []
             List.rev revAcc
@@ -111,11 +92,8 @@ let replayBacklogWith (host: Host) (inputForPart: FlatPart -> obj) (messages: ob
                 |> List.fold
                     (fun (revAcc, revBurst) fp ->
                         if isTodoResultFor host fp.part then
-                            let input = inputForPart fp
-                            if isNullish input then (revAcc, revBurst)
-                            else
-                                let report = backlogReportFromTodoInput host input
-                                if report <> "" then (revAcc, report :: revBurst) else (revAcc, revBurst)
+                            let report = reportOf fp
+                            if report <> "" then (revAcc, report :: revBurst) else (revAcc, revBurst)
                         elif breaksTodoBurstFor host fp then
                             let revAcc' = flushBurst revAcc revBurst
                             (revAcc', [])
