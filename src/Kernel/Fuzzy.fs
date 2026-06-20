@@ -139,13 +139,11 @@ let private resolveAgainst (basePath: string) (p: string) : string =
     "/" + String.concat "/" (normalizeSegments parts)
 
 let private relativePath (fromPath: string) (toPath: string) : string =
-    let fromParts = resolveAgainst "/" fromPath |> fun p -> p.Split('/') |> Array.filter ((<>) "") |> List.ofArray
-    let toParts = resolveAgainst "/" toPath |> fun p -> p.Split('/') |> Array.filter ((<>) "") |> List.ofArray
-    let rec commonPrefix a b =
-        match a, b with
-        | x :: xs, y :: ys when x = y -> commonPrefix xs ys
-        | _ -> (a, b)
-    let remainingFrom, remainingTo = commonPrefix fromParts toParts
+    let splitAbs p = resolveAgainst "/" p |> fun s -> s.Split('/') |> Array.filter ((<>) "") |> List.ofArray
+    let fromParts, toParts = splitAbs fromPath, splitAbs toPath
+    let commonLen = List.zip fromParts toParts |> List.takeWhile (fun (a, b) -> a = b) |> List.length
+    let remainingFrom = List.skip commonLen fromParts
+    let remainingTo = List.skip commonLen toParts
     let result = (remainingFrom |> List.map (fun _ -> "..")) @ remainingTo
     if result.IsEmpty then "." else String.concat "/" result
 

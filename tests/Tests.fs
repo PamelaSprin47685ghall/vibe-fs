@@ -39,6 +39,7 @@ let runAll (_args: string array) : JS.Promise<int> =
         AgentTests.coordinatorRuntime ()
         AgentTests.shouldSuppress' ()
         KernelTests.headTail' ()
+        KernelTests.stripLexer' ()
         KernelTests.dedup' ()
         KernelTests.jsBoundary' ()
         KernelTests.hostKernel' ()
