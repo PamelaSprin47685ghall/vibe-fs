@@ -65,14 +65,22 @@
 | 47-48 | Opencode/HookExecute.fs | 删除 `restoreMimocodeTaskArgsAfterExecute`。调研证实 setKey 写回 input.args 无任何生产消费者(backlog replay 经 MagicSessionStore 按 callID 取,不读 input.args),且其 takeReport 反而偷走了 BacklogInputForPart 所需的 report —— 删除既消除原地涂改又修复潜在 bug。capture 保留(before-hook 存 store 供 backlog)。2 个 round-trip 测试改为验证 capture store 保留供 replay |
 | 53 | Opencode/WikiRuntime.fs | P53 真正落地:`WikiCommand` DU(8 case)+ 纯 `reducer` 函数(WikiState → WikiCommand → WikiState,无 IO);新增 `commandQueue : SerialQueue` 串行所有异步方法(EnsureSessionSnapshot/Submit/StartMaintenanceIfDue/WaitForBackgroundJobsForTesting/launchBackgroundSession)的状态+IO;同步方法同 tick 经 reducer;状态更新不再在 JS.Promise 悬挂中裸跑 |
 
-### 评估保留 / 后续专项(第三轮复核)
+### 第四轮新增完成(基线 926 passed → 926 passed,零回归)
+
+| 点 | 文件 | 改造 |
+|---|---|---|
+| 1/2 全链 | Kernel/Messaging.fs + Message.fs + MagicProjection.fs + MagicCore.fs + MagicTodo.fs + CapsFormat.fs + Opencode/MessagingCodec.fs(新) + CapsCodec.fs(新) + HookTransform.fs + SessionIo.fs + MagicTests.fs + KernelTests.fs | P1/P2 全链落地:Kernel 消息链彻底去 Dyn。Messaging.fs 纯类型+纯逻辑(零 open Dyn/JsInterop);decode/encode 集中 Opencode/MessagingCodec.fs(唯一 FFI 边界);Message.fs 删全部 Dyn 访问器(只留纯常量);MagicProjection 改 Message list→Message list(纯,删 open Dyn,findFoldRange/burst 算法逐行保持);MagicCore/MagicTodo 改 Part 模式匹配;CapsFormat 拆为纯函数(Kernel)+ CapsCodec(Opencode 构造边界);MagicTodo(Kernel) reportOf 注入消除 Dyn;HookTransform/SessionIo 边界 decode/encode;MagicTests/KernelTests 强类型。encodePart/encodeMessage 保持未改 part/message 引用(dedup/caps "preserves original" 契约) |
+| 48 | Opencode/HookSchema.fs + HookExecute.fs | setUiLabel 改为返回带 _ui 的新 args(Dyn.withKey 浅拷贝),不再原地 setKey mutate 入参 args;toolExecuteBeforeFor 赋 output.args 新对象 |
+| 72(部分) | Opencode/PluginCore.fs | 删除死代码 clearArray/pushPart/ensureParts |
+
+### 评估保留 / 后续专项(第四轮复核)
 
 下列点经评估后判定「保留现状」或「属架构级多日改造,单次安全重构不可行」,理由附后。判定遵循铁律:不为追求数量把读者注意力引向新的偶然复杂度。
 
 | 点 | 判定 | 理由 |
 |---|---|---|
-| 1, 2 | 基础已建/消费者专项 | `Kernel/Messaging.fs` 强类型树 + 边界 decode 已建(锁眼已开,见第二轮表)。`MagicCore`/`MagicProjection`/`MessageDedup` 全量消费者迁移依赖精细状态机(findFoldRange / Mimocode task burst / synthetic prefix 重建)的强类型重写,盲目重写回归风险高于收益,建议专项推进 |
-| 3-8, 10-17 | 架构缓行 | 依赖 P1/P2 的强类型 `Message`/`Part` 树。`part: obj` 是 opencode 消息形态的固有事实,未引入入口解码器前,记录复制(`{ part with … }`)不可表达 |
+| 1, 2 | 已完成 | 见第四轮表:Kernel 消息全链去 Dyn(Messaging/Message/MagicProjection/MagicCore/MagicTodo/CapsFormat 纯,decode/encode 集中 MessagingCodec/CapsCodec) |
+| 3-8, 10-17 | 已完成 | 见第四轮表:P1/P2 全链后,readAssistantText/flatten/setPartOutput/stripSynthetic 等均消费强类型 Message/Part,记录复制({ part with … })已可表达 |
 | 23, 26, 27, 32, 34, 49, 50, 69 | 保留 | 原 ENHANCE.md 已列入「评估保留」,本轮复核结论不变 |
 | 43 | 保留 | `decodeTodos`/`decodeLastAssistant` 仍接收 `obj array`,需 P1/P2 解码器才能转 `SessionSnapshot` 强类型 |
 | 44, 45 | 保留 | `TypedIteratorStore` 已是强类型双桶(见 `FuzzyTests.iteratorStoreStronglyTyped` 锁定的契约);`mutable counter` 是生成唯一 opaque id 的必要手段,改 Actor 会让 `storeIterator`/`consumeIterator` 退化为异步,破坏 `FuzzyTests.iteratorRoundTrip` 的同步契约 |
