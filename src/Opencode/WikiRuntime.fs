@@ -5,6 +5,8 @@ open Fable.Core.JsInterop
 open System.Collections.Generic
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Wiki
+open VibeFs.Kernel.WikiPrompts
+open VibeFs.Kernel.WikiMaintenance
 open VibeFs.Shell.WikiFiles
 open VibeFs.Shell.WikiPortLock
 
@@ -90,34 +92,6 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
 
     let today () = (nowUtc ()).ToString("yyyy-MM-dd")
 
-    let lastSunday () =
-        let now = nowUtc ()
-        let daysSinceSunday = int now.DayOfWeek
-        now.AddDays(-daysSinceSunday).ToString("yyyy-MM-dd")
-
-    let parseDate (s: string) : System.DateTime option =
-        match s.Split('-') with
-        | [| yearStr; monthStr; dayStr |] ->
-            match System.Int32.TryParse yearStr, System.Int32.TryParse monthStr, System.Int32.TryParse dayStr with
-            | (true, year), (true, month), (true, day) when year >= 1 && year <= 9999 && month >= 1 && month <= 12 && day >= 1 && day <= 31 ->
-                try Some (System.DateTime(year, month, day)) with _ -> None
-            | _ -> None
-        | _ -> None
-
-    let dateRangeInclusive (start: string) (endDate: string) : string list =
-        match parseDate start, parseDate endDate with
-        | Some startDate, Some stopDate when startDate <= stopDate ->
-            let rec loop (current: System.DateTime) (acc: string list) =
-                if current > stopDate then List.rev acc
-                else loop (current.AddDays(1.0)) (current.ToString("yyyy-MM-dd") :: acc)
-            loop startDate []
-        | _ -> []
-
-    let addOneDay (date: string) : string =
-        match parseDate date with
-        | Some d -> d.AddDays(1.0).ToString("yyyy-MM-dd")
-        | None -> date
-
     let sessionApi () =
         if isNullish client then None
         else
@@ -129,88 +103,6 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
 
     let effectiveWorkspaceRoot (value: string) : string =
         if System.String.IsNullOrWhiteSpace value then workspaceRoot else value
-
-    let projectionLines (projection: WikiProjection) : string list =
-        projection |> Map.toList |> List.map (fun (_, entry) -> renderEntry entry)
-
-    let projectionText (projection: WikiProjection) : string =
-        let lines = projectionLines projection
-        if lines.IsEmpty then "(empty)" else String.concat "\n" lines
-
-    let filesText (entries: WikiEntry list) : string =
-        let lines = entries |> List.map renderEntry
-        if lines.IsEmpty then "(empty)" else String.concat "\n" lines
-
-    let entriesForDay (files: WikiFile list) (date: string) : WikiEntry list =
-        files
-        |> List.tryPick (fun file ->
-            match file.header with
-            | DayHeader(day, _) when day = date -> Some file.entries
-            | _ -> None)
-        |> Option.defaultValue []
-
-    let entriesThroughCutoff (files: WikiFile list) (throughDate: string) : WikiEntry list =
-        files
-        |> List.collect (fun file ->
-            match file.header with
-            | SnapshotHeader _ -> file.entries
-            | DayHeader(day, _) when day <= throughDate -> file.entries
-            | _ -> [])
-
-    let buildAppendPrompt (title: string) (workInput: string) (workOutput: string) (rwSummary: string) (projection: WikiProjection) : string =
-        let rwSection =
-            if System.String.IsNullOrWhiteSpace rwSummary then None
-            else Some ("=== RW Tool Summary ===\n" + rwSummary.Trim())
-        let coreSections = [
-            "You are the project wiki bookkeeper."
-            "Submit exactly one `submit_wiki` call. Reuse existing ids when facts update, omit ids for new durable facts, and submit `[]` if nothing durable should be recorded."
-            "=== Existing Wiki ==="
-            projectionText projection
-            "=== Work Title ==="
-            title
-            "=== Work Input ==="
-            workInput
-            "=== Work Output ==="
-            workOutput
-        ]
-        let withRw =
-            match rwSection with
-            | Some section -> coreSections @ [ section ]
-            | None -> coreSections
-        String.concat "\n\n" (withRw @ [
-            "=== Output Rules ==="
-            "Record only stable project knowledge. Do not record temporary errors, progress chatter, or command noise."
-        ])
-
-    let buildDailyPrompt (date: string) (files: WikiFile list) (projection: WikiProjection) : string =
-        String.concat "\n\n"
-            [ "You are rewriting one day of the project wiki."
-              "Submit exactly one `submit_wiki` call. Replace the target day with durable canonical entries. It is valid to submit `[]`."
-              "=== Current Wiki ==="
-              projectionText projection
-              "=== Target Day ==="
-              filesText (entriesForDay files date) ]
-
-    let buildWeeklyPrompt (throughDate: string) (files: WikiFile list) (projection: WikiProjection) : string =
-        let snapshotEntries =
-            files
-            |> List.tryPick (fun file ->
-                match file.header with
-                | SnapshotHeader _ -> Some file.entries
-                | _ -> None)
-            |> Option.defaultValue []
-            |> filesText
-        let dayEntries = filesText (entriesThroughCutoff files throughDate)
-
-        String.concat "\n\n"
-            [ "You are rewriting the project wiki snapshot."
-              "Submit exactly one `submit_wiki` call. Preserve surviving ids when possible, merge duplicates, omit ids only for genuinely new facts, and submit `[]` if nothing durable remains."
-              "=== Current Wiki ==="
-              projectionText projection
-              "=== Previous Snapshot ==="
-              snapshotEntries
-              "=== Day Files Through Cutoff ==="
-              dayEntries ]
 
     let launchBackgroundSession (root: string) (kind: WikiJobKind) (title: string) (promptText: string) : Async<unit> =
         async {
@@ -397,51 +289,19 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
             let root = effectiveWorkspaceRoot workspaceRoot
             let! files = readWikiFiles root |> Async.AwaitPromise
             let projection = projectLatestWins files
-            let todayValue = today ()
-            let dayFiles =
-                files
-                |> List.choose (fun file ->
-                    match file.header with
-                    | DayHeader(date, rewritten) -> Some(date, rewritten)
-                    | _ -> None)
-                |> List.sortBy fst
+            let dailyDue, weeklyDue = dueMaintenance files (nowUtc ())
 
-            dayFiles
-            |> List.tryFind (fun (date, rewritten) -> date < todayValue && not rewritten)
-            |> Option.iter (fun (date, _) ->
+            dailyDue
+            |> Option.iter (fun date ->
                 if recordLaunchOnce root "daily" date "Daily wiki rewrite" ($"daily maintenance due for {date}") ($"daily:{date}") then
                     queueBackgroundLaunch root (DailyRewrite date) "Daily wiki rewrite" (fun () -> async { return buildDailyPrompt date files projection })
-                else
-                    ())
+                else ())
 
-            let snapshotThrough =
-                files
-                |> List.tryPick (fun file ->
-                    match file.header with
-                    | SnapshotHeader through -> through
-                    | _ -> None)
-                |> Option.orElseWith (fun () ->
-                    dayFiles
-                    |> List.tryHead
-                    |> Option.bind (fun (oldestDate, _) -> parseDate oldestDate)
-                    |> Option.map (fun d -> d.AddDays(-1.0).ToString("yyyy-MM-dd")))
-
-            match snapshotThrough with
-            | None -> ()
-            | Some through ->
-                let cutoff = lastSunday ()
-                if cutoff > through then
-                    let requiredDays = dateRangeInclusive (addOneDay through) cutoff
-                    let dayRewritten (date: string) : bool =
-                        match dayFiles |> List.tryFind (fun (date2, _) -> date2 = date) with
-                        | Some(_, rewritten) -> rewritten
-                        | None -> true
-                    let allDaysRewritten = not requiredDays.IsEmpty && List.forall dayRewritten requiredDays
-                    if allDaysRewritten then
-                        if recordLaunchOnce root "weekly" cutoff "Weekly wiki snapshot rewrite" ($"weekly maintenance due through {cutoff}") ($"weekly:{cutoff}") then
-                            queueBackgroundLaunch root (WeeklyRewrite cutoff) "Weekly wiki snapshot rewrite" (fun () -> async { return buildWeeklyPrompt cutoff files projection })
-                    else
-                        ()
+            weeklyDue
+            |> Option.iter (fun cutoff ->
+                if recordLaunchOnce root "weekly" cutoff "Weekly wiki snapshot rewrite" ($"weekly maintenance due through {cutoff}") ($"weekly:{cutoff}") then
+                    queueBackgroundLaunch root (WeeklyRewrite cutoff) "Weekly wiki snapshot rewrite" (fun () -> async { return buildWeeklyPrompt cutoff files projection })
+                else ())
         }
         |> Async.StartAsPromise
 

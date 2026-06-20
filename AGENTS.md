@@ -7,13 +7,16 @@ $ pnpm build && pnpm test
 
 # 异步并发宪法：全面拥抱 Task
 
-> **铁律：本代码库中绝对禁止出现 `Async` 和 `JS.Promise`。**
+> ⏸ **状态：本宪法当前暂缓执行（S6 挂起）。**
+> 经用户裁决（见 `REFACTOR.md` §12 与 §10 S6），全库**目前**仍以 `async { }` + `JS.Promise<'T>` + `Async.AwaitPromise`/`Async.StartAsPromise` + `MailboxProcessor` 为异步货币。下文的"铁律 / 禁用词清单 / 必须立刻重写"描述的是**目标方向**，不是当下强制法；在 Task 迁移单独开阶段之前，**不**据此把现有 `async`/`Promise`/`MailboxProcessor` 代码判为 Bug 去重写。新增代码可遵循此方向，但不得与既有 `async`/`Promise` 货币混用导致无谓装箱。
+>
+> **铁律（目标态）：本代码库最终将禁止出现 `Async` 和 `JS.Promise`。**
 > Fable 5 已经完美支持 F# 的 `Task<'T>`，并在底层 1:1 编译为原生 JavaScript `Promise`。
 > 为了彻底消除层层装箱/拆箱的样板代码，我们确立 `Task<'T>` 为全库唯一的异步货币。
 
 ## 1. 禁用词清单 (Kill List)
 
-在任何新代码、重构代码中，**看到以下关键字，即视为 Bug，必须立刻重写**：
+在任何新代码、重构代码中，**看到以下关键字，即视为目标态的待迁移项（⚠️ 当前暂缓，见上方状态条与 `REFACTOR.md` §12；勿据此重写既有代码）**：
 
 🚫 **禁止使用：**
 - `async { ... }` （替换为 `task { ... }`）
