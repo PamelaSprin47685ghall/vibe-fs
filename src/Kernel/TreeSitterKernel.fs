@@ -28,8 +28,25 @@ let syntaxCheckMarker = "[syntax-check]"
 
 let isFileEditTool (tool: string) : bool = Set.contains (tool.ToLowerInvariant ()) fileEditTools
 
-/// Pull file path(s) out of a tool call's args — supports path/file_path/filePath,
-/// or extracts `*** Add/Update/Move to: <path>` lines from patchText.
+/// Pure parser over a patchText blob: extracts every `*** Add File|Update
+/// File|Move to: <path>` target, de-duplicated, order-preserved.  Lives on its
+/// own so `extractFilePaths` no longer mixes "pull a key off args" with "scan a
+/// patch body" — the two concerns have nothing in common (P38/P39).
+let private patchPathRe = Regex(@"^\*\*\* (?:Add File|Update File|Move to): (.+)$")
+
+let pathsFromPatchText (patchText: string) : string list =
+    if System.String.IsNullOrEmpty patchText then []
+    else
+        patchText.Split('\n')
+        |> Seq.choose (fun line ->
+            let m = patchPathRe.Match line
+            if m.Success then Some m.Groups.[1].Value else None)
+        |> List.ofSeq
+        |> List.distinct
+
+/// Pull file path(s) out of a tool call's args — the args-side concern only:
+/// resolve `path` / `file_path` / `filePath`; when absent, hand the patchText
+/// body to the dedicated `pathsFromPatchText` parser.
 let extractFilePaths (args: obj) : string list =
     if Dyn.isNullish args then []
     else
@@ -37,13 +54,8 @@ let extractFilePaths (args: obj) : string list =
         | Some path when path <> "" -> [ path ]
         | _ ->
             let patchText = Dyn.get args "patchText"
-            if not (Dyn.isNullish patchText) && string patchText <> "" then
-                (string patchText).Split('\n')
-                |> Seq.choose (fun line ->
-                    let m = Regex.Match(line, @"^\*\*\* (?:Add File|Update File|Move to): (.+)$")
-                    if m.Success then Some m.Groups.[1].Value else None)
-                |> List.ofSeq |> List.distinct
-            else []
+            if Dyn.isNullish patchText then []
+            else pathsFromPatchText (string patchText)
 
 let extractFilePath (args: obj) : string option =
     extractFilePaths args |> List.tryHead

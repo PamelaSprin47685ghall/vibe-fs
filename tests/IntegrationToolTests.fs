@@ -970,16 +970,21 @@ let mimoTaskExecuteInPlaceStripSpec () = promise {
     let hookInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ci1" ]
 
     do! teb $ (hookInput, beforeOut) |> unbox<JS.Promise<unit>>
-    check "mimo task strip mutates the original args reference in place" (isNullish (get originalArgs "completedWorkReport"))
-    check "mimo task strip removes stray task_id on original args reference" (isNullish (get originalArgs "task_id"))
-    check "mimo task strip preserves operation on original args reference" (not (isNullish (get originalArgs "operation")))
+    let sanitized = get beforeOut "args"
+    check "mimo task strip rebuilds args without completedWorkReport" (isNullish (get sanitized "completedWorkReport"))
+    check "mimo task strip rebuilds args without task_id" (isNullish (get sanitized "task_id"))
+    check "mimo task strip keeps operation on rebuilt args" (not (isNullish (get sanitized "operation")))
+    check "mimo task strip leaves original args reference untouched" (str originalArgs "completedWorkReport" = "top-level report text")
 
     let nestedOperation = createObj [ "action", box "create"; "summary", box "nested case"; "completedWorkReport", box "nested report text" ]
     let nestedArgs = createObj [ "operation", nestedOperation ]
     let nestedBeforeOut = createObj [ "args", box nestedArgs ]
     do! teb $ (createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ci2" ], nestedBeforeOut) |> unbox<JS.Promise<unit>>
-    check "mimo task strip mutates the original operation reference in place" (isNullish (get nestedOperation "completedWorkReport"))
-    check "mimo task strip keeps real fields on original operation reference" (str nestedOperation "summary" = "nested case")
+    let sanitizedNested = get nestedBeforeOut "args"
+    let sanitizedNestedOperation = get sanitizedNested "operation"
+    check "mimo task strip rebuilds operation without nested report" (isNullish (get sanitizedNestedOperation "completedWorkReport"))
+    check "mimo task strip keeps real fields on rebuilt operation" (str sanitizedNestedOperation "summary" = "nested case")
+    check "mimo task strip leaves original operation reference untouched" (str nestedOperation "completedWorkReport" = "nested report text")
     do! rmAsync workspaceDir
 }
 
@@ -992,8 +997,10 @@ let mimoTaskExecuteStripsTaskIdSpec () = promise {
     let originalArgs = createObj [ "operation", operation; "task_id", box "T4"; "completedWorkReport", box "noop report" ]
     let beforeOut = createObj [ "args", box originalArgs ]
     do! teb $ (createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ctid" ], beforeOut) |> unbox<JS.Promise<unit>>
-    check "mimo task execute.before strips task_id in place" (isNullish (get originalArgs "task_id"))
-    check "mimo task execute.before keeps operation after task_id strip" (not (isNullish (get originalArgs "operation")))
+    let sanitized = get beforeOut "args"
+    check "mimo task execute.before rebuilds args without task_id" (isNullish (get sanitized "task_id"))
+    check "mimo task execute.before keeps operation on rebuilt args" (not (isNullish (get sanitized "operation")))
+    check "mimo task execute.before leaves original args untouched" (str originalArgs "task_id" = "T4")
     do! rmAsync workspaceDir
 }
 
@@ -1167,28 +1174,31 @@ let executorActorSpec () = promise {
     check "executor actor preserves order" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
 }
 
-let wikiActorSpec () = promise {
+let wikiWorkspaceSerializationSpec () = promise {
     let seen = System.Collections.Generic.List<string>()
-    let actor = VibeFs.Opencode.WikiRuntime.WikiActor()
+    /// WikiRuntime serializes per-workspace writes through one SerialQueue per
+    /// workspace (P51 removed the WikiActor class wrapper); this pins the
+    /// ordering guarantee of that queue directly.
+    let queue = VibeFs.Shell.PromiseQueue.SerialQueue()
     let releaseRequested = ref false
     let gateResolve = ref (fun () -> ())
     let gateAsync : JS.Promise<unit> =
         Promise.create (fun resolve _ ->
             gateResolve.Value <- resolve
             if releaseRequested.Value then resolve ())
-    actor.Post("ws-1", fun () -> promise {
+    queue.Enqueue(fun () -> promise {
         seen.Add "first-start"
         do! gateAsync
         seen.Add "first-end"
-    })
-    actor.Post("ws-1", fun () -> promise {
+    }) |> Promise.start
+    queue.Enqueue(fun () -> promise {
         seen.Add "second-start"
         seen.Add "second-end"
-    })
+    }) |> Promise.start
     releaseRequested.Value <- true
     gateResolve.Value ()
-    let! _ = actor.Run("ws-1", fun () -> promise { return "" })
-    check "wiki actor preserves order" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
+    let! _ = queue.Enqueue(fun () -> promise { return "" })
+    check "wiki workspace serialization preserves order" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
 }
 
 let jobContextCleanupOnAbortOrDeleteSpec () = promise {
@@ -1274,6 +1284,6 @@ let run () : JS.Promise<unit> =
         do! investigatorToolSpec ()
         do! investigatorToolLateClientInjectionSpec ()
         do! executorActorSpec ()
-        do! wikiActorSpec ()
+        do! wikiWorkspaceSerializationSpec ()
         do! jobContextCleanupOnAbortOrDeleteSpec ()
     }

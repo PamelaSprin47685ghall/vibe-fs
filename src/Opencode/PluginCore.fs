@@ -173,29 +173,32 @@ let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: 
         if command = "loop" || command = "loop-review" then
             let sessionID = Dyn.str input "sessionID"
             let task = (Dyn.str input "arguments").Trim()
-            let parts = ensureParts output
-            clearArray parts
+            let parts = ResizeArray<obj>()
             if task = "" then
                 reviewStore.deactivateReview sessionID
-                pushPart parts (box {| ``type`` = "text"; text = cancelledMarker |})
+                parts.Add(box {| ``type`` = "text"; text = cancelledMarker |})
             elif reviewStore.isReviewActive sessionID then
-                pushPart parts (box {| ``type`` = "text"; text = "With-Review Mode is already active. Submit your work via submit_review." |})
+                parts.Add(box {| ``type`` = "text"; text = "With-Review Mode is already active. Submit your work via submit_review." |})
             elif command = "loop" then
                 reviewStore.activateReview(sessionID, task, dateNow ())
                 let msg = buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
-                pushPart parts (box {| ``type`` = "text"; text = msg |})
+                parts.Add(box {| ``type`` = "text"; text = msg |})
             else
                 let directory = Dyn.str ctx "directory"
                 let! result = runReviewerSession childAgentRegistry (Dyn.get ctx "client") reviewStore directory sessionID task
                 match result with
                 | Accepted ->
-                    pushPart parts (box {| ``type`` = "text"; text = $"Pre-review passed. Task \"{task}\" already meets all criteria — no changes needed." |})
+                    parts.Add(box {| ``type`` = "text"; text = $"Pre-review passed. Task \"{task}\" already meets all criteria — no changes needed." |})
                 | Terminated ->
-                    pushPart parts (box {| ``type`` = "text"; text = "Pre-review could not complete." |})
+                    parts.Add(box {| ``type`` = "text"; text = "Pre-review could not complete." |})
                 | Rejected feedback ->
                     reviewStore.activateReview(sessionID, task, dateNow ())
                     let msg = buildLoopMessage task [ "=== Pre-review Feedback ==="; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]
-                    pushPart parts (box {| ``type`` = "text"; text = msg |})
+                    parts.Add(box {| ``type`` = "text"; text = msg |})
+            /// Assign a fresh parts array rather than clearing the host's array
+            /// in place then pushing (P65): the hook builds the replacement and
+            /// overwrites `output.parts` once at the boundary.
+            setKey output "parts" (box parts)
     }
 
 /// Register /loop and /loop-review command templates in the opencode config.

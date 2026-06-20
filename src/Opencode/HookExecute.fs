@@ -25,19 +25,26 @@ let private captureMimocodeReport (input: obj) (args: obj) : unit =
     let report = if topReport <> "" then topReport else nestedReport
     if report <> "" then captureCompletedWorkReport callID report
 
-/// Strip Mimocode `task` extras from the original args reference so the host's
-/// strict task schema parses. The host re-parses this very reference, so the
-/// deletes MUST land on it (and on the nested `operation` object) in place.
-let private stripMimocodeTaskArgsForExecute (input: obj) (args: obj) : unit =
+/// Build a fresh args object with Mimocode `task` extras removed, never mutating
+/// the host's reference: a shallow copy skips the excluded keys. The result
+/// replaces `output.args` so the host's strict task schema parses it. (P46-48:
+/// the before-hook returns a new record instead of in-place deleteKey/restore.)
+let private copyObjExcept (source: obj) (excluded: string Set) : obj =
+    let result = createObj []
+    for key in Dyn.keys source do
+        if not (Set.contains key excluded) then setKey result key (source?(key))
+    result
+
+let private stripMimocodeTaskArgsForExecute (input: obj) (output: obj) (args: obj) : unit =
     let tool = normalizeToolName Mimocode (Dyn.str input "tool")
     if tool <> "todowrite" then ()
     else
         captureMimocodeReport input args
-        Dyn.deleteKey args "completedWorkReport"
-        Dyn.deleteKey args "task_id"
         let operation = Dyn.get args "operation"
+        let cleaned = copyObjExcept args (Set [ "completedWorkReport"; "task_id" ])
         if not (Dyn.isNullish operation) then
-            Dyn.deleteKey operation "completedWorkReport"
+            setKey cleaned "operation" (copyObjExcept operation (Set [ "completedWorkReport" ]))
+        setKey output "args" cleaned
 
 let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) : unit =
     if Dyn.str input "tool" <> "apply_patch" then ()
@@ -74,7 +81,7 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
             let tool = Dyn.str input "tool"
             setUiLabel setKey args tool
             if host = Mimocode then
-                stripMimocodeTaskArgsForExecute input args
+                stripMimocodeTaskArgsForExecute input output args
                 rewriteMimocodeApplyPatchArgsForExecute output input args
     }
 

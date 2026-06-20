@@ -27,14 +27,6 @@ module FuzzyCommandsModule = VibeFs.Shell.FuzzySearch
 let private nodeBuffer : obj = jsNative
 let private byteLength (s: string) : int = nodeBuffer?byteLength(s, "utf-8")
 
-let private entry (key: string) (value: obj) : obj = createObj [ key, value ]
-
-let private mergeObjects (objs: obj array) : obj =
-    let merged = createObj []
-    for item in objs do
-        Dyn.assignInto merged item |> ignore
-    merged
-
 let private resolveStr (s: string) : JS.Promise<string> = Promise.lift s
 
 let private formatDomainError (context: string) (error: DomainError) : string =
@@ -342,13 +334,18 @@ let submitReviewResultTool (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj
             promise { return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve." })
 
 let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
-    mergeObjects [|
-        entry "coder" (coderTool registry wikiRuntime ctx); entry "investigator" (investigatorTool registry ctx)
-        entry "meditator" (meditatorTool registry ctx); entry "browser" (browserTool registry ctx)
-        entry "executor" (executorTool registry wikiRuntime ctx)
-        entry "fuzzy_find" (fuzzyFindTool finderCache); entry "fuzzy_grep" (fuzzyGrepTool finderCache)
-        entry "websearch" (websearchTool registry ctx); entry "webfetch" (webfetchTool ())
-        entry "fetch_wiki" (fetchWikiTool wikiRuntime ctx); entry "submit_wiki" (submitWikiTool wikiRuntime)
-        entry "submit_review" (submitReviewTool registry ctx reviewStore)
-        entry "return_reviewer" (submitReviewResultTool reviewStore)
-    |]
+    createObj [
+        "coder", box (coderTool registry wikiRuntime ctx)
+        "investigator", box (investigatorTool registry ctx)
+        "meditator", box (meditatorTool registry ctx)
+        "browser", box (browserTool registry ctx)
+        "executor", box (executorTool registry wikiRuntime ctx)
+        "fuzzy_find", box (fuzzyFindTool finderCache)
+        "fuzzy_grep", box (fuzzyGrepTool finderCache)
+        "websearch", box (websearchTool registry ctx)
+        "webfetch", box (webfetchTool ())
+        "fetch_wiki", box (fetchWikiTool wikiRuntime ctx)
+        "submit_wiki", box (submitWikiTool wikiRuntime)
+        "submit_review", box (submitReviewTool registry ctx reviewStore)
+        "return_reviewer", box (submitReviewResultTool reviewStore)
+    ]

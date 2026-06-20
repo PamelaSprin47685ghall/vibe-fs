@@ -1,6 +1,7 @@
 module VibeFs.Kernel.Message
 
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.HostTools
 
 let capsSynthUserPrefix = "caps-synth-user-"
@@ -37,34 +38,54 @@ let partOutput (part: obj) : obj = Dyn.get part "output"
 
 let private allPrefixes = [ capsSynthUserPrefix; capsSynthAssistantPrefix; magicTodoProjectionPrefix; magicTodoPrefixPrefix ]
 let isSyntheticId (id: string) : bool = id <> "" && allPrefixes |> List.exists id.StartsWith
-let isSyntheticMessage (msg: obj) : bool = let info = messageInfo msg in if Dyn.isNullish info then false else isSyntheticId (infoId info)
-let stripSyntheticMessages (messages: obj array) : obj array = if Dyn.isNullish messages then [||] else messages |> Array.filter (fun msg -> not (isSyntheticMessage msg))
+/// Drop synthetic (caps / magic-todo projection) messages by Source DU rather
+/// than string-prefix sniffing (P8). Messages here use the { info; parts } tree
+/// that decodeMessage handles.
+let stripSyntheticMessages (messages: obj array) : obj array =
+    if Dyn.isNullish messages then [||]
+    else
+        messages
+        |> Array.filter (fun msg ->
+            match decodeMessage msg with
+            | Some m -> m.source = Native
+            | None -> true)
 
 type AssistantTextOptions = { startIndex: int; joiner: string }
 let defaultOptions = { startIndex = 0; joiner = "\n\n" }
 
+/// Pull the `content` array off an entry iff it is a well-formed assistant
+/// message; returns None for any non-assistant / malformed / empty entry. One
+/// flat guard instead of the previous pyramid of nested `isNullish` checks (P9).
+/// NOTE: session entries use the shape `{ type; message = { role; content } }`,
+/// distinct from the { info; parts } message tree handled by Messaging, so this
+/// boundary reader stays shape-specific rather than going through decodeMessage.
+let private tryAssistantContent (entry: obj) : obj array option =
+    if isNullish entry || entryType entry <> "message" then None
+    else
+        let message = entryMessage entry
+        if isNullish message || infoRole message <> "assistant" then None
+        else
+            let content = infoContent message
+            if isNullish content || not (isArray content) then None
+            else Some (content :?> obj array)
+
+/// Pull the non-empty text string off a content part, if it is a text part.
+let private tryPartText (part: obj) : string option =
+    if isNullish part || partType part <> "text" then None
+    else
+        let text = partText part
+        if isNullish text || string text = "" then None else Some (string text)
+
 let readAssistantText (entries: obj array) (options: AssistantTextOptions option) : string option =
     let opts = defaultArg options defaultOptions
-    let chunks =
-        if opts.startIndex >= entries.Length then [||]
-        else
+    if opts.startIndex >= entries.Length then None
+    else
+        let chunks =
             entries.[opts.startIndex..]
-            |> Array.choose (fun entry ->
-                if isNullish entry || entryType entry <> "message" then None
-                else
-                    let message = entryMessage entry
-                    if isNullish message || infoRole message <> "assistant" then None
-                    else
-                        let content = infoContent message
-                        if isNullish content || not (isArray content) then None
-                        else Some (content :?> obj array))
+            |> Array.choose tryAssistantContent
             |> Array.collect id
-            |> Array.choose (fun part ->
-                if isNullish part || partType part <> "text" then None
-                else
-                    let text = partText part
-                    if isNullish text || string text = "" then None else Some (string text))
-    if chunks.Length > 0 then Some(String.concat opts.joiner chunks) else None
+            |> Array.choose tryPartText
+        if chunks.Length > 0 then Some(String.concat opts.joiner chunks) else None
 
 let getLatestTodoPhasesFromEntriesFor (isTodoToolResult: string -> bool) (entries: obj array) : obj =
     let phasesOf entry =
@@ -85,7 +106,7 @@ let getLatestTodoPhasesFromEntriesFor (isTodoToolResult: string -> bool) (entrie
     entries
     |> Array.tryFindBack (fun entry -> phasesOf entry |> Option.isSome)
     |> Option.bind phasesOf
-    |> Option.map Dyn.clone
+    |> Option.map clone
     |> Option.defaultValue (box [||])
 
 let getLatestTodoPhasesFromEntries (entries: obj array) : obj =
@@ -109,13 +130,7 @@ let partToolInput (part: obj) : obj = let state = partState part in if isNullish
 let partCallID (part: obj) : string = str part "callID"
 let partTextStr (part: obj) : string = let text = partText part in if isNullish text then "" else string text
 let setPartOutput (part: obj) (newOutput: string) : obj =
-    let clonedPart = clone part
-    let state = get clonedPart "state"
-    if not (isNullish state) then
-        let nextState = withKey state "output" (box newOutput)
-        withKey clonedPart "state" nextState
-    else
-        clonedPart
+    withToolOutput (decodePart part) newOutput
 
 let flatten (messages: obj array) : FlatPart list =
     messages

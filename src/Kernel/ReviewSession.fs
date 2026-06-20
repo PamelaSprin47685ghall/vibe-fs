@@ -72,11 +72,14 @@ let empty id createdAt : ReviewSession =
       originalTask = None; lastFeedback = None; parentId = None; childIds = [] }
 
 /// Apply a command through the pure transition, returning a new session when the
-/// state actually changes.  Structural equality lets us skip no-op writes.
+/// state actually changes. `transition` already returns the event log (the
+/// authoritative "did anything happen?" signal): an event fires iff the state
+/// moved, so we trust that instead of recomputing via structural equality (P36).
 let applyCommand (session: ReviewSession) (command: ReviewCommand) : ReviewSession =
-    let nextState, _ = transition session.state command
-    if nextState = session.state then session
-    else { session with state = nextState; version = session.version + 1 }
+    let nextState, event = transition session.state command
+    match event with
+    | None -> session
+    | Some _ -> { session with state = nextState; version = session.version + 1 }
 
 let withTask (task: string) (session: ReviewSession) : ReviewSession =
     if session.originalTask = Some task then session

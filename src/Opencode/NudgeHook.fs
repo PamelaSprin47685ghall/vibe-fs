@@ -87,25 +87,31 @@ let private decodeNudgeHostEvent (eventType: string) (props: obj) : NudgeHostEve
     | "session.next.retried" -> SessionNextRetried
     | "message.updated" ->
         let info = Dyn.get props "info"
-        let errorValue = Dyn.get info "error"
-        MessageUpdated(isAbortDomainError errorValue, isCompletedAssistantMessage info)
+        let outcome =
+            if isAbortDomainError (Dyn.get info "error") then UpdateAborted
+            elif isCompletedAssistantMessage info then UpdateCompletedAssistant
+            else UpdateNoChange
+        MessageUpdated outcome
     | "message.part.updated" ->
         let part = Dyn.get props "part"
         let partType = Dyn.str part "type"
-        let errorValue = Dyn.get part "error"
-        let stateValue = Dyn.get part "state"
-        MessagePartUpdated(partType, isAbortDomainError errorValue, isAbortDomainError stateValue)
+        let outcome =
+            if partType = "retry" then PartRetry
+            elif isAbortDomainError (Dyn.get part "error") || isAbortDomainError (Dyn.get part "state") then PartAborted
+            elif isRetryProgressPart partType then PartRetryProgress
+            else PartOther
+        MessagePartUpdated outcome
     | "session.next.step.failed" ->
-        SessionNextStepFailed(isAbortDomainError (Dyn.get props "error"))
+        SessionNextStepFailed (if isAbortDomainError (Dyn.get props "error") then StepFailAbort else StepFailOther)
     | "session.next.tool.failed" ->
-        SessionNextToolFailed(isAbortDomainError (Dyn.get props "error"))
+        SessionNextToolFailed (if isAbortDomainError (Dyn.get props "error") then ToolFailAbort else ToolFailOther)
     | "session.next.step.ended" ->
         let direct = Dyn.str props "finish"
         let finish = if direct <> "" then direct else Dyn.str (Dyn.get props "info") "finish"
         SessionNextStepEnded finish
     | "session.idle" -> SessionIdle
     | "session.error" ->
-        SessionError(isAbortDomainError (Dyn.get props "error"))
+        SessionError (if isAbortDomainError (Dyn.get props "error") then SessionErrorAbort else SessionErrorOther)
     | "session.status" ->
         match Dyn.str (Dyn.get props "status") "type" with
         | "idle" -> SessionStatusIdle

@@ -29,6 +29,29 @@ type SendOutcome =
     | Busy
     | Failed
 
+/// Resolved outcome of a `message.updated` event. Replaces the
+/// `(isAbortError, isCompletedAssistant)` boolean pair, which could express the
+/// impossible (abort AND completed) state — the three legal states are now the
+/// only constructors (P40/P41). Cases are prefixed `Update…` to avoid collision
+/// with `DomainError.MessageAborted`.
+type MessageOutcome =
+    | UpdateAborted
+    | UpdateCompletedAssistant
+    | UpdateNoChange
+
+/// Resolved outcome of a `message.part.updated` event. The host decodes the raw
+/// `(partType, errorValue, stateValue)` triple into exactly one of these, so the
+/// kernel transition never re-parses partType or re-checks abort flags.
+type PartOutcome =
+    | PartRetry
+    | PartAborted
+    | PartRetryProgress
+    | PartOther
+
+type StepFailOutcome = StepFailAbort | StepFailOther
+type ToolFailOutcome = ToolFailAbort | ToolFailOther
+type SessionErrorOutcome = SessionErrorAbort | SessionErrorOther
+
 /// Decoded host event ready for exhaustive nudge state transition. Host adapters
 /// decode their native event shapes into this DU; NudgeState owns the transitions.
 type NudgeHostEvent =
@@ -36,13 +59,13 @@ type NudgeHostEvent =
     | SessionDeleted
     | SessionNextPrompted of promptText: string
     | SessionNextRetried
-    | MessageUpdated of isAbortError: bool * isCompletedAssistant: bool
-    | MessagePartUpdated of partType: string * isAbortError: bool * isAbortState: bool
-    | SessionNextStepFailed of isAbortError: bool
-    | SessionNextToolFailed of isAbortError: bool
+    | MessageUpdated of outcome: MessageOutcome
+    | MessagePartUpdated of outcome: PartOutcome
+    | SessionNextStepFailed of outcome: StepFailOutcome
+    | SessionNextToolFailed of outcome: ToolFailOutcome
     | SessionNextStepEnded of finish: string
     | SessionIdle
-    | SessionError of isAbortError: bool
+    | SessionError of outcome: SessionErrorOutcome
     | SessionStatusIdle
     | SessionStatusBusy
     | SessionStatusRetry
@@ -159,33 +182,6 @@ let tryRecordSend state sessionID outcome : NudgeShellState option =
     then Some(recordSend state sessionID outcome)
     else None
 
-let handleSessionNextPrompted state promptText sessionID =
-    if isNudgePrompt promptText then state else resumeSession state sessionID
-
-let handleMessageUpdated state isAbortError isCompletedAssistantMessage errorValue info sessionID =
-    if isAbortError errorValue then
-        stopSession state sessionID, false
-    elif isCompletedAssistantMessage info then
-        tryClaimNudge state sessionID
-    else
-        state, false
-
-let handleMessagePartUpdated state isAbortError partType errorValue stateValue sessionID =
-    if partType = "retry" then
-        addRetryPendingSession state sessionID
-    elif isAbortError errorValue || isAbortError stateValue then
-        stopSession state sessionID
-    elif isRetryProgressPart partType then
-        deleteRetryPendingSession state sessionID
-    else
-        state
-
-let handleSessionNextStepFailed state isAbortError errorValue sessionID =
-    if isAbortError errorValue then stopSession state sessionID else state
-
-let handleSessionNextToolFailed state isAbortError errorValue sessionID =
-    if isAbortError errorValue then stopSession state sessionID else deleteRetryPendingSession state sessionID
-
 let handleSessionNextStepEnded state finish sessionID =
     let state = deleteRetryPendingSession state sessionID
     if finish <> "" && isTerminalAssistantFinish finish then
@@ -198,34 +194,32 @@ let handleSessionBusy state sessionID =
         if state.lastNudgedSession <> Some sessionID then deleteNudgedSession state sessionID else state
     { state with lastNudgedSession = None }
 
-let handleSessionError state isAbortError errorValue sessionID =
-    if isAbortError errorValue then stopSession state sessionID else addRetryPendingSession state sessionID
-
-/// Exhaustive transition over NudgeHostEvent. Replaces the host-layer string
-/// match: the compiler now enforces that every event kind is handled.
+/// Exhaustive transition over NudgeHostEvent. Each event's outcome is already
+/// resolved into a finite constructor at the host boundary, so the kernel only
+/// maps a legal state to its successor — no boolean re-interpretation here.
+/// `SessionNextPrompted` is inlined (P42) so every transition lives in one fold.
 let handleEvent (state: NudgeShellState) (sessionID: string) (event: NudgeHostEvent) : NudgeShellState * bool =
     match event with
     | StreamAbort -> clearSession state sessionID, false
     | SessionDeleted -> clearSession state sessionID, false
-    | SessionNextPrompted promptText -> handleSessionNextPrompted state promptText sessionID, false
+    | SessionNextPrompted promptText ->
+        (if isNudgePrompt promptText then state else resumeSession state sessionID), false
     | SessionNextRetried -> addRetryPendingSession state sessionID, false
-    | MessageUpdated(isAbortError, isCompletedAssistant) ->
-        if isAbortError then stopSession state sessionID, false
-        elif isCompletedAssistant then tryClaimNudge state sessionID
-        else state, false
-    | MessagePartUpdated(partType, isAbortError, isAbortState) ->
-        if partType = "retry" then addRetryPendingSession state sessionID, false
-        elif isAbortError || isAbortState then stopSession state sessionID, false
-        elif isRetryProgressPart partType then deleteRetryPendingSession state sessionID, false
-        else state, false
-    | SessionNextStepFailed isAbortError ->
-        if isAbortError then stopSession state sessionID, false else state, false
-    | SessionNextToolFailed isAbortError ->
-        if isAbortError then stopSession state sessionID, false else deleteRetryPendingSession state sessionID, false
+    | MessageUpdated UpdateAborted -> stopSession state sessionID, false
+    | MessageUpdated UpdateCompletedAssistant -> tryClaimNudge state sessionID
+    | MessageUpdated UpdateNoChange -> state, false
+    | MessagePartUpdated PartRetry -> addRetryPendingSession state sessionID, false
+    | MessagePartUpdated PartAborted -> stopSession state sessionID, false
+    | MessagePartUpdated PartRetryProgress -> deleteRetryPendingSession state sessionID, false
+    | MessagePartUpdated PartOther -> state, false
+    | SessionNextStepFailed StepFailAbort -> stopSession state sessionID, false
+    | SessionNextStepFailed StepFailOther -> state, false
+    | SessionNextToolFailed ToolFailAbort -> stopSession state sessionID, false
+    | SessionNextToolFailed ToolFailOther -> deleteRetryPendingSession state sessionID, false
     | SessionNextStepEnded finish -> handleSessionNextStepEnded state finish sessionID
     | SessionIdle -> tryClaimNudge state sessionID
-    | SessionError isAbortError ->
-        if isAbortError then stopSession state sessionID, false else addRetryPendingSession state sessionID, false
+    | SessionError SessionErrorAbort -> stopSession state sessionID, false
+    | SessionError SessionErrorOther -> addRetryPendingSession state sessionID, false
     | SessionStatusIdle -> tryClaimNudge state sessionID
     | SessionStatusBusy -> handleSessionBusy state sessionID, false
     | SessionStatusRetry -> addRetryPendingSession state sessionID, false

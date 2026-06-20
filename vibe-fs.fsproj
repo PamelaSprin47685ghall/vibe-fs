@@ -23,6 +23,7 @@
     <Compile Include="src/Kernel/ToolCatalog.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />
     <Compile Include="src/Kernel/Dedup.fs" />
+    <Compile Include="src/Kernel/Messaging.fs" />
     <Compile Include="src/Kernel/Message.fs" />
     <Compile Include="src/Kernel/Wiki.fs" />
     <Compile Include="src/Kernel/WikiPrompts.fs" />

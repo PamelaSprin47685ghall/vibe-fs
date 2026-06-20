@@ -1,7 +1,5 @@
 module VibeFs.Kernel.MagicCore
 
-open Fable.Core.JsInterop
-open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Message
 

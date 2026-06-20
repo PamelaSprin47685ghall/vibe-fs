@@ -121,15 +121,14 @@ let private normalizeSeparators (p: string) = p.Replace("\\", "/")
 let private isPathAbsolute (p: string) = normalizeSeparators p |> fun n -> n.StartsWith("/")
 
 let private normalizeSegments (segments: string list) : string list =
-    let rec fold acc = function
-        | [] -> List.rev acc
-        | "." :: rest -> fold acc rest
-        | ".." :: rest ->
-            match acc with
-            | [] -> fold acc rest
-            | _ :: tail -> fold tail rest
-        | seg :: rest -> fold (seg :: acc) rest
-    fold [] segments
+    (segments, [])
+    ||> List.fold (fun acc seg ->
+        match seg, acc with
+        | ".", _ -> acc
+        | "..", [] -> []
+        | "..", _ :: tail -> tail
+        | other, prefix -> other :: prefix)
+    |> List.rev
 
 let private resolveAgainst (basePath: string) (p: string) : string =
     let combined =
@@ -159,6 +158,13 @@ let private recursiveDirRe = Regex(@"^(.*)/\*\*(?:/\*)?$")
 let private globCharsRe = Regex(@"[\*\?\[\{]")
 let private hasExtension (segment: string) = extensionRe.IsMatch segment
 let private hasGlobChars (s: string) = globCharsRe.IsMatch s
+
+/// Active pattern over `recursiveDirRe`: captures the directory prefix of a
+/// `dir/**` recursive glob, or None when the input is not such a glob.
+let private (|RecursiveDirGlob|_|) (s: string) =
+    match recursiveDirRe.Match s with
+    | m when m.Success -> Some m.Groups.[1].Value
+    | _ -> None
 let private isOutside basePath targetPath =
     let rel = relativePath basePath targetPath
     rel = ".." || rel.StartsWith("../") || isPathAbsolute rel
@@ -169,16 +175,17 @@ type ResolvedFuzzySearchPath =
       external: bool }
 
 let private normalizeTrimmed (trimmed: string) : string option =
-    if trimmed = "." || trimmed = "./" then None
-    else
-        let t = if trimmed.StartsWith("./") then trimmed.[2..] else trimmed
-        let recursive = recursiveDirRe.Match t
-        if recursive.Success then
-            let dir = recursive.Groups.[1].Value
-            if dir <> "" && not (hasGlobChars dir) then Some $"{dir}/" else Some t
-        elif t.StartsWith("/") || t.EndsWith("/") then Some t
-        elif hasGlobChars t then Some t
-        else
+    let stripLeadingDotSlash (t: string) =
+        if t.StartsWith("./") then t.[2..] else t
+    match trimmed with
+    | "." | "./" -> None
+    | _ ->
+        let t = stripLeadingDotSlash trimmed
+        match t with
+        | RecursiveDirGlob dir when dir <> "" && not (hasGlobChars dir) -> Some $"{dir}/"
+        | RecursiveDirGlob _ -> Some t
+        | _ when t.StartsWith("/") || t.EndsWith("/") || hasGlobChars t -> Some t
+        | _ ->
             let lastSegment = t.Split('/') |> Array.tryLast |> Option.defaultValue ""
             if hasExtension lastSegment then Some t else Some $"{t}/"
 
