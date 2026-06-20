@@ -2,6 +2,8 @@
 
 > 这不是建议清单，是合同。落地到代码上的每一处偏离都要在评审里被记录、修复，或显式签收。
 > 上一版『克制版』已完成；它做的是清扫，没动骨架。本版要把骨架捏到 Kolmogorov 极小：每一行托着真实概念，每一个模块对应不可消的领域事实，每一处抽象都付得起它的篇幅。
+>
+> **进度（最近校准）**：S0–S3 已落地 —— Kernel/Shell 分层成形、状态副作用收口到 Shell、`DomainError` 铺到主 IO 入口、空 stub 与兼容门面清除。S4（双 host 收编为 `Hosts/`）与 S5（`Dyn` 下沉、Kernel 去 `obj`、`RawHostEvent` 定型）未动。两项裁决：① 三个 plugin 入口（`Plugin.fs`/`PluginMimo.fs`/`PluginMimoTui.fs`）服务于不同宿主，**不合**，D10 撤销；② `AGENTS.md` 的 Task 宪法成立但迁移**暂缓**（先不做），全库仍以 `async`/`JS.Promise` 为货币。下文各节已按代码现状标注 ✅ / ⏳。
 
 ---
 
@@ -29,31 +31,32 @@
 
 ---
 
-## 1. 现状诊断（v1 收尾后）
+## 1. 现状诊断（v2 进度）
 
-v1 完成项（保留）：
+v2 已落地（Kernel/Shell 分层成形，状态副作用收口）：
 
-- `Kernel/Subagent.fs` 把任务 → prompt 收敛成单点。
-- `Kernel/ToolCatalog.fs` 持有所有工具的 description / paramDocs。
-- `Opencode/Hooks.fs` 拆为 `HookExecute` / `HookTransform`（旧文件留为空 stub，**本版直接删除**）。
-- `Opencode/Session.fs` 拆为 `SessionIo` / `ReviewerLoop`（同样删 stub）。
-- `MagicSession` 收编 `completedWorkReportByCall`。
-- `Shell/FuzzySearch.fs` 内部 `TypedIteratorStore` 强类型化。
+- `Kernel/LoopMessages.fs`：`buildLoopMessage` / `loopFooter` SSOT，双 host 同源调用。
+- `Kernel/Prompts.fs::ReviewerVerdictPrompts`：两版 verdict instructions 合到唯一模块；`formatReviewResult` 已上移 Kernel。
+- `Shell/CallStore.fs`（原 `Mux/CallStore.fs`）、`Shell/ChildAgentRegistry.fs`（原 `Opencode/Actors.fs`）：host 无关容器上移到 Shell。
+- `Shell/MagicSessionStore.fs`：收编 `MagicSession` 内部全部 mutable Dictionary（report / backlog 两张表按 `Host` 分桶）；Mimocode 跨钩子 report 通信走 sanctioned Shell 容器。
+- `Shell/NudgeRuntime.fs`：`NudgeCoordinator` class 已删；Kernel 只剩 `State -> Cmd -> State * Effect` 纯函数，Shell 持 `ref`。
+- `Mux/EventHook.fs`：原 `HashSet<string>` 三件套全部表达为 `Kernel.NudgeState`，hook 仅做 `NudgeHostEvent` 翻译。
+- `Kernel/Domain.fs::DomainError`：完整 DU 已建；`ollamaPost` / `FileSys.write` 等外部 IO 入口返回 `Result<_, DomainError>`。
+- 删除：`Opencode/Hooks.fs` / `Opencode/Session.fs` 空 stub；`Mux/Plugin.fs` 兼容门面；`Kernel/Dyn.fs::ArgsPatch`。
 
 剩余债务，按"违反 SSOT 程度"排序：
 
 | # | 违反 | 证据 | 深度 |
 | - | --- | --- | --- |
-| D1 | 双 host 仍各持一份 *工具装配* 代码 | `Opencode/Tools.fs` (330) ≈ `Mux/SubagentTools.fs` (218) + `Mux/HostTools.fs` (246) 同构 | 高 |
-| D2 | 双 host 各持一份 *Schema 编译器*（Zod vs JSON Schema），但所有字段已经在 `ToolCatalog` 集中 | `Opencode/ToolSchema.fs` 里的 `coderIntentsSchema` 仍硬编码字段；`SubagentIntents.fs` 里又有 `muxCoderIntentsSchema` | 高 |
-| D3 | 状态副作用四处长 | `MagicSession` 里 `Dictionary<string,string>`、`reportTables` 静态字典、`MagicTodo.shared`、`FinderCache`、`callStore`、`ReviewStore` 内部 `mutable registry / effects` | 高 |
-| D4 | `Hooks.fs` / `Session.fs` 仍以空文件存在；`Plugin.fs` 内仍残留无用 `getPluginToolPolicy` / `deduplicateReadOutputsXXX` 兼容门面 | `Mux/Plugin.fs:109-131` | 中 |
-| D5 | `Dyn.fs` 是项目里最危险的"任意 obj"出口；目前还在被 hooks 直接调 `setKey` / `replaceArrayInPlace` 等原地写 | `HookTransform.fs:27 replaceArrayInPlace` | 中 |
-| D6 | 错误处理三套（`raise exn`、`Result<_,string>`、字符串前缀如 `"Error: ..."`、JSON-stringified `{ success=false; error }`），调用方各猜各的 | `Mux/HostTools.fs websearchTool`、`Opencode/Tools.fs websearchTool`、`Shell/FileSys.fs write` | 中 |
-| D7 | Mimocode 任务参数清洗（`stripMimocodeTaskArgsForExecute` + `restoreMimocodeTaskArgsAfterExecute`）依赖 `callID` 静态字典做跨钩子隐式通信 | `MagicTodo.fs:18 reportTables` | 中 |
-| D8 | `Config.fs::canUseCanonical` 把权限策略写成嵌套子串匹配的 if-else 瀑布；可读但拒绝增长 | `Kernel/Config.fs:16-30` | 低 |
-| D9 | `Prompts.fs` 同时承担 prompt body、reviewer instructions、UI 文案、search/fetch 格式化等四类内容，按角色未拆 | 单文件 236 行 | 低 |
-| D10 | `Opencode/Plugin.fs` / `PluginMimo.fs` / `PluginMimoTui.fs` 是三个仅入口形状不同的薄壳 | 三文件总共 < 130 行，但概念散落 | 低 |
+| D1 | 双 host 仍各持一份 *工具装配* 代码 | `Opencode/Tools.fs` (361) ≈ `Mux/SubagentTools.fs` (268) + `Mux/HostTools.fs` (258) 同构 | 高 |
+| D2 | 双 host 各持一份 *Schema 编译器*（Zod vs JSON Schema），字段却已在 `ToolCatalog` 集中 | `Opencode/ToolSchema.fs::coderIntentsSchema` 与 `Mux/SubagentTools.fs::muxCoderIntentsSchema` 仍各写一遍 | 高 |
+| D5 | `Dyn.fs` 仍是 Kernel 里最危险的"任意 obj"出口；hooks 仍直接调 `setKey` / `replaceArrayInPlace` 原地写 | `Kernel/Dyn.fs`（应在 `Shell/JsBridge.fs`）；`HookTransform.fs::replaceArrayInPlace` | 高 |
+| D6 | 错误处理仍有三套痕迹：`raise exn` / `Result<_,DomainError>` / 边界 `try ... with _ -> ""` 兜底 | `DomainError` 已铺到主 IO 入口，但 SDK 边界仍散落 `try _ -> None/""` | 中 |
+| D8 | `Config.fs::canUseCanonical` 权限写成嵌套子串匹配瀑布 | `Kernel/Config.fs:16-30` 未动 | 低 |
+| D9 | `Prompts.fs` 仍同时承担 prompt body / reviewer 指令 / UI 文案 / search 格式化 | 单文件 266 行；`ReviewerVerdictPrompts` 已收口，职责分居暂缓（§4.1） | 低 |
+| ~~D10~~ | ~~三个 plugin 入口薄壳~~ | 服务于不同宿主，**裁决不合**，撤销 | — |
+| ~~D11~~ | ~~Task 迁移~~ | `AGENTS.md` Task 宪法**暂缓**（先不做），见 §12 | — |
+| D12 | **新**：`Opencode/WikiRuntime.fs` 单文件 470 行，是全库最大违反者，actor + 维护调度 + prompt 构建 + 读写全挤一处 | `WikiRuntime.fs` | 中 |
 
 ---
 
@@ -90,7 +93,7 @@ v1 完成项（保留）：
 
 - **Kernel 不出现 `obj`**。任何 `obj` 都必须在 Shell 或 Host 边界翻译为代数数据类型。当前 `Dyn.fs` 是 Kernel 模块，违法 → 移到 `Shell/Dyn.fs` 并改名 `Shell.JsBridge`，让"我在和 JS 玩 duck typing"这件事写在路径上。
 - **Kernel 不出现 `mutable` / `Dictionary` / `ref`**。状态聚合必须以 `state -> command -> state * event list` 的归约形式表达。当前 `Nudge.NudgeCoordinator` 类有 `mutable state` → 拆成 `update : State -> Cmd -> State * Effect`，由 Shell 持有引用。
-- **Kernel 不出现 `JS.Promise`**。Promise 是 Node 的事；Kernel 用 `Async` 或纯返回值。
+- **Kernel 不出现 `JS.Promise`**。Promise 是 Node 的事；Kernel 用 `Async` 或纯返回值。（`AGENTS.md` 的 `Task<'T>` 宪法已暂缓执行，见 §12；当前全库以 `async` + `JS.Promise` + `Async.AwaitPromise`/`StartAsPromise` 为货币。）
 - **Host 不出现业务判断**。"什么时候 nudge"不是 host 的事；host 只把外部事件翻译成 `NudgeState.Cmd`。
 
 ---
@@ -99,20 +102,20 @@ v1 完成项（保留）：
 
 凡是在以下清单上的代码，必须在 v2 完工前消失。无人问津的 Public、契约、影响面大都不是借口；下游通过 git 通知。
 
-### 3.1 立即删除（一行不留）
+### 3.1 立即删除（一行不留）— ✅ 已完成
 
-- `src/Opencode/Hooks.fs`（空 stub，6 行）。
-- `src/Opencode/Session.fs`（空 stub，5 行）。
-- `Mux/Plugin.fs:109-131` 的 `getPluginToolPolicy` / `deduplicateReadOutputsXXX` / `collectReadOutputs` 兼容门面。已经没人调用，删。
-- `Kernel/Dyn.fs::ArgsPatch` + `applyPatch` —— v1 引入但调用点几乎为零；跨钩子 args 重写应通过 Kernel 的 `ArgsCommand` 类型表达，而不是把"我要 mutate 这个 obj"封装一层。如果 v2 落地后还需要这条路径，再以代数数据类型形式重新引入。
+- ~~`src/Opencode/Hooks.fs`（空 stub）~~ 已删。
+- ~~`src/Opencode/Session.fs`（空 stub）~~ 已删。
+- ~~`Mux/Plugin.fs` 的 `getPluginToolPolicy` / `deduplicateReadOutputsXXX` / `collectReadOutputs` 兼容门面~~ 已删。
+- ~~`Kernel/Dyn.fs::ArgsPatch` + `applyPatch`~~ 已删。
 
 ### 3.2 收编后删除（合并到新 SSOT）
 
-- `Mux/SubagentTools.fs::buildLoopMessage` —— 与 `Opencode/PluginCore.fs::buildLoopMessage` 是同一段拼接，搬进 `Kernel/LoopMessages.fs`。
-- `Mux/SubagentTools.fs::reviewVerdictInstructions` 与 `Mux/SlashCommands.fs::loopReviewVerdictInstructions` —— 两段几乎逐字相同的 reviewer 指令模板。搬进 `Kernel/Prompts.fs::ReviewerVerdictPrompts` 模块。
-- `Opencode/Tools.fs::formatReviewResult` —— 与 `Mux/SubagentTools.fs` 中 review verdict 文案是兄弟。搬到 `Kernel/Prompts.fs`。
-- `Mux/Wrappers.fs::createAllWrappers*` 的 `mkWebOverride` —— 让 Mux 的 web_search / web_fetch 直接调用 Kernel `Subagent` 入口；不需要先注册一份 `websearch` / `webfetch` 工具又通过 wrapper 重映射到 host 的 `web_search` / `web_fetch`。
-- `Opencode/PluginMimo.fs` / `Opencode/PluginMimoTui.fs` 与 `Opencode/Plugin.fs` —— 收成 `Hosts/Opencode/Entry.fs` 一个文件，三个 `[<ExportDefault>]` 入口同源。
+- ~~`Mux/SubagentTools.fs::buildLoopMessage`~~ → 已进 `Kernel/LoopMessages.fs`。✅
+- ~~reviewer verdict 两版指令模板~~ → 已进 `Kernel/Prompts.fs::ReviewerVerdictPrompts`。✅
+- ~~`Opencode/Tools.fs::formatReviewResult`~~ → 已进 `Kernel/Prompts.fs`。✅
+- ~~`Mux/Wrappers.fs::mkWebOverride`~~ → 已删，Mux web 工具直接走 Kernel `Subagent` 入口。✅
+- `Opencode/PluginMimo.fs` / `PluginMimoTui.fs` / `Plugin.fs` → **裁决不合**（D10 撤销：三个入口服务于不同宿主，各自保留）。
 
 ### 3.3 禁止再生
 
@@ -160,7 +163,7 @@ src/
 │   │   ├── SubagentRunner.fs     ── (新) SubagentRunner 接口 + 默认 timeout / retry 策略
 │   │   └── SchemaProjection.fs   ── (新) ToolSpec -> SchemaIR 抽象 (字符串、整型、枚举、对象、数组)
 │   ├── Opencode/
-│   │   ├── Entry.fs              ── 合并 Plugin.fs / PluginMimo.fs / PluginMimoTui.fs
+│   │   ├── Entry.fs              ── opencode 主入口（D10 撤销后：Mimo / MimoTui 按宿主分离，不合）
 │   │   ├── ZodCompile.fs         ── 旧 ToolSchema.fs：只剩 SchemaIR -> Zod 投影
 │   │   ├── HookExecute.fs / HookTransform.fs ── 改名 Hooks*.fs 后保留；只做 obj↔Kernel 翻译
 │   │   ├── SessionIo.fs / ReviewerLoop.fs ── 保留 (但调用 SubagentRunner 抽象)
@@ -208,17 +211,18 @@ Kernel/Prompts/
 
 当前所有 mutable 状态的容器列表：
 
-| 容器 | 当前位置 | v2 归属 | 命令集 |
+| 容器 | 状态 | 当前位置 | 命令集 |
 | --- | --- | --- | --- |
-| `ChildAgentRegistry` | `Opencode/Actors.fs` | `Shell/ChildAgentRegistry.fs` | `Register / Unregister / Lookup / ResolveParent` |
-| `ExecutorActor` | `Opencode/Actors.fs` | `Shell/Executor.fs` 内 actor 子模块 | `Submit (sessionID, work)` |
-| `FinderCache` | `Shell/FuzzyFinderShell.fs` | 保留位置 | `Get / Destroy / DestroyAll` |
-| `CallStore` | `Mux/CallStore.fs` | `Shell/CallStore.fs` (host 无关) | `Register / Resolve / Reject(timeout)` |
-| `ReviewStore` | `Shell/ReviewRuntime.fs` | 保留位置 | 当前接口已正确，不动 |
-| `MagicSession` 内部 `Dictionary<string,_>` | `Opencode/MagicTodo.fs` | `Shell/MagicSessionStore.fs` | `CaptureReport / TakeReport / GetOrRebuildBacklog` |
-| `NudgeCoordinator.mutable state` | `Kernel/Nudge.fs` | 删除 class；改 `Shell/NudgeRuntime.fs` 持有 `Kernel.NudgeState` | `Submit (sessionId, ctx) -> action` |
-| `EventHook` 内 `HashSet<string>` 三件套 | `Mux/EventHook.fs` | 全部表达为 `Kernel.NudgeState`，hook 仅翻译事件 | — |
-| `registeredToolNames` 模块全局可变 | `Mux/Wrappers.fs` | 删除；改成函数参数显式传 | — |
+| `ChildAgentRegistry` | ✅ | `Shell/ChildAgentRegistry.fs` | `Register / Unregister / Lookup / ResolveParent` |
+| `ExecutorActor` | ✅ | `Shell/ChildAgentRegistry.fs`（与 registry 同文件） | `Post (sessionID, work)` |
+| `FinderCache` | ✅ | `Shell/FuzzyFinderShell.fs` | `Get / Destroy / DestroyAll` |
+| `CallStore` | ✅ | `Shell/CallStore.fs`（host 无关） | `Register / Resolve / Reject(timeout)` |
+| `ReviewStore` | ✅ | `Shell/ReviewRuntime.fs` | 接口已正确，不动 |
+| `MagicSession` 内部表 | ✅ | `Shell/MagicSessionStore.fs`（report/backlog 按 `Host` 分桶） | `CaptureReport / TakeReport / StoreBacklog / TryGetBacklog` |
+| `NudgeCoordinator` class | ✅ 已删 | Kernel 只剩纯 `update`/`handleEvent`；`Shell/NudgeRuntime.fs` 持 `ref` | `Submit (sessionId, ctx) -> action` |
+| `EventHook` HashSet | ✅ | `Mux/EventHook.fs` 仅翻译为 `NudgeHostEvent` | — |
+| `registeredToolNames` 全局可变 | ✅ 已删 | 改为函数参数显式传 | — |
+| `WikiActor` / `MailboxProcessor` | ⏸ 暂缓 | `Opencode/WikiRuntime.fs` / `Shell/ChildAgentRegistry.fs` | Task 迁移解冻后改 `SerialQueue`（S6 挂起） |
 
 每一个容器在 Shell 里都必须满足三条：
 
@@ -276,6 +280,8 @@ JS 单线程 + 多 Promise 并发是事实，不是借口。v2 强制：
 - **AbortSignal 必须穿透每一层**。当前 `Mux/Delegate.fs` 与 `Opencode/SessionIo.fs` 各写一遍 promiseRace。抽到 `Hosts/Common/AbortRace.fs`。
 - **禁止 setTimeout 直接出现在 Kernel/Shell 业务逻辑里**。CallStore 的 TTL 是合法用例，但只在 `Shell/CallStore.fs` 内；任何业务文件 grep 命中 `JS.setTimeout` = bug。
 
+> Task 迁移暂缓（§12）。解冻后上述 `Async.StartImmediate` / `Async.StartAsPromise` / `Async.AwaitPromise` / `MailboxProcessor` 系统替换为 `Task` 原语（`Task.Delay` / `Task.WhenAll` / `SerialQueue`），但并发协议本身（5ms 让出、单一 `Mutate`、AbortSignal 穿透、setTimeout 仅限 CallStore）不变。
+
 ---
 
 ## 8. 持久化与事件溯源
@@ -292,7 +298,7 @@ vibe-fs 没有显式磁盘日志（review/nudge/magic-todo 都是内存状态机
 凡是字符串穿过两个模块，必须升级为命名类型：
 
 - `SessionId` / `WorkspaceId` / `AgentId` / `ToolId` / `CallId` / `ChildId` —— 已经在 `Kernel/Domain.fs::Id`。**v2 强制全代码库使用**，禁止裸 `string` 表示这些概念。检查方式：grep `: string` 出现在签名里且参数名为 `sessionID` / `workspaceId` / `agent` / `tool` / `callID` 的一律改类型。
-- `RawHostEvent` —— 当前 hook 全部以 `obj` 流转，把 `event.type` / `properties` 各自 `Dyn.str` 是危险游戏。v2 在 `Kernel/Hooks.fs` 定义：
+- `RawHostEvent` —— 当前 hook 全部以 `obj` 流转，把 `event.type` / `properties` 各自 `Dyn.str` 是危险游戏。已落地为 `Kernel/NudgeState.fs::NudgeHostEvent`（穷尽 DU，`handleEvent` 单点 match）；S5 待办：正名/归并到 `Kernel/Hooks.fs::RawHostEvent`，并把 `AssistantInfo`/`PartInfo`/`FinishReason` 从裸 `obj` 升为命名 record。原计划形状：
 
 ```fsharp
 type RawHostEvent =
@@ -309,20 +315,21 @@ type RawHostEvent =
     | Other
 ```
 
-Kernel 拿到这种类型决策；host 仅做翻译。`dispatchEventState` 的 13 路 string match 立刻转成对 DU 的 match，编译器给"漏分支"上保险。
+⏳ host 翻译层之外仍残留 `Dyn.str event "type"`；完全归零是 S5 出口。
 
 ---
 
-## 10. 路线图（六阶段，每阶段必须 `pnpm build && pnpm test` 全绿）
+## 10. 路线图（活跃六阶段 S0–S5，每阶段必须 `pnpm build && pnpm test` 全绿；S6 Task 迁移暂缓）
 
-| 阶段 | 主题 | 范围 | 退出条件 |
-| --- | --- | --- | --- |
-| **S0** | 删 stub + 死代码 | 删 `Hooks.fs`/`Session.fs` 空 stub；删 `Mux/Plugin.fs` 兼容门面；删 `Dyn.ArgsPatch` | grep 命中 0；`vibe-fs.fsproj` 干净 |
-| **S1** | Prompts 目录化 + LoopMessages SSOT | §4.1 拆分；移 `buildLoopMessage` / verdict instructions | `Kernel/Prompts/*.fs` ≤80 行；两侧 host 同源调用 |
-| **S2** | 错误统一为 DomainError | §6 全量；删除所有 `try _ -> "string"` 与 `"Error:"` 字符串前缀 | 全代码库 `failwith` 仅在 `ToolCatalog.specOf` 这种程序错误处；`Result<_, DomainError>` 出现在所有外部 IO 入口 |
-| **S3** | 状态封装与去 mutable | §5 表；删 `NudgeCoordinator` class；`Mux/EventHook` 内 HashSet 全部上升为 `NudgeState` | Kernel grep `mutable\|Dictionary\|ref ` 命中 0；Shell 容器全部 `internal` |
-| **S4** | 双 host 收编 | §4 目录重组；`Hosts/Common` 抽出 ToolBindings / SubagentRunner / SchemaProjection；删 `Mux/Wrappers.fs` 的 `mkWebOverride` | `Opencode/Tools.fs` ≤120 行；`Mux/Tools.fs` ≤120 行；同一个工具的 schema 字段在代码里只有一份 |
-| **S5** | 类型化边界 + RawHostEvent | §9；`Hooks.fs` 引入 DU；event hook 翻译层之外不再出现 `Dyn.str event "type"` | Kernel 任何函数签名内 `obj` 出现次数 = 0；hook 决策路径有完整 match exhaustiveness |
+| 阶段 | 状态 | 主题 | 范围 | 退出条件 |
+| --- | --- | --- | --- | --- |
+| **S0** | ✅ | 删 stub + 死代码 | 删 `Hooks.fs`/`Session.fs` 空 stub；删 `Mux/Plugin.fs` 兼容门面；删 `Dyn.ArgsPatch` | grep 命中 0；`vibe-fs.fsproj` 干净 |
+| **S1** | ✅ | LoopMessages SSOT + verdict 收口 | `buildLoopMessage` 进 `Kernel/LoopMessages.fs`；verdict instructions 进 `ReviewerVerdictPrompts`；`formatReviewResult` 上移 Kernel | 双 host 同源调用（Prompts 目录化暂缓，见 §4.1） |
+| **S2** | 🟡 | 错误统一为 DomainError | §6；`DomainError` DU 已建并铺到主 IO 入口；SDK 边界 `try _ -> ""` 兜底仍待清 | 全代码库 `failwith` 仅在程序错误处；`Result<_, DomainError>` 覆盖所有外部 IO 入口；无业务字符串前缀错误 |
+| **S3** | ✅ | 状态封装与去 mutable | §5 表；`NudgeCoordinator` class 已删；`Mux/EventHook` HashSet 全部上升为 `NudgeState`；容器上移 Shell | Kernel grep `mutable\|Dictionary\|ref ` 命中 0（`Dyn` 仍在 Kernel，属 S5）；Shell 容器全部 `internal` |
+| **S4** | ⏳ | 双 host 收编 | §4 目录重组；`Hosts/Common` 抽出 ToolBindings / SubagentRunner / SchemaProjection | `Opencode/Tools.fs` ≤120 行；Mux 工具装配 ≤120 行；同一工具 schema 字段只有一份 |
+| **S5** | ⏳ | 类型化边界 + RawHostEvent | `Dyn` 下沉 `Shell/JsBridge.fs`；`NudgeHostEvent` 正名/归并到 `Kernel/Hooks.fs::RawHostEvent`；event 翻译层之外不再 `Dyn.str event "type"` | Kernel 函数签名内 `obj` 出现次数 = 0；hook 决策路径完整 match exhaustiveness |
+| ~~S6~~ | ⏸ 暂缓 | Task 迁移 | `AGENTS.md` Task 宪法：`async`/`JS.Promise`/`MailboxProcessor` → `Task<'T>` + `SerialQueue` | 用户裁决"先不做"；待工具链确认后单独开阶段 |
 
 每阶段独立 PR；任何阶段无法在 2 个工作日内完成意味着拆分错了，回溯重切。
 
@@ -334,15 +341,15 @@ Kernel 拿到这种类型决策；host 仅做翻译。`dispatchEventState` 的 1
 
 | 维度 | 上限 | 当前最大违反者 |
 | --- | --- | --- |
-| 单文件行数 | 260 预警，300 以上才默认要求解释职责是否混杂 | `Opencode/Tools.fs` 330；`MessageDedup.fs` 269；`NudgeState.fs` 252；`SubagentIntents.fs` 182 |
-| 单函数行数 | 45 预警，60 以上才默认要求解释是否包含多个规则块 | `MessageDedup.deduplicateModelReadOutputsWithSeen` 70+；`Hooks.runNudgeFlow` ≈30（OK） |
-| 模块圈复杂度 | 10 | `dispatchEventState` 13 路 → §9 后归零 |
-| Kernel 内 `obj` 出现次数 | 5（仅在 `MagicCore` / `Message` 这种 SDK 边界 helper）| 当前满地都是，S5 出口归零 |
-| Kernel 内 `Dictionary` / `mutable` / `ref` | 0 | 当前 `Nudge.NudgeCoordinator` / `MagicSession`（实质 Shell）违例 |
-| 同一字符串字面量在两个文件 | 0 | `loopFooter`、verdict instructions、`(no output)` 三处 |
-| 公开 API 中 `string` 表示 SessionId/WorkspaceId/CallId/AgentId/ToolId | 0 | 当前 host 层大量裸 `string` |
-| 工具 description 文案出现在 `ToolCatalog` 之外 | 0 | 当前 `Opencode/ToolSchema.fs` `description` 直接 import 自 `ToolCatalog` (OK)，但 Mux 侧 `coder = description "coder"` 正好；新增工具时容易破窗 |
-| `match host with` 在 Kernel 模块出现 | 0 | 当前 `MagicCore.fs:isTodoResultFor` / `MagicProjection.fs` 多处 → 改成 host 注入闭包 |
+| 单文件行数 | 260 预警，300 以上才默认要求解释职责是否混杂 | `Opencode/WikiRuntime.fs` 470（D12）；`Opencode/Tools.fs` 361；`NudgeState.fs` 302；`FuzzySearch.fs` 299；`Fuzzy.fs` 290；`Prompts.fs` 266 |
+| 单函数行数 | 45 预警，60 以上才默认要求解释是否包含多个规则块 | `MessageDedup.deduplicateModelReadOutputsWithSeen` 70+；`WikiRuntime.StartMaintenanceIfDue` ≈50 |
+| 模块圈复杂度 | 10 | `dispatchEventState` 13 路 → 已由 `NudgeHostEvent` 穷尽 match 替代；剩余 string match 在 host 翻译层（S5 出口归零） |
+| Kernel 内 `obj` 出现次数 | 5（仅在 `MagicCore` / `Message` 这种 SDK 边界 helper）| `Dyn` 仍在 Kernel 且被 `Message`/`CapsFormat`/`MessageDedup` 广泛使用，S5 下沉后归零 |
+| Kernel 内 `Dictionary` / `mutable` / `ref` | 0 | 已清零（容器全上移 Shell，`NudgeCoordinator` class 已删）；剩余只有 `Kernel/Dyn.fs` 仍在 Kernel 目录，随 S5 下沉 |
+| 同一字符串字面量在两个文件 | 0 | `loopFooter`/verdict 已收敛到 Kernel SSOT；`(no output)` 仍在 `SessionIo.fs`/`WikiRuntime.fs` 零散出现 |
+| 公开 API 中 `string` 表示 SessionId/WorkspaceId/CallId/AgentId/ToolId | 0 | host 层大量裸 `string`（S5 强制 `Id.*` 命名类型） |
+| 工具 description 文案出现在 `ToolCatalog` 之外 | 0 | `Opencode/ToolSchema.fs` 与 Mux 侧均 import 自 `ToolCatalog`（OK）；新增工具时守住 |
+| `match host with` 在 Kernel 模块出现 | 0 | `HostTools`/`MagicCore`/`MagicProjection`/`MagicTodo`/`Prompts`/`HookSchema` 仍以 `host` 参数在 Kernel 内分支 → S5 改 host 注入闭包 |
 
 ---
 
@@ -357,7 +364,7 @@ Kernel 拿到这种类型决策；host 仅做翻译。`dispatchEventState` 的 1
 - **不为了预算机械拆文件、拆函数**。一个 220 行但语义单一的文件，胜过 4 个来回跳转的空壳文件；一个 55 行但顺读的纯解释器，胜过 6 个只有包装价值的小函数。
 - **不接受 `// TODO`**。要么实现，要么删掉；TODO 就是债务伪装成谦虚。
 - **不接受 fallback / default-value / 兜底**。任何 fallback 都是把 bug 推迟到看不见的地方。看到 `defaultArg ... ""`、`if isNull then "" else ...` 用于业务字段都要给原因或改成 `Result.Error InvalidIntent`。
-- **不做 `Task<'T>` 迁移**。AGENTS.md 的 Task 宪法对当前工具链不成立：实测 Fable 5.2.0 不支持 `task { }` CE（`TaskBuilder.Run` / `Task.Delay` / `Task.GetAwaiter` 均报 "not supported by Fable"）。本次重构沿用全库既有的 `async { }` + `JS.Promise<'T>` + `Async.AwaitPromise` / `Async.StartAsPromise` 桥接，不引入 `task` / `Task<'T>`。待 Fable 确实支持后再单独迁移。
+- **`Task<'T>` 迁移暂缓**。`AGENTS.md` 的 Task 宪法（禁 `async`/`JS.Promise`/`MailboxProcessor`，统一 `Task<'T>` + `SerialQueue`）方向成立，但用户裁决**先不做**：当前沿用全库既有的 `async { }` + `JS.Promise<'T>` + `Async.AwaitPromise`/`Async.StartAsPromise` 桥接。待工具链确认 `task` CE 稳定后再单独开阶段（原 §10 S6 已挂起）。
 
 ---
 
@@ -379,8 +386,11 @@ vibe-fs 的内核（review / nudge / magic todo / subagent intents / fuzzy / exe
 
 v2 的工作不是『再清理一遍』，是**把所有不属于本质领域的 mutable 状态、字符串错误、obj 流转、host 分支，从 Kernel 推到 Shell；从 Shell 推到 Hosts/* 边界；在 Hosts/* 边界统一塌缩到一份 SSOT**。这个过程可以伴随少量必要拆分，但拆分永远服务于语义聚焦，不服务于数字洁癖。完成后：
 
-- Kernel 是一坨纯函数 + 代数数据类型，可以脱离 opencode-plugin / Mux SDK 单独读懂、单独测试。
-- Shell 是有限几个 actor + 翻译器，每一个都对应一项真实 IO。
-- Hosts 是薄到手心一摞的 SDK 形状适配器，三百行内能写完一种新 host。
+当前落点（S0–S3 完，S4–S5 未动，Task 暂缓）：
+
+- Kernel 已基本是纯函数 + 代数数据类型（`DomainError` / `NudgeHostEvent` / `ReviewState` 状态机）；唯一残留是 `Dyn.fs` 仍在 Kernel 目录（S5 下沉）。可脱离 SDK 单独读懂。
+- Shell 已收口所有 mutable 容器（`CallStore` / `ChildAgentRegistry` / `MagicSessionStore` / `NudgeRuntime` / `ReviewRuntime` / `FinderCache`），每个对应一项真实 IO。
+- Hosts 层尚未从 `Opencode/` + `Mux/` 抽出（S4）；抽完后才达到"三百行写完一种新 host"。
+- 三个 plugin 入口按宿主分离保留（D10 撤销）。
 
 读者沿任何一个概念边界往下追都不会撞到第二份描述、不会撞到 fallback、不会撞到 try-catch 黑洞、不会撞到 `obj?.foo?.bar?.baz`。这是 Kolmogorov 级别的 codebase 的样子。
