@@ -11,7 +11,7 @@ let private nodeProcess : obj = jsNative
 [<Global>]
 let private fetch (url: string) (init: obj) : JS.Promise<obj> = jsNative
 
-let postInitNoSignal (apiKey: string) (body: string) : obj =
+let postInit (apiKey: string) (body: string) (signal: obj option) : obj =
     createObj [
         "method" ==> "POST"
         "headers" ==> createObj [
@@ -19,17 +19,7 @@ let postInitNoSignal (apiKey: string) (body: string) : obj =
             "Authorization" ==> $"Bearer {apiKey}"
         ]
         "body" ==> body
-    ]
-
-let postInitWithSignal (apiKey: string) (body: string) (signal: obj) : obj =
-    createObj [
-        "method" ==> "POST"
-        "headers" ==> createObj [
-            "Content-Type" ==> "application/json"
-            "Authorization" ==> $"Bearer {apiKey}"
-        ]
-        "body" ==> body
-        "signal" ==> signal
+        if signal.IsSome then "signal" ==> signal.Value
     ]
 
 let responseMethod0 (response: obj) (methodName: string) : obj =
@@ -63,10 +53,7 @@ let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
         | Ok apiKey ->
             let url = $"{ollamaApiBase}{normalizeOllamaPath pathname}"
             let bodyStr = JS.JSON.stringify(body)
-            let init =
-                match abortSignal with
-                | Some signal -> postInitWithSignal apiKey bodyStr signal
-                | None -> postInitNoSignal apiKey bodyStr
+            let init = postInit apiKey bodyStr abortSignal
             try
                 let! response = fetch url init
                 let ok = Dyn.truthy (Dyn.get response "ok")

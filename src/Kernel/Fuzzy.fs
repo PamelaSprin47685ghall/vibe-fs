@@ -139,13 +139,11 @@ let private resolveAgainst (basePath: string) (p: string) : string =
     "/" + String.concat "/" (normalizeSegments parts)
 
 let private relativePath (fromPath: string) (toPath: string) : string =
-    let fromParts = resolveAgainst "/" fromPath |> fun p -> p.Split('/') |> Array.filter ((<>) "") |> List.ofArray
-    let toParts = resolveAgainst "/" toPath |> fun p -> p.Split('/') |> Array.filter ((<>) "") |> List.ofArray
-    let rec commonPrefix a b =
-        match a, b with
-        | x :: xs, y :: ys when x = y -> commonPrefix xs ys
-        | _ -> (a, b)
-    let remainingFrom, remainingTo = commonPrefix fromParts toParts
+    let splitAbs p = resolveAgainst "/" p |> fun s -> s.Split('/') |> Array.filter ((<>) "") |> List.ofArray
+    let fromParts, toParts = splitAbs fromPath, splitAbs toPath
+    let commonLen = List.zip fromParts toParts |> List.takeWhile (fun (a, b) -> a = b) |> List.length
+    let remainingFrom = List.skip commonLen fromParts
+    let remainingTo = List.skip commonLen toParts
     let result = (remainingFrom |> List.map (fun _ -> "..")) @ remainingTo
     if result.IsEmpty then "." else String.concat "/" result
 
@@ -284,7 +282,13 @@ let parseExcludeField (args: obj) : string list =
     else [ string v ]
 
 let buildGrepOutput (body: string) (regexError: string option) (nextIterator: string) : string =
-    let regexNotice = regexError |> Option.map (fun error -> sprintf "Invalid regex: %s, used literal match" error)
-    let iteratorNotice = if nextIterator = "" then None else Some(sprintf "iterator=\"%s\"" nextIterator)
-    let notices = (regexNotice |> Option.toList) @ (iteratorNotice |> Option.toList)
-    if notices.IsEmpty then body else sprintf "%s\n\n[%s]" body (String.concat ". " notices)
+    let notices =
+        [
+            regexError |> Option.map (fun error -> sprintf "Invalid regex: %s, used literal match" error)
+            if nextIterator <> "" then Some(sprintf "iterator=\"%s\"" nextIterator) else None
+        ]
+        |> List.choose id
+    if notices.IsEmpty then body
+    else
+        let joined = String.concat ". " notices
+        sprintf "%s\n\n[%s]" body joined

@@ -13,35 +13,31 @@ type Tool = string
 
 let private knownAgents = [ "manager"; "investigator"; "coder"; "reviewer"; "browser"; "meditator"; "executor"; "bookkeeper" ]
 
-/// `true` when `tool` contains any of `subs` as a substring. The substring
-/// matching is load-bearing: host / MCP tool names vary by prefix and suffix
-/// (e.g. `stealth-browser-mcp_navigate`, `bash_run`, `return_reviewer`,
-/// `ast_edit`), so an exact-equality table cannot replace it.
-let private toolContainsAny (tool: Tool) (subs: string list) : bool =
-    subs |> List.exists tool.Contains
-
-/// The permission decision as an ordered rule list. Precedence is the domain
-/// knowledge — the first matching rule wins — and each rule is named so a
-/// reader can follow "why may agent X use tool Y" without mentally simulating
-/// nested `when` guards (REFACTOR.md §1 D8).
+/// The permission decision as an ordered pattern-match over (agent, tool).
+/// First matching clause wins. The `when` guards express the substring rules
+/// that host / MCP tool naming makes load-bearing (e.g. `stealth-browser-mcp_*`,
+/// `bash_run`, `return_<role>`), so an exact-equality table cannot replace them
+/// (REFACTOR.md §1 D8).
 let canUseCanonical (agent: Agent) (tool: Tool) : bool =
-    if tool = "fetch_wiki" then agent = "manager"
-    elif tool = "submit_wiki" then agent = "bookkeeper"
-    elif toolContainsAny tool [ "agent_report" ] then true
-    elif agent = "bookkeeper" then false
-    elif toolContainsAny tool [ "bash"; "task" ] || tool = "grep" then false
-    elif toolContainsAny tool [ "stealth" ] then agent = "browser"
-    elif toolContainsAny tool [ "return" ] then toolContainsAny tool [ agent ]
-    elif agent = "meditator" || agent = "executor" then false
-    elif tool = "read" then true
-    elif agent = "reviewer" || agent = "browser" then false
-    elif agent = "investigator" && toolContainsAny tool [ "executor" ] then true
-    elif toolContainsAny tool knownAgents
-         || toolContainsAny tool [ "todo"; "question"; "web"; "skill" ]
-         || tool = "submit_review" then agent <> "investigator" && agent <> "coder"
-    elif toolContainsAny tool [ "write"; "edit"; "patch" ] then agent <> "investigator" && agent <> "manager"
-    elif agent = "manager" then tool <> "fuzzy_grep"
-    else true
+    let toolMatches (subs: string list) = subs |> List.exists tool.Contains
+    match agent, tool with
+    | _, "fetch_wiki" -> agent = "manager"
+    | _, "submit_wiki" -> agent = "bookkeeper"
+    | _, _ when toolMatches [ "agent_report" ] -> true
+    | "bookkeeper", _ -> false
+    | _, _ when toolMatches [ "bash"; "task" ] || tool = "grep" -> false
+    | _, _ when toolMatches [ "stealth" ] -> agent = "browser"
+    | _, _ when toolMatches [ "return" ] -> toolMatches [ agent ]
+    | "meditator", _ | "executor", _ -> false
+    | _, "read" -> true
+    | "reviewer", _ | "browser", _ -> false
+    | "investigator", _ when toolMatches [ "executor" ] -> true
+    | _, _ when toolMatches knownAgents
+                     || toolMatches [ "todo"; "question"; "web"; "skill" ]
+                     || tool = "submit_review" -> agent <> "investigator" && agent <> "coder"
+    | _, _ when toolMatches [ "write"; "edit"; "patch" ] -> agent <> "investigator" && agent <> "manager"
+    | "manager", _ -> tool <> "fuzzy_grep"
+    | _, _ -> true
 
 let canUseForHost (host: Host) (agent: Agent) (tool: Tool) : bool =
     canUseCanonical agent (normalizeToolName host tool)

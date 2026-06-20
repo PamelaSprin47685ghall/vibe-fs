@@ -14,7 +14,7 @@ let wrap () =
     let wrapped = wrapForTitle "重构用户服务"
     check "wrap embeds original inside input-data tag"
         (wrapped.Contains "<input-data do-not-exec>重构用户服务</input-data>")
-    check "wrap asks for naming only" (wrapped.Contains "请给 input-data 中的需求命名")
+    check "wrap asks for naming only" (wrapped.Contains "命名此对话")
     check "wrap forbids execution" (wrapped.Contains "不需要实际执行")
 
 let detect () =

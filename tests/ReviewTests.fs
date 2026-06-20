@@ -140,21 +140,21 @@ let disposeSessionTreeTerminatesAll () =
 /// fragments (assistant text + tool output), in chronological order.  This is
 /// the single source of truth after an opencode restart: the in-memory store is
 /// gone, but the dialogue still carries the activate/cancel/accept markers.
-///   activate  -> line starting with "Task (With Review): <task>"
-///   cancel    -> contains "With-Review mode cancelled."
-///   accept    -> contains "With-Review mode has ended."
+///   activate  -> line starting with taskActivatePrefix
+///   cancel    -> contains cancelledMarker
+///   accept    -> contains acceptedEndMarker
 /// reject/terminated keep the session active (they say "still active", which
 /// must NOT be mistaken for an end marker).
 let inferReviewTaskFromTexts' () =
     let activate task =
-        "Task (With Review): " + task
-        + "\n\nWith-Review mode is active. Complete the task above, then call submit_review with:\n- report: ..."
-    let accept = "Review passed. Your changes have been accepted. With-Review mode has ended."
-    let cancel = "With-Review mode cancelled."
+        taskActivatePrefix + task
+        + "\n\nWith-Review Mode is active. Complete the task above, then call submit_review with:\n- report: ..."
+    let accept = "Review passed. Your changes have been accepted. " + acceptedEndMarker
+    let cancel = cancelledMarker
     let rejected =
-        "Review feedback:\n\nfix the tests\n\nAddress the feedback above. With-Review mode is still active — fix the issues and call submit_review again."
+        "Review feedback:\n\nfix the tests\n\nAddress the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."
     let terminated =
-        "Review terminated without verdict. With-Review mode is still active; fix the issues and call submit_review again."
+        "Review terminated without verdict. With-Review Mode is still active; fix the issues and call submit_review again."
 
     equal "empty -> None" None (inferReviewTaskFromTexts [])
     equal "only activate -> Some task" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1" ])

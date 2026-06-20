@@ -33,7 +33,7 @@ let readOnlyRulesFor (host: Host) =
 let readOnlyRules = readOnlyRulesFor opencode
 
 let loopNudgePrompt =
-    "You are in With-Review mode. You must call the submit_review tool to\n"
+    "You are in With-Review Mode. You must call the submit_review tool to\n"
     + "submit your detailed report and list of modified files for review\n"
     + "before finishing. Do not end the conversation without calling submit_review."
 
@@ -265,7 +265,7 @@ let formatReviewResult (result: ReviewResult) : string =
     | Accepted ->
         "Review passed. Your changes have been accepted. " + acceptedEndMarker
     | Terminated ->
-        "Review terminated without verdict. With-Review mode is still active; fix the issues and call submit_review again."
+        "Review terminated without verdict. With-Review Mode is still active; fix the issues and call submit_review again."
     | Rejected feedback ->
         "Review feedback:\n\n" + feedback
-        + "\n\nAddress the feedback above. With-Review mode is still active — fix the issues and call submit_review again."
+        + "\n\nAddress the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."

@@ -179,10 +179,10 @@ let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: 
                 reviewStore.deactivateReview sessionID
                 pushPart parts (box {| ``type`` = "text"; text = cancelledMarker |})
             elif reviewStore.isReviewActive sessionID then
-                pushPart parts (box {| ``type`` = "text"; text = "With-Review mode is already active. Submit your work via submit_review." |})
+                pushPart parts (box {| ``type`` = "text"; text = "With-Review Mode is already active. Submit your work via submit_review." |})
             elif command = "loop" then
                 reviewStore.activateReview(sessionID, task, dateNow ())
-                let msg = buildLoopMessage task [ "With-Review mode is active. Complete the task above, then call submit_review with:" ]
+                let msg = buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
                 pushPart parts (box {| ``type`` = "text"; text = msg |})
             else
                 let directory = Dyn.str ctx "directory"
@@ -203,9 +203,9 @@ let private registerCommands (cfg: obj) : unit =
     let cmd = Dyn.get cfg "command"
     let cmdObj = if Dyn.isNullish cmd then emptyObj () else cmd
     if Dyn.isNullish (Dyn.get cmdObj "loop") then
-        setKey cmdObj "loop" (box {| template = "Enable With-Review mode."; description = "Enable With-Review mode — the next submission must pass through a reviewer before being accepted" |})
+        setKey cmdObj "loop" (box {| template = "Enable With-Review Mode."; description = "Enable With-Review Mode — the next submission must pass through a reviewer before being accepted" |})
     if Dyn.isNullish (Dyn.get cmdObj "loop-review") then
-        setKey cmdObj "loop-review" (box {| template = "Enable With-Review mode with pre-review."; description = "Enable With-Review mode with pre-review — the task is pre-reviewed immediately, and reviewer feedback is prepended to your prompt before any work begins" |})
+        setKey cmdObj "loop-review" (box {| template = "Enable With-Review Mode with pre-review."; description = "Enable With-Review Mode with pre-review — the task is pre-reviewed immediately, and reviewer feedback is prepended to your prompt before any work begins" |})
     setKey cfg "command" cmdObj
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<obj, obj, JS.Promise<unit>>(f))

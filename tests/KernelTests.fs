@@ -16,6 +16,81 @@ let headTail' () =
     let r = headTail "hello" 2 2
     check "headTail" (r = "he...lo")
 
+/// Characterization net for Executor.strip: locks the pipe-stripping lexer's
+/// 12 behavioral boundaries (EOF / terminator / quote / comment / chained-pipe
+/// handling) before any refactor of parsePipe+scan.
+let stripLexer' () =
+    // 1. plain no pipe
+    let r1 = strip "echo hi"
+    check "strip plain script unchanged" (r1.script = "echo hi")
+    check "strip plain no stripped" (List.isEmpty r1.stripped)
+
+    // 2. head at EOF
+    let r2 = strip "printf hi | head -n 1"
+    check "strip head eof script" (r2.script = "printf hi")
+    check "strip head eof one stripped" (r2.stripped.Length = 1)
+    check "strip head eof name" (r2.stripped.[0].name = "head")
+    check "strip head eof count" (r2.stripped.[0].count = 1)
+    check "strip head eof pipe" (r2.stripped.[0].pipe = "| head -n 1")
+
+    // 3. tail at EOF
+    let r3 = strip "data | tail -n 2"
+    check "strip tail eof script" (r3.script = "data")
+    check "strip tail eof name" (r3.stripped.[0].name = "tail")
+    check "strip tail eof count" (r3.stripped.[0].count = 2)
+
+    // 4. bare dash no -n
+    let r4 = strip "data | head -1"
+    check "strip bare dash script" (r4.script = "data")
+    check "strip bare dash name" (r4.stripped.[0].name = "head")
+    check "strip bare dash count" (r4.stripped.[0].count = 1)
+
+    // 5. head followed by \n
+    let r5 = strip "printf hi | head -n 1\necho done"
+    check "strip head newline script" (r5.script = "printf hi\necho done")
+    check "strip head newline one stripped" (r5.stripped.Length = 1)
+
+    // 6. head followed by ;
+    let r6 = strip "printf hi | head -n 1; echo"
+    check "strip head semicolon script" (r6.script = "printf hi; echo")
+    check "strip head semicolon one stripped" (r6.stripped.Length = 1)
+
+    // 7. pipe in single quotes
+    let r7 = strip "echo 'foo | head -n 1'"
+    check "strip single quote unchanged" (r7.script = "echo 'foo | head -n 1'")
+    check "strip single quote empty" (List.isEmpty r7.stripped)
+
+    // 8. pipe in double quotes
+    let r8 = strip "echo \"foo | head -n 1\""
+    check "strip double quote unchanged" (r8.script = "echo \"foo | head -n 1\"")
+    check "strip double quote empty" (List.isEmpty r8.stripped)
+
+    // 9. non-head/tail pipe
+    let r9 = strip "a | grep foo"
+    check "strip grep unchanged" (r9.script = "a | grep foo")
+    check "strip grep empty" (List.isEmpty r9.stripped)
+
+    // 10. two chained head/tail pipes: strip's outer multi-pass loop strips tail first (reducing to "a | head -n 1"), then head (now at EOF)
+    let r10 = strip "a | head -n 1 | tail -n 2"
+    check "strip chained two stripped" (r10.stripped.Length = 2)
+    check "strip chained script fully reduced" (r10.script = "a")
+    check "strip chained head name" (r10.stripped.[0].name = "head")
+    check "strip chained head count" (r10.stripped.[0].count = 1)
+    check "strip chained tail name" (r10.stripped.[1].name = "tail")
+    check "strip chained tail count" (r10.stripped.[1].count = 2)
+
+    // 11. pipe in hash comment
+    let r11 = strip "echo hi\n# noisy | head -n 1"
+    check "strip hash comment unchanged" (r11.script = "echo hi\n# noisy | head -n 1")
+    check "strip hash comment empty" (List.isEmpty r11.stripped)
+
+    // 12. pipe after double-quoted segment
+    let r12 = strip "echo \"x\" | head -n 1"
+    check "strip pipe after quote script" (r12.script = "echo \"x\"")
+    check "strip pipe after quote one stripped" (r12.stripped.Length = 1)
+    check "strip pipe after quote head name" (r12.stripped.[0].name = "head")
+    check "strip pipe after quote head count" (r12.stripped.[0].count = 1)
+
 let dedup' () =
     let s = createDedupState ()
     let r1 = deduplicate s.seenContents "same string"
@@ -203,7 +278,7 @@ let dynDeleteKey () =
 /// string verbatim — no re-interpretation, no per-host wording drift.
 let loopMessagesShared () =
     let task = "ship S1 refactor"
-    let intro = "With-Review mode is active. Complete the task above, then call submit_review with:"
+    let intro = "With-Review Mode is active. Complete the task above, then call submit_review with:"
     let kernelMsg = VibeFs.Kernel.LoopMessages.buildLoopMessage task [ intro ]
     check "loop message embeds task" (kernelMsg.Contains task)
     check "loop message embeds intro" (kernelMsg.Contains intro)

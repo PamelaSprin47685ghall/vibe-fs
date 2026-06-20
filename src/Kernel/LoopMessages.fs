@@ -7,8 +7,8 @@ module VibeFs.Kernel.LoopMessages
 /// opencode restart — so the wording written and the wording parsed can never
 /// drift apart.
 let taskActivatePrefix = "Task (With Review): "
-let cancelledMarker = "With-Review mode cancelled."
-let acceptedEndMarker = "With-Review mode has ended."
+let cancelledMarker = "With-Review Mode cancelled."
+let acceptedEndMarker = "With-Review Mode has ended."
 
 let loopFooter =
     [ "- report: a detailed description of what you did and why"

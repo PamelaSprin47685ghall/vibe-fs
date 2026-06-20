@@ -17,7 +17,7 @@ let private requireFn : string -> obj = createRequire'(string importMeta?url)
 let private pathModule : obj = requireFn("path")
 
 let ollamaFetchInit () =
-    let init = VibeFs.Shell.OllamaClient.postInitNoSignal "KEY123" "{\"a\":1}"
+    let init = VibeFs.Shell.OllamaClient.postInit "KEY123" "{\"a\":1}" None
     equal "init method POST" "POST" (VibeFs.Kernel.Dyn.str init "method")
     let headers = VibeFs.Kernel.Dyn.get init "headers"
     equal "init Content-Type" "application/json" (VibeFs.Kernel.Dyn.str headers "Content-Type")
@@ -25,7 +25,7 @@ let ollamaFetchInit () =
     check "init Authorization key" (auth.Contains "KEY123")
     equal "init body json" "{\"a\":1}" (VibeFs.Kernel.Dyn.str init "body")
     check "init no signal when None" (VibeFs.Kernel.Dyn.isNullish (VibeFs.Kernel.Dyn.get init "signal"))
-    let withSignal = VibeFs.Shell.OllamaClient.postInitWithSignal "K" "b" (box "ABORT")
+    let withSignal = VibeFs.Shell.OllamaClient.postInit "K" "b" (Some (box "ABORT"))
     check "init signal when Some" (not (VibeFs.Kernel.Dyn.isNullish (VibeFs.Kernel.Dyn.get withSignal "signal")))
 
 let ollamaResponseMethodCall () =
