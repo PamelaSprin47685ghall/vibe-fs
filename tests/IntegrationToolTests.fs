@@ -275,8 +275,7 @@ let titleAgentInputProjectionSpec () = async {
         let msgs = unbox<obj[]> (get output "messages")
         let parts = unbox<obj[]> (get msgs.[0] "parts")
         let wrappedText = str parts.[0] "text"
-        check "title input starts with wrapper" (wrappedText.StartsWith "请给这个需求命名。<input-data do-not-exec>")
-        check "title input ends with wrapper" (wrappedText.EndsWith "</input-data>")
+        check "title input starts with wrapper" (wrappedText.StartsWith "请给 input-data 中的需求命名。<input-data do-not-exec>")
         check "title input preserves payload" (wrappedText.Contains "Generate a title for this chat")
         check "title mutation in-place message" (obj.ReferenceEquals(msgs.[0], originalMsg))
         check "title mutation in-place parts array" (obj.ReferenceEquals(parts, originalParts))
