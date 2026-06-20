@@ -72,7 +72,7 @@ let investigatorIntentsSchema (desc: string) : obj =
         strictObject (createObj [ "objective", objectiveField; "background", backgroundField; "questions", questionsField; "entries", entriesField ])
     arrayMin inner 1 desc
 
-let uiParam : obj = call1 (call0 (str ()) "optional") "describe" (box "Internal: populated by hook")
+let uiParam : obj = call1 (call0 (str ()) "optional") "describe" (box "Internal UI label. Visible to the LLM and UI, but the LLM must never fill it. Leave `_ui` unset; the tool.execute.before hook populates it automatically.")
 let strArrayReq (desc: string) : obj = call1 (arr (strMin 1 "")) "describe" (box desc)
 let strArrayOpt (desc: string) : obj = call1 (call0 (arr (strMin 1 "")) "optional") "describe" (box desc)
 
