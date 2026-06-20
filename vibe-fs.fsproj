@@ -71,6 +71,7 @@
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/HookExecute.fs" />
     <Compile Include="src/Opencode/HookTransform.fs" />
+    <Compile Include="src/Opencode/TitleFetchGuard.fs" />
     <Compile Include="src/Opencode/PluginCore.fs" />
     <Compile Include="src/Opencode/Plugin.fs" />
     <Compile Include="src/Opencode/PluginMimo.fs" />
@@ -94,6 +95,7 @@
     <Compile Include="tests/MagicTests.fs" />
     <Compile Include="tests/WikiTests.fs" />
     <Compile Include="tests/WikiFileTests.fs" />
+    <Compile Include="tests/TitleFetchGuardTests.fs" />
     <Compile Include="tests/Tests.fs" />
   </ItemGroup>
 

@@ -260,35 +260,6 @@ let capsAndMagicOrderSpec () = async {
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
-let titleAgentInputProjectionSpec () = async {
-    let mkMsg () =
-        box {| info = createObj [ "id", box "u1"; "agent", box "title"; "role", box "user"; "sessionID", box "title-session" ]
-               parts = [| box {| ``type`` = "text"; text = "Generate a title for this chat" |} |] |}
-    let checkPlugin (pluginObject: obj) = async {
-        let transform = get pluginObject "experimental.chat.messages.transform"
-        let output = createObj [ "messages", box [| mkMsg () |] ]
-        let originalMsgs = unbox<obj[]> (get output "messages")
-        let originalMsg = originalMsgs.[0]
-        let originalParts = unbox<obj[]> (get originalMsg "parts")
-        let originalPart = originalParts.[0]
-        do! transform $ (createObj ["agent", box "title"], output) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
-        let msgs = unbox<obj[]> (get output "messages")
-        let parts = unbox<obj[]> (get msgs.[0] "parts")
-        let wrappedText = str parts.[0] "text"
-        check "title input starts with wrapper" (wrappedText.StartsWith "请给 input-data 中的需求命名。<input-data do-not-exec>")
-        check "title input preserves payload" (wrappedText.Contains "Generate a title for this chat")
-        check "title mutation in-place message" (obj.ReferenceEquals(msgs.[0], originalMsg))
-        check "title mutation in-place parts array" (obj.ReferenceEquals(parts, originalParts))
-        check "title mutation in-place part object" (obj.ReferenceEquals(parts.[0], originalPart))
-    }
-    let! workspaceDir = mkdtempAsync "title-input-projection-" |> Async.AwaitPromise
-    let! opencodePlugin = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
-    do! checkPlugin opencodePlugin
-    let! mimoPlugin = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
-    do! checkPlugin mimoPlugin
-    do! rmAsync workspaceDir |> Async.AwaitPromise
-}
-
 let wikiPreludeWithoutCapsSpec () = async {
     let! workspaceDir = mkdtempAsync "wiki-prelude-" |> Async.AwaitPromise
     do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |})) |> Async.AwaitPromise
@@ -1251,7 +1222,6 @@ let run () : JS.Promise<unit> =
         do! capsTransformSpec ()
         do! capsTransformInPlaceSpec ()
         do! capsAndMagicOrderSpec ()
-        do! titleAgentInputProjectionSpec ()
         do! wikiPreludeWithoutCapsSpec ()
         do! fetchWikiSnapshotSpec ()
         do! directWriteTurnAggregationSpec ()

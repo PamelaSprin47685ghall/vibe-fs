@@ -13,6 +13,7 @@ open VibeFs.Kernel.Message
 open VibeFs.Opencode.Tools
 open VibeFs.Opencode.HookExecute
 open VibeFs.Opencode.HookTransform
+open VibeFs.Opencode.TitleFetchGuard
 open VibeFs.Opencode.NudgeHook
 open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Opencode.WikiRuntime
@@ -212,6 +213,7 @@ let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<ob
 
 let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
     async {
+        installTitleFetchGuard ()
         let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
         let childAgentRegistry = ChildAgentRegistry.Create()
         let finderCache = FinderCache()

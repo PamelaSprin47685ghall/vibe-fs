@@ -18,6 +18,7 @@ open VibeFs.Tests.IntegrationChatTests
 open VibeFs.Tests.MagicTests
 open VibeFs.Tests.WikiTests
 open VibeFs.Tests.WikiFileTests
+open VibeFs.Tests.TitleFetchGuardTests
 
 let runAll (_args: string array) : JS.Promise<int> =
     async {
@@ -86,6 +87,13 @@ let runAll (_args: string array) : JS.Promise<int> =
         do! WikiTests.run () |> Async.AwaitPromise
         do! WikiFileTests.run () |> Async.AwaitPromise
         MagicTests.run ()
+        TitleFetchGuardTests.signature ()
+        TitleFetchGuardTests.wrap ()
+        TitleFetchGuardTests.detect ()
+        TitleFetchGuardTests.tryWrapString ()
+        TitleFetchGuardTests.rewriteStringContent ()
+        TitleFetchGuardTests.rewriteArrayContent ()
+        TitleFetchGuardTests.skipProbeMessage ()
         return summary ()
     }
     |> Async.StartAsPromise
