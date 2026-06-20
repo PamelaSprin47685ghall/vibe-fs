@@ -18,7 +18,7 @@ open VibeFs.Mux.AiSettings
 /// serializes every state+IO change through `commandQueue`. All pure state
 /// transitions live in `Kernel.WikiRuntimeState`; the stateless IO orchestration
 /// (prompt building, file IO, background session launch) lives in
-/// `WikiRuntimeIO`. Synchronous methods (RegisterJob/DeleteJob/MarkRwTool/...)
+/// `WikiRuntimeIO`. Synchronous methods (RegisterJob/DeleteJob/...)
 /// run to completion in a single tick and cannot dangle a JS.Promise mid
 /// state-change; the only async-with-await method that holds a job context
 /// across an await is `Submit`, which caches `ctx` before awaiting and uses an
@@ -135,18 +135,6 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 | Error message -> return message
         }
 
-    member _.MarkRwTool(sessionID: string, tool: string, summary: string) : unit =
-        let trimmed = summary.Trim()
-        if sessionID <> "" && trimmed <> "" then
-            applyCmd (MarkRwToolCmd (sessionID, $"{tool}: {trimmed}"))
-
-    member this.FlushTurnIfNeeded(sessionID: string, assistantText: string) : unit =
-        let flushed, nextState = consumeDirtyTurn state sessionID
-        state <- nextState
-        match flushed with
-        | Some rwSummary -> this.StartBookkeeperAppend(rwSummary, assistantText, "Direct write tools", rwSummary)
-        | None -> ()
-
     member _.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
         commandQueue.Enqueue(fun () ->
             promise {
@@ -158,7 +146,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 dailyDue
                 |> Option.iter (fun date ->
                     let key = root + "|daily|" + date
-                    let launch = { agent = "bookkeeper"; title = "Daily wiki rewrite"; prompt = $"daily maintenance due for {date}"; result = $"daily:{date}"; rwSummary = "" }
+                    let launch = { agent = "bookkeeper"; title = "Daily wiki rewrite"; prompt = $"daily maintenance due for {date}"; result = $"daily:{date}" }
                     let first, nextState = recordLaunchOnce state key launch
                     state <- nextState
                     if first then
@@ -167,24 +155,24 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 weeklyDue
                 |> Option.iter (fun cutoff ->
                     let key = root + "|weekly|" + cutoff
-                    let launch = { agent = "bookkeeper"; title = "Weekly wiki snapshot rewrite"; prompt = $"weekly maintenance due through {cutoff}"; result = $"weekly:{cutoff}"; rwSummary = "" }
+                    let launch = { agent = "bookkeeper"; title = "Weekly wiki snapshot rewrite"; prompt = $"weekly maintenance due through {cutoff}"; result = $"weekly:{cutoff}" }
                     let first, nextState = recordLaunchOnce state key launch
                     state <- nextState
                     if first then
                         launchBg root None (WeeklyRewrite cutoff) "Weekly wiki snapshot rewrite" (fun () -> Promise.lift (buildWeeklyPrompt cutoff files projection)) emptySettings (Some key))
             })
 
-    member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string, rwSummary: string) : unit =
-        applyCmd (RecordLaunchCmd { agent = agent; title = title; prompt = prompt; result = result; rwSummary = rwSummary })
+    member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string) : unit =
+        applyCmd (RecordLaunchCmd { agent = agent; title = title; prompt = prompt; result = result })
 
-    member this.StartBookkeeperAppend(prompt: string, result: string, title: string, rwSummary: string, ?parentSessionID: string, ?aiSettings: DelegatedAiSettings) : unit =
-        this.RecordBookkeeperLaunch("bookkeeper", title, prompt, result, rwSummary)
+    member this.StartBookkeeperAppend(prompt: string, result: string, title: string, ?parentSessionID: string, ?aiSettings: DelegatedAiSettings) : unit =
+        this.RecordBookkeeperLaunch("bookkeeper", title, prompt, result)
         let root = effectiveWorkspaceRoot workspaceRoot
         let settings = defaultArg aiSettings emptySettings
         launchBg root parentSessionID AppendAfterWork title (fun () ->
             promise {
                 let! projection = readProjection root
-                return buildAppendPrompt title prompt result rwSummary projection
+                return buildAppendPrompt title prompt result projection
             }) settings None
 
     /// Test-only projection: drains recorded bookkeeper launches so integration

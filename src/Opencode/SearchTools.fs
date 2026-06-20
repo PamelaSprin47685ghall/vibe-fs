@@ -83,6 +83,7 @@ let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
         (fun args context ->
             let query = Dyn.str args "query"
             let whatToSummarize = Dyn.str args "what_to_summarize"
+            let tc = extractToolContext context (Dyn.str ctx "directory")
             if query = "" then resolveStr (formatDomainError "Web search" (InvalidIntent ("websearch", "query", "required")))
             elif whatToSummarize = "" then resolveStr (formatDomainError "Web search" (InvalidIntent ("websearch", "what_to_summarize", "required")))
             else
@@ -99,12 +100,12 @@ let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                             if Dyn.isNullish results || not (Dyn.isArray results) then []
                             else (results :?> obj array) |> Array.map (fun r -> { title = Dyn.str r "title"; url = Dyn.str r "url"; content = Dyn.str r "content" }) |> List.ofArray
                         let rawResults = formatSearchResults items
-                        if items.IsEmpty then return rawResults
+                        if items.IsEmpty then
+                            return rawResults
                         else
-                            let tc = extractToolContext context (Dyn.str ctx "directory")
                             let prompt = formatPrompt opencode (WebsearchSummary(whatToSummarize, rawResults)) |> List.head
                             return! runSubagentWithCleanup registry (client ()) "executor" "Web search summary" prompt
-                                        (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
+                                (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
                 })
 
 let webfetchTool () : obj =

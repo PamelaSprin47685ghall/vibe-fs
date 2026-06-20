@@ -7,14 +7,16 @@ open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Messaging
 open VibeFs.Opencode.MessagingCodec
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Mux.AiSettings
 
-type WorkspaceEffect = Ro | Rw
-
-type WikiRecordRequest =
-    { title: string
+type SubagentLaunchOptions =
+    { agent: string
+      title: string
       prompt: string
-      result: string
-      agent: string }
+      directory: string
+      sessionID: string
+      tools: obj
+      aiSettings: DelegatedAiSettings }
 
 /// Placeholder for a subagent session that produced no assistant text. Distinct
 /// from the executor's "(no output)" (shell stdout): same string, different
@@ -57,6 +59,33 @@ let extractToolContext (context: obj) (pluginDirectory: string) : obj =
 /// Dynamically invoke a method on `target`, awaiting the resulting promise.
 let invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
     unbox (target?(method)(arg))
+
+let private tryReadPromptModel (payload: obj) : obj option =
+    let promptModel = Dyn.get payload "model"
+    if not (Dyn.isNullish promptModel) then Some promptModel
+    else
+        let modelString = Dyn.str payload "modelString"
+        if modelString = "" then None
+        else
+            let slash = modelString.IndexOf('/')
+            if slash <= 0 || slash >= modelString.Length - 1 then None
+            else Some (box {| providerID = modelString.[0..slash-1]; modelID = modelString.[slash+1..] |})
+
+let private buildPromptBody (options: SubagentLaunchOptions) childID : obj =
+    let body = box {| agent = options.agent; parts = [| box {| ``type`` = "text"; text = options.prompt |} |] |}
+    let body = if Dyn.isNullish options.tools then body else Dyn.withKey body "tools" options.tools
+    let body =
+        match options.aiSettings.modelString with
+        | None -> body
+        | Some modelString ->
+            match tryReadPromptModel (createObj [ "modelString", box modelString ]) with
+            | Some model -> Dyn.withKey body "model" model
+            | None -> body
+    let body =
+        match options.aiSettings.thinkingLevel with
+        | Some level when level.Trim() <> "" -> Dyn.withKey body "variant" (box level)
+        | _ -> body
+    createObj [ "path", box {| id = childID |}; "body", body ]
 
 /// Pull the latest assistant text from a session's messages.
 let extractSessionText (client: obj) (sessionId: string) (directory: string) : JS.Promise<string> =
@@ -124,47 +153,49 @@ let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
                 | _ -> return! Promise.reject err
     }
 
+let startSubagentSession (registry: ChildAgentRegistry) (client: obj) (options: SubagentLaunchOptions) : JS.Promise<string> =
+    promise {
+        let parentID = registry.ResolveSubsessionParentID(if options.sessionID = "" then None else Some options.sessionID)
+        let session = Dyn.get client "session"
+        let createBody =
+            box {|
+                query = box {| directory = options.directory |}
+                body = box {| parentID = (match parentID with Some p -> box p | None -> box null); title = options.title |}
+            |}
+        let! createResult = invoke1 createBody "create" session
+        let childID = Dyn.str (Dyn.get createResult "data") "id"
+        if childID = "" then return! Promise.reject (exn "Failed to create child session")
+        else
+            registry.RegisterChildAgent(childID, options.agent, parentID)
+            do! promptWithAbort client (buildPromptBody options childID) null
+            return childID
+    }
+
 /// Core subagent runner. The `cleanup` flag controls whether the child session
 /// is aborted and unregistered after the prompt finishes.
 let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                             (directory: string) (sessionID: string) (context: obj)
-                            (tools: obj) (cleanup: bool) (workspaceEffect: WorkspaceEffect)
-                            (wikiRecorder: (WikiRecordRequest -> unit) option) : JS.Promise<string> =
+                            (tools: obj) (cleanup: bool) : JS.Promise<string> =
     promise {
-        let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
-        let session = Dyn.get client "session"
-        let createBody =
-            box {|
-                query = box {| directory = directory |}
-                body = box {|
-                    parentID =
-                        match parentID with
-                        | Some p -> box p
-                        | None -> box null
-                    title = title
-                |}
-            |}
-        let! createResult = invoke1 createBody "create" session
-        let childID = Dyn.str (Dyn.get createResult "data") "id"
-        if childID = "" then return "Failed to create child session"
-        else
+        try
+            let! childID =
+                startSubagentSession registry client
+                    { agent = agent
+                      title = title
+                      prompt = prompt
+                      directory = directory
+                      sessionID = sessionID
+                      tools = tools
+                      aiSettings = emptySettings }
             let abortAndUnregister () =
                 if cleanup then
+                    let session = Dyn.get client "session"
                     let abortPromise : JS.Promise<obj> = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
                     abortPromise |> ignore
                     registry.UnregisterChildAgent(childID)
-            registry.RegisterChildAgent(childID, agent, parentID)
             try
                 try
-                    let promptBody =
-                        let body = box {| agent = agent; parts = [| box {| ``type`` = "text"; text = prompt |} |] |}
-                        let body = if Dyn.isNullish tools then body else Dyn.withKey body "tools" tools
-                        createObj [ "path", box {| id = childID |}; "body", body ]
-                    do! promptWithAbort client promptBody (getAbortSignal context)
                     let! text = extractSessionText client childID directory
-                    match workspaceEffect, wikiRecorder with
-                    | Rw, Some record when text <> "" -> record { title = title; prompt = prompt; result = text; agent = agent }
-                    | _ -> ()
                     return if text = "" then noOutputText else text
                 finally
                     abortAndUnregister ()
@@ -175,34 +206,21 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
                     let! text = extractSessionText client childID directory
                     return if text = "" then abortedPrefix else $"{abortedPrefix} {text}"
                 | _ -> return! Promise.reject err
+        with _ ->
+            return "Failed to create child session"
     }
 
 /// Run a subagent and keep the child session registered after return.
 let runSubagent (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                 (directory: string) (sessionID: string) (context: obj)
                 (tools: obj) : JS.Promise<string> =
-    runSubagentCore registry client agent title prompt directory sessionID context tools false Ro None
-
-let runSubagentWithEffect
-    (registry: ChildAgentRegistry)
-    (client: obj)
-    (agent: string)
-    (title: string)
-    (prompt: string)
-    (directory: string)
-    (sessionID: string)
-    (context: obj)
-    (tools: obj)
-    (workspaceEffect: WorkspaceEffect)
-    (wikiRecorder: (WikiRecordRequest -> unit) option)
-    : JS.Promise<string> =
-    runSubagentCore registry client agent title prompt directory sessionID context tools false workspaceEffect wikiRecorder
+    runSubagentCore registry client agent title prompt directory sessionID context tools false
 
 /// Run a subagent and clean up the child session afterwards. Used for
 /// short-lived analysis subagents such as the executor summarizer.
 let runSubagentWithCleanup (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                            (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
-    runSubagentCore registry client agent title prompt directory sessionID context (box null) true Ro None
+    runSubagentCore registry client agent title prompt directory sessionID context (box null) true
 
 /// Run a subagent with an explicit tool set and clean up afterwards.
 let runSubagentWithTools
@@ -210,4 +228,4 @@ let runSubagentWithTools
     (client: obj) (agent: string) (title: string) (prompt: string)
     (directory: string) (sessionID: string) (context: obj)
     (tools: obj) : JS.Promise<string> =
-    runSubagentCore registry client agent title prompt directory sessionID context tools true Ro None
+    runSubagentCore registry client agent title prompt directory sessionID context tools true

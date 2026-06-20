@@ -9,6 +9,7 @@ open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Opencode.HookSchema
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Opencode.WikiRuntime
+open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.TreeSitterShell
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
@@ -104,51 +105,33 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
                     if formatted <> "" then setOutput output (s + "\n\n" + formatted)
     }
 
-let private isDirectWriteTool (tool: string) : bool =
-    tool = "write" || tool = "apply_patch" || tool = "patch" || isFileEditTool tool
+/// Tools whose every user-facing invocation is durable enough to feed the wiki
+/// bookkeeper as an input/output black box. Direct write tools join the set via
+/// `isFileEditTool`; subagent and IO tools are listed explicitly. Pure lookups
+/// (fuzzy_find/fuzzy_grep), the wiki/review tools themselves, and host read
+/// tools never record.
+let private bookkeepingSubagentTools =
+    Set [ "coder"; "investigator"; "meditator"; "browser"; "executor"; "websearch"; "webfetch" ]
 
-let private summarizeWriteArgs (args: obj) : string option =
-    let filePath =
-        let direct = Dyn.str args "file_path"
-        if direct <> "" then direct else Dyn.str args "filePath"
-    let content = Dyn.str args "content"
-    if filePath = "" && content = "" then None
-    elif content = "" then Some filePath
-    else Some ($"{filePath}\n{content}")
+let private recordsToBookkeeper (tool: string) : bool =
+    tool = "write" || tool = "apply_patch" || tool = "patch"
+    || isFileEditTool tool
+    || Set.contains tool bookkeepingSubagentTools
 
-let private summarizePatchArgs (args: obj) : string option =
-    let patchText = Dyn.str args "patchText"
-    if patchText <> "" then Some patchText
-    else
-        let patch = Dyn.str args "patch"
-        if patch <> "" then Some patch
-        else
-            let text = Dyn.str args "text"
-            if text <> "" then Some text else None
-
-let private buildRwSummary (tool: string) (input: obj) (output: obj) : string =
+let private bookkeeperInput (input: obj) : string =
     let args = Dyn.get input "args"
-    let fromInput =
-        if Dyn.isNullish args then None
-        elif tool = "write" then summarizeWriteArgs args
-        elif tool = "apply_patch" || tool = "patch" then summarizePatchArgs args
-        else None
-    match fromInput with
-    | Some summary when summary.Trim() <> "" -> summary
-    | _ ->
-        let text = Dyn.str output "output"
-        let summary = if text = "" then Dyn.str output "error" else text
-        if summary = "" then tool else summary
+    if Dyn.isNullish args then "" else JS.JSON.stringify args
 
-let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (wikiRuntime: WikiRuntime) (input: obj) (output: obj) : JS.Promise<unit> =
+let private bookkeeperResult (output: obj) : string =
+    let text = Dyn.str output "output"
+    if text <> "" then text else Dyn.str output "error"
+
+let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (wikiRuntime: WikiRuntime) (registry: ChildAgentRegistry) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         do! appendSyntaxDiagnostics directory input output
         let tool = Dyn.str input "tool"
-        if isDirectWriteTool tool then
-            let sessionID = Dyn.str input "sessionID"
-            wikiRuntime.MarkRwTool(sessionID, tool, buildRwSummary tool input output)
+        let sessionID = Dyn.str input "sessionID"
+        if recordsToBookkeeper tool && (registry.LookupChildAgent sessionID).IsNone then
+            wikiRuntime.StartBookkeeperAppend(bookkeeperInput input, bookkeeperResult output, tool, parentSessionID = sessionID)
         do! nudgeHook.handleToolExecuteAfter input output
     }
-
-let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (wikiRuntime: WikiRuntime) (input: obj) (output: obj) : JS.Promise<unit> =
-    toolExecuteAfterFor opencode directory nudgeHook wikiRuntime input output

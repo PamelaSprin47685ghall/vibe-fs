@@ -22,12 +22,11 @@ let canUseCanonical (agent: Agent) (tool: Tool) : bool =
     let toolMatches (subs: string list) = subs |> List.exists tool.Contains
     match agent, tool with
     | _, "fetch_wiki" -> agent = "manager"
-    | _, "submit_wiki" -> agent = "bookkeeper"
     | _, _ when toolMatches [ "agent_report" ] -> true
-    | "bookkeeper", _ -> false
     | _, _ when toolMatches [ "bash"; "task" ] || tool = "grep" -> false
     | _, _ when toolMatches [ "stealth" ] -> agent = "browser"
     | _, _ when toolMatches [ "return" ] -> toolMatches [ agent ]
+    | "bookkeeper", _ -> false
     | "meditator", _ | "executor", _ -> false
     | _, "read" -> true
     | "reviewer", _ | "browser", _ -> false

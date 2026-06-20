@@ -53,16 +53,12 @@ let entriesThroughCutoffSpec () =
 
 let appendPromptSpec () =
     let proj = projectionOf [ entry "0a3f" "existing q" "existing a" ]
-    let withoutRw = buildAppendPrompt "T1" "do work" "got result" "" proj
-    check "append prompt names bookkeeper role" (withoutRw.Contains "wiki bookkeeper")
-    check "append prompt embeds title" (withoutRw.Contains "T1")
-    check "append prompt embeds work input" (withoutRw.Contains "do work")
-    check "append prompt embeds work output" (withoutRw.Contains "got result")
-    check "append prompt embeds existing wiki" (withoutRw.Contains "existing q")
-    check "append prompt omits RW section when blank" (not (withoutRw.Contains "RW Tool Summary"))
-    let withRw = buildAppendPrompt "T1" "i" "o" "touched files" proj
-    check "append prompt includes RW section when present" (withRw.Contains "RW Tool Summary")
-    check "append prompt embeds rw summary" (withRw.Contains "touched files")
+    let prompt = buildAppendPrompt "T1" "do work" "got result" proj
+    check "append prompt names bookkeeper role" (prompt.Contains "wiki bookkeeper")
+    check "append prompt embeds title" (prompt.Contains "T1")
+    check "append prompt embeds work input" (prompt.Contains "do work")
+    check "append prompt embeds work output" (prompt.Contains "got result")
+    check "append prompt embeds existing wiki" (prompt.Contains "existing q")
 
 let dailyPromptSpec () =
     let files = [ dayFile "2026-06-19" false [ entry "0a3f" "target q" "target a" ] ]

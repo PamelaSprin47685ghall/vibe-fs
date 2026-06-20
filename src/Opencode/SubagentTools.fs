@@ -13,9 +13,8 @@ open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ToolHelpers
 open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Opencode.WikiRuntime
 
-let coderTool (registry: ChildAgentRegistry) (wikiRuntime: WikiRuntime) (ctx: obj) : obj =
+let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"
     define coder
         (box {| intents = coderIntentsSchema Params.coderIntents; tdd = enumReq [| "red"; "green" |] Params.coderTdd; _ui = uiParam |})
@@ -31,7 +30,7 @@ let coderTool (registry: ChildAgentRegistry) (wikiRuntime: WikiRuntime) (ctx: ob
                     let! reports =
                         prompts
                         |> List.map (fun prompt ->
-                            runSubagentWithEffect
+                            runSubagent
                                 registry
                                 (client ())
                                 "coder"
@@ -40,9 +39,7 @@ let coderTool (registry: ChildAgentRegistry) (wikiRuntime: WikiRuntime) (ctx: ob
                                 directory
                                 sessionID
                                 context
-                                (box null)
-                                Rw
-                                (Some (fun record -> wikiRuntime.StartBookkeeperAppend(record.prompt, record.result, record.title, record.prompt))))
+                                (box null))
                         |> Promise.all
                     return joinReports reports
                 })
@@ -62,8 +59,16 @@ let investigatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                     let! reports =
                         prompts
                         |> List.map (fun prompt ->
-                            runSubagent registry (client ()) "investigator" "Investigator" prompt
-                                (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null))
+                            runSubagent
+                                registry
+                                (client ())
+                                "investigator"
+                                "Investigator"
+                                prompt
+                                (Dyn.str tc "directory")
+                                (Dyn.str tc "sessionID")
+                                context
+                                (box null))
                         |> Promise.all
                     return joinReports reports
                 })

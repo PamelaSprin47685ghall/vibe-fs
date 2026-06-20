@@ -186,9 +186,9 @@ let toolCatalogCentralized () =
     check "fetch wiki description mentions snapshot" (fetchSpec.description.Contains "session's wiki snapshot")
     check "fetch wiki requires id" (fetchSpec.requiredFields = [ "id" ])
 
-    let submitSpec = VibeFs.Kernel.ToolCatalog.specOf "submit_wiki"
-    check "submit wiki description mentions wiki" (submitSpec.description.Contains "wiki")
-    check "submit wiki requires entries" (submitSpec.requiredFields = [ "entries" ])
+    let submitSpec = VibeFs.Kernel.ToolCatalog.specOf "return_bookkeeper"
+    check "return bookkeeper description mentions wiki" (submitSpec.description.Contains "wiki")
+    check "return bookkeeper requires entries" (submitSpec.requiredFields = [ "entries" ])
 
     let allSpecs = VibeFs.Kernel.ToolCatalog.all
     let names = allSpecs |> List.map (fun spec -> spec.name) |> Set.ofList
@@ -198,12 +198,12 @@ let toolCatalogCentralized () =
     check "catalog covers browser" (Set.contains "browser" names)
     check "catalog covers executor" (Set.contains "executor" names)
     check "catalog covers fetch_wiki" (Set.contains "fetch_wiki" names)
-    check "catalog covers submit_wiki" (Set.contains "submit_wiki" names)
+    check "catalog covers return_bookkeeper" (Set.contains "return_bookkeeper" names)
 
 let hostToolsWikiNames () =
     let names = VibeFs.Kernel.HostTools.allToolNames VibeFs.Kernel.HostTools.opencode |> Set.ofArray
     check "host tools include fetch_wiki" (Set.contains "fetch_wiki" names)
-    check "host tools include submit_wiki" (Set.contains "submit_wiki" names)
+    check "host tools include return_bookkeeper" (Set.contains "return_bookkeeper" names)
 
 /// P0-1: a single host-aware dispatcher must produce every subagent prompt.
 /// Today each host has its own `formatXxxUserPrompt` / `formatMuxXxxUserPrompt`;

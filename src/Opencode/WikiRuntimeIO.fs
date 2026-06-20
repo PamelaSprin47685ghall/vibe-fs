@@ -8,6 +8,7 @@ open VibeFs.Kernel.Wiki
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.WikiRuntimeState
 open VibeFs.Opencode.MessagingCodec
+open VibeFs.Opencode.SessionIo
 open VibeFs.Shell.PromiseQueue
 open VibeFs.Shell.WikiFiles
 open VibeFs.Shell.WikiPortLock
@@ -64,58 +65,11 @@ let submitForKind (todayStr: string) (root: string) (kind: WikiJobKind) (drafts:
 let private promptParts (ctx: WikiJobContext) (promptText: string) : obj array =
     [| box {| ``type`` = "text"; text = renderJobMarker ctx + "\n\n" + promptText |} |]
 
-let private tryReadPromptModel (payload: obj) : obj option =
-    let promptModel = get payload "model"
-    if not (isNullish promptModel) then Some promptModel
-    else
-        let modelString = str payload "modelString"
-        if modelString = "" then None
-        else
-            let slash = modelString.IndexOf('/')
-            if slash <= 0 || slash >= modelString.Length - 1 then None
-            else Some (box {| providerID = modelString.[0..slash-1]; modelID = modelString.[slash+1..] |})
-
-let private promptBodyForBookkeeper (ctx: WikiJobContext) (promptText: string) (aiSettings: DelegatedAiSettings) : obj =
-    let body =
-        box {| agent = "bookkeeper"
-               parts = promptParts ctx promptText
-               tools = createObj [ "submit_wiki", box true ] |}
-    let body =
-        match aiSettings.modelString with
-        | None -> body
-        | Some modelString ->
-            match tryReadPromptModel (createObj [ "modelString", box modelString ]) with
-            | Some model -> withKey body "model" model
-            | None -> body
-    let body =
-        match aiSettings.thinkingLevel with
-        | Some level when level.Trim() <> "" -> withKey body "variant" (box level)
-        | _ -> body
-    body
-
 let private launchResultText (title: string) (childId: string) : string =
     $"Started {title} in background session {childId}."
 
 let private failedLaunchResult (title: string) (reason: string) : string =
     $"Failed to start {title}: {reason}"
-
-let private promptSubmitted (client: obj) (childId: string) (directory: string) : JS.Promise<bool> =
-    promise {
-        try
-            let! result = invoke1 (get client "session") "messages" (box {| path = box {| id = childId |}; query = box {| directory = directory |} |})
-            let data = get result "data"
-            if isNullish data || not (isArray data) then return false
-            else
-                let messages: obj array = unbox data
-                return
-                    messages
-                    |> Array.exists (fun message ->
-                        let parts = get message "parts"
-                        not (isNullish parts)
-                        && isArray parts
-                        && ((unbox<obj array> parts) |> Array.exists (fun part -> str part "type" = "tool" && str part "tool" = "submit_wiki")))
-        with _ -> return false
-    }
 
 let tryResolveJobContext (client: obj) (directory: string) (sessionID: string) : JS.Promise<WikiJobContext option> =
     promise {
@@ -138,30 +92,20 @@ let tryResolveJobContext (client: obj) (directory: string) (sessionID: string) :
             with _ -> return None
     }
 
-/// Run the create+prompt IO for a background bookkeeper session. Returns a
-/// human-visible status string instead of failing silently.
 let launchBackgroundSession (session: obj) (root: string) (parentID: string option) (kind: WikiJobKind) (title: string) (promptText: string) (aiSettings: DelegatedAiSettings) (client: obj) (registry: ChildAgentRegistry) : JS.Promise<string> =
     promise {
         try
-            let createBody =
-                createObj [
-                    "query", box {| directory = root |}
-                    "body", createObj [
-                        "parentID", (match parentID with Some id -> box id | None -> null)
-                        "title", box title
-                        "agent", box "bookkeeper" ] ]
-            let! created = invoke1 session "create" createBody
-            let childId = str (get created "data") "id"
-            if childId = "" then return failedLaunchResult title "host returned empty child session id"
-            else
-                let ctx = { workspaceRoot = root; kind = kind }
-                registry.RegisterChildAgent(childId, "bookkeeper", parentID)
-                let promptBody =
-                    box {| path = box {| id = childId |}
-                           body = promptBodyForBookkeeper ctx promptText aiSettings |}
-                do! invoke1 session "prompt" promptBody |> Promise.map ignore
-                let! submitted = promptSubmitted client childId root
-                return if submitted then launchResultText title childId else failedLaunchResult title "bookkeeper responded without submit_wiki"
+            let ctx = { workspaceRoot = root; kind = kind }
+            let! childId =
+                startSubagentSession registry client
+                    { agent = "bookkeeper"
+                      title = title
+                      prompt = renderJobMarker ctx + "\n\n" + promptText
+                      directory = root
+                      sessionID = defaultArg parentID ""
+                      tools = null
+                      aiSettings = aiSettings }
+            return launchResultText title childId
         with ex ->
             return failedLaunchResult title (string ex)
     }

@@ -54,7 +54,7 @@ let private registerWikiJobForTest (wikiRuntime: obj) (sessionID: string) (works
     registrar.Invoke(sessionID, workspaceRoot, kindTag, payload)
 
 let private submitWikiTool (pluginObject: obj) : obj =
-    get (get pluginObject "tool") "submit_wiki"
+    get (get pluginObject "tool") "return_bookkeeper"
 
 let private pluginWikiRuntime (pluginObject: obj) : obj =
     get pluginObject "__wikiRuntime"
@@ -375,13 +375,12 @@ let fetchWikiSnapshotSpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let directWriteTurnAggregationSpec () = promise {
-    let! workspaceDir = mkdtempAsync "direct-write-aggregation-"
+let afterHookRecordsDirectWriteSpec () = promise {
+    let! workspaceDir = mkdtempAsync "after-hook-write-"
     do! ensureWikiDir workspaceDir
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "turn-1" "Patched files" |]
     let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient |})
     let toolExecuteAfter = get pluginObject "tool.execute.after"
-    let eventHook = get pluginObject "event"
 
     let writeInput =
         createObj [ "tool", box "write"
@@ -399,27 +398,16 @@ let directWriteTurnAggregationSpec () = promise {
     let patchOutput = createObj [ "output", box "Applied patch to src/turn.fs" ]
     do! toolExecuteAfter $ (patchInput, patchOutput) |> unbox<JS.Promise<unit>>
 
-    let completionEvent =
-        createObj [
-            "event",
-            box
-                {| ``type`` = "message.updated"
-                   properties = box
-                       {| sessionID = "turn-1"
-                          info = createObj [ "id", box "turn-1-assistant"; "agent", box "manager"; "sessionID", box "turn-1"; "role", box "assistant"; "finish", box "stop"; "time", box (createObj [ "created", box 1; "completed", box 2 ]) ]
-                          parts = [| box {| ``type`` = "text"; text = "Patched files" |} |] |} |}
-        ]
-    do! eventHook $ completionEvent |> unbox<JS.Promise<unit>>
-
     do! waitForBackgroundJobsForTesting pluginObject
     let launches = takeBookkeeperLaunchesForTesting pluginObject
-    check "direct write turn aggregation launches exactly one bookkeeper job" (launches.Length = 1)
-    check "direct write turn aggregation uses bookkeeper agent" (str launches.[0] "agent" = "bookkeeper")
-    check "direct write turn aggregation prompt includes write input" (
-        let prompt = str launches.[0] "prompt"
-        prompt.Contains "src/turn.fs" && prompt.Contains "let turn = 1" && prompt.Contains "*** Update File: src/turn.fs")
-    check "direct write turn aggregation background result is visible" (
-        launches |> Array.exists (fun launch -> (str launch "result") = "Patched files" && (str launch "prompt").Contains "src/turn.fs"))
+    check "after-hook records each write call once" (launches.Length = 2)
+    check "after-hook write uses bookkeeper agent" (launches |> Array.forall (fun l -> str l "agent" = "bookkeeper"))
+    check "after-hook write launch carries file path and content as input" (
+        launches |> Array.exists (fun l -> (str l "prompt").Contains "src/turn.fs" && (str l "prompt").Contains "let turn = 1"))
+    check "after-hook patch launch carries patch text as input" (
+        launches |> Array.exists (fun l -> (str l "prompt").Contains "*** Update File: src/turn.fs"))
+    check "after-hook write launch carries tool output as result" (
+        launches |> Array.exists (fun l -> (str l "result").Contains "Successfully wrote to src/turn.fs"))
     do! rmAsync workspaceDir
 }
 
@@ -518,41 +506,39 @@ let weeklyMaintenanceWithoutSnapshotFileSpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let directPatchWriteAggregationSpec () = promise {
-    let! workspaceDir = mkdtempAsync "direct-patch-aggregation-"
+let afterHookSkipsChildSessionSpec () = promise {
+    let mockClient =
+        createObj [ "session", box (createObj [
+            "create", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (promise { return box {| data = box {| id = "child-coder-session" |} |} })))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ())))
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (promise { return box {| data = [|
+                    box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "text"; text = "Coder finished" |} |] |}
+                |] |} })))
+            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ())))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "after-hook-child-skip-"
     do! ensureWikiDir workspaceDir
-    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "patch-turn-1" "Patched via patch tool" |]
     let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient |})
+    let coder = get (get pluginObject "tool") "coder"
+    let intents : obj array = [|
+        createObj [ "objective", box "fix bug"; "background", box "bg"; "targets", box [| createObj [ "file", box "a.ts"; "guide", box "g" ] |] ]
+    |]
+    let! _ = (get coder "execute") $ (createObj [ "intents", box intents ], createObj [ "directory", box workspaceDir; "sessionID", box "coder-parent"; "abort", box null ]) |> unbox<JS.Promise<string>>
+
     let toolExecuteAfter = get pluginObject "tool.execute.after"
-    let eventHook = get pluginObject "event"
-
-    let patchInput =
-        createObj [ "tool", box "patch"
-                    "sessionID", box "patch-turn-1"
-                    "callID", box "patch-call-1"
-                    "args", box (createObj [ "patchText", box "*** Begin Patch\n*** Update File: src/patch.fs\n@@\n-let x = 0\n+let x = 1\n*** End Patch" ]) ]
-    let patchOutput = createObj [ "output", box "Applied patch to src/patch.fs" ]
-    do! toolExecuteAfter $ (patchInput, patchOutput) |> unbox<JS.Promise<unit>>
-
-    let completionEvent =
-        createObj [
-            "event",
-            box
-                {| ``type`` = "message.updated"
-                   properties = box
-                       {| sessionID = "patch-turn-1"
-                          info = createObj [ "id", box "patch-turn-1-assistant"; "agent", box "manager"; "sessionID", box "patch-turn-1"; "role", box "assistant"; "finish", box "stop"; "time", box (createObj [ "created", box 1; "completed", box 2 ]) ]
-                          parts = [| box {| ``type`` = "text"; text = "Patched via patch tool" |} |] |} |}
-        ]
-    do! eventHook $ completionEvent |> unbox<JS.Promise<unit>>
+    let childWriteInput =
+        createObj [ "tool", box "write"
+                    "sessionID", box "child-coder-session"
+                    "callID", box "child-write-1"
+                    "args", box (createObj [ "file_path", box "src/internal.fs"; "content", box "internal" ]) ]
+    let childWriteOutput = createObj [ "output", box "Successfully wrote to src/internal.fs" ]
+    do! toolExecuteAfter $ (childWriteInput, childWriteOutput) |> unbox<JS.Promise<unit>>
 
     do! waitForBackgroundJobsForTesting pluginObject
     let launches = takeBookkeeperLaunchesForTesting pluginObject
-    check "direct patch tool triggers one bookkeeper launch after completion" (launches.Length = 1)
-    check "direct patch bookkeeper launch uses bookkeeper agent" (str launches.[0] "agent" = "bookkeeper")
-    check "direct patch turn result records patch summary" (
-        let prompt = str launches.[0] "prompt"
-        prompt.Contains "patch" && prompt.Contains "src/patch.fs")
+    check "after-hook skips bookkeeping for tools inside child-agent sessions" (launches.Length = 0)
     do! rmAsync workspaceDir
 }
 
@@ -780,43 +766,39 @@ let executorModeSchemaSpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let coderTriggersBookkeeperSpec () = promise {
+let afterHookRecordsCoderSpec () = promise {
     let createCalls = ResizeArray<obj>()
-    let promptCalls = ResizeArray<obj>()
     let mockClient =
         createObj [ "session", box (createObj [
             "create", box (System.Func<obj, JS.Promise<obj>>(fun arg ->
-                (promise { createCalls.Add(arg); return box {| data = box {| id = "child-coder-session" |} |} })))
-            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
-                (promise { promptCalls.Add(arg) })))
+                (promise { createCalls.Add(arg); return box {| data = box {| id = "child-bk-session" |} |} })))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ())))
             "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
                 (promise { return box {| data = [|
-                    box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "text"; text = "Coder finished" |} |] |}
+                    box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "text"; text = "bk" |} |] |}
                 |] |} })))
-            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ ->
-                (Promise.lift ())))
+            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ())))
         ]) ]
-    let! workspaceDir = mkdtempAsync "coder-bookkeeper-"
+    let! workspaceDir = mkdtempAsync "after-hook-coder-"
+    do! ensureWikiDir workspaceDir
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
-    let coder = get (get p "tool") "coder"
-    let intents : obj array = [|
-        createObj [
-            "objective", box "fix bug"
-            "background", box "test background"
-            "targets", box [| createObj [ "file", box "a.ts"; "guide", box "test guide" ] |]
-        ]
-    |]
-    let! result = (get coder "execute") $ (createObj [ "intents", box intents ], createObj [ "directory", box workspaceDir; "sessionID", box "coder-parent"; "abort", box null ]) |> unbox<JS.Promise<string>>
-    check "coder tool returns subagent output" (result.Contains("Coder finished"))
+    let toolExecuteAfter = get p "tool.execute.after"
+    let coderInput =
+        createObj [ "tool", box "coder"
+                    "sessionID", box "coder-parent"
+                    "callID", box "coder-call-1"
+                    "args", box (createObj [ "intents", box [| createObj [ "objective", box "fix bug" ] |] ]) ]
+    let coderOutput = createObj [ "output", box "Coder finished" ]
+    do! toolExecuteAfter $ (coderInput, coderOutput) |> unbox<JS.Promise<unit>>
+
     let launches = takeBookkeeperLaunchesForTesting p
-    check "coder tool still launches bookkeeper hook" (launches.Length = 1)
-    check "coder bookkeeper launch agent" (str launches.[0] "agent" = "bookkeeper")
-    check "coder bookkeeper launch records prompt" (not (isNullish (get launches.[0] "prompt")) && str launches.[0] "prompt" <> "")
-    check "coder bookkeeper child session keeps parentID" (
-        createCalls |> Seq.exists (fun call ->
-            let body = get call "body"
-            str body "parentID" = "coder-parent"))
+    check "after-hook records coder tool once" (launches.Length = 1)
+    check "after-hook coder launch agent" (str launches.[0] "agent" = "bookkeeper")
+    check "after-hook coder launch records input" (str launches.[0] "prompt" <> "")
+    check "after-hook coder launch records output" ((str launches.[0] "result").Contains "Coder finished")
     do! waitForBackgroundJobsForTesting p
+    check "after-hook coder bookkeeper child flattens to user-facing parent" (
+        createCalls |> Seq.exists (fun call -> str (get call "body") "parentID" = "coder-parent"))
     do! rmAsync workspaceDir
 }
 
@@ -830,14 +812,14 @@ let bookkeeperLaunchCarriesAiSettingsSpec () = promise {
             "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
                 (promise { promptCalls.Add(arg) })))
             "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
-                (promise { return box {| data = [| userTextMessage "child-bk-ai-session" "[vibe-wiki-job] {\"type\":\"vibe_wiki_job\",\"workspaceRoot\":\"/tmp\",\"kind\":\"append\"}"; box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "tool"; tool = "submit_wiki" |} |] |} |] |} })))
+                (promise { return box {| data = [| userTextMessage "child-bk-ai-session" "[vibe-wiki-job] {\"type\":\"vibe_wiki_job\",\"workspaceRoot\":\"/tmp\",\"kind\":\"append\"}"; box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "tool"; tool = "return_bookkeeper" |} |] |} |] |} })))
             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ()))
         ]) ]
     let! workspaceDir = mkdtempAsync "bookkeeper-ai-settings-"
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
     let wikiRuntime = get (pluginWikiRuntime p) "rawInstance" :?> WikiRuntime
     let aiSettings : DelegatedAiSettings = { modelString = Some "openai/gpt-5"; thinkingLevel = Some "high" }
-    wikiRuntime.StartBookkeeperAppend("input", "result", "Title", "rw", parentSessionID = "parent-session", aiSettings = aiSettings)
+    wikiRuntime.StartBookkeeperAppend("input", "result", "Title", parentSessionID = "parent-session", aiSettings = aiSettings)
     do! waitForBackgroundJobsForTesting p
     check "bookkeeper aiSettings create keeps parentID" (str (get createCalls.[0] "body") "parentID" = "parent-session")
     let promptBody = get promptCalls.[0] "body"
@@ -862,43 +844,45 @@ let bookkeeperFireAndForgetSpec () = promise {
             ])
         ]
     let! workspaceDir = mkdtempAsync "bookkeeper-fireforget-"
+    do! ensureWikiDir workspaceDir
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
-    let coder = get (get p "tool") "coder"
-    let intents : obj array = [|
-        createObj [
-            "objective", box "do work"
-            "background", box "bg"
-            "targets", box [| createObj [ "file", box "a.ts"; "guide", box "g" ] |]
-        ]
-    |]
-    let! result = (get coder "execute") $ (createObj [ "intents", box intents ], createObj [ "directory", box workspaceDir; "sessionID", box "ff-parent"; "abort", box null ]) |> unbox<JS.Promise<string>>
-    check "fire-and-forget: coder returns result without awaiting bookkeeper completion" (result.Contains("done"))
+    let toolExecuteAfter = get p "tool.execute.after"
+    let coderInput =
+        createObj [ "tool", box "coder"
+                    "sessionID", box "ff-parent"
+                    "callID", box "ff-call-1"
+                    "args", box (createObj [ "intents", box [| createObj [ "objective", box "do work" ] |] ]) ]
+    let coderOutput = createObj [ "output", box "Coder finished" ]
+    do! toolExecuteAfter $ (coderInput, coderOutput) |> unbox<JS.Promise<unit>>
     let launches = takeBookkeeperLaunchesForTesting p
-    check "fire-and-forget: bookkeeper launch recorded" (launches.Length = 1)
+    check "fire-and-forget: bookkeeper launch recorded synchronously" (launches.Length = 1)
     do! waitForBackgroundJobsForTesting p
-    check "fire-and-forget: bookkeeper prompt ran in background after main returned" (promptCompleted.Count >= 1)
+    check "fire-and-forget: bookkeeper prompt ran in background" (promptCompleted.Count >= 1)
     do! rmAsync workspaceDir
 }
 
-let executorRoRwBookkeeperSpec () = promise {
+let afterHookRecordsExecutorSpec () = promise {
     let! workspaceDir = mkdtempAsync "executor-bookkeeper-"
+    do! ensureWikiDir workspaceDir
     let! p = plugin (box {| directory = workspaceDir |})
-    let executor = executorDefinition p
     check "executor tool exposes mode" (not (isNullish (executorModeSchema p)))
-    let runExecutor mode =
-        (get executor "execute") $
-            (createObj [ "language", box "shell"; "program", box "printf ok"; "timeout_type", box "short"; "mode", box mode ],
-             createObj [ "directory", box workspaceDir; "sessionID", box "executor-session" ])
-        |> unbox<JS.Promise<string>>
-    let! roResult = runExecutor "ro"
-    check "executor ro returns output" (roResult <> "")
-    check "executor ro does not launch bookkeeper" (takeBookkeeperLaunchesForTesting p |> Array.isEmpty)
-    let! rwResult = runExecutor "rw"
-    check "executor rw returns output" (rwResult <> "")
-    let launches = takeBookkeeperLaunchesForTesting p
-    check "executor rw launches bookkeeper once" (launches.Length = 1)
-    check "executor rw launch agent" (str launches.[0] "agent" = "bookkeeper")
+    let toolExecuteAfter = get p "tool.execute.after"
+    let fire mode =
+        let input =
+            createObj [ "tool", box "executor"
+                        "sessionID", box "executor-session"
+                        "callID", box ("exec-" + mode)
+                        "args", box (createObj [ "language", box "shell"; "program", box "printf ok"; "timeout_type", box "short"; "mode", box mode ]) ]
+        let output = createObj [ "output", box "ok" ]
+        toolExecuteAfter $ (input, output) |> unbox<JS.Promise<unit>>
+    do! fire "ro"
+    do! fire "rw"
     do! waitForBackgroundJobsForTesting p
+    let launches = takeBookkeeperLaunchesForTesting p
+    check "after-hook records every executor call as black box" (launches.Length = 2)
+    check "after-hook executor launch agent" (launches |> Array.forall (fun l -> str l "agent" = "bookkeeper"))
+    check "after-hook executor launch carries program as input" (
+        launches |> Array.forall (fun l -> (str l "prompt").Contains "printf ok"))
     do! rmAsync workspaceDir
 }
 
@@ -1245,6 +1229,42 @@ let investigatorToolLateClientInjectionSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let websearchTriggersBookkeeperSpec () = promise {
+    let! workspaceDir = mkdtempAsync "websearch-bookkeeper-"
+    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "child-bookkeeper-session" "noted" |]
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
+    let toolExecuteAfter = get p "tool.execute.after"
+    let input = createObj [ "tool", box "websearch"; "sessionID", box "websearch-parent"; "callID", box "ws-1"
+                            "args", box (createObj [ "query", box "ollama"; "what_to_summarize", box "summary" ]) ]
+    let output = createObj [ "output", box "search results body" ]
+    do! toolExecuteAfter $ (input, output) |> unbox<JS.Promise<unit>>
+    let launches = takeBookkeeperLaunchesForTesting p
+    check "websearch after-hook records one bookkeeper launch" (launches.Length = 1)
+    check "websearch after-hook launch agent" (str launches.[0] "agent" = "bookkeeper")
+    check "websearch after-hook prompt carries query and output" (
+        (str launches.[0] "prompt").Contains "ollama" && (str launches.[0] "result").Contains "search results body")
+    do! waitForBackgroundJobsForTesting p
+    do! rmAsync workspaceDir
+}
+
+let webfetchTriggersBookkeeperSpec () = promise {
+    let! workspaceDir = mkdtempAsync "webfetch-bookkeeper-"
+    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "child-bookkeeper-session" "noted" |]
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
+    let toolExecuteAfter = get p "tool.execute.after"
+    let input = createObj [ "tool", box "webfetch"; "sessionID", box "webfetch-parent"; "callID", box "wf-1"
+                            "args", box (createObj [ "url", box "https://example.com" ]) ]
+    let output = createObj [ "output", box "fetched page content" ]
+    do! toolExecuteAfter $ (input, output) |> unbox<JS.Promise<unit>>
+    let launches = takeBookkeeperLaunchesForTesting p
+    check "webfetch after-hook records one bookkeeper launch" (launches.Length = 1)
+    check "webfetch after-hook launch agent" (str launches.[0] "agent" = "bookkeeper")
+    check "webfetch after-hook prompt carries url and output" (
+        (str launches.[0] "prompt").Contains "https://example.com" && (str launches.[0] "result").Contains "fetched page content")
+    do! waitForBackgroundJobsForTesting p
+    do! rmAsync workspaceDir
+}
+
 let executorActorSpec () = promise {
     let seen = System.Collections.Generic.List<string>()
     let releaseRequested = ref false
@@ -1364,29 +1384,26 @@ let bookkeeperSessionRegisteredInChildAgentRegistrySpec () = promise {
         ]) ]
     let! workspaceDir = mkdtempAsync "bookkeeper-registry-"
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
-    let coder = get (get p "tool") "coder"
-    let intents : obj array = [|
-        createObj [
-            "objective", box "fix bug"
-            "background", box "test background"
-            "targets", box [| createObj [ "file", box "a.ts"; "guide", box "test guide" ] |]
-        ]
-    |]
-    let! _coderResult =
-        ((get coder "execute")
-            $ (createObj [ "intents", box intents ], createObj [ "directory", box workspaceDir; "sessionID", box "bk-parent"; "abort", box null ])
-        |> unbox<JS.Promise<string>>)
+    let toolExecuteAfter = get p "tool.execute.after"
+    let coderInput =
+        createObj [ "tool", box "coder"
+                    "sessionID", box "bk-parent"
+                    "callID", box "coder-call-1"
+                    "args", box (createObj [ "intents", box "fix bug" ]) ]
+    let coderOutput = createObj [ "output", box "Coder finished" ]
+    do! toolExecuteAfter $ (coderInput, coderOutput) |> unbox<JS.Promise<unit>>
     do! waitForBackgroundJobsForTesting p
 
     let chatMessage = get p "chat.message"
-    let tools = createObj [ "submit_wiki", box true ]
+    let tools = createObj [ "return_bookkeeper", box true; "websearch", box true ]
     let message = createObj [ "tools", box tools ]
     let output = createObj [ "message", box message; "parts", box [||] ]
     let input = createObj [ "sessionID", box "child-bk-session" ]
     do! chatMessage $ (input, output) |> unbox<JS.Promise<unit>>
 
     let resolvedTools = get (get output "message") "tools"
-    check "bookkeeper session keeps submit_wiki enabled" (unbox<bool> (get resolvedTools "submit_wiki") = true)
+    check "bookkeeper session keeps return_bookkeeper enabled" (unbox<bool> (get resolvedTools "return_bookkeeper") = true)
+    check "bookkeeper session denies unrelated tools via permission matrix" (unbox<bool> (get resolvedTools "websearch") = false)
     do! rmAsync workspaceDir
 }
 
@@ -1404,12 +1421,12 @@ let run () : JS.Promise<unit> =
         do! coderReceivesWikiPreludeSpec ()
         do! browserDoesNotReceiveWikiPreludeSpec ()
         do! fetchWikiSnapshotSpec ()
-        do! directWriteTurnAggregationSpec ()
+        do! afterHookRecordsDirectWriteSpec ()
         do! dailyMaintenanceLaunchSpec ()
         do! weeklyMaintenanceLaunchSpec ()
         do! weeklyMaintenanceUsesLastSundaySpec ()
         do! weeklyMaintenanceWithoutSnapshotFileSpec ()
-        do! directPatchWriteAggregationSpec ()
+        do! afterHookSkipsChildSessionSpec ()
         do! submitWikiAppendSpec ()
         do! submitWikiAppendEmptySpec ()
         do! submitWikiSchemaAllowsEmptySpec ()
@@ -1428,13 +1445,15 @@ let run () : JS.Promise<unit> =
         do! mimoTaskDefinitionHandlesZodLikeParametersSpec ()
         do! bookkeeperAgentConfigSpec ()
         do! executorModeSchemaSpec ()
-        do! coderTriggersBookkeeperSpec ()
+        do! afterHookRecordsCoderSpec ()
         do! bookkeeperLaunchCarriesAiSettingsSpec ()
         do! bookkeeperFireAndForgetSpec ()
-        do! executorRoRwBookkeeperSpec ()
+        do! afterHookRecordsExecutorSpec ()
         do! coderToolSpec ()
         do! investigatorToolSpec ()
         do! investigatorToolLateClientInjectionSpec ()
+        do! websearchTriggersBookkeeperSpec ()
+        do! webfetchTriggersBookkeeperSpec ()
         do! executorActorSpec ()
         do! wikiWorkspaceSerializationSpec ()
         do! submitWikiReconstructsJobFromHistorySpec ()

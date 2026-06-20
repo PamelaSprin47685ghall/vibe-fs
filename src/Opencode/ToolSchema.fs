@@ -125,7 +125,7 @@ let webfetch = description "webfetch"
 
 let fetchWiki = description "fetch_wiki"
 
-let submitWiki = description "submit_wiki"
+let submitWiki = description "return_bookkeeper"
 
 module Params = VibeFs.Kernel.ToolCatalog.Params
 

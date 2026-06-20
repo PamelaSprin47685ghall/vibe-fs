@@ -11,22 +11,6 @@ open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Opencode.WikiRuntime
 open VibeFs.Shell.ChildAgentRegistry
 
-let private getEventAssistantText (event: obj) : string =
-    let properties = Dyn.get event "properties"
-    VibeFs.Kernel.NudgeState.getPartsText (Dyn.get properties "parts")
-
-let flushDirectWriteTurnIfCompleted (wikiRuntime: WikiRuntime) (input: obj) : unit =
-    let event = Dyn.get input "event"
-    if Dyn.str event "type" = "message.updated" then
-        let properties = Dyn.get event "properties"
-        let info = Dyn.get properties "info"
-        if VibeFs.Kernel.NudgeState.isCompletedAssistantMessage info then
-            let sessionID =
-                let fromProps = Dyn.str properties "sessionID"
-                if fromProps <> "" then fromProps else Dyn.str info "sessionID"
-            if sessionID <> "" then
-                wikiRuntime.FlushTurnIfNeeded(sessionID, getEventAssistantText event)
-
 let cleanUpJobContextIfAbortedOrDeleted (wikiRuntime: WikiRuntime) (input: obj) : unit =
     let event = Dyn.get input "event"
     let eventType = Dyn.str event "type"

@@ -68,7 +68,7 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         setKey result "chat.message" (twoArgHook (fun input output -> chatMessageFor host childAgentRegistry nudgeHook input output))
         setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
         setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBeforeFor host input output))
-        setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host directory nudgeHook wikiRuntime input output))
+        setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host directory nudgeHook wikiRuntime childAgentRegistry input output))
         setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform childAgentRegistry directory magicSession wikiRuntime reviewStore input output))
         setKey result "command.execute.before" (twoArgHook (fun input output ->
             promise {
@@ -79,7 +79,6 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
             promise {
                 do! eventHandler reviewStore input
                 cleanUpJobContextIfAbortedOrDeleted wikiRuntime input
-                flushDirectWriteTurnIfCompleted wikiRuntime input
                 do! nudgeHook.handleEvent input
             }))
         setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host magicSession input output))

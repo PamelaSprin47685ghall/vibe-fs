@@ -7,12 +7,7 @@ type BookkeeperLaunch =
     { agent: string
       title: string
       prompt: string
-      result: string
-      rwSummary: string }
-
-/// Per-turn accumulator for RW-tool summaries captured during one assistant
-/// turn. Immutable: each MarkRwTool derives a fresh record.
-type DirectWriteTurn = { rwSummaries: string list; dirty: bool }
+      result: string }
 
 /// Single-responsibility immutable aggregate of all wiki host state (P52/P53).
 /// Every field is updated only by the pure transition functions below; the IO
@@ -24,30 +19,15 @@ type DirectWriteTurn = { rwSummaries: string list; dirty: bool }
 type WikiState =
     { sessionSnapshots: Map<string, WikiProjection>
       bookkeeperLaunches: BookkeeperLaunch list
-      directWriteTurns: Map<string, DirectWriteTurn>
       scheduledMaintenance: Set<string> }
 
 let initialWikiState : WikiState =
     { sessionSnapshots = Map.empty
       bookkeeperLaunches = []
-      directWriteTurns = Map.empty
       scheduledMaintenance = Set.empty }
 
 let private cacheSnapshot (state: WikiState) (sessionID: string) (projection: WikiProjection) : WikiState =
     { state with sessionSnapshots = Map.add sessionID projection state.sessionSnapshots }
-
-let private markRwTool (state: WikiState) (sessionID: string) (entry: string) : WikiState =
-    let turn = Map.tryFind sessionID state.directWriteTurns |> Option.defaultValue { rwSummaries = []; dirty = false }
-    { state with directWriteTurns = Map.add sessionID { turn with rwSummaries = entry :: turn.rwSummaries; dirty = true } state.directWriteTurns }
-
-/// Return the flushed RW summary when the turn is dirty, plus the state with
-/// the turn consumed.
-let consumeDirtyTurn (state: WikiState) (sessionID: string) : string option * WikiState =
-    match Map.tryFind sessionID state.directWriteTurns with
-    | Some turn when turn.dirty ->
-        let summary = String.concat "\n" (List.rev turn.rwSummaries)
-        Some summary, { state with directWriteTurns = Map.remove sessionID state.directWriteTurns }
-    | _ -> None, state
 
 let private recordLaunch (state: WikiState) (launch: BookkeeperLaunch) : WikiState =
     { state with bookkeeperLaunches = state.bookkeeperLaunches @ [ launch ] }
@@ -90,25 +70,21 @@ let normalizeDraftIds (projection: WikiProjection) (drafts: WikiDraft list) : Wi
 
 /// Unified command type covering every state change in the runtime (P53). The
 /// reducer is the single pure dispatch; multi-value transitions
-/// (consumeDirtyTurn/recordLaunchOnce/drainLaunches) stay available as standalone
-/// functions so callers needing their extra return value read it in the same tick.
+/// (recordLaunchOnce/drainLaunches) stay available as standalone functions so
+/// callers needing their extra return value read it in the same tick.
 type WikiCommand =
     | CacheSnapshotCmd of sessionID: string * projection: WikiProjection
-    | MarkRwToolCmd of sessionID: string * entry: string
     | RecordLaunchCmd of launch: BookkeeperLaunch
     | UpdateLatestLaunchResultCmd of title: string * result: string
     | RecordLaunchOnceCmd of key: string * launch: BookkeeperLaunch
     | DrainLaunchesCmd
-    | ConsumeTurnCmd of sessionID: string
     | CompleteLaunchCmd of key: string
 
 let reducer (state: WikiState) (cmd: WikiCommand) : WikiState =
     match cmd with
     | CacheSnapshotCmd (sessionID, projection) -> cacheSnapshot state sessionID projection
-    | MarkRwToolCmd (sessionID, entry) -> markRwTool state sessionID entry
     | RecordLaunchCmd launch -> recordLaunch state launch
     | UpdateLatestLaunchResultCmd (title, result) -> updateLatestLaunchResult state title result
     | RecordLaunchOnceCmd (key, launch) -> recordLaunchOnce state key launch |> snd
     | DrainLaunchesCmd -> drainLaunches state |> snd
-    | ConsumeTurnCmd sessionID -> consumeDirtyTurn state sessionID |> snd
     | CompleteLaunchCmd key -> completeLaunch state key

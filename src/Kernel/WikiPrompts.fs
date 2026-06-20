@@ -43,13 +43,10 @@ let private snapshotEntries (files: WikiFile list) : WikiEntry list =
         | _ -> None)
     |> Option.defaultValue []
 
-let buildAppendPrompt (title: string) (workInput: string) (workOutput: string) (rwSummary: string) (projection: WikiProjection) : string =
-    let rwSection =
-        if String.IsNullOrWhiteSpace rwSummary then None
-        else Some ("=== RW Tool Summary ===\n" + rwSummary.Trim())
-    let coreSections = [
+let buildAppendPrompt (title: string) (workInput: string) (workOutput: string) (projection: WikiProjection) : string =
+    String.concat "\n\n" [
         "You are the project wiki bookkeeper."
-        "Submit exactly one `submit_wiki` call. Reuse existing ids when facts update, omit ids for new durable facts, and submit `[]` if nothing durable should be recorded."
+        "Submit exactly one `return_bookkeeper` call. Reuse existing ids when facts update, omit ids for new durable facts, and return `[]` if nothing durable should be recorded."
         "=== Existing Wiki ==="
         projectionText projection
         "=== Work Title ==="
@@ -58,20 +55,14 @@ let buildAppendPrompt (title: string) (workInput: string) (workOutput: string) (
         workInput
         "=== Work Output ==="
         workOutput
-    ]
-    let withRw =
-        match rwSection with
-        | Some section -> coreSections @ [ section ]
-        | None -> coreSections
-    String.concat "\n\n" (withRw @ [
         "=== Output Rules ==="
         "Record only stable project knowledge. Do not record temporary errors, progress chatter, or command noise."
-    ])
+    ]
 
 let buildDailyPrompt (date: string) (files: WikiFile list) (projection: WikiProjection) : string =
     String.concat "\n\n"
         [ "You are rewriting one day of the project wiki."
-          "Submit exactly one `submit_wiki` call. Replace the target day with durable canonical entries. It is valid to submit `[]`."
+          "Submit exactly one `return_bookkeeper` call. Replace the target day with durable canonical entries. It is valid to return `[]`."
           "=== Current Wiki ==="
           projectionText projection
           "=== Target Day ==="
@@ -82,7 +73,7 @@ let buildWeeklyPrompt (throughDate: string) (files: WikiFile list) (projection: 
     let dayEntries = filesText (entriesThroughCutoff files throughDate)
     String.concat "\n\n"
         [ "You are rewriting the project wiki snapshot."
-          "Submit exactly one `submit_wiki` call. Preserve surviving ids when possible, merge duplicates, omit ids only for genuinely new facts, and submit `[]` if nothing durable remains."
+          "Submit exactly one `return_bookkeeper` call. Preserve surviving ids when possible, merge duplicates, omit ids only for genuinely new facts, and return `[]` if nothing durable remains."
           "=== Current Wiki ==="
           projectionText projection
           "=== Previous Snapshot ==="

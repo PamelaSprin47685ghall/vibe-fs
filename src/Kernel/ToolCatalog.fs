@@ -83,9 +83,9 @@ let private fetchWikiSpec : ToolSpec =
       requiredFields = [ "id" ] }
 
 let private submitWikiSpec : ToolSpec =
-    { name = "submit_wiki"
+    { name = "return_bookkeeper"
       description =
-        "Submit wiki draft entries for the current wiki job context. The host decides whether this is an append, daily rewrite, or weekly rewrite job; entries with an id update existing knowledge, and entries without an id receive a host-assigned id."
+        "Return wiki draft entries for the current wiki job context. The host decides whether this is an append, daily rewrite, or weekly rewrite job; entries with an id update existing knowledge, and entries without an id receive a host-assigned id."
       paramDocs = map [ "entries", "Array of wiki draft entries. Each entry: optional id, required q, required a." ]
       requiredFields = [ "entries" ] }
 
@@ -186,7 +186,7 @@ module Params =
     let executorTimeout = doc "executor" "timeout_type"
     let executorMode = doc "executor" "mode"
     let fetchWikiId = doc "fetch_wiki" "id"
-    let submitWikiEntries = doc "submit_wiki" "entries"
+    let submitWikiEntries = doc "return_bookkeeper" "entries"
     let fuzzyFindPattern = doc "fuzzy_find" "pattern"
     let fuzzyFindPath = doc "fuzzy_find" "path"
     let fuzzyFindLimit = doc "fuzzy_find" "limit"

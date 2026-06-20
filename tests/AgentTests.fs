@@ -35,8 +35,8 @@ let canUse' () =
     check "manager can fetch_wiki" (canUse "manager" "fetch_wiki")
     check "coder denied fetch_wiki" (not (canUse "coder" "fetch_wiki"))
     check "reviewer denied fetch_wiki" (not (canUse "reviewer" "fetch_wiki"))
-    check "bookkeeper can submit_wiki" (canUse "bookkeeper" "submit_wiki")
-    check "manager denied submit_wiki" (not (canUse "manager" "submit_wiki"))
+    check "bookkeeper can return_bookkeeper" (canUse "bookkeeper" "return_bookkeeper")
+    check "manager denied return_bookkeeper" (not (canUse "manager" "return_bookkeeper"))
     check "bookkeeper denied read" (not (canUse "bookkeeper" "read"))
     check "bookkeeper denied coder dispatch" (not (canUse "bookkeeper" "coder"))
     check "bookkeeper denied websearch" (not (canUse "bookkeeper" "websearch"))
@@ -99,7 +99,7 @@ let canUseMatrix () =
     // (tool, expected-allow per agent in `agents` order)
     let matrix : (string * (bool list)) list = [
         "fetch_wiki",                    [ true;  false; false; false; false; false; false; false ]
-        "submit_wiki",                   [ false; false; false; false; false; false; false; true  ]
+        "return_bookkeeper",             [ false; false; false; false; false; false; false; true  ]
         "agent_report",                  [ true;  true;  true;  true;  true;  true;  true;  true  ]
         "bash",                          [ false; false; false; false; false; false; false; false ]
         "bash_run",                      [ false; false; false; false; false; false; false; false ]
