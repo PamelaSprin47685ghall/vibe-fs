@@ -55,11 +55,9 @@ let private validatedOllamaApiKey () : Result<string, DomainError> =
 let private normalizeOllamaPath (pathname: string) : string =
     if pathname.StartsWith("/") then pathname else $"/{pathname}"
 
-let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
-
 /// POST JSON to the Ollama API with the bearer key, returning parsed JSON.
 let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Promise<Result<obj, DomainError>> =
-    async {
+    promise {
         match validatedOllamaApiKey () with
         | Error e -> return Error e
         | Ok apiKey ->
@@ -70,13 +68,13 @@ let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
                 | Some signal -> postInitWithSignal apiKey bodyStr signal
                 | None -> postInitNoSignal apiKey bodyStr
             try
-                let! response = fetch url init |> Async.AwaitPromise
+                let! response = fetch url init
                 let ok = Dyn.truthy (Dyn.get response "ok")
                 if not ok then
                     let! text =
-                        async {
+                        promise {
                             try
-                                let! t = response?text() |> asPromise<string> |> Async.AwaitPromise
+                                let! (t: string) = response?text()
                                 return t
                             with _ -> return ""
                         }
@@ -85,9 +83,8 @@ let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
                     let detail = if text <> "" then text else statusText
                     return Error (UpstreamRefused $"Ollama API error ({status}): {detail}")
                 else
-                    let! json = response?json() |> asPromise<obj> |> Async.AwaitPromise
+                    let! (json: obj) = response?json()
                     return Ok json
             with ex ->
                 return Error (UnknownJsError ex.Message)
     }
-    |> Async.StartAsPromise

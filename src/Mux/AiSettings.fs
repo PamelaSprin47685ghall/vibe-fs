@@ -60,7 +60,7 @@ let mergeNamedSettings (sources: DelegatedAiSettings option list) : DelegatedAiS
         | None -> acc) emptySettings
 
 let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) : JS.Promise<DelegatedAiSettings> =
-    async {
+    promise {
         let cfg = decodeAiConfig config
         let configFile = loadConfigOrDefault deps
         let workspace =
@@ -70,9 +70,9 @@ let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) 
                 Dyn.get result "workspace"
         let byAgent = Dyn.get workspace "aiSettingsByAgent"
         let! descriptorSettings =
-            async {
+            promise {
                 try
-                    let! fm = resolveAgentFrontmatter deps cfg.runtime cfg.cwd agentId |> Async.AwaitPromise
+                    let! fm = resolveAgentFrontmatter deps cfg.runtime cfg.cwd agentId
                     let ai = Dyn.get fm "ai"
                     return { modelString = normalizeStr (Dyn.get ai "model"); thinkingLevel = thinkingFromEntry ai }
                 with _ -> return emptySettings
@@ -85,7 +85,7 @@ let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) 
                 Some descriptorSettings
                 if agentId = "exec" then namedSettingsFromRecord byAgent "exec" else None
             ]
-    } |> Async.StartAsPromise
+    }
 
 let internal coerceThinkingLevel (value: string) : string option =
     let trimmed = value.Trim()

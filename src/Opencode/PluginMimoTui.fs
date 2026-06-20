@@ -41,8 +41,7 @@ let private toOption (child: obj) : obj =
     let label = childLabel child
     box {| title = label; value = id; description = relTime (numField child "time" "updated") |}
 
-let private awaitObj (p: obj) : Async<obj> =
-    unbox<JS.Promise<obj>> p |> Async.AwaitPromise
+let private awaitObj (p: obj) : JS.Promise<obj> = unbox<JS.Promise<obj>> p
 
 let private toast (api: obj) (variant: string) (message: string) : unit =
     api?ui?toast(box {| message = message; variant = variant |}) |> ignore
@@ -58,7 +57,7 @@ let private openSubagents (api: obj) : unit =
     else
         let sessionID = Dyn.str (Dyn.get route "params") "sessionID"
         let directory = api?state?path?directory
-        async {
+        promise {
             try
                 let! sessRes = awaitObj (api?client?session?get(box {| sessionID = sessionID; directory = directory |}))
                 let sess = Dyn.get sessRes "data"
@@ -92,7 +91,7 @@ let private openSubagents (api: obj) : unit =
             with _ ->
                 toast api "error" "Failed to load subagents"
         }
-        |> Async.StartImmediate
+        |> Promise.start
 
 let private registerCommands (api: obj) : unit =
     api?command?register(System.Func<obj>(fun () ->
@@ -107,7 +106,7 @@ let private registerCommands (api: obj) : unit =
     )) |> ignore
 
 let private tuiImpl (api: obj) : JS.Promise<unit> =
-    async { registerCommands api } |> Async.StartAsPromise
+    promise { registerCommands api }
 
 [<ExportDefault>]
 let plugin = box {| id = "vibe-fs-subagents"; tui = tuiImpl |}

@@ -90,39 +90,36 @@ let getExecutorTempScriptPath (sessionId: string) (extension: string) : string =
 type RunOutcome = { stdout: string; stderr: string; code: int option; timedOut: bool }
 
 let private awaitChild (child: SpawnedChild) (kill: SpawnedChild -> unit) (timeoutMs: int option) : JS.Promise<RunOutcome> =
-    let work =
-        Async.FromContinuations(fun (resolve, reject, _) ->
-            let stdout = ResizeArray<string>()
-            let stderr = ResizeArray<string>()
-            let mutable settled = false
-            let removeListeners () =
-                try child?stdout?removeAllListeners() |> ignore with _ -> ()
-                try child?stderr?removeAllListeners() |> ignore with _ -> ()
-            let settle code timedOut =
-                if not settled then
-                    settled <- true
-                    removeListeners ()
-                    resolve { stdout = String.concat "" stdout
-                              stderr = String.concat "" stderr
-                              code = code
-                              timedOut = timedOut }
-            child?stdout?on("data", fun (c: obj) -> stdout.Add(string c)) |> ignore
-            child?stderr?on("data", fun (c: obj) -> stderr.Add(string c)) |> ignore
-            child?on("error", fun (e: obj) -> reject (e :?> exn)) |> ignore
-            child?on("close", fun (code: obj) ->
-                settle (if isNull code then None else Some(unbox<int> code)) false) |> ignore
-            match timeoutMs with
-            | None -> ()
-            | Some ms ->
-                async {
-                    do! Async.Sleep ms
-                    if not settled then
-                        kill child
-                        settle None true
-                }
-                |> Async.StartImmediate
-        )
-    work |> Async.StartAsPromise
+    Promise.create (fun resolve reject ->
+        let stdout = ResizeArray<string>()
+        let stderr = ResizeArray<string>()
+        let mutable settled = false
+        let removeListeners () =
+            try child?stdout?removeAllListeners() |> ignore with _ -> ()
+            try child?stderr?removeAllListeners() |> ignore with _ -> ()
+        let settle code timedOut =
+            if not settled then
+                settled <- true
+                removeListeners ()
+                resolve { stdout = String.concat "" stdout
+                          stderr = String.concat "" stderr
+                          code = code
+                          timedOut = timedOut }
+        child?stdout?on("data", fun (c: obj) -> stdout.Add(string c)) |> ignore
+        child?stderr?on("data", fun (c: obj) -> stderr.Add(string c)) |> ignore
+        child?on("error", fun (e: obj) -> reject (e :?> exn)) |> ignore
+        child?on("close", fun (code: obj) ->
+            settle (if isNull code then None else Some(unbox<int> code)) false) |> ignore
+        let onTimeout () =
+            if not settled then (kill child; settle None true)
+        match timeoutMs with
+        | None -> ()
+        | Some ms ->
+            promise {
+                do! Promise.sleep ms
+                onTimeout ()
+            }
+            |> Promise.start)
 
 let spawnAndRun (command: string) (args: string array) (cwd: string) (timeoutMs: int option)
                 : JS.Promise<RunOutcome> =
@@ -150,31 +147,26 @@ let private runPythonProgram (program: string) (dependencies: string list) (cwd:
                yield dep |]
     let warmup () =
         spawnAndRun "uvx" (Array.append baseArgs [| "--from"; "python"; "python"; "-c"; "pass" |]) cwd None
-    async {
+    promise {
         if not dependencies.IsEmpty then
-            let! warm = warmup () |> Async.AwaitPromise
+            let! warm = warmup ()
             if warm.code <> Some 0 then return warm
             else
                 return! runScript "uvx" (Array.append baseArgs [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs)
-                          |> Async.AwaitPromise
         else
             return! runScript "uvx" (Array.append baseArgs [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs)
-                      |> Async.AwaitPromise
     }
-    |> Async.StartAsPromise
 
 let private runJavascriptProgram (program: string) (dependencies: string list) (cwd: string)
                                  (sessionId: string) (timeoutMs: int) : JS.Promise<RunOutcome> =
-    async {
+    promise {
         let projectDir = getExecutorProjectDir (Some sessionId)
-        do! ensureJavascriptProject projectDir dependencies |> Async.AwaitPromise
-        let! rewritten = rewriteJavascriptModuleSpecifiers program cwd |> Async.AwaitPromise
+        do! ensureJavascriptProject projectDir dependencies
+        let! rewritten = rewriteJavascriptModuleSpecifiers program cwd
         let body = $"{createJavascriptPrelude cwd}{rewritten}"
         let scriptPath = createTempScript $"{projectDir}/script.mts" body
         return! runScript "npx" [| "--prefix"; projectDir; "--yes"; "--no-install"; "tsx" |] cwd scriptPath (Some timeoutMs)
-                  |> Async.AwaitPromise
     }
-    |> Async.StartAsPromise
 
 let private isErrnoException (error: obj) : bool =
     not (isNull error) && string error?("code") = "ENOENT"
@@ -212,14 +204,13 @@ let defaultExecuteDeps : ExecuteDeps = { runProgram = defaultRunProgram }
 
 let executeWith (deps: ExecuteDeps) (options: ExecuteOptions) (sessionId: string)
                 : JS.Promise<ExecuteResult> =
-    async {
+    promise {
         let timeout = timeoutMs options.timeoutType
         let cwd = defaultArg options.cwd (nodeProcess?cwd())
         let program = prepareProgramForExecution options
         try
             let! outcome =
                 deps.runProgram program options.language options.dependencies cwd sessionId timeout
-                |> Async.AwaitPromise
             let output = (outcome.stdout + outcome.stderr).Trim()
             return mapOutcome options timeout output outcome
         with error ->
@@ -229,7 +220,6 @@ let executeWith (deps: ExecuteDeps) (options: ExecuteOptions) (sessionId: string
                                          output = $"Error: '{executable}' executable not found. Please ensure '{executable}' is installed and available on your PATH.")
             else return Failed(output = $"Error: {error.Message}")
     }
-    |> Async.StartAsPromise
 
 let execute (options: ExecuteOptions) (sessionId: string) : JS.Promise<ExecuteResult> =
     executeWith defaultExecuteDeps options sessionId

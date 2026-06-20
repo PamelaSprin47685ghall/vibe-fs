@@ -100,20 +100,17 @@ module Tool =
         (title: string)
         (aiSettingsAgentId: string)
         (role: string)
-        (buildPrompt: obj -> obj -> Async<string>)
+        (buildPrompt: obj -> obj -> JS.Promise<string>)
         : obj -> obj -> JS.Promise<string> =
         fun config args ->
-            async {
+            promise {
                 match strField config "workspaceId" with
                 | None -> return $"{title} requires workspaceId"
                 | Some _ ->
                     let! prompt = buildPrompt config args
                     let opts = toolOptions toolNames role aiSettingsAgentId
-                    return!
-                        runMuxSubagent deps config agentId prompt title opts
-                        |> Async.AwaitPromise
+                    return! runMuxSubagent deps config agentId prompt title opts
             }
-            |> Async.StartAsPromise
 
     let bindParallel
         (deps: obj)
@@ -122,10 +119,10 @@ module Tool =
         (title: string)
         (aiSettingsAgentId: string)
         (role: string)
-        (buildPrompts: obj -> obj -> Async<string array>)
+        (buildPrompts: obj -> obj -> JS.Promise<string array>)
         : obj -> obj -> JS.Promise<string> =
         fun config args ->
-            async {
+            promise {
                 match strField config "workspaceId" with
                 | None -> return $"{title} requires workspaceId"
                 | Some _ ->
@@ -138,21 +135,20 @@ module Tool =
                         let! reports =
                             prompts
                             |> Array.map (fun prompt ->
-                                async {
+                                promise {
                                     try
-                                        let! r = runMuxSubagent deps (abortableConfig config controller.signal) agentId prompt title opts |> Async.AwaitPromise
+                                        let! r = runMuxSubagent deps (abortableConfig config controller.signal) agentId prompt title opts
                                         return Some r
                                     with _ ->
                                         controller.abort()
                                         return None
                                 })
-                            |> Async.Parallel
+                            |> Promise.all
                         return joinReports (reports |> Array.choose id |> Array.toList)
             }
-            |> Async.StartAsPromise
 
-let private buildCoderPrompts (_config: obj) (args: obj) : Async<string array> =
-    async {
+let private buildCoderPrompts (_config: obj) (args: obj) : JS.Promise<string array> =
+    promise {
         match parseCoderIntents (Dyn.get args "intents") with
         | Error _ -> return [||]
         | Ok intents -> return formatPrompt mimocode (Coder intents) |> List.toArray
@@ -165,8 +161,8 @@ let coderTool (deps: obj) (toolNames: string array) : ToolDefinition =
       execute = Tool.bindParallel deps toolNames "exec" "Coder" "exec" "coder" buildCoderPrompts
       condition = None }
 
-let private buildInvestigatorPrompts (_config: obj) (args: obj) : Async<string array> =
-    async {
+let private buildInvestigatorPrompts (_config: obj) (args: obj) : JS.Promise<string array> =
+    promise {
         match parseInvestigatorIntents (Dyn.get args "intents") with
         | Error _ -> return [||]
         | Ok intents -> return formatPrompt mimocode (Investigator intents) |> List.toArray
@@ -179,12 +175,12 @@ let investigatorTool (deps: obj) (toolNames: string array) : ToolDefinition =
       execute = Tool.bindParallel deps toolNames "explore" "Investigator" "explore" "investigator" buildInvestigatorPrompts
       condition = None }
 
-let private meditatorPromptFromArgs (config: obj) (args: obj) : Async<string> =
-    async {
+let private meditatorPromptFromArgs (config: obj) (args: obj) : JS.Promise<string> =
+    promise {
         let intent = defaultArg (strField args "intent") ""
         let files = requireStrArray args "files" |> List.ofArray
         let cwd = defaultArg (strField config "directory") ""
-        let! results = VibeFs.Shell.WorkspaceFiles.readReverieFiles cwd files |> Async.AwaitPromise
+        let! results = VibeFs.Shell.WorkspaceFiles.readReverieFiles cwd files
         let sections =
             results
             |> List.map (fun r -> { file = r.filePath; content = r.content } : MeditatorFileSection)
@@ -201,8 +197,8 @@ let meditatorTool (deps: obj) (toolNames: string array) : ToolDefinition =
       execute = Tool.bind deps toolNames "explore" "Meditator" "exec" "meditator" meditatorPromptFromArgs
       condition = None }
 
-let private buildBrowserPrompt (_config: obj) (args: obj) : Async<string> =
-    async {
+let private buildBrowserPrompt (_config: obj) (args: obj) : JS.Promise<string> =
+    promise {
         let intent = defaultArg (strField args "intent") ""
         return formatPrompt mimocode (Browser intent) |> List.head
     }
@@ -228,7 +224,7 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                   if reviewStore.isReviewActive workspaceId then resolveStr "A review is already in progress for this session."
                   else resolveStr "You do not need review. Just continue with your work."
               else
-                  async {
+                  promise {
                       try
                           let originalTask = defaultArg (reviewStore.getReviewTask workspaceId) ""
                           let taskSection = if originalTask = "" then "" else "\n=== Original Task ===\n\n" + originalTask
@@ -245,11 +241,11 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                                   [ "subagentRole", box "reviewer"
                                     "toolPolicy", box (createObj [ "disabledTools", box disabledTools ]) ]
                           let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
-                          let! _ = delegateToSubAgent deps config "explore" reviewPrompt "Review" (Some opts) |> Async.AwaitPromise
+                          let! _ = delegateToSubAgent deps config "explore" reviewPrompt "Review" (Some opts)
                           let! verdict =
-                              async {
+                              promise {
                                   try
-                                      let! args = verdictPromise |> Async.AwaitPromise
+                                      let! args = verdictPromise
                                       let v = defaultArg (strField args "verdict") "" |> fun s -> s.Trim().ToLowerInvariant()
                                       let feedback = defaultArg (strField args "feedback") ""
                                       if v = "pass" then return Accepted
@@ -264,5 +260,5 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                           return formatReviewResult verdict
                       finally
                           reviewStore.unlockReview workspaceId
-                  } |> Async.StartAsPromise
+                  }
       condition = None }

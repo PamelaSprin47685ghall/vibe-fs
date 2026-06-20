@@ -32,8 +32,8 @@ let private toolsToObject (tools: ToolDefinition array) : obj =
     createObj [ for t in tools -> t.name, box t ]
 
 let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]> =
-    async {
-        let! files = findCapsFiles projectRoot |> Async.AwaitPromise
+    promise {
+        let! files = findCapsFiles projectRoot
         if List.isEmpty files then return [||]
         else
             let timestamp = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
@@ -52,7 +52,6 @@ let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]
                                   lines_read = f.content.Split('\n').Length
                                   content = f.content.Split('\n') |> Array.mapi (fun i line -> $"{i + 1}\t{line}") |> String.concat "\n" |} })
     }
-    |> Async.StartAsPromise
 
 let createToolCatalog
     (deps: obj)
@@ -97,10 +96,10 @@ let createRegistration (deps: obj) : obj =
            mcpServers = mcpServers
            contextInjector =
                box {| inject = (fun (projectPath: string) ->
-                   async {
-                       let! files = findCapsFiles projectPath |> Async.AwaitPromise
+                   promise {
+                       let! files = findCapsFiles projectPath
                        return if List.isEmpty files then box null else box (VibeFs.Kernel.CapsFormat.buildCapitalsContext files)
-                   } |> Async.StartAsPromise :> obj) |}
+                   } :> obj) |}
            eventHook = eventHook
            slashCommands = slashCommands
            getToolPolicy = (fun (_agentId: string) (role: obj) ->

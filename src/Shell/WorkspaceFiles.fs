@@ -25,10 +25,9 @@ let private yamlParse (text: string) : obj = jsNative
 [<Import("promises", "node:fs")>]
 let private fsPromises : obj = jsNative
 
-let private asPromise<'T> (value: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> value
-let private readdir (dir: string) : JS.Promise<obj[]> = fsPromises?readdir(dir, {| withFileTypes = true |}) |> asPromise<obj[]>
-let private stat (path: string) : JS.Promise<obj> = fsPromises?stat(path) |> asPromise<obj>
-let private readFile (path: string) : JS.Promise<string> = fsPromises?readFile(path, "utf-8") |> asPromise<string>
+let private readdir (dir: string) : JS.Promise<obj[]> = fsPromises?readdir(dir, {| withFileTypes = true |})
+let private stat (path: string) : JS.Promise<obj> = fsPromises?stat(path)
+let private readFile (path: string) : JS.Promise<string> = fsPromises?readFile(path, "utf-8")
 let private statSize (s: obj) : int = s?size
 let private statIsFile (s: obj) : bool = s?isFile ()
 let private statIsDirectory (s: obj) : bool = s?isDirectory ()
@@ -44,19 +43,19 @@ let private entryName (entry: obj) : string = entry?name
 let private entryIsFile (entry: obj) : bool = entry?isFile ()
 let private entryIsDirectory (entry: obj) : bool = entry?isDirectory ()
 
-let private tryReadFileAsync (filePath: string) (label: string) : Async<CapsFile option> =
-    async {
+let private tryReadFileAsync (filePath: string) (label: string) : JS.Promise<CapsFile option> =
+    promise {
         try
-            let! fileStat = stat filePath |> Async.AwaitPromise
+            let! fileStat = stat filePath
             if not (statIsFile fileStat) || statSize fileStat > maxFileSize then return None
             else
-                let! content = readFile filePath |> Async.AwaitPromise
+                let! content = readFile filePath
                 return if content.Trim() = "" then None else Some { filePath = filePath; label = label; content = content }
         with _ -> return None
     }
 
-let private absorbFileAsync (filePath: string) (label: string) (budget: Budget) : Async<Budget> =
-    async {
+let private absorbFileAsync (filePath: string) (label: string) (budget: Budget) : JS.Promise<Budget> =
+    promise {
         if isFull budget then return budget
         else
             let! fileInfo = tryReadFileAsync filePath label
@@ -65,14 +64,14 @@ let private absorbFileAsync (filePath: string) (label: string) (budget: Budget) 
             | Some file -> return absorb file budget
     }
 
-let rec private collectDirAsync (dirPath: string) (projectRoot: string) (budget: Budget) : Async<Budget> =
-    async {
+let rec private collectDirAsync (dirPath: string) (projectRoot: string) (budget: Budget) : JS.Promise<Budget> =
+    promise {
         if isFull budget then return budget
         else
             try
-                let! entries = readdir dirPath |> Async.AwaitPromise
+                let! entries = readdir dirPath
                 let rec processEntry index currentBudget =
-                    async {
+                    promise {
                         if index >= entries.Length || isFull currentBudget then return currentBudget
                         else
                             let entry = entries.[index]
@@ -91,13 +90,13 @@ let rec private collectDirAsync (dirPath: string) (projectRoot: string) (budget:
             with _ -> return budget
     }
 
-let private readImportEntryAsync (projectRoot: string) (entry: string) (budget: Budget) : Async<Budget> =
-    async {
+let private readImportEntryAsync (projectRoot: string) (entry: string) (budget: Budget) : JS.Promise<Budget> =
+    promise {
         if isFull budget then return budget
         else
             let absPath = pathResolve projectRoot entry
             try
-                let! s = stat absPath |> Async.AwaitPromise
+                let! s = stat absPath
                 if statIsFile s then
                     return! absorbFileAsync absPath (pathRelative projectRoot absPath) budget
                 elif statIsDirectory s then
@@ -107,9 +106,9 @@ let private readImportEntryAsync (projectRoot: string) (entry: string) (budget: 
             with _ -> return budget
     }
 
-let private readImportsAsync (projectRoot: string) (entries: string list) (budget: Budget) : Async<Budget> =
+let private readImportsAsync (projectRoot: string) (entries: string list) (budget: Budget) : JS.Promise<Budget> =
     let rec loop remaining currentBudget =
-        async {
+        promise {
             match remaining with
             | [] -> return currentBudget
             | entry :: rest ->
@@ -148,7 +147,7 @@ let private extractImportList (frontmatter: obj option) : string list =
             else [ string importVal ]
 
 let findCapsFiles (projectRoot: string) : JS.Promise<CapsFile list> =
-    async {
+    promise {
         let agentsPath = pathJoin projectRoot "AGENTS.md"
         let! agentsFile = tryReadFileAsync agentsPath "AGENTS.md"
         match agentsFile with
@@ -162,7 +161,6 @@ let findCapsFiles (projectRoot: string) : JS.Promise<CapsFile list> =
             let! finalBudget = readImportsAsync projectRoot importList initial
             return finalBudget.results |> Seq.toList |> List.sortBy (fun file -> file.filePath)
     }
-    |> Async.StartAsPromise
 
 let maxReverieFileBytes = 1_048_576
 
@@ -175,29 +173,28 @@ let private statSize2 (s: obj) : int = s?size
 let private statIsFile2 (s: obj) : bool = s?isFile ()
 
 let readOne (cwd: string) (file: string) : JS.Promise<ReverieFileResult> =
-    async {
+    promise {
         let absolute = pathResolve cwd file
         try
-            let! s = stat absolute |> Async.AwaitPromise
+            let! s = stat absolute
             if not (statIsFile2 s) then
                 return { filePath = file; content = None; skipReason = Some "not-file" }
             elif statSize2 s > maxReverieFileBytes then
                 return { filePath = file; content = None; skipReason = Some "too-large" }
             else
-                let! content = readFile absolute |> Async.AwaitPromise
+                let! content = readFile absolute
                 return { filePath = absolute; content = Some content; skipReason = None }
         with _ ->
             return { filePath = file; content = None; skipReason = Some "unreadable" }
     }
-    |> Async.StartAsPromise
 
 let readReverieFiles (cwd: string) (files: string list) : JS.Promise<ReverieFileResult list> =
     let rec loop remaining acc =
-        async {
+        promise {
             match remaining with
             | [] -> return List.rev acc
             | file :: rest ->
-                let! r = readOne cwd file |> Async.AwaitPromise
+                let! r = readOne cwd file
                 return! loop rest (r :: acc)
         }
-    loop files [] |> Async.StartAsPromise
+    loop files []

@@ -19,7 +19,7 @@ let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> 
 let private setOutput (o: obj) (v: string) : unit =
     o?("output") <- v
 
-let private resolvedUnitPromise () : JS.Promise<unit> = async { return () } |> Async.StartAsPromise
+let private resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
 
 // ── Atomic state holder ──
 //
@@ -40,17 +40,17 @@ type private StateHolder<'state>(initialState: 'state) =
         state <- nextState
         result
 
-let private collectSnapshot (client: obj) (sessionID: SessionId) : Async<SessionSnapshot option> =
-    async {
+let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<SessionSnapshot option> =
+    promise {
         try
             let sessionIDStr = Id.sessionIdValue sessionID
             let session = Dyn.get client "session"
-            let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session |> Async.AwaitPromise
+            let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
             let openTodos = decodeTodos (Dyn.get todoResp "data")
             let! (lastAssistantMessage, agentFromMessage, messageCount) =
-                async {
+                promise {
                     try
-                        let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session |> Async.AwaitPromise
+                        let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
                         let text, agent, count = decodeLastAssistant (Dyn.get messagesResp "data")
                         return (text, agent, count)
                     with _ ->
@@ -63,12 +63,12 @@ let private collectSnapshot (client: obj) (sessionID: SessionId) : Async<Session
         with _ -> return None
     }
 
-let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string option) (promptText: string) : Async<unit> =
-    async {
+let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string option) (promptText: string) : JS.Promise<unit> =
+    promise {
         let body = createPromptBody agentOpt promptText
         let promptArg = box {| path = box {| id = Id.sessionIdValue sessionID |}; body = body |}
         let session = Dyn.get client "session"
-        do! invoke1 promptArg "prompt" session |> Async.AwaitPromise |> Async.Ignore
+        do! invoke1 promptArg "prompt" session |> Promise.map ignore
     }
 
 let private decodeNudgeHostEvent (eventType: string) (props: obj) : NudgeHostEvent =
@@ -120,8 +120,8 @@ let private decodeNudgeHostEvent (eventType: string) (props: obj) : NudgeHostEve
 let private runNudgeFlow (holder: StateHolder<VibeFs.Kernel.NudgeState.NudgeShellState>) (client: obj)
                           (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                           (registry: ChildAgentRegistry)
-                          (sessionID: SessionId) : Async<unit> =
-    async {
+                          (sessionID: SessionId) : JS.Promise<unit> =
+    promise {
         try
             let! snapshotOpt = collectSnapshot client sessionID
             match snapshotOpt with
@@ -131,11 +131,11 @@ let private runNudgeFlow (holder: StateHolder<VibeFs.Kernel.NudgeState.NudgeShel
                 match holder.Mutate(fun (state: VibeFs.Kernel.NudgeState.NudgeShellState) -> VibeFs.Kernel.NudgeState.decideNudge reviewStore.isReviewActive registry.LookupChildAgent state sid snapshot) with
                 | VibeFs.Kernel.NudgeState.StandDown -> ()
                 | VibeFs.Kernel.NudgeState.Send(promptText, agentOpt, messageCount) ->
-                    let! caught = Async.Catch(sendNudge client sessionID agentOpt promptText)
+                    let! caught = sendNudge client sessionID agentOpt promptText |> Promise.result
                     let outcome =
                         match caught with
-                        | Choice1Of2 () -> VibeFs.Kernel.NudgeState.Delivered messageCount
-                        | Choice2Of2 error ->
+                        | Ok () -> VibeFs.Kernel.NudgeState.Delivered messageCount
+                        | Error error ->
                             match translateJsError error with
                             | MessageAborted -> VibeFs.Kernel.NudgeState.Aborted
                             | SessionBusy -> VibeFs.Kernel.NudgeState.Busy
@@ -148,15 +148,15 @@ let private runNudgeFlow (holder: StateHolder<VibeFs.Kernel.NudgeState.NudgeShel
             holder.Mutate(fun (state: VibeFs.Kernel.NudgeState.NudgeShellState) -> VibeFs.Kernel.NudgeState.clearSession state (Id.sessionIdValue sessionID), ())
     }
 
-/// Fire the nudge flow detached from the caller's hook promise.  `StartImmediate`
-/// runs only up to the first `AwaitPromise` (kicking off the snapshot SDK call,
-/// which is non-blocking) before yielding, so the hook returns at once and the
-/// rest of the flow — including any `session.prompt` — never blocks the lock.
+/// Fire the nudge flow detached from the caller's hook promise.  `Promise.start`
+/// kicks off the promise without waiting (JS promises are hot), so the hook
+/// returns at once and the rest of the flow — including any `session.prompt` —
+/// never blocks the lock.
 let private startNudgeFlow (holder: StateHolder<VibeFs.Kernel.NudgeState.NudgeShellState>) (client: obj)
                             (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                             (registry: ChildAgentRegistry)
                             (sessionID: SessionId) : unit =
-    Async.StartImmediate(runNudgeFlow holder client reviewStore registry sessionID)
+    runNudgeFlow holder client reviewStore registry sessionID |> Promise.start
 
 // ── Hook class ──
 
@@ -180,14 +180,14 @@ type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.Rev
         resolvedUnitPromise ()
 
     member _.handleToolExecuteAfter(input: obj) (output: obj) : JS.Promise<unit> =
-        async {
+        promise {
             if normalizeToolName host (Dyn.str input "tool") = "todowrite" then
                 let out = Dyn.get output "output"
                 if not (Dyn.isNullish out) && Dyn.typeIs out "string" then
                     let s = string out
                     if not (s.Contains meditatorNudge) then
                         setOutput output (s + "\n" + meditatorNudge)
-        } |> Async.StartAsPromise
+        }
 
     member _.handleEvent(input: obj) : JS.Promise<unit> =
         let claimed =

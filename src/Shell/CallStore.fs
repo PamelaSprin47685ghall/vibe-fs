@@ -30,13 +30,13 @@ let private cleanupOld (store: CallStore) =
         store.PendingCalls.Remove(k) |> ignore
 
 let registerCallWithTimeout (store: CallStore) (callId: string) (timeoutMs: int64) : JS.Promise<obj> =
-    async {
+    promise {
         cleanupOld store
         let! result =
-            Async.FromContinuations (fun (cont, econt, _) ->
+            Promise.create (fun resolve reject ->
                 let entry =
-                    { resolve = cont
-                      reject = econt
+                    { resolve = resolve
+                      reject = reject
                       createdAt = nowMs () }
                 store.PendingCalls.[callId] <- entry
                 JS.setTimeout (fun () ->
@@ -48,7 +48,6 @@ let registerCallWithTimeout (store: CallStore) (callId: string) (timeoutMs: int6
         store.PendingCalls.Remove(callId) |> ignore
         return result
     }
-    |> Async.StartAsPromise
 
 let registerCall (store: CallStore) (callId: string) : JS.Promise<obj> = registerCallWithTimeout store callId ttlMs
 

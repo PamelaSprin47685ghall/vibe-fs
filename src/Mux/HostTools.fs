@@ -37,13 +37,13 @@ let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
       timeoutType = parseTimeout (Dyn.str args "timeout_type")
       cwd = Some (getCwd config) }
 
-let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptions) (output: string) : Async<string> =
-    async {
+let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptions) (output: string) : JS.Promise<string> =
+    promise {
         if not (shouldSummarize byteLength output) then
             return prependSafetyWarningForExecution output options
         else
             let prompt = formatPrompt mimocode (ExecutorSummary output) |> List.head
-            let! report = runMuxSubagent deps config "executor" prompt "Executor summary" None |> Async.AwaitPromise
+            let! report = runMuxSubagent deps config "executor" prompt "Executor summary" None
             return prependSafetyWarningForExecution report options
     }
 
@@ -74,16 +74,15 @@ let executorTool (deps: obj) : ToolDefinition =
             [| "language"; "program"; "timeout_type" |]
       execute =
         fun config args ->
-            async {
+            promise {
                 let opts = buildExecutorOptions args config
                 let sessionId = Dyn.str config "sessionID"
-                let! execResult = VibeFs.Shell.Executor.execute opts sessionId |> Async.AwaitPromise
+                let! execResult = VibeFs.Shell.Executor.execute opts sessionId
                 let output =
                     match execResult with
                     | Completed o | Truncated(o, _) | Failed o | MissingExecutable(_, o) -> o
                 return! summarizeWhenNeeded deps config opts output
             }
-            |> Async.StartAsPromise
       condition = None }
 
 let readTool (_deps: obj) (hostReadExec: HostReadExec) : ToolDefinition =
@@ -99,19 +98,18 @@ let readTool (_deps: obj) (hostReadExec: HostReadExec) : ToolDefinition =
             [| "path" |]
       execute =
         fun config args ->
-            async {
+            promise {
                 let path = Dyn.str args "path"
                 let offset = optInt args "offset"
                 let limit = optInt args "limit"
                 match hostReadExec.TryGet() with
                 | Some hostExec ->
                     let hostFn = hostExec :?> obj -> obj -> JS.Promise<obj>
-                    let! result = hostFn args config |> Async.AwaitPromise
+                    let! result = hostFn args config
                     return string result
                 | None ->
                     return! read (Some (getCwd config)) path offset limit
             }
-            |> Async.StartAsPromise
       condition = None }
 
 let writeTool (_deps: obj) : ToolDefinition =
@@ -126,7 +124,7 @@ let writeTool (_deps: obj) : ToolDefinition =
             [| "file_path"; "content" |]
       execute =
         fun config args ->
-            async {
+            promise {
                 if not (Dyn.has args "file_path") then
                     return describeDomainError (InvalidIntent ("write", "file_path", "missing required parameter"))
                 elif not (Dyn.has args "content") then
@@ -142,7 +140,6 @@ let writeTool (_deps: obj) : ToolDefinition =
                         | Ok msg -> return msg
                         | Error e -> return describeDomainError e
             }
-            |> Async.StartAsPromise
       condition = None }
 
 let private buildFinderOptions (config: obj) (finderCache: FinderCache) : SearchOptions =
@@ -165,11 +162,10 @@ let fuzzyFindTool (finderCache: FinderCache) : ToolDefinition =
                     limit = optInt args "limit"
                     iterator = strField args "iterator" }
               let o = buildFinderOptions config finderCache
-              async {
-                  let! r = FuzzyCommandsModule.fuzzyFind p o |> Async.AwaitPromise
+              promise {
+                  let! r = FuzzyCommandsModule.fuzzyFind p o
                   return r.output
               }
-              |> Async.StartAsPromise
       condition = None }
 
 let fuzzyGrepTool (finderCache: FinderCache) : ToolDefinition =
@@ -189,11 +185,10 @@ let fuzzyGrepTool (finderCache: FinderCache) : ToolDefinition =
                     limit = optInt args "limit"
                     iterator = strField args "iterator" }
               let o = buildFinderOptions config finderCache
-              async {
-                  let! r = FuzzyCommandsModule.fuzzyGrep p o |> Async.AwaitPromise
+              promise {
+                  let! r = FuzzyCommandsModule.fuzzyGrep p o
                   return r.output
               }
-              |> Async.StartAsPromise
       condition = None }
 
 let websearchTool (deps: obj) : ToolDefinition =
@@ -207,10 +202,10 @@ let websearchTool (deps: obj) : ToolDefinition =
           | Some _ when whatToSummarize = "" -> resolveStr "Error: `what_to_summarize` is required"
           | Some query ->
               let abortSignal = Dyn.get config "abortSignal"
-              async {
+              promise {
                   let numResults = defaultArg (optInt args "numResults") 10
                   let body = createObj [ "query", box query; "max_results", box numResults ]
-                  let! result = ollamaPost "web_search" body (if Dyn.isNullish abortSignal then None else Some abortSignal) |> Async.AwaitPromise
+                  let! result = ollamaPost "web_search" body (if Dyn.isNullish abortSignal then None else Some abortSignal)
                   match result with
                   | Error e -> return "Web search failed: " + describeDomainError e
                   | Ok data ->
@@ -222,9 +217,8 @@ let websearchTool (deps: obj) : ToolDefinition =
                       if items.IsEmpty then return rawResults
                       else
                           let prompt = formatPrompt mimocode (WebsearchSummary(whatToSummarize, rawResults)) |> List.head
-                          return! runMuxSubagent deps config "executor" prompt "Web search summary" None |> Async.AwaitPromise
+                          return! runMuxSubagent deps config "executor" prompt "Web search summary" None
               }
-              |> Async.StartAsPromise
       condition = None }
 
 let webfetchTool : ToolDefinition =
@@ -236,7 +230,7 @@ let webfetchTool : ToolDefinition =
           | None -> resolveStr "Error: `url` must be a string"
           | Some url ->
               let abortSignal = Dyn.get config "abortSignal"
-              async {
+              promise {
                   let bodyEntries = ResizeArray<(string * obj)>()
                   bodyEntries.Add("url", box url)
                   match optBool args "extract_main" with Some v -> bodyEntries.Add("extract_main", box v) | None -> ()
@@ -244,7 +238,7 @@ let webfetchTool : ToolDefinition =
                   match strField args "prompt" with Some v -> bodyEntries.Add("prompt", box v) | None -> ()
                   match optInt args "timeout" with Some v -> bodyEntries.Add("timeout", box v) | None -> ()
                   let body = createObj (Seq.toList bodyEntries)
-                  let! result = ollamaPost "web_fetch" body (if Dyn.isNullish abortSignal then None else Some abortSignal) |> Async.AwaitPromise
+                  let! result = ollamaPost "web_fetch" body (if Dyn.isNullish abortSignal then None else Some abortSignal)
                   match result with
                   | Error e -> return "Web fetch failed: " + describeDomainError e
                   | Ok data ->
@@ -254,5 +248,4 @@ let webfetchTool : ToolDefinition =
                       let content = if Dyn.isNullish (Dyn.get data "content") then None else Some (Dyn.str data "content")
                       return formatFetchResponse { title = title; byline = byline; length = length_; content = content }
               }
-              |> Async.StartAsPromise
       condition = None }

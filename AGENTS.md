@@ -1,6 +1,5 @@
 ---
-import:
-  - src/
+import: []
 ---
 
 $ pnpm build && pnpm test
@@ -26,8 +25,12 @@ $ pnpm build && pnpm test
 
 ✅ **唯一合法用法：**
 ```fsharp
-open Fable.Core.JS
-// 必须安装并引用 Fable.Promise 库
+open Fable.Core
+// 已通过 NuGet 引用 Fable.Promise 包。该包的 `Promise` 模块是顶层
+// RequireQualifiedAccess 模块——不要 `open Fable.Promise`，直接用
+// `Promise.lift/create/all/race/sleep/bind/map/catch` 等限定名即可；
+// `promise { }` CE 由 AutoOpen 自动可用。注意：resolve 对应 `Promise.lift`，
+// 库中没有 `Promise.resolve`。
 
 let doSomethingAsync () : JS.Promise<string> =
     promise {
@@ -65,7 +68,7 @@ open Fable.Core.JS
 
 /// 单线程下的无锁异步串行队列
 type SerialQueue() =
-    let mutable tail : JS.Promise<unit> = Promise.resolve()
+    let mutable tail : JS.Promise<unit> = Promise.lift ()
 
     /// 将任务排入队列，并返回该任务的 Promise 结果
     member _.Enqueue(work: unit -> JS.Promise<'T>) : JS.Promise<'T> =

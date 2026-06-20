@@ -65,14 +65,14 @@ let installTitleFetchGuard () : unit =
         let nativeFetch = emitJsExpr () "globalThis.fetch"
         let guarded : obj -> obj -> JS.Promise<obj> =
             fun url init ->
-                async {
+                promise {
                     let body = get init "body"
                     if not (isTitleRequestBody body) then
-                        return! callNative nativeFetch url init |> Async.AwaitPromise
+                        return! callNative nativeFetch url init
                     else
                         let parsed = JS.JSON.parse (string body)
                         rewriteTitleMessages parsed
                         init?("body") <- box (JS.JSON.stringify parsed)
-                        return! callNative nativeFetch url init |> Async.AwaitPromise
-                } |> Async.StartAsPromise
+                        return! callNative nativeFetch url init
+                }
         emitJsExpr (guarded) "globalThis.fetch = $0" |> ignore

@@ -9,6 +9,7 @@ open VibeFs.Kernel.WikiPrompts
 open VibeFs.Kernel.WikiMaintenance
 open VibeFs.Shell.WikiFiles
 open VibeFs.Shell.WikiPortLock
+open VibeFs.Shell.PromiseQueue
 
 type BookkeeperLaunch =
     { agent: string
@@ -26,56 +27,25 @@ type WikiJobContext =
     { workspaceRoot: string
       kind: WikiJobKind }
 
-type WikiWork =
-    { workspaceRoot: string
-      work: unit -> Async<unit> }
-
-type private WikiActorMessage =
-    | FireAndForget of WikiWork
-    | AwaitResult of workspaceRoot: string * work: (unit -> Async<string>) * reply: AsyncReplyChannel<Result<string, exn>>
-
+/// Per-workspace serial queue: serializes wiki writes (append/daily/weekly) so
+/// concurrent jobs on the same workspace never interleave. Replaces the legacy
+/// F# Agent actor with a Promise-chain SerialQueue.
 type WikiActor() =
-    let actors = Dictionary<string, MailboxProcessor<WikiActorMessage>>()
+    let queues = Dictionary<string, SerialQueue>()
 
-    let createWorkspaceAgent () =
-        MailboxProcessor.Start(fun inbox ->
-            let rec loop () =
-                async {
-                    let! message = inbox.Receive()
-                    match message with
-                    | FireAndForget work ->
-                        let! _ = Async.Catch (work.work ())
-                        return! loop ()
-                    | AwaitResult(_, work, reply) ->
-                        let! outcome = Async.Catch (work ())
-                        match outcome with
-                        | Choice1Of2 result -> reply.Reply (Ok result)
-                        | Choice2Of2 error -> reply.Reply (Error error)
-                        return! loop ()
-                }
-
-            loop ())
-
-    let getWorkspaceAgent (workspaceRoot: string) =
-        match actors.TryGetValue workspaceRoot with
-        | true, agent -> agent
+    let getWorkspaceQueue (workspaceRoot: string) =
+        match queues.TryGetValue workspaceRoot with
+        | true, queue -> queue
         | false, _ ->
-            let agent = createWorkspaceAgent ()
-            actors.[workspaceRoot] <- agent
-            agent
+            let queue = SerialQueue()
+            queues.[workspaceRoot] <- queue
+            queue
 
-    member _.Post(workspaceRoot: string, work: unit -> Async<unit>) : unit =
-        getWorkspaceAgent workspaceRoot |> fun agent -> agent.Post (FireAndForget { workspaceRoot = workspaceRoot; work = work })
+    member _.Post(workspaceRoot: string, work: unit -> JS.Promise<unit>) : unit =
+        getWorkspaceQueue workspaceRoot |> fun queue -> queue.Enqueue(work) |> Promise.start
 
-    member _.Run(workspaceRoot: string, work: unit -> Async<string>) : JS.Promise<string> =
-        let agent = getWorkspaceAgent workspaceRoot
-        async {
-            let! result = agent.PostAndAsyncReply(fun reply -> AwaitResult(workspaceRoot, work, reply))
-            match result with
-            | Ok value -> return value
-            | Error error -> return raise error
-        }
-        |> Async.StartAsPromise
+    member _.Run(workspaceRoot: string, work: unit -> JS.Promise<string>) : JS.Promise<string> =
+        getWorkspaceQueue workspaceRoot |> fun queue -> queue.Enqueue(work)
 
 let private invoke1 (target: obj) (methodName: string) (arg: obj) : JS.Promise<obj> =
     unbox (target?(methodName)(arg))
@@ -104,8 +74,8 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
     let effectiveWorkspaceRoot (value: string) : string =
         if System.String.IsNullOrWhiteSpace value then workspaceRoot else value
 
-    let launchBackgroundSession (root: string) (kind: WikiJobKind) (title: string) (promptText: string) : Async<unit> =
-        async {
+    let launchBackgroundSession (root: string) (kind: WikiJobKind) (title: string) (promptText: string) : JS.Promise<unit> =
+        promise {
             match sessionApi () with
             | None -> ()
             | Some session ->
@@ -114,7 +84,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                     let createBody =
                         box {| query = box {| directory = root |}
                                body = box {| parentID = box null; title = title |} |}
-                    let! created = invoke1 session "create" createBody |> Async.AwaitPromise
+                    let! created = invoke1 session "create" createBody
                     let childId = str (get created "data") "id"
                     if childId <> "" then
                         sessionId <- childId
@@ -124,21 +94,22 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                                    body = box {| agent = "bookkeeper"
                                                  parts = [| box {| ``type`` = "text"; text = promptText |} |]
                                                  tools = box (createObj [ "submit_wiki", box true ]) |} |}
-                        do! invoke1 session "prompt" promptBody |> Async.AwaitPromise |> Async.Ignore
+                        do! invoke1 session "prompt" promptBody |> Promise.map ignore
                 with _ ->
                     if sessionId <> "" then
                         jobContexts.Remove sessionId |> ignore
         }
 
-    let queueBackgroundLaunch (root: string) (kind: WikiJobKind) (title: string) (buildPrompt: unit -> Async<string>) : unit =
+    let queueBackgroundLaunch (root: string) (kind: WikiJobKind) (title: string) (buildPrompt: unit -> JS.Promise<string>) : unit =
         match sessionApi () with
         | None -> ()
-        | Some _ -> actor.Post(root, fun () -> async {
-            try
-                let! promptText = buildPrompt ()
-                do! launchBackgroundSession root kind title promptText
-            with _ -> ()
-        })
+        | Some _ -> actor.Post(root, fun () ->
+            promise {
+                try
+                    let! promptText = buildPrompt ()
+                    do! launchBackgroundSession root kind title promptText
+                with _ -> ()
+            })
 
     let normalizeDraftIds (projection: WikiProjection) (drafts: WikiDraft list) : WikiDraft list =
         drafts
@@ -148,8 +119,8 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
             | _ -> { draft with id = None })
 
     let buildEntries (root: string) (drafts: WikiDraft list) : JS.Promise<WikiEntry list> =
-        async {
-            let! projection = readProjection root |> Async.AwaitPromise
+        promise {
+            let! projection = readProjection root
             let normalizedDrafts = normalizeDraftIds projection drafts
             match applyDrafts (fun knownIds ->
                       let random = System.Random()
@@ -162,7 +133,6 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
             | Ok entries -> return entries
             | Error error -> return raise (exn error)
         }
-        |> Async.StartAsPromise
 
     let recordLaunchOnce (root: string) (kind: string) (value: string) (title: string) (prompt: string) (result: string) : bool =
         let key = root + "|" + kind + "|" + value
@@ -180,36 +150,35 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
             directWriteTurns.[sessionID] <- turn
             turn
 
-    let submitForKind (root: string) (kind: WikiJobKind) (drafts: WikiDraft list) : Async<string> =
-        withWikiPortLock root (
-            async {
-                let! entries = buildEntries root drafts |> Async.AwaitPromise
+    let submitForKind (root: string) (kind: WikiJobKind) (drafts: WikiDraft list) : JS.Promise<string> =
+        withWikiPortLock root (fun () ->
+            promise {
+                let! entries = buildEntries root drafts
                 match kind with
                 | AppendAfterWork ->
-                    do! appendEntries root (today ()) entries |> Async.AwaitPromise
+                    do! appendEntries root (today ()) entries
                     return $"Appended {entries.Length} wiki entries."
                 | DailyRewrite date ->
-                    do! rewriteDay root date entries |> Async.AwaitPromise
+                    do! rewriteDay root date entries
                     return $"Rewrote wiki day {date}."
                 | WeeklyRewrite throughDate ->
-                    do! rewriteSnapshot root throughDate entries |> Async.AwaitPromise
-                    do! deleteDayFilesThrough root throughDate |> Async.AwaitPromise
+                    do! rewriteSnapshot root throughDate entries
+                    do! deleteDayFilesThrough root throughDate
                     return $"Rewrote wiki snapshot through {throughDate}."
             })
 
     member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<WikiProjection> =
-        async {
+        promise {
             if sessionID = "" then
                 return Map.empty
             else
                 match sessionSnapshots.TryGetValue sessionID with
                 | true, projection -> return projection
                 | false, _ ->
-                    let! projection = readProjection (effectiveWorkspaceRoot directory) |> Async.AwaitPromise
+                    let! projection = readProjection (effectiveWorkspaceRoot directory)
                     sessionSnapshots.[sessionID] <- projection
                     return projection
         }
-        |> Async.StartAsPromise
 
     member _.RegisterJob(sessionID: string, ctx: WikiJobContext) : unit =
         jobContexts.[sessionID] <- ctx
@@ -240,34 +209,31 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
 
     member this.Submit(sessionID: string, drafts: WikiDraft list) : JS.Promise<string> =
         match this.TakeJob sessionID with
-        | None -> async { return "No active wiki job for this session." } |> Async.StartAsPromise
+        | None -> Promise.lift "No active wiki job for this session."
         | Some ctx ->
-            async {
+            promise {
                 try
-                    return! actor.Run(ctx.workspaceRoot, fun () -> submitForKind ctx.workspaceRoot ctx.kind drafts) |> Async.AwaitPromise
+                    return! actor.Run(ctx.workspaceRoot, fun () -> submitForKind ctx.workspaceRoot ctx.kind drafts)
                 finally
                     jobContexts.Remove sessionID |> ignore
             }
-            |> Async.StartAsPromise
 
     member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
-        async {
-            let! projection = this.EnsureSessionSnapshot(sessionID, directory) |> Async.AwaitPromise
+        promise {
+            let! projection = this.EnsureSessionSnapshot(sessionID, directory)
             return buildPreludeSection projection
         }
-        |> Async.StartAsPromise
 
     member this.FetchFromSessionSnapshot(sessionID: string, directory: string, id: string) : JS.Promise<string> =
-        async {
+        promise {
             if sessionID = "" then
                 return "Wiki snapshot unavailable for this session."
             else
-                let! projection = this.EnsureSessionSnapshot(sessionID, directory) |> Async.AwaitPromise
+                let! projection = this.EnsureSessionSnapshot(sessionID, directory)
                 match fetchAnswer projection id with
                 | Ok answer -> return answer
                 | Error message -> return message
         }
-        |> Async.StartAsPromise
 
     member _.MarkRwTool(sessionID: string, tool: string, summary: string) : unit =
         let trimmed = summary.Trim()
@@ -285,25 +251,24 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         | _ -> ()
 
     member _.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
-        async {
+        promise {
             let root = effectiveWorkspaceRoot workspaceRoot
-            let! files = readWikiFiles root |> Async.AwaitPromise
+            let! files = readWikiFiles root
             let projection = projectLatestWins files
             let dailyDue, weeklyDue = dueMaintenance files (nowUtc ())
 
             dailyDue
             |> Option.iter (fun date ->
                 if recordLaunchOnce root "daily" date "Daily wiki rewrite" ($"daily maintenance due for {date}") ($"daily:{date}") then
-                    queueBackgroundLaunch root (DailyRewrite date) "Daily wiki rewrite" (fun () -> async { return buildDailyPrompt date files projection })
+                    queueBackgroundLaunch root (DailyRewrite date) "Daily wiki rewrite" (fun () -> Promise.lift (buildDailyPrompt date files projection))
                 else ())
 
             weeklyDue
             |> Option.iter (fun cutoff ->
                 if recordLaunchOnce root "weekly" cutoff "Weekly wiki snapshot rewrite" ($"weekly maintenance due through {cutoff}") ($"weekly:{cutoff}") then
-                    queueBackgroundLaunch root (WeeklyRewrite cutoff) "Weekly wiki snapshot rewrite" (fun () -> async { return buildWeeklyPrompt cutoff files projection })
+                    queueBackgroundLaunch root (WeeklyRewrite cutoff) "Weekly wiki snapshot rewrite" (fun () -> Promise.lift (buildWeeklyPrompt cutoff files projection))
                 else ())
         }
-        |> Async.StartAsPromise
 
     member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string, rwSummary: string) : unit =
         bookkeeperLaunches.Add { agent = agent; title = title; prompt = prompt; result = result; rwSummary = rwSummary }
@@ -311,10 +276,11 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
     member this.StartBookkeeperAppend(prompt: string, result: string, title: string, rwSummary: string) : unit =
         this.RecordBookkeeperLaunch("bookkeeper", title, prompt, result, rwSummary)
         let root = effectiveWorkspaceRoot workspaceRoot
-        queueBackgroundLaunch root AppendAfterWork title (fun () -> async {
-            let! projection = readProjection root |> Async.AwaitPromise
-            return buildAppendPrompt title prompt result rwSummary projection
-        })
+        queueBackgroundLaunch root AppendAfterWork title (fun () ->
+            promise {
+                let! projection = readProjection root
+                return buildAppendPrompt title prompt result rwSummary projection
+            })
 
     member _.TakeBookkeeperLaunchesForTesting() : obj array =
         let launches = bookkeeperLaunches |> Seq.map box |> Seq.toArray
@@ -322,9 +288,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         launches
 
     member _.WaitForBackgroundJobsForTesting() : JS.Promise<unit> =
-        async {
-            let! _ = actor.Run(workspaceRoot, fun () -> async { return "" }) |> Async.AwaitPromise
-            let! _ = async { return () } |> Async.StartAsPromise |> Async.AwaitPromise
+        promise {
+            let! _ = actor.Run(workspaceRoot, fun () -> Promise.lift "")
             return ()
         }
-        |> Async.StartAsPromise

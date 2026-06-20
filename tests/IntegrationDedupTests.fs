@@ -193,9 +193,9 @@ let private readOutputOf (msg: obj) : string =
     let state = get part "state"
     str state "output"
 
-let opencodeDedupInPlaceSpec () = async {
-    let! workspaceDir = mkdtempAsync "dedup-plugin-" |> Async.AwaitPromise
-    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+let opencodeDedupInPlaceSpec () = promise {
+    let! workspaceDir = mkdtempAsync "dedup-plugin-"
+    let! p = plugin (box {| directory = workspaceDir |})
     let stableContent = String.replicate 8 "line of stable content\n"
     let readStateA = createObj [ "output", box stableContent ]
     let readStateB = createObj [ "output", box stableContent ]
@@ -209,7 +209,7 @@ let opencodeDedupInPlaceSpec () = async {
                         "parts", box [| readPartB |] ]
         |] ]
     let dedupMessagesRef = get dedupInPlace "messages"
-    do! (get p "experimental.chat.messages.transform") $ (box {| sessionID = "dedup-session" |}, dedupInPlace) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    do! (get p "experimental.chat.messages.transform") $ (box {| sessionID = "dedup-session" |}, dedupInPlace) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> dedupMessagesRef
     check "opencode dedup keeps messages array ref" (obj.ReferenceEquals(msgs, unbox<obj[]> (get dedupInPlace "messages")))
     let msg1 = findMsgById msgs "dedup-m1"
@@ -234,19 +234,19 @@ let opencodeDedupInPlaceSpec () = async {
             createObj [ "info", box (createObj [ "id", box "dedup-s2"; "agent", box "manager"; "role", box "assistant"; "sessionID", box "dedup-session2" ])
                         "parts", box [| supersetPart |] ]
         |] ]
-    do! (get p "experimental.chat.messages.transform") $ (box {| sessionID = "dedup-session2" |}, dedupSuperset) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    do! (get p "experimental.chat.messages.transform") $ (box {| sessionID = "dedup-session2" |}, dedupSuperset) |> unbox<JS.Promise<unit>>
     let supMsgs = unbox<obj[]> (get dedupSuperset "messages")
     let supMsg = findMsgById supMsgs "dedup-s2"
     let supPart = get supMsg "parts" |> unbox<obj[]> |> Array.item 0
     let supState = get supPart "state"
     check "opencode dedup superset keeps state ref" (obj.ReferenceEquals(supState, supersetState))
     check "opencode dedup superset not replaced" (str supState "output" = supersetContent)
-    do! rmAsync workspaceDir |> Async.AwaitPromise
+    do! rmAsync workspaceDir
 }
 
-let opencodeDedupIgnoresMagicFoldedReadsSpec () = async {
-    let! workspaceDir = mkdtempAsync "dedup-magic-" |> Async.AwaitPromise
-    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+let opencodeDedupIgnoresMagicFoldedReadsSpec () = promise {
+    let! workspaceDir = mkdtempAsync "dedup-magic-"
+    let! p = plugin (box {| directory = workspaceDir |})
     let sessionID = "dedup-magic-session"
     let messages =
         createObj [ "messages", box [|
@@ -258,16 +258,16 @@ let opencodeDedupIgnoresMagicFoldedReadsSpec () = async {
             assistantMsg "mg-m6" sessionID [| readToolPart "same" |]
         |] ]
     let messagesRef = get messages "messages"
-    do! (get p "experimental.chat.messages.transform") $ (box {| sessionID = sessionID |}, messages) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    do! (get p "experimental.chat.messages.transform") $ (box {| sessionID = sessionID |}, messages) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> messagesRef
     check "opencode dedup ignores magic folded reads: keeps messages ref" (obj.ReferenceEquals(msgs, unbox<obj[]> (get messages "messages")))
     let latest = findMsgById msgs "mg-m6"
     check "opencode dedup ignores magic folded reads: latest read kept" (readOutputOf latest = "same")
-    do! rmAsync workspaceDir |> Async.AwaitPromise
+    do! rmAsync workspaceDir
 }
 
 let run () : JS.Promise<unit> =
-    async {
+    promise {
         dedupStringOutputSpec ()
         dedupObjectOutputSpec ()
         dedupPerPathDifferentSpec ()
@@ -289,4 +289,3 @@ let run () : JS.Promise<unit> =
         do! opencodeDedupInPlaceSpec ()
         do! opencodeDedupIgnoresMagicFoldedReadsSpec ()
     }
-    |> Async.StartAsPromise

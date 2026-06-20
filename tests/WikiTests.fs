@@ -194,7 +194,7 @@ let allocateSpec () =
     check "allocateRandomHexId exhausted Error" (isErr (allocateRandomHexId always5 existing5))
 
 let run () : JS.Promise<unit> =
-    async {
+    promise {
         idParseSpec ()
         headerParseSpec ()
         headerRenderSpec ()
@@ -207,4 +207,3 @@ let run () : JS.Promise<unit> =
         applyDraftsSpec ()
         allocateSpec ()
     }
-    |> Async.StartAsPromise

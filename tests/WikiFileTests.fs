@@ -29,88 +29,88 @@ let private some (o: 'a option) : 'a =
 
 let private joinPath (a: string) (b: string) : string = unbox (pathModule?join(a, b))
 
-let emptyWikiProjectionSpec () = async {
-    let! ws = mkdtempAsync "wiki-files-empty-" |> Async.AwaitPromise
-    let! proj = readProjection ws |> Async.AwaitPromise
+let emptyWikiProjectionSpec () = promise {
+    let! ws = mkdtempAsync "wiki-files-empty-"
+    let! proj = readProjection ws
     check "empty wiki projection is empty" (Map.isEmpty proj)
-    let! files = readWikiFiles ws |> Async.AwaitPromise
+    let! files = readWikiFiles ws
     check "empty wiki files is []" files.IsEmpty
-    let! days = listDayFiles ws |> Async.AwaitPromise
+    let! days = listDayFiles ws
     check "empty wiki listDayFiles is []" days.IsEmpty
-    do! rmAsync ws |> Async.AwaitPromise
+    do! rmAsync ws
 }
 
-let appendCreatesDayFileSpec () = async {
-    let! ws = mkdtempAsync "wiki-files-append-" |> Async.AwaitPromise
-    do! ensureTodayFile ws "2026-06-19" |> Async.AwaitPromise
+let appendCreatesDayFileSpec () = promise {
+    let! ws = mkdtempAsync "wiki-files-append-"
+    do! ensureTodayFile ws "2026-06-19"
     let dayFile = dayPath ws "2026-06-19"
     check "append creates day file exists" (existsSync dayFile)
     let headerContent = readSync dayFile
     check "append day header contains rewritten" (headerContent.Contains "rewritten")
     check "append day header contains date" (headerContent.Contains "2026-06-19")
-    do! appendEntries ws "2026-06-19" [ entry "0a3f" "q1" "a1" ] |> Async.AwaitPromise
+    do! appendEntries ws "2026-06-19" [ entry "0a3f" "q1" "a1" ]
     let afterContent = readSync dayFile
     check "append day has header line" (afterContent.Contains "wiki_header")
     check "append day has entry with id" (afterContent.Contains "0a3f")
-    do! rmAsync ws |> Async.AwaitPromise
+    do! rmAsync ws
 }
 
-let appendMultipleKeepsNdjsonSpec () = async {
-    let! ws = mkdtempAsync "wiki-files-ndjson-" |> Async.AwaitPromise
-    do! ensureTodayFile ws "2026-06-19" |> Async.AwaitPromise
-    do! appendEntries ws "2026-06-19" [ entry "0a3f" "q1" "a1" ] |> Async.AwaitPromise
-    do! appendEntries ws "2026-06-19" [ entry "b912" "q2" "a2" ] |> Async.AwaitPromise
+let appendMultipleKeepsNdjsonSpec () = promise {
+    let! ws = mkdtempAsync "wiki-files-ndjson-"
+    do! ensureTodayFile ws "2026-06-19"
+    do! appendEntries ws "2026-06-19" [ entry "0a3f" "q1" "a1" ]
+    do! appendEntries ws "2026-06-19" [ entry "b912" "q2" "a2" ]
     let dayFile = dayPath ws "2026-06-19"
     let content = readSync dayFile
     let nonEmpty = content.Split('\n') |> Array.filter (fun l -> l.Trim() <> "")
     check "ndjson 1 header + 2 entries = 3 lines" (nonEmpty.Length = 3)
-    do! rmAsync ws |> Async.AwaitPromise
+    do! rmAsync ws
 }
 
-let rewriteDayReplacesEntriesSpec () = async {
-    let! ws = mkdtempAsync "wiki-files-rewrite-day-" |> Async.AwaitPromise
-    do! ensureTodayFile ws "2026-06-19" |> Async.AwaitPromise
-    do! appendEntries ws "2026-06-19" [ entry "0a3f" "oldq" "olda" ] |> Async.AwaitPromise
-    do! rewriteDay ws "2026-06-19" [ entry "1111" "newq" "newa" ] |> Async.AwaitPromise
+let rewriteDayReplacesEntriesSpec () = promise {
+    let! ws = mkdtempAsync "wiki-files-rewrite-day-"
+    do! ensureTodayFile ws "2026-06-19"
+    do! appendEntries ws "2026-06-19" [ entry "0a3f" "oldq" "olda" ]
+    do! rewriteDay ws "2026-06-19" [ entry "1111" "newq" "newa" ]
     let dayFile = dayPath ws "2026-06-19"
     let content = readSync dayFile
     check "rewrite day contains newq" (content.Contains "newq")
     check "rewrite day not contains oldq" (not (content.Contains "oldq"))
     check "rewrite day contains rewritten true" (content.Contains "\"rewritten\":true")
-    do! rmAsync ws |> Async.AwaitPromise
+    do! rmAsync ws
 }
 
-let rewriteSnapshotReplacesHeaderSpec () = async {
-    let! ws = mkdtempAsync "wiki-files-rewrite-snap-" |> Async.AwaitPromise
-    do! ensureWikiDir ws |> Async.AwaitPromise
+let rewriteSnapshotReplacesHeaderSpec () = promise {
+    let! ws = mkdtempAsync "wiki-files-rewrite-snap-"
+    do! ensureWikiDir ws
     let snapFile = snapshotPath ws
-    do! writeFileAsync snapFile (renderHeader (SnapshotHeader(Some "2026-06-07")) + "\n") |> Async.AwaitPromise
-    do! rewriteSnapshot ws "2026-06-14" [ entry "2222" "sq" "sa" ] |> Async.AwaitPromise
+    do! writeFileAsync snapFile (renderHeader (SnapshotHeader(Some "2026-06-07")) + "\n")
+    do! rewriteSnapshot ws "2026-06-14" [ entry "2222" "sq" "sa" ]
     let content = readSync snapFile
     check "rewrite snapshot contains new through" (content.Contains "2026-06-14")
     check "rewrite snapshot contains entry id" (content.Contains "2222")
     check "rewrite snapshot not contains old through" (not (content.Contains "2026-06-07"))
-    do! rmAsync ws |> Async.AwaitPromise
+    do! rmAsync ws
 }
 
-let weeklyDeleteDayFilesSpec () = async {
-    let! ws = mkdtempAsync "wiki-files-weekly-delete-" |> Async.AwaitPromise
-    do! ensureTodayFile ws "2026-06-10" |> Async.AwaitPromise
-    do! appendEntries ws "2026-06-10" [ entry "0a3f" "q1" "a1" ] |> Async.AwaitPromise
-    do! ensureTodayFile ws "2026-06-12" |> Async.AwaitPromise
-    do! appendEntries ws "2026-06-12" [ entry "b912" "q2" "a2" ] |> Async.AwaitPromise
-    do! ensureTodayFile ws "2026-06-15" |> Async.AwaitPromise
-    do! appendEntries ws "2026-06-15" [ entry "7c01" "q3" "a3" ] |> Async.AwaitPromise
-    do! deleteDayFilesThrough ws "2026-06-12" |> Async.AwaitPromise
+let weeklyDeleteDayFilesSpec () = promise {
+    let! ws = mkdtempAsync "wiki-files-weekly-delete-"
+    do! ensureTodayFile ws "2026-06-10"
+    do! appendEntries ws "2026-06-10" [ entry "0a3f" "q1" "a1" ]
+    do! ensureTodayFile ws "2026-06-12"
+    do! appendEntries ws "2026-06-12" [ entry "b912" "q2" "a2" ]
+    do! ensureTodayFile ws "2026-06-15"
+    do! appendEntries ws "2026-06-15" [ entry "7c01" "q3" "a3" ]
+    do! deleteDayFilesThrough ws "2026-06-12"
     check "weekly delete removes 06-10" (not (existsSync (dayPath ws "2026-06-10")))
     check "weekly delete removes 06-12" (not (existsSync (dayPath ws "2026-06-12")))
     check "weekly delete keeps 06-15" (existsSync (dayPath ws "2026-06-15"))
-    do! rmAsync ws |> Async.AwaitPromise
+    do! rmAsync ws
 }
 
-let tempRenameCompletenessSpec () = async {
-    let! ws = mkdtempAsync "wiki-files-tmp-rename-" |> Async.AwaitPromise
-    do! rewriteDay ws "2026-06-19" [ entry "3333" "tq" "ta" ] |> Async.AwaitPromise
+let tempRenameCompletenessSpec () = promise {
+    let! ws = mkdtempAsync "wiki-files-tmp-rename-"
+    do! rewriteDay ws "2026-06-19" [ entry "3333" "tq" "ta" ]
     let dayFile = dayPath ws "2026-06-19"
     check "temp rename leaves day file" (existsSync dayFile)
     let content = readSync dayFile
@@ -118,38 +118,38 @@ let tempRenameCompletenessSpec () = async {
     let wDir = wikiDir ws
     let entries = readdirSync wDir
     check "temp rename no tmp file left" (not (entries |> Array.exists (fun f -> f.EndsWith ".tmp")))
-    do! rmAsync ws |> Async.AwaitPromise
+    do! rmAsync ws
 }
 
-let listDayFilesSortedSpec () = async {
-    let! ws = mkdtempAsync "wiki-files-list-sorted-" |> Async.AwaitPromise
-    do! ensureTodayFile ws "2026-06-15" |> Async.AwaitPromise
-    do! ensureTodayFile ws "2026-06-10" |> Async.AwaitPromise
-    do! ensureTodayFile ws "2026-06-12" |> Async.AwaitPromise
-    let! days = listDayFiles ws |> Async.AwaitPromise
+let listDayFilesSortedSpec () = promise {
+    let! ws = mkdtempAsync "wiki-files-list-sorted-"
+    do! ensureTodayFile ws "2026-06-15"
+    do! ensureTodayFile ws "2026-06-10"
+    do! ensureTodayFile ws "2026-06-12"
+    let! days = listDayFiles ws
     equal "listDayFiles sorted ascending" [ "2026-06-10"; "2026-06-12"; "2026-06-15" ] days
-    do! rmAsync ws |> Async.AwaitPromise
+    do! rmAsync ws
 }
 
-let readProjectionLatestWinsSpec () = async {
-    let! ws = mkdtempAsync "wiki-files-latest-wins-" |> Async.AwaitPromise
-    do! ensureWikiDir ws |> Async.AwaitPromise
+let readProjectionLatestWinsSpec () = promise {
+    let! ws = mkdtempAsync "wiki-files-latest-wins-"
+    do! ensureWikiDir ws
     let snapFile = snapshotPath ws
-    do! writeFileAsync snapFile (renderNdjson (SnapshotHeader(Some "2026-06-07")) [ entry "0a3f" "oldq" "olda" ]) |> Async.AwaitPromise
+    do! writeFileAsync snapFile (renderNdjson (SnapshotHeader(Some "2026-06-07")) [ entry "0a3f" "oldq" "olda" ])
     let dayFile = dayPath ws "2026-06-19"
-    do! writeFileAsync dayFile (renderNdjson (DayHeader("2026-06-19", false)) [ entry "0a3f" "newq" "newa" ]) |> Async.AwaitPromise
-    let! proj = readProjection ws |> Async.AwaitPromise
+    do! writeFileAsync dayFile (renderNdjson (DayHeader("2026-06-19", false)) [ entry "0a3f" "newq" "newa" ])
+    let! proj = readProjection ws
     let id = some (tryParseId "0a3f")
     match Map.tryFind id proj with
     | Some e ->
         check "readProjection latest wins q" (e.q = "newq")
         check "readProjection latest wins a" (e.a = "newa")
     | None -> check "readProjection latest wins found" false
-    do! rmAsync ws |> Async.AwaitPromise
+    do! rmAsync ws
 }
 
 let run () : JS.Promise<unit> =
-    async {
+    promise {
         do! emptyWikiProjectionSpec ()
         do! appendCreatesDayFileSpec ()
         do! appendMultipleKeepsNdjsonSpec ()
@@ -160,4 +160,3 @@ let run () : JS.Promise<unit> =
         do! listDayFilesSortedSpec ()
         do! readProjectionLatestWinsSpec ()
     }
-    |> Async.StartAsPromise

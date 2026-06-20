@@ -15,7 +15,7 @@ let private maxNudges = 3
 let createReviewerChild (registry: ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                         (directory: string) (parentID: string option)
                         (sessionID: string) (title: string) : JS.Promise<string> =
-    async {
+    promise {
         let createBody =
             box {|
                 query = box {| directory = directory |}
@@ -27,14 +27,13 @@ let createReviewerChild (registry: ChildAgentRegistry) (client: obj) (reviewStor
                     title = title
                 |}
             |}
-        let! createResult = invoke1 createBody "create" (Dyn.get client "session") |> Async.AwaitPromise
+        let! createResult = invoke1 createBody "create" (Dyn.get client "session")
         let childID = Dyn.str (Dyn.get createResult "data") "id"
         if childID <> "" then
             reviewStore.addChild(sessionID, childID)
             registry.RegisterChildAgent(childID, "reviewer", parentID)
         return childID
     }
-    |> Async.StartAsPromise
 
 let private textParts (parts: string list) : obj array =
     parts |> List.map (fun text -> box {| ``type`` = "text"; text = text |}) |> Array.ofList
@@ -47,27 +46,27 @@ let private textParts (parts: string list) : obj array =
 let runReviewerLoop (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                     (childID: string) (initialParts: string list) (abortSignal: obj)
                     : JS.Promise<ReviewResult> =
-    async {
+    promise {
         let verdict : ReviewResult option ref = ref None
         reviewStore.setPendingReview(childID, (fun r -> verdict.Value <- Some r))
         reviewStore.tryLockReview childID |> ignore
         let runRound (parts: string list) =
-            async {
+            promise {
                 let promptBody =
                     box {|
                         path = box {| id = childID |}
                         body = box {| agent = "reviewer"; parts = textParts parts; tools = box (createObj [ "return_reviewer", box true ]) |}
                     |}
-                let! caught = Async.Catch (promptWithAbort client promptBody abortSignal |> Async.AwaitPromise)
-                match caught with
-                | Choice2Of2 _ -> return PromptFailed
-                | Choice1Of2 () ->
+                try
+                    do! promptWithAbort client promptBody abortSignal
                     match verdict.Value with
                     | Some v -> return Resolved v
                     | None -> return NoResult
+                with _ ->
+                    return PromptFailed
             }
         let rec loop nudgeCount =
-            async {
+            promise {
                 let parts = promptParts nudgeCount initialParts reviewerNudgePrompt
                 let! outcome = runRound parts
                 match decideAfterRound nudgeCount outcome maxNudges with
@@ -78,22 +77,20 @@ let runReviewerLoop (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.Revie
         reviewStore.unlockReview childID
         return result
     }
-    |> Async.StartAsPromise
 
 /// Run a pre-review session (used by /loop-review): create a reviewer child,
 /// prompt it with review instructions + task, wait for the verdict.
 let runReviewerSession (registry: ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
                        (directory: string) (sessionID: string) (task: string)
                        : JS.Promise<ReviewResult> =
-    async {
+    promise {
         let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
-        let! childID = createReviewerChild registry client reviewStore directory parentID sessionID "Pre-Reviewer" |> Async.AwaitPromise
+        let! childID = createReviewerChild registry client reviewStore directory parentID sessionID "Pre-Reviewer"
         if childID = "" then return Terminated
         else
             let parts = [ reviewInstructions; $"=== Task ===\n\n{task}" ]
-            return! runReviewerLoop client reviewStore childID parts null |> Async.AwaitPromise
+            return! runReviewerLoop client reviewStore childID parts null
     }
-    |> Async.StartAsPromise
 
 /// Run a submit-review (used by the submit_review tool): create a reviewer
 /// child, prompt it with review instructions + change report + affected files +
@@ -103,9 +100,9 @@ let runSubmitReview (registry: ChildAgentRegistry) (client: obj) (reviewStore: V
                     (report: string) (affectedFiles: string list)
                     (task: string) (abortSignal: obj)
                     : JS.Promise<ReviewResult> =
-    async {
+    promise {
         let parentID = registry.ResolveSubsessionParentID(Some sessionID)
-        let! childID = createReviewerChild registry client reviewStore directory parentID sessionID "Reviewer" |> Async.AwaitPromise
+        let! childID = createReviewerChild registry client reviewStore directory parentID sessionID "Reviewer"
         if childID = "" then return Terminated
         else
             let filesText = String.concat "\n" affectedFiles
@@ -114,6 +111,5 @@ let runSubmitReview (registry: ChildAgentRegistry) (client: obj) (reviewStore: V
                   $"=== Change Report ===\n\n{report}"
                   $"=== Affected Files ===\n\n{filesText}"
                   if task <> "" then $"=== Original Task ===\n\n{task}" ]
-            return! runReviewerLoop client reviewStore childID parts abortSignal |> Async.AwaitPromise
+            return! runReviewerLoop client reviewStore childID parts abortSignal
     }
-    |> Async.StartAsPromise

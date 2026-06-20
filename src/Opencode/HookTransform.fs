@@ -23,7 +23,7 @@ let private defaultExcludedAgents = [ "browser"; "investigator"; "executor"; "ti
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
-let private resolvedUnit : JS.Promise<unit> = async { return () } |> Async.StartAsPromise
+let private resolvedUnit : JS.Promise<unit> = Promise.lift ()
 
 let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
     if System.Object.ReferenceEquals(target, source) then ()
@@ -61,16 +61,16 @@ let private resolveChatTools (host: Host) (agent: string) (existingTools: obj) :
     next
 
 let chatMessageFor (host: Host) (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
-    async {
+    promise {
         let agent = resolveAgent registry input
         let sessionID = Id.sessionIdQuick (Dyn.str input "sessionID")
-        do! nudgeHook.handleChatMessage(sessionID, agent, Dyn.get output "parts") |> Async.AwaitPromise
+        do! nudgeHook.handleChatMessage(sessionID, agent, Dyn.get output "parts")
         let message = Dyn.get output "message"
         if not (Dyn.isNullish message) then
             let tools = Dyn.get message "tools"
             if not (Dyn.isNullish tools) then
                 setKey message "tools" (resolveChatTools host agent tools)
-    } |> Async.StartAsPromise
+    }
 
 let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     chatMessageFor opencode registry nudgeHook input output
@@ -115,16 +115,16 @@ module private CapsFileCache =
 
     let getOrLoad (sessionID: string) (directory: string) : JS.Promise<VibeFs.Kernel.CapsFormat.CapsFile list> =
         match cache.TryGetValue sessionID with
-        | true, files -> async { return files } |> Async.StartAsPromise
+        | true, files -> Promise.lift files
         | false, _ ->
-            async {
-                let! files = VibeFs.Shell.WorkspaceFiles.findCapsFiles directory |> Async.AwaitPromise
+            promise {
+                let! files = VibeFs.Shell.WorkspaceFiles.findCapsFiles directory
                 if not (cache.ContainsKey sessionID) then cache.[sessionID] <- files
                 return files
-            } |> Async.StartAsPromise
+            }
 
 let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: MagicSession) (wikiRuntime: WikiRuntime) (input: obj) (output: obj) : JS.Promise<unit> =
-    async {
+    promise {
         let messages = Dyn.get output "messages"
         if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
         else
@@ -143,11 +143,11 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                         let afterMagic = projectMagicFor magicSession.Host cleaned backlog false sessionID
                         applyReadDedup afterMagic
                         if agent = "manager" then
-                            do! wikiRuntime.StartMaintenanceIfDue(directory) |> Async.AwaitPromise
-                        let! capsFiles = CapsFileCache.getOrLoad sessionID directory |> Async.AwaitPromise
+                            do! wikiRuntime.StartMaintenanceIfDue(directory)
+                        let! capsFiles = CapsFileCache.getOrLoad sessionID directory
                         let! wikiPrelude =
-                            if agent = "manager" then wikiRuntime.BuildPreludeForSession(sessionID, directory) |> Async.AwaitPromise
-                            else async { return None }
+                            if agent = "manager" then wikiRuntime.BuildPreludeForSession(sessionID, directory)
+                            else Promise.lift None
                         let final =
                             buildCapsMessages
                                 VibeFs.Shell.FileSys.sha256HexTruncated
@@ -157,10 +157,10 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                                 capsFiles
                                 wikiPrelude
                         replaceArrayInPlace messagesArr final
-    } |> Async.StartAsPromise
+    }
 
 let compactingHandlerFor (host: Host) (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
-    async {
+    promise {
         let sessionID = Dyn.str input "sessionID"
         let backlog = magicSession.GetOrRebuildBacklog(sessionID, [||])
         if backlog.IsEmpty then ()
@@ -169,13 +169,13 @@ let compactingHandlerFor (host: Host) (magicSession: MagicSession) (input: obj) 
             if not (Dyn.isNullish context) && Dyn.isArray context then
                 let hint = "Preserve the latest " + magicTodoToolNameFor host + " result and the complete Magic Todo backlog in the summary. If earlier user messages are folded, rewrite them into that todo summary as work-period user updates instead of preserving raw user messages verbatim."
                 (box context)?push(box hint) |> ignore
-    } |> Async.StartAsPromise
+    }
 
 let compactingHandler (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
     compactingHandlerFor opencode magicSession input output
 
 let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
-    async {
+    promise {
         let toolID = Dyn.str input "toolID"
         if toolID = "coder" || toolID = "investigator" then
             rewriteToolJsonSchema setKey stripUiFromJsonSchema output
@@ -187,13 +187,13 @@ let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit>
             | Mimocode ->
                 setKey output "description" (box fusedTaskToolDescription)
                 rewriteToolJsonSchema setKey mergeMagicReportIntoTaskSchema output
-    } |> Async.StartAsPromise
+    }
 
 let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
     toolDefinitionFor opencode input output
 
 let eventHandler (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
-    async {
+    promise {
         let event = Dyn.get input "event"
         if Dyn.str event "type" = "stream-abort" then
             let props = Dyn.get event "properties"
@@ -203,7 +203,7 @@ let eventHandler (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: o
                     let s = Dyn.str props "sessionID"
                     if s = "" then "loop" else s
             reviewStore.deactivateReview sessionID
-    } |> Async.StartAsPromise
+    }
 
 let noop (_a: obj) (_b: obj) : JS.Promise<unit> = resolvedUnit
 let noopEvent (_a: obj) : JS.Promise<unit> = resolvedUnit

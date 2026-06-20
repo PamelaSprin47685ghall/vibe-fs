@@ -22,7 +22,7 @@ type ToolDefinition =
       execute: obj -> obj -> JS.Promise<string>
       condition: (obj -> bool) option }
 
-let resolveStr (s: string) : JS.Promise<string> = async { return s } |> Async.StartAsPromise
+let resolveStr (s: string) : JS.Promise<string> = Promise.lift s
 
 let jsonStringify (o: obj) : string = JS.JSON.stringify(o)
 
@@ -55,12 +55,12 @@ let requireWorkspaceId (config: obj) (toolName: string) : Result<string, string>
     else Result.Ok(string wid)
 
 let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promise<obj> =
-    async {
+    promise {
         match extractFilePath args with
         | None -> return result
         | Some filePath ->
             try
-                let! formatted = readAndCheckSyntax filePath (Dyn.str config "cwd") false |> Async.AwaitPromise
+                let! formatted = readAndCheckSyntax filePath (Dyn.str config "cwd") false
                 match formatted with
                 | None -> return result
                 | Some f ->
@@ -69,12 +69,11 @@ let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promis
                         return Dyn.withKey result "syntax_diagnostics" (box f)
                     else return result
             with _ -> return result
-    } |> Async.StartAsPromise
+    }
 
 let private bindExecute (tool: obj) : obj = tool?execute
 
-let private disabledResult () : JS.Promise<string> =
-    async { return "disabled" } |> Async.StartAsPromise
+let private disabledResult () : JS.Promise<string> = Promise.lift "disabled"
 
 let private appendMeditatorNudge (result: obj) : obj =
     if Dyn.isNullish result then result
@@ -139,16 +138,13 @@ let private mkResultWrapper (targetTool: string) (callback: obj -> obj -> obj ->
             else
                 let executeFn =
                     System.Func<obj, obj, JS.Promise<obj>>(fun args opts ->
-                        async {
+                        promise {
                             let raw = tool?execute(args, opts)
                             let! v =
-                                if isThenable raw then
-                                    Async.AwaitPromise(unbox<JS.Promise<obj>> raw)
-                                else
-                                    async { return raw }
-                            return! callback v args config |> Async.AwaitPromise
-                        }
-                        |> Async.StartAsPromise)
+                                if isThenable raw then unbox<JS.Promise<obj>> raw
+                                else Promise.lift raw
+                            return! callback v args config
+                        })
                 Dyn.withKey tool "execute" (box executeFn))
     createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
 
@@ -161,16 +157,13 @@ let private mkSyncResultWrapper (targetTool: string) (callback: obj -> obj) : ob
             else
                 let executeFn =
                     System.Func<obj, obj, JS.Promise<obj>>(fun args opts ->
-                        async {
+                        promise {
                             let raw = tool?execute(args, opts)
                             let! v =
-                                if isThenable raw then
-                                    Async.AwaitPromise(unbox<JS.Promise<obj>> raw)
-                                else
-                                    async { return raw }
+                                if isThenable raw then unbox<JS.Promise<obj>> raw
+                                else Promise.lift raw
                             return callback v
-                        }
-                        |> Async.StartAsPromise)
+                        })
                 Dyn.withKey tool "execute" (box executeFn))
     createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
 
@@ -196,26 +189,17 @@ let private mkAgentReportOverride (callStore: CallStore) : obj =
         System.Func<obj, obj, obj>(fun (tool: obj) (_config: obj) ->
             let execFn =
                 System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
-                    async {
+                    promise {
                         let callId = Dyn.str args "callId"
                         if callId <> "" && hasCall callStore callId then
                             resolveCall callStore callId args |> ignore
                             let upstreamArgs = createObj [ "reportMarkdown", box (formatAgentReportMarkdown args) ]
                             let raw = tool?execute(upstreamArgs, opts)
-                            return!
-                                if isThenable raw then
-                                    Async.AwaitPromise(unbox<JS.Promise<obj>> raw)
-                                else
-                                    async { return raw }
+                            return! (if isThenable raw then unbox<JS.Promise<obj>> raw else Promise.lift raw)
                         else
                             let raw = tool?execute(args, opts)
-                            return!
-                                if isThenable raw then
-                                    Async.AwaitPromise(unbox<JS.Promise<obj>> raw)
-                                else
-                                    async { return raw }
-                    }
-                    |> Async.StartAsPromise)
+                            return! (if isThenable raw then unbox<JS.Promise<obj>> raw else Promise.lift raw)
+                    })
             let definition = agentReportDefinition callStore
             createObj [ "description", box definition.description
                         "parameters", box definition.parameters

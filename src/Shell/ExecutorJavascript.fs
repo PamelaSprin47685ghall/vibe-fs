@@ -23,19 +23,21 @@ let private writeFileSync (path: string) (content: string) (encoding: string) : 
 [<Import("spawn", "node:child_process")>]
 let private childSpawn (cmd: string) (args: string array) (opts: obj) : obj = jsNative
 
-let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
-
 /// Initialise the lexer and parse a program's static imports in one step.
+/// es-module-lexer v2 API (confirmed from types/lexer.d.ts):
+///   - `init` is a `Promise<void>` (a value you AWAIT), NOT a function — never call it.
+///   - `parse` is a SYNCHRONOUS function returning [imports, exports, facade, hasModuleSyntax].
+/// The `init` promise MUST resolve before `parse` is called, or the WASM lexer
+/// isn't ready. Both the old `Dyn.call1 init ()` and the `Promise.lift` wrapper
+/// were broken (init isn't callable; Promise.lift wouldn't await a nested promise).
 let private parseImports (program: string) : JS.Promise<obj array> =
-    async {
-        let! module' = importDynamic<obj> "es-module-lexer" |> Async.AwaitPromise
-        let init = Dyn.get module' "init"
-        do! Dyn.call1 init (box ()) |> asPromise<unit> |> Async.AwaitPromise
-        let parse = Dyn.get module' "parse"
-        let! result = Dyn.call1 parse (box program) |> asPromise<obj[]> |> Async.AwaitPromise
-        return unbox<obj[]> result.[0]
+    promise {
+        let! module' = importDynamic<obj> "es-module-lexer"
+        do! Dyn.get module' "init" |> unbox<JS.Promise<unit>>
+        let parseResult = Dyn.call1 (Dyn.get module' "parse") (box program)
+        let imports = (parseResult :?> obj array).[0]
+        return unbox<obj array> imports
     }
-    |> Async.StartAsPromise
 
 /// Read the full package.json object, defaulting to `{ type:'module', dependencies:{} }`
 /// and ensuring both fields exist (repairs a pre-existing file lacking type:module).
@@ -63,15 +65,12 @@ let private jsonEscape (s: string) : string =
 /// Spawn `npx npm install` in the project dir, resolving on a clean exit.
 let private npmInstall (projectDir: string) (packages: string array) : JS.Promise<unit> =
     let args' = Array.append [| "--yes"; "npm@latest"; "install"; "--prefix"; projectDir |] packages
-    let work =
-        Async.FromContinuations(fun (resolve, reject, _) ->
-            let c = childSpawn "npx" args' (box {| cwd = projectDir; stdio = "ignore" |})
-            c?on("error", fun (e: obj) -> reject (e :?> exn)) |> ignore
-            c?on("close", fun (code: obj) ->
-                if unbox<int> code = 0 then resolve ()
-                else reject (exn $"npm install exited with {code}")) |> ignore
-        )
-    work |> Async.StartAsPromise
+    Promise.create (fun resolve reject ->
+        let c = childSpawn "npx" args' (box {| cwd = projectDir; stdio = "ignore" |})
+        c?on("error", fun (e: obj) -> reject (e :?> exn)) |> ignore
+        c?on("close", fun (code: obj) ->
+            if unbox<int> code = 0 then resolve ()
+            else reject (exn $"npm install exited with {code}")) |> ignore)
 
 /// Build the ESM prelude that gives a transpiled script require/__dirname/__filename.
 let createJavascriptPrelude (cwd: string) : string =
@@ -97,8 +96,8 @@ let resolveJavascriptSpecifier (cwd: string) (specifier: string) : string =
 /// Uses es-module-lexer parse results to build output from non-overlapping segments
 /// rather than string-index replacement, avoiding sourcemap/edge-case fragility.
 let rewriteJavascriptModuleSpecifiers (program: string) (cwd: string) : JS.Promise<string> =
-    async {
-        let! imports = parseImports program |> Async.AwaitPromise
+    promise {
+        let! imports = parseImports program
         if Dyn.isNullish imports || Array.isEmpty imports then return program
         else
             let lastEnd, segmentsRev =
@@ -125,13 +124,12 @@ let rewriteJavascriptModuleSpecifiers (program: string) (cwd: string) : JS.Promi
             if List.isEmpty segmentsRev then return program
             else return String.concat "" (List.rev segmentsRev)
     }
-    |> Async.StartAsPromise
 
 /// Ensure the temp project dir is an ESM project with tsx + dependencies.
 /// Always guarantees `type: "module"` is present, repairing a pre-existing
 /// package.json that lacks it even when no dependencies need installation.
 let ensureJavascriptProject (projectDir: string) (dependencies: string list) : JS.Promise<unit> =
-    async {
+    promise {
         mkdirSync projectDir (box {| recursive = true |})
         let pkgPath = $"{projectDir}/package.json"
         let pkg =
@@ -143,6 +141,5 @@ let ensureJavascriptProject (projectDir: string) (dependencies: string list) : J
         for pkgName in toInstall do setDep deps pkgName "*"
         writeFileSync pkgPath $"{jsonStringify pkg}\n" "utf-8"
         if not toInstall.IsEmpty then
-            do! npmInstall projectDir (Array.ofList toInstall) |> Async.AwaitPromise
+            do! npmInstall projectDir (Array.ofList toInstall)
     }
-    |> Async.StartAsPromise

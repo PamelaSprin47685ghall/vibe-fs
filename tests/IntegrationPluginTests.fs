@@ -33,8 +33,8 @@ let registrationShape (reg: obj) =
     let coderRemoves = unbox<string[]> (get coderPolicy "remove")
     check "mux.getToolPolicy coder keeps write" (not (coderRemoves |> Array.contains "write"))
 
-let syntaxSpec () = async {
-    let! result = checkSyntax "const x = 1;" "test.js" |> Async.AwaitPromise
+let syntaxSpec () = promise {
+    let! result = checkSyntax "const x = 1;" "test.js"
     match result with
     | Ok (_, errors) -> check "tree-sitter no errors" (errors.Length = 0)
     | Failed _ -> check "tree-sitter not failed" false
@@ -61,10 +61,10 @@ let countsSpec (reg: obj) =
     check "wrapper count" (wrappers.Length = 5)
     check "tool count" (tools.Length = 12)
 
-let configSpec () = async {
-    let! workspaceDir = mkdtempAsync "plugin-config-" |> Async.AwaitPromise
-    let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
-    let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>> |> Async.AwaitPromise
+let configSpec () = promise {
+    let! workspaceDir = mkdtempAsync "plugin-config-"
+    let! p = plugin (box {| directory = workspaceDir |})
+    let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>>
     let agents = get cfg "agent"
     check "config manager exists" (not (isNullish (get agents "manager")))
     check "config build exists" (not (isNullish (get agents "build")))
@@ -85,14 +85,14 @@ let configSpec () = async {
     check "config manager permission.bash deny" (str permission "bash" = "deny")
     check "config manager permission.glob present" (not (isNullish (get permission "glob")))
     check "config manager permission.skill present" (not (isNullish (get permission "skill")))
-    do! rmAsync workspaceDir |> Async.AwaitPromise
+    do! rmAsync workspaceDir
 }
 
-let mimoConfigSpec () = async {
-    let! workspaceDir = mkdtempAsync "mimo-plugin-config-" |> Async.AwaitPromise
-    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+let mimoConfigSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mimo-plugin-config-"
+    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     pluginShape p
-    let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>> |> Async.AwaitPromise
+    let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>>
     let agents = get cfg "agent"
     let manager = get agents "manager"
     let managerPermissions = get manager "permission"
@@ -109,7 +109,7 @@ let mimoConfigSpec () = async {
             "additionalProperties", box false
         ]
     let todoDef = createObj [ "description", box "old desc"; "parameters", box taskParams ]
-    do! (get p "tool.definition") $ (createObj [ "toolID", box "task" ], todoDef) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    do! (get p "tool.definition") $ (createObj [ "toolID", box "task" ], todoDef) |> unbox<JS.Promise<unit>>
     check "mimo tool.definition rewrites task description" (str todoDef "description" |> fun text -> text.Contains("append-only work backlog") && text.Contains("operation"))
     check "mimo tool.definition merges completedWorkReport into parameters" (not (isNullish (get (get (get todoDef "parameters") "properties") "completedWorkReport")))
     check "mimo tool.definition removes host task_id from schema" (isNullish (get (get (get todoDef "parameters") "properties") "task_id"))
@@ -162,7 +162,7 @@ let mimoConfigSpec () = async {
         makeTaskMessage "mimo-msg-3" "Third report from the final task."
     |]
     let output = createObj [ "messages", box messages ]
-    do! (get p "experimental.chat.messages.transform") $ (createObj [ "agent", box "manager" ], output) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    do! (get p "experimental.chat.messages.transform") $ (createObj [ "agent", box "manager" ], output) |> unbox<JS.Promise<unit>>
     let transformedMessages = unbox<obj[]> (get output "messages")
     let prefixMessages = transformedMessages |> Array.filter (fun message -> str (get message "info") "id" |> fun id -> id.StartsWith("magic-todo-prefix-"))
     check "mimo messages.transform emits folded prefix messages" (prefixMessages.Length = 2)
@@ -183,20 +183,20 @@ let mimoConfigSpec () = async {
 
     let compactingContext = [||]
     let compactingOutput = createObj [ "context", box compactingContext ]
-    do! (get p "experimental.session.compacting") $ (createObj [ "sessionID", box sessionID ], compactingOutput) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+    do! (get p "experimental.session.compacting") $ (createObj [ "sessionID", box sessionID ], compactingOutput) |> unbox<JS.Promise<unit>>
     let compactingContextAfter = unbox<obj[]> (get compactingOutput "context")
     check "mimo session.compacting uses task naming" (
         compactingContextAfter.Length = 1
         && (string compactingContextAfter.[0]).Contains("task")
         && not ((string compactingContextAfter.[0]).Contains("todowrite"))
     )
-    do! rmAsync workspaceDir |> Async.AwaitPromise
+    do! rmAsync workspaceDir
 }
 
 let run () : JS.Promise<unit> =
-    async {
-        let! workspaceDir = mkdtempAsync "plugin-run-" |> Async.AwaitPromise
-        let! p = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
+    promise {
+        let! workspaceDir = mkdtempAsync "plugin-run-"
+        let! p = plugin (box {| directory = workspaceDir |})
         pluginShape p
         let reg = createRegistration (createObj [])
         registrationShape reg
@@ -206,6 +206,5 @@ let run () : JS.Promise<unit> =
         countsSpec reg
         do! configSpec ()
         do! mimoConfigSpec ()
-        do! rmAsync workspaceDir |> Async.AwaitPromise
+        do! rmAsync workspaceDir
     }
-    |> Async.StartAsPromise

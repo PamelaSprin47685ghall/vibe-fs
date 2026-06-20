@@ -39,14 +39,14 @@ let private slashConfigFromCtx (deps: obj) (workspaceId: WorkspaceId) (ctx: obj)
               "taskService", box (Dyn.get deps "taskService") ]
 
 let private pluginConfigForSlash (deps: obj) (workspaceId: WorkspaceId) : JS.Promise<obj> =
-    async {
+    promise {
         let resolver = Dyn.get deps "resolveWorkspacePluginContext"
         if not (Dyn.typeIs resolver "function") then
             return fallbackSlashConfig deps workspaceId
         else
-            let! ctx = Dyn.call2 resolver (box (Id.workspaceIdValue workspaceId)) (box null) :?> JS.Promise<obj> |> Async.AwaitPromise
+            let! ctx = unbox<JS.Promise<obj>> (Dyn.call2 resolver (box (Id.workspaceIdValue workspaceId)) (box null))
             return slashConfigFromCtx deps workspaceId ctx
-    } |> Async.StartAsPromise
+    }
 
 let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     box {| key = "loop"
@@ -54,17 +54,17 @@ let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) 
            inputHint = "<task description>"
            execute = System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
                 match Id.tryWorkspaceId workspaceIdStr with
-                | None -> (async { return "Invalid workspaceId" } |> Async.StartAsPromise)
+                | None -> Promise.lift "Invalid workspaceId"
                 | Some wid ->
                     let task = args.Trim()
                     if task = "" then
                         reviewStore.deactivateReview (Id.workspaceIdValue wid)
-                        (async { return "Loop mode cancelled." } |> Async.StartAsPromise)
+                        Promise.lift "Loop mode cancelled."
                     elif reviewStore.isReviewActive (Id.workspaceIdValue wid) then
-                        (async { return "Loop mode is already active. Submit your work via submit_review." } |> Async.StartAsPromise)
+                        Promise.lift "Loop mode is already active. Submit your work via submit_review."
                     else
                         reviewStore.activateReview(Id.workspaceIdValue wid, task, dateNow ())
-                        (async { return buildLoopMessage task [ "Loop mode is active. Complete the task above, then call submit_review with:" ] } |> Async.StartAsPromise)) |}
+                        Promise.lift (buildLoopMessage task [ "Loop mode is active. Complete the task above, then call submit_review with:" ])) |}
 
 let private parseLoopReviewVerdict (args: obj option) (report: string) : bool * string =
     match args with
@@ -87,12 +87,12 @@ let private loopReviewExecute
     let workspaceIdStr = Id.workspaceIdValue workspaceId
     if task = "" then
         reviewStore.deactivateReview workspaceIdStr
-        (async { return "Loop mode cancelled." } |> Async.StartAsPromise)
+        Promise.lift "Loop mode cancelled."
     elif reviewStore.isReviewActive workspaceIdStr then
-        (async { return "Loop mode is already active. Submit your work via submit_review." } |> Async.StartAsPromise)
+        Promise.lift "Loop mode is already active. Submit your work via submit_review."
     else
-        async {
-            let! config = pluginConfigForSlash deps workspaceId |> Async.AwaitPromise
+        promise {
+            let! config = pluginConfigForSlash deps workspaceId
             let disabledTools = deniedTools "reviewer" (Array.toList toolNames) |> Array.ofList
             let callId = workspaceIdStr + "-loop-review-" + string (dateNow ())
             let verdictPromise = registerCallWithTimeout callStore callId 300000
@@ -104,9 +104,9 @@ let private loopReviewExecute
             let promptText = ReviewerVerdictPrompts.loopReviewVerdictInstructions + "\n\n=== Task Description ===\n\n" + task + "\n\n" + submissionFooter "agent_report" callId
             let! outcome = delegateWithTimeout deps config "explore" promptText "Pre-review" (Some opts) 300000
             let! verdictArgs =
-                async {
+                promise {
                     try
-                        let! args = verdictPromise |> Async.AwaitPromise
+                        let! args = verdictPromise
                         return Some args
                     with _ -> return None
                 }
@@ -125,7 +125,7 @@ let private loopReviewExecute
                         buildLoopMessage task [ "Loop mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
                     else
                         buildLoopMessage task [ "Pre-review feedback:"; ""; feedback; ""; "Loop mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
-        } |> Async.StartAsPromise
+        }
 
 let createLoopReviewCommand (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     box
@@ -135,7 +135,7 @@ let createLoopReviewCommand (deps: obj) (toolNames: string array) (callStore: Ca
            execute =
                System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
                    match Id.tryWorkspaceId workspaceIdStr with
-                   | None -> (async { return "Invalid workspaceId" } |> Async.StartAsPromise)
+                   | None -> Promise.lift "Invalid workspaceId"
                    | Some wid -> loopReviewExecute deps toolNames callStore reviewStore wid args) |}
 
 let createSlashCommands (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj array =

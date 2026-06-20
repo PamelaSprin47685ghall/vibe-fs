@@ -139,7 +139,7 @@ let dueMaintenanceWeeklySpec () =
     check "empty wiki no weekly" (weeklyDue3 |> Option.isNone)
 
 let run () : JS.Promise<unit> =
-    async {
+    promise {
         projectionTextSpec ()
         filesTextSpec ()
         entriesForDaySpec ()
@@ -154,4 +154,3 @@ let run () : JS.Promise<unit> =
         dueMaintenanceDailySpec ()
         dueMaintenanceWeeklySpec ()
     }
-    |> Async.StartAsPromise

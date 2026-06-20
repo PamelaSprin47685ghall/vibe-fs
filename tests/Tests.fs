@@ -22,7 +22,7 @@ open VibeFs.Tests.WikiKernelTests
 open VibeFs.Tests.TitleFetchGuardTests
 
 let runAll (_args: string array) : JS.Promise<int> =
-    async {
+    promise {
         ReviewTests.transition' ()
         ReviewTests.registry ()
         ReviewTests.resultMapping ()
@@ -76,19 +76,20 @@ let runAll (_args: string array) : JS.Promise<int> =
         ShellTests.summarizerInputCap ()
         do! ShellTests.readDirectoryListing ()
         do! ShellTests.ensureJavascriptProjectRepairsModuleType ()
+        do! ShellTests.rewriteJavascriptRelativeImports ()
         do! ShellTests.wikiPortRangeSpec ()
         do! ShellTests.wikiPortSerialSpec ()
         DynTests.nullish ()
         DelegateTests.run ()
         ResolveAiSettingsTests.run ()
-        do! IntegrationPluginTests.run () |> Async.AwaitPromise
-        do! IntegrationEventTests.run () |> Async.AwaitPromise
-        do! IntegrationDedupTests.run () |> Async.AwaitPromise
-        do! IntegrationToolTests.run () |> Async.AwaitPromise
-        do! IntegrationChatTests.run () |> Async.AwaitPromise
-        do! WikiTests.run () |> Async.AwaitPromise
-        do! WikiFileTests.run () |> Async.AwaitPromise
-        do! WikiKernelTests.run () |> Async.AwaitPromise
+        do! IntegrationPluginTests.run ()
+        do! IntegrationEventTests.run ()
+        do! IntegrationDedupTests.run ()
+        do! IntegrationToolTests.run ()
+        do! IntegrationChatTests.run ()
+        do! WikiTests.run ()
+        do! WikiFileTests.run ()
+        do! WikiKernelTests.run ()
         MagicTests.run ()
         TitleFetchGuardTests.signature ()
         TitleFetchGuardTests.wrap ()
@@ -99,4 +100,3 @@ let runAll (_args: string array) : JS.Promise<int> =
         TitleFetchGuardTests.skipProbeMessage ()
         return summary ()
     }
-    |> Async.StartAsPromise

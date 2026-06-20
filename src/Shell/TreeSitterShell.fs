@@ -135,7 +135,7 @@ let rec private collectDiagnostics (node: obj) (acc: SyntaxDiagnostic list) : Sy
         innerAcc, (isMissing || isError || innerHas)
 
 let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckResult> =
-    async {
+    promise {
         match tryGetPack() with
         | Result.Error reason -> return Failed("", reason)
         | Result.Ok pack ->
@@ -163,28 +163,23 @@ let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckRes
                         let errors, _ = collectDiagnostics rootNode []
                         return Ok(lang, errors |> List.rev |> Array.ofList)
     }
-    |> Async.StartAsPromise
 
 [<Import("promises", "node:fs")>]
 let private fsPromises : obj = jsNative
 
-let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
-
 let readAndCheckSyntax (filePath: string) (cwd: string) (includeOk: bool) : JS.Promise<string option> =
-    async {
+    promise {
         try
             let abs = pathResolve cwd filePath
-            let! content = fsPromises?readFile(abs, "utf-8") |> asPromise<string> |> Async.AwaitPromise
-            let! result = checkSyntax content filePath |> Async.AwaitPromise
+            let! (content: string) = fsPromises?readFile(abs, "utf-8")
+            let! result = checkSyntax content filePath
             return formatSyntaxDiagnostics filePath result includeOk
         with _ -> return None
     }
-    |> Async.StartAsPromise
 
 let appendSyntaxDiagnostics (filePath: string) (content: string) (includeOk: bool)
                             : JS.Promise<string option> =
-    async {
-        let! result = checkSyntax content filePath |> Async.AwaitPromise
+    promise {
+        let! result = checkSyntax content filePath
         return formatSyntaxDiagnostics filePath result includeOk
     }
-    |> Async.StartAsPromise

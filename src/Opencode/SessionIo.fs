@@ -6,7 +6,6 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Message
 open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.PromiseRace
 
 type WorkspaceEffect = Ro | Rw
 
@@ -74,14 +73,14 @@ let private toEntries (messages: obj) : obj array =
 
 /// Pull the latest assistant text from a session's messages.
 let extractSessionText (client: obj) (sessionId: string) (directory: string) : JS.Promise<string> =
-    async {
+    promise {
         try
             let arg =
                 if directory = "" then
                     box {| path = box {| id = sessionId |} |}
                 else
                     box {| path = box {| id = sessionId |}; query = box {| directory = directory |} |}
-            let! result = invoke1 arg "messages" (Dyn.get client "session") |> Async.AwaitPromise
+            let! result = invoke1 arg "messages" (Dyn.get client "session")
             let data = Dyn.get result "data"
             if Dyn.isNullish data then return noOutputText
             else
@@ -90,9 +89,6 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) : J
                 | None -> return noOutputText
         with _ -> return noOutputText
     }
-    |> Async.StartAsPromise
-
-let private asPromise<'T> (o: obj) : JS.Promise<'T> = unbox<JS.Promise<'T>> o
 
 [<Global>]
 type DOMException(message: string, name: string) =
@@ -101,29 +97,29 @@ type DOMException(message: string, name: string) =
 /// Prompt a session and race it against an AbortSignal. The returned promise
 /// rejects with `AbortError` if the signal fires before the prompt resolves.
 let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
-    async {
+    promise {
         let session = Dyn.get client "session"
         if Dyn.isNullish signal then
-            do! session?prompt(args) |> asPromise<unit> |> Async.AwaitPromise
+            do! session?prompt(args)
         elif Dyn.truthy (Dyn.get signal "aborted") then
-            raise (DOMException("Aborted", "AbortError"))
+            return! Promise.reject (DOMException("Aborted", "AbortError"))
         else
             let settled = ref false
             let handlerRef = ref None
-            let abortAsync =
-                Async.FromContinuations (fun (cont, _, _) ->
+            let abortAsync : JS.Promise<string> =
+                Promise.create (fun resolve _reject ->
                     let handler = fun () ->
                         if not settled.Value then
                             settled.Value <- true
                             match handlerRef.Value with
                             | Some h -> signal?removeEventListener("abort", h) |> ignore
                             | None -> ()
-                            cont "aborted"
+                            resolve "aborted"
                     handlerRef.Value <- Some handler
                     signal?addEventListener("abort", handler) |> ignore)
-            let promptAsync =
-                async {
-                    do! session?prompt(args) |> asPromise<unit> |> Async.AwaitPromise
+            let promptAsync : JS.Promise<string> =
+                promise {
+                    do! session?prompt(args)
                     if not settled.Value then
                         settled.Value <- true
                         match handlerRef.Value with
@@ -132,14 +128,13 @@ let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
                     return "ok"
                 }
             try
-                let! winner = promiseRace [| promptAsync |> Async.StartAsPromise; abortAsync |> Async.StartAsPromise |] |> Async.AwaitPromise
-                if winner = "aborted" then raise (DOMException("Aborted", "AbortError"))
+                let! winner = Promise.race [ promptAsync; abortAsync ]
+                if winner = "aborted" then return! Promise.reject (DOMException("Aborted", "AbortError"))
             with err ->
                 match translateJsError err with
-                | MessageAborted -> raise (DOMException("Aborted", "AbortError"))
-                | _ -> raise err
+                | MessageAborted -> return! Promise.reject (DOMException("Aborted", "AbortError"))
+                | _ -> return! Promise.reject err
     }
-    |> Async.StartAsPromise
 
 /// Core subagent runner. The `cleanup` flag controls whether the child session
 /// is aborted and unregistered after the prompt finishes.
@@ -147,7 +142,7 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
                             (directory: string) (sessionID: string) (context: obj)
                             (tools: obj) (cleanup: bool) (workspaceEffect: WorkspaceEffect)
                             (wikiRecorder: (WikiRecordRequest -> unit) option) : JS.Promise<string> =
-    async {
+    promise {
         let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
         let session = Dyn.get client "session"
         let createBody =
@@ -161,7 +156,7 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
                     title = title
                 |}
             |}
-        let! createResult = invoke1 createBody "create" session |> Async.AwaitPromise
+        let! createResult = invoke1 createBody "create" session
         let childID = Dyn.str (Dyn.get createResult "data") "id"
         if childID = "" then return "Failed to create child session"
         else
@@ -177,8 +172,8 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
                         let body = box {| agent = agent; parts = [| box {| ``type`` = "text"; text = prompt |} |] |}
                         let body = if Dyn.isNullish tools then body else Dyn.withKey body "tools" tools
                         createObj [ "path", box {| id = childID |}; "body", body ]
-                    do! promptWithAbort client promptBody (getAbortSignal context) |> Async.AwaitPromise
-                    let! text = extractSessionText client childID directory |> Async.AwaitPromise
+                    do! promptWithAbort client promptBody (getAbortSignal context)
+                    let! text = extractSessionText client childID directory
                     match workspaceEffect, wikiRecorder with
                     | Rw, Some record when text <> "" -> record { title = title; prompt = prompt; result = text; agent = agent }
                     | _ -> ()
@@ -189,11 +184,10 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
                 match translateJsError err with
                 | MessageAborted ->
                     abortAndUnregister ()
-                    let! text = extractSessionText client childID directory |> Async.AwaitPromise
+                    let! text = extractSessionText client childID directory
                     return if text = "" then abortedPrefix else $"{abortedPrefix} {text}"
-                | _ -> return (raise err)
+                | _ -> return! Promise.reject err
     }
-    |> Async.StartAsPromise
 
 /// Run a subagent and keep the child session registered after return.
 let runSubagent (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)

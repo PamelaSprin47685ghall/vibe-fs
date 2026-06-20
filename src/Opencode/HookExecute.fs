@@ -67,7 +67,7 @@ let private restoreMimocodeTaskArgsAfterExecute (host: Host) (input: obj) (args:
             if cached <> "" then setKey args "completedWorkReport" (box cached)
 
 let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
-    async {
+    promise {
         let args = Dyn.get output "args"
         if Dyn.isNullish args then ()
         else
@@ -76,13 +76,13 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
             if host = Mimocode then
                 stripMimocodeTaskArgsForExecute input args
                 rewriteMimocodeApplyPatchArgsForExecute output input args
-    } |> Async.StartAsPromise
+    }
 
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
     toolExecuteBeforeFor opencode input output
 
-let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: obj) : Async<unit> =
-    async {
+let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
+    promise {
         let tool = Dyn.str input "tool"
         if not (isFileEditTool tool) then ()
         else
@@ -95,8 +95,8 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
                     let paths = extractFilePaths (Dyn.get input "args")
                     let! diagnostics =
                         paths
-                        |> List.map (fun path -> readAndCheckSyntax path directory false |> Async.AwaitPromise)
-                        |> Async.Parallel
+                        |> List.map (fun path -> readAndCheckSyntax path directory false)
+                        |> Promise.all
                     let formatted =
                         diagnostics
                         |> Array.choose id
@@ -113,7 +113,7 @@ let private buildRwSummary (tool: string) (output: obj) : string =
     if summary = "" then tool else summary
 
 let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (wikiRuntime: WikiRuntime) (input: obj) (output: obj) : JS.Promise<unit> =
-    async {
+    promise {
         let args = Dyn.get input "args"
         if not (Dyn.isNullish args) then restoreMimocodeTaskArgsAfterExecute host input args
         do! appendSyntaxDiagnostics directory input output
@@ -121,8 +121,8 @@ let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Open
         if isDirectWriteTool tool then
             let sessionID = Dyn.str input "sessionID"
             wikiRuntime.MarkRwTool(sessionID, tool, buildRwSummary tool output)
-        do! nudgeHook.handleToolExecuteAfter input output |> Async.AwaitPromise
-    } |> Async.StartAsPromise
+        do! nudgeHook.handleToolExecuteAfter input output
+    }
 
 let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (wikiRuntime: WikiRuntime) (input: obj) (output: obj) : JS.Promise<unit> =
     toolExecuteAfterFor opencode directory nudgeHook wikiRuntime input output

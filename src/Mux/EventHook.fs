@@ -45,5 +45,5 @@ let private parseHookEvent (event: obj) : NudgeRuntimeEvent =
 let createEventHook (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     let runtime = createNudgeRuntime reviewStore
     let fn = System.Func<obj, obj, JS.Promise<unit>>(fun event helpers ->
-        unbox<JS.Promise<unit>> (runtime.HandleEvent(parseHookEvent event, helpers)))
+        runtime.HandleEvent(parseHookEvent event, helpers))
     box fn

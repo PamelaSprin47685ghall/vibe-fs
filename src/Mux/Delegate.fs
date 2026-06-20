@@ -6,15 +6,13 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Mux.AiSettings
 open VibeFs.Mux.Wrappers
-open VibeFs.Shell.PromiseRace
 
 [<Global>]
 type AbortController() =
     member _.signal: obj = jsNative
     member _.abort(): unit = jsNative
 
-let private resolveStr (s: string) : JS.Promise<string> =
-    async { return s } |> Async.StartAsPromise
+let private resolveStr (s: string) : JS.Promise<string> = Promise.lift s
 
 let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
     unbox<JS.Promise<obj>>(taskService?create(input))
@@ -78,15 +76,15 @@ let delegateToSubAgent
         if isNull taskService then
             resolveStr $"No task service for {title.ToLower()}"
         else
-            async {
+            promise {
                 let opts = defaultArg options (box null)
                 let experiments = Dyn.get opts "experiments"
                 let aiSettingsAgentId = Dyn.str opts "aiSettingsAgentId"
                 let! aiSettings : DelegatedAiSettings =
                     if aiSettingsAgentId = "" then
-                        async { return emptySettings }
+                        Promise.lift emptySettings
                     else
-                        resolveDelegatedAgentAiSettings deps config aiSettingsAgentId |> Async.AwaitPromise
+                        resolveDelegatedAgentAiSettings deps config aiSettingsAgentId
 
                 let input =
                     createInput
@@ -99,7 +97,7 @@ let delegateToSubAgent
                         (buildParentRuntimeAiSettings config)
                         experiments
 
-                let! createResult = taskCreate taskService input |> Async.AwaitPromise
+                let! createResult = taskCreate taskService input
                 let success = Dyn.truthy (Dyn.get createResult "success")
 
                 if not success then
@@ -116,15 +114,14 @@ let delegateToSubAgent
                                backgroundOnMessageQueued = false |}
 
                     try
-                        let! report = taskWait taskService taskId waitOpts |> Async.AwaitPromise
+                        let! report = taskWait taskService taskId waitOpts
                         return Dyn.str report "reportMarkdown"
                     with err ->
                         match translateJsError err with
                         | TaskWaitBackgrounded ->
                             return $"{title} task ({taskId}) moved to background. Use task tools to monitor it."
-                        | _ -> return raise err
+                        | _ -> return! Promise.reject err
             }
-            |> Async.StartAsPromise
 
 let runMuxSubagent
     (deps: obj)
@@ -144,32 +141,30 @@ let delegateWithTimeout
     (title: string)
     (options: obj option)
     (timeoutMs: int)
-    : Async<DelegateOutcome> =
-    async {
+    : JS.Promise<DelegateOutcome> =
+    promise {
         let controller = new AbortController()
         let signal = controller.signal
         let configWithSignal = Dyn.withKey config "abortSignal" signal
 
         let workPromise =
-            async {
-                let! report = delegateToSubAgent deps configWithSignal agentId prompt title options |> Async.AwaitPromise
+            promise {
+                let! report = delegateToSubAgent deps configWithSignal agentId prompt title options
                 return box (Report report)
             }
-            |> Async.StartAsPromise
 
         let timeoutPromise =
-            async {
-                do! Async.Sleep timeoutMs
+            promise {
+                do! Promise.sleep timeoutMs
                 controller.abort()
                 return box TimedOut
             }
-            |> Async.StartAsPromise
 
         try
-            let! winner = promiseRace [| workPromise; timeoutPromise |] |> Async.AwaitPromise
+            let! winner = Promise.race [| workPromise; timeoutPromise |]
             return unbox<DelegateOutcome> winner
         with err ->
             match translateJsError err with
             | MessageAborted -> return TimedOut
-            | _ -> return raise err
+            | _ -> return! Promise.reject err
     }

@@ -168,7 +168,7 @@ let private ensureParts (output: obj) : obj =
 /// Handle /loop and /loop-review slash commands.
 let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (input: obj) (output: obj) : JS.Promise<unit> =
-    async {
+    promise {
         let command = Dyn.str input "command"
         if command = "loop" || command = "loop-review" then
             let sessionID = Dyn.str input "sessionID"
@@ -187,7 +187,7 @@ let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: 
                 pushPart parts (box {| ``type`` = "text"; text = msg |})
             else
                 let directory = Dyn.str ctx "directory"
-                let! result = runReviewerSession childAgentRegistry (Dyn.get ctx "client") reviewStore directory sessionID task |> Async.AwaitPromise
+                let! result = runReviewerSession childAgentRegistry (Dyn.get ctx "client") reviewStore directory sessionID task
                 match result with
                 | Accepted ->
                     pushPart parts (box {| ``type`` = "text"; text = $"Pre-review passed. Task \"{task}\" already meets all criteria — no changes needed." |})
@@ -197,7 +197,7 @@ let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: 
                     reviewStore.activateReview(sessionID, task, dateNow ())
                     let msg = buildLoopMessage task [ "=== Pre-review Feedback ==="; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]
                     pushPart parts (box {| ``type`` = "text"; text = msg |})
-    } |> Async.StartAsPromise
+    }
 
 /// Register /loop and /loop-review command templates in the opencode config.
 let private registerCommands (cfg: obj) : unit =
@@ -212,7 +212,7 @@ let private registerCommands (cfg: obj) : unit =
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<obj, obj, JS.Promise<unit>>(f))
 
 let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
-    async {
+    promise {
         installTitleFetchGuard ()
         let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
         let childAgentRegistry = ChildAgentRegistry.Create()
@@ -248,29 +248,28 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
                     box (System.Func<JS.Promise<unit>>(fun () -> wikiRuntime.WaitForBackgroundJobsForTesting()))
                 ]))
         setKey result "config" (box (fun (cfg: obj) ->
-            (async {
+            promise {
                 let next = applyAgentConfigFor host cfg mcpMap
                 registerCommands cfg
                 return assignInto cfg next
-            } |> Async.StartAsPromise)))
+            }))
         setKey result "chat.message" (twoArgHook (fun input output -> chatMessageFor host childAgentRegistry nudgeHook input output))
         setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
         setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBeforeFor host input output))
         setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host directory nudgeHook wikiRuntime input output))
         setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform childAgentRegistry directory magicSession wikiRuntime input output))
         setKey result "command.execute.before" (twoArgHook (fun input output ->
-            async {
-                do! nudgeHook.handleCommandExecuteBefore input output |> Async.AwaitPromise
-                do! commandExecuteBefore childAgentRegistry ctx reviewStore input output |> Async.AwaitPromise
-            } |> Async.StartAsPromise))
+            promise {
+                do! nudgeHook.handleCommandExecuteBefore input output
+                do! commandExecuteBefore childAgentRegistry ctx reviewStore input output
+            }))
         setKey result "event" (box (fun (input: obj) ->
-            async {
-                do! eventHandler reviewStore input |> Async.AwaitPromise
+            promise {
+                do! eventHandler reviewStore input
                 cleanUpJobContextIfAbortedOrDeleted wikiRuntime input
                 flushDirectWriteTurnIfCompleted wikiRuntime input
-                do! nudgeHook.handleEvent input |> Async.AwaitPromise
-            } |> Async.StartAsPromise))
+                do! nudgeHook.handleEvent input
+            }))
         setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host magicSession input output))
         return result
     }
-    |> Async.StartAsPromise

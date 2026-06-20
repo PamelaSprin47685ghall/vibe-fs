@@ -29,15 +29,14 @@ let private selectNudgePrompt (action: string) : string option =
     | _ -> None
 
 let private tryGetTodos (helpers: obj) (workspaceId: string) : JS.Promise<string list> =
-    async {
+    promise {
         try
             let getTodosFn = Dyn.get helpers "getTodos"
-            let! result = unbox<JS.Promise<obj array>> (Dyn.call1 getTodosFn workspaceId) |> Async.AwaitPromise
+            let! result = unbox<JS.Promise<obj[]>> (Dyn.call1 getTodosFn workspaceId)
             return result |> Array.map string |> List.ofArray
         with _ ->
             return []
     }
-    |> Async.StartAsPromise
 
 let private rememberAction (state: StreamEndState) (workspaceId: string) (action: string) : StreamEndState =
     match ofString action with
@@ -57,7 +56,7 @@ let private handleNudgeRequest
     (lastMessage: string)
     (todos: string list)
     : JS.Promise<StreamEndState> =
-    async {
+    promise {
         let context : NudgeContext =
             { todos = todos
               lastAssistantMessage = lastMessage
@@ -74,13 +73,12 @@ let private handleNudgeRequest
             | Some prompt ->
                 try
                     let nudgeFn = Dyn.get helpers "nudge"
-                    let! _ = unbox<JS.Promise<bool>> (Dyn.call2 nudgeFn workspaceId prompt) |> Async.AwaitPromise
+                    let! _ = unbox<JS.Promise<bool>> (Dyn.call2 nudgeFn workspaceId prompt)
                     return rememberAction state workspaceId action
                 with _ ->
                     coordinator.Value <- clearRuntimeSession coordinator.Value workspaceId
                     return state
     }
-    |> Async.StartAsPromise
 
 /// Holds the per-workspace stream-end state and the nudge coordinator. All
 /// mutations happen inside HandleEvent; the host adapter only decodes events
@@ -90,7 +88,7 @@ type NudgeRuntime(reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) =
     let coordinator = ref freshCoordinatorRuntime
 
     member _.HandleEvent(parsed: NudgeRuntimeEvent, helpers: obj) : JS.Promise<unit> =
-        async {
+        promise {
             match parsed with
             | Ignore -> return ()
             | StreamEnd(workspaceId, stopReason, lastMessage) ->
@@ -99,10 +97,9 @@ type NudgeRuntime(reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) =
                 elif stopReason = "queued-message" then
                     return ()
                 else
-                    let! todos = tryGetTodos helpers workspaceId |> Async.AwaitPromise
+                    let! todos = tryGetTodos helpers workspaceId
                     let! nextState =
                         handleNudgeRequest reviewStore.isReviewActive coordinator state helpers workspaceId lastMessage todos
-                        |> Async.AwaitPromise
                     state <- nextState
                     return ()
             | StreamAbort workspaceId ->
@@ -115,7 +112,6 @@ type NudgeRuntime(reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) =
                 state <- clearWorkspaceState state workspaceId
                 return ()
         }
-        |> Async.StartAsPromise
 
 let createNudgeRuntime (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : NudgeRuntime =
     NudgeRuntime(reviewStore)

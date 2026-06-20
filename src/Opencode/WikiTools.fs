@@ -7,7 +7,7 @@ open VibeFs.Kernel.Wiki
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.WikiRuntime
 
-let private resolveStr (s: string) : JS.Promise<string> = async { return s } |> Async.StartAsPromise
+let private resolveStr (s: string) : JS.Promise<string> = Promise.lift s
 
 let fetchWikiTool (wikiRuntime: WikiRuntime) (ctx: obj) : obj =
     define fetchWiki

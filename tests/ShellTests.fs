@@ -65,57 +65,76 @@ let capsContextFormat () =
 let capsFileSizeLimit () =
     equal "caps file size limit 4MB" (4 * 1_048_576) VibeFs.Shell.WorkspaceFiles.maxFileSize
 
-let readDirectoryListing () = async {
-    let! workspaceDir = mkdtempAsync "read-dir-" |> Async.AwaitPromise
+let readDirectoryListing () = promise {
+    let! workspaceDir = mkdtempAsync "read-dir-"
     let nestedDir = unbox<string> (pathModule?join(workspaceDir, "nested"))
     let filePath = unbox<string> (pathModule?join(workspaceDir, "note.txt"))
-    do! writeFileAsync filePath "hello" |> Async.AwaitPromise
+    do! writeFileAsync filePath "hello"
     let fsAsync : obj = requireFn("fs")?promises
-    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(nestedDir)) |> Async.AwaitPromise
+    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(nestedDir))
     let! listing = VibeFs.Shell.FileSys.read None workspaceDir None None
     check "directory listing contains file" (listing.Contains "note.txt")
     check "directory listing contains directory" (listing.Contains "nested")
     check "directory listing has total header" (listing.Contains "total 2")
-    do! rmAsync workspaceDir |> Async.AwaitPromise
+    do! rmAsync workspaceDir
 }
 
-let ensureJavascriptProjectRepairsModuleType () = async {
-    let! projectDir = mkdtempAsync "executor-js-project-" |> Async.AwaitPromise
+let ensureJavascriptProjectRepairsModuleType () = promise {
+    let! projectDir = mkdtempAsync "executor-js-project-"
     let packageJsonPath = unbox<string> (pathModule?join(projectDir, "package.json"))
-    do! writeFileAsync packageJsonPath "{\n  \"dependencies\": {\n    \"tsx\": \"*\"\n  }\n}\n" |> Async.AwaitPromise
-    do! VibeFs.Shell.ExecutorJavascript.ensureJavascriptProject projectDir [] |> Async.AwaitPromise
+    do! writeFileAsync packageJsonPath "{\n  \"dependencies\": {\n    \"tsx\": \"*\"\n  }\n}\n"
+    do! VibeFs.Shell.ExecutorJavascript.ensureJavascriptProject projectDir []
     let fsAsync : obj = requireFn("fs")?promises
-    let! packageJson = unbox<JS.Promise<string>> (fsAsync?readFile(packageJsonPath, "utf-8")) |> Async.AwaitPromise
+    let! packageJson = unbox<JS.Promise<string>> (fsAsync?readFile(packageJsonPath, "utf-8"))
     check "ensureJavascriptProject writes type module" (packageJson.Contains "\"type\": \"module\"")
-    do! rmAsync projectDir |> Async.AwaitPromise
+    do! rmAsync projectDir
 }
 
-let wikiPortRangeSpec () = async {
+/// Exercises parseImports: es-module-lexer's `init()` returns a native JS Promise
+/// that MUST be awaited before `parse()`. The Promise.lift regression wrapped it
+/// without awaiting, so parse ran before the WASM lexer was ready and the call
+/// rejected — leaving relative specifiers un-rewritten. Skipped gracefully when
+/// es-module-lexer (an optionalDependency) is absent from this environment.
+let private canRequireEsModuleLexer () : bool =
+    try
+        requireFn("es-module-lexer") |> ignore
+        true
+    with _ -> false
+
+let rewriteJavascriptRelativeImports () = promise {
+    if not (canRequireEsModuleLexer ()) then ()
+    else
+        let program = "import { x } from \"./foo.js\";\nconsole.log(x);\n"
+        let! rewritten = VibeFs.Shell.ExecutorJavascript.rewriteJavascriptModuleSpecifiers program "/abs/cwd"
+        check "relative import rewritten to file URL" (rewritten.Contains "file:///")
+        check "relative specifier consumed" (not (rewritten.Contains "\"./foo.js\""))
+        check "non-relative body preserved" (rewritten.Contains "console.log(x)")
+}
+
+let wikiPortRangeSpec () = promise {
     let portA = VibeFs.Shell.WikiPortLock.lockPortForPath "/tmp/wiki-a"
     let portB = VibeFs.Shell.WikiPortLock.lockPortForPath "/tmp/wiki-a"
     check "wiki lock deterministic" (portA = portB)
     check "wiki lock in high range" (portA >= 49152 && portA < 65536)
 }
 
-let wikiPortSerialSpec () = async {
+let wikiPortSerialSpec () = promise {
     let seen = System.Collections.Generic.List<string>()
     let first =
-        VibeFs.Shell.WikiPortLock.withWikiPortLock "/tmp/wiki-lock-test" (async {
+        VibeFs.Shell.WikiPortLock.withWikiPortLock "/tmp/wiki-lock-test" (fun () -> promise {
             seen.Add "first-start"
-            do! Async.Sleep 50
+            do! Promise.sleep 50
             seen.Add "first-end"
             return "one"
         })
-        |> Async.StartAsPromise
     let second =
-        VibeFs.Shell.WikiPortLock.withWikiPortLock "/tmp/wiki-lock-test" (async {
+        VibeFs.Shell.WikiPortLock.withWikiPortLock "/tmp/wiki-lock-test" (fun () -> promise {
             seen.Add "second-start"
             seen.Add "second-end"
             return "two"
         })
-        |> Async.StartAsPromise
-    let! _ = first |> Async.AwaitPromise
-    let! _ = second |> Async.AwaitPromise
+    let! _ = first
+    let! _ = second
     check "wiki lock serializes same workspace" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
 }
 

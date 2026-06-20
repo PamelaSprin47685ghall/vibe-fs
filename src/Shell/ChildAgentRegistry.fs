@@ -2,6 +2,7 @@ module VibeFs.Shell.ChildAgentRegistry
 
 open Fable.Core
 open VibeFs.Kernel.Domain
+open VibeFs.Shell.PromiseQueue
 
 type ChildAgentRegistry private (state: WorkspaceState ref) =
 
@@ -64,44 +65,21 @@ type ChildAgentRegistry private (state: WorkspaceState ref) =
         | Some childId ->
             state.Value <- reduce state.Value (ChildUnregistered childId)
 
-type private ExecutorEnvelope =
-    { work: unit -> Async<string>
-      reply: AsyncReplyChannel<Result<string, exn>> }
-
+/// Per-session serial executor: guarantees shell commands for one session run in
+/// submission order. Backed by a Promise-chain SerialQueue (no legacy F# Agent).
 type ExecutorActor() =
-    let agents = System.Collections.Generic.Dictionary<string, MailboxProcessor<ExecutorEnvelope>>()
+    let queues = System.Collections.Generic.Dictionary<string, SerialQueue>()
 
-    let createSessionAgent () =
-        MailboxProcessor.Start(fun inbox ->
-            let rec loop () = async {
-                let! message = inbox.Receive()
-                let! outcome = Async.Catch(message.work())
-                match outcome with
-                | Choice1Of2 result -> message.reply.Reply(Ok result)
-                | Choice2Of2 error -> message.reply.Reply(Error error)
-                return! loop ()
-            }
-            loop ())
-
-    let getSessionAgent (sessionID: string) =
-        match agents.TryGetValue sessionID with
-        | true, agent -> agent
+    let getSessionQueue (sessionID: string) =
+        match queues.TryGetValue sessionID with
+        | true, queue -> queue
         | false, _ ->
-            let agent = createSessionAgent ()
-            agents.[sessionID] <- agent
-            agent
+            let queue = SerialQueue()
+            queues.[sessionID] <- queue
+            queue
 
     member _.Post(sessionID: string, work: unit -> JS.Promise<string>) : JS.Promise<string> =
-        async {
-            let agent = getSessionAgent sessionID
-            let! outcome = agent.PostAndAsyncReply(fun reply ->
-                { work = fun () -> work () |> Async.AwaitPromise
-                  reply = reply })
-            match outcome with
-            | Ok result -> return result
-            | Error error -> return raise error
-        }
-        |> Async.StartAsPromise
+        getSessionQueue sessionID |> fun queue -> queue.Enqueue(work)
 
 let private actor = ExecutorActor()
 

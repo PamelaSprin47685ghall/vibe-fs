@@ -35,7 +35,7 @@ let private mergeObjects (objs: obj array) : obj =
         Dyn.assignInto merged item |> ignore
     merged
 
-let private resolveStr (s: string) : JS.Promise<string> = async { return s } |> Async.StartAsPromise
+let private resolveStr (s: string) : JS.Promise<string> = Promise.lift s
 
 let private formatDomainError (context: string) (error: DomainError) : string =
     match error with
@@ -68,7 +68,7 @@ let coderTool (registry: ChildAgentRegistry) (wikiRuntime: VibeFs.Opencode.WikiR
                 let directory = Dyn.str tc "directory"
                 let sessionID = Dyn.str tc "sessionID"
                 let prompts = formatPrompt opencode (Coder intents)
-                async {
+                promise {
                     let! reports =
                         prompts
                         |> List.map (fun prompt ->
@@ -83,11 +83,10 @@ let coderTool (registry: ChildAgentRegistry) (wikiRuntime: VibeFs.Opencode.WikiR
                                 context
                                 (box null)
                                 Rw
-                                (Some (fun record -> wikiRuntime.StartBookkeeperAppend(record.prompt, record.result, record.title, record.prompt)))
-                            |> Async.AwaitPromise)
-                        |> Async.Parallel
+                                (Some (fun record -> wikiRuntime.StartBookkeeperAppend(record.prompt, record.result, record.title, record.prompt))))
+                        |> Promise.all
                     return joinReports reports
-                } |> Async.StartAsPromise)
+                })
 
 let investigatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"
@@ -100,16 +99,15 @@ let investigatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
             | Ok intents ->
                 let tc = extractToolContext context (Dyn.str ctx "directory")
                 let prompts = formatPrompt opencode (Investigator intents)
-                async {
+                promise {
                     let! reports =
                         prompts
                         |> List.map (fun prompt ->
                             runSubagent registry (client ()) "investigator" "Investigator" prompt
-                                (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null)
-                            |> Async.AwaitPromise)
-                        |> Async.Parallel
+                                (Dyn.str tc "directory") (Dyn.str tc "sessionID") context (box null))
+                        |> Promise.all
                     return joinReports reports
-                } |> Async.StartAsPromise)
+                })
 
 let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"
@@ -121,8 +119,8 @@ let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
             let sessionID = Dyn.str tc "sessionID"
             let intent = Dyn.str args "intent"
             let files = if Dyn.isNullish (Dyn.get args "files") then [||] else Dyn.get args "files" :?> obj array |> Array.map string
-            async {
-                let! readResults = VibeFs.Shell.WorkspaceFiles.readReverieFiles directory (List.ofArray files) |> Async.AwaitPromise
+            promise {
+                let! readResults = VibeFs.Shell.WorkspaceFiles.readReverieFiles directory (List.ofArray files)
                 let sections =
                     Array.map2 (fun file (r: VibeFs.Shell.WorkspaceFiles.ReverieFileResult) ->
                         { file = file; content = r.content } : MeditatorFileSection)
@@ -131,8 +129,7 @@ let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                 let prompt = formatPrompt opencode (Meditator(intent, sections)) |> List.head
                 return! runSubagent registry (client ()) "meditator" "Meditator" prompt
                     directory sessionID context (box null)
-                    |> Async.AwaitPromise
-            } |> Async.StartAsPromise)
+            })
 
 let executorTool (registry: ChildAgentRegistry) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"
@@ -151,24 +148,23 @@ let executorTool (registry: ChildAgentRegistry) (wikiRuntime: VibeFs.Opencode.Wi
                 let options : ExecuteOptions =
                     { program = Dyn.str args "program"; language = lang; dependencies = deps
                       timeoutType = timeout; cwd = Some (Dyn.str tc "directory") }
-                async {
-                    let! result = VibeFs.Shell.Executor.execute options sessionID |> Async.AwaitPromise
+                promise {
+                    let! result = VibeFs.Shell.Executor.execute options sessionID
                     let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
                     let! finalOutput =
                         if not (shouldSummarize byteLength output) then
-                            async { return prependSafetyWarningForExecution output options }
+                            Promise.lift (prependSafetyWarningForExecution output options)
                         else
-                            async {
+                            promise {
                                 let prompt = formatPrompt opencode (ExecutorSummary output) |> List.head
                                 let! summary =
                                     runSubagentWithCleanup registry (client ()) "executor" "Executor summary" prompt
                                         (Dyn.str tc "directory") sessionID context
-                                    |> Async.AwaitPromise
                                 return prependSafetyWarningForExecution summary options
                             }
                     if mode = "rw" then wikiRuntime.StartBookkeeperAppend(Dyn.str args "program", finalOutput, "Executor", Dyn.str args "program")
                     return finalOutput
-                } |> Async.StartAsPromise))
+                }))
 
 let browserTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"
@@ -197,11 +193,10 @@ let fuzzyFindTool (finderCache: FinderCache) : obj =
                       scopeId = scopeId
                       store = None
                       finderCache = finderCache }
-                async {
-                    let! r = FuzzyCommandsModule.fuzzyFind p o |> Async.AwaitPromise
+                promise {
+                    let! r = FuzzyCommandsModule.fuzzyFind p o
                     return r.output
-                }
-                |> Async.StartAsPromise)
+                })
 
 let fuzzyGrepTool (finderCache: FinderCache) : obj =
     define ToolSchemaModule.fuzzyGrep
@@ -226,11 +221,10 @@ let fuzzyGrepTool (finderCache: FinderCache) : obj =
                       scopeId = scopeId
                       store = None
                       finderCache = finderCache }
-                async {
-                    let! r = FuzzyCommandsModule.fuzzyGrep p o |> Async.AwaitPromise
+                promise {
+                    let! r = FuzzyCommandsModule.fuzzyGrep p o
                     return r.output
-                }
-                |> Async.StartAsPromise)
+                })
 
 let private abortSignal (context: obj) : obj =
     if Dyn.isNullish context then null else Dyn.get context "abort"
@@ -248,10 +242,10 @@ let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
             elif whatToSummarize = "" then resolveStr (formatDomainError "Web search" (InvalidIntent ("websearch", "what_to_summarize", "required")))
             else
                 let signal = abortSignal context
-                async {
+                promise {
                     let numResults = defaultArg (optInt args "numResults") 10
                     let body = createObj [ "query", box query; "max_results", box numResults ]
-                    let! result = ollamaPost "web_search" body (if Dyn.isNullish signal then None else Some signal) |> Async.AwaitPromise
+                    let! result = ollamaPost "web_search" body (if Dyn.isNullish signal then None else Some signal)
                     match result with
                     | Error e -> return formatDomainError "Web search" e
                     | Ok data ->
@@ -266,8 +260,7 @@ let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                             let prompt = formatPrompt opencode (WebsearchSummary(whatToSummarize, rawResults)) |> List.head
                             return! runSubagentWithCleanup registry (client ()) "executor" "Web search summary" prompt
                                         (Dyn.str tc "directory") (Dyn.str tc "sessionID") context
-                                    |> Async.AwaitPromise
-                } |> Async.StartAsPromise)
+                })
 
 let webfetchTool () : obj =
     define webfetch
@@ -281,7 +274,7 @@ let webfetchTool () : obj =
             if url = "" then resolveStr (formatDomainError "Web fetch" (InvalidIntent ("webfetch", "url", "required")))
             else
                 let signal = abortSignal context
-                async {
+                promise {
                     let bodyEntries = ResizeArray<(string * obj)>()
                     bodyEntries.Add("url", box url)
                     match optBool args "extract_main" with Some v -> bodyEntries.Add("extract_main", box v) | None -> ()
@@ -289,7 +282,7 @@ let webfetchTool () : obj =
                     match optStr args "prompt" with Some v -> bodyEntries.Add("prompt", box v) | None -> ()
                     match optInt args "timeout" with Some v -> bodyEntries.Add("timeout", box v) | None -> ()
                     let body = createObj (Seq.toList bodyEntries)
-                    let! result = ollamaPost "web_fetch" body (if Dyn.isNullish signal then None else Some signal) |> Async.AwaitPromise
+                    let! result = ollamaPost "web_fetch" body (if Dyn.isNullish signal then None else Some signal)
                     match result with
                     | Error e -> return formatDomainError "Web fetch" e
                     | Ok data ->
@@ -298,7 +291,7 @@ let webfetchTool () : obj =
                         let length_ = if Dyn.isNullish (Dyn.get data "length") then None else Some (unbox<int> (Dyn.get data "length"))
                         let content = if Dyn.isNullish (Dyn.get data "content") then None else Some (Dyn.str data "content")
                         return formatFetchResponse { title = title; byline = byline; length = length_; content = content }
-                } |> Async.StartAsPromise)
+                })
 
 let private formatReviewResult = VibeFs.Kernel.Prompts.formatReviewResult
 
@@ -319,10 +312,10 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Sh
                     if Dyn.isNullish (Dyn.get args "affectedFiles") then []
                     else Dyn.get args "affectedFiles" :?> obj array |> Array.map string |> List.ofArray
                 let abort = Dyn.get tc "abortSignal"
-                async {
+                promise {
                     try
                         let task = defaultArg (store.getReviewTask sessionID) ""
-                        let! result = runSubmitReview registry (client ()) store (Dyn.str tc "directory") sessionID report affectedFiles task abort |> Async.AwaitPromise
+                        let! result = runSubmitReview registry (client ()) store (Dyn.str tc "directory") sessionID report affectedFiles task abort
                         match result with
                         | Accepted
                         | Terminated ->
@@ -331,7 +324,7 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Sh
                         return formatReviewResult result
                     finally
                         store.unlockReview sessionID
-                } |> Async.StartAsPromise)
+                })
 
 let submitReviewResultTool (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     define "Submit your review verdict."
@@ -346,7 +339,7 @@ let submitReviewResultTool (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj
                 | Some f ->
                     let trimmed = f.Trim()
                     if trimmed = "" then Accepted else Rejected trimmed
-            async { return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve." } |> Async.StartAsPromise)
+            promise { return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve." })
 
 let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     mergeObjects [|

@@ -248,15 +248,14 @@ let private runFind (state: FuzzyFindState) (store: TypedIteratorStore) (opts: S
         { output = output; isError = false }
 
 let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
-    async {
+    promise {
         let store = resolveStore opts
         match resolveFindSearchState params' opts with
         | Error msg -> return { output = msg; isError = true }
         | Ok state ->
-            let! finderResult = acquireFinderFromOptions state.externalBasePath opts |> Async.AwaitPromise
+            let! finderResult = acquireFinderFromOptions state.externalBasePath opts
             return runWithFinder finderResult state.externalBasePath (runFind state store opts)
     }
-    |> Async.StartAsPromise
 
 // ─── Grep pipeline ──────────────────────────────────────────────────────────
 
@@ -288,12 +287,11 @@ let private runGrepWithFinder (state: FuzzyGrepState) (store: TypedIteratorStore
         { output = buildGrepOutput body resolved.regexError nextIterator; isError = false }
 
 let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
-    async {
+    promise {
         let store = resolveStore opts
         match resolveGrepSearchState params' opts with
         | Error msg -> return { output = msg; isError = true }
         | Ok state ->
-            let! finderResult = acquireFinderFromOptions state.externalBasePath opts |> Async.AwaitPromise
+            let! finderResult = acquireFinderFromOptions state.externalBasePath opts
             return runWithFinder finderResult state.externalBasePath (runGrepWithFinder state store opts)
     }
-    |> Async.StartAsPromise
