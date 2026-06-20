@@ -107,7 +107,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
             promise {
                 try
                     let! promptText = buildPrompt ()
-                    do! launchBackgroundSession root kind title promptText
+                    launchBackgroundSession root kind title promptText |> Promise.start
                 with _ -> ()
             })
 
