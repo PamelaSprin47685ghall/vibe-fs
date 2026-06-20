@@ -76,6 +76,16 @@ let uiParam : obj = call1 (call0 (str ()) "optional") "describe" (box "Internal:
 let strArrayReq (desc: string) : obj = call1 (arr (strMin 1 "")) "describe" (box desc)
 let strArrayOpt (desc: string) : obj = call1 (call0 (arr (strMin 1 "")) "optional") "describe" (box desc)
 
+let wikiDraftEntriesReq (desc: string) : obj =
+    let entryShape =
+        strictObject (
+            createObj [
+                "id", strOpt "Optional wiki id"
+                "q", strReq "Wiki question"
+                "a", strReq "Wiki answer"
+            ])
+    arrayMin entryShape 1 desc
+
 let numOpt (desc: string) : obj =
     let n = call0 schema "number"
     let n = call0 n "int"
@@ -113,4 +123,10 @@ let websearch = description "websearch"
 
 let webfetch = description "webfetch"
 
+let fetchWiki = description "fetch_wiki"
+
+let submitWiki = description "submit_wiki"
+
 module Params = VibeFs.Kernel.ToolCatalog.Params
+
+let executorMode = VibeFs.Kernel.ToolCatalog.Params.executorMode

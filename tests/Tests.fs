@@ -16,6 +16,8 @@ open VibeFs.Tests.IntegrationDedupTests
 open VibeFs.Tests.IntegrationToolTests
 open VibeFs.Tests.IntegrationChatTests
 open VibeFs.Tests.MagicTests
+open VibeFs.Tests.WikiTests
+open VibeFs.Tests.WikiFileTests
 
 let runAll (_args: string array) : JS.Promise<int> =
     async {
@@ -37,7 +39,10 @@ let runAll (_args: string array) : JS.Promise<int> =
         KernelTests.dedup' ()
         KernelTests.jsBoundary' ()
         KernelTests.hostKernel' ()
+        KernelTests.wikiFetchAnswer ()
+        KernelTests.wikiDraftArrayParsing ()
         KernelTests.toolCatalogCentralized ()
+        KernelTests.hostToolsWikiNames ()
         KernelTests.subagentDispatch ()
         KernelTests.subagentJoinReports ()
         KernelTests.dynDeleteKey ()
@@ -50,6 +55,7 @@ let runAll (_args: string array) : JS.Promise<int> =
         FuzzyTests.formatFull ()
         FuzzyTests.fuzzyFallbackNotice ()
         FuzzyTests.findPagingDefault ()
+        FuzzyTests.emptyIteratorNotRendered ()
         FuzzyTests.totalMatchedSemantics ()
         FuzzyTests.iteratorNamespaceConstants ()
         FuzzyTests.iteratorStoreStronglyTyped ()
@@ -66,6 +72,8 @@ let runAll (_args: string array) : JS.Promise<int> =
         ShellTests.summarizerInputCap ()
         do! ShellTests.readDirectoryListing ()
         do! ShellTests.ensureJavascriptProjectRepairsModuleType ()
+        do! ShellTests.wikiPortRangeSpec ()
+        do! ShellTests.wikiPortSerialSpec ()
         DynTests.nullish ()
         DelegateTests.run ()
         ResolveAiSettingsTests.run ()
@@ -74,6 +82,8 @@ let runAll (_args: string array) : JS.Promise<int> =
         do! IntegrationDedupTests.run () |> Async.AwaitPromise
         do! IntegrationToolTests.run () |> Async.AwaitPromise
         do! IntegrationChatTests.run () |> Async.AwaitPromise
+        do! WikiTests.run () |> Async.AwaitPromise
+        do! WikiFileTests.run () |> Async.AwaitPromise
         MagicTests.run ()
         return summary ()
     }

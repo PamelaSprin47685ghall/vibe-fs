@@ -15,6 +15,7 @@ open VibeFs.Shell.OllamaClient
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ReviewerLoop
+open VibeFs.Opencode.WikiTools
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzySearch
@@ -40,7 +41,7 @@ let private optInt (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullis
 let private optBool (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<bool> v)
 let private optField (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some v
 
-let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
+let coderTool (registry: ChildAgentRegistry) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"
     define coder
         (box {| intents = coderIntentsSchema Params.coderIntents; tdd = enumReq [| "red"; "green" |] Params.coderTdd; _ui = uiParam |})
@@ -56,7 +57,18 @@ let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                     let! reports =
                         prompts
                         |> List.map (fun prompt ->
-                            runSubagent registry (client ()) "coder" "Coder" prompt directory sessionID context (box null)
+                            runSubagentWithEffect
+                                registry
+                                (client ())
+                                "coder"
+                                "Coder"
+                                prompt
+                                directory
+                                sessionID
+                                context
+                                (box null)
+                                Rw
+                                (Some (fun record -> wikiRuntime.StartBookkeeperAppend(record.prompt, record.result, record.title)))
                             |> Async.AwaitPromise)
                         |> Async.Parallel
                     return joinReports reports
@@ -107,17 +119,19 @@ let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                     |> Async.AwaitPromise
             } |> Async.StartAsPromise)
 
-let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
+let executorTool (registry: ChildAgentRegistry) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"
     define executor
         (box {| language = strReq Params.executorLanguage; program = strReq Params.executorProgram
-                dependencies = strArrayOpt Params.executorDeps; timeout_type = strReq Params.executorTimeout |})
+                dependencies = strArrayOpt Params.executorDeps; timeout_type = strReq Params.executorTimeout
+                mode = enumReq [| "ro"; "rw" |] Params.executorMode |})
         (fun args context ->
             let tc = extractToolContext context (Dyn.str ctx "directory")
             let sessionID = Dyn.str tc "sessionID"
             post sessionID (fun () ->
                 let lang = parseLanguage (Dyn.str args "language")
                 let timeout = parseTimeout (Dyn.str args "timeout_type")
+                let mode = Dyn.str args "mode"
                 let deps = if Dyn.isNullish (Dyn.get args "dependencies") then [] else Dyn.get args "dependencies" :?> obj array |> Array.map string |> List.ofArray
                 let options : ExecuteOptions =
                     { program = Dyn.str args "program"; language = lang; dependencies = deps
@@ -125,14 +139,20 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                 async {
                     let! result = VibeFs.Shell.Executor.execute options sessionID |> Async.AwaitPromise
                     let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
-                    if not (shouldSummarize byteLength output) then return prependSafetyWarningForExecution output options
-                    else
-                        let prompt = formatPrompt opencode (ExecutorSummary output) |> List.head
-                        let! summary =
-                            runSubagentWithCleanup registry (client ()) "executor" "Executor summary" prompt
-                                (Dyn.str tc "directory") sessionID context
-                            |> Async.AwaitPromise
-                        return prependSafetyWarningForExecution summary options
+                    let! finalOutput =
+                        if not (shouldSummarize byteLength output) then
+                            async { return prependSafetyWarningForExecution output options }
+                        else
+                            async {
+                                let prompt = formatPrompt opencode (ExecutorSummary output) |> List.head
+                                let! summary =
+                                    runSubagentWithCleanup registry (client ()) "executor" "Executor summary" prompt
+                                        (Dyn.str tc "directory") sessionID context
+                                    |> Async.AwaitPromise
+                                return prependSafetyWarningForExecution summary options
+                            }
+                    if mode = "rw" then wikiRuntime.StartBookkeeperAppend(Dyn.str args "program", finalOutput, "Executor")
+                    return finalOutput
                 } |> Async.StartAsPromise))
 
 let browserTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
@@ -311,13 +331,14 @@ let submitReviewResultTool (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj
                     if trimmed = "" then Accepted else Rejected trimmed
             async { return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve." } |> Async.StartAsPromise)
 
-let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     mergeObjects [|
-        entry "coder" (coderTool registry ctx); entry "investigator" (investigatorTool registry ctx)
+        entry "coder" (coderTool registry wikiRuntime ctx); entry "investigator" (investigatorTool registry ctx)
         entry "meditator" (meditatorTool registry ctx); entry "browser" (browserTool registry ctx)
-        entry "executor" (executorTool registry ctx)
+        entry "executor" (executorTool registry wikiRuntime ctx)
         entry "fuzzy_find" (fuzzyFindTool finderCache); entry "fuzzy_grep" (fuzzyGrepTool finderCache)
         entry "websearch" (websearchTool registry ctx); entry "webfetch" (webfetchTool ())
+        entry "fetch_wiki" (fetchWikiTool wikiRuntime ctx); entry "submit_wiki" (submitWikiTool wikiRuntime)
         entry "submit_review" (submitReviewTool registry ctx reviewStore)
         entry "return_reviewer" (submitReviewResultTool reviewStore)
     |]

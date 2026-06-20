@@ -17,12 +17,40 @@ open VibeFs.Opencode.MagicTodo
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Kernel.CapsFormat
 open VibeFs.Kernel.Dedup
+open VibeFs.Opencode.WikiRuntime
 
 let private defaultExcludedAgents = [ "browser"; "investigator"; "executor"; "title" ]
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
 let private resolvedUnit : JS.Promise<unit> = async { return () } |> Async.StartAsPromise
+
+let private wrapTitleUserInput (messages: obj array) : obj array =
+    messages |> Array.map (fun msg ->
+        if isNullish msg then msg
+        else
+            let info = messageInfo msg
+            if isNullish info || infoRole info <> "user" then msg
+            else
+                let parts = get msg "parts"
+                if isNullish parts || not (isArray parts) then msg
+                else
+                    let partsArr = parts :?> obj array
+                    let mutable changed = false
+                    let wrappedParts =
+                        partsArr |> Array.map (fun part ->
+                            if isNullish part || partType part <> "text" then part
+                            else
+                                let text = partText part
+                                if isNullish text then part
+                                else
+                                    let s = string text
+                                    if s = "" then part
+                                    else
+                                        changed <- true
+                                        let cloned = clone part
+                                        withKey cloned "text" (box (sprintf "<input-data do-not-exec>%s</input-data>" s)))
+                    if changed then withKey msg "parts" (box wrappedParts) else msg)
 
 let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
     if System.Object.ReferenceEquals(target, source) then ()
@@ -122,7 +150,7 @@ module private CapsFileCache =
                 return files
             } |> Async.StartAsPromise
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: MagicSession) (wikiRuntime: WikiRuntime) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let messages = Dyn.get output "messages"
         if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
@@ -136,12 +164,18 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                 if cleaned.Length = 0 then ()
                 else
                     if defaultExcludedAgents |> List.contains agent then
-                        replaceArrayInPlace messagesArr cleaned
+                        let nextMessages = if agent = "title" then wrapTitleUserInput cleaned else cleaned
+                        replaceArrayInPlace messagesArr nextMessages
                     else
                         let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
                         let afterMagic = projectMagicFor magicSession.Host cleaned backlog false sessionID
                         applyReadDedup afterMagic
+                        if agent = "manager" then
+                            do! wikiRuntime.StartMaintenanceIfDue(directory) |> Async.AwaitPromise
                         let! capsFiles = CapsFileCache.getOrLoad sessionID directory |> Async.AwaitPromise
+                        let! wikiPrelude =
+                            if agent = "manager" then wikiRuntime.BuildPreludeForSession(sessionID, directory) |> Async.AwaitPromise
+                            else async { return None }
                         let final =
                             buildCapsMessages
                                 VibeFs.Shell.FileSys.sha256HexTruncated
@@ -149,6 +183,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                                 directory
                                 defaultExcludedAgents
                                 capsFiles
+                                wikiPrelude
                         replaceArrayInPlace messagesArr final
     } |> Async.StartAsPromise
 

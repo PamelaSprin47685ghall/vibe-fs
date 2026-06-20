@@ -84,7 +84,11 @@ let private buildToolParts (capsFiles: CapsFile list) (fp: string) (sessionID: s
         ]))
     |> Array.ofList
 
-let private buildUserMessage (userId: string) (sessionID: string option) : obj =
+let private buildUserMessage (userId: string) (sessionID: string option) (preludeText: string option) : obj =
+    let text =
+        match preludeText with
+        | Some prelude when prelude.Trim() <> "" -> "你好\n\n" + prelude.Trim()
+        | _ -> "你好"
     box (createObj [
         "info", box (createObj [
             "id", box userId
@@ -94,7 +98,7 @@ let private buildUserMessage (userId: string) (sessionID: string option) : obj =
             "agent", box "orchestrator"
             "model", box (createObj [ "providerID", box ""; "modelID", box "" ])
         ])
-        "parts", box [| box {| ``type`` = "text"; text = "你好" |} |]
+        "parts", box [| box {| ``type`` = "text"; text = text |} |]
     ])
 
 let private buildAssistantMessage (assistantId: string) (userId: string) (sessionID: string option) (projectRoot: string) (toolParts: obj array) : obj =
@@ -132,6 +136,7 @@ let buildCapsMessages
     (projectRoot: string)
     (excludedAgents: string list)
     (capsFiles: CapsFile list)
+    (preludeText: string option)
     : obj array =
     let shouldSkip =
         match findFirstRealMessage messages with
@@ -143,15 +148,16 @@ let buildCapsMessages
         let existingStripped =
             if hasExistingCapsMessages messages && messages.Length >= 2 then messages.[2..]
             else messages
+        let hasPrelude = match preludeText with Some text when text.Trim() <> "" -> true | _ -> false
         if existingStripped.Length = 0 then messages
-        elif capsFiles.IsEmpty then existingStripped
+        elif capsFiles.IsEmpty && not hasPrelude then existingStripped
         else
             let sessionID = messageSessionID existingStripped.[0]
             let sessionOpt = if sessionID = "" then None else Some sessionID
             let fp = stableFingerprint hashFn capsFiles
             let userId = $"{capsUserPrefix}{fp}"
             let assistantId = $"{capsAssistantPrefix}{fp}"
-            let toolParts = buildToolParts capsFiles fp sessionOpt assistantId
-            let userMsg = buildUserMessage userId sessionOpt
+            let toolParts = if capsFiles.IsEmpty then [||] else buildToolParts capsFiles fp sessionOpt assistantId
+            let userMsg = buildUserMessage userId sessionOpt preludeText
             let assistantMsg = buildAssistantMessage assistantId userId sessionOpt projectRoot toolParts
             Array.concat [| [| userMsg |]; [| assistantMsg |]; existingStripped |]

@@ -90,6 +90,35 @@ let ensureJavascriptProjectRepairsModuleType () = async {
     do! rmAsync projectDir |> Async.AwaitPromise
 }
 
+let wikiPortRangeSpec () = async {
+    let portA = VibeFs.Shell.WikiPortLock.lockPortForPath "/tmp/wiki-a"
+    let portB = VibeFs.Shell.WikiPortLock.lockPortForPath "/tmp/wiki-a"
+    check "wiki lock deterministic" (portA = portB)
+    check "wiki lock in high range" (portA >= 49152 && portA < 65536)
+}
+
+let wikiPortSerialSpec () = async {
+    let seen = System.Collections.Generic.List<string>()
+    let first =
+        VibeFs.Shell.WikiPortLock.withWikiPortLock "/tmp/wiki-lock-test" (async {
+            seen.Add "first-start"
+            do! Async.Sleep 50
+            seen.Add "first-end"
+            return "one"
+        })
+        |> Async.StartAsPromise
+    let second =
+        VibeFs.Shell.WikiPortLock.withWikiPortLock "/tmp/wiki-lock-test" (async {
+            seen.Add "second-start"
+            seen.Add "second-end"
+            return "two"
+        })
+        |> Async.StartAsPromise
+    let! _ = first |> Async.AwaitPromise
+    let! _ = second |> Async.AwaitPromise
+    check "wiki lock serializes same workspace" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
+}
+
 let ollamaFormat () =
     let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]
     let formatted = VibeFs.Kernel.Prompts.formatSearchResults results

@@ -23,6 +23,7 @@
     <Compile Include="src/Kernel/Nudge.fs" />
     <Compile Include="src/Kernel/Dedup.fs" />
     <Compile Include="src/Kernel/Message.fs" />
+    <Compile Include="src/Kernel/Wiki.fs" />
     <Compile Include="src/Kernel/CapsFormat.fs" />
     <Compile Include="src/Kernel/TreeSitterKernel.fs" />
     <Compile Include="src/Kernel/MessageDedup.fs" />
@@ -43,6 +44,8 @@
     <Compile Include="src/Shell/TreeSitterShell.fs" />
     <Compile Include="src/Shell/FuzzyFinderShell.fs" />
     <Compile Include="src/Shell/FileSys.fs" />
+    <Compile Include="src/Shell/WikiPortLock.fs" />
+    <Compile Include="src/Shell/WikiFiles.fs" />
     <Compile Include="src/Shell/WorkspaceFiles.fs" />
     <Compile Include="src/Shell/Executor.fs" />
     <Compile Include="src/Shell/FuzzySearch.fs" />
@@ -62,6 +65,8 @@
     <Compile Include="src/Opencode/NudgeHook.fs" />
     <Compile Include="src/Opencode/SessionIo.fs" />
     <Compile Include="src/Opencode/ReviewerLoop.fs" />
+    <Compile Include="src/Opencode/WikiRuntime.fs" />
+    <Compile Include="src/Opencode/WikiTools.fs" />
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/HookExecute.fs" />
     <Compile Include="src/Opencode/HookTransform.fs" />
@@ -86,6 +91,8 @@
     <Compile Include="tests/IntegrationToolTests.fs" />
     <Compile Include="tests/IntegrationChatTests.fs" />
     <Compile Include="tests/MagicTests.fs" />
+    <Compile Include="tests/WikiTests.fs" />
+    <Compile Include="tests/WikiFileTests.fs" />
     <Compile Include="tests/Tests.fs" />
   </ItemGroup>
 

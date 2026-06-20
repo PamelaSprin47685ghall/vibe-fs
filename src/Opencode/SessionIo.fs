@@ -7,6 +7,14 @@ open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Message
 open VibeFs.Shell.ChildAgentRegistry
 
+type WorkspaceEffect = Ro | Rw
+
+type WikiRecordRequest =
+    { title: string
+      prompt: string
+      result: string
+      agent: string }
+
 let private firstString (ctx: obj) (keys: string list) : string option =
     keys
     |> List.tryPick (fun key ->
@@ -136,7 +144,8 @@ let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
 /// is aborted and unregistered after the prompt finishes.
 let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                             (directory: string) (sessionID: string) (context: obj)
-                            (tools: obj) (cleanup: bool) : JS.Promise<string> =
+                            (tools: obj) (cleanup: bool) (workspaceEffect: WorkspaceEffect)
+                            (wikiRecorder: (WikiRecordRequest -> unit) option) : JS.Promise<string> =
     async {
         let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
         let session = Dyn.get client "session"
@@ -166,9 +175,12 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
                     let promptBody =
                         let body = box {| agent = agent; parts = [| box {| ``type`` = "text"; text = prompt |} |] |}
                         let body = if Dyn.isNullish tools then body else Dyn.withKey body "tools" tools
-                        box {| path = box {| id = childID |}; body = body |}
+                        createObj [ "path", box {| id = childID |}; "body", body ]
                     do! promptWithAbort client promptBody (getAbortSignal context) |> Async.AwaitPromise
                     let! text = extractSessionText client childID directory |> Async.AwaitPromise
+                    match workspaceEffect, wikiRecorder with
+                    | Rw, Some record when text <> "" -> record { title = title; prompt = prompt; result = text; agent = agent }
+                    | _ -> ()
                     return if text = "" then "(no output)" else text
                 finally
                     abortAndUnregister ()
@@ -178,7 +190,7 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
                     abortAndUnregister ()
                     let! text = extractSessionText client childID directory |> Async.AwaitPromise
                     return if text = "" then "(aborted)" else $"(aborted) {text}"
-                | _ -> return raise err
+                | _ -> return (raise err)
     }
     |> Async.StartAsPromise
 
@@ -186,13 +198,28 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
 let runSubagent (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                 (directory: string) (sessionID: string) (context: obj)
                 (tools: obj) : JS.Promise<string> =
-    runSubagentCore registry client agent title prompt directory sessionID context tools false
+    runSubagentCore registry client agent title prompt directory sessionID context tools false Ro None
+
+let runSubagentWithEffect
+    (registry: ChildAgentRegistry)
+    (client: obj)
+    (agent: string)
+    (title: string)
+    (prompt: string)
+    (directory: string)
+    (sessionID: string)
+    (context: obj)
+    (tools: obj)
+    (workspaceEffect: WorkspaceEffect)
+    (wikiRecorder: (WikiRecordRequest -> unit) option)
+    : JS.Promise<string> =
+    runSubagentCore registry client agent title prompt directory sessionID context tools false workspaceEffect wikiRecorder
 
 /// Run a subagent and clean up the child session afterwards. Used for
 /// short-lived analysis subagents such as the executor summarizer.
 let runSubagentWithCleanup (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                            (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
-    runSubagentCore registry client agent title prompt directory sessionID context (box null) true
+    runSubagentCore registry client agent title prompt directory sessionID context (box null) true Ro None
 
 /// Run a subagent with an explicit tool set and clean up afterwards.
 let runSubagentWithTools
@@ -200,4 +227,4 @@ let runSubagentWithTools
     (client: obj) (agent: string) (title: string) (prompt: string)
     (directory: string) (sessionID: string) (context: obj)
     (tools: obj) : JS.Promise<string> =
-    runSubagentCore registry client agent title prompt directory sessionID context tools true
+    runSubagentCore registry client agent title prompt directory sessionID context tools true Ro None

@@ -71,13 +71,28 @@ let private executorSpec : ToolSpec =
               "program", "The program to execute."
               "dependencies", "Dependencies to install (for python or javascript)."
               "timeout_type",
-              "Execution timeout budget: 'short' (1s), 'long' (10s), or 'last-resort' (100s). Use 'last-resort' only when absolutely necessary." ]
-      requiredFields = [ "language"; "program"; "timeout_type" ] }
+              "Execution timeout budget: 'short' (1s), 'long' (10s), or 'last-resort' (100s). Use 'last-resort' only when absolutely necessary."
+              "mode", "Execution mode: 'ro' for read-only/diagnostic commands, 'rw' for commands that modify project files or project state." ]
+      requiredFields = [ "language"; "program"; "timeout_type"; "mode" ] }
+
+let private fetchWikiSpec : ToolSpec =
+    { name = "fetch_wiki"
+      description =
+        "Fetch the answer for a project wiki id from this session's wiki snapshot. The manager prelude lists available ids and questions. This tool returns only the answer text and does not read the latest disk wiki."
+      paramDocs = map [ "id", "Wiki entry id from the manager prelude." ]
+      requiredFields = [ "id" ] }
+
+let private submitWikiSpec : ToolSpec =
+    { name = "submit_wiki"
+      description =
+        "Submit wiki draft entries for the current wiki job context. The host decides whether this is an append, daily rewrite, or weekly rewrite job; entries with an id update existing knowledge, and entries without an id receive a host-assigned id."
+      paramDocs = map [ "entries", "Array of wiki draft entries. Each entry: optional id, required q, required a." ]
+      requiredFields = [ "entries" ] }
 
 let private fuzzyFindSpec : ToolSpec =
     { name = "fuzzy_find"
       description =
-        "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported. Every result ends with iterator=\"...\"; iteration is finished when it becomes iterator=\"\"."
+        "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported. When more results exist, the response ends with iterator=\"...\"."
       paramDocs =
         map
             [ "pattern", "Initial plain fuzzy file path text to search for."
@@ -89,7 +104,7 @@ let private fuzzyFindSpec : ToolSpec =
 let private fuzzyGrepSpec : ToolSpec =
     { name = "fuzzy_grep"
       description =
-        "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked. Supports automatic regex mode detection. Use mode=fuzzy explicitly for fuzzy matching when exact regex yields no results. Every result ends with iterator=\"...\"; iteration is finished when it becomes iterator=\"\"."
+        "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked. Supports automatic regex mode detection. Use mode=fuzzy explicitly for fuzzy matching when exact regex yields no results. When more results exist, the response ends with iterator=\"...\"."
       paramDocs =
         map
             [ "pattern", "Initial search pattern. Required on the first call."
@@ -139,7 +154,7 @@ let private submitReviewSpec : ToolSpec =
 
 let all : ToolSpec list =
     [ coderSpec; investigatorSpec; meditatorSpec; browserSpec; executorSpec
-      fuzzyFindSpec; fuzzyGrepSpec; websearchSpec; webfetchSpec; submitReviewSpec ]
+      fetchWikiSpec; submitWikiSpec; fuzzyFindSpec; fuzzyGrepSpec; websearchSpec; webfetchSpec; submitReviewSpec ]
 
 let private byName : Map<string, ToolSpec> = all |> List.map (fun spec -> spec.name, spec) |> Map.ofList
 
@@ -169,6 +184,9 @@ module Params =
     let executorProgram = doc "executor" "program"
     let executorDeps = doc "executor" "dependencies"
     let executorTimeout = doc "executor" "timeout_type"
+    let executorMode = doc "executor" "mode"
+    let fetchWikiId = doc "fetch_wiki" "id"
+    let submitWikiEntries = doc "submit_wiki" "entries"
     let fuzzyFindPattern = doc "fuzzy_find" "pattern"
     let fuzzyFindPath = doc "fuzzy_find" "path"
     let fuzzyFindLimit = doc "fuzzy_find" "limit"

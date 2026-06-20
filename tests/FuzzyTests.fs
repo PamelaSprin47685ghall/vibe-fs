@@ -77,6 +77,9 @@ let findPagingDefault () =
     let id = findNextIterator state store opts 100
     check "many matches → iterator stored" (id <> "")
 
+let emptyIteratorNotRendered () =
+    equal "empty iterator omitted" "body" (buildGrepOutput "body" None "")
+
 /// totalMatched has three semantics, all guarded here with exact header lines:
 ///   Some n (n ≠ items.Length) — header uses n verbatim
 ///   Some 0                   — header is "0 matches" / "0 matching files" (not items.Length)

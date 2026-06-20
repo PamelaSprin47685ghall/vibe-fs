@@ -32,6 +32,15 @@ let canUse' () =
     check "reviewer denied coder" (not (canUse "reviewer" "coder"))
     check "reviewer denied fuzzy_find" (not (canUse "reviewer" "fuzzy_find"))
 
+    check "manager can fetch_wiki" (canUse "manager" "fetch_wiki")
+    check "coder denied fetch_wiki" (not (canUse "coder" "fetch_wiki"))
+    check "reviewer denied fetch_wiki" (not (canUse "reviewer" "fetch_wiki"))
+    check "bookkeeper can submit_wiki" (canUse "bookkeeper" "submit_wiki")
+    check "manager denied submit_wiki" (not (canUse "manager" "submit_wiki"))
+    check "bookkeeper denied read" (not (canUse "bookkeeper" "read"))
+    check "bookkeeper denied coder dispatch" (not (canUse "bookkeeper" "coder"))
+    check "bookkeeper denied websearch" (not (canUse "bookkeeper" "websearch"))
+
     check "browser can read" (canUse "browser" "read")
     check "browser denied coder" (not (canUse "browser" "coder"))
 

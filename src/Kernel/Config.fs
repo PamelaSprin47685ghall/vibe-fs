@@ -11,16 +11,19 @@ let getStealthBrowserMcpLocalConfig (envValue: string) : {| ``type``: string; co
 type Agent = string
 type Tool = string
 
-let private knownAgents = [ "manager"; "investigator"; "coder"; "reviewer"; "browser"; "meditator"; "executor" ]
+let private knownAgents = [ "manager"; "investigator"; "coder"; "reviewer"; "browser"; "meditator"; "executor"; "bookkeeper" ]
 
 let private canUseCanonical (agent: Agent) (tool: Tool) : bool =
     let toolHas (subs: string list) = subs |> List.exists tool.Contains
     match agent with
+    | _ when tool = "fetch_wiki" -> agent = "manager"
+    | _ when tool = "submit_wiki" -> agent = "bookkeeper"
     | _ when toolHas [ "agent_report" ] -> true
+    | "bookkeeper" -> false
     | _ when toolHas [ "bash"; "task" ] || tool = "grep" -> false
     | _ when toolHas [ "stealth" ] -> agent = "browser"
     | _ when toolHas [ "return" ] -> toolHas [ agent ]
-    | "meditator" | "executor" -> false
+    | "meditator" | "executor" | "bookkeeper" -> false
     | _ when tool = "read" -> true
     | "reviewer" | "browser" -> false
     | "investigator" when toolHas [ "executor" ] -> true

@@ -8,11 +8,14 @@ open VibeFs.Kernel.Config
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.NudgeState
+open VibeFs.Kernel.Message
 open VibeFs.Opencode.Tools
 open VibeFs.Opencode.HookExecute
 open VibeFs.Opencode.HookTransform
 open VibeFs.Opencode.NudgeHook
 open VibeFs.Opencode.ReviewerLoop
+open VibeFs.Opencode.WikiRuntime
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Opencode.MagicTodo
@@ -31,6 +34,22 @@ let private assignInto (target: obj) (source: obj) : obj = Dyn.assignInto target
 let private clearArray (arr: obj) : unit = (arr :?> ResizeArray<obj>).Clear()
 let private pushPart (arr: obj) (part: obj) : unit = (arr :?> ResizeArray<obj>).Add(part)
 
+let private getEventAssistantText (event: obj) : string =
+    let properties = Dyn.get event "properties"
+    getPartsText (Dyn.get properties "parts")
+
+let private flushDirectWriteTurnIfCompleted (wikiRuntime: WikiRuntime) (input: obj) : unit =
+    let event = Dyn.get input "event"
+    if Dyn.str event "type" = "message.updated" then
+        let properties = Dyn.get event "properties"
+        let info = Dyn.get properties "info"
+        if isCompletedAssistantMessage info then
+            let sessionID =
+                let fromProps = Dyn.str properties "sessionID"
+                if fromProps <> "" then fromProps else infoSessionID info
+            if sessionID <> "" then
+                wikiRuntime.FlushTurnIfNeeded(sessionID, getEventAssistantText event)
+
 let private emptyMcps : obj = [||] :> obj
 
 type private BuiltinAgentSpec =
@@ -48,6 +67,7 @@ let private builtinAgentSpecs =
       { name = "coder"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "investigator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "meditator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
+      { name = "bookkeeper"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "reviewer"; defaultMode = "subagent"; systemPrompt = Prompts.reviewInstructions; defaultMcps = [||] }
       { name = "browser"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [| "stealth-browser-mcp" |] }
       { name = "executor"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] } ]
@@ -187,8 +207,13 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         let finderCache = FinderCache()
         let nudgeHook = createNudgeHook host ctx reviewStore childAgentRegistry
         let directory = Dyn.str ctx "directory"
+        let nowUtc () =
+            let nowMs = Dyn.get ctx "nowMs"
+            if Dyn.isNullish nowMs then System.DateTime.UtcNow
+            else System.DateTimeOffset.FromUnixTimeMilliseconds(int64 (unbox<float> nowMs)).UtcDateTime
+        let wikiRuntime = WikiRuntime(Dyn.get ctx "client", directory, nowUtc)
         let magicSession = MagicSession host
-        let tools = createTools childAgentRegistry finderCache ctx reviewStore
+        let tools = createTools childAgentRegistry finderCache ctx wikiRuntime reviewStore
         let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
         let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
         let result = emptyObj ()
@@ -196,6 +221,19 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         setKey result "name" (box "kunwei")
         setKey result "mcp" mcpMap
         setKey result "tool" tools
+        setKey
+            result
+            "__wikiRuntime"
+            (box (
+                createObj [
+                    "registerJobForTesting",
+                    box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
+                        wikiRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
+                    "takeBookkeeperLaunchesForTesting",
+                    box (System.Func<obj array>(fun () -> wikiRuntime.TakeBookkeeperLaunchesForTesting()))
+                    "waitForBackgroundJobsForTesting",
+                    box (System.Func<JS.Promise<unit>>(fun () -> wikiRuntime.WaitForBackgroundJobsForTesting()))
+                ]))
         setKey result "config" (box (fun (cfg: obj) ->
             (async {
                 let next = applyAgentConfigFor host cfg mcpMap
@@ -205,8 +243,8 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         setKey result "chat.message" (twoArgHook (fun input output -> chatMessageFor host childAgentRegistry nudgeHook input output))
         setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
         setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBeforeFor host input output))
-        setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host directory nudgeHook input output))
-        setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform childAgentRegistry directory magicSession input output))
+        setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host directory nudgeHook wikiRuntime input output))
+        setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform childAgentRegistry directory magicSession wikiRuntime input output))
         setKey result "command.execute.before" (twoArgHook (fun input output ->
             async {
                 do! nudgeHook.handleCommandExecuteBefore input output |> Async.AwaitPromise
@@ -215,6 +253,7 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         setKey result "event" (box (fun (input: obj) ->
             async {
                 do! eventHandler reviewStore input |> Async.AwaitPromise
+                flushDirectWriteTurnIfCompleted wikiRuntime input
                 do! nudgeHook.handleEvent input |> Async.AwaitPromise
             } |> Async.StartAsPromise))
         setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host magicSession input output))

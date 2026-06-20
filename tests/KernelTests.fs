@@ -51,6 +51,32 @@ let hostKernel' () =
     check "investigator has objective" (investigatorPrompt.IndexOf("find auth") >= 0)
     check "investigator read-only" (investigatorPrompt.IndexOf("READ-ONLY") >= 0)
 
+let wikiFetchAnswer () =
+    let wikiId = match VibeFs.Kernel.Wiki.tryParseId "0a3f" with Some value -> value | None -> failwith "0a3f should parse"
+    let projection =
+        Map.ofList [
+            wikiId, ({ id = wikiId; q = "Q"; a = "A" } : VibeFs.Kernel.Wiki.WikiEntry)
+        ]
+    check "wiki fetch existing" (VibeFs.Kernel.Wiki.fetchAnswer projection "0a3f" = Ok "A")
+    check "wiki fetch invalid id" (VibeFs.Kernel.Wiki.fetchAnswer projection "nope" = Error "Invalid wiki id: nope")
+    check "wiki fetch missing id" (VibeFs.Kernel.Wiki.fetchAnswer projection "b912" = Error "Wiki entry not found in this session snapshot: b912")
+
+let wikiDraftArrayParsing () =
+    let drafts =
+        [|
+            box {| q = "Q1"; a = "A1" |}
+            box {| id = "0a3f"; q = "Q2"; a = "A2" |}
+        |]
+    match VibeFs.Kernel.Wiki.parseDraftArray (box drafts) with
+    | Ok parsed ->
+        check "wiki draft parse count" (parsed.Length = 2)
+        check "wiki draft parse first no id" (parsed.[0].id.IsNone)
+        check "wiki draft parse second id" (parsed.[1].id = Some "0a3f")
+    | Error _ -> check "wiki draft parse valid ok" false
+
+    let invalidDrafts = [| box {| a = "A1" |} |]
+    check "wiki draft parse invalid error" (match VibeFs.Kernel.Wiki.parseDraftArray (box invalidDrafts) with Error _ -> true | _ -> false)
+
 /// P0-2: every tool description and parameter doc the two adapter layers ship
 /// must come from a single Kernel-level `ToolCatalog`.  Today the strings live
 /// twice (Opencode/ToolSchema + Mux/SubagentTools); these tests pin the future
@@ -69,6 +95,16 @@ let toolCatalogCentralized () =
 
     let executorSpec = VibeFs.Kernel.ToolCatalog.specOf "executor"
     check "executor describes timeout budgets" (executorSpec.description.Contains "timeout")
+    check "executor requires mode" (executorSpec.requiredFields |> List.contains "mode")
+    check "executor param doc for mode" (Map.containsKey "mode" executorSpec.paramDocs)
+
+    let fetchSpec = VibeFs.Kernel.ToolCatalog.specOf "fetch_wiki"
+    check "fetch wiki description mentions snapshot" (fetchSpec.description.Contains "session's wiki snapshot")
+    check "fetch wiki requires id" (fetchSpec.requiredFields = [ "id" ])
+
+    let submitSpec = VibeFs.Kernel.ToolCatalog.specOf "submit_wiki"
+    check "submit wiki description mentions wiki" (submitSpec.description.Contains "wiki")
+    check "submit wiki requires entries" (submitSpec.requiredFields = [ "entries" ])
 
     let allSpecs = VibeFs.Kernel.ToolCatalog.all
     let names = allSpecs |> List.map (fun spec -> spec.name) |> Set.ofList
@@ -77,6 +113,13 @@ let toolCatalogCentralized () =
     check "catalog covers meditator" (Set.contains "meditator" names)
     check "catalog covers browser" (Set.contains "browser" names)
     check "catalog covers executor" (Set.contains "executor" names)
+    check "catalog covers fetch_wiki" (Set.contains "fetch_wiki" names)
+    check "catalog covers submit_wiki" (Set.contains "submit_wiki" names)
+
+let hostToolsWikiNames () =
+    let names = VibeFs.Kernel.HostTools.allToolNames VibeFs.Kernel.HostTools.opencode |> Set.ofArray
+    check "host tools include fetch_wiki" (Set.contains "fetch_wiki" names)
+    check "host tools include submit_wiki" (Set.contains "submit_wiki" names)
 
 /// P0-1: a single host-aware dispatcher must produce every subagent prompt.
 /// Today each host has its own `formatXxxUserPrompt` / `formatMuxXxxUserPrompt`;

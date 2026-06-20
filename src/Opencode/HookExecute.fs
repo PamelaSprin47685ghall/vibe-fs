@@ -8,6 +8,7 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Opencode.HookSchema
 open VibeFs.Opencode.MagicTodo
+open VibeFs.Opencode.WikiRuntime
 open VibeFs.Shell.TreeSitterShell
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
@@ -103,13 +104,25 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
                     if formatted <> "" then setOutput output (s + "\n\n" + formatted)
     }
 
-let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
+let private isDirectWriteTool (tool: string) : bool =
+    tool = "write" || tool = "apply_patch" || tool = "patch" || isFileEditTool tool
+
+let private buildRwSummary (tool: string) (output: obj) : string =
+    let text = Dyn.str output "output"
+    let summary = if text = "" then Dyn.str output "error" else text
+    if summary = "" then tool else summary
+
+let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (wikiRuntime: WikiRuntime) (input: obj) (output: obj) : JS.Promise<unit> =
     async {
         let args = Dyn.get input "args"
         if not (Dyn.isNullish args) then restoreMimocodeTaskArgsAfterExecute host input args
         do! appendSyntaxDiagnostics directory input output
+        let tool = Dyn.str input "tool"
+        if isDirectWriteTool tool then
+            let sessionID = Dyn.str input "sessionID"
+            wikiRuntime.MarkRwTool(sessionID, tool, buildRwSummary tool output)
         do! nudgeHook.handleToolExecuteAfter input output |> Async.AwaitPromise
     } |> Async.StartAsPromise
 
-let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
-    toolExecuteAfterFor opencode directory nudgeHook input output
+let toolExecuteAfter (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (wikiRuntime: WikiRuntime) (input: obj) (output: obj) : JS.Promise<unit> =
+    toolExecuteAfterFor opencode directory nudgeHook wikiRuntime input output

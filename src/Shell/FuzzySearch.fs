@@ -243,7 +243,9 @@ let private runFind (state: FuzzyFindState) (store: TypedIteratorStore) (opts: S
         let totalForPaging = totalOpt |> Option.defaultValue 0
         let totalFiles = optInt value "totalFiles" |> Option.defaultValue 0
         let body = formatFindOutput (Some { items = matches; totalMatched = totalOpt; totalFiles = totalFiles })
-        { output = sprintf "%s\n\n[iterator=\"%s\"]" body (findNextIterator state (box store) opts totalForPaging); isError = false }
+        let nextIterator = findNextIterator state (box store) opts totalForPaging
+        let output = if nextIterator = "" then body else sprintf "%s\n\n[iterator=\"%s\"]" body nextIterator
+        { output = output; isError = false }
 
 let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     async {
