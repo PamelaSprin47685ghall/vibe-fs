@@ -145,7 +145,7 @@ let private webfetchSpec : ToolSpec =
 let private submitReviewSpec : ToolSpec =
     { name = "submit_review"
       description =
-        "Submit completed work for review. Creates a reviewer sub-agent that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active loop mode."
+        "Submit completed work for review. Creates a reviewer sub-agent that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active With-Review mode."
       paramDocs =
         map
             [ "report", "Detailed report of what was done"

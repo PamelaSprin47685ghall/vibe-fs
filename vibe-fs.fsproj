@@ -17,8 +17,8 @@
     <Compile Include="src/Kernel/HostTools.fs" />
     <Compile Include="src/Kernel/SubagentIntents.fs" />
     <Compile Include="src/Kernel/ReviewSession.fs" />
-    <Compile Include="src/Kernel/Prompts.fs" />
     <Compile Include="src/Kernel/LoopMessages.fs" />
+    <Compile Include="src/Kernel/Prompts.fs" />
     <Compile Include="src/Kernel/Subagent.fs" />
     <Compile Include="src/Kernel/ToolCatalog.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />

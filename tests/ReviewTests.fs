@@ -2,6 +2,7 @@ module VibeFs.Tests.ReviewTests
 
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.LoopMessages
 open VibeFs.Shell.ReviewRuntime
 
 let transition' () =
@@ -134,3 +135,33 @@ let disposeSessionTreeTerminatesAll () =
     let next2 = disposeSessionTree next [ "ghost-1"; "ghost-2" ]
     check "disposing absent ids leaves pending empty" next2.pendingResolutions.IsEmpty
     check "disposing absent ids leaves suppressors empty" next2.abortSuppressors.IsEmpty
+
+/// Reconstruct the current review task purely from conversation-history text
+/// fragments (assistant text + tool output), in chronological order.  This is
+/// the single source of truth after an opencode restart: the in-memory store is
+/// gone, but the dialogue still carries the activate/cancel/accept markers.
+///   activate  -> line starting with "Task (With Review): <task>"
+///   cancel    -> contains "With-Review mode cancelled."
+///   accept    -> contains "With-Review mode has ended."
+/// reject/terminated keep the session active (they say "still active", which
+/// must NOT be mistaken for an end marker).
+let inferReviewTaskFromTexts' () =
+    let activate task =
+        "Task (With Review): " + task
+        + "\n\nWith-Review mode is active. Complete the task above, then call submit_review with:\n- report: ..."
+    let accept = "Review passed. Your changes have been accepted. With-Review mode has ended."
+    let cancel = "With-Review mode cancelled."
+    let rejected =
+        "Review feedback:\n\nfix the tests\n\nAddress the feedback above. With-Review mode is still active — fix the issues and call submit_review again."
+    let terminated =
+        "Review terminated without verdict. With-Review mode is still active; fix the issues and call submit_review again."
+
+    equal "empty -> None" None (inferReviewTaskFromTexts [])
+    equal "only activate -> Some task" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1" ])
+    equal "activate + accept -> None" None (inferReviewTaskFromTexts [ activate "ship S1"; accept ])
+    equal "activate + cancel -> None" None (inferReviewTaskFromTexts [ activate "ship S1"; cancel ])
+    equal "activate + reject -> still active" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1"; rejected ])
+    equal "activate + terminated -> still active" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1"; terminated ])
+    equal "two activates no end -> last task" (Some "ship S2") (inferReviewTaskFromTexts [ activate "ship S1"; activate "ship S2" ])
+    equal "activate + accept + activate -> second active" (Some "ship S2") (inferReviewTaskFromTexts [ activate "ship S1"; accept; activate "ship S2" ])
+    equal "accept without activate -> None" None (inferReviewTaskFromTexts [ accept ])

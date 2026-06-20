@@ -50,7 +50,7 @@ let private pluginConfigForSlash (deps: obj) (workspaceId: WorkspaceId) : JS.Pro
 
 let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     box {| key = "loop"
-           description = "Activate review loop mode. AI completes task, submits for review."
+           description = "Activate With-Review mode. AI completes task, submits for review."
            inputHint = "<task description>"
            execute = System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
                 match Id.tryWorkspaceId workspaceIdStr with
@@ -130,7 +130,7 @@ let private loopReviewExecute
 let createLoopReviewCommand (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     box
         {| key = "loop-review"
-           description = "Pre-review task description with a reviewer sub-agent, then activate review loop mode."
+           description = "Pre-review task description with a reviewer sub-agent, then activate With-Review mode."
            inputHint = "<task description>"
            execute =
                System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->

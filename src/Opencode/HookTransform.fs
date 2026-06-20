@@ -9,6 +9,7 @@ open VibeFs.Kernel.Config
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Kernel.Message
+open VibeFs.Kernel.LoopMessages
 open VibeFs.Opencode.HookSchema
 open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.MagicProjection
@@ -123,7 +124,33 @@ module private CapsFileCache =
                 return files
             }
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: MagicSession) (wikiRuntime: WikiRuntime) (input: obj) (output: obj) : JS.Promise<unit> =
+let private extractHistoryTexts (messages: obj array) =
+    messages
+    |> Message.flatten
+    |> List.map (fun fp ->
+        let part = fp.part
+        if Message.partIsText part then Message.partTextStr part
+        elif Message.partIsTool part then Message.partToolOutput part
+        else "")
+
+/// After an opencode restart the in-memory review store is empty, but the
+/// dialogue history still carries the activation / cancel / accept markers.
+/// Replay them and re-activate the session iff the store has no record of it
+/// yet — never clobber a live (possibly locked) review with a rebuild.  The
+/// history is the single source of truth; the store is its re-buildable
+/// projection.
+let private reconstructReviewState (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (sessionID: string) (messages: obj array) : unit =
+    if sessionID = "" then ()
+    else
+        match reviewStore.getReviewState sessionID with
+        | Some _ -> ()
+        | None ->
+            match inferReviewTaskFromTexts (extractHistoryTexts messages) with
+            | Some task ->
+                reviewStore.activateReview(sessionID, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            | None -> ()
+
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: MagicSession) (wikiRuntime: WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let messages = Dyn.get output "messages"
         if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
@@ -133,6 +160,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
             else
                 let agent = resolveAgent registry input
                 let sessionID = extractSessionID messagesArr
+                reconstructReviewState reviewStore sessionID messagesArr
                 let cleaned = stripSyntheticMessages messagesArr
                 if cleaned.Length = 0 then ()
                 else

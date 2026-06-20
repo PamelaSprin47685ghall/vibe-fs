@@ -177,13 +177,12 @@ let private commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: 
             clearArray parts
             if task = "" then
                 reviewStore.deactivateReview sessionID
-                let cancelText = if command = "loop-review" then "loop-review mode cancelled." else "loop mode cancelled."
-                pushPart parts (box {| ``type`` = "text"; text = cancelText |})
+                pushPart parts (box {| ``type`` = "text"; text = cancelledMarker |})
             elif reviewStore.isReviewActive sessionID then
-                pushPart parts (box {| ``type`` = "text"; text = "loop mode is already active. Submit your work via submit_review." |})
+                pushPart parts (box {| ``type`` = "text"; text = "With-Review mode is already active. Submit your work via submit_review." |})
             elif command = "loop" then
                 reviewStore.activateReview(sessionID, task, dateNow ())
-                let msg = buildLoopMessage task [ "loop mode is active. Complete the task above, then call submit_review with:" ]
+                let msg = buildLoopMessage task [ "With-Review mode is active. Complete the task above, then call submit_review with:" ]
                 pushPart parts (box {| ``type`` = "text"; text = msg |})
             else
                 let directory = Dyn.str ctx "directory"
@@ -204,9 +203,9 @@ let private registerCommands (cfg: obj) : unit =
     let cmd = Dyn.get cfg "command"
     let cmdObj = if Dyn.isNullish cmd then emptyObj () else cmd
     if Dyn.isNullish (Dyn.get cmdObj "loop") then
-        setKey cmdObj "loop" (box {| template = "Enable loop mode."; description = "Enable loop mode — the next submission must pass through a reviewer before being accepted" |})
+        setKey cmdObj "loop" (box {| template = "Enable With-Review mode."; description = "Enable With-Review mode — the next submission must pass through a reviewer before being accepted" |})
     if Dyn.isNullish (Dyn.get cmdObj "loop-review") then
-        setKey cmdObj "loop-review" (box {| template = "Enable while-loop mode with pre-review."; description = "Enable while-loop mode — the task is pre-reviewed immediately, and reviewer feedback is prepended to your prompt before any work begins" |})
+        setKey cmdObj "loop-review" (box {| template = "Enable With-Review mode with pre-review."; description = "Enable With-Review mode with pre-review — the task is pre-reviewed immediately, and reviewer feedback is prepended to your prompt before any work begins" |})
     setKey cfg "command" cmdObj
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<obj, obj, JS.Promise<unit>>(f))
@@ -257,7 +256,7 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
         setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBeforeFor host input output))
         setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host directory nudgeHook wikiRuntime input output))
-        setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform childAgentRegistry directory magicSession wikiRuntime input output))
+        setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform childAgentRegistry directory magicSession wikiRuntime reviewStore input output))
         setKey result "command.execute.before" (twoArgHook (fun input output ->
             promise {
                 do! nudgeHook.handleCommandExecuteBefore input output

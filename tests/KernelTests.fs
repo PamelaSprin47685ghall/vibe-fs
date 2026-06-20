@@ -203,7 +203,7 @@ let dynDeleteKey () =
 /// string verbatim — no re-interpretation, no per-host wording drift.
 let loopMessagesShared () =
     let task = "ship S1 refactor"
-    let intro = "Loop mode is active. Complete the task above, then call submit_review with:"
+    let intro = "With-Review mode is active. Complete the task above, then call submit_review with:"
     let kernelMsg = VibeFs.Kernel.LoopMessages.buildLoopMessage task [ intro ]
     check "loop message embeds task" (kernelMsg.Contains task)
     check "loop message embeds intro" (kernelMsg.Contains intro)
@@ -239,7 +239,7 @@ let reviewerVerdictPromptsShared () =
 let reviewResultFormattingShared () =
     let accepted = VibeFs.Kernel.Prompts.formatReviewResult VibeFs.Kernel.ReviewSession.ReviewResult.Accepted
     check "accepted text mentions passed" (accepted.ToLower().Contains "passed" || accepted.ToLower().Contains "accepted")
-    check "accepted text mentions loop ended" (accepted.ToLower().Contains "loop")
+    check "accepted text signals with-review ended" (accepted.ToLower().Contains "with-review")
 
     let rejected = VibeFs.Kernel.Prompts.formatReviewResult (VibeFs.Kernel.ReviewSession.ReviewResult.Rejected "missing tests")
     check "rejected text embeds feedback" (rejected.Contains "missing tests")

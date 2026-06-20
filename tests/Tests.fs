@@ -31,6 +31,7 @@ let runAll (_args: string array) : JS.Promise<int> =
         ReviewTests.promptPartsBranches ()
         ReviewTests.resolvePendingClearsSuppressor ()
         ReviewTests.disposeSessionTreeTerminatesAll ()
+        ReviewTests.inferReviewTaskFromTexts' ()
         AgentTests.canUse' ()
         AgentTests.canUseMatrix ()
         AgentTests.deniedTools' ()
