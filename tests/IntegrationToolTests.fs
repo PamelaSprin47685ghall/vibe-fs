@@ -270,13 +270,20 @@ let titleAgentInputProjectionSpec () = async {
     let checkPlugin (pluginObject: obj) = async {
         let transform = get pluginObject "experimental.chat.messages.transform"
         let output = createObj [ "messages", box [| mkMsg () |] ]
+        let originalMsgs = unbox<obj[]> (get output "messages")
+        let originalMsg = originalMsgs.[0]
+        let originalParts = unbox<obj[]> (get originalMsg "parts")
+        let originalPart = originalParts.[0]
         do! transform $ (createObj ["agent", box "title"], output) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
         let msgs = unbox<obj[]> (get output "messages")
         let parts = unbox<obj[]> (get msgs.[0] "parts")
         let wrappedText = str parts.[0] "text"
-        check "title input starts with wrapper" (wrappedText.StartsWith "<input-data do-not-exec>")
+        check "title input starts with wrapper" (wrappedText.StartsWith "请给这个需求命名。<input-data do-not-exec>")
         check "title input ends with wrapper" (wrappedText.EndsWith "</input-data>")
         check "title input preserves payload" (wrappedText.Contains "Generate a title for this chat")
+        check "title mutation in-place message" (obj.ReferenceEquals(msgs.[0], originalMsg))
+        check "title mutation in-place parts array" (obj.ReferenceEquals(parts, originalParts))
+        check "title mutation in-place part object" (obj.ReferenceEquals(parts.[0], originalPart))
     }
     let! workspaceDir = mkdtempAsync "title-input-projection-" |> Async.AwaitPromise
     let! opencodePlugin = plugin (box {| directory = workspaceDir |}) |> Async.AwaitPromise
