@@ -445,6 +445,30 @@ let weeklyMaintenanceUsesLastSundaySpec () = async {
     do! rmAsync workspaceDir |> Async.AwaitPromise
 }
 
+let weeklyMaintenanceWithoutSnapshotFileSpec () = async {
+    let! workspaceDir = mkdtempAsync "weekly-maintenance-no-snapshot-" |> Async.AwaitPromise
+    do! ensureWikiDir workspaceDir |> Async.AwaitPromise
+    do! ensureTodayFile workspaceDir "2026-06-15" |> Async.AwaitPromise
+    do! rewriteDay workspaceDir "2026-06-10" [ wikiEntry "0a3f" "周初问题" "Day 10 entry" ] |> Async.AwaitPromise
+    do! rewriteDay workspaceDir "2026-06-12" [ wikiEntry "b912" "周中问题" "Day 12 entry" ] |> Async.AwaitPromise
+    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "weekly-no-snapshot-session" "Wiki prelude" |]
+    let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-15" |}) |> Async.AwaitPromise
+    let transform = get pluginObject "experimental.chat.messages.transform"
+    let messages = createObj [ "messages", box [| managerSessionMessage "weekly-no-snapshot-session" |] ]
+    do! transform $ (createObj [], messages) |> unbox<JS.Promise<unit>> |> Async.AwaitPromise
+
+    let launches = takeBookkeeperLaunchesForTesting pluginObject
+    check "weekly maintenance without snapshot file schedules at least one launch" (launches.Length >= 1)
+    check "weekly maintenance without snapshot file mentions snapshot or weekly" (
+        launches
+        |> Array.exists (fun launch ->
+            let title = (str launch "title").ToLowerInvariant()
+            let prompt = (str launch "prompt").ToLowerInvariant()
+            title.Contains "snapshot" || title.Contains "weekly" || prompt.Contains "snapshot" || prompt.Contains "weekly"))
+    do! waitForBackgroundJobsForTesting pluginObject |> Async.AwaitPromise
+    do! rmAsync workspaceDir |> Async.AwaitPromise
+}
+
 let directPatchWriteAggregationSpec () = async {
     let! workspaceDir = mkdtempAsync "direct-patch-aggregation-" |> Async.AwaitPromise
     do! ensureWikiDir workspaceDir |> Async.AwaitPromise
@@ -1178,6 +1202,7 @@ let run () : JS.Promise<unit> =
         do! dailyMaintenanceLaunchSpec ()
         do! weeklyMaintenanceLaunchSpec ()
         do! weeklyMaintenanceUsesLastSundaySpec ()
+        do! weeklyMaintenanceWithoutSnapshotFileSpec ()
         do! directPatchWriteAggregationSpec ()
         do! submitWikiAppendSpec ()
         do! submitWikiDailyRewriteSpec ()

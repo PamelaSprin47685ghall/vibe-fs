@@ -408,6 +408,11 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                     match file.header with
                     | SnapshotHeader through -> through
                     | _ -> None)
+                |> Option.orElseWith (fun () ->
+                    dayFiles
+                    |> List.tryHead
+                    |> Option.bind (fun (oldestDate, _) -> parseDate oldestDate)
+                    |> Option.map (fun d -> d.AddDays(-1.0).ToString("yyyy-MM-dd")))
 
             match snapshotThrough with
             | None -> ()
@@ -416,7 +421,9 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 if cutoff > through then
                     let requiredDays = dateRangeInclusive (addOneDay through) cutoff
                     let dayRewritten (date: string) : bool =
-                        dayFiles |> List.exists (fun (date2, rewritten) -> date2 = date && rewritten)
+                        match dayFiles |> List.tryFind (fun (date2, _) -> date2 = date) with
+                        | Some(_, rewritten) -> rewritten
+                        | None -> true
                     let allDaysRewritten = not requiredDays.IsEmpty && List.forall dayRewritten requiredDays
                     if allDaysRewritten then
                         if recordLaunchOnce root "weekly" cutoff "Weekly wiki snapshot rewrite" ($"weekly maintenance due through {cutoff}") ($"weekly:{cutoff}") then
