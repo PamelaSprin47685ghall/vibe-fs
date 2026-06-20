@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.CapsFormat
+open VibeFs.Opencode.CapsPrelude
 
 /// The obj-boundary layer for caps message synthesis: reads info fields off
 /// host message objects and constructs the synthetic user/assistant prefix
@@ -12,6 +13,8 @@ open VibeFs.Kernel.CapsFormat
 
 let private capsUserPrefix = "caps-synth-user-"
 let private capsAssistantPrefix = "caps-synth-assistant-"
+let private capsThinkingPrefix = "caps-synth-thinking-"
+let private capsContextPrefix = "caps-synth-context-"
 
 let private messageInfoField (field: obj -> string) (msg: obj) : string =
     let info = get msg "info"
@@ -28,10 +31,13 @@ let messageSessionID (msg: obj) : string =
 
 let hasExistingCapsMessages (messages: obj array) : bool =
     match messages |> List.ofArray with
-    | m0 :: m1 :: _ ->
+    | m0 :: m1 :: m2 :: _ ->
         let id0 = messageId m0
-        id0 <> "" && id0.StartsWith capsUserPrefix &&
-        (let id1 = messageId m1 in id1 <> "" && id1.StartsWith capsAssistantPrefix)
+        let id1 = messageId m1
+        let id2 = messageId m2
+        id0 <> "" && id0.StartsWith capsUserPrefix
+        && id1 <> "" && id1.StartsWith capsThinkingPrefix
+        && id2 <> "" && id2.StartsWith capsContextPrefix
     | _ -> false
 
 let private sessionBox (sessionID: string option) : obj =
@@ -75,27 +81,48 @@ let private buildUserMessage (userId: string) (sessionID: string option) (prelud
         "parts", box [| box {| ``type`` = "text"; text = text |} |]
     ])
 
-let private buildAssistantMessage (assistantId: string) (userId: string) (sessionID: string option) (projectRoot: string) (toolParts: obj array) : obj =
-    box (createObj [
-        "info", box (createObj [
-            "id", box assistantId
-            "sessionID", sessionBox sessionID
-            "role", box "assistant"
-            "time", box (createObj [ "created", box 0; "completed", box 1 ])
-            "parentID", box userId
-            "modelID", box ""
-            "providerID", box ""
-            "mode", box "code"
-            "path", box (createObj [ "cwd", box projectRoot; "root", box projectRoot ])
-            "cost", box 0
-            "tokens", box (createObj [
-                "input", box 0
-                "output", box 0
-                "reasoning", box 0
-                "cache", box (createObj [ "read", box 0; "write", box 0 ])
-            ])
+let private assistantInfo (assistantId: string) (parentID: string) (sessionID: string option) (projectRoot: string) : obj =
+    createObj [
+        "id", box assistantId
+        "sessionID", sessionBox sessionID
+        "role", box "assistant"
+        "time", box (createObj [ "created", box 0; "completed", box 1 ])
+        "parentID", box parentID
+        "modelID", box ""
+        "providerID", box ""
+        "mode", box "code"
+        "path", box (createObj [ "cwd", box projectRoot; "root", box projectRoot ])
+        "cost", box 0
+        "tokens", box (createObj [
+            "input", box 0
+            "output", box 0
+            "reasoning", box 0
+            "cache", box (createObj [ "read", box 0; "write", box 0 ])
         ])
-        "parts", box toolParts
+    ]
+
+let private textPart (partId: string) (sessionID: string option) (messageID: string) (text: string) : obj =
+    box (createObj [
+        "id", box partId
+        "sessionID", sessionBox sessionID
+        "messageID", box messageID
+        "type", box "text"
+        "text", box text
+    ])
+
+let private reasoningPart (partId: string) (sessionID: string option) (messageID: string) (text: string) : obj =
+    box (createObj [
+        "id", box partId
+        "sessionID", sessionBox sessionID
+        "messageID", box messageID
+        "type", box "reasoning"
+        "text", box text
+    ])
+
+let private buildAssistantMessage (assistantId: string) (parentID: string) (sessionID: string option) (projectRoot: string) (parts: obj array) : obj =
+    box (createObj [
+        "info", box (assistantInfo assistantId parentID sessionID projectRoot)
+        "parts", box parts
     ])
 
 let private findFirstRealMessage (messages: obj array) : obj option =
@@ -120,7 +147,7 @@ let buildCapsMessages
     if shouldSkip then messages
     else
         let existingStripped =
-            if hasExistingCapsMessages messages && messages.Length >= 2 then messages.[2..]
+            if hasExistingCapsMessages messages && messages.Length >= 3 then messages.[3..]
             else messages
         let hasPrelude = match preludeText with Some text when text.Trim() <> "" -> true | _ -> false
         if existingStripped.Length = 0 then messages
@@ -130,8 +157,14 @@ let buildCapsMessages
             let sessionOpt = if sessionID = "" then None else Some sessionID
             let fp = stableFingerprint hashFn capsFiles
             let userId = $"{capsUserPrefix}{fp}"
+            let thinkingId = $"{capsThinkingPrefix}{fp}"
+            let contextId = $"{capsContextPrefix}{fp}"
             let assistantId = $"{capsAssistantPrefix}{fp}"
+            let thinkingParts = [| reasoningPart $"caps-reasoning-{fp}" sessionOpt thinkingId thinkText |]
+            let contextParts = [| textPart $"caps-text-{fp}" sessionOpt contextId llmText |]
             let toolParts = if capsFiles.IsEmpty then [||] else buildToolParts capsFiles fp sessionOpt assistantId
             let userMsg = buildUserMessage userId sessionOpt preludeText
-            let assistantMsg = buildAssistantMessage assistantId userId sessionOpt projectRoot toolParts
-            Array.concat [| [| userMsg |]; [| assistantMsg |]; existingStripped |]
+            let thinkingMsg = buildAssistantMessage thinkingId userId sessionOpt projectRoot thinkingParts
+            let contextMsg = buildAssistantMessage contextId thinkingId sessionOpt projectRoot contextParts
+            let assistantMsg = buildAssistantMessage assistantId contextId sessionOpt projectRoot toolParts
+            Array.concat [| [| userMsg |]; [| thinkingMsg |]; [| contextMsg |]; [| assistantMsg |]; existingStripped |]

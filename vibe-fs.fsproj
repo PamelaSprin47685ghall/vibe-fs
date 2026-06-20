@@ -58,9 +58,10 @@
     <Compile Include="src/Shell/ChildAgentRegistry.fs" />
     <Compile Include="src/Shell/NudgeRuntime.fs" />
 
-    <Compile Include="src/Mux/AiSettings.fs" />
-    <Compile Include="src/Opencode/MessagingCodec.fs" />
-    <Compile Include="src/Opencode/CapsCodec.fs" />
+     <Compile Include="src/Mux/AiSettings.fs" />
+     <Compile Include="src/Opencode/MessagingCodec.fs" />
+    <Compile Include="src/Opencode/CapsPrelude.fs" />
+     <Compile Include="src/Opencode/CapsCodec.fs" />
     <Compile Include="src/Opencode/MagicTodo.fs" />
     <Compile Include="src/Opencode/ToolSchema.fs" />
     <Compile Include="src/Opencode/HookSchema.fs" />

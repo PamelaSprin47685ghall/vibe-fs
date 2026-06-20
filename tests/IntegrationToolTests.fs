@@ -8,6 +8,7 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Message
 open VibeFs.Kernel.Wiki
 open VibeFs.Mux.Plugin
+open VibeFs.Opencode.CapsPrelude
 open VibeFs.Opencode.Plugin
 open VibeFs.Opencode.WikiRuntime
 open VibeFs.Shell.ChildAgentRegistry
@@ -186,8 +187,8 @@ let capsTransformSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "caps transform injects two messages" (msgs.Length = 3)
-    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[2], originalMsg))
+    check "caps transform injects four messages" (msgs.Length = 5)
+    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[4], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -251,12 +252,16 @@ let capsAndMagicOrderSpec () = promise {
     do! tf $ (createObj [], messages) |> unbox<JS.Promise<unit>>
     let result = unbox<obj[]> (get messages "messages")
     let capsParts = unbox<obj[]> (get result.[0] "parts")
-    let capsAssistantInfo = get result.[1] "info"
-    let magicInfo = get result.[2] "info"
+    let thinkingParts = unbox<obj[]> (get result.[1] "parts")
+    let contextParts = unbox<obj[]> (get result.[2] "parts")
+    let capsAssistantInfo = get result.[3] "info"
+    let magicInfo = get result.[4] "info"
     let magicId : string = str magicInfo "id"
     check "caps/magic order: caps user first" ((str capsParts.[0] "text").StartsWith "你好")
-    check "caps/magic order: caps assistant second" ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
-    check "caps/magic order: magic prefix third" (magicId.StartsWith(magicTodoPrefixPrefix : string))
+    check "caps/magic order: thinking second" (str thinkingParts.[0] "type" = "reasoning" && str thinkingParts.[0] "text" = thinkText)
+    check "caps/magic order: llm text third" (str contextParts.[0] "type" = "text" && str contextParts.[0] "text" = llmText)
+    check "caps/magic order: caps read assistant fourth" ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
+    check "caps/magic order: magic prefix fifth" (magicId.StartsWith(magicTodoPrefixPrefix : string))
     do! rmAsync workspaceDir
 }
 
@@ -271,14 +276,18 @@ let wikiPreludeWithoutCapsSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "wiki prelude injects synthetic messages without caps" (msgs.Length = 3)
+    check "wiki prelude injects synthetic messages without caps" (msgs.Length = 4)
     let firstParts = unbox<obj[]> (get msgs.[0] "parts")
+    let thinkingParts = unbox<obj[]> (get msgs.[1] "parts")
+    let contextParts = unbox<obj[]> (get msgs.[2] "parts")
     let firstText = str firstParts.[0] "text"
     check "wiki prelude keeps hello prefix" (firstText.StartsWith "你好")
     check "wiki prelude includes history header" (firstText.Contains "[项目背景和历史]")
     check "wiki prelude includes question" (firstText.Contains "0a3f 项目插件入口在哪里？")
     check "wiki prelude hides answers" (not (firstText.Contains "src/Opencode/Plugin.fs"))
-    check "wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[2], originalMsg))
+    check "wiki prelude injects thinking" (str thinkingParts.[0] "type" = "reasoning" && str thinkingParts.[0] "text" = thinkText)
+    check "wiki prelude injects llm text" (str contextParts.[0] "type" = "text" && str contextParts.[0] "text" = llmText)
+    check "wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
     do! rmAsync workspaceDir
 }
 
