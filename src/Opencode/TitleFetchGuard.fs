@@ -23,9 +23,12 @@ let isTitleRequestBody (body: obj) : bool =
                 if not (isArray messages) then false
                 else
                     let arr = messages :?> obj array
-                    arr.Length > 0
-                    && str arr.[0] "role" = "user"
-                    && (string (get arr.[0] "content")).StartsWith titleRequestSignature
+                    let firstUser = arr |> Array.tryFind (fun msg -> str msg "role" = "user")
+                    match firstUser with
+                    | None -> false
+                    | Some msg ->
+                        let content = get msg "content"
+                        typeIs content "string" && (string content).StartsWith titleRequestSignature
             with _ -> false
 
 let tryWrapStringContent (content: obj) : string option =

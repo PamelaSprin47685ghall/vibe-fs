@@ -30,6 +30,8 @@ let detect () =
     check "probe not in messages[0] not detected" (not (isTitleRequestBody historyMention))
     let nonUserFirst = box "{\"messages\":[{\"role\":\"system\",\"content\":\"Generate a title for this conversation\"}]}"
     check "probe in non-user messages[0] not detected" (not (isTitleRequestBody nonUserFirst))
+    let realTitleBody = box "{\"messages\":[{\"role\":\"system\",\"content\":\"You are a title generator.\"},{\"role\":\"user\",\"content\":\"Generate a title for this conversation:\\n\"},{\"role\":\"user\",\"content\":\"真实需求\"}]}"
+    check "system-prefixed title body detected" (isTitleRequestBody realTitleBody)
 
 let tryWrapString () =
     equal "string content wrapped" (Some(wrapForTitle "x")) (tryWrapStringContent (box "x"))
