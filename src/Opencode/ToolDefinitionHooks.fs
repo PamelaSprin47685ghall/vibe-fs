@@ -16,9 +16,7 @@ let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let toolID = Dyn.str input "toolID"
-        if toolID = "coder" || toolID = "investigator" then
-            rewriteToolJsonSchema setKey stripUiFromJsonSchema output
-        elif toolID = magicTodoToolNameFor host then
+        if toolID = magicTodoToolNameFor host then
             match host with
             | Opencode ->
                 setKey output "description" (box toolDescription)
