@@ -90,11 +90,37 @@ let private recordLaunchOnce (state: WikiState) (key: string) (launch: Bookkeepe
 let private drainLaunches (state: WikiState) : BookkeeperLaunch list * WikiState =
     state.bookkeeperLaunches, { state with bookkeeperLaunches = [] }
 
+/// Unified command type covering every state change in the runtime (P53). The
+/// reducer is the single pure dispatch; multi-value transitions
+/// (consumeDirtyTurn/recordLaunchOnce/drainLaunches) stay available as standalone
+/// functions so callers needing their extra return value read it in the same tick.
+type WikiCommand =
+    | RegisterJobCmd of sessionID: string * ctx: WikiJobContext
+    | RemoveJobCmd of sessionID: string
+    | CacheSnapshotCmd of sessionID: string * projection: WikiProjection
+    | MarkRwToolCmd of sessionID: string * entry: string
+    | RecordLaunchCmd of launch: BookkeeperLaunch
+    | RecordLaunchOnceCmd of key: string * launch: BookkeeperLaunch
+    | DrainLaunchesCmd
+    | ConsumeTurnCmd of sessionID: string
+
+let private reducer (state: WikiState) (cmd: WikiCommand) : WikiState =
+    match cmd with
+    | RegisterJobCmd (sessionID, ctx) -> registerJob state sessionID ctx
+    | RemoveJobCmd sessionID -> removeJob state sessionID
+    | CacheSnapshotCmd (sessionID, projection) -> cacheSnapshot state sessionID projection
+    | MarkRwToolCmd (sessionID, entry) -> markRwTool state sessionID entry
+    | RecordLaunchCmd launch -> recordLaunch state launch
+    | RecordLaunchOnceCmd (key, launch) -> recordLaunchOnce state key launch |> snd
+    | DrainLaunchesCmd -> drainLaunches state |> snd
+    | ConsumeTurnCmd sessionID -> consumeDirtyTurn state sessionID |> snd
+
 let private invoke1 (target: obj) (methodName: string) (arg: obj) : JS.Promise<obj> =
     unbox (target?(methodName)(arg))
 
 type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> System.DateTime) =
     let mutable state = initialWikiState
+    let commandQueue = SerialQueue()
     let writeQueues = Dictionary<string, SerialQueue>()
     let client = client
     let workspaceRoot = initialWorkspaceRoot
@@ -130,6 +156,9 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
     let effectiveWorkspaceRoot (value: string) : string =
         if System.String.IsNullOrWhiteSpace value then workspaceRoot else value
 
+    /// Runs inside a commandQueue task: the create/prompt IO and the
+    /// register/remove-job state updates are serialized against every other
+    /// async method so no JS.Promise dangles mid state change.
     let launchBackgroundSession (root: string) (kind: WikiJobKind) (title: string) (promptText: string) : JS.Promise<unit> =
         promise {
             match sessionApi () with
@@ -144,7 +173,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                     let childId = str (get created "data") "id"
                     if childId <> "" then
                         sessionId <- childId
-                        state <- registerJob state childId { workspaceRoot = root; kind = kind }
+                        state <- reducer state (RegisterJobCmd (childId, { workspaceRoot = root; kind = kind }))
                         let promptBody =
                             box {| path = box {| id = childId |}
                                    body = box {| agent = "bookkeeper"
@@ -152,19 +181,20 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                                                  tools = box (createObj [ "submit_wiki", box true ]) |} |}
                         do! invoke1 session "prompt" promptBody |> Promise.map ignore
                 with _ ->
-                    if sessionId <> "" then state <- removeJob state sessionId
+                    if sessionId <> "" then state <- reducer state (RemoveJobCmd sessionId)
         }
 
     let queueBackgroundLaunch (root: string) (kind: WikiJobKind) (title: string) (buildPrompt: unit -> JS.Promise<string>) : unit =
         match sessionApi () with
         | None -> ()
-        | Some _ -> postWorkspace root (fun () ->
-            promise {
-                try
-                    let! promptText = buildPrompt ()
-                    launchBackgroundSession root kind title promptText |> Promise.start
-                with _ -> ()
-            })
+        | Some _ ->
+            commandQueue.Enqueue(fun () ->
+                promise {
+                    try
+                        let! promptText = buildPrompt ()
+                        do! launchBackgroundSession root kind title promptText
+                    with _ -> ()
+                }) |> Promise.start
 
     let normalizeDraftIds (projection: WikiProjection) (drafts: WikiDraft list) : WikiDraft list =
         drafts
@@ -207,20 +237,20 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
             })
 
     member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<WikiProjection> =
-        promise {
-            if sessionID = "" then
-                return Map.empty
-            else
-                match Map.tryFind sessionID state.sessionSnapshots with
-                | Some projection -> return projection
-                | None ->
-                    let! projection = readProjection (effectiveWorkspaceRoot directory)
-                    state <- cacheSnapshot state sessionID projection
-                    return projection
-        }
+        if sessionID = "" then Promise.lift Map.empty
+        else
+            commandQueue.Enqueue(fun () ->
+                promise {
+                    match Map.tryFind sessionID state.sessionSnapshots with
+                    | Some projection -> return projection
+                    | None ->
+                        let! projection = readProjection (effectiveWorkspaceRoot directory)
+                        state <- reducer state (CacheSnapshotCmd (sessionID, projection))
+                        return projection
+                })
 
     member _.RegisterJob(sessionID: string, ctx: WikiJobContext) : unit =
-        state <- registerJob state sessionID ctx
+        state <- reducer state (RegisterJobCmd (sessionID, ctx))
 
     member this.RegisterJobForTesting(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =
         let payloadObj: obj = payload
@@ -242,18 +272,20 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         tryJob state sessionID
 
     member _.DeleteJob(sessionID: string) : unit =
-        state <- removeJob state sessionID
+        state <- reducer state (RemoveJobCmd sessionID)
 
     member _.Submit(sessionID: string, drafts: WikiDraft list) : JS.Promise<string> =
-        match tryJob state sessionID with
-        | None -> Promise.lift "No active wiki job for this session."
-        | Some ctx ->
+        commandQueue.Enqueue(fun () ->
             promise {
-                try
-                    return! runWorkspace ctx.workspaceRoot (fun () -> submitForKind ctx.workspaceRoot ctx.kind drafts)
-                finally
-                    state <- removeJob state sessionID
-            }
+                match tryJob state sessionID with
+                | None -> return "No active wiki job for this session."
+                | Some ctx ->
+                    try
+                        let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind ctx.workspaceRoot ctx.kind drafts)
+                        return result
+                    finally
+                        state <- reducer state (RemoveJobCmd sessionID)
+            })
 
     member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
         promise {
@@ -275,7 +307,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
     member _.MarkRwTool(sessionID: string, tool: string, summary: string) : unit =
         let trimmed = summary.Trim()
         if sessionID <> "" && trimmed <> "" then
-            state <- markRwTool state sessionID $"{tool}: {trimmed}"
+            state <- reducer state (MarkRwToolCmd (sessionID, $"{tool}: {trimmed}"))
 
     member this.FlushTurnIfNeeded(sessionID: string, assistantText: string) : unit =
         let flushed, nextState = consumeDirtyTurn state sessionID
@@ -285,33 +317,34 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         | None -> ()
 
     member _.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
-        promise {
-            let root = effectiveWorkspaceRoot workspaceRoot
-            let! files = readWikiFiles root
-            let projection = projectLatestWins files
-            let dailyDue, weeklyDue = dueMaintenance files (nowUtc ())
+        commandQueue.Enqueue(fun () ->
+            promise {
+                let root = effectiveWorkspaceRoot workspaceRoot
+                let! files = readWikiFiles root
+                let projection = projectLatestWins files
+                let dailyDue, weeklyDue = dueMaintenance files (nowUtc ())
 
-            dailyDue
-            |> Option.iter (fun date ->
-                let key = root + "|daily|" + date
-                let launch = { agent = "bookkeeper"; title = "Daily wiki rewrite"; prompt = $"daily maintenance due for {date}"; result = $"daily:{date}"; rwSummary = "" }
-                let first, nextState = recordLaunchOnce state key launch
-                state <- nextState
-                if first then queueBackgroundLaunch root (DailyRewrite date) "Daily wiki rewrite" (fun () -> Promise.lift (buildDailyPrompt date files projection))
-                else ())
+                dailyDue
+                |> Option.iter (fun date ->
+                    let key = root + "|daily|" + date
+                    let launch = { agent = "bookkeeper"; title = "Daily wiki rewrite"; prompt = $"daily maintenance due for {date}"; result = $"daily:{date}"; rwSummary = "" }
+                    let first, nextState = recordLaunchOnce state key launch
+                    state <- nextState
+                    if first then queueBackgroundLaunch root (DailyRewrite date) "Daily wiki rewrite" (fun () -> Promise.lift (buildDailyPrompt date files projection))
+                    else ())
 
-            weeklyDue
-            |> Option.iter (fun cutoff ->
-                let key = root + "|weekly|" + cutoff
-                let launch = { agent = "bookkeeper"; title = "Weekly wiki snapshot rewrite"; prompt = $"weekly maintenance due through {cutoff}"; result = $"weekly:{cutoff}"; rwSummary = "" }
-                let first, nextState = recordLaunchOnce state key launch
-                state <- nextState
-                if first then queueBackgroundLaunch root (WeeklyRewrite cutoff) "Weekly wiki snapshot rewrite" (fun () -> Promise.lift (buildWeeklyPrompt cutoff files projection))
-                else ())
-        }
+                weeklyDue
+                |> Option.iter (fun cutoff ->
+                    let key = root + "|weekly|" + cutoff
+                    let launch = { agent = "bookkeeper"; title = "Weekly wiki snapshot rewrite"; prompt = $"weekly maintenance due through {cutoff}"; result = $"weekly:{cutoff}"; rwSummary = "" }
+                    let first, nextState = recordLaunchOnce state key launch
+                    state <- nextState
+                    if first then queueBackgroundLaunch root (WeeklyRewrite cutoff) "Weekly wiki snapshot rewrite" (fun () -> Promise.lift (buildWeeklyPrompt cutoff files projection))
+                    else ())
+            })
 
     member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string, rwSummary: string) : unit =
-        state <- recordLaunch state { agent = agent; title = title; prompt = prompt; result = result; rwSummary = rwSummary }
+        state <- reducer state (RecordLaunchCmd { agent = agent; title = title; prompt = prompt; result = result; rwSummary = rwSummary })
 
     member this.StartBookkeeperAppend(prompt: string, result: string, title: string, rwSummary: string) : unit =
         this.RecordBookkeeperLaunch("bookkeeper", title, prompt, result, rwSummary)
@@ -328,7 +361,4 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         launches |> List.map box |> List.toArray
 
     member _.WaitForBackgroundJobsForTesting() : JS.Promise<unit> =
-        promise {
-            let! _ = runWorkspace workspaceRoot (fun () -> Promise.lift "")
-            return ()
-        }
+        commandQueue.Enqueue(fun () -> Promise.lift ())

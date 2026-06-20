@@ -61,17 +61,10 @@ let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (
                 let text = Dyn.str args "text"
                 if text <> "" then setKey output "args" (createObj [ "patchText", box text ])
 
-/// Restore the captured report after Mimocode's task call returns, so backlog
-/// replay sees the report on the original args object.
-let private restoreMimocodeTaskArgsAfterExecute (host: Host) (input: obj) (args: obj) : unit =
-    if host <> Mimocode then ()
-    else
-        let tool = normalizeToolName host (Dyn.str input "tool")
-        if tool <> "todowrite" then ()
-        else
-            let callID = Dyn.str input "callID"
-            let cached = takeCompletedWorkReport callID
-            if cached <> "" then setKey args "completedWorkReport" (box cached)
+// P47-48: the after-hook no longer restores completedWorkReport onto
+// input.args. Capture stays in MagicSessionStore keyed by callID and backlog
+// replay reads it directly via BacklogInputForPart — the old setKey had no
+// consumer and its takeReport actually stole the report backlog replay needed.
 
 let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
@@ -121,8 +114,6 @@ let private buildRwSummary (tool: string) (output: obj) : string =
 
 let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (wikiRuntime: WikiRuntime) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
-        let args = Dyn.get input "args"
-        if not (Dyn.isNullish args) then restoreMimocodeTaskArgsAfterExecute host input args
         do! appendSyntaxDiagnostics directory input output
         let tool = Dyn.str input "tool"
         if isDirectWriteTool tool then

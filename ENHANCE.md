@@ -58,7 +58,14 @@
 | 53 | Opencode/WikiRuntime.fs | 纯转移函数 reducer(`registerJob`/`removeJob`/`cacheSnapshot`/`markRwTool`/`consumeDirtyTurn`/`recordLaunchOnce`/`drainLaunches`)+ 按 workspace 写队列串行化;IO 不在状态转移中偷跑 |
 | 65 | Opencode/PluginCore.fs | `commandExecuteBefore` 不再 `clearArray` 清空宿主原 parts 数组 + `pushPart`;构建新 `ResizeArray` 一次性 `setKey output "parts"` |
 
-### 评估保留 / 后续专项(第二轮复核;P1/2基础/P8/P11/P46-48/P51-53/P65 已完成,见上方)
+### 第三轮新增完成(基线 925 passed → 925 passed,零回归)
+
+| 点 | 文件 | 改造 |
+|---|---|---|
+| 47-48 | Opencode/HookExecute.fs | 删除 `restoreMimocodeTaskArgsAfterExecute`。调研证实 setKey 写回 input.args 无任何生产消费者(backlog replay 经 MagicSessionStore 按 callID 取,不读 input.args),且其 takeReport 反而偷走了 BacklogInputForPart 所需的 report —— 删除既消除原地涂改又修复潜在 bug。capture 保留(before-hook 存 store 供 backlog)。2 个 round-trip 测试改为验证 capture store 保留供 replay |
+| 53 | Opencode/WikiRuntime.fs | P53 真正落地:`WikiCommand` DU(8 case)+ 纯 `reducer` 函数(WikiState → WikiCommand → WikiState,无 IO);新增 `commandQueue : SerialQueue` 串行所有异步方法(EnsureSessionSnapshot/Submit/StartMaintenanceIfDue/WaitForBackgroundJobsForTesting/launchBackgroundSession)的状态+IO;同步方法同 tick 经 reducer;状态更新不再在 JS.Promise 悬挂中裸跑 |
+
+### 评估保留 / 后续专项(第三轮复核)
 
 下列点经评估后判定「保留现状」或「属架构级多日改造,单次安全重构不可行」,理由附后。判定遵循铁律:不为追求数量把读者注意力引向新的偶然复杂度。
 
@@ -69,8 +76,8 @@
 | 23, 26, 27, 32, 34, 49, 50, 69 | 保留 | 原 ENHANCE.md 已列入「评估保留」,本轮复核结论不变 |
 | 43 | 保留 | `decodeTodos`/`decodeLastAssistant` 仍接收 `obj array`,需 P1/P2 解码器才能转 `SessionSnapshot` 强类型 |
 | 44, 45 | 保留 | `TypedIteratorStore` 已是强类型双桶(见 `FuzzyTests.iteratorStoreStronglyTyped` 锁定的契约);`mutable counter` 是生成唯一 opaque id 的必要手段,改 Actor 会让 `storeIterator`/`consumeIterator` 退化为异步,破坏 `FuzzyTests.iteratorRoundTrip` 的同步契约 |
-| 46-48 | 宿主约束 | Mimocode 的 `execute.before` 钩子对**同一 `args` 引用**用严格 schema 重新解析(见 HookExecute.fs 既有注释),「返回剥除字段的新 Record 给下家」在该宿主契约下无落地通道——原地 capture/restore 是唯一可行解,代码已注释说明 |
-| 51, 53 | 部分完成 | 纯内核已提取并测试:`dueMaintenance`/`applyDrafts`/`allocateRandomHexId`/`projectLatestWins`/`buildAppendPrompt` 均在 `Kernel/`(WikiTests/WikiKernelTests 覆盖);`WikiRuntime` 类是不可免的 IO 外壳(缓存 projection、pending job、launch 去重)。`IntegrationToolTests`(1279 行)重度依赖 `registerJobForTesting`/`takeBookkeeperLaunchesForTesting`/`waitForBackgroundJobsForTesting` 三个测钩,全量 Actor+reducer 重写回归风险超出单次安全边界 |
+| 46-48 | 已完成 | 见第二轮表(copyObjExcept 构建新 args 赋 output.args)+ 第三轮表(删 restore:setKey 无消费者)。before-hook 不再原地 mutate,after-hook 不再 setKey |
+| 51, 53 | 已完成 | 见第二轮表(删 WikiActor + 单一不可变 WikiState)+ 第三轮表(WikiCommand DU + 纯 reducer + commandQueue 串行,IO 与状态分离) |
 | 54-56 | 保留 | `ToolSpec`/`Params` 已在 `Kernel/ToolCatalog` 单一 SSOT 集中(`toolCatalogCentralized` 测试锁定);`Params.X` 命名访问是合理的便利层,P56 的反射/源生成在 Fable 下不可行 |
 | 57, 58 | 宿主约束 | Zod-like schema 必须经宿主 `tool.schema` 的 JS API(`call1 schema …`)构建,无法用一套 F# 解码器替代宿主声明——桥接层是 FFI 必需 |
 | 59, 60 | 保留 | `mergeNamedSettings` 已是 `Option.orElse` fold;`normalizeStr` 是边界 nullish→None 归一,无解码器库时不可消 |

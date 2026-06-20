@@ -914,7 +914,6 @@ let mimoTaskExecuteRoundTripSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-before-after-"
     let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let teb = get p "tool.execute.before"
-    let tea = get p "tool.execute.after"
 
     let operation = createObj [ "action", box "done"; "id", box "T1"; "event_summary", box "Finished parser fix" ]
     let originalArgs = createObj [ "operation", operation; "completedWorkReport", box "Detailed backlog report" ]
@@ -925,11 +924,7 @@ let mimoTaskExecuteRoundTripSpec () = promise {
     let sanitizedArgs = get beforeOut "args"
     check "mimo task execute.before keeps operation" (not (isNullish (get sanitizedArgs "operation")))
     check "mimo task execute.before strips report before host call" (isNullish (get sanitizedArgs "completedWorkReport"))
-
-    let afterInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "c1"; "args", box sanitizedArgs ]
-    let afterOut = createObj [ "output", box "ok" ]
-    do! tea $ (afterInput, afterOut) |> unbox<JS.Promise<unit>>
-    check "mimo task execute.after restores report for backlog" (str (get afterInput "args") "completedWorkReport" = "Detailed backlog report")
+    check "mimo task execute.before captures report for backlog replay" (VibeFs.Opencode.MagicTodo.takeCompletedWorkReport "c1" = "Detailed backlog report")
     do! rmAsync workspaceDir
 }
 
@@ -937,7 +932,6 @@ let mimoTaskExecuteNestedReportSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-nested-report-"
     let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let teb = get p "tool.execute.before"
-    let tea = get p "tool.execute.after"
 
     let operation = createObj [ "action", box "create"; "summary", box "Build feature"; "completedWorkReport", box "Misplaced backlog report" ]
     let originalArgs = createObj [ "operation", operation ]
@@ -951,11 +945,7 @@ let mimoTaskExecuteNestedReportSpec () = promise {
     check "mimo task execute.before keeps real operation fields" (str sanitizedOperation "summary" = "Build feature")
     check "mimo task execute.before strips report nested inside operation" (isNullish (get sanitizedOperation "completedWorkReport"))
     check "mimo task execute.before leaves no top-level report" (isNullish (get sanitizedArgs "completedWorkReport"))
-
-    let afterInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "cn1"; "args", box sanitizedArgs ]
-    let afterOut = createObj [ "output", box "ok" ]
-    do! tea $ (afterInput, afterOut) |> unbox<JS.Promise<unit>>
-    check "mimo task execute.after restores nested report to top level for backlog" (str (get afterInput "args") "completedWorkReport" = "Misplaced backlog report")
+    check "mimo task execute.before captures nested report for backlog replay" (VibeFs.Opencode.MagicTodo.takeCompletedWorkReport "cn1" = "Misplaced backlog report")
     do! rmAsync workspaceDir
 }
 
