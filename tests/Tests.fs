@@ -20,7 +20,7 @@ open VibeFs.Tests.WikiTests
 open VibeFs.Tests.WikiFileTests
 open VibeFs.Tests.WikiKernelTests
 open VibeFs.Tests.TitleFetchGuardTests
-open VibeFs.Tests.IntegrationEditPlusSpecs
+
 
 /// A test body: synchronous bodies run inline, asynchronous return a promise.
 type private TestBody =
@@ -112,7 +112,6 @@ let private tests : (string * TestBody) list = [
     "TitleFetchGuardTests.rewriteStringContent", Sync (sync TitleFetchGuardTests.rewriteStringContent)
     "TitleFetchGuardTests.rewriteArrayContent", Sync (sync TitleFetchGuardTests.rewriteArrayContent)
     "TitleFetchGuardTests.skipProbeMessage", Sync (sync TitleFetchGuardTests.skipProbeMessage)
-    "IntegrationEditPlusSpecs.run", Async IntegrationEditPlusSpecs.run
 ]
 
 let runAll (_args: string array) : JS.Promise<int> =

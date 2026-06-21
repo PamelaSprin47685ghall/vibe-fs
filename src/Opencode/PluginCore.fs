@@ -13,7 +13,6 @@ open VibeFs.Opencode.MessageTransform
 open VibeFs.Opencode.ToolDefinitionHooks
 open VibeFs.Opencode.EventHooks
 open VibeFs.Opencode.Tools
-open VibeFs.Opencode.EditPlusState
 open VibeFs.Opencode.HookExecute
 open VibeFs.Opencode.TitleFetchGuard
 open VibeFs.Opencode.NudgeHook
@@ -31,12 +30,11 @@ type private CoreServices = {
     Directory: string
     WikiRuntime: WikiRuntime
     MagicSession: MagicSession
-    EditPlusState: EditPlusState option
     Tools: obj
     McpMap: obj
 }
 
-let private createCoreServices (host: Host) (editPlusEnabled: bool) (ctx: obj) =
+let private createCoreServices (host: Host) (ctx: obj) =
     let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
     let childAgentRegistry = ChildAgentRegistry.Create()
     let finderCache = FinderCache()
@@ -48,8 +46,7 @@ let private createCoreServices (host: Host) (editPlusEnabled: bool) (ctx: obj) =
         else System.DateTimeOffset.FromUnixTimeMilliseconds(int64 (unbox<float> nowMs)).UtcDateTime
     let wikiRuntime = WikiRuntime(Dyn.get ctx "client", directory, nowUtc, childAgentRegistry, 30000L, 1000)
     let magicSession = MagicSession host
-    let editPlusState = if editPlusEnabled then Some(EditPlusState()) else None
-    let tools = createTools childAgentRegistry finderCache ctx wikiRuntime reviewStore editPlusEnabled editPlusState
+    let tools = createTools childAgentRegistry finderCache ctx wikiRuntime reviewStore
     let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
     let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
     {
@@ -59,7 +56,6 @@ let private createCoreServices (host: Host) (editPlusEnabled: bool) (ctx: obj) =
         Directory = directory
         WikiRuntime = wikiRuntime
         MagicSession = magicSession
-        EditPlusState = editPlusState
         Tools = tools
         McpMap = mcpMap
     }
@@ -69,7 +65,7 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
     setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
     setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBeforeFor host input output))
     setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host services.Directory services.NudgeHook services.WikiRuntime services.ChildAgentRegistry input output))
-    setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform services.ChildAgentRegistry services.Directory services.MagicSession services.WikiRuntime services.ReviewStore services.EditPlusState input output))
+    setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform services.ChildAgentRegistry services.Directory services.MagicSession services.WikiRuntime services.ReviewStore input output))
     setKey result "command.execute.before" (twoArgHook (fun input output ->
         promise {
             do! services.NudgeHook.handleCommandExecuteBefore input output
@@ -83,10 +79,10 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
         }))
     setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host services.MagicSession input output))
 
-let pluginFor (host: Host) (editPlusEnabled: bool) (ctx: obj) : JS.Promise<obj> =
+let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
     promise {
         installTitleFetchGuard ()
-        let services = createCoreServices host editPlusEnabled ctx
+        let services = createCoreServices host ctx
         let result = emptyObj ()
         setKey result "id" (box "kunwei")
         setKey result "name" (box "kunwei")

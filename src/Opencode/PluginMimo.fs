@@ -5,4 +5,4 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Opencode.PluginCore
 
 [<ExportDefault>]
-let plugin (ctx: obj) = pluginFor mimocode false ctx
+let plugin (ctx: obj) = pluginFor mimocode ctx

@@ -10,19 +10,10 @@ open VibeFs.Opencode.SubagentTools
 open VibeFs.Opencode.ExecutorTool
 open VibeFs.Opencode.SearchTools
 open VibeFs.Opencode.ReviewTools
-open VibeFs.Opencode.EditPlusState
-open VibeFs.Opencode.EditPlusTools
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.FuzzyFinderShell
 
-let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (editPlusEnabled: bool) (editPlusState: EditPlusState option) : obj =
-    let editPlusEntries =
-        if editPlusEnabled then
-            match editPlusState with
-            | Some state -> [ "read", box (editPlusReadTool state); "edit", box (editPlusEditTool state) ]
-            | None -> []
-        else
-            []
+let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     createObj [
         "coder", box (coderTool registry ctx)
         "investigator", box (investigatorTool registry ctx)
@@ -37,5 +28,4 @@ let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: 
         "return_bookkeeper", box (submitWikiTool wikiRuntime)
         "submit_review", box (submitReviewTool registry ctx reviewStore)
         "return_reviewer", box (submitReviewResultTool reviewStore)
-        yield! editPlusEntries
     ]
