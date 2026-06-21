@@ -13,18 +13,17 @@ open VibeFs.Shell.WikiFiles
 open VibeFs.Shell.WikiPortLock
 open VibeFs.Shell.PromiseQueue
 
-let private allocateRandomHexId (knownIds: Set<string>) : string =
-    let random = Random()
-    match Wiki.allocateRandomHexId (fun () -> random.Next(0, 65536)) knownIds with
-    | Ok id -> id
-    | Error message -> failwith message
-
 let private buildEntries (root: string) (drafts: WikiDraft list) : JS.Promise<WikiEntry list> =
     promise {
         let! files = readWikiFiles root
         let projection = projectLatestWins files
         let normalizedDrafts = normalizeDraftIds projection drafts
-        match applyDrafts allocateRandomHexId projection normalizedDrafts with
+        let allocate (knownIds: Set<string>) : string =
+            let random = System.Random()
+            match Wiki.allocateRandomHexId (fun () -> random.Next(0, 65536)) knownIds with
+            | Ok id -> id
+            | Error message -> failwith message
+        match applyDrafts allocate projection normalizedDrafts with
         | Ok entries -> return entries
         | Error error -> return raise (exn error)
     }

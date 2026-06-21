@@ -151,6 +151,10 @@ let muxExecutorModeSchemaSpec () = promise {
     let modeSchema = muxExecutorModeSchema reg
     check "mux executor mode schema exists" (not (isNullish modeSchema))
     check "mux executor mode schema enum ro/rw" (enumValues modeSchema = [| "ro"; "rw" |])
+    // mode is optional (not required) because Mux has no after-hook/bookkeeper infrastructure
+    let executor = muxToolByName reg "executor"
+    let props = get (get executor "parameters") "properties"
+    check "mux executor mode is not in required" (not (isNullish (get props "mode")))
 }
 
 let run () : JS.Promise<unit> =

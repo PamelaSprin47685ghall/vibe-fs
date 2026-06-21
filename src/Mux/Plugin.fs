@@ -30,8 +30,42 @@ let getPluginToolPolicy (agentId: string) (role: obj) : obj =
 let collectReadOutputs (messages: obj array) : string[] =
     VibeFs.Kernel.MessageDedup.collectReadOutputs messages |> Array.ofList
 
+let private muxReadToolNames = Set [ "read"; "file_read" ]
+
+let private wrapDedupedMuxReadOutput (originalPart: obj) (dedupedPart: obj) : obj =
+    let originalOutput = Dyn.get originalPart "output"
+    let dedupedOutput = Dyn.get dedupedPart "output"
+    let isReadPart =
+        Dyn.str dedupedPart "type" = "dynamic-tool"
+        && Set.contains (Dyn.str dedupedPart "toolName") muxReadToolNames
+        && Dyn.str dedupedPart "state" = "output-available"
+    if isReadPart
+       && not (Dyn.isNullish originalOutput)
+       && not (Dyn.typeIs originalOutput "string")
+       && Dyn.typeIs dedupedOutput "string"
+       && string dedupedOutput = VibeFs.Kernel.Dedup.dedupMarker then
+        Dyn.withKey dedupedPart "output" (box (Dyn.withKey originalOutput "content" (box VibeFs.Kernel.Dedup.dedupMarker)))
+    else
+        dedupedPart
+
+let private wrapDedupedMuxReadParts (originalMessage: obj) (dedupedMessage: obj) : obj =
+    let originalParts = Dyn.get originalMessage "parts"
+    let dedupedParts = Dyn.get dedupedMessage "parts"
+    if Dyn.isNullish originalParts || Dyn.isNullish dedupedParts || not (Dyn.isArray originalParts) || not (Dyn.isArray dedupedParts) then
+        dedupedMessage
+    else
+        let originalArray = originalParts :?> obj array
+        let dedupedArray = dedupedParts :?> obj array
+        if originalArray.Length <> dedupedArray.Length then
+            dedupedMessage
+        else
+            let wrappedParts = Array.map2 wrapDedupedMuxReadOutput originalArray dedupedArray
+            Dyn.withKey dedupedMessage "parts" (box wrappedParts)
+
 let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : obj[] =
-    VibeFs.Kernel.MessageDedup.deduplicateReadOutputsWithSeen (List.ofArray seenOutputs) messages |> snd
+    let deduped = VibeFs.Kernel.MessageDedup.deduplicateReadOutputsWithSeen (List.ofArray seenOutputs) messages |> snd
+    if messages.Length <> deduped.Length then deduped
+    else Array.map2 wrapDedupedMuxReadParts messages deduped
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative

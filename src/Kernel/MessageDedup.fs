@@ -161,12 +161,7 @@ let private muxReadOp (part: obj) : ReadOp option =
         if current.Length = 0 then None
         else
             Some { pathKey = readPartPath rp; current = current;
-                   apply = fun nextOutput ->
-                       if Dyn.typeIs rp.output "string" then
-                           Dyn.withKey part "output" (box nextOutput)
-                       else
-                           let newOutput = Dyn.withKey rp.output "content" (box nextOutput)
-                           Dyn.withKey part "output" (box newOutput) }
+                   apply = fun nextOutput -> Dyn.withKey part "output" (box nextOutput) }
     | _ -> None
 
 let private modelReadOp (part: obj) : ReadOp option =

@@ -62,6 +62,18 @@ let private describeDomainError (error: DomainError) : string =
     | ToolNotPermitted(agent, tool) -> $"tool '{tool}' not permitted for '{agent}'"
     | InvalidIntent(tool, field, detail) -> $"invalid {tool}.{field}: {detail}"
 
+let private perSessionQueues = System.Collections.Generic.Dictionary<string, VibeFs.Shell.PromiseQueue.SerialQueue>()
+
+let private enqueuePerSession (sessionId: string) (work: unit -> JS.Promise<string>) : JS.Promise<string> =
+    let queue =
+        match perSessionQueues.TryGetValue sessionId with
+        | true, q -> q
+        | false, _ ->
+            let q = VibeFs.Shell.PromiseQueue.SerialQueue()
+            perSessionQueues.[sessionId] <- q
+            q
+    queue.Enqueue(work)
+
 let addIfSome (entries: ResizeArray<string * obj>) (key: string) (v: 'T option) =
     match v with
     | Some x -> entries.Add(key, box x)
@@ -81,17 +93,20 @@ let executorTool (deps: obj) : ToolDefinition =
                   "dependencies", box (strArrayProp Params.executorDeps)
                   "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |])
                   "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |]) ])
-            [| "language"; "program"; "timeout_type"; "mode" |]
+            [| "language"; "program"; "timeout_type" |]
       execute =
         fun config args ->
             promise {
                 let opts = buildExecutorOptions args config
                 let sessionId = Dyn.str config "sessionID"
-                let! execResult = VibeFs.Shell.Executor.execute opts sessionId
-                let output =
-                    match execResult with
-                    | Completed o | Truncated(o, _) | Failed o | MissingExecutable(_, o) -> o
-                return! summarizeWhenNeeded deps config opts output
+                let! execResult = enqueuePerSession sessionId (fun () ->
+                    promise {
+                        let! r = VibeFs.Shell.Executor.execute opts sessionId
+                        return match r with
+                               | Completed o | Truncated(o, _) | Failed o | MissingExecutable(_, o) -> o
+                    })
+                let! output = summarizeWhenNeeded deps config opts execResult
+                return output
             }
       condition = None }
 
