@@ -247,3 +247,26 @@ let readProjectionAsync (workspaceRoot: string) : JS.Promise<WikiProjection> =
 
 let readAllWikiFiles (workspaceRoot: string) : JS.Promise<WikiFile list> =
     readWikiFiles workspaceRoot
+
+let muxMessageTransform (reg: obj) : obj =
+    get reg "messagesTransform"
+
+let muxTextMessage (id: string) (role: string) (text: string) : obj =
+    box {| id = id; role = role; parts = [| box {| ``type`` = "text"; text = text; state = "done" |} |] |}
+
+let firstTextPartText (msg: obj) : string =
+    let parts = get msg "parts"
+    if isNullish parts then ""
+    else
+        let arr = unbox<obj[]> parts
+        if arr.Length = 0 then ""
+        else str arr.[0] "text"
+
+let hasDynamicToolReadPart (msg: obj) : bool =
+    let parts = get msg "parts"
+    if isNullish parts then false
+    else
+        unbox<obj[]> parts
+        |> Array.exists (fun p ->
+            str p "type" = "dynamic-tool"
+            && str p "toolName" = "file_read")

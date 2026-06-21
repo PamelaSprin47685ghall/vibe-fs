@@ -39,6 +39,115 @@ let computeCountSpec (reg: obj) =
     check "has return_bookkeeper tool" (names |> Array.contains "return_bookkeeper")
     check "has return_reviewer tool" (names |> Array.contains "return_reviewer")
 
+let muxMessageTransformRegisteredSpec () =
+    promise {
+        let reg = createRegistration (minimalMuxDeps ())
+        let tf = muxMessageTransform reg
+        check "mux registration exposes messagesTransform" (not (isNullish tf))
+        check "mux messagesTransform is callable" (typeIs tf "function")
+    }
+
+let muxWikiPreludeForManagerSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-wiki-prelude-manager-"
+    do! ensureWikiDir workspaceDir
+    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
+    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ])
+    let reg = createRegistration (minimalMuxDeps ())
+    let tf = muxMessageTransform reg
+    let originalMsg = muxTextMessage "msg-manager" "user" "go"
+    let out = createObj [ "messages", box [| originalMsg |] ]
+    let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-wiki-prelude-manager-session" ]
+    if isNullish tf then
+        check "mux messagesTransform exposed for manager" false
+    else
+        do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+        let msgs = unbox<obj[]> (get out "messages")
+        check "mux manager wiki prelude injects prefix messages" (msgs.Length >= 4)
+        let firstText = firstTextPartText msgs.[0]
+        check "mux manager wiki prelude starts with hello" (firstText.StartsWith "你好")
+        check "mux manager wiki prelude has wiki front matter" (firstText.Contains "---\nwiki:")
+        check "mux manager wiki prelude lists question" (firstText.Contains "0a3f" && firstText.Contains "项目插件入口在哪里？")
+        check "mux manager wiki prelude hides answer" (not (firstText.Contains "src/Mux/Plugin.fs"))
+        check "mux manager wiki prelude preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
+    do! rmAsync workspaceDir
+}
+
+let muxWikiPreludeForCoderSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-wiki-prelude-coder-"
+    do! ensureWikiDir workspaceDir
+    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
+    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ])
+    let reg = createRegistration (minimalMuxDeps ())
+    let tf = muxMessageTransform reg
+    let originalMsg = muxTextMessage "msg-coder" "user" "go"
+    let out = createObj [ "messages", box [| originalMsg |] ]
+    let input = createObj [ "agent", box "coder"; "directory", box workspaceDir; "sessionID", box "mux-wiki-prelude-coder-session" ]
+    if isNullish tf then
+        check "mux messagesTransform exposed for coder" false
+    else
+        do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+        let msgs = unbox<obj[]> (get out "messages")
+        check "mux coder wiki prelude injects prefix messages" (msgs.Length >= 4)
+        let firstText = firstTextPartText msgs.[0]
+        check "mux coder wiki prelude starts with hello" (firstText.StartsWith "你好")
+        check "mux coder wiki prelude has wiki front matter" (firstText.Contains "---\nwiki:")
+        check "mux coder wiki prelude lists question" (firstText.Contains "0a3f" && firstText.Contains "项目插件入口在哪里？")
+        check "mux coder wiki prelude hides answer" (not (firstText.Contains "src/Mux/Plugin.fs"))
+        check "mux coder wiki prelude preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
+    do! rmAsync workspaceDir
+}
+
+let muxNoWikiPreludeForExcludedAgentsSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-wiki-prelude-excluded-"
+    do! ensureWikiDir workspaceDir
+    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
+    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ])
+    let reg = createRegistration (minimalMuxDeps ())
+    let tf = muxMessageTransform reg
+    if isNullish tf then
+        check "mux messagesTransform exposed for excluded agents" false
+    else
+        for agent in [| "browser"; "bookkeeper" |] do
+            let originalMsg = muxTextMessage ("msg-" + agent) "user" "go"
+            let out = createObj [ "messages", box [| originalMsg |] ]
+            let input = createObj [ "agent", box agent; "directory", box workspaceDir; "sessionID", box ("mux-wiki-excl-" + agent) ]
+            do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+            let msgs = unbox<obj[]> (get out "messages")
+            check (agent + " still receives default prefix") (msgs.Length >= 4)
+            let firstText = firstTextPartText msgs.[0]
+            check (agent + " default prefix starts with hello") (firstText.StartsWith "你好")
+            check (agent + " omits wiki prelude") (not (firstText.Contains "---\nwiki:"))
+            check (agent + " preserves original") (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
+    do! rmAsync workspaceDir
+}
+
+let muxCapsAndWikiPreludeOrderSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-caps-wiki-order-"
+    do! ensureWikiDir workspaceDir
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content"
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n"
+    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
+    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ])
+    let reg = createRegistration (minimalMuxDeps ())
+    let tf = muxMessageTransform reg
+    let originalMsg = muxTextMessage "msg-order" "user" "go"
+    let out = createObj [ "messages", box [| originalMsg |] ]
+    let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-caps-wiki-session" ]
+    if isNullish tf then
+        check "mux messagesTransform exposed for caps+wiki order" false
+    else
+        do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+        let msgs = unbox<obj[]> (get out "messages")
+        check "mux caps+wiki injects prefix messages" (msgs.Length >= 3)
+        let firstText = firstTextPartText msgs.[0]
+        check "mux caps+wiki first message starts with hello" (firstText.StartsWith "你好")
+        check "mux caps+wiki first message includes wiki front matter" (firstText.Contains "---\nwiki:")
+        let hasCapsAssistant = msgs.[..msgs.Length - 2] |> Array.exists hasDynamicToolReadPart
+        check "mux caps+wiki includes assistant caps read before original" hasCapsAssistant
+        check "mux caps+wiki preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
+    do! rmAsync workspaceDir
+}
+
 let muxFetchWikiSnapshotSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-wiki-fetch-"
     do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
@@ -263,14 +372,22 @@ let run () : JS.Promise<unit> =
             "muxReturnBookkeeperReconstructsJobFromHistory", muxReturnBookkeeperReconstructsJobFromHistorySpec
             "muxReturnBookkeeperAppendTriggersLaunch", muxReturnBookkeeperAppendTriggersLaunchSpec
             "muxExecutorModeSchema", muxExecutorModeSchemaSpec
+            "muxMessageTransformRegistered", muxMessageTransformRegisteredSpec
+            "muxWikiPreludeForManager", muxWikiPreludeForManagerSpec
+            "muxWikiPreludeForCoder", muxWikiPreludeForCoderSpec
+            "muxNoWikiPreludeForExcludedAgents", muxNoWikiPreludeForExcludedAgentsSpec
+            "muxCapsAndWikiPreludeOrder", muxCapsAndWikiPreludeOrderSpec
             "muxTopLevelPolicy", muxTopLevelPolicySpec
             "muxTopLevelDedup", muxTopLevelDedupSpec
             "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
             "muxSubmitReviewPromptSuppliesCallId", muxSubmitReviewPromptSuppliesCallIdSpec
             "muxReturnReviewerRegistered", muxReturnReviewerRegisteredSpec
             "muxReturnReviewerRejectsResolve", muxReturnReviewerRejectsResolveSpec
+            "muxReturnReviewerRejectCleansReviewState", muxReturnReviewerRejectCleansReviewStateSpec
             "muxReturnReviewerFirstPassDoubleCheck", muxReturnReviewerFirstPassDoubleCheckSpec
             "muxReturnReviewerSecondPassResolves", muxReturnReviewerSecondPassResolvesSpec
+            "muxSubmitReviewTerminatedCleansReviewState", muxSubmitReviewTerminatedCleansReviewStateSpec
+            "muxExecutorFailureDoesNotBookkeep", muxExecutorFailureDoesNotBookkeepSpec
         ]
         for (label, spec) in specs do
             do! timedAsync ("IntegrationTool." + label) spec

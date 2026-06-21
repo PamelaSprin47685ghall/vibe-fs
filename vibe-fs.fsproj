@@ -70,8 +70,9 @@
     <Compile Include="src/Mux/Delegate.fs" />
     <Compile Include="src/Mux/SubagentTools.fs" />
     <Compile Include="src/Mux/HostTools.fs" />
-    <Compile Include="src/Mux/WikiTools.fs" />
-    <Compile Include="src/Mux/EventHook.fs" />
+     <Compile Include="src/Mux/WikiTools.fs" />
+     <Compile Include="src/Mux/MessageTransform.fs" />
+     <Compile Include="src/Mux/EventHook.fs" />
     <Compile Include="src/Mux/SlashCommands.fs" />
     <Compile Include="src/Mux/Plugin.fs" />
     <Compile Include="src/Opencode/NudgeHook.fs" />

@@ -138,7 +138,7 @@ let private preparePendingReviewCallForTest (reg: obj) (workspaceDir: string) (s
                 let! _ = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
                 ()
             with _ ->
-                ()
+                muxActivateReviewForTest reg sessionID "Implement feature X"
     }
 
 let muxReturnReviewerRegisteredSpec () = promise {
@@ -228,5 +228,72 @@ let muxSubmitReviewPromptSuppliesCallIdSpec () = promise {
         | Some callId ->
             let promptText = if prompts.Count > 0 then prompts.[0] else ""
             check "submit_review prompt includes the review callId for the reviewer" (promptText.Contains(callId))
+    do! rmAsync workspaceDir
+}
+
+let muxReturnReviewerRejectKeepsReviewActiveSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-return-reviewer-reject-keeps-"
+    let sessionID = "mux-return-reviewer-reject-keeps"
+    let reg = createRegistration (muxDepsWithChatHistory sessionID [||])
+    do! preparePendingReviewCallForTest reg workspaceDir sessionID
+    let returnTool = muxToolByName reg "return_reviewer"
+    if isNullish returnTool then
+        check "mux registration exposes return_reviewer tool" false
+    else
+        let ctx = makeReturnReviewerContext workspaceDir sessionID
+        let args = createObj [ "feedback", box "needs rework" ]
+        let! result = ((get returnTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+        check "return_reviewer reject reports verdict submitted" (result.Contains "Verdict submitted.")
+        check "return_reviewer reject keeps review session active" (muxIsReviewActiveForTest reg sessionID)
+    do! rmAsync workspaceDir
+}
+
+let muxReturnReviewerRejectCleansReviewStateSpec () = muxReturnReviewerRejectKeepsReviewActiveSpec ()
+
+let muxSubmitReviewTerminatedCleansReviewStateSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-submit-review-terminated-"
+    let sessionID = "mux-submit-review-terminated"
+    let reg = createRegistration (muxDepsWithChatHistory sessionID [||])
+    muxActivateReviewForTest reg sessionID "Implement feature X"
+    let prompts = ResizeArray<string>()
+    let taskService = mockMuxTaskServiceCapturingPrompt prompts
+    let submitTool = muxToolByName reg "submit_review"
+    if isNullish submitTool then
+        check "mux registration exposes submit_review tool" false
+    else
+        let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
+        let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+        let! result =
+            promise {
+                try
+                    let! r = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+                    return r
+                with ex ->
+                    return string ex
+            }
+        check "submit_review reports termination, timeout or error" (
+            result.Contains "Reviewer timed out"
+            || result.Contains "Terminated"
+            || result.Contains "terminated"
+            || result.Contains "timeout"
+            || result.Contains "failed")
+        check "submit_review termination deactivates review session" (not (muxIsReviewActiveForTest reg sessionID))
+    do! rmAsync workspaceDir
+}
+
+let muxExecutorFailureDoesNotBookkeepSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-executor-fail-"
+    let reg = createRegistration (createObj [])
+    let executor = muxToolByName reg "executor"
+    if isNullish executor then
+        check "mux registration exposes executor tool" false
+    else
+        let ctx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-executor-fail"; "workspaceId", box "mux-executor-fail" ]
+        let args = createObj [ "language", box "shell"; "program", box "exit 1"; "timeout_type", box "short"; "mode", box "rw" ]
+        let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+        check "executor failure reports non-zero exit" (result.Contains "exited with code 1")
+        do! waitForBackgroundJobsForTesting reg
+        let launches = takeBookkeeperLaunchesForTesting reg
+        check "executor failure does not trigger bookkeeper" (launches.Length = 0)
     do! rmAsync workspaceDir
 }

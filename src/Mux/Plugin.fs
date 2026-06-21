@@ -16,6 +16,7 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.MessageDedup
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.WorkspaceFiles
+open VibeFs.Mux.MessageTransform
 
 let muxToolNames =
     [| "coder"; "investigator"; "meditator"; "browser"; "executor"
@@ -148,6 +149,9 @@ let createRegistration (deps: obj) : obj =
     let wrappers = createAllWrappers toolsObj hostReadExec callStore
     let eventHook = createEventHook reviewStore
     let slashCommands = createSlashCommands deps toolNames callStore reviewStore
+    let messagesTransformFn =
+        System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
+            messagesTransform wikiRuntime reviewStore input output)
     box {| toolNames = toolNames
            tools = tools
            wrappers = wrappers
@@ -160,6 +164,7 @@ let createRegistration (deps: obj) : obj =
                    } :> obj) |}
            eventHook = eventHook
            slashCommands = slashCommands
+           messagesTransform = box messagesTransformFn
            __wikiRuntime =
                 box (createObj
                     [ "rawInstance", box wikiRuntime

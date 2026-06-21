@@ -185,8 +185,8 @@ let private awaitReviewVerdict (verdictPromise: JS.Promise<obj>) : JS.Promise<Re
             if v = "pass" then return Accepted
             elif v = "reject" then return Rejected feedback
             else return Rejected $"Reviewer returned unclear verdict: \"{v}\". Expected \"pass\" or \"reject\"."
-        with ex ->
-            return Rejected $"Reviewer timed out or failed: {ex.Message}"
+        with _ ->
+            return Terminated
     }
 
 let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : ToolDefinition =
@@ -217,12 +217,16 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                               + "\n" + taskSection
                           let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box (disabledToolsForReviewer toolNames) ]) ]
                           let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
-                          let! _ = delegateToSubAgent deps config "explore" reviewPrompt "Review" (Some opts)
-                          let! verdict = awaitReviewVerdict verdictPromise
-                          match verdict with
-                          | Accepted -> reviewStore.deactivateReview workspaceId
-                          | _ -> ()
-                          return formatReviewResult verdict
+                          try
+                              let! _ = delegateToSubAgent deps config "explore" reviewPrompt "Review" (Some opts)
+                              let! verdict = awaitReviewVerdict verdictPromise
+                              match verdict with
+                              | Accepted | Terminated -> reviewStore.deactivateReview workspaceId
+                              | Rejected _ -> ()
+                              return formatReviewResult verdict
+                          with ex ->
+                              reviewStore.deactivateReview workspaceId
+                              return! Promise.reject ex
                       finally
                           reviewStore.unlockReview workspaceId
                   }

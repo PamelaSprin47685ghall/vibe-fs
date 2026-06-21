@@ -245,6 +245,10 @@ export interface PluginRegistration {
   contextInjector: { inject: (projectPath: string) => Promise<unknown> };
   eventHook: (event: PluginEvent, helpers: PluginEventHelpers) => Promise<void>;
   slashCommands: PluginSlashCommandDefinition[];
+  messagesTransform?: (
+    input: { workspacePath?: string; workspaceId?: string; effectiveAgentId?: string } & Record<string, unknown>,
+    output: { messages: unknown[] },
+  ) => Promise<void>;
   getToolPolicy: (agentId: string, role?: string) => MuxToolPolicy | null;
 }
 

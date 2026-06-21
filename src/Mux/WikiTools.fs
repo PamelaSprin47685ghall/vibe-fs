@@ -97,12 +97,36 @@ type MuxWikiRuntime(?deps: obj) as this =
                     with _ -> return None
         }
 
-    member _.FetchFromSessionSnapshot(_sessionID: string, directory: string, id: string) : JS.Promise<string> =
+    member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<WikiProjection> =
+        if sessionID = "" then Promise.lift Map.empty
+        else
+            commandQueue.Enqueue(fun () ->
+                promise {
+                    match Map.tryFind sessionID state.sessionSnapshots with
+                    | Some projection -> return projection
+                    | None ->
+                        let! projection = readProjection directory
+                        state <- reducer state (CacheSnapshotCmd (sessionID, projection))
+                        return projection
+                })
+
+    member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
+        promise {
+            let! projection = this.EnsureSessionSnapshot(sessionID, directory)
+            return buildPreludeSection projection
+        }
+
+    member this.FetchFromSessionSnapshot(sessionID: string, directory: string, id: string) : JS.Promise<string> =
         promise {
             if System.String.IsNullOrWhiteSpace directory then
                 return "No wiki directory provided."
-            else
+            elif sessionID = "" then
                 let! projection = readProjection directory
+                match fetchAnswer projection id with
+                | Ok answer -> return answer
+                | Error message -> return message
+            else
+                let! projection = this.EnsureSessionSnapshot(sessionID, directory)
                 match fetchAnswer projection id with
                 | Ok answer -> return answer
                 | Error message -> return message
