@@ -209,3 +209,44 @@
 {"id":"5f77","q":"WikiPortLock.fs acquireLoop 删除?","a":"已删。acquireLoop(L34-42)零调用死代码。acquireLoopUntil 保留。文件 71→61 行。"}
 {"id":"133f","q":"WikiRuntimeIO.fs submitForKind 新增 portLockRetryDelayMs 参数?","a":"src/Opencode/WikiRuntimeIO.fs submitForKind 签名新增 portLockRetryDelayMs: int 第二位参数,透传给 withWikiPortLock。public 签名变更,上游 PluginCore.fs extract createCoreServices 调用点需同步更新(传 1000 或现有值)。"}
 {"id":"d30b","q":"WikiRuntimeIO.fs submitForKind 新增 portLockRetryDelayMs 参数?","a":"src/Opencode/WikiRuntimeIO.fs submitForKind 签名新增 portLockRetryDelayMs: int 第二位参数,透传给 withWikiPortLock。public 签名变更,上游 PluginCore.fs extract createCoreServices 调用点需同步更新(传 1000 或现有值)。"}
+{"id":"c5f8","q":"vibe-fs 新增 editplus 特性:四个入口点矩阵+状态恢复?","a":"src/Opencode 新增 editplus 特性。四个入口点:Plugin.fs(opencode,禁)/PluginPlus.fs(opencode,启)/PluginMimo.fs(mimocode,禁)/PluginMimoPlus.fs(mimocode,启)。核心算法翻F#入 EditPlusState.fs(tag registry/lock/replay)与 EditPlusTools.fs(read/edit工具)。状态不落盘,靠 MessageTransform.fs 重放 session history 恢复。read 输出 tag 视图,edit 按 tag 区间替换/插入/删除,stale/external 报错。write 工具保持原样不动。pnpm build && pnpm test 通过。"}
+{"id":"3a2c","q":"editplus 四个入口点矩阵?","a":"src/Opencode 四个入口点:Plugin.fs(opencode,false)/PluginPlus.fs(opencode,true)/PluginMimo.fs(mimocode,false)/PluginMimoPlus.fs(mimocode,true)。入口点本身=editplus开关,非运行时布尔。Plus版额外覆盖read/edit工具,write保持不动。"}
+{"id":"e28b","q":"editplus 状态恢复机制?","a":"状态不落盘。EditPlusState.fs(tag registry/lock/replay)与EditPlusTools.fs(read/edit工具)为核心。MessageTransform.fs 重放session history恢复:从MessagingCodec.ToolState筛选toolName=read|edit且status=completed的消息,提取input path/begin/endExclusive/endInclusive与output结果重建tag registry。历史是唯一真源,不依赖磁盘快照。"}
+{"id":"ebc1","q":"editplus read 协议?","a":"输入:path+begin+endExclusive/endInclusive(二选一),无range时返回完整tag视图。输出:tag协议格式化文本,大文件不整页倾倒。保留BOM/CRLF/LF原样,不默默改写行尾。旧filePath/offset/limit兼容口已删。"}
+{"id":"8b1a","q":"editplus edit 协议?","a":"输入:path+begin+endExclusive/endInclusive+content。content为空=删除,begin==endExclusive=插入,否则替换。编辑后更新registry,返回新tag信息。跨文件/反向区间/过期tag/external修改报错。不再支持oldString/newString。"}
+{"id":"89d5","q":"editplus tag 核心算法?","a":"numToTag/tagToNum:base52编码。TagRegistry:每文件分配稳定tag段,维持zList/xList前后映射,编辑后重排受影响段,未受影响tag保持稳定。withLock:同文件串行写入。appendSummary:错误时自动附当前文件摘要。resolveTag:解析tag到行位置,区分expired/stale/external。"}
+{"id":"6da2","q":"editplus 与现有host集成注意点?","a":"read/edit变tag协议后,前端file chip可能退化(旧host认filePath)。内部记录保留解析后绝对路径+编辑范围供展示层使用,不为旧API做兼容分支。入口点就是开关,避免runtime分支。"}
+{"id":"a7cc","q":"editplus 测试覆盖矩阵?","a":"四入口点shape/tool注册差异(IntegrationPluginTests.fs)。Plus版tool definition含read/edit(IntegrationToolDefSpecs.fs)。message replay不破坏wiki/caps注入(IntegrationWikiPreludeSpecs.fs)。write记账不变(IntegrationAfterHookSpecs.fs)。新增editplus专项:test/read/edit/stale-external/replay。"}
+{"id":"fdd7","q":"当前构建测试状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"d1d2","q":"vibe-fs 怎么构建和测试?","a":"构建 `pnpm build`:Fable 编译后拷贝产物到 `build/`。测试 `pnpm test`:`node tests/runner.js` 导入编译后的测试 JS。合并 `pnpm build && pnpm test`。无独立 lint/typecheck 命令。"}
+{"id":"37d8","q":"当前构建状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"773d","q":"当前构建状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"8d47","q":"current build status?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"c4c3","q":"当前构建状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"de0b","q":"vibe-fs 当前构建测试状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"fdd7","q":"当前构建测试状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"3ffa","q":"哪个测试验证失败工具跳过 bookkeeper 记账?","a":"IntegrationToolTests.fs 的 `afterHookSkipsFailedToolSpec`:建带 wiki 目录的 workspace,对返回 `error = \"permission denied\"` 的 `write` 调用执行 `tool.execute.after`,经 `takeBookkeeperLaunchesForTesting` 断言 `launches.Length = 0`。失败不触发 append。"}
+{"id":"49ed","q":"afterHookRecordsExecutorSpec 确认 ro/rw 均记账","a":"原测试已删除/重命名。现两测试 `after-hook skips read-only executor calls, records only rw` 与 `after-hook records only the rw executor call` 通过，断言 ro 不记账、仅 rw 记账。"}
+{"id":"73e6","q":"executor mode 字段存在但未被使用","a":"src/Opencode/HookExecute.fs:121–122 新增 `isReadOnlyExecutor` 私有守卫: `tool = \"executor\" && Dyn.str (Dyn.get input \"args\") \"mode\" = \"ro\"`。条件 `succeeded && recordsToBookkeeper tool && ...` 中插 `&& not (isReadOnlyExecutor tool input)` (line 134)。ro 调用跳过 bookkeeper 记账，仅 rw 记账。文件顶部无注释，函数名自文档。"}
+{"id":"7413","q":"工具执行如何记入 bookkeeper(wiki 附录)?","a":"HookExecute.fs toolExecuteAfterFor。四条件全满足才记：succeeded(output.error==\"\")、recordsToBookkeeper tool(含 executor/fileEdit)、非子 agent 会话、mode=\"rw\"。ro 模式跳过。input 中 Dyn.str \"mode\" 可取到，ExecuteResult/ExecuteOptions 不携带。"}
+{"id":"98c8","q":"ToolHelpers.fs + WikiTools.fs 重复 Wrappers 函数重构结果?","a":"ToolHelpers.fs 删 resolveStr/optInt/optBool/optField 重复定义,保留 formatDomainError/optStr。SearchTools/SubagentTools/ReviewTools 加 open VibeFs.Mux.Wrappers 消费单一来源。WikiTools.fs 删私有 resolveStr,加 open VibeFs.Mux.Wrappers,调用点用 Wrappers.resolveStr。grep 确认无残留 ToolHelpers.xxx 限定调用。"}
+{"id":"d471","q":"ToolHelpers.fs 独有函数?","a":"formatDomainError 与 optStr 保留,其余 optInt/optBool/optField/resolveStr 统一来源 Wrappers。"}
+{"id":"02b5","q":"HostTools 同名模块混淆与重命名方案?","a":"Kernel.HostTools(44行,Host DU+标识函数)与Mux.HostTools(259行,内置工具实现)同名。Kernel被28文件open,Mux被3文件open。重命名Mux.HostTools→Mux.BuiltinTools,改3文件(Mux/HostTools.fs/Mux/Plugin.fs/Opencode/SearchTools.fs),零测试。语义精确:Kernel=宿主种类,Mux=内置工具。"}
+{"id":"2e1c","q":"Mux.HostTools 重命名为 BuiltinTools?","a":"VibeFs.Mux.HostTools → VibeFs.Mux.BuiltinTools。改 Plugin.fs 与 SearchTools.fs open 语句。消除与 Kernel.HostTools 同名混淆。"}
+{"id":"c5fb","q":"parseSearchResults 抽取位置与调用点?","a":"Kernel/Prompts.fs:15-17 新增公开 parseSearchResults : obj -> SearchResult list。SearchTools.fs:100 与 BuiltinTools.fs(websearchTool):220 均替换为调用之。重复消除。"}
+{"id":"9714","q":"TreeSitterShell.fs getOrCall0/getOrCall1 归并","a":"首轮用 [<ParamArray>] args: obj[] 合并,编译失败:ParamArray 在 F# preview 未定义(需 System.ParamArrayAttribute)且调用点单值 string 被当 obj[] 参数传致类型不匹配。修复:弃 ParamArray,改 callOrGet 共享逻辑 + getOrCall(无参)/getOrCallWith(单参)两 wrapper。6 处单参调用(detectLanguageFromPath/detectLanguageFromContent/hasLanguage/child/getParser/parse)改 getOrCallWith;5 处无参(downloadAll/nodeField/nodeBool/nodeKind/rootNode)留 getOrCall。无残留 getOrCall0/getOrCall1/ParamArray。"}
+{"id":"ad96","q":"WikiTests.fs prelude 断言为何更新?","a":"同步 Wiki.fs 前言从中文改为英文的变更(entry 5685)。测试断言从 `需要某条历史答案时，调用 fetch_wiki(id)。` 改为 `Call fetch_wiki(id)`，与新提示词对齐。"}
+{"id":"5685","q":"Wiki.fs 前言提示词从什么改成什么?","a":"src/Kernel/Wiki.fs wiki front-matter 前言指令从中文改为英文: `需要某条历史答案时，调用 fetch_wiki(id)。` → `Call fetch_wiki(id) to expand a historical entry's full answer.`。用户面向提示词语言统一，无行为变更。"}
+{"id":"300b","q":"rewritePruneRules 何时也附给 weekly prompt?","a":"b220 原称 weekly 引用 rewritePruneRules 系误报。`buildWeeklyPrompt` 实际仅引 `bookkeeperQualityRules`，欠 `rewritePruneRules`。修复:提示词拼接追加 `@ rewritePruneRules`。现 daily/weekly 均引用，append 独不引用。"}
+{"id":"c204","q":"WikiPrompts.fs rewritePruneRules 是什么?","a":"src/Kernel/WikiPrompts.fs 新增 `rewritePruneRules` 列表。含两条规则：主动过滤低价值内容（丢弃无未来读者行动的琐事、移除已过时的临时细节）、合并重叠事实为单一规范条目。目标：更短高信号 wiki，而非穷举保留。由 daily/weekly rewrite 提示词引用，append 不引用。"}
+{"id":"65ae","q":"Config.fs canUse 守卫平面 match 是否已回退?","a":"已回退。git checkout src/Kernel/Config.fs 还原原始平面守卫(8×toolMatches)。pnpm build 通过,Fable 编译 9626ms。969 测试全过。"}
+{"id":"14df","q":"vibe-fs 当前构建测试状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"2540","q":"当前构建状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"8df7","q":"current build status?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"db2d","q":"当前测试状态?","a":"967 passed, 0 failed."}
+{"id":"ee7f","q":"current test status?","a":"967 passed, 0 failed. Build succeeds."}
+{"id":"b8e4","q":"vibe-fs 当前构建测试状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"7223","q":"当前构建测试状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"95f7","q":"vibe-fs 当前构建测试状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"ae46","q":"当前构建状态?","a":"pnpm build && pnpm test 通过。107 源文件，967 测试全过。"}
+{"id":"255b","q":"当前测试状态?","a":"967 passed, 0 failed."}
