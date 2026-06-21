@@ -23,7 +23,8 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"
     define executor
         (box {| language = strReq Params.executorLanguage; program = strReq Params.executorProgram
-                dependencies = strArrayOpt Params.executorDeps; timeout_type = strReq Params.executorTimeout
+                dependencies = strArrayOpt Params.executorDeps
+                timeout_type = enumReq [| "short"; "long"; "last-resort" |] Params.executorTimeout
                 mode = enumReq [| "ro"; "rw" |] Params.executorMode |})
         (fun args context ->
             let tc = extractToolContext context (Dyn.str ctx "directory")
