@@ -12,7 +12,7 @@ type SubagentTaskKind =
     | Investigator of InvestigatorIntent list
     | Meditator of intent: string * sections: MeditatorFileSection list
     | Browser of intent: string
-    | ExecutorSummary of output: string
+    | ExecutorSummary of output: string * language: string * program: string * dependencies: string list * timeoutType: string * mode: string
     | WebsearchSummary of question: string * raw: string
 
 let private agentReportTail =
@@ -35,7 +35,7 @@ let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
     | Investigator intents -> intents |> List.map (investigatorPrompt >> wrap)
     | Meditator(intent, sections) -> [ meditatorPrompt sections intent |> wrap ]
     | Browser intent -> [ browserPrompt intent |> wrap ]
-    | ExecutorSummary output -> [ executorSummarizerPrompt output |> wrap ]
+    | ExecutorSummary(output, language, program, dependencies, timeoutType, mode) -> [ executorSummarizerPrompt output language program dependencies timeoutType mode |> wrap ]
     | WebsearchSummary(question, raw) -> [ websearchSummarizerPrompt question raw |> wrap ]
 
 let reportSeparator = "\n---\n"

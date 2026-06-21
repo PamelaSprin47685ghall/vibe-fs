@@ -85,6 +85,24 @@ let browserDoesNotReceiveWikiPreludeSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let executorChildSessionWithoutInputAgentDoesNotReceiveWikiPreludeSpec () = promise {
+    let! workspaceDir = mkdtempAsync "wiki-prelude-executor-"
+    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
+    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
+    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ])
+    let! p = plugin (box {| directory = workspaceDir |})
+    let tf = get p "experimental.chat.messages.transform"
+    let originalMsg = box {| info = createObj [ "id", box "msg-executor-1"; "agent", box "executor"; "sessionID", box "child-executor-session" ]; parts = [||] |}
+    let out = createObj [ "messages", box [| originalMsg |] ]
+    do! tf $ (createObj [], out) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    check "executor child without input agent still gets default prefix" (msgs.Length = 4)
+    let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
+    check "executor child without input agent omits wiki prelude" (not (firstText.Contains "---\nwiki:"))
+    check "executor child without input agent preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
+    do! rmAsync workspaceDir
+}
+
 let fetchWikiSnapshotSpec () = promise {
     let! workspaceDir = mkdtempAsync "wiki-fetch-"
     do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))

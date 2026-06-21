@@ -112,14 +112,18 @@ type MuxWikiRuntime(?deps: obj) as this =
 
     member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
         promise {
-            let! projection = this.EnsureSessionSnapshot(sessionID, directory)
-            return buildPreludeSection projection
+            if not (wikiDirExists directory) then return None
+            else
+                let! projection = this.EnsureSessionSnapshot(sessionID, directory)
+                return buildPreludeSection projection
         }
 
     member this.FetchFromSessionSnapshot(sessionID: string, directory: string, id: string) : JS.Promise<string> =
         promise {
             if System.String.IsNullOrWhiteSpace directory then
                 return "No wiki directory provided."
+            elif not (wikiDirExists directory) then
+                return "Wiki directory not found."
             elif sessionID = "" then
                 let! projection = readProjection directory
                 match fetchAnswer projection id with
@@ -169,104 +173,110 @@ type MuxWikiRuntime(?deps: obj) as this =
         registeredJobs.Remove(sessionID) |> ignore
 
     member this.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
-        commandQueue.Enqueue(fun () ->
-            promise {
-                let! files = readWikiFiles workspaceRoot
-                let projection = projectLatestWins files
-                let dailyDue, weeklyDue = dueMaintenance files System.DateTime.UtcNow
+        if not (wikiDirExists workspaceRoot) then Promise.lift ()
+        else
+            commandQueue.Enqueue(fun () ->
+                promise {
+                    let! files = readWikiFiles workspaceRoot
+                    let projection = projectLatestWins files
+                    let dailyDue, weeklyDue = dueMaintenance files System.DateTime.UtcNow
 
-                let launchIfDue (due: string list) kind title resultPrefix promptInfix buildPrompt =
-                    due
-                    |> List.iter (fun value ->
-                        let key = workspaceRoot + "|" + resultPrefix + "|" + value
-                        let launch = { agent = "bookkeeper"; title = title; prompt = $"{resultPrefix} maintenance due {promptInfix} {value}"; result = $"{resultPrefix}:{value}" }
-                        let first, nextState = recordLaunchOnce state key launch
-                        state <- nextState
-                        if first then
-                            let promptText = buildPrompt value files projection
-                            launchBg workspaceRoot (kind value) title promptText)
+                    let launchIfDue (due: string list) kind title resultPrefix promptInfix buildPrompt =
+                        due
+                        |> List.iter (fun value ->
+                            let key = workspaceRoot + "|" + resultPrefix + "|" + value
+                            let launch = { agent = "bookkeeper"; title = title; prompt = $"{resultPrefix} maintenance due {promptInfix} {value}"; result = $"{resultPrefix}:{value}" }
+                            let first, nextState = recordLaunchOnce state key launch
+                            state <- nextState
+                            if first then
+                                let promptText = buildPrompt value files projection
+                                launchBg workspaceRoot (kind value) title promptText)
 
-                launchIfDue dailyDue DailyRewrite "Daily wiki rewrite" "daily" "for" buildDailyPrompt
-                launchIfDue (Option.toList weeklyDue) WeeklyRewrite "Weekly wiki snapshot rewrite" "weekly" "through" buildWeeklyPrompt
-            })
+                    launchIfDue dailyDue DailyRewrite "Daily wiki rewrite" "daily" "for" buildDailyPrompt
+                    launchIfDue (Option.toList weeklyDue) WeeklyRewrite "Weekly wiki snapshot rewrite" "weekly" "through" buildWeeklyPrompt
+                })
 
     member this.Submit(sessionID: string, directory: string, drafts: WikiDraft list, ?config: obj) : JS.Promise<string> =
-        promise {
-            match config with
-            | Some cfg -> latestConfig <- Some cfg
-            | None -> ()
+        if not (wikiDirExists directory) then Promise.lift "Wiki directory not found."
+        else
+            promise {
+                match config with
+                | Some cfg -> latestConfig <- Some cfg
+                | None -> ()
 
-            let! reconstructed = this.TryResolveJobContext(sessionID)
-            let jobCtxOpt =
-                reconstructed |> Option.orElseWith (fun () ->
-                    match registeredJobs.TryGetValue sessionID with
-                    | true, ctx -> Some ctx
-                    | false, _ -> None)
+                let! reconstructed = this.TryResolveJobContext(sessionID)
+                let jobCtxOpt =
+                    reconstructed |> Option.orElseWith (fun () ->
+                        match registeredJobs.TryGetValue sessionID with
+                        | true, ctx -> Some ctx
+                        | false, _ -> None)
 
-            match jobCtxOpt with
-            | None -> return "No active wiki job for this session."
-            | Some ctx ->
-                let root = ctx.workspaceRoot
-                let todayStr = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
-                return! writeQueue.Enqueue(fun () ->
-                    promise {
-                        let! entries = buildEntries root drafts
-                        let kind = ctx.kind
-                        let! result =
-                            withWikiPortLock 30000L 1000 root (fun () ->
-                                match kind with
-                                | AppendAfterWork ->
-                                    promise {
-                                        do! appendEntries root todayStr entries
-                                        registeredJobs.Remove(sessionID) |> ignore
-                                        return $"Appended {entries.Length} wiki entries."
-                                    }
-                                | DailyRewrite date ->
-                                    promise {
-                                        do! rewriteDay root date entries
-                                        registeredJobs.Remove(sessionID) |> ignore
-                                        return $"Rewrote wiki day {date}."
-                                    }
-                                | WeeklyRewrite throughDate ->
-                                    promise {
-                                        do! rewriteSnapshot root throughDate entries
-                                        do! deleteDayFilesThrough root throughDate
-                                        registeredJobs.Remove(sessionID) |> ignore
-                                        return $"Rewrote wiki snapshot through {throughDate}."
-                                    })
-                        let isAppend = match kind with AppendAfterWork -> true | _ -> false
-                        if isAppend then
-                            do! this.StartMaintenanceIfDue(root)
-                        return result
-                    })
-        }
+                match jobCtxOpt with
+                | None -> return "No active wiki job for this session."
+                | Some ctx ->
+                    let root = ctx.workspaceRoot
+                    let todayStr = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
+                    return! writeQueue.Enqueue(fun () ->
+                        promise {
+                            let! entries = buildEntries root drafts
+                            let kind = ctx.kind
+                            let! result =
+                                withWikiPortLock 30000L 1000 root (fun () ->
+                                    match kind with
+                                    | AppendAfterWork ->
+                                        promise {
+                                            do! appendEntries root todayStr entries
+                                            registeredJobs.Remove(sessionID) |> ignore
+                                            return $"Appended {entries.Length} wiki entries."
+                                        }
+                                    | DailyRewrite date ->
+                                        promise {
+                                            do! rewriteDay root date entries
+                                            registeredJobs.Remove(sessionID) |> ignore
+                                            return $"Rewrote wiki day {date}."
+                                        }
+                                    | WeeklyRewrite throughDate ->
+                                        promise {
+                                            do! rewriteSnapshot root throughDate entries
+                                            do! deleteDayFilesThrough root throughDate
+                                            registeredJobs.Remove(sessionID) |> ignore
+                                            return $"Rewrote wiki snapshot through {throughDate}."
+                                        })
+                            let isAppend = match kind with AppendAfterWork -> true | _ -> false
+                            if isAppend then
+                                do! this.StartMaintenanceIfDue(root)
+                            return result
+                        })
+            }
 
     member this.StartBookkeeperAppend(prompt: string, result: string, title: string, ?config: obj) : unit =
-        state <- reducer state (RecordLaunchCmd { agent = "bookkeeper"; title = title; prompt = prompt; result = result })
-        match config with
-        | Some cfg when not (Dyn.isNullish cfg) -> latestConfig <- Some cfg
-        | _ -> ()
         let root =
             match config with
             | Some cfg when not (Dyn.isNullish cfg) ->
                 let dir = Dyn.str cfg "directory"
                 if dir <> "" then dir else defaultArg (strField cfg "cwd") ""
             | _ -> ""
-        if root <> "" && not (Dyn.isNullish deps) then
-            match latestConfig with
-            | Some cfg when not (Dyn.isNullish cfg) ->
-                launchQueue.Enqueue(fun () ->
-                    promise {
-                        try
-                            let! projection = readProjection root
-                            let promptText = buildAppendPrompt title prompt result projection
-                            let options = Some (box {| aiSettingsAgentId = "bookkeeper" |})
-                            let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
-                            recordBackgroundResult title "success"
-                        with ex ->
-                            recordBackgroundResult title (string ex)
-                    }) |> Promise.start
+        if root = "" || not (wikiDirExists root) then ()
+        else
+            state <- reducer state (RecordLaunchCmd { agent = "bookkeeper"; title = title; prompt = prompt; result = result })
+            match config with
+            | Some cfg when not (Dyn.isNullish cfg) -> latestConfig <- Some cfg
             | _ -> ()
+            if not (Dyn.isNullish deps) then
+                match latestConfig with
+                | Some cfg when not (Dyn.isNullish cfg) ->
+                    launchQueue.Enqueue(fun () ->
+                        promise {
+                            try
+                                let! projection = readProjection root
+                                let promptText = buildAppendPrompt title prompt result projection
+                                let options = Some (box {| aiSettingsAgentId = "bookkeeper" |})
+                                let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
+                                recordBackgroundResult title "success"
+                            with ex ->
+                                recordBackgroundResult title (string ex)
+                        }) |> Promise.start
+                | _ -> ()
 
     member _.TakeBookkeeperLaunchesForTesting() : obj array =
         let launches, nextState = drainLaunches state

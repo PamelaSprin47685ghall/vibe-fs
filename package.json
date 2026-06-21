@@ -4,14 +4,14 @@
   "private": true,
   "type": "module",
   "description": "vibe-me reimagined in F# compiled to JavaScript via Fable",
-  "main": "build/index.js",
+  "main": "build/src/Mux/Plugin.js",
   "types": "index.d.ts",
   "exports": {
     ".": {
       "types": "./index.d.ts",
-      "import": "./build/index.js",
-      "require": "./build/index.js",
-      "default": "./build/index.js"
+      "import": "./build/src/Mux/Plugin.js",
+      "require": "./build/src/Mux/Plugin.js",
+      "default": "./build/src/Mux/Plugin.js"
     }
   },
   "files": [
@@ -20,7 +20,7 @@
   ],
   "scripts": {
     "clean": "rm -rf build",
-    "build": "dotnet fable vibe-fs.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && cp build/src/Mux/Plugin.js build/index.js",
+    "build": "dotnet fable vibe-fs.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json",
     "watch": "dotnet fable watch vibe-fs.fsproj --outDir build",
     "test": "node tests/runner.js"
   },

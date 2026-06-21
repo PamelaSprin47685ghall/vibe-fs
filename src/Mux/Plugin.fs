@@ -16,6 +16,7 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.MessageDedup
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.WorkspaceFiles
+open VibeFs.Shell.WikiFiles
 open VibeFs.Mux.MessageTransform
 
 let muxToolNames =
@@ -117,24 +118,24 @@ let createToolCatalog
     (hostReadExec: HostReadExec)
     (finderCache: FinderCache)
     (wikiRuntime: MuxWikiRuntime)
+    (wikiEnabled: bool)
     : ToolDefinition array =
-    let tools =
-        [| coderTool deps toolNames
-           investigatorTool deps toolNames
-           meditatorTool deps toolNames
-           browserTool deps toolNames
-           executorTool deps (box wikiRuntime)
-           submitReviewTool deps toolNames callStore reviewStore
-           returnReviewerTool deps callStore reviewStore
-           websearchTool deps
-           webfetchTool
-           fuzzyGrepTool finderCache
-           fuzzyFindTool finderCache
-           writeTool deps
-           readTool deps hostReadExec
+    [| coderTool deps toolNames
+       investigatorTool deps toolNames
+       meditatorTool deps toolNames
+       browserTool deps toolNames
+       executorTool deps (if wikiEnabled then box wikiRuntime else null)
+       submitReviewTool deps toolNames callStore reviewStore
+       returnReviewerTool deps callStore reviewStore
+       websearchTool deps
+       webfetchTool
+       fuzzyGrepTool finderCache
+       fuzzyFindTool finderCache
+       writeTool deps
+       readTool deps hostReadExec
+       if wikiEnabled then
            fetchWikiTool wikiRuntime
            returnBookkeeperTool wikiRuntime |]
-    tools
 
 let createRegistration (deps: obj) : obj =
     let callStore = createCallStore ()
@@ -143,7 +144,11 @@ let createRegistration (deps: obj) : obj =
     let finderCache = FinderCache()
     let wikiRuntime = MuxWikiRuntime(deps)
     let toolNames = muxToolNames
-    let tools = createToolCatalog deps toolNames callStore reviewStore hostReadExec finderCache wikiRuntime
+    let directory =
+        let dir = Dyn.str deps "directory"
+        if dir <> "" then dir else Dyn.str deps "cwd"
+    let wikiEnabled = wikiDirExists directory
+    let tools = createToolCatalog deps toolNames callStore reviewStore hostReadExec finderCache wikiRuntime wikiEnabled
     let toolsObj = toolsToObject tools
     let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.Config.getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
     let wrappers = createAllWrappers toolsObj hostReadExec callStore

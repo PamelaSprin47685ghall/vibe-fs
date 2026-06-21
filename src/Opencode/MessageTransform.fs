@@ -33,18 +33,25 @@ let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
         for item in source do
             targetObj?push(item) |> ignore
 
-let private resolveAgent (registry: ChildAgentRegistry) (input: obj) : string =
+let private extractSessionID (messages: Message list) : string =
+    messages
+    |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
+    |> Option.defaultValue ""
+
+let private resolveAgentFromMessages (registry: ChildAgentRegistry) (messages: Message list) : string option =
+    messages
+    |> List.tryPick (fun message ->
+        if message.info.agent <> "" then Some message.info.agent
+        elif message.info.sessionID <> "" then registry.LookupChildAgent(message.info.sessionID)
+        else None)
+
+let private resolveAgent (registry: ChildAgentRegistry) (input: obj) (messages: Message list) : string =
     let explicit = Dyn.str input "agent"
     if explicit <> "" then explicit
     else
         match registry.LookupChildAgent(Dyn.str input "sessionID") with
         | Some a -> a
-        | None -> "manager"
-
-let private extractSessionID (messages: Message list) : string =
-    messages
-    |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
-    |> Option.defaultValue ""
+        | None -> resolveAgentFromMessages registry messages |> Option.defaultValue "manager"
 
 let private applyReadDedup (messages: obj array) : unit =
     if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
@@ -128,8 +135,8 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
             let messagesArr = messages :?> obj array
             if messagesArr.Length = 0 then ()
             else
-                let agent = resolveAgent registry input
                 let messagesList = MessagingCodec.decodeMessages messagesArr
+                let agent = resolveAgent registry input messagesList
                 let sessionID = extractSessionID messagesList
                 reconstructReviewState reviewStore sessionID messagesList
                 let cleaned = Messaging.stripSyntheticBySource messagesList

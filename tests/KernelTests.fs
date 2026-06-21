@@ -248,9 +248,15 @@ let subagentDispatch () =
     check "browser prompt embeds intent" ((browserPrompts |> List.head).Contains "open google.com")
 
     let execPrompts =
-        VibeFs.Kernel.Subagent.formatPrompt host (VibeFs.Kernel.Subagent.ExecutorSummary "raw shell output")
+        VibeFs.Kernel.Subagent.formatPrompt host (VibeFs.Kernel.Subagent.ExecutorSummary("raw shell output", "shell", "echo 1", [ "dep1" ], "short", "ro"))
     check "executor summary prompt count is one" (execPrompts |> List.length = 1)
-    check "executor summary embeds raw output" ((execPrompts |> List.head).Contains "raw shell output")
+    let execPrompt = execPrompts |> List.head
+    check "executor summary embeds language" (execPrompt.Contains "language: \"shell\"")
+    check "executor summary embeds program" (execPrompt.Contains "program: |\n  echo 1")
+    check "executor summary embeds dependencies" (execPrompt.Contains "dependencies:\n  - \"dep1\"")
+    check "executor summary embeds timeout_type" (execPrompt.Contains "timeout_type: \"short\"")
+    check "executor summary embeds mode" (execPrompt.Contains "mode: \"ro\"")
+    check "executor summary embeds raw output" (execPrompt.Contains "raw_output: |\n  raw shell output")
 
     let webPrompts =
         VibeFs.Kernel.Subagent.formatPrompt host (VibeFs.Kernel.Subagent.WebsearchSummary("ts compiler", "raw search results blob"))

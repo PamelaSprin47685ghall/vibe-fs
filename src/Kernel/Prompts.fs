@@ -215,8 +215,13 @@ let browserPrompt (intent: string) : string =
         "Return a clear summary of what you found or did."
     ]
 
-let executorSummarizerPrompt (output: string) : string =
+let executorSummarizerPrompt (output: string) (language: string) (program: string) (dependencies: string list) (timeoutType: string) (mode: string) : string =
     agentPrompt [
+        yamlScalarField "language" language
+        yamlBlockField "program" program
+        yamlStringSeqField "dependencies" dependencies
+        yamlScalarField "timeout_type" timeoutType
+        yamlScalarField "mode" mode
         yamlBlockField "raw_output" output
     ] [
         "You are a summarizer for executor (shell) output. Preserve errors, non-zero exit status, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output."

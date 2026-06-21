@@ -42,7 +42,9 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                     if not (shouldSummarize byteLength output) then
                         return prependSafetyWarningForExecution output options
                     else
-                        let prompt = formatPrompt opencode (ExecutorSummary output) |> List.head
+                        let langStr = languageToString options.language
+                        let timeoutStr = timeoutToString options.timeoutType
+                        let prompt = formatPrompt opencode (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
                         let! summary =
                             runSubagentWithCleanup registry (client ()) "executor" "Executor summary" prompt
                                 (Dyn.str tc "directory") sessionID context

@@ -111,36 +111,42 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         this.SubmitFromHistory(sessionID, "", drafts)
 
     member this.SubmitFromHistory(sessionID: string, directory: string, drafts: WikiDraft list) : JS.Promise<string> =
-        commandQueue.Enqueue(fun () ->
-            promise {
-                let root = effectiveWorkspaceRoot directory
-                let! reconstructed = tryResolveJobContext client root sessionID
-                match reconstructed |> Option.orElseWith (fun () ->
-                    match registeredJobs.TryGetValue sessionID with
-                    | true, ctx -> Some ctx
-                    | false, _ -> None) with
-                | None -> return "No active wiki job for this session."
-                | Some ctx ->
-                    try
-                        let isAppend = match ctx.kind with AppendAfterWork -> true | _ -> false
-                        let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind portLockTimeoutMs portLockRetryDelayMs (today ()) ctx.workspaceRoot ctx.kind drafts)
-                        if isAppend then
-                            this.StartMaintenanceIfDue(root) |> ignore
-                        return result
-                    finally
-                        registry.UnregisterChildAgent(sessionID)
-                        registeredJobs.Remove(sessionID) |> ignore
-            })
+        let root = effectiveWorkspaceRoot directory
+        if not (wikiDirExists root) then Promise.lift "Wiki directory not found."
+        else
+            commandQueue.Enqueue(fun () ->
+                promise {
+                    let! reconstructed = tryResolveJobContext client root sessionID
+                    match reconstructed |> Option.orElseWith (fun () ->
+                        match registeredJobs.TryGetValue sessionID with
+                        | true, ctx -> Some ctx
+                        | false, _ -> None) with
+                    | None -> return "No active wiki job for this session."
+                    | Some ctx ->
+                        try
+                            let isAppend = match ctx.kind with AppendAfterWork -> true | _ -> false
+                            let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind portLockTimeoutMs portLockRetryDelayMs (today ()) ctx.workspaceRoot ctx.kind drafts)
+                            if isAppend then
+                                this.StartMaintenanceIfDue(root) |> ignore
+                            return result
+                        finally
+                            registry.UnregisterChildAgent(sessionID)
+                            registeredJobs.Remove(sessionID) |> ignore
+                })
 
     member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
         promise {
-            let! projection = this.EnsureSessionSnapshot(sessionID, directory)
-            return buildPreludeSection projection
+            if not (wikiDirExists (effectiveWorkspaceRoot directory)) then return None
+            else
+                let! projection = this.EnsureSessionSnapshot(sessionID, directory)
+                return buildPreludeSection projection
         }
 
     member this.FetchFromSessionSnapshot(sessionID: string, directory: string, id: string) : JS.Promise<string> =
         promise {
-            if sessionID = "" then
+            if not (wikiDirExists (effectiveWorkspaceRoot directory)) then
+                return "Wiki directory not found."
+            elif sessionID = "" then
                 return "Wiki snapshot unavailable for this session."
             else
                 let! projection = this.EnsureSessionSnapshot(sessionID, directory)
@@ -149,39 +155,43 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 | Error message -> return message
         }
     member _.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
-        commandQueue.Enqueue(fun () ->
-            promise {
-                let root = effectiveWorkspaceRoot workspaceRoot
-                let! files = readWikiFiles root
-                let projection = projectLatestWins files
-                let dailyDue, weeklyDue = dueMaintenance files (nowUtc ())
+        let root = effectiveWorkspaceRoot workspaceRoot
+        if not (wikiDirExists root) then Promise.lift ()
+        else
+            commandQueue.Enqueue(fun () ->
+                promise {
+                    let! files = readWikiFiles root
+                    let projection = projectLatestWins files
+                    let dailyDue, weeklyDue = dueMaintenance files (nowUtc ())
 
-                let launchIfDue (due: string list) kind title resultPrefix promptInfix buildPrompt =
-                    due
-                    |> List.iter (fun value ->
-                        let key = root + "|" + resultPrefix + "|" + value
-                        let launch = { agent = "bookkeeper"; title = title; prompt = $"{resultPrefix} maintenance due {promptInfix} {value}"; result = $"{resultPrefix}:{value}" }
-                        let first, nextState = recordLaunchOnce state key launch
-                        state <- nextState
-                        if first then
-                            launchBg root None (kind value) title (fun () -> Promise.lift (buildPrompt value files projection)) emptySettings)
+                    let launchIfDue (due: string list) kind title resultPrefix promptInfix buildPrompt =
+                        due
+                        |> List.iter (fun value ->
+                            let key = root + "|" + resultPrefix + "|" + value
+                            let launch = { agent = "bookkeeper"; title = title; prompt = $"{resultPrefix} maintenance due {promptInfix} {value}"; result = $"{resultPrefix}:{value}" }
+                            let first, nextState = recordLaunchOnce state key launch
+                            state <- nextState
+                            if first then
+                                launchBg root None (kind value) title (fun () -> Promise.lift (buildPrompt value files projection)) emptySettings)
 
-                launchIfDue dailyDue DailyRewrite "Daily wiki rewrite" "daily" "for" buildDailyPrompt
-                launchIfDue (Option.toList weeklyDue) WeeklyRewrite "Weekly wiki snapshot rewrite" "weekly" "through" buildWeeklyPrompt
-            })
+                    launchIfDue dailyDue DailyRewrite "Daily wiki rewrite" "daily" "for" buildDailyPrompt
+                    launchIfDue (Option.toList weeklyDue) WeeklyRewrite "Weekly wiki snapshot rewrite" "weekly" "through" buildWeeklyPrompt
+                })
 
     member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string) : unit =
         applyCmd (RecordLaunchCmd { agent = agent; title = title; prompt = prompt; result = result })
 
     member this.StartBookkeeperAppend(prompt: string, result: string, title: string, ?parentSessionID: string, ?aiSettings: DelegatedAiSettings) : unit =
-        this.RecordBookkeeperLaunch("bookkeeper", title, prompt, result)
         let root = effectiveWorkspaceRoot workspaceRoot
-        let settings = defaultArg aiSettings emptySettings
-        launchBg root parentSessionID AppendAfterWork title (fun () ->
-            promise {
-                let! projection = readProjection root
-                return buildAppendPrompt title prompt result projection
-            }) settings
+        if not (wikiDirExists root) then ()
+        else
+            this.RecordBookkeeperLaunch("bookkeeper", title, prompt, result)
+            let settings = defaultArg aiSettings emptySettings
+            launchBg root parentSessionID AppendAfterWork title (fun () ->
+                promise {
+                    let! projection = readProjection root
+                    return buildAppendPrompt title prompt result projection
+                }) settings
 
     /// Test-only projection: drains recorded bookkeeper launches so integration
     /// tests can assert what the runtime would have fired. Kept on the production

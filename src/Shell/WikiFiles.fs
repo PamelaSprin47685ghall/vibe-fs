@@ -21,6 +21,8 @@ let private readdirSync (p: string) : obj array = jsNative
 
 let wikiDir (workspaceRoot: string) : string = join workspaceRoot "wiki"
 
+let wikiDirExists (workspaceRoot: string) : bool = existsSync (wikiDir workspaceRoot)
+
 let snapshotPath (workspaceRoot: string) : string = join (wikiDir workspaceRoot) "snapshot.ndjson"
 
 let dayPath (workspaceRoot: string) (date: string) : string = join (wikiDir workspaceRoot) (date + ".ndjson")

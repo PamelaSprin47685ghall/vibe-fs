@@ -324,6 +324,7 @@ let run () : JS.Promise<unit> =
             "wikiPreludeWithoutCaps", wikiPreludeWithoutCapsSpec
             "coderReceivesWikiPrelude", coderReceivesWikiPreludeSpec
             "browserDoesNotReceiveWikiPrelude", browserDoesNotReceiveWikiPreludeSpec
+            "executorChildSessionWithoutInputAgentDoesNotReceiveWikiPrelude", executorChildSessionWithoutInputAgentDoesNotReceiveWikiPreludeSpec
             "fetchWikiSnapshot", fetchWikiSnapshotSpec
             "afterHookRecordsDirectWrite", afterHookRecordsDirectWriteSpec
             "afterHookSkipsChildSession", afterHookSkipsChildSessionSpec

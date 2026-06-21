@@ -206,8 +206,20 @@ let parseLanguage (value: string) : ExecutorLanguage =
     | "javascript" -> Javascript
     | _ -> Shell
 
+let languageToString (value: ExecutorLanguage) : string =
+    match value with
+    | Python -> "python"
+    | Javascript -> "javascript"
+    | Shell -> "shell"
+
 let parseTimeout (value: string) : ExecutorTimeoutType =
     match value.Replace("-", "").ToLowerInvariant() with
     | "long" -> Long
     | "lastresort" -> LastResort
     | _ -> Short
+
+let timeoutToString (value: ExecutorTimeoutType) : string =
+    match value with
+    | Short -> "short"
+    | Long -> "long"
+    | LastResort -> "last-resort"

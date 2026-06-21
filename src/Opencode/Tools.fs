@@ -13,19 +13,20 @@ open VibeFs.Opencode.ReviewTools
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.FuzzyFinderShell
 
-let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (wikiEnabled: bool) : obj =
     createObj [
-        "coder", box (coderTool registry ctx)
-        "investigator", box (investigatorTool registry ctx)
-        "meditator", box (meditatorTool registry ctx)
-        "browser", box (browserTool registry ctx)
-        "executor", box (executorTool registry ctx)
-        "fuzzy_find", box (fuzzyFindTool finderCache)
-        "fuzzy_grep", box (fuzzyGrepTool finderCache)
-        "websearch", box (websearchTool registry ctx)
-        "webfetch", box (webfetchTool ())
-        "fetch_wiki", box (fetchWikiTool wikiRuntime ctx)
-        "return_bookkeeper", box (submitWikiTool wikiRuntime)
-        "submit_review", box (submitReviewTool registry ctx reviewStore)
-        "return_reviewer", box (submitReviewResultTool ctx reviewStore)
+        yield "coder", box (coderTool registry ctx)
+        yield "investigator", box (investigatorTool registry ctx)
+        yield "meditator", box (meditatorTool registry ctx)
+        yield "browser", box (browserTool registry ctx)
+        yield "executor", box (executorTool registry ctx)
+        yield "fuzzy_find", box (fuzzyFindTool finderCache)
+        yield "fuzzy_grep", box (fuzzyGrepTool finderCache)
+        yield "websearch", box (websearchTool registry ctx)
+        yield "webfetch", box (webfetchTool ())
+        if wikiEnabled then
+            yield "fetch_wiki", box (fetchWikiTool wikiRuntime ctx)
+            yield "return_bookkeeper", box (submitWikiTool wikiRuntime)
+        yield "submit_review", box (submitReviewTool registry ctx reviewStore)
+        yield "return_reviewer", box (submitReviewResultTool ctx reviewStore)
     ]

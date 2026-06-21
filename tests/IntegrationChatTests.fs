@@ -78,6 +78,24 @@ let childAgentChatSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let childExecutorChatWithoutInputAgentSpec () = promise {
+    let! workspaceDir = mkdtempAsync "child-executor-chat-"
+    let! p = plugin (box {| directory = workspaceDir |})
+    let chatMsg = get p "chat.message"
+    let chat = createObj [ "message", box (createObj [
+        "info", box (createObj [ "agent", box "executor"; "sessionID", box "child-executor-session" ])
+        "tools", box (createObj [
+            "fetch_wiki", box true
+            "read", box true
+        ])
+    ]) ]
+    do! chatMsg $ (createObj [], chat) |> unbox<JS.Promise<unit>>
+    let tools = get (get chat "message") "tools"
+    check "executor child chat hides fetch_wiki without input agent" (not (unbox<bool> (get tools "fetch_wiki")))
+    check "executor child chat also hides read" (not (unbox<bool> (get tools "read")))
+    do! rmAsync workspaceDir
+}
+
 let websearchBoundariesSpec () = promise {
     let! workspaceDir = mkdtempAsync "websearch-boundaries-"
     let! p = plugin (box {| directory = workspaceDir |})
@@ -145,6 +163,7 @@ let run () : JS.Promise<unit> =
     promise {
         do! chatMessageSpec ()
         do! childAgentChatSpec ()
+        do! childExecutorChatWithoutInputAgentSpec ()
         do! websearchBoundariesSpec ()
         do! subagentParentSpec ()
         do! nestedSubagentSpec ()

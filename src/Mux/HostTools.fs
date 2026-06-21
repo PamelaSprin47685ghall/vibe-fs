@@ -43,7 +43,9 @@ let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptio
         if not (shouldSummarize byteLength output) then
             return prependSafetyWarningForExecution output options
         else
-            let prompt = formatPrompt mimocode (ExecutorSummary output) |> List.head
+            let langStr = languageToString options.language
+            let timeoutStr = timeoutToString options.timeoutType
+            let prompt = formatPrompt mimocode (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
             let! report = runMuxSubagent deps config "executor" prompt "Executor summary" None
             return prependSafetyWarningForExecution report options
     }

@@ -19,6 +19,7 @@ open VibeFs.Opencode.NudgeHook
 open VibeFs.Opencode.WikiRuntime
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Shell.FuzzyFinderShell
+open VibeFs.Shell.WikiFiles
 open VibeFs.Shell.ChildAgentRegistry
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<obj, obj, JS.Promise<unit>>(f))
@@ -44,9 +45,10 @@ let private createCoreServices (host: Host) (ctx: obj) =
         let nowMs = Dyn.get ctx "nowMs"
         if Dyn.isNullish nowMs then System.DateTime.UtcNow
         else System.DateTimeOffset.FromUnixTimeMilliseconds(int64 (unbox<float> nowMs)).UtcDateTime
+    let wikiEnabled = wikiDirExists directory
     let wikiRuntime = WikiRuntime(Dyn.get ctx "client", directory, nowUtc, childAgentRegistry, 30000L, 1000)
     let magicSession = MagicSession host
-    let tools = createTools childAgentRegistry finderCache ctx wikiRuntime reviewStore
+    let tools = createTools childAgentRegistry finderCache ctx wikiRuntime reviewStore wikiEnabled
     let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
     let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
     {
