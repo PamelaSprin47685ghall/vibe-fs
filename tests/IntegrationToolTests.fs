@@ -96,6 +96,56 @@ let muxReturnBookkeeperAppendSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let muxReturnBookkeeperNoActiveJobSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-wiki-nojob-"
+    do! ensureWikiDir workspaceDir
+    let reg = createRegistration (createObj [])
+    let submitTool = muxToolByName reg "return_bookkeeper"
+    if isNullish submitTool then
+        check "mux registration exposes return_bookkeeper tool" false
+    else
+        let entries = [| wikiDraftEntry None "问题？" "答案。" |]
+        let submitArgs = createObj [ "entries", box entries ]
+        let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-wiki-nojob-session" ]
+        let! result = ((get submitTool "execute") $ (submitCtx, submitArgs)) |> unbox<JS.Promise<string>>
+        check "mux return_bookkeeper rejects unregistered job even with directory" (result = "No active wiki job for this session.")
+        let! files = readAllWikiFiles workspaceDir
+        check "mux return_bookkeeper does not create files for unregistered job" (List.isEmpty files)
+    do! rmAsync workspaceDir
+}
+
+let muxTopLevelPolicySpec () =
+    promise {
+        let managerPolicy = getPluginToolPolicy "x" (box "manager")
+        let managerRemoves = unbox<string[]> (get managerPolicy "remove")
+        check "mux top-level policy manager removes write" (managerRemoves |> Array.contains "write")
+        check "mux top-level policy manager keeps submit_review" (not (managerRemoves |> Array.contains "submit_review"))
+        check "mux top-level policy manager removes fuzzy_grep" (managerRemoves |> Array.contains "fuzzy_grep")
+        let coderPolicy = getPluginToolPolicy "x" (box "coder")
+        let coderRemoves = unbox<string[]> (get coderPolicy "remove")
+        check "mux top-level policy coder keeps write" (not (coderRemoves |> Array.contains "write"))
+        check "mux top-level policy coder removes submit_review" (coderRemoves |> Array.contains "submit_review")
+        let defaultPolicy = getPluginToolPolicy "x" null
+        let defaultRemoves = unbox<string[]> (get defaultPolicy "remove")
+        check "mux top-level policy defaults to manager" (defaultRemoves |> Array.contains "write")
+    }
+
+let muxTopLevelDedupSpec () =
+    promise {
+        let mutable callIdCounter = 0
+        let readMsg (content: string) : obj =
+            callIdCounter <- callIdCounter + 1
+            box {| parts = [| box {| ``type`` = "dynamic-tool"; toolName = "file_read"; state = "output-available"; output = box {| content = content |}; toolCallId = string callIdCounter |} |] |}
+        let history = [| readMsg "seen" |]
+        let window = [| readMsg "seen" |]
+        let seen = collectReadOutputs history
+        check "mux top-level collectReadOutputs returns content" (seen.Length = 1 && seen.[0] = "seen")
+        let result = deduplicateReadOutputsWithSeen seen window
+        check "mux top-level dedup returns array" (result.Length = 1)
+        let output = get (unbox<obj[]> (get result.[0] "parts")).[0] "output"
+        check "mux top-level dedup replaces repeat content" (str output "content" = "[No Change Since Previous Read/Write]")
+    }
+
 let muxExecutorModeSchemaSpec () = promise {
     let reg = createRegistration (createObj [])
     let modeSchema = muxExecutorModeSchema reg
@@ -161,7 +211,10 @@ let run () : JS.Promise<unit> =
             "wikiPortLockTimeout", wikiPortLockTimeoutSpec
             "muxFetchWikiSnapshot", muxFetchWikiSnapshotSpec
             "muxReturnBookkeeperAppend", muxReturnBookkeeperAppendSpec
+            "muxReturnBookkeeperNoActiveJob", muxReturnBookkeeperNoActiveJobSpec
             "muxExecutorModeSchema", muxExecutorModeSchemaSpec
+            "muxTopLevelPolicy", muxTopLevelPolicySpec
+            "muxTopLevelDedup", muxTopLevelDedupSpec
             "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
             "muxSubmitReviewPromptSuppliesCallId", muxSubmitReviewPromptSuppliesCallIdSpec
         ]

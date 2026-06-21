@@ -196,6 +196,11 @@ let mimoConfigSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let topLevelExportsSpec () =
+    check "top-level getPluginToolPolicy is function" (typeIs getPluginToolPolicy "function")
+    check "top-level collectReadOutputs is function" (typeIs collectReadOutputs "function")
+    check "top-level deduplicateReadOutputsWithSeen is function" (typeIs deduplicateReadOutputsWithSeen "function")
+
 let run () : JS.Promise<unit> =
     promise {
         let! workspaceDir = mkdtempAsync "plugin-run-"
@@ -203,6 +208,7 @@ let run () : JS.Promise<unit> =
         pluginShape p
         let reg = createRegistration (createObj [])
         registrationShape reg
+        topLevelExportsSpec ()
         do! syntaxSpec ()
         webfetchSchemaSpec reg
         slashCommandsSpec reg

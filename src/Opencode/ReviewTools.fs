@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.LoopMessages
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ReviewerLoop
@@ -46,17 +47,33 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Sh
                         store.unlockReview sessionID
                 })
 
-let submitReviewResultTool (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let submitReviewResultTool (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+    let client () = Dyn.get ctx "client"
+    let pluginDirectory = Dyn.str ctx "directory"
     define "Submit your review verdict."
         (box {| feedback = strOpt "null to accept, or specific rejection feedback" |})
         (fun args context ->
             let sessionID =
                 let id = Dyn.str context "sessionID"
                 if id = "" then "loop" else id
+            let directory =
+                let d = Dyn.str context "directory"
+                if d <> "" then d else pluginDirectory
             let result =
                 match optStr args "feedback" with
                 | None -> Accepted
                 | Some f ->
                     let trimmed = f.Trim()
                     if trimmed = "" then Accepted else Rejected trimmed
-            promise { return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve." })
+            promise {
+                match result with
+                | Accepted ->
+                    let! texts = VibeFs.Opencode.SessionIo.readSessionTexts (client ()) sessionID directory
+                    if hasDoubleCheckAnchor texts then
+                        return if store.resolvePendingReview (sessionID, Accepted) then "Verdict submitted." else "No active review to resolve."
+                    else
+                        let task = defaultArg (inferReviewTaskFromTexts texts) ""
+                        return doubleCheckPrompt task
+                | Rejected _ | Terminated ->
+                    return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve."
+            })

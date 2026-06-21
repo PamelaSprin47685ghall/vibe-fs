@@ -27,5 +27,5 @@ let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: 
         "fetch_wiki", box (fetchWikiTool wikiRuntime ctx)
         "return_bookkeeper", box (submitWikiTool wikiRuntime)
         "submit_review", box (submitReviewTool registry ctx reviewStore)
-        "return_reviewer", box (submitReviewResultTool reviewStore)
+        "return_reviewer", box (submitReviewResultTool ctx reviewStore)
     ]

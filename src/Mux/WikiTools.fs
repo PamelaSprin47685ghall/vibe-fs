@@ -15,12 +15,9 @@ open VibeFs.Shell.PromiseQueue
 
 let private allocateRandomHexId (knownIds: Set<string>) : string =
     let random = Random()
-    let rec loop attempts =
-        if attempts > 65536 then failwith "wiki id space exhausted"
-        else
-            let candidate = sprintf "%04x" (random.Next(0, 65536))
-            if Set.contains candidate knownIds then loop (attempts + 1) else candidate
-    loop 0
+    match Wiki.allocateRandomHexId (fun () -> random.Next(0, 65536)) knownIds with
+    | Ok id -> id
+    | Error message -> failwith message
 
 let private buildEntries (root: string) (drafts: WikiDraft list) : JS.Promise<WikiEntry list> =
     promise {
@@ -83,23 +80,17 @@ type MuxWikiRuntime() =
     member _.DeleteJob(sessionID: string) : unit =
         registeredJobs.Remove(sessionID) |> ignore
 
-    member _.Submit(sessionID: string, directory: string, drafts: WikiDraft list) : JS.Promise<string> =
+    member _.Submit(sessionID: string, _directory: string, drafts: WikiDraft list) : JS.Promise<string> =
         promise {
-            let root =
-                match registeredJobs.TryGetValue sessionID with
-                | true, ctx -> ctx.workspaceRoot
-                | false, _ ->
-                    if System.String.IsNullOrWhiteSpace directory then "" else directory
-            if root = "" then return "No active wiki job for this session."
-            else
+            match registeredJobs.TryGetValue sessionID with
+            | false, _ -> return "No active wiki job for this session."
+            | true, ctx ->
+                let root = ctx.workspaceRoot
                 let todayStr = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
                 return! writeQueue.Enqueue(fun () ->
                     promise {
                         let! entries = buildEntries root drafts
-                        let kind =
-                            match registeredJobs.TryGetValue sessionID with
-                            | true, ctx -> ctx.kind
-                            | false, _ -> AppendAfterWork
+                        let kind = ctx.kind
                         return!
                             withWikiPortLock 30000L 1000 root (fun () ->
                                 match kind with

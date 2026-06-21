@@ -111,6 +111,31 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) : J
         with _ -> return noOutputText
     }
 
+/// Read all text fragments from a session's message history.
+let readSessionTexts (client: obj) (sessionId: string) (directory: string) : JS.Promise<string list> =
+    promise {
+        try
+            let arg =
+                if directory = "" then
+                    box {| path = box {| id = sessionId |} |}
+                else
+                    box {| path = box {| id = sessionId |}; query = box {| directory = directory |} |}
+            let! result = invoke1 arg "messages" (Dyn.get client "session")
+            let data = Dyn.get result "data"
+            if Dyn.isNullish data then return []
+            else
+                let messagesList = MessagingCodec.decodeMessages (unbox<obj[]> data)
+                return
+                    messagesList
+                    |> Messaging.flatten
+                    |> List.map (fun fp ->
+                        match fp.part with
+                        | TextPart text -> text
+                        | ToolPart(_, _, Some state, _) -> state.output
+                        | _ -> "")
+        with _ -> return []
+    }
+
 /// Prompt a session and race it against an AbortSignal. The returned promise
 /// rejects with `AbortError` if the signal fires before the prompt resolves.
 let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =

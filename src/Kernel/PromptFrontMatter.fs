@@ -53,22 +53,23 @@ let parseFrontMatterScalars (text: string) : Map<string, string> =
         else
             let readBlock startIndex =
                 let rec gather j acc =
-                    if j < lines.Length && (lines.[j].StartsWith("  ") || lines.[j] = "") then
-                        let line =
-                            if lines.[j].StartsWith("  ") then
-                                lines.[j].Substring(2)
-                            else
-                                ""
-                        gather (j + 1) (line :: acc)
-                    else
+                    if j >= lines.Length then
                         String.concat "\n" (List.rev acc), j
+                    else
+                        let line = lines.[j]
+                        if line = "" then
+                            gather (j + 1) ("" :: acc)
+                        elif line.StartsWith("  ") then
+                            gather (j + 1) (line.Substring(2) :: acc)
+                        else
+                            String.concat "\n" (List.rev acc), j
                 gather startIndex []
 
-            let rec loop i acc =
+            let rec loop i acc : Map<string, string> option =
                 if i >= lines.Length then
-                    Map.empty
+                    None
                 elif lines.[i] = "---" then
-                    acc
+                    Some acc
                 else
                     let line = lines.[i]
                     if line.Length = 0 || line.[0] = ' ' || line.[0] = '\t' then
@@ -89,4 +90,4 @@ let parseFrontMatterScalars (text: string) : Map<string, string> =
                             | _ ->
                                 loop (i + 1) acc
 
-            loop 1 Map.empty
+            loop 1 Map.empty |> Option.defaultValue Map.empty

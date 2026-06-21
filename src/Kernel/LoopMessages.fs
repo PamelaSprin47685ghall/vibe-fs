@@ -64,3 +64,9 @@ let inferReviewTaskFromTexts (texts: string seq) : string option =
             match Map.tryFind verdictField fields with
             | Some verdict when isEndVerdict verdict -> None
             | _ -> current) None
+
+let doubleCheckField = "double-check"
+
+let hasDoubleCheckAnchor (texts: string seq) : bool =
+    texts
+    |> Seq.exists (fun text -> Map.containsKey doubleCheckField (parseFrontMatterScalars text))

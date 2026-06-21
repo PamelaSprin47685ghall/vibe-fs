@@ -13,8 +13,25 @@ open VibeFs.Mux.EventHook
 open VibeFs.Mux.SlashCommands
 open VibeFs.Mux.WikiTools
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.MessageDedup
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.WorkspaceFiles
+
+let muxToolNames =
+    [| "coder"; "investigator"; "meditator"; "browser"; "executor"
+       "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
+       "fetch_wiki"; "return_bookkeeper" |]
+
+let getPluginToolPolicy (agentId: string) (role: obj) : obj =
+    let agent = if Dyn.isNullish role then "manager" else string role
+    let remove = muxToolNames |> Array.filter (fun t -> not (canUse agent t))
+    box {| add = [||]; remove = remove |}
+
+let collectReadOutputs (messages: obj array) : string[] =
+    VibeFs.Kernel.MessageDedup.collectReadOutputs messages |> Array.ofList
+
+let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : obj[] =
+    VibeFs.Kernel.MessageDedup.deduplicateReadOutputsWithSeen (List.ofArray seenOutputs) messages |> snd
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -86,10 +103,7 @@ let createRegistration (deps: obj) : obj =
     let hostReadExec = HostReadExec()
     let finderCache = FinderCache()
     let wikiRuntime = MuxWikiRuntime()
-    let toolNames =
-        [| "coder"; "investigator"; "meditator"; "browser"; "executor"
-           "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
-           "fetch_wiki"; "return_bookkeeper" |]
+    let toolNames = muxToolNames
     let tools = createToolCatalog deps toolNames callStore reviewStore hostReadExec finderCache wikiRuntime
     let toolsObj = toolsToObject tools
     let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.Config.getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}

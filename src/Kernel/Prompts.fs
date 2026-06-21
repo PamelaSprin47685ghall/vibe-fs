@@ -71,11 +71,29 @@ let reviewCriteria =
 
 let readOnlyWorkspaceConstraint = readOnlyRules
 
-let reviewInstructions =
+let private reviewInstructionsProse =
     readOnlyWorkspaceConstraint + "\n\n"
     + "You are a code reviewer performing a rigorous review of submitted work.\n\n"
     + reviewCriteria
     + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\nreturn_reviewer({ \"feedback\": null })          // Accept — pass with no feedback\nreturn_reviewer({ \"feedback\": \"specific...\" }) // Reject — provide detailed, actionable feedback\n\nIMPORTANT: If you accept, feedback MUST be null. Do not write praise or any other text — it will be misinterpreted as rejection feedback.\n\nYou MUST call return_reviewer before finishing. Do not end the conversation without submitting your verdict."
+
+let reviewInstructions =
+    frontMatterPrompt [ yamlScalarField "role" "reviewer" ] reviewInstructionsProse
+
+let doubleCheckPrompt (task: string) : string =
+    let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
+    frontMatterPrompt
+        ([ yamlScalarField doubleCheckField "Does it fully satisfy the original task without cutting corners?" ]
+         @ taskLine)
+        "如果你确信，请你再次提交 PASS，否则请你提交 REJECT + 报告。"
+
+let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) : string =
+    let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
+    let filesLine = if affectedFiles.Length > 0 then [ yamlStringSeqField "affected_files" affectedFiles ] else []
+    let body =
+        if System.String.IsNullOrEmpty report then reviewInstructionsProse
+        else reviewInstructionsProse + "\n\n# Worker Report\n\n" + report
+    frontMatterPrompt (taskLine @ filesLine) body
 
 let withReviewCommandTemplate =
     frontMatterPrompt [
@@ -113,8 +131,7 @@ let withReviewPrecheckCommandTemplate =
     ])
 
 let reviewerNudgePrompt =
-    "You have not submitted your review verdict yet.\n\n"
-    + "You must call return_reviewer to submit your verdict:\n"
+    "Submit your review verdict now via return_reviewer:\n"
     + "  return_reviewer({ \"feedback\": null })          // Accept\n"
     + "  return_reviewer({ \"feedback\": \"details...\" })  // Reject\n\n"
     + "Do not explain what you plan to do — call the tool immediately."

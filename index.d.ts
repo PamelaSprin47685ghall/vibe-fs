@@ -249,3 +249,10 @@ export interface PluginRegistration {
 
 export function createRegistration(deps: unknown): PluginRegistration;
 export function buildCapsFileReadData(projectRoot: string): Promise<CapsFileReadEntry[]>;
+
+export function getPluginToolPolicy(agentId: string, role?: string | null): MuxToolPolicy;
+export function collectReadOutputs(messages: ReadonlyArray<unknown>): string[];
+export function deduplicateReadOutputsWithSeen(
+  seenOutputs: ReadonlyArray<string>,
+  messages: ReadonlyArray<unknown>,
+): unknown[];

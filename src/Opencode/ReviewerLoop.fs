@@ -88,7 +88,7 @@ let runReviewerSession (registry: ChildAgentRegistry) (client: obj) (reviewStore
         let! childID = createReviewerChild registry client reviewStore directory parentID sessionID "Pre-Reviewer"
         if childID = "" then return Terminated
         else
-            let parts = [ reviewInstructions; $"=== Task ===\n\n{task}" ]
+            let parts = [ reviewerPrompt task "" [] ]
             return! runReviewerLoop client reviewStore childID parts null
     }
 
@@ -105,11 +105,6 @@ let runSubmitReview (registry: ChildAgentRegistry) (client: obj) (reviewStore: V
         let! childID = createReviewerChild registry client reviewStore directory parentID sessionID "Reviewer"
         if childID = "" then return Terminated
         else
-            let filesText = String.concat "\n" affectedFiles
-            let parts =
-                [ reviewInstructions
-                  $"=== Change Report ===\n\n{report}"
-                  $"=== Affected Files ===\n\n{filesText}"
-                  if task <> "" then $"=== Original Task ===\n\n{task}" ]
+            let parts = [ reviewerPrompt task report affectedFiles ]
             return! runReviewerLoop client reviewStore childID parts abortSignal
     }

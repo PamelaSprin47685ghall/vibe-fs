@@ -195,3 +195,49 @@ let parseFrontMatterScalars' () =
     equal "plain prose → empty" Map.empty (parseFrontMatterScalars "just a normal message, no front matter")
     equal "no closing fence → empty" Map.empty (parseFrontMatterScalars "---\ntask: \"x\"\nnever closes")
     equal "indented task not top-level → empty" Map.empty (parseFrontMatterScalars "---\n  task: \"indented\"\n---")
+
+let doubleCheckAnchorReplay () =
+    check "empty history -> no anchor" (not (hasDoubleCheckAnchor []))
+    check "plain prose -> no anchor" (not (hasDoubleCheckAnchor [ "just a message"; "another" ]))
+    let prompt = VibeFs.Kernel.Prompts.doubleCheckPrompt "ship feature X"
+    check "double-check prompt carries anchor" (hasDoubleCheckAnchor [ prompt ])
+    check "anchor survives mixed history" (hasDoubleCheckAnchor [ "earlier msg"; prompt; "later msg" ])
+
+let doubleCheckPromptFormat () =
+    let prompt = VibeFs.Kernel.Prompts.doubleCheckPrompt "build the login page"
+    check "has front-matter fence" (prompt.Contains "---")
+    check "has double-check field" (prompt.Contains "double-check:")
+    check "embeds task" (prompt.Contains "build the login page")
+    check "asks for re-submission" (prompt.Contains "再次提交")
+    let multiline = VibeFs.Kernel.Prompts.doubleCheckPrompt "task with\nnewline and ### markdown"
+    check "multiline task uses block field" (multiline.Contains "task: |")
+    let parsed = VibeFs.Kernel.PromptFrontMatter.parseFrontMatterScalars multiline
+    equal "multiline task round-trips" (Some "task with\nnewline and ### markdown") (Map.tryFind "task" parsed)
+
+let reviewerPromptFormat () =
+    let prompt = VibeFs.Kernel.Prompts.reviewerPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
+    check "has front-matter fence" (prompt.Contains "---")
+    check "embeds task as block field" (prompt.Contains "task: |")
+    check "lists affected files in front-matter" (prompt.Contains "affected_files:")
+    check "embeds affected file a.fs" (prompt.Contains "a.fs")
+    check "carries review criteria" (prompt.Contains "# Evaluation Criteria")
+    check "worker report is markdown body" (prompt.Contains "# Worker Report")
+    check "embeds report content" (prompt.Contains "changed A and B")
+    check "no ugly Task header" (not (prompt.Contains "=== Task ==="))
+    check "no ugly Change Report header" (not (prompt.Contains "=== Change Report ==="))
+    check "no change_report front-matter field" (not (prompt.Contains "change_report:"))
+    let minimal = VibeFs.Kernel.Prompts.reviewerPrompt "only task" "" []
+    check "minimal prompt embeds task" (minimal.Contains "only task")
+    check "minimal prompt has no worker report section" (not (minimal.Contains "# Worker Report"))
+    check "minimal prompt omits affected_files when empty" (not (minimal.Contains "affected_files:"))
+    let multilineTask = "Line one of task\nLine two with ### markdown\nLine three"
+    let mp = VibeFs.Kernel.Prompts.reviewerPrompt multilineTask "" []
+    let parsed = VibeFs.Kernel.PromptFrontMatter.parseFrontMatterScalars mp
+    equal "multiline task round-trips through front-matter" (Some multilineTask) (Map.tryFind "task" parsed)
+
+let reviewInstructionsFrontMatter () =
+    let instr = VibeFs.Kernel.Prompts.reviewInstructions
+    check "instructions wrapped in front-matter" (instr.StartsWith "---")
+    check "instructions carry role" (instr.Contains "role: \"reviewer\"")
+    check "instructions carry review criteria" (instr.Contains "# Evaluation Criteria")
+    check "instructions mention return_reviewer" (instr.Contains "return_reviewer")

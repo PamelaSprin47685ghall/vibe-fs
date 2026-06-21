@@ -18,7 +18,7 @@ open VibeFs.Mux.AiSettings
 /// serializes every state+IO change through `commandQueue`. All pure state
 /// transitions live in `Kernel.WikiRuntimeState`; the stateless IO orchestration
 /// (prompt building, file IO, background session launch) lives in
-/// `WikiRuntimeIO`. Synchronous methods (RegisterJob/DeleteJob/...)
+/// `WikiRuntimeIO`. Synchronous methods (RegisterJob/DeleteJob/MarkRwTool/...)
 /// run to completion in a single tick and cannot dangle a JS.Promise mid
 /// state-change; the only async-with-await method that holds a job context
 /// across an await is `Submit`, which caches `ctx` before awaiting and uses an
@@ -149,7 +149,6 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 | Ok answer -> return answer
                 | Error message -> return message
         }
-
     member _.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
         commandQueue.Enqueue(fun () ->
             promise {
