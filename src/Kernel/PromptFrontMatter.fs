@@ -27,3 +27,41 @@ let frontMatter (fields: string list) : string =
 
 let frontMatterPrompt (fields: string list) (prose: string) : string =
     frontMatter fields + "\n\n" + prose
+
+/// Inverse of `yamlScalar`: strip the surrounding quotes and unescape. Returns
+/// None when the value is not a quoted scalar (e.g. a `key: |` block header), so
+/// callers scanning for scalar anchors naturally ignore block fields.
+let parseYamlScalar (raw: string) : string option =
+    let t = raw.Trim()
+    if t.Length >= 2 && t.StartsWith("\"") && t.EndsWith("\"") then
+        Some(t.Substring(1, t.Length - 2).Replace("\\n", "\n").Replace("\\\"", "\"").Replace("\\\\", "\\"))
+    else None
+
+/// Parse the top-level scalar fields of the YAML front-matter block that opens
+/// `text`. Only a block whose first line is exactly `---` and that closes with a
+/// later `---` line is recognized, and only un-indented `key: "value"` scalars
+/// are returned — indented block-field bodies (and any `---` within them) are
+/// skipped. Ordinary prose, which practically never opens with a `---` fence,
+/// yields an empty map, making these fields a collision-free state anchor.
+let parseFrontMatterScalars (text: string) : Map<string, string> =
+    if isNull text then Map.empty
+    else
+        let lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
+        if lines.Length < 2 || lines.[0] <> "---" then Map.empty
+        else
+            let rec loop i acc =
+                if i >= lines.Length then Map.empty
+                elif lines.[i] = "---" then acc
+                else
+                    let line = lines.[i]
+                    let acc =
+                        if line.Length > 0 && line.[0] <> ' ' && line.[0] <> '\t' then
+                            let sep = line.IndexOf(": ")
+                            if sep > 0 then
+                                match parseYamlScalar (line.Substring(sep + 2)) with
+                                | Some value -> Map.add (line.Substring(0, sep)) value acc
+                                | None -> acc
+                            else acc
+                        else acc
+                    loop (i + 1) acc
+            loop 1 Map.empty

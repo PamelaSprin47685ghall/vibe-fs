@@ -57,7 +57,7 @@ let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) 
                     let task = args.Trim()
                     if task = "" then
                         reviewStore.deactivateReview (Id.workspaceIdValue wid)
-                        Promise.lift "With-Review Mode cancelled."
+                        Promise.lift loopCancelledMessage
                     elif reviewStore.isReviewActive (Id.workspaceIdValue wid) then
                         Promise.lift "With-Review Mode is already active. Submit your work via submit_review."
                     else
@@ -120,7 +120,7 @@ let private loopReviewExecute
     let workspaceIdStr = Id.workspaceIdValue workspaceId
     if task = "" then
         reviewStore.deactivateReview workspaceIdStr
-        Promise.lift "With-Review Mode cancelled."
+        Promise.lift loopCancelledMessage
     elif reviewStore.isReviewActive workspaceIdStr then
         Promise.lift "With-Review Mode is already active. Submit your work via submit_review."
     else

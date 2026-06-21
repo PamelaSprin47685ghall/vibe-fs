@@ -9,4 +9,4 @@ open VibeFs.Opencode.PluginCore
 /// legacy loader invokes every exported function as a plugin factory. All
 /// shared builder logic lives in PluginCore so it is never re-exported here.
 [<ExportDefault>]
-let plugin (ctx: obj) : JS.Promise<obj> = pluginFor opencode ctx
+let plugin (ctx: obj) : JS.Promise<obj> = pluginFor opencode false ctx

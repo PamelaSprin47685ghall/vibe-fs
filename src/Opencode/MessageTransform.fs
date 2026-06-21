@@ -17,6 +17,7 @@ open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Opencode.MessagingCodec
 open VibeFs.Opencode.CapsCodec
+open VibeFs.Opencode.EditPlusState
 open VibeFs.Opencode.WikiRuntime
 open VibeFs.Shell.ChildAgentRegistry
 
@@ -42,7 +43,9 @@ let private resolveAgent (registry: ChildAgentRegistry) (input: obj) : string =
         | None -> "manager"
 
 let private extractSessionID (messages: Message list) : string =
-    match messages with m :: _ -> m.info.sessionID | [] -> ""
+    messages
+    |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
+    |> Option.defaultValue ""
 
 let private applyReadDedup (messages: obj array) : unit =
     if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
@@ -118,7 +121,66 @@ let private reconstructReviewState (reviewStore: VibeFs.Shell.ReviewRuntime.Revi
                 reviewStore.activateReview(sessionID, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
             | None -> ()
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: MagicSession) (wikiRuntime: WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) (output: obj) : JS.Promise<unit> =
+let private countLinesInOutput (output: string) : int =
+    if output = "" then 0
+    else
+        output.Split('\n')
+        |> Array.filter (fun line ->
+            if not (line.Contains("|")) then false
+            else
+                let tag = line.Split('|').[0]
+                tag.Length > 0 && tag |> Seq.forall (fun c -> (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
+        |> Array.length
+
+let private resolveEndForReplay (state: EditPlusState) (input: obj) : int option =
+    let endInc = Dyn.get input "endInclusive"
+    if not (Dyn.isNullish endInc) then
+        let endNum = if Dyn.typeIs endInc "string" then tagToNum (string endInc) else unbox<int> endInc
+        match state.Registry.Resolve(endNum) with
+        | TagValid(_, line) -> Some(line + 1)
+        | _ -> None
+    else
+        let endExc = Dyn.get input "endExclusive"
+        if not (Dyn.isNullish endExc) then
+            let endNum = if Dyn.typeIs endExc "string" then tagToNum (string endExc) else unbox<int> endExc
+            match state.Registry.Resolve(endNum) with
+            | TagValid(_, line) -> Some line
+            | _ -> None
+        else None
+
+let private replayEditPlusState (editPlusState: EditPlusState option) (messages: Message list) : unit =
+    match editPlusState with
+    | None -> ()
+    | Some state ->
+        state.Reset()
+        for fp in Messaging.flatten messages do
+            match fp.part with
+            | ToolPart(toolName, _, Some st, _) when st.status = "completed" ->
+                if toolName = "read" then
+                    let input = st.input
+                    if not (Dyn.isNullish input) then
+                        let path = Dyn.str input "path"
+                        if path <> "" && not (state.Registry.HasFile(path)) then
+                            let lineCount = countLinesInOutput st.output
+                            state.Registry.Assign(path, 0, lineCount + 1) |> ignore
+                elif toolName = "edit" then
+                    let input = st.input
+                    if not (Dyn.isNullish input) then
+                        let beginTag = Dyn.get input "begin"
+                        let content = Dyn.str input "content"
+                        if not (Dyn.isNullish beginTag) then
+                            let beginNum = if Dyn.typeIs beginTag "string" then tagToNum (string beginTag) else unbox<int> beginTag
+                            match state.Registry.Resolve(beginNum) with
+                            | TagValid(path, bLine) ->
+                                match resolveEndForReplay state input with
+                                | Some eLine ->
+                                    let ins = if content = "" then [||] else splitLines content
+                                    state.Registry.Edit(path, bLine, eLine, ins.Length) |> ignore
+                                | None -> ()
+                            | _ -> ()
+            | _ -> ()
+
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: MagicSession) (wikiRuntime: WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (editPlusState: VibeFs.Opencode.EditPlusState.EditPlusState option) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let messages = Dyn.get output "messages"
         if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
@@ -130,6 +192,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                 let messagesList = MessagingCodec.decodeMessages messagesArr
                 let sessionID = extractSessionID messagesList
                 reconstructReviewState reviewStore sessionID messagesList
+                replayEditPlusState editPlusState messagesList
                 let cleaned = Messaging.stripSyntheticBySource messagesList
                 if cleaned.IsEmpty then ()
                 else

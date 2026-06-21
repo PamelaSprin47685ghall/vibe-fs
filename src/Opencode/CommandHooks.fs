@@ -36,7 +36,7 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
             let parts = ResizeArray<obj>()
             if task = "" then
                 reviewStore.deactivateReview sessionID
-                parts.Add(box {| ``type`` = "text"; text = cancelledMarker |})
+                parts.Add(box {| ``type`` = "text"; text = loopCancelledMessage |})
             elif reviewStore.isReviewActive sessionID then
                 parts.Add(box {| ``type`` = "text"; text = "With-Review Mode is already active. Submit your work via submit_review." |})
             elif command = "loop" then

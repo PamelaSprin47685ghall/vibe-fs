@@ -20,6 +20,7 @@ open VibeFs.Tests.WikiTests
 open VibeFs.Tests.WikiFileTests
 open VibeFs.Tests.WikiKernelTests
 open VibeFs.Tests.TitleFetchGuardTests
+open VibeFs.Tests.IntegrationEditPlusSpecs
 
 /// A test body: synchronous bodies run inline, asynchronous return a promise.
 type private TestBody =
@@ -39,6 +40,7 @@ let private tests : (string * TestBody) list = [
     "ReviewTests.resolvePendingClearsSuppressor", Sync (sync ReviewTests.resolvePendingClearsSuppressor)
     "ReviewTests.disposeSessionTreeTerminatesAll", Sync (sync ReviewTests.disposeSessionTreeTerminatesAll)
     "ReviewTests.inferReviewTaskFromTexts'", Sync (sync ReviewTests.inferReviewTaskFromTexts')
+    "ReviewTests.parseFrontMatterScalars'", Sync (sync ReviewTests.parseFrontMatterScalars')
     "AgentTests.canUse'", Sync (sync AgentTests.canUse')
     "AgentTests.canUseMatrix", Sync (sync AgentTests.canUseMatrix)
     "AgentTests.deniedTools'", Sync (sync AgentTests.deniedTools')
@@ -46,6 +48,8 @@ let private tests : (string * TestBody) list = [
     "AgentTests.updateState", Sync (sync AgentTests.updateState)
     "AgentTests.coordinatorRuntime", Sync (sync AgentTests.coordinatorRuntime)
     "AgentTests.shouldSuppress'", Sync (sync AgentTests.shouldSuppress')
+    "AgentTests.decideNudge'", Sync (sync AgentTests.decideNudge')
+    "AgentTests.decodeLastAssistantNudge", Sync (sync AgentTests.decodeLastAssistantNudge)
     "KernelTests.headTail'", Sync (sync KernelTests.headTail')
     "KernelTests.stripLexer'", Sync (sync KernelTests.stripLexer')
     "KernelTests.dedup'", Sync (sync KernelTests.dedup')
@@ -108,6 +112,7 @@ let private tests : (string * TestBody) list = [
     "TitleFetchGuardTests.rewriteStringContent", Sync (sync TitleFetchGuardTests.rewriteStringContent)
     "TitleFetchGuardTests.rewriteArrayContent", Sync (sync TitleFetchGuardTests.rewriteArrayContent)
     "TitleFetchGuardTests.skipProbeMessage", Sync (sync TitleFetchGuardTests.skipProbeMessage)
+    "IntegrationEditPlusSpecs.run", Async IntegrationEditPlusSpecs.run
 ]
 
 let runAll (_args: string array) : JS.Promise<int> =

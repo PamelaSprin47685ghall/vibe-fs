@@ -3,6 +3,7 @@ module VibeFs.Tests.ReviewTests
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.LoopMessages
+open VibeFs.Kernel.PromptFrontMatter
 open VibeFs.Shell.ReviewRuntime
 
 let transition' () =
@@ -139,21 +140,22 @@ let disposeSessionTreeTerminatesAll () =
 /// Reconstruct the current review task purely from conversation-history text
 /// fragments (assistant text + tool output), in chronological order.  This is
 /// the single source of truth after an opencode restart: the in-memory store is
-/// gone, but the dialogue still carries the activate/cancel/accept markers.
-///   activate  -> YAML front-matter with a `task` field
-///   cancel    -> contains cancelledMarker
-///   accept    -> contains acceptedEndMarker
-/// reject/terminated keep the session active (they say "still active", which
-/// must NOT be mistaken for an end marker).
+/// gone, but the dialogue still carries the structured YAML front-matter that
+/// every producer authors.  Matching is on front-matter fields ONLY — never on
+/// prose substrings — so a user message merely quoting "accepted" can't clear a
+/// live review.
+///   activate  -> front-matter `task` field
+///   cancel    -> front-matter `verdict: cancelled`
+///   accept    -> front-matter `verdict: accepted`
+/// reject/terminated carry `verdict: rejected` / `verdict: terminated`, which
+/// are NOT end verdicts, so the session stays active.
 let inferReviewTaskFromTexts' () =
     let activate task =
         buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
-    let accept = "Review passed. Your changes have been accepted. " + acceptedEndMarker
-    let cancel = cancelledMarker
-    let rejected =
-        "Review feedback:\n\nfix the tests\n\nAddress the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."
-    let terminated =
-        "Review terminated without verdict. With-Review Mode is still active; fix the issues and call submit_review again."
+    let accept = VibeFs.Kernel.Prompts.formatReviewResult Accepted
+    let cancel = loopCancelledMessage
+    let rejected = VibeFs.Kernel.Prompts.formatReviewResult (Rejected "fix the tests")
+    let terminated = VibeFs.Kernel.Prompts.formatReviewResult Terminated
 
     equal "empty -> None" None (inferReviewTaskFromTexts [])
     equal "only activate -> Some task" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1" ])
@@ -164,3 +166,29 @@ let inferReviewTaskFromTexts' () =
     equal "two activates no end -> last task" (Some "ship S2") (inferReviewTaskFromTexts [ activate "ship S1"; activate "ship S2" ])
     equal "activate + accept + activate -> second active" (Some "ship S2") (inferReviewTaskFromTexts [ activate "ship S1"; accept; activate "ship S2" ])
     equal "accept without activate -> None" None (inferReviewTaskFromTexts [ accept ])
+    // A user message merely QUOTING the prose must not clear a live review —
+    // only a real front-matter verdict can. This is the anti-fragility the
+    // structured anchor buys over the old `Contains(marker)` scan.
+    equal "prose mention of accepted does not end review" (Some "ship S1")
+        (inferReviewTaskFromTexts [ activate "ship S1"; "I think your changes look accepted to me. With-Review Mode has ended, right?" ])
+    // A stray `task:` line buried in prose (not a front-matter block) must not
+    // activate a review.
+    equal "prose task line does not activate" None
+        (inferReviewTaskFromTexts [ "Here is my plan:\ntask: refactor everything\nlet's go" ])
+
+/// parseFrontMatterScalars is the structural anchor reader. It must (a) read
+/// only the leading `---` block, (b) keep un-indented scalar fields, (c) skip
+/// `key: |` block headers and their indented bodies — even when a body line is
+/// itself `---` after indentation — and (d) return empty for ordinary prose.
+let parseFrontMatterScalars' () =
+    let scalars = parseFrontMatterScalars (frontMatterPrompt [ yamlScalarField "verdict" "rejected"; yamlBlockField "feedback" "line one\n---\nline three" ] "Address the feedback above.")
+    equal "scalar verdict parsed" (Some "rejected") (Map.tryFind "verdict" scalars)
+    check "block field skipped" (not (Map.containsKey "feedback" scalars))
+
+    let multi = parseFrontMatterScalars (frontMatter [ yamlScalarField "task" "do thing"; yamlScalarField "verdict" "accepted" ])
+    equal "first scalar" (Some "do thing") (Map.tryFind "task" multi)
+    equal "second scalar" (Some "accepted") (Map.tryFind "verdict" multi)
+
+    equal "plain prose → empty" Map.empty (parseFrontMatterScalars "just a normal message, no front matter")
+    equal "no closing fence → empty" Map.empty (parseFrontMatterScalars "---\ntask: \"x\"\nnever closes")
+    equal "indented task not top-level → empty" Map.empty (parseFrontMatterScalars "---\n  task: \"indented\"\n---")

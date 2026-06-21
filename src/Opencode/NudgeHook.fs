@@ -47,18 +47,18 @@ let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<Se
             let session = Dyn.get client "session"
             let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
             let openTodos = decodeTodos (Dyn.get todoResp "data")
-            let! (lastAssistantMessage, agentFromMessage, messageCount) =
+            let! (lastAssistantMessage, agentFromMessage, alreadyNudged) =
                 promise {
                     try
                         let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
-                        let text, agent, count = decodeLastAssistant (Dyn.get messagesResp "data")
-                        return (text, agent, count)
+                        let text, agent, nudged = decodeLastAssistant (Dyn.get messagesResp "data")
+                        return (text, agent, nudged)
                     with _ ->
-                        return ("", None, None)
+                        return ("", None, false)
                 }
             return Some { todos = openTodos
                           lastAssistantMessage = lastAssistantMessage
-                          messageCount = messageCount
+                          alreadyNudged = alreadyNudged
                           agentFromMessage = agentFromMessage }
         with _ -> return None
     }
@@ -159,11 +159,11 @@ let private runNudgeFlow (holder: StateHolder<VibeFs.Kernel.NudgeState.NudgeShel
                 let sid = Id.sessionIdValue sessionID
                 match holder.Mutate(fun (state: VibeFs.Kernel.NudgeState.NudgeShellState) -> VibeFs.Kernel.NudgeState.decideNudge reviewStore.isReviewActive registry.LookupChildAgent state sid snapshot) with
                 | VibeFs.Kernel.NudgeState.StandDown -> ()
-                | VibeFs.Kernel.NudgeState.Send(promptText, agentOpt, messageCount) ->
+                | VibeFs.Kernel.NudgeState.Send(promptText, agentOpt) ->
                     let! caught = sendNudge client sessionID agentOpt promptText |> Promise.result
                     let outcome =
                         match caught with
-                        | Ok () -> VibeFs.Kernel.NudgeState.Delivered messageCount
+                        | Ok () -> VibeFs.Kernel.NudgeState.Delivered
                         | Error error ->
                             match translateJsError error with
                             | MessageAborted -> VibeFs.Kernel.NudgeState.Aborted

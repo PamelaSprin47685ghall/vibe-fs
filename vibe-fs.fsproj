@@ -84,6 +84,8 @@
     <Compile Include="src/Opencode/ChatHooks.fs" />
     <Compile Include="src/Opencode/ToolDefinitionHooks.fs" />
     <Compile Include="src/Opencode/EventHooks.fs" />
+    <Compile Include="src/Opencode/EditPlusState.fs" />
+    <Compile Include="src/Opencode/EditPlusTools.fs" />
     <Compile Include="src/Opencode/MessageTransform.fs" />
     <Compile Include="src/Opencode/ToolHelpers.fs" />
     <Compile Include="src/Opencode/SubagentTools.fs" />
@@ -96,7 +98,9 @@
     <Compile Include="src/Opencode/TitleFetchGuard.fs" />
     <Compile Include="src/Opencode/PluginCore.fs" />
     <Compile Include="src/Opencode/Plugin.fs" />
+    <Compile Include="src/Opencode/PluginPlus.fs" />
     <Compile Include="src/Opencode/PluginMimo.fs" />
+    <Compile Include="src/Opencode/PluginMimoPlus.fs" />
     <Compile Include="src/Opencode/PluginMimoTui.fs" />
 
     <Compile Include="tests/Assert.fs" />
@@ -129,6 +133,7 @@
     <Compile Include="tests/WikiFileTests.fs" />
     <Compile Include="tests/WikiKernelTests.fs" />
     <Compile Include="tests/TitleFetchGuardTests.fs" />
+    <Compile Include="tests/IntegrationEditPlusSpecs.fs" />
     <Compile Include="tests/Tests.fs" />
   </ItemGroup>
 

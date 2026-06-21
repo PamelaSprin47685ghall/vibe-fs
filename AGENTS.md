@@ -1,5 +1,4 @@
 ---
-import: []
+import: 
+  - README.md
 ---
-
-$ pnpm build && pnpm test
