@@ -11,6 +11,7 @@ open VibeFs.Mux.SubagentTools
 open VibeFs.Mux.BuiltinTools
 open VibeFs.Mux.EventHook
 open VibeFs.Mux.SlashCommands
+open VibeFs.Mux.WikiTools
 open VibeFs.Kernel.Dyn
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.WorkspaceFiles
@@ -60,6 +61,7 @@ let createToolCatalog
     (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (hostReadExec: HostReadExec)
     (finderCache: FinderCache)
+    (wikiRuntime: MuxWikiRuntime)
     : ToolDefinition array =
     let tools =
         [| coderTool deps toolNames
@@ -73,7 +75,9 @@ let createToolCatalog
            fuzzyGrepTool finderCache
            fuzzyFindTool finderCache
            writeTool deps
-           readTool deps hostReadExec |]
+           readTool deps hostReadExec
+           fetchWikiTool wikiRuntime
+           returnBookkeeperTool wikiRuntime |]
     tools
 
 let createRegistration (deps: obj) : obj =
@@ -81,10 +85,12 @@ let createRegistration (deps: obj) : obj =
     let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
     let hostReadExec = HostReadExec()
     let finderCache = FinderCache()
+    let wikiRuntime = MuxWikiRuntime()
     let toolNames =
         [| "coder"; "investigator"; "meditator"; "browser"; "executor"
-           "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read" |]
-    let tools = createToolCatalog deps toolNames callStore reviewStore hostReadExec finderCache
+           "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
+           "fetch_wiki"; "return_bookkeeper" |]
+    let tools = createToolCatalog deps toolNames callStore reviewStore hostReadExec finderCache wikiRuntime
     let toolsObj = toolsToObject tools
     let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.Config.getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
     let wrappers = createAllWrappers toolsObj hostReadExec callStore
@@ -102,6 +108,16 @@ let createRegistration (deps: obj) : obj =
                    } :> obj) |}
            eventHook = eventHook
            slashCommands = slashCommands
+           __wikiRuntime =
+               box (createObj
+                   [ "rawInstance", box wikiRuntime
+                     "registerJobForTesting",
+                     box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
+                         wikiRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
+                     "takeBookkeeperLaunchesForTesting",
+                     box (System.Func<obj array>(fun () -> [||]))
+                     "waitForBackgroundJobsForTesting",
+                     box (System.Func<JS.Promise<unit>>(fun () -> Promise.lift ())) ])
            getToolPolicy = (fun (_agentId: string) (role: obj) ->
                let agent = if Dyn.isNullish role then "manager" else string role
                let remove = toolNames |> Array.filter (fun t -> not (canUse agent t))

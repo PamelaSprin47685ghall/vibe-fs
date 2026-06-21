@@ -151,6 +151,35 @@ let registerWikiJobForTest (wikiRuntime: obj) (sessionID: string) (workspaceRoot
 let submitWikiTool (pluginObject: obj) : obj =
     get (get pluginObject "tool") "return_bookkeeper"
 
+let muxToolByName (reg: obj) (name: string) : obj =
+    let tools = unbox<obj[]> (get reg "tools")
+    tools
+    |> Array.tryFind (fun t -> str t "name" = name)
+    |> Option.defaultValue null
+
+let muxToolSchema (toolDef: obj) : obj =
+    if isNullish toolDef then null else get toolDef "parameters"
+
+let muxExecutorModeSchema (reg: obj) : obj =
+    let executor = muxToolByName reg "executor"
+    let schema = muxToolSchema executor
+    if isNullish schema then null
+    else
+        let props = get schema "properties"
+        if isNullish props then null else get props "mode"
+
+let muxWikiRuntime (reg: obj) : obj =
+    let direct = get reg "__wikiRuntime"
+    if not (isNullish direct) then direct
+    else
+        let rt = get reg "wikiRuntime"
+        if isNullish rt then null else rt
+
+let registerMuxWikiJobForTest (reg: obj) (sessionID: string) (workspaceRoot: string) (kindTag: string) (payload: obj) : unit =
+    let runtime = muxWikiRuntime reg
+    let registrar = get runtime "registerJobForTesting" |> unbox<System.Func<string, string, string, obj, unit>>
+    registrar.Invoke(sessionID, workspaceRoot, kindTag, payload)
+
 let readProjectionAsync (workspaceRoot: string) : JS.Promise<WikiProjection> =
     readProjection workspaceRoot
 

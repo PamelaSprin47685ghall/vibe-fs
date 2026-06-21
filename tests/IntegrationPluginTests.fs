@@ -58,8 +58,11 @@ let slashCommandsSpec (reg: obj) =
 let countsSpec (reg: obj) =
     let wrappers = unbox<obj[]> (get reg "wrappers")
     let tools = unbox<obj[]> (get reg "tools")
+    let names = tools |> Array.map (fun t -> str t "name")
     check "wrapper count" (wrappers.Length = 5)
-    check "tool count" (tools.Length = 12)
+    check "tool count" (tools.Length = 14)
+    check "mux has fetch_wiki tool" (names |> Array.contains "fetch_wiki")
+    check "mux has return_bookkeeper tool" (names |> Array.contains "return_bookkeeper")
 
 let configSpec () = promise {
     let! workspaceDir = mkdtempAsync "plugin-config-"

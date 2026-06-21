@@ -35,6 +35,7 @@ let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
           let v = Dyn.get args "dependencies"
           if Dyn.isNullish v then [] else unbox<obj array> v |> Array.map string |> List.ofArray
       timeoutType = parseTimeout (Dyn.str args "timeout_type")
+      mode = Dyn.str args "mode"
       cwd = Some (getCwd config) }
 
 let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptions) (output: string) : JS.Promise<string> =
@@ -78,8 +79,9 @@ let executorTool (deps: obj) : ToolDefinition =
                 [ "language", box (strEnumProp Params.executorLanguage [| "shell"; "python"; "javascript" |])
                   "program", box (strProp Params.executorProgram)
                   "dependencies", box (strArrayProp Params.executorDeps)
-                  "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |]) ])
-            [| "language"; "program"; "timeout_type" |]
+                  "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |])
+                  "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |]) ])
+            [| "language"; "program"; "timeout_type"; "mode" |]
       execute =
         fun config args ->
             promise {

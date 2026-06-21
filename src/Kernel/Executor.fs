@@ -118,6 +118,7 @@ type ExecuteOptions =
       language: ExecutorLanguage
       dependencies: string list
       timeoutType: ExecutorTimeoutType
+      mode: string
       cwd: string option }
 
 type ExecuteResult =

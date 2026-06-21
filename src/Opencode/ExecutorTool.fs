@@ -35,7 +35,7 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                 let deps = if Dyn.isNullish (Dyn.get args "dependencies") then [] else Dyn.get args "dependencies" :?> obj array |> Array.map string |> List.ofArray
                 let options : ExecuteOptions =
                     { program = Dyn.str args "program"; language = lang; dependencies = deps
-                      timeoutType = timeout; cwd = Some (Dyn.str tc "directory") }
+                      timeoutType = timeout; mode = Dyn.str args "mode"; cwd = Some (Dyn.str tc "directory") }
                 promise {
                     let! result = VibeFs.Shell.Executor.execute options sessionID
                     let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o

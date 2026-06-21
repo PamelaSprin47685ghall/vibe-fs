@@ -44,7 +44,7 @@ let ollamaApiKeyValidation () =
 
 let executorMapping () =
     let opts : ExecuteOptions =
-        { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; cwd = None }
+        { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; mode = "ro"; cwd = None }
     let run o = VibeFs.Shell.Executor.mapOutcome opts 10000 "out" o
     check "exit0→Completed" (match run { stdout=""; stderr=""; code=Some 0; timedOut=false } with Completed _ -> true | _ -> false)
     check "nonzero→Failed" (match run { stdout=""; stderr=""; code=Some 2; timedOut=false } with Failed _ -> true | _ -> false)
@@ -158,7 +158,7 @@ let summarizerInputCap () =
     let bl (s: string) : int = s.Length
     let trunc (s: string) (maxBytes: int) : string = if s.Length <= maxBytes then s else s.[..maxBytes - 1]
     let opts : ExecuteOptions =
-        { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; cwd = None }
+        { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; mode = "ro"; cwd = None }
     let small = String.replicate 100 "x"
     let smallPrompt = buildSummaryPrompt bl trunc opts (Completed small)
     check "small output kept whole" (smallPrompt.Contains small)
@@ -173,7 +173,7 @@ let summarizerInputCap () =
 let safetyWarning () =
     let warn program = prependSafetyWarning "OUT" program Shell
     let warnForExecution program =
-        prependSafetyWarningForExecution "OUT" { program = program; language = Shell; dependencies = []; timeoutType = Short; cwd = None }
+        prependSafetyWarningForExecution "OUT" { program = program; language = Shell; dependencies = []; timeoutType = Short; mode = "ro"; cwd = None }
     check "leading grep warns" ((warn "grep foo").Contains readOnlyWarning)
     check "grep after && warns" ((warn "cd src && grep foo").Contains readOnlyWarning)
     check "grep in pipe warns" ((warn "ls a | grep b").Contains readOnlyWarning)
