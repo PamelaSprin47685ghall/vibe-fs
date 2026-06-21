@@ -111,18 +111,12 @@ let heartbeatTriggersMaintenanceSpec () = promise {
     do! ensureWikiDir workspaceDir
     let dayFilePath = dayPath workspaceDir "2026-06-18"
     do! writeWikiFileAsync dayFilePath (DayHeader("2026-06-18", false)) [ wikiEntry "0a3f" "积压问题" "Daily candidate" ]
-    let appendDay = "2026-06-20"
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "heartbeat-session" "Wiki prelude" |]
-    let! p = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs appendDay |})
-    registerWikiJobForTest (pluginWikiRuntime p) "wiki-job-heartbeat" workspaceDir "append" (createObj [ "today", box appendDay ])
-    let submitTool = submitWikiTool p
-    let! result =
-        ((get submitTool "execute")
-            $ (createObj [ "entries", box [| wikiDraftEntry None "心跳问题" "Fresh answer" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "wiki-job-heartbeat" ]))
-        |> unbox<JS.Promise<string>>
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-20" |})
+    let wikiRuntime = get (pluginWikiRuntime p) "rawInstance" :?> WikiRuntime
+    wikiRuntime.StartBookkeeperAppend("input", "result", "write", parentSessionID = "heartbeat-parent")
     do! waitForBackgroundJobsForTesting p
     let launches = takeBookkeeperLaunchesForTesting p
-    check "heartbeat: append accepted" (result <> "")
     check "heartbeat: maintenance launch triggered on append heartbeat" (
         launches |> Array.exists (fun l ->
             let title = (str l "title").ToLowerInvariant()

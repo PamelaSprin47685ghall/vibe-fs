@@ -245,8 +245,8 @@ let muxReturnBookkeeperReconstructsJobFromHistorySpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let muxReturnBookkeeperAppendTriggersLaunchSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-wiki-launch-"
+let muxReturnBookkeeperAppendDoesNotTriggerMaintenanceSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-wiki-no-maintenance-"
     do! ensureWikiDir workspaceDir
     do! writeWikiFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [
         for i in 1 .. 10 do yield wikiEntry (sprintf "%04x" i) (sprintf "积压问题 %d" i) "Candidate" ]
@@ -263,7 +263,32 @@ let muxReturnBookkeeperAppendTriggersLaunchSpec () = promise {
         check "mux return_bookkeeper append accepted" (result <> "")
         do! waitForBackgroundJobsForTesting reg
         let launches = takeBookkeeperLaunchesForTesting reg
-        check "mux return_bookkeeper append triggers bookkeeper launch" (launches.Length > 0)
+        check "mux return_bookkeeper append does not trigger maintenance" (launches.Length = 0)
+    do! rmAsync workspaceDir
+}
+
+let muxExecutorRwTriggersMaintenanceSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-executor-maintenance-"
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [ wikiEntry "0a3f" "积压问题" "Daily candidate" ]
+    let deps = minimalMuxDeps ()
+    deps?("directory") <- workspaceDir
+    let reg = createRegistration deps
+    let executor = muxToolByName reg "executor"
+    if isNullish executor then
+        check "mux registration exposes executor tool" false
+    else
+        let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-executor-maintenance"; "sessionID", box "mux-executor-maintenance" ]
+        let args = createObj [ "language", box "shell"; "program", box "printf mux-maintenance"; "timeout_type", box "short"; "mode", box "rw" ]
+        let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+        check "mux rw executor returns output" (result.Contains "mux-maintenance")
+        do! waitForBackgroundJobsForTesting reg
+        let launches = takeBookkeeperLaunchesForTesting reg
+        check "mux rw executor triggers maintenance" (
+            launches |> Array.exists (fun launch ->
+                let title = (str launch "title").ToLowerInvariant()
+                let prompt = (str launch "prompt").ToLowerInvariant()
+                title.Contains "daily" || prompt.Contains "daily" || title.Contains "rewrite" || prompt.Contains "rewrite"))
     do! rmAsync workspaceDir
 }
 
@@ -338,6 +363,7 @@ let run () : JS.Promise<unit> =
             "heartbeatTriggersMaintenance", heartbeatTriggersMaintenanceSpec
             "submitWikiAppend", submitWikiAppendSpec
             "submitWikiAppendEmpty", submitWikiAppendEmptySpec
+            "submitWikiAppendDoesNotTriggerMaintenance", submitWikiAppendDoesNotTriggerMaintenanceSpec
             "submitWikiSchemaAllowsEmpty", submitWikiSchemaAllowsEmptySpec
             "submitWikiDailyRewrite", submitWikiDailyRewriteSpec
             "submitWikiWeeklyRewrite", submitWikiWeeklyRewriteSpec
@@ -371,7 +397,8 @@ let run () : JS.Promise<unit> =
             "muxReturnBookkeeperAppend", muxReturnBookkeeperAppendSpec
             "muxReturnBookkeeperNoActiveJob", muxReturnBookkeeperNoActiveJobSpec
             "muxReturnBookkeeperReconstructsJobFromHistory", muxReturnBookkeeperReconstructsJobFromHistorySpec
-            "muxReturnBookkeeperAppendTriggersLaunch", muxReturnBookkeeperAppendTriggersLaunchSpec
+            "muxReturnBookkeeperAppendDoesNotTriggerMaintenance", muxReturnBookkeeperAppendDoesNotTriggerMaintenanceSpec
+            "muxExecutorRwTriggersMaintenance", muxExecutorRwTriggersMaintenanceSpec
             "muxExecutorModeSchema", muxExecutorModeSchemaSpec
             "muxMessageTransformRegistered", muxMessageTransformRegisteredSpec
             "muxWikiPreludeForManager", muxWikiPreludeForManagerSpec

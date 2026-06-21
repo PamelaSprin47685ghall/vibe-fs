@@ -77,6 +77,25 @@ let submitWikiAppendEmptySpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let submitWikiAppendDoesNotTriggerMaintenanceSpec () = promise {
+    let! workspaceDir = mkdtempAsync "submit-wiki-no-maintenance-"
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [ wikiEntry "0a3f" "积压问题" "Daily candidate" ]
+    let appendDay = "2026-06-20"
+    let! p = plugin (box {| directory = workspaceDir; nowMs = dayMs appendDay |})
+    registerWikiJobForTest (pluginWikiRuntime p) "wiki-job-no-maintenance" workspaceDir "append" (createObj [ "today", box appendDay ])
+    let submitTool = submitWikiTool p
+    let! result =
+        ((get submitTool "execute")
+            $ (createObj [ "entries", box [| wikiDraftEntry None "纯写入问题" "Fresh answer" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "wiki-job-no-maintenance" ]))
+        |> unbox<JS.Promise<string>>
+    check "submit_wiki append writes entries" (result.Contains "Appended 1 wiki entries")
+    do! waitForBackgroundJobsForTesting p
+    let launches = takeBookkeeperLaunchesForTesting p
+    check "submit_wiki append does not trigger maintenance" (launches.Length = 0)
+    do! rmAsync workspaceDir
+}
+
 let submitWikiSchemaAllowsEmptySpec () = promise {
     let! workspaceDir = mkdtempAsync "submit-wiki-schema-empty-"
     do! ensureWikiDir workspaceDir

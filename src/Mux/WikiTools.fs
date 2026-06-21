@@ -242,9 +242,6 @@ type MuxWikiRuntime(?deps: obj) as this =
                                             registeredJobs.Remove(sessionID) |> ignore
                                             return $"Rewrote wiki snapshot through {throughDate}."
                                         })
-                            let isAppend = match kind with AppendAfterWork -> true | _ -> false
-                            if isAppend then
-                                do! this.StartMaintenanceIfDue(root)
                             return result
                         })
             }
@@ -262,6 +259,7 @@ type MuxWikiRuntime(?deps: obj) as this =
             match config with
             | Some cfg when not (Dyn.isNullish cfg) -> latestConfig <- Some cfg
             | _ -> ()
+            this.StartMaintenanceIfDue(root) |> ignore
             if not (Dyn.isNullish deps) then
                 match latestConfig with
                 | Some cfg when not (Dyn.isNullish cfg) ->

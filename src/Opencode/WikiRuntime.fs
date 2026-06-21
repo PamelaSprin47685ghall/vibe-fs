@@ -124,10 +124,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                     | None -> return "No active wiki job for this session."
                     | Some ctx ->
                         try
-                            let isAppend = match ctx.kind with AppendAfterWork -> true | _ -> false
                             let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind portLockTimeoutMs portLockRetryDelayMs (today ()) ctx.workspaceRoot ctx.kind drafts)
-                            if isAppend then
-                                this.StartMaintenanceIfDue(root) |> ignore
                             return result
                         finally
                             registry.UnregisterChildAgent(sessionID)
@@ -187,6 +184,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         else
             this.RecordBookkeeperLaunch("bookkeeper", title, prompt, result)
             let settings = defaultArg aiSettings emptySettings
+            this.StartMaintenanceIfDue(root) |> ignore
             launchBg root parentSessionID AppendAfterWork title (fun () ->
                 promise {
                     let! projection = readProjection root

@@ -124,11 +124,19 @@ let createToolCatalog
     (wikiRuntime: MuxWikiRuntime)
     (wikiEnabled: bool)
     : ToolDefinition array =
+    let executorWikiRuntime =
+        if wikiEnabled then
+            box (createObj [
+                "startBookkeeperAppend",
+                box (System.Func<string, string, string, obj, unit>(fun prompt result title config ->
+                    wikiRuntime.StartBookkeeperAppend(prompt, result, title, config)))
+            ])
+        else null
     [| coderTool deps toolNames
        investigatorTool deps toolNames
        meditatorTool deps toolNames
        browserTool deps toolNames
-       executorTool deps (if wikiEnabled then box wikiRuntime else null)
+       executorTool deps executorWikiRuntime
        submitReviewTool deps toolNames callStore reviewStore
        returnReviewerTool deps callStore reviewStore
        websearchTool deps
