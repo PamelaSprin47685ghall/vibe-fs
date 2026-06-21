@@ -227,3 +227,63 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                           reviewStore.unlockReview workspaceId
                   }
       condition = None }
+
+let returnReviewerTool (deps: obj) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : ToolDefinition =
+    let extractHistoryTexts (history: obj array) : string list =
+        history
+        |> Array.toList
+        |> List.collect (fun item ->
+            if Dyn.typeIs item "string" then [ string item ]
+            else
+                let texts = ResizeArray<string>()
+                let content = Dyn.str item "content"
+                if content <> "" then texts.Add(content)
+                let text = Dyn.str item "text"
+                if text <> "" then texts.Add(text)
+                let parts = Dyn.get item "parts"
+                if not (Dyn.isNullish parts) && Dyn.isArray parts then
+                    for p in (parts :?> obj array) do
+                        let partText = Dyn.str p "text"
+                        if partText <> "" then texts.Add(partText)
+                List.ofSeq texts)
+
+    let tryResolvePendingReviewCall (sessionID: string) (resolution: obj) : bool =
+        callStore.PendingCalls.Keys
+        |> Seq.tryFind (fun k -> k.StartsWith(sessionID + "-review-"))
+        |> Option.map (fun callId -> resolveCall callStore callId resolution)
+        |> Option.defaultValue false
+
+    { name = "return_reviewer"
+      description = "Submit a review verdict for the active review call. feedback:null/empty accepts; non-empty feedback rejects."
+      parameters = mkSchema (createObj [ "feedback", box (createObj [ "type", box "string"; "description", box "Null/empty to accept; detailed feedback to reject" ]) ]) [||]
+      execute = fun config args ->
+          promise {
+              let sessionID = Dyn.str config "sessionID"
+              if sessionID = "" then return "return_reviewer requires sessionID"
+              else
+                  let feedback = defaultArg (strField args "feedback") ""
+                  let verdict = defaultArg (strField args "verdict") "" |> fun s -> s.Trim().ToLowerInvariant()
+                  let isReject = verdict = "reject" || feedback <> ""
+                  if isReject then
+                      let resolution = createObj [ "verdict", box "reject"; "feedback", box feedback ]
+                      tryResolvePendingReviewCall sessionID resolution |> ignore
+                      return "Verdict submitted."
+                  else
+                      let getHistory = if Dyn.isNullish deps then null else Dyn.get deps "getChatHistory"
+                      if Dyn.isNullish getHistory then
+                          return doubleCheckPrompt (defaultArg (reviewStore.getReviewTask sessionID) "")
+                      else
+                          try
+                              let! history = unbox<JS.Promise<obj array>> (getHistory $ sessionID)
+                              let texts = extractHistoryTexts history
+                              if hasDoubleCheckAnchor texts then
+                                  let resolution = createObj [ "verdict", box "pass"; "feedback", box "" ]
+                                  tryResolvePendingReviewCall sessionID resolution |> ignore
+                                  reviewStore.deactivateReview sessionID
+                                  return "Verdict submitted."
+                              else
+                                  return doubleCheckPrompt (defaultArg (reviewStore.getReviewTask sessionID) "")
+                          with _ ->
+                              return doubleCheckPrompt (defaultArg (reviewStore.getReviewTask sessionID) "")
+          }
+      condition = None }

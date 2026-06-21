@@ -38,11 +38,12 @@ let parseYamlScalar (raw: string) : string option =
     else None
 
 /// Parse the top-level scalar-like fields of the YAML front-matter block that
-/// opens `text`. Supports both quoted scalars (`key: "value"`) and literal block
-/// scalars (`key: |` with two-space-indented body). The opening fence MUST be
-/// closed by a later top-level `---`; otherwise the result is empty. Ordinary
-/// prose, which practically never opens with a `---` fence, likewise yields an
-/// empty map, making these fields a collision-free state anchor.
+/// opens `text`. Supports quoted scalars (`key: "value"`), literal block
+/// scalars (`key: |` with two-space-indented body), and plain unquoted simple
+/// scalars (`key: value`). The opening fence MUST be closed by a later top-level
+/// `---`; otherwise the result is empty. Ordinary prose, which practically never
+/// opens with a `---` fence, likewise yields an empty map, making these fields a
+/// collision-free state anchor.
 let parseFrontMatterScalars (text: string) : Map<string, string> =
     if isNull text then
         Map.empty
@@ -87,7 +88,11 @@ let parseFrontMatterScalars (text: string) : Map<string, string> =
                             | None when raw = "|" ->
                                 let value, nextIndex = readBlock (i + 1)
                                 loop nextIndex (Map.add key value acc)
-                            | _ ->
-                                loop (i + 1) acc
+                            | None ->
+                                let value = raw.Trim()
+                                if value = "" then
+                                    loop (i + 1) acc
+                                else
+                                    loop (i + 1) (Map.add key value acc)
 
             loop 1 Map.empty |> Option.defaultValue Map.empty

@@ -118,6 +118,91 @@ let muxSubmitReviewNoActiveReviewSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let private makeReturnReviewerContext (workspaceDir: string) (sessionID: string) : obj =
+    createObj [
+        "directory", box workspaceDir
+        "workspaceId", box sessionID
+        "sessionID", box sessionID
+    ]
+
+let private preparePendingReviewCallForTest (reg: obj) (workspaceDir: string) (sessionID: string) : JS.Promise<unit> =
+    promise {
+        muxActivateReviewForTest reg sessionID "Implement feature X"
+        let prompts = ResizeArray<string>()
+        let taskService = mockMuxTaskServiceCapturingPrompt prompts
+        let submitTool = muxToolByName reg "submit_review"
+        if not (isNullish submitTool) then
+            let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
+            let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+            try
+                let! _ = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+                ()
+            with _ ->
+                ()
+    }
+
+let muxReturnReviewerRegisteredSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-return-reviewer-registered-"
+    let reg = createRegistration (muxDepsWithChatHistory "mux-return-reviewer-registered" [||])
+    let returnTool = muxToolByName reg "return_reviewer"
+    check "mux registration exposes return_reviewer tool" (not (isNullish returnTool))
+    do! rmAsync workspaceDir
+}
+
+let muxReturnReviewerRejectsResolveSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-return-reviewer-reject-"
+    let sessionID = "mux-return-reviewer-reject"
+    let reg = createRegistration (muxDepsWithChatHistory sessionID [||])
+    do! preparePendingReviewCallForTest reg workspaceDir sessionID
+    let returnTool = muxToolByName reg "return_reviewer"
+    if isNullish returnTool then
+        check "mux registration exposes return_reviewer tool" false
+    else
+        let ctx = makeReturnReviewerContext workspaceDir sessionID
+        let args = createObj [ "feedback", box "needs rework" ]
+        let! result = ((get returnTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+        check "return_reviewer reject reports verdict submitted" (result.Contains "Verdict submitted.")
+        let pending = muxPendingCallIdsForTest reg
+        check "return_reviewer reject resolves pending review call" (not (pending |> Array.exists (fun id -> id.StartsWith(sessionID + "-review-"))))
+    do! rmAsync workspaceDir
+}
+
+let muxReturnReviewerFirstPassDoubleCheckSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-return-reviewer-first-pass-"
+    let sessionID = "mux-return-reviewer-first-pass"
+    let reg = createRegistration (muxDepsWithChatHistory sessionID [||])
+    do! preparePendingReviewCallForTest reg workspaceDir sessionID
+    let returnTool = muxToolByName reg "return_reviewer"
+    if isNullish returnTool then
+        check "mux registration exposes return_reviewer tool" false
+    else
+        let ctx = makeReturnReviewerContext workspaceDir sessionID
+        let args = createObj [ "feedback", box null ]
+        let! result = ((get returnTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+        check "return_reviewer first pass returns double-check prompt" (result.Contains "double-check:")
+        let pending = muxPendingCallIdsForTest reg
+        check "return_reviewer first pass does not resolve pending review call" (pending |> Array.exists (fun id -> id.StartsWith(sessionID + "-review-")))
+    do! rmAsync workspaceDir
+}
+
+let muxReturnReviewerSecondPassResolvesSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-return-reviewer-second-pass-"
+    let sessionID = "mux-return-reviewer-second-pass"
+    let anchorHistory = [| box "---\ndouble-check: confirmed\n---\nok" |]
+    let reg = createRegistration (muxDepsWithChatHistory sessionID anchorHistory)
+    do! preparePendingReviewCallForTest reg workspaceDir sessionID
+    let returnTool = muxToolByName reg "return_reviewer"
+    if isNullish returnTool then
+        check "mux registration exposes return_reviewer tool" false
+    else
+        let ctx = makeReturnReviewerContext workspaceDir sessionID
+        let args = createObj [ "feedback", box null ]
+        let! result = ((get returnTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+        check "return_reviewer second pass reports verdict submitted" (result.Contains "Verdict submitted.")
+        let pending = muxPendingCallIdsForTest reg
+        check "return_reviewer second pass resolves pending review call" (not (pending |> Array.exists (fun id -> id.StartsWith(sessionID + "-review-"))))
+    do! rmAsync workspaceDir
+}
 let muxSubmitReviewPromptSuppliesCallIdSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-callid-"
     let reg = createRegistration (minimalMuxDeps ())

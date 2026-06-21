@@ -8,6 +8,9 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Wiki
 open VibeFs.Kernel.WikiRuntimeState
 open VibeFs.Kernel.ToolCatalog
+open VibeFs.Kernel.WikiMaintenance
+open VibeFs.Kernel.WikiPrompts
+open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Shell.WikiFiles
 open VibeFs.Shell.WikiPortLock
@@ -28,9 +31,71 @@ let private buildEntries (root: string) (drafts: WikiDraft list) : JS.Promise<Wi
         | Error error -> return raise (exn error)
     }
 
-type MuxWikiRuntime() =
+let private extractTexts (item: obj) : string list =
+    if Dyn.typeIs item "string" then [ string item ]
+    else
+        let texts = ResizeArray<string>()
+        let content = Dyn.str item "content"
+        if content <> "" then texts.Add(content)
+        let text = Dyn.str item "text"
+        if text <> "" then texts.Add(text)
+        let parts = Dyn.get item "parts"
+        if not (Dyn.isNullish parts) && Dyn.isArray parts then
+            for p in (parts :?> obj array) do
+                let partText = Dyn.str p "text"
+                if partText <> "" then texts.Add(partText)
+        List.ofSeq texts
+
+type MuxWikiRuntime(?deps: obj) as this =
     let registeredJobs = System.Collections.Generic.Dictionary<string, WikiJobContext>()
     let writeQueue = SerialQueue()
+    let commandQueue = SerialQueue()
+    let launchQueue = SerialQueue()
+    let mutable state = initialWikiState
+    let mutable latestConfig : obj option = None
+
+    let getChatHistory =
+        match deps with
+        | Some d when not (Dyn.isNullish d) ->
+            let getHistory = Dyn.get d "getChatHistory"
+            if not (Dyn.isNullish getHistory) then
+                Some (fun (sid: string) -> unbox<JS.Promise<obj array>> (getHistory $ sid))
+            else None
+        | _ -> None
+
+    let recordBackgroundResult title result =
+        state <- reducer state (UpdateLatestLaunchResultCmd (title, result))
+
+    let launchBg root kind title promptText =
+        match latestConfig with
+        | Some cfg ->
+            let options = Some (box {| aiSettingsAgentId = "bookkeeper" |})
+            launchQueue.Enqueue(fun () ->
+                promise {
+                    try
+                        let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
+                        recordBackgroundResult title "success"
+                    with ex ->
+                        recordBackgroundResult title (string ex)
+                }) |> Promise.start
+        | None -> ()
+
+    member _.TryResolveJobContext(sessionID: string) : JS.Promise<WikiJobContext option> =
+        promise {
+            if System.String.IsNullOrWhiteSpace sessionID then return None
+            else
+                match getChatHistory with
+                | None -> return None
+                | Some getHistory ->
+                    try
+                        let! history = getHistory sessionID
+                        let texts =
+                            history
+                            |> Array.toList
+                            |> List.collect extractTexts
+                        return texts |> List.tryPick tryParseJobMarker
+                    with _ -> return None
+        }
 
     member _.FetchFromSessionSnapshot(_sessionID: string, directory: string, id: string) : JS.Promise<string> =
         promise {
@@ -79,18 +144,51 @@ type MuxWikiRuntime() =
     member _.DeleteJob(sessionID: string) : unit =
         registeredJobs.Remove(sessionID) |> ignore
 
-    member _.Submit(sessionID: string, _directory: string, drafts: WikiDraft list) : JS.Promise<string> =
+    member this.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
+        commandQueue.Enqueue(fun () ->
+            promise {
+                let! files = readWikiFiles workspaceRoot
+                let projection = projectLatestWins files
+                let dailyDue, weeklyDue = dueMaintenance files System.DateTime.UtcNow
+
+                let launchIfDue (due: string list) kind title resultPrefix promptInfix buildPrompt =
+                    due
+                    |> List.iter (fun value ->
+                        let key = workspaceRoot + "|" + resultPrefix + "|" + value
+                        let launch = { agent = "bookkeeper"; title = title; prompt = $"{resultPrefix} maintenance due {promptInfix} {value}"; result = $"{resultPrefix}:{value}" }
+                        let first, nextState = recordLaunchOnce state key launch
+                        state <- nextState
+                        if first then
+                            let promptText = buildPrompt value files projection
+                            launchBg workspaceRoot (kind value) title promptText)
+
+                launchIfDue dailyDue DailyRewrite "Daily wiki rewrite" "daily" "for" buildDailyPrompt
+                launchIfDue (Option.toList weeklyDue) WeeklyRewrite "Weekly wiki snapshot rewrite" "weekly" "through" buildWeeklyPrompt
+            })
+
+    member this.Submit(sessionID: string, directory: string, drafts: WikiDraft list, ?config: obj) : JS.Promise<string> =
         promise {
-            match registeredJobs.TryGetValue sessionID with
-            | false, _ -> return "No active wiki job for this session."
-            | true, ctx ->
+            match config with
+            | Some cfg -> latestConfig <- Some cfg
+            | None -> ()
+
+            let! reconstructed = this.TryResolveJobContext(sessionID)
+            let jobCtxOpt =
+                reconstructed |> Option.orElseWith (fun () ->
+                    match registeredJobs.TryGetValue sessionID with
+                    | true, ctx -> Some ctx
+                    | false, _ -> None)
+
+            match jobCtxOpt with
+            | None -> return "No active wiki job for this session."
+            | Some ctx ->
                 let root = ctx.workspaceRoot
                 let todayStr = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
                 return! writeQueue.Enqueue(fun () ->
                     promise {
                         let! entries = buildEntries root drafts
                         let kind = ctx.kind
-                        return!
+                        let! result =
                             withWikiPortLock 30000L 1000 root (fun () ->
                                 match kind with
                                 | AppendAfterWork ->
@@ -112,8 +210,62 @@ type MuxWikiRuntime() =
                                         registeredJobs.Remove(sessionID) |> ignore
                                         return $"Rewrote wiki snapshot through {throughDate}."
                                     })
+                        let isAppend = match kind with AppendAfterWork -> true | _ -> false
+                        if isAppend then
+                            do! this.StartMaintenanceIfDue(root)
+                        return result
                     })
         }
+
+    member this.StartBookkeeperAppend(prompt: string, result: string, title: string, ?config: obj) : unit =
+        state <- reducer state (RecordLaunchCmd { agent = "bookkeeper"; title = title; prompt = prompt; result = result })
+        match config with
+        | Some cfg when not (Dyn.isNullish cfg) -> latestConfig <- Some cfg
+        | _ -> ()
+        let root =
+            match config with
+            | Some cfg when not (Dyn.isNullish cfg) ->
+                let dir = Dyn.str cfg "directory"
+                if dir <> "" then dir else defaultArg (strField cfg "cwd") ""
+            | _ -> ""
+        if root <> "" && not (Dyn.isNullish deps) then
+            match latestConfig with
+            | Some cfg when not (Dyn.isNullish cfg) ->
+                launchQueue.Enqueue(fun () ->
+                    promise {
+                        try
+                            let! projection = readProjection root
+                            let promptText = buildAppendPrompt title prompt result projection
+                            let options = Some (box {| aiSettingsAgentId = "bookkeeper" |})
+                            let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
+                            recordBackgroundResult title "success"
+                        with ex ->
+                            recordBackgroundResult title (string ex)
+                    }) |> Promise.start
+            | _ -> ()
+
+    member _.TakeBookkeeperLaunchesForTesting() : obj array =
+        let launches, nextState = drainLaunches state
+        state <- nextState
+        launches
+        |> List.map (fun l ->
+            box (createObj [
+                "agent", box l.agent
+                "title", box l.title
+                "prompt", box l.prompt
+                "result", box l.result
+            ]))
+        |> List.toArray
+
+    member _.WaitForBackgroundJobsForTesting() : JS.Promise<unit> =
+        promise {
+            do! commandQueue.Enqueue(fun () -> Promise.lift ())
+            do! launchQueue.Enqueue(fun () -> Promise.lift ())
+        }
+
+    member val startMaintenanceIfDue = System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> this.StartMaintenanceIfDue(workspaceRoot)) with get, set
+    member val takeBookkeeperLaunchesForTesting = System.Func<obj array>(fun () -> this.TakeBookkeeperLaunchesForTesting()) with get, set
+    member val waitForBackgroundJobsForTesting = System.Func<JS.Promise<unit>>(fun () -> this.WaitForBackgroundJobsForTesting()) with get, set
 
 let private wikiDraftEntrySchema : obj =
     createObj
@@ -161,5 +313,5 @@ let returnBookkeeperTool (wikiRuntime: MuxWikiRuntime) : ToolDefinition =
                   if current = "" then defaultArg (strField config "cwd") "" else current
               match parseDraftArray (Dyn.get args "entries") with
               | Error message -> resolveStr message
-              | Ok drafts -> wikiRuntime.Submit(sessionID, directory, drafts)
+              | Ok drafts -> wikiRuntime.Submit(sessionID, directory, drafts, config)
       condition = None }

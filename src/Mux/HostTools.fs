@@ -82,7 +82,7 @@ let addIfSome (entries: ResizeArray<string * obj>) (key: string) (v: 'T option) 
 let private wrapWebError (label: string) (e: DomainError) =
     $"Web {label} failed: {describeDomainError e}"
 
-let executorTool (deps: obj) : ToolDefinition =
+let executorTool (deps: obj) (wikiRuntime: obj) : ToolDefinition =
     { name = "executor"
       description = description "executor"
       parameters =
@@ -93,7 +93,7 @@ let executorTool (deps: obj) : ToolDefinition =
                   "dependencies", box (strArrayProp Params.executorDeps)
                   "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |])
                   "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |]) ])
-            [| "language"; "program"; "timeout_type" |]
+            [| "language"; "program"; "timeout_type"; "mode" |]
       execute =
         fun config args ->
             promise {
@@ -106,6 +106,11 @@ let executorTool (deps: obj) : ToolDefinition =
                                | Completed o | Truncated(o, _) | Failed o | MissingExecutable(_, o) -> o
                     })
                 let! output = summarizeWhenNeeded deps config opts execResult
+                if opts.mode = "rw" && not (Dyn.isNullish wikiRuntime) then
+                    let inputJson = JS.JSON.stringify args
+                    let startFn = Dyn.get wikiRuntime "startBookkeeperAppend"
+                    if not (Dyn.isNullish startFn) then
+                        startFn $ (inputJson, output, "executor", config) |> ignore
                 return output
             }
       condition = None }

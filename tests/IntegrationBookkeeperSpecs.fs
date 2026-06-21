@@ -12,6 +12,7 @@ open VibeFs.Opencode.WikiRuntime
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.WikiFiles
+open VibeFs.Kernel.Wiki
 
 let bookkeeperLaunchCarriesAiSettingsSpec () = promise {
     let createCalls = ResizeArray<obj>()
@@ -142,5 +143,23 @@ let bookkeeperSessionRegisteredInChildAgentRegistrySpec () = promise {
     let resolvedTools = get (get output "message") "tools"
     check "bookkeeper session keeps return_bookkeeper enabled" (unbox<bool> (get resolvedTools "return_bookkeeper") = true)
     check "bookkeeper session denies unrelated tools via permission matrix" (unbox<bool> (get resolvedTools "websearch") = false)
+    do! rmAsync workspaceDir
+}
+
+let muxDailyMaintenanceLaunchSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-daily-maintenance-"
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [ wikiEntry "0a3f" "积压问题" "Daily candidate" ]
+    let reg = createRegistration (minimalMuxDeps ())
+    let wikiRuntime = muxWikiRuntime reg
+    let startFn = get wikiRuntime "startMaintenanceIfDue"
+    if isNullish startFn then
+        check "mux wiki runtime exposes startMaintenanceIfDue" false
+    else
+        do! ((startFn $ workspaceDir) |> unbox<JS.Promise<unit>>)
+        do! waitForBackgroundJobsForTesting reg
+        let launches = takeBookkeeperLaunchesForTesting reg
+        check "mux daily maintenance schedules at least one launch" (launches.Length >= 1)
+        check "mux daily maintenance launch uses bookkeeper agent" (launches |> Array.forall (fun l -> str l "agent" = "bookkeeper"))
     do! rmAsync workspaceDir
 }

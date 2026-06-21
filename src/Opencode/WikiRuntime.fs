@@ -123,9 +123,8 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 | Some ctx ->
                     try
                         let isAppend = match ctx.kind with AppendAfterWork -> true | _ -> false
-                        let! preCount = if isAppend then dayEntryCount root (today ()) else Promise.lift 0
                         let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind portLockTimeoutMs portLockRetryDelayMs (today ()) ctx.workspaceRoot ctx.kind drafts)
-                        if isAppend && preCount % 10 = 0 then
+                        if isAppend then
                             this.StartMaintenanceIfDue(root) |> ignore
                         return result
                     finally

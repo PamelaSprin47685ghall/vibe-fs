@@ -216,6 +216,7 @@ export interface HostDependencies {
     configFile: ConfigFile,
     workspaceId: string,
   ) => FindWorkspaceEntryResult | undefined;
+  readonly getChatHistory?: (workspaceId: string) => Promise<unknown[]>;
 }
 
 export interface PluginEvent {

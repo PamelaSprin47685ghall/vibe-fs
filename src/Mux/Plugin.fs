@@ -19,13 +19,16 @@ open VibeFs.Shell.WorkspaceFiles
 
 let muxToolNames =
     [| "coder"; "investigator"; "meditator"; "browser"; "executor"
-       "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
+       "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
        "fetch_wiki"; "return_bookkeeper" |]
 
-let getPluginToolPolicy (agentId: string) (role: obj) : obj =
+let private buildToolPolicy (toolNames: string array) (role: obj) : obj =
     let agent = if Dyn.isNullish role then "manager" else string role
-    let remove = muxToolNames |> Array.filter (fun t -> not (canUse agent t))
+    let remove = toolNames |> Array.filter (fun t -> not (canUse agent t))
     box {| add = [||]; remove = remove |}
+
+let getPluginToolPolicy (agentId: string) (role: obj) : obj =
+    buildToolPolicy muxToolNames role
 
 let collectReadOutputs (messages: obj array) : string[] =
     VibeFs.Kernel.MessageDedup.collectReadOutputs messages |> Array.ofList
@@ -119,8 +122,9 @@ let createToolCatalog
            investigatorTool deps toolNames
            meditatorTool deps toolNames
            browserTool deps toolNames
-           executorTool deps
+           executorTool deps (box wikiRuntime)
            submitReviewTool deps toolNames callStore reviewStore
+           returnReviewerTool deps callStore reviewStore
            websearchTool deps
            webfetchTool
            fuzzyGrepTool finderCache
@@ -136,7 +140,7 @@ let createRegistration (deps: obj) : obj =
     let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
     let hostReadExec = HostReadExec()
     let finderCache = FinderCache()
-    let wikiRuntime = MuxWikiRuntime()
+    let wikiRuntime = MuxWikiRuntime(deps)
     let toolNames = muxToolNames
     let tools = createToolCatalog deps toolNames callStore reviewStore hostReadExec finderCache wikiRuntime
     let toolsObj = toolsToObject tools
@@ -157,15 +161,17 @@ let createRegistration (deps: obj) : obj =
            eventHook = eventHook
            slashCommands = slashCommands
            __wikiRuntime =
-               box (createObj
-                   [ "rawInstance", box wikiRuntime
-                     "registerJobForTesting",
-                     box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
-                         wikiRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
-                     "takeBookkeeperLaunchesForTesting",
-                     box (System.Func<obj array>(fun () -> [||]))
-                     "waitForBackgroundJobsForTesting",
-                     box (System.Func<JS.Promise<unit>>(fun () -> Promise.lift ())) ])
+                box (createObj
+                    [ "rawInstance", box wikiRuntime
+                      "registerJobForTesting",
+                      box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
+                          wikiRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
+                      "startMaintenanceIfDue",
+                      box (System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> wikiRuntime.StartMaintenanceIfDue(workspaceRoot)))
+                      "takeBookkeeperLaunchesForTesting",
+                      box (System.Func<obj array>(fun () -> wikiRuntime.TakeBookkeeperLaunchesForTesting()))
+                      "waitForBackgroundJobsForTesting",
+                      box (System.Func<JS.Promise<unit>>(fun () -> wikiRuntime.WaitForBackgroundJobsForTesting())) ])
            __reviewStore =
                box (createObj
                    [ "activateReview",
@@ -187,7 +193,4 @@ let createRegistration (deps: obj) : obj =
                          |> Seq.tryFind (fun k -> k.StartsWith(prefix))
                          |> Option.map (fun k -> resolveCall callStore k args)
                          |> Option.defaultValue false)) ])
-           getToolPolicy = (fun (_agentId: string) (role: obj) ->
-               let agent = if Dyn.isNullish role then "manager" else string role
-               let remove = toolNames |> Array.filter (fun t -> not (canUse agent t))
-               box {| add = [||]; remove = remove |}) |}
+           getToolPolicy = (fun (_agentId: string) (role: obj) -> buildToolPolicy toolNames role) |}

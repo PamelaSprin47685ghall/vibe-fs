@@ -160,6 +160,15 @@ let muxToolByName (reg: obj) (name: string) : obj =
 let muxToolSchema (toolDef: obj) : obj =
     if isNullish toolDef then null else get toolDef "parameters"
 
+let muxToolSchemaRequired (toolDef: obj) : string array =
+    if isNullish toolDef then [||]
+    else
+        let schema = muxToolSchema toolDef
+        if isNullish schema then [||]
+        else
+            let req = get schema "required"
+            if isArray req then unbox<string[]> req else [||]
+
 let muxExecutorModeSchema (reg: obj) : obj =
     let executor = muxToolByName reg "executor"
     let schema = muxToolSchema executor
@@ -204,6 +213,16 @@ let minimalMuxDeps () : obj =
           "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
           "resolveAgentFrontmatter",
           box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj []))) ]
+
+let muxDepsWithChatHistory (sessionID: string) (messages: obj array) : obj =
+    createObj
+        [ "loadConfigOrDefault", box (fun () -> createObj [])
+          "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
+          "resolveAgentFrontmatter",
+          box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
+          "getChatHistory",
+          box (System.Func<string, JS.Promise<obj array>>(fun sid ->
+              promise { return if sid = sessionID then messages else [||] })) ]
 
 let mockMuxTaskServiceCapturingPrompt (prompts: ResizeArray<string>) : obj =
     createObj

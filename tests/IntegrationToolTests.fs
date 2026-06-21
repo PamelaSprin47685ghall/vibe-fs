@@ -37,6 +37,7 @@ let computeCountSpec (reg: obj) =
     check "has submit_review tool" (names |> Array.contains "submit_review")
     check "has fetch_wiki tool" (names |> Array.contains "fetch_wiki")
     check "has return_bookkeeper tool" (names |> Array.contains "return_bookkeeper")
+    check "has return_reviewer tool" (names |> Array.contains "return_reviewer")
 
 let muxFetchWikiSnapshotSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-wiki-fetch-"
@@ -114,6 +115,49 @@ let muxReturnBookkeeperNoActiveJobSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let muxReturnBookkeeperReconstructsJobFromHistorySpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-wiki-history-"
+    do! ensureWikiDir workspaceDir
+    let sessionID = "mux-wiki-history-session"
+    let marker = renderJobMarker { workspaceRoot = workspaceDir; kind = AppendAfterWork }
+    let deps = muxDepsWithChatHistory sessionID [| box marker |]
+    let reg = createRegistration deps
+    let submitTool = muxToolByName reg "return_bookkeeper"
+    if isNullish submitTool then
+        check "mux registration exposes return_bookkeeper tool" false
+    else
+        let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box sessionID ]
+        let submitArgs = createObj [ "entries", box [| wikiDraftEntry None "历史重建问题" "历史重建答案" |] ]
+        let! result = ((get submitTool "execute") $ (submitCtx, submitArgs)) |> unbox<JS.Promise<string>>
+        check "mux return_bookkeeper reconstructs job from history" (result.Contains "Appended 1 wiki entries")
+        let! projection = readProjectionAsync workspaceDir
+        check "mux return_bookkeeper history reconstruction persists entry" (
+            projection |> Map.toList |> List.exists (fun (_, entry) -> entry.q = "历史重建问题" && entry.a = "历史重建答案"))
+    do! rmAsync workspaceDir
+}
+
+let muxReturnBookkeeperAppendTriggersLaunchSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-wiki-launch-"
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [
+        for i in 1 .. 10 do yield wikiEntry (sprintf "%04x" i) (sprintf "积压问题 %d" i) "Candidate" ]
+    let today = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
+    let reg = createRegistration (minimalMuxDeps ())
+    registerMuxWikiJobForTest reg "mux-wiki-launch-job" workspaceDir "append" (createObj [ "today", box today ])
+    let submitTool = muxToolByName reg "return_bookkeeper"
+    if isNullish submitTool then
+        check "mux registration exposes return_bookkeeper tool" false
+    else
+        let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-wiki-launch-job" ]
+        let submitArgs = createObj [ "entries", box [| wikiDraftEntry None "触发问题" "触发答案" |] ]
+        let! result = ((get submitTool "execute") $ (submitCtx, submitArgs)) |> unbox<JS.Promise<string>>
+        check "mux return_bookkeeper append accepted" (result <> "")
+        do! waitForBackgroundJobsForTesting reg
+        let launches = takeBookkeeperLaunchesForTesting reg
+        check "mux return_bookkeeper append triggers bookkeeper launch" (launches.Length > 0)
+    do! rmAsync workspaceDir
+}
+
 let muxTopLevelPolicySpec () =
     promise {
         let managerPolicy = getPluginToolPolicy "x" (box "manager")
@@ -151,10 +195,9 @@ let muxExecutorModeSchemaSpec () = promise {
     let modeSchema = muxExecutorModeSchema reg
     check "mux executor mode schema exists" (not (isNullish modeSchema))
     check "mux executor mode schema enum ro/rw" (enumValues modeSchema = [| "ro"; "rw" |])
-    // mode is optional (not required) because Mux has no after-hook/bookkeeper infrastructure
     let executor = muxToolByName reg "executor"
-    let props = get (get executor "parameters") "properties"
-    check "mux executor mode is not in required" (not (isNullish (get props "mode")))
+    let required = muxToolSchemaRequired executor
+    check "mux executor mode is required" (required |> Array.contains "mode")
 }
 
 let run () : JS.Promise<unit> =
@@ -194,6 +237,7 @@ let run () : JS.Promise<unit> =
             "websearchTriggersBookkeeper", websearchTriggersBookkeeperSpec
             "webfetchTriggersBookkeeper", webfetchTriggersBookkeeperSpec
             "bookkeeperSessionRegisteredInChildAgentRegistry", bookkeeperSessionRegisteredInChildAgentRegistrySpec
+            "muxDailyMaintenanceLaunch", muxDailyMaintenanceLaunchSpec
             "toolDefinition", toolDefinitionSpec
             "toolExecuteBefore", toolExecuteBeforeSpec
             "mimoApplyPatchExecuteBefore", mimoApplyPatchExecuteBeforeSpec
@@ -216,11 +260,17 @@ let run () : JS.Promise<unit> =
             "muxFetchWikiSnapshot", muxFetchWikiSnapshotSpec
             "muxReturnBookkeeperAppend", muxReturnBookkeeperAppendSpec
             "muxReturnBookkeeperNoActiveJob", muxReturnBookkeeperNoActiveJobSpec
+            "muxReturnBookkeeperReconstructsJobFromHistory", muxReturnBookkeeperReconstructsJobFromHistorySpec
+            "muxReturnBookkeeperAppendTriggersLaunch", muxReturnBookkeeperAppendTriggersLaunchSpec
             "muxExecutorModeSchema", muxExecutorModeSchemaSpec
             "muxTopLevelPolicy", muxTopLevelPolicySpec
             "muxTopLevelDedup", muxTopLevelDedupSpec
             "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
             "muxSubmitReviewPromptSuppliesCallId", muxSubmitReviewPromptSuppliesCallIdSpec
+            "muxReturnReviewerRegistered", muxReturnReviewerRegisteredSpec
+            "muxReturnReviewerRejectsResolve", muxReturnReviewerRejectsResolveSpec
+            "muxReturnReviewerFirstPassDoubleCheck", muxReturnReviewerFirstPassDoubleCheckSpec
+            "muxReturnReviewerSecondPassResolves", muxReturnReviewerSecondPassResolvesSpec
         ]
         for (label, spec) in specs do
             do! timedAsync ("IntegrationTool." + label) spec
