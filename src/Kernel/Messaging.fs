@@ -64,12 +64,15 @@ let classifySource (id: string) : Source =
         |> Option.map Synthetic
         |> Option.defaultValue Native
 
-let decodeRole (s: string) : Role =
-    match s with
-    | "user" -> User
-    | "assistant" -> Assistant
-    | "toolResult" | "tool-result" | "tool_result" -> ToolResult
-    | _ -> System
+let private roleMap =
+    Map.ofList
+        [ "user", User
+          "assistant", Assistant
+          "toolResult", ToolResult
+          "tool-result", ToolResult
+          "tool_result", ToolResult ]
+
+let decodeRole (s: string) : Role = Map.tryFind s roleMap |> Option.defaultValue System
 
 /// Pure typed copy of a tool part with its state.output overwritten.
 let setPartOutputTyped (part: Part) (newOutput: string) : Part =

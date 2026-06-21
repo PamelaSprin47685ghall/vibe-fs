@@ -106,18 +106,17 @@ let private readImportEntryAsync (projectRoot: string) (entry: string) (budget: 
             with _ -> return budget
     }
 
+let rec private foldAsync<'State, 'T> (folder: 'State -> 'T -> JS.Promise<'State>) (state: 'State) (items: 'T list) : JS.Promise<'State> =
+    promise {
+        match items with
+        | [] -> return state
+        | x :: xs ->
+            let! nextState = folder state x
+            return! foldAsync folder nextState xs
+    }
+
 let private readImportsAsync (projectRoot: string) (entries: string list) (budget: Budget) : JS.Promise<Budget> =
-    let rec loop remaining currentBudget =
-        promise {
-            match remaining with
-            | [] -> return currentBudget
-            | entry :: rest ->
-                if isFull currentBudget then return currentBudget
-                else
-                    let! nextBudget = readImportEntryAsync projectRoot entry currentBudget
-                    return! loop rest nextBudget
-        }
-    loop entries budget
+    foldAsync (fun currentBudget entry -> readImportEntryAsync projectRoot entry currentBudget) budget entries
 
 let private splitFrontMatter (content: string) : string * obj option =
     let trimmed = content.TrimStart('\r', '\n')
@@ -169,17 +168,14 @@ type ReverieFileResult =
       content: string option
       skipReason: string option }
 
-let private statSize2 (s: obj) : int = s?size
-let private statIsFile2 (s: obj) : bool = s?isFile ()
-
 let readOne (cwd: string) (file: string) : JS.Promise<ReverieFileResult> =
     promise {
         let absolute = pathResolve cwd file
         try
             let! s = stat absolute
-            if not (statIsFile2 s) then
+            if not (statIsFile s) then
                 return { filePath = file; content = None; skipReason = Some "not-file" }
-            elif statSize2 s > maxReverieFileBytes then
+            elif statSize s > maxReverieFileBytes then
                 return { filePath = file; content = None; skipReason = Some "too-large" }
             else
                 let! content = readFile absolute
@@ -188,13 +184,14 @@ let readOne (cwd: string) (file: string) : JS.Promise<ReverieFileResult> =
             return { filePath = file; content = None; skipReason = Some "unreadable" }
     }
 
+let private readAndPrepend (cwd: string) (xs: ReverieFileResult list) (file: string) : JS.Promise<ReverieFileResult list> =
+    promise {
+        let! r = readOne cwd file
+        return r :: xs
+    }
+
 let readReverieFiles (cwd: string) (files: string list) : JS.Promise<ReverieFileResult list> =
-    let rec loop remaining acc =
-        promise {
-            match remaining with
-            | [] -> return List.rev acc
-            | file :: rest ->
-                let! r = readOne cwd file
-                return! loop rest (r :: acc)
-        }
-    loop files []
+    promise {
+        let! acc = foldAsync (readAndPrepend cwd) ([]: ReverieFileResult list) files
+        return List.rev acc
+    }

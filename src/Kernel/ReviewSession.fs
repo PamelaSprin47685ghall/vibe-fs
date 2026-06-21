@@ -50,13 +50,8 @@ let isActive (state: ReviewState) : bool =
 
 let initialState = ReviewState.Inactive
 
-/// The terminal outcome of a review round, distinguishable from the ongoing
-/// state machine: Accepted and Rejected echo the verdict, Terminated means the
-/// session was disposed without a verdict.
 type ReviewResult = Accepted | Rejected of feedback: string | Terminated
 
-/// A session is the review state machine plus the provenance the host needs to
-/// render and link sessions.  Immutable: every mutation produces a new record.
 type ReviewSession =
     { id: string
       version: int
@@ -71,28 +66,19 @@ let empty id createdAt : ReviewSession =
     { id = id; version = 0; state = ReviewState.Inactive; createdAt = createdAt
       originalTask = None; lastFeedback = None; parentId = None; childIds = [] }
 
-/// Apply a command through the pure transition, returning a new session when the
-/// state actually changes. `transition` already returns the event log (the
-/// authoritative "did anything happen?" signal): an event fires iff the state
-/// moved, so we trust that instead of recomputing via structural equality (P36).
 let applyCommand (session: ReviewSession) (command: ReviewCommand) : ReviewSession =
     let nextState, event = transition session.state command
     match event with
     | None -> session
     | Some _ -> { session with state = nextState; version = session.version + 1 }
 
-let withTask (task: string) (session: ReviewSession) : ReviewSession =
-    if session.originalTask = Some task then session
-    else { session with originalTask = Some task; version = session.version + 1 }
-let withFeedback (session: ReviewSession) (feedback: string) : ReviewSession =
-    if session.lastFeedback = Some feedback then session
-    else { session with lastFeedback = Some feedback; version = session.version + 1 }
+let withTask task session =
+    if session.originalTask = Some task then session else { session with originalTask = Some task; version = session.version + 1 }
+let withFeedback session feedback =
+    if session.lastFeedback = Some feedback then session else { session with lastFeedback = Some feedback; version = session.version + 1 }
 let addChild session childId =
-    if List.contains childId session.childIds then session
-    else { session with childIds = session.childIds @ [ childId ]; version = session.version + 1 }
+    if List.contains childId session.childIds then session else { session with childIds = session.childIds @ [ childId ]; version = session.version + 1 }
 
-/// The registry is a fold over session-level actions — the event-sourcing
-/// reduce.  Every action is data; `reduce` is the single interpreter.
 [<RequireQualifiedAccess>]
 type RegistryAction =
     | Activate of id: string * task: string * createdAt: int64
@@ -116,23 +102,19 @@ let private updateSession registry id f =
     | None -> registry
     | Some session -> set registry id (f session)
 
-/// Apply a review command to the session at `id`, then run `extra` on the
-/// result only when the state actually changed. Structural equality makes the
-/// no-op case a no-write (REFACTOR.md §2).
-let private transitionSession registry id command extra =
+let private transitionSessionWithExtra registry id command extra =
     updateSession registry id (fun session ->
         let updated = applyCommand session command
         if updated = session then session else extra updated)
 
+let private transitionSession registry id command =
+    transitionSessionWithExtra registry id command (fun s -> s)
+
 let private evictStale registry cutoff : Registry =
-    let changed =
-        registry
-        |> Map.exists (fun _ s -> s.createdAt < cutoff)
+    let changed = registry |> Map.exists (fun _ s -> s.createdAt < cutoff)
     if not changed then registry
     else registry |> Map.filter (fun _ s -> s.createdAt >= cutoff)
 
-/// The single reducer.  Pattern match is exhaustive over RegistryAction —
-/// adding a case is a compile error until it is handled here.
 let reduce (registry: Registry) (action: RegistryAction) : Registry =
     match action with
     | RegistryAction.Activate (id, task, createdAt) ->
@@ -142,20 +124,18 @@ let reduce (registry: Registry) (action: RegistryAction) : Registry =
             |> withTask task
         set registry id (applyCommand seed (ReviewCommand.Activate task))
     | RegistryAction.Lock (id, reviewerId) ->
-        transitionSession registry id (ReviewCommand.Lock reviewerId) (fun s -> s)
+        transitionSession registry id (ReviewCommand.Lock reviewerId)
     | RegistryAction.Unlock id ->
-        transitionSession registry id ReviewCommand.Unlock (fun s -> s)
+        transitionSession registry id ReviewCommand.Unlock
     | RegistryAction.Accept id ->
-        transitionSession registry id ReviewCommand.Accept (fun s -> s)
+        transitionSession registry id ReviewCommand.Accept
     | RegistryAction.Reject (id, feedback) ->
-        transitionSession registry id (ReviewCommand.Reject feedback) (fun s -> withFeedback s feedback)
+        transitionSessionWithExtra registry id (ReviewCommand.Reject feedback) (fun s -> withFeedback s feedback)
     | RegistryAction.Deactivate id -> Map.remove id registry
     | RegistryAction.Evict cutoff -> evictStale registry cutoff
     | RegistryAction.AddChild (parentId, childId) ->
         updateSession registry parentId (fun s -> addChild s childId)
     | RegistryAction.Clear -> emptyRegistry
-
-// ── Queries ──────────────────────────────────────────────────────────────────
 
 let actionFor (id: string) (result: ReviewResult) : RegistryAction =
     match result with
@@ -186,65 +166,53 @@ let reduceIfVersionMatches (registry: Registry) (id: string) (expectedVersion: i
     | Some session when session.version = expectedVersion -> Some(reduce registry action)
     | _ -> None
 
-// ── Reviewer loop ─────────────────────────────────────────────────────────────
-
-/// What happened in a single reviewer round.
 type RoundOutcome =
     | Resolved of result: ReviewResult
     | PromptFailed
     | NoResult
 
-/// What the orchestrator should do after a round: stop with a result, or nudge.
 type LoopDecision =
     | Finish of result: ReviewResult
     | Nudge of nudgeCount: int
 
-/// Decide the next move after a round.  Resolved ends the loop; a failed prompt
-/// terminates; running out of nudges terminates; otherwise nudge and retry.
-let decideAfterRound (nudgeCount: int) (outcome: RoundOutcome) (maxNudges: int) : LoopDecision =
+let decideAfterRound nudgeCount outcome maxNudges : LoopDecision =
     match outcome with
     | Resolved result -> Finish result
     | PromptFailed -> Finish Terminated
-    | NoResult ->
-        let next = nudgeCount + 1
-        if next >= maxNudges then Finish Terminated else Nudge next
+    | NoResult -> if nudgeCount + 1 >= maxNudges then Finish Terminated else Nudge (nudgeCount + 1)
 
-/// Initial round uses the task prompt; every retry uses the short nudge prompt.
 let promptParts (nudgeCount: int) (initialParts: string list) (nudgePrompt: string) : string list =
     if nudgeCount = 0 then initialParts else [ nudgePrompt ]
 
-/// Pending review resolutions and their abort suppressors, keyed by session.
 type SessionEffects =
     { pendingResolutions: Map<string, ReviewResult -> unit>
       abortSuppressors: Map<string, unit -> unit> }
 
-let emptyEffects : SessionEffects =
-    { pendingResolutions = Map.empty; abortSuppressors = Map.empty }
+let emptyEffects : SessionEffects = { pendingResolutions = Map.empty; abortSuppressors = Map.empty }
 
 let setPending effects sessionId resolve =
     { effects with pendingResolutions = Map.add sessionId resolve effects.pendingResolutions }
 
-/// Fire the pending resolver for a session, then clean up its suppressor.
-/// Returns true when a resolver was actually waiting.
-let resolvePending (effects: SessionEffects) sessionId result : SessionEffects * bool =
-    match Map.tryFind sessionId effects.pendingResolutions with
-    | None -> effects, false
+let private fireClear effects id result =
+    match Map.tryFind id effects.pendingResolutions with
+    | None -> None
     | Some resolve ->
         resolve result
-        let without = { effects with pendingResolutions = Map.remove sessionId effects.pendingResolutions }
-        match Map.tryFind sessionId effects.abortSuppressors with
-        | Some suppress -> suppress(); { without with abortSuppressors = Map.remove sessionId without.abortSuppressors }, true
-        | None -> without, true
+        let without = { effects with pendingResolutions = Map.remove id effects.pendingResolutions }
+        match Map.tryFind id without.abortSuppressors with
+        | Some suppress ->
+            suppress ()
+            Some { without with abortSuppressors = Map.remove id without.abortSuppressors }
+        | None -> Some without
 
-/// Resolve every pending session in a tree as Terminated, firing suppressors.
+let resolvePending (effects: SessionEffects) sessionId result : SessionEffects * bool =
+    match fireClear effects sessionId result with
+    | None -> effects, false
+    | Some next -> next, true
+
 let disposeSessionTree (effects: SessionEffects) sessionIds : SessionEffects =
     sessionIds
     |> List.fold (fun acc id ->
-        match Map.tryFind id acc.pendingResolutions with
-        | Some resolve ->
-            resolve Terminated
-            let cleared = { acc with pendingResolutions = Map.remove id acc.pendingResolutions }
-            match Map.tryFind id cleared.abortSuppressors with
-            | Some suppress -> suppress(); { cleared with abortSuppressors = Map.remove id cleared.abortSuppressors }
-            | None -> cleared
-        | None -> acc) effects
+        match fireClear acc id Terminated with
+        | None -> acc
+        | Some next -> next) effects

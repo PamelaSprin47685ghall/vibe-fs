@@ -11,6 +11,7 @@ type FileAnnotation =
 let hotFrecency = 25
 let warmFrecency = 20
 let grepMaxLineLength = 500
+let private skipGitStatuses = Set [ "clean"; "unknown"; "" ]
 
 let truncateLine (line: string) (max: int) : string =
     let trimmed = line.Trim()
@@ -21,7 +22,7 @@ let fileAnnotation (item: FileAnnotation option) : string =
     | None -> ""
     | Some i ->
         match i.gitStatus with
-        | Some g when g <> "clean" && g <> "unknown" && g <> "" -> $"  [{g} in git]"
+        | Some g when not (Set.contains g skipGitStatuses) -> $"  [{g} in git]"
         | _ ->
             let frecency = i.totalFrecencyScore |> Option.orElse i.accessFrecencyScore |> Option.defaultValue 0
             match frecency with

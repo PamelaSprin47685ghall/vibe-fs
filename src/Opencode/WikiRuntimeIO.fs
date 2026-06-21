@@ -62,8 +62,11 @@ let submitForKind (todayStr: string) (root: string) (kind: WikiJobKind) (drafts:
                 return $"Rewrote wiki snapshot through {throughDate}."
         })
 
+let private jobMarkerPrompt (ctx: WikiJobContext) (promptText: string) : string =
+    renderJobMarker ctx + "\n\n" + promptText
+
 let private promptParts (ctx: WikiJobContext) (promptText: string) : obj array =
-    [| box {| ``type`` = "text"; text = renderJobMarker ctx + "\n\n" + promptText |} |]
+    [| box {| ``type`` = "text"; text = jobMarkerPrompt ctx promptText |} |]
 
 let private launchResultText (title: string) (childId: string) : string =
     $"Started {title} in background session {childId}."
@@ -100,7 +103,7 @@ let launchBackgroundSession (session: obj) (root: string) (parentID: string opti
                 startSubagentSession registry client
                     { agent = "bookkeeper"
                       title = title
-                      prompt = renderJobMarker ctx + "\n\n" + promptText
+                      prompt = jobMarkerPrompt ctx promptText
                       directory = root
                       sessionID = defaultArg parentID ""
                       tools = null
@@ -111,11 +114,9 @@ let launchBackgroundSession (session: obj) (root: string) (parentID: string opti
     }
 
 /// Fire-and-forget: build the prompt then launch the background session inside
-/// the runtime commandQueue. When the job finishes (success or failure), clear
-/// the optional scheduled-maintenance dedup key so the next cycle may retrigger.
-/// `applyCmd` mutates the runtime state cell and is serialized with the rest of
-/// the commandQueue work.
-let queueBackgroundLaunch (client: obj) (commandQueue: SerialQueue) (recordResult: string -> unit) (root: string) (parentID: string option) (kind: WikiJobKind) (title: string) (buildPrompt: unit -> JS.Promise<string>) (aiSettings: DelegatedAiSettings) (maintenanceKey: string option) (registry: ChildAgentRegistry) : unit =
+/// the runtime commandQueue. `applyCmd` mutates the runtime state cell and is
+/// serialized with the rest of the commandQueue work.
+let queueBackgroundLaunch (client: obj) (commandQueue: SerialQueue) (recordResult: string -> unit) (root: string) (parentID: string option) (kind: WikiJobKind) (title: string) (buildPrompt: unit -> JS.Promise<string>) (aiSettings: DelegatedAiSettings) (registry: ChildAgentRegistry) : unit =
     match sessionApiOf client with
     | None -> recordResult (failedLaunchResult title "host client is missing session.create/session.prompt APIs")
     | Some session ->

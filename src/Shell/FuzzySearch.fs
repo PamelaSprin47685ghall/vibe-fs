@@ -33,27 +33,28 @@ let private trim<'t> (dict: Dictionary<string, 't>) (max: int) : unit =
         let first = Seq.head dict.Keys
         dict.Remove(first) |> ignore
 
-let storeFindIterator (store: TypedIteratorStore) (scopeId: string) (state: FuzzyFindState) : string =
-    let id = nextId store scopeId findIteratorNamespace
-    store.findIterators.[id] <- state
-    trim store.findIterators store.maxIterators
+let private storeTyped (dict: Dictionary<string, 't>) (store: TypedIteratorStore) (scopeId: string) (namespace': string) (state: 't) : string =
+    let id = nextId store scopeId namespace'
+    dict.[id] <- state
+    trim dict store.maxIterators
     id
+
+let private consumeTyped (dict: Dictionary<string, 't>) (id: string) : 't option =
+    match dict.TryGetValue id with
+    | true, state -> dict.Remove id |> ignore; Some state
+    | false, _ -> None
+
+let storeFindIterator (store: TypedIteratorStore) (scopeId: string) (state: FuzzyFindState) : string =
+    storeTyped store.findIterators store scopeId findIteratorNamespace state
 
 let storeGrepIterator (store: TypedIteratorStore) (scopeId: string) (state: FuzzyGrepState) : string =
-    let id = nextId store scopeId grepIteratorNamespace
-    store.grepIterators.[id] <- state
-    trim store.grepIterators store.maxIterators
-    id
+    storeTyped store.grepIterators store scopeId grepIteratorNamespace state
 
 let consumeFindIterator (store: TypedIteratorStore) (id: string) : FuzzyFindState option =
-    match store.findIterators.TryGetValue id with
-    | true, state -> store.findIterators.Remove id |> ignore; Some state
-    | false, _ -> None
+    consumeTyped store.findIterators id
 
 let consumeGrepIterator (store: TypedIteratorStore) (id: string) : FuzzyGrepState option =
-    match store.grepIterators.TryGetValue id with
-    | true, state -> store.grepIterators.Remove id |> ignore; Some state
-    | false, _ -> None
+    consumeTyped store.grepIterators id
 
 let clearTypedIteratorScope (store: TypedIteratorStore) (scopeId: string) : unit =
     let prefix = scopeId + ":"
@@ -115,15 +116,17 @@ let resolveStore (opts: SearchOptions) : TypedIteratorStore =
     | Some s -> unbox<TypedIteratorStore> s
     | None -> unbox<TypedIteratorStore> globalIteratorStore
 
+let private iteratorError toolName it = $"{toolName} iterator error: unknown, expired, or already consumed iterator \"{it}\""
+
+let private resolveIteratorBranch (store: TypedIteratorStore) iterator consume toolName onFresh =
+    match iterator with
+    | Some it -> match consume store it with Some s -> Ok s | None -> Error (iteratorError toolName it)
+    | None -> onFresh ()
+
 let resolveFindSearchState (params': FuzzyFindParams) (opts: SearchOptions)
     : Result<FuzzyFindState, string> =
     let store = resolveStore opts
-    match params'.iterator with
-    | Some it ->
-        match consumeFindIterator store it with
-        | Some state -> Ok state
-        | None -> Error $"fuzzy_find iterator error: unknown, expired, or already consumed iterator \"{it}\""
-    | None ->
+    resolveIteratorBranch store params'.iterator consumeFindIterator "fuzzy_find" (fun () ->
         match params'.pattern with
         | None | Some "" -> Error "pattern is required on the first call"
         | Some pattern ->
@@ -132,17 +135,12 @@ let resolveFindSearchState (params': FuzzyFindParams) (opts: SearchOptions)
             Ok { query = buildQuery searchPath.pathConstraint pattern [] searchPath.basePath searchPath.external
                  pageSize = defaultArg params'.limit 30
                  pageIndex = 0
-                 externalBasePath = externalBasePath }
+                 externalBasePath = externalBasePath })
 
 let resolveGrepSearchState (params': FuzzyGrepParams) (opts: SearchOptions)
     : Result<FuzzyGrepState, string> =
     let store = resolveStore opts
-    match params'.iterator with
-    | Some it ->
-        match consumeGrepIterator store it with
-        | Some state -> Ok state
-        | None -> Error $"fuzzy_grep iterator error: unknown, expired, or already consumed iterator \"{it}\""
-    | None ->
+    resolveIteratorBranch store params'.iterator consumeGrepIterator "fuzzy_grep" (fun () ->
         match params'.pattern with
         | None | Some "" -> Error "pattern is required on the first call"
         | Some pattern ->
@@ -159,7 +157,7 @@ let resolveGrepSearchState (params': FuzzyGrepParams) (opts: SearchOptions)
                      afterContext = defaultArg params'.context 0
                      pageSize = defaultArg params'.limit 50
                      externalBasePath = externalBasePath
-                     cursor = None }
+                     cursor = None })
 
 // ─── Finder acquisition / release ───────────────────────────────────────────
 

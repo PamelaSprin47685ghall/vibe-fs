@@ -31,14 +31,12 @@ module Id =
     let workspaceIdQuick (input: string) : WorkspaceId = WorkspaceId input
     let agentIdQuick (input: string) : AgentId = AgentId input
 
-    let trySessionId (input: string) : SessionId option =
-        match parse "SessionId" input with Ok value -> Some(SessionId value) | _ -> None
+    let private tryId (parser: string -> Result<'id, string>) (input: string) : 'id option =
+        match parser input with Ok value -> Some value | _ -> None
 
-    let tryWorkspaceId (input: string) : WorkspaceId option =
-        match parse "WorkspaceId" input with Ok value -> Some(WorkspaceId value) | _ -> None
-
-    let tryAgentId (input: string) : AgentId option =
-        match parse "AgentId" input with Ok value -> Some(AgentId value) | _ -> None
+    let trySessionId = tryId sessionId
+    let tryWorkspaceId = tryId workspaceId
+    let tryAgentId = tryId agentId
 
 type DomainError =
     | MessageAborted

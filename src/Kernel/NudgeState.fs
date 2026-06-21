@@ -226,6 +226,16 @@ let handleEvent (state: NudgeShellState) (sessionID: string) (event: NudgeHostEv
     | RetryProgress -> deleteRetryPendingSession state sessionID, false
     | Other -> state, false
 
+let private sessionEventTypes =
+    Set.ofList [
+        "session.created"
+        "session.updated"
+        "session.deleted"
+        "session.delete"
+        "session.close"
+        "session.remove"
+    ]
+
 let getSessionID (eventType: string) (props: obj) : string =
     let part = Dyn.get props "part"
     let info = Dyn.get props "info"
@@ -233,7 +243,7 @@ let getSessionID (eventType: string) (props: obj) : string =
         [ Dyn.str props "sessionID"
           Dyn.str part "sessionID"
           Dyn.str info "sessionID"
-          if eventType = "session.created" || eventType = "session.updated" || eventType = "session.deleted" || eventType = "session.delete" || eventType = "session.close" || eventType = "session.remove" then
+          if Set.contains eventType sessionEventTypes then
               Dyn.str info "id"
           else "" ]
     candidates |> List.tryFind (fun s -> s <> "") |> Option.defaultValue ""

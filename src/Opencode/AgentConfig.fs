@@ -27,7 +27,7 @@ type private BuiltinAgentSpec =
       systemPrompt: string
       defaultMcps: string array }
 
-let private defaultPrimaryAliases = [ "manager"; "build"; "plan" ]
+let private defaultPrimaryAliases = Set [ "manager"; "build"; "plan" ]
 
 let private builtinAgentSpecs =
     [ { name = "manager"; defaultMode = "primary"; systemPrompt = Prompts.managerSystemPrompt; defaultMcps = [||] }
@@ -53,15 +53,16 @@ let private mergeObj (a: obj) (b: obj) : obj =
 let private objectKeys (o: obj) : string array =
     JS.Constructors.Object.keys(o) |> Seq.toArray
 
-let private toolDefaultsFor (host: Host) (agentName: string) : obj =
+let private mapToolNames (host: Host) (f: string -> 'a) : obj =
     allToolNames host
-    |> Seq.map (fun name -> name, box (canUseForHost host agentName name))
+    |> Seq.map (fun name -> name, box (f name))
     |> createObj
 
+let private toolDefaultsFor (host: Host) (agentName: string) : obj =
+    mapToolNames host (canUseForHost host agentName)
+
 let private permissionDefaultsFor (host: Host) (agentName: string) : obj =
-    allToolNames host
-    |> Seq.map (fun name -> name, box (if canUseForHost host agentName name then "allow" else "deny"))
-    |> createObj
+    mapToolNames host (fun name -> if canUseForHost host agentName name then "allow" else "deny")
 
 let private withRoleDefaultsFor (host: Host) (name: string) (userAgent: obj) : obj =
     let spec = tryFindBuiltinAgent name
@@ -73,7 +74,7 @@ let private withRoleDefaultsFor (host: Host) (name: string) (userAgent: obj) : o
     let mode =
         if userMode <> "" then userMode
         else spec |> Option.map (fun value -> value.defaultMode) |> Option.defaultValue "subagent"
-    let primaryDefaultMode = if defaultPrimaryAliases |> List.contains name then "primary" else "subagent"
+    let primaryDefaultMode = if defaultPrimaryAliases |> Set.contains name then "primary" else "subagent"
     let effectiveMode = if mode <> "" then mode else primaryDefaultMode
     let userPerm = Dyn.get userAgent "permission"
     let userTools = Dyn.get userAgent "tools"

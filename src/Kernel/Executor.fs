@@ -23,10 +23,13 @@ let private takeWhile pred (s: string) i =
     let finish = skipWhile pred s i
     finish, s.[i..finish - 1]
 
+let private allowedPipeCommands: Set<string> =
+    Set.ofList [ "head"; "tail" ]
+
 let private parsePipe (s: string) (index: int) : (int * StrippedPipe) option =
     let afterSpace = skipWhile isWhitespace s (index + 1)
     let nameEnd, name = takeWhile isLetter s afterSpace
-    if not (name = "head" || name = "tail") || not (nameEnd < s.Length && isWhitespace s.[nameEnd]) then
+    if not (Set.contains name allowedPipeCommands) || not (nameEnd < s.Length && isWhitespace s.[nameEnd]) then
         None
     else
         let afterSpace2 = skipWhile isWhitespace s nameEnd

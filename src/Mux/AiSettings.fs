@@ -87,13 +87,19 @@ let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) 
             ]
     }
 
+let private thinkingLevelMap =
+    [ "med", Some "medium"
+      "off", Some "off"
+      "low", Some "low"
+      "medium", Some "medium"
+      "high", Some "high"
+      "xhigh", Some "xhigh"
+      "max", Some "max" ]
+    |> Map.ofList
+
 let internal coerceThinkingLevel (value: string) : string option =
-    let trimmed = value.Trim()
-    match trimmed with
-    | "med" -> Some "medium"
-    | "off" | "low" | "medium" | "high" | "xhigh" | "max" -> Some trimmed
-    | "" -> None
-    | _ -> None
+    Map.tryFind (value.Trim()) thinkingLevelMap
+    |> Option.defaultValue None
 
 type ParentRuntimeAiSettings =
     { modelString: string option

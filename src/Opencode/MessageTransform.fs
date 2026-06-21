@@ -20,7 +20,7 @@ open VibeFs.Opencode.CapsCodec
 open VibeFs.Opencode.WikiRuntime
 open VibeFs.Shell.ChildAgentRegistry
 
-let private defaultExcludedAgents = [ "browser"; "investigator"; "executor"; "title"; "bookkeeper" ]
+let private defaultExcludedAgents = set [ "browser"; "investigator"; "executor"; "title"; "bookkeeper" ]
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
@@ -133,13 +133,11 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                 let cleaned = Messaging.stripSyntheticBySource messagesList
                 if cleaned.IsEmpty then ()
                 else
-                    let excluded = defaultExcludedAgents |> List.contains agent
+                    let excluded = defaultExcludedAgents |> Set.contains agent
                     let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleaned)
                     let afterMagic = if excluded then cleaned else projectMagicFor magicSession.Host cleaned backlog false sessionID
                     let encoded = MessagingCodec.encodeMessages afterMagic
                     if not excluded then applyReadDedup encoded
-                    if agent = "manager" then
-                        do! wikiRuntime.StartMaintenanceIfDue(directory)
                     let! capsFiles =
                         if excluded then Promise.lift ([]: CapsFile list)
                         else CapsFileCache.getOrLoad sessionID directory

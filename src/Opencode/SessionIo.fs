@@ -9,6 +9,10 @@ open VibeFs.Opencode.MessagingCodec
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Mux.AiSettings
 
+[<Global>]
+type DOMException(message: string, name: string) =
+    inherit System.Exception()
+
 type SubagentLaunchOptions =
     { agent: string
       title: string
@@ -107,10 +111,6 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) : J
         with _ -> return noOutputText
     }
 
-[<Global>]
-type DOMException(message: string, name: string) =
-    inherit System.Exception()
-
 /// Prompt a session and race it against an AbortSignal. The returned promise
 /// rejects with `AbortError` if the signal fires before the prompt resolves.
 let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
@@ -171,8 +171,6 @@ let startSubagentSession (registry: ChildAgentRegistry) (client: obj) (options: 
             return childID
     }
 
-/// Core subagent runner. The `cleanup` flag controls whether the child session
-/// is aborted and unregistered after the prompt finishes.
 let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                             (directory: string) (sessionID: string) (context: obj)
                             (tools: obj) (cleanup: bool) : JS.Promise<string> =
@@ -210,14 +208,11 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
             return "Failed to create child session"
     }
 
-/// Run a subagent and keep the child session registered after return.
 let runSubagent (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                 (directory: string) (sessionID: string) (context: obj)
                 (tools: obj) : JS.Promise<string> =
     runSubagentCore registry client agent title prompt directory sessionID context tools false
 
-/// Run a subagent and clean up the child session afterwards. Used for
-/// short-lived analysis subagents such as the executor summarizer.
 let runSubagentWithCleanup (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                            (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
     runSubagentCore registry client agent title prompt directory sessionID context (box null) true

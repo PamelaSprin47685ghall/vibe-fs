@@ -100,6 +100,14 @@ let private coderTargetItem (t: CoderTarget) : string =
         draftLines
     ] |> String.concat "\n"
 
+let private agentPrompt fields lines =
+    let actualLines =
+        if lines |> List.exists (fun (l: string) -> l.StartsWith("You are an implementation agent")) then
+            lines
+        else
+            readOnlyRules :: lines
+    frontMatterPrompt fields (String.concat "\n\n" actualLines)
+
 let coderPrompt (intent: CoderIntent) : string =
     let fields =
         [ yamlBlockField "objective" intent.objective
@@ -107,24 +115,23 @@ let coderPrompt (intent: CoderIntent) : string =
           yamlSeqField "targets" (intent.targets |> List.map coderTargetItem) ]
         @ (if intent.doNotTouch.Length = 0 then []
            else [ yamlStringSeqField "do_not_touch" (List.ofArray intent.doNotTouch) ])
-    frontMatterPrompt fields (String.concat "\n\n" [
+    agentPrompt fields [
         "You are an implementation agent. Read the listed files and related code, then edit or create files to satisfy the objective and each target guide."
         "Static verification only (read, inspect, type-check). Do NOT run tests or execute code."
         "Return a concise summary of changes and verification results."
-    ])
+    ]
 
 let investigatorPrompt (intent: InvestigatorIntent) : string =
-    frontMatterPrompt [
+    agentPrompt [
         yamlBlockField "objective" intent.objective
         yamlBlockField "background" intent.background
         yamlStringSeqField "questions" (List.ofArray intent.questions)
         yamlStringSeqField "entries" (List.ofArray intent.entries)
-    ] (String.concat "\n\n" [
-        readOnlyRules
+    ] [
         "You are a codebase search agent. Explore the workspace and answer every question in `questions`."
         "Use fuzzy_find, glob, fuzzy_grep, and read. Report concrete file paths and line-number references, and answer each question explicitly."
         "Return a structured report with relatedFiles and relatedCode."
-    ])
+    ]
 
 let meditatorPrompt (sections: MeditatorFileSection list) (intent: string) : string =
     let fileItem (s: MeditatorFileSection) : string =
@@ -134,43 +141,39 @@ let meditatorPrompt (sections: MeditatorFileSection list) (intent: string) : str
             [| "  - path: " + yamlScalar s.file; "    content: |" |]
             contentLines
         ] |> String.concat "\n"
-    frontMatterPrompt [
+    agentPrompt [
         yamlSeqField "files" (sections |> List.map fileItem)
         yamlBlockField "question" intent
-    ] (String.concat "\n\n" [
-        readOnlyRules
+    ] [
         "You are a deep-reasoning agent. The file contents are provided above; analyze every listed file carefully."
         "Produce a thorough analysis covering tradeoffs, risks, and concrete recommendations."
         "Return a structured report with relatedFiles and relatedCode."
-    ])
+    ]
 
 let browserPrompt (intent: string) : string =
-    frontMatterPrompt [
+    agentPrompt [
         yamlBlockField "task" intent
-    ] (String.concat "\n\n" [
-        readOnlyRules
+    ] [
         "You are a browser automation agent. Use only stealth-browser-mcp tools to interact with web pages. Do not write files or run shell commands."
         "Return a clear summary of what you found or did."
-    ])
+    ]
 
 let executorSummarizerPrompt (output: string) : string =
-    frontMatterPrompt [
+    agentPrompt [
         yamlBlockField "raw_output" output
-    ] (String.concat "\n\n" [
-        readOnlyRules
+    ] [
         "You are a summarizer for executor (shell) output. Preserve errors, non-zero exit status, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output."
         "Return a concise, actionable summary."
-    ])
+    ]
 
 let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =
-    frontMatterPrompt [
+    agentPrompt [
         yamlBlockField "question" whatToSummarize
         yamlBlockField "raw_results" rawResults
-    ] (String.concat "\n\n" [
-        readOnlyRules
+    ] [
         "You are a summarizer for web search results. Focus on answering the question above using the raw results. Preserve concrete facts: URLs, names, version numbers, code samples, and exact values. Omit boilerplate and unrelated results. Do not invent details not present in the results."
         "Return a focused, ready-to-use answer."
-    ])
+    ]
 
 let agentReportReviewInstructions =
     readOnlyWorkspaceConstraint + "\n\n"
@@ -185,11 +188,12 @@ let formatSearchResults (results: SearchResult list) : string =
     else
         let items =
             results |> List.map (fun r ->
-                let contentLines = r.content.Split('\n') |> Array.map (fun line -> "      " + line)
-                Array.concat [
-                    [| "  - title: " + yamlScalar r.title; "    url: " + yamlScalar r.url; "    content: |" |]
-                    contentLines
-                ] |> String.concat "\n")
+                let contentBlock = yamlBlockField "content" r.content
+                let indentedContentBlock =
+                    contentBlock.Split('\n')
+                    |> Array.map (fun line -> "    " + line)
+                    |> String.concat "\n"
+                "  - title: " + yamlScalar r.title + "\n    url: " + yamlScalar r.url + "\n" + indentedContentBlock)
         frontMatter [ yamlSeqField "results" items ]
 
 let formatFetchResponse (data: FetchResponse) : string =

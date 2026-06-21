@@ -111,12 +111,14 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
 /// (fuzzy_find/fuzzy_grep), the wiki/review tools themselves, and host read
 /// tools never record.
 let private bookkeepingSubagentTools =
-    Set [ "coder"; "investigator"; "meditator"; "browser"; "executor"; "websearch"; "webfetch" ]
+    Set [ "coder"; "investigator"; "meditator"; "browser"; "executor"; "websearch"; "webfetch"; "write"; "apply_patch"; "patch" ]
 
 let private recordsToBookkeeper (tool: string) : bool =
-    tool = "write" || tool = "apply_patch" || tool = "patch"
-    || isFileEditTool tool
+    isFileEditTool tool
     || Set.contains tool bookkeepingSubagentTools
+
+let private isReadOnlyExecutor (tool: string) (input: obj) : bool =
+    tool = "executor" && Dyn.str (Dyn.get input "args") "mode" = "ro"
 
 let private bookkeeperInput (input: obj) : string =
     let args = Dyn.get input "args"
@@ -128,7 +130,7 @@ let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Open
         let tool = Dyn.str input "tool"
         let sessionID = Dyn.str input "sessionID"
         let succeeded = Dyn.str output "error" = ""
-        if succeeded && recordsToBookkeeper tool && (registry.LookupChildAgent sessionID).IsNone then
+        if succeeded && recordsToBookkeeper tool && not (isReadOnlyExecutor tool input) && (registry.LookupChildAgent sessionID).IsNone then
             wikiRuntime.StartBookkeeperAppend(bookkeeperInput input, Dyn.str output "output", tool, parentSessionID = sessionID)
         do! nudgeHook.handleToolExecuteAfter input output
     }

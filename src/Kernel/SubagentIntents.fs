@@ -91,51 +91,66 @@ let private parseCoderTargets (targets: obj) : Result<CoderTarget list, string> 
         if arr.Length = 0 then Result.Error "Invalid LLM input for coder: targets must be a non-empty array"
         else foldArrayResult decodeCoderTarget arr
 
-let parseCoderIntent (item: obj) : Result<CoderIntent, string> =
-    if not (Dyn.typeIs item "object") then Result.Error "Invalid LLM input for coder: each intent must be an object"
+type private CoderSpecific =
+    { targets: CoderTarget list
+      doNotTouch: string array }
+
+type private InvestigatorSpecific =
+    { questions: string array
+      entries: string array }
+
+let private parseIntentCore<'specific, 'intent> (tool: string) (item: obj) (decodeSpecific: obj -> Result<'specific, string>) (makeIntent: string -> string -> 'specific -> 'intent) : Result<'intent, string> =
+    if not (Dyn.typeIs item "object") then Result.Error $"Invalid LLM input for {tool}: each intent must be an object"
     else
-        let objective = requireNonEmpty "objective" (Dyn.str item "objective") "coder"
-        let background = requireNonEmpty "background" (Dyn.str item "background") "coder"
-        let targets = parseCoderTargets (Dyn.get item "targets")
-        let doNotTouch = optionalStrArray item "do_not_touch"
-        Ok (fun o b t dnt ->
-            { objective = o
-              background = b
-              targets = t
-              doNotTouch = dnt })
-        <*> objective <*> background <*> targets <*> Ok doNotTouch
+        let objective = requireNonEmpty "objective" (Dyn.str item "objective") tool
+        let background = requireNonEmpty "background" (Dyn.str item "background") tool
+        let specific = decodeSpecific item
+        Ok (fun o b s -> makeIntent o b s)
+        <*> objective <*> background <*> specific
+
+let private decodeCoderSpecific (item: obj) : Result<CoderSpecific, string> =
+    let targets = parseCoderTargets (Dyn.get item "targets")
+    let doNotTouch = optionalStrArray item "do_not_touch"
+    Ok (fun ts -> { targets = ts; doNotTouch = doNotTouch })
+    <*> targets
+
+let private decodeInvestigatorSpecific (item: obj) : Result<InvestigatorSpecific, string> =
+    let questions = optionalStrArray item "questions"
+    let entries = optionalStrArray item "entries"
+    if questions.Length = 0 then
+        Result.Error "Invalid LLM input for investigator: questions must be a non-empty string array"
+    else
+        Ok (fun es -> { questions = questions; entries = es })
+        <*> Ok entries
+
+let parseCoderIntent (item: obj) : Result<CoderIntent, string> =
+    parseIntentCore "coder" item decodeCoderSpecific (fun o b s ->
+        { objective = o; background = b; targets = s.targets; doNotTouch = s.doNotTouch })
 
 let parseInvestigatorIntent (item: obj) : Result<InvestigatorIntent, string> =
-    if not (Dyn.typeIs item "object") then Result.Error "Invalid LLM input for investigator: each intent must be an object"
+    parseIntentCore "investigator" item decodeInvestigatorSpecific (fun o b s ->
+        { objective = o; background = b; questions = s.questions; entries = s.entries })
+
+let private parseIntentList<'T> (parser: obj -> Result<'T, string>) (errorPrefix: string) (intents: obj) : Result<'T list, string> =
+    if not (Dyn.isArray intents) then Result.Error $"Invalid LLM input for {errorPrefix}: intents must be an array"
     else
-        let objective = requireNonEmpty "objective" (Dyn.str item "objective") "investigator"
-        let background = requireNonEmpty "background" (Dyn.str item "background") "investigator"
-        let questions = optionalStrArray item "questions"
-        let entries = optionalStrArray item "entries"
-        if questions.Length = 0 then
-            Result.Error "Invalid LLM input for investigator: questions must be a non-empty string array"
-        else
-            Ok (fun o b e -> { objective = o; background = b; questions = questions; entries = e })
-            <*> objective <*> background <*> Ok entries
+        let arr = intents :?> obj array
+        if arr.Length = 0 then Result.Error $"Invalid LLM input for {errorPrefix}: intents must be a non-empty array"
+        else foldArrayResult parser arr
 
 let parseCoderIntents (intents: obj) : Result<CoderIntent list, string> =
-    if not (Dyn.isArray intents) then Result.Error "Invalid LLM input for coder: intents must be an array"
-    else
-        let arr = intents :?> obj array
-        if arr.Length = 0 then Result.Error "Invalid LLM input for coder: intents must be a non-empty array"
-        else foldArrayResult parseCoderIntent arr
+    parseIntentList parseCoderIntent "coder" intents
 
 let parseInvestigatorIntents (intents: obj) : Result<InvestigatorIntent list, string> =
-    if not (Dyn.isArray intents) then Result.Error "Invalid LLM input for investigator: intents must be an array"
-    else
-        let arr = intents :?> obj array
-        if arr.Length = 0 then Result.Error "Invalid LLM input for investigator: intents must be a non-empty array"
-        else foldArrayResult parseInvestigatorIntent arr
+    parseIntentList parseInvestigatorIntent "investigator" intents
+
+let private joinIntentUiLabel<'T> (parser: obj -> Result<'T list, string>) (getObjective: 'T -> string) (intents: obj) : Result<string, string> =
+    parser intents |> Result.map (fun list -> list |> List.map getObjective |> String.concat "; ")
 
 let joinCoderUiLabel (intents: obj) : Result<string, string> =
-    parseCoderIntents intents |> Result.map (fun list -> list |> List.map (fun i -> i.objective) |> String.concat "; ")
+    joinIntentUiLabel parseCoderIntents (fun i -> i.objective) intents
 
 let joinInvestigatorUiLabel (intents: obj) : Result<string, string> =
-    parseInvestigatorIntents intents |> Result.map (fun list -> list |> List.map (fun i -> i.objective) |> String.concat "; ")
+    joinIntentUiLabel parseInvestigatorIntents (fun i -> i.objective) intents
 
 let coderTargetFiles (intent: CoderIntent) : string list = intent.targets |> List.map (fun t -> t.file)

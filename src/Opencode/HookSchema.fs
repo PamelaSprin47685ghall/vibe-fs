@@ -26,13 +26,13 @@ let setUiLabel (args: obj) (tool: string) : unit =
 let private objectKeys (o: obj) : string array =
     JS.Constructors.Object.keys(o) |> Seq.toArray
 
-let private requiredWithoutUi (required: obj) : obj =
+let private filterRequired (excludeKey: string) (required: obj) : obj =
     if not (isArray required) then required
-    else required :?> obj array |> Array.choose (fun item -> let key = string item in if key = "_ui" then None else Some(box key)) |> box
+    else required :?> obj array |> Array.choose (fun item -> let key = string item in if key = excludeKey then None else Some(box key)) |> box
 
-let private requiredWithoutTaskId (required: obj) : obj =
-    if not (isArray required) then required
-    else required :?> obj array |> Array.choose (fun item -> let key = string item in if key = "task_id" then None else Some(box key)) |> box
+let private requiredWithoutUi (required: obj) : obj = filterRequired "_ui" required
+
+let private requiredWithoutTaskId (required: obj) : obj = filterRequired "task_id" required
 
 let stripUiFromJsonSchema (schema: obj) : obj =
     if isNullish schema then schema
@@ -67,13 +67,18 @@ let private hasCallable (o: obj) (key: string) : bool =
     let value = get o key
     not (isNullish value) && jsType value = "function"
 
-let private callSchemaMethod (schema: obj) (methodName: string) (arg: obj) : obj option =
-    if hasCallable schema methodName then Some (call1 schema methodName arg)
+let private callSchemaMethodOpt (schema: obj) (methodName: string) (arg: obj option) : obj option =
+    if hasCallable schema methodName then
+        match arg with
+        | Some a -> Some (call1 schema methodName a)
+        | None -> Some (call0 schema methodName)
     else None
 
+let private callSchemaMethod (schema: obj) (methodName: string) (arg: obj) : obj option =
+    callSchemaMethodOpt schema methodName (Some arg)
+
 let private callSchemaMethod0 (schema: obj) (methodName: string) : obj option =
-    if hasCallable schema methodName then Some (call0 schema methodName)
-    else None
+    callSchemaMethodOpt schema methodName None
 
 let private tryGetNestedTaskStringSchema (schema: obj) : obj option =
     let shape = get schema "shape"

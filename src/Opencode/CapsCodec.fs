@@ -104,23 +104,20 @@ let private assistantInfo (assistantId: string) (parentID: string) (sessionID: s
         ])
     ]
 
-let private textPart (partId: string) (sessionID: string option) (messageID: string) (text: string) : obj =
+let private partOfType (partType: string) (partId: string) (sessionID: string option) (messageID: string) (text: string) : obj =
     box (createObj [
         "id", box partId
         "sessionID", sessionBox sessionID
         "messageID", box messageID
-        "type", box "text"
+        "type", box partType
         "text", box text
     ])
 
+let private textPart (partId: string) (sessionID: string option) (messageID: string) (text: string) : obj =
+    partOfType "text" partId sessionID messageID text
+
 let private reasoningPart (partId: string) (sessionID: string option) (messageID: string) (text: string) : obj =
-    box (createObj [
-        "id", box partId
-        "sessionID", sessionBox sessionID
-        "messageID", box messageID
-        "type", box "reasoning"
-        "text", box text
-    ])
+    partOfType "reasoning" partId sessionID messageID text
 
 let private buildAssistantMessage (assistantId: string) (parentID: string) (sessionID: string option) (projectRoot: string) (parts: obj array) : obj =
     box (createObj [

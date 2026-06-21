@@ -58,8 +58,8 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
     let recordBackgroundResult title result =
         applyCmd (UpdateLatestLaunchResultCmd (title, result))
 
-    let launchBg root parentID kind title buildPrompt aiSettings maintenanceKey =
-        queueBackgroundLaunch client launchQueue (recordBackgroundResult title) root parentID kind title buildPrompt aiSettings maintenanceKey registry
+    let launchBg root parentID kind title buildPrompt aiSettings =
+        queueBackgroundLaunch client launchQueue (recordBackgroundResult title) root parentID kind title buildPrompt aiSettings registry
 
     member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<WikiProjection> =
         if sessionID = "" then Promise.lift Map.empty
@@ -86,11 +86,16 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
             else value.Trim()
 
         let kind =
-            match kindTag.Trim().ToLowerInvariant() with
-            | "append" -> AppendAfterWork
-            | "daily" -> DailyRewrite(readRequiredField "date")
-            | "weekly" -> WeeklyRewrite(readRequiredField "through")
-            | other -> failwith $"Unknown wiki job kind: {other}"
+            let normalizedTag = kindTag.Trim().ToLowerInvariant()
+            let builders =
+                Map [
+                    "append", fun () -> AppendAfterWork
+                    "daily", fun () -> DailyRewrite(readRequiredField "date")
+                    "weekly", fun () -> WeeklyRewrite(readRequiredField "through")
+                ]
+            match Map.tryFind normalizedTag builders with
+            | Some build -> build ()
+            | None -> failwith $"Unknown wiki job kind: {normalizedTag}"
         this.RegisterJob(sessionID, { workspaceRoot = workspaceRoot; kind = kind })
 
     member _.TakeJob(_sessionID: string) : WikiJobContext option =
@@ -105,7 +110,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
     member this.Submit(sessionID: string, drafts: WikiDraft list) : JS.Promise<string> =
         this.SubmitFromHistory(sessionID, "", drafts)
 
-    member _.SubmitFromHistory(sessionID: string, directory: string, drafts: WikiDraft list) : JS.Promise<string> =
+    member this.SubmitFromHistory(sessionID: string, directory: string, drafts: WikiDraft list) : JS.Promise<string> =
         commandQueue.Enqueue(fun () ->
             promise {
                 let root = effectiveWorkspaceRoot directory
@@ -117,7 +122,11 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 | None -> return "No active wiki job for this session."
                 | Some ctx ->
                     try
+                        let isAppend = match ctx.kind with AppendAfterWork -> true | _ -> false
+                        let! preCount = if isAppend then dayEntryCount root (today ()) else Promise.lift 0
                         let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind (today ()) ctx.workspaceRoot ctx.kind drafts)
+                        if isAppend && preCount % 10 = 0 then
+                            this.StartMaintenanceIfDue(root) |> ignore
                         return result
                     finally
                         registry.UnregisterChildAgent(sessionID)
@@ -149,23 +158,18 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 let projection = projectLatestWins files
                 let dailyDue, weeklyDue = dueMaintenance files (nowUtc ())
 
-                dailyDue
-                |> Option.iter (fun date ->
-                    let key = root + "|daily|" + date
-                    let launch = { agent = "bookkeeper"; title = "Daily wiki rewrite"; prompt = $"daily maintenance due for {date}"; result = $"daily:{date}" }
-                    let first, nextState = recordLaunchOnce state key launch
-                    state <- nextState
-                    if first then
-                        launchBg root None (DailyRewrite date) "Daily wiki rewrite" (fun () -> Promise.lift (buildDailyPrompt date files projection)) emptySettings (Some key))
+                let launchIfDue (due: string list) kind title resultPrefix promptInfix buildPrompt =
+                    due
+                    |> List.iter (fun value ->
+                        let key = root + "|" + resultPrefix + "|" + value
+                        let launch = { agent = "bookkeeper"; title = title; prompt = $"{resultPrefix} maintenance due {promptInfix} {value}"; result = $"{resultPrefix}:{value}" }
+                        let first, nextState = recordLaunchOnce state key launch
+                        state <- nextState
+                        if first then
+                            launchBg root None (kind value) title (fun () -> Promise.lift (buildPrompt value files projection)) emptySettings)
 
-                weeklyDue
-                |> Option.iter (fun cutoff ->
-                    let key = root + "|weekly|" + cutoff
-                    let launch = { agent = "bookkeeper"; title = "Weekly wiki snapshot rewrite"; prompt = $"weekly maintenance due through {cutoff}"; result = $"weekly:{cutoff}" }
-                    let first, nextState = recordLaunchOnce state key launch
-                    state <- nextState
-                    if first then
-                        launchBg root None (WeeklyRewrite cutoff) "Weekly wiki snapshot rewrite" (fun () -> Promise.lift (buildWeeklyPrompt cutoff files projection)) emptySettings (Some key))
+                launchIfDue dailyDue DailyRewrite "Daily wiki rewrite" "daily" "for" buildDailyPrompt
+                launchIfDue (Option.toList weeklyDue) WeeklyRewrite "Weekly wiki snapshot rewrite" "weekly" "through" buildWeeklyPrompt
             })
 
     member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string) : unit =
@@ -179,7 +183,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
             promise {
                 let! projection = readProjection root
                 return buildAppendPrompt title prompt result projection
-            }) settings None
+            }) settings
 
     /// Test-only projection: drains recorded bookkeeper launches so integration
     /// tests can assert what the runtime would have fired. Kept on the production

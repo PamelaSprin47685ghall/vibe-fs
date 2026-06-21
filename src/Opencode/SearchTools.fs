@@ -20,56 +20,59 @@ open VibeFs.Shell.FuzzySearch
 module ToolSchemaModule = VibeFs.Opencode.ToolSchema
 module FuzzyCommandsModule = VibeFs.Shell.FuzzySearch
 
-let fuzzyFindTool (finderCache: FinderCache) : obj =
-    define ToolSchemaModule.fuzzyFind
-        (box {| pattern = strMinNullish 1 Params.fuzzyFindPattern; path = strOpt Params.fuzzyFindPath
-                limit = intMinNullish 1 Params.fuzzyFindLimit; iterator = strOpt Params.fuzzyFindIterator |})
+let private addIfSome (entries: ResizeArray<(string * obj)>) (key: string) (v: 'T option) =
+    match v with Some x -> entries.Add(key, box x) | None -> ()
+
+let private buildFuzzyTool (description: string) (args: obj) (toolName: string) (buildParams: obj -> 'P) (execute: 'P -> SearchOptions -> JS.Promise<SearchOutcome>) (finderCache: FinderCache) : obj =
+    define description
+        args
         (fun args context ->
             let scopeId = Dyn.str context "sessionID"
-            if scopeId = "" then resolveStr (formatDomainError "fuzzy_find" (InvalidIntent ("fuzzy_find", "session", "requires an active session")))
+            if scopeId = "" then resolveStr (formatDomainError toolName (InvalidIntent (toolName, "session", "requires an active session")))
             else
-                let p : FuzzyFindParams =
-                    { pattern = optStr args "pattern"
-                      path = optStr args "path"
-                      limit = optInt args "limit"
-                      iterator = optStr args "iterator" }
+                let p = buildParams args
                 let o : SearchOptions =
                     { cwd = Dyn.str context "directory"
                       scopeId = scopeId
                       store = None
                       finderCache = finderCache }
                 promise {
-                    let! r = FuzzyCommandsModule.fuzzyFind p o
+                    let! r = execute p o
                     return r.output
                 })
 
+let fuzzyFindTool (finderCache: FinderCache) : obj =
+    buildFuzzyTool
+        ToolSchemaModule.fuzzyFind
+        (box {| pattern = strMinNullish 1 Params.fuzzyFindPattern; path = strOpt Params.fuzzyFindPath
+                limit = intMinNullish 1 Params.fuzzyFindLimit; iterator = strOpt Params.fuzzyFindIterator |})
+        "fuzzy_find"
+        (fun args ->
+            { pattern = optStr args "pattern"
+              path = optStr args "path"
+              limit = optInt args "limit"
+              iterator = optStr args "iterator" })
+        FuzzyCommandsModule.fuzzyFind
+        finderCache
+
 let fuzzyGrepTool (finderCache: FinderCache) : obj =
-    define ToolSchemaModule.fuzzyGrep
+    buildFuzzyTool
+        ToolSchemaModule.fuzzyGrep
         (box {| pattern = strMinNullish 1 Params.fuzzyGrepPattern; path = strOpt Params.fuzzyGrepPath
                 exclude = excludeOpt Params.fuzzyGrepExclude; caseSensitive = boolOpt Params.fuzzyGrepCaseSensitive
                 context = intMinNullish 0 Params.fuzzyGrepContext; limit = intMinNullish 1 Params.fuzzyGrepLimit
                 iterator = strOpt Params.fuzzyGrepIterator |})
-        (fun args context ->
-            let scopeId = Dyn.str context "sessionID"
-            if scopeId = "" then resolveStr (formatDomainError "fuzzy_grep" (InvalidIntent ("fuzzy_grep", "session", "requires an active session")))
-            else
-                let p : FuzzyGrepParams =
-                    { pattern = optStr args "pattern"
-                      path = optStr args "path"
-                      exclude = parseExcludeField args
-                      caseSensitive = optBool args "caseSensitive"
-                      context = optInt args "context"
-                      limit = optInt args "limit"
-                      iterator = optStr args "iterator" }
-                let o : SearchOptions =
-                    { cwd = Dyn.str context "directory"
-                      scopeId = scopeId
-                      store = None
-                      finderCache = finderCache }
-                promise {
-                    let! r = FuzzyCommandsModule.fuzzyGrep p o
-                    return r.output
-                })
+        "fuzzy_grep"
+        (fun args ->
+            { pattern = optStr args "pattern"
+              path = optStr args "path"
+              exclude = parseExcludeField args
+              caseSensitive = optBool args "caseSensitive"
+              context = optInt args "context"
+              limit = optInt args "limit"
+              iterator = optStr args "iterator" })
+        FuzzyCommandsModule.fuzzyGrep
+        finderCache
 
 let private abortSignal (context: obj) : obj =
     if Dyn.isNullish context then null else Dyn.get context "abort"
@@ -123,10 +126,10 @@ let webfetchTool () : obj =
                 promise {
                     let bodyEntries = ResizeArray<(string * obj)>()
                     bodyEntries.Add("url", box url)
-                    match optBool args "extract_main" with Some v -> bodyEntries.Add("extract_main", box v) | None -> ()
-                    match optStr args "prefer_llms_txt" with Some v -> bodyEntries.Add("prefer_llms_txt", box v) | None -> ()
-                    match optStr args "prompt" with Some v -> bodyEntries.Add("prompt", box v) | None -> ()
-                    match optInt args "timeout" with Some v -> bodyEntries.Add("timeout", box v) | None -> ()
+                    addIfSome bodyEntries "extract_main" (optBool args "extract_main")
+                    addIfSome bodyEntries "prefer_llms_txt" (optStr args "prefer_llms_txt")
+                    addIfSome bodyEntries "prompt" (optStr args "prompt")
+                    addIfSome bodyEntries "timeout" (optInt args "timeout")
                     let body = createObj (Seq.toList bodyEntries)
                     let! result = ollamaPost "web_fetch" body (if Dyn.isNullish signal then None else Some signal)
                     match result with

@@ -110,21 +110,28 @@ let dueMaintenanceDailySpec () =
     // Past unrewritten day → daily due.
     let files = [ dayFile "2026-06-10" false [ entry "0a3f" "q" "a" ] ]
     let dailyDue, weeklyDue = dueMaintenance files (DateTime(2026, 6, 20))
-    equal "daily due past unrewritten" (Some "2026-06-10") dailyDue
+    equal "daily due past unrewritten" ["2026-06-10"] dailyDue
     check "daily due scenario no weekly" (weeklyDue |> Option.isNone)
-    // Rewritten past day → not daily due.
+    // Rewritten past day -> not daily due.
     let dailyDue2, _ = dueMaintenance [ dayFile "2026-06-10" true [] ] (DateTime(2026, 6, 20))
-    check "daily not due when rewritten" (dailyDue2 |> Option.isNone)
-    // Today's own day is not "past" → not due.
+    check "daily not due when rewritten" (dailyDue2 |> List.isEmpty)
+    // Today's own day is not "past" -> not due.
     let dailyDue3, _ = dueMaintenance [ dayFile "2026-06-20" false [] ] (DateTime(2026, 6, 20))
-    check "daily not due for today" (dailyDue3 |> Option.isNone)
+    check "daily not due for today" (dailyDue3 |> List.isEmpty)
+    // Multiple past unrewritten days -> list all, ascending, skip rewritten.
+    let multiFiles =
+        [ dayFile "2026-06-12" false [ entry "0a3f" "q" "a" ]
+          dayFile "2026-06-10" false [ entry "0a40" "q2" "a2" ]
+          dayFile "2026-06-11" true [] ]
+    let dailyDue4, _ = dueMaintenance multiFiles (DateTime(2026, 6, 20))
+    equal "daily due lists all past unrewritten ascending" ["2026-06-10"; "2026-06-12"] dailyDue4
 
 let dueMaintenanceWeeklySpec () =
     // Snapshot through 2026-06-07, now 2026-06-20 (last Sunday 2026-06-14).
     // Gap days 06-08..06-14 are absent → treated as rewritten → weekly due at 06-14.
     let files = [ snapshotFile "2026-06-07" [ entry "1111" "q" "a" ] ]
     let dailyDue, weeklyDue = dueMaintenance files (DateTime(2026, 6, 20))
-    check "weekly scenario no daily" (dailyDue |> Option.isNone)
+    check "weekly scenario no daily" (dailyDue |> List.isEmpty)
     equal "weekly due when gap all rewritten" (Some "2026-06-14") weeklyDue
     // A gap day that exists but is unrewritten blocks the weekly rewrite.
     let blockingFiles =
@@ -134,7 +141,7 @@ let dueMaintenanceWeeklySpec () =
     check "weekly blocked by unrewritten gap day" (weeklyDue2 |> Option.isNone)
     // No snapshot and no day files → nothing due.
     let dailyDue3, weeklyDue3 = dueMaintenance [] (DateTime(2026, 6, 20))
-    check "empty wiki no daily" (dailyDue3 |> Option.isNone)
+    check "empty wiki no daily" (dailyDue3 |> List.isEmpty)
     check "empty wiki no weekly" (weeklyDue3 |> Option.isNone)
 
 let run () : JS.Promise<unit> =

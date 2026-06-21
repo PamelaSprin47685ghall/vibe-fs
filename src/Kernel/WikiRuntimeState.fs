@@ -13,9 +13,8 @@ type BookkeeperLaunch =
 /// Every field is updated only by the pure transition functions below; the IO
 /// shell applies them through the `reducer`. `scheduledMaintenance` is a
 /// process-level dedup set: a workspace+kind+value triple queues a background
-/// rewrite at most once per cycle. The key is cleared by `CompleteLaunchCmd`
-/// when the matching background job finishes (success or failure), so the next
-/// maintenance cycle may retrigger the same triple.
+/// rewrite at most once per cycle; keys accumulate for the lifetime of the process
+/// and reset on restart, so a killed process retries accumulated work.
 type WikiState =
     { sessionSnapshots: Map<string, WikiProjection>
       bookkeeperLaunches: BookkeeperLaunch list
@@ -55,12 +54,6 @@ let recordLaunchOnce (state: WikiState) (key: string) (launch: BookkeeperLaunch)
 let drainLaunches (state: WikiState) : BookkeeperLaunch list * WikiState =
     state.bookkeeperLaunches, { state with bookkeeperLaunches = [] }
 
-/// Clear a scheduled-maintenance dedup key once the matching background job has
-/// finished, so the next maintenance cycle may retrigger the same triple.
-/// Idempotent: safe to call for a key that was never (or already) cleared.
-let private completeLaunch (state: WikiState) (key: string) : WikiState =
-    { state with scheduledMaintenance = Set.remove key state.scheduledMaintenance }
-
 let normalizeDraftIds (projection: WikiProjection) (drafts: WikiDraft list) : WikiDraft list =
     drafts
     |> List.map (fun draft ->
@@ -78,7 +71,6 @@ type WikiCommand =
     | UpdateLatestLaunchResultCmd of title: string * result: string
     | RecordLaunchOnceCmd of key: string * launch: BookkeeperLaunch
     | DrainLaunchesCmd
-    | CompleteLaunchCmd of key: string
 
 let reducer (state: WikiState) (cmd: WikiCommand) : WikiState =
     match cmd with
@@ -87,4 +79,3 @@ let reducer (state: WikiState) (cmd: WikiCommand) : WikiState =
     | UpdateLatestLaunchResultCmd (title, result) -> updateLatestLaunchResult state title result
     | RecordLaunchOnceCmd (key, launch) -> recordLaunchOnce state key launch |> snd
     | DrainLaunchesCmd -> drainLaunches state |> snd
-    | CompleteLaunchCmd key -> completeLaunch state key

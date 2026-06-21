@@ -21,10 +21,7 @@ let private disabledToolsForReviewer (toolNames: string array) : string array =
     deniedTools "reviewer" (Array.toList toolNames) |> Array.ofList
 
 let private toolOptions (toolNames: string array) (role: string) (aiSettingsAgentId: string) : obj option =
-    Some (
-        createObj
-            [ "experiments", box (createObj [ "subagentRole", box role; "toolPolicy", box (createObj [ "disabledTools", box (deniedTools role (Array.toList toolNames) |> Array.ofList) ]) ])
-              "aiSettingsAgentId", box aiSettingsAgentId ])
+    Some (createObj [ "experiments", box (createObj [ "subagentRole", box role; "toolPolicy", box (createObj [ "disabledTools", box (deniedTools role (Array.toList toolNames) |> Array.ofList) ]) ]); "aiSettingsAgentId", box aiSettingsAgentId ])
 
 let private abortableConfig (config: obj) (signal: obj) = Dyn.withKey config "abortSignal" signal
 
@@ -32,24 +29,13 @@ let private muxStrReq (desc: string) : obj =
     createObj [ "type", box "string"; "minLength", box 1; "description", box desc ]
 
 let private muxStrArrayReq (desc: string) : obj =
-    createObj
-        [ "type", box "array"
-          "minItems", box 1
-          "items", createObj [ "type", box "string"; "minLength", box 1 ]
-          "description", box desc ]
+    createObj [ "type", box "array"; "minItems", box 1; "items", createObj [ "type", box "string"; "minLength", box 1 ]; "description", box desc ]
 
 let private muxStrArrayOpt (desc: string) : obj =
-    createObj
-        [ "type", box "array"
-          "items", createObj [ "type", box "string"; "minLength", box 1 ]
-          "description", box desc ]
+    createObj [ "type", box "array"; "items", createObj [ "type", box "string"; "minLength", box 1 ]; "description", box desc ]
 
 let private muxObjectSchema (properties: obj) (required: string array) : obj =
-    createObj
-        [ "type", box "object"
-          "properties", properties
-          "required", box required
-          "additionalProperties", box false ]
+    createObj [ "type", box "object"; "properties", properties; "required", box required; "additionalProperties", box false ]
 
 let private muxCoderIntentsSchema (intentsDesc: string) : obj =
     let targetItem =
@@ -93,42 +79,24 @@ let private muxInvestigatorIntentsSchema (intentsDesc: string) : obj =
           "description", box intentsDesc ]
 
 module Tool =
-    let bind
-        (deps: obj)
-        (toolNames: string array)
-        (agentId: string)
-        (title: string)
-        (aiSettingsAgentId: string)
-        (role: string)
-        (buildPrompt: obj -> obj -> JS.Promise<string>)
-        : obj -> obj -> JS.Promise<string> =
+    let bind (deps: obj) (toolNames: string array) (agentId: string) (title: string) (aiSettingsAgentId: string) (role: string) (buildPrompt: obj -> obj -> JS.Promise<string>) : obj -> obj -> JS.Promise<string> =
         fun config args ->
             promise {
                 match strField config "workspaceId" with
                 | None -> return $"{title} requires workspaceId"
                 | Some _ ->
                     let! prompt = buildPrompt config args
-                    let opts = toolOptions toolNames role aiSettingsAgentId
-                    return! runMuxSubagent deps config agentId prompt title opts
+                    return! runMuxSubagent deps config agentId prompt title (toolOptions toolNames role aiSettingsAgentId)
             }
 
-    let bindParallel
-        (deps: obj)
-        (toolNames: string array)
-        (agentId: string)
-        (title: string)
-        (aiSettingsAgentId: string)
-        (role: string)
-        (buildPrompts: obj -> obj -> JS.Promise<string array>)
-        : obj -> obj -> JS.Promise<string> =
+    let bindParallel (deps: obj) (toolNames: string array) (agentId: string) (title: string) (aiSettingsAgentId: string) (role: string) (buildPrompts: obj -> obj -> JS.Promise<string array>) : obj -> obj -> JS.Promise<string> =
         fun config args ->
             promise {
                 match strField config "workspaceId" with
                 | None -> return $"{title} requires workspaceId"
                 | Some _ ->
                     let! prompts = buildPrompts config args
-                    if prompts.Length = 0 then
-                        return "Error: `intents` must be a non-empty array."
+                    if prompts.Length = 0 then return "Error: `intents` must be a non-empty array."
                     else
                         let controller = AbortController()
                         let opts = toolOptions toolNames role aiSettingsAgentId
@@ -147,12 +115,15 @@ module Tool =
                         return joinReports (reports |> Array.choose id |> Array.toList)
             }
 
-let private buildCoderPrompts (_config: obj) (args: obj) : JS.Promise<string array> =
+let private buildPromptsFor parser constructor args =
     promise {
-        match parseCoderIntents (Dyn.get args "intents") with
+        match parser (Dyn.get args "intents") with
         | Error _ -> return [||]
-        | Ok intents -> return formatPrompt mimocode (Coder intents) |> List.toArray
+        | Ok intents -> return formatPrompt mimocode (constructor intents) |> List.toArray
     }
+
+let private buildCoderPrompts (_config: obj) (args: obj) : JS.Promise<string array> =
+    buildPromptsFor parseCoderIntents Coder args
 
 let coderTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = "coder"
@@ -162,11 +133,7 @@ let coderTool (deps: obj) (toolNames: string array) : ToolDefinition =
       condition = None }
 
 let private buildInvestigatorPrompts (_config: obj) (args: obj) : JS.Promise<string array> =
-    promise {
-        match parseInvestigatorIntents (Dyn.get args "intents") with
-        | Error _ -> return [||]
-        | Ok intents -> return formatPrompt mimocode (Investigator intents) |> List.toArray
-    }
+    buildPromptsFor parseInvestigatorIntents Investigator args
 
 let investigatorTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = "investigator"
@@ -210,6 +177,19 @@ let browserTool (deps: obj) (toolNames: string array) : ToolDefinition =
       execute = Tool.bind deps toolNames "explore" "Browser" "explore" "browser" buildBrowserPrompt
       condition = None }
 
+let private awaitReviewVerdict (verdictPromise: JS.Promise<obj>) : JS.Promise<ReviewResult> =
+    promise {
+        try
+            let! args = verdictPromise
+            let v = defaultArg (strField args "verdict") "" |> fun s -> s.Trim().ToLowerInvariant()
+            let feedback = defaultArg (strField args "feedback") ""
+            if v = "pass" then return Accepted
+            elif v = "reject" then return Rejected feedback
+            else return Rejected $"Reviewer returned unclear verdict: \"{v}\". Expected \"pass\" or \"reject\"."
+        with ex ->
+            return Rejected $"Reviewer timed out or failed: {ex.Message}"
+    }
+
 let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : ToolDefinition =
     { name = "submit_review"
       description = "Submit completed work for review. Creates a reviewer sub-agent that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active With-Review Mode."
@@ -235,25 +215,10 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                               + "\n\n=== Change Report ===\n\n" + report
                               + "\n\n=== Affected Files ===\n\n" + String.concat "\n" affectedFiles
                               + "\n" + taskSection
-                          let disabledTools = disabledToolsForReviewer toolNames
-                          let experiments =
-                              createObj
-                                  [ "subagentRole", box "reviewer"
-                                    "toolPolicy", box (createObj [ "disabledTools", box disabledTools ]) ]
+                          let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box (disabledToolsForReviewer toolNames) ]) ]
                           let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
                           let! _ = delegateToSubAgent deps config "explore" reviewPrompt "Review" (Some opts)
-                          let! verdict =
-                              promise {
-                                  try
-                                      let! args = verdictPromise
-                                      let v = defaultArg (strField args "verdict") "" |> fun s -> s.Trim().ToLowerInvariant()
-                                      let feedback = defaultArg (strField args "feedback") ""
-                                      if v = "pass" then return Accepted
-                                      elif v = "reject" then return Rejected feedback
-                                      else return Rejected $"Reviewer returned unclear verdict: \"{v}\". Expected \"pass\" or \"reject\"."
-                                  with ex ->
-                                      return Rejected $"Reviewer timed out or failed: {ex.Message}"
-                              }
+                          let! verdict = awaitReviewVerdict verdictPromise
                           match verdict with
                           | Accepted -> reviewStore.deactivateReview workspaceId
                           | _ -> ()

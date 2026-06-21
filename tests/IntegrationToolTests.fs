@@ -446,9 +446,8 @@ let dailyMaintenanceLaunchSpec () = promise {
     do! writeWikiFileAsync dayFilePath (DayHeader("2026-06-18", false)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Daily candidate" ]
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "daily-session" "Wiki prelude" |]
     let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-20" |})
-    let transform = get pluginObject "experimental.chat.messages.transform"
-    let messages = createObj [ "messages", box [| managerSessionMessage "daily-session" |] ]
-    do! transform $ (createObj [], messages) |> unbox<JS.Promise<unit>>
+    let wikiRuntime = get (pluginWikiRuntime pluginObject) "rawInstance" :?> WikiRuntime
+    do! wikiRuntime.StartMaintenanceIfDue(workspaceDir)
 
     let launches = takeBookkeeperLaunchesForTesting pluginObject
     check "daily maintenance schedules one launch" (launches.Length = 1)
@@ -468,9 +467,8 @@ let weeklyMaintenanceLaunchSpec () = promise {
     do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "b912" "Magic Todo backlog 如何保存？" "Weekly candidate one" ]
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "weekly-session" "Wiki prelude" |]
     let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-15" |})
-    let transform = get pluginObject "experimental.chat.messages.transform"
-    let messages = createObj [ "messages", box [| managerSessionMessage "weekly-session" |] ]
-    do! transform $ (createObj [], messages) |> unbox<JS.Promise<unit>>
+    let wikiRuntime = get (pluginWikiRuntime pluginObject) "rawInstance" :?> WikiRuntime
+    do! wikiRuntime.StartMaintenanceIfDue(workspaceDir)
 
     let launches = takeBookkeeperLaunchesForTesting pluginObject
     check "weekly maintenance schedules at least one launch" (launches.Length >= 1)
@@ -495,9 +493,8 @@ let weeklyMaintenanceUsesLastSundaySpec () = promise {
     let lastSunday = "2026-06-14"
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "weekly-sunday-session" "Wiki prelude" |]
     let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-15" |})
-    let transform = get pluginObject "experimental.chat.messages.transform"
-    let messages = createObj [ "messages", box [| managerSessionMessage "weekly-sunday-session" |] ]
-    do! transform $ (createObj [], messages) |> unbox<JS.Promise<unit>>
+    let wikiRuntime = get (pluginWikiRuntime pluginObject) "rawInstance" :?> WikiRuntime
+    do! wikiRuntime.StartMaintenanceIfDue(workspaceDir)
 
     do! waitForBackgroundJobsForTesting pluginObject
     let launches = takeBookkeeperLaunchesForTesting pluginObject
@@ -518,9 +515,8 @@ let weeklyMaintenanceWithoutSnapshotFileSpec () = promise {
     do! rewriteDay workspaceDir "2026-06-12" [ wikiEntry "b912" "周中问题" "Day 12 entry" ]
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "weekly-no-snapshot-session" "Wiki prelude" |]
     let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-15" |})
-    let transform = get pluginObject "experimental.chat.messages.transform"
-    let messages = createObj [ "messages", box [| managerSessionMessage "weekly-no-snapshot-session" |] ]
-    do! transform $ (createObj [], messages) |> unbox<JS.Promise<unit>>
+    let wikiRuntime = get (pluginWikiRuntime pluginObject) "rawInstance" :?> WikiRuntime
+    do! wikiRuntime.StartMaintenanceIfDue(workspaceDir)
 
     let launches = takeBookkeeperLaunchesForTesting pluginObject
     check "weekly maintenance without snapshot file schedules at least one launch" (launches.Length >= 1)
@@ -531,6 +527,31 @@ let weeklyMaintenanceWithoutSnapshotFileSpec () = promise {
             let prompt = (str launch "prompt").ToLowerInvariant()
             title.Contains "snapshot" || title.Contains "weekly" || prompt.Contains "snapshot" || prompt.Contains "weekly"))
     do! waitForBackgroundJobsForTesting pluginObject
+    do! rmAsync workspaceDir
+}
+
+let heartbeatTriggersMaintenanceSpec () = promise {
+    let! workspaceDir = mkdtempAsync "heartbeat-maintenance-"
+    do! ensureWikiDir workspaceDir
+    let dayFilePath = dayPath workspaceDir "2026-06-18"
+    do! writeWikiFileAsync dayFilePath (DayHeader("2026-06-18", false)) [ wikiEntry "0a3f" "积压问题" "Daily candidate" ]
+    let appendDay = "2026-06-20"
+    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "heartbeat-session" "Wiki prelude" |]
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs appendDay |})
+    registerWikiJobForTest (pluginWikiRuntime p) "wiki-job-heartbeat" workspaceDir "append" (createObj [ "today", box appendDay ])
+    let submitTool = submitWikiTool p
+    let! result =
+        ((get submitTool "execute")
+            $ (createObj [ "entries", box [| wikiDraftEntry None "心跳问题" "Fresh answer" |] ], createObj [ "directory", box workspaceDir; "sessionID", box "wiki-job-heartbeat" ]))
+        |> unbox<JS.Promise<string>>
+    do! waitForBackgroundJobsForTesting p
+    let launches = takeBookkeeperLaunchesForTesting p
+    check "heartbeat: append accepted" (result <> "")
+    check "heartbeat: maintenance launch triggered on append heartbeat" (
+        launches |> Array.exists (fun l ->
+            let title = (str l "title").ToLowerInvariant()
+            let prompt = (str l "prompt").ToLowerInvariant()
+            title.Contains "daily" || title.Contains "rewrite" || prompt.Contains "daily" || prompt.Contains "rewrite"))
     do! rmAsync workspaceDir
 }
 
@@ -919,17 +940,17 @@ let afterHookRecordsExecutorSpec () = promise {
             createObj [ "tool", box "executor"
                         "sessionID", box "executor-session"
                         "callID", box ("exec-" + mode)
-                        "args", box (createObj [ "language", box "shell"; "program", box "printf ok"; "timeout_type", box "short"; "mode", box mode ]) ]
+                        "args", box (createObj [ "language", box "shell"; "program", box ("printf " + mode); "timeout_type", box "short"; "mode", box mode ]) ]
         let output = createObj [ "output", box "ok" ]
         toolExecuteAfter $ (input, output) |> unbox<JS.Promise<unit>>
     do! fire "ro"
     do! fire "rw"
     do! waitForBackgroundJobsForTesting p
     let launches = takeBookkeeperLaunchesForTesting p
-    check "after-hook records every executor call as black box" (launches.Length = 2)
+    check "after-hook skips read-only executor calls, records only rw" (launches.Length = 1)
     check "after-hook executor launch agent" (launches |> Array.forall (fun l -> str l "agent" = "bookkeeper"))
-    check "after-hook executor launch carries program as input" (
-        launches |> Array.forall (fun l -> (str l "prompt").Contains "printf ok"))
+    check "after-hook records only the rw executor call" (
+        launches |> Array.forall (fun l -> (str l "prompt").Contains "printf rw"))
     do! rmAsync workspaceDir
 }
 
@@ -1474,6 +1495,7 @@ let run () : JS.Promise<unit> =
         do! weeklyMaintenanceLaunchSpec ()
         do! weeklyMaintenanceUsesLastSundaySpec ()
         do! weeklyMaintenanceWithoutSnapshotFileSpec ()
+        do! heartbeatTriggersMaintenanceSpec ()
         do! afterHookSkipsChildSessionSpec ()
         do! afterHookSkipsFailedToolSpec ()
         do! submitWikiAppendSpec ()

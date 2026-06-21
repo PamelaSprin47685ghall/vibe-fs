@@ -21,11 +21,19 @@ let decodeToolState (state: obj) : ToolState option =
               input = input
               operationAction = operationAction }
 
+let private partDecoders: Map<string, obj -> Part> =
+    Map [
+        "text", fun part -> TextPart (str part "text")
+    ]
+
 let decodePart (part: obj) : Part =
-    match str part "type" with
-    | "text" -> TextPart (str part "text")
-    | "tool" -> ToolPart (str part "tool", str part "callID", decodeToolState (get part "state"), part)
-    | _ -> RawPart part
+    let typ = str part "type"
+    match Map.tryFind typ partDecoders with
+    | Some decode -> decode part
+    | None ->
+        match typ with
+        | "tool" -> ToolPart (str part "tool", str part "callID", decodeToolState (get part "state"), part)
+        | _ -> RawPart part
 
 let decodeParts (parts: obj) : Part list =
     if isNullish parts || not (isArray parts) then []

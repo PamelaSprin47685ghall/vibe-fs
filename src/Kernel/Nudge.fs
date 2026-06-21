@@ -36,12 +36,12 @@ let private isInsideCodeFence (text: string) : bool =
         if trimmed.StartsWith("```") || trimmed.StartsWith("~~~") then not inFence
         else inFence) false
 
-let private isQuestion (text: string) =
-    not (isInsideCodeFence text) && questionRe.IsMatch text
-let private skipsTodo (text: string) =
-    not (isInsideCodeFence text) && skipTodoRe.IsMatch text
-let private skipsLoop (text: string) =
-    not (isInsideCodeFence text) && skipLoopRe.IsMatch text
+let private outsideCodeFence (text: string) (predicate: string -> bool) =
+    not (isInsideCodeFence text) && predicate text
+
+let private isQuestion (text: string) = outsideCodeFence text questionRe.IsMatch
+let private skipsTodo (text: string) = outsideCodeFence text skipTodoRe.IsMatch
+let private skipsLoop (text: string) = outsideCodeFence text skipLoopRe.IsMatch
 
 /// Priority: open todos → active runner → active loop → none.  A question or
 /// explicit skip tag suppresses the todo/loop nudges so the agent can wait for
@@ -143,6 +143,17 @@ let isTerminal (s: TodoStatus) : bool =
     | Completed | Cancelled | Abandoned -> true
     | InProgress | Pending -> false
 
+let isTerminalAssistantFinish (finish: string) : bool =
+    let normalized = finish.ToLower().Replace("-", "").Replace("_", "").Replace(" ", "")
+    not (normalized.Contains("tool")) && not (normalized.Contains("abort"))
+
+let isNudgePrompt (text: string) : bool = text = todoNudgePrompt || text = loopNudgePrompt
+
+let createPromptBody (agent: string option) (text: string) : obj =
+    match agent with
+    | Some a -> box {| agent = a; parts = [| box {| ``type`` = "text"; text = text |} |] |}
+    | None -> box {| parts = [| box {| ``type`` = "text"; text = text |} |] |}
+
 let retryProgressEvents: Set<string> =
     Set.ofList
         [ "session.next.step.started"; "session.next.step.ended"
@@ -158,14 +169,3 @@ let retryProgressParts: Set<string> =
 
 let isRetryProgressEvent (eventType: string) : bool = Set.contains eventType retryProgressEvents
 let isRetryProgressPart (partType: string) : bool = Set.contains partType retryProgressParts
-
-let isTerminalAssistantFinish (finish: string) : bool =
-    let normalized = finish.ToLower().Replace("-", "").Replace("_", "").Replace(" ", "")
-    not (normalized.Contains("tool")) && not (normalized.Contains("abort"))
-
-let isNudgePrompt (text: string) : bool = text = todoNudgePrompt || text = loopNudgePrompt
-
-let createPromptBody (agent: string option) (text: string) : obj =
-    match agent with
-    | Some a -> box {| agent = a; parts = [| box {| ``type`` = "text"; text = text |} |] |}
-    | None -> box {| parts = [| box {| ``type`` = "text"; text = text |} |] |}

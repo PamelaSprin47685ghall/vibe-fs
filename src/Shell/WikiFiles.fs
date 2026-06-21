@@ -80,6 +80,16 @@ let appendEntries (workspaceRoot: string) (today: string) (entries: WikiEntry li
                 do! fsPromises?appendFile(p, data, "utf-8")
     }
 
+let dayEntryCount (workspaceRoot: string) (today: string) : JS.Promise<int> =
+    promise {
+        let p = dayPath workspaceRoot today
+        if not (existsSync p) then return 0
+        else
+            let! (t: string) = fsPromises?readFile(p, "utf-8")
+            let name = today + ".ndjson"
+            return match parseNdjson name t with Ok f -> f.entries.Length | Error _ -> 0
+    }
+
 let rewriteDay (workspaceRoot: string) (date: string) (entries: WikiEntry list) : JS.Promise<unit> =
     promise {
         do! ensureWikiDir workspaceRoot

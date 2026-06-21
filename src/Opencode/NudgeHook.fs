@@ -71,55 +71,78 @@ let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string opt
         do! invoke1 promptArg "prompt" session |> Promise.map ignore
     }
 
+let private pureMap =
+    Map [
+        "stream-abort", StreamAbort
+        "session.delete", SessionDeleted
+        "session.close", SessionDeleted
+        "session.remove", SessionDeleted
+        "session.deleted", SessionDeleted
+        "session.next.retried", SessionNextRetried
+        "session.idle", SessionIdle
+    ]
+
+let private extractorMap : Map<string, obj -> NudgeHostEvent option> =
+    Map [
+        "session.next.prompted", fun props ->
+            let prompt = Dyn.get props "prompt"
+            let promptText = Dyn.str prompt "text"
+            let text =
+                if promptText <> "" then promptText
+                else
+                    let partsText = getPartsText (Dyn.get props "parts")
+                    if partsText <> "" then partsText else Dyn.str props "text"
+            Some (SessionNextPrompted text)
+
+        "message.updated", fun props ->
+            let info = Dyn.get props "info"
+            let outcome =
+                if isAbortDomainError (Dyn.get info "error") then UpdateAborted
+                elif isCompletedAssistantMessage info then UpdateCompletedAssistant
+                else UpdateNoChange
+            Some (MessageUpdated outcome)
+
+        "message.part.updated", fun props ->
+            let part = Dyn.get props "part"
+            let partType = Dyn.str part "type"
+            let outcome =
+                if partType = "retry" then PartRetry
+                elif isAbortDomainError (Dyn.get part "error") || isAbortDomainError (Dyn.get part "state") then PartAborted
+                elif isRetryProgressPart partType then PartRetryProgress
+                else PartOther
+            Some (MessagePartUpdated outcome)
+
+        "session.next.step.failed", fun props ->
+            Some (SessionNextStepFailed (if isAbortDomainError (Dyn.get props "error") then StepFailAbort else StepFailOther))
+
+        "session.next.tool.failed", fun props ->
+            Some (SessionNextToolFailed (if isAbortDomainError (Dyn.get props "error") then ToolFailAbort else ToolFailOther))
+
+        "session.next.step.ended", fun props ->
+            let direct = Dyn.str props "finish"
+            let finish = if direct <> "" then direct else Dyn.str (Dyn.get props "info") "finish"
+            Some (SessionNextStepEnded finish)
+
+        "session.error", fun props ->
+            Some (SessionError (if isAbortDomainError (Dyn.get props "error") then SessionErrorAbort else SessionErrorOther))
+
+        "session.status", fun props ->
+            let ev =
+                match Dyn.str (Dyn.get props "status") "type" with
+                | "idle" -> SessionStatusIdle
+                | "busy" -> SessionStatusBusy
+                | "retry" -> SessionStatusRetry
+                | _ -> Other
+            Some ev
+    ]
+
 let private decodeNudgeHostEvent (eventType: string) (props: obj) : NudgeHostEvent =
-    match eventType with
-    | "stream-abort" -> StreamAbort
-    | "session.delete" | "session.close" | "session.remove" | "session.deleted" -> SessionDeleted
-    | "session.next.prompted" ->
-        let prompt = Dyn.get props "prompt"
-        let promptText = Dyn.str prompt "text"
-        let text =
-            if promptText <> "" then promptText
-            else
-                let partsText = getPartsText (Dyn.get props "parts")
-                if partsText <> "" then partsText else Dyn.str props "text"
-        SessionNextPrompted text
-    | "session.next.retried" -> SessionNextRetried
-    | "message.updated" ->
-        let info = Dyn.get props "info"
-        let outcome =
-            if isAbortDomainError (Dyn.get info "error") then UpdateAborted
-            elif isCompletedAssistantMessage info then UpdateCompletedAssistant
-            else UpdateNoChange
-        MessageUpdated outcome
-    | "message.part.updated" ->
-        let part = Dyn.get props "part"
-        let partType = Dyn.str part "type"
-        let outcome =
-            if partType = "retry" then PartRetry
-            elif isAbortDomainError (Dyn.get part "error") || isAbortDomainError (Dyn.get part "state") then PartAborted
-            elif isRetryProgressPart partType then PartRetryProgress
-            else PartOther
-        MessagePartUpdated outcome
-    | "session.next.step.failed" ->
-        SessionNextStepFailed (if isAbortDomainError (Dyn.get props "error") then StepFailAbort else StepFailOther)
-    | "session.next.tool.failed" ->
-        SessionNextToolFailed (if isAbortDomainError (Dyn.get props "error") then ToolFailAbort else ToolFailOther)
-    | "session.next.step.ended" ->
-        let direct = Dyn.str props "finish"
-        let finish = if direct <> "" then direct else Dyn.str (Dyn.get props "info") "finish"
-        SessionNextStepEnded finish
-    | "session.idle" -> SessionIdle
-    | "session.error" ->
-        SessionError (if isAbortDomainError (Dyn.get props "error") then SessionErrorAbort else SessionErrorOther)
-    | "session.status" ->
-        match Dyn.str (Dyn.get props "status") "type" with
-        | "idle" -> SessionStatusIdle
-        | "busy" -> SessionStatusBusy
-        | "retry" -> SessionStatusRetry
-        | _ -> Other
-    | _ ->
-        if isRetryProgressEvent eventType then RetryProgress else Other
+    match Map.tryFind eventType pureMap with
+    | Some ev -> ev
+    | None ->
+        match Map.tryFind eventType extractorMap with
+        | Some extract -> extract props |> Option.defaultValue Other
+        | None -> if isRetryProgressEvent eventType then RetryProgress else Other
 
 /// The detached nudge flow: all client I/O happens here, never under the lock.
 /// Each lock re-entry (`Mutate`) is a pure, instant transition.

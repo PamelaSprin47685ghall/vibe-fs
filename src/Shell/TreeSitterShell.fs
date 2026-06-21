@@ -19,11 +19,14 @@ let private importMetaUrl : string = string importMeta?url
 [<Import("default", "highlight.js")>]
 let private hljs : {| highlightAuto: string -> {| language: string; relevance: float |} |} = jsNative
 
-let private getOrCall0 (o: obj) (key: string) : obj =
-    if Dyn.typeIs (Dyn.get o key) "function" then o?(key)() else Dyn.get o key
+let private callOrGet (o: obj) (key: string) (call: unit -> obj) : obj =
+    if Dyn.typeIs (Dyn.get o key) "function" then call () else Dyn.get o key
 
-let private getOrCall1 (o: obj) (key: string) (arg: obj) : obj =
-    if Dyn.typeIs (Dyn.get o key) "function" then o?(key)(arg) else Dyn.get o key
+let private getOrCall (o: obj) (key: string) : obj =
+    callOrGet o key (fun () -> o?(key)())
+
+let private getOrCallWith (o: obj) (key: string) (arg: obj) : obj =
+    callOrGet o key (fun () -> o?(key)(arg))
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -54,7 +57,7 @@ let private tryGetPack () : Result<obj, string> =
             let nativePath = nodeRequire?resolve($"@kreuzberg/tree-sitter-language-pack/ts-pack-core-node.{suffix}.node")
             let pack = nodeRequire nativePath
             try
-                getOrCall0 pack "downloadAll" |> ignore
+                getOrCall pack "downloadAll" |> ignore
             with _ -> ()
             Result.Ok pack
         with e ->
@@ -63,13 +66,13 @@ let private tryGetPack () : Result<obj, string> =
 let private detectLanguage (pack: obj) (content: string) (filePath: string) : string =
     let probePath () : string option =
         try
-            let r = getOrCall1 pack "detectLanguageFromPath" filePath
+            let r = getOrCallWith pack "detectLanguageFromPath" filePath
             if isNullish r then None else Some (string r)
         with _ -> None
 
     let probeContent () : string option =
         try
-            let r = getOrCall1 pack "detectLanguageFromContent" content
+            let r = getOrCallWith pack "detectLanguageFromContent" content
             if isNullish r then None else Some (string r)
         with _ -> None
 
@@ -77,7 +80,7 @@ let private detectLanguage (pack: obj) (content: string) (filePath: string) : st
         try
             let hl = hljs.highlightAuto content
             if not (isNullish hl) && not (isNullish hl.language) && hl.relevance >= 5.0 then
-                let hasLang = getOrCall1 pack "hasLanguage" hl.language
+                let hasLang = getOrCallWith pack "hasLanguage" hl.language
                 if truthy hasLang then Some (string hl.language) else None
             else None
         with _ -> None
@@ -86,24 +89,25 @@ let private detectLanguage (pack: obj) (content: string) (filePath: string) : st
     |> List.tryPick (fun probe -> probe ())
     |> Option.defaultValue ""
 
+let private nodeField<'T> (node: obj) (key: string) (defaultValue: 'T) : 'T =
+    let v = getOrCall node key
+    if isNullish v then defaultValue else unbox<'T> v
+
 let private nodeChildCount (node: obj) : int =
-    let v = getOrCall0 node "childCount"
-    if isNullish v then 0 else unbox<int> v
+    nodeField node "childCount" 0
 
 let private nodeChild (node: obj) (i: int) : obj option =
-    let c = getOrCall1 node "child" (box i)
+    let c = getOrCallWith node "child" (box i)
     if isNullish c then None else Some c
 
 let private nodeBool (node: obj) (key: string) : bool =
-    let v = getOrCall0 node key
-    truthy v
+    getOrCall node key |> truthy
 
 let private nodePosition (node: obj) (key: string) : Position =
-    let v = getOrCall0 node key
-    if isNullish v then { row = 0; column = 0 } else unbox<Position> v
+    nodeField node key { row = 0; column = 0 }
 
 let private nodeKind (node: obj) (isMissing: bool) : string =
-    let v = getOrCall0 node "kind"
+    let v = getOrCall node "kind"
     if isNullish v then (if isMissing then "MISSING" else "ERROR") else string v
 
 let rec private collectDiagnostics (node: obj) (acc: SyntaxDiagnostic list) : SyntaxDiagnostic list * bool =
@@ -144,7 +148,7 @@ let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckRes
             else
                 let parserResult =
                     try
-                        Result.Ok (getOrCall1 pack "getParser" lang)
+                        Result.Ok (getOrCallWith pack "getParser" lang)
                     with e ->
                         Result.Error $"parser load failed: {e.Message}"
                 match parserResult with
@@ -152,14 +156,14 @@ let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckRes
                 | Result.Ok parser ->
                     let treeResult =
                         try
-                            let tree = getOrCall1 parser "parse" content
+                            let tree = getOrCallWith parser "parse" content
                             if isNullish tree then Result.Error "parser returned undefined" else Result.Ok tree
                         with e ->
                             Result.Error $"parse failed: {e.Message}"
                     match treeResult with
                     | Result.Error reason -> return Failed(lang, reason)
                     | Result.Ok tree ->
-                        let rootNode = getOrCall0 tree "rootNode"
+                        let rootNode = getOrCall tree "rootNode"
                         let errors, _ = collectDiagnostics rootNode []
                         return Ok(lang, errors |> List.rev |> Array.ofList)
     }

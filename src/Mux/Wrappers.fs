@@ -149,23 +149,7 @@ let private mkResultWrapper (targetTool: string) (callback: obj -> obj -> obj ->
     createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
 
 let private mkSyncResultWrapper (targetTool: string) (callback: obj -> obj) : obj =
-    let wrapperFn =
-        System.Func<obj, obj, obj>(fun tool config ->
-            let orig = tool?execute
-            if not (Dyn.typeIs orig "function") then
-                tool
-            else
-                let executeFn =
-                    System.Func<obj, obj, JS.Promise<obj>>(fun args opts ->
-                        promise {
-                            let raw = tool?execute(args, opts)
-                            let! v =
-                                if isThenable raw then unbox<JS.Promise<obj>> raw
-                                else Promise.lift raw
-                            return callback v
-                        })
-                Dyn.withKey tool "execute" (box executeFn))
-    createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
+    mkResultWrapper targetTool (fun result _ _ -> Promise.lift (callback result))
 
 let private mkSyntaxWrappers () : obj array =
     [| mkResultWrapper "file_edit_replace_string" (fun result args config -> applySyntaxCheck result args config)

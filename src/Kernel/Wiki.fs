@@ -245,10 +245,9 @@ let applyDrafts (allocate: Set<string> -> string) (projection: WikiProjection) (
         match tryParseId idStr with
         | Some wid when Map.containsKey wid projection -> Some wid
         | _ -> None
-    let rec loop known revResults remaining =
-        match remaining with
-        | [] -> Ok(List.rev revResults)
-        | draft :: rest ->
+    let step state draft =
+        state
+        |> Result.bind (fun (known, acc) ->
             match validateDraft draft with
             | Error e -> Error e
             | Ok d ->
@@ -260,8 +259,10 @@ let applyDrafts (allocate: Set<string> -> string) (projection: WikiProjection) (
                         match tryParseId newId with
                         | Some wid -> wid, Set.add newId known
                         | None -> failwith "allocated id invalid"
-                loop nextKnown (({ id = targetId; q = d.q; a = d.a } : WikiEntry) :: revResults) rest
-    loop initialKnown [] drafts
+                Ok(nextKnown, ({ id = targetId; q = d.q; a = d.a } : WikiEntry) :: acc))
+    drafts
+    |> List.fold step (Ok(initialKnown, []))
+    |> Result.map (snd >> List.rev)
 
 let allocateRandomHexId (randomInt: unit -> int) (existingIds: Set<string>) : Result<string, string> =
     let rec loop attempts =
