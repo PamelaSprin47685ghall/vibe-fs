@@ -27,11 +27,18 @@ let timed (label: string) (f: unit -> 'a) : 'a =
     r
 
 /// Time an asynchronous test body; return a unit promise.
+/// Catches exceptions so one throwing test does not abort the entire suite.
 let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
     promise {
         let start = now ()
-        let! _ = f ()
-        timings.Add(label, now () - start)
+        try
+            let! _ = f ()
+            timings.Add(label, now () - start)
+        with ex ->
+            printfn "ERROR in %s: %A" label ex
+            failed <- failed + 1
+            failures.Add(label + " [THREW]")
+            timings.Add(label, now () - start)
     }
 
 /// Print the pass/fail summary and the slowest tests, return the failure count.

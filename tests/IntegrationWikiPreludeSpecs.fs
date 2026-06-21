@@ -9,7 +9,6 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Message
 open VibeFs.Kernel.Wiki
 open VibeFs.Mux.Plugin
-open VibeFs.Opencode.CapsPrelude
 open VibeFs.Opencode.Plugin
 open VibeFs.Opencode.WikiRuntime
 open VibeFs.Mux.AiSettings
@@ -27,18 +26,14 @@ let wikiPreludeWithoutCapsSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "manager" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "wiki prelude injects synthetic messages without caps" (msgs.Length = 4)
+    check "wiki prelude injects synthetic messages without caps" (msgs.Length = 2)
     let firstParts = unbox<obj[]> (get msgs.[0] "parts")
-    let thinkingParts = unbox<obj[]> (get msgs.[1] "parts")
-    let contextParts = unbox<obj[]> (get msgs.[2] "parts")
     let firstText = str firstParts.[0] "text"
-    check "wiki prelude keeps hello prefix" (firstText.StartsWith "你好")
     check "wiki prelude is front matter" (firstText.Contains "---\nwiki:")
     check "wiki prelude includes question" (firstText.Contains "0a3f" && firstText.Contains "项目插件入口在哪里？")
     check "wiki prelude hides answers" (not (firstText.Contains "src/Opencode/Plugin.fs"))
-    check "wiki prelude injects thinking" (str thinkingParts.[0] "type" = "reasoning" && str thinkingParts.[0] "text" = thinkText)
-    check "wiki prelude injects llm text" (str contextParts.[0] "type" = "text" && str contextParts.[0] "text" = llmText)
-    check "wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
+    check "wiki prelude injects think-wrapped content" (firstText.Contains "<think>")
+    check "wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -54,12 +49,12 @@ let coderReceivesWikiPreludeSpec () = promise {
     do! tf $ (createObj [ "agent", box "coder" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
     let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
-    check "coder wiki prelude injects synthetic messages" (msgs.Length = 4)
-    check "coder wiki prelude keeps hello prefix" (firstText.StartsWith "你好")
+    check "coder wiki prelude injects synthetic messages" (msgs.Length = 2)
+    check "coder wiki prelude has think-wrapped content" (firstText.Contains "<think>")
     check "coder wiki prelude is front matter" (firstText.Contains "---\nwiki:")
     check "coder wiki prelude includes question" (firstText.Contains "0a3f" && firstText.Contains "项目插件入口在哪里？")
     check "coder wiki prelude hides answers" (not (firstText.Contains "src/Opencode/Plugin.fs"))
-    check "coder wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
+    check "coder wiki prelude preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -74,14 +69,11 @@ let browserDoesNotReceiveWikiPreludeSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "browser" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "browser still receives thinking+assistant injection" (msgs.Length = 4)
+    check "browser still receives injection" (msgs.Length = 2)
     let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
     check "browser injection omits wiki prelude" (not (firstText.Contains "[项目背景和历史]"))
-    let thinkingParts = unbox<obj[]> (get msgs.[1] "parts")
-    let contextParts = unbox<obj[]> (get msgs.[2] "parts")
-    check "browser injection has thinking" (str thinkingParts.[0] "type" = "reasoning" && str thinkingParts.[0] "text" = thinkText)
-    check "browser injection has llm text" (str contextParts.[0] "type" = "text" && str contextParts.[0] "text" = llmText)
-    check "browser injection preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
+    check "browser injection has think-wrapped content" (firstText.Contains "<think>")
+    check "browser injection preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -96,10 +88,10 @@ let executorChildSessionWithoutInputAgentDoesNotReceiveWikiPreludeSpec () = prom
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "executor child without input agent still gets default prefix" (msgs.Length = 4)
+    check "executor child without input agent still gets default prefix" (msgs.Length = 2)
     let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
     check "executor child without input agent omits wiki prelude" (not (firstText.Contains "---\nwiki:"))
-    check "executor child without input agent preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
+    check "executor child without input agent preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }
 

@@ -73,3 +73,5 @@ let llmText ="""# 铁律
 - 前置思考：what-to-do(读取/准备 ∉ todo)。∀ todo 条目→必须对应可验收产出。
 - 宁慢且稳，严禁使用自动化程序批量增删改查程序代码。
 - 脚本=急速幻觉+反复返工；手工编辑=脚踏实地+步步为营。慢=快。"""
+
+let thinkWrapped = "<think>\n" + thinkText + "\n\n" + llmText + "\n</think>"

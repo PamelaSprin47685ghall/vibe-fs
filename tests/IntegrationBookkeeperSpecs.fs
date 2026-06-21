@@ -28,6 +28,7 @@ let bookkeeperLaunchCarriesAiSettingsSpec () = promise {
             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ()))
         ]) ]
     let! workspaceDir = mkdtempAsync "bookkeeper-ai-settings-"
+    do! ensureWikiDir workspaceDir
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
     let wikiRuntime = get (pluginWikiRuntime p) "rawInstance" :?> WikiRuntime
     let aiSettings : DelegatedAiSettings = { modelString = Some "openai/gpt-5"; thinkingLevel = Some "high" }
@@ -75,6 +76,7 @@ let bookkeeperFireAndForgetSpec () = promise {
 
 let websearchTriggersBookkeeperSpec () = promise {
     let! workspaceDir = mkdtempAsync "websearch-bookkeeper-"
+    do! ensureWikiDir workspaceDir
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "child-bookkeeper-session" "noted" |]
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
     let toolExecuteAfter = get p "tool.execute.after"
@@ -93,6 +95,7 @@ let websearchTriggersBookkeeperSpec () = promise {
 
 let webfetchTriggersBookkeeperSpec () = promise {
     let! workspaceDir = mkdtempAsync "webfetch-bookkeeper-"
+    do! ensureWikiDir workspaceDir
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "child-bookkeeper-session" "noted" |]
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
     let toolExecuteAfter = get p "tool.execute.after"
@@ -122,6 +125,7 @@ let bookkeeperSessionRegisteredInChildAgentRegistrySpec () = promise {
             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ())))
         ]) ]
     let! workspaceDir = mkdtempAsync "bookkeeper-registry-"
+    do! ensureWikiDir workspaceDir
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
     let toolExecuteAfter = get p "tool.execute.after"
     let coderInput =

@@ -79,6 +79,7 @@ let submitWikiAppendEmptySpec () = promise {
 
 let submitWikiSchemaAllowsEmptySpec () = promise {
     let! workspaceDir = mkdtempAsync "submit-wiki-schema-empty-"
+    do! ensureWikiDir workspaceDir
     let! p = plugin (box {| directory = workspaceDir |})
     let submitDef = submitWikiTool p
     let argsSchema = get submitDef "args"

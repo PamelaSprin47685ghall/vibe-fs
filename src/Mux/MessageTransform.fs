@@ -19,8 +19,6 @@ let private defaultExcludedAgents = set [ "browser"; "investigator"; "executor";
 
 let private capsUserPrefix = "caps-synth-user-"
 let private capsAssistantPrefix = "caps-synth-assistant-"
-let private capsThinkingPrefix = "caps-synth-thinking-"
-let private capsContextPrefix = "caps-synth-context-"
 
 let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
     if System.Object.ReferenceEquals(target, source) then ()
@@ -38,17 +36,15 @@ let private isPrefixed (prefix: string) (msg: obj) : bool =
     id <> "" && id.StartsWith prefix
 
 let private hasExistingCapsMessages (messages: obj array) : bool =
-    match messages |> List.ofArray with
-    | m0 :: m1 :: m2 :: _ ->
-        isPrefixed capsUserPrefix m0
-        && isPrefixed capsThinkingPrefix m1
-        && isPrefixed capsContextPrefix m2
-    | _ -> false
+    messages.Length > 0 && isPrefixed capsUserPrefix messages.[0]
 
 let private stripExistingCapsMessages (messages: obj array) : obj array =
     if not (hasExistingCapsMessages messages) then messages
-    elif messages.Length >= 4 && isPrefixed capsAssistantPrefix messages.[3] then messages.[4..]
-    else messages.[3..]
+    else
+        messages
+        |> Array.skipWhile (fun msg ->
+            let id = messageId msg
+            id <> "" && id.StartsWith "caps-synth-")
 
 let private extractTexts (messages: obj array) : string seq =
     messages
@@ -89,15 +85,9 @@ let private buildMuxMessage (id: string) (role: string) (parts: obj array) : obj
 let private buildUserMessage (userId: string) (preludeText: string option) : obj =
     let text =
         match preludeText with
-        | Some prelude when prelude.Trim() <> "" -> "你好\n\n" + prelude.Trim()
-        | _ -> "你好"
+        | Some prelude when prelude.Trim() <> "" -> prelude.Trim() + "\n\n" + thinkWrapped
+        | _ -> thinkWrapped
     buildMuxMessage userId "user" [| buildTextPart text |]
-
-let private buildThinkingMessage (id: string) (parentId: string) : obj =
-    buildMuxMessage id "assistant" [| buildTextPart thinkText |]
-
-let private buildContextMessage (id: string) (parentId: string) : obj =
-    buildMuxMessage id "assistant" [| buildTextPart llmText |]
 
 let private buildCapsAssistantMessage (id: string) (parentId: string) (capsFiles: CapsFile list) (fp: string) : obj =
     let parts =
@@ -140,16 +130,12 @@ let private buildCapsMessages
         else
             let fp = stableFingerprint sha256HexTruncated capsFiles
             let userId = $"{capsUserPrefix}{fp}"
-            let thinkingId = $"{capsThinkingPrefix}{fp}"
-            let contextId = $"{capsContextPrefix}{fp}"
             let assistantId = $"{capsAssistantPrefix}{fp}"
             let userMsg = buildUserMessage userId preludeText
-            let thinkingMsg = buildThinkingMessage thinkingId userId
-            let contextMsg = buildContextMessage contextId thinkingId
             let assistantMsgs =
                 if capsFiles.IsEmpty then [||]
-                else [| buildCapsAssistantMessage assistantId contextId capsFiles fp |]
-            Array.concat [| [| userMsg |]; [| thinkingMsg |]; [| contextMsg |]; assistantMsgs; existingStripped |]
+                else [| buildCapsAssistantMessage assistantId userId capsFiles fp |]
+            Array.concat [| [| userMsg |]; assistantMsgs; existingStripped |]
 
 let messagesTransform
     (wikiRuntime: MuxWikiRuntime)

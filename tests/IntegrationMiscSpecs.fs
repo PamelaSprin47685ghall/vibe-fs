@@ -135,6 +135,7 @@ let wikiWorkspaceSerializationSpec () = promise {
 
 let wikiPortLockTimeoutSpec () = promise {
     let! workspaceDir = mkdtempAsync "wiki-port-lock-timeout-"
+    do! ensureWikiDir workspaceDir
     let port = VibeFs.Shell.WikiPortLock.lockPortForPath workspaceDir
     let net = requireFn("node:net")
     let server = net?createServer()

@@ -9,7 +9,6 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Message
 open VibeFs.Kernel.Wiki
 open VibeFs.Mux.Plugin
-open VibeFs.Opencode.CapsPrelude
 open VibeFs.Opencode.Plugin
 open VibeFs.Opencode.WikiRuntime
 open VibeFs.Mux.AiSettings
@@ -40,8 +39,8 @@ let capsTransformSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "manager" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "caps transform injects four messages" (msgs.Length = 5)
-    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[4], originalMsg))
+    check "caps transform injects messages" (msgs.Length = 3)
+    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[2], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -67,12 +66,10 @@ let defaultPreludeWithoutCapsSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "manager" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "default prelude injects synthetic messages without caps or wiki" (msgs.Length = 4)
-    let thinkingParts = unbox<obj[]> (get msgs.[1] "parts")
-    let contextParts = unbox<obj[]> (get msgs.[2] "parts")
-    check "default prelude injects thinking without caps or wiki" (str thinkingParts.[0] "type" = "reasoning" && str thinkingParts.[0] "text" = thinkText)
-    check "default prelude injects llm text without caps or wiki" (str contextParts.[0] "type" = "text" && str contextParts.[0] "text" = llmText)
-    check "default prelude preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
+    check "default prelude injects synthetic messages without caps or wiki" (msgs.Length = 2)
+    let userParts = unbox<obj[]> (get msgs.[0] "parts")
+    check "default prelude injects think-wrapped content" ((str userParts.[0] "text").StartsWith "<think>")
+    check "default prelude preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -123,17 +120,13 @@ let capsAndMagicOrderSpec () = promise {
     |] ]
     do! tf $ (createObj [], messages) |> unbox<JS.Promise<unit>>
     let result = unbox<obj[]> (get messages "messages")
-    let capsParts = unbox<obj[]> (get result.[0] "parts")
-    let thinkingParts = unbox<obj[]> (get result.[1] "parts")
-    let contextParts = unbox<obj[]> (get result.[2] "parts")
-    let capsAssistantInfo = get result.[3] "info"
-    let magicInfo = get result.[4] "info"
+    let userParts = unbox<obj[]> (get result.[0] "parts")
+    let capsAssistantInfo = get result.[1] "info"
+    let magicInfo = get result.[2] "info"
     let magicId : string = str magicInfo "id"
-    check "caps/magic order: caps user first" ((str capsParts.[0] "text").StartsWith "你好")
-    check "caps/magic order: thinking second" (str thinkingParts.[0] "type" = "reasoning" && str thinkingParts.[0] "text" = thinkText)
-    check "caps/magic order: llm text third" (str contextParts.[0] "type" = "text" && str contextParts.[0] "text" = llmText)
-    check "caps/magic order: caps read assistant fourth" ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
-    check "caps/magic order: magic prefix fifth" (magicId.StartsWith(magicTodoPrefixPrefix : string))
+    check "caps/magic order: caps user first" ((str userParts.[0] "text").StartsWith "<think>")
+    check "caps/magic order: caps read assistant second" ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
+    check "caps/magic order: magic prefix third" (magicId.StartsWith(magicTodoPrefixPrefix : string))
     do! rmAsync workspaceDir
 }
 
@@ -150,11 +143,10 @@ let bookkeeperDoesNotReceiveCapsSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "bookkeeper" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "bookkeeper still receives thinking+assistant injection without caps files" (msgs.Length = 4)
+    check "bookkeeper still receives injection without caps files" (msgs.Length = 2)
     let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
     check "bookkeeper injection omits wiki prelude" (not (firstText.Contains "[项目背景和历史]"))
-    check "bookkeeper injection has thinking" (str (unbox<obj[]> (get msgs.[1] "parts")).[0] "type" = "reasoning")
-    check "bookkeeper injection has llm text" (str (unbox<obj[]> (get msgs.[2] "parts")).[0] "type" = "text")
-    check "bookkeeper injection preserves original message" (obj.ReferenceEquals(msgs.[3], originalMsg))
+    check "bookkeeper injection has think-wrapped content" (firstText.StartsWith "<think>")
+    check "bookkeeper injection preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }

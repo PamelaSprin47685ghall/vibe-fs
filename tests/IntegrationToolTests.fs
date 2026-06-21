@@ -62,9 +62,9 @@ let muxWikiPreludeForManagerSpec () = promise {
     else
         do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
         let msgs = unbox<obj[]> (get out "messages")
-        check "mux manager wiki prelude injects prefix messages" (msgs.Length >= 4)
+        check "mux manager wiki prelude injects prefix messages" (msgs.Length >= 2)
         let firstText = firstTextPartText msgs.[0]
-        check "mux manager wiki prelude starts with hello" (firstText.StartsWith "你好")
+        check "mux manager wiki prelude has think-wrapped content" (firstText.Contains "<think>")
         check "mux manager wiki prelude has wiki front matter" (firstText.Contains "---\nwiki:")
         check "mux manager wiki prelude lists question" (firstText.Contains "0a3f" && firstText.Contains "项目插件入口在哪里？")
         check "mux manager wiki prelude hides answer" (not (firstText.Contains "src/Mux/Plugin.fs"))
@@ -87,9 +87,9 @@ let muxWikiPreludeForCoderSpec () = promise {
     else
         do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
         let msgs = unbox<obj[]> (get out "messages")
-        check "mux coder wiki prelude injects prefix messages" (msgs.Length >= 4)
+        check "mux coder wiki prelude injects prefix messages" (msgs.Length >= 2)
         let firstText = firstTextPartText msgs.[0]
-        check "mux coder wiki prelude starts with hello" (firstText.StartsWith "你好")
+        check "mux coder wiki prelude has think-wrapped content" (firstText.Contains "<think>")
         check "mux coder wiki prelude has wiki front matter" (firstText.Contains "---\nwiki:")
         check "mux coder wiki prelude lists question" (firstText.Contains "0a3f" && firstText.Contains "项目插件入口在哪里？")
         check "mux coder wiki prelude hides answer" (not (firstText.Contains "src/Mux/Plugin.fs"))
@@ -113,9 +113,9 @@ let muxNoWikiPreludeForExcludedAgentsSpec () = promise {
             let input = createObj [ "agent", box agent; "directory", box workspaceDir; "sessionID", box ("mux-wiki-excl-" + agent) ]
             do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
             let msgs = unbox<obj[]> (get out "messages")
-            check (agent + " still receives default prefix") (msgs.Length >= 4)
+            check (agent + " still receives default prefix") (msgs.Length >= 2)
             let firstText = firstTextPartText msgs.[0]
-            check (agent + " default prefix starts with hello") (firstText.StartsWith "你好")
+            check (agent + " default prefix has think-wrapped content") (firstText.Contains "<think>")
             check (agent + " omits wiki prelude") (not (firstText.Contains "---\nwiki:"))
             check (agent + " preserves original") (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
     do! rmAsync workspaceDir
@@ -138,9 +138,9 @@ let muxCapsAndWikiPreludeOrderSpec () = promise {
     else
         do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
         let msgs = unbox<obj[]> (get out "messages")
-        check "mux caps+wiki injects prefix messages" (msgs.Length >= 3)
+        check "mux caps+wiki injects prefix messages" (msgs.Length >= 2)
         let firstText = firstTextPartText msgs.[0]
-        check "mux caps+wiki first message starts with hello" (firstText.StartsWith "你好")
+        check "mux caps+wiki first message has think-wrapped content" (firstText.Contains "<think>")
         check "mux caps+wiki first message includes wiki front matter" (firstText.Contains "---\nwiki:")
         let hasCapsAssistant = msgs.[..msgs.Length - 2] |> Array.exists hasDynamicToolReadPart
         check "mux caps+wiki includes assistant caps read before original" hasCapsAssistant

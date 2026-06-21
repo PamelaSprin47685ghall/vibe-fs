@@ -72,6 +72,10 @@ let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array)
     if messages.Length <> deduped.Length then deduped
     else Array.map2 wrapDedupedMuxReadParts messages deduped
 
+let deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj[] =
+    let seen, deduped = VibeFs.Kernel.MessageDedup.deduplicateModelReadOutputsWithSeen (List.ofArray seenOutputs) messages
+    Array.ofList seen, deduped
+
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
 

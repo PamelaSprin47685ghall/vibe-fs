@@ -13,8 +13,6 @@ open VibeFs.Opencode.CapsPrelude
 
 let private capsUserPrefix = "caps-synth-user-"
 let private capsAssistantPrefix = "caps-synth-assistant-"
-let private capsThinkingPrefix = "caps-synth-thinking-"
-let private capsContextPrefix = "caps-synth-context-"
 
 let private messageInfoField (field: obj -> string) (msg: obj) : string =
     let info = get msg "info"
@@ -31,17 +29,15 @@ let messageSessionID (msg: obj) : string =
     messageInfoField (fun info -> str info "sessionID") msg
 
 let hasExistingCapsMessages (messages: obj array) : bool =
-    match messages |> List.ofArray with
-    | m0 :: m1 :: m2 :: _ ->
-        isPrefixed capsUserPrefix m0
-        && isPrefixed capsThinkingPrefix m1
-        && isPrefixed capsContextPrefix m2
-    | _ -> false
+    messages.Length > 0 && isPrefixed capsUserPrefix messages.[0]
 
 let private stripExistingCapsMessages (messages: obj array) : obj array =
     if not (hasExistingCapsMessages messages) then messages
-    elif messages.Length >= 4 && isPrefixed capsAssistantPrefix messages.[3] then messages.[4..]
-    else messages.[3..]
+    else
+        messages
+        |> Array.skipWhile (fun msg ->
+            let id = messageId msg
+            id <> "" && id.StartsWith "caps-synth-")
 
 let private sessionBox (sessionID: string option) : obj =
     match sessionID with Some s -> box s | None -> box null
@@ -70,8 +66,8 @@ let private buildToolParts (capsFiles: CapsFile list) (fp: string) (sessionID: s
 let private buildUserMessage (userId: string) (sessionID: string option) (preludeText: string option) : obj =
     let text =
         match preludeText with
-        | Some prelude when prelude.Trim() <> "" -> "你好\n\n" + prelude.Trim()
-        | _ -> "你好"
+        | Some prelude when prelude.Trim() <> "" -> prelude.Trim() + "\n\n" + thinkWrapped
+        | _ -> thinkWrapped
     box (createObj [
         "info", box (createObj [
             "id", box userId
@@ -104,21 +100,6 @@ let private assistantInfo (assistantId: string) (parentID: string) (sessionID: s
         ])
     ]
 
-let private partOfType (partType: string) (partId: string) (sessionID: string option) (messageID: string) (text: string) : obj =
-    box (createObj [
-        "id", box partId
-        "sessionID", sessionBox sessionID
-        "messageID", box messageID
-        "type", box partType
-        "text", box text
-    ])
-
-let private textPart (partId: string) (sessionID: string option) (messageID: string) (text: string) : obj =
-    partOfType "text" partId sessionID messageID text
-
-let private reasoningPart (partId: string) (sessionID: string option) (messageID: string) (text: string) : obj =
-    partOfType "reasoning" partId sessionID messageID text
-
 let private buildAssistantMessage (assistantId: string) (parentID: string) (sessionID: string option) (projectRoot: string) (parts: obj array) : obj =
     box (createObj [
         "info", box (assistantInfo assistantId parentID sessionID projectRoot)
@@ -131,11 +112,12 @@ let private findFirstRealMessage (messages: obj array) : obj option =
         let id = messageId msg
         id <> "" && not (id.StartsWith capsUserPrefix) && not (id.StartsWith capsAssistantPrefix))
 
-/// Build the synthetic caps prefix (user 你好 + thinking + assistant context,
-/// then optional caps-file tool reads). The caller decides suppression by
-/// passing an empty `capsFiles` (no file reads) and/or `None` prelude; this
-/// keeps a single decision point in `MessageTransform`. The only guard here is
-/// structural: nothing to anchor onto when there is no real message.
+/// Build the synthetic caps prefix: a single user message whose text wraps
+/// thinkText + llmText in <think></think>, followed by optional caps-file
+/// tool reads. The caller decides suppression by passing an empty `capsFiles`
+/// (no file reads) and/or `None` prelude; this keeps a single decision point
+/// in `MessageTransform`. The only guard here is structural: nothing to
+/// anchor onto when there is no real message.
 let buildCapsMessages
     (hashFn: string -> string)
     (messages: obj array)
@@ -154,14 +136,8 @@ let buildCapsMessages
             let sessionOpt = if sessionID = "" then None else Some sessionID
             let fp = stableFingerprint hashFn capsFiles
             let userId = $"{capsUserPrefix}{fp}"
-            let thinkingId = $"{capsThinkingPrefix}{fp}"
-            let contextId = $"{capsContextPrefix}{fp}"
             let assistantId = $"{capsAssistantPrefix}{fp}"
-            let thinkingParts = [| reasoningPart $"caps-reasoning-{fp}" sessionOpt thinkingId thinkText |]
-            let contextParts = [| textPart $"caps-text-{fp}" sessionOpt contextId llmText |]
             let toolParts = if capsFiles.IsEmpty then [||] else buildToolParts capsFiles fp sessionOpt assistantId
             let userMsg = buildUserMessage userId sessionOpt preludeText
-            let thinkingMsg = buildAssistantMessage thinkingId userId sessionOpt projectRoot thinkingParts
-            let contextMsg = buildAssistantMessage contextId thinkingId sessionOpt projectRoot contextParts
-            let assistantMessages = if capsFiles.IsEmpty then [||] else [| buildAssistantMessage assistantId contextId sessionOpt projectRoot toolParts |]
-            Array.concat [| [| userMsg |]; [| thinkingMsg |]; [| contextMsg |]; assistantMessages; existingStripped |]
+            let assistantMessages = if capsFiles.IsEmpty then [||] else [| buildAssistantMessage assistantId userId sessionOpt projectRoot toolParts |]
+            Array.concat [| [| userMsg |]; assistantMessages; existingStripped |]

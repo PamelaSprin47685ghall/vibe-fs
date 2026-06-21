@@ -261,3 +261,8 @@ export function deduplicateReadOutputsWithSeen(
   seenOutputs: ReadonlyArray<string>,
   messages: ReadonlyArray<unknown>,
 ): unknown[];
+
+export function deduplicateModelReadOutputsWithSeen(
+  seenOutputs: ReadonlyArray<string>,
+  messages: ReadonlyArray<unknown>,
+): [string[], unknown[]];
