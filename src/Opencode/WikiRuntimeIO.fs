@@ -45,8 +45,8 @@ let buildEntries (root: string) (drafts: WikiDraft list) : JS.Promise<WikiEntry 
         | Error error -> return raise (exn error)
     }
 
-let submitForKind (todayStr: string) (root: string) (kind: WikiJobKind) (drafts: WikiDraft list) : JS.Promise<string> =
-    withWikiPortLock root (fun () ->
+let submitForKind (portLockTimeoutMs: int64) (portLockRetryDelayMs: int) (todayStr: string) (root: string) (kind: WikiJobKind) (drafts: WikiDraft list) : JS.Promise<string> =
+    withWikiPortLock portLockTimeoutMs portLockRetryDelayMs root (fun () ->
         promise {
             let! entries = buildEntries root drafts
             match kind with

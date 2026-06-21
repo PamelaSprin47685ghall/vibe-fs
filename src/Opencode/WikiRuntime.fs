@@ -24,7 +24,7 @@ open VibeFs.Mux.AiSettings
 /// across an await is `Submit`, which caches `ctx` before awaiting and uses an
 /// idempotent `RemoveJobCmd` on exit so a synchronous `DeleteJob` raised by a
 /// stream-abort/session.delete event during the await cannot corrupt it.
-type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> System.DateTime, registry: ChildAgentRegistry) =
+type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> System.DateTime, registry: ChildAgentRegistry, portLockTimeoutMs: int64, portLockRetryDelayMs: int) =
     let mutable state = initialWikiState
     let commandQueue = SerialQueue()
     // Background bookkeeper launches run their full LLM round-trip here, off the
@@ -124,7 +124,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                     try
                         let isAppend = match ctx.kind with AppendAfterWork -> true | _ -> false
                         let! preCount = if isAppend then dayEntryCount root (today ()) else Promise.lift 0
-                        let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind (today ()) ctx.workspaceRoot ctx.kind drafts)
+                        let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind portLockTimeoutMs portLockRetryDelayMs (today ()) ctx.workspaceRoot ctx.kind drafts)
                         if isAppend && preCount % 10 = 0 then
                             this.StartMaintenanceIfDue(root) |> ignore
                         return result

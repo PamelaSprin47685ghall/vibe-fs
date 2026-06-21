@@ -101,6 +101,16 @@
 
     <Compile Include="tests/Assert.fs" />
     <Compile Include="tests/TempWorkspace.fs" />
+    <Compile Include="tests/IntegrationToolSetup.fs" />
+    <Compile Include="tests/IntegrationCapsSpecs.fs" />
+    <Compile Include="tests/IntegrationWikiPreludeSpecs.fs" />
+    <Compile Include="tests/IntegrationAfterHookSpecs.fs" />
+    <Compile Include="tests/IntegrationMaintenanceSpecs.fs" />
+    <Compile Include="tests/IntegrationSubmitWikiSpecs.fs" />
+    <Compile Include="tests/IntegrationBookkeeperSpecs.fs" />
+    <Compile Include="tests/IntegrationToolDefSpecs.fs" />
+    <Compile Include="tests/IntegrationSubagentSpecs.fs" />
+    <Compile Include="tests/IntegrationMiscSpecs.fs" />
     <Compile Include="tests/ReviewTests.fs" />
     <Compile Include="tests/AgentTests.fs" />
     <Compile Include="tests/KernelTests.fs" />

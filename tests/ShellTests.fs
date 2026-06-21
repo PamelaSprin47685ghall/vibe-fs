@@ -121,19 +121,26 @@ let wikiPortRangeSpec () = promise {
 
 let wikiPortSerialSpec () = promise {
     let seen = System.Collections.Generic.List<string>()
+    let firstAcquiredResolve = ref (fun () -> ())
+    let firstAcquired : JS.Promise<unit> = Promise.create (fun resolve _ -> firstAcquiredResolve.Value <- resolve)
+    let releaseFirst = ref (fun () -> ())
+    let firstGate : JS.Promise<unit> = Promise.create (fun resolve _ -> releaseFirst.Value <- resolve)
     let first =
-        VibeFs.Shell.WikiPortLock.withWikiPortLock "/tmp/wiki-lock-test" (fun () -> promise {
+        VibeFs.Shell.WikiPortLock.withWikiPortLock 30000L 0 "/tmp/wiki-lock-test" (fun () -> promise {
             seen.Add "first-start"
-            do! Promise.sleep 50
+            firstAcquiredResolve.Value ()
+            do! firstGate
             seen.Add "first-end"
             return "one"
         })
+    do! firstAcquired
     let second =
-        VibeFs.Shell.WikiPortLock.withWikiPortLock "/tmp/wiki-lock-test" (fun () -> promise {
+        VibeFs.Shell.WikiPortLock.withWikiPortLock 30000L 0 "/tmp/wiki-lock-test" (fun () -> promise {
             seen.Add "second-start"
             seen.Add "second-end"
             return "two"
         })
+    releaseFirst.Value ()
     let! _ = first
     let! _ = second
     check "wiki lock serializes same workspace" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
