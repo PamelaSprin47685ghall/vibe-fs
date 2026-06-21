@@ -43,6 +43,36 @@ let private toOption (child: obj) : obj =
 
 let private awaitObj (p: obj) : JS.Promise<obj> = unbox<JS.Promise<obj>> p
 
+let private fetchVisibleChildren (api: obj) (sessionID: string) (directory: obj) : JS.Promise<obj[]> =
+    promise {
+        let! sessRes = awaitObj (api?client?session?get(box {| sessionID = sessionID; directory = directory |}))
+        let sess = Dyn.get sessRes "data"
+        let parentID = if Dyn.isNullish sess then "" else Dyn.str sess "parentID"
+        let rootID = if parentID = "" then sessionID else parentID
+        let! childRes = awaitObj (api?client?session?children(box {| sessionID = rootID; directory = directory |}))
+        let data = Dyn.get childRes "data"
+        return
+            if Dyn.isNullish data then [||]
+            else unbox<obj[]> data |> Array.filter (fun c -> isVisibleSubagent c && not (isCheckpointWriterSession c))
+    }
+
+let private showSubagentDialog (api: obj) (sessionID: string) (visible: obj[]) : unit =
+    let options =
+        visible
+        |> Array.sortBy (fun c -> numField c "time" "created")
+        |> Array.map toOption
+    let onSelect =
+        System.Func<obj, unit>(fun opt ->
+            api?route?navigate("session", box {| sessionID = Dyn.str opt "value" |}) |> ignore
+            api?ui?dialog?clear() |> ignore)
+    let props =
+        box {| title = "Subagents"
+               placeholder = "Switch to subagent"
+               current = sessionID
+               options = options
+               onSelect = onSelect |}
+    api?ui?dialog?replace(System.Func<obj>(fun () -> api?ui?DialogSelect(props))) |> ignore
+
 let private toast (api: obj) (variant: string) (message: string) : unit =
     api?ui?toast(box {| message = message; variant = variant |}) |> ignore
 
@@ -59,35 +89,11 @@ let private openSubagents (api: obj) : unit =
         let directory = api?state?path?directory
         promise {
             try
-                let! sessRes = awaitObj (api?client?session?get(box {| sessionID = sessionID; directory = directory |}))
-                let sess = Dyn.get sessRes "data"
-                let parentID = if Dyn.isNullish sess then "" else Dyn.str sess "parentID"
-                let rootID = if parentID = "" then sessionID else parentID
-                let! childRes = awaitObj (api?client?session?children(box {| sessionID = rootID; directory = directory |}))
-                let data = Dyn.get childRes "data"
-                let children =
-                    if Dyn.isNullish data then [||]
-                    else unbox<obj[]> data |> Array.filter isVisibleSubagent
-                let visible =
-                    children |> Array.filter (fun c -> not (isCheckpointWriterSession c))
+                let! visible = fetchVisibleChildren api sessionID directory
                 if visible.Length = 0 then
                     toast api "info" "No subagents running yet"
                 else
-                    let options =
-                        visible
-                        |> Array.sortBy (fun c -> numField c "time" "created")
-                        |> Array.map toOption
-                    let onSelect =
-                        System.Func<obj, unit>(fun opt ->
-                            api?route?navigate("session", box {| sessionID = Dyn.str opt "value" |}) |> ignore
-                            api?ui?dialog?clear() |> ignore)
-                    let props =
-                        box {| title = "Subagents"
-                               placeholder = "Switch to subagent"
-                               current = sessionID
-                               options = options
-                               onSelect = onSelect |}
-                    api?ui?dialog?replace(System.Func<obj>(fun () -> api?ui?DialogSelect(props))) |> ignore
+                    showSubagentDialog api sessionID visible
             with _ ->
                 toast api "error" "Failed to load subagents"
         }

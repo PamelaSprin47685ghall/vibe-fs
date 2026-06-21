@@ -31,16 +31,6 @@ let private closeServer (server: obj) : JS.Promise<unit> =
             server?close(closeHandler) |> ignore
         with _ -> resolve ())
 
-let rec private acquireLoop (port: int) : JS.Promise<obj> =
-    promise {
-        try
-            let! server = listenServer port
-            return server
-        with _ ->
-            do! Promise.sleep 1000
-            return! acquireLoop port
-    }
-
 let private acquireTimeoutMs = 30000L
 
 let rec private acquireLoopUntil (port: int) (deadlineMs: int64) : JS.Promise<obj> =

@@ -7,6 +7,7 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Fuzzy
 open VibeFs.Kernel.HostTools
+open VibeFs.Mux.BuiltinTools
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.ToolCatalog
@@ -14,14 +15,12 @@ open VibeFs.Shell.OllamaClient
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ToolHelpers
+open VibeFs.Mux.Wrappers
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzySearch
 module ToolSchemaModule = VibeFs.Opencode.ToolSchema
 module FuzzyCommandsModule = VibeFs.Shell.FuzzySearch
-
-let private addIfSome (entries: ResizeArray<(string * obj)>) (key: string) (v: 'T option) =
-    match v with Some x -> entries.Add(key, box x) | None -> ()
 
 let private buildFuzzyTool (description: string) (args: obj) (toolName: string) (buildParams: obj -> 'P) (execute: 'P -> SearchOptions -> JS.Promise<SearchOutcome>) (finderCache: FinderCache) : obj =
     define description
@@ -98,10 +97,7 @@ let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                     match result with
                     | Error e -> return formatDomainError "Web search" e
                     | Ok data ->
-                        let results = Dyn.get data "results"
-                        let items =
-                            if Dyn.isNullish results || not (Dyn.isArray results) then []
-                            else (results :?> obj array) |> Array.map (fun r -> { title = Dyn.str r "title"; url = Dyn.str r "url"; content = Dyn.str r "content" }) |> List.ofArray
+                        let items = parseSearchResults (Dyn.get data "results")
                         let rawResults = formatSearchResults items
                         if items.IsEmpty then
                             return rawResults

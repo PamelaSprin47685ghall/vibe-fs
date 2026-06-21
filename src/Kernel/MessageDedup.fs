@@ -94,6 +94,49 @@ let private dedupForPath (seenByPath: Map<string, string list>) (pathKey: string
         | NewContent payload -> payload.content
     (Map.add pathKey nextState.seenContents seenByPath, nextOutput, verdict)
 
+let private foldDedupPart
+    (classify: obj -> ReadOp option)
+    (state: Map<string, string list> * string list)
+    (part: obj)
+    : (Map<string, string list> * string list) * obj * bool =
+    let seenByPath, outputsRev = state
+    match classify part with
+    | None -> (state, part, false)
+    | Some op ->
+        if op.current.Length = 0 then (state, part, false)
+        else
+            let nextSeen, nextOutput, verdict = dedupForPath seenByPath op.pathKey op.current
+            let newPart, changed = if nextOutput = op.current then part, false else op.apply nextOutput, true
+            let outputsRev' = match verdict with NewContent _ -> op.current :: outputsRev | AlreadySeen -> outputsRev
+            ((nextSeen, outputsRev'), newPart, changed)
+
+let private processDedupMessage
+    (getContainer: obj -> obj)
+    (setContainer: obj -> obj array -> obj)
+    (classify: obj -> ReadOp option)
+    (state: Map<string, string list> * string list * bool)
+    (msg: obj)
+    : (Map<string, string list> * string list * bool) * obj =
+    let seenByPath, outputsRev, anyChanged = state
+    if Dyn.isNullish msg then (state, msg)
+    else
+        let container = getContainer msg
+        if Dyn.isNullish container || not (Dyn.isArray container) then (state, msg)
+        else
+            let arr = container :?> obj array
+            if Array.isEmpty arr then (state, msg)
+            else
+                let (nextState, revParts2, partChanged2) =
+                    arr
+                    |> Array.fold
+                        (fun (stateAcc, revParts, ch) part ->
+                            let (stateAcc', newPart, partCh) = foldDedupPart classify stateAcc part
+                            (stateAcc', newPart :: revParts, ch || partCh))
+                        ((seenByPath, outputsRev), [], false)
+                let (fs, fo) = nextState
+                if not partChanged2 then ((fs, fo, anyChanged), msg)
+                else ((fs, fo, true), setContainer msg (List.toArray (List.rev revParts2)))
+
 let private deduplicateMessages
     (getContainer: obj -> obj)
     (setContainer: obj -> obj array -> obj)
@@ -101,39 +144,11 @@ let private deduplicateMessages
     (seenByPath: Map<string, string list>)
     (messages: obj array)
     : string list * obj array =
-    let foldPart (seenByPath, outputsRev) part : ((Map<string, string list> * string list) * obj * bool) =
-        match classify part with
-        | None -> ((seenByPath, outputsRev), part, false)
-        | Some op ->
-            if op.current.Length = 0 then ((seenByPath, outputsRev), part, false)
-            else
-                let nextSeen, nextOutput, verdict = dedupForPath seenByPath op.pathKey op.current
-                let newPart, changed = if nextOutput = op.current then part, false else op.apply nextOutput, true
-                let outputsRev' = match verdict with NewContent _ -> op.current :: outputsRev | AlreadySeen -> outputsRev
-                ((nextSeen, outputsRev'), newPart, changed)
-    let processMsg (seenByPath, outputsRev, anyChanged) msg : ((Map<string, string list> * string list * bool) * obj) =
-        if Dyn.isNullish msg then ((seenByPath, outputsRev, anyChanged), msg)
-        else
-            let container = getContainer msg
-            if Dyn.isNullish container || not (Dyn.isArray container) then ((seenByPath, outputsRev, anyChanged), msg)
-            else
-                let arr = container :?> obj array
-                if Array.isEmpty arr then ((seenByPath, outputsRev, anyChanged), msg)
-                else
-                    let ((fs, fo), revParts2, partChanged2) =
-                        arr
-                        |> Array.fold
-                            (fun ((s, o), revParts, ch) part ->
-                                let ((s', o'), newPart, partCh) = foldPart (s, o) part
-                                ((s', o'), newPart :: revParts, ch || partCh))
-                            ((seenByPath, outputsRev), [], false)
-                    if not partChanged2 then ((fs, fo, anyChanged), msg)
-                    else ((fs, fo, true), setContainer msg (List.toArray (List.rev revParts2)))
     let finalState, resultsRev =
         messages
         |> Array.fold
             (fun (state, revMsgs) msg ->
-                let nextState, newMsg = processMsg state msg
+                let nextState, newMsg = processDedupMessage getContainer setContainer classify state msg
                 (nextState, newMsg :: revMsgs))
             ((seenByPath, [], false), [])
     let (_, outputsRev, anyChanged) = finalState

@@ -77,6 +77,8 @@ let private (|SessionBusyError|_|) (name: string, tag: string) =
 let private (|ForegroundWaitBackgroundedError|_|) (name: string, tag: string) =
     if name = "ForegroundWaitBackgroundedError" || tag = "TaskWaitBackgrounded" then Some () else None
 
+let nowMs () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+
 let translateJsError (error: obj) : DomainError =
     let rec classify (value: obj) (seen: obj list) =
         if Dyn.isNullish value then SystemPanic "Null error context"

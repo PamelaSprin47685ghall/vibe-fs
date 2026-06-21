@@ -8,7 +8,7 @@ open VibeFs.Shell.CallStore
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
-open VibeFs.Mux.HostTools
+open VibeFs.Mux.BuiltinTools
 open VibeFs.Mux.EventHook
 open VibeFs.Mux.SlashCommands
 open VibeFs.Kernel.Dyn

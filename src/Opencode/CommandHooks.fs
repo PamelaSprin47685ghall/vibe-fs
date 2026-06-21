@@ -10,18 +10,20 @@ open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Opencode.WikiRuntime
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Kernel.Domain
+
+let private abortOrDeleteEvents =
+    set [ "stream-abort"; "session.delete"; "session.close"; "session.remove"; "session.deleted" ]
 
 let cleanUpJobContextIfAbortedOrDeleted (wikiRuntime: WikiRuntime) (input: obj) : unit =
     let event = Dyn.get input "event"
     let eventType = Dyn.str event "type"
-    if eventType = "stream-abort" || eventType = "session.delete" || eventType = "session.close" || eventType = "session.remove" || eventType = "session.deleted" then
+    if Set.contains eventType abortOrDeleteEvents then
         let rawProps = Dyn.get event "properties"
         let props = if Dyn.isNullish rawProps then event else rawProps
         let sessionID = VibeFs.Kernel.NudgeState.getSessionID eventType props
         if sessionID <> "" then
             wikiRuntime.DeleteJob(sessionID)
-
-let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
 
 /// Handle /loop and /loop-review slash commands.
 let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
@@ -38,7 +40,7 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
             elif reviewStore.isReviewActive sessionID then
                 parts.Add(box {| ``type`` = "text"; text = "With-Review Mode is already active. Submit your work via submit_review." |})
             elif command = "loop" then
-                reviewStore.activateReview(sessionID, task, dateNow ())
+                reviewStore.activateReview(sessionID, task, Domain.nowMs ())
                 let msg = buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
                 parts.Add(box {| ``type`` = "text"; text = msg |})
             else
@@ -50,7 +52,7 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
                 | Terminated ->
                     parts.Add(box {| ``type`` = "text"; text = "Pre-review could not complete." |})
                 | Rejected feedback ->
-                    reviewStore.activateReview(sessionID, task, dateNow ())
+                    reviewStore.activateReview(sessionID, task, Domain.nowMs ())
                     let msg = buildLoopMessage task [ "=== Pre-review Feedback ==="; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]
                     parts.Add(box {| ``type`` = "text"; text = msg |})
             setKey output "parts" (box parts)

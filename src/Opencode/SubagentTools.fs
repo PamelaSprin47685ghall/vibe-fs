@@ -12,6 +12,7 @@ open VibeFs.Kernel.ToolCatalog
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ToolHelpers
+open VibeFs.Mux.Wrappers
 open VibeFs.Shell.ChildAgentRegistry
 
 let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =

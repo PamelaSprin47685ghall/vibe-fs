@@ -10,6 +10,7 @@ open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Opencode.ToolHelpers
+open VibeFs.Mux.Wrappers
 open VibeFs.Shell.ChildAgentRegistry
 
 let private formatReviewResult = VibeFs.Kernel.Prompts.formatReviewResult

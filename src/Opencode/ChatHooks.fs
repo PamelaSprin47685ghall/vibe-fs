@@ -9,9 +9,6 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Shell.ChildAgentRegistry
 
-let private objectKeys (o: obj) : string array =
-    JS.Constructors.Object.keys(o) |> Seq.toArray
-
 let private resolveAgent (registry: ChildAgentRegistry) (input: obj) : string =
     let explicit = Dyn.str input "agent"
     if explicit <> "" then explicit
@@ -23,7 +20,7 @@ let private resolveAgent (registry: ChildAgentRegistry) (input: obj) : string =
 let private resolveChatTools (host: Host) (agent: string) (existingTools: obj) : obj =
     let next = createObj []
     if not (Dyn.isNullish existingTools) then
-        for key in objectKeys existingTools do
+        for key in Dyn.keys existingTools do
             if canUseForHost host agent key then
                 setKey next key (Dyn.get existingTools key)
             else

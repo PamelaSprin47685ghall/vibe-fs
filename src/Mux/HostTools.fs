@@ -1,4 +1,4 @@
-module VibeFs.Mux.HostTools
+module VibeFs.Mux.BuiltinTools
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -61,7 +61,7 @@ let private describeDomainError (error: DomainError) : string =
     | ToolNotPermitted(agent, tool) -> $"tool '{tool}' not permitted for '{agent}'"
     | InvalidIntent(tool, field, detail) -> $"invalid {tool}.{field}: {detail}"
 
-let private addIfSome (entries: ResizeArray<string * obj>) (v: 'T option) (key: string) =
+let addIfSome (entries: ResizeArray<string * obj>) (key: string) (v: 'T option) =
     match v with
     | Some x -> entries.Add(key, box x)
     | None -> ()
@@ -217,10 +217,7 @@ let websearchTool (deps: obj) : ToolDefinition =
                   match result with
                   | Error e -> return wrapWebError "search" e
                   | Ok data ->
-                      let results = Dyn.get data "results"
-                      let items =
-                          if Dyn.isNullish results || not (Dyn.isArray results) then []
-                          else (results :?> obj array) |> Array.map (fun r -> { title = Dyn.str r "title"; url = Dyn.str r "url"; content = Dyn.str r "content" }) |> List.ofArray
+                      let items = parseSearchResults (Dyn.get data "results")
                       let rawResults = formatSearchResults items
                       if items.IsEmpty then return rawResults
                       else
@@ -241,10 +238,10 @@ let webfetchTool : ToolDefinition =
               promise {
                   let bodyEntries = ResizeArray<(string * obj)>()
                   bodyEntries.Add("url", box url)
-                  addIfSome bodyEntries (optBool args "extract_main") "extract_main"
-                  addIfSome bodyEntries (strField args "prefer_llms_txt") "prefer_llms_txt"
-                  addIfSome bodyEntries (strField args "prompt") "prompt"
-                  addIfSome bodyEntries (optInt args "timeout") "timeout"
+                  addIfSome bodyEntries "extract_main" (optBool args "extract_main")
+                  addIfSome bodyEntries "prefer_llms_txt" (strField args "prefer_llms_txt")
+                  addIfSome bodyEntries "prompt" (strField args "prompt")
+                  addIfSome bodyEntries "timeout" (optInt args "timeout")
                   let body = createObj (Seq.toList bodyEntries)
                   let! result = ollamaPost "web_fetch" body (if Dyn.isNullish abortSignal then None else Some abortSignal)
                   match result with

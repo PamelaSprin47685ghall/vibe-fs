@@ -23,9 +23,6 @@ let setUiLabel (args: obj) (tool: string) : unit =
     | Result.Ok label when label <> "" -> args?("_ui") <- box label
     | _ -> ()
 
-let private objectKeys (o: obj) : string array =
-    JS.Constructors.Object.keys(o) |> Seq.toArray
-
 let private filterRequired (excludeKey: string) (required: obj) : obj =
     if not (isArray required) then required
     else required :?> obj array |> Array.choose (fun item -> let key = string item in if key = excludeKey then None else Some(box key)) |> box
@@ -41,10 +38,10 @@ let stripUiFromJsonSchema (schema: obj) : obj =
         if isNullish properties then schema
         else
             let nextProperties =
-                objectKeys properties
+                Dyn.keys properties
                 |> Array.choose (fun key -> if key = "_ui" then None else Some(key, get properties key))
                 |> createObj
-            createObj [ for key in objectKeys schema do if key = "properties" then yield key, nextProperties elif key = "required" then yield key, requiredWithoutUi (get schema "required") else yield key, get schema key ]
+            createObj [ for key in Dyn.keys schema do if key = "properties" then yield key, nextProperties elif key = "required" then yield key, requiredWithoutUi (get schema "required") else yield key, get schema key ]
 
 let rewriteToolJsonSchema (setKey: obj -> string -> obj -> unit) (rewrite: obj -> obj) (output: obj) : unit =
     let jsonSchema = get output "jsonSchema"
@@ -153,13 +150,12 @@ let mergeMagicReportIntoTaskSchema (schema: obj) : obj =
             if isNullish (get properties "completedWorkReport") then
                 properties?("completedWorkReport") <- stringProperty reportDesc
             if not (isNullish (get properties "task_id")) then
-                JS.Constructors.Object.keys(properties)
-                |> Seq.toArray
+                Dyn.keys properties
                 |> Array.filter (fun key -> key <> "task_id")
                 |> Array.map (fun key -> key, get properties key)
                 |> createObj
                 |> fun nextProperties ->
-                    createObj [ for key in objectKeys schema do if key = "properties" then yield key, nextProperties elif key = "required" then yield key, requiredWithoutTaskId (get schema "required") else yield key, get schema key ]
+                    createObj [ for key in Dyn.keys schema do if key = "properties" then yield key, nextProperties elif key = "required" then yield key, requiredWithoutTaskId (get schema "required") else yield key, get schema key ]
             else schema
 
 let fusedTaskToolDescription =

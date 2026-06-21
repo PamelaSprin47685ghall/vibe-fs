@@ -28,8 +28,11 @@ let initialWikiState : WikiState =
 let private cacheSnapshot (state: WikiState) (sessionID: string) (projection: WikiProjection) : WikiState =
     { state with sessionSnapshots = Map.add sessionID projection state.sessionSnapshots }
 
-let private recordLaunch (state: WikiState) (launch: BookkeeperLaunch) : WikiState =
+let private appendLaunch (state: WikiState) (launch: BookkeeperLaunch) : WikiState =
     { state with bookkeeperLaunches = state.bookkeeperLaunches @ [ launch ] }
+
+let private recordLaunch (state: WikiState) (launch: BookkeeperLaunch) : WikiState =
+    appendLaunch state launch
 
 let private updateLatestLaunchResult (state: WikiState) (title: string) (result: string) : WikiState =
     let rec loop rev remaining =
@@ -49,7 +52,7 @@ let private updateLatestLaunchResult (state: WikiState) (title: string) (result:
 /// launch for the triple (caller queues the job only then) and the next state.
 let recordLaunchOnce (state: WikiState) (key: string) (launch: BookkeeperLaunch) : bool * WikiState =
     if Set.contains key state.scheduledMaintenance then false, state
-    else true, { state with scheduledMaintenance = Set.add key state.scheduledMaintenance; bookkeeperLaunches = state.bookkeeperLaunches @ [ launch ] }
+    else true, { appendLaunch state launch with scheduledMaintenance = Set.add key state.scheduledMaintenance }
 
 let drainLaunches (state: WikiState) : BookkeeperLaunch list * WikiState =
     state.bookkeeperLaunches, { state with bookkeeperLaunches = [] }

@@ -50,9 +50,6 @@ let private mergeObj (a: obj) (b: obj) : obj =
     Dyn.assignInto result b |> ignore
     result
 
-let private objectKeys (o: obj) : string array =
-    JS.Constructors.Object.keys(o) |> Seq.toArray
-
 let private mapToolNames (host: Host) (f: string -> 'a) : obj =
     allToolNames host
     |> Seq.map (fun name -> name, box (f name))
@@ -105,7 +102,7 @@ let applyAgentConfigFor (host: Host) (opencodeConfig: obj) (mcps: obj) : obj =
     for name in builtinAgentSpecs |> List.map (fun spec -> spec.name) do
         if Dyn.isNullish (Dyn.get agents name) then setKey agents name (emptyObj ())
     let finalAgents =
-        objectKeys agents
+        Dyn.keys agents
         |> Seq.map (fun name ->
             let ua = Dyn.get agents name
             let uaObj = if Dyn.isNullish ua then emptyObj () else ua

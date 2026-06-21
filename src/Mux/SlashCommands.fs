@@ -14,8 +14,6 @@ open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
 
-let private dateNow () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
 
@@ -63,7 +61,7 @@ let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) 
                     elif reviewStore.isReviewActive (Id.workspaceIdValue wid) then
                         Promise.lift "With-Review Mode is already active. Submit your work via submit_review."
                     else
-                        reviewStore.activateReview(Id.workspaceIdValue wid, task, dateNow ())
+                        reviewStore.activateReview(Id.workspaceIdValue wid, task, Domain.nowMs ())
                         Promise.lift (buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ])) |}
 
 let private parseLoopReviewVerdict (args: obj option) (report: string) : bool * string =
@@ -87,7 +85,7 @@ let private precheckReview
         let! config = pluginConfigForSlash deps workspaceId
         let disabledTools = deniedTools "reviewer" (Array.toList toolNames) |> Array.ofList
         let workspaceIdStr = Id.workspaceIdValue workspaceId
-        let callId = workspaceIdStr + "-loop-review-" + string (dateNow ())
+        let callId = workspaceIdStr + "-loop-review-" + string (Domain.nowMs ())
         let verdictPromise = registerCallWithTimeout callStore callId 300000
         let experiments =
             createObj
@@ -109,7 +107,7 @@ let private precheckReview
 let private activateReview
     (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (workspaceIdStr: string) (task: string)
     (isPass: bool) (feedback: string) : string =
-    reviewStore.activateReview(workspaceIdStr, task, dateNow ())
+    reviewStore.activateReview(workspaceIdStr, task, Domain.nowMs ())
     if isPass then
         buildLoopMessage task [ "With-Review Mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
     else

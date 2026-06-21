@@ -19,7 +19,7 @@ let createCallStore () = CallStore.Create()
 
 let private ttlMs = 600000L
 
-let private nowMs () = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+let private nowMs () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
 
 let private cleanupOld (store: CallStore) =
     let cutoff = nowMs () - ttlMs

@@ -6,13 +6,13 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.TreeSitterKernel
+open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.HookSchema
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Opencode.WikiRuntime
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.TreeSitterShell
 
-let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
 
 /// Stash the report keyed by callID for `tool.execute.after` to restore.

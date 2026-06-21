@@ -14,8 +14,7 @@ open VibeFs.Kernel.ReviewSession
 open VibeFs.Shell.CallStore
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
-
-let private dateNow () = int (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+open VibeFs.Kernel.Domain
 
 let private disabledToolsForReviewer (toolNames: string array) : string array =
     deniedTools "reviewer" (Array.toList toolNames) |> Array.ofList
@@ -208,7 +207,7 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                       try
                           let originalTask = defaultArg (reviewStore.getReviewTask workspaceId) ""
                           let taskSection = if originalTask = "" then "" else "\n=== Original Task ===\n\n" + originalTask
-                          let callId = workspaceId + "-review-" + string (dateNow ())
+                          let callId = workspaceId + "-review-" + string (Domain.nowMs ())
                           let verdictPromise = registerCallWithTimeout callStore callId 300000
                           let reviewPrompt =
                               ReviewerVerdictPrompts.reviewerVerdictInstructions
