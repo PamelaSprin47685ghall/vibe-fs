@@ -15,6 +15,9 @@ let verdictAccepted = "accepted"
 let verdictRejected = "rejected"
 let verdictTerminated = "terminated"
 let verdictCancelled = "cancelled"
+let commandField = "command"
+let commandWithReview = "with-review"
+let commandWithReviewPrecheck = "with-review-precheck"
 
 /// Verdicts that END With-Review Mode. Reject/terminate keep it active (the work
 /// continues), so they are deliberately excluded.
@@ -29,6 +32,9 @@ let loopFooter =
 
 let buildLoopMessage (task: string) (bodyLines: string list) : string =
     frontMatterPrompt [ yamlScalarField taskField task ] (String.concat "\n" (bodyLines @ loopFooter))
+
+let buildLoopCommandTemplate (commandName: string) (bodyLines: string list) : string =
+    frontMatterPrompt [ yamlScalarField commandField commandName ] (String.concat "\n" bodyLines)
 
 /// Loop cancellation carries a `verdict: cancelled` front-matter anchor so a
 /// restart replay recognizes it structurally, followed by the human-readable

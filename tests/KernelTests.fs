@@ -294,6 +294,13 @@ let loopMessagesShared () =
     check "loop message lists affectedFiles field" (kernelMsg.Contains "affectedFiles")
     check "loop message names reviewer" (kernelMsg.Contains "reviewer")
 
+    let loopTemplate = VibeFs.Kernel.Prompts.withReviewCommandTemplate
+    check "loop template carries command front-matter" (loopTemplate.Contains "command: \"with-review\"")
+    check "loop template preserves arguments placeholder" (loopTemplate.Contains "$ARGUMENTS")
+    check "loop template reuses review criteria" (loopTemplate.Contains "# Evaluation Criteria")
+    check "loop template mentions submit_review" (loopTemplate.Contains "submit_review")
+    check "loop template forbids finishing early" (loopTemplate.Contains "Do not end the conversation")
+
 /// S1 SSOT: the reviewer's "submit a PASS/REJECT verdict via agent_report"
 /// instruction template lives once in the Kernel, not duplicated between
 /// Mux/SubagentTools.fs (review verdict) and Mux/SlashCommands.fs (loop-review

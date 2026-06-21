@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.LoopMessages
+open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.ReviewerLoop
@@ -63,7 +64,7 @@ let registerCommands (cfg: obj) : unit =
     let cmd = Dyn.get cfg "command"
     let cmdObj = if Dyn.isNullish cmd then emptyObj () else cmd
     if Dyn.isNullish (Dyn.get cmdObj "loop") then
-        setKey cmdObj "loop" (box {| template = "Enable With-Review Mode."; description = "Enable With-Review Mode — the next submission must pass through a reviewer before being accepted" |})
+        setKey cmdObj "loop" (box {| template = withReviewCommandTemplate; description = "Enable With-Review Mode — the next submission must pass through a reviewer before being accepted" |})
     if Dyn.isNullish (Dyn.get cmdObj "loop-review") then
-        setKey cmdObj "loop-review" (box {| template = "Enable With-Review Mode with pre-review."; description = "Enable With-Review Mode with pre-review — the task is pre-reviewed immediately, and reviewer feedback is prepended to your prompt before any work begins" |})
+        setKey cmdObj "loop-review" (box {| template = withReviewPrecheckCommandTemplate; description = "Enable With-Review Mode with pre-review — the task is pre-reviewed immediately, and reviewer feedback is prepended to your prompt before any work begins" |})
     setKey cfg "command" cmdObj
