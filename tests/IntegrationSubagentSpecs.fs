@@ -103,3 +103,45 @@ let investigatorToolLateClientInjectionSpec () = promise {
     check "investigator tool late injection prompts child investigator agent" (str (get promptCalls.[0] "body") "agent" = "investigator")
     do! rmAsync workspaceDir
 }
+
+let muxSubmitReviewNoActiveReviewSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-submit-review-no-active-"
+    let reg = createRegistration (minimalMuxDeps ())
+    let submitTool = muxToolByName reg "submit_review"
+    if isNullish submitTool then
+        check "mux registration exposes submit_review tool" false
+    else
+        let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-review-no-active"; "sessionID", box "mux-review-no-active" ]
+        let args = createObj [ "report", box "nothing"; "affectedFiles", box [| "a.ts" |] ]
+        let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+        check "submit_review without active review tells user no review is needed" (result.Contains("You do not need review"))
+    do! rmAsync workspaceDir
+}
+
+let muxSubmitReviewPromptSuppliesCallIdSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-submit-review-callid-"
+    let reg = createRegistration (minimalMuxDeps ())
+    let submitTool = muxToolByName reg "submit_review"
+    if isNullish submitTool then
+        check "mux registration exposes submit_review tool" false
+    else
+        let sessionID = "mux-review-callid"
+        muxActivateReviewForTest reg sessionID "Implement feature X"
+        let prompts = ResizeArray<string>()
+        let taskService = mockMuxTaskServiceCapturingPrompt prompts
+        let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
+        let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+        try
+            let! _ = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+            check "submit_review should not complete when reviewer cannot report verdict" false
+        with _ ->
+            ()
+        let pending = muxPendingCallIdsForTest reg
+        let matching = pending |> Array.tryFind (fun id -> id.StartsWith(sessionID + "-review-"))
+        match matching with
+        | None -> check "submit_review registers a pending review call" false
+        | Some callId ->
+            let promptText = if prompts.Count > 0 then prompts.[0] else ""
+            check "submit_review prompt includes the review callId for the reviewer" (promptText.Contains(callId))
+    do! rmAsync workspaceDir
+}

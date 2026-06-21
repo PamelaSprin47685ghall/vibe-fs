@@ -118,6 +118,27 @@ let createRegistration (deps: obj) : obj =
                      box (System.Func<obj array>(fun () -> [||]))
                      "waitForBackgroundJobsForTesting",
                      box (System.Func<JS.Promise<unit>>(fun () -> Promise.lift ())) ])
+           __reviewStore =
+               box (createObj
+                   [ "activateReview",
+                     box (System.Func<string, string, int64, unit>(fun sessionID task createdAt ->
+                         reviewStore.activateReview(sessionID, task, createdAt)))
+                     "deactivateReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.deactivateReview sessionID))
+                     "isReviewActive", box (System.Func<string, bool>(fun sessionID -> reviewStore.isReviewActive sessionID))
+                     "getReviewTask", box (System.Func<string, string option>(fun sessionID -> reviewStore.getReviewTask sessionID))
+                     "tryLockReview", box (System.Func<string, bool>(fun sessionID -> reviewStore.tryLockReview sessionID))
+                     "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ])
+           __callStore =
+               box (createObj
+                   [ "resolveCall", box (System.Func<string, obj, bool>(fun callId args -> resolveCall callStore callId args))
+                     "pendingCallIds", box (System.Func<string array>(fun () -> callStore.PendingCalls.Keys |> Seq.toArray))
+                     "hasCall", box (System.Func<string, bool>(fun callId -> hasCall callStore callId))
+                     "resolveFirstMatching",
+                     box (System.Func<string, obj, bool>(fun prefix args ->
+                         callStore.PendingCalls.Keys
+                         |> Seq.tryFind (fun k -> k.StartsWith(prefix))
+                         |> Option.map (fun k -> resolveCall callStore k args)
+                         |> Option.defaultValue false)) ])
            getToolPolicy = (fun (_agentId: string) (role: obj) ->
                let agent = if Dyn.isNullish role then "manager" else string role
                let remove = toolNames |> Array.filter (fun t -> not (canUse agent t))

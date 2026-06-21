@@ -296,10 +296,17 @@ let loopMessagesShared () =
 
     let loopTemplate = VibeFs.Kernel.Prompts.withReviewCommandTemplate
     check "loop template carries command front-matter" (loopTemplate.Contains "command: \"with-review\"")
-    check "loop template preserves arguments placeholder" (loopTemplate.Contains "$ARGUMENTS")
+    check "loop template carries task front-matter block placeholder" (loopTemplate.Contains "task: |\n  $ARGUMENTS")
+    check "loop template does not say task is repeated below" (not (loopTemplate.Contains "repeated below"))
     check "loop template reuses review criteria" (loopTemplate.Contains "# Evaluation Criteria")
     check "loop template mentions submit_review" (loopTemplate.Contains "submit_review")
     check "loop template forbids finishing early" (loopTemplate.Contains "Do not end the conversation")
+
+    let precheckTemplate = VibeFs.Kernel.Prompts.withReviewPrecheckCommandTemplate
+    check "precheck template carries command front-matter" (precheckTemplate.Contains "command: \"with-review-precheck\"")
+    check "precheck template carries task front-matter block placeholder" (precheckTemplate.Contains "task: |\n  $ARGUMENTS")
+    check "precheck template reuses review criteria" (precheckTemplate.Contains "# Evaluation Criteria")
+    check "precheck template does not repeat task in body tail" (not (precheckTemplate.EndsWith "$ARGUMENTS"))
 
 /// S1 SSOT: the reviewer's "submit a PASS/REJECT verdict via agent_report"
 /// instruction template lives once in the Kernel, not duplicated between

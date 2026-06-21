@@ -177,17 +177,20 @@ let inferReviewTaskFromTexts' () =
         (inferReviewTaskFromTexts [ "Here is my plan:\ntask: refactor everything\nlet's go" ])
 
 /// parseFrontMatterScalars is the structural anchor reader. It must (a) read
-/// only the leading `---` block, (b) keep un-indented scalar fields, (c) skip
-/// `key: |` block headers and their indented bodies — even when a body line is
-/// itself `---` after indentation — and (d) return empty for ordinary prose.
+/// only the leading `---` block, (b) keep un-indented scalar fields, (c) parse
+/// `key: |` literal block fields without mistaking indented `---` for the close
+/// fence, and (d) return empty for ordinary prose or an unclosed front matter.
 let parseFrontMatterScalars' () =
     let scalars = parseFrontMatterScalars (frontMatterPrompt [ yamlScalarField "verdict" "rejected"; yamlBlockField "feedback" "line one\n---\nline three" ] "Address the feedback above.")
     equal "scalar verdict parsed" (Some "rejected") (Map.tryFind "verdict" scalars)
-    check "block field skipped" (not (Map.containsKey "feedback" scalars))
+    equal "block field parsed" (Some "line one\n---\nline three") (Map.tryFind "feedback" scalars)
 
     let multi = parseFrontMatterScalars (frontMatter [ yamlScalarField "task" "do thing"; yamlScalarField "verdict" "accepted" ])
     equal "first scalar" (Some "do thing") (Map.tryFind "task" multi)
     equal "second scalar" (Some "accepted") (Map.tryFind "verdict" multi)
+
+    let block = parseFrontMatterScalars (frontMatter [ yamlBlockField "task" "line one\nline two\n: [] {} \"quoted\"" ])
+    equal "block scalar parsed" (Some "line one\nline two\n: [] {} \"quoted\"") (Map.tryFind "task" block)
 
     equal "plain prose → empty" Map.empty (parseFrontMatterScalars "just a normal message, no front matter")
     equal "no closing fence → empty" Map.empty (parseFrontMatterScalars "---\ntask: \"x\"\nnever closes")

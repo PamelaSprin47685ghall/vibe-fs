@@ -211,6 +211,7 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                           let verdictPromise = registerCallWithTimeout callStore callId 300000
                           let reviewPrompt =
                               ReviewerVerdictPrompts.reviewerVerdictInstructions
+                              + "\n\n=== Review Call ID ===\n\n" + callId
                               + "\n\n=== Change Report ===\n\n" + report
                               + "\n\n=== Affected Files ===\n\n" + String.concat "\n" affectedFiles
                               + "\n" + taskSection

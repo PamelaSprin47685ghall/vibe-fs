@@ -37,31 +37,56 @@ let parseYamlScalar (raw: string) : string option =
         Some(t.Substring(1, t.Length - 2).Replace("\\n", "\n").Replace("\\\"", "\"").Replace("\\\\", "\\"))
     else None
 
-/// Parse the top-level scalar fields of the YAML front-matter block that opens
-/// `text`. Only a block whose first line is exactly `---` and that closes with a
-/// later `---` line is recognized, and only un-indented `key: "value"` scalars
-/// are returned — indented block-field bodies (and any `---` within them) are
-/// skipped. Ordinary prose, which practically never opens with a `---` fence,
-/// yields an empty map, making these fields a collision-free state anchor.
+/// Parse the top-level scalar-like fields of the YAML front-matter block that
+/// opens `text`. Supports both quoted scalars (`key: "value"`) and literal block
+/// scalars (`key: |` with two-space-indented body). The opening fence MUST be
+/// closed by a later top-level `---`; otherwise the result is empty. Ordinary
+/// prose, which practically never opens with a `---` fence, likewise yields an
+/// empty map, making these fields a collision-free state anchor.
 let parseFrontMatterScalars (text: string) : Map<string, string> =
-    if isNull text then Map.empty
+    if isNull text then
+        Map.empty
     else
         let lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
-        if lines.Length < 2 || lines.[0] <> "---" then Map.empty
+        if lines.Length < 2 || lines.[0] <> "---" then
+            Map.empty
         else
+            let readBlock startIndex =
+                let rec gather j acc =
+                    if j < lines.Length && (lines.[j].StartsWith("  ") || lines.[j] = "") then
+                        let line =
+                            if lines.[j].StartsWith("  ") then
+                                lines.[j].Substring(2)
+                            else
+                                ""
+                        gather (j + 1) (line :: acc)
+                    else
+                        String.concat "\n" (List.rev acc), j
+                gather startIndex []
+
             let rec loop i acc =
-                if i >= lines.Length then Map.empty
-                elif lines.[i] = "---" then acc
+                if i >= lines.Length then
+                    Map.empty
+                elif lines.[i] = "---" then
+                    acc
                 else
                     let line = lines.[i]
-                    let acc =
-                        if line.Length > 0 && line.[0] <> ' ' && line.[0] <> '\t' then
-                            let sep = line.IndexOf(": ")
-                            if sep > 0 then
-                                match parseYamlScalar (line.Substring(sep + 2)) with
-                                | Some value -> Map.add (line.Substring(0, sep)) value acc
-                                | None -> acc
-                            else acc
-                        else acc
-                    loop (i + 1) acc
+                    if line.Length = 0 || line.[0] = ' ' || line.[0] = '\t' then
+                        loop (i + 1) acc
+                    else
+                        let sep = line.IndexOf(": ")
+                        if sep <= 0 then
+                            loop (i + 1) acc
+                        else
+                            let key = line.Substring(0, sep)
+                            let raw = line.Substring(sep + 2)
+                            match parseYamlScalar raw with
+                            | Some value ->
+                                loop (i + 1) (Map.add key value acc)
+                            | None when raw = "|" ->
+                                let value, nextIndex = readBlock (i + 1)
+                                loop nextIndex (Map.add key value acc)
+                            | _ ->
+                                loop (i + 1) acc
+
             loop 1 Map.empty

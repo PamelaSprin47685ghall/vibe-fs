@@ -162,6 +162,8 @@ let run () : JS.Promise<unit> =
             "muxFetchWikiSnapshot", muxFetchWikiSnapshotSpec
             "muxReturnBookkeeperAppend", muxReturnBookkeeperAppendSpec
             "muxExecutorModeSchema", muxExecutorModeSchemaSpec
+            "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
+            "muxSubmitReviewPromptSuppliesCallId", muxSubmitReviewPromptSuppliesCallIdSpec
         ]
         for (label, spec) in specs do
             do! timedAsync ("IntegrationTool." + label) spec

@@ -175,6 +175,49 @@ let muxWikiRuntime (reg: obj) : obj =
         let rt = get reg "wikiRuntime"
         if isNullish rt then null else rt
 
+let muxReviewStore (reg: obj) : obj = get reg "__reviewStore"
+let muxCallStore (reg: obj) : obj = get reg "__callStore"
+
+let muxActivateReviewForTest (reg: obj) (sessionID: string) (task: string) : unit =
+    let store = muxReviewStore reg
+    let activate = get store "activateReview" |> unbox<System.Func<string, string, int64, unit>>
+    activate.Invoke(sessionID, task, 0L)
+
+let muxIsReviewActiveForTest (reg: obj) (sessionID: string) : bool =
+    let store = muxReviewStore reg
+    let fn = get store "isReviewActive" |> unbox<System.Func<string, bool>>
+    fn.Invoke(sessionID)
+
+let muxPendingCallIdsForTest (reg: obj) : string array =
+    let store = muxCallStore reg
+    let fn = get store "pendingCallIds" |> unbox<System.Func<string array>>
+    fn.Invoke()
+
+let muxResolveFirstMatchingCallForTest (reg: obj) (prefix: string) (args: obj) : bool =
+    let store = muxCallStore reg
+    let fn = get store "resolveFirstMatching" |> unbox<System.Func<string, obj, bool>>
+    fn.Invoke(prefix, args)
+
+let minimalMuxDeps () : obj =
+    createObj
+        [ "loadConfigOrDefault", box (fun () -> createObj [])
+          "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
+          "resolveAgentFrontmatter",
+          box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj []))) ]
+
+let mockMuxTaskServiceCapturingPrompt (prompts: ResizeArray<string>) : obj =
+    createObj
+        [ "create",
+          box (System.Func<obj, JS.Promise<obj>>(fun input ->
+              promise {
+                  let promptText = str input "prompt"
+                  if promptText <> "" then prompts.Add(promptText)
+                  return box {| success = true; data = box {| taskId = "reviewer-task-1"; kind = "agent" |} |}
+              }))
+          "waitForAgentReport",
+          box (System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
+              Promise.reject (exn "simulated reviewer timeout"))) ]
+
 let registerMuxWikiJobForTest (reg: obj) (sessionID: string) (workspaceRoot: string) (kindTag: string) (payload: obj) : unit =
     let runtime = muxWikiRuntime reg
     let registrar = get runtime "registerJobForTesting" |> unbox<System.Func<string, string, string, obj, unit>>

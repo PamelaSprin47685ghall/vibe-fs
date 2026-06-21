@@ -78,29 +78,39 @@ let reviewInstructions =
     + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\nreturn_reviewer({ \"feedback\": null })          // Accept — pass with no feedback\nreturn_reviewer({ \"feedback\": \"specific...\" }) // Reject — provide detailed, actionable feedback\n\nIMPORTANT: If you accept, feedback MUST be null. Do not write praise or any other text — it will be misinterpreted as rejection feedback.\n\nYou MUST call return_reviewer before finishing. Do not end the conversation without submitting your verdict."
 
 let withReviewCommandTemplate =
-    buildLoopCommandTemplate commandWithReview [
+    frontMatterPrompt [
+        yamlScalarField commandField commandWithReview
+        yamlBlockField taskField "$ARGUMENTS"
+    ] (String.concat "\n" [
         "You are entering With-Review Mode."
-        "Complete the task after this message."
-        "Your eventual submission will be judged by the reviewer using these criteria:"
+        "Complete the task recorded in the front matter."
+        ""
+        "The reviewer will judge your eventual submission using these criteria:"
+        ""
         reviewCriteria
+        ""
         "Before finishing, you must call submit_review with:"
         "- report: a detailed description of what you did and why"
         "- affectedFiles: every file you modified or created"
         "Defend proactively against reviewer rejection: keep the implementation natural, minimal, complete, and well-tested."
         "Do not end the conversation without submit_review."
-        "$ARGUMENTS"
-    ]
+    ])
 
 let withReviewPrecheckCommandTemplate =
-    buildLoopCommandTemplate commandWithReviewPrecheck [
+    frontMatterPrompt [
+        yamlScalarField commandField commandWithReviewPrecheck
+        yamlBlockField taskField "$ARGUMENTS"
+    ] (String.concat "\n" [
         "You are requesting With-Review Mode with pre-review."
-        "The task after this message will be pre-reviewed first."
-        "If the task is activated, your eventual submission will be judged by the reviewer using these criteria:"
+        "The task recorded in the front matter will be pre-reviewed first."
+        ""
+        "If the task is activated, the reviewer will later judge your submission using these criteria:"
+        ""
         reviewCriteria
+        ""
         "If activated, complete the task and later submit your work via submit_review."
         "Do not treat this message itself as completed work."
-        "$ARGUMENTS"
-    ]
+    ])
 
 let reviewerNudgePrompt =
     "You have not submitted your review verdict yet.\n\n"
