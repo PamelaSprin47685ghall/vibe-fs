@@ -73,8 +73,8 @@ type MuxWikiRuntime(?deps: obj) as this =
             launchQueue.Enqueue(fun () ->
                 promise {
                     try
-                        let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
-                        recordBackgroundResult title "success"
+                            let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
+                            recordBackgroundResult title "success"
                     with ex ->
                         recordBackgroundResult title (string ex)
                 }) |> Promise.start
@@ -189,7 +189,7 @@ type MuxWikiRuntime(?deps: obj) as this =
                             let first, nextState = recordLaunchOnce state key launch
                             state <- nextState
                             if first then
-                                let promptText = buildPrompt value files projection
+                                let promptText = prependJobMarker { workspaceRoot = workspaceRoot; kind = kind value } (buildPrompt value files projection)
                                 launchBg workspaceRoot (kind value) title promptText)
 
                     launchIfDue dailyDue DailyRewrite "Daily wiki rewrite" "daily" "for" buildDailyPrompt
@@ -267,7 +267,7 @@ type MuxWikiRuntime(?deps: obj) as this =
                         promise {
                             try
                                 let! projection = readProjection root
-                                let promptText = buildAppendPrompt title prompt result projection
+                                let promptText = prependJobMarker { workspaceRoot = root; kind = AppendAfterWork } (buildAppendPrompt title prompt result projection)
                                 let options = Some (box {| aiSettingsAgentId = "bookkeeper" |})
                                 let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
                                 recordBackgroundResult title "success"

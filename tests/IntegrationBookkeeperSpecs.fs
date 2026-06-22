@@ -10,6 +10,7 @@ open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 open VibeFs.Opencode.WikiRuntime
 open VibeFs.Mux.AiSettings
+open VibeFs.Mux.WikiTools
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.WikiFiles
 open VibeFs.Kernel.Wiki
@@ -24,7 +25,7 @@ let bookkeeperLaunchCarriesAiSettingsSpec () = promise {
             "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
                 (promise { promptCalls.Add(arg) })))
             "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
-                (promise { return box {| data = [| userTextMessage "child-bk-ai-session" "[vibe-wiki-job] {\"type\":\"vibe_wiki_job\",\"workspaceRoot\":\"/tmp\",\"kind\":\"append\"}"; box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "tool"; tool = "return_bookkeeper" |} |] |} |] |} })))
+                (promise { return box {| data = [| userTextMessage "child-bk-ai-session" (renderJobMarker { workspaceRoot = "/tmp"; kind = AppendAfterWork }); box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "tool"; tool = "return_bookkeeper" |} |] |} |] |} })))
             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ()))
         ]) ]
     let! workspaceDir = mkdtempAsync "bookkeeper-ai-settings-"
@@ -154,16 +155,31 @@ let muxDailyMaintenanceLaunchSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-daily-maintenance-"
     do! ensureWikiDir workspaceDir
     do! writeWikiFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [ wikiEntry "0a3f" "积压问题" "Daily candidate" ]
-    let reg = createRegistration (minimalMuxDeps ())
+    let prompts = ResizeArray<string>()
+    let deps = minimalMuxDeps ()
+    deps?("directory") <- workspaceDir
+    deps?("taskService") <- mockMuxTaskServiceCapturingPrompt prompts
+    let reg = createRegistration deps
     let wikiRuntime = muxWikiRuntime reg
     let startFn = get wikiRuntime "startMaintenanceIfDue"
     if isNullish startFn then
         check "mux wiki runtime exposes startMaintenanceIfDue" false
     else
+        let runtime = get wikiRuntime "rawInstance" :?> MuxWikiRuntime
+        let config = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-daily-maintenance"; "taskService", box (get deps "taskService") ]
+        runtime.StartBookkeeperAppend("input", "result", "write", config = config)
         do! ((startFn $ workspaceDir) |> unbox<JS.Promise<unit>>)
         do! waitForBackgroundJobsForTesting reg
         let launches = takeBookkeeperLaunchesForTesting reg
         check "mux daily maintenance schedules at least one launch" (launches.Length >= 1)
         check "mux daily maintenance launch uses bookkeeper agent" (launches |> Array.forall (fun l -> str l "agent" = "bookkeeper"))
+        check "mux daily maintenance delegate prompt uses frontmatter job marker" (
+            prompts
+            |> Seq.exists (fun prompt ->
+                prompt.StartsWith("---\n")
+                && prompt.Contains("type: \"vibe_wiki_job\"")
+                && prompt.Contains("workspaceRoot: \"" + workspaceDir + "\"")
+                && prompt.Contains("kind: \"daily\"")
+                && not (prompt.Contains("[vibe-wiki-job]"))))
     do! rmAsync workspaceDir
 }

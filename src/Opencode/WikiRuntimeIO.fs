@@ -63,7 +63,7 @@ let submitForKind (portLockTimeoutMs: int64) (portLockRetryDelayMs: int) (todayS
         })
 
 let private jobMarkerPrompt (ctx: WikiJobContext) (promptText: string) : string =
-    renderJobMarker ctx + "\n\n" + promptText
+    prependJobMarker ctx promptText
 
 let private promptParts (ctx: WikiJobContext) (promptText: string) : obj array =
     [| box {| ``type`` = "text"; text = jobMarkerPrompt ctx promptText |} |]

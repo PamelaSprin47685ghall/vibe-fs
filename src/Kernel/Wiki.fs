@@ -46,42 +46,57 @@ let private jobKindTag (kind: WikiJobKind) : string * string option =
     | DailyRewrite date -> "daily", Some date
     | WeeklyRewrite throughDate -> "weekly", Some throughDate
 
-let renderJobMarker (ctx: WikiJobContext) : string =
+let private jobMarkerFields (ctx: WikiJobContext) : string list =
     let kind, value = jobKindTag ctx.kind
-    let fields =
-        [ "type", box "vibe_wiki_job"
-          "workspaceRoot", box ctx.workspaceRoot
-          "kind", box kind
-          match value with
-          | Some date when kind = "daily" -> "date", box date
-          | Some throughDate when kind = "weekly" -> "through", box throughDate
-          | _ -> () ]
-    "[vibe-wiki-job] " + jsonStringify (createObj fields)
+    [ yield yamlScalarField "type" "vibe_wiki_job"
+      yield yamlScalarField "workspaceRoot" ctx.workspaceRoot
+      yield yamlScalarField "kind" kind
+      match value with
+      | Some date when kind = "daily" -> yield yamlScalarField "date" date
+      | Some throughDate when kind = "weekly" -> yield yamlScalarField "through" throughDate
+      | _ -> () ]
+
+let renderJobMarker (ctx: WikiJobContext) : string =
+    frontMatter (jobMarkerFields ctx)
+
+let prependJobMarker (ctx: WikiJobContext) (text: string) : string =
+    let markerFields = jobMarkerFields ctx
+    if String.IsNullOrEmpty text then
+        frontMatter markerFields
+    else
+        let normalized = text.Replace("\r\n", "\n").Replace("\r", "\n")
+        let lines = normalized.Split('\n')
+        if lines.Length < 2 || lines.[0] <> "---" then
+            frontMatterPrompt markerFields normalized
+        else
+            match lines.[1..] |> Array.tryFindIndex ((=) "---") with
+            | None -> frontMatterPrompt markerFields normalized
+            | Some relativeCloseIndex ->
+                let closeIndex = relativeCloseIndex + 1
+                let existingFields = lines.[1 .. closeIndex - 1] |> Array.toList
+                let remainder =
+                    if closeIndex + 1 >= lines.Length then ""
+                    else String.concat "\n" lines.[closeIndex + 1 ..]
+                let merged = frontMatter (markerFields @ existingFields)
+                if remainder = "" then merged else merged + "\n" + remainder
 
 let tryParseJobMarker (text: string) : WikiJobContext option =
-    let prefix = "[vibe-wiki-job] "
-    let markerLine =
-        text.Split('\n')
-        |> Array.tryFind (fun line -> line.StartsWith prefix)
-    match markerLine with
-    | None -> None
-    | Some line ->
-        try
-            let payload = jsonParse (line.Substring(prefix.Length))
-            let workspaceRoot = Dyn.str payload "workspaceRoot"
-            let kind = Dyn.str payload "kind"
-            if workspaceRoot.Trim() = "" then None
-            else
-                match kind with
-                | "append" -> Some { workspaceRoot = workspaceRoot; kind = AppendAfterWork }
-                | "daily" ->
-                    let date = Dyn.str payload "date"
-                    if date.Trim() = "" then None else Some { workspaceRoot = workspaceRoot; kind = DailyRewrite date }
-                | "weekly" ->
-                    let throughDate = Dyn.str payload "through"
-                    if throughDate.Trim() = "" then None else Some { workspaceRoot = workspaceRoot; kind = WeeklyRewrite throughDate }
-                | _ -> None
-        with _ -> None
+    let fields = parseFrontMatterScalars text
+    if Map.tryFind "type" fields <> Some "vibe_wiki_job" then None
+    else
+        let workspaceRoot = Map.tryFind "workspaceRoot" fields |> Option.defaultValue ""
+        let kind = Map.tryFind "kind" fields |> Option.defaultValue ""
+        if workspaceRoot.Trim() = "" then None
+        else
+            match kind with
+            | "append" -> Some { workspaceRoot = workspaceRoot; kind = AppendAfterWork }
+            | "daily" ->
+                let date = Map.tryFind "date" fields |> Option.defaultValue ""
+                if date.Trim() = "" then None else Some { workspaceRoot = workspaceRoot; kind = DailyRewrite date }
+            | "weekly" ->
+                let throughDate = Map.tryFind "through" fields |> Option.defaultValue ""
+                if throughDate.Trim() = "" then None else Some { workspaceRoot = workspaceRoot; kind = WeeklyRewrite throughDate }
+            | _ -> None
 
 let tryParseId (s: string) : WikiId option =
     if idRe.IsMatch s then Some(WikiId s) else None

@@ -121,6 +121,19 @@ let projectionSpec () =
     let resolved = Map.find (some (tryParseId "0a3f")) proj
     check "projectLatestWins latest wins" (resolved.q = "q new" && resolved.a = "a new")
 
+let jobMarkerSpec () =
+    let appendCtx = { workspaceRoot = "/tmp/wiki-root"; kind = AppendAfterWork }
+    let rendered = renderJobMarker appendCtx
+    check "renderJobMarker is front matter" (rendered.StartsWith("---\n"))
+    check "renderJobMarker includes type field" (rendered.Contains("type: \"vibe_wiki_job\""))
+    check "renderJobMarker append round-trips" (tryParseJobMarker rendered = Some appendCtx)
+
+    let merged = prependJobMarker appendCtx (buildAppendPrompt "T1" "input" "output" Map.empty)
+    check "prependJobMarker keeps front matter form" (merged.StartsWith("---\n"))
+    check "prependJobMarker merges workspaceRoot into prompt front matter" (merged.Contains("workspaceRoot: \"/tmp/wiki-root\""))
+    check "prependJobMarker preserves existing wiki prompt fields" (merged.Contains("existing_wiki: []"))
+    check "prependJobMarker merged prompt still parses" (tryParseJobMarker merged = Some appendCtx)
+
 let preludeSpec () =
     check "buildPreludeSection empty None" (buildPreludeSection Map.empty |> Option.isNone)
     let e1 = entry "0a3f" "项目插件入口在哪里？" "src/Opencode/Plugin.fs"
@@ -197,6 +210,7 @@ let run () : JS.Promise<unit> =
         ndjsonParseSpec ()
         ndjsonRenderSpec ()
         projectionSpec ()
+        jobMarkerSpec ()
         preludeSpec ()
         draftValidationSpec ()
         applyDraftsSpec ()
