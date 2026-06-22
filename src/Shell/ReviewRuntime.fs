@@ -58,3 +58,16 @@ let createReviewStore () : ReviewStore =
         member _.isReviewActive(sessionID) = sessionIsActive registry sessionID
         member _.addChild(parentID, childID) =
             registry <- reduce registry (RegistryAction.AddChild(parentID, childID)) }
+
+let syncReviewProjection (store: ReviewStore) (sessionID: string) (task: string option) : unit =
+    if sessionID = "" then ()
+    else
+        match task with
+        | Some nextTask ->
+            if store.getReviewTask sessionID <> Some nextTask || not (store.isReviewActive sessionID) then
+                if store.getReviewState sessionID |> Option.isSome then
+                    store.deactivateReview sessionID
+                store.activateReview(sessionID, nextTask, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+        | None ->
+            if store.getReviewState sessionID |> Option.isSome then
+                store.deactivateReview sessionID

@@ -12,8 +12,23 @@ open VibeFs.Opencode.ToolSchema
 [<Import("createRequire", "node:module")>]
 let private createRequire (pathOrUrl: string) : obj = jsNative
 
+[<Import("dirname", "node:path")>]
+let private dirname (path: string) : string = jsNative
+
+[<Import("join", "node:path")>]
+let private join (left: string) (right: string) : string = jsNative
+
 [<Import("pathToFileURL", "node:url")>]
 let private pathToFileURL (path: string) : obj = jsNative
+
+[<Import("fileURLToPath", "node:url")>]
+let private fileURLToPath (url: string) : string = jsNative
+
+[<Import("existsSync", "node:fs")>]
+let private existsSync (path: string) : bool = jsNative
+
+[<Import("readFileSync", "node:fs")>]
+let private readFileSync (path: string) (encoding: string) : string = jsNative
 
 [<Global("import.meta")>]
 let private importMeta : obj = jsNative
@@ -29,17 +44,37 @@ let private resolveStr (text: string) : JS.Promise<string> = Promise.lift text
 
 let private importMetaUrl = string importMeta?url
 
-let private tryResolveHostModulePath (specifier: string) : string option =
-    let tryResolveFrom (basePathOrUrl: string) =
-        if String.IsNullOrWhiteSpace basePathOrUrl then None
-        else
-            try
-                let resolver = createRequire basePathOrUrl
-                let resolved = Dyn.call1 (Dyn.get resolver "resolve") (box specifier) |> string
-                if String.IsNullOrWhiteSpace resolved then None else Some resolved
-            with _ ->
-                None
+let private tryResolveFromHostPackage (relativePath: string) : string option =
+    try
+        let hostRequire = createRequire importMetaUrl
+        let packageJsonPath = Dyn.call1 (Dyn.get hostRequire "resolve") (box "@mimo-ai/cli/package.json") |> string
+        Some(join (dirname packageJsonPath) relativePath)
+    with _ ->
+        None
 
+let private tryFindCliRootFrom (startPath: string) : string option =
+    let rec loop (currentPath: string) =
+        if String.IsNullOrWhiteSpace currentPath then None
+        else
+            let candidate = join currentPath "package.json"
+            if existsSync candidate then
+                try
+                    let pkg = JS.JSON.parse(readFileSync candidate "utf8")
+                    if Dyn.str pkg "name" = "@mimo-ai/cli" then Some currentPath
+                    else
+                        let parent = dirname currentPath
+                        if parent = currentPath then None else loop parent
+                with _ ->
+                    let parent = dirname currentPath
+                    if parent = currentPath then None else loop parent
+            else
+                let parent = dirname currentPath
+                if parent = currentPath then None else loop parent
+
+    if String.IsNullOrWhiteSpace startPath then None
+    else loop (if startPath.StartsWith("file://") then dirname (fileURLToPath startPath) else dirname startPath)
+
+let private tryResolveCliModulePath (relativePath: string) : string option =
     let argvBase =
         let argv = Dyn.get nodeProcess "argv"
         if Dyn.isArray argv then
@@ -48,17 +83,20 @@ let private tryResolveHostModulePath (specifier: string) : string option =
         else
             ""
 
-    [ argvBase; importMetaUrl ]
-    |> List.tryPick tryResolveFrom
+    tryResolveFromHostPackage relativePath
+    |> Option.orElseWith (fun () ->
+        [ argvBase; importMetaUrl ]
+        |> List.tryPick tryFindCliRootFrom
+        |> Option.map (fun cliRoot -> join cliRoot relativePath))
 
-let private importHostModule (specifier: string) : JS.Promise<obj> =
+let private importCliModule (relativePath: string) : JS.Promise<obj> =
     promise {
-        match tryResolveHostModulePath specifier with
+        match tryResolveCliModulePath relativePath with
         | Some resolvedPath ->
             let href = string (Dyn.get (pathToFileURL resolvedPath) "href")
             return! importDynamic<obj> href
         | None ->
-            return raise (Exception $"Could not resolve host module {specifier} from the running MiMo process")
+            return raise (Exception $"Could not resolve MiMo CLI root from the running process for {relativePath}")
     }
 
 let private toTodoPayload (todos: TodoItem list) : obj array =
@@ -120,8 +158,8 @@ let private trySyncViaHostRuntime (pluginCtx: obj) (sessionID: string) (todos: o
             return None
         else
             try
-                let! appRuntimeModule = importHostModule "@mimo-ai/cli/effect/app-runtime"
-                let! todoModule = importHostModule "@mimo-ai/cli/session/todo"
+                let! appRuntimeModule = importCliModule "src/effect/app-runtime.ts"
+                let! todoModule = importCliModule "src/session/todo.ts"
                 let appRuntime = Dyn.get appRuntimeModule "AppRuntime"
                 let todoService = Dyn.get todoModule "Service"
                 let effect =

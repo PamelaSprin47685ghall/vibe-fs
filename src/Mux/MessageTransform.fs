@@ -76,13 +76,8 @@ let private extractTexts (messages: obj array) : string seq =
 let private reconstructReviewState (reviewStore: ReviewStore) (sessionID: string) (messages: obj array) : unit =
     if sessionID = "" then ()
     else
-        match inferReviewTaskFromTexts (extractTexts messages) with
-        | Some task when not (reviewStore.isReviewActive sessionID) ->
-            reviewStore.activateReview(sessionID, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-        | Some _ -> ()
-        | None when reviewStore.isReviewActive sessionID ->
-            reviewStore.deactivateReview sessionID
-        | None -> ()
+        inferReviewTaskFromTexts (extractTexts messages)
+        |> syncReviewProjection reviewStore sessionID
 
 let private magicSession = MagicSession()
 

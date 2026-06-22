@@ -8,6 +8,7 @@ open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Kernel.Dyn
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
+open VibeFs.Kernel.LoopMessages
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.WikiFiles
@@ -125,6 +126,9 @@ let private makeReturnReviewerContext (workspaceDir: string) (sessionID: string)
         "sessionID", box sessionID
     ]
 
+let private reviewActivationHistory (task: string) : obj array =
+    [| box (buildLoopMessage task [ "With-Review Mode is active." ]) |]
+
 let private preparePendingReviewCallForTest (reg: obj) (workspaceDir: string) (sessionID: string) : JS.Promise<unit> =
     promise {
         muxActivateReviewForTest reg sessionID "Implement feature X"
@@ -152,7 +156,7 @@ let muxReturnReviewerRegisteredSpec () = promise {
 let muxReturnReviewerRejectsResolveSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-return-reviewer-reject-"
     let sessionID = "mux-return-reviewer-reject"
-    let reg = createRegistration (muxDepsWithChatHistory sessionID [||])
+    let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     do! preparePendingReviewCallForTest reg workspaceDir sessionID
     let returnTool = muxToolByName reg "return_reviewer"
     if isNullish returnTool then
@@ -170,7 +174,7 @@ let muxReturnReviewerRejectsResolveSpec () = promise {
 let muxReturnReviewerFirstPassDoubleCheckSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-return-reviewer-first-pass-"
     let sessionID = "mux-return-reviewer-first-pass"
-    let reg = createRegistration (muxDepsWithChatHistory sessionID [||])
+    let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     do! preparePendingReviewCallForTest reg workspaceDir sessionID
     let returnTool = muxToolByName reg "return_reviewer"
     if isNullish returnTool then
@@ -188,7 +192,7 @@ let muxReturnReviewerFirstPassDoubleCheckSpec () = promise {
 let muxReturnReviewerSecondPassResolvesSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-return-reviewer-second-pass-"
     let sessionID = "mux-return-reviewer-second-pass"
-    let anchorHistory = [| box "---\ndouble-check: confirmed\n---\nok" |]
+    let anchorHistory = Array.append (reviewActivationHistory "Implement feature X") [| box "---\ndouble-check: confirmed\n---\nok" |]
     let reg = createRegistration (muxDepsWithChatHistory sessionID anchorHistory)
     do! preparePendingReviewCallForTest reg workspaceDir sessionID
     let returnTool = muxToolByName reg "return_reviewer"
@@ -248,6 +252,32 @@ let muxSubmitReviewPromptSuppliesCallIdSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let muxSubmitReviewUsesRolledBackHistoryTaskSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-submit-review-history-rollback-"
+    let sessionID = "mux-submit-review-history-rollback"
+    let history = ResizeArray<obj>()
+    history.Add(box "---\ntask: First task\n---\nWith-Review Mode is active.")
+    let deps = muxMutableDepsWithChatHistory sessionID history
+    let reg = createRegistration deps
+    let submitTool = muxToolByName reg "submit_review"
+    if isNullish submitTool then
+        check "mux registration exposes submit_review tool" false
+    else
+        muxActivateReviewForTest reg sessionID "Second task"
+        let prompts = ResizeArray<string>()
+        let taskService = mockMuxTaskServiceCapturingPrompt prompts
+        let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
+        let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+        try
+            let! _ = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+            ()
+        with _ ->
+            ()
+        let promptText = if prompts.Count > 0 then prompts.[0] else ""
+        check "submit_review uses rolled-back history task instead of stale store task" (promptText.Contains "First task" && not (promptText.Contains "Second task"))
+    do! rmAsync workspaceDir
+}
+
 let muxLoopReviewPromptUsesFrontMatterSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-loop-review-prompt-"
     let prompts = ResizeArray<string>()
@@ -285,7 +315,7 @@ let muxLoopReviewPromptUsesFrontMatterSpec () = promise {
 let muxReturnReviewerRejectKeepsReviewActiveSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-return-reviewer-reject-keeps-"
     let sessionID = "mux-return-reviewer-reject-keeps"
-    let reg = createRegistration (muxDepsWithChatHistory sessionID [||])
+    let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     do! preparePendingReviewCallForTest reg workspaceDir sessionID
     let returnTool = muxToolByName reg "return_reviewer"
     if isNullish returnTool then
@@ -304,7 +334,7 @@ let muxReturnReviewerRejectCleansReviewStateSpec () = muxReturnReviewerRejectKee
 let muxSubmitReviewTerminatedCleansReviewStateSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-terminated-"
     let sessionID = "mux-submit-review-terminated"
-    let reg = createRegistration (muxDepsWithChatHistory sessionID [||])
+    let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     muxActivateReviewForTest reg sessionID "Implement feature X"
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceCapturingPrompt prompts

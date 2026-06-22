@@ -224,6 +224,16 @@ let muxDepsWithChatHistory (sessionID: string) (messages: obj array) : obj =
           box (System.Func<string, JS.Promise<obj array>>(fun sid ->
               promise { return if sid = sessionID then messages else [||] })) ]
 
+let muxMutableDepsWithChatHistory (sessionID: string) (messages: ResizeArray<obj>) : obj =
+    createObj
+        [ "loadConfigOrDefault", box (fun () -> createObj [])
+          "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
+          "resolveAgentFrontmatter",
+          box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
+          "getChatHistory",
+          box (System.Func<string, JS.Promise<obj array>>(fun sid ->
+              promise { return if sid = sessionID then messages.ToArray() else [||] })) ]
+
 let mockMuxTaskServiceCapturingPrompt (prompts: ResizeArray<string>) : obj =
     createObj
         [ "create",

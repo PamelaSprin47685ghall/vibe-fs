@@ -730,6 +730,7 @@ let run () : JS.Promise<unit> =
             "muxMeditatorReadsFilesFromCwd", muxMeditatorReadsFilesFromCwdSpec
             "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
             "muxSubmitReviewPromptSuppliesCallId", muxSubmitReviewPromptSuppliesCallIdSpec
+            "muxSubmitReviewUsesRolledBackHistoryTask", muxSubmitReviewUsesRolledBackHistoryTaskSpec
             "muxLoopReviewPromptUsesFrontMatter", muxLoopReviewPromptUsesFrontMatterSpec
             "muxReturnReviewerRegistered", muxReturnReviewerRegisteredSpec
             "muxReturnReviewerRejectsResolve", muxReturnReviewerRejectsResolveSpec
