@@ -13,8 +13,15 @@ type SearchResult =
       content: string }
 
 let parseSearchResults (results: obj) : SearchResult list =
-    if Dyn.isNullish results || not (Dyn.isArray results) then []
-    else (results :?> obj array) |> Array.map (fun r -> { title = Dyn.str r "title"; url = Dyn.str r "url"; content = Dyn.str r "content" }) |> List.ofArray
+    if Dyn.isNullish results || not (Dyn.isArray results) then
+        []
+    else
+        (results :?> obj array)
+        |> Array.map (fun r ->
+            { title = Dyn.str r "title"
+              url = Dyn.str r "url"
+              content = Dyn.str r "content" })
+        |> List.ofArray
 
 type FetchResponse =
     { title: string option
@@ -33,7 +40,9 @@ let todoNudgePrompt =
 let readOnlyRulesFor (host: Host) =
     "READ-ONLY: You may only use read, search, and discovery tools. "
     + "You must NOT write, edit, patch, or create files. "
-    + "You must NOT run commands or call " + todoWritePromptName host + " or any mutating tool. "
+    + "You must NOT run commands or call "
+    + todoWritePromptName host
+    + " or any mutating tool. "
     + "You must NOT change workspace state. Output reports only."
 
 let readOnlyRules = readOnlyRulesFor opencode
@@ -47,11 +56,16 @@ let managerSystemPromptFor (host: Host) =
     let todoLine =
         match host with
         | Opencode ->
-            "For multi-step work, keep " + todoWriteToolName host + " current. Every " + todoWriteToolName host
+            "For multi-step work, keep "
+            + todoWriteToolName host
+            + " current. Every "
+            + todoWriteToolName host
             + " call must provide the full todos list plus a detailed completedWorkReport that can survive context folding."
         | Mimocode ->
-            "For multi-step work, drive the session task registry via the " + todoWriteToolName host
+            "For multi-step work, drive the session task registry via the "
+            + todoWriteToolName host
             + " tool (`operation` with create/list/start/done/…). On calls where you make or plan meaningful progress, also include a detailed completedWorkReport so Magic Todo can survive context folding."
+
     "You are the manager agent. Coordinate the overall task, decide when to delegate to subagents, and synthesize their outputs into a final answer that satisfies the user's original goal.\n\n"
     + todoLine
 
@@ -72,7 +86,8 @@ let reviewCriteria =
 let readOnlyWorkspaceConstraint = readOnlyRules
 
 let private reviewInstructionsProse =
-    readOnlyWorkspaceConstraint + "\n\n"
+    readOnlyWorkspaceConstraint
+    + "\n\n"
     + "You are a code reviewer performing a rigorous review of submitted work.\n\n"
     + reviewCriteria
     + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\nreturn_reviewer({ \"feedback\": null })          // Accept — pass with no feedback\nreturn_reviewer({ \"feedback\": \"specific...\" }) // Reject — provide detailed, actionable feedback\n\nIMPORTANT: If you accept, feedback MUST be null. Do not write praise or any other text — it will be misinterpreted as rejection feedback.\n\nYou MUST call return_reviewer before finishing. Do not end the conversation without submitting your verdict."
@@ -82,6 +97,7 @@ let reviewInstructions =
 
 let doubleCheckPrompt (task: string) : string =
     let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
+
     frontMatterPrompt
         ([ yamlScalarField doubleCheckField "Does it fully satisfy the original task without cutting corners?" ]
          @ taskLine)
@@ -89,46 +105,55 @@ let doubleCheckPrompt (task: string) : string =
 
 let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) : string =
     let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
-    let filesLine = if affectedFiles.Length > 0 then [ yamlStringSeqField "affected_files" affectedFiles ] else []
+
+    let filesLine =
+        if affectedFiles.Length > 0 then
+            [ yamlStringSeqField "affected_files" affectedFiles ]
+        else
+            []
+
     let body =
-        if System.String.IsNullOrEmpty report then reviewInstructionsProse
-        else reviewInstructionsProse + "\n\n# Worker Report\n\n" + report
+        if System.String.IsNullOrEmpty report then
+            reviewInstructionsProse
+        else
+            reviewInstructionsProse + "\n\n# Worker Report\n\n" + report
+
     frontMatterPrompt (taskLine @ filesLine) body
 
 let withReviewCommandTemplate =
-    frontMatterPrompt [
-        yamlScalarField commandField commandWithReview
-        yamlBlockField taskField "$ARGUMENTS"
-    ] (String.concat "\n" [
-        "You are entering With-Review Mode."
-        "Complete the task recorded in the front matter."
-        ""
-        "The reviewer will judge your eventual submission using these criteria:"
-        ""
-        reviewCriteria
-        ""
-        "Before finishing, you must call submit_review with:"
-        "- report: a detailed description of what you did and why"
-        "- affectedFiles: every file you modified or created"
-        "Defend proactively against reviewer rejection: keep the implementation natural, minimal, complete, and well-tested."
-        "Do not end the conversation without submit_review."
-    ])
+    frontMatterPrompt
+        [ yamlScalarField commandField commandWithReview
+          yamlBlockField taskField "$ARGUMENTS" ]
+        (String.concat
+            "\n"
+            [ "You are entering With-Review Mode."
+              "Complete the task recorded in the front matter."
+              ""
+              "The reviewer will judge your eventual submission using these criteria:"
+              ""
+              reviewCriteria
+              ""
+              "Before finishing, you must call submit_review with:"
+              "- report: a detailed description of what you did and why"
+              "- affectedFiles: every file you modified or created"
+              "Defend proactively against reviewer rejection: keep the implementation natural, minimal, complete, and well-tested."
+              "Do not end the conversation without submit_review." ])
 
 let withReviewPrecheckCommandTemplate =
-    frontMatterPrompt [
-        yamlScalarField commandField commandWithReviewPrecheck
-        yamlBlockField taskField "$ARGUMENTS"
-    ] (String.concat "\n" [
-        "You are requesting With-Review Mode with pre-review."
-        "The task recorded in the front matter will be pre-reviewed first."
-        ""
-        "If the task is activated, the reviewer will later judge your submission using these criteria:"
-        ""
-        reviewCriteria
-        ""
-        "If activated, complete the task and later submit your work via submit_review."
-        "Do not treat this message itself as completed work."
-    ])
+    frontMatterPrompt
+        [ yamlScalarField commandField commandWithReviewPrecheck
+          yamlBlockField taskField "$ARGUMENTS" ]
+        (String.concat
+            "\n"
+            [ "You are requesting With-Review Mode with pre-review."
+              "The task recorded in the front matter will be pre-reviewed first."
+              ""
+              "If the task is activated, the reviewer will later judge your submission using these criteria:"
+              ""
+              reviewCriteria
+              ""
+              "If activated, complete the task and later submit your work via submit_review."
+              "Do not treat this message itself as completed work." ])
 
 let reviewerNudgePrompt =
     "Submit your review verdict now via return_reviewer:\n"
@@ -141,28 +166,33 @@ let reviewerNudgePrompt =
 let meditatorSkippedSection = "(skipped)"
 
 type MeditatorFileSection =
-    { file: string
-      content: string option }
+    { file: string; content: string option }
 
 let private coderTargetItem (t: CoderTarget) : string =
     let guideLines = t.guide.Split('\n') |> Array.map (fun line -> "      " + line)
+
     let draftLines =
         match t.draft with
         | Some draft when not (System.String.IsNullOrWhiteSpace draft) ->
-            Array.append [|"    draft: |"|] (draft.Split('\n') |> Array.map (fun line -> "      " + line))
+            Array.append [| "    draft: |" |] (draft.Split('\n') |> Array.map (fun line -> "      " + line))
         | _ -> [||]
-    Array.concat [
-        [| "  - file: " + yamlScalar t.file; "    guide: |" |]
-        guideLines
-        draftLines
-    ] |> String.concat "\n"
+
+    Array.concat
+        [ [| "  - file: " + yamlScalar t.file; "    guide: |" |]
+          guideLines
+          draftLines ]
+    |> String.concat "\n"
 
 let private agentPrompt fields lines =
     let actualLines =
-        if lines |> List.exists (fun (l: string) -> l.StartsWith("You are an implementation agent")) then
+        if
+            lines
+            |> List.exists (fun (l: string) -> l.StartsWith("You are an implementation agent"))
+        then
             lines
         else
             readOnlyRules :: lines
+
     frontMatterPrompt fields (String.concat "\n\n" actualLines)
 
 let coderPrompt (intent: CoderIntent) : string =
@@ -170,75 +200,76 @@ let coderPrompt (intent: CoderIntent) : string =
         [ yamlBlockField "objective" intent.objective
           yamlBlockField "background" intent.background
           yamlSeqField "targets" (intent.targets |> List.map coderTargetItem) ]
-        @ (if intent.doNotTouch.Length = 0 then []
-           else [ yamlStringSeqField "do_not_touch" (List.ofArray intent.doNotTouch) ])
-    agentPrompt fields [
-        "You are an implementation agent. Read the listed files and related code, then edit or create files to satisfy the objective and each target guide."
-        "Static verification only (read, inspect, type-check). Do NOT run tests or execute code."
-        "Return a concise summary of changes and verification results."
-    ]
+        @ (if intent.doNotTouch.Length = 0 then
+               []
+           else
+               [ yamlStringSeqField "do_not_touch" (List.ofArray intent.doNotTouch) ])
+
+    agentPrompt
+        fields
+        [ "You are an implementation agent. Read the listed files and related code, then edit or create files to satisfy the objective and each target guide."
+          "Static verification only (read, inspect, type-check). Do NOT run tests or execute code."
+          "Return a concise summary of changes and/or your difficulties." ]
 
 let investigatorPrompt (intent: InvestigatorIntent) : string =
-    agentPrompt [
-        yamlBlockField "objective" intent.objective
-        yamlBlockField "background" intent.background
-        yamlStringSeqField "questions" (List.ofArray intent.questions)
-        yamlStringSeqField "entries" (List.ofArray intent.entries)
-    ] [
-        "You are a codebase search agent. Explore the workspace and answer every question in `questions`."
-        "Use fuzzy_find, glob, fuzzy_grep, and read. Report concrete file paths and line-number references, and answer each question explicitly."
-        "Return a structured report with relatedFiles and relatedCode."
-    ]
+    agentPrompt
+        [ yamlBlockField "objective" intent.objective
+          yamlBlockField "background" intent.background
+          yamlStringSeqField "questions" (List.ofArray intent.questions)
+          yamlStringSeqField "entries" (List.ofArray intent.entries) ]
+        [ "You are a codebase search agent. Explore the workspace and answer every question in `questions`."
+          "Use fuzzy_find, glob, fuzzy_grep, and read. Report concrete file paths and line-number references, and answer each question explicitly."
+          "Return a structured report with relatedFiles and line ranges." ]
 
 let meditatorPrompt (sections: MeditatorFileSection list) (intent: string) : string =
     let fileItem (s: MeditatorFileSection) : string =
         let body = Option.defaultValue meditatorSkippedSection s.content
         let contentLines = body.Split('\n') |> Array.map (fun line -> "      " + line)
-        Array.concat [
-            [| "  - path: " + yamlScalar s.file; "    content: |" |]
-            contentLines
-        ] |> String.concat "\n"
-    agentPrompt [
-        yamlSeqField "files" (sections |> List.map fileItem)
-        yamlBlockField "question" intent
-    ] [
-        "You are a deep-reasoning agent. The file contents are provided above; analyze every listed file carefully."
-        "Produce a thorough analysis covering tradeoffs, risks, and concrete recommendations."
-        "Return a structured report with relatedFiles and relatedCode."
-    ]
+
+        Array.concat [ [| "  - path: " + yamlScalar s.file; "    content: |" |]; contentLines ]
+        |> String.concat "\n"
+
+    agentPrompt
+        [ yamlSeqField "files" (sections |> List.map fileItem)
+          yamlBlockField "question" intent ]
+        [ "You are a deep-reasoning agent. The file contents are provided above; analyze every listed file carefully."
+          "Produce a thorough analysis covering tradeoffs, risks, and concrete recommendations."
+          "Return a conclusive report with reasoning." ]
 
 let browserPrompt (intent: string) : string =
-    agentPrompt [
-        yamlBlockField "task" intent
-    ] [
-        "You are a browser automation agent. Use only stealth-browser-mcp tools to interact with web pages. Do not write files or run shell commands."
-        "Return a clear summary of what you found or did."
-    ]
+    agentPrompt
+        [ yamlBlockField "task" intent ]
+        [ "You are a browser automation agent. Use only stealth-browser-mcp tools to interact with web pages. Do not write files or run shell commands."
+          "Return a clear summary of what you found or did." ]
 
-let executorSummarizerPrompt (output: string) (language: string) (program: string) (dependencies: string list) (timeoutType: string) (mode: string) : string =
-    agentPrompt [
-        yamlScalarField "language" language
-        yamlBlockField "program" program
-        yamlStringSeqField "dependencies" dependencies
-        yamlScalarField "timeout_type" timeoutType
-        yamlScalarField "mode" mode
-        yamlBlockField "raw_output" output
-    ] [
-        "You are a summarizer for executor (shell) output. Preserve errors, non-zero exit status, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output."
-        "Return a concise, actionable summary."
-    ]
+let executorSummarizerPrompt
+    (output: string)
+    (language: string)
+    (program: string)
+    (dependencies: string list)
+    (timeoutType: string)
+    (mode: string)
+    : string =
+    agentPrompt
+        [ yamlScalarField "language" language
+          yamlBlockField "program" program
+          yamlStringSeqField "dependencies" dependencies
+          yamlScalarField "timeout_type" timeoutType
+          yamlScalarField "mode" mode
+          yamlBlockField "raw_output" output ]
+        [ "You are a filter for executor (shell) output. Preserve errors, non-zero exit status, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output."
+          "Do NOT lose any information." ]
 
 let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =
-    agentPrompt [
-        yamlBlockField "question" whatToSummarize
-        yamlBlockField "raw_results" rawResults
-    ] [
-        "You are a summarizer for web search results. Focus on answering the question above using the raw results. Preserve concrete facts: URLs, names, version numbers, code samples, and exact values. Omit boilerplate and unrelated results. Do not invent details not present in the results."
-        "Return a focused, ready-to-use answer."
-    ]
+    agentPrompt
+        [ yamlBlockField "question" whatToSummarize
+          yamlBlockField "raw_results" rawResults ]
+        [ "You are a filter for web search results. Focus on answering the question above using the raw results. Preserve concrete facts. Omit boilerplate and unrelated results. Do not invent details not present in the results."
+          "Do NOT lose any information." ]
 
 let agentReportReviewInstructions =
-    readOnlyWorkspaceConstraint + "\n\n"
+    readOnlyWorkspaceConstraint
+    + "\n\n"
     + "You are a code reviewer performing a rigorous review of submitted work.\n\n"
     + reviewCriteria
     + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\n"
@@ -246,25 +277,49 @@ let agentReportReviewInstructions =
     + "IMPORTANT: If you accept, reportMarkdown MUST be exactly \"PASS\". Do not write ACCEPT, praise, JSON, or any other text — it will be misinterpreted as rejection feedback."
 
 let formatSearchResults (results: SearchResult list) : string =
-    if results.IsEmpty then "No results found."
+    if results.IsEmpty then
+        "No results found."
     else
         let items =
-            results |> List.map (fun r ->
+            results
+            |> List.map (fun r ->
                 let contentBlock = yamlBlockField "content" r.content
+
                 let indentedContentBlock =
                     contentBlock.Split('\n')
                     |> Array.map (fun line -> "    " + line)
                     |> String.concat "\n"
-                "  - title: " + yamlScalar r.title + "\n    url: " + yamlScalar r.url + "\n" + indentedContentBlock)
+
+                "  - title: "
+                + yamlScalar r.title
+                + "\n    url: "
+                + yamlScalar r.url
+                + "\n"
+                + indentedContentBlock)
+
         frontMatter [ yamlSeqField "results" items ]
 
 let formatFetchResponse (data: FetchResponse) : string =
     let nonEmpty (s: string) = not (System.String.IsNullOrEmpty s)
-    let scalarIf (key: string) = function Some v when nonEmpty v -> [ yamlScalarField key v ] | _ -> []
+
+    let scalarIf (key: string) =
+        function
+        | Some v when nonEmpty v -> [ yamlScalarField key v ]
+        | _ -> []
+
     let title = scalarIf "title" data.title
     let byline = scalarIf "byline" data.byline
-    let length = match data.length with Some l -> [ yamlScalarField "length" (string l) ] | None -> []
-    let content = match data.content with Some c when nonEmpty c -> [ yamlBlockField "content" c ] | _ -> []
+
+    let length =
+        match data.length with
+        | Some l -> [ yamlScalarField "length" (string l) ]
+        | None -> []
+
+    let content =
+        match data.content with
+        | Some c when nonEmpty c -> [ yamlBlockField "content" c ]
+        | _ -> []
+
     frontMatter (title @ byline @ length @ content)
 
 module ReviewerVerdictPrompts =
@@ -290,13 +345,15 @@ module ReviewerVerdictPrompts =
 let formatReviewResult (result: ReviewResult) : string =
     match result with
     | Accepted ->
-        frontMatterPrompt [ yamlScalarField verdictField verdictAccepted ]
+        frontMatterPrompt
+            [ yamlScalarField verdictField verdictAccepted ]
             "Review passed. Your changes have been accepted. With-Review Mode has ended."
     | Terminated ->
-        frontMatterPrompt [ yamlScalarField verdictField verdictTerminated ]
+        frontMatterPrompt
+            [ yamlScalarField verdictField verdictTerminated ]
             "Review terminated without verdict. With-Review Mode is still active; fix the issues and call submit_review again."
     | Rejected feedback ->
-        frontMatterPrompt [
-            yamlScalarField verdictField verdictRejected
-            yamlBlockField "feedback" feedback
-        ] "Address the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."
+        frontMatterPrompt
+            [ yamlScalarField verdictField verdictRejected
+              yamlBlockField "feedback" feedback ]
+            "Address the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."

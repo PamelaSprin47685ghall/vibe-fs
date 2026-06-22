@@ -32,6 +32,14 @@ type private MagicSessionStore(state: MagicSessionStoreState) =
                 report
             | false, _ -> ""
 
+    member this.TryGetReport(host: Host, callId: string) : string option =
+        if callId = "" then None
+        else
+            let reportByCall = this.DictionaryFor(state.reportTables, host)
+            match reportByCall.TryGetValue callId with
+            | true, report -> Some report
+            | false, _ -> None
+
     member this.StoreBacklog(host: Host, sessionId: string, backlog: BacklogEntry list) : unit =
         let backlogBySession = this.DictionaryFor(state.backlogCaches, host)
         backlogBySession.[sessionId] <- backlog
@@ -52,6 +60,9 @@ let captureReport (host: Host) (callId: string) (report: string) : unit =
 
 let takeReport (host: Host) (callId: string) : string =
     store.TakeReport(host, callId)
+
+let tryGetReport (host: Host) (callId: string) : string option =
+    store.TryGetReport(host, callId)
 
 let storeBacklog (host: Host) (sessionId: string) (backlog: BacklogEntry list) : unit =
     store.StoreBacklog(host, sessionId, backlog)

@@ -65,6 +65,7 @@ export interface PluginToolConfiguration {
   readonly taskService?: TaskServiceLike;
   readonly abortSignal?: AbortSignal;
   readonly muxEnv?: Record<string, string>;
+  readonly subagentRole?: string;
 }
 
 export interface RuntimeHandle {

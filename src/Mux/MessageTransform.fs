@@ -7,15 +7,20 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.CapsFormat
+open VibeFs.Kernel.MagicProjection
+open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.Wiki
 open VibeFs.Kernel.WikiRuntimeState
+open VibeFs.Mux.MagicTodo
+open VibeFs.Mux.MessagingCodec
+open VibeFs.Mux.ReadDedup
 open VibeFs.Opencode.CapsPrelude
 open VibeFs.Shell.FileSys
 open VibeFs.Shell.WorkspaceFiles
 open VibeFs.Shell.ReviewRuntime
 open VibeFs.Mux.WikiTools
 
-let private defaultExcludedAgents = set [ "browser"; "investigator"; "executor"; "title"; "bookkeeper" ]
+let private defaultExcludedAgents = set [ "browser"; "investigator"; "executor"; "exec"; "explore"; "title"; "bookkeeper" ]
 
 let private capsUserPrefix = "caps-synth-user-"
 let private capsAssistantPrefix = "caps-synth-assistant-"
@@ -75,6 +80,8 @@ let private reconstructReviewState (reviewStore: ReviewStore) (sessionID: string
             | Some task ->
                 reviewStore.activateReview(sessionID, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
             | None -> ()
+
+let private magicSession = MagicSession()
 
 let private buildTextPart (text: string) : obj =
     createObj [ "type", box "text"; "text", box text; "state", box "done" ]
@@ -161,6 +168,14 @@ let messagesTransform
                     if explicit <> "" then explicit else Dyn.str input "workspacePath"
                 reconstructReviewState reviewStore sessionID messagesArr
                 let excluded = defaultExcludedAgents |> Set.contains agent
+                let typedMessages = decodeMessages sessionID messagesArr
+                let cleanedMessages = stripSyntheticBySource typedMessages
+                let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleanedMessages)
+                let afterMagic =
+                    if excluded then cleanedMessages
+                    else projectMagicFor magicSession.Host cleanedMessages backlog false sessionID
+                let encoded = encodeMessages afterMagic
+                let deduped = if excluded then encoded else deduplicateReadOutputsWithSeenByPath Map.empty encoded
                 let! capsFiles =
                     if excluded || directory = "" then Promise.lift ([]: CapsFile list)
                     else findCapsFiles directory
@@ -169,6 +184,6 @@ let messagesTransform
                         wikiRuntime.BuildPreludeForSession(sessionID, directory)
                     else
                         Promise.lift (None: string option)
-                let final = buildCapsMessages messagesArr directory capsFiles wikiPrelude
+                let final = buildCapsMessages deduped directory capsFiles wikiPrelude
                 replaceArrayInPlace messagesArr final
     }

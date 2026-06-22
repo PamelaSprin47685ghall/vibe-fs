@@ -15,6 +15,9 @@
     <Compile Include="src/Mux/Delegate.fs" />
     <Compile Include="src/Mux/SubagentTools.fs" />
     <Compile Include="src/Mux/HostTools.fs" />
+    <Compile Include="src/Mux/ReadDedup.fs" />
+    <Compile Include="src/Mux/MessagingCodec.fs" />
+    <Compile Include="src/Mux/MagicTodo.fs" />
     <Compile Include="src/Mux/WikiTools.fs" />
     <Compile Include="src/Mux/MessageTransform.fs" />
     <Compile Include="src/Mux/EventHook.fs" />

@@ -28,6 +28,8 @@ let private getCwd (config: obj) : string =
     | Some v when not (System.String.IsNullOrWhiteSpace v) -> v
     | _ -> defaultArg (strField config "directory") ""
 
+let executionSubagentId = "exec"
+
 let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
     { language = parseLanguage (Dyn.str args "language")
       program = Dyn.str args "program"
@@ -46,7 +48,7 @@ let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptio
             let langStr = languageToString options.language
             let timeoutStr = timeoutToString options.timeoutType
             let prompt = formatPrompt mimocode (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
-            let! report = runMuxSubagent deps config "executor" prompt "Executor summary" None
+            let! report = runMuxSubagent deps config executionSubagentId prompt "Executor summary" None
             return prependSafetyWarningForExecution report options
     }
 
@@ -83,6 +85,45 @@ let addIfSome (entries: ResizeArray<string * obj>) (key: string) (v: 'T option) 
 
 let private wrapWebError (label: string) (e: DomainError) =
     $"Web {label} failed: {describeDomainError e}"
+
+let private formatHostReadResult (result: obj) : string =
+    if Dyn.isNullish result then
+        ""
+    elif Dyn.typeIs result "string" then
+        string result
+    else
+        let content = Dyn.str result "content"
+        let warning = Dyn.str result "warning"
+        let success = Dyn.get result "success"
+        let error = Dyn.str result "error"
+
+        if not (Dyn.isNullish success) then
+            if Dyn.truthy success then
+                match content, warning with
+                | "", "" -> ""
+                | "", warning -> warning
+                | content, "" -> content
+                | content, warning -> $"{content}\n\n{warning}"
+            elif error <> "" then
+                error
+            else
+                string result
+        elif content <> "" then
+            if warning = "" then content else $"{content}\n\n{warning}"
+        elif error <> "" then
+            error
+        else
+            string result
+
+let private hostReadResultIsDirectoryError (result: obj) : bool =
+    if Dyn.isNullish result || not (Dyn.typeIs result "object") then
+        false
+    else
+        let success = Dyn.get result "success"
+        let error = Dyn.str result "error"
+        not (Dyn.isNullish success)
+        && not (Dyn.truthy success)
+        && error.StartsWith "Path is a directory, not a file:"
 
 let executorTool (deps: obj) (wikiRuntime: obj) : ToolDefinition =
     { name = "executor"
@@ -136,9 +177,16 @@ let readTool (_deps: obj) (hostReadExec: HostReadExec) : ToolDefinition =
                 let limit = optInt args "limit"
                 match hostReadExec.TryGet() with
                 | Some hostExec ->
-                    let hostFn = hostExec :?> obj -> obj -> JS.Promise<obj>
-                    let! result = hostFn args config
-                    return string result
+                    let raw = Dyn.call2 hostExec args config
+                    let! result =
+                        if Dyn.typeIs (Dyn.get raw "then") "function" then
+                            unbox<JS.Promise<obj>> raw
+                        else
+                            Promise.lift raw
+                    if hostReadResultIsDirectoryError result then
+                        return! read (Some (getCwd config)) path offset limit
+                    else
+                        return formatHostReadResult result
                 | None ->
                     return! read (Some (getCwd config)) path offset limit
             }
@@ -246,7 +294,7 @@ let websearchTool (deps: obj) : ToolDefinition =
                       if items.IsEmpty then return rawResults
                       else
                           let prompt = formatPrompt mimocode (WebsearchSummary(whatToSummarize, rawResults)) |> List.head
-                          return! runMuxSubagent deps config "executor" prompt "Web search summary" None
+                          return! runMuxSubagent deps config executionSubagentId prompt "Web search summary" None
               }
       condition = None }
 

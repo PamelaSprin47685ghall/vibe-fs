@@ -13,8 +13,13 @@ open VibeFs.Tests.IntegrationToolDefSpecs
 open VibeFs.Tests.IntegrationSubagentSpecs
 open VibeFs.Tests.IntegrationMiscSpecs
 open VibeFs.Kernel.Dyn
+open VibeFs.Kernel.Executor
+open VibeFs.Kernel.HostTools
+open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.Wiki
+open VibeFs.Mux.BuiltinTools
 open VibeFs.Mux.Plugin
+open VibeFs.Shell.MagicSessionStore
 open VibeFs.Shell.WikiFiles
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.TempWorkspace
@@ -318,6 +323,149 @@ let muxTopLevelDedupSpec () =
         check "mux top-level dedup replaces repeat content" (str output "content" = "[No Change Since Previous Read/Write]")
     }
 
+let muxExecutionSubagentIdSpec () =
+    check "mux execution subagent id is exec" (executionSubagentId = "exec")
+
+let private muxDynamicToolMessage (id: string) (toolName: string) (toolCallId: string) (input: obj) (output: obj) : obj =
+    box
+        {| id = id
+           role = "assistant"
+           parts =
+            [| box
+                   {| ``type`` = "dynamic-tool"
+                      toolName = toolName
+                      toolCallId = toolCallId
+                      state = "output-available"
+                      input = input
+                      output = output |} |] |}
+
+let private muxFirstDynamicToolOutput (msg: obj) : obj =
+    get (unbox<obj[]> (get msg "parts")).[0] "output"
+
+let muxMessagesTransformDedupsRepeatedReadSpec () = promise {
+    let reg = createRegistration (createObj [])
+    let tf = muxMessageTransform reg
+    if isNullish tf then
+        check "mux messagesTransform exposed for read dedup" false
+    else
+        let repeated = box {| content = "same bytes" |}
+        let messages =
+            [| muxDynamicToolMessage "read-1" "file_read" "call-1" (createObj [ "path", box "same.ts" ]) repeated
+               muxDynamicToolMessage "read-2" "file_read" "call-2" (createObj [ "path", box "same.ts" ]) repeated |]
+        let out = createObj [ "messages", box messages ]
+        let input = createObj [ "agent", box "manager"; "sessionID", box "mux-read-dedup-session" ]
+        do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+        let transformed = unbox<obj[]> (get out "messages")
+        let readMessages =
+            transformed
+            |> Array.filter (fun msg ->
+                let parts = unbox<obj[]> (get msg "parts")
+                parts |> Array.exists (fun part -> str part "toolName" = "file_read"))
+        check "mux messagesTransform keeps both read messages" (readMessages.Length = 2)
+        let secondOutput = muxFirstDynamicToolOutput readMessages.[1]
+        check "mux messagesTransform dedups repeated read" (str secondOutput "content" = "[No Change Since Previous Read/Write]")
+}
+
+let muxTodoWriteWrapperSchemaSpec () = promise {
+    let reg = createRegistration (createObj [])
+    let wrappers = unbox<obj[]> (get reg "wrappers")
+    let todoWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "todo_write")
+    if isNullish todoWrapper then
+        check "mux registration exposes todo_write wrapper" false
+    else
+        let fakeHostTodo =
+            box
+                {| execute =
+                    System.Func<obj, obj, JS.Promise<obj>>(fun args _opts ->
+                        promise { return box {| success = true; count = (unbox<obj[]> (get args "todos")).Length |} }) |}
+        let wrapped = (get todoWrapper "wrapper") $ (fakeHostTodo, createObj [])
+        let schema = get wrapped "parameters"
+        let properties = get schema "properties"
+        let todosProp = get properties "todos"
+        let todoItem = get todosProp "items"
+        let todoProps = get todoItem "properties"
+        let required = unbox<string[]> (get schema "required")
+        let todoRequired = unbox<string[]> (get todoItem "required")
+        check "mux todo_write wrapper requires completedWorkReport" (required |> Array.contains "completedWorkReport")
+        check "mux todo_write wrapper exposes priority" (not (isNullish (get todoProps "priority")))
+        check "mux todo_write wrapper requires priority" (todoRequired |> Array.contains "priority")
+}
+
+let muxTodoWriteCapturesCompletedWorkReportSpec () = promise {
+    let reg = createRegistration (createObj [])
+    let wrappers = unbox<obj[]> (get reg "wrappers")
+    let todoWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "todo_write")
+    if isNullish todoWrapper then
+        check "mux registration exposes todo_write wrapper for capture" false
+    else
+        let mutable nativeArgs = null
+        let fakeHostTodo =
+            box
+                {| execute =
+                    System.Func<obj, obj, JS.Promise<obj>>(fun args _opts ->
+                        nativeArgs <- args
+                        promise { return box {| success = true; count = (unbox<obj[]> (get args "todos")).Length |} }) |}
+        let wrapped = (get todoWrapper "wrapper") $ (fakeHostTodo, createObj [])
+        let execute = get wrapped "execute"
+        let args =
+            createObj
+                [ "completedWorkReport", box "finished wrapper capture"
+                  "todos",
+                  box
+                      [| createObj [ "content", box "Inspect wrapper"; "status", box "in_progress"; "priority", box "high" ] |] ]
+        let! result = (execute $ (args, createObj [ "toolCallId", box "todo-call-1" ])) |> unbox<JS.Promise<obj>>
+        let nativeTodos = unbox<obj[]> (get nativeArgs "todos")
+        check "mux todo_write wrapper strips completedWorkReport before native execute" (isNullish (get nativeArgs "completedWorkReport"))
+        check "mux todo_write wrapper strips priority before native execute" (isNullish (get nativeTodos.[0] "priority"))
+        check "mux todo_write wrapper captures completedWorkReport" (tryGetReport opencode "todo-call-1" = Some "finished wrapper capture")
+        check "mux todo_write wrapper keeps nudge behavior" ((str result "nudge").Contains "meditator")
+}
+
+let muxMagicTodoProjectionSpec () = promise {
+    let reg = createRegistration (createObj [])
+    let tf = muxMessageTransform reg
+    if isNullish tf then
+        check "mux messagesTransform exposed for magic todo projection" false
+    else
+        let todoInput report content status priority =
+            createObj
+                [ "completedWorkReport", box report
+                  "todos", box [| createObj [ "content", box content; "status", box status; "priority", box priority ] |] ]
+        let todoOutput count = createObj [ "success", box true; "count", box count ]
+        let messages =
+            [| muxTextMessage "todo-user-1" "user" "plan phase"
+               muxDynamicToolMessage "todo-1" "todo_write" "todo-call-a" (todoInput "planned phase" "Plan change" "in_progress" "high") (todoOutput 1)
+               muxTextMessage "todo-user-2" "user" "implemented phase"
+               muxDynamicToolMessage "todo-2" "todo_write" "todo-call-b" (todoInput "implemented phase" "Implement change" "completed" "high") (todoOutput 1)
+               muxTextMessage "todo-user-3" "user" "verified phase"
+               muxDynamicToolMessage "todo-3" "todo_write" "todo-call-c" (todoInput "verified phase" "Verify change" "completed" "medium") (todoOutput 1) |]
+        let out = createObj [ "messages", box messages ]
+        let input = createObj [ "agent", box "manager"; "sessionID", box "mux-magic-todo-session" ]
+        do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+        let transformed = unbox<obj[]> (get out "messages")
+        let texts =
+            transformed
+            |> Array.collect (fun msg ->
+                let parts = unbox<obj[]> (get msg "parts")
+                parts
+                |> Array.choose (fun part -> if str part "type" = "text" then Some (str part "text") else None))
+        check "mux magic todo projection injects folded backlog text" (texts |> Array.exists (fun text -> text.Contains foldHeader && text.Contains "planned phase"))
+}
+
+let muxExecutorRoCatPrependsWarningSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-executor-ro-warning-"
+    let reg = createRegistration (createObj [])
+    let executor = muxToolByName reg "executor"
+    if isNullish executor then
+        check "mux registration exposes executor tool for ro warning" false
+    else
+        let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-executor-ro-warning"; "sessionID", box "mux-executor-ro-warning" ]
+        let args = createObj [ "language", box "shell"; "program", box "cat /etc/passwd"; "timeout_type", box "short"; "mode", box "ro" ]
+        let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+        check "mux executor ro cat prepends warning" (result.StartsWith readOnlyWarning)
+    do! rmAsync workspaceDir
+}
+
 let muxExecutorModeSchemaSpec () = promise {
     let reg = createRegistration (createObj [])
     let modeSchema = muxExecutorModeSchema reg
@@ -326,6 +474,74 @@ let muxExecutorModeSchemaSpec () = promise {
     let executor = muxToolByName reg "executor"
     let required = muxToolSchemaRequired executor
     check "mux executor mode is required" (required |> Array.contains "mode")
+}
+
+let muxReadToolReturnsContentSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-read-content-"
+    let filePath = pathModule?join(workspaceDir, "sample.txt")
+    let fileContent = "line1\nline2\nline3\nline4\nline5"
+    do! writeFileAsync filePath fileContent
+    let reg = createRegistration (createObj [])
+    let wrappers = unbox<obj[]> (get reg "wrappers")
+    let fileReadWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "file_read")
+    if isNullish fileReadWrapper then
+        check "mux registration exposes file_read wrapper" false
+    else
+        let fakeHostRead =
+            box {| execute =
+                    System.Func<obj, obj, JS.Promise<obj>>(fun args _config ->
+                        promise {
+                            let path = str args "path"
+                            if path = filePath then
+                                return box {| success = true; content = fileContent |}
+                            else
+                                return box {| success = false; error = "file not found" |}
+                        }) |}
+        (get fileReadWrapper "wrapper") $ (fakeHostRead, createObj []) |> ignore
+        let readTool = muxToolByName reg "read"
+        if isNullish readTool then
+            check "mux registration exposes read tool" false
+        else
+            let ctx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-read-content-session" ]
+            let args = createObj [ "path", box filePath ]
+            let! result = ((get readTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+            check "mux read returns non-nullish content" (not (isNullish result))
+            check "mux read returns expected line text" (result.Contains "line1" && result.Contains "line5")
+            check "mux read does not stringify undefined" (result <> "undefined")
+            check "mux read does not stringify object" (not (result.Contains "[object Object]"))
+    do! rmAsync workspaceDir
+}
+
+let muxReadToolListsDirectoriesSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-read-directory-"
+    do! writeFileAsync (pathModule?join(workspaceDir, "note.txt")) "alpha\nbeta"
+    let reg = createRegistration (createObj [])
+    let wrappers = unbox<obj[]> (get reg "wrappers")
+    let fileReadWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "file_read")
+    if isNullish fileReadWrapper then
+        check "mux registration exposes file_read wrapper for directory read" false
+    else
+        let fakeHostRead =
+            box {| execute =
+                    System.Func<obj, obj, JS.Promise<obj>>(fun args _config ->
+                        promise {
+                            let path = str args "path"
+                            if path = workspaceDir then
+                                return box {| success = false; error = $"Path is a directory, not a file: {workspaceDir}" |}
+                            else
+                                return box {| success = true; content = "1\talpha\n2\tbeta" |}
+                        }) |}
+        (get fileReadWrapper "wrapper") $ (fakeHostRead, createObj []) |> ignore
+        let readTool = muxToolByName reg "read"
+        if isNullish readTool then
+            check "mux registration exposes read tool for directory read" false
+        else
+            let ctx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-read-directory-session" ]
+            let args = createObj [ "path", box workspaceDir ]
+            let! result = ((get readTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+            check "mux read returns directory listing" (result.Contains "note.txt" && result.Contains "total 1")
+            check "mux read directory does not return file-only error" (not (result.Contains "Path is a directory, not a file"))
+    do! rmAsync workspaceDir
 }
 
 let run () : JS.Promise<unit> =
@@ -395,13 +611,21 @@ let run () : JS.Promise<unit> =
             "muxDailyRewriteTriggersNext", muxDailyRewriteTriggersNextSpec
             "muxExecutorRwTriggersMaintenance", muxExecutorRwTriggersMaintenanceSpec
             "muxExecutorModeSchema", muxExecutorModeSchemaSpec
+            "muxReadToolReturnsContent", muxReadToolReturnsContentSpec
+            "muxReadToolListsDirectories", muxReadToolListsDirectoriesSpec
             "muxMessageTransformRegistered", muxMessageTransformRegisteredSpec
             "muxWikiPreludeForManager", muxWikiPreludeForManagerSpec
             "muxWikiPreludeForCoder", muxWikiPreludeForCoderSpec
             "muxNoWikiPreludeForExcludedAgents", muxNoWikiPreludeForExcludedAgentsSpec
             "muxCapsAndWikiPreludeOrder", muxCapsAndWikiPreludeOrderSpec
+            "muxExecutionSubagentId", (fun () -> promise { muxExecutionSubagentIdSpec () })
             "muxTopLevelPolicy", muxTopLevelPolicySpec
             "muxTopLevelDedup", muxTopLevelDedupSpec
+            "muxMessagesTransformDedupsRepeatedRead", muxMessagesTransformDedupsRepeatedReadSpec
+            "muxTodoWriteWrapperSchema", muxTodoWriteWrapperSchemaSpec
+            "muxTodoWriteCapturesCompletedWorkReport", muxTodoWriteCapturesCompletedWorkReportSpec
+            "muxMagicTodoProjection", muxMagicTodoProjectionSpec
+            "muxExecutorRoCatPrependsWarning", muxExecutorRoCatPrependsWarningSpec
             "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
             "muxSubmitReviewPromptSuppliesCallId", muxSubmitReviewPromptSuppliesCallIdSpec
             "muxReturnReviewerRegistered", muxReturnReviewerRegisteredSpec

@@ -4,10 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.HostTools
+open VibeFs.Kernel.MagicTodo
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.TreeSitterKernel
+open VibeFs.Opencode.HookSchema
 open VibeFs.Shell.TreeSitterShell
 open VibeFs.Shell.CallStore
+open VibeFs.Shell.MagicSessionStore
 
 type JsonSchema =
     { ``type``: string
@@ -97,34 +100,29 @@ type HostReadExec() =
     member _.Capture(fn: obj) : unit = captured <- Some fn
     member _.TryGet() : obj option = captured
 
-let agentReportDefinition (_store: CallStore) : ToolDefinition =
+let private reviewerAgentReportDefinition () : ToolDefinition =
     { name = "agent_report"
-      description = "Submit structured work results. Provide callId plus the stage fields; the plugin forwards a markdown rendering to the upstream UI."
+      description = "Submit a review verdict. Provide callId, verdict, and feedback; the wrapper forwards the verdict as the upstream agent_report markdown."
       parameters =
           { ``type`` = "object"
             properties =
                 createObj
-                    [ "reportMarkdown", box (createObj [ "type", box "string"; "description", box "Human-friendly markdown shown in the upstream UI." ])
-                      "callId", box (createObj [ "type", box "string"; "description", box "Internal call id supplied by the prompt." ])
-                      "verdict", box (createObj [ "type", box "string"; "description", box "Verdict string (e.g. PASS or REJECT)." ])
-                      "feedback", box (createObj [ "type", box "string"; "description", box "Detailed feedback when rejecting." ]) ]
-            required = Some [| "callId" |]
-            additionalProperties = Some true }
-      execute = fun _config args ->
-          let callId = defaultArg (strField args "callId") ""
-          if callId = "" then
-              resolveStr (defaultArg (strField args "reportMarkdown") "")
-          elif resolveCall _store callId args then
-              resolveStr "Submitted."
-          else
-              resolveStr $"No pending call for {callId}"
+                    [ "callId", box (createObj [ "type", box "string"; "description", box "Internal review call id supplied by the prompt." ])
+                      "verdict", box (createObj [ "type", box "string"; "enum", box [| "PASS"; "REJECT" |]; "description", box "PASS accepts the work; REJECT sends actionable feedback." ])
+                      "feedback", box (createObj [ "type", box "string"; "description", box "Detailed actionable feedback. Empty string when passing." ]) ]
+            required = Some [| "callId"; "verdict"; "feedback" |]
+            additionalProperties = Some false }
+      execute = fun _ _ -> resolveStr "" 
       condition = None }
 
-let formatAgentReportMarkdown (args: obj) : string =
-    let copied = Dyn.clone args
-    copied?("callId") <- null
-    let content = JS.JSON.stringify(copied)
-    "# Agent Report\n\n```json\n" + content + "\n```"
+let private formatReviewerAgentReportMarkdown (args: obj) : string =
+    let verdict = defaultArg (strField args "verdict") "" |> fun value -> value.Trim().ToUpperInvariant()
+    let feedback = defaultArg (strField args "feedback") "" |> fun value -> value.Trim()
+    if verdict = "REJECT" || feedback <> "" then
+        if feedback = "" then "REJECT: No feedback provided."
+        else "REJECT: " + feedback
+    else
+        "PASS"
 
 let private isThenable (value: obj) : bool =
     not (Dyn.isNullish value) && Dyn.typeIs (Dyn.get value "then") "function"
@@ -155,8 +153,43 @@ let private mkSyntaxWrappers () : obj array =
     [| mkResultWrapper "file_edit_replace_string" (fun result args config -> applySyntaxCheck result args config)
        mkResultWrapper "file_edit_insert" (fun result args config -> applySyntaxCheck result args config) |]
 
-let private mkTodoNudgeWrapper (host: Host) : obj =
-    mkSyncResultWrapper (todoWritePromptName host) (fun result -> appendMeditatorNudge result)
+let private todoItemForNativeWrite (todo: obj) : obj =
+    createObj [ "content", box (Dyn.str todo "content"); "status", box (Dyn.str todo "status") ]
+
+let private todoArrayForNativeWrite (args: obj) : obj =
+    let todos = Dyn.get args "todos"
+    if Dyn.isNullish todos || not (Dyn.isArray todos) then
+        box [||]
+    else
+        todos :?> obj array |> Array.map todoItemForNativeWrite |> box
+
+let private captureTodoReport (args: obj) (opts: obj) : unit =
+    let report = Dyn.str args "completedWorkReport" |> fun value -> value.Trim()
+    let toolCallId = Dyn.str opts "toolCallId"
+    if report <> "" && toolCallId <> "" then
+        captureReport opencode toolCallId report
+
+let private mkTodoWriteWrapper () : obj =
+    let wrapperFn =
+        System.Func<obj, obj, obj>(fun (tool: obj) (_config: obj) ->
+            let execFn =
+                System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
+                    promise {
+                        captureTodoReport args opts
+                        let nativeArgs = createObj [ "todos", todoArrayForNativeWrite args ]
+                        let raw = tool?execute(nativeArgs, opts)
+                        let! result =
+                            if isThenable raw then unbox<JS.Promise<obj>> raw
+                            else Promise.lift raw
+                        return appendMeditatorNudge result
+                    })
+
+            createObj
+                [ "description", box toolDescription
+                  "parameters", buildMagicTodoSchema ()
+                  "execute", box execFn ])
+
+    createObj [ "targetTool", box (todoWritePromptName opencode); "wrapper", box wrapperFn ]
 
 let private mkFileReadCapture (hostReadExec: HostReadExec) : obj =
     let wrapperFn =
@@ -170,24 +203,25 @@ let private mkFileReadCapture (hostReadExec: HostReadExec) : obj =
 
 let private mkAgentReportOverride (callStore: CallStore) : obj =
     let wrapperFn =
-        System.Func<obj, obj, obj>(fun (tool: obj) (_config: obj) ->
-            let execFn =
-                System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
-                    promise {
-                        let callId = Dyn.str args "callId"
-                        if callId <> "" && hasCall callStore callId then
-                            resolveCall callStore callId args |> ignore
-                            let upstreamArgs = createObj [ "reportMarkdown", box (formatAgentReportMarkdown args) ]
+        System.Func<obj, obj, obj>(fun (tool: obj) (config: obj) ->
+            if Dyn.str config "subagentRole" <> "reviewer" then
+                tool
+            else
+                let definition = reviewerAgentReportDefinition ()
+                let execFn =
+                    System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
+                        promise {
+                            let callId = Dyn.str args "callId"
+                            if callId <> "" then
+                                resolveCall callStore callId args |> ignore
+
+                            let upstreamArgs = createObj [ "reportMarkdown", box (formatReviewerAgentReportMarkdown args) ]
                             let raw = tool?execute(upstreamArgs, opts)
                             return! (if isThenable raw then unbox<JS.Promise<obj>> raw else Promise.lift raw)
-                        else
-                            let raw = tool?execute(args, opts)
-                            return! (if isThenable raw then unbox<JS.Promise<obj>> raw else Promise.lift raw)
-                    })
-            let definition = agentReportDefinition callStore
-            createObj [ "description", box definition.description
-                        "parameters", box definition.parameters
-                        "execute", box execFn ])
+                        })
+                createObj [ "description", box definition.description
+                            "parameters", box definition.parameters
+                            "execute", box execFn ])
     createObj [ "targetTool", box "agent_report"; "wrapper", box wrapperFn ]
 
 
@@ -195,7 +229,7 @@ let createAllWrappersFor (host: Host) (tools: obj) (hostReadExec: HostReadExec) 
     Array.append
         (mkSyntaxWrappers ())
         [| mkFileReadCapture hostReadExec
-           mkTodoNudgeWrapper host
+           mkTodoWriteWrapper ()
            mkAgentReportOverride callStore |]
 
 let createAllWrappers (tools: obj) (hostReadExec: HostReadExec) (callStore: CallStore) : obj array =
