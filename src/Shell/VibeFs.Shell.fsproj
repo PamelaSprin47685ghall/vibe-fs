@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Kernel/VibeFs.Kernel.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="ReviewRuntime.fs" />
+    <Compile Include="PromiseQueue.fs" />
+    <Compile Include="CallStore.fs" />
+    <Compile Include="MagicSessionStore.fs" />
+    <Compile Include="ExecutorJavascript.fs" />
+    <Compile Include="OllamaClient.fs" />
+    <Compile Include="TreeSitterShell.fs" />
+    <Compile Include="FuzzyFinderShell.fs" />
+    <Compile Include="FileSys.fs" />
+    <Compile Include="WikiPortLock.fs" />
+    <Compile Include="WikiFiles.fs" />
+    <Compile Include="WorkspaceFiles.fs" />
+    <Compile Include="Executor.fs" />
+    <Compile Include="FuzzySearch.fs" />
+    <Compile Include="ChildAgentRegistry.fs" />
+    <Compile Include="NudgeRuntime.fs" />
+  </ItemGroup>
+</Project>

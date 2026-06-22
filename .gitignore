@@ -18,6 +18,9 @@ yarn-error.log*
 
 ## Build artifacts (Fable -> JS output)
 build/
+build-kernel/
+build-shell/
+build-tests/
 
 ## Generated / vendored dumps
 repomix-output.xml

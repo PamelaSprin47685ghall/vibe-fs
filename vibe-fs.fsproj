@@ -1,68 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <RootNamespace>VibeFs</RootNamespace>
-    <LangVersion>preview</LangVersion>
-    <OtherFlags>--nowarn:1182 --nowarn:3520</OtherFlags>
-  </PropertyGroup>
-
   <ItemGroup>
-    <PackageReference Include="Fable.Core" Version="5.*" />
-    <PackageReference Include="Fable.Promise" Version="3.2.0" />
+    <ProjectReference Include="src/Shell/VibeFs.Shell.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="src/Kernel/Dyn.fs" />
-    <Compile Include="src/Kernel/HostTools.fs" />
-    <Compile Include="src/Kernel/SubagentIntents.fs" />
-    <Compile Include="src/Kernel/PromptFrontMatter.fs" />
-    <Compile Include="src/Kernel/ReviewSession.fs" />
-    <Compile Include="src/Kernel/LoopMessages.fs" />
-    <Compile Include="src/Kernel/Prompts.fs" />
-    <Compile Include="src/Kernel/Subagent.fs" />
-    <Compile Include="src/Kernel/ToolCatalog.fs" />
-    <Compile Include="src/Kernel/Nudge.fs" />
-    <Compile Include="src/Kernel/Dedup.fs" />
-    <Compile Include="src/Kernel/Messaging.fs" />
-    <Compile Include="src/Kernel/Message.fs" />
-    <Compile Include="src/Kernel/Wiki.fs" />
-    <Compile Include="src/Kernel/WikiPrompts.fs" />
-    <Compile Include="src/Kernel/WikiMaintenance.fs" />
-    <Compile Include="src/Kernel/WikiRuntimeState.fs" />
-    <Compile Include="src/Kernel/CapsFormat.fs" />
-    <Compile Include="src/Kernel/TreeSitterKernel.fs" />
-    <Compile Include="src/Kernel/MessageDedup.fs" />
-    <Compile Include="src/Kernel/MagicCore.fs" />
-    <Compile Include="src/Kernel/MagicProjection.fs" />
-    <Compile Include="src/Kernel/MagicTodo.fs" />
-    <Compile Include="src/Kernel/Domain.fs" />
-    <Compile Include="src/Kernel/NudgeState.fs" />
-    <Compile Include="src/Kernel/Config.fs" />
-    <Compile Include="src/Kernel/Fuzzy.fs" />
-    <Compile Include="src/Kernel/Executor.fs" />
-
-    <Compile Include="src/Shell/ReviewRuntime.fs" />
-    <Compile Include="src/Shell/PromiseQueue.fs" />
-    <Compile Include="src/Shell/CallStore.fs" />
-    <Compile Include="src/Shell/MagicSessionStore.fs" />
-    <Compile Include="src/Shell/ExecutorJavascript.fs" />
-    <Compile Include="src/Shell/OllamaClient.fs" />
-    <Compile Include="src/Shell/TreeSitterShell.fs" />
-    <Compile Include="src/Shell/FuzzyFinderShell.fs" />
-    <Compile Include="src/Shell/FileSys.fs" />
-    <Compile Include="src/Shell/WikiPortLock.fs" />
-    <Compile Include="src/Shell/WikiFiles.fs" />
-    <Compile Include="src/Shell/WorkspaceFiles.fs" />
-    <Compile Include="src/Shell/Executor.fs" />
-    <Compile Include="src/Shell/FuzzySearch.fs" />
-    <Compile Include="src/Shell/ChildAgentRegistry.fs" />
-    <Compile Include="src/Shell/NudgeRuntime.fs" />
-
-     <Compile Include="src/Mux/AiSettings.fs" />
-     <Compile Include="src/Opencode/MessagingCodec.fs" />
+    <Compile Include="src/Mux/AiSettings.fs" />
+    <Compile Include="src/Opencode/MessagingCodec.fs" />
     <Compile Include="src/Opencode/CapsPrelude.fs" />
-     <Compile Include="src/Opencode/CapsCodec.fs" />
+    <Compile Include="src/Opencode/CapsCodec.fs" />
     <Compile Include="src/Opencode/MagicTodo.fs" />
     <Compile Include="src/Opencode/ToolSchema.fs" />
     <Compile Include="src/Opencode/HookSchema.fs" />
@@ -70,9 +15,9 @@
     <Compile Include="src/Mux/Delegate.fs" />
     <Compile Include="src/Mux/SubagentTools.fs" />
     <Compile Include="src/Mux/HostTools.fs" />
-     <Compile Include="src/Mux/WikiTools.fs" />
-     <Compile Include="src/Mux/MessageTransform.fs" />
-     <Compile Include="src/Mux/EventHook.fs" />
+    <Compile Include="src/Mux/WikiTools.fs" />
+    <Compile Include="src/Mux/MessageTransform.fs" />
+    <Compile Include="src/Mux/EventHook.fs" />
     <Compile Include="src/Mux/SlashCommands.fs" />
     <Compile Include="src/Mux/Plugin.fs" />
     <Compile Include="src/Opencode/NudgeHook.fs" />
@@ -100,38 +45,5 @@
     <Compile Include="src/Opencode/Plugin.fs" />
     <Compile Include="src/Opencode/PluginMimo.fs" />
     <Compile Include="src/Opencode/PluginMimoTui.fs" />
-
-    <Compile Include="tests/Assert.fs" />
-    <Compile Include="tests/TempWorkspace.fs" />
-    <Compile Include="tests/IntegrationToolSetup.fs" />
-    <Compile Include="tests/IntegrationCapsSpecs.fs" />
-    <Compile Include="tests/IntegrationWikiPreludeSpecs.fs" />
-    <Compile Include="tests/IntegrationAfterHookSpecs.fs" />
-    <Compile Include="tests/IntegrationMaintenanceSpecs.fs" />
-    <Compile Include="tests/IntegrationSubmitWikiSpecs.fs" />
-    <Compile Include="tests/IntegrationBookkeeperSpecs.fs" />
-    <Compile Include="tests/IntegrationToolDefSpecs.fs" />
-    <Compile Include="tests/IntegrationSubagentSpecs.fs" />
-    <Compile Include="tests/IntegrationMiscSpecs.fs" />
-    <Compile Include="tests/ReviewTests.fs" />
-    <Compile Include="tests/AgentTests.fs" />
-    <Compile Include="tests/KernelTests.fs" />
-    <Compile Include="tests/FuzzyTests.fs" />
-    <Compile Include="tests/ShellTests.fs" />
-    <Compile Include="tests/DynTests.fs" />
-    <Compile Include="tests/DelegateTests.fs" />
-    <Compile Include="tests/ResolveAiSettingsTests.fs" />
-    <Compile Include="tests/IntegrationPluginTests.fs" />
-    <Compile Include="tests/IntegrationEventTests.fs" />
-    <Compile Include="tests/IntegrationDedupTests.fs" />
-    <Compile Include="tests/IntegrationToolTests.fs" />
-    <Compile Include="tests/IntegrationChatTests.fs" />
-    <Compile Include="tests/MagicTests.fs" />
-    <Compile Include="tests/WikiTests.fs" />
-    <Compile Include="tests/WikiFileTests.fs" />
-    <Compile Include="tests/WikiKernelTests.fs" />
-    <Compile Include="tests/TitleFetchGuardTests.fs" />
-    <Compile Include="tests/Tests.fs" />
   </ItemGroup>
-
 </Project>

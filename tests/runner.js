@@ -1,3 +1,3 @@
-import { runAll } from '../build/tests/Tests.js';
+import { runAll } from '../build-tests/Tests.js';
 
-runAll([]).then(code => process.exit(code));
+runAll(process.argv.slice(2)).then(code => process.exit(code));

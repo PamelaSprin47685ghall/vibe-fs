@@ -21,13 +21,10 @@ open VibeFs.Tests.WikiFileTests
 open VibeFs.Tests.WikiKernelTests
 open VibeFs.Tests.TitleFetchGuardTests
 
-
-/// A test body: synchronous bodies run inline, asynchronous return a promise.
 type private TestBody =
     | Sync of (unit -> unit)
     | Async of (unit -> JS.Promise<unit>)
 
-/// Coerce any synchronous body into a unit-returning one.
 let private sync (f: unit -> 'a) : unit -> unit = fun () -> ignore (f ())
 
 let private tests : (string * TestBody) list = [
@@ -118,11 +115,26 @@ let private tests : (string * TestBody) list = [
     "TitleFetchGuardTests.skipProbeMessage", Sync (sync TitleFetchGuardTests.skipProbeMessage)
 ]
 
-let runAll (_args: string array) : JS.Promise<int> =
+let private matchesSelector (selectors: string array) (label: string) =
+    selectors.Length = 0
+    || selectors
+       |> Array.exists (fun selector ->
+           let trimmed = selector.Trim ()
+           trimmed.Length > 0 && label.StartsWith trimmed)
+
+let private selectedTests (selectors: string array) =
+    tests |> List.filter (fun (label, _) -> matchesSelector selectors label)
+
+let runAll (args: string array) : JS.Promise<int> =
     promise {
-        for (label, body) in tests do
-            match body with
-            | Sync f -> let _ = timed label f in ()
-            | Async f -> do! timedAsync label f
-        return summary ()
+        let runnableTests = selectedTests args
+        if List.isEmpty runnableTests then
+            printfn "No tests matched selectors: %A" args
+            return 1
+        else
+            for (label, body) in runnableTests do
+                match body with
+                | Sync f -> let _ = timed label f in ()
+                | Async f -> do! timedAsync label f
+            return summary ()
     }

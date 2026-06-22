@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Include="Dyn.fs" />
+    <Compile Include="HostTools.fs" />
+    <Compile Include="SubagentIntents.fs" />
+    <Compile Include="PromptFrontMatter.fs" />
+    <Compile Include="ReviewSession.fs" />
+    <Compile Include="LoopMessages.fs" />
+    <Compile Include="Prompts.fs" />
+    <Compile Include="Subagent.fs" />
+    <Compile Include="ToolCatalog.fs" />
+    <Compile Include="Nudge.fs" />
+    <Compile Include="Dedup.fs" />
+    <Compile Include="Messaging.fs" />
+    <Compile Include="Message.fs" />
+    <Compile Include="Wiki.fs" />
+    <Compile Include="WikiPrompts.fs" />
+    <Compile Include="WikiMaintenance.fs" />
+    <Compile Include="WikiRuntimeState.fs" />
+    <Compile Include="CapsFormat.fs" />
+    <Compile Include="TreeSitterKernel.fs" />
+    <Compile Include="MessageDedup.fs" />
+    <Compile Include="MagicCore.fs" />
+    <Compile Include="MagicProjection.fs" />
+    <Compile Include="MagicTodo.fs" />
+    <Compile Include="Domain.fs" />
+    <Compile Include="NudgeState.fs" />
+    <Compile Include="Config.fs" />
+    <Compile Include="Fuzzy.fs" />
+    <Compile Include="Executor.fs" />
+  </ItemGroup>
+</Project>

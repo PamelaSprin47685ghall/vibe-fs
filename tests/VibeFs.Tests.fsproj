@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../vibe-fs.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Assert.fs" />
+    <Compile Include="TempWorkspace.fs" />
+    <Compile Include="IntegrationToolSetup.fs" />
+    <Compile Include="IntegrationCapsSpecs.fs" />
+    <Compile Include="IntegrationWikiPreludeSpecs.fs" />
+    <Compile Include="IntegrationAfterHookSpecs.fs" />
+    <Compile Include="IntegrationMaintenanceSpecs.fs" />
+    <Compile Include="IntegrationSubmitWikiSpecs.fs" />
+    <Compile Include="IntegrationBookkeeperSpecs.fs" />
+    <Compile Include="IntegrationToolDefSpecs.fs" />
+    <Compile Include="IntegrationSubagentSpecs.fs" />
+    <Compile Include="IntegrationMiscSpecs.fs" />
+    <Compile Include="ReviewTests.fs" />
+    <Compile Include="AgentTests.fs" />
+    <Compile Include="KernelTests.fs" />
+    <Compile Include="FuzzyTests.fs" />
+    <Compile Include="ShellTests.fs" />
+    <Compile Include="DynTests.fs" />
+    <Compile Include="DelegateTests.fs" />
+    <Compile Include="ResolveAiSettingsTests.fs" />
+    <Compile Include="IntegrationPluginTests.fs" />
+    <Compile Include="IntegrationEventTests.fs" />
+    <Compile Include="IntegrationDedupTests.fs" />
+    <Compile Include="IntegrationToolTests.fs" />
+    <Compile Include="IntegrationChatTests.fs" />
+    <Compile Include="MagicTests.fs" />
+    <Compile Include="WikiTests.fs" />
+    <Compile Include="WikiFileTests.fs" />
+    <Compile Include="WikiKernelTests.fs" />
+    <Compile Include="TitleFetchGuardTests.fs" />
+    <Compile Include="Tests.fs" />
+  </ItemGroup>
+</Project>

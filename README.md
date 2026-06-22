@@ -341,16 +341,35 @@ YAML front-matter 刚好处于中间：
 ```bash
 dotnet tool restore
 pnpm install
+pnpm run clean
 pnpm build
+pnpm run build:kernel
+pnpm run build:shell
+pnpm run build:tests
+pnpm run watch
+pnpm run watch:tests
 pnpm test
+pnpm run test:kernel
+pnpm run test:shell
+pnpm run test:integration
 ```
 
 说明：
 
-- `pnpm build` 会执行 `dotnet fable vibe-fs.fsproj --outDir build`，然后把 `build-package.json` 复制成 `build/package.json`
-- 构建产物位于 `build/`
-- npm 包主导出入口当前是 `build/src/Mux/Plugin.js`
-- 测试由同一个 `vibe-fs.fsproj` 编译，再由 `node tests/runner.js` 执行
+- `pnpm run clean` 清理 `build/`、`build-kernel/`、`build-shell/`、`build-tests/`
+- `pnpm build` 只编译宿主插件层：`dotnet fable vibe-fs.fsproj --outDir build`，不再顺带测试
+- `pnpm run build:kernel` 单独编译 `src/Kernel/VibeFs.Kernel.fsproj` 到 `build-kernel/`
+- `pnpm run build:shell` 单独编译 `src/Shell/VibeFs.Shell.fsproj` 到 `build-shell/`
+- `pnpm run build:tests` 单独编译 `tests/VibeFs.Tests.fsproj` 到 `build-tests/`
+- `pnpm run watch` 监听宿主插件工程并输出到 `build/`
+- `pnpm run watch:tests` 监听测试工程并输出到 `build-tests/`
+- `pnpm test` 默认先执行测试编译，再运行 `node tests/runner.js`
+- `pnpm run test:kernel` 覆盖 `ReviewTests`、`AgentTests`、`KernelTests`、`FuzzyTests`、`DynTests`、`DelegateTests`、`ResolveAiSettingsTests`、`MagicTests`、`WikiKernelTests`、`TitleFetchGuardTests`
+- `pnpm run test:shell` 覆盖 `ShellTests`、`WikiFileTests`
+- `pnpm run test:integration` 覆盖全部 `Integration*` 与 `WikiTests`
+- `pnpm run test:kernel` + `pnpm run test:shell` + `pnpm run test:integration` 的并集等于 `pnpm test`
+- npm 包主导出入口仍是 `build/src/Mux/Plugin.js`
+- 测试入口由 `tests/runner.js` 加载 `build-tests/Tests.js`
 - 测试集覆盖 Kernel、Shell、Review、Wiki，以及多组集成契约（见 `tests/Tests.fs`）
 
 ## 源码入口速览

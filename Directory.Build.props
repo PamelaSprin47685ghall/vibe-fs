@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>VibeFs</RootNamespace>
+    <LangVersion>preview</LangVersion>
+    <OtherFlags>--nowarn:1182 --nowarn:3520</OtherFlags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fable.Core" Version="5.*" />
+    <PackageReference Include="Fable.Promise" Version="3.2.0" />
+  </ItemGroup>
+</Project>

@@ -19,11 +19,18 @@
     "index.d.ts"
   ],
   "scripts": {
-    "clean": "rm -rf build",
+    "clean": "rm -rf build build-kernel build-shell build-tests",
     "build": "dotnet fable vibe-fs.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json",
+    "build:kernel": "dotnet fable src/Kernel/VibeFs.Kernel.fsproj --outDir build-kernel",
+    "build:shell": "dotnet fable src/Shell/VibeFs.Shell.fsproj --outDir build-shell",
+    "build:tests": "dotnet fable tests/VibeFs.Tests.fsproj --outDir build-tests",
     "watch": "dotnet fable watch vibe-fs.fsproj --outDir build",
-    "test": "node tests/runner.js",
-    "prepare": "dotnet fable vibe-fs.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json"
+    "watch:tests": "dotnet fable watch tests/VibeFs.Tests.fsproj --outDir build-tests",
+    "test": "pnpm run build:tests && node tests/runner.js",
+    "test:kernel": "pnpm run build:tests && node tests/runner.js ReviewTests AgentTests KernelTests FuzzyTests DynTests DelegateTests ResolveAiSettingsTests MagicTests WikiKernelTests TitleFetchGuardTests",
+    "test:shell": "pnpm run build:tests && node tests/runner.js ShellTests WikiFileTests",
+    "test:integration": "pnpm run build:tests && node tests/runner.js Integration WikiTests",
+    "prepare": "pnpm run build"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.1.1",
