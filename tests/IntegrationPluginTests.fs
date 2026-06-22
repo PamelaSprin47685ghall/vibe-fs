@@ -28,7 +28,7 @@ let registrationShape (reg: obj) =
     let policy = (get reg "getToolPolicy") $ ("x", "manager")
     check "mux.getToolPolicy non-null" (not (isNullish policy) && typeIs policy "object")
     let removes = unbox<string[]> (get policy "remove")
-    check "mux.getToolPolicy manager removes write" (removes |> Array.contains "write")
+    check "mux.getToolPolicy manager keeps write" (not (removes |> Array.contains "write"))
     let coderPolicy = (get reg "getToolPolicy") $ ("x", "coder")
     let coderRemoves = unbox<string[]> (get coderPolicy "remove")
     check "mux.getToolPolicy coder keeps write" (not (coderRemoves |> Array.contains "write"))
