@@ -193,6 +193,29 @@ let projectLatestWins (files: WikiFile list) : WikiProjection =
     |> List.collect (fun f -> f.entries)
     |> List.fold (fun m e -> Map.add e.id e m) Map.empty
 
+let snapshotEntries (files: WikiFile list) : WikiEntry list =
+    files
+    |> List.tryPick (fun file ->
+        match file.header with
+        | SnapshotHeader _ -> Some file.entries
+        | _ -> None)
+    |> Option.defaultValue []
+
+let mergeEntryChanges (baseEntries: WikiEntry list) (changes: WikiEntry list) : WikiEntry list =
+    let changeMap = changes |> List.fold (fun acc entry -> Map.add entry.id entry acc) Map.empty
+    let baseIds = baseEntries |> List.map (fun entry -> entry.id) |> Set.ofList
+    let mergedBase =
+        baseEntries
+        |> List.map (fun entry -> Map.tryFind entry.id changeMap |> Option.defaultValue entry)
+    let additions =
+        changes
+        |> List.rev
+        |> List.fold (fun (seenIds, acc) entry ->
+            if Set.contains entry.id baseIds || Set.contains entry.id seenIds then seenIds, acc
+            else Set.add entry.id seenIds, entry :: acc) (Set.empty, [])
+        |> snd
+    mergedBase @ additions
+
 let buildPreludeSection (projection: WikiProjection) : string option =
     if Map.isEmpty projection then None
     else

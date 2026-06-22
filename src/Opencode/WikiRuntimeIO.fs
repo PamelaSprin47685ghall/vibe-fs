@@ -9,7 +9,6 @@ open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.WikiRuntimeState
 open VibeFs.Opencode.MessagingCodec
 open VibeFs.Opencode.SessionIo
-open VibeFs.Shell.PromiseQueue
 open VibeFs.Shell.WikiFiles
 open VibeFs.Shell.WikiPortLock
 open VibeFs.Shell.ChildAgentRegistry
@@ -57,7 +56,8 @@ let submitForKind (portLockTimeoutMs: int64) (portLockRetryDelayMs: int) (todayS
                 do! rewriteDay root date entries
                 return $"Rewrote wiki day {date}."
             | WeeklyRewrite throughDate ->
-                do! rewriteSnapshot root throughDate entries
+                let! files = readWikiFiles root
+                do! rewriteSnapshot root throughDate (mergeEntryChanges (snapshotEntries files) entries)
                 do! deleteDayFilesThrough root throughDate
                 return $"Rewrote wiki snapshot through {throughDate}."
         })
@@ -113,20 +113,18 @@ let launchBackgroundSession (session: obj) (root: string) (parentID: string opti
             return failedLaunchResult title (string ex)
     }
 
-/// Fire-and-forget: build the prompt then launch the background session inside
-/// the runtime commandQueue. `applyCmd` mutates the runtime state cell and is
-/// serialized with the rest of the commandQueue work.
-let queueBackgroundLaunch (client: obj) (commandQueue: SerialQueue) (recordResult: string -> unit) (root: string) (parentID: string option) (kind: WikiJobKind) (title: string) (buildPrompt: unit -> JS.Promise<string>) (aiSettings: DelegatedAiSettings) (registry: ChildAgentRegistry) : unit =
+/// Fire-and-forget: build the prompt then launch the background session without
+/// serializing unrelated bookkeeper sessions behind one another.
+let queueBackgroundLaunch (client: obj) (startBackgroundJob: JS.Promise<unit> -> unit) (recordResult: string -> unit) (root: string) (parentID: string option) (kind: WikiJobKind) (title: string) (buildPrompt: unit -> JS.Promise<string>) (aiSettings: DelegatedAiSettings) (registry: ChildAgentRegistry) : unit =
     match sessionApiOf client with
     | None -> recordResult (failedLaunchResult title "host client is missing session.create/session.prompt APIs")
     | Some session ->
-        commandQueue.Enqueue(fun () ->
-            promise {
-                try
-                    let! promptText = buildPrompt ()
-                    let! result = launchBackgroundSession session root parentID kind title promptText aiSettings client registry
-                    recordResult result
-                with ex ->
-                    recordResult (failedLaunchResult title (string ex))
-            })
-        |> Promise.start
+        promise {
+            try
+                let! promptText = buildPrompt ()
+                let! result = launchBackgroundSession session root parentID kind title promptText aiSettings client registry
+                recordResult result
+            with ex ->
+                recordResult (failedLaunchResult title (string ex))
+        }
+        |> startBackgroundJob

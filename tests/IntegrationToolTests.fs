@@ -361,6 +361,8 @@ let run () : JS.Promise<unit> =
             "weeklyMaintenanceUsesLastSunday", weeklyMaintenanceUsesLastSundaySpec
             "weeklyMaintenanceWithoutSnapshotFile", weeklyMaintenanceWithoutSnapshotFileSpec
             "heartbeatTriggersMaintenance", heartbeatTriggersMaintenanceSpec
+            "heartbeatMaintenanceUsesParentSession", heartbeatMaintenanceUsesParentSessionSpec
+            "heartbeatSchedulesOnlyEarliestDailyWhileAppendRuns", heartbeatSchedulesOnlyEarliestDailyWhileAppendRunsSpec
             "submitWikiAppend", submitWikiAppendSpec
             "submitWikiAppendEmpty", submitWikiAppendEmptySpec
             "submitWikiAppendDoesNotTriggerMaintenance", submitWikiAppendDoesNotTriggerMaintenanceSpec

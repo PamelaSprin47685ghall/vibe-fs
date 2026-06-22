@@ -50,7 +50,7 @@ type MuxWikiRuntime(?deps: obj) as this =
     let registeredJobs = System.Collections.Generic.Dictionary<string, WikiJobContext>()
     let writeQueue = SerialQueue()
     let commandQueue = SerialQueue()
-    let launchQueue = SerialQueue()
+    let backgroundJobs = ResizeArray<JS.Promise<unit>>()
     let mutable state = initialWikiState
     let mutable latestConfig : obj option = None
 
@@ -66,18 +66,22 @@ type MuxWikiRuntime(?deps: obj) as this =
     let recordBackgroundResult title result =
         state <- reducer state (UpdateLatestLaunchResultCmd (title, result))
 
+    let startBackgroundJob (job: JS.Promise<unit>) : unit =
+        backgroundJobs.Add(job)
+        job |> Promise.start
+
     let launchBg root kind title promptText =
         match latestConfig with
         | Some cfg ->
             let options = Some (box {| aiSettingsAgentId = "bookkeeper" |})
-            launchQueue.Enqueue(fun () ->
-                promise {
-                    try
-                            let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
-                            recordBackgroundResult title "success"
-                    with ex ->
-                        recordBackgroundResult title (string ex)
-                }) |> Promise.start
+            promise {
+                try
+                    let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
+                    recordBackgroundResult title "success"
+                with ex ->
+                    recordBackgroundResult title (string ex)
+            }
+            |> startBackgroundJob
         | None -> ()
 
     member _.TryResolveJobContext(sessionID: string) : JS.Promise<WikiJobContext option> =
@@ -237,7 +241,8 @@ type MuxWikiRuntime(?deps: obj) as this =
                                         }
                                     | WeeklyRewrite throughDate ->
                                         promise {
-                                            do! rewriteSnapshot root throughDate entries
+                                            let! files = readWikiFiles root
+                                            do! rewriteSnapshot root throughDate (mergeEntryChanges (snapshotEntries files) entries)
                                             do! deleteDayFilesThrough root throughDate
                                             registeredJobs.Remove(sessionID) |> ignore
                                             return $"Rewrote wiki snapshot through {throughDate}."
@@ -263,17 +268,17 @@ type MuxWikiRuntime(?deps: obj) as this =
             if not (Dyn.isNullish deps) then
                 match latestConfig with
                 | Some cfg when not (Dyn.isNullish cfg) ->
-                    launchQueue.Enqueue(fun () ->
-                        promise {
-                            try
-                                let! projection = readProjection root
-                                let promptText = prependJobMarker { workspaceRoot = root; kind = AppendAfterWork } (buildAppendPrompt title prompt result projection)
-                                let options = Some (box {| aiSettingsAgentId = "bookkeeper" |})
-                                let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
-                                recordBackgroundResult title "success"
-                            with ex ->
-                                recordBackgroundResult title (string ex)
-                        }) |> Promise.start
+                    promise {
+                        try
+                            let! projection = readProjection root
+                            let promptText = prependJobMarker { workspaceRoot = root; kind = AppendAfterWork } (buildAppendPrompt title prompt result projection)
+                            let options = Some (box {| aiSettingsAgentId = "bookkeeper" |})
+                            let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
+                            recordBackgroundResult title "success"
+                        with ex ->
+                            recordBackgroundResult title (string ex)
+                    }
+                    |> startBackgroundJob
                 | _ -> ()
 
     member _.TakeBookkeeperLaunchesForTesting() : obj array =
@@ -292,7 +297,11 @@ type MuxWikiRuntime(?deps: obj) as this =
     member _.WaitForBackgroundJobsForTesting() : JS.Promise<unit> =
         promise {
             do! commandQueue.Enqueue(fun () -> Promise.lift ())
-            do! launchQueue.Enqueue(fun () -> Promise.lift ())
+            let jobs = backgroundJobs |> Seq.toArray
+            backgroundJobs.Clear()
+            if jobs.Length > 0 then
+                let! _ = Promise.all jobs
+                return ()
         }
 
     member val startMaintenanceIfDue = System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> this.StartMaintenanceIfDue(workspaceRoot)) with get, set

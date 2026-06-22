@@ -153,6 +153,7 @@ let submitWikiWeeklyRewriteSpec () = promise {
     let snapshotFileContent =
         renderNdjson (SnapshotHeader(Some "2026-06-14")) [
             wikiEntry "0a3f" "保留问题" "Old snapshot answer"
+            wikiEntry "0a40" "未变化问题" "Stable answer"
         ]
     let dayFilePathOne = dayPath workspaceDir "2026-06-15"
     let dayFileContentOne =
@@ -183,6 +184,7 @@ let submitWikiWeeklyRewriteSpec () = promise {
     let snapshot = files |> List.find (fun file -> match file.header with SnapshotHeader _ -> true | _ -> false)
     check "submit_wiki weekly rewrite updates snapshot cutoff" (match snapshot.header with SnapshotHeader(Some through) -> through = "2026-06-16" | _ -> false)
     check "submit_wiki weekly rewrite keeps merged answer" (snapshot.entries |> List.exists (fun entry -> entry.q = "保留问题" && entry.a = "Merged answer"))
+    check "submit_wiki weekly rewrite preserves unchanged snapshot entries" (snapshot.entries |> List.exists (fun entry -> entry.q = "未变化问题" && entry.a = "Stable answer"))
     let newWeekly = snapshot.entries |> List.tryFind (fun entry -> entry.q = "新增周知识")
     check "submit_wiki weekly rewrite allocates new id" (
         match newWeekly with

@@ -153,3 +153,49 @@ let heartbeatMaintenanceUsesParentSessionSpec () = promise {
     check "heartbeat maintenance: maintenance launch also uses parent session" (parentIds.Length >= 2 && parentIds |> Array.forall ((=) "heartbeat-parent"))
     do! rmAsync workspaceDir
 }
+
+let heartbeatSchedulesOnlyEarliestDailyWhileAppendRunsSpec () = promise {
+    let! workspaceDir = mkdtempAsync "heartbeat-maintenance-concurrent-"
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [ wikiEntry "0a3f" "第一日" "Daily candidate 1" ]
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-19") (DayHeader("2026-06-19", false)) [ wikiEntry "0a40" "第二日" "Daily candidate 2" ]
+
+    let createCalls = ResizeArray<obj>()
+    let promptCalls = ResizeArray<obj>()
+    let releasePrompt = ref (fun () -> ())
+    let promptGate : JS.Promise<unit> = Promise.create (fun resolve _ -> releasePrompt.Value <- resolve)
+    let mockClient =
+        createObj [ "session", box (createObj [
+            "create", box (System.Func<obj, JS.Promise<obj>>(fun arg ->
+                promise {
+                    createCalls.Add(arg)
+                    return box {| data = box {| id = "child-bookkeeper-session-" + string createCalls.Count |} |}
+                }))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                promptCalls.Add(arg)
+                promptGate))
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ -> promise { return box {| data = [||] |} }))
+            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ()))
+        ]) ]
+
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-20" |})
+    let wikiRuntime = get (pluginWikiRuntime p) "rawInstance" :?> WikiRuntime
+    wikiRuntime.StartBookkeeperAppend("input", "result", "write", parentSessionID = "heartbeat-parent")
+    let! _ = wikiRuntime.EnsureSessionSnapshot("drain-command-queue", workspaceDir)
+    do! Promise.sleep 0
+
+    check "heartbeat maintenance: append and earliest daily launch before prompt release" (createCalls.Count = 2)
+    check "heartbeat maintenance: blocked prompt has both append and daily prompts" (promptCalls.Count = 2)
+    let promptTexts =
+        promptCalls
+        |> Seq.map (fun call ->
+            let parts = get (get call "body") "parts"
+            if isArray parts then str (unbox<obj[]> parts).[0] "text" else "")
+        |> Seq.toArray
+    check "heartbeat maintenance: schedules earliest daily" (promptTexts |> Array.exists (fun text -> text.Contains "2026-06-18"))
+    check "heartbeat maintenance: does not schedule later daily yet" (promptTexts |> Array.forall (fun text -> not (text.Contains "2026-06-19")))
+
+    releasePrompt.Value()
+    do! waitForBackgroundJobsForTesting p
+    do! rmAsync workspaceDir
+}

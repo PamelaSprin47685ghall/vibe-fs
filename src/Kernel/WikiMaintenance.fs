@@ -63,7 +63,7 @@ let snapshotThroughOf (files: WikiFile list) : string option =
         |> Option.map (fun d -> d.AddDays(-1.0).ToString("yyyy-MM-dd")))
 
 /// The maintenance decisions, in one pure pass: `(dailyDue, weeklyDue)`.
-/// `dailyDue` = past day-files that have not yet been rewritten (their dates).
+/// `dailyDue` = the oldest past day-file that has not yet been rewritten.
 /// `weeklyDue` = the Sunday cutoff when a snapshot rewrite is due AND every day
 /// between the current frontier and that Sunday has already been rewritten.
 /// Both are empty/None when nothing is due. Mirrors the original inline logic.
@@ -74,6 +74,7 @@ let dueMaintenance (files: WikiFile list) (now: DateTime) : string list * string
         dayFiles
         |> List.filter (fun (date, rewritten) -> date < todayStr && not rewritten)
         |> List.map fst
+        |> List.truncate 1
     let weeklyDue =
         match snapshotThroughOf files with
         | None -> None

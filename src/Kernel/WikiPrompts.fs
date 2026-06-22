@@ -16,8 +16,18 @@ let private entrySeqLines (entries: WikiEntry list) : string list =
             "    q: " + yamlScalar entry.q
             "    a: " + yamlScalar entry.a ])
 
+let private eventSeqLines (entries: WikiEntry list) : string list =
+    entries
+    |> List.map (fun entry ->
+        String.concat "\n" [
+            "  - q: " + yamlScalar entry.q
+            "    a: " + yamlScalar entry.a ])
+
 let yamlSeqField (key: string) (entries: WikiEntry list) : string =
     PromptFrontMatter.yamlSeqField key (entrySeqLines entries)
+
+let private yamlEventSeqField (key: string) (entries: WikiEntry list) : string =
+    PromptFrontMatter.yamlSeqField key (eventSeqLines entries)
 
 let projectionText (projection: WikiProjection) : string =
     yamlSeqField "wiki" (projection |> Map.toList |> List.map snd)
@@ -41,13 +51,54 @@ let entriesThroughCutoff (files: WikiFile list) (throughDate: string) : WikiEntr
         | DayHeader(day, _) when day <= throughDate -> file.entries
         | _ -> [])
 
-let private snapshotEntries (files: WikiFile list) : WikiEntry list =
+let private filesBefore (date: string) (files: WikiFile list) : WikiFile list =
+    files
+    |> List.filter (fun file ->
+        match file.header with
+        | SnapshotHeader _ -> true
+        | DayHeader(day, _) -> day < date)
+
+let private entriesProjection (entries: WikiEntry list) : WikiProjection =
+    entries |> List.fold (fun acc entry -> Map.add entry.id entry acc) Map.empty
+
+let private projectionEntries (projection: WikiProjection) : WikiEntry list =
+    projection |> Map.toList |> List.map snd
+
+let private projectionDelta (before: WikiProjection) (after: WikiProjection) : WikiEntry list =
+    after
+    |> Map.toList
+    |> List.choose (fun (id, entry) ->
+        match Map.tryFind id before with
+        | Some oldEntry when oldEntry.q = entry.q && oldEntry.a = entry.a -> None
+        | _ -> Some entry)
+
+let private foldedEntriesBefore (date: string) (files: WikiFile list) : WikiEntry list =
+    files
+    |> filesBefore date
+    |> projectLatestWins
+    |> projectionEntries
+
+let private deltaEntriesForDay (date: string) (files: WikiFile list) : WikiEntry list =
+    projectionDelta (files |> filesBefore date |> projectLatestWins) (entriesForDay files date |> entriesProjection)
+
+let private snapshotThrough (files: WikiFile list) : string option =
     files
     |> List.tryPick (fun file ->
         match file.header with
-        | SnapshotHeader _ -> Some file.entries
+        | SnapshotHeader through -> through
         | _ -> None)
-    |> Option.defaultValue []
+
+let private eventsThroughCutoff (files: WikiFile list) (throughDate: string) : WikiEntry list =
+    let lowerBound = snapshotThrough files
+    files
+    |> List.collect (fun file ->
+        match file.header with
+        | DayHeader(day, _) when day <= throughDate && (lowerBound |> Option.forall (fun previous -> day > previous)) -> file.entries
+        | _ -> [])
+
+let private deltaEntriesThroughCutoff (files: WikiFile list) (throughDate: string) : WikiEntry list =
+    let existing = snapshotEntries files
+    projectionDelta (entriesProjection existing) (eventsThroughCutoff files throughDate |> entriesProjection)
 
 let private bookkeeperQualityRules = [
     "Write every recorded Q&A in modern compressed Chinese: drop filler, keep concepts and exact identifiers."
@@ -72,21 +123,22 @@ let buildAppendPrompt (title: string) (workInput: string) (workOutput: string) (
           "Submit exactly one `return_bookkeeper` call. Reuse existing ids when facts update, omit ids for new durable facts, and return `[]` if nothing durable should be recorded." ]
         @ bookkeeperQualityRules))
 
-let buildDailyPrompt (date: string) (files: WikiFile list) (projection: WikiProjection) : string =
+let buildDailyPrompt (date: string) (files: WikiFile list) (_projection: WikiProjection) : string =
     frontMatterPrompt [
-        yamlSeqField "current_wiki" (projection |> Map.toList |> List.map snd)
-        yamlSeqField "target_day" (entriesForDay files date)
+        yamlSeqField "existing_wiki" (foldedEntriesBefore date files)
+        yamlEventSeqField "new_events" (deltaEntriesForDay date files)
     ] (String.concat "\n\n" (
-        [ "You are rewriting one day of the project wiki."
-          "Submit exactly one `return_bookkeeper` call. Replace the target day with durable canonical entries. It is valid to return `[]`." ]
+        [ "You are the project wiki bookkeeper."
+          "You are given existing wiki entries. Some new events happened. Organize and merge the new events, then modify the existing wiki entries."
+          "Submit exactly one `return_bookkeeper` call. Reuse existing ids when facts update, omit ids for new durable facts, and return `[]` if nothing durable should be changed." ]
         @ bookkeeperQualityRules @ rewritePruneRules))
 
-let buildWeeklyPrompt (throughDate: string) (files: WikiFile list) (projection: WikiProjection) : string =
+let buildWeeklyPrompt (throughDate: string) (files: WikiFile list) (_projection: WikiProjection) : string =
     frontMatterPrompt [
-        yamlSeqField "current_wiki" (projection |> Map.toList |> List.map snd)
-        yamlSeqField "previous_snapshot" (snapshotEntries files)
-        yamlSeqField "day_files_through_cutoff" (entriesThroughCutoff files throughDate)
+        yamlSeqField "existing_wiki" (snapshotEntries files)
+        yamlEventSeqField "new_events" (deltaEntriesThroughCutoff files throughDate)
     ] (String.concat "\n\n" (
-        [ "You are rewriting the project wiki snapshot."
-          "Submit exactly one `return_bookkeeper` call. Preserve surviving ids when possible, merge duplicates, omit ids only for genuinely new facts, and return `[]` if nothing durable remains." ]
+        [ "You are the project wiki bookkeeper."
+          "You are given existing wiki entries. Some new events happened. Organize and merge the new events, then modify the existing wiki entries."
+          "Submit exactly one `return_bookkeeper` call. Reuse existing ids when facts update, omit ids for new durable facts, and return `[]` if nothing durable should be changed." ]
         @ bookkeeperQualityRules @ rewritePruneRules))

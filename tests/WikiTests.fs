@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Wiki
+open VibeFs.Kernel.WikiPrompts
 
 let private ok r =
     match r with

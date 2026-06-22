@@ -63,23 +63,58 @@ let appendPromptSpec () =
     check "append prompt has existing_wiki field" (prompt.Contains "existing_wiki:")
 
 let dailyPromptSpec () =
-    let files = [ dayFile "2026-06-19" false [ entry "0a3f" "target q" "target a" ] ]
+    let files =
+        [ snapshotFile "2026-06-18" [ entry "1111" "snapshot q" "snapshot a" ]
+          dayFile "2026-06-19" false [ entry "2222" "stale target q" "stale target a"; entry "2222" "target q" "target a" ]
+          dayFile "2026-06-20" false [ entry "3333" "future q" "future a" ] ]
     let prompt = buildDailyPrompt "2026-06-19" files Map.empty
-    check "daily prompt names rewrite role" (prompt.Contains "rewriting one day")
-    check "daily prompt has target day field" (prompt.Contains "target_day:")
-    check "daily prompt includes target entry" (prompt.Contains "target q")
+    check "daily prompt uses bookkeeper role" (prompt.Contains "project wiki bookkeeper")
+    check "daily prompt has existing wiki field" (prompt.Contains "existing_wiki:")
+    check "daily prompt has new events field" (prompt.Contains "new_events:")
+    check "daily prompt includes previous folded wiki" (prompt.Contains "snapshot q")
+    check "daily prompt includes target event" (prompt.Contains "target q")
+    check "daily prompt folds target events last-win" (not (prompt.Contains "stale target q"))
+    check "daily prompt excludes future events" (not (prompt.Contains "future q"))
+    check "daily prompt hides target event id" (not (prompt.Contains "id: 2222"))
+    check "daily prompt keeps existing wiki ids" (prompt.Contains "id: 1111")
+    check "daily prompt does not use old target day payload field" (not (prompt.Contains "target_day:\n"))
+    check "daily prompt hides implementation vocabulary" (not (prompt.Contains "last-win") && not (prompt.Contains "delta") && not (prompt.Contains "rewritten"))
+    check "daily prompt uses simple maintenance instruction" (prompt.Contains "Some new events happened" && prompt.Contains "modify the existing wiki entries")
     check "daily prompt is yaml-frontmatter markdown" (prompt.StartsWith "---\n")
+    let rollbackPrompt =
+        buildDailyPrompt "2026-06-19"
+            [ snapshotFile "2026-06-18" [ entry "2222" "old q" "old a" ]
+              dayFile "2026-06-19" false [ entry "2222" "changed q" "changed a"; entry "2222" "old q" "old a" ] ]
+            Map.empty
+    check "daily prompt drops events that roll back to old value" (not (rollbackPrompt.Contains "changed q") && not (rollbackPrompt.Contains "new_events:\n  -"))
 
 let weeklyPromptSpec () =
     let files =
         [ snapshotFile "2026-06-07" [ entry "1111" "snap q" "snap a" ]
-          dayFile "2026-06-10" false [ entry "2222" "day q" "day a" ] ]
+          dayFile "2026-06-10" false [ entry "2222" "stale day q" "stale day a" ]
+          dayFile "2026-06-11" false [ entry "2222" "day q" "day a" ]
+          dayFile "2026-06-20" false [ entry "3333" "later q" "later a" ] ]
     let prompt = buildWeeklyPrompt "2026-06-14" files Map.empty
-    check "weekly prompt names snapshot rewrite role" (prompt.Contains "rewriting the project wiki snapshot")
-    check "weekly prompt has previous snapshot field" (prompt.Contains "previous_snapshot:")
-    check "weekly prompt has day-through-cutoff field" (prompt.Contains "day_files_through_cutoff:")
+    check "weekly prompt uses bookkeeper role" (prompt.Contains "project wiki bookkeeper")
+    check "weekly prompt has existing wiki field" (prompt.Contains "existing_wiki:")
+    check "weekly prompt has new events field" (prompt.Contains "new_events:")
     check "weekly prompt includes previous snapshot entry" (prompt.Contains "snap q")
-    check "weekly prompt includes day-through-cutoff entry" (prompt.Contains "day q")
+    check "weekly prompt includes cutoff event" (prompt.Contains "day q")
+    check "weekly prompt folds cutoff events last-win" (not (prompt.Contains "stale day q"))
+    check "weekly prompt excludes later event" (not (prompt.Contains "later q"))
+    check "weekly prompt hides new event id" (not (prompt.Contains "id: 2222"))
+    check "weekly prompt keeps existing wiki ids" (prompt.Contains "id: 1111")
+    check "weekly prompt does not use old previous snapshot field" (not (prompt.Contains "previous_snapshot:"))
+    check "weekly prompt does not use old day files field" (not (prompt.Contains "day_files_through_cutoff:"))
+    check "weekly prompt hides implementation vocabulary" (not (prompt.Contains "last-win") && not (prompt.Contains "delta") && not (prompt.Contains "rewritten"))
+    check "weekly prompt uses simple maintenance instruction" (prompt.Contains "Some new events happened" && prompt.Contains "modify the existing wiki entries")
+    let rollbackPrompt =
+        buildWeeklyPrompt "2026-06-14"
+            [ snapshotFile "2026-06-07" [ entry "2222" "old q" "old a" ]
+              dayFile "2026-06-10" false [ entry "2222" "changed q" "changed a" ]
+              dayFile "2026-06-11" false [ entry "2222" "old q" "old a" ] ]
+            Map.empty
+    check "weekly prompt drops events that roll back to old value" (not (rollbackPrompt.Contains "changed q") && not (rollbackPrompt.Contains "new_events:\n  -"))
 
 // ── WikiMaintenance (pure scheduling decisions) ─────────────────────────────
 
@@ -118,13 +153,14 @@ let dueMaintenanceDailySpec () =
     // Today's own day is not "past" -> not due.
     let dailyDue3, _ = dueMaintenance [ dayFile "2026-06-20" false [] ] (DateTime(2026, 6, 20))
     check "daily not due for today" (dailyDue3 |> List.isEmpty)
-    // Multiple past unrewritten days -> list all, ascending, skip rewritten.
+    // Multiple past unrewritten days -> only the oldest is due; later days wait
+    // until the earlier rewrite is persisted.
     let multiFiles =
         [ dayFile "2026-06-12" false [ entry "0a3f" "q" "a" ]
           dayFile "2026-06-10" false [ entry "0a40" "q2" "a2" ]
           dayFile "2026-06-11" true [] ]
     let dailyDue4, _ = dueMaintenance multiFiles (DateTime(2026, 6, 20))
-    equal "daily due lists all past unrewritten ascending" ["2026-06-10"; "2026-06-12"] dailyDue4
+    equal "daily due schedules oldest past unrewritten only" ["2026-06-10"] dailyDue4
 
 let dueMaintenanceWeeklySpec () =
     // Snapshot through 2026-06-07, now 2026-06-20 (last Sunday 2026-06-14).
