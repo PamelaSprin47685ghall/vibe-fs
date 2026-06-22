@@ -19,6 +19,7 @@ open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.Wiki
 open VibeFs.Mux.BuiltinTools
 open VibeFs.Mux.Plugin
+open VibeFs.Mux.SubagentTools
 open VibeFs.Shell.MagicSessionStore
 open VibeFs.Shell.WikiFiles
 open VibeFs.Tests.IntegrationToolSetup
@@ -282,6 +283,16 @@ let muxExecutorRwTriggersMaintenanceSpec () = promise {
         let args = createObj [ "language", box "shell"; "program", box "printf mux-maintenance"; "timeout_type", box "short"; "mode", box "rw" ]
         let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         check "mux rw executor returns output" (result.Contains "mux-maintenance")
+        let after = get reg "tool.execute.after"
+        let afterInput =
+            createObj
+                [ "tool", box "executor"
+                  "sessionID", box "mux-executor-maintenance"
+                  "callID", box "mux-exec-after"
+                  "args", box args
+                  "directory", box workspaceDir ]
+        let afterOutput = createObj [ "output", box result ]
+        do! after $ (afterInput, afterOutput) |> unbox<JS.Promise<unit>>
         do! waitForBackgroundJobsForTesting reg
         let launches = takeBookkeeperLaunchesForTesting reg
         check "mux rw executor triggers maintenance" (
@@ -324,8 +335,34 @@ let muxTopLevelDedupSpec () =
         check "mux top-level dedup replaces repeat content" (str output "content" = "[No Change Since Previous Read/Write]")
     }
 
-let muxExecutionSubagentIdSpec () =
-    check "mux execution subagent id is exec" (executionSubagentId = "exec")
+let muxSummarizationSpec () =
+    check "mux summarization agent id is explore" (summarizationAgentId = "explore")
+    check "mux summarization role is executor" (summarizationRole = "executor")
+    check "mux summarization ai settings agent id is explore" (summarizationAiSettingsAgentId = "explore")
+
+/// Locks the permission shape of the summary child workspace. Mirrors opencode's
+/// `executor` agent: only `agent_report` survives — every other surface
+/// (sub-agents, mutating tools, fuzzy, wiki, write, etc.) must be stripped so
+/// the child cannot re-enter the host tool surface (no `investigator`/`coder`/
+/// `browser`/`meditator` re-spawn, no file edits, no further fetches).
+let muxSummarizationToolPolicySpec () =
+    let toolNames =
+        [| "coder"; "investigator"; "meditator"; "browser"; "executor"
+           "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
+           "fetch_wiki"; "return_bookkeeper" |]
+    let opts = toolOptions toolNames summarizationRole summarizationAiSettingsAgentId
+    check "toolOptions is provided" (Option.isSome opts)
+    let payload = Option.get opts
+    let experiments = get payload "experiments"
+    check "subagentRole bound to executor" (str experiments "subagentRole" = "executor")
+    check "aiSettingsAgentId routes to explore model" (str payload "aiSettingsAgentId" = "explore")
+    let policy = get experiments "toolPolicy"
+    let disabled = unbox<string[]> (get policy "disabledTools") |> Set.ofArray
+    // Every host surface except the read-only escape hatches must be removed.
+    for removed in [ "coder"; "investigator"; "meditator"; "browser"; "executor"
+                     "submit_review"; "return_reviewer"; "websearch"; "webfetch"
+                     "fuzzy_grep"; "fuzzy_find"; "write"; "fetch_wiki"; "return_bookkeeper" ] do
+        check $"summary child strips {removed}" (Set.contains removed disabled)
 
 let private muxDynamicToolMessage (id: string) (toolName: string) (toolCallId: string) (input: obj) (output: obj) : obj =
     box
@@ -696,6 +733,9 @@ let run () : JS.Promise<unit> =
             "loopCommand", (fun () -> loopCommandSpec reg)
             "agentConfig", agentConfigSpec
             "bookkeeperAgentConfig", bookkeeperAgentConfigSpec
+            "disableMimoMemoryAndCheckpoint", disableMimoMemoryAndCheckpointSpec
+            "disableMimoMemoryAndCheckpointPreservesUserAgent", disableMimoMemoryAndCheckpointPreservesUserAgentSpec
+            "pluginConfigHookDisablesMimoMemoryAndCheckpoint", pluginConfigHookDisablesMimoMemoryAndCheckpointSpec
             "executorModeSchema", executorModeSchemaSpec
             "executorActor", executorActorSpec
             "wikiWorkspaceSerialization", wikiWorkspaceSerializationSpec
@@ -715,7 +755,8 @@ let run () : JS.Promise<unit> =
             "muxWikiPreludeForCoder", muxWikiPreludeForCoderSpec
             "muxNoWikiPreludeForExcludedAgents", muxNoWikiPreludeForExcludedAgentsSpec
             "muxCapsAndWikiPreludeOrder", muxCapsAndWikiPreludeOrderSpec
-            "muxExecutionSubagentId", (fun () -> promise { muxExecutionSubagentIdSpec () })
+            "muxSummarization", (fun () -> promise { muxSummarizationSpec () })
+            "muxSummarizationToolPolicy", (fun () -> promise { muxSummarizationToolPolicySpec () })
             "muxTopLevelPolicy", muxTopLevelPolicySpec
             "muxTopLevelDedup", muxTopLevelDedupSpec
             "muxMessagesTransformDedupsRepeatedRead", muxMessagesTransformDedupsRepeatedReadSpec

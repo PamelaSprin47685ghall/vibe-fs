@@ -152,6 +152,62 @@ let bookkeeperSessionRegisteredInChildAgentRegistrySpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let muxToolExecuteAfterTriggersBookkeeperSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-tool-after-"
+    do! ensureWikiDir workspaceDir
+    let prompts = ResizeArray<string>()
+    let deps = minimalMuxDeps ()
+    deps?("directory") <- workspaceDir
+    deps?("taskService") <- mockMuxTaskServiceCapturingPrompt prompts
+    let reg = createRegistration deps
+    let after = get reg "tool.execute.after"
+    if isNullish after then
+        check "mux plugin exposes tool.execute.after" false
+    else
+        let coderInput =
+            createObj
+                [ "tool", box "coder"
+                  "sessionID", box "mux-after-parent"
+                  "callID", box "mux-coder-1"
+                  "args", box (createObj [ "intents", box "do mux work" ]) ]
+        let coderOutput = createObj [ "output", box "Coder finished mux" ]
+        do! after $ (coderInput, coderOutput) |> unbox<JS.Promise<unit>>
+        let launches = takeBookkeeperLaunchesForTesting reg
+        check "mux tool.execute.after records a bookkeeper launch" (launches.Length = 1)
+        check "mux tool.execute.after launch uses bookkeeper agent" (str launches.[0] "agent" = "bookkeeper")
+        do! waitForBackgroundJobsForTesting reg
+        check "mux tool.execute.after delegates via taskService" (prompts.Count >= 1)
+        check "mux tool.execute.after taskService prompt carries job marker" (
+            prompts
+            |> Seq.exists (fun p ->
+                p.StartsWith("---\n") && p.Contains("type: \"vibe_wiki_job\"")))
+    do! rmAsync workspaceDir
+}
+
+let muxToolExecuteAfterSkipsReadOnlyExecutorSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-tool-after-ro-"
+    do! ensureWikiDir workspaceDir
+    let deps = minimalMuxDeps ()
+    deps?("directory") <- workspaceDir
+    deps?("taskService") <- mockMuxTaskServiceCapturingPrompt (ResizeArray<string>())
+    let reg = createRegistration deps
+    let after = get reg "tool.execute.after"
+    if isNullish after then
+        check "mux plugin exposes tool.execute.after (ro)" false
+    else
+        let roInput =
+            createObj
+                [ "tool", box "executor"
+                  "sessionID", box "mux-ro-parent"
+                  "callID", box "mux-exec-ro"
+                  "args", box (createObj [ "mode", box "ro" ]) ]
+        let roOutput = createObj [ "output", box "ro output" ]
+        do! after $ (roInput, roOutput) |> unbox<JS.Promise<unit>>
+        let roLaunches = takeBookkeeperLaunchesForTesting reg
+        check "mux tool.execute.after skips read-only executor" (roLaunches.Length = 0)
+    do! rmAsync workspaceDir
+}
+
 let muxDailyMaintenanceLaunchSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-daily-maintenance-"
     do! ensureWikiDir workspaceDir

@@ -94,9 +94,64 @@ let private withRoleDefaultsFor (host: Host) (name: string) (userAgent: obj) : o
     setKey result "mcps" mcps
     result
 
+let private emptyJsArray : obj = [||] :> obj
+
+let private zeroedPushCaps : obj =
+    createObj [
+        "tasks_ledger", box 0
+        "focus_task", box 0
+        "actor_ledger", box 0
+        "memory_titles", box 0
+        "global", box 0
+        "checkpoint", box 0
+        "memory", box 0
+        "notes", box 0
+        "design_decisions", box 0
+        "open_notes", box 0
+    ]
+
+let private nativeAgentDisableOverrides : obj =
+    createObj [
+        "dream", box {| disable = true |}
+        "distill", box {| disable = true |}
+        "checkpoint-writer", box {| disable = true |}
+    ]
+
+let private disabledCheckpointSection : obj =
+    createObj [
+        "thresholds", box emptyJsArray
+        "push_caps", box zeroedPushCaps
+        "memory_reconcile_on_search", box false
+    ]
+
+let private disabledAutoSection : obj = createObj [ "auto", box false ]
+
+let private disabledMemorySection : obj = createObj [ "cc_index", box false ]
+
+let private injectAgentDisables (agents: obj) : unit =
+    for name in [|"dream"; "distill"; "checkpoint-writer"|] do
+        let ua = Dyn.get agents name
+        if Dyn.isNullish ua then setKey agents name (createObj [ "disable", box true ])
+        elif Dyn.isNullish (Dyn.get ua "disable") then
+            ua?disable <- box true
+
+let disableMimoMemoryAndCheckpoint (cfg: obj) : obj =
+    let existingAgent = Dyn.get cfg "agent"
+    let agentMap = if Dyn.isNullish existingAgent then emptyObj () else existingAgent
+    injectAgentDisables agentMap
+    mergeObj cfg
+        (box (createObj [
+            "agent", box agentMap
+            "checkpoint", box disabledCheckpointSection
+            "dream", box disabledAutoSection
+            "distill", box disabledAutoSection
+            "memory", box disabledMemorySection
+        ]))
+
 let applyAgentConfigFor (host: Host) (opencodeConfig: obj) (mcps: obj) : obj =
-    let userAgent = if Dyn.isNullish (Dyn.get opencodeConfig "agent") then emptyObj () else Dyn.get opencodeConfig "agent"
-    let configMcp = Dyn.get opencodeConfig "mcp"
+    let prepared = disableMimoMemoryAndCheckpoint opencodeConfig
+    let userAgent = Dyn.get prepared "agent"
+    let configMcp = Dyn.get prepared "mcp"
     let mergedMcp = if Dyn.isNullish configMcp then mcps else mergeObj configMcp mcps
     let agents = mergeObj userAgent (emptyObj ())
     for name in builtinAgentSpecs |> List.map (fun spec -> spec.name) do
@@ -108,4 +163,4 @@ let applyAgentConfigFor (host: Host) (opencodeConfig: obj) (mcps: obj) : obj =
             let uaObj = if Dyn.isNullish ua then emptyObj () else ua
             name, withRoleDefaultsFor host name uaObj)
         |> createObj
-    mergeObj opencodeConfig (box {| agent = finalAgents; mcp = mergedMcp |})
+    mergeObj prepared (box {| agent = finalAgents; mcp = mergedMcp |})

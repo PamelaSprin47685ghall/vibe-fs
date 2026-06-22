@@ -40,22 +40,56 @@ type private StateHolder<'state>(initialState: 'state) =
         state <- nextState
         result
 
+/// Scan message history for task tool parts with non-terminal todos.
+/// Mirrors the TUI's tryRecoverTodosFromMessages: iterates messages in
+/// reverse, finds the last `task` tool call, and extracts open items.
+let private recoverOpenTodosFromMessages (messagesData: obj) : string list =
+    if not (Dyn.isArray messagesData) then []
+    else
+        (messagesData :?> obj array)
+        |> Array.rev
+        |> Array.tryPick (fun message ->
+            let parts = Dyn.get message "parts"
+            if not (Dyn.isArray parts) then None
+            else
+                (parts :?> obj array)
+                |> Array.rev
+                |> Array.tryPick (fun part ->
+                    if Dyn.str part "type" <> "tool" || Dyn.str part "tool" <> "task" then None
+                    else
+                        let state = Dyn.get part "state"
+                        let input = Dyn.get state "input"
+                        let todos = Dyn.get input "todos"
+                        if not (Dyn.isArray todos) then None
+                        else
+                            let openItems =
+                                (todos :?> obj array)
+                                |> Array.choose (fun todo ->
+                                    let content = Dyn.str todo "content"
+                                    let status = Dyn.str todo "status"
+                                    if content = "" || status = "" then None
+                                    else
+                                        match todoStatusOfString status with
+                                        | Some s when isTerminal s -> None
+                                        | _ -> Some content)
+                            Some openItems))
+        |> Option.defaultValue [||]
+        |> Array.toList
+
 let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<SessionSnapshot option> =
     promise {
         try
             let sessionIDStr = Id.sessionIdValue sessionID
             let session = Dyn.get client "session"
             let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
-            let openTodos = decodeTodos (Dyn.get todoResp "data")
-            let! (lastAssistantMessage, agentFromMessage, alreadyNudged) =
-                promise {
-                    try
-                        let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
-                        let text, agent, nudged = decodeLastAssistant (Dyn.get messagesResp "data")
-                        return (text, agent, nudged)
-                    with _ ->
-                        return ("", None, false)
-                }
+            let openTodosFromApi = decodeTodos (Dyn.get todoResp "data")
+            let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
+            let messagesData = Dyn.get messagesResp "data"
+            let openTodos =
+                if not (List.isEmpty openTodosFromApi) then openTodosFromApi
+                else recoverOpenTodosFromMessages messagesData
+            let lastAssistantMessage, agentFromMessage, alreadyNudged =
+                decodeLastAssistant messagesData
             return Some { todos = openTodos
                           lastAssistantMessage = lastAssistantMessage
                           alreadyNudged = alreadyNudged

@@ -186,3 +186,29 @@ let runWithFinderSharedPipeline () =
     with _ -> raised <- true
     check "exception bubbled" raised
     equal "external finder released even on throw" 1 releasedOnError
+
+/// Empty-string iterator must be treated as "absent", not as a stored key.  An
+/// LLM/client passing `iterator: ""` (instead of omitting the field) should
+/// fall through to the fresh-search branch whenever `pattern` is present.
+let emptyIteratorTreatedAsAbsent () =
+    let store = VibeFs.Shell.FuzzySearch.createIteratorStore 10
+    let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = Some store; finderCache = FinderCache() }
+    let params' : FuzzyFindParams = { pattern = Some "q"; path = None; limit = None; iterator = Some "" }
+    match resolveFindSearchState params' opts with
+    | Ok _ -> check "empty iterator falls through to fresh search" true
+    | Error msg ->
+        // Old behaviour: "fuzzy_find iterator error: ..."  New behaviour: Ok.
+        check ("empty iterator must not error: " + msg) false
+    // Sanity: a stored iterator id still flows through the consume path.
+    let storedId =
+        storeIterator<FuzzyFindState> store "scope" "ffi_f"
+            { query = "q"; pageSize = 30; pageIndex = 0; externalBasePath = None }
+    let resumed : FuzzyFindParams = { pattern = None; path = None; limit = None; iterator = Some storedId }
+    match resolveFindSearchState resumed opts with
+    | Ok _ -> check "stored iterator resumes" true
+    | Error _ -> check "stored iterator resumes" false
+    // And an unknown id (non-empty, non-stored) still errors.
+    let bogus : FuzzyFindParams = { pattern = None; path = None; limit = None; iterator = Some "nope" }
+    match resolveFindSearchState bogus opts with
+    | Error _ -> check "unknown iterator still errors" true
+    | Ok _ -> check "unknown iterator still errors" false

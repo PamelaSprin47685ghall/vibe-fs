@@ -196,6 +196,57 @@ let mimoConfigSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let mimoTuiTodoFallbackSpec () = promise {
+    let sessionID = "mimo-tui-session"
+    let mutable disposeHook : (unit -> unit) option = None
+    let routeCurrent = createObj [ "name", box "home" ]
+    let recoveredTodos =
+        [| createObj [
+            "content", box "Ship sidebar sync"
+            "status", box "in_progress"
+            "priority", box "high"
+        ] |]
+    let taskPart =
+        box (createObj [
+            "type", box "tool"
+            "tool", box "task"
+            "state", box (createObj [
+                "status", box "completed"
+                "input", box (createObj [ "todos", box recoveredTodos ])
+            ])
+        ])
+    let api =
+        createObj [
+            "state", box (createObj [
+                "session", box (createObj [
+                    "todo", box (System.Func<string, obj>(fun _ -> box [||]))
+                    "messages", box (System.Func<string, obj>(fun sid ->
+                        if sid = sessionID then
+                            box [| box (createObj [ "id", box "msg-1" ]) |]
+                        else box [||]))
+                ])
+                "part", box (System.Func<string, obj>(fun messageID ->
+                    if messageID = "msg-1" then box [| taskPart |] else box [||]))
+            ])
+            "lifecycle", box (createObj [
+                "onDispose", box (System.Func<obj, obj>(fun fn ->
+                    disposeHook <- Some (unbox<unit -> unit> fn)
+                    box (fun () -> ())))
+            ])
+            "command", box (createObj [ "register", box (System.Func<obj, obj>(fun _ -> box (fun () -> ()))) ])
+            "route", box (createObj [ "current", box routeCurrent ])
+        ]
+    let pluginObj = VibeFs.Opencode.PluginMimoTui.plugin
+    do! (get pluginObj "tui") $ (api, null, null) |> unbox<JS.Promise<unit>>
+    let todosAfterInstall = call1 (get (get (get api "state") "session") "todo") (box sessionID) |> unbox<obj array>
+    check "mimo tui todo fallback recovers task todos" (todosAfterInstall.Length = 1)
+    check "mimo tui todo fallback preserves content" (str todosAfterInstall.[0] "content" = "Ship sidebar sync")
+    check "mimo tui todo fallback preserves status" (str todosAfterInstall.[0] "status" = "in_progress")
+    disposeHook |> Option.iter (fun dispose -> dispose ())
+    let todosAfterDispose = call1 (get (get (get api "state") "session") "todo") (box sessionID) |> unbox<obj array>
+    check "mimo tui todo fallback restores original todo getter on dispose" (todosAfterDispose.Length = 0)
+}
+
 let topLevelExportsSpec () =
     check "top-level getPluginToolPolicy is function" (typeIs getPluginToolPolicy "function")
     check "top-level collectReadOutputs is function" (typeIs collectReadOutputs "function")
@@ -215,5 +266,6 @@ let run () : JS.Promise<unit> =
         countsSpec reg
         do! configSpec ()
         do! mimoConfigSpec ()
+        do! mimoTuiTodoFallbackSpec ()
         do! rmAsync workspaceDir
     }

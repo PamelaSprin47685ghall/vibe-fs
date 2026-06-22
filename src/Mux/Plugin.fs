@@ -54,6 +54,8 @@ let private envVar (name: string) : string =
     let v = nodeProcess?env?(name)
     if isNull v then "" else string v
 
+let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
+
 type CapsFileReadEntry =
     { path: string
       callId: string
@@ -95,22 +97,14 @@ let createToolCatalog
     (wikiRuntime: MuxWikiRuntime)
     (wikiEnabled: bool)
     : ToolDefinition array =
-    let executorWikiRuntime =
-        if wikiEnabled then
-            box (createObj [
-                "startBookkeeperAppend",
-                box (System.Func<string, string, string, obj, unit>(fun prompt result title config ->
-                    wikiRuntime.StartBookkeeperAppend(prompt, result, title, config)))
-            ])
-        else null
     [| coderTool deps toolNames
        investigatorTool deps toolNames
        meditatorTool deps toolNames
        browserTool deps toolNames
-       executorTool deps executorWikiRuntime
+       executorTool deps toolNames null
        submitReviewTool deps toolNames callStore reviewStore
        returnReviewerTool deps callStore reviewStore
-       websearchTool deps
+       websearchTool deps toolNames
        webfetchTool
        fuzzyGrepTool finderCache
        fuzzyFindTool finderCache
@@ -119,6 +113,43 @@ let createToolCatalog
        if wikiEnabled then
            fetchWikiTool wikiRuntime
            returnBookkeeperTool wikiRuntime |]
+
+let private recordsToBookkeeper (tool: string) : bool =
+    let allowed =
+        [| "coder"; "investigator"; "meditator"; "browser"; "executor"
+           "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "write" |]
+    Array.contains tool allowed
+
+let private isReadOnlyExecutor (tool: string) (input: obj) : bool =
+    tool = "executor" && Dyn.str (Dyn.get input "args") "mode" = "ro"
+
+let private bookkeeperInput (input: obj) : string =
+    let args = Dyn.get input "args"
+    if Dyn.isNullish args then "" else JS.JSON.stringify args
+
+let private toolExecuteAfter
+    (wikiRuntime: MuxWikiRuntime)
+    (wikiEnabled: bool)
+    (input: obj)
+    (output: obj)
+    : JS.Promise<unit> =
+    promise {
+        if not wikiEnabled then ()
+        else
+            let tool = Dyn.str input "tool"
+            let sessionID = Dyn.str input "sessionID"
+            let succeeded = Dyn.str output "error" = ""
+            if succeeded
+               && recordsToBookkeeper tool
+               && not (isReadOnlyExecutor tool input) then
+                wikiRuntime.StartBookkeeperAppend(
+                    bookkeeperInput input,
+                    Dyn.str output "output",
+                    tool,
+                    config = createObj
+                        [ "sessionID", box sessionID
+                          "directory", box (Dyn.str input "directory") ])
+    }
 
 let createRegistration (deps: obj) : obj =
     let callStore = createCallStore ()
@@ -140,50 +171,55 @@ let createRegistration (deps: obj) : obj =
     let messagesTransformFn =
         System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
             messagesTransform deps wikiRuntime reviewStore input output)
-    box {| toolNames = toolNames
-           tools = tools
-           wrappers = wrappers
-           mcpServers = mcpServers
-           contextInjector =
-               box {| inject = (fun (projectPath: string) ->
-                   promise {
-                       let! files = findCapsFiles projectPath
-                       return if List.isEmpty files then box null else box (VibeFs.Kernel.CapsFormat.buildCapitalsContext files)
-                   } :> obj) |}
-           eventHook = eventHook
-           slashCommands = slashCommands
-           messagesTransform = box messagesTransformFn
-           __wikiRuntime =
-                box (createObj
-                    [ "rawInstance", box wikiRuntime
-                      "registerJobForTesting",
-                      box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
-                          wikiRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
-                      "startMaintenanceIfDue",
-                      box (System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> wikiRuntime.StartMaintenanceIfDue(workspaceRoot)))
-                      "takeBookkeeperLaunchesForTesting",
-                      box (System.Func<obj array>(fun () -> wikiRuntime.TakeBookkeeperLaunchesForTesting()))
-                      "waitForBackgroundJobsForTesting",
-                      box (System.Func<JS.Promise<unit>>(fun () -> wikiRuntime.WaitForBackgroundJobsForTesting())) ])
-           __reviewStore =
-               box (createObj
-                   [ "activateReview",
-                     box (System.Func<string, string, int64, unit>(fun sessionID task createdAt ->
-                         reviewStore.activateReview(sessionID, task, createdAt)))
-                     "deactivateReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.deactivateReview sessionID))
-                     "isReviewActive", box (System.Func<string, bool>(fun sessionID -> reviewStore.isReviewActive sessionID))
-                     "getReviewTask", box (System.Func<string, string option>(fun sessionID -> reviewStore.getReviewTask sessionID))
-                     "tryLockReview", box (System.Func<string, bool>(fun sessionID -> reviewStore.tryLockReview sessionID))
-                     "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ])
-           __callStore =
-               box (createObj
-                   [ "resolveCall", box (System.Func<string, obj, bool>(fun callId args -> resolveCall callStore callId args))
-                     "pendingCallIds", box (System.Func<string array>(fun () -> callStore.PendingCalls.Keys |> Seq.toArray))
-                     "hasCall", box (System.Func<string, bool>(fun callId -> hasCall callStore callId))
-                     "resolveFirstMatching",
-                     box (System.Func<string, obj, bool>(fun prefix args ->
-                         callStore.PendingCalls.Keys
-                         |> Seq.tryFind (fun k -> k.StartsWith(prefix))
-                         |> Option.map (fun k -> resolveCall callStore k args)
-                         |> Option.defaultValue false)) ])
-           getToolPolicy = (fun (_agentId: string) (role: obj) -> buildToolPolicy toolNames role) |}
+    let getToolPolicy = System.Func<string, obj, obj>(fun (_agentId: string) (role: obj) -> buildToolPolicy toolNames role)
+    let registration = createObj [
+        "toolNames", box toolNames
+        "tools", box tools
+        "wrappers", box wrappers
+        "mcpServers", box mcpServers
+        "contextInjector",
+            box {| inject = (fun (projectPath: string) ->
+                promise {
+                    let! files = findCapsFiles projectPath
+                    return if List.isEmpty files then box null else box (VibeFs.Kernel.CapsFormat.buildCapitalsContext files)
+                } :> obj) |}
+        "eventHook", box eventHook
+        "slashCommands", box slashCommands
+        "messagesTransform", box messagesTransformFn
+        "getToolPolicy", box getToolPolicy
+        "__wikiRuntime",
+            box (createObj
+                [ "rawInstance", box wikiRuntime
+                  "registerJobForTesting",
+                  box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
+                      wikiRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
+                  "startMaintenanceIfDue",
+                  box (System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> wikiRuntime.StartMaintenanceIfDue(workspaceRoot)))
+                  "takeBookkeeperLaunchesForTesting",
+                  box (System.Func<obj array>(fun () -> wikiRuntime.TakeBookkeeperLaunchesForTesting()))
+                  "waitForBackgroundJobsForTesting",
+                  box (System.Func<JS.Promise<unit>>(fun () -> wikiRuntime.WaitForBackgroundJobsForTesting())) ])
+        "__reviewStore",
+            box (createObj
+                [ "activateReview",
+                  box (System.Func<string, string, int64, unit>(fun sessionID task createdAt ->
+                      reviewStore.activateReview(sessionID, task, createdAt)))
+                  "deactivateReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.deactivateReview sessionID))
+                  "isReviewActive", box (System.Func<string, bool>(fun sessionID -> reviewStore.isReviewActive sessionID))
+                  "getReviewTask", box (System.Func<string, string option>(fun sessionID -> reviewStore.getReviewTask sessionID))
+                  "tryLockReview", box (System.Func<string, bool>(fun sessionID -> reviewStore.tryLockReview sessionID))
+                  "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ])
+        "__callStore",
+            box (createObj
+                [ "resolveCall", box (System.Func<string, obj, bool>(fun callId args -> resolveCall callStore callId args))
+                  "pendingCallIds", box (System.Func<string array>(fun () -> callStore.PendingCalls.Keys |> Seq.toArray))
+                  "hasCall", box (System.Func<string, bool>(fun callId -> hasCall callStore callId))
+                  "resolveFirstMatching",
+                  box (System.Func<string, obj, bool>(fun prefix args ->
+                      callStore.PendingCalls.Keys
+                      |> Seq.tryFind (fun k -> k.StartsWith(prefix))
+                      |> Option.map (fun k -> resolveCall callStore k args)
+                      |> Option.defaultValue false)) ]) ]
+    setKey registration "tool.execute.after" (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
+        toolExecuteAfter wikiRuntime wikiEnabled input output)))
+    box registration

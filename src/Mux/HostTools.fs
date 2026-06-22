@@ -12,6 +12,7 @@ open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
+open VibeFs.Mux.SubagentTools
 open VibeFs.Shell.FileSys
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzySearch
@@ -28,7 +29,15 @@ let private getCwd (config: obj) : string =
     | Some v when not (System.String.IsNullOrWhiteSpace v) -> v
     | _ -> defaultArg (strField config "directory") ""
 
-let executionSubagentId = "exec"
+/// Sub-agent used to summarize large executor output and web-search raw hits.
+/// Both are pure read-only distillation jobs, so we route them through the lightweight
+/// `explore` agent (matches the model-priority rule used by investigator/browser/meditator)
+/// and apply the `executor` role, which under opencode `canUseCanonical` permits only
+/// `agent_report` + `read`. This forbids the summary child from re-entering the host tool
+/// surface (no `investigator`/`coder`/`browser`/`meditator`/`websearch`/`write`/etc.).
+let summarizationAgentId = "explore"
+let summarizationRole = "executor"
+let summarizationAiSettingsAgentId = "explore"
 
 let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
     { language = parseLanguage (Dyn.str args "language")
@@ -40,7 +49,7 @@ let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
       mode = Dyn.str args "mode"
       cwd = Some (getCwd config) }
 
-let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptions) (output: string) : JS.Promise<string> =
+let private summarizeWhenNeeded (deps: obj) (config: obj) (toolNames: string array) (options: ExecuteOptions) (output: string) : JS.Promise<string> =
     promise {
         if not (shouldSummarize byteLength output) then
             return output
@@ -48,7 +57,8 @@ let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptio
             let langStr = languageToString options.language
             let timeoutStr = timeoutToString options.timeoutType
             let prompt = formatPrompt mimocode (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
-            let! report = runMuxSubagent deps config executionSubagentId prompt "Executor summary" None
+            let opts = toolOptions toolNames summarizationRole summarizationAiSettingsAgentId
+            let! report = runMuxSubagent deps config summarizationAgentId prompt "Executor summary" opts
             return report
     }
 
@@ -125,7 +135,7 @@ let private hostReadResultIsDirectoryError (result: obj) : bool =
         && not (Dyn.truthy success)
         && error.StartsWith "Path is a directory, not a file:"
 
-let executorTool (deps: obj) (wikiRuntime: obj) : ToolDefinition =
+let executorTool (deps: obj) (toolNames: string array) (_wikiRuntime: obj) : ToolDefinition =
     { name = "executor"
       description = description "executor"
       parameters =
@@ -148,12 +158,7 @@ let executorTool (deps: obj) (wikiRuntime: obj) : ToolDefinition =
                         return match r with
                                | Completed o | Truncated(o, _) | Failed o | MissingExecutable(_, o) -> o
                     })
-                let! output = summarizeWhenNeeded deps config opts execResult
-                if opts.mode = "rw" && not (Dyn.isNullish wikiRuntime) then
-                    let inputJson = JS.JSON.stringify args
-                    let startFn = Dyn.get wikiRuntime "startBookkeeperAppend"
-                    if not (Dyn.isNullish startFn) then
-                        startFn $ (inputJson, output, "executor", config) |> ignore
+                let! output = summarizeWhenNeeded deps config toolNames opts execResult
                 return output
             }
       condition = None }
@@ -271,7 +276,7 @@ let fuzzyGrepTool (finderCache: FinderCache) : ToolDefinition =
               }
       condition = None }
 
-let websearchTool (deps: obj) : ToolDefinition =
+let websearchTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = "websearch"
       description = description "websearch"
       parameters = mkSchema (createObj [ "query", box (strProp Params.websearchQuery); "numResults", box (numProp Params.websearchNumResults); "what_to_summarize", box (strProp Params.websearchWhatToSummarize) ]) [| "query"; "what_to_summarize" |]
@@ -294,7 +299,8 @@ let websearchTool (deps: obj) : ToolDefinition =
                       if items.IsEmpty then return rawResults
                       else
                           let prompt = formatPrompt mimocode (WebsearchSummary(whatToSummarize, rawResults)) |> List.head
-                          return! runMuxSubagent deps config executionSubagentId prompt "Web search summary" None
+                          let opts = toolOptions toolNames summarizationRole summarizationAiSettingsAgentId
+                          return! runMuxSubagent deps config summarizationAgentId prompt "Web search summary" opts
               }
       condition = None }
 

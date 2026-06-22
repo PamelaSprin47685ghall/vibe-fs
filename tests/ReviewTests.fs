@@ -208,7 +208,7 @@ let doubleCheckPromptFormat () =
     check "has front-matter fence" (prompt.Contains "---")
     check "has double-check field" (prompt.Contains "double-check:")
     check "embeds task" (prompt.Contains "build the login page")
-    check "asks for re-submission" (prompt.Contains "再次提交")
+    check "asks for re-submission" (prompt.Contains "REJECT with detailed feedback")
     let multiline = VibeFs.Kernel.Prompts.doubleCheckPrompt "task with\nnewline and ### markdown"
     check "multiline task uses block field" (multiline.Contains "task: |")
     let parsed = VibeFs.Kernel.PromptFrontMatter.parseFrontMatterScalars multiline

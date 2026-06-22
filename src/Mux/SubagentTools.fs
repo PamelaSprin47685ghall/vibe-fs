@@ -20,7 +20,10 @@ open VibeFs.Kernel.Domain
 let private disabledToolsForReviewer (toolNames: string array) : string array =
     deniedTools "reviewer" (Array.toList toolNames) |> Array.ofList
 
-let private toolOptions (toolNames: string array) (role: string) (aiSettingsAgentId: string) : obj option =
+/// Mirrors opencode `canUseCanonical` for the requested role: emit a `toolPolicy.disabledTools`
+/// list so the spawned child workspace strips everything except `agent_report` + `read`.
+/// `subagentRole` is what the host binds to `roleScopedHostRemovals` and vibe-fs plugin policy.
+let toolOptions (toolNames: string array) (role: string) (aiSettingsAgentId: string) : obj option =
     Some (createObj [ "experiments", box (createObj [ "subagentRole", box role; "toolPolicy", box (createObj [ "disabledTools", box (deniedTools role (Array.toList toolNames) |> Array.ofList) ]) ]); "aiSettingsAgentId", box aiSettingsAgentId ])
 
 let private abortableConfig (config: obj) (signal: obj) = Dyn.withKey config "abortSignal" signal

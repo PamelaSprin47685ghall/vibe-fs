@@ -120,8 +120,8 @@ let private iteratorError toolName it = $"{toolName} iterator error: unknown, ex
 
 let private resolveIteratorBranch (store: TypedIteratorStore) iterator consume toolName onFresh =
     match iterator with
-    | Some it -> match consume store it with Some s -> Ok s | None -> Error (iteratorError toolName it)
-    | None -> onFresh ()
+    | Some it when it <> "" -> match consume store it with Some s -> Ok s | None -> Error (iteratorError toolName it)
+    | _ -> onFresh ()
 
 let resolveFindSearchState (params': FuzzyFindParams) (opts: SearchOptions)
     : Result<FuzzyFindState, string> =
