@@ -124,3 +124,32 @@ let heartbeatTriggersMaintenanceSpec () = promise {
             title.Contains "daily" || title.Contains "rewrite" || prompt.Contains "daily" || prompt.Contains "rewrite"))
     do! rmAsync workspaceDir
 }
+
+let heartbeatMaintenanceUsesParentSessionSpec () = promise {
+    let! workspaceDir = mkdtempAsync "heartbeat-maintenance-parent-"
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [ wikiEntry "0a3f" "积压问题" "Daily candidate" ]
+
+    let createCalls = ResizeArray<obj>()
+    let mockClient =
+        createObj [ "session", box (createObj [
+            "create", box (System.Func<obj, JS.Promise<obj>>(fun arg ->
+                promise {
+                    createCalls.Add(arg)
+                    return box {| data = box {| id = "child-bookkeeper-session" |} |}
+                }))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ()))
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ -> promise { return box {| data = [| assistantCompletionMessage "child-bookkeeper-session" "done" |] |} }))
+            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ()))
+        ]) ]
+
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-20" |})
+    let wikiRuntime = get (pluginWikiRuntime p) "rawInstance" :?> WikiRuntime
+    wikiRuntime.StartBookkeeperAppend("input", "result", "write", parentSessionID = "heartbeat-parent")
+    do! waitForBackgroundJobsForTesting p
+
+    let parentIds = createCalls |> Seq.map (fun call -> str (get call "body") "parentID") |> Seq.toArray
+    check "heartbeat maintenance: append launch uses parent session" (parentIds |> Array.contains "heartbeat-parent")
+    check "heartbeat maintenance: maintenance launch also uses parent session" (parentIds.Length >= 2 && parentIds |> Array.forall ((=) "heartbeat-parent"))
+    do! rmAsync workspaceDir
+}
