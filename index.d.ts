@@ -68,7 +68,7 @@ export interface PluginToolConfiguration {
 }
 
 export interface RuntimeHandle {
-  readonly __brand: "RuntimeHandle";
+  readonly __brand?: "RuntimeHandle";
 }
 
 export interface TaskCreateInput {
@@ -140,7 +140,7 @@ export interface AgentInheritanceEntry {
 }
 
 export interface AgentInheritanceRequest {
-  readonly runtime: RuntimeHandle | null;
+  readonly runtime: any;
   readonly workspacePath: string;
   readonly agentId: string;
   readonly agentDefinition: AgentDefinitionPackage;
@@ -198,14 +198,14 @@ export interface HostDependencies {
     workspaceId: string,
     parentRuntime?: ParentRuntimeMuxEnvOverlay | null,
   ) => Promise<WorkspacePluginContext | null>;
-  readonly loadConfigOrDefault: () => ConfigFile;
+  readonly loadConfigOrDefault: () => unknown;
   readonly readAgentDefinition: (
-    runtime: RuntimeHandle | null,
+    runtime: any,
     workspacePath: string,
     agentId: string,
   ) => Promise<AgentDefinitionPackage>;
   readonly resolveAgentFrontmatter: (
-    runtime: RuntimeHandle | null,
+    runtime: any,
     workspacePath: string,
     agentId: string,
   ) => Promise<AgentFrontmatterPackage>;
@@ -213,9 +213,9 @@ export interface HostDependencies {
     request: AgentInheritanceRequest,
   ) => Promise<readonly AgentInheritanceEntry[]>;
   readonly findWorkspaceEntry: (
-    configFile: ConfigFile,
+    configFile: any,
     workspaceId: string,
-  ) => FindWorkspaceEntryResult | undefined;
+  ) => FindWorkspaceEntryResult | undefined | null;
   readonly getChatHistory?: (workspaceId: string) => Promise<unknown[]>;
 }
 
