@@ -74,10 +74,6 @@ let private parseLoopReviewVerdict (args: obj option) (report: string) : bool * 
         else false, report
     | None -> false, report
 
-let private submissionFooter (toolName: string) (callId: string) =
-    "\n\nYou must call the `" + toolName + "` tool to submit your answer. "
-    + "Use callId `" + callId + "`. Do not write files, run commands, or modify the workspace."
-
 let private precheckReview
     (deps: obj) (toolNames: string array) (callStore: CallStore) (workspaceId: WorkspaceId) (task: string)
     : JS.Promise<DelegateOutcome * obj option> =
@@ -92,7 +88,7 @@ let private precheckReview
                 [ "subagentRole", box "reviewer"
                   "toolPolicy", box (createObj [ "disabledTools", box disabledTools ]) ]
         let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
-        let promptText = ReviewerVerdictPrompts.loopReviewVerdictInstructions + "\n\n=== Task Description ===\n\n" + task + "\n\n" + submissionFooter "agent_report" callId
+        let promptText = preReviewVerdictPrompt task callId
         let! outcome = delegateWithTimeout deps config "explore" promptText "Pre-review" (Some opts) 300000
         let! verdictArgs =
             promise {

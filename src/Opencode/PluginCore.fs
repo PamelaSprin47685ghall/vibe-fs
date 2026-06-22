@@ -48,7 +48,7 @@ let private createCoreServices (host: Host) (ctx: obj) =
     let wikiEnabled = wikiDirExists directory
     let wikiRuntime = WikiRuntime(Dyn.get ctx "client", directory, nowUtc, childAgentRegistry, 30000L, 1000)
     let magicSession = MagicSession host
-    let tools = createTools childAgentRegistry finderCache ctx wikiRuntime reviewStore wikiEnabled
+    let tools = createTools host childAgentRegistry finderCache ctx wikiRuntime reviewStore wikiEnabled
     let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
     let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
     {

@@ -213,21 +213,72 @@ let muxSubmitReviewPromptSuppliesCallIdSpec () = promise {
         let sessionID = "mux-review-callid"
         muxActivateReviewForTest reg sessionID "Implement feature X"
         let prompts = ResizeArray<string>()
-        let taskService = mockMuxTaskServiceCapturingPrompt prompts
+        let taskService =
+            createObj
+                [ "create",
+                  box (System.Func<obj, JS.Promise<obj>>(fun input ->
+                      promise {
+                          let promptText = str input "prompt"
+                          if promptText <> "" then prompts.Add(promptText)
+                          return box {| success = true; data = box {| taskId = "reviewer-task-1"; kind = "agent" |} |}
+                      }))
+                  "waitForAgentReport",
+                  box (System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
+                      Promise.lift (box {| reportMarkdown = "reviewer running" |}))) ]
         let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
         let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
-        try
-            let! _ = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-            check "submit_review should not complete when reviewer cannot report verdict" false
-        with _ ->
-            ()
+        let submitPromise = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+        do! Promise.sleep 0
         let pending = muxPendingCallIdsForTest reg
         let matching = pending |> Array.tryFind (fun id -> id.StartsWith(sessionID + "-review-"))
         match matching with
         | None -> check "submit_review registers a pending review call" false
         | Some callId ->
             let promptText = if prompts.Count > 0 then prompts.[0] else ""
+            check "submit_review prompt uses front-matter" (promptText.StartsWith "---")
             check "submit_review prompt includes the review callId for the reviewer" (promptText.Contains(callId))
+            check "submit_review prompt includes call_id field" (promptText.Contains("call_id: \"" + callId + "\""))
+            check "submit_review prompt reuses review criteria" (promptText.Contains "# Evaluation Criteria")
+            check "submit_review prompt uses agent_report protocol" (promptText.Contains "agent_report")
+            check "submit_review prompt drops legacy divider" (not (promptText.Contains "==="))
+            let resolved = muxResolveFirstMatchingCallForTest reg (sessionID + "-review-") (createObj [ "verdict", box "PASS"; "feedback", box "" ])
+            check "submit_review prompt test resolves pending review call" resolved
+            let! result = submitPromise
+            check "submit_review accepts resolved PASS verdict" (result.Contains "verdict: accepted")
+    do! rmAsync workspaceDir
+}
+
+let muxLoopReviewPromptUsesFrontMatterSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-loop-review-prompt-"
+    let prompts = ResizeArray<string>()
+    let deps = minimalMuxDeps ()
+    deps?("taskService") <-
+        createObj [ "create",
+                    box (System.Func<obj, JS.Promise<obj>>(fun input ->
+                        promise {
+                            let promptText = str input "prompt"
+                            if promptText <> "" then prompts.Add(promptText)
+                            return box {| success = true; data = box {| taskId = "loop-reviewer-task-1"; kind = "agent" |} |}
+                        }))
+                    "waitForAgentReport",
+                    box (System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
+                        Promise.lift (box {| reportMarkdown = "PASS" |}))) ]
+    let reg = createRegistration deps
+    let commands = unbox<obj[]> (get reg "slashCommands")
+    let loopReview = commands |> Array.find (fun command -> str command "key" = "loop-review")
+    let loopPromise = (get loopReview "execute") $ ("mux-loop-review-prompt", "Clarify rollout plan") |> unbox<JS.Promise<string>>
+    do! Promise.sleep 0
+    let promptText = if prompts.Count > 0 then prompts.[0] else ""
+    check "loop-review prompt uses front-matter" (promptText.StartsWith "---")
+    check "loop-review prompt includes call_id field" (promptText.Contains "call_id: \"")
+    check "loop-review prompt carries task block" (promptText.Contains "task: |")
+    check "loop-review prompt reuses review criteria" (promptText.Contains "# Evaluation Criteria")
+    check "loop-review prompt uses agent_report protocol" (promptText.Contains "agent_report")
+    check "loop-review prompt drops legacy divider" (not (promptText.Contains "==="))
+    let resolved = muxResolveFirstMatchingCallForTest reg "mux-loop-review-prompt-loop-review-" (createObj [ "verdict", box "PASS"; "feedback", box "" ])
+    check "loop-review prompt test resolves pending pre-review call" resolved
+    let! result = loopPromise
+    check "loop-review activates review after pass" (result.Contains "With-Review Mode is active")
     do! rmAsync workspaceDir
 }
 

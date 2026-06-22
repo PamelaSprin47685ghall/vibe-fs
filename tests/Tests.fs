@@ -41,6 +41,8 @@ let private tests : (string * TestBody) list = [
     "ReviewTests.doubleCheckAnchorReplay", Sync (sync ReviewTests.doubleCheckAnchorReplay)
     "ReviewTests.doubleCheckPromptFormat", Sync (sync ReviewTests.doubleCheckPromptFormat)
     "ReviewTests.reviewerPromptFormat", Sync (sync ReviewTests.reviewerPromptFormat)
+    "ReviewTests.muxReviewerVerdictPromptFormat", Sync (sync ReviewTests.muxReviewerVerdictPromptFormat)
+    "ReviewTests.muxPreReviewVerdictPromptFormat", Sync (sync ReviewTests.muxPreReviewVerdictPromptFormat)
     "ReviewTests.reviewInstructionsFrontMatter", Sync (sync ReviewTests.reviewInstructionsFrontMatter)
     "AgentTests.canUse'", Sync (sync AgentTests.canUse')
     "AgentTests.canUseMatrix", Sync (sync AgentTests.canUseMatrix)

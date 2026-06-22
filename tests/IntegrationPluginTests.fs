@@ -108,16 +108,15 @@ let mimoConfigSpec () = promise {
     let taskParams =
         createObj [
             "type", box "object"
-            "properties", box (createObj [ "operation", box (createObj [ "type", box "object" ]) ])
-            "required", box [| box "operation" |]
+            "properties", box (createObj [ "todos", box (createObj [ "type", box "array" ]) ])
+            "required", box [| box "todos" |]
             "additionalProperties", box false
         ]
     let todoDef = createObj [ "description", box "old desc"; "parameters", box taskParams ]
     do! (get p "tool.definition") $ (createObj [ "toolID", box "task" ], todoDef) |> unbox<JS.Promise<unit>>
-    check "mimo tool.definition rewrites task description" (str todoDef "description" |> fun text -> text.Contains("append-only work backlog") && text.Contains("operation"))
+    check "mimo tool.definition rewrites task description" (str todoDef "description" |> fun text -> text.Contains("append-only work backlog") && text.Contains("full todos list"))
     check "mimo tool.definition merges completedWorkReport into parameters" (not (isNullish (get (get (get todoDef "parameters") "properties") "completedWorkReport")))
-    check "mimo tool.definition removes host task_id from schema" (isNullish (get (get (get todoDef "parameters") "properties") "task_id"))
-    check "mimo tool.definition leaves task operation schema" (not (isNullish (get (get (get todoDef "parameters") "properties") "operation")))
+    check "mimo tool.definition keeps todos schema" (not (isNullish (get (get (get todoDef "parameters") "properties") "todos")))
 
     let sessionID = "mimo-session-1"
     let makeTaskMessage id report =
@@ -137,7 +136,7 @@ let mimoConfigSpec () = promise {
                     "state", box (createObj [
                         "status", box "completed"
                         "input", box (createObj [
-                            "operation", box (createObj [ "action", box "done"; "id", box "T1"; "event_summary", box report ])
+                            "todos", box [| createObj [ "content", box report; "status", box "completed"; "priority", box "high" ] |]
                             "completedWorkReport", box report
                         ])
                         "output", box report
@@ -192,7 +191,7 @@ let mimoConfigSpec () = promise {
     check "mimo session.compacting uses task naming" (
         compactingContextAfter.Length = 1
         && (string compactingContextAfter.[0]).Contains("task")
-        && not ((string compactingContextAfter.[0]).Contains("todowrite"))
+        && (string compactingContextAfter.[0]).Contains("Magic Todo backlog")
     )
     do! rmAsync workspaceDir
 }

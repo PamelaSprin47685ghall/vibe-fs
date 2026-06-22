@@ -2,6 +2,7 @@ module VibeFs.Tests.IntegrationToolDefSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
+open System
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
@@ -11,6 +12,11 @@ open VibeFs.Opencode.Plugin
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.WikiFiles
+
+let private mimoTodoSyncHook (calls: ResizeArray<string * obj array>) : obj =
+    box (System.Func<string, obj array, JS.Promise<obj>>(fun sessionID todos ->
+        calls.Add(sessionID, todos)
+        Promise.lift null))
 
 
 let toolDefinitionSpec () = promise {
@@ -50,27 +56,26 @@ let toolDefinitionSpec () = promise {
     let taskParams =
         createObj [
             "type", box "object"
-            "properties", box (createObj [ "operation", box (createObj [ "type", box "object" ]) ])
-            "required", box [| box "operation" |]
+            "properties", box (createObj [ "todos", box (createObj [ "type", box "array" ]) ])
+            "required", box [| box "todos" |]
         ]
     let taskDef = createObj [ "description", box "native"; "parameters", box taskParams ]
     do! mimoTd $ (createObj [ "toolID", box "task" ], taskDef) |> unbox<JS.Promise<unit>>
     check "mimo task.definition keeps parameters not jsonSchema" (isNullish (get taskDef "jsonSchema"))
     check "mimo task.definition fuses report into parameters" (not (isNullish (get (get (get taskDef "parameters") "properties") "completedWorkReport")))
-    check "mimo task.definition removes host task_id from schema" (isNullish (get (get (get taskDef "parameters") "properties") "task_id"))
-    check "mimo task.definition preserves operation" (not (isNullish (get (get (get taskDef "parameters") "properties") "operation")))
+    check "mimo task.definition preserves todos" (not (isNullish (get (get (get taskDef "parameters") "properties") "todos")))
 
     let taskJsonSchema = createObj [
         "type", box "object"
-        "properties", box (createObj [ "operation", box (createObj [ "type", box "object" ]); "task_id", box (createObj [ "type", box "string" ]) ])
-        "required", box [| box "operation"; box "task_id" |]
+        "properties", box (createObj [ "todos", box (createObj [ "type", box "array" ]); "task_id", box (createObj [ "type", box "string" ]) ])
+        "required", box [| box "todos"; box "task_id" |]
     ]
     let taskJsonDef = createObj [ "description", box "native"; "jsonSchema", box taskJsonSchema ]
     do! mimoTd $ (createObj [ "toolID", box "task" ], taskJsonDef) |> unbox<JS.Promise<unit>>
     check "mimo task.definition rewrites jsonSchema when that is the exposed path" (not (isNullish (get (get (get taskJsonDef "jsonSchema") "properties") "completedWorkReport")))
     check "mimo task.definition strips task_id from jsonSchema" (isNullish (get (get (get taskJsonDef "jsonSchema") "properties") "task_id"))
     let jsonRequired = unbox<obj[]> (get (get taskJsonDef "jsonSchema") "required") |> Array.map string
-    check "mimo task.definition keeps operation required in jsonSchema" (jsonRequired |> Array.contains "operation")
+    check "mimo task.definition keeps todos required in jsonSchema" (jsonRequired |> Array.contains "todos")
     check "mimo task.definition drops task_id required in jsonSchema" (not (jsonRequired |> Array.contains "task_id"))
     do! rmAsync workspaceDir
 }
@@ -114,39 +119,26 @@ let mimoApplyPatchExecuteBeforeSpec () = promise {
 let mimoTaskExecuteRoundTripSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-before-after-"
     let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
-    let teb = get p "tool.execute.before"
-
-    let operation = createObj [ "action", box "done"; "id", box "T1"; "event_summary", box "Finished parser fix" ]
-    let originalArgs = createObj [ "operation", operation; "completedWorkReport", box "Detailed backlog report" ]
-    let beforeOut = createObj [ "args", box originalArgs ]
-    let hookInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "c1" ]
-
-    do! teb $ (hookInput, beforeOut) |> unbox<JS.Promise<unit>>
-    let sanitizedArgs = get beforeOut "args"
-    check "mimo task execute.before keeps operation" (not (isNullish (get sanitizedArgs "operation")))
-    check "mimo task execute.before strips report before host call" (isNullish (get sanitizedArgs "completedWorkReport"))
-    check "mimo task execute.before captures report for backlog replay" (VibeFs.Opencode.MagicTodo.takeCompletedWorkReport "c1" = "Detailed backlog report")
+    let taskTool = get (get p "tool") "task"
+    let args = createObj [
+        "completedWorkReport", box "Detailed backlog report"
+        "todos", box [| createObj [ "content", box "Ship parser fix"; "status", box "completed"; "priority", box "high" ] |]
+    ]
+    let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ]) |> unbox<JS.Promise<string>>
+    check "mimo task execute returns todo update text" (result.Contains "Todos updated.")
     do! rmAsync workspaceDir
 }
 
 let mimoTaskExecuteNestedReportSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-nested-report-"
     let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
-    let teb = get p "tool.execute.before"
-
-    let operation = createObj [ "action", box "create"; "summary", box "Build feature"; "completedWorkReport", box "Misplaced backlog report" ]
-    let originalArgs = createObj [ "operation", operation ]
-    let beforeOut = createObj [ "args", box originalArgs ]
-    let hookInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "cn1" ]
-
-    do! teb $ (hookInput, beforeOut) |> unbox<JS.Promise<unit>>
-    let sanitizedArgs = get beforeOut "args"
-    let sanitizedOperation = get sanitizedArgs "operation"
-    check "mimo task execute.before keeps operation when report nested inside" (not (isNullish sanitizedOperation))
-    check "mimo task execute.before keeps real operation fields" (str sanitizedOperation "summary" = "Build feature")
-    check "mimo task execute.before strips report nested inside operation" (isNullish (get sanitizedOperation "completedWorkReport"))
-    check "mimo task execute.before leaves no top-level report" (isNullish (get sanitizedArgs "completedWorkReport"))
-    check "mimo task execute.before captures nested report for backlog replay" (VibeFs.Opencode.MagicTodo.takeCompletedWorkReport "cn1" = "Misplaced backlog report")
+    let taskTool = get (get p "tool") "task"
+    let args = createObj [
+        "completedWorkReport", box "Nested report is no longer supported"
+        "todos", box [| createObj [ "content", box "Build feature"; "status", box "in_progress"; "priority", box "high" ] |]
+    ]
+    let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ]) |> unbox<JS.Promise<string>>
+    check "mimo task execute still succeeds with explicit top-level report" (result.Contains "Todos updated.")
     do! rmAsync workspaceDir
 }
 
@@ -154,44 +146,50 @@ let mimoTaskExecuteInPlaceStripSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-inplace-"
     let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let teb = get p "tool.execute.before"
-
-    let operation = createObj [ "action", box "create"; "summary", box "test task tool" ]
-    let originalArgs = createObj [ "operation", operation; "completedWorkReport", box "top-level report text"; "task_id", box "T99" ]
+    let originalArgs = createObj [ "completedWorkReport", box "top-level report text"; "todos", box [||] ]
     let beforeOut = createObj [ "args", box originalArgs ]
-    let hookInput = createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ci1" ]
-
-    do! teb $ (hookInput, beforeOut) |> unbox<JS.Promise<unit>>
-    let sanitized = get beforeOut "args"
-    check "mimo task strip rebuilds args without completedWorkReport" (isNullish (get sanitized "completedWorkReport"))
-    check "mimo task strip rebuilds args without task_id" (isNullish (get sanitized "task_id"))
-    check "mimo task strip keeps operation on rebuilt args" (not (isNullish (get sanitized "operation")))
-    check "mimo task strip leaves original args reference untouched" (str originalArgs "completedWorkReport" = "top-level report text")
-
-    let nestedOperation = createObj [ "action", box "create"; "summary", box "nested case"; "completedWorkReport", box "nested report text" ]
-    let nestedArgs = createObj [ "operation", nestedOperation ]
-    let nestedBeforeOut = createObj [ "args", box nestedArgs ]
-    do! teb $ (createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ci2" ], nestedBeforeOut) |> unbox<JS.Promise<unit>>
-    let sanitizedNested = get nestedBeforeOut "args"
-    let sanitizedNestedOperation = get sanitizedNested "operation"
-    check "mimo task strip rebuilds operation without nested report" (isNullish (get sanitizedNestedOperation "completedWorkReport"))
-    check "mimo task strip keeps real fields on rebuilt operation" (str sanitizedNestedOperation "summary" = "nested case")
-    check "mimo task strip leaves original operation reference untouched" (str nestedOperation "completedWorkReport" = "nested report text")
+    do! teb $ (createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ci1" ], beforeOut) |> unbox<JS.Promise<unit>>
+    check "mimo task execute.before leaves todo args untouched" (obj.ReferenceEquals(get beforeOut "args", originalArgs))
     do! rmAsync workspaceDir
 }
 
 let mimoTaskExecuteStripsTaskIdSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-strip-task-id-"
     let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
-    let teb = get p "tool.execute.before"
+    let taskTool = get (get p "tool") "task"
+    let args = createObj [
+        "completedWorkReport", box "noop report"
+        "todos", box [| createObj [ "content", box "List current work"; "status", box "pending"; "priority", box "low" ] |]
+        "task_id", box "T4"
+    ]
+    let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ]) |> unbox<JS.Promise<string>>
+    check "mimo task execute ignores stray task_id" (result.Contains "Todos updated.")
+    do! rmAsync workspaceDir
+}
 
-    let operation = createObj [ "action", box "list" ]
-    let originalArgs = createObj [ "operation", operation; "task_id", box "T4"; "completedWorkReport", box "noop report" ]
-    let beforeOut = createObj [ "args", box originalArgs ]
-    do! teb $ (createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ctid" ], beforeOut) |> unbox<JS.Promise<unit>>
-    let sanitized = get beforeOut "args"
-    check "mimo task execute.before rebuilds args without task_id" (isNullish (get sanitized "task_id"))
-    check "mimo task execute.before keeps operation on rebuilt args" (not (isNullish (get sanitized "operation")))
-    check "mimo task execute.before leaves original args untouched" (str originalArgs "task_id" = "T4")
+let mimoTaskSyncsViaHostHookSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mimo-task-host-sync-"
+    let calls = ResizeArray<string * obj array>()
+    let! p = VibeFs.Opencode.PluginMimo.plugin (createObj [ "directory", box workspaceDir; "__mimoTodoSyncForTesting", mimoTodoSyncHook calls ])
+    let taskTool = get (get p "tool") "task"
+    let sessionID = "mimo-hook-session-1"
+    let args = createObj [
+        "completedWorkReport", box "Synced via host todo service bridge"
+        "todos", box [|
+            createObj [ "content", box "Ship host sync bridge"; "status", box "in_progress"; "priority", box "high" ]
+            createObj [ "content", box "Verify sidebar order"; "status", box "pending"; "priority", box "medium" ]
+        |]
+    ]
+    let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box sessionID ]) |> unbox<JS.Promise<string>>
+    check "mimo task execute sync hook returns success text" (result = "Todos updated.")
+    check "mimo task execute calls host sync hook once" (calls.Count = 1)
+    let syncedSessionID, syncedTodos = calls.[0]
+    check "mimo task execute passes session id to host sync hook" (syncedSessionID = sessionID)
+    check "mimo task execute passes two todos to host sync hook" (syncedTodos.Length = 2)
+    check "mimo task execute keeps first todo content for host sync hook" (str syncedTodos.[0] "content" = "Ship host sync bridge")
+    check "mimo task execute keeps first todo status for host sync hook" (str syncedTodos.[0] "status" = "in_progress")
+    check "mimo task execute keeps second todo content for host sync hook" (str syncedTodos.[1] "content" = "Verify sidebar order")
+    check "mimo task execute keeps second todo status for host sync hook" (str syncedTodos.[1] "status" = "pending")
     do! rmAsync workspaceDir
 }
 
@@ -203,35 +201,17 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () = promise {
     let extendCalls = ResizeArray<obj>()
     let describeCalls = ResizeArray<string>()
     let optionalCalls = ResizeArray<string>()
-    let summaryField = createObj [
-        "describe", box (System.Func<obj, obj>(fun desc ->
-            describeCalls.Add(string desc)
-            createObj [
-                "optional", box (System.Func<obj>(fun () ->
-                    optionalCalls.Add("optional")
-                    createObj [ "kind", box "optional-string"; "description", desc ]))
-            ]))
-    ]
+    let existingReportField = createObj [ "kind", box "existing-report" ]
     let zodLikeParams = createObj [
         "safeExtend", box (System.Func<obj, obj>(fun arg ->
             extendCalls.Add(arg)
             createObj [ "kind", box "extended" ]))
-        "shape", box (createObj [
-            "operation", box (createObj [
-                "options", box [| createObj [ "shape", box (createObj [ "summary", box summaryField ]) ] |]
-            ])
-        ])
+        "shape", box (createObj [ "completedWorkReport", box existingReportField ])
     ]
     let taskDef = createObj [ "description", box "native"; "parameters", box zodLikeParams ]
 
     do! td $ (createObj [ "toolID", box "task" ], taskDef) |> unbox<JS.Promise<unit>>
     check "mimo task.definition rewrites zod-like parameters" (string (get (get taskDef "parameters") "kind") = "extended")
-    check "mimo task.definition adds report field through safeExtend" (
-        string (get (get extendCalls.[0] "completedWorkReport") "kind") = "optional-string"
-        && string (get (get extendCalls.[0] "completedWorkReport") "description") = VibeFs.Kernel.MagicTodo.mimoReportFieldDesc)
-    check "mimo task.definition derives report field from host zod schema" (
-        describeCalls.Count = 1
-        && describeCalls.[0] = VibeFs.Kernel.MagicTodo.mimoReportFieldDesc
-        && optionalCalls.Count = 1)
+    check "mimo task.definition reuses existing report field on zod schema" (obj.ReferenceEquals(get extendCalls.[0] "completedWorkReport", existingReportField))
     do! rmAsync workspaceDir
 }

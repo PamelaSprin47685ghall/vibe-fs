@@ -211,15 +211,9 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                   promise {
                       try
                           let originalTask = defaultArg (reviewStore.getReviewTask workspaceId) ""
-                          let taskSection = if originalTask = "" then "" else "\n=== Original Task ===\n\n" + originalTask
                           let callId = workspaceId + "-review-" + string (Domain.nowMs ())
                           let verdictPromise = registerCallWithTimeout callStore callId 300000
-                          let reviewPrompt =
-                              ReviewerVerdictPrompts.reviewerVerdictInstructions
-                              + "\n\n=== Review Call ID ===\n\n" + callId
-                              + "\n\n=== Change Report ===\n\n" + report
-                              + "\n\n=== Affected Files ===\n\n" + String.concat "\n" affectedFiles
-                              + "\n" + taskSection
+                          let reviewPrompt = reviewSubmissionVerdictPrompt originalTask report affectedFiles callId
                           let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box (disabledToolsForReviewer toolNames) ]) ]
                           let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
                           try

@@ -30,6 +30,7 @@
     <Compile Include="src/Opencode/WikiRuntime.fs" />
     <Compile Include="src/Opencode/WikiTools.fs" />
     <Compile Include="src/Opencode/AgentConfig.fs" />
+    <Compile Include="src/Opencode/MimoTodoTool.fs" />
     <Compile Include="src/Opencode/CommandHooks.fs" />
     <Compile Include="src/Opencode/ChatHooks.fs" />
     <Compile Include="src/Opencode/ToolDefinitionHooks.fs" />

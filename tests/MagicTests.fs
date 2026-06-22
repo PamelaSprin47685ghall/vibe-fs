@@ -113,12 +113,6 @@ let replayBacklogForMimocodeIgnoresActor () =
     let backlog = replayBacklogFor Mimocode msgs
     check "mimocode replay: actor does not enter backlog" (backlog.IsEmpty)
 
-let mimocodeTaskReportCaptureRoundTrip () =
-    captureCompletedWorkReport "call-1" "  backlog text  "
-    let taken = takeCompletedWorkReport "call-1"
-    check "capture report: round trip" (taken = "backlog text")
-    check "capture report: consumed" (takeCompletedWorkReport "call-1" = "")
-
 let magicSessionCaptureRoundTrip () =
     let session = MagicSession(Mimocode)
     session.CaptureReport("session-call-1", "  scoped text  ")
@@ -136,26 +130,20 @@ let magicSessionRestoresMimocodeReportDuringBacklogRebuild () =
     let msgs = [ taskCreateMsg "m1" "restore-c1" ]
     session.CaptureReport("restore-c1", "captured before execute")
     let backlog = session.GetOrRebuildBacklog("test", msgs)
-    check "session rebuild: restored report enters backlog" (backlog.Length = 1 && backlog.[0].report = "captured before execute")
-    check "session rebuild: report consumed during replay" (session.TakeReport "restore-c1" = "")
+    check "session rebuild: no captured report injection without host rewrite" (backlog.IsEmpty)
+    check "session rebuild: report remains untouched" (session.TakeReport "restore-c1" = "captured before execute")
 
 let replayBacklogForMimocodeMergesConsecutiveWorkReports () =
     let msgs = [ taskMsgWithReport "m1" "c1" "Work A"; taskMsgWithReport "m2" "c2" "Work B"; taskMsgWithReport "m3" "c3" "Work C" ]
     let backlog = replayBacklogFor Mimocode msgs
-    check "mimocode work reports: one merged entry" (backlog.Length = 1)
-    check "mimocode work reports: all present" (
-        backlog.[0].report.Contains("Work A")
-        && backlog.[0].report.Contains("Work B")
-        && backlog.[0].report.Contains("Work C"))
+    check "mimocode work reports: one entry per task now" (backlog.Length = 3)
+    check "mimocode work reports: preserve order" (backlog.[0].report = "Work A" && backlog.[1].report = "Work B" && backlog.[2].report = "Work C")
 
 let replayBacklogForMimocodeMergesConsecutiveTaskBurst () =
     let msgs = [ toolMsg "task" "m1" "c1" "R1"; toolMsg "task" "m2" "c2" "R2"; toolMsg "task" "m3" "c3" "R3" ]
     let backlog = replayBacklogFor Mimocode msgs
-    check "mimocode burst: one backlog entry" (backlog.Length = 1)
-    check "mimocode burst: merges reports" (
-        backlog.[0].report.Contains("R1")
-        && backlog.[0].report.Contains("R2")
-        && backlog.[0].report.Contains("R3"))
+    check "mimocode task behaves like opencode per call" (backlog.Length = 3)
+    check "mimocode task preserves reports" (backlog.[0].report = "R1" && backlog.[1].report = "R2" && backlog.[2].report = "R3")
 
 let replayBacklogForMimocodeSplitsBurstsOnGap () =
     let msgs = [ toolMsg "task" "m1" "c1" "A"; userMsg "u1" "gap"; toolMsg "task" "m2" "c2" "B" ]
@@ -166,16 +154,14 @@ let replayBacklogForMimocodeSplitsBurstsOnGap () =
 let replayBacklogForMimocodeIgnoresAssistantTextBetweenTasks () =
     let msgs = [ taskMsgWithReport "m1" "c1" "Work A"; assistantTextMsg "a1" "let me continue"; taskMsgWithReport "m2" "c2" "Work B" ]
     let backlog = replayBacklogFor Mimocode msgs
-    check "mimocode assistant text: stays one burst" (backlog.Length = 1)
-    check "mimocode assistant text: merges reports" (
-        backlog.[0].report.Contains("Work A") && backlog.[0].report.Contains("Work B"))
+    check "mimocode assistant text: does not merge calls" (backlog.Length = 2)
+    check "mimocode assistant text: preserves reports" (backlog.[0].report = "Work A" && backlog.[1].report = "Work B")
 
 let replayBacklogForMimocodeIgnoresReasoningBetweenTasks () =
     let msgs = [ taskMsgWithReport "m1" "c1" "Work A"; reasoningMsg "r1" "thinking through next step"; taskMsgWithReport "m2" "c2" "Work B" ]
     let backlog = replayBacklogFor Mimocode msgs
-    check "mimocode reasoning: stays one burst" (backlog.Length = 1)
-    check "mimocode reasoning: merges reports" (
-        backlog.[0].report.Contains("Work A") && backlog.[0].report.Contains("Work B"))
+    check "mimocode reasoning: does not merge calls" (backlog.Length = 2)
+    check "mimocode reasoning: preserves reports" (backlog.[0].report = "Work A" && backlog.[1].report = "Work B")
 
 let replayBacklogForMimocodeSplitsOnOtherToolCall () =
     let msgs = [ taskMsgWithReport "m1" "c1" "Work A"; toolMsg "read" "r1" "rc1" "reading"; taskMsgWithReport "m2" "c2" "Work B" ]
@@ -212,8 +198,8 @@ let findFoldRangeOpencodePerCallMimicodePerBurst () =
             taskMsgWithReport "m2" "c2" "B"
             taskMsgWithReport "m3" "c3" "C"
         ]
-    check "mimocode: three consecutive task calls are one burst (no 3-anchor fold)" (
-        findFoldRangeFor Mimocode flatMimo false |> Option.isNone)
+    check "mimocode: three task calls now enable fold like opencode" (
+        findFoldRangeFor Mimocode flatMimo false |> Option.isSome)
 
 let findFoldRangeForMimocodeIgnoresReadOnlyTaskCalls () =
     let flat =
@@ -223,8 +209,8 @@ let findFoldRangeForMimocodeIgnoresReadOnlyTaskCalls () =
             taskMsgWithActionAndReport "get" "m2" "c2" "Read 2"
             taskMsgWithActionAndReport "list" "m3" "c3" "Read 3"
         ]
-    check "mimocode: read-only task calls do not become fold anchors" (
-        findFoldRangeFor Mimocode flat false |> Option.isNone)
+    check "mimocode: read-only concept removed; task calls are anchors" (
+        findFoldRangeFor Mimocode flat false |> Option.isSome)
 
 let findFoldRangeForMimocodeRequiresThreeProgressBursts () =
     let flat =
@@ -237,8 +223,8 @@ let findFoldRangeForMimocodeRequiresThreeProgressBursts () =
             userMsg "u2" "gap"
             taskMsgWithActionAndReport "block" "m5" "c5" "Work 3"
         ]
-    check "mimocode: two progress bursts still do not satisfy 3-anchor fold" (
-        findFoldRangeFor Mimocode flat false |> Option.isNone)
+    check "mimocode: three task calls satisfy 3-anchor fold" (
+        findFoldRangeFor Mimocode flat false |> Option.isSome)
 
 let findFoldRangeForMimocodeUsesLastProgressCallInBurst () =
     let flat =
@@ -253,11 +239,11 @@ let findFoldRangeForMimocodeUsesLastProgressCallInBurst () =
             taskMsgWithActionAndReport "block" "m5" "c5" "Work 3"
             taskMsgWithActionAndReport "list" "m6" "c6" "Read 3"
         ]
-    check "mimocode: burst anchor uses last progress call, not trailing read-only call" (
+    check "mimocode: first and second-to-last anchors follow raw call order" (
         findFoldRangeFor Mimocode flat false
         |> Option.exists (fun range ->
             partCallID flat.[range.firstResult].part = "c1"
-            && partCallID flat.[range.secondToLast].part = "c3"))
+            && partCallID flat.[range.secondToLast].part = "c5"))
 
 let findFoldRangeForMimocodeAssistantTextKeepsBurst () =
     let flat =
@@ -276,8 +262,8 @@ let findFoldRangeForMimocodeAssistantTextKeepsBurst () =
     match findFoldRangeFor Mimocode flat false with
     | None -> check "mimocode assistant text in burst: fold found" false
     | Some range ->
-        check "mimocode assistant text in burst: first segment ends after text" (
-            partCallID flat.[range.firstResult].part = "c2")
+        check "mimocode assistant text in burst: first anchor stays first task call" (
+            partCallID flat.[range.firstResult].part = "c1")
 
 let projectMagicFolds () =
     let msgs =
@@ -312,8 +298,8 @@ let projectMagicForMimocodeUsesTask () =
     let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
     check "mimocode project: has prefix" (allJson.Contains(magicTodoPrefixPrefix))
     check "mimocode project: has Report 1" (allJson.Contains("Report 1"))
-    check "mimocode project: latest burst present" (allJson.Contains("Report 3a") && allJson.Contains("Report 3b"))
-    check "mimocode project: does not rely on todowrite" (not (allJson.Contains("todowrite")))
+    check "mimocode project: latest task reports present" (allJson.Contains("Report 3a") && allJson.Contains("Report 3b"))
+    check "mimocode project: task is the exposed todo alias" (allJson.Contains("task"))
 
 let projectMagicHidesErrors () =
     let msgs =
@@ -406,7 +392,7 @@ let magicSessionRefreshesBacklogForMimocode () =
     let second = [ toolMsg "task" "m1" "c1" "R1"; toolMsg "task" "m2" "c2" "R2" ]
     let _ = session.GetOrRebuildBacklog("test", first)
     let backlog = session.GetOrRebuildBacklog("test", second)
-    check "mimocode session: consecutive tasks count as one backlog entry" (backlog.Length = 1)
+    check "mimocode session: rebuilds stale backlog per call" (backlog.Length = 2)
 
 let magicSessionRefreshesBacklog () =
     let session = MagicSession(Opencode)
@@ -429,7 +415,6 @@ let run () =
     replaySkipsEmpty ()
     replayBacklogForMimocodeUsesTask ()
     replayBacklogForMimocodeIgnoresActor ()
-    mimocodeTaskReportCaptureRoundTrip ()
     magicSessionCaptureRoundTrip ()
     magicSessionShareReportTableAcrossInstances ()
     magicSessionRestoresMimocodeReportDuringBacklogRebuild ()

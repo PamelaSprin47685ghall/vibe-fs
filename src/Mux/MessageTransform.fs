@@ -66,7 +66,9 @@ let private extractTexts (messages: obj array) : string seq =
                 elif Dyn.str part "type" = "dynamic-tool" then
                     let output = Dyn.get part "output"
                     if not (Dyn.isNullish output) then
-                        let text = Dyn.str output "content"
+                        let text =
+                            if Dyn.typeIs output "string" then string output
+                            else Dyn.str output "content"
                         if text <> "" then Some text else None
                     else None
                 else None))

@@ -23,6 +23,7 @@ open VibeFs.Shell.MagicSessionStore
 open VibeFs.Shell.WikiFiles
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.TempWorkspace
+open VibeFs.Kernel.Prompts
 
 let wrapperSpec (reg: obj) =
     let wrappers = unbox<obj[]> (get reg "wrappers")
@@ -412,6 +413,24 @@ let muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec () = promise {
         check "mux messagesTransform dedups repeated read for top-level exec" (str secondOutput "content" = "[No Change Since Previous Read/Write]")
 }
 
+let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () = promise {
+    let reg = createRegistration (minimalMuxDeps ())
+    let tf = muxMessageTransform reg
+    let sessionID = "mux-review-accepted-history"
+    muxActivateReviewForTest reg sessionID "Ship feature"
+    if isNullish tf then
+        check "mux messagesTransform exposed for accepted review replay" false
+    else
+        let accepted = formatReviewResult VibeFs.Kernel.ReviewSession.ReviewResult.Accepted
+        let messages =
+            [| muxTextMessage "loop-task" "assistant" "---\ntask: Ship feature\n---\nWith-Review Mode is active."
+               muxDynamicToolMessage "submit-review" "submit_review" "call-review" (createObj []) (box accepted) |]
+        let out = createObj [ "messages", box messages ]
+        let input = createObj [ "agent", box "manager"; "sessionID", box sessionID ]
+        do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+        check "mux accepted submit_review history clears active review" (not (muxIsReviewActiveForTest reg sessionID))
+}
+
 let muxTodoWriteWrapperSchemaSpec () = promise {
     let reg = createRegistration (createObj [])
     let wrappers = unbox<obj[]> (get reg "wrappers")
@@ -669,6 +688,7 @@ let run () : JS.Promise<unit> =
             "mimoTaskExecuteNestedReport", mimoTaskExecuteNestedReportSpec
             "mimoTaskExecuteInPlaceStrip", mimoTaskExecuteInPlaceStripSpec
             "mimoTaskExecuteStripsTaskId", mimoTaskExecuteStripsTaskIdSpec
+            "mimoTaskSyncsViaHostHook", mimoTaskSyncsViaHostHookSpec
             "mimoTaskDefinitionHandlesZodLikeParameters", mimoTaskDefinitionHandlesZodLikeParametersSpec
             "coderTool", coderToolSpec
             "investigatorTool", investigatorToolSpec
@@ -702,6 +722,7 @@ let run () : JS.Promise<unit> =
             "muxMessagesTransformDedupsRepeatedRead", muxMessagesTransformDedupsRepeatedReadSpec
             "muxMessagesTransformDedupsRepeatedFileRead", muxMessagesTransformDedupsRepeatedFileReadSpec
             "muxMessagesTransformDedupsRepeatedReadForTopLevelExec", muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec
+            "muxMessagesTransformAcceptedSubmitReviewEndsLoop", muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec
             "muxTodoWriteWrapperSchema", muxTodoWriteWrapperSchemaSpec
             "muxTodoWriteCapturesCompletedWorkReport", muxTodoWriteCapturesCompletedWorkReportSpec
             "muxMagicTodoProjection", muxMagicTodoProjectionSpec
@@ -709,6 +730,7 @@ let run () : JS.Promise<unit> =
             "muxMeditatorReadsFilesFromCwd", muxMeditatorReadsFilesFromCwdSpec
             "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
             "muxSubmitReviewPromptSuppliesCallId", muxSubmitReviewPromptSuppliesCallIdSpec
+            "muxLoopReviewPromptUsesFrontMatter", muxLoopReviewPromptUsesFrontMatterSpec
             "muxReturnReviewerRegistered", muxReturnReviewerRegisteredSpec
             "muxReturnReviewerRejectsResolve", muxReturnReviewerRejectsResolveSpec
             "muxReturnReviewerRejectCleansReviewState", muxReturnReviewerRejectCleansReviewStateSpec

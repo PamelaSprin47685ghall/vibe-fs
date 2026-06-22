@@ -10,10 +10,11 @@ open VibeFs.Opencode.SubagentTools
 open VibeFs.Opencode.ExecutorTool
 open VibeFs.Opencode.SearchTools
 open VibeFs.Opencode.ReviewTools
+open VibeFs.Opencode.MimoTodoTool
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.FuzzyFinderShell
 
-let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (wikiEnabled: bool) : obj =
+let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (wikiEnabled: bool) : obj =
     createObj [
         yield "coder", box (coderTool registry ctx)
         yield "investigator", box (investigatorTool registry ctx)
@@ -29,4 +30,6 @@ let createTools (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: 
             yield "return_bookkeeper", box (submitWikiTool wikiRuntime)
         yield "submit_review", box (submitReviewTool registry ctx reviewStore)
         yield "return_reviewer", box (submitReviewResultTool ctx reviewStore)
+        if host = Mimocode then
+            yield todoWriteToolName host, box (mimoTodoTool ctx)
     ]

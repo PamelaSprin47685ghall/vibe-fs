@@ -54,17 +54,11 @@ let loopNudgePrompt =
 
 let managerSystemPromptFor (host: Host) =
     let todoLine =
-        match host with
-        | Opencode ->
-            "For multi-step work, keep "
-            + todoWriteToolName host
-            + " current. Every "
-            + todoWriteToolName host
-            + " call must provide the full todos list plus a detailed completedWorkReport that can survive context folding."
-        | Mimocode ->
-            "For multi-step work, drive the session task registry via the "
-            + todoWriteToolName host
-            + " tool (`operation` with create/list/start/done/…). On calls where you make or plan meaningful progress, also include a detailed completedWorkReport so Magic Todo can survive context folding."
+        "For multi-step work, keep "
+        + todoWriteToolName host
+        + " current. Every "
+        + todoWriteToolName host
+        + " call must provide the full todos list plus a detailed completedWorkReport that can survive context folding."
 
     "You are the manager agent. Coordinate the overall task, decide when to delegate to subagents, and synthesize their outputs into a final answer that satisfies the user's original goal.\n\n"
     + todoLine
@@ -95,13 +89,33 @@ let private reviewInstructionsProse =
 let reviewInstructions =
     frontMatterPrompt [ yamlScalarField "role" "reviewer" ] reviewInstructionsProse
 
+let private reviewerVerdictPrologue (subject: string) =
+    $"You are a reviewer evaluating {subject}.\n\n"
+    + "Call the agent_report tool to submit your verdict. Use exactly these fields:\n"
+    + "- verdict: \"PASS\" if the changes are acceptable, \"REJECT\" otherwise\n"
+    + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n"
+    + "- callId: the callId supplied in this prompt\n\n"
+    + "Do not output free-form text as your final answer; the tool call is required."
+
+let private agentReportVerdictInstructions (passMeaning: string) =
+    "Call the agent_report tool to submit your verdict. Use exactly these fields:\n"
+    + "- verdict: \"PASS\" if "
+    + passMeaning
+    + ", \"REJECT\" otherwise\n"
+    + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n"
+    + "- callId: the callId supplied in this prompt\n\n"
+    + "IMPORTANT: If you accept, verdict MUST be \"PASS\" and feedback MUST be an empty string. "
+    + "Do not output free-form text as your final answer; the tool call is required."
+
 let doubleCheckPrompt (task: string) : string =
     let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
 
     frontMatterPrompt
-        ([ yamlScalarField doubleCheckField "Does it fully satisfy the original task without cutting corners?" ]
+        ([ yamlScalarField
+               doubleCheckField
+               "Please reevaluate: does it really fully satisfy the original task without cutting corners?" ]
          @ taskLine)
-        "如果你确信，请你再次提交 PASS，否则请你提交 REJECT + 报告。"
+        "If you insist on PASS, otherwise please REJECT with detailed feedback."
 
 let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) : string =
     let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
@@ -119,6 +133,59 @@ let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) 
             reviewInstructionsProse + "\n\n# Worker Report\n\n" + report
 
     frontMatterPrompt (taskLine @ filesLine) body
+
+let private reviewerPromptFrontMatter (callId: string) (fields: string list) : string list =
+    [ yamlScalarField "role" "reviewer"; yamlScalarField "call_id" callId ] @ fields
+
+let private reviewSubmissionVerdictBody =
+    readOnlyWorkspaceConstraint
+    + "\n\n"
+    + "You are a code reviewer performing a rigorous review of submitted work.\n\n"
+    + reviewCriteria
+    + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. "
+    + "The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n"
+    + "# Submitting Your Verdict\n\n"
+    + agentReportVerdictInstructions "the reported changes satisfy the original task"
+
+let private preReviewVerdictBody =
+    readOnlyWorkspaceConstraint
+    + "\n\n"
+    + "You are a code reviewer evaluating whether the proposed task is clear and actionable enough to begin work.\n\n"
+    + reviewCriteria
+    + "\n\nBased on the task above, judge whether the requirement is specific, coherent, and implementable without guesswork. "
+    + "Reject when the task is ambiguous, underspecified, or self-contradictory.\n\n"
+    + "# Submitting Your Verdict\n\n"
+    + agentReportVerdictInstructions "the task is clear, specific, and actionable enough to begin work"
+
+let reviewerVerdictPrompt (subject: string) (callId: string) (fields: string list) : string =
+    frontMatterPrompt (reviewerPromptFrontMatter callId fields) (reviewerVerdictPrologue subject)
+
+let reviewSubmissionVerdictPrompt
+    (task: string)
+    (report: string)
+    (affectedFiles: string list)
+    (callId: string)
+    : string =
+    let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
+
+    let filesLine =
+        if affectedFiles.Length > 0 then
+            [ yamlStringSeqField "affected_files" affectedFiles ]
+        else
+            []
+
+    let reportLine =
+        if System.String.IsNullOrEmpty report then
+            []
+        else
+            [ yamlBlockField "report" report ]
+
+    frontMatterPrompt (reviewerPromptFrontMatter callId (taskLine @ filesLine @ reportLine)) reviewSubmissionVerdictBody
+
+let preReviewVerdictPrompt (task: string) (callId: string) : string =
+    let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
+
+    frontMatterPrompt (reviewerPromptFrontMatter callId taskLine) preReviewVerdictBody
 
 let withReviewCommandTemplate =
     frontMatterPrompt
@@ -323,16 +390,8 @@ let formatFetchResponse (data: FetchResponse) : string =
     frontMatter (title @ byline @ length @ content)
 
 module ReviewerVerdictPrompts =
-    let private verdictPrologue (subject: string) =
-        $"You are a reviewer evaluating {subject}.\n\n"
-        + "Call the agent_report tool to submit your verdict. Use exactly these fields:\n"
-        + "- verdict: \"PASS\" if the changes are acceptable, \"REJECT\" otherwise\n"
-        + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n"
-        + "- callId: the callId supplied in this prompt\n\n"
-        + "Do not output free-form text as your final answer; the tool call is required."
-
     let reviewerVerdictInstructions =
-        verdictPrologue "whether the reported changes satisfy the original task"
+        reviewerVerdictPrologue "whether the reported changes satisfy the original task"
 
     let loopReviewVerdictInstructions =
         "You are a reviewer evaluating whether a task description is clear and actionable enough to begin work.\n\n"

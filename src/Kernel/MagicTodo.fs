@@ -19,12 +19,8 @@ let private toolDescriptionTail =
     + "- Detailed context between older todo writes can be folded away, so completedWorkReport must preserve anything future turns need."
 
 let toolDescriptionFor (host: Host) =
-    match host with
-    | Opencode ->
-        toolDescriptionHeader + "\n- Always provide the full todos list. Partial updates are not supported.\n\n"
-        + toolDescriptionTail
-    | Mimocode ->
-        toolDescriptionHeader + "\n\n" + toolDescriptionTail
+    toolDescriptionHeader + "\n- Always provide the full todos list. Partial updates are not supported.\n\n"
+    + toolDescriptionTail
 
 let toolDescription = toolDescriptionFor opencode
 
@@ -48,24 +44,10 @@ let reportDesc =
     + "Verbosity is encouraged - this report is preserved in an append-only backlog that "
     + "survives context folding, so it must contain everything future turns need."
 
-let mimoReportFieldDesc =
-    reportDesc
-    + " CRITICAL: place `completedWorkReport` as a TOP-LEVEL argument, a sibling of `operation`. "
-    + "Never nest it inside the `operation` object."
+let mimoReportFieldDesc = reportDesc
 
 let private consEntry (revAcc: BacklogEntry list) (report: string) : BacklogEntry list =
     { sequence = revAcc.Length + 1; timestamp = ""; report = report } :: revAcc
-
-let private flushBurst (revAcc: BacklogEntry list) (revBurst: string list) : BacklogEntry list =
-    match revBurst with
-    | [] -> revAcc
-    | _ ->
-        let burst = List.rev revBurst
-        let merged =
-            match burst with
-            | [ single ] -> single
-            | _ -> burst |> List.mapi (fun i line -> string (i + 1) + ". " + line) |> String.concat "\n"
-        consEntry revAcc merged
 
 /// Replay the message stream into a backlog. `reportOf` extracts the completed-
 /// work report string for a given flat tool-result part (host-specific Dyn
@@ -74,30 +56,13 @@ let replayBacklogWith (host: Host) (reportOf: FlatPart -> string) (messages: Mes
     if messages.IsEmpty then []
     else
         let flat = flatten messages
-        match host with
-        | Opencode ->
-            let revAcc =
-                flat
-                |> List.fold
-                    (fun acc fp ->
-                        if isTodoResultFor host fp.part then
-                            let report = reportOf fp
-                            if report <> "" then consEntry acc report else acc
-                        else acc)
-                    []
-            List.rev revAcc
-        | Mimocode ->
-            let revAcc, revBurst =
-                flat
-                |> List.fold
-                    (fun (revAcc, revBurst) fp ->
-                        if isTodoResultFor host fp.part then
-                            let report = reportOf fp
-                            if report <> "" then (revAcc, report :: revBurst) else (revAcc, revBurst)
-                        elif breaksTodoBurstFor host fp then
-                            let revAcc' = flushBurst revAcc revBurst
-                            (revAcc', [])
-                        else
-                            (revAcc, revBurst))
-                    ([], [])
-            flushBurst revAcc revBurst |> List.rev
+        let revAcc =
+            flat
+            |> List.fold
+                (fun acc fp ->
+                    if isTodoResultFor host fp.part then
+                        let report = reportOf fp
+                        if report <> "" then consEntry acc report else acc
+                    else acc)
+                []
+        List.rev revAcc

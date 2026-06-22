@@ -158,11 +158,4 @@ let mergeMagicReportIntoTaskSchema (schema: obj) : obj =
                     createObj [ for key in Dyn.keys schema do if key = "properties" then yield key, nextProperties elif key = "required" then yield key, requiredWithoutTaskId (get schema "required") else yield key, get schema key ]
             else schema
 
-let fusedTaskToolDescription =
-    toolDescriptionFor Mimocode
-    + "\n\n"
-    + "This host also exposes the native session task registry: every call must include an `operation` object "
-    + "(actions: create, list, get, start, block, unblock, done, abandon, rename). "
-    + "Include `completedWorkReport` as a TOP-LEVEL argument — a sibling of `operation`, NOT a property inside the `operation` object — on calls where you made or planned meaningful progress so Magic Todo can fold context; "
-    + "read-only operations such as list/get may omit it. "
-    + "Consecutive `task` tool results without intervening user messages are merged into one backlog entry for context folding (OpenCode `todowrite` does not merge — one call, one entry)."
+let fusedTaskToolDescription = toolDescriptionFor Mimocode

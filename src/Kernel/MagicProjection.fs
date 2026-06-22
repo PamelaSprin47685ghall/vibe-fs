@@ -4,15 +4,8 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.MagicCore
 
-let private isReadOnlyMimicodeTaskResult (part: Part) : bool =
-    match part with
-    | ToolPart(_, _, Some state, _) ->
-        state.operationAction = "list" || state.operationAction = "get"
-    | _ -> false
-
 let private isFoldAnchorFor (host: Host) (part: Part) : bool =
     isTodoResultFor host part
-    && (host <> Mimocode || not (isReadOnlyMimicodeTaskResult part))
 
 type FoldRange = { firstResult: int; secondToLast: int }
 
@@ -24,25 +17,8 @@ let private todoIndexesFor (host: Host) (flat: FlatPart list) : int list =
 let private todoIndexes (flat: FlatPart list) : int list =
     todoIndexesFor opencode flat
 
-let private splitOn (isBreak: 'a -> bool) (xs: 'a list) : 'a list list =
-    let rec go revSegs revCur = function
-        | x :: rest when isBreak x -> go (List.rev revCur :: revSegs) [] rest
-        | x :: rest -> go revSegs (x :: revCur) rest
-        | [] -> List.rev revCur :: revSegs |> List.rev
-    go [] [] xs
-
 let private todoSegmentEndIndexesFor (host: Host) (flat: FlatPart list) : int list =
-    match host with
-    | Opencode -> todoIndexesFor host flat
-    | Mimocode ->
-        flat
-        |> List.indexed
-        |> splitOn (fun (_, fp) -> breaksTodoBurstFor host fp)
-        |> List.choose (fun segment ->
-            segment
-            |> List.filter (fun (_, fp) -> isFoldAnchorFor host fp.part)
-            |> List.tryLast
-            |> Option.map fst)
+    todoIndexesFor host flat
 
 let private foldTodoAnchorsFor (host: Host) (flat: FlatPart list) : int list =
     todoSegmentEndIndexesFor host flat

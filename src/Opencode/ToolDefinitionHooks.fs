@@ -23,7 +23,16 @@ let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit>
                 setKey output "jsonSchema" (buildMagicTodoSchema ())
             | Mimocode ->
                 setKey output "description" (box fusedTaskToolDescription)
-                rewriteToolJsonSchema setKey mergeMagicReportIntoTaskSchema output
+                let parameters = get output "parameters"
+                if not (isNullish parameters) then
+                    let safeExtend = get parameters "safeExtend"
+                    let extend = get parameters "extend"
+                    if (not (isNullish safeExtend) && Dyn.typeIs safeExtend "function") || (not (isNullish extend) && Dyn.typeIs extend "function") then
+                        setKey output "parameters" (mergeMagicReportIntoTaskSchema parameters)
+                    else
+                        setKey output "parameters" (buildMagicTodoSchema ())
+                else
+                    setKey output "jsonSchema" (buildMagicTodoSchema ())
     }
 
 let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =

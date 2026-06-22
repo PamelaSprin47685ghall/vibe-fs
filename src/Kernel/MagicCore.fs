@@ -36,14 +36,6 @@ let lastTodoErrorTextFor (host: Host) (flat: FlatPart list) : string option =
         | ToolPart(_, _, Some state, _) -> state.error
         | _ -> "")
 
-/// Mimocode 连续 task 调用 burst 的打断判定：用户消息（插话/输入）或其他工具调用会打断；
-/// assistant 文本输出、reasoning 思考、进度 part 不打断。
-let breaksTodoBurstFor (host: Host) (fp: FlatPart) : bool =
-    fp.isUser
-    || (match fp.part with
-        | ToolPart(toolName, _, _, _) when toolName <> magicTodoToolNameFor host -> true
-        | _ -> false)
-
 let isReviewTool (part: Part) : bool =
     match part with
     | ToolPart(toolName, _, _, _) when toolName = magicReviewToolName -> true
