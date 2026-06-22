@@ -187,7 +187,6 @@ let muxDailyMaintenanceLaunchSpec () = promise {
 let muxDailyRewriteTriggersNextSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-daily-chain-"
     do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (snapshotPath workspaceDir) (SnapshotHeader(Some "2026-06-07")) [ wikiEntry "0a3f" "基线问题" "Snapshot baseline" ]
     do! writeWikiFileAsync (dayPath workspaceDir "2026-06-08") (DayHeader("2026-06-08", false)) [ wikiEntry "b912" "第八日问题" "Day 8 candidate" ]
     do! writeWikiFileAsync (dayPath workspaceDir "2026-06-09") (DayHeader("2026-06-09", false)) [ wikiEntry "c813" "第九日问题" "Day 9 candidate" ]
 

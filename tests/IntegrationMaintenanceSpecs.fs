@@ -35,77 +35,6 @@ let dailyMaintenanceLaunchSpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let weeklyMaintenanceLaunchSpec () = promise {
-    let! workspaceDir = mkdtempAsync "weekly-maintenance-"
-    do! ensureWikiDir workspaceDir
-    let snapshotFilePath = snapshotPath workspaceDir
-    do! writeWikiFileAsync snapshotFilePath (SnapshotHeader(Some "2026-06-13")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Snapshot baseline" ]
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "b912" "Magic Todo backlog 如何保存？" "Weekly candidate one" ]
-    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "weekly-session" "Wiki prelude" |]
-    let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-15" |})
-    let wikiRuntime = get (pluginWikiRuntime pluginObject) "rawInstance" :?> WikiRuntime
-    do! wikiRuntime.StartMaintenanceIfDue(workspaceDir)
-
-    let launches = takeBookkeeperLaunchesForTesting pluginObject
-    check "weekly maintenance schedules at least one launch" (launches.Length >= 1)
-    check "weekly maintenance launch mentions snapshot or weekly" (
-        launches
-        |> Array.exists (fun launch ->
-            let title = (str launch "title").ToLowerInvariant()
-            let prompt = (str launch "prompt").ToLowerInvariant()
-            title.Contains "snapshot" || title.Contains "weekly" || prompt.Contains "snapshot" || prompt.Contains "weekly"))
-    do! waitForBackgroundJobsForTesting pluginObject
-    do! rmAsync workspaceDir
-}
-
-let weeklyMaintenanceUsesLastSundaySpec () = promise {
-    let! workspaceDir = mkdtempAsync "weekly-maintenance-sunday-"
-    do! ensureWikiDir workspaceDir
-    let snapshotFilePath = snapshotPath workspaceDir
-    let snapshotThrough = "2026-06-07"
-    do! writeWikiFileAsync snapshotFilePath (SnapshotHeader(Some snapshotThrough)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Snapshot baseline" ]
-    for day in [ "2026-06-08"; "2026-06-09"; "2026-06-10"; "2026-06-11"; "2026-06-12"; "2026-06-13"; "2026-06-14" ] do
-        do! writeWikiFileAsync (dayPath workspaceDir day) (DayHeader(day, true)) [ wikiEntry "b912" ("周内问题 " + day) "Day entry" ]
-    let lastSunday = "2026-06-14"
-    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "weekly-sunday-session" "Wiki prelude" |]
-    let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-15" |})
-    let wikiRuntime = get (pluginWikiRuntime pluginObject) "rawInstance" :?> WikiRuntime
-    do! wikiRuntime.StartMaintenanceIfDue(workspaceDir)
-
-    do! waitForBackgroundJobsForTesting pluginObject
-    let launches = takeBookkeeperLaunchesForTesting pluginObject
-    check "weekly maintenance lastSunday schedules exactly one weekly launch" (launches.Length = 1)
-    let launch = launches.[0]
-    let title = str launch "title"
-    let prompt = str launch "prompt"
-    check "weekly maintenance launch references lastSunday cutoff" (title.Contains lastSunday || prompt.Contains lastSunday)
-    check "weekly maintenance launch does not reference old snapshot through" (not (title.Contains snapshotThrough) && not (prompt.Contains snapshotThrough))
-    do! rmAsync workspaceDir
-}
-
-let weeklyMaintenanceWithoutSnapshotFileSpec () = promise {
-    let! workspaceDir = mkdtempAsync "weekly-maintenance-no-snapshot-"
-    do! ensureWikiDir workspaceDir
-    do! ensureTodayFile workspaceDir "2026-06-15"
-    do! rewriteDay workspaceDir "2026-06-10" [ wikiEntry "0a3f" "周初问题" "Day 10 entry" ]
-    do! rewriteDay workspaceDir "2026-06-12" [ wikiEntry "b912" "周中问题" "Day 12 entry" ]
-    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "weekly-no-snapshot-session" "Wiki prelude" |]
-    let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-15" |})
-    let wikiRuntime = get (pluginWikiRuntime pluginObject) "rawInstance" :?> WikiRuntime
-    do! wikiRuntime.StartMaintenanceIfDue(workspaceDir)
-
-    let launches = takeBookkeeperLaunchesForTesting pluginObject
-    check "weekly maintenance without snapshot file schedules at least one launch" (launches.Length >= 1)
-    check "weekly maintenance without snapshot file mentions snapshot or weekly" (
-        launches
-        |> Array.exists (fun launch ->
-            let title = (str launch "title").ToLowerInvariant()
-            let prompt = (str launch "prompt").ToLowerInvariant()
-            title.Contains "snapshot" || title.Contains "weekly" || prompt.Contains "snapshot" || prompt.Contains "weekly"))
-    do! waitForBackgroundJobsForTesting pluginObject
-    do! rmAsync workspaceDir
-}
-
 let heartbeatTriggersMaintenanceSpec () = promise {
     let! workspaceDir = mkdtempAsync "heartbeat-maintenance-"
     do! ensureWikiDir workspaceDir
@@ -200,35 +129,62 @@ let heartbeatSchedulesOnlyEarliestDailyWhileAppendRunsSpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let dailyRewriteTriggersNextDailyAndWeeklySpec () = promise {
+let dailyRewriteTriggersNextDailySpec () = promise {
     let! workspaceDir = mkdtempAsync "daily-chain-"
     do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (snapshotPath workspaceDir) (SnapshotHeader(Some "2026-06-07")) [ wikiEntry "0a3f" "基线问题" "Snapshot baseline" ]
     do! writeWikiFileAsync (dayPath workspaceDir "2026-06-08") (DayHeader("2026-06-08", false)) [ wikiEntry "b912" "第八日问题" "Day 8 candidate" ]
     do! writeWikiFileAsync (dayPath workspaceDir "2026-06-09") (DayHeader("2026-06-09", false)) [ wikiEntry "c813" "第九日问题" "Day 9 candidate" ]
 
-    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "chain-session" "Wiki prelude" |]
+    let createCalls = ResizeArray<obj>()
+    let childIds = ResizeArray<string>()
+    let childPrompts = System.Collections.Generic.Dictionary<string, string>()
+    let mockClient =
+        createObj [ "session", box (createObj [
+            "create", box (System.Func<obj, JS.Promise<obj>>(fun arg ->
+                promise {
+                    createCalls.Add(arg)
+                    let childId = $"child-bookkeeper-session-{createCalls.Count}"
+                    childIds.Add(childId)
+                    return box {| data = box {| id = childId |} |}
+                }))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                promise {
+                    let childId = str (get arg "path") "id"
+                    let parts = unbox<obj array> (get (get arg "body") "parts")
+                    childPrompts.[childId] <- str parts.[0] "text"
+                }))
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun arg ->
+                promise {
+                    let childId = str (get arg "path") "id"
+                    match childPrompts.TryGetValue childId with
+                    | true, promptText ->
+                        return box {| data = [| userTextMessage childId promptText; assistantCompletionMessage childId "done" |] |}
+                    | false, _ ->
+                        return box {| data = [| assistantCompletionMessage "chain-session" "done" |] |}
+                }))
+            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ()))
+        ]) ]
     let! p = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-15" |})
     let wikiRuntime = get (pluginWikiRuntime p) "rawInstance" :?> WikiRuntime
 
-    do! wikiRuntime.StartMaintenanceIfDue(workspaceDir)
+    do! wikiRuntime.StartMaintenanceIfDue(workspaceDir, parentSessionID = "chain-parent")
+    do! waitForBackgroundJobsForTesting p
     let launches1 = takeBookkeeperLaunchesForTesting p
     check "first maintenance schedules day 8" (launches1.Length = 1 && (str launches1.[0] "prompt").Contains "2026-06-08")
+    check "first maintenance launch keeps root parent" (str (get createCalls.[0] "body") "parentID" = "chain-parent")
 
-    wikiRuntime.RegisterJobForTesting("job-day8", workspaceDir, "daily", createObj [ "date", box "2026-06-08" ])
-    let! _ = wikiRuntime.Submit("job-day8", [])
+    let! submit1 = wikiRuntime.Submit(childIds.[0], [])
+    check "submit day 8 succeeds" (submit1.Contains "Rewrote wiki day 2026-06-08")
     do! waitForBackgroundJobsForTesting p
     let launches2 = takeBookkeeperLaunchesForTesting p
     check "submit day 8 triggers day 9" (launches2.Length = 1 && (str launches2.[0] "prompt").Contains "2026-06-09")
+    check "submit day 8 keeps chained parent at root" (str (get createCalls.[1] "body") "parentID" = "chain-parent")
 
-    wikiRuntime.RegisterJobForTesting("job-day9", workspaceDir, "daily", createObj [ "date", box "2026-06-09" ])
-    let! _ = wikiRuntime.Submit("job-day9", [])
+    let! submit2 = wikiRuntime.Submit(childIds.[1], [])
+    check "submit day 9 succeeds" (submit2.Contains "Rewrote wiki day 2026-06-09")
     do! waitForBackgroundJobsForTesting p
     let launches3 = takeBookkeeperLaunchesForTesting p
-    check "submit day 9 triggers weekly for sunday 14" (
-        launches3.Length = 1
-        && (str launches3.[0] "prompt").Contains "2026-06-14"
-        && (str launches3.[0] "prompt").Contains "weekly")
+    check "submit day 9 does not schedule more maintenance" (launches3.Length = 0)
 
     do! rmAsync workspaceDir
 }

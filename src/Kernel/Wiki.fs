@@ -21,7 +21,6 @@ type WikiDraft = { id: string option; q: string; a: string }
 
 type WikiHeader =
     | DayHeader of date: string * rewritten: bool
-    | SnapshotHeader of through: string option
 
 type WikiFile = { header: WikiHeader; entries: WikiEntry list }
 
@@ -34,7 +33,6 @@ type WikiProjection = Map<WikiId, WikiEntry>
 type WikiJobKind =
     | AppendAfterWork
     | DailyRewrite of date: string
-    | WeeklyRewrite of throughDate: string
 
 type WikiJobContext =
     { workspaceRoot: string
@@ -44,7 +42,6 @@ let private jobKindTag (kind: WikiJobKind) : string * string option =
     match kind with
     | AppendAfterWork -> "append", None
     | DailyRewrite date -> "daily", Some date
-    | WeeklyRewrite throughDate -> "weekly", Some throughDate
 
 let private jobMarkerFields (ctx: WikiJobContext) : string list =
     let kind, value = jobKindTag ctx.kind
@@ -53,7 +50,6 @@ let private jobMarkerFields (ctx: WikiJobContext) : string list =
       yield yamlScalarField "kind" kind
       match value with
       | Some date when kind = "daily" -> yield yamlScalarField "date" date
-      | Some throughDate when kind = "weekly" -> yield yamlScalarField "through" throughDate
       | _ -> () ]
 
 let renderJobMarker (ctx: WikiJobContext) : string =
@@ -93,9 +89,6 @@ let tryParseJobMarker (text: string) : WikiJobContext option =
             | "daily" ->
                 let date = Map.tryFind "date" fields |> Option.defaultValue ""
                 if date.Trim() = "" then None else Some { workspaceRoot = workspaceRoot; kind = DailyRewrite date }
-            | "weekly" ->
-                let throughDate = Map.tryFind "through" fields |> Option.defaultValue ""
-                if throughDate.Trim() = "" then None else Some { workspaceRoot = workspaceRoot; kind = WeeklyRewrite throughDate }
             | _ -> None
 
 let tryParseId (s: string) : WikiId option =
@@ -112,9 +105,6 @@ let parseHeaderLine (line: string) : Result<WikiHeader, string> =
             let k = Dyn.str o "kind"
             if t <> "wiki_header" || string (Dyn.get o "version") <> "1" then Error "bad header"
             elif k = "day" then Ok(DayHeader(Dyn.str o "date", unbox<bool> (Dyn.get o "rewritten")))
-            elif k = "snapshot" then
-                let thr = Dyn.str o "through"
-                if thr = "" then Error "snapshot missing through" else Ok(SnapshotHeader(Some thr))
             else Error "bad header kind"
     with _ -> Error "header parse failed"
 
@@ -127,17 +117,6 @@ let renderHeader (header: WikiHeader) : string =
             "kind", box "day"
             "date", box date
             "rewritten", box rewritten ])
-    | SnapshotHeader(Some through) ->
-        jsonStringify (createObj [
-            "type", box "wiki_header"
-            "version", box 1
-            "kind", box "snapshot"
-            "through", box through ])
-    | SnapshotHeader None ->
-        jsonStringify (createObj [
-            "type", box "wiki_header"
-            "version", box 1
-            "kind", box "snapshot" ])
 
 let parseEntryLine (line: string) : Result<WikiEntry, string> =
     try
@@ -192,29 +171,6 @@ let projectLatestWins (files: WikiFile list) : WikiProjection =
     files
     |> List.collect (fun f -> f.entries)
     |> List.fold (fun m e -> Map.add e.id e m) Map.empty
-
-let snapshotEntries (files: WikiFile list) : WikiEntry list =
-    files
-    |> List.tryPick (fun file ->
-        match file.header with
-        | SnapshotHeader _ -> Some file.entries
-        | _ -> None)
-    |> Option.defaultValue []
-
-let mergeEntryChanges (baseEntries: WikiEntry list) (changes: WikiEntry list) : WikiEntry list =
-    let changeMap = changes |> List.fold (fun acc entry -> Map.add entry.id entry acc) Map.empty
-    let baseIds = baseEntries |> List.map (fun entry -> entry.id) |> Set.ofList
-    let mergedBase =
-        baseEntries
-        |> List.map (fun entry -> Map.tryFind entry.id changeMap |> Option.defaultValue entry)
-    let additions =
-        changes
-        |> List.rev
-        |> List.fold (fun (seenIds, acc) entry ->
-            if Set.contains entry.id baseIds || Set.contains entry.id seenIds then seenIds, acc
-            else Set.add entry.id seenIds, entry :: acc) (Set.empty, [])
-        |> snd
-    mergedBase @ additions
 
 let buildPreludeSection (projection: WikiProjection) : string option =
     if Map.isEmpty projection then None

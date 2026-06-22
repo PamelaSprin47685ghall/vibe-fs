@@ -55,11 +55,6 @@ let submitForKind (portLockTimeoutMs: int64) (portLockRetryDelayMs: int) (todayS
             | DailyRewrite date ->
                 do! rewriteDay root date entries
                 return $"Rewrote wiki day {date}."
-            | WeeklyRewrite throughDate ->
-                let! files = readWikiFiles root
-                do! rewriteSnapshot root throughDate (mergeEntryChanges (snapshotEntries files) entries)
-                do! deleteDayFilesThrough root throughDate
-                return $"Rewrote wiki snapshot through {throughDate}."
         })
 
 let private jobMarkerPrompt (ctx: WikiJobContext) (promptText: string) : string =

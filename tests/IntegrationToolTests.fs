@@ -50,8 +50,7 @@ let muxMessageTransformRegisteredSpec () =
 let muxWikiPreludeForManagerSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-wiki-prelude-manager-"
     do! ensureWikiDir workspaceDir
-    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ])
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ]
     let reg = createRegistration (minimalMuxDeps ())
     let tf = muxMessageTransform reg
     let originalMsg = muxTextMessage "msg-manager" "user" "go"
@@ -75,8 +74,7 @@ let muxWikiPreludeForManagerSpec () = promise {
 let muxWikiPreludeForCoderSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-wiki-prelude-coder-"
     do! ensureWikiDir workspaceDir
-    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ])
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ]
     let reg = createRegistration (minimalMuxDeps ())
     let tf = muxMessageTransform reg
     let originalMsg = muxTextMessage "msg-coder" "user" "go"
@@ -100,8 +98,7 @@ let muxWikiPreludeForCoderSpec () = promise {
 let muxNoWikiPreludeForExcludedAgentsSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-wiki-prelude-excluded-"
     do! ensureWikiDir workspaceDir
-    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ])
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ]
     let reg = createRegistration (minimalMuxDeps ())
     let tf = muxMessageTransform reg
     if isNullish tf then
@@ -126,8 +123,7 @@ let muxCapsAndWikiPreludeOrderSpec () = promise {
     do! ensureWikiDir workspaceDir
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content"
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n"
-    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ])
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ]
     let reg = createRegistration (minimalMuxDeps ())
     let tf = muxMessageTransform reg
     let originalMsg = muxTextMessage "msg-order" "user" "go"
@@ -150,9 +146,8 @@ let muxCapsAndWikiPreludeOrderSpec () = promise {
 
 let muxFetchWikiSnapshotSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-wiki-fetch-"
-    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
-    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Snapshot answer" ])
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Snapshot answer" ]
     let reg = createRegistration (createObj [])
     let fetchTool = muxToolByName reg "fetch_wiki"
     if isNullish fetchTool then
@@ -160,7 +155,7 @@ let muxFetchWikiSnapshotSpec () = promise {
     else
         let context = createObj [ "directory", box workspaceDir; "sessionID", box "mux-wiki-fetch-session" ]
         let! answer = ((get fetchTool "execute") $ (context, createObj [ "id", box "0a3f" ])) |> unbox<JS.Promise<string>>
-        check "mux fetch_wiki returns snapshot answer" (answer = "Snapshot answer")
+        check "mux fetch_wiki returns answer" (answer = "Snapshot answer")
         let! invalid = ((get fetchTool "execute") $ (context, createObj [ "id", box "nope" ])) |> unbox<JS.Promise<string>>
         check "mux fetch_wiki validates id format" (invalid.Contains "Invalid wiki id")
         let! missing = ((get fetchTool "execute") $ (context, createObj [ "id", box "b912" ])) |> unbox<JS.Promise<string>>
@@ -171,8 +166,7 @@ let muxFetchWikiSnapshotSpec () = promise {
 let muxReturnBookkeeperAppendSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-wiki-submit-"
     do! ensureWikiDir workspaceDir
-    let snapshotPath = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotPath (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Old answer" ])
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Old answer" ]
     let reg = createRegistration (createObj [])
     let submitTool = muxToolByName reg "return_bookkeeper"
     if isNullish submitTool then
@@ -201,7 +195,7 @@ let muxReturnBookkeeperAppendSpec () = promise {
                 | Some (id, entry) -> idValue id <> "" && entry.a = "Fresh answer"
                 | None -> false)
             let! files = readAllWikiFiles workspaceDir
-            let dayFile = files |> List.tryFind (fun file -> match file.header with DayHeader(date, _) -> date = today | _ -> false)
+            let dayFile = files |> List.tryFind (fun file -> let (DayHeader(date, _)) = file.header in date = today)
             check "mux return_bookkeeper creates today file" (dayFile.IsSome)
     do! rmAsync workspaceDir
 }
@@ -357,19 +351,15 @@ let run () : JS.Promise<unit> =
             "afterHookRecordsCoder", afterHookRecordsCoderSpec
             "afterHookRecordsExecutor", afterHookRecordsExecutorSpec
             "dailyMaintenanceLaunch", dailyMaintenanceLaunchSpec
-            "weeklyMaintenanceLaunch", weeklyMaintenanceLaunchSpec
-            "weeklyMaintenanceUsesLastSunday", weeklyMaintenanceUsesLastSundaySpec
-            "weeklyMaintenanceWithoutSnapshotFile", weeklyMaintenanceWithoutSnapshotFileSpec
             "heartbeatTriggersMaintenance", heartbeatTriggersMaintenanceSpec
             "heartbeatMaintenanceUsesParentSession", heartbeatMaintenanceUsesParentSessionSpec
             "heartbeatSchedulesOnlyEarliestDailyWhileAppendRuns", heartbeatSchedulesOnlyEarliestDailyWhileAppendRunsSpec
-            "dailyRewriteTriggersNextDailyAndWeekly", dailyRewriteTriggersNextDailyAndWeeklySpec
+            "dailyRewriteTriggersNextDaily", dailyRewriteTriggersNextDailySpec
             "submitWikiAppend", submitWikiAppendSpec
             "submitWikiAppendEmpty", submitWikiAppendEmptySpec
             "submitWikiAppendDoesNotTriggerMaintenance", submitWikiAppendDoesNotTriggerMaintenanceSpec
             "submitWikiSchemaAllowsEmpty", submitWikiSchemaAllowsEmptySpec
             "submitWikiDailyRewrite", submitWikiDailyRewriteSpec
-            "submitWikiWeeklyRewrite", submitWikiWeeklyRewriteSpec
             "submitWikiReconstructsJobFromHistory", submitWikiReconstructsJobFromHistorySpec
             "bookkeeperLaunchCarriesAiSettings", bookkeeperLaunchCarriesAiSettingsSpec
             "bookkeeperFireAndForget", bookkeeperFireAndForgetSpec

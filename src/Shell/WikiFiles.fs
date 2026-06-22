@@ -23,8 +23,6 @@ let wikiDir (workspaceRoot: string) : string = join workspaceRoot "wiki"
 
 let wikiDirExists (workspaceRoot: string) : bool = existsSync (wikiDir workspaceRoot)
 
-let snapshotPath (workspaceRoot: string) : string = join (wikiDir workspaceRoot) "snapshot.ndjson"
-
 let dayPath (workspaceRoot: string) (date: string) : string = join (wikiDir workspaceRoot) (date + ".ndjson")
 
 let ensureWikiDir (workspaceRoot: string) : JS.Promise<unit> =
@@ -40,11 +38,10 @@ let readWikiFiles (workspaceRoot: string) : JS.Promise<WikiFile list> =
         if not (existsSync wDir) then return []
         else
             let! (entries: obj[]) = fsPromises?readdir(wDir)
-            let names = entries |> Array.map string |> Array.filter (fun n -> n.EndsWith ".ndjson") |> Array.toList
-            let dayNames = names |> List.filter ((<>) "snapshot.ndjson") |> List.sort
-            let orderedNames = (if names |> List.contains "snapshot.ndjson" then [ "snapshot.ndjson" ] else []) @ dayNames
+            let orderedNames = entries |> Array.map string |> Array.filter (fun n -> n.EndsWith ".ndjson" && n <> "snapshot.ndjson") |> Array.sort
             let! texts =
                 orderedNames
+                |> Array.toList
                 |> List.map (fun n ->
                     promise {
                         let p = join wDir n
@@ -102,16 +99,6 @@ let rewriteDay (workspaceRoot: string) (date: string) (entries: WikiEntry list) 
         do! fsPromises?rename(tmp, p)
     }
 
-let rewriteSnapshot (workspaceRoot: string) (through: string) (entries: WikiEntry list) : JS.Promise<unit> =
-    promise {
-        do! ensureWikiDir workspaceRoot
-        let p = snapshotPath workspaceRoot
-        let tmp = p + ".tmp"
-        let content = renderNdjson (SnapshotHeader(Some through)) entries
-        do! fsPromises?writeFile(tmp, content, "utf-8")
-        do! fsPromises?rename(tmp, p)
-    }
-
 let listDayFiles (workspaceRoot: string) : JS.Promise<string list> =
     promise {
         let wDir = wikiDir workspaceRoot
@@ -125,12 +112,4 @@ let listDayFiles (workspaceRoot: string) : JS.Promise<string list> =
                 |> Array.map (fun n -> n.Replace(".ndjson", ""))
                 |> Array.toList
                 |> List.sort
-    }
-
-let deleteDayFilesThrough (workspaceRoot: string) (through: string) : JS.Promise<unit> =
-    promise {
-        let! days = listDayFiles workspaceRoot
-        let toDelete = days |> List.filter (fun d -> d <= through)
-        for d in toDelete do
-            do! fsPromises?unlink(dayPath workspaceRoot d)
     }

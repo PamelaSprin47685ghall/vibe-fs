@@ -17,9 +17,8 @@ open VibeFs.Shell.WikiFiles
 
 let wikiPreludeWithoutCapsSpec () = promise {
     let! workspaceDir = mkdtempAsync "wiki-prelude-"
-    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
-    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ])
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ]
     let! p = plugin (box {| directory = workspaceDir |})
     let tf = get p "experimental.chat.messages.transform"
     let originalMsg = box {| info = createObj [ "id", box "msg-1"; "agent", box "manager"; "sessionID", box "wiki-session" ]; parts = [||] |}
@@ -39,9 +38,8 @@ let wikiPreludeWithoutCapsSpec () = promise {
 
 let coderReceivesWikiPreludeSpec () = promise {
     let! workspaceDir = mkdtempAsync "wiki-prelude-coder-"
-    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
-    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ])
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ]
     let! p = plugin (box {| directory = workspaceDir |})
     let tf = get p "experimental.chat.messages.transform"
     let originalMsg = box {| info = createObj [ "id", box "msg-coder-1"; "agent", box "coder"; "sessionID", box "wiki-coder-session" ]; parts = [||] |}
@@ -60,9 +58,8 @@ let coderReceivesWikiPreludeSpec () = promise {
 
 let browserDoesNotReceiveWikiPreludeSpec () = promise {
     let! workspaceDir = mkdtempAsync "wiki-prelude-browser-"
-    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
-    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ])
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ]
     let! p = plugin (box {| directory = workspaceDir |})
     let tf = get p "experimental.chat.messages.transform"
     let originalMsg = box {| info = createObj [ "id", box "msg-browser-1"; "agent", box "browser"; "sessionID", box "wiki-browser-session" ]; parts = [||] |}
@@ -79,9 +76,8 @@ let browserDoesNotReceiveWikiPreludeSpec () = promise {
 
 let executorChildSessionWithoutInputAgentDoesNotReceiveWikiPreludeSpec () = promise {
     let! workspaceDir = mkdtempAsync "wiki-prelude-executor-"
-    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
-    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ])
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ]
     let! p = plugin (box {| directory = workspaceDir |})
     let tf = get p "experimental.chat.messages.transform"
     let originalMsg = box {| info = createObj [ "id", box "msg-executor-1"; "agent", box "executor"; "sessionID", box "child-executor-session" ]; parts = [||] |}
@@ -97,20 +93,20 @@ let executorChildSessionWithoutInputAgentDoesNotReceiveWikiPreludeSpec () = prom
 
 let fetchWikiSnapshotSpec () = promise {
     let! workspaceDir = mkdtempAsync "wiki-fetch-"
-    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
-    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Old answer" ])
+    do! ensureWikiDir workspaceDir
+    let dayFile = dayPath workspaceDir "2026-06-14"
+    do! writeFileAsync dayFile (renderNdjson (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Old answer" ])
     let! p = plugin (box {| directory = workspaceDir |})
     let tf = get p "experimental.chat.messages.transform"
     let managerMsg = box {| info = createObj [ "id", box "msg-fetch"; "agent", box "manager"; "sessionID", box "wiki-fetch-session" ]; parts = [||] |}
     let out = createObj [ "messages", box [| managerMsg |] ]
     do! tf $ (createObj [], out) |> unbox<JS.Promise<unit>>
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "New answer" ])
+    do! writeFileAsync dayFile (renderNdjson (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "New answer" ])
     let tools = get p "tool"
     let fetchTool = get tools "fetch_wiki"
     let context = createObj [ "directory", box workspaceDir; "sessionID", box "wiki-fetch-session" ]
     let! oldAnswer = (get fetchTool "execute") $ (createObj [ "id", box "0a3f" ], context) |> unbox<JS.Promise<string>>
-    check "fetch_wiki returns snapshot answer" (oldAnswer = "Old answer")
+    check "fetch_wiki returns cached answer" (oldAnswer = "Old answer")
     let! invalidId = (get fetchTool "execute") $ (createObj [ "id", box "nope" ], context) |> unbox<JS.Promise<string>>
     check "fetch_wiki validates id format" (invalidId.Contains "Invalid wiki id")
     let! missing = (get fetchTool "execute") $ (createObj [ "id", box "b912" ], context) |> unbox<JS.Promise<string>>

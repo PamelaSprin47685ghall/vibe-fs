@@ -160,7 +160,6 @@ type MuxWikiRuntime(?deps: obj) as this =
                 Map [
                     "append", fun () -> AppendAfterWork
                     "daily", fun () -> DailyRewrite(readRequiredField "date")
-                    "weekly", fun () -> WeeklyRewrite(readRequiredField "through")
                 ]
             match Map.tryFind normalizedTag builders with
             | Some build -> build ()
@@ -183,7 +182,7 @@ type MuxWikiRuntime(?deps: obj) as this =
                 promise {
                     let! files = readWikiFiles workspaceRoot
                     let projection = projectLatestWins files
-                    let dailyDue, weeklyDue = dueMaintenance files System.DateTime.UtcNow
+                    let dailyDue = dueMaintenance files System.DateTime.UtcNow
 
                     let launchIfDue (due: string list) kind title resultPrefix promptInfix buildPrompt =
                         due
@@ -197,7 +196,6 @@ type MuxWikiRuntime(?deps: obj) as this =
                                 launchBg workspaceRoot (kind value) title promptText)
 
                     launchIfDue dailyDue DailyRewrite "Daily wiki rewrite" "daily" "for" buildDailyPrompt
-                    launchIfDue (Option.toList weeklyDue) WeeklyRewrite "Weekly wiki snapshot rewrite" "weekly" "through" buildWeeklyPrompt
                 })
 
     member this.Submit(sessionID: string, directory: string, drafts: WikiDraft list, ?config: obj) : JS.Promise<string> =
@@ -238,20 +236,12 @@ type MuxWikiRuntime(?deps: obj) as this =
                                             do! rewriteDay root date entries
                                             registeredJobs.Remove(sessionID) |> ignore
                                             return $"Rewrote wiki day {date}."
-                                        }
-                                    | WeeklyRewrite throughDate ->
-                                        promise {
-                                            let! files = readWikiFiles root
-                                            do! rewriteSnapshot root throughDate (mergeEntryChanges (snapshotEntries files) entries)
-                                            do! deleteDayFilesThrough root throughDate
-                                            registeredJobs.Remove(sessionID) |> ignore
-                                            return $"Rewrote wiki snapshot through {throughDate}."
                                         })
                             return result
                         })
 
                     match ctx.kind with
-                    | DailyRewrite _ | WeeklyRewrite _ -> this.StartMaintenanceIfDue(root) |> ignore
+                    | DailyRewrite _ -> this.StartMaintenanceIfDue(root) |> ignore
                     | _ -> ()
 
                     return result

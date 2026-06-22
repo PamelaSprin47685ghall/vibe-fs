@@ -85,7 +85,7 @@ let private fetchWikiSpec : ToolSpec =
 let private submitWikiSpec : ToolSpec =
     { name = "return_bookkeeper"
       description =
-        "Return wiki draft entries for the current wiki job context. The host decides whether this is an append, daily rewrite, or weekly rewrite job; entries with an id update existing knowledge, and entries without an id receive a host-assigned id."
+        "Return wiki draft entries for the current wiki job context. The host decides whether this is an append or daily rewrite job; entries with an id update existing knowledge, and entries without an id receive a host-assigned id."
       paramDocs = map [ "entries", "Array of wiki draft entries. Each entry: optional id, required q, required a." ]
       requiredFields = [ "entries" ] }
 

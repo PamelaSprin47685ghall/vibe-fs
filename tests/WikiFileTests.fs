@@ -80,34 +80,6 @@ let rewriteDayReplacesEntriesSpec () = promise {
     do! rmAsync ws
 }
 
-let rewriteSnapshotReplacesHeaderSpec () = promise {
-    let! ws = mkdtempAsync "wiki-files-rewrite-snap-"
-    do! ensureWikiDir ws
-    let snapFile = snapshotPath ws
-    do! writeFileAsync snapFile (renderHeader (SnapshotHeader(Some "2026-06-07")) + "\n")
-    do! rewriteSnapshot ws "2026-06-14" [ entry "2222" "sq" "sa" ]
-    let content = readSync snapFile
-    check "rewrite snapshot contains new through" (content.Contains "2026-06-14")
-    check "rewrite snapshot contains entry id" (content.Contains "2222")
-    check "rewrite snapshot not contains old through" (not (content.Contains "2026-06-07"))
-    do! rmAsync ws
-}
-
-let weeklyDeleteDayFilesSpec () = promise {
-    let! ws = mkdtempAsync "wiki-files-weekly-delete-"
-    do! ensureTodayFile ws "2026-06-10"
-    do! appendEntries ws "2026-06-10" [ entry "0a3f" "q1" "a1" ]
-    do! ensureTodayFile ws "2026-06-12"
-    do! appendEntries ws "2026-06-12" [ entry "b912" "q2" "a2" ]
-    do! ensureTodayFile ws "2026-06-15"
-    do! appendEntries ws "2026-06-15" [ entry "7c01" "q3" "a3" ]
-    do! deleteDayFilesThrough ws "2026-06-12"
-    check "weekly delete removes 06-10" (not (existsSync (dayPath ws "2026-06-10")))
-    check "weekly delete removes 06-12" (not (existsSync (dayPath ws "2026-06-12")))
-    check "weekly delete keeps 06-15" (existsSync (dayPath ws "2026-06-15"))
-    do! rmAsync ws
-}
-
 let tempRenameCompletenessSpec () = promise {
     let! ws = mkdtempAsync "wiki-files-tmp-rename-"
     do! rewriteDay ws "2026-06-19" [ entry "3333" "tq" "ta" ]
@@ -134,10 +106,8 @@ let listDayFilesSortedSpec () = promise {
 let readProjectionLatestWinsSpec () = promise {
     let! ws = mkdtempAsync "wiki-files-latest-wins-"
     do! ensureWikiDir ws
-    let snapFile = snapshotPath ws
-    do! writeFileAsync snapFile (renderNdjson (SnapshotHeader(Some "2026-06-07")) [ entry "0a3f" "oldq" "olda" ])
-    let dayFile = dayPath ws "2026-06-19"
-    do! writeFileAsync dayFile (renderNdjson (DayHeader("2026-06-19", false)) [ entry "0a3f" "newq" "newa" ])
+    do! writeFileAsync (dayPath ws "2026-06-18") (renderNdjson (DayHeader("2026-06-18", true)) [ entry "0a3f" "oldq" "olda" ])
+    do! writeFileAsync (dayPath ws "2026-06-19") (renderNdjson (DayHeader("2026-06-19", false)) [ entry "0a3f" "newq" "newa" ])
     let! proj = readProjection ws
     let id = some (tryParseId "0a3f")
     match Map.tryFind id proj with
@@ -154,8 +124,6 @@ let run () : JS.Promise<unit> =
         do! appendCreatesDayFileSpec ()
         do! appendMultipleKeepsNdjsonSpec ()
         do! rewriteDayReplacesEntriesSpec ()
-        do! rewriteSnapshotReplacesHeaderSpec ()
-        do! weeklyDeleteDayFilesSpec ()
         do! tempRenameCompletenessSpec ()
         do! listDayFilesSortedSpec ()
         do! readProjectionLatestWinsSpec ()

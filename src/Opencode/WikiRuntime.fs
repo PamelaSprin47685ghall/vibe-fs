@@ -90,7 +90,6 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 Map [
                     "append", fun () -> AppendAfterWork
                     "daily", fun () -> DailyRewrite(readRequiredField "date")
-                    "weekly", fun () -> WeeklyRewrite(readRequiredField "through")
                 ]
             match Map.tryFind normalizedTag builders with
             | Some build -> build ()
@@ -114,7 +113,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         if not (wikiDirExists root) then Promise.lift "Wiki directory not found."
         else
             promise {
-                let! result, kindOpt =
+                let! result, kindOpt, parentID =
                     commandQueue.Enqueue(fun () ->
                         promise {
                             let! reconstructed = tryResolveJobContext client root sessionID
@@ -122,18 +121,18 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                                 match registeredJobs.TryGetValue sessionID with
                                 | true, ctx -> Some ctx
                                 | false, _ -> None) with
-                            | None -> return "No active wiki job for this session.", None
+                            | None -> return "No active wiki job for this session.", None, None
                             | Some ctx ->
+                                let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
                                 try
                                     let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind portLockTimeoutMs portLockRetryDelayMs (today ()) ctx.workspaceRoot ctx.kind drafts)
-                                    return result, Some ctx.kind
+                                    return result, Some ctx.kind, parentID
                                 finally
                                     registry.UnregisterChildAgent(sessionID)
                                     registeredJobs.Remove(sessionID) |> ignore
                         })
                 match kindOpt with
-                | Some (DailyRewrite _) | Some (WeeklyRewrite _) ->
-                    let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
+                | Some (DailyRewrite _) ->
                     this.StartMaintenanceIfDue(root, ?parentSessionID = parentID) |> ignore
                 | _ -> ()
                 return result
@@ -167,7 +166,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 promise {
                     let! files = readWikiFiles root
                     let projection = projectLatestWins files
-                    let dailyDue, weeklyDue = dueMaintenance files (nowUtc ())
+                    let dailyDue = dueMaintenance files (nowUtc ())
 
                     let launchIfDue (due: string list) kind title resultPrefix promptInfix buildPrompt =
                         due
@@ -180,7 +179,6 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                                 launchBg root parentSessionID (kind value) title (fun () -> Promise.lift (buildPrompt value files projection)) emptySettings)
 
                     launchIfDue dailyDue DailyRewrite "Daily wiki rewrite" "daily" "for" buildDailyPrompt
-                    launchIfDue (Option.toList weeklyDue) WeeklyRewrite "Weekly wiki snapshot rewrite" "weekly" "through" buildWeeklyPrompt
                 })
 
     member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string) : unit =

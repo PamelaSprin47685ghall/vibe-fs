@@ -16,9 +16,6 @@ let private entry (idStr: string) (q: string) (a: string) : WikiEntry =
 let private dayFile (date: string) (rewritten: bool) (entries: WikiEntry list) : WikiFile =
     { header = DayHeader(date, rewritten); entries = entries }
 
-let private snapshotFile (through: string) (entries: WikiEntry list) : WikiFile =
-    { header = SnapshotHeader(Some through); entries = entries }
-
 let private projectionOf (entries: WikiEntry list) : WikiProjection =
     entries |> List.map (fun e -> e.id, e) |> Map.ofList
 
@@ -41,16 +38,6 @@ let entriesForDaySpec () =
     check "entriesForDay matches day" ((entriesForDay files "2026-06-19").Length = 1)
     check "entriesForDay misses other day" ((entriesForDay files "2026-06-20").IsEmpty)
 
-let entriesThroughCutoffSpec () =
-    let files =
-        [ snapshotFile "2026-06-07" [ entry "1111" "snap q" "snap a" ]
-          dayFile "2026-06-10" false [ entry "2222" "day q" "day a" ]
-          dayFile "2026-06-20" false [ entry "3333" "later q" "later a" ] ]
-    let through = entriesThroughCutoff files "2026-06-14"
-    check "entriesThroughCutoff includes snapshot entry" (through |> List.exists (fun e -> idValue e.id = "1111"))
-    check "entriesThroughCutoff includes day <= cutoff" (through |> List.exists (fun e -> idValue e.id = "2222"))
-    check "entriesThroughCutoff excludes day > cutoff" (not (through |> List.exists (fun e -> idValue e.id = "3333")))
-
 let appendPromptSpec () =
     let proj = projectionOf [ entry "0a3f" "existing q" "existing a" ]
     let prompt = buildAppendPrompt "T1" "do work" "got result" proj
@@ -64,14 +51,14 @@ let appendPromptSpec () =
 
 let dailyPromptSpec () =
     let files =
-        [ snapshotFile "2026-06-18" [ entry "1111" "snapshot q" "snapshot a" ]
+        [ dayFile "2026-06-18" true [ entry "1111" "history q" "history a" ]
           dayFile "2026-06-19" false [ entry "2222" "stale target q" "stale target a"; entry "2222" "target q" "target a" ]
           dayFile "2026-06-20" false [ entry "3333" "future q" "future a" ] ]
     let prompt = buildDailyPrompt "2026-06-19" files Map.empty
     check "daily prompt uses bookkeeper role" (prompt.Contains "project wiki bookkeeper")
     check "daily prompt has existing wiki field" (prompt.Contains "existing_wiki:")
     check "daily prompt has new events field" (prompt.Contains "new_events:")
-    check "daily prompt includes previous folded wiki" (prompt.Contains "snapshot q")
+    check "daily prompt includes previous folded wiki" (prompt.Contains "history q")
     check "daily prompt includes target event" (prompt.Contains "target q")
     check "daily prompt folds target events last-win" (not (prompt.Contains "stale target q"))
     check "daily prompt excludes future events" (not (prompt.Contains "future q"))
@@ -83,38 +70,10 @@ let dailyPromptSpec () =
     check "daily prompt is yaml-frontmatter markdown" (prompt.StartsWith "---\n")
     let rollbackPrompt =
         buildDailyPrompt "2026-06-19"
-            [ snapshotFile "2026-06-18" [ entry "2222" "old q" "old a" ]
+            [ dayFile "2026-06-18" true [ entry "2222" "old q" "old a" ]
               dayFile "2026-06-19" false [ entry "2222" "changed q" "changed a"; entry "2222" "old q" "old a" ] ]
             Map.empty
     check "daily prompt drops events that roll back to old value" (not (rollbackPrompt.Contains "changed q") && not (rollbackPrompt.Contains "new_events:\n  -"))
-
-let weeklyPromptSpec () =
-    let files =
-        [ snapshotFile "2026-06-07" [ entry "1111" "snap q" "snap a" ]
-          dayFile "2026-06-10" false [ entry "2222" "stale day q" "stale day a" ]
-          dayFile "2026-06-11" false [ entry "2222" "day q" "day a" ]
-          dayFile "2026-06-20" false [ entry "3333" "later q" "later a" ] ]
-    let prompt = buildWeeklyPrompt "2026-06-14" files Map.empty
-    check "weekly prompt uses bookkeeper role" (prompt.Contains "project wiki bookkeeper")
-    check "weekly prompt has existing wiki field" (prompt.Contains "existing_wiki:")
-    check "weekly prompt has new events field" (prompt.Contains "new_events:")
-    check "weekly prompt includes previous snapshot entry" (prompt.Contains "snap q")
-    check "weekly prompt includes cutoff event" (prompt.Contains "day q")
-    check "weekly prompt folds cutoff events last-win" (not (prompt.Contains "stale day q"))
-    check "weekly prompt excludes later event" (not (prompt.Contains "later q"))
-    check "weekly prompt hides new event id" (not (prompt.Contains "id: 2222"))
-    check "weekly prompt keeps existing wiki ids" (prompt.Contains "id: 1111")
-    check "weekly prompt does not use old previous snapshot field" (not (prompt.Contains "previous_snapshot:"))
-    check "weekly prompt does not use old day files field" (not (prompt.Contains "day_files_through_cutoff:"))
-    check "weekly prompt hides implementation vocabulary" (not (prompt.Contains "last-win") && not (prompt.Contains "delta") && not (prompt.Contains "rewritten"))
-    check "weekly prompt uses simple maintenance instruction" (prompt.Contains "Some new events happened" && prompt.Contains "modify the existing wiki entries")
-    let rollbackPrompt =
-        buildWeeklyPrompt "2026-06-14"
-            [ snapshotFile "2026-06-07" [ entry "2222" "old q" "old a" ]
-              dayFile "2026-06-10" false [ entry "2222" "changed q" "changed a" ]
-              dayFile "2026-06-11" false [ entry "2222" "old q" "old a" ] ]
-            Map.empty
-    check "weekly prompt drops events that roll back to old value" (not (rollbackPrompt.Contains "changed q") && not (rollbackPrompt.Contains "new_events:\n  -"))
 
 // ── WikiMaintenance (pure scheduling decisions) ─────────────────────────────
 
@@ -124,34 +83,16 @@ let parseDateSpec () =
     check "parseDate bad shape" (parseDate "not-a-date" |> Option.isNone)
     check "parseDate empty" (parseDate "" |> Option.isNone)
 
-let addOneDaySpec () =
-    check "addOneDay rolls month boundary" (addOneDay "2026-06-30" = "2026-07-01")
-    check "addOneDay normal" (addOneDay "2026-06-19" = "2026-06-20")
-    check "addOneDay bad unchanged" (addOneDay "nope" = "nope")
-
-let dateRangeSpec () =
-    equal "dateRangeInclusive ascending" [ "2026-06-19"; "2026-06-20"; "2026-06-21" ] (dateRangeInclusive "2026-06-19" "2026-06-21")
-    check "dateRangeInclusive reversed empty" (dateRangeInclusive "2026-06-21" "2026-06-19" |> List.isEmpty)
-    check "dateRangeInclusive single" (dateRangeInclusive "2026-06-19" "2026-06-19" = [ "2026-06-19" ])
-
-let lastSundaySpec () =
-    // 2026-06-20 is a Saturday (DayOfWeek = 6) → Sunday on or before is 2026-06-14.
-    equal "lastSundayOnOrBefore Saturday -> prior Sunday" "2026-06-14" (lastSundayOnOrBefore (DateTime(2026, 6, 20)))
-    // A Sunday stays itself.
-    let sunday = DateTime(2026, 6, 14)
-    equal "lastSundayOnOrBefore Sunday -> itself" "2026-06-14" (lastSundayOnOrBefore sunday)
-
 let dueMaintenanceDailySpec () =
     // Past unrewritten day → daily due.
     let files = [ dayFile "2026-06-10" false [ entry "0a3f" "q" "a" ] ]
-    let dailyDue, weeklyDue = dueMaintenance files (DateTime(2026, 6, 20))
+    let dailyDue = dueMaintenance files (DateTime(2026, 6, 20))
     equal "daily due past unrewritten" ["2026-06-10"] dailyDue
-    check "daily due scenario no weekly" (weeklyDue |> Option.isNone)
     // Rewritten past day -> not daily due.
-    let dailyDue2, _ = dueMaintenance [ dayFile "2026-06-10" true [] ] (DateTime(2026, 6, 20))
+    let dailyDue2 = dueMaintenance [ dayFile "2026-06-10" true [] ] (DateTime(2026, 6, 20))
     check "daily not due when rewritten" (dailyDue2 |> List.isEmpty)
     // Today's own day is not "past" -> not due.
-    let dailyDue3, _ = dueMaintenance [ dayFile "2026-06-20" false [] ] (DateTime(2026, 6, 20))
+    let dailyDue3 = dueMaintenance [ dayFile "2026-06-20" false [] ] (DateTime(2026, 6, 20))
     check "daily not due for today" (dailyDue3 |> List.isEmpty)
     // Multiple past unrewritten days -> only the oldest is due; later days wait
     // until the earlier rewrite is persisted.
@@ -159,40 +100,16 @@ let dueMaintenanceDailySpec () =
         [ dayFile "2026-06-12" false [ entry "0a3f" "q" "a" ]
           dayFile "2026-06-10" false [ entry "0a40" "q2" "a2" ]
           dayFile "2026-06-11" true [] ]
-    let dailyDue4, _ = dueMaintenance multiFiles (DateTime(2026, 6, 20))
+    let dailyDue4 = dueMaintenance multiFiles (DateTime(2026, 6, 20))
     equal "daily due schedules oldest past unrewritten only" ["2026-06-10"] dailyDue4
-
-let dueMaintenanceWeeklySpec () =
-    // Snapshot through 2026-06-07, now 2026-06-20 (last Sunday 2026-06-14).
-    // Gap days 06-08..06-14 are absent → treated as rewritten → weekly due at 06-14.
-    let files = [ snapshotFile "2026-06-07" [ entry "1111" "q" "a" ] ]
-    let dailyDue, weeklyDue = dueMaintenance files (DateTime(2026, 6, 20))
-    check "weekly scenario no daily" (dailyDue |> List.isEmpty)
-    equal "weekly due when gap all rewritten" (Some "2026-06-14") weeklyDue
-    // A gap day that exists but is unrewritten blocks the weekly rewrite.
-    let blockingFiles =
-        [ snapshotFile "2026-06-07" [ entry "1111" "q" "a" ]
-          dayFile "2026-06-10" false [ entry "2222" "q" "a" ] ]
-    let _, weeklyDue2 = dueMaintenance blockingFiles (DateTime(2026, 6, 20))
-    check "weekly blocked by unrewritten gap day" (weeklyDue2 |> Option.isNone)
-    // No snapshot and no day files → nothing due.
-    let dailyDue3, weeklyDue3 = dueMaintenance [] (DateTime(2026, 6, 20))
-    check "empty wiki no daily" (dailyDue3 |> List.isEmpty)
-    check "empty wiki no weekly" (weeklyDue3 |> Option.isNone)
 
 let run () : JS.Promise<unit> =
     promise {
         projectionTextSpec ()
         filesTextSpec ()
         entriesForDaySpec ()
-        entriesThroughCutoffSpec ()
         appendPromptSpec ()
         dailyPromptSpec ()
-        weeklyPromptSpec ()
         parseDateSpec ()
-        addOneDaySpec ()
-        dateRangeSpec ()
-        lastSundaySpec ()
         dueMaintenanceDailySpec ()
-        dueMaintenanceWeeklySpec ()
     }

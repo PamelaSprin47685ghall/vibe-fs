@@ -43,25 +43,18 @@ let idParseSpec () =
 
 let headerParseSpec () =
     let dayLine = """{"type":"wiki_header","version":1,"kind":"day","date":"2026-06-19","rewritten":false}"""
-    let snapLine = """{"type":"wiki_header","version":1,"kind":"snapshot","through":"2026-06-14"}"""
     check "parseHeaderLine day Ok DayHeader" (match parseHeaderLine dayLine with Ok(DayHeader("2026-06-19", false)) -> true | _ -> false)
-    check "parseHeaderLine snapshot Ok SnapshotHeader" (match parseHeaderLine snapLine with Ok(SnapshotHeader(Some "2026-06-14")) -> true | _ -> false)
     check "parseHeaderLine garbage Error" (isErr (parseHeaderLine "not json at all"))
-    let snapNoThrough = """{"type":"wiki_header","version":1,"kind":"snapshot"}"""
-    check "parseHeaderLine snapshot missing through Error" (isErr (parseHeaderLine snapNoThrough))
+    let snapshotLine = """{"type":"wiki_header","version":1,"kind":"snapshot","through":"2026-06-14"}"""
+    check "parseHeaderLine snapshot rejected" (isErr (parseHeaderLine snapshotLine))
 
 let headerRenderSpec () =
     let dayRendered = renderHeader (DayHeader("2026-06-18", true))
     check "renderHeader day contains rewritten true" (dayRendered.Contains("\"rewritten\":true"))
     check "renderHeader day contains kind day" (dayRendered.Contains("\"kind\":\"day\""))
     check "renderHeader day contains date" (dayRendered.Contains("2026-06-18"))
-    let snapRendered = renderHeader (SnapshotHeader(Some "2026-06-14"))
-    check "renderHeader snapshot contains kind snapshot" (snapRendered.Contains("\"kind\":\"snapshot\""))
-    check "renderHeader snapshot contains through" (snapRendered.Contains("\"through\":\"2026-06-14\""))
     let dh = DayHeader("2026-06-18", true)
     check "header round-trip day" (parseHeaderLine (renderHeader dh) = Ok dh)
-    let sh = SnapshotHeader(Some "2026-06-14")
-    check "header round-trip snapshot" (parseHeaderLine (renderHeader sh) = Ok sh)
 
 let entryParseRenderSpec () =
     let line = """{"id":"0a3f","q":"项目插件入口在哪里？","a":"src/Opencode/Plugin.fs"}"""

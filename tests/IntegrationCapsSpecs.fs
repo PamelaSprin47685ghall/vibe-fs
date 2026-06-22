@@ -134,9 +134,8 @@ let bookkeeperDoesNotReceiveCapsSpec () = promise {
     let! workspaceDir = mkdtempAsync "caps-bookkeeper-"
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content"
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n"
-    do! unbox<JS.Promise<unit>> (fsAsync?mkdir(pathModule?join(workspaceDir, "wiki"), box {| recursive = true |}))
-    let snapshotFile = unbox<string> (pathModule?join(workspaceDir, "wiki", "snapshot.ndjson"))
-    do! writeFileAsync snapshotFile (renderNdjson (SnapshotHeader(Some "2026-06-14")) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ])
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ]
     let! p = plugin (box {| directory = workspaceDir |})
     let tf = get p "experimental.chat.messages.transform"
     let originalMsg = box {| info = createObj [ "id", box "msg-bk-1"; "agent", box "bookkeeper"; "sessionID", box "caps-bk-session" ]; parts = [||] |}
