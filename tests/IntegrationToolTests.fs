@@ -363,6 +363,7 @@ let run () : JS.Promise<unit> =
             "heartbeatTriggersMaintenance", heartbeatTriggersMaintenanceSpec
             "heartbeatMaintenanceUsesParentSession", heartbeatMaintenanceUsesParentSessionSpec
             "heartbeatSchedulesOnlyEarliestDailyWhileAppendRuns", heartbeatSchedulesOnlyEarliestDailyWhileAppendRunsSpec
+            "dailyRewriteTriggersNextDailyAndWeekly", dailyRewriteTriggersNextDailyAndWeeklySpec
             "submitWikiAppend", submitWikiAppendSpec
             "submitWikiAppendEmpty", submitWikiAppendEmptySpec
             "submitWikiAppendDoesNotTriggerMaintenance", submitWikiAppendDoesNotTriggerMaintenanceSpec
@@ -376,6 +377,7 @@ let run () : JS.Promise<unit> =
             "webfetchTriggersBookkeeper", webfetchTriggersBookkeeperSpec
             "bookkeeperSessionRegisteredInChildAgentRegistry", bookkeeperSessionRegisteredInChildAgentRegistrySpec
             "muxDailyMaintenanceLaunch", muxDailyMaintenanceLaunchSpec
+            "muxDailyRewriteTriggersNext", muxDailyRewriteTriggersNextSpec
             "toolDefinition", toolDefinitionSpec
             "toolExecuteBefore", toolExecuteBeforeSpec
             "mimoApplyPatchExecuteBefore", mimoApplyPatchExecuteBeforeSpec
@@ -400,6 +402,7 @@ let run () : JS.Promise<unit> =
             "muxReturnBookkeeperNoActiveJob", muxReturnBookkeeperNoActiveJobSpec
             "muxReturnBookkeeperReconstructsJobFromHistory", muxReturnBookkeeperReconstructsJobFromHistorySpec
             "muxReturnBookkeeperAppendDoesNotTriggerMaintenance", muxReturnBookkeeperAppendDoesNotTriggerMaintenanceSpec
+            "muxDailyRewriteTriggersNext", muxDailyRewriteTriggersNextSpec
             "muxExecutorRwTriggersMaintenance", muxExecutorRwTriggersMaintenanceSpec
             "muxExecutorModeSchema", muxExecutorModeSchemaSpec
             "muxMessageTransformRegistered", muxMessageTransformRegisteredSpec

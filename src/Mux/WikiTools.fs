@@ -220,7 +220,7 @@ type MuxWikiRuntime(?deps: obj) as this =
                 | Some ctx ->
                     let root = ctx.workspaceRoot
                     let todayStr = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
-                    return! writeQueue.Enqueue(fun () ->
+                    let! result = writeQueue.Enqueue(fun () ->
                         promise {
                             let! entries = buildEntries root drafts
                             let kind = ctx.kind
@@ -249,6 +249,12 @@ type MuxWikiRuntime(?deps: obj) as this =
                                         })
                             return result
                         })
+
+                    match ctx.kind with
+                    | DailyRewrite _ | WeeklyRewrite _ -> this.StartMaintenanceIfDue(root) |> ignore
+                    | _ -> ()
+
+                    return result
             }
 
     member this.StartBookkeeperAppend(prompt: string, result: string, title: string, ?config: obj) : unit =

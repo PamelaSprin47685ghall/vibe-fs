@@ -183,3 +183,34 @@ let muxDailyMaintenanceLaunchSpec () = promise {
                 && not (prompt.Contains("[vibe-wiki-job]"))))
     do! rmAsync workspaceDir
 }
+
+let muxDailyRewriteTriggersNextSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-daily-chain-"
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (snapshotPath workspaceDir) (SnapshotHeader(Some "2026-06-07")) [ wikiEntry "0a3f" "基线问题" "Snapshot baseline" ]
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-08") (DayHeader("2026-06-08", false)) [ wikiEntry "b912" "第八日问题" "Day 8 candidate" ]
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-09") (DayHeader("2026-06-09", false)) [ wikiEntry "c813" "第九日问题" "Day 9 candidate" ]
+
+    let prompts = ResizeArray<string>()
+    let deps = minimalMuxDeps ()
+    deps?("directory") <- workspaceDir
+    deps?("taskService") <- mockMuxTaskServiceCapturingPrompt prompts
+    let reg = createRegistration deps
+    let wikiRuntimeObj = muxWikiRuntime reg
+    let startFn = get wikiRuntimeObj "startMaintenanceIfDue"
+    if isNullish startFn then
+        check "mux wiki runtime exposes startMaintenanceIfDue" false
+    else
+        let runtime = get wikiRuntimeObj "rawInstance" :?> MuxWikiRuntime
+        let config = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-daily-chain"; "taskService", box (get deps "taskService") ]
+        do! ((startFn $ workspaceDir) |> unbox<JS.Promise<unit>>)
+        let launches1 = takeBookkeeperLaunchesForTesting reg
+        check "mux first maintenance schedules day 8" (launches1.Length = 1 && (str launches1.[0] "prompt").Contains "2026-06-08")
+
+        registerMuxWikiJobForTest reg "job-day8" workspaceDir "daily" (createObj [ "date", box "2026-06-08" ])
+        let! _ = runtime.Submit("job-day8", workspaceDir, [], config = config)
+        do! waitForBackgroundJobsForTesting reg
+        let launches2 = takeBookkeeperLaunchesForTesting reg
+        check "mux submit day 8 triggers day 9" (launches2.Length = 1 && (str launches2.[0] "prompt").Contains "2026-06-09")
+    do! rmAsync workspaceDir
+}

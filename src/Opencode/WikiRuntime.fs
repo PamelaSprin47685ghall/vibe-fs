@@ -113,22 +113,31 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         let root = effectiveWorkspaceRoot directory
         if not (wikiDirExists root) then Promise.lift "Wiki directory not found."
         else
-            commandQueue.Enqueue(fun () ->
-                promise {
-                    let! reconstructed = tryResolveJobContext client root sessionID
-                    match reconstructed |> Option.orElseWith (fun () ->
-                        match registeredJobs.TryGetValue sessionID with
-                        | true, ctx -> Some ctx
-                        | false, _ -> None) with
-                    | None -> return "No active wiki job for this session."
-                    | Some ctx ->
-                        try
-                            let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind portLockTimeoutMs portLockRetryDelayMs (today ()) ctx.workspaceRoot ctx.kind drafts)
-                            return result
-                        finally
-                            registry.UnregisterChildAgent(sessionID)
-                            registeredJobs.Remove(sessionID) |> ignore
-                })
+            promise {
+                let! result, kindOpt =
+                    commandQueue.Enqueue(fun () ->
+                        promise {
+                            let! reconstructed = tryResolveJobContext client root sessionID
+                            match reconstructed |> Option.orElseWith (fun () ->
+                                match registeredJobs.TryGetValue sessionID with
+                                | true, ctx -> Some ctx
+                                | false, _ -> None) with
+                            | None -> return "No active wiki job for this session.", None
+                            | Some ctx ->
+                                try
+                                    let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind portLockTimeoutMs portLockRetryDelayMs (today ()) ctx.workspaceRoot ctx.kind drafts)
+                                    return result, Some ctx.kind
+                                finally
+                                    registry.UnregisterChildAgent(sessionID)
+                                    registeredJobs.Remove(sessionID) |> ignore
+                        })
+                match kindOpt with
+                | Some (DailyRewrite _) | Some (WeeklyRewrite _) ->
+                    let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
+                    this.StartMaintenanceIfDue(root, ?parentSessionID = parentID) |> ignore
+                | _ -> ()
+                return result
+            }
 
     member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
         promise {

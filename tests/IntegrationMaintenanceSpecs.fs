@@ -199,3 +199,36 @@ let heartbeatSchedulesOnlyEarliestDailyWhileAppendRunsSpec () = promise {
     do! waitForBackgroundJobsForTesting p
     do! rmAsync workspaceDir
 }
+
+let dailyRewriteTriggersNextDailyAndWeeklySpec () = promise {
+    let! workspaceDir = mkdtempAsync "daily-chain-"
+    do! ensureWikiDir workspaceDir
+    do! writeWikiFileAsync (snapshotPath workspaceDir) (SnapshotHeader(Some "2026-06-07")) [ wikiEntry "0a3f" "基线问题" "Snapshot baseline" ]
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-08") (DayHeader("2026-06-08", false)) [ wikiEntry "b912" "第八日问题" "Day 8 candidate" ]
+    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-09") (DayHeader("2026-06-09", false)) [ wikiEntry "c813" "第九日问题" "Day 9 candidate" ]
+
+    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "chain-session" "Wiki prelude" |]
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient; nowMs = dayMs "2026-06-15" |})
+    let wikiRuntime = get (pluginWikiRuntime p) "rawInstance" :?> WikiRuntime
+
+    do! wikiRuntime.StartMaintenanceIfDue(workspaceDir)
+    let launches1 = takeBookkeeperLaunchesForTesting p
+    check "first maintenance schedules day 8" (launches1.Length = 1 && (str launches1.[0] "prompt").Contains "2026-06-08")
+
+    wikiRuntime.RegisterJobForTesting("job-day8", workspaceDir, "daily", createObj [ "date", box "2026-06-08" ])
+    let! _ = wikiRuntime.Submit("job-day8", [])
+    do! waitForBackgroundJobsForTesting p
+    let launches2 = takeBookkeeperLaunchesForTesting p
+    check "submit day 8 triggers day 9" (launches2.Length = 1 && (str launches2.[0] "prompt").Contains "2026-06-09")
+
+    wikiRuntime.RegisterJobForTesting("job-day9", workspaceDir, "daily", createObj [ "date", box "2026-06-09" ])
+    let! _ = wikiRuntime.Submit("job-day9", [])
+    do! waitForBackgroundJobsForTesting p
+    let launches3 = takeBookkeeperLaunchesForTesting p
+    check "submit day 9 triggers weekly for sunday 14" (
+        launches3.Length = 1
+        && (str launches3.[0] "prompt").Contains "2026-06-14"
+        && (str launches3.[0] "prompt").Contains "weekly")
+
+    do! rmAsync workspaceDir
+}
