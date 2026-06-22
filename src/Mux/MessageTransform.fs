@@ -76,13 +76,13 @@ let private extractTexts (messages: obj array) : string seq =
 let private reconstructReviewState (reviewStore: ReviewStore) (sessionID: string) (messages: obj array) : unit =
     if sessionID = "" then ()
     else
-        match reviewStore.getReviewState sessionID with
+        match inferReviewTaskFromTexts (extractTexts messages) with
+        | Some task when not (reviewStore.isReviewActive sessionID) ->
+            reviewStore.activateReview(sessionID, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
         | Some _ -> ()
-        | None ->
-            match inferReviewTaskFromTexts (extractTexts messages) with
-            | Some task ->
-                reviewStore.activateReview(sessionID, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
-            | None -> ()
+        | None when reviewStore.isReviewActive sessionID ->
+            reviewStore.deactivateReview sessionID
+        | None -> ()
 
 let private magicSession = MagicSession()
 

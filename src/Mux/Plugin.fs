@@ -135,7 +135,7 @@ let createRegistration (deps: obj) : obj =
     let toolsObj = toolsToObject tools
     let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.Config.getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
     let wrappers = createAllWrappers toolsObj hostReadExec callStore
-    let eventHook = createEventHook reviewStore
+    let eventHook = createEventHook deps reviewStore
     let slashCommands = createSlashCommands deps toolNames callStore reviewStore
     let messagesTransformFn =
         System.Func<obj, obj, JS.Promise<unit>>(fun input output ->

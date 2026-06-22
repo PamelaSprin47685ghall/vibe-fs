@@ -3,115 +3,172 @@ module VibeFs.Shell.NudgeRuntime
 open Fable.Core
 open VibeFs.Kernel
 open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.NudgeState
 
-/// Decoded event ready for stateful processing. Host adapters (e.g.
-/// Mux/EventHook) produce this from their native event shapes; NudgeRuntime
-/// owns the state transitions and the nudge coordinator.
 type NudgeRuntimeEvent =
     | Ignore
     | StreamEnd of workspaceId: string * stopReason: string * lastAssistantMessage: string
     | StreamAbort of workspaceId: string
     | AbortedError of workspaceId: string
 
-type private StreamEndState =
-    { stoppedWorkspaces: Set<string>
-      lastNudgeActions: Map<string, NudgeAction> }
+type private StateHolder<'state>(initialState: 'state) =
+    let mutable state = initialState
 
-let private freshStreamEndState : StreamEndState =
-    { stoppedWorkspaces = Set.empty
-      lastNudgeActions = Map.empty }
-
-let private selectNudgePrompt (action: string) : string option =
-    match action with
-    | "nudge-todo" -> Some todoNudgePrompt
-    | "nudge-loop" -> Some loopNudgePrompt
-    | _ -> None
+    member _.Mutate<'result>(transition: 'state -> 'state * 'result) : 'result =
+        let nextState, result = transition state
+        state <- nextState
+        result
 
 let private tryGetTodos (helpers: obj) (workspaceId: string) : JS.Promise<string list> =
     promise {
         try
             let getTodosFn = Dyn.get helpers "getTodos"
-            let! result = unbox<JS.Promise<obj[]>> (Dyn.call1 getTodosFn workspaceId)
-            return result |> Array.map string |> List.ofArray
+            let! result = unbox<JS.Promise<obj>> (Dyn.call1 getTodosFn workspaceId)
+            if Dyn.isArray result then
+                return (result :?> obj array) |> Array.map string |> List.ofArray
+            else
+                return []
         with _ ->
             return []
     }
 
-let private rememberAction (state: StreamEndState) (workspaceId: string) (action: string) : StreamEndState =
-    match ofString action with
-    | Ok parsed -> { state with lastNudgeActions = Map.add workspaceId parsed state.lastNudgeActions }
-    | Error _ -> state
-
-let private clearWorkspaceState (state: StreamEndState) (workspaceId: string) : StreamEndState =
-    { stoppedWorkspaces = Set.add workspaceId state.stoppedWorkspaces
-      lastNudgeActions = Map.remove workspaceId state.lastNudgeActions }
-
-let private handleNudgeRequest
-    (isReviewActive: string -> bool)
-    (coordinator: CoordinatorRuntimeState ref)
-    (state: StreamEndState)
-    (helpers: obj)
+let private tryGetChatHistory
+    (getChatHistory: (string -> JS.Promise<obj array>) option)
     (workspaceId: string)
-    (lastMessage: string)
-    (todos: string list)
-    : JS.Promise<StreamEndState> =
+    : JS.Promise<obj array> =
     promise {
-        let context : NudgeContext =
-            { todos = todos
-              lastAssistantMessage = lastMessage
-              hasActiveRunner = false
-              isLoopActive = isReviewActive workspaceId }
-        let previousAction = Map.tryFind workspaceId state.lastNudgeActions
-        let nextCoordinator, action = decideRuntimeAction coordinator.Value workspaceId context
-        coordinator.Value <- nextCoordinator
-        if shouldSuppressNudge workspaceId context previousAction then
-            return state
-        else
-            match selectNudgePrompt action with
-            | None -> return rememberAction state workspaceId action
-            | Some prompt ->
-                try
-                    let nudgeFn = Dyn.get helpers "nudge"
-                    let! _ = unbox<JS.Promise<bool>> (Dyn.call2 nudgeFn workspaceId prompt)
-                    return rememberAction state workspaceId action
-                with _ ->
-                    coordinator.Value <- clearRuntimeSession coordinator.Value workspaceId
-                    return state
+        match getChatHistory with
+        | None -> return [||]
+        | Some getHistory ->
+            try
+                return! getHistory workspaceId
+            with _ ->
+                return [||]
     }
 
-/// Holds the per-workspace stream-end state and the nudge coordinator. All
-/// mutations happen inside HandleEvent; the host adapter only decodes events
-/// into NudgeRuntimeEvent and delegates.
-type NudgeRuntime(reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) =
-    let mutable state = freshStreamEndState
-    let coordinator = ref freshCoordinatorRuntime
+let private getPartsText (parts: obj) : string =
+    if not (Dyn.isArray parts) then ""
+    else
+        (parts :?> obj array)
+        |> Array.choose (fun part ->
+            if Dyn.str part "type" = "text" then
+                let text = Dyn.get part "text"
+                if Dyn.isNullish text then None else Some (string text)
+            else None)
+        |> String.concat "\n"
+
+let private decodeLastAssistant (messages: obj array) : string * bool =
+    let lastAssistantIndex =
+        messages
+        |> Array.tryFindIndexBack (fun message -> Dyn.str message "role" = "assistant")
+
+    match lastAssistantIndex with
+    | None -> "", false
+    | Some index ->
+        let text = getPartsText (Dyn.get messages.[index] "parts")
+        let alreadyNudged =
+            messages.[index + 1 ..]
+            |> Array.exists (fun message ->
+                Dyn.str message "role" = "user"
+                && isNudgePrompt (getPartsText (Dyn.get message "parts")))
+        text, alreadyNudged
+
+let private collectSnapshot
+    (getChatHistory: (string -> JS.Promise<obj array>) option)
+    (helpers: obj)
+    (workspaceId: string)
+    (eventLastAssistantMessage: string)
+    : JS.Promise<SessionSnapshot> =
+    promise {
+        let! todos = tryGetTodos helpers workspaceId
+        let! history = tryGetChatHistory getChatHistory workspaceId
+        let historyLastAssistantMessage, historyAlreadyNudged = decodeLastAssistant history
+        let effectiveLastAssistantMessage, alreadyNudged =
+            if historyLastAssistantMessage = "" then
+                eventLastAssistantMessage, false
+            elif eventLastAssistantMessage <> "" && eventLastAssistantMessage <> historyLastAssistantMessage then
+                eventLastAssistantMessage, false
+            else
+                historyLastAssistantMessage, historyAlreadyNudged
+
+        return
+            { todos = todos
+              lastAssistantMessage = effectiveLastAssistantMessage
+              alreadyNudged = alreadyNudged
+              agentFromMessage = None }
+    }
+
+let private runNudgeFlow
+    (holder: StateHolder<NudgeShellState>)
+    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (getChatHistory: (string -> JS.Promise<obj array>) option)
+    (helpers: obj)
+    (workspaceId: string)
+    (lastAssistantMessage: string)
+    : JS.Promise<unit> =
+    promise {
+        try
+            let! snapshot = collectSnapshot getChatHistory helpers workspaceId lastAssistantMessage
+            match holder.Mutate(fun state -> decideNudge reviewStore.isReviewActive (fun _ -> None) state workspaceId snapshot) with
+            | StandDown -> ()
+            | Send(promptText, _) ->
+                let! delivered =
+                    promise {
+                        try
+                            let nudgeFn = Dyn.get helpers "nudge"
+                            return! unbox<JS.Promise<bool>> (Dyn.call2 nudgeFn workspaceId promptText)
+                        with _ ->
+                            return false
+                    }
+
+                let outcome = if delivered then Delivered else Busy
+                holder.Mutate(fun state ->
+                    match tryRecordSend state workspaceId outcome with
+                    | Some nextState -> nextState, ()
+                    | None -> state, ())
+        with _ ->
+            holder.Mutate(fun state -> clearSession state workspaceId, ())
+    }
+
+let private startNudgeFlow
+    (holder: StateHolder<NudgeShellState>)
+    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (getChatHistory: (string -> JS.Promise<obj array>) option)
+    (helpers: obj)
+    (workspaceId: string)
+    (lastAssistantMessage: string)
+    : unit =
+    runNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage |> Promise.start
+
+type NudgeRuntime
+    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore,
+     getChatHistory: (string -> JS.Promise<obj array>) option) =
+
+    let holder = StateHolder<NudgeShellState>(emptyState)
 
     member _.HandleEvent(parsed: NudgeRuntimeEvent, helpers: obj) : JS.Promise<unit> =
         promise {
             match parsed with
             | Ignore -> return ()
-            | StreamEnd(workspaceId, stopReason, lastMessage) ->
-                if Dyn.isNullish helpers || Set.contains workspaceId state.stoppedWorkspaces then
-                    return ()
-                elif stopReason = "queued-message" then
+            | StreamEnd(workspaceId, stopReason, lastAssistantMessage) ->
+                if Dyn.isNullish helpers || stopReason = "queued-message" then
                     return ()
                 else
-                    let! todos = tryGetTodos helpers workspaceId
-                    let! nextState =
-                        handleNudgeRequest reviewStore.isReviewActive coordinator state helpers workspaceId lastMessage todos
-                    state <- nextState
+                    let wantsNudge =
+                        holder.Mutate(fun state -> handleEvent state workspaceId SessionIdle)
+
+                    if wantsNudge then
+                        startNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage
+
                     return ()
-            | StreamAbort workspaceId ->
-                reviewStore.deactivateReview workspaceId
-                coordinator.Value <- clearRuntimeSession coordinator.Value workspaceId
-                state <- clearWorkspaceState state workspaceId
-                return ()
+            | StreamAbort workspaceId
             | AbortedError workspaceId ->
-                coordinator.Value <- suppressSession coordinator.Value workspaceId
-                state <- clearWorkspaceState state workspaceId
+                holder.Mutate(fun state -> clearSession state workspaceId, ())
                 return ()
         }
 
-let createNudgeRuntime (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : NudgeRuntime =
-    NudgeRuntime(reviewStore)
+let createNudgeRuntime
+    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (getChatHistory: (string -> JS.Promise<obj array>) option)
+    : NudgeRuntime =
+    NudgeRuntime(reviewStore, getChatHistory)

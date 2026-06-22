@@ -42,8 +42,15 @@ let private parseHookEvent (event: obj) : NudgeRuntimeEvent =
         | "error" when decoded.errorType = "aborted" -> AbortedError decoded.workspaceId
         | _ -> Ignore
 
-let createEventHook (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
-    let runtime = createNudgeRuntime reviewStore
+let createEventHook (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+    let getChatHistory =
+        if Dyn.isNullish deps then None
+        else
+            let getter = Dyn.get deps "getChatHistory"
+            if Dyn.isNullish getter then None
+            else Some (fun (workspaceId: string) -> unbox<JS.Promise<obj array>> (Dyn.call1 getter workspaceId))
+
+    let runtime = createNudgeRuntime reviewStore getChatHistory
     let fn = System.Func<obj, obj, JS.Promise<unit>>(fun event helpers ->
         runtime.HandleEvent(parseHookEvent event, helpers))
     box fn

@@ -405,14 +405,14 @@ let formatReviewResult (result: ReviewResult) : string =
     match result with
     | Accepted ->
         frontMatterPrompt
-            [ yamlScalarField verdictField verdictAccepted ]
+            [ yamlPlainField verdictField verdictAccepted ]
             "Review passed. Your changes have been accepted. With-Review Mode has ended."
     | Terminated ->
         frontMatterPrompt
-            [ yamlScalarField verdictField verdictTerminated ]
+            [ yamlPlainField verdictField verdictTerminated ]
             "Review terminated without verdict. With-Review Mode is still active; fix the issues and call submit_review again."
     | Rejected feedback ->
         frontMatterPrompt
-            [ yamlScalarField verdictField verdictRejected
+            [ yamlPlainField verdictField verdictRejected
               yamlBlockField "feedback" feedback ]
             "Address the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."

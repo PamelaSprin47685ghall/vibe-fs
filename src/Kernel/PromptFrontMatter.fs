@@ -10,6 +10,9 @@ let yamlScalar (value: string) : string =
 let yamlScalarField (key: string) (value: string) : string =
     key + ": " + yamlScalar value
 
+let yamlPlainField (key: string) (value: string) : string =
+    key + ": " + value
+
 let yamlBlockField (key: string) (value: string) : string =
     let body = value.Split('\n') |> Array.map (fun line -> "  " + line) |> String.concat "\n"
     key + ": |\n" + body

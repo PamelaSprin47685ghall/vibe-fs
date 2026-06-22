@@ -40,7 +40,7 @@ let buildLoopCommandTemplate (commandName: string) (bodyLines: string list) : st
 /// restart replay recognizes it structurally, followed by the human-readable
 /// line. Authored once here, consumed verbatim by both hosts' cancel paths.
 let loopCancelledMessage : string =
-    frontMatterPrompt [ yamlScalarField verdictField verdictCancelled ] "With-Review Mode cancelled."
+    frontMatterPrompt [ yamlPlainField verdictField verdictCancelled ] "With-Review Mode cancelled."
 
 // ── Reconstruction from dialogue history ─────────────────────────────────────
 
