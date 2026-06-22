@@ -69,6 +69,8 @@ let private launchResultText (title: string) (childId: string) : string =
 let private failedLaunchResult (title: string) (reason: string) : string =
     $"Failed to start {title}: {reason}"
 
+let private bookkeeperSessionTitle = "Bookkeeper"
+
 let tryResolveJobContext (client: obj) (directory: string) (sessionID: string) : JS.Promise<WikiJobContext option> =
     promise {
         if sessionID.Trim() = "" || isNullish client then return None
@@ -97,7 +99,7 @@ let launchBackgroundSession (session: obj) (root: string) (parentID: string opti
             let! childId =
                 startSubagentSession registry client
                     { agent = "bookkeeper"
-                      title = title
+                      title = bookkeeperSessionTitle
                       prompt = jobMarkerPrompt ctx promptText
                       directory = root
                       sessionID = defaultArg parentID ""

@@ -124,6 +124,9 @@ let private formatReviewerAgentReportMarkdown (args: obj) : string =
     else
         "PASS"
 
+let private reviewerAgentReportPayload (args: obj) : obj =
+    createObj [ "reportMarkdown", box (formatReviewerAgentReportMarkdown args) ]
+
 let private isThenable (value: obj) : bool =
     not (Dyn.isNullish value) && Dyn.typeIs (Dyn.get value "then") "function"
 
@@ -215,9 +218,13 @@ let private mkAgentReportOverride (callStore: CallStore) : obj =
                             if callId <> "" then
                                 resolveCall callStore callId args |> ignore
 
-                            let upstreamArgs = createObj [ "reportMarkdown", box (formatReviewerAgentReportMarkdown args) ]
+                            let upstreamArgs = reviewerAgentReportPayload args
                             let raw = tool?execute(upstreamArgs, opts)
-                            return! (if isThenable raw then unbox<JS.Promise<obj>> raw else Promise.lift raw)
+                            let! result = if isThenable raw then unbox<JS.Promise<obj>> raw else Promise.lift raw
+                            if Dyn.typeIs result "object" && Dyn.truthy (Dyn.get result "success") then
+                                return Dyn.withKey result "report" (box upstreamArgs)
+                            else
+                                return result
                         })
                 createObj [ "description", box definition.description
                             "parameters", box definition.parameters

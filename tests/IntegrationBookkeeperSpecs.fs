@@ -36,6 +36,7 @@ let bookkeeperLaunchCarriesAiSettingsSpec () = promise {
     wikiRuntime.StartBookkeeperAppend("input", "result", "Title", parentSessionID = "parent-session", aiSettings = aiSettings)
     do! waitForBackgroundJobsForTesting p
     check "bookkeeper aiSettings create keeps parentID" (str (get createCalls.[0] "body") "parentID" = "parent-session")
+    check "bookkeeper session title is stable" (str (get createCalls.[0] "body") "title" = "Bookkeeper")
     let promptBody = get promptCalls.[0] "body"
     let modelObj = get promptBody "model"
     check "bookkeeper aiSettings prompt carries model" (str modelObj "providerID" = "openai" && str modelObj "modelID" = "gpt-5")

@@ -43,13 +43,13 @@ let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
 let private summarizeWhenNeeded (deps: obj) (config: obj) (options: ExecuteOptions) (output: string) : JS.Promise<string> =
     promise {
         if not (shouldSummarize byteLength output) then
-            return prependSafetyWarningForExecution output options
+            return output
         else
             let langStr = languageToString options.language
             let timeoutStr = timeoutToString options.timeoutType
             let prompt = formatPrompt mimocode (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
             let! report = runMuxSubagent deps config executionSubagentId prompt "Executor summary" None
-            return prependSafetyWarningForExecution report options
+            return report
     }
 
 let private describeDomainError (error: DomainError) : string =

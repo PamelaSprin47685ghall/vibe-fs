@@ -25,9 +25,14 @@ let muxToolNames =
        "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
        "fetch_wiki"; "return_bookkeeper" |]
 
+let private canUseMuxTopLevel (agent: string) (toolName: string) : bool =
+    match agent, toolName with
+    | "manager", "write" -> true
+    | _ -> canUse agent toolName
+
 let private buildToolPolicy (toolNames: string array) (role: obj) : obj =
     let agent = if Dyn.isNullish role then "manager" else string role
-    let remove = toolNames |> Array.filter (fun t -> not (canUse agent t))
+    let remove = toolNames |> Array.filter (fun t -> not (canUseMuxTopLevel agent t))
     box {| add = [||]; remove = remove |}
 
 let getPluginToolPolicy (agentId: string) (role: obj) : obj =
@@ -134,7 +139,7 @@ let createRegistration (deps: obj) : obj =
     let slashCommands = createSlashCommands deps toolNames callStore reviewStore
     let messagesTransformFn =
         System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
-            messagesTransform wikiRuntime reviewStore input output)
+            messagesTransform deps wikiRuntime reviewStore input output)
     box {| toolNames = toolNames
            tools = tools
            wrappers = wrappers

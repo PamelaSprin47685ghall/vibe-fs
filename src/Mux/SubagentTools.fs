@@ -144,12 +144,17 @@ let investigatorTool (deps: obj) (toolNames: string array) : ToolDefinition =
 let private meditatorPromptFromArgs (config: obj) (args: obj) : JS.Promise<string> =
     promise {
         let intent = defaultArg (strField args "intent") ""
-        let files = requireStrArray args "files" |> List.ofArray
-        let cwd = defaultArg (strField config "directory") ""
-        let! results = VibeFs.Shell.WorkspaceFiles.readReverieFiles cwd files
+        let files = requireStrArray args "files"
+        let fileList = List.ofArray files
+        let cwd =
+            defaultArg (strField config "directory") ""
+            |> fun value -> if value <> "" then value else defaultArg (strField config "cwd") ""
+            |> fun value -> if value <> "" then value else defaultArg (strField config "workspacePath") ""
+        let! results = VibeFs.Shell.WorkspaceFiles.readReverieFiles cwd fileList
         let sections =
-            results
-            |> List.map (fun r -> { file = r.filePath; content = r.content } : MeditatorFileSection)
+            Array.zip files (List.toArray results)
+            |> Array.map (fun (file, r) -> { file = file; content = r.content } : MeditatorFileSection)
+            |> List.ofArray
         return formatPrompt mimocode (Meditator(intent, sections)) |> List.head
     }
 

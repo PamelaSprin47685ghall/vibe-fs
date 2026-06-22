@@ -20,7 +20,8 @@ open VibeFs.Shell.WorkspaceFiles
 open VibeFs.Shell.ReviewRuntime
 open VibeFs.Mux.WikiTools
 
-let private defaultExcludedAgents = set [ "browser"; "investigator"; "executor"; "exec"; "explore"; "title"; "bookkeeper" ]
+let private alwaysExcludedAgents = set [ "browser"; "investigator"; "executor"; "title"; "bookkeeper" ]
+let private childWorkspaceExcludedAgents = set [ "exec"; "explore" ]
 
 let private capsUserPrefix = "caps-synth-user-"
 let private capsAssistantPrefix = "caps-synth-assistant-"
@@ -144,7 +145,27 @@ let private buildCapsMessages
                 else [| buildCapsAssistantMessage assistantId userId capsFiles fp |]
             Array.concat [| [| userMsg |]; assistantMsgs; existingStripped |]
 
+let private findWorkspaceEntry (deps: obj) (workspaceId: string) : obj =
+    if Dyn.isNullish deps || workspaceId = "" then null
+    else
+        let loadConfig = Dyn.get deps "loadConfigOrDefault"
+        let findEntry = Dyn.get deps "findWorkspaceEntry"
+        if Dyn.isNullish loadConfig || Dyn.isNullish findEntry then null
+        else
+            try
+                let configFile = loadConfig $ ()
+                findEntry $ (configFile, workspaceId)
+            with _ -> null
+
+let private isChildWorkspace (deps: obj) (workspaceId: string) : bool =
+    let entry = findWorkspaceEntry deps workspaceId
+    if Dyn.isNullish entry then false
+    else
+        let workspace = Dyn.get entry "workspace"
+        not (Dyn.isNullish workspace) && Dyn.str workspace "parentWorkspaceId" <> ""
+
 let messagesTransform
+    (deps: obj)
     (wikiRuntime: MuxWikiRuntime)
     (reviewStore: ReviewStore)
     (input: obj)
@@ -167,7 +188,9 @@ let messagesTransform
                     let explicit = Dyn.str input "directory"
                     if explicit <> "" then explicit else Dyn.str input "workspacePath"
                 reconstructReviewState reviewStore sessionID messagesArr
-                let excluded = defaultExcludedAgents |> Set.contains agent
+                let excluded =
+                    Set.contains agent alwaysExcludedAgents
+                    || (isChildWorkspace deps sessionID && Set.contains agent childWorkspaceExcludedAgents)
                 let typedMessages = decodeMessages sessionID messagesArr
                 let cleanedMessages = stripSyntheticBySource typedMessages
                 let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleanedMessages)

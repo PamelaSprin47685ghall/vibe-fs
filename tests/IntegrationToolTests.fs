@@ -295,7 +295,7 @@ let muxTopLevelPolicySpec () =
     promise {
         let managerPolicy = getPluginToolPolicy "x" (box "manager")
         let managerRemoves = unbox<string[]> (get managerPolicy "remove")
-        check "mux top-level policy manager removes write" (managerRemoves |> Array.contains "write")
+        check "mux top-level policy manager keeps write" (not (managerRemoves |> Array.contains "write"))
         check "mux top-level policy manager keeps submit_review" (not (managerRemoves |> Array.contains "submit_review"))
         check "mux top-level policy manager removes fuzzy_grep" (managerRemoves |> Array.contains "fuzzy_grep")
         let coderPolicy = getPluginToolPolicy "x" (box "coder")
@@ -304,7 +304,7 @@ let muxTopLevelPolicySpec () =
         check "mux top-level policy coder removes submit_review" (coderRemoves |> Array.contains "submit_review")
         let defaultPolicy = getPluginToolPolicy "x" null
         let defaultRemoves = unbox<string[]> (get defaultPolicy "remove")
-        check "mux top-level policy defaults to manager" (defaultRemoves |> Array.contains "write")
+        check "mux top-level policy defaults to manager" (not (defaultRemoves |> Array.contains "write"))
     }
 
 let muxTopLevelDedupSpec () =
@@ -348,6 +348,29 @@ let muxMessagesTransformDedupsRepeatedReadSpec () = promise {
     if isNullish tf then
         check "mux messagesTransform exposed for read dedup" false
     else
+        let messages =
+            [| muxDynamicToolMessage "read-1" "read" "call-1" (createObj [ "path", box "same.ts" ]) (box "same bytes")
+               muxDynamicToolMessage "read-2" "read" "call-2" (createObj [ "path", box "same.ts" ]) (box "same bytes") |]
+        let out = createObj [ "messages", box messages ]
+        let input = createObj [ "agent", box "manager"; "sessionID", box "mux-read-dedup-session" ]
+        do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+        let transformed = unbox<obj[]> (get out "messages")
+        let readMessages =
+            transformed
+            |> Array.filter (fun msg ->
+                let parts = unbox<obj[]> (get msg "parts")
+                parts |> Array.exists (fun part -> str part "toolName" = "read"))
+        check "mux messagesTransform keeps both plugin read messages" (readMessages.Length = 2)
+        let secondOutput = muxFirstDynamicToolOutput readMessages.[1]
+        check "mux messagesTransform dedups repeated plugin read" (string secondOutput = "[No Change Since Previous Read/Write]")
+}
+
+let muxMessagesTransformDedupsRepeatedFileReadSpec () = promise {
+    let reg = createRegistration (createObj [])
+    let tf = muxMessageTransform reg
+    if isNullish tf then
+        check "mux messagesTransform exposed for file_read dedup" false
+    else
         let repeated = box {| content = "same bytes" |}
         let messages =
             [| muxDynamicToolMessage "read-1" "file_read" "call-1" (createObj [ "path", box "same.ts" ]) repeated
@@ -363,7 +386,30 @@ let muxMessagesTransformDedupsRepeatedReadSpec () = promise {
                 parts |> Array.exists (fun part -> str part "toolName" = "file_read"))
         check "mux messagesTransform keeps both read messages" (readMessages.Length = 2)
         let secondOutput = muxFirstDynamicToolOutput readMessages.[1]
-        check "mux messagesTransform dedups repeated read" (str secondOutput "content" = "[No Change Since Previous Read/Write]")
+        check "mux messagesTransform dedups repeated file_read" (str secondOutput "content" = "[No Change Since Previous Read/Write]")
+}
+
+let muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec () = promise {
+    let reg = createRegistration (minimalMuxDeps ())
+    let tf = muxMessageTransform reg
+    if isNullish tf then
+        check "mux messagesTransform exposed for top-level exec read dedup" false
+    else
+        let messages =
+            [| muxDynamicToolMessage "read-top-1" "read" "call-top-1" (createObj [ "path", box "same.ts" ]) (box {| content = "same bytes" |})
+               muxDynamicToolMessage "read-top-2" "read" "call-top-2" (createObj [ "path", box "same.ts" ]) (box {| content = "same bytes" |}) |]
+        let out = createObj [ "messages", box messages ]
+        let input = createObj [ "agent", box "exec"; "workspaceId", box "top-level-exec" ]
+        do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+        let transformed = unbox<obj[]> (get out "messages")
+        let readMessages =
+            transformed
+            |> Array.filter (fun msg ->
+                let parts = unbox<obj[]> (get msg "parts")
+                parts |> Array.exists (fun part -> str part "toolName" = "read"))
+        check "mux messagesTransform keeps both top-level exec read messages" (readMessages.Length = 2)
+        let secondOutput = muxFirstDynamicToolOutput readMessages.[1]
+        check "mux messagesTransform dedups repeated read for top-level exec" (str secondOutput "content" = "[No Change Since Previous Read/Write]")
 }
 
 let muxTodoWriteWrapperSchemaSpec () = promise {
@@ -462,7 +508,39 @@ let muxExecutorRoCatPrependsWarningSpec () = promise {
         let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-executor-ro-warning"; "sessionID", box "mux-executor-ro-warning" ]
         let args = createObj [ "language", box "shell"; "program", box "cat /etc/passwd"; "timeout_type", box "short"; "mode", box "ro" ]
         let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-        check "mux executor ro cat prepends warning" (result.StartsWith readOnlyWarning)
+        check "mux executor ro cat does not prepend warning" (not (result.StartsWith readOnlyWarning))
+    do! rmAsync workspaceDir
+}
+
+let muxMeditatorReadsFilesFromCwdSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-meditator-files-"
+    let filePath = pathModule?join(workspaceDir, "note.md")
+    do! writeFileAsync filePath "deep context"
+    let reg = createRegistration (minimalMuxDeps ())
+    let meditator = muxToolByName reg "meditator"
+    if isNullish meditator then
+        check "mux registration exposes meditator tool" false
+    else
+        let prompts = ResizeArray<string>()
+        let taskService =
+            createObj
+                [ "create",
+                  box (System.Func<obj, JS.Promise<obj>>(fun input ->
+                      promise {
+                          prompts.Add(str input "prompt")
+                          return box {| success = true; data = box {| taskId = "meditator-task-1"; kind = "agent" |} |}
+                      }))
+                  "waitForAgentReport",
+                  box (System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
+                      Promise.lift (box {| reportMarkdown = "meditated" |}))) ]
+        let ctx = createObj [ "cwd", box workspaceDir; "workspaceId", box "mux-meditator-files"; "taskService", box taskService ]
+        let args = createObj [ "intent", box "reason"; "files", box [| "note.md" |] ]
+        let! result = ((get meditator "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+        let promptText = if prompts.Count > 0 then prompts.[0] else ""
+        check "mux meditator returns subagent report" (result = "meditated")
+        check "mux meditator prompt keeps requested relative file path" (promptText.Contains "note.md")
+        check "mux meditator prompt includes file content" (promptText.Contains "deep context")
+        check "mux meditator prompt does not mark readable file skipped" (not (promptText.Contains "(skipped)"))
     do! rmAsync workspaceDir
 }
 
@@ -622,10 +700,13 @@ let run () : JS.Promise<unit> =
             "muxTopLevelPolicy", muxTopLevelPolicySpec
             "muxTopLevelDedup", muxTopLevelDedupSpec
             "muxMessagesTransformDedupsRepeatedRead", muxMessagesTransformDedupsRepeatedReadSpec
+            "muxMessagesTransformDedupsRepeatedFileRead", muxMessagesTransformDedupsRepeatedFileReadSpec
+            "muxMessagesTransformDedupsRepeatedReadForTopLevelExec", muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec
             "muxTodoWriteWrapperSchema", muxTodoWriteWrapperSchemaSpec
             "muxTodoWriteCapturesCompletedWorkReport", muxTodoWriteCapturesCompletedWorkReportSpec
             "muxMagicTodoProjection", muxMagicTodoProjectionSpec
             "muxExecutorRoCatPrependsWarning", muxExecutorRoCatPrependsWarningSpec
+            "muxMeditatorReadsFilesFromCwd", muxMeditatorReadsFilesFromCwdSpec
             "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
             "muxSubmitReviewPromptSuppliesCallId", muxSubmitReviewPromptSuppliesCallIdSpec
             "muxReturnReviewerRegistered", muxReturnReviewerRegisteredSpec
