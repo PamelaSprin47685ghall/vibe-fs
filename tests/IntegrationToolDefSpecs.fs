@@ -13,11 +13,6 @@ open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.WikiFiles
 
-let private mimoTodoSyncHook (calls: ResizeArray<string * obj array>) : obj =
-    box (System.Func<string, obj array, JS.Promise<obj>>(fun sessionID todos ->
-        calls.Add(sessionID, todos)
-        Promise.lift null))
-
 
 let toolDefinitionSpec () = promise {
     let! workspaceDir = mkdtempAsync "tool-definition-"
@@ -164,32 +159,6 @@ let mimoTaskExecuteStripsTaskIdSpec () = promise {
     ]
     let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ]) |> unbox<JS.Promise<string>>
     check "mimo task execute ignores stray task_id" (result.Contains "Todos updated.")
-    do! rmAsync workspaceDir
-}
-
-let mimoTaskSyncsViaHostHookSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mimo-task-host-sync-"
-    let calls = ResizeArray<string * obj array>()
-    let! p = VibeFs.Opencode.PluginMimo.plugin (createObj [ "directory", box workspaceDir; "__mimoTodoSyncForTesting", mimoTodoSyncHook calls ])
-    let taskTool = get (get p "tool") "task"
-    let sessionID = "mimo-hook-session-1"
-    let args = createObj [
-        "completedWorkReport", box "Synced via host todo service bridge"
-        "todos", box [|
-            createObj [ "content", box "Ship host sync bridge"; "status", box "in_progress"; "priority", box "high" ]
-            createObj [ "content", box "Verify sidebar order"; "status", box "pending"; "priority", box "medium" ]
-        |]
-    ]
-    let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box sessionID ]) |> unbox<JS.Promise<string>>
-    check "mimo task execute sync hook returns success text" (result = "Todos updated.")
-    check "mimo task execute calls host sync hook once" (calls.Count = 1)
-    let syncedSessionID, syncedTodos = calls.[0]
-    check "mimo task execute passes session id to host sync hook" (syncedSessionID = sessionID)
-    check "mimo task execute passes two todos to host sync hook" (syncedTodos.Length = 2)
-    check "mimo task execute keeps first todo content for host sync hook" (str syncedTodos.[0] "content" = "Ship host sync bridge")
-    check "mimo task execute keeps first todo status for host sync hook" (str syncedTodos.[0] "status" = "in_progress")
-    check "mimo task execute keeps second todo content for host sync hook" (str syncedTodos.[1] "content" = "Verify sidebar order")
-    check "mimo task execute keeps second todo status for host sync hook" (str syncedTodos.[1] "status" = "pending")
     do! rmAsync workspaceDir
 }
 

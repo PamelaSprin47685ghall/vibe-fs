@@ -293,12 +293,17 @@ let loopMessagesShared () =
     let task = "ship S1 refactor"
     let intro = "With-Review Mode is active. Complete the task above, then call submit_review with:"
     let kernelMsg = VibeFs.Kernel.LoopMessages.buildLoopMessage task [ intro ]
+    check "loop message carries task as block field" (kernelMsg.Contains "task: |")
     check "loop message embeds task" (kernelMsg.Contains task)
     check "loop message embeds intro" (kernelMsg.Contains intro)
     check "loop message mentions submit_review" (kernelMsg.Contains "submit_review")
     check "loop message lists report field" (kernelMsg.Contains "report")
     check "loop message lists affectedFiles field" (kernelMsg.Contains "affectedFiles")
     check "loop message names reviewer" (kernelMsg.Contains "reviewer")
+
+    let multilineTask = "ship S1 refactor\ninclude follow-up cleanup"
+    let parsedLoopMsg = VibeFs.Kernel.PromptFrontMatter.parseFrontMatterScalars (VibeFs.Kernel.LoopMessages.buildLoopMessage multilineTask [ intro ])
+    equal "loop message multiline task round-trips through block front-matter" (Some multilineTask) (Map.tryFind "task" parsedLoopMsg)
 
     let loopTemplate = VibeFs.Kernel.Prompts.withReviewCommandTemplate
     check "loop template carries command front-matter" (loopTemplate.Contains "command: \"with-review\"")

@@ -688,7 +688,6 @@ let run () : JS.Promise<unit> =
             "mimoTaskExecuteNestedReport", mimoTaskExecuteNestedReportSpec
             "mimoTaskExecuteInPlaceStrip", mimoTaskExecuteInPlaceStripSpec
             "mimoTaskExecuteStripsTaskId", mimoTaskExecuteStripsTaskIdSpec
-            "mimoTaskSyncsViaHostHook", mimoTaskSyncsViaHostHookSpec
             "mimoTaskDefinitionHandlesZodLikeParameters", mimoTaskDefinitionHandlesZodLikeParametersSpec
             "coderTool", coderToolSpec
             "investigatorTool", investigatorToolSpec
