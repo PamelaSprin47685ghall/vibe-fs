@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Executor
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.SearchPrompts
 
 [<Import("createRequire", "node:module")>]
 let private createRequire' : string -> (string -> obj) = jsNative
@@ -148,11 +148,11 @@ let knowledgeGraphPortSerialSpec () = promise {
 
 let ollamaFormat () =
     let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]
-    let formatted = VibeFs.Kernel.Prompts.formatSearchResults results
+    let formatted = VibeFs.Kernel.SearchPrompts.formatSearchResults results
     check "search results front matter" (formatted.StartsWith "---\nresults:")
     check "search embeds title A" (formatted.Contains "title: \"A\"")
     check "search embeds title B" (formatted.Contains "title: \"B\"")
-    equal "empty search" "No results found." (VibeFs.Kernel.Prompts.formatSearchResults [])
+    equal "empty search" "No results found." (VibeFs.Kernel.SearchPrompts.formatSearchResults [])
 
 let summarizerInputCap () =
     let bl (s: string) : int = s.Length

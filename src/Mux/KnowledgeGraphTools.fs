@@ -1,13 +1,11 @@
 module VibeFs.Mux.KnowledgeGraphTools
 
-open System
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
-open VibeFs.Kernel.ToolCatalog
 open VibeFs.Kernel.KnowledgeGraphMaintenance
 open VibeFs.Kernel.KnowledgeGraphPrompts
 open VibeFs.Mux.Delegate
@@ -98,7 +96,9 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
                             |> Array.toList
                             |> List.collect extractTexts
                         return texts |> List.tryPick tryParseJobMarker
-                    with _ -> return None
+                    with ex ->
+                        printfn $"[kg] TryResolveJobContext getChatHistory failed for {sessionID}: {ex.Message}"
+                        return None
         }
 
     member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<KnowledgeGraphProjection> =
@@ -301,57 +301,3 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
     member val startMaintenanceIfDue = System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> this.StartMaintenanceIfDue(workspaceRoot)) with get, set
     member val takeBookkeeperLaunchesForTesting = System.Func<obj array>(fun () -> this.TakeBookkeeperLaunchesForTesting()) with get, set
     member val waitForBackgroundJobsForTesting = System.Func<JS.Promise<unit>>(fun () -> this.WaitForBackgroundJobsForTesting()) with get, set
-
-let private knowledgeGraphDraftEntrySchema : obj =
-    createObj
-        [ "type", box "object"
-          "properties",
-          box
-              (createObj
-                  [ "id", box (createObj [ "type", box "string"; "description", box "Existing entry id to update" ])
-                    "entity",
-                    box
-                        (createObj
-                            [ "type", box "array"
-                              "items", box (createObj [ "type", box "string" ])
-                              "description", box "Knowledge graph entity" ])
-                    "fact", box (createObj [ "type", box "string"; "description", box "Knowledge graph fact" ]) ])
-          "required", box [| "entity"; "fact" |]
-          "additionalProperties", box false ]
-
-let knowledgeGraphFetchTool (kgRuntime: MuxKnowledgeGraphRuntime) : ToolDefinition =
-    { name = "knowledge_graph_fetch"
-      description = description "knowledge_graph_fetch"
-      parameters = mkSchema (createObj [ "entity", box (strProp Params.fetchKnowledgeGraphEntity) ]) [| "entity" |]
-      execute =
-          fun config args ->
-              let sessionID = Dyn.str config "sessionID"
-              let directory =
-                  let current = Dyn.str config "directory"
-                  if current = "" then defaultArg (strField config "cwd") "" else current
-              kgRuntime.FetchFromSessionSnapshot(sessionID, directory, Dyn.str args "entity")
-      condition = None }
-
-let returnBookkeeperTool (kgRuntime: MuxKnowledgeGraphRuntime) : ToolDefinition =
-    { name = "return_bookkeeper"
-      description = description "return_bookkeeper"
-      parameters =
-          mkSchema
-              (createObj
-                  [ "entries",
-                    box
-                        (createObj
-                            [ "type", box "array"
-                              "items", box knowledgeGraphDraftEntrySchema
-                              "description", box Params.submitKnowledgeGraphEntries ]) ])
-              [| "entries" |]
-      execute =
-          fun config args ->
-              let sessionID = Dyn.str config "sessionID"
-              let directory =
-                  let current = Dyn.str config "directory"
-                  if current = "" then defaultArg (strField config "cwd") "" else current
-              match parseDraftArray (Dyn.get args "entries") with
-              | Error message -> resolveStr message
-              | Ok drafts -> kgRuntime.Submit(sessionID, directory, drafts, config)
-      condition = None }

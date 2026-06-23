@@ -7,7 +7,7 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Prompts
+
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Opencode.ToolSchema

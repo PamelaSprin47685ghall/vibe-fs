@@ -53,7 +53,8 @@ let private tryGetPack () : Result<obj, string> =
     let warmPack (pack: obj) =
         try
             getOrCall pack "downloadAll" |> ignore
-        with _ -> ()
+        with ex ->
+            printfn $"[tree-sitter] warmPack downloadAll failed: {ex.Message}"
         pack
 
     let loadFromRootPackage () =
@@ -194,7 +195,9 @@ let readAndCheckSyntax (filePath: string) (cwd: string) (includeOk: bool) : JS.P
             let! (content: string) = fsPromises?readFile(abs, "utf-8")
             let! result = checkSyntax content filePath
             return formatSyntaxDiagnostics filePath result includeOk
-        with _ -> return None
+        with ex ->
+            printfn $"[tree-sitter] checkSyntaxFile failed for {filePath}: {ex.Message}"
+            return None
     }
 
 let appendSyntaxDiagnostics (filePath: string) (content: string) (includeOk: bool)

@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.Domain
 open VibeFs.Shell.ReviewRuntime

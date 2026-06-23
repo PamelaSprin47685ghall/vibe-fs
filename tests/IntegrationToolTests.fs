@@ -24,7 +24,8 @@ open VibeFs.Shell.MagicSessionStore
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.TempWorkspace
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.ReviewPrompts
+
 
 let wrapperSpec (reg: obj) =
     let wrappers = unbox<obj[]> (get reg "wrappers")

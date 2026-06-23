@@ -28,7 +28,8 @@ let private tryGetTodos (helpers: obj) (workspaceId: string) : JS.Promise<string
                 return (result :?> obj array) |> Array.map string |> List.ofArray
             else
                 return []
-        with _ ->
+        with ex ->
+            printfn $"[nudge] tryGetTodos failed for {workspaceId}: {ex.Message}"
             return []
     }
 
@@ -42,7 +43,8 @@ let private tryGetChatHistory
         | Some getHistory ->
             try
                 return! getHistory workspaceId
-            with _ ->
+            with ex ->
+                printfn $"[nudge] tryGetChatHistory failed for {workspaceId}: {ex.Message}"
                 return [||]
     }
 
@@ -117,7 +119,8 @@ let private runNudgeFlow
                         try
                             let nudgeFn = Dyn.get helpers "nudge"
                             return! unbox<JS.Promise<bool>> (Dyn.call2 nudgeFn workspaceId promptText)
-                        with _ ->
+                        with ex ->
+                            printfn $"[nudge] sendNudge failed for {workspaceId}: {ex.Message}"
                             return false
                     }
 
@@ -126,7 +129,8 @@ let private runNudgeFlow
                     match tryRecordSend state workspaceId outcome with
                     | Some nextState -> nextState, ()
                     | None -> state, ())
-        with _ ->
+        with ex ->
+            printfn $"[nudge] startNudgeFlow outer catch for {workspaceId}: {ex.Message}"
             holder.Mutate(fun state -> clearSession state workspaceId, ())
     }
 

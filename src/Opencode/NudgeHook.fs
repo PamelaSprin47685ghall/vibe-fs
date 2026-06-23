@@ -7,7 +7,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeState
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.PromptFragments
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicCore
 open VibeFs.Shell.ChildAgentRegistry
@@ -94,7 +94,9 @@ let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<Se
                           lastAssistantMessage = lastAssistantMessage
                           alreadyNudged = alreadyNudged
                           agentFromMessage = agentFromMessage }
-        with _ -> return None
+        with ex ->
+            printfn $"[nudge-hook] collectSnapshot failed for {Id.sessionIdValue sessionID}: {ex.Message}"
+            return None
     }
 
 let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string option) (promptText: string) : JS.Promise<unit> =
@@ -207,7 +209,8 @@ let private runNudgeFlow (holder: StateHolder<VibeFs.Kernel.NudgeState.NudgeShel
                         match VibeFs.Kernel.NudgeState.tryRecordSend state sid outcome with
                         | Some nextState -> nextState, ()
                         | None -> state, ())
-        with _ ->
+        with ex ->
+            printfn $"[nudge-hook] startNudgeFlow failed for {Id.sessionIdValue sessionID}: {ex.Message}"
             holder.Mutate(fun (state: VibeFs.Kernel.NudgeState.NudgeShellState) -> VibeFs.Kernel.NudgeState.clearSession state (Id.sessionIdValue sessionID), ())
     }
 
@@ -267,7 +270,9 @@ type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.Rev
                         let nudgeEvent = decodeNudgeHostEvent eventType props
                         let nextState, wantsNudge = NudgeState.handleEvent state (Id.sessionIdValue sessionID) nudgeEvent
                         nextState, (if wantsNudge then Some sessionID else None)
-                with _ -> state, None)
+                with ex ->
+                    printfn $"[nudge-hook] event decode failed: {ex.Message}"
+                    state, None)
         match claimed with
         | Some sessionID -> startNudgeFlow holder (client ()) reviewStore registry sessionID
         | None -> ()

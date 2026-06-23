@@ -152,10 +152,10 @@ let disposeSessionTreeTerminatesAll () =
 let inferReviewTaskFromTexts' () =
     let activate task =
         buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
-    let accept = VibeFs.Kernel.Prompts.formatReviewResult Accepted
+    let accept = VibeFs.Kernel.ReviewPrompts.formatReviewResult Accepted
     let cancel = loopCancelledMessage
-    let rejected = VibeFs.Kernel.Prompts.formatReviewResult (Rejected "fix the tests")
-    let terminated = VibeFs.Kernel.Prompts.formatReviewResult Terminated
+    let rejected = VibeFs.Kernel.ReviewPrompts.formatReviewResult (Rejected "fix the tests")
+    let terminated = VibeFs.Kernel.ReviewPrompts.formatReviewResult Terminated
 
     equal "empty -> None" None (inferReviewTaskFromTexts [])
     equal "only activate -> Some task" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1" ])
@@ -199,23 +199,23 @@ let parseFrontMatterScalars' () =
 let doubleCheckAnchorReplay () =
     check "empty history -> no anchor" (not (hasDoubleCheckAnchor []))
     check "plain prose -> no anchor" (not (hasDoubleCheckAnchor [ "just a message"; "another" ]))
-    let prompt = VibeFs.Kernel.Prompts.doubleCheckPrompt "ship feature X"
+    let prompt = VibeFs.Kernel.ReviewPrompts.doubleCheckPrompt "ship feature X"
     check "double-check prompt carries anchor" (hasDoubleCheckAnchor [ prompt ])
     check "anchor survives mixed history" (hasDoubleCheckAnchor [ "earlier msg"; prompt; "later msg" ])
 
 let doubleCheckPromptFormat () =
-    let prompt = VibeFs.Kernel.Prompts.doubleCheckPrompt "build the login page"
+    let prompt = VibeFs.Kernel.ReviewPrompts.doubleCheckPrompt "build the login page"
     check "has front-matter fence" (prompt.Contains "---")
     check "has double-check field" (prompt.Contains "double-check:")
     check "embeds task" (prompt.Contains "build the login page")
     check "asks for re-submission" (prompt.Contains "REJECT with detailed feedback")
-    let multiline = VibeFs.Kernel.Prompts.doubleCheckPrompt "task with\nnewline and ### markdown"
+    let multiline = VibeFs.Kernel.ReviewPrompts.doubleCheckPrompt "task with\nnewline and ### markdown"
     check "multiline task uses block field" (multiline.Contains "task: |")
     let parsed = VibeFs.Kernel.PromptFrontMatter.parseFrontMatterScalars multiline
     equal "multiline task round-trips" (Some "task with\nnewline and ### markdown") (Map.tryFind "task" parsed)
 
 let reviewerPromptFormat () =
-    let prompt = VibeFs.Kernel.Prompts.reviewerPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
+    let prompt = VibeFs.Kernel.ReviewPrompts.reviewerPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
     check "has front-matter fence" (prompt.Contains "---")
     check "embeds task as block field" (prompt.Contains "task: |")
     check "lists affected files in front-matter" (prompt.Contains "affected_files:")
@@ -226,17 +226,17 @@ let reviewerPromptFormat () =
     check "no ugly Task header" (not (prompt.Contains "=== Task ==="))
     check "no ugly Change Report header" (not (prompt.Contains "=== Change Report ==="))
     check "no change_report front-matter field" (not (prompt.Contains "change_report:"))
-    let minimal = VibeFs.Kernel.Prompts.reviewerPrompt "only task" "" []
+    let minimal = VibeFs.Kernel.ReviewPrompts.reviewerPrompt "only task" "" []
     check "minimal prompt embeds task" (minimal.Contains "only task")
     check "minimal prompt has no worker report section" (not (minimal.Contains "# Worker Report"))
     check "minimal prompt omits affected_files when empty" (not (minimal.Contains "affected_files:"))
     let multilineTask = "Line one of task\nLine two with ### markdown\nLine three"
-    let mp = VibeFs.Kernel.Prompts.reviewerPrompt multilineTask "" []
+    let mp = VibeFs.Kernel.ReviewPrompts.reviewerPrompt multilineTask "" []
     let parsed = VibeFs.Kernel.PromptFrontMatter.parseFrontMatterScalars mp
     equal "multiline task round-trips through front-matter" (Some multilineTask) (Map.tryFind "task" parsed)
 
 let muxReviewerVerdictPromptFormat () =
-    let prompt = VibeFs.Kernel.Prompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ] "call-123"
+    let prompt = VibeFs.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ] "call-123"
     check "mux prompt starts with front-matter" (prompt.StartsWith "---")
     check "mux prompt carries reviewer role" (prompt.Contains "role: \"reviewer\"")
     check "mux prompt carries call_id" (prompt.Contains "call_id: \"call-123\"")
@@ -249,7 +249,7 @@ let muxReviewerVerdictPromptFormat () =
     check "mux prompt has no legacy divider" (not (prompt.Contains "==="))
 
 let muxPreReviewVerdictPromptFormat () =
-    let prompt = VibeFs.Kernel.Prompts.preReviewVerdictPrompt "clarify rollout" "call-456"
+    let prompt = VibeFs.Kernel.ReviewPrompts.preReviewVerdictPrompt "clarify rollout" "call-456"
     check "pre-review prompt starts with front-matter" (prompt.StartsWith "---")
     check "pre-review prompt carries reviewer role" (prompt.Contains "role: \"reviewer\"")
     check "pre-review prompt carries call_id" (prompt.Contains "call_id: \"call-456\"")
@@ -259,7 +259,7 @@ let muxPreReviewVerdictPromptFormat () =
     check "pre-review prompt has no legacy divider" (not (prompt.Contains "==="))
 
 let reviewInstructionsFrontMatter () =
-    let instr = VibeFs.Kernel.Prompts.reviewInstructions
+    let instr = VibeFs.Kernel.ReviewPrompts.reviewInstructions
     check "instructions wrapped in front-matter" (instr.StartsWith "---")
     check "instructions carry role" (instr.Contains "role: \"reviewer\"")
     check "instructions carry review criteria" (instr.Contains "# Evaluation Criteria")

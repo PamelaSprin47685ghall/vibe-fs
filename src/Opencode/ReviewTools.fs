@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
@@ -14,7 +14,7 @@ open VibeFs.Opencode.ToolHelpers
 open VibeFs.Mux.Wrappers
 open VibeFs.Shell.ChildAgentRegistry
 
-let private formatReviewResult = VibeFs.Kernel.Prompts.formatReviewResult
+let private formatReviewResult = VibeFs.Kernel.ReviewPrompts.formatReviewResult
 
 let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     let client () = Dyn.get ctx "client"

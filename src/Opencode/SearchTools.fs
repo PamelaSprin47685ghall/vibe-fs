@@ -8,7 +8,7 @@ open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Fuzzy
 open VibeFs.Kernel.HostTools
 open VibeFs.Mux.BuiltinTools
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.SearchPrompts
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Shell.OllamaClient

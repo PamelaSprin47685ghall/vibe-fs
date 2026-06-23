@@ -3,7 +3,7 @@ module VibeFs.Kernel.NudgeState
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.PromptFragments
 
 type NudgeShellState =
     { nudgedSessions: Set<string>

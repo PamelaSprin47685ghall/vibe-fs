@@ -1,7 +1,7 @@
 module VibeFs.Kernel.Nudge
 
 open System.Text.RegularExpressions
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.PromptFragments
 
 /// Which kind of nudge, if any, a session needs right now.
 type NudgeAction = NudgeTodo | NudgeLoop | NudgeRunner | NudgeNone

@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.SubagentPrompts
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.ToolCatalog

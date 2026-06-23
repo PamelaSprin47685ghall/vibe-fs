@@ -221,7 +221,7 @@ let decideNudge' () =
     // Claimed + open todos + fresh stop → Send the todo nudge.
     let claimed, _ = tryClaimNudge emptyState "s"
     match snd (decideNudge noReview noChild claimed "s" (snapshot [ "a" ] "working" false None)) with
-    | Send(text, _) -> check "claimed fresh stop nudges todo" (text = VibeFs.Kernel.Prompts.todoNudgePrompt)
+    | Send(text, _) -> check "claimed fresh stop nudges todo" (text = VibeFs.Kernel.PromptFragments.todoNudgePrompt)
     | StandDown -> check "claimed fresh stop nudges todo" false
 
     // Claimed but the history already carries a trailing nudge → stand down.
@@ -235,7 +235,7 @@ let decideNudge' () =
     // Claimed + loop active (no todos) → loop nudge.
     let loopReview (_: string) = true
     match snd (decideNudge loopReview noChild claimed "s" (snapshot [] "ok" false None)) with
-    | Send(text, _) -> check "loop active nudges loop" (text = VibeFs.Kernel.Prompts.loopNudgePrompt)
+    | Send(text, _) -> check "loop active nudges loop" (text = VibeFs.Kernel.PromptFragments.loopNudgePrompt)
     | StandDown -> check "loop active nudges loop" false
 
     // Stopped session is never nudged even when claimed.
@@ -261,13 +261,13 @@ let decodeLastAssistantNudge () =
 
     // A nudge prompt after the last assistant turn marks the stop as nudged.
     let _, _, nudged2 =
-        decodeLastAssistant (box [| user "go"; assistant "did work"; user VibeFs.Kernel.Prompts.todoNudgePrompt |])
+        decodeLastAssistant (box [| user "go"; assistant "did work"; user VibeFs.Kernel.PromptFragments.todoNudgePrompt |])
     check "trailing todo nudge → true" nudged2
 
     // Once the agent answers the nudge, a NEW assistant turn is the last one and
     // the stop is open for nudging again.
     let _, _, nudged3 =
-        decodeLastAssistant (box [| user "go"; assistant "did work"; user VibeFs.Kernel.Prompts.todoNudgePrompt; assistant "more work" |])
+        decodeLastAssistant (box [| user "go"; assistant "did work"; user VibeFs.Kernel.PromptFragments.todoNudgePrompt; assistant "more work" |])
     check "assistant after nudge → false" (not nudged3)
 
     let _, _, nudgedEmpty = decodeLastAssistant (box [||])

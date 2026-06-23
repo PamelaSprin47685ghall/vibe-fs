@@ -6,7 +6,8 @@ open VibeFs.Tests.Assert
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.PromptFragments
+
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 

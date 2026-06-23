@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.ReviewerLoop

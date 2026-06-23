@@ -6,7 +6,8 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Config
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.PromptFragments
+open VibeFs.Kernel.ReviewPrompts
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -30,14 +31,14 @@ type private BuiltinAgentSpec =
 let private defaultPrimaryAliases = Set [ "manager"; "build"; "plan" ]
 
 let private builtinAgentSpecs =
-    [ { name = "manager"; defaultMode = "primary"; systemPrompt = Prompts.managerSystemPrompt; defaultMcps = [||] }
+    [ { name = "manager"; defaultMode = "primary"; systemPrompt = managerSystemPrompt; defaultMcps = [||] }
       { name = "build"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
       { name = "plan"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
       { name = "coder"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "investigator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "meditator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "bookkeeper"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "reviewer"; defaultMode = "subagent"; systemPrompt = Prompts.reviewInstructions; defaultMcps = [||] }
+      { name = "reviewer"; defaultMode = "subagent"; systemPrompt = reviewInstructions; defaultMcps = [||] }
       { name = "browser"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [| "stealth-browser-mcp" |] }
       { name = "executor"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] } ]
 

@@ -6,7 +6,10 @@
     <Compile Include="PromptFrontMatter.fs" />
     <Compile Include="ReviewSession.fs" />
     <Compile Include="LoopMessages.fs" />
-    <Compile Include="Prompts.fs" />
+    <Compile Include="PromptFragments.fs" />
+    <Compile Include="SearchPrompts.fs" />
+    <Compile Include="ReviewPrompts.fs" />
+    <Compile Include="SubagentPrompts.fs" />
     <Compile Include="Subagent.fs" />
     <Compile Include="ToolCatalog.fs" />
     <Compile Include="Nudge.fs" />

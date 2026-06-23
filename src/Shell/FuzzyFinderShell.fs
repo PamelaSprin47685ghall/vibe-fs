@@ -23,8 +23,9 @@ let private createFinderRaw (basePath: string) : JS.Promise<obj> =
             let finder = Dyn.get result "value"
             try
                 do! finder?waitForScan(15000)
-            with _ -> ()
-            return createObj [ "ok" ==> true; "value" ==> finder ]
+                return createObj [ "ok" ==> true; "value" ==> finder; "scanWarn" ==> null ]
+            with ex ->
+                return createObj [ "ok" ==> true; "value" ==> finder; "scanWarn" ==> $"waitForScan failed: {ex.Message}" ]
     }
 
 let resultFromRaw (raw: obj) : Result<FinderLike, string> =

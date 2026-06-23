@@ -9,10 +9,13 @@ open VibeFs.Shell.CallStore
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
+open VibeFs.Mux.ReviewToolsMux
 open VibeFs.Mux.BuiltinTools
+open VibeFs.Mux.WebTools
 open VibeFs.Mux.EventHook
 open VibeFs.Mux.SlashCommands
 open VibeFs.Mux.KnowledgeGraphTools
+open VibeFs.Mux.KnowledgeGraphToolDefs
 open VibeFs.Kernel.Dyn
 open VibeFs.Mux.ReadDedup
 open VibeFs.Shell.FuzzyFinderShell
@@ -93,7 +96,6 @@ let createToolCatalog
     (hostReadExec: HostReadExec)
     (finderCache: FinderCache)
     (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
-    (knowledgeGraphEnabled: bool)
     : ToolDefinition array =
     [| yield coderTool deps toolNames
        yield investigatorTool deps toolNames
@@ -108,9 +110,8 @@ let createToolCatalog
        yield fuzzyFindTool finderCache
        yield writeTool deps
        yield readTool deps hostReadExec
-       if knowledgeGraphEnabled then
-           yield knowledgeGraphFetchTool knowledgeGraphRuntime
-           yield returnBookkeeperTool knowledgeGraphRuntime |]
+       yield knowledgeGraphFetchTool knowledgeGraphRuntime
+       yield returnBookkeeperTool knowledgeGraphRuntime |]
 
 let private recordsToBookkeeper (tool: string) : bool =
     let allowed =
@@ -127,26 +128,23 @@ let private bookkeeperInput (input: obj) : string =
 
 let private toolExecuteAfter
     (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
-    (knowledgeGraphEnabled: bool)
     (input: obj)
     (output: obj)
     : JS.Promise<unit> =
     promise {
-        if not knowledgeGraphEnabled then ()
-        else
-            let tool = Dyn.str input "tool"
-            let sessionID = Dyn.str input "sessionID"
-            let succeeded = Dyn.str output "error" = ""
-            if succeeded
-               && recordsToBookkeeper tool
-               && not (isReadOnlyExecutor tool input) then
-                knowledgeGraphRuntime.StartBookkeeperAppend(
-                    bookkeeperInput input,
-                    Dyn.str output "output",
-                    tool,
-                    config = createObj
-                        [ "sessionID", box sessionID
-                          "directory", box (Dyn.str input "directory") ])
+        let tool = Dyn.str input "tool"
+        let sessionID = Dyn.str input "sessionID"
+        let succeeded = Dyn.str output "error" = ""
+        if succeeded
+           && recordsToBookkeeper tool
+           && not (isReadOnlyExecutor tool input) then
+            knowledgeGraphRuntime.StartBookkeeperAppend(
+                bookkeeperInput input,
+                Dyn.str output "output",
+                tool,
+                config = createObj
+                    [ "sessionID", box sessionID
+                      "directory", box (Dyn.str input "directory") ])
     }
 
 let createRegistration (deps: obj) : obj =
@@ -155,11 +153,7 @@ let createRegistration (deps: obj) : obj =
     let hostReadExec = HostReadExec()
     let finderCache = FinderCache()
     let knowledgeGraphRuntime = MuxKnowledgeGraphRuntime(deps)
-    let directory =
-        let dir = Dyn.str deps "directory"
-        if dir <> "" then dir else Dyn.str deps "cwd"
-    let knowledgeGraphEnabled = knowledgeGraphDirExists directory
-    let tools = createToolCatalog deps muxToolNames callStore reviewStore hostReadExec finderCache knowledgeGraphRuntime knowledgeGraphEnabled
+    let tools = createToolCatalog deps muxToolNames callStore reviewStore hostReadExec finderCache knowledgeGraphRuntime
     let toolsObj = toolsToObject tools
     let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.Config.getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
     let wrappers = createAllWrappers toolsObj hostReadExec callStore
@@ -218,5 +212,5 @@ let createRegistration (deps: obj) : obj =
                       |> Option.map (fun k -> resolveCall callStore k args)
                       |> Option.defaultValue false)) ]) ]
     setKey registration "tool.execute.after" (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
-        toolExecuteAfter knowledgeGraphRuntime knowledgeGraphEnabled input output)))
+        toolExecuteAfter knowledgeGraphRuntime input output)))
     box registration

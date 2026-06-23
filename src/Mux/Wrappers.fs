@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicTodo
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.PromptFragments
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Opencode.HookSchema
 open VibeFs.Shell.TreeSitterShell

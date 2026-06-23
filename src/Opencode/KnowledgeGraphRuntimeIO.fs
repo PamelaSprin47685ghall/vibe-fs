@@ -84,7 +84,9 @@ let tryResolveJobContext (client: obj) (directory: string) (sessionID: string) :
                             | TextPart text -> Some text
                             | _ -> None)
                     return texts |> List.tryPick tryParseJobMarker
-            with _ -> return None
+            with ex ->
+                printfn $"[kg] parseJobMarkerFromSession failed: {ex.Message}"
+                return None
     }
 
 let private parseModelString (modelString: string) : obj option =

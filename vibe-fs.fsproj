@@ -14,11 +14,14 @@
     <Compile Include="src/Mux/Wrappers.fs" />
     <Compile Include="src/Mux/Delegate.fs" />
     <Compile Include="src/Mux/SubagentTools.fs" />
+    <Compile Include="src/Mux/ReviewToolsMux.fs" />
     <Compile Include="src/Mux/HostTools.fs" />
+    <Compile Include="src/Mux/WebTools.fs" />
     <Compile Include="src/Mux/ReadDedup.fs" />
     <Compile Include="src/Mux/MessagingCodec.fs" />
     <Compile Include="src/Mux/MagicTodo.fs" />
     <Compile Include="src/Mux/KnowledgeGraphTools.fs" />
+    <Compile Include="src/Mux/KnowledgeGraphToolDefs.fs" />
     <Compile Include="src/Mux/MessageTransform.fs" />
     <Compile Include="src/Mux/EventHook.fs" />
     <Compile Include="src/Mux/SlashCommands.fs" />

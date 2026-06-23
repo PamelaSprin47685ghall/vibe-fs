@@ -6,7 +6,9 @@ open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dedup
 open VibeFs.Kernel.Executor
 open VibeFs.Shell.WorkspaceFiles
-open VibeFs.Kernel.Prompts
+open VibeFs.Kernel.ReviewPrompts
+open VibeFs.Kernel.SearchPrompts
+open VibeFs.Kernel.SubagentPrompts
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Messaging
@@ -305,7 +307,7 @@ let loopMessagesShared () =
     let parsedLoopMsg = VibeFs.Kernel.PromptFrontMatter.parseFrontMatterScalars (VibeFs.Kernel.LoopMessages.buildLoopMessage multilineTask [ intro ])
     equal "loop message multiline task round-trips through block front-matter" (Some multilineTask) (Map.tryFind "task" parsedLoopMsg)
 
-    let loopTemplate = VibeFs.Kernel.Prompts.withReviewCommandTemplate
+    let loopTemplate = VibeFs.Kernel.ReviewPrompts.withReviewCommandTemplate
     check "loop template carries command front-matter" (loopTemplate.Contains "command: \"with-review\"")
     check "loop template carries task front-matter block placeholder" (loopTemplate.Contains "task: |\n  $ARGUMENTS")
     check "loop template does not say task is repeated below" (not (loopTemplate.Contains "repeated below"))
@@ -313,7 +315,7 @@ let loopMessagesShared () =
     check "loop template mentions submit_review" (loopTemplate.Contains "submit_review")
     check "loop template forbids finishing early" (loopTemplate.Contains "Do not end the conversation")
 
-    let precheckTemplate = VibeFs.Kernel.Prompts.withReviewPrecheckCommandTemplate
+    let precheckTemplate = VibeFs.Kernel.ReviewPrompts.withReviewPrecheckCommandTemplate
     check "precheck template carries command front-matter" (precheckTemplate.Contains "command: \"with-review-precheck\"")
     check "precheck template carries task front-matter block placeholder" (precheckTemplate.Contains "task: |\n  $ARGUMENTS")
     check "precheck template reuses review criteria" (precheckTemplate.Contains "# Evaluation Criteria")
@@ -326,13 +328,13 @@ let loopMessagesShared () =
 /// and `Kernel.Prompts.loopReviewVerdictInstructions` — both authored once,
 /// both Kernel-pure, both host-agnostic.
 let reviewerVerdictPromptsShared () =
-    let verdict = VibeFs.Kernel.Prompts.ReviewerVerdictPrompts.reviewerVerdictInstructions
+    let verdict = VibeFs.Kernel.ReviewPrompts.ReviewerVerdictPrompts.reviewerVerdictInstructions
     check "reviewer verdict mentions agent_report" (verdict.Contains "agent_report")
     check "reviewer verdict mentions PASS" (verdict.Contains "PASS")
     check "reviewer verdict mentions REJECT" (verdict.Contains "REJECT")
     check "reviewer verdict mentions feedback" (verdict.Contains "feedback")
 
-    let preReview = VibeFs.Kernel.Prompts.ReviewerVerdictPrompts.loopReviewVerdictInstructions
+    let preReview = VibeFs.Kernel.ReviewPrompts.ReviewerVerdictPrompts.loopReviewVerdictInstructions
     check "loop-review verdict mentions agent_report" (preReview.Contains "agent_report")
     check "loop-review verdict mentions PASS" (preReview.Contains "PASS")
     check "loop-review verdict mentions REJECT" (preReview.Contains "REJECT")
@@ -343,15 +345,15 @@ let reviewerVerdictPromptsShared () =
 /// `Opencode/Tools.fs::formatReviewResult` and the Mux side open-codes a
 /// near-identical message. Pin a single Kernel formatter both hosts call.
 let reviewResultFormattingShared () =
-    let accepted = VibeFs.Kernel.Prompts.formatReviewResult VibeFs.Kernel.ReviewSession.ReviewResult.Accepted
+    let accepted = VibeFs.Kernel.ReviewPrompts.formatReviewResult VibeFs.Kernel.ReviewSession.ReviewResult.Accepted
     check "accepted text mentions passed" (accepted.ToLower().Contains "passed" || accepted.ToLower().Contains "accepted")
     check "accepted text signals with-review ended" (accepted.ToLower().Contains "with-review")
 
-    let rejected = VibeFs.Kernel.Prompts.formatReviewResult (VibeFs.Kernel.ReviewSession.ReviewResult.Rejected "missing tests")
+    let rejected = VibeFs.Kernel.ReviewPrompts.formatReviewResult (VibeFs.Kernel.ReviewSession.ReviewResult.Rejected "missing tests")
     check "rejected text embeds feedback" (rejected.Contains "missing tests")
     check "rejected text instructs to retry" (rejected.Contains "submit_review")
 
-    let terminated = VibeFs.Kernel.Prompts.formatReviewResult VibeFs.Kernel.ReviewSession.ReviewResult.Terminated
+    let terminated = VibeFs.Kernel.ReviewPrompts.formatReviewResult VibeFs.Kernel.ReviewSession.ReviewResult.Terminated
     check "terminated text mentions terminated" (terminated.ToLower().Contains "terminat")
 
 /// S2 red: pin the extended DomainError union before the Kernel rewrite lands.
