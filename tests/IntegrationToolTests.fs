@@ -38,6 +38,7 @@ let run () : JS.Promise<unit> =
             "bookkeeperDoesNotReceiveCaps", bookkeeperDoesNotReceiveCapsSpec
             "compactionDoesNotReceiveCaps", compactionDoesNotReceiveCapsSpec
             "opencodeMethodologyProbe", opencodeMethodologyProbeSpec
+            "opencodeMethodologyProbeBuildWithoutInputAgent", opencodeMethodologyProbeBuildWithoutInputAgentSpec
             "opencodeMethodologyProbeSuppressed", opencodeMethodologyProbeSuppressedSpec
             "opencodeMethodologyProbeExcludedAgents", opencodeMethodologyProbeExcludedAgentsSpec
             "opencodeMethodologyProbeStripped", opencodeMethodologyProbeStrippedSpec

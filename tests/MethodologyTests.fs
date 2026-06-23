@@ -26,7 +26,7 @@ let private assistantTextMsg (id: string) (text: string) : Message<obj> =
 
 let probeTextContent () =
     check "probe text: mentions tool name" (methodologyProbeText.Contains("select_methodology"))
-    check "probe text: mentions reasoning methodologies" (methodologyProbeText.Contains("reasoning methodologies"))
+    check "probe text: mentions methodologies" (methodologyProbeText.Contains("methodologies"))
 
 let toolResultTextExact () =
     check "tool result: exact fixed text" (methodologyToolResultText = "Continue using the selected methodologies.")
@@ -51,6 +51,13 @@ let shouldNotAppendAfterCompletedMethodology () =
 let shouldAppendAfterOtherTool () =
     check "other tool: still append" (
         shouldAppendMethodologyProbe [ userMsg "u1" "task"; assistantToolMsg "a1" "fuzzy_find" "completed" ] = true)
+
+let shouldAppendAfterEarlierMethodologyThenOtherTool () =
+    check "earlier methodology then other tool in new wave: append" (
+        shouldAppendMethodologyProbe
+            [ userMsg "u1" "task"
+              assistantToolMsg "a1" selectMethodologyToolName "completed"
+              assistantToolMsg "a2" "fuzzy_find" "completed" ] = true)
 
 let shouldAppendAfterErroredMethodology () =
     check "errored methodology: still append" (
@@ -90,6 +97,7 @@ let run () =
     shouldAppendEmptySession ()
     shouldNotAppendAfterCompletedMethodology ()
     shouldAppendAfterOtherTool ()
+    shouldAppendAfterEarlierMethodologyThenOtherTool ()
     shouldAppendAfterErroredMethodology ()
     shouldAppendNewTurnAfterOldMethodology ()
     shouldNotAppendNoUserMessage ()

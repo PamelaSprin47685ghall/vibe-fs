@@ -20,8 +20,8 @@ let selectMethodologyTool : ToolDefinition =
           mkSchema
               (createObj [
                   "methods", box (enumArrayProp "One or more reasoning methodology names from the catalog." (List.toArray methodologyEnumValues))
-                  "plan", box (strProp "Concise execution plan for applying the selected methodologies.")
+                  "reason", box (strProp "Concise reasoning for applying the selected methodologies.")
               ])
-              [| "methods"; "plan" |]
+              [| "methods"; "reason" |]
       execute = fun _ _ -> resolveStr methodologyToolResultText
       condition = None }

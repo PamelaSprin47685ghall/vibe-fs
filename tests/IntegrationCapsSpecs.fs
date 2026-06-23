@@ -175,7 +175,7 @@ let opencodeMethodologyProbeSpec () = promise {
     let! workspaceDir = mkdtempAsync "opencode-methodology-probe-"
     let! p = plugin (box {| directory = workspaceDir |})
     let tf = get p "experimental.chat.messages.transform"
-    for agent in [| "manager"; "coder"; "reviewer"; "meditator" |] do
+    for agent in [| "manager"; "coder"; "reviewer"; "meditator"; "build"; "plan" |] do
         let userMsg =
             box {| info = createObj [ "id", box ("msg-user-" + agent); "agent", box agent; "role", box "user"; "sessionID", box ("probe-" + agent) ]
                    parts = [| box {| ``type`` = "text"; text = "do the task" |} |] |}
@@ -190,6 +190,27 @@ let opencodeMethodologyProbeSpec () = promise {
         let firstPart = (unbox<obj[]> parts).[0]
         let probeText = str firstPart "text"
         check (agent + " probe mentions select_methodology") (probeText.Contains "select_methodology")
+    do! rmAsync workspaceDir
+}
+
+let opencodeMethodologyProbeBuildWithoutInputAgentSpec () = promise {
+    let! workspaceDir = mkdtempAsync "opencode-methodology-probe-build-"
+    let! p = plugin (box {| directory = workspaceDir |})
+    let tf = get p "experimental.chat.messages.transform"
+    let userMsg =
+        box {| info = createObj [ "id", box "msg-user-build"; "agent", box "build"; "role", box "user"; "sessionID", box "probe-build" ]
+               parts = [| box {| ``type`` = "text"; text = "do the task" |} |] |}
+    let out = createObj [ "messages", box [| userMsg |] ]
+    do! tf $ (createObj [], out) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    let lastMsg = msgs.[msgs.Length - 1]
+    let lastInfo = get lastMsg "info"
+    let lastId = str lastInfo "id"
+    check "build without input agent receives methodology probe" (lastId.StartsWith "methodology-probe-")
+    let parts = get lastMsg "parts"
+    let firstPart = (unbox<obj[]> parts).[0]
+    let probeText = str firstPart "text"
+    check "build without input agent probe mentions select_methodology" (probeText.Contains "select_methodology")
     do! rmAsync workspaceDir
 }
 

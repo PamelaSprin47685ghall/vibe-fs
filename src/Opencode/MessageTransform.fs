@@ -42,12 +42,24 @@ let private extractSessionID (messages: Message<obj> list) : string =
     |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
     |> Option.defaultValue ""
 
+let private agentFromMessageInfo (registry: ChildAgentRegistry) (info: MessageInfo<obj>) : string option =
+    if info.agent <> "" then Some info.agent
+    elif info.sessionID <> "" then registry.LookupChildAgent(info.sessionID)
+    else None
+
 let private resolveAgentFromMessages (registry: ChildAgentRegistry) (messages: Message<obj> list) : string option =
-    messages
-    |> List.tryPick (fun message ->
-        if message.info.agent <> "" then Some message.info.agent
-        elif message.info.sessionID <> "" then registry.LookupChildAgent(message.info.sessionID)
-        else None)
+    let fromInfo = agentFromMessageInfo registry
+    let tryAgentBack (predicate: Message<obj> -> bool) : string option =
+        messages
+        |> List.filter predicate
+        |> List.tryLast
+        |> Option.bind (fun m -> fromInfo m.info)
+    [
+        tryAgentBack (fun m -> m.info.role = User && m.source = Native)
+        tryAgentBack (fun m -> m.info.role = Assistant)
+        tryAgentBack (fun m -> fromInfo m.info |> Option.isSome)
+    ]
+    |> List.tryPick id
 
 let private resolveAgent (registry: ChildAgentRegistry) (input: obj) (messages: Message<obj> list) : string =
     let explicit = Dyn.str input "agent"
@@ -55,7 +67,7 @@ let private resolveAgent (registry: ChildAgentRegistry) (input: obj) (messages: 
     else
         match registry.LookupChildAgent(Dyn.str input "sessionID") with
         | Some a -> a
-        | None -> resolveAgentFromMessages registry messages |> Option.defaultValue "manager"
+        | None -> resolveAgentFromMessages registry messages |> Option.defaultValue "build"
 
 let private applyReadDedup (messages: obj array) : unit =
     if Dyn.isNullish messages || not (Dyn.isArray messages) then ()

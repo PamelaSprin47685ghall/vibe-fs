@@ -32,7 +32,7 @@
 LLM 可见探针文本：
 
 ```text
-Before answering the user's task, decide which reasoning methodologies are useful for this turn. Call the select_methodology tool with one or more methods and a concise plan. If no methodology call is needed, continue normally.
+<system>Before the task, please decide which methodologies are useful for this turn. Now you MUST Call the select_methodology tool with one or more methods. </system>
 ```
 
 这条消息不是事实，只是本次 provider turn 的临时投影输入。真正事实是后续模型是否调用 `select_methodology` 以及工具参数。
@@ -50,7 +50,7 @@ Schema：
 ```ts
 {
   methods: array<enum>,
-  plan: string
+  reason: string
 }
 ```
 
@@ -61,7 +61,7 @@ Schema：
 建议 description：
 
 ```text
-Select the reasoning methodologies that should guide the next work step. Use this before continuing when the task benefits from explicit structure, search-space control, proof discipline, design reasoning, decomposition, verification, or risk control. Choose all useful methodologies by their definitions, not by keyword vibes, and write a concise execution plan.
+Select the reasoning methodologies that should guide the next work step. Use this before continuing when the task benefits from explicit structure, search-space control, proof discipline, design reasoning, decomposition, verification, or risk control. Choose all useful methodologies by their definitions, not by keyword vibes, and write a concise reason.
 
 Methodology catalog:
 Common methods can be selected with their short definitions. Uncommon methods include trigger conditions; do not avoid them merely because they are less familiar.
@@ -212,7 +212,7 @@ Continue using the selected methodologies.
 
 历史中允许出现：
 
-- assistant tool call：`select_methodology({ methods, plan })`
+- assistant tool call：`select_methodology({ methods, reason })`
 - tool result：`Continue using the selected methodologies.`
 - assistant 后续正式回答
 
@@ -242,7 +242,7 @@ Continue using the selected methodologies.
 - 不改 OpenCode core 来设置 `toolChoice: required`。
 - 不创建隐藏 session。
 - 不通过 revert、delete message、cleanup 做补偿事务。
-- 不把 methodology plan 写入独立存储。
+- 不把 methodology reason 写入独立存储。
 - 不影响 title、summary、bookkeeper、reviewer、subagent 的专用上下文。
 
 ## 失败策略
@@ -260,7 +260,7 @@ Continue using the selected methodologies.
 - 普通主对话第一次投影会追加一条虚拟 user probe。
 - 虚拟 user probe 不出现在 session history、UI、导出、SDK messages 中。
 - 模型调用 `select_methodology` 后，下一次投影不会再追加 probe。
-- `select_methodology` 参数包含 `methods: string[]` 和 `plan: string`。
+- `select_methodology` 参数包含 `methods: string[]` 和 `reason: string`。
 - `methods` 只允许枚举值。
 - 工具返回固定文本 `Continue using the selected methodologies.`。
 - compaction/title/subagent/bookkeeper 等上下文不收到 probe。
@@ -283,4 +283,4 @@ Continue using the selected methodologies.
 4. compaction agent：不追加 probe。
 5. title agent：不追加 probe。
 6. `select_methodology` 执行：返回固定英文文本。
-7. schema：`methods` 是 enum array，`plan` 是 string。
+7. schema：`methods` 是 enum array，`reason` 是 string。

@@ -6,7 +6,7 @@ let selectMethodologyToolName = "select_methodology"
 let methodologyProbeIdPrefix = "methodology-probe-"
 
 let methodologyProbeText =
-    "Before the user's task, decide which methodologies are useful for this turn. You MUST Call the select_methodology tool with one or more methods. "
+    "<system>Before the task, please decide which methodologies are useful for this turn. Now you MUST Call the select_methodology tool with one or more methods. </system>"
 
 let methodologyToolResultText = "Continue using the selected methodologies."
 
@@ -66,7 +66,7 @@ let methodologyEnumValues: string list =
       "performance_analysis"
       "user_intent_clarification" ]
 
-let methodologyCatalog = """Select the reasoning methodologies that should guide the next work step. Use this before continuing when the task benefits from explicit structure, search-space control, proof discipline, design reasoning, decomposition, verification, or risk control. Choose all useful methodologies by their definitions, not by keyword vibes, and write a concise execution plan.
+let methodologyCatalog = """Select the reasoning methodologies that should guide the next work step. Use this before continuing when the task benefits from explicit structure, search-space control, proof discipline, design reasoning, decomposition, verification, or risk control. Choose all useful methodologies by their definitions, not by keyword vibes, and write a concise reason.
 
 Methodology catalog:
 Common methods can be selected with their short definitions. Uncommon methods include trigger conditions; do not avoid them merely because they are less familiar.
@@ -140,15 +140,22 @@ let shouldAppendMethodologyProbe (messages: Message<'raw> list) : bool =
     match lastUserIdx with
     | None -> false
     | Some idx ->
-        messages.[idx..]
-        |> List.exists (fun m ->
-            m.info.role = Assistant
-            && m.parts
-               |> List.exists (function
-                   | ToolPart(name, _, Some state, _)
-                       when name = selectMethodologyToolName && state.status = "completed" -> true
-                   | _ -> false))
-        |> not
+        let lastAssistantToolMsg =
+            messages.[idx..]
+            |> List.tryFindBack (fun m ->
+                m.info.role = Assistant
+                && m.parts |> List.exists (function ToolPart _ -> true | _ -> false))
+
+        match lastAssistantToolMsg with
+        | None -> true
+        | Some msg ->
+            let hasCompletedSelect =
+                msg.parts
+                |> List.exists (function
+                    | ToolPart(name, _, Some state, _)
+                        when name = selectMethodologyToolName && state.status = "completed" -> true
+                    | _ -> false)
+            not hasCompletedSelect
 
 /// Constructs the synthetic probe user message. Never persisted: id prefix
 /// `methodology-probe-` ensures stripSyntheticBySource removes it on

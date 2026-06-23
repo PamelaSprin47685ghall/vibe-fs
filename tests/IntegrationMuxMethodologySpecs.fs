@@ -91,17 +91,17 @@ let muxMethodologyToolSchemaSpec () = promise {
         let schema = muxToolSchema tool
         let props = get schema "properties"
         let methodsSchema = get props "methods"
-        let planSchema = get props "plan"
+        let reasonSchema = get props "reason"
         check "methodology methods is array type" (str methodsSchema "type" = "array")
         let itemsSchema = get methodsSchema "items"
         check "methodology methods items is string type" (str itemsSchema "type" = "string")
         let enumArr = unbox<obj[]> (get itemsSchema "enum")
         check "methodology methods enum has all values" (enumArr.Length = (List.toArray methodologyEnumValues).Length)
         check "methodology methods minItems is 1" (unbox<int> (get methodsSchema "minItems") = 1)
-        check "methodology plan is string type" (str planSchema "type" = "string")
+        check "methodology reason is string type" (str reasonSchema "type" = "string")
         let required = muxToolSchemaRequired tool
         check "methodology required includes methods" (required |> Array.contains "methods")
-        check "methodology required includes plan" (required |> Array.contains "plan")
+        check "methodology required includes reason" (required |> Array.contains "reason")
 }
 
 let muxMethodologyProbeStrippedOnReprojectionSpec () = promise {
