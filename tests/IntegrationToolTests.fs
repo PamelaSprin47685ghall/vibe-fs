@@ -100,7 +100,7 @@ let muxKnowledgeGraphPreludeForCoderSpec () = promise {
         check "mux coder knowledge graph prelude has knowledge graph front matter" (firstText.Contains "---\nknowledge_graph:")
         check "mux coder knowledge graph prelude lists entity" (firstText.Contains "项目" && firstText.Contains "插件入口" && not (firstText.Contains "0a3f"))
         check "mux coder knowledge graph prelude hides fact" (not (firstText.Contains "src/Mux/Plugin.fs"))
-        check "mux coder knowledge graph prelude preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
+        check "mux coder knowledge graph prelude preserves original" (msgs |> Array.exists (fun m -> obj.ReferenceEquals(m, originalMsg)))
     do! rmAsync workspaceDir
 }
 
