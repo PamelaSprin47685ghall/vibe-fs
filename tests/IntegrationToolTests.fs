@@ -700,6 +700,7 @@ let run () : JS.Promise<unit> =
             "defaultPreludeWithoutCaps", defaultPreludeWithoutCapsSpec
             "capsAndMagicOrder", capsAndMagicOrderSpec
             "bookkeeperDoesNotReceiveCaps", bookkeeperDoesNotReceiveCapsSpec
+            "compactionDoesNotReceiveCaps", compactionDoesNotReceiveCapsSpec
             "knowledgeGraphPreludeWithoutCaps", knowledgeGraphPreludeWithoutCapsSpec
             "coderReceivesKnowledgeGraphPrelude", coderReceivesKnowledgeGraphPreludeSpec
             "browserDoesNotReceiveKnowledgeGraphPrelude", browserDoesNotReceiveKnowledgeGraphPreludeSpec

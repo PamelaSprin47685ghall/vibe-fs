@@ -149,3 +149,23 @@ let bookkeeperDoesNotReceiveCapsSpec () = promise {
     check "bookkeeper injection preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }
+
+let compactionDoesNotReceiveCapsSpec () = promise {
+    let! workspaceDir = mkdtempAsync "caps-compaction-"
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content"
+    do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n"
+    do! ensureKnowledgeGraphDir workspaceDir
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目插件入口在哪里？"] "Opencode 主入口是 src/Opencode/Plugin.fs。" ]
+    let! p = plugin (box {| directory = workspaceDir |})
+    let tf = get p "experimental.chat.messages.transform"
+    let originalMsg = box {| info = createObj [ "id", box "msg-compaction-1"; "agent", box "compaction"; "sessionID", box "caps-compaction-session" ]; parts = [||] |}
+    let out = createObj [ "messages", box [| originalMsg |] ]
+    do! tf $ (createObj [], out) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    check "compaction receives only default prefix and original message" (msgs.Length = 2)
+    let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
+    check "compaction injection omits knowledge graph prelude" (not (firstText.Contains "knowledge_graph"))
+    check "compaction injection has Kolmolgorov prelude content" (firstText.StartsWith "# Kolmolgorov 宝典")
+    check "compaction injection preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
+    do! rmAsync workspaceDir
+}

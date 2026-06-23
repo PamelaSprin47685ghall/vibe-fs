@@ -20,7 +20,7 @@ open VibeFs.Opencode.CapsCodec
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.ChildAgentRegistry
 
-let private defaultExcludedAgents = set [ "browser"; "investigator"; "executor"; "title"; "bookkeeper" ]
+let private defaultExcludedAgents = set [ "browser"; "investigator"; "executor"; "title"; "compaction"; "bookkeeper" ]
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let private setOutput (o: obj) (v: string) : unit = o?output <- v

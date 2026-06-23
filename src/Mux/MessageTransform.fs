@@ -21,7 +21,7 @@ open VibeFs.Shell.ReviewRuntime
 open VibeFs.Shell.FileSys
 open VibeFs.Shell.WorkspaceFiles
 
-let private alwaysExcludedAgents = set [ "browser"; "investigator"; "executor"; "title"; "bookkeeper" ]
+let private alwaysExcludedAgents = set [ "browser"; "investigator"; "executor"; "title"; "compaction"; "bookkeeper" ]
 let private childWorkspaceExcludedAgents = set [ "exec"; "explore" ]
 
 let private capsUserPrefix = "caps-synth-user-"
