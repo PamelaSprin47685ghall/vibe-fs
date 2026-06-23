@@ -1,8 +1,3 @@
-/// Methodology Selection Probe: before each main-conversation turn, the
-/// messages transform appends a synthetic user message asking the model to
-/// choose reasoning methodologies via the select_methodology tool. The probe
-/// is ephemeral (stripped on next projection); only the tool call/result
-/// persist as durable facts. See PRD.md for the full specification.
 module VibeFs.Kernel.Methodology
 
 open VibeFs.Kernel.Messaging
@@ -11,7 +6,7 @@ let selectMethodologyToolName = "select_methodology"
 let methodologyProbeIdPrefix = "methodology-probe-"
 
 let methodologyProbeText =
-    "Before answering the user's task, decide which reasoning methodologies are useful for this turn. Call the select_methodology tool with one or more methods and a concise plan. If no methodology call is needed, continue normally."
+    "Before the user's task, decide which methodologies are useful for this turn. You MUST Call the select_methodology tool with one or more methods. "
 
 let methodologyToolResultText = "Continue using the selected methodologies."
 
