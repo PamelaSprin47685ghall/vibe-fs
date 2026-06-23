@@ -334,40 +334,41 @@ YAML front-matter 刚好处于中间：
 
 - .NET SDK（项目目标 `net10.0`）
 - `dotnet tool restore` 安装 Fable
-- Node.js + `pnpm`
+- Node.js + `npm`
 
 常用命令：
 
 ```bash
 dotnet tool restore
-pnpm install
-pnpm run clean
-pnpm build
-pnpm run build:kernel
-pnpm run build:shell
-pnpm run build:tests
-pnpm run watch
-pnpm run watch:tests
-pnpm test
-pnpm run test:kernel
-pnpm run test:shell
-pnpm run test:integration
+npm install
+npm run clean
+npm run build
+npm run build:kernel
+npm run build:shell
+npm run build:tests
+npm run watch
+npm run watch:tests
+npm test
+npm run test:kernel
+npm run test:shell
+npm run test:integration
 ```
 
 说明：
 
-- `pnpm run clean` 清理 `build/`、`build-kernel/`、`build-shell/`、`build-tests/`
-- `pnpm build` 只编译宿主插件层：`dotnet fable vibe-fs.fsproj --outDir build`，不再顺带测试
-- `pnpm run build:kernel` 单独编译 `src/Kernel/VibeFs.Kernel.fsproj` 到 `build-kernel/`
-- `pnpm run build:shell` 单独编译 `src/Shell/VibeFs.Shell.fsproj` 到 `build-shell/`
-- `pnpm run build:tests` 单独编译 `tests/VibeFs.Tests.fsproj` 到 `build-tests/`
-- `pnpm run watch` 监听宿主插件工程并输出到 `build/`
-- `pnpm run watch:tests` 监听测试工程并输出到 `build-tests/`
-- `pnpm test` 默认先执行测试编译，再运行 `node tests/runner.js`
-- `pnpm run test:kernel` 覆盖 `ReviewTests`、`AgentTests`、`KernelTests`、`FuzzyTests`、`DynTests`、`DelegateTests`、`ResolveAiSettingsTests`、`MagicTests`、`KnowledgeGraphKernelTests`、`TitleFetchGuardTests`
-- `pnpm run test:shell` 覆盖 `ShellTests`、`KnowledgeGraphFileTests`
-- `pnpm run test:integration` 覆盖全部 `Integration*` 与 `KnowledgeGraphTests`
-- `pnpm run test:kernel` + `pnpm run test:shell` + `pnpm run test:integration` 的并集等于 `pnpm test`
+- `npm run clean` 清理 `build/`、`build-kernel/`、`build-shell/`、`build-tests/`、`artifacts/`
+- 所有 MSBuild `bin/`、`obj/` 中间产物统一落到根目录 `artifacts/`，不再散落到 `src/`、`tests/` 下
+- `npm run build` 只编译宿主插件层：`dotnet fable vibe-fs.fsproj --outDir build`，不再顺带测试
+- `npm run build:kernel` 单独编译 `src/Kernel/VibeFs.Kernel.fsproj` 到 `build-kernel/`
+- `npm run build:shell` 单独编译 `src/Shell/VibeFs.Shell.fsproj` 到 `build-shell/`
+- `npm run build:tests` 单独编译 `tests/VibeFs.Tests.fsproj` 到 `build-tests/`
+- `npm run watch` 监听宿主插件工程并输出到 `build/`
+- `npm run watch:tests` 监听测试工程并输出到 `build-tests/`
+- `npm test` 默认先执行测试编译，再运行 `node tests/runner.js`
+- `npm run test:kernel` 覆盖 `ReviewTests`、`AgentTests`、`KernelTests`、`FuzzyTests`、`DynTests`、`DelegateTests`、`ResolveAiSettingsTests`、`MagicTests`、`KnowledgeGraphKernelTests`、`TitleFetchGuardTests`
+- `npm run test:shell` 覆盖 `ShellTests`、`KnowledgeGraphFileTests`
+- `npm run test:integration` 覆盖全部 `Integration*` 与 `KnowledgeGraphTests`
+- `npm run test:kernel` + `npm run test:shell` + `npm run test:integration` 的并集等于 `npm test`
 - npm 包主导出入口仍是 `build/src/Mux/Plugin.js`
 - 测试入口由 `tests/runner.js` 加载 `build-tests/Tests.js`
 - 测试集覆盖 Kernel、Shell、Review、KnowledgeGraph，以及多组集成契约（见 `tests/Tests.fs`）

@@ -4,6 +4,10 @@
     <RootNamespace>VibeFs</RootNamespace>
     <LangVersion>preview</LangVersion>
     <OtherFlags>--nowarn:1182 --nowarn:3520</OtherFlags>
+    <ArtifactsDir Condition="'$(ArtifactsDir)' == ''">$(MSBuildThisFileDirectory)artifacts/</ArtifactsDir>
+    <BaseIntermediateOutputPath>$(ArtifactsDir)obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+    <BaseOutputPath>$(ArtifactsDir)bin/$(MSBuildProjectName)/</BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
