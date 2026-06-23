@@ -47,7 +47,7 @@ let llmText ="""# 铁律
 - executor(=bash) 工具使用偏好：复杂脚本≻琐碎命令多轮交互。
 - 绝对禁止使用 executor 仅用于查找+读写文件→必须用 read/investigator/coder 代替！
 - 绝对禁止使用 investigator 仅用于读文件原文→必须用 read 代替！
-- 对 coder 仅需说明意图。coder 具自理解力→避免重复现有内容+提供大段新增代码。
+- 对 coder(=apply_path|edit|write) 仅需说明意图。coder 具自理解力→避免重复现有内容+提供大段新增代码。
 - 鼓励多意图并发→拆分独立元素+对每个意图提供完备背景知识(上下文互隔离)。
 - 诉求拆细→细粒度并发。拒绝大块意图→规避长时延迟。
 - coder 缺失删除工具时→由父节点补删。
@@ -74,4 +74,4 @@ let llmText ="""# 铁律
 - 宁慢且稳，严禁使用自动化程序批量增删改查程序代码。
 - 脚本=急速幻觉+反复返工；手工编辑=脚踏实地+步步为营。慢=快。"""
 
-let thinkWrapped = "<think>\n" + thinkText + "\n\n" + llmText + "\n</think>"
+let thinkWrapped = thinkText + "\n\n" + llmText

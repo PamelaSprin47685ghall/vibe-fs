@@ -1,10 +1,10 @@
-module VibeFs.Tests.WikiTests
+module VibeFs.Tests.KnowledgeGraphTests
 
 open System
 open Fable.Core
 open VibeFs.Tests.Assert
-open VibeFs.Kernel.Wiki
-open VibeFs.Kernel.WikiPrompts
+open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraphPrompts
 
 let private ok r =
     match r with
@@ -24,12 +24,12 @@ let private isErr r =
     | Ok _ -> false
     | Error _ -> true
 
-let private entry idStr q a : WikiEntry =
-    { id = some (tryParseId idStr); q = q; a = a }
+let private entry idStr entities fact : KnowledgeGraphEntry =
+    { id = some (tryParseId idStr); entity = entities; fact = fact }
 
-let private file (header: WikiHeader) (entries: WikiEntry list) : WikiFile = { header = header; entries = entries }
+let private file (header: KnowledgeGraphHeader) (entries: KnowledgeGraphEntry list) : KnowledgeGraphFile = { header = header; entries = entries }
 
-let private projection (entries: WikiEntry list) : WikiProjection =
+let private projection (entries: KnowledgeGraphEntry list) : KnowledgeGraphProjection =
     entries |> List.map (fun e -> e.id, e) |> Map.ofList
 
 let idParseSpec () =
@@ -42,10 +42,10 @@ let idParseSpec () =
     equal "idValue round trips" "b912" (idValue id)
 
 let headerParseSpec () =
-    let dayLine = """{"type":"wiki_header","version":1,"kind":"day","date":"2026-06-19","rewritten":false}"""
+    let dayLine = """{"type":"knowledge_graph_header","version":1,"kind":"day","date":"2026-06-19","rewritten":false}"""
     check "parseHeaderLine day Ok DayHeader" (match parseHeaderLine dayLine with Ok(DayHeader("2026-06-19", false)) -> true | _ -> false)
     check "parseHeaderLine garbage Error" (isErr (parseHeaderLine "not json at all"))
-    let snapshotLine = """{"type":"wiki_header","version":1,"kind":"snapshot","through":"2026-06-14"}"""
+    let snapshotLine = """{"type":"knowledge_graph_header","version":1,"kind":"snapshot","through":"2026-06-14"}"""
     check "parseHeaderLine snapshot rejected" (isErr (parseHeaderLine snapshotLine))
 
 let headerRenderSpec () =
@@ -57,27 +57,27 @@ let headerRenderSpec () =
     check "header round-trip day" (parseHeaderLine (renderHeader dh) = Ok dh)
 
 let entryParseRenderSpec () =
-    let line = """{"id":"0a3f","q":"项目插件入口在哪里？","a":"src/Opencode/Plugin.fs"}"""
+    let line = """{"id":"0a3f","entity":["项目插件入口"],"fact":"src/Opencode/Plugin.fs"}"""
     let parsed = ok (parseEntryLine line)
     equal "parseEntry id" "0a3f" (idValue parsed.id)
-    equal "parseEntry q" "项目插件入口在哪里？" parsed.q
-    equal "parseEntry a" "src/Opencode/Plugin.fs" parsed.a
+    equal "parseEntry entity" ["项目插件入口"] parsed.entity
+    equal "parseEntry fact" "src/Opencode/Plugin.fs" parsed.fact
     let rerendered = renderEntry parsed
     let reparsed = ok (parseEntryLine rerendered)
     equal "entry render round-trip id" (idValue parsed.id) (idValue reparsed.id)
-    equal "entry render round-trip q" parsed.q reparsed.q
-    equal "entry render round-trip a" parsed.a reparsed.a
-    let missingA = """{"id":"0a3f","q":"q"}"""
-    check "parseEntry missing a Error" (isErr (parseEntryLine missingA))
-    let badId5 = """{"id":"0a3f5","q":"q","a":"a"}"""
+    equal "entry render round-trip entity" parsed.entity reparsed.entity
+    equal "entry render round-trip fact" parsed.fact reparsed.fact
+    let missingFact = """{"id":"0a3f","entity":["项目插件入口"]}"""
+    check "parseEntry missing fact Error" (isErr (parseEntryLine missingFact))
+    let badId5 = """{"id":"0a3f5","entity":["项目插件入口"],"fact":"fact"}"""
     check "parseEntry bad id 5 chars Error" (isErr (parseEntryLine badId5))
-    let badIdUpper = """{"id":"FFFF","q":"q","a":"a"}"""
+    let badIdUpper = """{"id":"FFFF","entity":["项目插件入口"],"fact":"fact"}"""
     check "parseEntry bad id uppercase Error" (isErr (parseEntryLine badIdUpper))
 
 let ndjsonParseSpec () =
-    let dayHeader = """{"type":"wiki_header","version":1,"kind":"day","date":"2026-06-19","rewritten":false}"""
-    let e1 = """{"id":"0a3f","q":"q1","a":"a1"}"""
-    let e2 = """{"id":"b912","q":"q2","a":"a2"}"""
+    let dayHeader = """{"type":"knowledge_graph_header","version":1,"kind":"day","date":"2026-06-19","rewritten":false}"""
+    let e1 = """{"id":"0a3f","entity":["e1"],"fact":"f1"}"""
+    let e2 = """{"id":"b912","entity":["e2"],"fact":"f2"}"""
     let text = String.concat "\n" [ dayHeader; e1; e2; "" ]
     let parsed = ok (parseNdjson "f" text)
     check "parseNdjson 2 entries" (parsed.entries.Length = 2)
@@ -97,8 +97,8 @@ let ndjsonRenderSpec () =
     let dh = DayHeader("2026-06-19", false)
     let renderedEmpty = renderNdjson dh []
     check "renderNdjson empty ends with header line newline" (renderedEmpty.EndsWith(renderHeader dh + "\n"))
-    let e1 = entry "0a3f" "q1" "a1"
-    let e2 = entry "b912" "q2" "a2"
+    let e1 = entry "0a3f" ["e1"] "f1"
+    let e2 = entry "b912" ["e2"] "f2"
     let rendered = renderNdjson dh [ e1; e2 ]
     check "renderNdjson has trailing newline" (rendered.EndsWith("\n"))
     let reparsed = ok (parseNdjson "f" rendered)
@@ -108,77 +108,86 @@ let ndjsonRenderSpec () =
 
 let projectionSpec () =
     let dh = DayHeader("2026-06-18", false)
-    let oldEntry = entry "0a3f" "q old" "a old"
-    let newEntry = entry "0a3f" "q new" "a new"
+    let oldEntry = entry "0a3f" ["e"] "old fact"
+    let newEntry = entry "0a3f" ["e"] "new fact"
     let files = [ file dh [ oldEntry ]; file dh [ newEntry ] ]
     let proj = projectLatestWins files
     let resolved = Map.find (some (tryParseId "0a3f")) proj
-    check "projectLatestWins latest wins" (resolved.q = "q new" && resolved.a = "a new")
+    check "projectLatestWins latest wins" (resolved.entity = ["e"] && resolved.fact = "new fact")
 
 let jobMarkerSpec () =
-    let appendCtx = { workspaceRoot = "/tmp/wiki-root"; kind = AppendAfterWork }
+    let appendCtx = { workspaceRoot = "/tmp/kg-root"; kind = AppendAfterWork }
     let rendered = renderJobMarker appendCtx
     check "renderJobMarker is front matter" (rendered.StartsWith("---\n"))
-    check "renderJobMarker includes type field" (rendered.Contains("type: \"vibe_wiki_job\""))
+    check "renderJobMarker includes type field" (rendered.Contains("type: \"vibe_knowledge_graph_job\""))
     check "renderJobMarker append round-trips" (tryParseJobMarker rendered = Some appendCtx)
 
     let merged = prependJobMarker appendCtx (buildAppendPrompt "T1" "input" "output" Map.empty)
     check "prependJobMarker keeps front matter form" (merged.StartsWith("---\n"))
-    check "prependJobMarker merges workspaceRoot into prompt front matter" (merged.Contains("workspaceRoot: \"/tmp/wiki-root\""))
-    check "prependJobMarker preserves existing wiki prompt fields" (merged.Contains("existing_wiki: []"))
+    check "prependJobMarker merges workspaceRoot into prompt front matter" (merged.Contains("workspaceRoot: \"/tmp/kg-root\""))
+    check "prependJobMarker preserves existing knowledge graph prompt fields" (merged.Contains("existing_knowledge_graph: []"))
     check "prependJobMarker merged prompt still parses" (tryParseJobMarker merged = Some appendCtx)
 
 let preludeSpec () =
     check "buildPreludeSection empty None" (buildPreludeSection Map.empty |> Option.isNone)
-    let e1 = entry "0a3f" "项目插件入口在哪里？" "src/Opencode/Plugin.fs"
-    let e2 = entry "b912" "Magic Todo backlog 如何保存？" "completedWorkReport"
-    let proj = projection [ e1; e2 ]
+    let e1 = entry "0a3f" ["项目插件入口"] "src/Opencode/Plugin.fs"
+    let e2 = entry "b912" ["Magic Todo backlog"] "completedWorkReport"
+    let e3 = entry "c001" ["项目插件入口"] "another fact"
+    let proj = projection [ e1; e2; e3 ]
     match buildPreludeSection proj with
     | None -> check "buildPreludeSection non-empty Some" false
     | Some section ->
         check "prelude is front matter" (section.StartsWith("---\n"))
-        check "prelude has wiki field" (section.Contains("wiki:"))
-        check "prelude has id e1" (section.Contains("0a3f"))
-        check "prelude has question e1" (section.Contains("项目插件入口在哪里？"))
-        check "prelude has id e2" (section.Contains("b912"))
-        check "prelude has fetch instruction" (section.Contains("Call fetch_wiki(id)"))
-        check "prelude does NOT contain e1 answer" (not (section.Contains("src/Opencode/Plugin.fs")))
-        check "prelude does NOT contain e2 answer" (not (section.Contains("completedWorkReport")))
-    let longQ = String('x', 200)
-    let longEntry = entry "7c01" longQ "a"
+        check "prelude has knowledge_graph field" (section.Contains("knowledge_graph:"))
+        check "prelude lists deduplicated entity e1" (section.Contains("项目插件入口"))
+        check "prelude lists deduplicated entity e2" (section.Contains("Magic Todo backlog"))
+        check "prelude has fetch instruction" (section.Contains("Call knowledge_graph_fetch(entity)"))
+        check "prelude does NOT contain id" (not (section.Contains "0a3f") && not (section.Contains "b912") && not (section.Contains "c001"))
+        check "prelude does NOT contain e1 fact" (not (section.Contains("src/Opencode/Plugin.fs")))
+        check "prelude does NOT contain e2 fact" (not (section.Contains("completedWorkReport")))
+    let longEntity = String('x', 200)
+    let longEntry = entry "7c01" [longEntity] "a"
     let longProj = projection [ longEntry ]
     match buildPreludeSection longProj with
     | None -> check "prelude truncation section built" false
     | Some longSection ->
         check "prelude truncation marks ellipsis" (longSection.Contains("..."))
 
+let fetchAnswerSpec () =
+    let e1 = entry "0a3f" ["项目插件入口"] "src/Opencode/Plugin.fs"
+    let e2 = entry "b912" ["项目插件入口"] "build/src/Mux/Plugin.js"
+    let proj = projection [ e1; e2 ]
+    let result = ok (fetchAnswer proj "项目插件入口")
+    check "fetchAnswer concatenates facts for entity" (result.Contains "src/Opencode/Plugin.fs" && result.Contains "build/src/Mux/Plugin.js")
+    check "fetchAnswer entity no match Error" (isErr (fetchAnswer proj "missing entity"))
+
 let draftValidationSpec () =
-    check "validateDraft valid id Ok" (isOk (validateDraft { id = Some "0a3f"; q = "q"; a = "a" }))
-    check "validateDraft bad id Error" (isErr (validateDraft { id = Some "BAD"; q = "q"; a = "a" }))
-    check "validateDraft empty q Error" (isErr (validateDraft { id = None; q = ""; a = "a" }))
-    check "validateDraft empty a Error" (isErr (validateDraft { id = None; q = "q"; a = "" }))
-    check "validateDraft no id Ok" (isOk (validateDraft { id = None; q = "q"; a = "a" }))
+    check "validateDraft valid id Ok" (isOk (validateDraft { id = Some "0a3f"; entity = ["e"]; fact = "f" }))
+    check "validateDraft bad id Error" (isErr (validateDraft { id = Some "BAD"; entity = ["e"]; fact = "f" }))
+    check "validateDraft empty entity Error" (isErr (validateDraft { id = None; entity = []; fact = "f" }))
+    check "validateDraft empty fact Error" (isErr (validateDraft { id = None; entity = ["e"]; fact = "" }))
+    check "validateDraft no id Ok" (isOk (validateDraft { id = None; entity = ["e"]; fact = "f" }))
 
 let applyDraftsSpec () =
     let counter = ref 0
     let allocator (_existingIds: Set<string>) : string =
         counter.Value <- counter.Value + 1
         sprintf "%04x" counter.Value
-    let existing = entry "0a3f" "old q" "old a"
+    let existing = entry "0a3f" ["old e"] "old fact"
     let proj = projection [ existing ]
     let drafts =
-        [ { id = Some "0a3f"; q = "updated q"; a = "updated a" }
-          { id = Some "9999"; q = "ghost q"; a = "ghost a" }
-          { id = None; q = "fresh q"; a = "fresh a" } ]
+        [ { id = Some "0a3f"; entity = ["updated e"]; fact = "updated fact" }
+          { id = Some "9999"; entity = ["ghost e"]; fact = "ghost fact" }
+          { id = None; entity = ["fresh e"]; fact = "fresh fact" } ]
     let results = ok (applyDrafts allocator proj drafts)
     check "applyDrafts 3 results" (results.Length = 3)
     equal "applyDrafts existing id reused" "0a3f" (idValue results.[0].id)
-    equal "applyDrafts existing id q" "updated q" results.[0].q
-    equal "applyDrafts existing id a" "updated a" results.[0].a
+    equal "applyDrafts existing id entity" ["updated e"] results.[0].entity
+    equal "applyDrafts existing id fact" "updated fact" results.[0].fact
     equal "applyDrafts ghost id reassigned" "0001" (idValue results.[1].id)
-    equal "applyDrafts ghost q kept" "ghost q" results.[1].q
+    equal "applyDrafts ghost entity kept" ["ghost e"] results.[1].entity
     equal "applyDrafts fresh id assigned" "0002" (idValue results.[2].id)
-    equal "applyDrafts fresh q kept" "fresh q" results.[2].q
+    equal "applyDrafts fresh entity kept" ["fresh e"] results.[2].entity
     let empty = ok (applyDrafts allocator proj [])
     check "applyDrafts empty Ok" empty.IsEmpty
 
@@ -206,6 +215,7 @@ let run () : JS.Promise<unit> =
         projectionSpec ()
         jobMarkerSpec ()
         preludeSpec ()
+        fetchAnswerSpec ()
         draftValidationSpec ()
         applyDraftsSpec ()
         allocateSpec ()

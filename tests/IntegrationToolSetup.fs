@@ -3,8 +3,8 @@ module VibeFs.Tests.IntegrationToolSetup
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.Wiki
-open VibeFs.Shell.WikiFiles
+open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Tests.TempWorkspace
 
 [<Import("createRequire", "node:module")>]
@@ -20,10 +20,10 @@ let pathModule : obj = requireFn("path")
 let unlinkAsync (p: string) : JS.Promise<unit> =
     unbox (fsAsync?unlink(p))
 
-let wikiEntry idStr q a : WikiEntry =
+let knowledgeGraphEntry idStr entity fact : KnowledgeGraphEntry =
     match tryParseId idStr with
-    | Some id -> { id = id; q = q; a = a }
-    | None -> failwithf "invalid wiki id: %s" idStr
+    | Some id -> { id = id; entity = entity; fact = fact }
+    | None -> failwithf "invalid knowledge graph id: %s" idStr
 
 let dayMs (date: string) : float =
     match date.Split('-') with
@@ -53,6 +53,17 @@ let executorModeSchema (pluginObject: obj) : obj =
             let properties = get schema "properties"
             if isNullish properties then null else get properties "mode"
 
+let executorLanguageSchema (pluginObject: obj) : obj =
+    let schema = executorSchema pluginObject
+    let direct = get schema "language"
+    if not (isNullish direct) then direct
+    else
+        let shape = get schema "shape"
+        if not (isNullish shape) then get shape "language"
+        else
+            let properties = get schema "properties"
+            if isNullish properties then null else get properties "language"
+
 let enumValues (modeSchema: obj) : string array =
     let candidates =
         [ get (get modeSchema "def") "entries"
@@ -67,20 +78,20 @@ let enumValues (modeSchema: obj) : string array =
             if values.Length = 0 then None else Some values)
     |> Option.defaultValue [||]
 
-let pluginWikiRuntime (pluginObject: obj) : obj =
-    get pluginObject "__wikiRuntime"
+let pluginKnowledgeGraphRuntime (pluginObject: obj) : obj =
+    get pluginObject "__knowledgeGraphRuntime"
 
 let takeBookkeeperLaunchesForTesting (pluginObject: obj) : obj array =
-    let wikiRuntime = pluginWikiRuntime pluginObject
-    let takeLaunches = get wikiRuntime "takeBookkeeperLaunchesForTesting"
+    let kgRuntime = pluginKnowledgeGraphRuntime pluginObject
+    let takeLaunches = get kgRuntime "takeBookkeeperLaunchesForTesting"
     if typeIs takeLaunches "function" then
         unbox<obj[]> ((takeLaunches $ null))
     else
         [||]
 
 let waitForBackgroundJobsForTesting (pluginObject: obj) : JS.Promise<unit> =
-    let wikiRuntime = pluginWikiRuntime pluginObject
-    let waiter = get wikiRuntime "waitForBackgroundJobsForTesting"
+    let kgRuntime = pluginKnowledgeGraphRuntime pluginObject
+    let waiter = get kgRuntime "waitForBackgroundJobsForTesting"
     if typeIs waiter "function" then
         unbox<JS.Promise<unit>> ((waiter $ null))
     else
@@ -92,7 +103,8 @@ let bookkeeperMockClient (messages: obj array) : obj =
         box (
             createObj [
                 "messages",
-                box (System.Func<obj, JS.Promise<obj>>(fun _ -> promise { return box {| data = messages |} }))
+                box (
+                    System.Func<obj, JS.Promise<obj>>(fun _ -> promise { return box {| data = messages |} }))
                 "todo",
                 box (System.Func<unit, JS.Promise<obj>>(fun () -> promise { return box {| data = [||] |} }))
                 "prompt",
@@ -113,7 +125,7 @@ let userTextMessage (sessionID: string) (text: string) : obj =
     box {| info = createObj [ "id", box (sessionID + "-user"); "agent", box "bookkeeper"; "sessionID", box sessionID; "role", box "user" ]
            parts = [| box {| ``type`` = "text"; text = text |} |] |}
 
-let writeWikiFileAsync (filePath: string) (header: WikiHeader) (entries: WikiEntry list) : JS.Promise<unit> =
+let writeKnowledgeGraphFileAsync (filePath: string) (header: KnowledgeGraphHeader) (entries: KnowledgeGraphEntry list) : JS.Promise<unit> =
     writeFileAsync filePath (renderNdjson header entries)
 
 let sampleCoderIntent (objective: string) (file: string) : obj =
@@ -135,20 +147,20 @@ let sampleInvestigatorIntent (objective: string) : obj =
           "background", box "test background"
           "questions", box [| box "What did you find?" |] ]
 
-let wikiDraftEntry (id: string option) (q: string) (a: string) : obj =
+let knowledgeGraphDraftEntry (id: string option) (entities: string list) (fact: string) : obj =
     let fields =
         [ match id with
           | Some value -> yield "id", box value
           | None -> ()
-          yield "q", box q
-          yield "a", box a ]
+          yield "entity", box (Array.ofList entities)
+          yield "fact", box fact ]
     createObj fields
 
-let registerWikiJobForTest (wikiRuntime: obj) (sessionID: string) (workspaceRoot: string) (kindTag: string) (payload: obj) : unit =
-    let registrar = get wikiRuntime "registerJobForTesting" |> unbox<System.Func<string, string, string, obj, unit>>
+let registerKnowledgeGraphJobForTest (kgRuntime: obj) (sessionID: string) (workspaceRoot: string) (kindTag: string) (payload: obj) : unit =
+    let registrar = get kgRuntime "registerJobForTesting" |> unbox<System.Func<string, string, string, obj, unit>>
     registrar.Invoke(sessionID, workspaceRoot, kindTag, payload)
 
-let submitWikiTool (pluginObject: obj) : obj =
+let submitKnowledgeGraphTool (pluginObject: obj) : obj =
     get (get pluginObject "tool") "return_bookkeeper"
 
 let muxToolByName (reg: obj) (name: string) : obj =
@@ -177,11 +189,11 @@ let muxExecutorModeSchema (reg: obj) : obj =
         let props = get schema "properties"
         if isNullish props then null else get props "mode"
 
-let muxWikiRuntime (reg: obj) : obj =
-    let direct = get reg "__wikiRuntime"
+let muxKnowledgeGraphRuntime (reg: obj) : obj =
+    let direct = get reg "__knowledgeGraphRuntime"
     if not (isNullish direct) then direct
     else
-        let rt = get reg "wikiRuntime"
+        let rt = get reg "knowledgeGraphRuntime"
         if isNullish rt then null else rt
 
 let muxReviewStore (reg: obj) : obj = get reg "__reviewStore"
@@ -247,16 +259,16 @@ let mockMuxTaskServiceCapturingPrompt (prompts: ResizeArray<string>) : obj =
           box (System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
               Promise.reject (exn "simulated reviewer timeout"))) ]
 
-let registerMuxWikiJobForTest (reg: obj) (sessionID: string) (workspaceRoot: string) (kindTag: string) (payload: obj) : unit =
-    let runtime = muxWikiRuntime reg
+let registerMuxKnowledgeGraphJobForTest (reg: obj) (sessionID: string) (workspaceRoot: string) (kindTag: string) (payload: obj) : unit =
+    let runtime = muxKnowledgeGraphRuntime reg
     let registrar = get runtime "registerJobForTesting" |> unbox<System.Func<string, string, string, obj, unit>>
     registrar.Invoke(sessionID, workspaceRoot, kindTag, payload)
 
-let readProjectionAsync (workspaceRoot: string) : JS.Promise<WikiProjection> =
+let readKnowledgeGraphProjectionAsync (workspaceRoot: string) : JS.Promise<KnowledgeGraphProjection> =
     readProjection workspaceRoot
 
-let readAllWikiFiles (workspaceRoot: string) : JS.Promise<WikiFile list> =
-    readWikiFiles workspaceRoot
+let readAllKnowledgeGraphFiles (workspaceRoot: string) : JS.Promise<KnowledgeGraphFile list> =
+    readKnowledgeGraphFiles workspaceRoot
 
 let muxMessageTransform (reg: obj) : obj =
     get reg "messagesTransform"

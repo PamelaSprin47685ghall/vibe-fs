@@ -11,7 +11,7 @@ open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.WikiFiles
+open VibeFs.Shell.KnowledgeGraphFiles
 
 
 let toolDefinitionSpec () = promise {

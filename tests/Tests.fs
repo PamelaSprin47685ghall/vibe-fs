@@ -16,9 +16,9 @@ open VibeFs.Tests.IntegrationDedupTests
 open VibeFs.Tests.IntegrationToolTests
 open VibeFs.Tests.IntegrationChatTests
 open VibeFs.Tests.MagicTests
-open VibeFs.Tests.WikiTests
-open VibeFs.Tests.WikiFileTests
-open VibeFs.Tests.WikiKernelTests
+open VibeFs.Tests.KnowledgeGraphTests
+open VibeFs.Tests.KnowledgeGraphFileTests
+open VibeFs.Tests.KnowledgeGraphKernelTests
 open VibeFs.Tests.TitleFetchGuardTests
 
 type private TestBody =
@@ -58,10 +58,10 @@ let private tests : (string * TestBody) list = [
     "KernelTests.dedup'", Sync (sync KernelTests.dedup')
     "KernelTests.jsBoundary'", Sync (sync KernelTests.jsBoundary')
     "KernelTests.hostKernel'", Sync (sync KernelTests.hostKernel')
-    "KernelTests.wikiFetchAnswer", Sync (sync KernelTests.wikiFetchAnswer)
-    "KernelTests.wikiDraftArrayParsing", Sync (sync KernelTests.wikiDraftArrayParsing)
+    "KernelTests.knowledgeGraphFetchAnswer", Sync (sync KernelTests.knowledgeGraphFetchAnswer)
+    "KernelTests.knowledgeGraphDraftArrayParsing", Sync (sync KernelTests.knowledgeGraphDraftArrayParsing)
     "KernelTests.toolCatalogCentralized", Sync (sync KernelTests.toolCatalogCentralized)
-    "KernelTests.hostToolsWikiNames", Sync (sync KernelTests.hostToolsWikiNames)
+    "KernelTests.hostToolsKnowledgeGraphNames", Sync (sync KernelTests.hostToolsKnowledgeGraphNames)
     "KernelTests.subagentDispatch", Sync (sync KernelTests.subagentDispatch)
     "KernelTests.subagentJoinReports", Sync (sync KernelTests.subagentJoinReports)
     "KernelTests.dynDeleteKey", Sync (sync KernelTests.dynDeleteKey)
@@ -95,8 +95,8 @@ let private tests : (string * TestBody) list = [
     "ShellTests.readDirectoryListing", Async ShellTests.readDirectoryListing
     "ShellTests.ensureJavascriptProjectRepairsModuleType", Async ShellTests.ensureJavascriptProjectRepairsModuleType
     "ShellTests.rewriteJavascriptRelativeImports", Async ShellTests.rewriteJavascriptRelativeImports
-    "ShellTests.wikiPortRangeSpec", Async ShellTests.wikiPortRangeSpec
-    "ShellTests.wikiPortSerialSpec", Async ShellTests.wikiPortSerialSpec
+    "ShellTests.knowledgeGraphPortRangeSpec", Async ShellTests.knowledgeGraphPortRangeSpec
+    "ShellTests.knowledgeGraphPortSerialSpec", Async ShellTests.knowledgeGraphPortSerialSpec
     "DynTests.nullish", Sync (sync DynTests.nullish)
     "DelegateTests.run", Sync (sync DelegateTests.run)
     "ResolveAiSettingsTests.run", Sync (sync ResolveAiSettingsTests.run)
@@ -105,9 +105,9 @@ let private tests : (string * TestBody) list = [
     "IntegrationDedupTests.run", Async IntegrationDedupTests.run
     "IntegrationToolTests.run", Async IntegrationToolTests.run
     "IntegrationChatTests.run", Async IntegrationChatTests.run
-    "WikiTests.run", Async WikiTests.run
-    "WikiFileTests.run", Async WikiFileTests.run
-    "WikiKernelTests.run", Async WikiKernelTests.run
+    "KnowledgeGraphTests.run", Async KnowledgeGraphTests.run
+    "KnowledgeGraphFileTests.run", Async KnowledgeGraphFileTests.run
+    "KnowledgeGraphKernelTests.run", Async KnowledgeGraphKernelTests.run
     "MagicTests.run", Sync (sync MagicTests.run)
     "TitleFetchGuardTests.signature", Sync (sync TitleFetchGuardTests.signature)
     "TitleFetchGuardTests.wrap", Sync (sync TitleFetchGuardTests.wrap)

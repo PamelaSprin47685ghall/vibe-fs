@@ -1,23 +1,21 @@
-module VibeFs.Opencode.WikiRuntimeIO
+module VibeFs.Opencode.KnowledgeGraphRuntimeIO
 
 open System
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.Wiki
+open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.WikiRuntimeState
-open VibeFs.Opencode.MessagingCodec
-open VibeFs.Opencode.SessionIo
-open VibeFs.Shell.WikiFiles
-open VibeFs.Shell.WikiPortLock
+open VibeFs.Shell.KnowledgeGraphFiles
+open VibeFs.Shell.KnowledgeGraphPortLock
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Mux.AiSettings
 
 let invoke1 (target: obj) (methodName: string) (arg: obj) : JS.Promise<obj> =
     unbox (target?(methodName)(arg))
 
-/// Resolve the host session API object (create + prompt) from the wiki client,
+/// Resolve the host session API object (create + prompt) from the knowledge graph client,
 /// or None when the host does not expose it.
 let sessionApiOf (client: obj) : obj option =
     if isNullish client then None
@@ -28,14 +26,14 @@ let sessionApiOf (client: obj) : obj option =
         elif not (typeIs (get session "prompt") "function") then None
         else Some session
 
-let buildEntries (root: string) (drafts: WikiDraft list) : JS.Promise<WikiEntry list> =
+let buildEntries (root: string) (drafts: KnowledgeGraphDraft list) : JS.Promise<KnowledgeGraphEntry list> =
     promise {
         let! projection = readProjection root
         let normalizedDrafts = normalizeDraftIds projection drafts
         match applyDrafts (fun knownIds ->
                   let random = Random()
                   let rec loop attempts =
-                      if attempts > 65536 then failwith "wiki id space exhausted"
+                      if attempts > 65536 then failwith "knowledge graph id space exhausted"
                       else
                           let candidate = sprintf "%04x" (random.Next(0, 65536))
                           if Set.contains candidate knownIds then loop (attempts + 1) else candidate
@@ -44,24 +42,21 @@ let buildEntries (root: string) (drafts: WikiDraft list) : JS.Promise<WikiEntry 
         | Error error -> return raise (exn error)
     }
 
-let submitForKind (portLockTimeoutMs: int64) (portLockRetryDelayMs: int) (todayStr: string) (root: string) (kind: WikiJobKind) (drafts: WikiDraft list) : JS.Promise<string> =
-    withWikiPortLock portLockTimeoutMs portLockRetryDelayMs root (fun () ->
+let submitForKind (portLockTimeoutMs: int64) (portLockRetryDelayMs: int) (todayStr: string) (root: string) (kind: KnowledgeGraphJobKind) (drafts: KnowledgeGraphDraft list) : JS.Promise<string> =
+    withKnowledgeGraphPortLock portLockTimeoutMs portLockRetryDelayMs root (fun () ->
         promise {
             let! entries = buildEntries root drafts
             match kind with
             | AppendAfterWork ->
                 do! appendEntries root todayStr entries
-                return $"Appended {entries.Length} wiki entries."
+                return $"Appended {entries.Length} knowledge graph entries."
             | DailyRewrite date ->
                 do! rewriteDay root date entries
-                return $"Rewrote wiki day {date}."
+                return $"Rewrote knowledge graph day {date}."
         })
 
-let private jobMarkerPrompt (ctx: WikiJobContext) (promptText: string) : string =
+let private jobMarkerPrompt (ctx: KnowledgeGraphJobContext) (promptText: string) : string =
     prependJobMarker ctx promptText
-
-let private promptParts (ctx: WikiJobContext) (promptText: string) : obj array =
-    [| box {| ``type`` = "text"; text = jobMarkerPrompt ctx promptText |} |]
 
 let private launchResultText (title: string) (childId: string) : string =
     $"Started {title} in background session {childId}."
@@ -71,7 +66,7 @@ let private failedLaunchResult (title: string) (reason: string) : string =
 
 let private bookkeeperSessionTitle = "Bookkeeper"
 
-let tryResolveJobContext (client: obj) (directory: string) (sessionID: string) : JS.Promise<WikiJobContext option> =
+let tryResolveJobContext (client: obj) (directory: string) (sessionID: string) : JS.Promise<KnowledgeGraphJobContext option> =
     promise {
         if sessionID.Trim() = "" || isNullish client then return None
         else
@@ -92,27 +87,49 @@ let tryResolveJobContext (client: obj) (directory: string) (sessionID: string) :
             with _ -> return None
     }
 
-let launchBackgroundSession (session: obj) (root: string) (parentID: string option) (kind: WikiJobKind) (title: string) (promptText: string) (aiSettings: DelegatedAiSettings) (client: obj) (registry: ChildAgentRegistry) : JS.Promise<string> =
+let private parseModelString (modelString: string) : obj option =
+    let slash = modelString.IndexOf('/')
+    if slash <= 0 || slash >= modelString.Length - 1 then None
+    else Some (box {| providerID = modelString.[0..slash-1]; modelID = modelString.[slash+1..] |})
+
+let launchBackgroundSession (session: obj) (root: string) (parentID: string option) (kind: KnowledgeGraphJobKind) (title: string) (promptText: string) (aiSettings: DelegatedAiSettings) (_client: obj) (registry: ChildAgentRegistry) : JS.Promise<string> =
     promise {
         try
             let ctx = { workspaceRoot = root; kind = kind }
-            let! childId =
-                startSubagentSession registry client
-                    { agent = "bookkeeper"
-                      title = bookkeeperSessionTitle
-                      prompt = jobMarkerPrompt ctx promptText
-                      directory = root
-                      sessionID = defaultArg parentID ""
-                      tools = null
-                      aiSettings = aiSettings }
-            return launchResultText title childId
+            let prompt = jobMarkerPrompt ctx promptText
+            let createBody =
+                box {|
+                    query = box {| directory = root |}
+                    body = box {| parentID = (match parentID with Some p -> box p | None -> box null); title = bookkeeperSessionTitle |}
+                |}
+            let! createResult = invoke1 session "create" createBody
+            let childID = str (get createResult "data") "id"
+            if childID = "" then
+                return failedLaunchResult title "Failed to create child session"
+            else
+                registry.RegisterChildAgent(childID, "bookkeeper", parentID)
+                let bodyFields =
+                    [ yield "agent", box "bookkeeper"
+                      yield "parts", box [| box {| ``type`` = "text"; text = prompt |} |]
+                      match aiSettings.modelString with
+                      | Some ms ->
+                          match parseModelString ms with
+                          | Some model -> yield "model", model
+                          | None -> ()
+                      | None -> ()
+                      match aiSettings.thinkingLevel with
+                      | Some level when level.Trim() <> "" -> yield "variant", box level
+                      | _ -> () ]
+                let promptBody = createObj [ "path", box {| id = childID |}; "body", createObj bodyFields ]
+                let! _ = invoke1 session "prompt" promptBody
+                return launchResultText title childID
         with ex ->
             return failedLaunchResult title (string ex)
     }
 
 /// Fire-and-forget: build the prompt then launch the background session without
 /// serializing unrelated bookkeeper sessions behind one another.
-let queueBackgroundLaunch (client: obj) (startBackgroundJob: JS.Promise<unit> -> unit) (recordResult: string -> unit) (root: string) (parentID: string option) (kind: WikiJobKind) (title: string) (buildPrompt: unit -> JS.Promise<string>) (aiSettings: DelegatedAiSettings) (registry: ChildAgentRegistry) : unit =
+let queueBackgroundLaunch (client: obj) (startBackgroundJob: JS.Promise<unit> -> unit) (recordResult: string -> unit) (root: string) (parentID: string option) (kind: KnowledgeGraphJobKind) (title: string) (buildPrompt: unit -> JS.Promise<string>) (aiSettings: DelegatedAiSettings) (registry: ChildAgentRegistry) : unit =
     match sessionApiOf client with
     | None -> recordResult (failedLaunchResult title "host client is missing session.create/session.prompt APIs")
     | Some session ->

@@ -1,29 +1,29 @@
-module VibeFs.Mux.WikiTools
+module VibeFs.Mux.KnowledgeGraphTools
 
 open System
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.Wiki
-open VibeFs.Kernel.WikiRuntimeState
+open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.WikiMaintenance
-open VibeFs.Kernel.WikiPrompts
+open VibeFs.Kernel.KnowledgeGraphMaintenance
+open VibeFs.Kernel.KnowledgeGraphPrompts
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
-open VibeFs.Shell.WikiFiles
-open VibeFs.Shell.WikiPortLock
+open VibeFs.Shell.KnowledgeGraphFiles
+open VibeFs.Shell.KnowledgeGraphPortLock
 open VibeFs.Shell.PromiseQueue
 
-let private buildEntries (root: string) (drafts: WikiDraft list) : JS.Promise<WikiEntry list> =
+let private buildEntries (root: string) (drafts: KnowledgeGraphDraft list) : JS.Promise<KnowledgeGraphEntry list> =
     promise {
-        let! files = readWikiFiles root
+        let! files = readKnowledgeGraphFiles root
         let projection = projectLatestWins files
         let normalizedDrafts = normalizeDraftIds projection drafts
         let allocate (knownIds: Set<string>) : string =
             let random = System.Random()
-            match Wiki.allocateRandomHexId (fun () -> random.Next(0, 65536)) knownIds with
+            match KnowledgeGraph.allocateRandomHexId (fun () -> random.Next(0, 65536)) knownIds with
             | Ok id -> id
             | Error message -> failwith message
         match applyDrafts allocate projection normalizedDrafts with
@@ -46,12 +46,12 @@ let private extractTexts (item: obj) : string list =
                 if partText <> "" then texts.Add(partText)
         List.ofSeq texts
 
-type MuxWikiRuntime(?deps: obj) as this =
-    let registeredJobs = System.Collections.Generic.Dictionary<string, WikiJobContext>()
+type MuxKnowledgeGraphRuntime(?deps: obj) as this =
+    let registeredJobs = System.Collections.Generic.Dictionary<string, KnowledgeGraphJobContext>()
     let writeQueue = SerialQueue()
     let commandQueue = SerialQueue()
     let backgroundJobs = ResizeArray<JS.Promise<unit>>()
-    let mutable state = initialWikiState
+    let mutable state = initialKnowledgeGraphState
     let mutable latestConfig : obj option = None
 
     let getChatHistory =
@@ -84,7 +84,7 @@ type MuxWikiRuntime(?deps: obj) as this =
             |> startBackgroundJob
         | None -> ()
 
-    member _.TryResolveJobContext(sessionID: string) : JS.Promise<WikiJobContext option> =
+    member _.TryResolveJobContext(sessionID: string) : JS.Promise<KnowledgeGraphJobContext option> =
         promise {
             if System.String.IsNullOrWhiteSpace sessionID then return None
             else
@@ -101,7 +101,7 @@ type MuxWikiRuntime(?deps: obj) as this =
                     with _ -> return None
         }
 
-    member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<WikiProjection> =
+    member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<KnowledgeGraphProjection> =
         if sessionID = "" then Promise.lift Map.empty
         else
             commandQueue.Enqueue(fun () ->
@@ -116,42 +116,42 @@ type MuxWikiRuntime(?deps: obj) as this =
 
     member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
         promise {
-            if not (wikiDirExists directory) then return None
+            if not (knowledgeGraphDirExists directory) then return None
             else
                 let! projection = this.EnsureSessionSnapshot(sessionID, directory)
                 return buildPreludeSection projection
         }
 
-    member this.FetchFromSessionSnapshot(sessionID: string, directory: string, id: string) : JS.Promise<string> =
+    member this.FetchFromSessionSnapshot(sessionID: string, directory: string, entity: string) : JS.Promise<string> =
         promise {
             if System.String.IsNullOrWhiteSpace directory then
-                return "No wiki directory provided."
-            elif not (wikiDirExists directory) then
-                return "Wiki directory not found."
+                return "No knowledge graph directory provided."
+            elif not (knowledgeGraphDirExists directory) then
+                return "Knowledge graph directory not found."
             elif sessionID = "" then
                 let! projection = readProjection directory
-                match fetchAnswer projection id with
+                match fetchAnswer projection entity with
                 | Ok answer -> return answer
                 | Error message -> return message
             else
                 let! projection = this.EnsureSessionSnapshot(sessionID, directory)
-                match fetchAnswer projection id with
+                match fetchAnswer projection entity with
                 | Ok answer -> return answer
                 | Error message -> return message
         }
 
-    member _.RegisterJob(_sessionID: string, _ctx: WikiJobContext) : unit =
+    member _.RegisterJob(_sessionID: string, _ctx: KnowledgeGraphJobContext) : unit =
         registeredJobs.[_sessionID] <- _ctx
 
     member this.RegisterJobForTesting(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =
         if System.String.IsNullOrWhiteSpace workspaceRoot then
-            failwith "Wiki job workspaceRoot must be a non-empty directory path."
+            failwith "Knowledge graph job workspaceRoot must be a non-empty directory path."
 
         let payloadObj = payload
 
         let readRequiredField (fieldName: string) : string =
             let value = str payloadObj fieldName
-            if value.Trim() = "" then failwith $"Wiki job payload missing required field '{fieldName}'"
+            if value.Trim() = "" then failwith $"Knowledge graph job payload missing required field '{fieldName}'"
             else value.Trim()
 
         let kind =
@@ -163,11 +163,11 @@ type MuxWikiRuntime(?deps: obj) as this =
                 ]
             match Map.tryFind normalizedTag builders with
             | Some build -> build ()
-            | None -> failwith $"Unknown wiki job kind: {normalizedTag}"
+            | None -> failwith $"Unknown knowledge graph job kind: {normalizedTag}"
 
         this.RegisterJob(sessionID, { workspaceRoot = workspaceRoot; kind = kind })
 
-    member _.TakeJob(sessionID: string) : WikiJobContext option =
+    member _.TakeJob(sessionID: string) : KnowledgeGraphJobContext option =
         match registeredJobs.TryGetValue sessionID with
         | true, ctx -> Some ctx
         | false, _ -> None
@@ -176,11 +176,11 @@ type MuxWikiRuntime(?deps: obj) as this =
         registeredJobs.Remove(sessionID) |> ignore
 
     member this.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
-        if not (wikiDirExists workspaceRoot) then Promise.lift ()
+        if not (knowledgeGraphDirExists workspaceRoot) then Promise.lift ()
         else
             commandQueue.Enqueue(fun () ->
                 promise {
-                    let! files = readWikiFiles workspaceRoot
+                    let! files = readKnowledgeGraphFiles workspaceRoot
                     let projection = projectLatestWins files
                     let dailyDue = dueMaintenance files System.DateTime.UtcNow
 
@@ -195,11 +195,11 @@ type MuxWikiRuntime(?deps: obj) as this =
                                 let promptText = prependJobMarker { workspaceRoot = workspaceRoot; kind = kind value } (buildPrompt value files projection)
                                 launchBg workspaceRoot (kind value) title promptText)
 
-                    launchIfDue dailyDue DailyRewrite "Daily wiki rewrite" "daily" "for" buildDailyPrompt
+                    launchIfDue dailyDue DailyRewrite "Daily knowledge graph rewrite" "daily" "for" buildDailyPrompt
                 })
 
-    member this.Submit(sessionID: string, directory: string, drafts: WikiDraft list, ?config: obj) : JS.Promise<string> =
-        if not (wikiDirExists directory) then Promise.lift "Wiki directory not found."
+    member this.Submit(sessionID: string, directory: string, drafts: KnowledgeGraphDraft list, ?config: obj) : JS.Promise<string> =
+        if not (knowledgeGraphDirExists directory) then Promise.lift "Knowledge graph directory not found."
         else
             promise {
                 match config with
@@ -214,7 +214,7 @@ type MuxWikiRuntime(?deps: obj) as this =
                         | false, _ -> None)
 
                 match jobCtxOpt with
-                | None -> return "No active wiki job for this session."
+                | None -> return "No active knowledge graph job for this session."
                 | Some ctx ->
                     let root = ctx.workspaceRoot
                     let todayStr = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
@@ -223,20 +223,18 @@ type MuxWikiRuntime(?deps: obj) as this =
                             let! entries = buildEntries root drafts
                             let kind = ctx.kind
                             let! result =
-                                withWikiPortLock 30000L 1000 root (fun () ->
-                                    match kind with
-                                    | AppendAfterWork ->
-                                        promise {
+                                withKnowledgeGraphPortLock 30000L 1000 root (fun () ->
+                                    promise {
+                                        match kind with
+                                        | AppendAfterWork ->
                                             do! appendEntries root todayStr entries
                                             registeredJobs.Remove(sessionID) |> ignore
-                                            return $"Appended {entries.Length} wiki entries."
-                                        }
-                                    | DailyRewrite date ->
-                                        promise {
+                                            return $"Appended {entries.Length} knowledge graph entries."
+                                        | DailyRewrite date ->
                                             do! rewriteDay root date entries
                                             registeredJobs.Remove(sessionID) |> ignore
-                                            return $"Rewrote wiki day {date}."
-                                        })
+                                            return $"Rewrote knowledge graph day {date}."
+                                    })
                             return result
                         })
 
@@ -254,7 +252,7 @@ type MuxWikiRuntime(?deps: obj) as this =
                 let dir = Dyn.str cfg "directory"
                 if dir <> "" then dir else defaultArg (strField cfg "cwd") ""
             | _ -> ""
-        if root = "" || not (wikiDirExists root) then ()
+        if root = "" || not (knowledgeGraphDirExists root) then ()
         else
             state <- reducer state (RecordLaunchCmd { agent = "bookkeeper"; title = title; prompt = prompt; result = result })
             match config with
@@ -304,32 +302,37 @@ type MuxWikiRuntime(?deps: obj) as this =
     member val takeBookkeeperLaunchesForTesting = System.Func<obj array>(fun () -> this.TakeBookkeeperLaunchesForTesting()) with get, set
     member val waitForBackgroundJobsForTesting = System.Func<JS.Promise<unit>>(fun () -> this.WaitForBackgroundJobsForTesting()) with get, set
 
-let private wikiDraftEntrySchema : obj =
+let private knowledgeGraphDraftEntrySchema : obj =
     createObj
         [ "type", box "object"
           "properties",
           box
               (createObj
-                  [ "id", box (createObj [ "type", box "string"; "description", box "Existing wiki entry id to update" ])
-                    "q", box (createObj [ "type", box "string"; "description", box "Question" ])
-                    "a", box (createObj [ "type", box "string"; "description", box "Answer" ]) ])
-          "required", box [| "q"; "a" |]
+                  [ "id", box (createObj [ "type", box "string"; "description", box "Existing entry id to update" ])
+                    "entity",
+                    box
+                        (createObj
+                            [ "type", box "array"
+                              "items", box (createObj [ "type", box "string" ])
+                              "description", box "Knowledge graph entity" ])
+                    "fact", box (createObj [ "type", box "string"; "description", box "Knowledge graph fact" ]) ])
+          "required", box [| "entity"; "fact" |]
           "additionalProperties", box false ]
 
-let fetchWikiTool (wikiRuntime: MuxWikiRuntime) : ToolDefinition =
-    { name = "fetch_wiki"
-      description = description "fetch_wiki"
-      parameters = mkSchema (createObj [ "id", box (strProp Params.fetchWikiId) ]) [| "id" |]
+let knowledgeGraphFetchTool (kgRuntime: MuxKnowledgeGraphRuntime) : ToolDefinition =
+    { name = "knowledge_graph_fetch"
+      description = description "knowledge_graph_fetch"
+      parameters = mkSchema (createObj [ "entity", box (strProp Params.fetchKnowledgeGraphEntity) ]) [| "entity" |]
       execute =
           fun config args ->
               let sessionID = Dyn.str config "sessionID"
               let directory =
                   let current = Dyn.str config "directory"
                   if current = "" then defaultArg (strField config "cwd") "" else current
-              wikiRuntime.FetchFromSessionSnapshot(sessionID, directory, Dyn.str args "id")
+              kgRuntime.FetchFromSessionSnapshot(sessionID, directory, Dyn.str args "entity")
       condition = None }
 
-let returnBookkeeperTool (wikiRuntime: MuxWikiRuntime) : ToolDefinition =
+let returnBookkeeperTool (kgRuntime: MuxKnowledgeGraphRuntime) : ToolDefinition =
     { name = "return_bookkeeper"
       description = description "return_bookkeeper"
       parameters =
@@ -339,8 +342,8 @@ let returnBookkeeperTool (wikiRuntime: MuxWikiRuntime) : ToolDefinition =
                     box
                         (createObj
                             [ "type", box "array"
-                              "items", box wikiDraftEntrySchema
-                              "description", box Params.submitWikiEntries ]) ])
+                              "items", box knowledgeGraphDraftEntrySchema
+                              "description", box Params.submitKnowledgeGraphEntries ]) ])
               [| "entries" |]
       execute =
           fun config args ->
@@ -350,5 +353,5 @@ let returnBookkeeperTool (wikiRuntime: MuxWikiRuntime) : ToolDefinition =
                   if current = "" then defaultArg (strField config "cwd") "" else current
               match parseDraftArray (Dyn.get args "entries") with
               | Error message -> resolveStr message
-              | Ok drafts -> wikiRuntime.Submit(sessionID, directory, drafts, config)
+              | Ok drafts -> kgRuntime.Submit(sessionID, directory, drafts, config)
       condition = None }

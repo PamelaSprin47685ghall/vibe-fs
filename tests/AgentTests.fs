@@ -34,10 +34,10 @@ let canUse' () =
     check "reviewer denied coder" (not (canUse "reviewer" "coder"))
     check "reviewer denied fuzzy_find" (not (canUse "reviewer" "fuzzy_find"))
 
-    check "manager can fetch_wiki" (canUse "manager" "fetch_wiki")
-    check "coder can fetch_wiki mirrors fuzzy_find" (canUse "coder" "fetch_wiki")
-    check "reviewer denied fetch_wiki mirrors fuzzy_find" (not (canUse "reviewer" "fetch_wiki"))
-    check "bookkeeper denied fetch_wiki mirrors fuzzy_find" (not (canUse "bookkeeper" "fetch_wiki"))
+    check "manager can knowledge_graph_fetch" (canUse "manager" "knowledge_graph_fetch")
+    check "coder can knowledge_graph_fetch mirrors fuzzy_find" (canUse "coder" "knowledge_graph_fetch")
+    check "reviewer denied knowledge_graph_fetch mirrors fuzzy_find" (not (canUse "reviewer" "knowledge_graph_fetch"))
+    check "bookkeeper denied knowledge_graph_fetch mirrors fuzzy_find" (not (canUse "bookkeeper" "knowledge_graph_fetch"))
     check "bookkeeper can return_bookkeeper" (canUse "bookkeeper" "return_bookkeeper")
     check "manager denied return_bookkeeper" (not (canUse "manager" "return_bookkeeper"))
     check "bookkeeper denied read" (not (canUse "bookkeeper" "read"))
@@ -79,7 +79,7 @@ let canUse' () =
     check "unknown agent can coder dispatch" (canUse "build" "coder")
     check "unknown agent can investigator dispatch" (canUse "build" "investigator")
     check "unknown agent can fuzzy_find" (canUse "build" "fuzzy_find")
-    check "unknown agent fetch_wiki mirrors fuzzy_find" (canUse "build" "fetch_wiki" = canUse "build" "fuzzy_find")
+    check "unknown agent knowledge_graph_fetch mirrors fuzzy_find" (canUse "build" "knowledge_graph_fetch" = canUse "build" "fuzzy_find")
 
 let deniedTools' () =
     let tools = [ "coder"; "investigator"; "read"; "write"; "bash"; "fuzzy_find"; "fuzzy_grep"; "agent_report" ]
@@ -103,7 +103,7 @@ let canUseMatrix () =
         [ "manager"; "investigator"; "coder"; "reviewer"; "browser"; "meditator"; "executor"; "bookkeeper" ]
     // (tool, expected-allow per agent in `agents` order)
     let matrix : (string * (bool list)) list = [
-        "fetch_wiki",                    [ true;  true;  true;  false; false; false; false; false ]
+        "knowledge_graph_fetch",                    [ true;  true;  true;  false; false; false; false; false ]
         "return_bookkeeper",             [ false; false; false; false; false; false; false; true  ]
         "agent_report",                  [ true;  true;  true;  true;  true;  true;  true;  true  ]
         "bash",                          [ false; false; false; false; false; false; false; false ]

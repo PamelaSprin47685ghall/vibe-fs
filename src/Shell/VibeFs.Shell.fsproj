@@ -13,8 +13,8 @@
     <Compile Include="TreeSitterShell.fs" />
     <Compile Include="FuzzyFinderShell.fs" />
     <Compile Include="FileSys.fs" />
-    <Compile Include="WikiPortLock.fs" />
-    <Compile Include="WikiFiles.fs" />
+    <Compile Include="KnowledgeGraphPortLock.fs" />
+    <Compile Include="KnowledgeGraphFiles.fs" />
     <Compile Include="WorkspaceFiles.fs" />
     <Compile Include="Executor.fs" />
     <Compile Include="FuzzySearch.fs" />

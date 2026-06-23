@@ -7,13 +7,13 @@ open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Message
-open VibeFs.Kernel.Wiki
+open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
-open VibeFs.Opencode.WikiRuntime
+open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.WikiFiles
+open VibeFs.Shell.KnowledgeGraphFiles
 
 let buildCapsFileReadDataSpec () = promise {
     let! tmpDir = mkdtempAsync "caps-test-"
@@ -66,7 +66,7 @@ let defaultPreludeWithoutCapsSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "manager" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "default prelude injects synthetic messages without caps or wiki" (msgs.Length = 2)
+    check "default prelude injects synthetic messages without caps or knowledge graph" (msgs.Length = 2)
     let userParts = unbox<obj[]> (get msgs.[0] "parts")
     check "default prelude injects think-wrapped content" ((str userParts.[0] "text").StartsWith "<think>")
     check "default prelude preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
@@ -134,8 +134,8 @@ let bookkeeperDoesNotReceiveCapsSpec () = promise {
     let! workspaceDir = mkdtempAsync "caps-bookkeeper-"
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content"
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n"
-    do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Opencode 主入口是 src/Opencode/Plugin.fs。" ]
+    do! ensureKnowledgeGraphDir workspaceDir
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目插件入口在哪里？"] "Opencode 主入口是 src/Opencode/Plugin.fs。" ]
     let! p = plugin (box {| directory = workspaceDir |})
     let tf = get p "experimental.chat.messages.transform"
     let originalMsg = box {| info = createObj [ "id", box "msg-bk-1"; "agent", box "bookkeeper"; "sessionID", box "caps-bk-session" ]; parts = [||] |}
@@ -144,7 +144,7 @@ let bookkeeperDoesNotReceiveCapsSpec () = promise {
     let msgs = unbox<obj[]> (get out "messages")
     check "bookkeeper still receives injection without caps files" (msgs.Length = 2)
     let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
-    check "bookkeeper injection omits wiki prelude" (not (firstText.Contains "[项目背景和历史]"))
+    check "bookkeeper injection omits knowledge graph prelude" (not (firstText.Contains "[项目背景和历史]"))
     check "bookkeeper injection has think-wrapped content" (firstText.StartsWith "<think>")
     check "bookkeeper injection preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir

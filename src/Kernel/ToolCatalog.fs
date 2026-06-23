@@ -75,18 +75,18 @@ let private executorSpec : ToolSpec =
               "mode", "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)." ]
       requiredFields = [ "language"; "program"; "timeout_type"; "mode" ] }
 
-let private fetchWikiSpec : ToolSpec =
-    { name = "fetch_wiki"
+let private fetchKnowledgeGraphSpec : ToolSpec =
+    { name = "knowledge_graph_fetch"
       description =
-        "Fetch the answer for a project wiki id from this session's wiki snapshot. The manager prelude lists available ids and questions. This tool returns only the answer text and does not read the latest disk wiki."
-      paramDocs = map [ "id", "Wiki entry id from the manager prelude." ]
-      requiredFields = [ "id" ] }
+        "Fetch facts for a knowledge graph entity from this session's knowledge graph snapshot. The manager prelude lists available entities. This tool returns only the fact text and does not read the latest disk knowledge graph."
+      paramDocs = map [ "entity", "Knowledge graph entity from the manager prelude." ]
+      requiredFields = [ "entity" ] }
 
-let private submitWikiSpec : ToolSpec =
+let private submitKnowledgeGraphSpec : ToolSpec =
     { name = "return_bookkeeper"
       description =
-        "Return wiki draft entries for the current wiki job context. The host decides whether this is an append or daily rewrite job; entries with an id update existing knowledge, and entries without an id receive a host-assigned id."
-      paramDocs = map [ "entries", "Array of wiki draft entries. Each entry: optional id, required q, required a." ]
+        "Return knowledge graph draft entries for the current knowledge graph job context. The host decides whether this is an append or daily rewrite job; entries with an id update existing facts, and entries without an id receive a host-assigned id."
+      paramDocs = map [ "entries", "Array of knowledge graph draft entries. Each entry: optional id, required entity (string array), required fact." ]
       requiredFields = [ "entries" ] }
 
 let private fuzzyFindSpec : ToolSpec =
@@ -154,7 +154,7 @@ let private submitReviewSpec : ToolSpec =
 
 let all : ToolSpec list =
     [ coderSpec; investigatorSpec; meditatorSpec; browserSpec; executorSpec
-      fetchWikiSpec; submitWikiSpec; fuzzyFindSpec; fuzzyGrepSpec; websearchSpec; webfetchSpec; submitReviewSpec ]
+      fetchKnowledgeGraphSpec; submitKnowledgeGraphSpec; fuzzyFindSpec; fuzzyGrepSpec; websearchSpec; webfetchSpec; submitReviewSpec ]
 
 let private byName : Map<string, ToolSpec> = all |> List.map (fun spec -> spec.name, spec) |> Map.ofList
 
@@ -187,8 +187,8 @@ module Params =
     let executorDeps = executor "dependencies"
     let executorTimeout = executor "timeout_type"
     let executorMode = executor "mode"
-    let fetchWikiId = doc "fetch_wiki" "id"
-    let submitWikiEntries = doc "return_bookkeeper" "entries"
+    let fetchKnowledgeGraphEntity = doc "knowledge_graph_fetch" "entity"
+    let submitKnowledgeGraphEntries = doc "return_bookkeeper" "entries"
     let private fuzzyFind = doc "fuzzy_find"
     let fuzzyFindPattern = fuzzyFind "pattern"
     let fuzzyFindPath = fuzzyFind "path"

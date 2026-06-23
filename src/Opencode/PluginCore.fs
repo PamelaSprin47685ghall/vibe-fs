@@ -16,10 +16,10 @@ open VibeFs.Opencode.Tools
 open VibeFs.Opencode.HookExecute
 open VibeFs.Opencode.TitleFetchGuard
 open VibeFs.Opencode.NudgeHook
-open VibeFs.Opencode.WikiRuntime
+open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.WikiFiles
+open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.ChildAgentRegistry
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<obj, obj, JS.Promise<unit>>(f))
@@ -29,7 +29,7 @@ type private CoreServices = {
     ChildAgentRegistry: ChildAgentRegistry
     NudgeHook: NudgeHook
     Directory: string
-    WikiRuntime: WikiRuntime
+    KnowledgeGraphRuntime: KnowledgeGraphRuntime
     MagicSession: MagicSession
     Tools: obj
     McpMap: obj
@@ -45,10 +45,10 @@ let private createCoreServices (host: Host) (ctx: obj) =
         let nowMs = Dyn.get ctx "nowMs"
         if Dyn.isNullish nowMs then System.DateTime.UtcNow
         else System.DateTimeOffset.FromUnixTimeMilliseconds(int64 (unbox<float> nowMs)).UtcDateTime
-    let wikiEnabled = wikiDirExists directory
-    let wikiRuntime = WikiRuntime(Dyn.get ctx "client", directory, nowUtc, childAgentRegistry, 30000L, 1000)
+    let knowledgeGraphEnabled = knowledgeGraphDirExists directory
+    let knowledgeGraphRuntime = KnowledgeGraphRuntime(Dyn.get ctx "client", directory, nowUtc, childAgentRegistry, 30000L, 1000)
     let magicSession = MagicSession host
-    let tools = createTools host childAgentRegistry finderCache ctx wikiRuntime reviewStore wikiEnabled
+    let tools = createTools host childAgentRegistry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled
     let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
     let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
     {
@@ -56,7 +56,7 @@ let private createCoreServices (host: Host) (ctx: obj) =
         ChildAgentRegistry = childAgentRegistry
         NudgeHook = nudgeHook
         Directory = directory
-        WikiRuntime = wikiRuntime
+        KnowledgeGraphRuntime = knowledgeGraphRuntime
         MagicSession = magicSession
         Tools = tools
         McpMap = mcpMap
@@ -66,8 +66,8 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
     setKey result "chat.message" (twoArgHook (fun input output -> chatMessageFor host services.ChildAgentRegistry services.NudgeHook input output))
     setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
     setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBeforeFor host input output))
-    setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host services.Directory services.NudgeHook services.WikiRuntime services.ChildAgentRegistry input output))
-    setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform services.ChildAgentRegistry services.Directory services.MagicSession services.WikiRuntime services.ReviewStore input output))
+    setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host services.Directory services.NudgeHook services.KnowledgeGraphRuntime services.ChildAgentRegistry input output))
+    setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform services.ChildAgentRegistry services.Directory services.MagicSession services.KnowledgeGraphRuntime services.ReviewStore input output))
     setKey result "command.execute.before" (twoArgHook (fun input output ->
         promise {
             do! services.NudgeHook.handleCommandExecuteBefore input output
@@ -76,7 +76,7 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
     setKey result "event" (box (fun (input: obj) ->
         promise {
             do! eventHandler services.ReviewStore input
-            cleanUpJobContextIfAbortedOrDeleted services.WikiRuntime input
+            cleanUpJobContextIfAbortedOrDeleted services.KnowledgeGraphRuntime input
             do! services.NudgeHook.handleEvent input
         }))
     setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host services.MagicSession input output))
@@ -92,17 +92,17 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         setKey result "tool" services.Tools
         setKey
             result
-            "__wikiRuntime"
+            "__knowledgeGraphRuntime"
             (box (
                 createObj [
-                    "rawInstance", box services.WikiRuntime
+                    "rawInstance", box services.KnowledgeGraphRuntime
                     "registerJobForTesting",
                     box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
-                        services.WikiRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
+                        services.KnowledgeGraphRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
                     "takeBookkeeperLaunchesForTesting",
-                    box (System.Func<obj array>(fun () -> services.WikiRuntime.TakeBookkeeperLaunchesForTesting()))
+                    box (System.Func<obj array>(fun () -> services.KnowledgeGraphRuntime.TakeBookkeeperLaunchesForTesting()))
                     "waitForBackgroundJobsForTesting",
-                    box (System.Func<JS.Promise<unit>>(fun () -> services.WikiRuntime.WaitForBackgroundJobsForTesting()))
+                    box (System.Func<JS.Promise<unit>>(fun () -> services.KnowledgeGraphRuntime.WaitForBackgroundJobsForTesting()))
                 ]))
         setKey result "config" (box (fun (cfg: obj) ->
             promise {

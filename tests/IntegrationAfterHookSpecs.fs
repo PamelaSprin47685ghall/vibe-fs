@@ -11,11 +11,11 @@ open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.WikiFiles
+open VibeFs.Shell.KnowledgeGraphFiles
 
 let afterHookRecordsDirectWriteSpec () = promise {
     let! workspaceDir = mkdtempAsync "after-hook-write-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "turn-1" "Patched files" |]
     let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient |})
     let toolExecuteAfter = get pluginObject "tool.execute.after"
@@ -62,7 +62,7 @@ let afterHookSkipsChildSessionSpec () = promise {
             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ())))
         ]) ]
     let! workspaceDir = mkdtempAsync "after-hook-child-skip-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient |})
     let coder = get (get pluginObject "tool") "coder"
     let intents : obj array = [|
@@ -87,7 +87,7 @@ let afterHookSkipsChildSessionSpec () = promise {
 
 let afterHookSkipsFailedToolSpec () = promise {
     let! workspaceDir = mkdtempAsync "after-hook-failed-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "fail-turn" "noted" |]
     let! pluginObject = plugin (box {| directory = workspaceDir; client = mockClient |})
     let toolExecuteAfter = get pluginObject "tool.execute.after"
@@ -118,7 +118,7 @@ let afterHookRecordsCoderSpec () = promise {
             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ())))
         ]) ]
     let! workspaceDir = mkdtempAsync "after-hook-coder-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
     let toolExecuteAfter = get p "tool.execute.after"
     let coderInput =
@@ -142,7 +142,7 @@ let afterHookRecordsCoderSpec () = promise {
 
 let afterHookRecordsExecutorSpec () = promise {
     let! workspaceDir = mkdtempAsync "executor-bookkeeper-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let! p = plugin (box {| directory = workspaceDir |})
     check "executor tool exposes mode" (not (isNullish (executorModeSchema p)))
     let toolExecuteAfter = get p "tool.execute.after"

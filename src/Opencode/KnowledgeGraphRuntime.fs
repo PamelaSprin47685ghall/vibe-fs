@@ -1,40 +1,40 @@
-module VibeFs.Opencode.WikiRuntime
+module VibeFs.Opencode.KnowledgeGraphRuntime
 
 open Fable.Core
 open Fable.Core.JsInterop
 open System.Collections.Generic
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.Wiki
-open VibeFs.Kernel.WikiPrompts
-open VibeFs.Kernel.WikiMaintenance
-open VibeFs.Kernel.WikiRuntimeState
-open VibeFs.Shell.WikiFiles
+open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraphPrompts
+open VibeFs.Kernel.KnowledgeGraphMaintenance
+open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.PromiseQueue
 open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Opencode.WikiRuntimeIO
+open VibeFs.Opencode.KnowledgeGraphRuntimeIO
 open VibeFs.Mux.AiSettings
 
-/// Wiki host IO shell (P53/P72): holds the single mutable state cell and
+/// KnowledgeGraph host IO shell (P53/P72): holds the single mutable state cell and
 /// serializes every state+IO change through `commandQueue`. All pure state
-/// transitions live in `Kernel.WikiRuntimeState`; the stateless IO orchestration
+/// transitions live in `Kernel.KnowledgeGraphRuntimeState`; the stateless IO orchestration
 /// (prompt building, file IO, background session launch) lives in
-/// `WikiRuntimeIO`. Synchronous methods (RegisterJob/DeleteJob/MarkRwTool/...)
+/// `KnowledgeGraphRuntimeIO`. Synchronous methods (RegisterJob/DeleteJob/MarkRwTool/...)
 /// run to completion in a single tick and cannot dangle a JS.Promise mid
 /// state-change; the only async-with-await method that holds a job context
 /// across an await is `Submit`, which caches `ctx` before awaiting and uses an
 /// idempotent `RemoveJobCmd` on exit so a synchronous `DeleteJob` raised by a
 /// stream-abort/session.delete event during the await cannot corrupt it.
-type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> System.DateTime, registry: ChildAgentRegistry, portLockTimeoutMs: int64, portLockRetryDelayMs: int) =
-    let mutable state = initialWikiState
+type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> System.DateTime, registry: ChildAgentRegistry, portLockTimeoutMs: int64, portLockRetryDelayMs: int) =
+    let mutable state = initialKnowledgeGraphState
     let commandQueue = SerialQueue()
     let backgroundJobs = ResizeArray<JS.Promise<unit>>()
     let writeQueues = Dictionary<string, SerialQueue>()
-    let registeredJobs = Dictionary<string, WikiJobContext>()
+    let registeredJobs = Dictionary<string, KnowledgeGraphJobContext>()
     let workspaceRoot = initialWorkspaceRoot
 
     let today () = (nowUtc ()).ToString("yyyy-MM-dd")
 
-    let applyCmd (cmd: WikiCommand) : unit = state <- reducer state cmd
+    let applyCmd (cmd: KnowledgeGraphCommand) : unit = state <- reducer state cmd
 
     let getWorkspaceQueue (root: string) =
         match writeQueues.TryGetValue root with
@@ -60,7 +60,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
     let launchBg root parentID kind title buildPrompt aiSettings =
         queueBackgroundLaunch client startBackgroundJob (recordBackgroundResult title) root parentID kind title buildPrompt aiSettings registry
 
-    member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<WikiProjection> =
+    member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<KnowledgeGraphProjection> =
         if sessionID = "" then Promise.lift Map.empty
         else
             commandQueue.Enqueue(fun () ->
@@ -73,7 +73,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                         return projection
                 })
 
-    member _.RegisterJob(_sessionID: string, _ctx: WikiJobContext) : unit =
+    member _.RegisterJob(_sessionID: string, _ctx: KnowledgeGraphJobContext) : unit =
         registeredJobs.[_sessionID] <- _ctx
 
     member this.RegisterJobForTesting(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =
@@ -81,7 +81,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
 
         let readRequiredField (fieldName: string) : string =
             let value = str payloadObj fieldName
-            if value.Trim() = "" then failwith $"Wiki job payload missing required field '{fieldName}'"
+            if value.Trim() = "" then failwith $"Knowledge graph job payload missing required field '{fieldName}'"
             else value.Trim()
 
         let kind =
@@ -93,10 +93,10 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                 ]
             match Map.tryFind normalizedTag builders with
             | Some build -> build ()
-            | None -> failwith $"Unknown wiki job kind: {normalizedTag}"
+            | None -> failwith $"Unknown knowledge graph job kind: {normalizedTag}"
         this.RegisterJob(sessionID, { workspaceRoot = workspaceRoot; kind = kind })
 
-    member _.TakeJob(_sessionID: string) : WikiJobContext option =
+    member _.TakeJob(_sessionID: string) : KnowledgeGraphJobContext option =
         match registeredJobs.TryGetValue _sessionID with
         | true, ctx -> Some ctx
         | false, _ -> None
@@ -105,12 +105,12 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
         registry.UnregisterChildAgent(sessionID)
         registeredJobs.Remove(sessionID) |> ignore
 
-    member this.Submit(sessionID: string, drafts: WikiDraft list) : JS.Promise<string> =
+    member this.Submit(sessionID: string, drafts: KnowledgeGraphDraft list) : JS.Promise<string> =
         this.SubmitFromHistory(sessionID, "", drafts)
 
-    member this.SubmitFromHistory(sessionID: string, directory: string, drafts: WikiDraft list) : JS.Promise<string> =
+    member this.SubmitFromHistory(sessionID: string, directory: string, drafts: KnowledgeGraphDraft list) : JS.Promise<string> =
         let root = effectiveWorkspaceRoot directory
-        if not (wikiDirExists root) then Promise.lift "Wiki directory not found."
+        if not (knowledgeGraphDirExists root) then Promise.lift "Knowledge graph directory not found."
         else
             promise {
                 let! result, kindOpt, parentID =
@@ -121,7 +121,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                                 match registeredJobs.TryGetValue sessionID with
                                 | true, ctx -> Some ctx
                                 | false, _ -> None) with
-                            | None -> return "No active wiki job for this session.", None, None
+                            | None -> return "No active knowledge graph job for this session.", None, None
                             | Some ctx ->
                                 let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
                                 try
@@ -140,31 +140,31 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
 
     member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
         promise {
-            if not (wikiDirExists (effectiveWorkspaceRoot directory)) then return None
+            if not (knowledgeGraphDirExists (effectiveWorkspaceRoot directory)) then return None
             else
                 let! projection = this.EnsureSessionSnapshot(sessionID, directory)
                 return buildPreludeSection projection
         }
 
-    member this.FetchFromSessionSnapshot(sessionID: string, directory: string, id: string) : JS.Promise<string> =
+    member this.FetchFromSessionSnapshot(sessionID: string, directory: string, entity: string) : JS.Promise<string> =
         promise {
-            if not (wikiDirExists (effectiveWorkspaceRoot directory)) then
-                return "Wiki directory not found."
+            if not (knowledgeGraphDirExists (effectiveWorkspaceRoot directory)) then
+                return "Knowledge graph directory not found."
             elif sessionID = "" then
-                return "Wiki snapshot unavailable for this session."
+                return "Knowledge graph snapshot unavailable for this session."
             else
                 let! projection = this.EnsureSessionSnapshot(sessionID, directory)
-                match fetchAnswer projection id with
+                match fetchAnswer projection entity with
                 | Ok answer -> return answer
                 | Error message -> return message
         }
     member _.StartMaintenanceIfDue(workspaceRoot: string, ?parentSessionID: string) : JS.Promise<unit> =
         let root = effectiveWorkspaceRoot workspaceRoot
-        if not (wikiDirExists root) then Promise.lift ()
+        if not (knowledgeGraphDirExists root) then Promise.lift ()
         else
             commandQueue.Enqueue(fun () ->
                 promise {
-                    let! files = readWikiFiles root
+                    let! files = readKnowledgeGraphFiles root
                     let projection = projectLatestWins files
                     let dailyDue = dueMaintenance files (nowUtc ())
 
@@ -178,7 +178,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
                             if first then
                                 launchBg root parentSessionID (kind value) title (fun () -> Promise.lift (buildPrompt value files projection)) emptySettings)
 
-                    launchIfDue dailyDue DailyRewrite "Daily wiki rewrite" "daily" "for" buildDailyPrompt
+                    launchIfDue dailyDue DailyRewrite "Daily knowledge graph rewrite" "daily" "for" buildDailyPrompt
                 })
 
     member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string) : unit =
@@ -186,7 +186,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
 
     member this.StartBookkeeperAppend(prompt: string, result: string, title: string, ?parentSessionID: string, ?aiSettings: DelegatedAiSettings) : unit =
         let root = effectiveWorkspaceRoot workspaceRoot
-        if not (wikiDirExists root) then ()
+        if not (knowledgeGraphDirExists root) then ()
         else
             this.RecordBookkeeperLaunch("bookkeeper", title, prompt, result)
             let settings = defaultArg aiSettings emptySettings
@@ -200,7 +200,7 @@ type WikiRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> Syst
     /// Test-only projection: drains recorded bookkeeper launches so integration
     /// tests can assert what the runtime would have fired. Kept on the production
     /// type because IntegrationToolTests reaches it through the duck-typed
-    /// __wikiRuntime surface; it performs no IO and mutates only the test buffer.
+    /// __knowledgeGraphRuntime surface; it performs no IO and mutates only the test buffer.
     member _.TakeBookkeeperLaunchesForTesting() : obj array =
         let launches, nextState = drainLaunches state
         state <- nextState

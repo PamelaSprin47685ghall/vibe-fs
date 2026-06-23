@@ -1,9 +1,9 @@
-module VibeFs.Kernel.WikiMaintenance
+module VibeFs.Kernel.KnowledgeGraphMaintenance
 
 open System
-open VibeFs.Kernel.Wiki
+open VibeFs.Kernel.KnowledgeGraph
 
-/// Pure wiki maintenance scheduling. Given the current wiki files and a clock
+/// Pure knowledge graph maintenance scheduling. Given the current knowledge graph files and a clock
 /// value, decide which background daily rewrite jobs are due — without touching
 /// disk or mutable state.
 
@@ -16,9 +16,9 @@ let parseDate (s: string) : DateTime option =
         | _ -> None
     | _ -> None
 
-/// Classify the day-files present in the wiki as `(date, rewritten)` pairs,
+/// Classify the day-files present in the knowledge graph as `(date, rewritten)` pairs,
 /// sorted ascending by date.
-let dayFileSummary (files: WikiFile list) : (string * bool) list =
+let dayFileSummary (files: KnowledgeGraphFile list) : (string * bool) list =
     files
     |> List.choose (fun file ->
         match file.header with
@@ -28,7 +28,7 @@ let dayFileSummary (files: WikiFile list) : (string * bool) list =
 
 /// The maintenance decisions, in one pure pass.
 /// `dailyDue` = the oldest past day-file that has not yet been rewritten.
-let dueMaintenance (files: WikiFile list) (now: DateTime) : string list =
+let dueMaintenance (files: KnowledgeGraphFile list) (now: DateTime) : string list =
     let todayStr = now.ToString("yyyy-MM-dd")
     dayFileSummary files
         |> List.filter (fun (date, rewritten) -> date < todayStr && not rewritten)

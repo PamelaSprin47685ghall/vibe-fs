@@ -9,16 +9,17 @@ open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.CapsFormat
 open VibeFs.Kernel.MagicProjection
 open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.Wiki
-open VibeFs.Kernel.WikiRuntimeState
-open VibeFs.Mux.MagicTodo
+open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Kernel.HostTools
+open VibeFs.Mux.KnowledgeGraphTools
 open VibeFs.Mux.MessagingCodec
 open VibeFs.Mux.ReadDedup
+open VibeFs.Mux.MagicTodo
 open VibeFs.Opencode.CapsPrelude
+open VibeFs.Shell.ReviewRuntime
 open VibeFs.Shell.FileSys
 open VibeFs.Shell.WorkspaceFiles
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Mux.WikiTools
 
 let private alwaysExcludedAgents = set [ "browser"; "investigator"; "executor"; "title"; "bookkeeper" ]
 let private childWorkspaceExcludedAgents = set [ "exec"; "explore" ]
@@ -163,7 +164,7 @@ let private isChildWorkspace (deps: obj) (workspaceId: string) : bool =
 
 let messagesTransform
     (deps: obj)
-    (wikiRuntime: MuxWikiRuntime)
+    (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
     (reviewStore: ReviewStore)
     (input: obj)
     (output: obj)
@@ -199,11 +200,11 @@ let messagesTransform
                 let! capsFiles =
                     if excluded || directory = "" then Promise.lift ([]: CapsFile list)
                     else findCapsFiles directory
-                let! wikiPrelude =
-                    if not excluded && directory <> "" && canUse agent "fetch_wiki" then
-                        wikiRuntime.BuildPreludeForSession(sessionID, directory)
+                let! knowledgeGraphPrelude =
+                    if not excluded && directory <> "" && canUse agent "knowledge_graph_fetch" then
+                        knowledgeGraphRuntime.BuildPreludeForSession(sessionID, directory)
                     else
                         Promise.lift (None: string option)
-                let final = buildCapsMessages deduped directory capsFiles wikiPrelude
+                let final = buildCapsMessages deduped directory capsFiles knowledgeGraphPrelude
                 replaceArrayInPlace messagesArr final
     }

@@ -36,7 +36,7 @@ let isTodoWriteToolName (toolName: string) : bool =
 let allToolNames (host: Host) : string array =
     [| "coder"; "investigator"; "meditator"; "browser"; "executor"
        "fuzzy_find"; "fuzzy_grep"; "websearch"; "webfetch"
-       "fetch_wiki"; "return_bookkeeper"; "submit_review"; "return_reviewer"; "read"; "write"
+       "knowledge_graph_fetch"; "return_bookkeeper"; "submit_review"; "return_reviewer"; "read"; "write"
        "bash"; taskToolName host; "grep"; "edit"; "patch"; "apply_patch"
        todoWriteToolName host; todoWritePromptName host; "stealth-browser-mcp_*"
        "question"; "ask_user_question"; "agent_report"

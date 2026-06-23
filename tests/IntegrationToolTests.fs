@@ -4,10 +4,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.IntegrationCapsSpecs
-open VibeFs.Tests.IntegrationWikiPreludeSpecs
+open VibeFs.Tests.IntegrationKnowledgeGraphPreludeSpecs
 open VibeFs.Tests.IntegrationAfterHookSpecs
 open VibeFs.Tests.IntegrationMaintenanceSpecs
-open VibeFs.Tests.IntegrationSubmitWikiSpecs
+open VibeFs.Tests.IntegrationSubmitKnowledgeGraphSpecs
 open VibeFs.Tests.IntegrationBookkeeperSpecs
 open VibeFs.Tests.IntegrationToolDefSpecs
 open VibeFs.Tests.IntegrationSubagentSpecs
@@ -16,12 +16,12 @@ open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicCore
-open VibeFs.Kernel.Wiki
+open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Mux.BuiltinTools
 open VibeFs.Mux.Plugin
 open VibeFs.Mux.SubagentTools
 open VibeFs.Shell.MagicSessionStore
-open VibeFs.Shell.WikiFiles
+open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Prompts
@@ -42,7 +42,7 @@ let computeCountSpec (reg: obj) =
     check "has write tool" (names |> Array.contains "write")
     check "has read tool" (names |> Array.contains "read")
     check "has submit_review tool" (names |> Array.contains "submit_review")
-    check "has fetch_wiki tool" (names |> Array.contains "fetch_wiki")
+    check "has knowledge_graph_fetch tool" (names |> Array.contains "knowledge_graph_fetch")
     check "has return_bookkeeper tool" (names |> Array.contains "return_bookkeeper")
     check "has return_reviewer tool" (names |> Array.contains "return_reviewer")
 
@@ -54,58 +54,58 @@ let muxMessageTransformRegisteredSpec () =
         check "mux messagesTransform is callable" (typeIs tf "function")
     }
 
-let muxWikiPreludeForManagerSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-wiki-prelude-manager-"
-    do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ]
+let muxKnowledgeGraphPreludeForManagerSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-kg-prelude-manager-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目"; "插件入口"] "Mux 主入口是 src/Mux/Plugin.fs。" ]
     let reg = createRegistration (minimalMuxDeps ())
     let tf = muxMessageTransform reg
     let originalMsg = muxTextMessage "msg-manager" "user" "go"
     let out = createObj [ "messages", box [| originalMsg |] ]
-    let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-wiki-prelude-manager-session" ]
+    let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-kg-prelude-manager-session" ]
     if isNullish tf then
         check "mux messagesTransform exposed for manager" false
     else
         do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
         let msgs = unbox<obj[]> (get out "messages")
-        check "mux manager wiki prelude injects prefix messages" (msgs.Length >= 2)
+        check "mux manager knowledge graph prelude injects prefix messages" (msgs.Length >= 2)
         let firstText = firstTextPartText msgs.[0]
-        check "mux manager wiki prelude has think-wrapped content" (firstText.Contains "<think>")
-        check "mux manager wiki prelude has wiki front matter" (firstText.Contains "---\nwiki:")
-        check "mux manager wiki prelude lists question" (firstText.Contains "0a3f" && firstText.Contains "项目插件入口在哪里？")
-        check "mux manager wiki prelude hides answer" (not (firstText.Contains "src/Mux/Plugin.fs"))
-        check "mux manager wiki prelude preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
+        check "mux manager knowledge graph prelude has think-wrapped content" (firstText.Contains "<think>")
+        check "mux manager knowledge graph prelude has knowledge graph front matter" (firstText.Contains "---\nknowledge_graph:")
+        check "mux manager knowledge graph prelude lists entity" (firstText.Contains "项目" && firstText.Contains "插件入口" && not (firstText.Contains "0a3f"))
+        check "mux manager knowledge graph prelude hides fact" (not (firstText.Contains "src/Mux/Plugin.fs"))
+        check "mux manager knowledge graph prelude preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
     do! rmAsync workspaceDir
 }
 
-let muxWikiPreludeForCoderSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-wiki-prelude-coder-"
-    do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ]
+let muxKnowledgeGraphPreludeForCoderSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-kg-prelude-coder-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目"; "插件入口"] "Mux 主入口是 src/Mux/Plugin.fs。" ]
     let reg = createRegistration (minimalMuxDeps ())
     let tf = muxMessageTransform reg
     let originalMsg = muxTextMessage "msg-coder" "user" "go"
     let out = createObj [ "messages", box [| originalMsg |] ]
-    let input = createObj [ "agent", box "coder"; "directory", box workspaceDir; "sessionID", box "mux-wiki-prelude-coder-session" ]
+    let input = createObj [ "agent", box "coder"; "directory", box workspaceDir; "sessionID", box "mux-kg-prelude-coder-session" ]
     if isNullish tf then
         check "mux messagesTransform exposed for coder" false
     else
         do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
         let msgs = unbox<obj[]> (get out "messages")
-        check "mux coder wiki prelude injects prefix messages" (msgs.Length >= 2)
+        check "mux coder knowledge graph prelude injects prefix messages" (msgs.Length >= 2)
         let firstText = firstTextPartText msgs.[0]
-        check "mux coder wiki prelude has think-wrapped content" (firstText.Contains "<think>")
-        check "mux coder wiki prelude has wiki front matter" (firstText.Contains "---\nwiki:")
-        check "mux coder wiki prelude lists question" (firstText.Contains "0a3f" && firstText.Contains "项目插件入口在哪里？")
-        check "mux coder wiki prelude hides answer" (not (firstText.Contains "src/Mux/Plugin.fs"))
-        check "mux coder wiki prelude preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
+        check "mux coder knowledge graph prelude has think-wrapped content" (firstText.Contains "<think>")
+        check "mux coder knowledge graph prelude has knowledge graph front matter" (firstText.Contains "---\nknowledge_graph:")
+        check "mux coder knowledge graph prelude lists entity" (firstText.Contains "项目" && firstText.Contains "插件入口" && not (firstText.Contains "0a3f"))
+        check "mux coder knowledge graph prelude hides fact" (not (firstText.Contains "src/Mux/Plugin.fs"))
+        check "mux coder knowledge graph prelude preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
     do! rmAsync workspaceDir
 }
 
-let muxNoWikiPreludeForExcludedAgentsSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-wiki-prelude-excluded-"
-    do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ]
+let muxNoKnowledgeGraphPreludeForExcludedAgentsSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-kg-prelude-excluded-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目"; "插件入口"] "Mux 主入口是 src/Mux/Plugin.fs。" ]
     let reg = createRegistration (minimalMuxDeps ())
     let tf = muxMessageTransform reg
     if isNullish tf then
@@ -114,121 +114,125 @@ let muxNoWikiPreludeForExcludedAgentsSpec () = promise {
         for agent in [| "browser"; "bookkeeper" |] do
             let originalMsg = muxTextMessage ("msg-" + agent) "user" "go"
             let out = createObj [ "messages", box [| originalMsg |] ]
-            let input = createObj [ "agent", box agent; "directory", box workspaceDir; "sessionID", box ("mux-wiki-excl-" + agent) ]
+            let input = createObj [ "agent", box agent; "directory", box workspaceDir; "sessionID", box ("mux-kg-excl-" + agent) ]
             do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
             let msgs = unbox<obj[]> (get out "messages")
             check (agent + " still receives default prefix") (msgs.Length >= 2)
             let firstText = firstTextPartText msgs.[0]
             check (agent + " default prefix has think-wrapped content") (firstText.Contains "<think>")
-            check (agent + " omits wiki prelude") (not (firstText.Contains "---\nwiki:"))
+            check (agent + " omits knowledge graph prelude") (not (firstText.Contains "knowledge_graph"))
             check (agent + " preserves original") (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
     do! rmAsync workspaceDir
 }
 
-let muxCapsAndWikiPreludeOrderSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-caps-wiki-order-"
-    do! ensureWikiDir workspaceDir
+let muxCapsAndKnowledgeGraphPreludeOrderSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-caps-kg-order-"
+    do! ensureKnowledgeGraphDir workspaceDir
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content"
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n"
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Mux 主入口是 src/Mux/Plugin.fs。" ]
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目"; "插件入口"] "Mux 主入口是 src/Mux/Plugin.fs。" ]
     let reg = createRegistration (minimalMuxDeps ())
     let tf = muxMessageTransform reg
     let originalMsg = muxTextMessage "msg-order" "user" "go"
     let out = createObj [ "messages", box [| originalMsg |] ]
-    let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-caps-wiki-session" ]
+    let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-caps-kg-session" ]
     if isNullish tf then
-        check "mux messagesTransform exposed for caps+wiki order" false
+        check "mux messagesTransform exposed for caps+kg order" false
     else
         do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
         let msgs = unbox<obj[]> (get out "messages")
-        check "mux caps+wiki injects prefix messages" (msgs.Length >= 2)
+        check "mux caps+kg injects prefix messages" (msgs.Length >= 2)
         let firstText = firstTextPartText msgs.[0]
-        check "mux caps+wiki first message has think-wrapped content" (firstText.Contains "<think>")
-        check "mux caps+wiki first message includes wiki front matter" (firstText.Contains "---\nwiki:")
+        check "mux caps+kg first message has think-wrapped content" (firstText.Contains "<think>")
+        check "mux caps+kg first message includes knowledge graph front matter" (firstText.Contains "---\nknowledge_graph:")
         let hasCapsAssistant = msgs.[..msgs.Length - 2] |> Array.exists hasDynamicToolReadPart
-        check "mux caps+wiki includes assistant caps read before original" hasCapsAssistant
-        check "mux caps+wiki preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
+        check "mux caps+kg includes assistant caps read before original" hasCapsAssistant
+        check "mux caps+kg preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
     do! rmAsync workspaceDir
 }
 
-let muxFetchWikiSnapshotSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-wiki-fetch-"
-    do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Snapshot answer" ]
+let muxFetchKnowledgeGraphSnapshotSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-kg-fetch-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    let entity = ["项目"; "入口"]
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [
+        knowledgeGraphEntry "0a3f" entity "Old fact 1"
+        knowledgeGraphEntry "b912" entity "Old fact 2" ]
     let reg = createRegistration (createObj [])
-    let fetchTool = muxToolByName reg "fetch_wiki"
+    let fetchTool = muxToolByName reg "knowledge_graph_fetch"
     if isNullish fetchTool then
-        check "mux registration exposes fetch_wiki tool" false
+        check "mux registration exposes knowledge_graph_fetch tool" false
     else
-        let context = createObj [ "directory", box workspaceDir; "sessionID", box "mux-wiki-fetch-session" ]
-        let! answer = ((get fetchTool "execute") $ (context, createObj [ "id", box "0a3f" ])) |> unbox<JS.Promise<string>>
-        check "mux fetch_wiki returns answer" (answer = "Snapshot answer")
-        let! invalid = ((get fetchTool "execute") $ (context, createObj [ "id", box "nope" ])) |> unbox<JS.Promise<string>>
-        check "mux fetch_wiki validates id format" (invalid.Contains "Invalid wiki id")
-        let! missing = ((get fetchTool "execute") $ (context, createObj [ "id", box "b912" ])) |> unbox<JS.Promise<string>>
-        check "mux fetch_wiki reports missing snapshot entry" (missing.Contains "Wiki entry not found in this session snapshot")
+        let context = createObj [ "directory", box workspaceDir; "sessionID", box "mux-kg-fetch-session" ]
+        let! answer = ((get fetchTool "execute") $ (context, createObj [ "entity", box "项目 入口" ])) |> unbox<JS.Promise<string>>
+        check "mux knowledge_graph_fetch returns concatenated facts" (answer.Contains "Old fact 1" && answer.Contains "Old fact 2")
+        let! invalid = ((get fetchTool "execute") $ (context, createObj [ "entity", box "" ])) |> unbox<JS.Promise<string>>
+        check "mux knowledge_graph_fetch validates entity" (invalid.Contains "Invalid knowledge graph entity")
+        let! missing = ((get fetchTool "execute") $ (context, createObj [ "entity", box "missing entity" ])) |> unbox<JS.Promise<string>>
+        check "mux knowledge_graph_fetch reports missing entity" (missing.Contains "Knowledge graph entity not found")
     do! rmAsync workspaceDir
 }
+
 
 let muxReturnBookkeeperAppendSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-wiki-submit-"
-    do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ wikiEntry "0a3f" "项目插件入口在哪里？" "Old answer" ]
+    let! workspaceDir = mkdtempAsync "mux-kg-submit-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目"; "插件入口"] "Old answer" ]
     let reg = createRegistration (createObj [])
     let submitTool = muxToolByName reg "return_bookkeeper"
     if isNullish submitTool then
         check "mux registration exposes return_bookkeeper tool" false
     else
-        let runtime = muxWikiRuntime reg
+        let runtime = muxKnowledgeGraphRuntime reg
         if isNullish runtime then
-            check "mux registration exposes wiki runtime for testing" false
+            check "mux registration exposes knowledge graph runtime for testing" false
         else
             let today = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
-            registerMuxWikiJobForTest reg "mux-wiki-job" workspaceDir "append" (createObj [ "today", box today ])
+            registerMuxKnowledgeGraphJobForTest reg "mux-kg-job" workspaceDir "append" (createObj [ "today", box today ])
             let entries = [|
-                wikiDraftEntry (Some "0a3f") "项目插件入口在哪里？" "Updated answer"
-                wikiDraftEntry None "新知识？" "Fresh answer"
+                knowledgeGraphDraftEntry (Some "0a3f") ["项目"; "插件入口"] "Updated answer"
+                knowledgeGraphDraftEntry None ["新知识"] "Fresh answer"
             |]
             let submitArgs = createObj [ "entries", box entries ]
-            let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-wiki-job" ]
+            let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-kg-job" ]
             let! result = ((get submitTool "execute") $ (submitCtx, submitArgs)) |> unbox<JS.Promise<string>>
             check "mux return_bookkeeper returns a response" (result <> "")
-            let! projection = readProjectionAsync workspaceDir
+            let! projection = readKnowledgeGraphProjectionAsync workspaceDir
             let updated = Map.find (tryParseId "0a3f" |> Option.get) projection
-            check "mux return_bookkeeper updates existing id" (updated.a = "Updated answer")
-            let fresh = projection |> Map.toList |> List.tryFind (fun (_, entry) -> entry.q = "新知识？")
+            check "mux return_bookkeeper updates existing id" (updated.fact = "Updated answer" && updated.entity = ["项目"; "插件入口"])
+            let fresh = projection |> Map.toList |> List.tryFind (fun (_, entry) -> entry.fact = "Fresh answer")
             check "mux return_bookkeeper allocates id for new entry" (
                 match fresh with
-                | Some (id, entry) -> idValue id <> "" && entry.a = "Fresh answer"
+                | Some (id, entry) -> idValue id <> "" && entry.fact = "Fresh answer" && entry.entity = ["新知识"]
                 | None -> false)
-            let! files = readAllWikiFiles workspaceDir
+            let! files = readAllKnowledgeGraphFiles workspaceDir
             let dayFile = files |> List.tryFind (fun file -> let (DayHeader(date, _)) = file.header in date = today)
             check "mux return_bookkeeper creates today file" (dayFile.IsSome)
     do! rmAsync workspaceDir
 }
 
 let muxReturnBookkeeperNoActiveJobSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-wiki-nojob-"
-    do! ensureWikiDir workspaceDir
+    let! workspaceDir = mkdtempAsync "mux-kg-nojob-"
+    do! ensureKnowledgeGraphDir workspaceDir
     let reg = createRegistration (createObj [])
     let submitTool = muxToolByName reg "return_bookkeeper"
     if isNullish submitTool then
         check "mux registration exposes return_bookkeeper tool" false
     else
-        let entries = [| wikiDraftEntry None "问题？" "答案。" |]
+        let entries = [| knowledgeGraphDraftEntry None ["问题"] "答案。" |]
         let submitArgs = createObj [ "entries", box entries ]
-        let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-wiki-nojob-session" ]
+        let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-kg-nojob-session" ]
         let! result = ((get submitTool "execute") $ (submitCtx, submitArgs)) |> unbox<JS.Promise<string>>
-        check "mux return_bookkeeper rejects unregistered job even with directory" (result = "No active wiki job for this session.")
-        let! files = readAllWikiFiles workspaceDir
+        check "mux return_bookkeeper rejects unregistered job even with directory" (result = "No active knowledge graph job for this session.")
+        let! files = readAllKnowledgeGraphFiles workspaceDir
         check "mux return_bookkeeper does not create files for unregistered job" (List.isEmpty files)
     do! rmAsync workspaceDir
 }
 
 let muxReturnBookkeeperReconstructsJobFromHistorySpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-wiki-history-"
-    do! ensureWikiDir workspaceDir
-    let sessionID = "mux-wiki-history-session"
+    let! workspaceDir = mkdtempAsync "mux-kg-history-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    let sessionID = "mux-kg-history-session"
     let marker = renderJobMarker { workspaceRoot = workspaceDir; kind = AppendAfterWork }
     let deps = muxDepsWithChatHistory sessionID [| box marker |]
     let reg = createRegistration deps
@@ -237,29 +241,29 @@ let muxReturnBookkeeperReconstructsJobFromHistorySpec () = promise {
         check "mux registration exposes return_bookkeeper tool" false
     else
         let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box sessionID ]
-        let submitArgs = createObj [ "entries", box [| wikiDraftEntry None "历史重建问题" "历史重建答案" |] ]
+        let submitArgs = createObj [ "entries", box [| knowledgeGraphDraftEntry None ["历史重建问题"] "历史重建答案" |] ]
         let! result = ((get submitTool "execute") $ (submitCtx, submitArgs)) |> unbox<JS.Promise<string>>
-        check "mux return_bookkeeper reconstructs job from history" (result.Contains "Appended 1 wiki entries")
-        let! projection = readProjectionAsync workspaceDir
+        check "mux return_bookkeeper reconstructs job from history" (result.Contains "Appended 1 knowledge graph entries")
+        let! projection = readKnowledgeGraphProjectionAsync workspaceDir
         check "mux return_bookkeeper history reconstruction persists entry" (
-            projection |> Map.toList |> List.exists (fun (_, entry) -> entry.q = "历史重建问题" && entry.a = "历史重建答案"))
+            projection |> Map.toList |> List.exists (fun (_, entry) -> entry.entity = ["历史重建问题"] && entry.fact = "历史重建答案"))
     do! rmAsync workspaceDir
 }
 
 let muxReturnBookkeeperAppendDoesNotTriggerMaintenanceSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-wiki-no-maintenance-"
-    do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [
-        for i in 1 .. 10 do yield wikiEntry (sprintf "%04x" i) (sprintf "积压问题 %d" i) "Candidate" ]
+    let! workspaceDir = mkdtempAsync "mux-kg-no-maintenance-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [
+        for i in 1 .. 10 do yield knowledgeGraphEntry (sprintf "%04x" i) [sprintf "积压问题 %d" i] "Candidate" ]
     let today = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
     let reg = createRegistration (minimalMuxDeps ())
-    registerMuxWikiJobForTest reg "mux-wiki-launch-job" workspaceDir "append" (createObj [ "today", box today ])
+    registerMuxKnowledgeGraphJobForTest reg "mux-kg-launch-job" workspaceDir "append" (createObj [ "today", box today ])
     let submitTool = muxToolByName reg "return_bookkeeper"
     if isNullish submitTool then
         check "mux registration exposes return_bookkeeper tool" false
     else
-        let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-wiki-launch-job" ]
-        let submitArgs = createObj [ "entries", box [| wikiDraftEntry None "触发问题" "触发答案" |] ]
+        let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-kg-launch-job" ]
+        let submitArgs = createObj [ "entries", box [| knowledgeGraphDraftEntry None ["触发问题"] "触发答案" |] ]
         let! result = ((get submitTool "execute") $ (submitCtx, submitArgs)) |> unbox<JS.Promise<string>>
         check "mux return_bookkeeper append accepted" (result <> "")
         do! waitForBackgroundJobsForTesting reg
@@ -270,8 +274,8 @@ let muxReturnBookkeeperAppendDoesNotTriggerMaintenanceSpec () = promise {
 
 let muxExecutorRwTriggersMaintenanceSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-executor-maintenance-"
-    do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [ wikiEntry "0a3f" "积压问题" "Daily candidate" ]
+    do! ensureKnowledgeGraphDir workspaceDir
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [ knowledgeGraphEntry "0a3f" ["积压问题"] "Daily candidate" ]
     let deps = minimalMuxDeps ()
     deps?("directory") <- workspaceDir
     let reg = createRegistration deps
@@ -342,14 +346,14 @@ let muxSummarizationSpec () =
 
 /// Locks the permission shape of the summary child workspace. Mirrors opencode's
 /// `executor` agent: only `agent_report` survives — every other surface
-/// (sub-agents, mutating tools, fuzzy, wiki, write, etc.) must be stripped so
+/// (sub-agents, mutating tools, fuzzy, knowledge graph, write, etc.) must be stripped so
 /// the child cannot re-enter the host tool surface (no `investigator`/`coder`/
 /// `browser`/`meditator` re-spawn, no file edits, no further fetches).
 let muxSummarizationToolPolicySpec () =
     let toolNames =
         [| "coder"; "investigator"; "meditator"; "browser"; "executor"
            "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
-           "fetch_wiki"; "return_bookkeeper" |]
+           "knowledge_graph_fetch"; "return_bookkeeper" |]
     let opts = toolOptions toolNames summarizationRole summarizationAiSettingsAgentId
     check "toolOptions is provided" (Option.isSome opts)
     let payload = Option.get opts
@@ -361,7 +365,7 @@ let muxSummarizationToolPolicySpec () =
     // Every host surface except the read-only escape hatches must be removed.
     for removed in [ "coder"; "investigator"; "meditator"; "browser"; "executor"
                      "submit_review"; "return_reviewer"; "websearch"; "webfetch"
-                     "fuzzy_grep"; "fuzzy_find"; "write"; "fetch_wiki"; "return_bookkeeper" ] do
+                     "fuzzy_grep"; "fuzzy_find"; "write"; "knowledge_graph_fetch"; "return_bookkeeper" ] do
         check $"summary child strips {removed}" (Set.contains removed disabled)
 
 let private muxDynamicToolMessage (id: string) (toolName: string) (toolCallId: string) (input: obj) (output: obj) : obj =
@@ -690,11 +694,11 @@ let run () : JS.Promise<unit> =
             "defaultPreludeWithoutCaps", defaultPreludeWithoutCapsSpec
             "capsAndMagicOrder", capsAndMagicOrderSpec
             "bookkeeperDoesNotReceiveCaps", bookkeeperDoesNotReceiveCapsSpec
-            "wikiPreludeWithoutCaps", wikiPreludeWithoutCapsSpec
-            "coderReceivesWikiPrelude", coderReceivesWikiPreludeSpec
-            "browserDoesNotReceiveWikiPrelude", browserDoesNotReceiveWikiPreludeSpec
-            "executorChildSessionWithoutInputAgentDoesNotReceiveWikiPrelude", executorChildSessionWithoutInputAgentDoesNotReceiveWikiPreludeSpec
-            "fetchWikiSnapshot", fetchWikiSnapshotSpec
+            "knowledgeGraphPreludeWithoutCaps", knowledgeGraphPreludeWithoutCapsSpec
+            "coderReceivesKnowledgeGraphPrelude", coderReceivesKnowledgeGraphPreludeSpec
+            "browserDoesNotReceiveKnowledgeGraphPrelude", browserDoesNotReceiveKnowledgeGraphPreludeSpec
+            "executorChildSessionWithoutInputAgentDoesNotReceiveKnowledgeGraphPrelude", executorChildSessionWithoutInputAgentDoesNotReceiveKnowledgeGraphPreludeSpec
+            "fetchKnowledgeGraphSnapshot", fetchKnowledgeGraphSnapshotSpec
             "afterHookRecordsDirectWrite", afterHookRecordsDirectWriteSpec
             "afterHookSkipsChildSession", afterHookSkipsChildSessionSpec
             "afterHookSkipsFailedTool", afterHookSkipsFailedToolSpec
@@ -705,12 +709,12 @@ let run () : JS.Promise<unit> =
             "heartbeatMaintenanceUsesParentSession", heartbeatMaintenanceUsesParentSessionSpec
             "heartbeatSchedulesOnlyEarliestDailyWhileAppendRuns", heartbeatSchedulesOnlyEarliestDailyWhileAppendRunsSpec
             "dailyRewriteTriggersNextDaily", dailyRewriteTriggersNextDailySpec
-            "submitWikiAppend", submitWikiAppendSpec
-            "submitWikiAppendEmpty", submitWikiAppendEmptySpec
-            "submitWikiAppendDoesNotTriggerMaintenance", submitWikiAppendDoesNotTriggerMaintenanceSpec
-            "submitWikiSchemaAllowsEmpty", submitWikiSchemaAllowsEmptySpec
-            "submitWikiDailyRewrite", submitWikiDailyRewriteSpec
-            "submitWikiReconstructsJobFromHistory", submitWikiReconstructsJobFromHistorySpec
+            "submitKnowledgeGraphAppend", submitKnowledgeGraphAppendSpec
+            "submitKnowledgeGraphAppendEmpty", submitKnowledgeGraphAppendEmptySpec
+            "submitKnowledgeGraphAppendDoesNotTriggerMaintenance", submitKnowledgeGraphAppendDoesNotTriggerMaintenanceSpec
+            "submitKnowledgeGraphSchemaAllowsEmpty", submitKnowledgeGraphSchemaAllowsEmptySpec
+            "submitKnowledgeGraphDailyRewrite", submitKnowledgeGraphDailyRewriteSpec
+            "submitKnowledgeGraphReconstructsJobFromHistory", submitKnowledgeGraphReconstructsJobFromHistorySpec
             "bookkeeperLaunchCarriesAiSettings", bookkeeperLaunchCarriesAiSettingsSpec
             "bookkeeperFireAndForget", bookkeeperFireAndForgetSpec
             "websearchTriggersBookkeeper", websearchTriggersBookkeeperSpec
@@ -735,12 +739,14 @@ let run () : JS.Promise<unit> =
             "bookkeeperAgentConfig", bookkeeperAgentConfigSpec
             "disableMimoMemoryAndCheckpoint", disableMimoMemoryAndCheckpointSpec
             "disableMimoMemoryAndCheckpointPreservesUserAgent", disableMimoMemoryAndCheckpointPreservesUserAgentSpec
+            "applyAgentConfigForMimoDisablesWorkflow", applyAgentConfigForMimoDisablesWorkflowSpec
             "pluginConfigHookDisablesMimoMemoryAndCheckpoint", pluginConfigHookDisablesMimoMemoryAndCheckpointSpec
             "executorModeSchema", executorModeSchemaSpec
+            "executorRejectsInvalidLanguage", executorRejectsInvalidLanguageSpec
             "executorActor", executorActorSpec
-            "wikiWorkspaceSerialization", wikiWorkspaceSerializationSpec
-            "wikiPortLockTimeout", wikiPortLockTimeoutSpec
-            "muxFetchWikiSnapshot", muxFetchWikiSnapshotSpec
+            "knowledgeGraphWorkspaceSerialization", knowledgeGraphWorkspaceSerializationSpec
+            "knowledgeGraphPortLockTimeout", knowledgeGraphPortLockTimeoutSpec
+            "muxFetchKnowledgeGraphSnapshot", muxFetchKnowledgeGraphSnapshotSpec
             "muxReturnBookkeeperAppend", muxReturnBookkeeperAppendSpec
             "muxReturnBookkeeperNoActiveJob", muxReturnBookkeeperNoActiveJobSpec
             "muxReturnBookkeeperReconstructsJobFromHistory", muxReturnBookkeeperReconstructsJobFromHistorySpec
@@ -751,10 +757,10 @@ let run () : JS.Promise<unit> =
             "muxReadToolReturnsContent", muxReadToolReturnsContentSpec
             "muxReadToolListsDirectories", muxReadToolListsDirectoriesSpec
             "muxMessageTransformRegistered", muxMessageTransformRegisteredSpec
-            "muxWikiPreludeForManager", muxWikiPreludeForManagerSpec
-            "muxWikiPreludeForCoder", muxWikiPreludeForCoderSpec
-            "muxNoWikiPreludeForExcludedAgents", muxNoWikiPreludeForExcludedAgentsSpec
-            "muxCapsAndWikiPreludeOrder", muxCapsAndWikiPreludeOrderSpec
+            "muxKnowledgeGraphPreludeForManager", muxKnowledgeGraphPreludeForManagerSpec
+            "muxKnowledgeGraphPreludeForCoder", muxKnowledgeGraphPreludeForCoderSpec
+            "muxNoKnowledgeGraphPreludeForExcludedAgents", muxNoKnowledgeGraphPreludeForExcludedAgentsSpec
+            "muxCapsAndKnowledgeGraphPreludeOrder", muxCapsAndKnowledgeGraphPreludeOrderSpec
             "muxSummarization", (fun () -> promise { muxSummarizationSpec () })
             "muxSummarizationToolPolicy", (fun () -> promise { muxSummarizationToolPolicySpec () })
             "muxTopLevelPolicy", muxTopLevelPolicySpec

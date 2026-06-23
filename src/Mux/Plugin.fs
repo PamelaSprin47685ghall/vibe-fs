@@ -12,23 +12,21 @@ open VibeFs.Mux.SubagentTools
 open VibeFs.Mux.BuiltinTools
 open VibeFs.Mux.EventHook
 open VibeFs.Mux.SlashCommands
-open VibeFs.Mux.WikiTools
+open VibeFs.Mux.KnowledgeGraphTools
 open VibeFs.Kernel.Dyn
 open VibeFs.Mux.ReadDedup
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.WorkspaceFiles
-open VibeFs.Shell.WikiFiles
+open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Mux.MessageTransform
 
 let muxToolNames =
     [| "coder"; "investigator"; "meditator"; "browser"; "executor"
        "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
-       "fetch_wiki"; "return_bookkeeper" |]
+       "knowledge_graph_fetch"; "return_bookkeeper" |]
 
 let private canUseMuxTopLevel (agent: string) (toolName: string) : bool =
-    match agent, toolName with
-    | "manager", "write" -> true
-    | _ -> canUse agent toolName
+    canUseCanonical agent toolName
 
 let private buildToolPolicy (toolNames: string array) (role: obj) : obj =
     let agent = if Dyn.isNullish role then "manager" else string role
@@ -94,25 +92,25 @@ let createToolCatalog
     (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (hostReadExec: HostReadExec)
     (finderCache: FinderCache)
-    (wikiRuntime: MuxWikiRuntime)
-    (wikiEnabled: bool)
+    (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
+    (knowledgeGraphEnabled: bool)
     : ToolDefinition array =
-    [| coderTool deps toolNames
-       investigatorTool deps toolNames
-       meditatorTool deps toolNames
-       browserTool deps toolNames
-       executorTool deps toolNames null
-       submitReviewTool deps toolNames callStore reviewStore
-       returnReviewerTool deps callStore reviewStore
-       websearchTool deps toolNames
-       webfetchTool
-       fuzzyGrepTool finderCache
-       fuzzyFindTool finderCache
-       writeTool deps
-       readTool deps hostReadExec
-       if wikiEnabled then
-           fetchWikiTool wikiRuntime
-           returnBookkeeperTool wikiRuntime |]
+    [| yield coderTool deps toolNames
+       yield investigatorTool deps toolNames
+       yield meditatorTool deps toolNames
+       yield browserTool deps toolNames
+       yield executorTool deps toolNames null
+       yield submitReviewTool deps toolNames callStore reviewStore
+       yield returnReviewerTool deps callStore reviewStore
+       yield websearchTool deps toolNames
+       yield webfetchTool
+       yield fuzzyGrepTool finderCache
+       yield fuzzyFindTool finderCache
+       yield writeTool deps
+       yield readTool deps hostReadExec
+       if knowledgeGraphEnabled then
+           yield knowledgeGraphFetchTool knowledgeGraphRuntime
+           yield returnBookkeeperTool knowledgeGraphRuntime |]
 
 let private recordsToBookkeeper (tool: string) : bool =
     let allowed =
@@ -128,13 +126,13 @@ let private bookkeeperInput (input: obj) : string =
     if Dyn.isNullish args then "" else JS.JSON.stringify args
 
 let private toolExecuteAfter
-    (wikiRuntime: MuxWikiRuntime)
-    (wikiEnabled: bool)
+    (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
+    (knowledgeGraphEnabled: bool)
     (input: obj)
     (output: obj)
     : JS.Promise<unit> =
     promise {
-        if not wikiEnabled then ()
+        if not knowledgeGraphEnabled then ()
         else
             let tool = Dyn.str input "tool"
             let sessionID = Dyn.str input "sessionID"
@@ -142,7 +140,7 @@ let private toolExecuteAfter
             if succeeded
                && recordsToBookkeeper tool
                && not (isReadOnlyExecutor tool input) then
-                wikiRuntime.StartBookkeeperAppend(
+                knowledgeGraphRuntime.StartBookkeeperAppend(
                     bookkeeperInput input,
                     Dyn.str output "output",
                     tool,
@@ -156,24 +154,23 @@ let createRegistration (deps: obj) : obj =
     let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
     let hostReadExec = HostReadExec()
     let finderCache = FinderCache()
-    let wikiRuntime = MuxWikiRuntime(deps)
-    let toolNames = muxToolNames
+    let knowledgeGraphRuntime = MuxKnowledgeGraphRuntime(deps)
     let directory =
         let dir = Dyn.str deps "directory"
         if dir <> "" then dir else Dyn.str deps "cwd"
-    let wikiEnabled = wikiDirExists directory
-    let tools = createToolCatalog deps toolNames callStore reviewStore hostReadExec finderCache wikiRuntime wikiEnabled
+    let knowledgeGraphEnabled = knowledgeGraphDirExists directory
+    let tools = createToolCatalog deps muxToolNames callStore reviewStore hostReadExec finderCache knowledgeGraphRuntime knowledgeGraphEnabled
     let toolsObj = toolsToObject tools
     let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.Config.getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
     let wrappers = createAllWrappers toolsObj hostReadExec callStore
     let eventHook = createEventHook deps reviewStore
-    let slashCommands = createSlashCommands deps toolNames callStore reviewStore
+    let slashCommands = createSlashCommands deps muxToolNames callStore reviewStore
     let messagesTransformFn =
         System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
-            messagesTransform deps wikiRuntime reviewStore input output)
-    let getToolPolicy = System.Func<string, obj, obj>(fun (_agentId: string) (role: obj) -> buildToolPolicy toolNames role)
+            messagesTransform deps knowledgeGraphRuntime reviewStore input output)
+    let getToolPolicy = System.Func<string, obj, obj>(fun (_agentId: string) (role: obj) -> buildToolPolicy muxToolNames role)
     let registration = createObj [
-        "toolNames", box toolNames
+        "toolNames", box muxToolNames
         "tools", box tools
         "wrappers", box wrappers
         "mcpServers", box mcpServers
@@ -187,18 +184,18 @@ let createRegistration (deps: obj) : obj =
         "slashCommands", box slashCommands
         "messagesTransform", box messagesTransformFn
         "getToolPolicy", box getToolPolicy
-        "__wikiRuntime",
+        "__knowledgeGraphRuntime",
             box (createObj
-                [ "rawInstance", box wikiRuntime
+                [ "rawInstance", box knowledgeGraphRuntime
                   "registerJobForTesting",
                   box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
-                      wikiRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
+                      knowledgeGraphRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
                   "startMaintenanceIfDue",
-                  box (System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> wikiRuntime.StartMaintenanceIfDue(workspaceRoot)))
+                  box (System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> knowledgeGraphRuntime.StartMaintenanceIfDue(workspaceRoot)))
                   "takeBookkeeperLaunchesForTesting",
-                  box (System.Func<obj array>(fun () -> wikiRuntime.TakeBookkeeperLaunchesForTesting()))
+                  box (System.Func<obj array>(fun () -> knowledgeGraphRuntime.TakeBookkeeperLaunchesForTesting()))
                   "waitForBackgroundJobsForTesting",
-                  box (System.Func<JS.Promise<unit>>(fun () -> wikiRuntime.WaitForBackgroundJobsForTesting())) ])
+                  box (System.Func<JS.Promise<unit>>(fun () -> knowledgeGraphRuntime.WaitForBackgroundJobsForTesting())) ])
         "__reviewStore",
             box (createObj
                 [ "activateReview",
@@ -221,5 +218,5 @@ let createRegistration (deps: obj) : obj =
                       |> Option.map (fun k -> resolveCall callStore k args)
                       |> Option.defaultValue false)) ]) ]
     setKey registration "tool.execute.after" (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
-        toolExecuteAfter wikiRuntime wikiEnabled input output)))
+        toolExecuteAfter knowledgeGraphRuntime knowledgeGraphEnabled input output)))
     box registration

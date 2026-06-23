@@ -17,7 +17,7 @@ open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Opencode.MessagingCodec
 open VibeFs.Opencode.CapsCodec
-open VibeFs.Opencode.WikiRuntime
+open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.ChildAgentRegistry
 
 let private defaultExcludedAgents = set [ "browser"; "investigator"; "executor"; "title"; "bookkeeper" ]
@@ -127,7 +127,7 @@ let private reconstructReviewState (reviewStore: VibeFs.Shell.ReviewRuntime.Revi
                 reviewStore.activateReview(sessionID, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
             | None -> ()
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: MagicSession) (wikiRuntime: WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) (output: obj) : JS.Promise<unit> =
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: MagicSession) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let messages = Dyn.get output "messages"
         if Dyn.isNullish messages || not (Dyn.isArray messages) then ()
@@ -150,8 +150,8 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                     let! capsFiles =
                         if excluded then Promise.lift ([]: CapsFile list)
                         else CapsFileCache.getOrLoad sessionID directory
-                    let! wikiPrelude =
-                        if not excluded && canUse agent "fetch_wiki" then wikiRuntime.BuildPreludeForSession(sessionID, directory)
+                    let! knowledgeGraphPrelude =
+                        if not excluded && canUse agent "knowledge_graph_fetch" then knowledgeGraphRuntime.BuildPreludeForSession(sessionID, directory)
                         else Promise.lift (None: string option)
                     let final =
                         buildCapsMessages
@@ -159,7 +159,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                             encoded
                             directory
                             capsFiles
-                            wikiPrelude
+                            knowledgeGraphPrelude
                     replaceArrayInPlace messagesArr final
     }
 

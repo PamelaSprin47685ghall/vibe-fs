@@ -11,7 +11,7 @@ open VibeFs.Opencode.Plugin
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.WikiFiles
+open VibeFs.Shell.KnowledgeGraphFiles
 
 let investigatorToolSpec () = promise {
     let createCalls = ResizeArray<obj>()

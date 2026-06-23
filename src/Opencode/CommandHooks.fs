@@ -9,14 +9,14 @@ open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.ReviewerLoop
-open VibeFs.Opencode.WikiRuntime
+open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Kernel.Domain
 
 let private abortOrDeleteEvents =
     set [ "stream-abort"; "session.delete"; "session.close"; "session.remove"; "session.deleted" ]
 
-let cleanUpJobContextIfAbortedOrDeleted (wikiRuntime: WikiRuntime) (input: obj) : unit =
+let cleanUpJobContextIfAbortedOrDeleted (knowledgeGraphRuntime: KnowledgeGraphRuntime) (input: obj) : unit =
     let event = Dyn.get input "event"
     let eventType = Dyn.str event "type"
     if Set.contains eventType abortOrDeleteEvents then
@@ -24,7 +24,7 @@ let cleanUpJobContextIfAbortedOrDeleted (wikiRuntime: WikiRuntime) (input: obj) 
         let props = if Dyn.isNullish rawProps then event else rawProps
         let sessionID = VibeFs.Kernel.NudgeState.getSessionID eventType props
         if sessionID <> "" then
-            wikiRuntime.DeleteJob(sessionID)
+            knowledgeGraphRuntime.DeleteJob(sessionID)
 
 /// Handle /loop and /loop-review slash commands.
 let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)

@@ -8,12 +8,12 @@ open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Kernel.Dyn
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
-open VibeFs.Opencode.WikiRuntime
+open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Mux.AiSettings
-open VibeFs.Mux.WikiTools
+open VibeFs.Mux.KnowledgeGraphTools
 open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.WikiFiles
-open VibeFs.Kernel.Wiki
+open VibeFs.Shell.KnowledgeGraphFiles
+open VibeFs.Kernel.KnowledgeGraph
 
 let bookkeeperLaunchCarriesAiSettingsSpec () = promise {
     let createCalls = ResizeArray<obj>()
@@ -29,11 +29,11 @@ let bookkeeperLaunchCarriesAiSettingsSpec () = promise {
             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ()))
         ]) ]
     let! workspaceDir = mkdtempAsync "bookkeeper-ai-settings-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
-    let wikiRuntime = get (pluginWikiRuntime p) "rawInstance" :?> WikiRuntime
+    let knowledgeGraphRuntime = get (pluginKnowledgeGraphRuntime p) "rawInstance" :?> KnowledgeGraphRuntime
     let aiSettings : DelegatedAiSettings = { modelString = Some "openai/gpt-5"; thinkingLevel = Some "high" }
-    wikiRuntime.StartBookkeeperAppend("input", "result", "Title", parentSessionID = "parent-session", aiSettings = aiSettings)
+    knowledgeGraphRuntime.StartBookkeeperAppend("input", "result", "Title", parentSessionID = "parent-session", aiSettings = aiSettings)
     do! waitForBackgroundJobsForTesting p
     check "bookkeeper aiSettings create keeps parentID" (str (get createCalls.[0] "body") "parentID" = "parent-session")
     check "bookkeeper session title is stable" (str (get createCalls.[0] "body") "title" = "Bookkeeper")
@@ -59,7 +59,7 @@ let bookkeeperFireAndForgetSpec () = promise {
             ])
         ]
     let! workspaceDir = mkdtempAsync "bookkeeper-fireforget-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
     let toolExecuteAfter = get p "tool.execute.after"
     let coderInput =
@@ -78,7 +78,7 @@ let bookkeeperFireAndForgetSpec () = promise {
 
 let websearchTriggersBookkeeperSpec () = promise {
     let! workspaceDir = mkdtempAsync "websearch-bookkeeper-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "child-bookkeeper-session" "noted" |]
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
     let toolExecuteAfter = get p "tool.execute.after"
@@ -97,7 +97,7 @@ let websearchTriggersBookkeeperSpec () = promise {
 
 let webfetchTriggersBookkeeperSpec () = promise {
     let! workspaceDir = mkdtempAsync "webfetch-bookkeeper-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let mockClient = bookkeeperMockClient [| assistantCompletionMessage "child-bookkeeper-session" "noted" |]
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
     let toolExecuteAfter = get p "tool.execute.after"
@@ -127,7 +127,7 @@ let bookkeeperSessionRegisteredInChildAgentRegistrySpec () = promise {
             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ())))
         ]) ]
     let! workspaceDir = mkdtempAsync "bookkeeper-registry-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
     let toolExecuteAfter = get p "tool.execute.after"
     let coderInput =
@@ -154,7 +154,7 @@ let bookkeeperSessionRegisteredInChildAgentRegistrySpec () = promise {
 
 let muxToolExecuteAfterTriggersBookkeeperSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-tool-after-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let prompts = ResizeArray<string>()
     let deps = minimalMuxDeps ()
     deps?("directory") <- workspaceDir
@@ -180,13 +180,13 @@ let muxToolExecuteAfterTriggersBookkeeperSpec () = promise {
         check "mux tool.execute.after taskService prompt carries job marker" (
             prompts
             |> Seq.exists (fun p ->
-                p.StartsWith("---\n") && p.Contains("type: \"vibe_wiki_job\"")))
+                p.StartsWith("---\n") && p.Contains("type: \"vibe_knowledge_graph_job\"")))
     do! rmAsync workspaceDir
 }
 
 let muxToolExecuteAfterSkipsReadOnlyExecutorSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-tool-after-ro-"
-    do! ensureWikiDir workspaceDir
+    do! ensureKnowledgeGraphDir workspaceDir
     let deps = minimalMuxDeps ()
     deps?("directory") <- workspaceDir
     deps?("taskService") <- mockMuxTaskServiceCapturingPrompt (ResizeArray<string>())
@@ -210,19 +210,19 @@ let muxToolExecuteAfterSkipsReadOnlyExecutorSpec () = promise {
 
 let muxDailyMaintenanceLaunchSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-daily-maintenance-"
-    do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [ wikiEntry "0a3f" "积压问题" "Daily candidate" ]
+    do! ensureKnowledgeGraphDir workspaceDir
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [ knowledgeGraphEntry "0a3f" ["积压问题"] "Daily candidate" ]
     let prompts = ResizeArray<string>()
     let deps = minimalMuxDeps ()
     deps?("directory") <- workspaceDir
     deps?("taskService") <- mockMuxTaskServiceCapturingPrompt prompts
     let reg = createRegistration deps
-    let wikiRuntime = muxWikiRuntime reg
-    let startFn = get wikiRuntime "startMaintenanceIfDue"
+    let knowledgeGraphRuntime = muxKnowledgeGraphRuntime reg
+    let startFn = get knowledgeGraphRuntime "startMaintenanceIfDue"
     if isNullish startFn then
-        check "mux wiki runtime exposes startMaintenanceIfDue" false
+        check "mux knowledge graph runtime exposes startMaintenanceIfDue" false
     else
-        let runtime = get wikiRuntime "rawInstance" :?> MuxWikiRuntime
+        let runtime = get knowledgeGraphRuntime "rawInstance" :?> MuxKnowledgeGraphRuntime
         let config = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-daily-maintenance"; "taskService", box (get deps "taskService") ]
         runtime.StartBookkeeperAppend("input", "result", "write", config = config)
         do! ((startFn $ workspaceDir) |> unbox<JS.Promise<unit>>)
@@ -234,36 +234,36 @@ let muxDailyMaintenanceLaunchSpec () = promise {
             prompts
             |> Seq.exists (fun prompt ->
                 prompt.StartsWith("---\n")
-                && prompt.Contains("type: \"vibe_wiki_job\"")
+                && prompt.Contains("type: \"vibe_knowledge_graph_job\"")
                 && prompt.Contains("workspaceRoot: \"" + workspaceDir + "\"")
                 && prompt.Contains("kind: \"daily\"")
-                && not (prompt.Contains("[vibe-wiki-job]"))))
+                && not (prompt.Contains("[vibe-kg-job]"))))
     do! rmAsync workspaceDir
 }
 
 let muxDailyRewriteTriggersNextSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-daily-chain-"
-    do! ensureWikiDir workspaceDir
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-08") (DayHeader("2026-06-08", false)) [ wikiEntry "b912" "第八日问题" "Day 8 candidate" ]
-    do! writeWikiFileAsync (dayPath workspaceDir "2026-06-09") (DayHeader("2026-06-09", false)) [ wikiEntry "c813" "第九日问题" "Day 9 candidate" ]
+    do! ensureKnowledgeGraphDir workspaceDir
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-08") (DayHeader("2026-06-08", false)) [ knowledgeGraphEntry "b912" ["第八日问题"] "Day 8 candidate" ]
+    do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-09") (DayHeader("2026-06-09", false)) [ knowledgeGraphEntry "c813" ["第九日问题"] "Day 9 candidate" ]
 
     let prompts = ResizeArray<string>()
     let deps = minimalMuxDeps ()
     deps?("directory") <- workspaceDir
     deps?("taskService") <- mockMuxTaskServiceCapturingPrompt prompts
     let reg = createRegistration deps
-    let wikiRuntimeObj = muxWikiRuntime reg
-    let startFn = get wikiRuntimeObj "startMaintenanceIfDue"
+    let knowledgeGraphRuntimeObj = muxKnowledgeGraphRuntime reg
+    let startFn = get knowledgeGraphRuntimeObj "startMaintenanceIfDue"
     if isNullish startFn then
-        check "mux wiki runtime exposes startMaintenanceIfDue" false
+        check "mux knowledge graph runtime exposes startMaintenanceIfDue" false
     else
-        let runtime = get wikiRuntimeObj "rawInstance" :?> MuxWikiRuntime
+        let runtime = get knowledgeGraphRuntimeObj "rawInstance" :?> MuxKnowledgeGraphRuntime
         let config = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-daily-chain"; "taskService", box (get deps "taskService") ]
         do! ((startFn $ workspaceDir) |> unbox<JS.Promise<unit>>)
         let launches1 = takeBookkeeperLaunchesForTesting reg
         check "mux first maintenance schedules day 8" (launches1.Length = 1 && (str launches1.[0] "prompt").Contains "2026-06-08")
 
-        registerMuxWikiJobForTest reg "job-day8" workspaceDir "daily" (createObj [ "date", box "2026-06-08" ])
+        registerMuxKnowledgeGraphJobForTest reg "job-day8" workspaceDir "daily" (createObj [ "date", box "2026-06-08" ])
         let! _ = runtime.Submit("job-day8", workspaceDir, [], config = config)
         do! waitForBackgroundJobsForTesting reg
         let launches2 = takeBookkeeperLaunchesForTesting reg

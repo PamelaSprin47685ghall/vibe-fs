@@ -112,21 +112,21 @@ let rewriteJavascriptRelativeImports () = promise {
         check "non-relative body preserved" (rewritten.Contains "console.log(x)")
 }
 
-let wikiPortRangeSpec () = promise {
-    let portA = VibeFs.Shell.WikiPortLock.lockPortForPath "/tmp/wiki-a"
-    let portB = VibeFs.Shell.WikiPortLock.lockPortForPath "/tmp/wiki-a"
-    check "wiki lock deterministic" (portA = portB)
-    check "wiki lock in high range" (portA >= 49152 && portA < 65536)
+let knowledgeGraphPortRangeSpec () = promise {
+    let portA = VibeFs.Shell.KnowledgeGraphPortLock.lockPortForPath "/tmp/kg-a"
+    let portB = VibeFs.Shell.KnowledgeGraphPortLock.lockPortForPath "/tmp/kg-a"
+    check "knowledge graph lock deterministic" (portA = portB)
+    check "knowledge graph lock in high range" (portA >= 49152 && portA < 65536)
 }
 
-let wikiPortSerialSpec () = promise {
+let knowledgeGraphPortSerialSpec () = promise {
     let seen = System.Collections.Generic.List<string>()
     let firstAcquiredResolve = ref (fun () -> ())
     let firstAcquired : JS.Promise<unit> = Promise.create (fun resolve _ -> firstAcquiredResolve.Value <- resolve)
     let releaseFirst = ref (fun () -> ())
     let firstGate : JS.Promise<unit> = Promise.create (fun resolve _ -> releaseFirst.Value <- resolve)
     let first =
-        VibeFs.Shell.WikiPortLock.withWikiPortLock 30000L 0 "/tmp/wiki-lock-test" (fun () -> promise {
+        VibeFs.Shell.KnowledgeGraphPortLock.withKnowledgeGraphPortLock 30000L 0 "/tmp/kg-lock-test" (fun () -> promise {
             seen.Add "first-start"
             firstAcquiredResolve.Value ()
             do! firstGate
@@ -135,7 +135,7 @@ let wikiPortSerialSpec () = promise {
         })
     do! firstAcquired
     let second =
-        VibeFs.Shell.WikiPortLock.withWikiPortLock 30000L 0 "/tmp/wiki-lock-test" (fun () -> promise {
+        VibeFs.Shell.KnowledgeGraphPortLock.withKnowledgeGraphPortLock 30000L 0 "/tmp/kg-lock-test" (fun () -> promise {
             seen.Add "second-start"
             seen.Add "second-end"
             return "two"
@@ -143,7 +143,7 @@ let wikiPortSerialSpec () = promise {
     releaseFirst.Value ()
     let! _ = first
     let! _ = second
-    check "wiki lock serializes same workspace" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
+    check "knowledge graph lock serializes same workspace" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
 }
 
 let ollamaFormat () =

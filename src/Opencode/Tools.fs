@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.HostTools
 open VibeFs.Opencode.ToolSchema
-open VibeFs.Opencode.WikiTools
+open VibeFs.Opencode.KnowledgeGraphTools
 open VibeFs.Opencode.SubagentTools
 open VibeFs.Opencode.ExecutorTool
 open VibeFs.Opencode.SearchTools
@@ -14,7 +14,7 @@ open VibeFs.Opencode.MimoTodoTool
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.FuzzyFinderShell
 
-let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (wikiEnabled: bool) : obj =
+let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (knowledgeGraphRuntime: VibeFs.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphEnabled: bool) : obj =
     createObj [
         yield "coder", box (coderTool registry ctx)
         yield "investigator", box (investigatorTool registry ctx)
@@ -25,9 +25,9 @@ let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: Finder
         yield "fuzzy_grep", box (fuzzyGrepTool finderCache)
         yield "websearch", box (websearchTool registry ctx)
         yield "webfetch", box (webfetchTool ())
-        if wikiEnabled then
-            yield "fetch_wiki", box (fetchWikiTool wikiRuntime ctx)
-            yield "return_bookkeeper", box (submitWikiTool wikiRuntime)
+        if knowledgeGraphEnabled then
+            yield "knowledge_graph_fetch", box (knowledgeGraphFetchTool knowledgeGraphRuntime ctx)
+            yield "return_bookkeeper", box (returnBookkeeperTool knowledgeGraphRuntime)
         yield "submit_review", box (submitReviewTool registry ctx reviewStore)
         yield "return_reviewer", box (submitReviewResultTool ctx reviewStore)
         if host = Mimocode then

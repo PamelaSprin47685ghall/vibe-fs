@@ -3,7 +3,6 @@ module VibeFs.Mux.SubagentTools
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.Prompts
 open VibeFs.Kernel.Subagent
@@ -16,15 +15,47 @@ open VibeFs.Shell.ReviewRuntime
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Kernel.Domain
+open VibeFs.Kernel.HostTools
+
+/// Mux host tool name universe. Sourced from ../mux/src/common/utils/tools/toolDefinitions.ts.
+let private muxHostToolNames =
+    [| "mux_agents_read"; "mux_agents_write"; "agent_skill_list"; "agent_skill_write"; "agent_skill_delete"
+       "skills_catalog_search"; "skills_catalog_read"; "mux_config_read"; "mux_config_write"; "file_read"
+       "attach_file"; "desktop_screenshot"; "desktop_move_mouse"; "desktop_click"; "desktop_double_click"
+       "desktop_drag"; "desktop_scroll"; "desktop_type"; "desktop_key_press"; "agent_skill_read"
+       "agent_skill_read_file"; "file_edit_replace_string"; "ask_user_question"; "propose_plan"; "bash"
+       "task"; "task_await"; "task_apply_git_patch"; "task_terminate"; "task_list"; "agent_report"; "set_goal"
+       "get_goal"; "complete_goal"; "heartbeat"; "todo_write"; "todo_read"; "review_pane_update"
+       "review_pane_get"; "notify"; "analytics_query"; "web_fetch"; "web_search"; "google_search"; "url_context" |]
+
+/// Map a Mux host tool name to the canonical name used by `canUseCanonical`.
+/// Plugin tools are already canonical and pass through unchanged.
+let private normalizeMuxToolName (toolName: string) : string =
+    if toolName.StartsWith "file_edit_" then "edit"
+    elif toolName = "file_read" then "read"
+    elif toolName = "web_fetch" then "webfetch"
+    elif toolName = "web_search" || toolName = "google_search" then "websearch"
+    elif toolName = "todo_write" || toolName = "todo_read" then "todo"
+    elif toolName.StartsWith "agent_skill_" || toolName.StartsWith "skills_catalog_" then "skill"
+    elif toolName = "ask_user_question" then "question"
+    elif toolName.StartsWith "task" then "task"
+    else toolName
+
+/// Emit a `toolPolicy.disabledTools` list in the Mux tool name universe while reusing
+/// the canonical permission semantics from `canUseCanonical`.
+let private disabledToolsForRole (toolNames: string array) (role: string) : string array =
+    Array.append toolNames muxHostToolNames
+    |> Array.distinct
+    |> Array.filter (fun tool -> not (canUseCanonical role (normalizeMuxToolName tool)))
 
 let private disabledToolsForReviewer (toolNames: string array) : string array =
-    deniedTools "reviewer" (Array.toList toolNames) |> Array.ofList
+    disabledToolsForRole toolNames "reviewer"
 
 /// Mirrors opencode `canUseCanonical` for the requested role: emit a `toolPolicy.disabledTools`
 /// list so the spawned child workspace strips everything except `agent_report` + `read`.
 /// `subagentRole` is what the host binds to `roleScopedHostRemovals` and vibe-fs plugin policy.
 let toolOptions (toolNames: string array) (role: string) (aiSettingsAgentId: string) : obj option =
-    Some (createObj [ "experiments", box (createObj [ "subagentRole", box role; "toolPolicy", box (createObj [ "disabledTools", box (deniedTools role (Array.toList toolNames) |> Array.ofList) ]) ]); "aiSettingsAgentId", box aiSettingsAgentId ])
+    Some (createObj [ "experiments", box (createObj [ "subagentRole", box role; "toolPolicy", box (createObj [ "disabledTools", box (disabledToolsForRole toolNames role) ]) ]); "aiSettingsAgentId", box aiSettingsAgentId ])
 
 let private abortableConfig (config: obj) (signal: obj) = Dyn.withKey config "abortSignal" signal
 
@@ -122,7 +153,7 @@ let private buildPromptsFor parser constructor args =
     promise {
         match parser (Dyn.get args "intents") with
         | Error _ -> return [||]
-        | Ok intents -> return formatPrompt mimocode (constructor intents) |> List.toArray
+        | Ok intents -> return formatPrompt Host.Mimocode (constructor intents) |> List.toArray
     }
 
 let private buildCoderPrompts (_config: obj) (args: obj) : JS.Promise<string array> =
@@ -159,7 +190,7 @@ let private meditatorPromptFromArgs (config: obj) (args: obj) : JS.Promise<strin
             Array.zip files (List.toArray results)
             |> Array.map (fun (file, r) -> { file = file; content = r.content } : MeditatorFileSection)
             |> List.ofArray
-        return formatPrompt mimocode (Meditator(intent, sections)) |> List.head
+        return formatPrompt Host.Mimocode (Meditator(intent, sections)) |> List.head
     }
 
 let meditatorTool (deps: obj) (toolNames: string array) : ToolDefinition =
@@ -175,7 +206,7 @@ let meditatorTool (deps: obj) (toolNames: string array) : ToolDefinition =
 let private buildBrowserPrompt (_config: obj) (args: obj) : JS.Promise<string> =
     promise {
         let intent = defaultArg (strField args "intent") ""
-        return formatPrompt mimocode (Browser intent) |> List.head
+        return formatPrompt Host.Mimocode (Browser intent) |> List.head
     }
 
 let browserTool (deps: obj) (toolNames: string array) : ToolDefinition =

@@ -135,31 +135,31 @@ let hostKernel' () =
     check "investigator has objective" (investigatorPromptText.IndexOf("find auth") >= 0)
     check "investigator read-only" (investigatorPromptText.IndexOf("READ-ONLY") >= 0)
 
-let wikiFetchAnswer () =
-    let wikiId = match VibeFs.Kernel.Wiki.tryParseId "0a3f" with Some value -> value | None -> failwith "0a3f should parse"
+let knowledgeGraphFetchAnswer () =
+    let kgId = match VibeFs.Kernel.KnowledgeGraph.tryParseId "0a3f" with Some value -> value | None -> failwith "0a3f should parse"
     let projection =
         Map.ofList [
-            wikiId, ({ id = wikiId; q = "Q"; a = "A" } : VibeFs.Kernel.Wiki.WikiEntry)
+            kgId, ({ id = kgId; entity = ["project entry"]; fact = "Fact text" } : VibeFs.Kernel.KnowledgeGraph.KnowledgeGraphEntry)
         ]
-    check "wiki fetch existing" (VibeFs.Kernel.Wiki.fetchAnswer projection "0a3f" = Ok "A")
-    check "wiki fetch invalid id" (VibeFs.Kernel.Wiki.fetchAnswer projection "nope" = Error "Invalid wiki id: nope")
-    check "wiki fetch missing id" (VibeFs.Kernel.Wiki.fetchAnswer projection "b912" = Error "Wiki entry not found in this session snapshot: b912")
+    check "knowledge graph fetch existing" (VibeFs.Kernel.KnowledgeGraph.fetchAnswer projection "project entry" = Ok "Fact text")
+    check "knowledge graph fetch invalid entity" (VibeFs.Kernel.KnowledgeGraph.fetchAnswer projection "" = Error "Invalid knowledge graph entity: ")
+    check "knowledge graph fetch missing entity" (VibeFs.Kernel.KnowledgeGraph.fetchAnswer projection "missing entity" = Error "Knowledge graph entity not found in this session snapshot: missing entity")
 
-let wikiDraftArrayParsing () =
+let knowledgeGraphDraftArrayParsing () =
     let drafts =
         [|
-            box {| q = "Q1"; a = "A1" |}
-            box {| id = "0a3f"; q = "Q2"; a = "A2" |}
+            box {| entity = ["E1"]; fact = "F1" |}
+            box {| id = "0a3f"; entity = ["E2"]; fact = "F2" |}
         |]
-    match VibeFs.Kernel.Wiki.parseDraftArray (box drafts) with
+    match VibeFs.Kernel.KnowledgeGraph.parseDraftArray (box drafts) with
     | Ok parsed ->
-        check "wiki draft parse count" (parsed.Length = 2)
-        check "wiki draft parse first no id" (parsed.[0].id.IsNone)
-        check "wiki draft parse second id" (parsed.[1].id = Some "0a3f")
-    | Error _ -> check "wiki draft parse valid ok" false
+        check "knowledge graph draft parse count" (parsed.Length = 2)
+        check "knowledge graph draft parse first no id" (parsed.[0].id.IsNone)
+        check "knowledge graph draft parse second id" (parsed.[1].id = Some "0a3f")
+    | Error _ -> check "knowledge graph draft parse valid ok" false
 
-    let invalidDrafts = [| box {| a = "A1" |} |]
-    check "wiki draft parse invalid error" (match VibeFs.Kernel.Wiki.parseDraftArray (box invalidDrafts) with Error _ -> true | _ -> false)
+    let invalidDrafts = [| box {| fact = "F1" |} |]
+    check "knowledge graph draft parse invalid error" (match VibeFs.Kernel.KnowledgeGraph.parseDraftArray (box invalidDrafts) with Error _ -> true | _ -> false)
 
 /// P0-2: every tool description and parameter doc the two adapter layers ship
 /// must come from a single Kernel-level `ToolCatalog`.  Today the strings live
@@ -182,12 +182,12 @@ let toolCatalogCentralized () =
     check "executor requires mode" (executorSpec.requiredFields |> List.contains "mode")
     check "executor param doc for mode" (Map.containsKey "mode" executorSpec.paramDocs)
 
-    let fetchSpec = VibeFs.Kernel.ToolCatalog.specOf "fetch_wiki"
-    check "fetch wiki description mentions snapshot" (fetchSpec.description.Contains "session's wiki snapshot")
-    check "fetch wiki requires id" (fetchSpec.requiredFields = [ "id" ])
+    let fetchSpec = VibeFs.Kernel.ToolCatalog.specOf "knowledge_graph_fetch"
+    check "fetch knowledge graph description mentions snapshot" (fetchSpec.description.Contains "session's knowledge graph snapshot")
+    check "fetch knowledge graph requires entity" (fetchSpec.requiredFields = [ "entity" ])
 
     let submitSpec = VibeFs.Kernel.ToolCatalog.specOf "return_bookkeeper"
-    check "return bookkeeper description mentions wiki" (submitSpec.description.Contains "wiki")
+    check "return bookkeeper description mentions knowledge graph" (submitSpec.description.Contains "knowledge graph")
     check "return bookkeeper requires entries" (submitSpec.requiredFields = [ "entries" ])
 
     let allSpecs = VibeFs.Kernel.ToolCatalog.all
@@ -197,12 +197,12 @@ let toolCatalogCentralized () =
     check "catalog covers meditator" (Set.contains "meditator" names)
     check "catalog covers browser" (Set.contains "browser" names)
     check "catalog covers executor" (Set.contains "executor" names)
-    check "catalog covers fetch_wiki" (Set.contains "fetch_wiki" names)
+    check "catalog covers knowledge_graph_fetch" (Set.contains "knowledge_graph_fetch" names)
     check "catalog covers return_bookkeeper" (Set.contains "return_bookkeeper" names)
 
-let hostToolsWikiNames () =
+let hostToolsKnowledgeGraphNames () =
     let names = VibeFs.Kernel.HostTools.allToolNames VibeFs.Kernel.HostTools.opencode |> Set.ofArray
-    check "host tools include fetch_wiki" (Set.contains "fetch_wiki" names)
+    check "host tools include knowledge_graph_fetch" (Set.contains "knowledge_graph_fetch" names)
     check "host tools include return_bookkeeper" (Set.contains "return_bookkeeper" names)
 
 /// P0-1: a single host-aware dispatcher must produce every subagent prompt.

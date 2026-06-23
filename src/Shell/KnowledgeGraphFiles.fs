@@ -1,8 +1,8 @@
-module VibeFs.Shell.WikiFiles
+module VibeFs.Shell.KnowledgeGraphFiles
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Wiki
+open VibeFs.Kernel.KnowledgeGraph
 
 [<Import("promises", "node:fs")>]
 let private fsPromises : obj = jsNative
@@ -19,22 +19,22 @@ let private mkdirSync (dir: string) (opts: obj) : unit = jsNative
 [<Import("readdirSync", "node:fs")>]
 let private readdirSync (p: string) : obj array = jsNative
 
-let wikiDir (workspaceRoot: string) : string = join workspaceRoot "wiki"
+let knowledgeGraphDir (workspaceRoot: string) : string = join workspaceRoot "kg"
 
-let wikiDirExists (workspaceRoot: string) : bool = existsSync (wikiDir workspaceRoot)
+let knowledgeGraphDirExists (workspaceRoot: string) : bool = existsSync (knowledgeGraphDir workspaceRoot)
 
-let dayPath (workspaceRoot: string) (date: string) : string = join (wikiDir workspaceRoot) (date + ".ndjson")
+let dayPath (workspaceRoot: string) (date: string) : string = join (knowledgeGraphDir workspaceRoot) (date + ".ndjson")
 
-let ensureWikiDir (workspaceRoot: string) : JS.Promise<unit> =
+let ensureKnowledgeGraphDir (workspaceRoot: string) : JS.Promise<unit> =
     promise {
         try
-            do! fsPromises?mkdir(wikiDir workspaceRoot, {| recursive = true |})
+            do! fsPromises?mkdir(knowledgeGraphDir workspaceRoot, {| recursive = true |})
         with _ -> ()
     }
 
-let readWikiFiles (workspaceRoot: string) : JS.Promise<WikiFile list> =
+let readKnowledgeGraphFiles (workspaceRoot: string) : JS.Promise<KnowledgeGraphFile list> =
     promise {
-        let wDir = wikiDir workspaceRoot
+        let wDir = knowledgeGraphDir workspaceRoot
         if not (existsSync wDir) then return []
         else
             let! (entries: obj[]) = fsPromises?readdir(wDir)
@@ -55,21 +55,21 @@ let readWikiFiles (workspaceRoot: string) : JS.Promise<WikiFile list> =
                 |> List.choose (fun (n, t) -> match parseNdjson n t with Ok f -> Some f | Error _ -> None)
     }
 
-let readProjection (workspaceRoot: string) : JS.Promise<WikiProjection> =
+let readProjection (workspaceRoot: string) : JS.Promise<KnowledgeGraphProjection> =
     promise {
-        let! files = readWikiFiles workspaceRoot
+        let! files = readKnowledgeGraphFiles workspaceRoot
         return projectLatestWins files
     }
 
 let ensureTodayFile (workspaceRoot: string) (today: string) : JS.Promise<unit> =
     promise {
-        do! ensureWikiDir workspaceRoot
+        do! ensureKnowledgeGraphDir workspaceRoot
         let p = dayPath workspaceRoot today
         if not (existsSync p) then
             do! fsPromises?writeFile(p, renderHeader (DayHeader(today, false)) + "\n", "utf-8")
     }
 
-let appendEntries (workspaceRoot: string) (today: string) (entries: WikiEntry list) : JS.Promise<unit> =
+let appendEntries (workspaceRoot: string) (today: string) (entries: KnowledgeGraphEntry list) : JS.Promise<unit> =
     promise {
         if not entries.IsEmpty then
             do! ensureTodayFile workspaceRoot today
@@ -89,9 +89,9 @@ let dayEntryCount (workspaceRoot: string) (today: string) : JS.Promise<int> =
             return match parseNdjson name t with Ok f -> f.entries.Length | Error _ -> 0
     }
 
-let rewriteDay (workspaceRoot: string) (date: string) (entries: WikiEntry list) : JS.Promise<unit> =
+let rewriteDay (workspaceRoot: string) (date: string) (entries: KnowledgeGraphEntry list) : JS.Promise<unit> =
     promise {
-        do! ensureWikiDir workspaceRoot
+        do! ensureKnowledgeGraphDir workspaceRoot
         let p = dayPath workspaceRoot date
         let tmp = p + ".tmp"
         let content = renderNdjson (DayHeader(date, true)) entries
@@ -101,7 +101,7 @@ let rewriteDay (workspaceRoot: string) (date: string) (entries: WikiEntry list) 
 
 let listDayFiles (workspaceRoot: string) : JS.Promise<string list> =
     promise {
-        let wDir = wikiDir workspaceRoot
+        let wDir = knowledgeGraphDir workspaceRoot
         if not (existsSync wDir) then return []
         else
             let entries = readdirSync wDir

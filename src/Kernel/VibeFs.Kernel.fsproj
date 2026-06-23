@@ -13,10 +13,10 @@
     <Compile Include="Dedup.fs" />
     <Compile Include="Messaging.fs" />
     <Compile Include="Message.fs" />
-    <Compile Include="Wiki.fs" />
-    <Compile Include="WikiPrompts.fs" />
-    <Compile Include="WikiMaintenance.fs" />
-    <Compile Include="WikiRuntimeState.fs" />
+    <Compile Include="KnowledgeGraph.fs" />
+    <Compile Include="KnowledgeGraphPrompts.fs" />
+    <Compile Include="KnowledgeGraphMaintenance.fs" />
+    <Compile Include="KnowledgeGraphRuntimeState.fs" />
     <Compile Include="CapsFormat.fs" />
     <Compile Include="TreeSitterKernel.fs" />
     <Compile Include="MessageDedup.fs" />

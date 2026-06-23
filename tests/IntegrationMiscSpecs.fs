@@ -6,14 +6,14 @@ open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Kernel.Dyn
-open VibeFs.Kernel.Wiki
+open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 open VibeFs.Opencode.AgentConfig
-open VibeFs.Opencode.WikiRuntime
+open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.WikiFiles
+open VibeFs.Shell.KnowledgeGraphFiles
 
 
 let writeToolSpec (reg: obj) = promise {
@@ -112,6 +112,18 @@ let disableMimoMemoryAndCheckpointPreservesUserAgentSpec () = promise {
         (isArray thresholds && (unbox<obj[]> thresholds).Length = 0)
 }
 
+let applyAgentConfigForMimoDisablesWorkflowSpec () = promise {
+    let cfg = createObj []
+    let next = applyAgentConfigFor VibeFs.Kernel.HostTools.mimocode cfg (createObj [])
+    let agents = get next "agent"
+    for name in [| "manager"; "build"; "plan"; "coder"; "investigator"; "meditator"; "bookkeeper"; "reviewer"; "browser"; "executor" |] do
+        let agent = get agents name
+        let permissions = get agent "permission"
+        let tools = get agent "tools"
+        check $"mimo {name} permission.workflow deny" (str permissions "workflow" = "deny")
+        check $"mimo {name} tools.workflow false" (unbox<bool> (get tools "workflow") = false)
+}
+
 let pluginConfigHookDisablesMimoMemoryAndCheckpointSpec () = promise {
     let! workspaceDir = mkdtempAsync "plugin-disable-mimo-"
     let! p = plugin (box {| directory = workspaceDir |})
@@ -137,6 +149,26 @@ let executorModeSchemaSpec () = promise {
     check "executor mode schema exists" (not (isNullish modeSchema))
     check "executor mode schema exposes mode" (not (isNullish modeSchema))
     check "executor mode schema enum ro/rw" (enumValues modeSchema = [| "ro"; "rw" |])
+    let languageSchema = executorLanguageSchema p
+    check "executor language schema exists" (not (isNullish languageSchema))
+    check "executor language schema enum shell/python/javascript" (enumValues languageSchema = [| "shell"; "python"; "javascript" |])
+    do! rmAsync workspaceDir
+}
+
+let executorRejectsInvalidLanguageSpec () = promise {
+    let! workspaceDir = mkdtempAsync "executor-invalid-language-"
+    let! p = plugin (box {| directory = workspaceDir |})
+    let executor = executorDefinition p
+    let args =
+        createObj [
+            "language", box "ruby"
+            "program", box "printf should-not-run"
+            "timeout_type", box "short"
+            "mode", box "ro"
+        ]
+    let context = createObj [ "directory", box workspaceDir; "sessionID", box "mimo-invalid-language"; "abort", box null ]
+    let! result = ((get executor "execute") $ (args, context)) |> unbox<JS.Promise<string>>
+    check "executor invalid language returns explicit error" (result = "Executor failed: invalid language for executor: expected shell, python, or javascript")
     do! rmAsync workspaceDir
 }
 
@@ -168,10 +200,10 @@ let executorActorSpec () = promise {
     check "executor actor preserves order" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
 }
 
-let wikiWorkspaceSerializationSpec () = promise {
+let knowledgeGraphWorkspaceSerializationSpec () = promise {
     let seen = System.Collections.Generic.List<string>()
-    /// WikiRuntime serializes per-workspace writes through one SerialQueue per
-    /// workspace (P51 removed the WikiActor class wrapper); this pins the
+    /// KnowledgeGraphRuntime serializes per-workspace writes through one SerialQueue per
+    /// workspace (P51 removed the KnowledgeGraphActor class wrapper); this pins the
     /// ordering guarantee of that queue directly.
     let queue = VibeFs.Shell.PromiseQueue.SerialQueue()
     let releaseRequested = ref false
@@ -192,34 +224,34 @@ let wikiWorkspaceSerializationSpec () = promise {
     releaseRequested.Value <- true
     gateResolve.Value ()
     let! _ = queue.Enqueue(fun () -> promise { return "" })
-    check "wiki workspace serialization preserves order" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
+    check "knowledge graph workspace serialization preserves order" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
 }
 
-let wikiPortLockTimeoutSpec () = promise {
-    let! workspaceDir = mkdtempAsync "wiki-port-lock-timeout-"
-    do! ensureWikiDir workspaceDir
-    let port = VibeFs.Shell.WikiPortLock.lockPortForPath workspaceDir
+let knowledgeGraphPortLockTimeoutSpec () = promise {
+    let! workspaceDir = mkdtempAsync "kg-port-lock-timeout-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    let port = VibeFs.Shell.KnowledgeGraphPortLock.lockPortForPath workspaceDir
     let net = requireFn("node:net")
     let server = net?createServer()
     do! Promise.create(fun resolve reject ->
         server?once("listening", System.Func<unit>(fun () -> resolve ())) |> ignore
         server?once("error", System.Func<obj, unit>(fun error -> reject (exn (string error)))) |> ignore
         server?listen(port, "127.0.0.1") |> ignore)
-    let wikiRuntime = WikiRuntime(null, workspaceDir, (fun () -> System.DateTime.UtcNow), ChildAgentRegistry.Create(), 0L, 0)
+    let knowledgeGraphRuntime = KnowledgeGraphRuntime(null, workspaceDir, (fun () -> System.DateTime.UtcNow), ChildAgentRegistry.Create(), 0L, 0)
     let marker = renderJobMarker { workspaceRoot = workspaceDir; kind = AppendAfterWork }
-    let sessionID = "wiki-lock-session"
+    let sessionID = "kg-lock-session"
     let lockClient =
         createObj [ "session", box (createObj [
             "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
                 (promise { return box {| data = [| userTextMessage sessionID marker |] |} })))
         ]) ]
-    let lockRuntime = WikiRuntime(lockClient, workspaceDir, (fun () -> System.DateTime.UtcNow), ChildAgentRegistry.Create(), 0L, 0)
+    let lockRuntime = KnowledgeGraphRuntime(lockClient, workspaceDir, (fun () -> System.DateTime.UtcNow), ChildAgentRegistry.Create(), 0L, 0)
     let submitAttempt = lockRuntime.SubmitFromHistory(sessionID, workspaceDir, [])
     let! errorText =
         submitAttempt
         |> Promise.map (fun _ -> "unexpected-success")
         |> Promise.catch (fun err -> string err)
-    check "wiki port lock timeout surfaces explicit error" (errorText.Contains "Timed out acquiring wiki port lock")
+    check "knowledge graph port lock timeout surfaces explicit error" (errorText.Contains "Timed out acquiring knowledge graph port lock")
     do! Promise.create(fun resolve _ -> server?close(System.Func<unit>(fun () -> resolve ())) |> ignore)
     do! rmAsync workspaceDir
 }

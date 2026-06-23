@@ -135,6 +135,21 @@ let private injectAgentDisables (agents: obj) : unit =
         elif Dyn.isNullish (Dyn.get ua "disable") then
             ua?disable <- box true
 
+let private disableMimoWorkflowToolsForAgents (agentMap: obj) : obj =
+    for name in Dyn.keys agentMap do
+        let agent = Dyn.get agentMap name
+        let agentObj = if Dyn.isNullish agent then emptyObj () else agent
+        let permissions =
+            let current = Dyn.get agentObj "permission"
+            mergeObj (if Dyn.isNullish current then emptyObj () else current) (createObj [ "workflow", box "deny" ])
+        let tools =
+            let current = Dyn.get agentObj "tools"
+            mergeObj (if Dyn.isNullish current then emptyObj () else current) (createObj [ "workflow", box false ])
+        setKey agentObj "permission" permissions
+        setKey agentObj "tools" tools
+        setKey agentMap name agentObj
+    agentMap
+
 let disableMimoMemoryAndCheckpoint (cfg: obj) : obj =
     let existingAgent = Dyn.get cfg "agent"
     let agentMap = if Dyn.isNullish existingAgent then emptyObj () else existingAgent
@@ -163,4 +178,8 @@ let applyAgentConfigFor (host: Host) (opencodeConfig: obj) (mcps: obj) : obj =
             let uaObj = if Dyn.isNullish ua then emptyObj () else ua
             name, withRoleDefaultsFor host name uaObj)
         |> createObj
+        |> fun builtAgents ->
+            match host with
+            | Mimocode -> disableMimoWorkflowToolsForAgents builtAgents
+            | Opencode -> builtAgents
     mergeObj prepared (box {| agent = finalAgents; mcp = mergedMcp |})

@@ -18,7 +18,7 @@
     <Compile Include="src/Mux/ReadDedup.fs" />
     <Compile Include="src/Mux/MessagingCodec.fs" />
     <Compile Include="src/Mux/MagicTodo.fs" />
-    <Compile Include="src/Mux/WikiTools.fs" />
+    <Compile Include="src/Mux/KnowledgeGraphTools.fs" />
     <Compile Include="src/Mux/MessageTransform.fs" />
     <Compile Include="src/Mux/EventHook.fs" />
     <Compile Include="src/Mux/SlashCommands.fs" />
@@ -26,9 +26,9 @@
     <Compile Include="src/Opencode/NudgeHook.fs" />
     <Compile Include="src/Opencode/SessionIo.fs" />
     <Compile Include="src/Opencode/ReviewerLoop.fs" />
-    <Compile Include="src/Opencode/WikiRuntimeIO.fs" />
-    <Compile Include="src/Opencode/WikiRuntime.fs" />
-    <Compile Include="src/Opencode/WikiTools.fs" />
+    <Compile Include="src/Opencode/KnowledgeGraphRuntimeIO.fs" />
+    <Compile Include="src/Opencode/KnowledgeGraphRuntime.fs" />
+    <Compile Include="src/Opencode/KnowledgeGraphTools.fs" />
     <Compile Include="src/Opencode/AgentConfig.fs" />
     <Compile Include="src/Opencode/MimoTodoTool.fs" />
     <Compile Include="src/Opencode/CommandHooks.fs" />

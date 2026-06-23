@@ -76,13 +76,13 @@ let uiParam : obj = call1 (call0 (str ()) "optional") "describe" (box "Internal 
 let strArrayReq (desc: string) : obj = call1 (arr (strMin 1 "")) "describe" (box desc)
 let strArrayOpt (desc: string) : obj = call1 (call0 (arr (strMin 1 "")) "optional") "describe" (box desc)
 
-let wikiDraftEntriesReq (desc: string) : obj =
+let knowledgeGraphDraftEntriesReq (desc: string) : obj =
     let entryShape =
         strictObject (
             createObj [
-                "id", strOpt "Optional wiki id"
-                "q", strReq "Wiki question"
-                "a", strReq "Wiki answer"
+                "id", strOpt "Optional entry id"
+                "entity", strArrayReq "Knowledge graph entity"
+                "fact", strReq "Knowledge graph fact"
             ])
     call1 (arr entryShape) "describe" (box desc)
 
@@ -123,9 +123,9 @@ let websearch = description "websearch"
 
 let webfetch = description "webfetch"
 
-let fetchWiki = description "fetch_wiki"
+let fetchKnowledgeGraph = description "knowledge_graph_fetch"
 
-let submitWiki = description "return_bookkeeper"
+let submitKnowledgeGraph = description "return_bookkeeper"
 
 module Params = VibeFs.Kernel.ToolCatalog.Params
 

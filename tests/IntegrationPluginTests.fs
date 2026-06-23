@@ -28,7 +28,7 @@ let registrationShape (reg: obj) =
     let policy = (get reg "getToolPolicy") $ ("x", "manager")
     check "mux.getToolPolicy non-null" (not (isNullish policy) && typeIs policy "object")
     let removes = unbox<string[]> (get policy "remove")
-    check "mux.getToolPolicy manager keeps write" (not (removes |> Array.contains "write"))
+    check "mux.getToolPolicy manager removes write" (removes |> Array.contains "write")
     let coderPolicy = (get reg "getToolPolicy") $ ("x", "coder")
     let coderRemoves = unbox<string[]> (get coderPolicy "remove")
     check "mux.getToolPolicy coder keeps write" (not (coderRemoves |> Array.contains "write"))
@@ -61,7 +61,7 @@ let countsSpec (reg: obj) =
     let names = tools |> Array.map (fun t -> str t "name")
     check "wrapper count" (wrappers.Length = 5)
     check "tool count" (tools.Length = 15)
-    check "mux has fetch_wiki tool" (names |> Array.contains "fetch_wiki")
+    check "mux has knowledge_graph_fetch tool" (names |> Array.contains "knowledge_graph_fetch")
     check "mux has return_bookkeeper tool" (names |> Array.contains "return_bookkeeper")
     check "mux has return_reviewer tool" (names |> Array.contains "return_reviewer")
 
@@ -102,9 +102,11 @@ let mimoConfigSpec () = promise {
     let managerPermissions = get manager "permission"
     check "mimo manager permission.task allow" (str managerPermissions "task" = "allow")
     check "mimo manager permission.actor deny" (str managerPermissions "actor" = "deny")
+    check "mimo manager permission.workflow deny" (str managerPermissions "workflow" = "deny")
     let managerTools = get manager "tools"
     check "mimo manager tools.task present" (not (isNullish (get managerTools "task")))
     check "mimo manager tools.actor false" (unbox<bool> (get managerTools "actor") = false)
+    check "mimo manager tools.workflow false" (unbox<bool> (get managerTools "workflow") = false)
     let taskParams =
         createObj [
             "type", box "object"

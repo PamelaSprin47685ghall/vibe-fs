@@ -27,9 +27,9 @@
     "watch": "dotnet fable watch vibe-fs.fsproj --outDir build",
     "watch:tests": "dotnet fable watch tests/VibeFs.Tests.fsproj --outDir build-tests",
     "test": "pnpm run build:tests && node tests/runner.js",
-    "test:kernel": "pnpm run build:tests && node tests/runner.js ReviewTests AgentTests KernelTests FuzzyTests DynTests DelegateTests ResolveAiSettingsTests MagicTests WikiKernelTests TitleFetchGuardTests",
-    "test:shell": "pnpm run build:tests && node tests/runner.js ShellTests WikiFileTests",
-    "test:integration": "pnpm run build:tests && node tests/runner.js Integration WikiTests",
+    "test:kernel": "pnpm run build:tests && node tests/runner.js ReviewTests AgentTests KernelTests FuzzyTests DynTests DelegateTests ResolveAiSettingsTests MagicTests KnowledgeGraphKernelTests TitleFetchGuardTests",
+    "test:shell": "pnpm run build:tests && node tests/runner.js ShellTests KnowledgeGraphFileTests",
+    "test:integration": "pnpm run build:tests && node tests/runner.js IntegrationKnowledgeGraphPreludeSpecs IntegrationAfterHookSpecs IntegrationMaintenanceSpecs IntegrationSubmitKnowledgeGraphSpecs IntegrationBookkeeperSpecs IntegrationToolDefSpecs IntegrationSubagentSpecs IntegrationMiscSpecs IntegrationPluginTests IntegrationEventTests IntegrationDedupTests IntegrationToolTests IntegrationChatTests KnowledgeGraphTests",
     "prepare": "pnpm run build"
   },
   "dependencies": {

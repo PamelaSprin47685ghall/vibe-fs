@@ -8,7 +8,7 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.HookSchema
-open VibeFs.Opencode.WikiRuntime
+open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.TreeSitterShell
 
@@ -66,10 +66,10 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
                     if formatted <> "" then setOutput output (s + "\n\n" + formatted)
     }
 
-/// Tools whose every user-facing invocation is durable enough to feed the wiki
+/// Tools whose every user-facing invocation is durable enough to feed the knowledge graph
 /// bookkeeper as an input/output black box. Direct write tools join the set via
 /// `isFileEditTool`; subagent and IO tools are listed explicitly. Pure lookups
-/// (fuzzy_find/fuzzy_grep), the wiki/review tools themselves, and host read
+/// (fuzzy_find/fuzzy_grep), the knowledge graph/review tools themselves, and host read
 /// tools never record.
 let private bookkeepingSubagentTools =
     Set [ "coder"; "investigator"; "meditator"; "browser"; "executor"; "websearch"; "webfetch"; "write"; "apply_patch"; "patch" ]
@@ -85,13 +85,13 @@ let private bookkeeperInput (input: obj) : string =
     let args = Dyn.get input "args"
     if Dyn.isNullish args then "" else JS.JSON.stringify args
 
-let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (wikiRuntime: WikiRuntime) (registry: ChildAgentRegistry) (input: obj) (output: obj) : JS.Promise<unit> =
+let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (registry: ChildAgentRegistry) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         do! appendSyntaxDiagnostics directory input output
         let tool = Dyn.str input "tool"
         let sessionID = Dyn.str input "sessionID"
         let succeeded = Dyn.str output "error" = ""
         if succeeded && recordsToBookkeeper tool && not (isReadOnlyExecutor tool input) && (registry.LookupChildAgent sessionID).IsNone then
-            wikiRuntime.StartBookkeeperAppend(bookkeeperInput input, Dyn.str output "output", tool, parentSessionID = sessionID)
+            knowledgeGraphRuntime.StartBookkeeperAppend(bookkeeperInput input, Dyn.str output "output", tool, parentSessionID = sessionID)
         do! nudgeHook.handleToolExecuteAfter input output
     }

@@ -1,4 +1,4 @@
-module VibeFs.Shell.WikiPortLock
+module VibeFs.Shell.KnowledgeGraphPortLock
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -38,13 +38,13 @@ let rec private acquireLoopUntil (port: int) (deadlineMs: int64) (retryDelayMs: 
             return server
         with _ ->
             if System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() >= deadlineMs then
-                return raise (exn ($"Timed out acquiring wiki port lock on 127.0.0.1:{port}"))
+                return raise (exn ($"Timed out acquiring knowledge graph port lock on 127.0.0.1:{port}"))
             else
                 do! Promise.sleep retryDelayMs
                 return! acquireLoopUntil port deadlineMs retryDelayMs
     }
 
-let withWikiPortLock (timeoutMs: int64) (retryDelayMs: int) (workspaceRoot: string) (work: unit -> JS.Promise<'a>) : JS.Promise<'a> =
+let withKnowledgeGraphPortLock (timeoutMs: int64) (retryDelayMs: int) (workspaceRoot: string) (work: unit -> JS.Promise<'a>) : JS.Promise<'a> =
     promise {
         let port = lockPortForPath workspaceRoot
         let deadlineMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + timeoutMs

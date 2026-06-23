@@ -113,7 +113,7 @@ let doubleCheckPrompt (task: string) : string =
     frontMatterPrompt
         ([ yamlScalarField
                doubleCheckField
-               "Please reevaluate: does it really fully satisfy the original task without cutting corners?" ]
+               "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?" ]
          @ taskLine)
         "If you insist on PASS, otherwise please REJECT with detailed feedback."
 

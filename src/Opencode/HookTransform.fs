@@ -14,8 +14,8 @@ let chatMessageFor (host: Host) (registry: ChildAgentRegistry) (nudgeHook: VibeF
 let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
     ChatHooks.chatMessage registry nudgeHook input output
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: VibeFs.Opencode.MagicTodo.MagicSession) (wikiRuntime: VibeFs.Opencode.WikiRuntime.WikiRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) (output: obj) : JS.Promise<unit> =
-    MessageTransform.messagesTransform registry directory magicSession wikiRuntime reviewStore input output
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: VibeFs.Opencode.MagicTodo.MagicSession) (knowledgeGraphRuntime: VibeFs.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) (output: obj) : JS.Promise<unit> =
+    MessageTransform.messagesTransform registry directory magicSession knowledgeGraphRuntime reviewStore input output
 
 let compactingHandlerFor (host: Host) (magicSession: VibeFs.Opencode.MagicTodo.MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
     MessageTransform.compactingHandlerFor host magicSession input output
