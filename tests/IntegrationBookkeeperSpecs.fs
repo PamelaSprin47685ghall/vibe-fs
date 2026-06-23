@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
+open VibeFs.Tests.IntegrationMuxSetup
 
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin

@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.IntegrationToolSetup
+open VibeFs.Tests.IntegrationMuxSetup
 open VibeFs.Tests.TempWorkspace
 
 open VibeFs.Kernel.PromptFragments

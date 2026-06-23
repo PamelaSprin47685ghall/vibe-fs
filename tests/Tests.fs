@@ -4,7 +4,9 @@ open Fable.Core
 open VibeFs.Tests.Assert
 open VibeFs.Tests.ReviewTests
 open VibeFs.Tests.AgentTests
+open VibeFs.Tests.AgentNudgeSpecs
 open VibeFs.Tests.KernelTests
+open VibeFs.Tests.KernelPromptSpecs
 open VibeFs.Tests.FuzzyTests
 open VibeFs.Tests.ShellTests
 open VibeFs.Tests.DynTests
@@ -50,27 +52,27 @@ let private tests : (string * TestBody) list = [
     "AgentTests.canUse'", Sync (sync AgentTests.canUse')
     "AgentTests.canUseMatrix", Sync (sync AgentTests.canUseMatrix)
     "AgentTests.deniedTools'", Sync (sync AgentTests.deniedTools')
-    "AgentTests.decision", Sync (sync AgentTests.decision)
-    "AgentTests.updateState", Sync (sync AgentTests.updateState)
-    "AgentTests.coordinatorRuntime", Sync (sync AgentTests.coordinatorRuntime)
-    "AgentTests.shouldSuppress'", Sync (sync AgentTests.shouldSuppress')
-    "AgentTests.decideNudge'", Sync (sync AgentTests.decideNudge')
-    "AgentTests.decodeLastAssistantNudge", Sync (sync AgentTests.decodeLastAssistantNudge)
+    "AgentNudgeSpecs.decision", Sync (sync AgentNudgeSpecs.decision)
+    "AgentNudgeSpecs.updateState", Sync (sync AgentNudgeSpecs.updateState)
+    "AgentNudgeSpecs.coordinatorRuntime", Sync (sync AgentNudgeSpecs.coordinatorRuntime)
+    "AgentNudgeSpecs.shouldSuppress'", Sync (sync AgentNudgeSpecs.shouldSuppress')
+    "AgentNudgeSpecs.decideNudge'", Sync (sync AgentNudgeSpecs.decideNudge')
+    "AgentNudgeSpecs.decodeLastAssistantNudge", Sync (sync AgentNudgeSpecs.decodeLastAssistantNudge)
     "KernelTests.headTail'", Sync (sync KernelTests.headTail')
     "KernelTests.stripLexer'", Sync (sync KernelTests.stripLexer')
     "KernelTests.dedup'", Sync (sync KernelTests.dedup')
     "KernelTests.jsBoundary'", Sync (sync KernelTests.jsBoundary')
-    "KernelTests.hostKernel'", Sync (sync KernelTests.hostKernel')
+    "KernelPromptSpecs.hostKernel'", Sync (sync KernelPromptSpecs.hostKernel')
     "KernelTests.knowledgeGraphFetchAnswer", Sync (sync KernelTests.knowledgeGraphFetchAnswer)
-    "KernelTests.toolCatalogCentralized", Sync (sync KernelTests.toolCatalogCentralized)
-    "KernelTests.hostToolsKnowledgeGraphNames", Sync (sync KernelTests.hostToolsKnowledgeGraphNames)
-    "KernelTests.subagentDispatch", Sync (sync KernelTests.subagentDispatch)
-    "KernelTests.subagentJoinReports", Sync (sync KernelTests.subagentJoinReports)
+    "KernelPromptSpecs.toolCatalogCentralized", Sync (sync KernelPromptSpecs.toolCatalogCentralized)
+    "KernelPromptSpecs.hostToolsKnowledgeGraphNames", Sync (sync KernelPromptSpecs.hostToolsKnowledgeGraphNames)
+    "KernelPromptSpecs.subagentDispatch", Sync (sync KernelPromptSpecs.subagentDispatch)
+    "KernelPromptSpecs.subagentJoinReports", Sync (sync KernelPromptSpecs.subagentJoinReports)
     "KernelTests.dynDeleteKey", Sync (sync KernelTests.dynDeleteKey)
-    "KernelTests.loopMessagesShared", Sync (sync KernelTests.loopMessagesShared)
-    "KernelTests.reviewerVerdictPromptsShared", Sync (sync KernelTests.reviewerVerdictPromptsShared)
-    "KernelTests.reviewResultFormattingShared", Sync (sync KernelTests.reviewResultFormattingShared)
-    "KernelTests.domainErrorsShared", Sync (sync KernelTests.domainErrorsShared)
+    "KernelPromptSpecs.loopMessagesShared", Sync (sync KernelPromptSpecs.loopMessagesShared)
+    "KernelPromptSpecs.reviewerVerdictPromptsShared", Sync (sync KernelPromptSpecs.reviewerVerdictPromptsShared)
+    "KernelPromptSpecs.reviewResultFormattingShared", Sync (sync KernelPromptSpecs.reviewResultFormattingShared)
+    "KernelPromptSpecs.domainErrorsShared", Sync (sync KernelPromptSpecs.domainErrorsShared)
     "FuzzyTests.grepDetect", Sync (sync FuzzyTests.grepDetect)
     "FuzzyTests.iteratorRoundTrip", Sync (sync FuzzyTests.iteratorRoundTrip)
     "FuzzyTests.finderConversion", Sync (sync FuzzyTests.finderConversion)

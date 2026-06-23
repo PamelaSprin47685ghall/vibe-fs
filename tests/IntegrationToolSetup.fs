@@ -44,27 +44,19 @@ let executorSchema (pluginObject: obj) : obj =
     let args = get definition "args"
     if not (isNullish args) then args else get definition "parameters"
 
-let executorModeSchema (pluginObject: obj) : obj =
+let private executorFieldSchema (pluginObject: obj) (field: string) : obj =
     let schema = executorSchema pluginObject
-    let direct = get schema "mode"
+    let direct = get schema field
     if not (isNullish direct) then direct
     else
         let shape = get schema "shape"
-        if not (isNullish shape) then get shape "mode"
+        if not (isNullish shape) then get shape field
         else
             let properties = get schema "properties"
-            if isNullish properties then null else get properties "mode"
+            if isNullish properties then null else get properties field
 
-let executorLanguageSchema (pluginObject: obj) : obj =
-    let schema = executorSchema pluginObject
-    let direct = get schema "language"
-    if not (isNullish direct) then direct
-    else
-        let shape = get schema "shape"
-        if not (isNullish shape) then get shape "language"
-        else
-            let properties = get schema "properties"
-            if isNullish properties then null else get properties "language"
+let executorModeSchema (pluginObject: obj) : obj = executorFieldSchema pluginObject "mode"
+let executorLanguageSchema (pluginObject: obj) : obj = executorFieldSchema pluginObject "language"
 
 let enumValues (modeSchema: obj) : string array =
     let candidates =
@@ -165,132 +157,8 @@ let registerKnowledgeGraphJobForTest (kgRuntime: obj) (sessionID: string) (works
 let submitKnowledgeGraphTool (pluginObject: obj) : obj =
     get (get pluginObject "tool") "return_bookkeeper"
 
-let muxToolByName (reg: obj) (name: string) : obj =
-    let tools = unbox<obj[]> (get reg "tools")
-    tools
-    |> Array.tryFind (fun t -> str t "name" = name)
-    |> Option.defaultValue null
-
-let muxToolSchema (toolDef: obj) : obj =
-    if isNullish toolDef then null else get toolDef "parameters"
-
-let muxToolSchemaRequired (toolDef: obj) : string array =
-    if isNullish toolDef then [||]
-    else
-        let schema = muxToolSchema toolDef
-        if isNullish schema then [||]
-        else
-            let req = get schema "required"
-            if isArray req then unbox<string[]> req else [||]
-
-let muxExecutorModeSchema (reg: obj) : obj =
-    let executor = muxToolByName reg "executor"
-    let schema = muxToolSchema executor
-    if isNullish schema then null
-    else
-        let props = get schema "properties"
-        if isNullish props then null else get props "mode"
-
-let muxKnowledgeGraphRuntime (reg: obj) : obj =
-    let direct = get reg "__knowledgeGraphRuntime"
-    if not (isNullish direct) then direct
-    else
-        let rt = get reg "knowledgeGraphRuntime"
-        if isNullish rt then null else rt
-
-let muxReviewStore (reg: obj) : obj = get reg "__reviewStore"
-let muxCallStore (reg: obj) : obj = get reg "__callStore"
-
-let muxActivateReviewForTest (reg: obj) (sessionID: string) (task: string) : unit =
-    let store = muxReviewStore reg
-    let activate = get store "activateReview" |> unbox<System.Func<string, string, int64, unit>>
-    activate.Invoke(sessionID, task, 0L)
-
-let muxIsReviewActiveForTest (reg: obj) (sessionID: string) : bool =
-    let store = muxReviewStore reg
-    let fn = get store "isReviewActive" |> unbox<System.Func<string, bool>>
-    fn.Invoke(sessionID)
-
-let muxPendingCallIdsForTest (reg: obj) : JS.Promise<string array> =
-    let store = muxCallStore reg
-    let fn = get store "pendingCallIds" |> unbox<System.Func<JS.Promise<string array>>>
-    fn.Invoke()
-
-let muxResolveFirstMatchingCallForTest (reg: obj) (prefix: string) (args: obj) : JS.Promise<bool> =
-    let store = muxCallStore reg
-    let fn = get store "resolveFirstMatching" |> unbox<System.Func<string, obj, JS.Promise<bool>>>
-    fn.Invoke(prefix, args)
-
-let minimalMuxDeps () : obj =
-    createObj
-        [ "loadConfigOrDefault", box (fun () -> createObj [])
-          "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
-          "resolveAgentFrontmatter",
-          box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj []))) ]
-
-let muxDepsWithChatHistory (sessionID: string) (messages: obj array) : obj =
-    createObj
-        [ "loadConfigOrDefault", box (fun () -> createObj [])
-          "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
-          "resolveAgentFrontmatter",
-          box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
-          "getChatHistory",
-          box (System.Func<string, JS.Promise<obj array>>(fun sid ->
-              promise { return if sid = sessionID then messages else [||] })) ]
-
-let muxMutableDepsWithChatHistory (sessionID: string) (messages: ResizeArray<obj>) : obj =
-    createObj
-        [ "loadConfigOrDefault", box (fun () -> createObj [])
-          "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
-          "resolveAgentFrontmatter",
-          box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
-          "getChatHistory",
-          box (System.Func<string, JS.Promise<obj array>>(fun sid ->
-              promise { return if sid = sessionID then messages.ToArray() else [||] })) ]
-
-let mockMuxTaskServiceCapturingPrompt (prompts: ResizeArray<string>) : obj =
-    createObj
-        [ "create",
-          box (System.Func<obj, JS.Promise<obj>>(fun input ->
-              promise {
-                  let promptText = str input "prompt"
-                  if promptText <> "" then prompts.Add(promptText)
-                  return box {| success = true; data = box {| taskId = "reviewer-task-1"; kind = "agent" |} |}
-              }))
-          "waitForAgentReport",
-          box (System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
-              Promise.reject (exn "simulated reviewer timeout"))) ]
-
-let registerMuxKnowledgeGraphJobForTest (reg: obj) (sessionID: string) (workspaceRoot: string) (kindTag: string) (payload: obj) : unit =
-    let runtime = muxKnowledgeGraphRuntime reg
-    let registrar = get runtime "registerJobForTesting" |> unbox<System.Func<string, string, string, obj, unit>>
-    registrar.Invoke(sessionID, workspaceRoot, kindTag, payload)
-
 let readKnowledgeGraphProjectionAsync (workspaceRoot: string) : JS.Promise<KnowledgeGraphProjection> =
     readProjection workspaceRoot
 
 let readAllKnowledgeGraphFiles (workspaceRoot: string) : JS.Promise<KnowledgeGraphFile list> =
     readKnowledgeGraphFiles workspaceRoot
-
-let muxMessageTransform (reg: obj) : obj =
-    get reg "messagesTransform"
-
-let muxTextMessage (id: string) (role: string) (text: string) : obj =
-    box {| id = id; role = role; parts = [| box {| ``type`` = "text"; text = text; state = "done" |} |] |}
-
-let firstTextPartText (msg: obj) : string =
-    let parts = get msg "parts"
-    if isNullish parts then ""
-    else
-        let arr = unbox<obj[]> parts
-        if arr.Length = 0 then ""
-        else str arr.[0] "text"
-
-let hasDynamicToolReadPart (msg: obj) : bool =
-    let parts = get msg "parts"
-    if isNullish parts then false
-    else
-        unbox<obj[]> parts
-        |> Array.exists (fun p ->
-            str p "type" = "dynamic-tool"
-            && str p "toolName" = "file_read")

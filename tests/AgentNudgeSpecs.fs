@@ -1,0 +1,128 @@
+module VibeFs.Tests.AgentNudgeSpecs
+
+open Fable.Core.JsInterop
+open VibeFs.Tests.Assert
+open VibeFs.Kernel.Nudge
+open VibeFs.Kernel.NudgeState
+open VibeFs.Opencode.NudgeEventCodec
+
+
+let private nudgeContext todos msg runner loopActive =
+    { todos = todos; lastAssistantMessage = msg; hasActiveRunner = runner; isLoopActive = loopActive }
+
+let decision () =
+    equal "todos → NudgeTodo" NudgeTodo (decide (nudgeContext [ "a" ] "working" false false))
+    equal "todos+question → None" NudgeNone (decide (nudgeContext [ "a" ] "what now?" false false))
+    equal "todos+skip → None" NudgeNone (decide (nudgeContext [ "a" ] "done <skip-todo-check />" false false))
+    equal "runner → NudgeRunner" NudgeRunner (decide (nudgeContext [] "ok" true false))
+    equal "loop → NudgeLoop" NudgeLoop (decide (nudgeContext [] "ok" false true))
+    equal "loop+skip → None" NudgeNone (decide (nudgeContext [] "done <skip-loop-check />" false true))
+    equal "nothing → None" NudgeNone (decide (nudgeContext [] "ok" false false))
+
+let updateState () =
+    let ctx = nudgeContext [ "a" ] "working" false false
+    let state, action = update freshCoordinator "sess" ctx
+    equal "update → NudgeTodo" NudgeTodo action
+    check "state records session" (Map.containsKey "sess" state.sessions)
+    let _, action2 = update state "sess" ctx
+    equal "same message suppressed → None" NudgeNone action2
+    let ctxNew = nudgeContext [ "a" ] "did more work" false false
+    let _, action3 = update state "sess" ctxNew
+    equal "new message allowed → NudgeTodo" NudgeTodo action3
+
+let coordinatorRuntime () =
+    let mutable coord = freshCoordinatorRuntime
+    let ctx : NudgeContext = { todos = [ "a" ]; lastAssistantMessage = "working"; hasActiveRunner = false; isLoopActive = false }
+    let next1, action1 = decideRuntimeAction coord "s" ctx
+    coord <- next1
+    equal "first nudge todo" "nudge-todo" action1
+    let next2, action2 = decideRuntimeAction coord "s" ctx
+    coord <- next2
+    equal "same message suppressed" "none" action2
+    let ctxNew = { ctx with lastAssistantMessage = "new output" }
+    let next3, action3 = decideRuntimeAction coord "s" ctxNew
+    coord <- next3
+    equal "new message re-nudge" "nudge-todo" action3
+    coord <- suppressSession coord "s"
+    let next4, action4 = decideRuntimeAction coord "s" ctxNew
+    coord <- next4
+    equal "explicit suppress none" "none" action4
+    coord <- clearRuntimeSession coord "s"
+    let _, action5 = decideRuntimeAction coord "s" ctx
+    equal "after clear todo" "nudge-todo" action5
+
+let shouldSuppress' () =
+    let previous = Some NudgeTodo
+    let repeated : NudgeContext =
+        { todos = [ "a" ]; lastAssistantMessage = "did more work"
+          hasActiveRunner = false; isLoopActive = false }
+    let cleared : NudgeContext =
+        { todos = []; lastAssistantMessage = "all done"
+          hasActiveRunner = false; isLoopActive = false }
+    let reopened : NudgeContext =
+        { todos = [ "a" ]; lastAssistantMessage = "new open todos"
+          hasActiveRunner = false; isLoopActive = false }
+
+    check "same action suppressed across consecutive stream-end" (shouldSuppressNudge "s" repeated previous)
+    check "cleared context resets suppression" (not (shouldSuppressNudge "s" cleared previous))
+    check "reopened context re-allows todo nudge" (not (shouldSuppressNudge "s" reopened None))
+
+let private snapshot todos msg alreadyNudged agent : SessionSnapshot =
+    { todos = todos; lastAssistantMessage = msg; alreadyNudged = alreadyNudged; agentFromMessage = agent }
+
+let private noReview (_: string) = false
+let private noChild (_: string) = None
+
+/// decideNudge is the restart-safe nudge gate. The per-stop de-dup signal is
+/// `alreadyNudged`, read from the dialogue history, NOT an in-memory counter —
+/// so a restart that wipes the counter can never resurrect a duplicate nudge.
+let decideNudge' () =
+    let _, d0 = decideNudge noReview noChild emptyState "s" (snapshot [ "a" ] "working" false None)
+    equal "unclaimed → StandDown" StandDown d0
+
+    let claimed, _ = tryClaimNudge emptyState "s"
+    match snd (decideNudge noReview noChild claimed "s" (snapshot [ "a" ] "working" false None)) with
+    | Send(text, _) -> check "claimed fresh stop nudges todo" (text = VibeFs.Kernel.PromptFragments.todoNudgePrompt)
+    | StandDown -> check "claimed fresh stop nudges todo" false
+
+    let _, dDup = decideNudge noReview noChild claimed "s" (snapshot [ "a" ] "working" true None)
+    equal "already-nudged stop → StandDown" StandDown dDup
+
+    let _, dNone = decideNudge noReview noChild claimed "s" (snapshot [] "done" false None)
+    equal "no work → StandDown" StandDown dNone
+
+    let loopReview (_: string) = true
+    match snd (decideNudge loopReview noChild claimed "s" (snapshot [] "ok" false None)) with
+    | Send(text, _) -> check "loop active nudges loop" (text = VibeFs.Kernel.PromptFragments.loopNudgePrompt)
+    | StandDown -> check "loop active nudges loop" false
+
+    let stopped = stopSession claimed "s"
+    let _, dStop = decideNudge noReview noChild stopped "s" (snapshot [ "a" ] "working" false None)
+    equal "stopped → StandDown" StandDown dStop
+
+/// decodeLastAssistant reads (text, agent, alreadyNudged) from the host message
+/// array.  `alreadyNudged` is true iff a nudge-prompt user message trails the
+/// last completed assistant turn — the durable, restart-proof de-dup anchor.
+let decodeLastAssistantNudge () =
+    let assistant text =
+        box {| info = box {| role = "assistant"; finish = "stop" |}
+               parts = [| box {| ``type`` = "text"; text = text |} |] |}
+    let user text =
+        box {| info = box {| role = "user" |}
+               parts = [| box {| ``type`` = "text"; text = text |} |] |}
+
+    let text1, agent1, nudged1 = decodeLastAssistant (box [| user "go"; assistant "did work" |])
+    equal "last assistant text" "did work" text1
+    equal "no agent field → None" None agent1
+    check "no trailing nudge → false" (not nudged1)
+
+    let _, _, nudged2 =
+        decodeLastAssistant (box [| user "go"; assistant "did work"; user VibeFs.Kernel.PromptFragments.todoNudgePrompt |])
+    check "trailing todo nudge → true" nudged2
+
+    let _, _, nudged3 =
+        decodeLastAssistant (box [| user "go"; assistant "did work"; user VibeFs.Kernel.PromptFragments.todoNudgePrompt; assistant "more work" |])
+    check "assistant after nudge → false" (not nudged3)
+
+    let _, _, nudgedEmpty = decodeLastAssistant (box [||])
+    check "empty history → false" (not nudgedEmpty)
