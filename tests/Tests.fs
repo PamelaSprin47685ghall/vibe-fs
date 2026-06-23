@@ -21,6 +21,7 @@ open VibeFs.Tests.KnowledgeGraphTests
 open VibeFs.Tests.KnowledgeGraphFileTests
 open VibeFs.Tests.KnowledgeGraphKernelTests
 open VibeFs.Tests.TitleFetchGuardTests
+open VibeFs.Tests.ArchitectureTests
 
 type private TestBody =
     | Sync of (unit -> unit)
@@ -60,7 +61,6 @@ let private tests : (string * TestBody) list = [
     "KernelTests.jsBoundary'", Sync (sync KernelTests.jsBoundary')
     "KernelTests.hostKernel'", Sync (sync KernelTests.hostKernel')
     "KernelTests.knowledgeGraphFetchAnswer", Sync (sync KernelTests.knowledgeGraphFetchAnswer)
-    "KernelTests.knowledgeGraphDraftArrayParsing", Sync (sync KernelTests.knowledgeGraphDraftArrayParsing)
     "KernelTests.toolCatalogCentralized", Sync (sync KernelTests.toolCatalogCentralized)
     "KernelTests.hostToolsKnowledgeGraphNames", Sync (sync KernelTests.hostToolsKnowledgeGraphNames)
     "KernelTests.subagentDispatch", Sync (sync KernelTests.subagentDispatch)
@@ -118,6 +118,12 @@ let private tests : (string * TestBody) list = [
     "TitleFetchGuardTests.rewriteStringContent", Sync (sync TitleFetchGuardTests.rewriteStringContent)
     "TitleFetchGuardTests.rewriteArrayContent", Sync (sync TitleFetchGuardTests.rewriteArrayContent)
     "TitleFetchGuardTests.skipProbeMessage", Sync (sync TitleFetchGuardTests.skipProbeMessage)
+    "ArchitectureTests.kernelBoundary", Sync (sync ArchitectureTests.kernelBoundary)
+    "ArchitectureTests.kernelNoEmptyDefault", Sync (sync ArchitectureTests.kernelNoEmptyDefault)
+    "ArchitectureTests.shellLayering", Sync (sync ArchitectureTests.shellLayering)
+    "ArchitectureTests.fileBodyUnder250", Sync (sync ArchitectureTests.fileBodyUnder250)
+    "ArchitectureTests.noDanglingMarkers", Sync (sync ArchitectureTests.noDanglingMarkers)
+    "ArchitectureTests.noBuiltinDictionary", Sync (sync ArchitectureTests.noBuiltinDictionary)
 ]
 
 let private matchesSelector (selectors: string array) (label: string) =

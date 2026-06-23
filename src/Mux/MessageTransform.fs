@@ -3,7 +3,8 @@ module VibeFs.Mux.MessageTransform
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.CapsFormat
@@ -21,6 +22,7 @@ open VibeFs.Opencode.CapsPrelude
 open VibeFs.Shell.ReviewRuntime
 open VibeFs.Shell.FileSys
 open VibeFs.Shell.WorkspaceFiles
+open VibeFs.Shell.Dyn
 
 let private alwaysExcludedAgents = set [ "browser"; "investigator"; "executor"; "title"; "compaction"; "bookkeeper" ]
 let private childWorkspaceExcludedAgents = set [ "exec"; "explore" ]

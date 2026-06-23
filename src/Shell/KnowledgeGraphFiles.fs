@@ -3,6 +3,7 @@ module VibeFs.Shell.KnowledgeGraphFiles
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraphCodec
 
 [<Import("promises", "node:fs")>]
 let private fsPromises : obj = jsNative

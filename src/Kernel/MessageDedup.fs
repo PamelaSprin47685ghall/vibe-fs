@@ -1,236 +1,49 @@
 module VibeFs.Kernel.MessageDedup
 
 open VibeFs.Kernel.Dedup
-open VibeFs.Kernel
-open VibeFs.Kernel.TreeSitterKernel
 
-type ReadPart =
-    { output: obj
-      input: obj
-      toolName: string
-      state: string
-      partType: string }
+type ReadPayload = { path: string; content: string }
 
-let tryDecodeReadPart (part: obj) : ReadPart option =
-    let toolName = Dyn.str part "toolName"
-    let partType = Dyn.str part "type"
-    let state = Dyn.str part "state"
-    let output = Dyn.get part "output"
-    if Dyn.isNullish output then None
-    else
-        let input = Dyn.get part "input"
-        if not (Dyn.isNullish input) then
-            Some { output = output; input = input; toolName = toolName; state = state; partType = partType }
-        else
-            let st = Dyn.get part "state"
-            if Dyn.isNullish st then None
-            else
-                let inp = Dyn.get st "input"
-                Some { output = output; input = inp; toolName = toolName; state = state; partType = partType }
+type DedupVerdict =
+    | AlreadySeen
+    | NewContent of ReadPayload
 
-let readPartOutputKey (output: obj) : string =
-    if Dyn.isNullish output then ""
-    elif Dyn.typeIs output "string" then string output
-    else
-        let content = Dyn.get output "content"
-        if Dyn.isNullish content then "" else string content
+type DedupState = { seenContents: string list }
 
-let readPartPath (rp: ReadPart) : string =
-    match extractFilePaths rp.input with
-    | path :: _ -> path
-    | [] -> ""
+let createDedupState () : DedupState = { seenContents = [] }
 
-type ModelReadPart =
-    { output: obj
-      input: obj
-      toolName: string
-      partType: string
-      outputType: string
-      outputValue: obj }
+let processDedup (state: DedupState) (payload: ReadPayload) : DedupVerdict * DedupState =
+    let result = deduplicate state.seenContents payload.content
+    if result.output = dedupMarker then AlreadySeen, state
+    else NewContent payload, { state with seenContents = result.seenOutputs }
 
-let tryDecodeModelReadPart (part: obj) : ModelReadPart option =
-    let toolName = Dyn.str part "toolName"
-    let partType = Dyn.str part "type"
-    let output = Dyn.get part "output"
-    if Dyn.isNullish output then None
-    else
-        let outputType = Dyn.str output "type"
-        let outputValue = Dyn.get output "value"
-        let input = Dyn.get part "input"
-        Some { output = output; input = input; toolName = toolName; partType = partType
-               outputType = outputType; outputValue = outputValue }
+/// Tool names that represent a file-read operation across hosts.
+let readToolNames = Set.ofList [ "read"; "file_read" ]
 
-let modelReadPartOutputKey (part: ModelReadPart) : string =
-    let value = part.outputValue
-    if part.outputType = "text" && not (Dyn.isNullish value) then string value
-    elif part.outputType = "json" && not (Dyn.isNullish value) then readPartOutputKey value
-    else ""
+let dedupForPath (seenByPath: Map<string, string list>) (payload: ReadPayload) : Map<string, string list> * DedupVerdict =
+    let pathSeen = Map.tryFind payload.path seenByPath |> Option.defaultValue []
+    let verdict, nextState = processDedup { seenContents = pathSeen } payload
+    (Map.add payload.path nextState.seenContents seenByPath), verdict
 
-let modelReadPartPath (part: ModelReadPart) : string =
-    match extractFilePaths part.input with
-    | path :: _ -> path
-    | [] -> ""
+let foldDedup (seenByPath: Map<string, string list>) (payloads: ReadPayload list) : Map<string, string list> * (string list * bool list) =
+    let (nextSeen, (outputsRev, replacedRev)) =
+        payloads
+        |> List.fold
+            (fun (state, (outs, reps)) payload ->
+                let seen', verdict = dedupForPath state payload
+                match verdict with
+                | AlreadySeen -> seen', (outs, true :: reps)
+                | NewContent _ -> seen', (payload.content :: outs, false :: reps))
+            (seenByPath, ([], []))
+    nextSeen, (List.rev outputsRev, List.rev replacedRev)
 
-let messageParts (msg: obj) : obj = Dyn.get msg "parts"
+let collectReadOutputsByPath (payloads: ReadPayload list) : Map<string, string list> =
+    payloads
+    |> List.fold
+        (fun map payload ->
+            let next = Map.tryFind payload.path map |> Option.defaultValue []
+            Map.add payload.path (next @ [ payload.content ]) map)
+        Map.empty
 
-let messageContent (msg: obj) : obj = Dyn.get msg "content"
-
-/// Tool names that represent a file-read operation across hosts.  The OpenCode
-/// host names the tool `read`; the Mux host names it `file_read`.
-let readToolNames = Set [ "read"; "file_read" ]
-
-type private ReadOp =
-    { pathKey: string
-      current: string
-      apply: string -> obj }
-
-let private dedupForPath (seenByPath: Map<string, string list>) (pathKey: string) (current: string) =
-    let pathSeen = Map.tryFind pathKey seenByPath |> Option.defaultValue []
-    let verdict, nextState =
-        processDedup { seenContents = pathSeen } { path = pathKey; content = current }
-    let nextOutput =
-        match verdict with
-        | AlreadySeen -> dedupMarker
-        | NewContent payload -> payload.content
-    (Map.add pathKey nextState.seenContents seenByPath, nextOutput, verdict)
-
-let private foldDedupPart
-    (classify: obj -> ReadOp option)
-    (state: Map<string, string list> * string list)
-    (part: obj)
-    : (Map<string, string list> * string list) * obj * bool =
-    let seenByPath, outputsRev = state
-    match classify part with
-    | None -> (state, part, false)
-    | Some op ->
-        if op.current.Length = 0 then (state, part, false)
-        else
-            let nextSeen, nextOutput, verdict = dedupForPath seenByPath op.pathKey op.current
-            let newPart, changed = if nextOutput = op.current then part, false else op.apply nextOutput, true
-            let outputsRev' = match verdict with NewContent _ -> op.current :: outputsRev | AlreadySeen -> outputsRev
-            ((nextSeen, outputsRev'), newPart, changed)
-
-let private processDedupMessage
-    (getContainer: obj -> obj)
-    (setContainer: obj -> obj array -> obj)
-    (classify: obj -> ReadOp option)
-    (state: Map<string, string list> * string list * bool)
-    (msg: obj)
-    : (Map<string, string list> * string list * bool) * obj =
-    let seenByPath, outputsRev, anyChanged = state
-    if Dyn.isNullish msg then (state, msg)
-    else
-        let container = getContainer msg
-        if Dyn.isNullish container || not (Dyn.isArray container) then (state, msg)
-        else
-            let arr = container :?> obj array
-            if Array.isEmpty arr then (state, msg)
-            else
-                let (nextState, revParts2, partChanged2) =
-                    arr
-                    |> Array.fold
-                        (fun (stateAcc, revParts, ch) part ->
-                            let (stateAcc', newPart, partCh) = foldDedupPart classify stateAcc part
-                            (stateAcc', newPart :: revParts, ch || partCh))
-                        ((seenByPath, outputsRev), [], false)
-                let (fs, fo) = nextState
-                if not partChanged2 then ((fs, fo, anyChanged), msg)
-                else ((fs, fo, true), setContainer msg (List.toArray (List.rev revParts2)))
-
-let private deduplicateMessages
-    (getContainer: obj -> obj)
-    (setContainer: obj -> obj array -> obj)
-    (classify: obj -> ReadOp option)
-    (seenByPath: Map<string, string list>)
-    (messages: obj array)
-    : string list * obj array =
-    let finalState, resultsRev =
-        messages
-        |> Array.fold
-            (fun (state, revMsgs) msg ->
-                let nextState, newMsg = processDedupMessage getContainer setContainer classify state msg
-                (nextState, newMsg :: revMsgs))
-            ((seenByPath, [], false), [])
-    let (_, outputsRev, anyChanged) = finalState
-    List.rev outputsRev, (if anyChanged then List.rev resultsRev |> List.toArray else messages)
-
-let private muxReadOp (part: obj) : ReadOp option =
-    match tryDecodeReadPart part with
-    | Some rp when rp.partType = "dynamic-tool" && Set.contains rp.toolName readToolNames && rp.state = "output-available" ->
-        let current = readPartOutputKey rp.output
-        if current.Length = 0 then None
-        else
-            Some { pathKey = readPartPath rp; current = current;
-                   apply = fun nextOutput -> Dyn.withKey part "output" (box nextOutput) }
-    | _ -> None
-
-let private modelReadOp (part: obj) : ReadOp option =
-    match tryDecodeModelReadPart part with
-    | Some rp when rp.partType = "tool-result" && Set.contains rp.toolName readToolNames ->
-        let current = modelReadPartOutputKey rp
-        if current.Length = 0 then None
-        else
-            Some { pathKey = modelReadPartPath rp; current = current;
-                   apply = fun nextOutput ->
-                       let newOutput = Dyn.withKey (Dyn.withKey rp.output "type" (box "text")) "value" (box nextOutput)
-                       Dyn.withKey part "output" (box newOutput) }
-    | _ -> None
-
-let private foldMuxReadPartsIntoSeenByPath (seenByPath: Map<string, string list>) (messages: obj array) : Map<string, string list> =
-    let foldPart acc part =
-        match muxReadOp part with
-        | Some op ->
-            let nextSeen, _, _ = dedupForPath acc op.pathKey op.current
-            nextSeen
-        | None -> acc
-
-    let foldMessage acc msg =
-        if Dyn.isNullish msg then acc
-        else
-            let parts = messageParts msg
-            if Dyn.isNullish parts then acc
-            else (parts :?> obj array) |> Array.fold foldPart acc
-
-    messages |> Array.fold foldMessage seenByPath
-
-let deduplicateReadOutputsWithSeenByPath
-    (seenByPath: Map<string, string list>)
-    (messages: obj array)
-    : string list * obj array =
-    deduplicateMessages messageParts (fun m arr -> Dyn.withKey m "parts" (box arr)) muxReadOp seenByPath messages
-
-let deduplicateReadOutputsWithSeen
-    (seenOutputs: string list)
-    (messages: obj array)
-    : string list * obj array =
-    let seenByPath =
-        if List.isEmpty seenOutputs then Map.empty
-        else Map.add "" seenOutputs Map.empty
-    deduplicateReadOutputsWithSeenByPath seenByPath messages
-
-let deduplicateModelReadOutputsWithSeen
-    (previouslySeenOutputs: string list)
-    (messages: obj array)
-    : string list * obj array =
-    let initialSeenByPath =
-        if List.isEmpty previouslySeenOutputs then Map.empty
-        else Map.add "" previouslySeenOutputs Map.empty
-    deduplicateMessages messageContent (fun m arr -> Dyn.withKey m "content" (box arr)) modelReadOp initialSeenByPath messages
-
-let deduplicateReadOutputs (messages: obj array) : obj array =
-    deduplicateReadOutputsWithSeen [] messages |> snd
-
-let deduplicateModelReadOutputs (messages: obj array) : obj array =
-    deduplicateModelReadOutputsWithSeen [] messages |> snd
-
-let private collectMuxReadOutputsInOrder (messages: obj array) : string list =
-    messages
-    |> Seq.collect (fun msg -> if Dyn.isNullish msg then Seq.empty else let p = messageParts msg in if Dyn.isNullish p then Seq.empty else (p :?> obj array) :> seq<_>)
-    |> Seq.choose (fun part -> match muxReadOp part with Some op -> Some op.current | None -> None)
-    |> List.ofSeq
-
-let collectReadOutputsByPath (messages: obj array) : Map<string, string list> =
-    foldMuxReadPartsIntoSeenByPath Map.empty messages
-
-let collectReadOutputs (messages: obj array) : string list =
-    collectMuxReadOutputsInOrder messages
+let collectReadOutputs (payloads: ReadPayload list) : string list =
+    payloads |> List.map (fun payload -> payload.content)

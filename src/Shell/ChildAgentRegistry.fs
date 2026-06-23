@@ -1,8 +1,6 @@
 module VibeFs.Shell.ChildAgentRegistry
 
-open Fable.Core
 open VibeFs.Kernel.Domain
-open VibeFs.Shell.PromiseQueue
 
 type ChildAgentRegistry private (state: WorkspaceState ref) =
 
@@ -65,23 +63,5 @@ type ChildAgentRegistry private (state: WorkspaceState ref) =
         | Some childId ->
             state.Value <- reduce state.Value (ChildUnregistered childId)
 
-/// Per-session serial executor: guarantees shell commands for one session run in
-/// submission order. Backed by a Promise-chain SerialQueue (no legacy F# Agent).
-type ExecutorActor() =
-    let queues = System.Collections.Generic.Dictionary<string, SerialQueue>()
+/// Per-session serial execution is provided by VibeFs.Shell.SessionExecutor.
 
-    let getSessionQueue (sessionID: string) =
-        match queues.TryGetValue sessionID with
-        | true, queue -> queue
-        | false, _ ->
-            let queue = SerialQueue()
-            queues.[sessionID] <- queue
-            queue
-
-    member _.Post(sessionID: string, work: unit -> JS.Promise<string>) : JS.Promise<string> =
-        getSessionQueue sessionID |> fun queue -> queue.Enqueue(work)
-
-let private actor = ExecutorActor()
-
-let post (sessionID: string) (work: unit -> JS.Promise<string>) : JS.Promise<string> =
-    actor.Post(sessionID, work)

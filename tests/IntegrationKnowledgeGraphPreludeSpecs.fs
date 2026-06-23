@@ -5,12 +5,14 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Kernel.Message
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraphCodec
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Opencode.Plugin
 open VibeFs.Shell.KnowledgeGraphFiles
+open VibeFs.Shell.Dyn
 
 let knowledgeGraphPreludeWithoutCapsSpec () = promise {
     let! workspaceDir = mkdtempAsync "kg-prelude-"

@@ -1,6 +1,7 @@
 module VibeFs.Shell.NudgeRuntime
 
 open Fable.Core
+open VibeFs.Shell.Dyn
 open VibeFs.Kernel
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeState
@@ -29,7 +30,6 @@ let private tryGetTodos (helpers: obj) (workspaceId: string) : JS.Promise<string
             else
                 return []
         with ex ->
-            printfn $"[nudge] tryGetTodos failed for {workspaceId}: {ex.Message}"
             return []
     }
 
@@ -44,7 +44,6 @@ let private tryGetChatHistory
             try
                 return! getHistory workspaceId
             with ex ->
-                printfn $"[nudge] tryGetChatHistory failed for {workspaceId}: {ex.Message}"
                 return [||]
     }
 
@@ -120,7 +119,6 @@ let private runNudgeFlow
                             let nudgeFn = Dyn.get helpers "nudge"
                             return! unbox<JS.Promise<bool>> (Dyn.call2 nudgeFn workspaceId promptText)
                         with ex ->
-                            printfn $"[nudge] sendNudge failed for {workspaceId}: {ex.Message}"
                             return false
                     }
 
@@ -130,7 +128,6 @@ let private runNudgeFlow
                     | Some nextState -> nextState, ()
                     | None -> state, ())
         with ex ->
-            printfn $"[nudge] startNudgeFlow outer catch for {workspaceId}: {ex.Message}"
             holder.Mutate(fun state -> clearSession state workspaceId, ())
     }
 

@@ -3,12 +3,16 @@ module VibeFs.Opencode.SearchTools
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Fuzzy
+open VibeFs.Kernel.FuzzyPath
+open VibeFs.Kernel.FuzzyQuery
+open VibeFs.Kernel.FuzzyFormat
 open VibeFs.Kernel.HostTools
 open VibeFs.Mux.BuiltinTools
 open VibeFs.Kernel.SearchPrompts
+open VibeFs.Shell.WebSearchCodec
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Shell.OllamaClient
@@ -19,6 +23,7 @@ open VibeFs.Mux.Wrappers
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzySearch
+open VibeFs.Shell.Dyn
 module ToolSchemaModule = VibeFs.Opencode.ToolSchema
 module FuzzyCommandsModule = VibeFs.Shell.FuzzySearch
 

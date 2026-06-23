@@ -6,11 +6,12 @@ open VibeFs.Kernel
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicTodo
 open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Opencode.HookSchema
 open VibeFs.Shell.TreeSitterShell
 open VibeFs.Shell.CallStore
 open VibeFs.Shell.MagicSessionStore
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 type JsonSchema =
     { ``type``: string
@@ -217,14 +218,8 @@ let private mkAgentReportOverride (callStore: CallStore) : obj =
                                 let a = Dyn.str opts "sessionID"
                                 if a <> "" then a else Dyn.str opts "sessionId"
 
-                            let resolvedBySession =
-                                if sessionID <> "" then
-                                    callStore.PendingCalls.Keys
-                                    |> Seq.tryFind (fun k -> k.StartsWith(sessionID + "-review-"))
-                                    |> Option.map (fun callId -> resolveCall callStore callId args)
-                                    |> Option.defaultValue false
-                                else
-                                    false
+                            if sessionID <> "" then
+                                do! resolveFirstMatchingAsync callStore (sessionID + "-review-") args |> Promise.map ignore
 
                             let upstreamArgs = reviewerAgentReportPayload args
                             let raw = tool?execute(upstreamArgs, opts)

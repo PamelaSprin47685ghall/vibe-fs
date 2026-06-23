@@ -4,9 +4,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.SearchPrompts
+open VibeFs.Shell.WebSearchCodec
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Mux.BuiltinTools
@@ -14,9 +16,10 @@ open VibeFs.Mux.Delegate
 open VibeFs.Mux.SubagentTools
 open VibeFs.Mux.Wrappers
 open VibeFs.Shell.OllamaClient
+open VibeFs.Shell.Dyn
 
 let private wrapWebError (label: string) (e: DomainError) =
-    $"Web {label} failed: {describeDomainError e}"
+    $"Web {label} failed: {formatDomainError e}"
 
 let websearchTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = "websearch"

@@ -6,12 +6,13 @@ open System
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.KnowledgeGraphFiles
+open VibeFs.Shell.Dyn
 
 
 let toolDefinitionSpec () = promise {

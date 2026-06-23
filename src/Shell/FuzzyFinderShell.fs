@@ -1,9 +1,9 @@
 module VibeFs.Shell.FuzzyFinderShell
 
-open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Shell.PromiseQueue
 
 type FinderLike =
     abstract member fileSearch: query: string * opts: obj -> obj
@@ -41,38 +41,34 @@ let createFinder (basePath: string) : JS.Promise<Result<FinderLike, string>> =
     }
 
 type FinderCache() =
-    let instances = Dictionary<string, FinderLike>()
-    let pending = Dictionary<string, JS.Promise<Result<FinderLike, string>>>()
+    let queue = SerialQueue()
+    let mutable instances = Map.empty<string, FinderLike>
+    let mutable pending = Map.empty<string, JS.Promise<Result<FinderLike, string>>>
 
     member _.Get(cwd: string) : JS.Promise<Result<FinderLike, string>> =
-        promise {
-            match instances.TryGetValue cwd with
-            | true, finder when not finder.isDestroyed -> return Ok finder
+        queue.Enqueue(fun () ->
+            match Map.tryFind cwd instances with
+            | Some finder when not finder.isDestroyed -> Promise.lift (Ok finder)
             | _ ->
-                match pending.TryGetValue cwd with
-                | true, finderPromise -> return! finderPromise
-                | _ ->
+                match Map.tryFind cwd pending with
+                | Some finderPromise -> finderPromise
+                | None ->
                     let finderPromise = createFinder cwd
-                    pending.[cwd] <- finderPromise
-
-                    try
-                        let! result = finderPromise
+                    pending <- Map.add cwd finderPromise pending
+                    finderPromise
+                    |> Promise.bind (fun result ->
                         match result with
-                        | Ok finder -> instances.[cwd] <- finder
+                        | Ok finder -> instances <- Map.add cwd finder instances
                         | Error _ -> ()
-                        pending.Remove(cwd) |> ignore
-                        return result
-                    with error ->
-                        pending.Remove(cwd) |> ignore
-                        return raise error
-        }
+                        pending <- Map.remove cwd pending
+                        Promise.lift result))
 
     member _.Destroy(cwd: string) : unit =
-        match instances.TryGetValue cwd with
-        | true, finder when not finder.isDestroyed -> finder.destroy()
+        match Map.tryFind cwd instances with
+        | Some finder when not finder.isDestroyed -> finder.destroy()
         | _ -> ()
-        instances.Remove(cwd) |> ignore
-        pending.Remove(cwd) |> ignore
+        instances <- Map.remove cwd instances
+        pending <- Map.remove cwd pending
 
     member this.DestroyAll() : unit =
-        instances.Keys |> Seq.toArray |> Array.iter this.Destroy
+        instances |> Map.toList |> List.map fst |> List.iter this.Destroy

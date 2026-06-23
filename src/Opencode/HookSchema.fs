@@ -4,10 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.SubagentIntents
+open VibeFs.Shell.SubagentIntentsCodec
 open VibeFs.Kernel.MagicTodo
 open VibeFs.Opencode.ToolSchema
+open VibeFs.Shell.Dyn
 
 /// Write `_ui` directly onto the host's args reference when the tool exposes a
 /// UI label (coder/investigator). The host keeps the same args object it passed
@@ -67,8 +70,8 @@ let private hasCallable (o: obj) (key: string) : bool =
 let private callSchemaMethodOpt (schema: obj) (methodName: string) (arg: obj option) : obj option =
     if hasCallable schema methodName then
         match arg with
-        | Some a -> Some (call1 schema methodName a)
-        | None -> Some (call0 schema methodName)
+        | Some a -> Some (ToolSchema.call1 schema methodName a)
+        | None -> Some (ToolSchema.call0 schema methodName)
     else None
 
 let private callSchemaMethod (schema: obj) (methodName: string) (arg: obj) : obj option =

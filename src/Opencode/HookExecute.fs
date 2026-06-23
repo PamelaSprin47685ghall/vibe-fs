@@ -3,7 +3,8 @@ module VibeFs.Opencode.HookExecute
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Opencode.AgentConfig
@@ -11,6 +12,7 @@ open VibeFs.Opencode.HookSchema
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.TreeSitterShell
+open VibeFs.Shell.Dyn
 
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
 

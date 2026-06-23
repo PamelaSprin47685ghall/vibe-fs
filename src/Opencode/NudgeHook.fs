@@ -1,234 +1,23 @@
 module VibeFs.Opencode.NudgeHook
 
-open System
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeState
-open VibeFs.Kernel.PromptFragments
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.MagicCore
+open VibeFs.Kernel.PromptFragments
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Opencode.NudgeEffect
+open VibeFs.Opencode.NudgeEventCodec
 open VibeFs.Opencode.MagicTodo
-
-let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
-    unbox (target?(method)(arg))
-
-let private setOutput (o: obj) (v: string) : unit =
-    o?("output") <- v
-
-let private resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
-
-// ── Atomic state holder ──
-//
-// JavaScript is single-threaded, so a synchronous read-modify-write is atomic
-// with respect to every other hook callback.  The holder must NEVER await
-// inside a transition: that was the freeze.  The old serialized queue chained
-// every hook onto one promise, and a transition that awaited `session.prompt`
-// (a whole assistant turn) left that promise pending — jamming every later
-// chat.message / command.execute.before behind it, and deadlocking outright
-// when the nudge's own prompt re-entered chat.message.  All I/O now lives in
-// detached flows outside this lock; transitions are pure and instant.
-
-type private StateHolder<'state>(initialState: 'state) =
-    let mutable state = initialState
-
-    member _.Mutate<'result>(transition: 'state -> 'state * 'result) : 'result =
-        let nextState, result = transition state
-        state <- nextState
-        result
-
-/// Scan message history for task tool parts with non-terminal todos.
-/// Mirrors the TUI's tryRecoverTodosFromMessages: iterates messages in
-/// reverse, finds the last `task` tool call, and extracts open items.
-let private recoverOpenTodosFromMessages (messagesData: obj) : string list =
-    if not (Dyn.isArray messagesData) then []
-    else
-        (messagesData :?> obj array)
-        |> Array.rev
-        |> Array.tryPick (fun message ->
-            let parts = Dyn.get message "parts"
-            if not (Dyn.isArray parts) then None
-            else
-                (parts :?> obj array)
-                |> Array.rev
-                |> Array.tryPick (fun part ->
-                    if Dyn.str part "type" <> "tool" || Dyn.str part "tool" <> "task" then None
-                    else
-                        let state = Dyn.get part "state"
-                        let input = Dyn.get state "input"
-                        let todos = Dyn.get input "todos"
-                        if not (Dyn.isArray todos) then None
-                        else
-                            let openItems =
-                                (todos :?> obj array)
-                                |> Array.choose (fun todo ->
-                                    let content = Dyn.str todo "content"
-                                    let status = Dyn.str todo "status"
-                                    if content = "" || status = "" then None
-                                    else
-                                        match todoStatusOfString status with
-                                        | Some s when isTerminal s -> None
-                                        | _ -> Some content)
-                            Some openItems))
-        |> Option.defaultValue [||]
-        |> Array.toList
-
-let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<SessionSnapshot option> =
-    promise {
-        try
-            let sessionIDStr = Id.sessionIdValue sessionID
-            let session = Dyn.get client "session"
-            let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
-            let openTodosFromApi = decodeTodos (Dyn.get todoResp "data")
-            let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
-            let messagesData = Dyn.get messagesResp "data"
-            let openTodos =
-                if not (List.isEmpty openTodosFromApi) then openTodosFromApi
-                else recoverOpenTodosFromMessages messagesData
-            let lastAssistantMessage, agentFromMessage, alreadyNudged =
-                decodeLastAssistant messagesData
-            return Some { todos = openTodos
-                          lastAssistantMessage = lastAssistantMessage
-                          alreadyNudged = alreadyNudged
-                          agentFromMessage = agentFromMessage }
-        with ex ->
-            printfn $"[nudge-hook] collectSnapshot failed for {Id.sessionIdValue sessionID}: {ex.Message}"
-            return None
-    }
-
-let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string option) (promptText: string) : JS.Promise<unit> =
-    promise {
-        let body = createPromptBody agentOpt promptText
-        let promptArg = box {| path = box {| id = Id.sessionIdValue sessionID |}; body = body |}
-        let session = Dyn.get client "session"
-        do! invoke1 promptArg "prompt" session |> Promise.map ignore
-    }
-
-let private pureMap =
-    Map [
-        "stream-abort", StreamAbort
-        "session.delete", SessionDeleted
-        "session.close", SessionDeleted
-        "session.remove", SessionDeleted
-        "session.deleted", SessionDeleted
-        "session.next.retried", SessionNextRetried
-        "session.idle", SessionIdle
-    ]
-
-let private extractorMap : Map<string, obj -> NudgeHostEvent option> =
-    Map [
-        "session.next.prompted", fun props ->
-            let prompt = Dyn.get props "prompt"
-            let promptText = Dyn.str prompt "text"
-            let text =
-                if promptText <> "" then promptText
-                else
-                    let partsText = getPartsText (Dyn.get props "parts")
-                    if partsText <> "" then partsText else Dyn.str props "text"
-            Some (SessionNextPrompted text)
-
-        "message.updated", fun props ->
-            let info = Dyn.get props "info"
-            let outcome =
-                if isAbortDomainError (Dyn.get info "error") then UpdateAborted
-                elif isCompletedAssistantMessage info then UpdateCompletedAssistant
-                else UpdateNoChange
-            Some (MessageUpdated outcome)
-
-        "message.part.updated", fun props ->
-            let part = Dyn.get props "part"
-            let partType = Dyn.str part "type"
-            let outcome =
-                if partType = "retry" then PartRetry
-                elif isAbortDomainError (Dyn.get part "error") || isAbortDomainError (Dyn.get part "state") then PartAborted
-                elif isRetryProgressPart partType then PartRetryProgress
-                else PartOther
-            Some (MessagePartUpdated outcome)
-
-        "session.next.step.failed", fun props ->
-            Some (SessionNextStepFailed (if isAbortDomainError (Dyn.get props "error") then StepFailAbort else StepFailOther))
-
-        "session.next.tool.failed", fun props ->
-            Some (SessionNextToolFailed (if isAbortDomainError (Dyn.get props "error") then ToolFailAbort else ToolFailOther))
-
-        "session.next.step.ended", fun props ->
-            let direct = Dyn.str props "finish"
-            let finish = if direct <> "" then direct else Dyn.str (Dyn.get props "info") "finish"
-            Some (SessionNextStepEnded finish)
-
-        "session.error", fun props ->
-            Some (SessionError (if isAbortDomainError (Dyn.get props "error") then SessionErrorAbort else SessionErrorOther))
-
-        "session.status", fun props ->
-            let ev =
-                match Dyn.str (Dyn.get props "status") "type" with
-                | "idle" -> SessionStatusIdle
-                | "busy" -> SessionStatusBusy
-                | "retry" -> SessionStatusRetry
-                | _ -> Other
-            Some ev
-    ]
-
-let private decodeNudgeHostEvent (eventType: string) (props: obj) : NudgeHostEvent =
-    match Map.tryFind eventType pureMap with
-    | Some ev -> ev
-    | None ->
-        match Map.tryFind eventType extractorMap with
-        | Some extract -> extract props |> Option.defaultValue Other
-        | None -> if isRetryProgressEvent eventType then RetryProgress else Other
-
-/// The detached nudge flow: all client I/O happens here, never under the lock.
-/// Each lock re-entry (`Mutate`) is a pure, instant transition.
-let private runNudgeFlow (holder: StateHolder<VibeFs.Kernel.NudgeState.NudgeShellState>) (client: obj)
-                          (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
-                          (registry: ChildAgentRegistry)
-                          (sessionID: SessionId) : JS.Promise<unit> =
-    promise {
-        try
-            let! snapshotOpt = collectSnapshot client sessionID
-            match snapshotOpt with
-            | None -> holder.Mutate(fun (state: VibeFs.Kernel.NudgeState.NudgeShellState) -> VibeFs.Kernel.NudgeState.clearSession state (Id.sessionIdValue sessionID), ())
-            | Some snapshot ->
-                let sid = Id.sessionIdValue sessionID
-                match holder.Mutate(fun (state: VibeFs.Kernel.NudgeState.NudgeShellState) -> VibeFs.Kernel.NudgeState.decideNudge reviewStore.isReviewActive registry.LookupChildAgent state sid snapshot) with
-                | VibeFs.Kernel.NudgeState.StandDown -> ()
-                | VibeFs.Kernel.NudgeState.Send(promptText, agentOpt) ->
-                    let! caught = sendNudge client sessionID agentOpt promptText |> Promise.result
-                    let outcome =
-                        match caught with
-                        | Ok () -> VibeFs.Kernel.NudgeState.Delivered
-                        | Error error ->
-                            match translateJsError error with
-                            | MessageAborted -> VibeFs.Kernel.NudgeState.Aborted
-                            | SessionBusy -> VibeFs.Kernel.NudgeState.Busy
-                            | _ -> VibeFs.Kernel.NudgeState.Failed
-                    holder.Mutate(fun (state: VibeFs.Kernel.NudgeState.NudgeShellState) ->
-                        match VibeFs.Kernel.NudgeState.tryRecordSend state sid outcome with
-                        | Some nextState -> nextState, ()
-                        | None -> state, ())
-        with ex ->
-            printfn $"[nudge-hook] startNudgeFlow failed for {Id.sessionIdValue sessionID}: {ex.Message}"
-            holder.Mutate(fun (state: VibeFs.Kernel.NudgeState.NudgeShellState) -> VibeFs.Kernel.NudgeState.clearSession state (Id.sessionIdValue sessionID), ())
-    }
-
-/// Fire the nudge flow detached from the caller's hook promise.  `Promise.start`
-/// kicks off the promise without waiting (JS promises are hot), so the hook
-/// returns at once and the rest of the flow — including any `session.prompt` —
-/// never blocks the lock.
-let private startNudgeFlow (holder: StateHolder<VibeFs.Kernel.NudgeState.NudgeShellState>) (client: obj)
-                            (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
-                            (registry: ChildAgentRegistry)
-                            (sessionID: SessionId) : unit =
-    runNudgeFlow holder client reviewStore registry sessionID |> Promise.start
-
-// ── Hook class ──
 
 type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore, registry: ChildAgentRegistry) =
     let client () = Dyn.get ctx "client"
-    let holder = StateHolder<VibeFs.Kernel.NudgeState.NudgeShellState>(VibeFs.Kernel.NudgeState.emptyState)
+    let holder = StateHolder<NudgeShellState>(emptyState)
 
     member _.handleChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
         holder.Mutate(fun state ->
@@ -237,12 +26,12 @@ type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.Rev
             if isNudgePrompt text then state, ()
             else
                 let agentOpt = if agent <> "" then Some agent else None
-                VibeFs.Kernel.NudgeState.resumeSession (VibeFs.Kernel.NudgeState.rememberAgent state sid agentOpt) sid, ())
+                resumeSession (rememberAgent state sid agentOpt) sid, ())
         resolvedUnitPromise ()
 
     member _.handleCommandExecuteBefore(input: obj) (_output: obj) : JS.Promise<unit> =
         let sessionIDStr = Dyn.str input "sessionID"
-        holder.Mutate(fun (state: VibeFs.Kernel.NudgeState.NudgeShellState) -> VibeFs.Kernel.NudgeState.resumeSession state sessionIDStr, ())
+        holder.Mutate(fun (state: NudgeShellState) -> resumeSession state sessionIDStr, ())
         resolvedUnitPromise ()
 
     member _.handleToolExecuteAfter(input: obj) (output: obj) : JS.Promise<unit> =
@@ -270,8 +59,7 @@ type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.Rev
                         let nudgeEvent = decodeNudgeHostEvent eventType props
                         let nextState, wantsNudge = NudgeState.handleEvent state (Id.sessionIdValue sessionID) nudgeEvent
                         nextState, (if wantsNudge then Some sessionID else None)
-                with ex ->
-                    printfn $"[nudge-hook] event decode failed: {ex.Message}"
+                with _ ->
                     state, None)
         match claimed with
         | Some sessionID -> startNudgeFlow holder (client ()) reviewStore registry sessionID

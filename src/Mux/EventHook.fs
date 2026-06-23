@@ -3,6 +3,8 @@ module VibeFs.Mux.EventHook
 open Fable.Core
 open VibeFs.Kernel
 open VibeFs.Shell.NudgeRuntime
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 type private DecodedHookEvent =
     { eventType: string

@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dedup
+open VibeFs.Kernel.MessageDedup
 open VibeFs.Kernel.Executor
 open VibeFs.Shell.WorkspaceFiles
 open VibeFs.Kernel.ReviewPrompts
@@ -12,7 +13,9 @@ open VibeFs.Kernel.SubagentPrompts
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell.ErrorClassify
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 let headTail' () =
     let r = headTail "hello" 2 2
@@ -104,7 +107,13 @@ let dedup' () =
 
 let jsBoundary' () =
     check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = VibeFs.Kernel.Domain.MessageAborted)
-    let msgs : Message list =
+    let nestedCause : obj = createObj [ "name", box "TypeError"; "message", box "terminated"; "cause", box (createObj [ "name", box "AbortError"; "message", box "aborted" ]) ]
+    check "abort nested via cause" (translateJsError nestedCause = VibeFs.Kernel.Domain.MessageAborted)
+    let nestedError : obj = createObj [ "name", box "TypeError"; "error", box (createObj [ "name", box "AbortError" ]) ]
+    check "abort nested via error" (translateJsError nestedError = VibeFs.Kernel.Domain.MessageAborted)
+    let nonAbort : obj = createObj [ "name", box "RangeError"; "message", box "out of range" ]
+    check "non-abort stays unknown" (translateJsError nonAbort = VibeFs.Kernel.Domain.UnknownJsError "out of range")
+    let msgs : Message<obj> list =
         [ { info =
                 { id = ""; sessionID = ""; role = Assistant; agent = ""
                   isError = false; toolName = ""; details = null; time = null }
@@ -146,22 +155,6 @@ let knowledgeGraphFetchAnswer () =
     check "knowledge graph fetch existing" (VibeFs.Kernel.KnowledgeGraph.fetchAnswer projection "project entry" = Ok "Fact text")
     check "knowledge graph fetch invalid entity" (VibeFs.Kernel.KnowledgeGraph.fetchAnswer projection "" = Error "Invalid knowledge graph entity: ")
     check "knowledge graph fetch missing entity" (VibeFs.Kernel.KnowledgeGraph.fetchAnswer projection "missing entity" = Error "Knowledge graph entity not found in this session snapshot: missing entity")
-
-let knowledgeGraphDraftArrayParsing () =
-    let drafts =
-        [|
-            box {| entity = ["E1"]; fact = "F1" |}
-            box {| id = "0a3f"; entity = ["E2"]; fact = "F2" |}
-        |]
-    match VibeFs.Kernel.KnowledgeGraph.parseDraftArray (box drafts) with
-    | Ok parsed ->
-        check "knowledge graph draft parse count" (parsed.Length = 2)
-        check "knowledge graph draft parse first no id" (parsed.[0].id.IsNone)
-        check "knowledge graph draft parse second id" (parsed.[1].id = Some "0a3f")
-    | Error _ -> check "knowledge graph draft parse valid ok" false
-
-    let invalidDrafts = [| box {| fact = "F1" |} |]
-    check "knowledge graph draft parse invalid error" (match VibeFs.Kernel.KnowledgeGraph.parseDraftArray (box invalidDrafts) with Error _ -> true | _ -> false)
 
 /// P0-2: every tool description and parameter doc the two adapter layers ship
 /// must come from a single Kernel-level `ToolCatalog`.  Today the strings live

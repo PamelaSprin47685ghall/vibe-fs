@@ -47,7 +47,7 @@ let private consEntry (revAcc: BacklogEntry list) (report: string) : BacklogEntr
 /// Replay the message stream into a backlog. `reportOf` extracts the completed-
 /// work report string for a given flat tool-result part (host-specific Dyn
 /// reading is injected by the caller, keeping this function pure).
-let replayBacklogWith (host: Host) (reportOf: FlatPart -> string) (messages: Message list) : BacklogEntry list =
+let replayBacklogWith (host: Host) (reportOf: FlatPart<'raw> -> string) (messages: Message<'raw> list) : BacklogEntry list =
     if messages.IsEmpty then
         []
     else

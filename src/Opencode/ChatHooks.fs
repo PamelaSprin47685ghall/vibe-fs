@@ -3,11 +3,13 @@ module VibeFs.Opencode.ChatHooks
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.HostTools
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Shell.Dyn
 
 let private resolveAgentFromMessage (registry: ChildAgentRegistry) (message: obj) : string option =
     if isNullish message then None

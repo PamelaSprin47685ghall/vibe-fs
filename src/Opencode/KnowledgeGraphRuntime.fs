@@ -2,8 +2,8 @@ module VibeFs.Opencode.KnowledgeGraphRuntime
 
 open Fable.Core
 open Fable.Core.JsInterop
-open System.Collections.Generic
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphPrompts
 open VibeFs.Kernel.KnowledgeGraphMaintenance
@@ -13,6 +13,7 @@ open VibeFs.Shell.PromiseQueue
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Opencode.KnowledgeGraphRuntimeIO
 open VibeFs.Mux.AiSettings
+open VibeFs.Shell.Dyn
 
 /// KnowledgeGraph host IO shell (P53/P72): holds the single mutable state cell and
 /// serializes every state+IO change through `commandQueue`. All pure state
@@ -28,8 +29,8 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
     let mutable state = initialKnowledgeGraphState
     let commandQueue = SerialQueue()
     let backgroundJobs = ResizeArray<JS.Promise<unit>>()
-    let writeQueues = Dictionary<string, SerialQueue>()
-    let registeredJobs = Dictionary<string, KnowledgeGraphJobContext>()
+    let mutable writeQueues = Map.empty<string, SerialQueue>
+    let mutable registeredJobs = Map.empty<string, KnowledgeGraphJobContext>
     let workspaceRoot = initialWorkspaceRoot
 
     let today () = (nowUtc ()).ToString("yyyy-MM-dd")
@@ -37,11 +38,11 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
     let applyCmd (cmd: KnowledgeGraphCommand) : unit = state <- reducer state cmd
 
     let getWorkspaceQueue (root: string) =
-        match writeQueues.TryGetValue root with
-        | true, queue -> queue
-        | false, _ ->
+        match Map.tryFind root writeQueues with
+        | Some queue -> queue
+        | None ->
             let queue = SerialQueue()
-            writeQueues.[root] <- queue
+            writeQueues <- Map.add root queue writeQueues
             queue
 
     let runWorkspace (root: string) (work: unit -> JS.Promise<string>) : JS.Promise<string> =
@@ -74,7 +75,7 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
                 })
 
     member _.RegisterJob(_sessionID: string, _ctx: KnowledgeGraphJobContext) : unit =
-        registeredJobs.[_sessionID] <- _ctx
+        registeredJobs <- Map.add _sessionID _ctx registeredJobs
 
     member this.RegisterJobForTesting(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =
         let payloadObj: obj = payload
@@ -97,13 +98,11 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
         this.RegisterJob(sessionID, { workspaceRoot = workspaceRoot; kind = kind })
 
     member _.TakeJob(_sessionID: string) : KnowledgeGraphJobContext option =
-        match registeredJobs.TryGetValue _sessionID with
-        | true, ctx -> Some ctx
-        | false, _ -> None
+        Map.tryFind _sessionID registeredJobs
 
     member _.DeleteJob(sessionID: string) : unit =
         registry.UnregisterChildAgent(sessionID)
-        registeredJobs.Remove(sessionID) |> ignore
+        registeredJobs <- Map.remove sessionID registeredJobs
 
     member this.Submit(sessionID: string, drafts: KnowledgeGraphDraft list) : JS.Promise<string> =
         this.SubmitFromHistory(sessionID, "", drafts)
@@ -117,10 +116,7 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
                     commandQueue.Enqueue(fun () ->
                         promise {
                             let! reconstructed = tryResolveJobContext client root sessionID
-                            match reconstructed |> Option.orElseWith (fun () ->
-                                match registeredJobs.TryGetValue sessionID with
-                                | true, ctx -> Some ctx
-                                | false, _ -> None) with
+                            match reconstructed |> Option.orElseWith (fun () -> Map.tryFind sessionID registeredJobs) with
                             | None -> return "No active knowledge graph job for this session.", None, None
                             | Some ctx ->
                                 let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
@@ -129,7 +125,7 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
                                     return result, Some ctx.kind, parentID
                                 finally
                                     registry.UnregisterChildAgent(sessionID)
-                                    registeredJobs.Remove(sessionID) |> ignore
+                                    registeredJobs <- Map.remove sessionID registeredJobs
                         })
                 match kindOpt with
                 | Some (DailyRewrite _) ->

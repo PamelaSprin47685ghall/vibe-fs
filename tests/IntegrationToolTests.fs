@@ -12,7 +12,7 @@ open VibeFs.Tests.IntegrationBookkeeperSpecs
 open VibeFs.Tests.IntegrationToolDefSpecs
 open VibeFs.Tests.IntegrationSubagentSpecs
 open VibeFs.Tests.IntegrationMiscSpecs
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicCore
@@ -26,6 +26,7 @@ open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.ReviewPrompts
+open VibeFs.Shell.Dyn
 
 
 let wrapperSpec (reg: obj) =

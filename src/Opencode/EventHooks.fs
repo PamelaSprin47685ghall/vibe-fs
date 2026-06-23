@@ -3,7 +3,9 @@ module VibeFs.Opencode.EventHooks
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
+
 
 let eventHandler (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
     promise {

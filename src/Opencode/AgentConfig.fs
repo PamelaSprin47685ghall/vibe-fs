@@ -3,11 +3,13 @@ module VibeFs.Opencode.AgentConfig
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.PromptFragments
 open VibeFs.Kernel.ReviewPrompts
+open VibeFs.Shell.Dyn
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative

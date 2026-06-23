@@ -142,7 +142,7 @@ let shouldAppendReadOnlyWarning (program: string) (language: ExecutorLanguage) :
         let words = stripped.Split([| ' '; '\t'; '\n'; '|'; '&'; ';' |], StringSplitOptions.RemoveEmptyEntries)
         words
         |> Array.exists (fun word ->
-            let bare = word.Split('/') |> Array.tryLast |> Option.defaultValue ""
+            let bare = word.Split('/') |> Array.last
             Set.contains bare readOnlyReadCommands)
     | _ -> false
 

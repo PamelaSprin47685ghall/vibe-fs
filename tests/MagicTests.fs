@@ -3,75 +3,76 @@ module VibeFs.Tests.MagicTests
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.MagicProjection
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Opencode.MessagingCodec
+open VibeFs.Shell.Dyn
 
-let private mkInfo (id: string) (role: Role) : MessageInfo =
+let private mkInfo (id: string) (role: Role) : MessageInfo<obj> =
     { id = id; sessionID = "test"; role = role; agent = ""; isError = false
       toolName = ""; details = null; time = null }
 
-let private mkState (status: string) (output: string) (input: obj) : ToolState =
+let private mkState (status: string) (output: string) (input: obj) : ToolState<obj> =
     { status = status; output = output; error = ""; input = input; operationAction = "" }
 
-let private userMsg (id: string) (text: string) : Message =
+let private userMsg (id: string) (text: string) : Message<obj> =
     { info = mkInfo id User; parts = [ TextPart text ]; source = Native; raw = null }
 
-let private timedTodoWriteMsg (id: string) (callID: string) (report: string) (created: int) (completed: int) : Message =
+let private timedTodoWriteMsg (id: string) (callID: string) (report: string) (created: int) (completed: int) : Message<obj> =
     let input = box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
     let time = box (createObj [ "created", box created; "completed", box completed ])
     { info = { mkInfo id Assistant with time = time }
       parts = [ ToolPart(magicTodoToolName, callID, Some (mkState "completed" "Todos updated." input), null) ]
       source = Native; raw = null }
 
-let private todoWriteMsg (id: string) (callID: string) (report: string) : Message =
+let private todoWriteMsg (id: string) (callID: string) (report: string) : Message<obj> =
     let input = box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
     { info = mkInfo id Assistant
       parts = [ ToolPart(magicTodoToolName, callID, Some (mkState "completed" "Todos updated." input), null) ]
       source = Native; raw = null }
 
-let private todoWriteErrorMsg (id: string) (callID: string) (errorText: string) : Message =
+let private todoWriteErrorMsg (id: string) (callID: string) (errorText: string) : Message<obj> =
     { info = mkInfo id Assistant
       parts = [ ToolPart(magicTodoToolName, callID, Some ({ status = "error"; output = ""; error = errorText; input = box (createObj []); operationAction = "" }), null) ]
       source = Native; raw = null }
 
-let private assistantTextMsg (id: string) (text: string) : Message =
+let private assistantTextMsg (id: string) (text: string) : Message<obj> =
     { info = mkInfo id Assistant; parts = [ TextPart text ]; source = Native; raw = null }
 
-let private reasoningMsg (id: string) (text: string) : Message =
+let private reasoningMsg (id: string) (text: string) : Message<obj> =
     { info = mkInfo id Assistant
       parts = [ RawPart (box (createObj [ "type", box "reasoning"; "text", box text ])) ]
       source = Native; raw = null }
 
-let private reviewMsg (id: string) (callID: string) (output: string) : Message =
+let private reviewMsg (id: string) (callID: string) (output: string) : Message<obj> =
     let input = box (createObj [ "review", box "looks good" ])
     { info = mkInfo id Assistant
       parts = [ ToolPart(magicReviewToolName, callID, Some (mkState "completed" output input), null) ]
       source = Native; raw = null }
 
-let private taskMsgWithReport (id: string) (callID: string) (report: string) : Message =
+let private taskMsgWithReport (id: string) (callID: string) (report: string) : Message<obj> =
     let input = box (createObj [ "operation", box (createObj [ "action", box "list" ]); "completedWorkReport", box report ])
     { info = mkInfo id Assistant
       parts = [ ToolPart("task", callID, Some ({ status = "completed"; output = "ok"; error = ""; input = input; operationAction = "list" }), null) ]
       source = Native; raw = null }
 
-let private taskMsgWithActionAndReport (action: string) (id: string) (callID: string) (report: string) : Message =
+let private taskMsgWithActionAndReport (action: string) (id: string) (callID: string) (report: string) : Message<obj> =
     let input = box (createObj [ "operation", box (createObj [ "action", box action ]); "completedWorkReport", box report ])
     { info = mkInfo id Assistant
       parts = [ ToolPart("task", callID, Some ({ status = "completed"; output = "ok"; error = ""; input = input; operationAction = action }), null) ]
       source = Native; raw = null }
 
-let private taskCreateMsg (id: string) (callID: string) : Message =
+let private taskCreateMsg (id: string) (callID: string) : Message<obj> =
     let input = box (createObj [ "operation", box (createObj [ "action", box "create"; "summary", box "ignored" ]) ])
     { info = mkInfo id Assistant
       parts = [ ToolPart("task", callID, Some ({ status = "completed"; output = "ok"; error = ""; input = input; operationAction = "create" }), null) ]
       source = Native; raw = null }
 
-let private toolMsg (toolName: string) (id: string) (callID: string) (report: string) : Message =
+let private toolMsg (toolName: string) (id: string) (callID: string) (report: string) : Message<obj> =
     let input = box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
     { info = mkInfo id Assistant
       parts = [ ToolPart(toolName, callID, Some (mkState "completed" "Todos updated." input), null) ]
@@ -80,7 +81,7 @@ let private toolMsg (toolName: string) (id: string) (callID: string) (report: st
 let private backlogEntry (_: int) (report: string) : BacklogEntry =
     { report = report }
 
-let private visibleText (messages: Message list) : string =
+let private visibleText (messages: Message<obj> list) : string =
     messages
     |> List.collect (fun message ->
         message.parts

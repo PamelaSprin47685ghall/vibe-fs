@@ -4,8 +4,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
+open VibeFs.Shell.ErrorClassify
 open VibeFs.Mux.AiSettings
 open VibeFs.Mux.Wrappers
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 [<Global>]
 type AbortController() =

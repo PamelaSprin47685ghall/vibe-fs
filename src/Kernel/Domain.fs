@@ -1,7 +1,5 @@
 module VibeFs.Kernel.Domain
 
-open VibeFs.Kernel.Dyn
-
 type SessionId = private SessionId of string
 type WorkspaceId = private WorkspaceId of string
 type AgentId = private AgentId of string
@@ -51,6 +49,20 @@ type DomainError =
     | SystemPanic of message: string
     | UnknownJsError of message: string
 
+let formatDomainError (error: DomainError) : string =
+    match error with
+    | MessageAborted -> "aborted"
+    | SessionBusy -> "session busy"
+    | TaskWaitBackgrounded -> "task wait backgrounded"
+    | ExecutorExecutableMissing exe -> $"executable not found: {exe}"
+    | ParseError(ctx, detail) -> $"parse error in {ctx}: {detail}"
+    | ToolNotPermitted(agent, tool) -> $"tool '{tool}' not permitted for agent '{agent}'"
+    | InvalidIntent(tool, field, detail) -> $"invalid {field} for tool '{tool}': {detail}"
+    | UpstreamTimeout seconds -> $"upstream timeout after {seconds}s"
+    | UpstreamRefused reason -> $"upstream refused: {reason}"
+    | SystemPanic message -> $"system panic: {message}"
+    | UnknownJsError message -> message
+
 let isAbort (error: DomainError) : bool =
     match error with
     | MessageAborted -> true
@@ -65,7 +77,7 @@ let isAbort (error: DomainError) : bool =
     | SystemPanic _
     | UnknownJsError _ -> false
 
-let private containsAbortText (message: string) : bool =
+let containsAbortText (message: string) : bool =
     not (System.String.IsNullOrWhiteSpace message) && message.ToLowerInvariant().Contains("abort")
 
 let private (|AbortError|_|) (name: string, tag: string) =
@@ -77,36 +89,15 @@ let private (|SessionBusyError|_|) (name: string, tag: string) =
 let private (|ForegroundWaitBackgroundedError|_|) (name: string, tag: string) =
     if name = "ForegroundWaitBackgroundedError" || tag = "TaskWaitBackgrounded" then Some () else None
 
-let nowMs () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+let classifyErrorLeaf (name: string) (tag: string) (message: string) : DomainError =
+    match name, tag with
+    | AbortError -> MessageAborted
+    | SessionBusyError -> SessionBusy
+    | ForegroundWaitBackgroundedError -> TaskWaitBackgrounded
+    | _ ->
+        if containsAbortText message then MessageAborted else UnknownJsError(message)
 
-let translateJsError (error: obj) : DomainError =
-    let rec classify (value: obj) (seen: obj list) =
-        if Dyn.isNullish value then SystemPanic "Null error context"
-        elif List.exists (fun seenObj -> obj.ReferenceEquals(value, seenObj)) seen then SystemPanic "Cyclic error context"
-        elif Dyn.typeIs value "string" then
-            let message = string value
-            if containsAbortText message then MessageAborted else UnknownJsError(message)
-        else
-            let seenNext = value :: seen
-            let name = Dyn.str value "name"
-            let tag = Dyn.str value "_tag"
-            match name, tag with
-            | AbortError -> MessageAborted
-            | SessionBusyError -> SessionBusy
-            | ForegroundWaitBackgroundedError -> TaskWaitBackgrounded
-            | _ ->
-                let nested = Dyn.get value "error"
-                if not (Dyn.isNullish nested) then classify nested seenNext
-                else
-                    let data = Dyn.get value "data"
-                    if not (Dyn.isNullish data) && Dyn.typeIs data "object" then classify data seenNext
-                    else
-                        let cause = Dyn.get value "cause"
-                        if not (Dyn.isNullish cause) then classify cause seenNext
-                        else
-                            let message = Dyn.str value "message"
-                            if containsAbortText message then MessageAborted else UnknownJsError(message)
-    classify error []
+let nowMs () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
 
 type ChildSessionMeta =
     { agent: string

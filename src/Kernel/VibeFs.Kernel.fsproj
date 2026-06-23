@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <Compile Include="Dyn.fs" />
+    <PackageReference Include="Thoth.Json" Version="10.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="HostTools.fs" />
     <Compile Include="SubagentIntents.fs" />
     <Compile Include="PromptFrontMatter.fs" />
@@ -17,6 +20,7 @@
     <Compile Include="Messaging.fs" />
     <Compile Include="Message.fs" />
     <Compile Include="KnowledgeGraph.fs" />
+    <Compile Include="KnowledgeGraphCodec.fs" />
     <Compile Include="KnowledgeGraphPrompts.fs" />
     <Compile Include="KnowledgeGraphMaintenance.fs" />
     <Compile Include="KnowledgeGraphRuntimeState.fs" />
@@ -29,7 +33,9 @@
     <Compile Include="Domain.fs" />
     <Compile Include="NudgeState.fs" />
     <Compile Include="Config.fs" />
-    <Compile Include="Fuzzy.fs" />
+    <Compile Include="FuzzyPath.fs" />
+    <Compile Include="FuzzyQuery.fs" />
+    <Compile Include="FuzzyFormat.fs" />
     <Compile Include="Executor.fs" />
     <Compile Include="Methodology.fs" />
   </ItemGroup>

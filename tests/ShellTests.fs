@@ -6,6 +6,8 @@ open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.SearchPrompts
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 [<Import("createRequire", "node:module")>]
 let private createRequire' : string -> (string -> obj) = jsNative
@@ -18,15 +20,15 @@ let private pathModule : obj = requireFn("path")
 
 let ollamaFetchInit () =
     let init = VibeFs.Shell.OllamaClient.postInit "KEY123" "{\"a\":1}" None
-    equal "init method POST" "POST" (VibeFs.Kernel.Dyn.str init "method")
-    let headers = VibeFs.Kernel.Dyn.get init "headers"
-    equal "init Content-Type" "application/json" (VibeFs.Kernel.Dyn.str headers "Content-Type")
-    let auth = VibeFs.Kernel.Dyn.str headers "Authorization"
+    equal "init method POST" "POST" (VibeFs.Shell.Dyn.str init "method")
+    let headers = VibeFs.Shell.Dyn.get init "headers"
+    equal "init Content-Type" "application/json" (VibeFs.Shell.Dyn.str headers "Content-Type")
+    let auth = VibeFs.Shell.Dyn.str headers "Authorization"
     check "init Authorization key" (auth.Contains "KEY123")
-    equal "init body json" "{\"a\":1}" (VibeFs.Kernel.Dyn.str init "body")
-    check "init no signal when None" (VibeFs.Kernel.Dyn.isNullish (VibeFs.Kernel.Dyn.get init "signal"))
+    equal "init body json" "{\"a\":1}" (VibeFs.Shell.Dyn.str init "body")
+    check "init no signal when None" (VibeFs.Shell.Dyn.isNullish (VibeFs.Shell.Dyn.get init "signal"))
     let withSignal = VibeFs.Shell.OllamaClient.postInit "K" "b" (Some (box "ABORT"))
-    check "init signal when Some" (not (VibeFs.Kernel.Dyn.isNullish (VibeFs.Kernel.Dyn.get withSignal "signal")))
+    check "init signal when Some" (not (VibeFs.Shell.Dyn.isNullish (VibeFs.Shell.Dyn.get withSignal "signal")))
 
 let ollamaResponseMethodCall () =
     let response =
@@ -35,7 +37,7 @@ let ollamaResponseMethodCall () =
               "json", box (fun () -> createObj [ "ok", box "yes" ]) ]
     equal "response.text() invoked" "body" (unbox<string> (VibeFs.Shell.OllamaClient.responseMethod0 response "text"))
     let json = VibeFs.Shell.OllamaClient.responseMethod0 response "json"
-    equal "response.json() invoked" "yes" (VibeFs.Kernel.Dyn.str json "ok")
+    equal "response.json() invoked" "yes" (VibeFs.Shell.Dyn.str json "ok")
 
 let ollamaApiKeyValidation () =
     equal "requireOllamaApiKey trims" (Ok "KEY123") (VibeFs.Shell.OllamaClient.requireOllamaApiKey "  KEY123  ")
@@ -46,9 +48,18 @@ let executorMapping () =
     let opts : ExecuteOptions =
         { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; mode = "ro"; cwd = None }
     let run o = VibeFs.Shell.Executor.mapOutcome opts 10000 "out" o
-    check "exit0→Completed" (match run { stdout=""; stderr=""; code=Some 0; timedOut=false } with Completed _ -> true | _ -> false)
-    check "nonzero→Failed" (match run { stdout=""; stderr=""; code=Some 2; timedOut=false } with Failed _ -> true | _ -> false)
-    check "timeout→Truncated" (match run { stdout=""; stderr=""; code=None; timedOut=true } with Truncated _ -> true | _ -> false)
+    check "exit0→Completed" (match run (VibeFs.Shell.Executor.Exited(0, "", "")) with Completed _ -> true | _ -> false)
+    check "nonzero→Failed" (match run (VibeFs.Shell.Executor.Exited(2, "", "")) with Failed _ -> true | _ -> false)
+    check "timeout→Truncated" (match run (VibeFs.Shell.Executor.TimedOut("", "")) with Truncated _ -> true | _ -> false)
+    check "signaled→Failed" (match run (VibeFs.Shell.Executor.Signaled("SIGKILL", "", "")) with Failed _ -> true | _ -> false)
+    check "spawnFail→MissingExecutable"
+        (match run (VibeFs.Shell.Executor.SpawnFailed(VibeFs.Kernel.Domain.ExecutorExecutableMissing "bash")) with
+         | MissingExecutable("bash", _) -> true
+         | _ -> false)
+    check "spawnFail(other)→Failed"
+        (match run (VibeFs.Shell.Executor.SpawnFailed(VibeFs.Kernel.Domain.SystemPanic "boom")) with
+         | Failed _ -> true
+         | _ -> false)
     equal "python exe uvx" "uvx" (VibeFs.Shell.Executor.missingExecutableFor Python)
 
 let capsFileShape () =

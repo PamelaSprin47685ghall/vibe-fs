@@ -3,7 +3,8 @@ module VibeFs.Opencode.ReviewTools
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.LoopMessages
@@ -13,6 +14,7 @@ open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Opencode.ToolHelpers
 open VibeFs.Mux.Wrappers
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Shell.Dyn
 
 let private formatReviewResult = VibeFs.Kernel.ReviewPrompts.formatReviewResult
 

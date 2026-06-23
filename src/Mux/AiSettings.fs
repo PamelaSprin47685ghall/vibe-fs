@@ -3,6 +3,8 @@ module VibeFs.Mux.AiSettings
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 type DelegatedAiSettings =
     { modelString: string option

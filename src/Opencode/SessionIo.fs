@@ -5,9 +5,12 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Messaging
+open VibeFs.Shell.ErrorClassify
 open VibeFs.Opencode.MessagingCodec
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Mux.AiSettings
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 [<Global>]
 type DOMException(message: string, name: string) =

@@ -4,23 +4,23 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Kernel.MagicCore
 open VibeFs.Opencode.Plugin
+open VibeFs.Shell.Dyn
 
 let private deduplicateReadOutputs (messages: obj array) : obj array =
-    VibeFs.Kernel.MessageDedup.deduplicateReadOutputs messages
+    VibeFs.Mux.ReadDedup.deduplicateReadOutputsWithSeen [||] messages
 
 let private deduplicateReadOutputsAgainstHistory (history: obj array) (messages: obj array) : obj array =
-    let seenByPath = VibeFs.Kernel.MessageDedup.collectReadOutputsByPath history
-    VibeFs.Kernel.MessageDedup.deduplicateReadOutputsWithSeenByPath seenByPath messages |> snd
+    let seenByPath = VibeFs.Mux.ReadDedup.collectReadOutputsByPath history
+    VibeFs.Mux.ReadDedup.deduplicateReadOutputsWithSeenByPath seenByPath messages
 
 let private deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj array =
-    let seen, result = VibeFs.Kernel.MessageDedup.deduplicateModelReadOutputsWithSeen (List.ofArray seenOutputs) messages
-    Array.ofList seen, result
+    VibeFs.Mux.ReadDedup.deduplicateModelReadOutputsWithSeen seenOutputs messages
 
 let private collectReadOutputs (messages: obj array) : string[] =
-    VibeFs.Kernel.MessageDedup.collectReadOutputs messages |> Array.ofList
+    VibeFs.Mux.ReadDedup.collectReadOutputs messages
 
 let private fileReadOutput (content: string) : obj =
     box {| success = true; file_size = content.Length; modifiedTime = "2024-01-01T00:00:00.000Z"; lines_read = 1; content = content |}
@@ -45,7 +45,7 @@ let dedupObjectOutputSpec () =
     let msgs = [| readMsg "file_read" (fileReadOutput "hello") "1"; readMsg "file_read" (fileReadOutput "hello") "2" |]
     let r = deduplicateReadOutputs msgs
     check "dedup object: keeps first content" (str (firstOutput r.[0]) "content" = "hello")
-    check "dedup object: replaces repeat" (unbox<string> (firstOutput r.[1]) = "[No Change Since Previous Read/Write]")
+    check "dedup object: replaces repeat" (str (firstOutput r.[1]) "content" = "[No Change Since Previous Read/Write]")
 
 let dedupPerPathDifferentSpec () =
     let shared = fileReadOutput "shared bytes"
@@ -57,7 +57,7 @@ let dedupPerPathSameSpec () =
     let out = fileReadOutput "repeat me"
     let msgs = [| readMsgWithPath "file_read" "same.ts" out "1"; readMsgWithPath "file_read" "same.ts" out "2" |]
     let r = deduplicateReadOutputs msgs
-    check "dedup same path: second marked" (unbox<string> (firstOutput r.[1]) = "[No Change Since Previous Read/Write]")
+    check "dedup same path: second marked" (str (firstOutput r.[1]) "content" = "[No Change Since Previous Read/Write]")
 
 let dedupSubstringSpec () =
     let msgs = [| readMsg "read" (box "hello world foo bar") "1"; readMsg "read" (box "hello world") "2" |]
@@ -100,7 +100,7 @@ let dedupAgainstHistorySpec () =
     let history = [| readMsg "file_read" (fileReadOutput "from history") "h1" |]
     let window = [| readMsg "file_read" (fileReadOutput "from history") "w1" |]
     let r = deduplicateReadOutputsAgainstHistory history window
-    check "againstHistory: repeat vs history marked" (unbox<string> (firstOutput r.[0]) = "[No Change Since Previous Read/Write]")
+    check "againstHistory: repeat vs history marked" (str (firstOutput r.[0]) "content" = "[No Change Since Previous Read/Write]")
 
 let dedupAgainstHistoryWindowSpec () =
     let window = [| readMsg "read" (box "same") "w1"; readMsg "read" (box "same") "w2" |]

@@ -12,6 +12,8 @@ open VibeFs.Shell.ReviewRuntime
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 let private awaitReviewVerdict (verdictPromise: JS.Promise<obj>) : JS.Promise<ReviewResult> =
     promise {
@@ -23,7 +25,6 @@ let private awaitReviewVerdict (verdictPromise: JS.Promise<obj>) : JS.Promise<Re
             elif v = "reject" then return Rejected feedback
             else return Rejected $"Reviewer returned unclear verdict: \"{v}\". Expected \"pass\" or \"reject\"."
         with ex ->
-            printfn $"[mux] awaitReviewVerdict failed: {ex.Message}"
             return Terminated
     }
 
@@ -55,7 +56,6 @@ let private tryGetHistoryTask (deps: obj) (sessionID: string) : JS.Promise<strin
                 let! history = unbox<JS.Promise<obj array>> (getHistory $ sessionID)
                 return Some(inferReviewTaskFromTexts (extractHistoryTexts history))
             with ex ->
-                printfn $"[mux] tryGetHistoryTask failed for {sessionID}: {ex.Message}"
                 return None
     }
 
@@ -109,11 +109,8 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
       condition = None }
 
 let returnReviewerTool (deps: obj) (callStore: CallStore) (reviewStore: ReviewStore) : ToolDefinition =
-    let tryResolvePendingReviewCall (sessionID: string) (resolution: obj) : bool =
-        callStore.PendingCalls.Keys
-        |> Seq.tryFind (fun k -> k.StartsWith(sessionID + "-review-"))
-        |> Option.map (fun callId -> resolveCall callStore callId resolution)
-        |> Option.defaultValue false
+    let tryResolvePendingReviewCall (sessionID: string) (resolution: obj) : JS.Promise<bool> =
+        resolveFirstMatchingAsync callStore (sessionID + "-review-") resolution
 
     { name = "return_reviewer"
       description = "Submit a review verdict for the active review call. feedback:null/empty accepts; non-empty feedback rejects."
@@ -128,7 +125,7 @@ let returnReviewerTool (deps: obj) (callStore: CallStore) (reviewStore: ReviewSt
                   let isReject = verdict = "reject" || feedback <> ""
                   if isReject then
                       let resolution = createObj [ "verdict", box "reject"; "feedback", box feedback ]
-                      tryResolvePendingReviewCall sessionID resolution |> ignore
+                      do! tryResolvePendingReviewCall sessionID resolution |> Promise.map ignore
                       return "Verdict submitted."
                   else
                       let getHistory = if Dyn.isNullish deps then null else Dyn.get deps "getChatHistory"
@@ -141,13 +138,12 @@ let returnReviewerTool (deps: obj) (callStore: CallStore) (reviewStore: ReviewSt
                               syncReviewProjection reviewStore sessionID (inferReviewTaskFromTexts texts)
                               if hasDoubleCheckAnchor texts then
                                   let resolution = createObj [ "verdict", box "pass"; "feedback", box "" ]
-                                  tryResolvePendingReviewCall sessionID resolution |> ignore
+                                  do! tryResolvePendingReviewCall sessionID resolution |> Promise.map ignore
                                   reviewStore.deactivateReview sessionID
                                   return "Verdict submitted."
                               else
                                   return doubleCheckPrompt (defaultArg (inferReviewTaskFromTexts texts) "")
                           with ex ->
-                              printfn $"[mux] return_reviewer getHistory failed for {sessionID}: {ex.Message}"
                               return doubleCheckPrompt (defaultArg (reviewStore.getReviewTask sessionID) "")
           }
       condition = None }

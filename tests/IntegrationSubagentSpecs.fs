@@ -5,13 +5,14 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.KnowledgeGraphFiles
+open VibeFs.Shell.Dyn
 
 let investigatorToolSpec () = promise {
     let createCalls = ResizeArray<obj>()
@@ -166,7 +167,7 @@ let muxReturnReviewerRejectsResolveSpec () = promise {
         let args = createObj [ "feedback", box "needs rework" ]
         let! result = ((get returnTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         check "return_reviewer reject reports verdict submitted" (result.Contains "Verdict submitted.")
-        let pending = muxPendingCallIdsForTest reg
+        let! pending = muxPendingCallIdsForTest reg
         check "return_reviewer reject resolves pending review call" (not (pending |> Array.exists (fun id -> id.StartsWith(sessionID + "-review-"))))
     do! rmAsync workspaceDir
 }
@@ -184,7 +185,7 @@ let muxReturnReviewerFirstPassDoubleCheckSpec () = promise {
         let args = createObj [ "feedback", box null ]
         let! result = ((get returnTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         check "return_reviewer first pass returns double-check prompt" (result.Contains "double-check:")
-        let pending = muxPendingCallIdsForTest reg
+        let! pending = muxPendingCallIdsForTest reg
         check "return_reviewer first pass does not resolve pending review call" (pending |> Array.exists (fun id -> id.StartsWith(sessionID + "-review-")))
     do! rmAsync workspaceDir
 }
@@ -203,7 +204,7 @@ let muxReturnReviewerSecondPassResolvesSpec () = promise {
         let args = createObj [ "feedback", box null ]
         let! result = ((get returnTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         check "return_reviewer second pass reports verdict submitted" (result.Contains "Verdict submitted.")
-        let pending = muxPendingCallIdsForTest reg
+        let! pending = muxPendingCallIdsForTest reg
         check "return_reviewer second pass resolves pending review call" (not (pending |> Array.exists (fun id -> id.StartsWith(sessionID + "-review-"))))
     do! rmAsync workspaceDir
 }
@@ -233,7 +234,7 @@ let muxSubmitReviewPromptSuppliesCallIdSpec () = promise {
         let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
         let submitPromise = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         do! Promise.sleep 0
-        let pending = muxPendingCallIdsForTest reg
+        let! pending = muxPendingCallIdsForTest reg
         let matching = pending |> Array.tryFind (fun id -> id.StartsWith(sessionID + "-review-"))
         match matching with
         | None -> check "submit_review registers a pending review call" false
@@ -245,7 +246,7 @@ let muxSubmitReviewPromptSuppliesCallIdSpec () = promise {
             check "submit_review prompt reuses review criteria" (promptText.Contains "# Evaluation Criteria")
             check "submit_review prompt uses agent_report protocol" (promptText.Contains "agent_report")
             check "submit_review prompt drops legacy divider" (not (promptText.Contains "==="))
-            let resolved = muxResolveFirstMatchingCallForTest reg (sessionID + "-review-") (createObj [ "verdict", box "PASS"; "feedback", box "" ])
+            let! resolved = muxResolveFirstMatchingCallForTest reg (sessionID + "-review-") (createObj [ "verdict", box "PASS"; "feedback", box "" ])
             check "submit_review prompt test resolves pending review call" resolved
             let! result = submitPromise
             check "submit_review accepts resolved PASS verdict" (result.Contains "verdict: accepted")
@@ -278,7 +279,7 @@ let muxAgentReportWrapperResolvesReviewBySessionSpec () = promise {
         let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
         let submitPromise = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         do! Promise.sleep 0
-        let pending = muxPendingCallIdsForTest reg
+        let! pending = muxPendingCallIdsForTest reg
         check "submit_review registers a pending review call" (pending |> Array.exists (fun id -> id.StartsWith(sessionID + "-review-")))
         let wrappers = unbox<obj[]> (get reg "wrappers")
         let agentReportWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "agent_report") |> Option.defaultValue null
@@ -311,7 +312,7 @@ let muxAgentReportWrapperResolvesReviewBySessionSpec () = promise {
             check "agent_report wrapper returns success" (truthy (get result "success"))
             let report = get result "report"
             check "agent_report wrapper attaches upstream report payload" (not (isNullish report) && (str report "reportMarkdown" = "PASS"))
-            let pendingAfter = muxPendingCallIdsForTest reg
+            let! pendingAfter = muxPendingCallIdsForTest reg
             check "agent_report wrapper resolves pending review call by sessionID" (not (pendingAfter |> Array.exists (fun id -> id.StartsWith(sessionID + "-review-"))))
             check "agent_report wrapper forwarded upstream markdown payload" (capturedUpstream.Count > 0 && (str capturedUpstream.[0] "reportMarkdown" = "PASS"))
             let fallbackSessionID = sessionID + "-no-session-fallback"
@@ -319,16 +320,16 @@ let muxAgentReportWrapperResolvesReviewBySessionSpec () = promise {
             let fallbackCtx = createObj [ "directory", box workspaceDir; "workspaceId", box fallbackSessionID; "sessionID", box fallbackSessionID; "taskService", box taskService ]
             let fallbackSubmitPromise = ((get submitTool "execute") $ (fallbackCtx, args)) |> unbox<JS.Promise<string>>
             do! Promise.sleep 0
-            let pendingBeforeFallback = muxPendingCallIdsForTest reg
+            let! pendingBeforeFallback = muxPendingCallIdsForTest reg
             let fallbackCallId = pendingBeforeFallback |> Array.tryFind (fun id -> id.StartsWith(fallbackSessionID + "-review-")) |> Option.defaultValue ""
             check "agent_report wrapper test captured fallback pending review call" (fallbackCallId <> "")
             let fallbackArgs = createObj [ "verdict", box "PASS"; "feedback", box ""; "callId", box fallbackCallId ]
             let fallbackOpts = createObj []
             let! fallbackResult = (get wrapped "execute") $ (fallbackArgs, fallbackOpts) |> unbox<JS.Promise<obj>>
             check "agent_report wrapper still succeeds without session context" (truthy (get fallbackResult "success"))
-            let pendingAfterFallback = muxPendingCallIdsForTest reg
+            let! pendingAfterFallback = muxPendingCallIdsForTest reg
             check "agent_report wrapper ignores tool-level callId fallback" (pendingAfterFallback |> Array.exists (fun id -> id = fallbackCallId))
-            let fallbackResolved = muxResolveFirstMatchingCallForTest reg (fallbackSessionID + "-review-") (createObj [ "verdict", box "PASS"; "feedback", box "" ])
+            let! fallbackResolved = muxResolveFirstMatchingCallForTest reg (fallbackSessionID + "-review-") (createObj [ "verdict", box "PASS"; "feedback", box "" ])
             check "fallback review call resolved explicitly for cleanup" fallbackResolved
             let! fallbackSubmitResult = fallbackSubmitPromise
             check "fallback submit_review accepts explicit PASS verdict" (fallbackSubmitResult.Contains "verdict: accepted")
@@ -391,7 +392,7 @@ let muxLoopReviewPromptUsesFrontMatterSpec () = promise {
     check "loop-review prompt reuses review criteria" (promptText.Contains "# Evaluation Criteria")
     check "loop-review prompt uses agent_report protocol" (promptText.Contains "agent_report")
     check "loop-review prompt drops legacy divider" (not (promptText.Contains "==="))
-    let resolved = muxResolveFirstMatchingCallForTest reg "mux-loop-review-prompt-loop-review-" (createObj [ "verdict", box "PASS"; "feedback", box "" ])
+    let! resolved = muxResolveFirstMatchingCallForTest reg "mux-loop-review-prompt-loop-review-" (createObj [ "verdict", box "PASS"; "feedback", box "" ])
     check "loop-review prompt test resolves pending pre-review call" resolved
     let! result = loopPromise
     check "loop-review activates review after pass" (result.Contains "With-Review Mode is active")

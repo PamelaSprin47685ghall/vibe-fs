@@ -3,7 +3,8 @@ module VibeFs.Opencode.KnowledgeGraphRuntimeIO
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Kernel.Messaging
@@ -11,6 +12,7 @@ open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.KnowledgeGraphPortLock
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Mux.AiSettings
+open VibeFs.Shell.Dyn
 
 let invoke1 (target: obj) (methodName: string) (arg: obj) : JS.Promise<obj> =
     unbox (target?(methodName)(arg))
@@ -26,34 +28,34 @@ let sessionApiOf (client: obj) : obj option =
         elif not (typeIs (get session "prompt") "function") then None
         else Some session
 
-let buildEntries (root: string) (drafts: KnowledgeGraphDraft list) : JS.Promise<KnowledgeGraphEntry list> =
+let buildEntries (root: string) (drafts: KnowledgeGraphDraft list) : JS.Promise<Result<KnowledgeGraphEntry list, string>> =
     promise {
         let! projection = readProjection root
         let normalizedDrafts = normalizeDraftIds projection drafts
-        match applyDrafts (fun knownIds ->
-                  let random = Random()
-                  let rec loop attempts =
-                      if attempts > 65536 then failwith "knowledge graph id space exhausted"
-                      else
-                          let candidate = sprintf "%04x" (random.Next(0, 65536))
-                          if Set.contains candidate knownIds then loop (attempts + 1) else candidate
-                  loop 0) projection normalizedDrafts with
-        | Ok entries -> return entries
-        | Error error -> return raise (exn error)
+        let random = Random()
+        return applyDrafts (allocateRandomHexId (fun () -> random.Next(0, 65536))) projection normalizedDrafts
     }
 
 let submitForKind (portLockTimeoutMs: int64) (portLockRetryDelayMs: int) (todayStr: string) (root: string) (kind: KnowledgeGraphJobKind) (drafts: KnowledgeGraphDraft list) : JS.Promise<string> =
-    withKnowledgeGraphPortLock portLockTimeoutMs portLockRetryDelayMs root (fun () ->
-        promise {
-            let! entries = buildEntries root drafts
-            match kind with
-            | AppendAfterWork ->
-                do! appendEntries root todayStr entries
-                return $"Appended {entries.Length} knowledge graph entries."
-            | DailyRewrite date ->
-                do! rewriteDay root date entries
-                return $"Rewrote knowledge graph day {date}."
-        })
+    promise {
+        let! lockResult = withKnowledgeGraphPortLock portLockTimeoutMs portLockRetryDelayMs root (fun () ->
+            promise {
+                let! entriesResult = buildEntries root drafts
+                match entriesResult with
+                | Error e -> return e
+                | Ok entries ->
+                    match kind with
+                    | AppendAfterWork ->
+                        do! appendEntries root todayStr entries
+                        return $"Appended {entries.Length} knowledge graph entries."
+                    | DailyRewrite date ->
+                        do! rewriteDay root date entries
+                        return $"Rewrote knowledge graph day {date}."
+            })
+        match lockResult with
+        | Error e -> return e
+        | Ok msg -> return msg
+    }
 
 let private jobMarkerPrompt (ctx: KnowledgeGraphJobContext) (promptText: string) : string =
     prependJobMarker ctx promptText
@@ -84,9 +86,7 @@ let tryResolveJobContext (client: obj) (directory: string) (sessionID: string) :
                             | TextPart text -> Some text
                             | _ -> None)
                     return texts |> List.tryPick tryParseJobMarker
-            with ex ->
-                printfn $"[kg] parseJobMarkerFromSession failed: {ex.Message}"
-                return None
+            with _ -> return None
     }
 
 let private parseModelString (modelString: string) : obj option =

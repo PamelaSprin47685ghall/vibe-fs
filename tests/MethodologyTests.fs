@@ -6,22 +6,22 @@ open VibeFs.Tests.Assert
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.Methodology
 
-let private mkInfo (id: string) (role: Role) : MessageInfo =
+let private mkInfo (id: string) (role: Role) : MessageInfo<obj> =
     { id = id; sessionID = "test"; role = role; agent = ""; isError = false
       toolName = ""; details = null; time = null }
 
-let private mkToolState (status: string) : ToolState =
+let private mkToolState (status: string) : ToolState<obj> =
     { status = status; output = "ok"; error = ""; input = null; operationAction = "" }
 
-let private userMsg (id: string) (text: string) : Message =
+let private userMsg (id: string) (text: string) : Message<obj> =
     { info = mkInfo id User; parts = [ TextPart text ]; source = Native; raw = null }
 
-let private assistantToolMsg (id: string) (toolName: string) (status: string) : Message =
+let private assistantToolMsg (id: string) (toolName: string) (status: string) : Message<obj> =
     { info = mkInfo id Assistant
       parts = [ ToolPart(toolName, "call-1", Some (mkToolState status), null) ]
       source = Native; raw = null }
 
-let private assistantTextMsg (id: string) (text: string) : Message =
+let private assistantTextMsg (id: string) (text: string) : Message<obj> =
     { info = mkInfo id Assistant; parts = [ TextPart text ]; source = Native; raw = null }
 
 let probeTextContent () =

@@ -21,6 +21,8 @@ open VibeFs.Opencode.MagicTodo
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<obj, obj, JS.Promise<unit>>(f))
 

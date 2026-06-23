@@ -5,6 +5,8 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Kernel.SubagentIntents
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 /// The opencode plugin SDK's `tool` factory + `tool.schema` (Zod-like) builder.
 [<Import("tool", "@opencode-ai/plugin/tool")>]

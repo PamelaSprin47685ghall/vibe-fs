@@ -13,8 +13,8 @@ type MagicSession() =
     member _.CaptureReport(callID: string, report: string) : unit =
         captureReport opencode callID report
 
-    member _.ReplayBacklog(messages: Message list) : BacklogEntry list =
-        let reportOf (fp: FlatPart) : string =
+    member _.ReplayBacklog(messages: Message<obj> list) : BacklogEntry list =
+        let reportOf (fp: FlatPart<obj>) : string =
             match fp.part with
             | ToolPart(_, callID, Some state, _) ->
                 let explicit = backlogReportFromTodoInput opencode state.input
@@ -24,7 +24,7 @@ type MagicSession() =
 
         replayBacklogWith opencode reportOf messages
 
-    member this.GetOrRebuildBacklog(sessionID: string, messages: Message list) : BacklogEntry list =
+    member this.GetOrRebuildBacklog(sessionID: string, messages: Message<obj> list) : BacklogEntry list =
         if messages.Length > 0 then
             let backlog = this.ReplayBacklog messages
             storeBacklog opencode sessionID backlog

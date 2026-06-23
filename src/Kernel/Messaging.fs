@@ -1,8 +1,7 @@
 module VibeFs.Kernel.Messaging
 
-/// Strongly-typed view of an opencode message part. Tool/Raw parts carry the
-/// host object reference (`raw`) so the encoder can emit the original shape with
-/// only mutated fields overwritten — no speculative deep cloning.
+/// Host-agnostic message model. `'raw` carries the original host object reference
+/// through the Kernel without being inspected; only Host codec layers instantiate it.
 
 type Role =
     | User
@@ -10,48 +9,48 @@ type Role =
     | ToolResult
     | System
 
-type ToolState =
+type ToolState<'raw> =
     { status: string
       output: string
       error: string
-      input: obj
+      input: 'raw
       operationAction: string }
 
-type Part =
+type Part<'raw> =
     | TextPart of text: string
-    | ToolPart of toolName: string * callID: string * state: ToolState option * raw: obj
-    | RawPart of raw: obj
+    | ToolPart of toolName: string * callID: string * state: ToolState<'raw> option * raw: 'raw
+    | RawPart of raw: 'raw
 
-type MessageInfo =
+type MessageInfo<'raw> =
     { id: string
       sessionID: string
       role: Role
       agent: string
       isError: bool
       toolName: string
-      details: obj
-      time: obj }
+      details: 'raw
+      time: 'raw }
 
 type Source =
     | Native
     | Synthetic of kind: string
 
-type Message =
-    { info: MessageInfo
-      parts: Part list
+type Message<'raw> =
+    { info: MessageInfo<'raw>
+      parts: Part<'raw> list
       source: Source
-      raw: obj }
+      raw: 'raw }
 
-type Entry =
-    | MessageEntry of Message
-    | CustomEntry of customType: string * data: obj
-    | RawEntry of obj
+type Entry<'raw> =
+    | MessageEntry of Message<'raw>
+    | CustomEntry of customType: string * data: 'raw
+    | RawEntry of 'raw
 
-type FlatPart =
+type FlatPart<'raw> =
     { msgIndex: int
       partIndex: int
       isUser: bool
-      part: Part }
+      part: Part<'raw> }
 
 let private synthPrefixes =
     [ "caps-synth-user-"; "caps-synth-assistant-"; "magic-todo-projection-"; "magic-todo-prefix-"; "methodology-probe-" ]
@@ -75,35 +74,35 @@ let private roleMap =
 let decodeRole (s: string) : Role = Map.tryFind s roleMap |> Option.defaultValue System
 
 /// Pure typed copy of a tool part with its state.output overwritten.
-let setPartOutputTyped (part: Part) (newOutput: string) : Part =
+let setPartOutputTyped (part: Part<'raw>) (newOutput: string) : Part<'raw> =
     match part with
     | ToolPart(toolName, callID, Some state, raw) ->
         ToolPart(toolName, callID, Some { state with output = newOutput }, raw)
     | other -> other
 
-let partCallID (part: Part) : string =
+let partCallID (part: Part<'raw>) : string =
     match part with
     | ToolPart(_, callID, _, _) -> callID
     | _ -> ""
 
-let partTextStr (part: Part) : string =
+let partTextStr (part: Part<'raw>) : string =
     match part with
     | TextPart text -> text
     | _ -> ""
 
-let partIsText (part: Part) : bool =
+let partIsText (part: Part<'raw>) : bool =
     match part with
     | TextPart _ -> true
     | _ -> false
 
-let partIsTool (part: Part) : bool =
+let partIsTool (part: Part<'raw>) : bool =
     match part with
     | ToolPart _ -> true
     | _ -> false
 
 /// Flatten a message list into ordered flat parts, tagging whether each
 /// belongs to a user message. Pure: no IO, no host-object access.
-let flatten (messages: Message list) : FlatPart list =
+let flatten (messages: Message<'raw> list) : FlatPart<'raw> list =
     messages
     |> List.indexed
     |> List.collect (fun (msgIdx, msg) ->
@@ -115,7 +114,7 @@ let flatten (messages: Message list) : FlatPart list =
 
 /// Skip `startIndex` messages, then collect non-empty text from assistant
 /// messages' TextParts, joining with `joiner`. Pure.
-let readAssistantText (messages: Message list) (startIndex: int) (joiner: string) : string option =
+let readAssistantText (messages: Message<'raw> list) (startIndex: int) (joiner: string) : string option =
     if startIndex >= List.length messages then None
     else
         let chunks =
@@ -130,5 +129,5 @@ let readAssistantText (messages: Message list) (startIndex: int) (joiner: string
         if chunks.IsEmpty then None else Some(String.concat joiner chunks)
 
 /// Drop synthetic messages, keeping only Native-sourced ones. Pure.
-let stripSyntheticBySource (messages: Message list) : Message list =
+let stripSyntheticBySource (messages: Message<'raw> list) : Message<'raw> list =
     messages |> List.filter (fun m -> m.source = Native)

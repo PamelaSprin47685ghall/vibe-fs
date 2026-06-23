@@ -3,17 +3,19 @@ module VibeFs.Opencode.SubagentTools
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.SubagentPrompts
 open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.SubagentIntents
+open VibeFs.Shell.SubagentIntentsCodec
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ToolHelpers
 open VibeFs.Mux.Wrappers
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Shell.Dyn
 
 let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let client () = Dyn.get ctx "client"

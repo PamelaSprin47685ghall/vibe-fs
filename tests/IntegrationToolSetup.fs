@@ -2,10 +2,12 @@ module VibeFs.Tests.IntegrationToolSetup
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraphCodec
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Tests.TempWorkspace
+open VibeFs.Shell.Dyn
 
 [<Import("createRequire", "node:module")>]
 let private createRequire' : string -> (string -> obj) = jsNative
@@ -209,14 +211,14 @@ let muxIsReviewActiveForTest (reg: obj) (sessionID: string) : bool =
     let fn = get store "isReviewActive" |> unbox<System.Func<string, bool>>
     fn.Invoke(sessionID)
 
-let muxPendingCallIdsForTest (reg: obj) : string array =
+let muxPendingCallIdsForTest (reg: obj) : JS.Promise<string array> =
     let store = muxCallStore reg
-    let fn = get store "pendingCallIds" |> unbox<System.Func<string array>>
+    let fn = get store "pendingCallIds" |> unbox<System.Func<JS.Promise<string array>>>
     fn.Invoke()
 
-let muxResolveFirstMatchingCallForTest (reg: obj) (prefix: string) (args: obj) : bool =
+let muxResolveFirstMatchingCallForTest (reg: obj) (prefix: string) (args: obj) : JS.Promise<bool> =
     let store = muxCallStore reg
-    let fn = get store "resolveFirstMatching" |> unbox<System.Func<string, obj, bool>>
+    let fn = get store "resolveFirstMatching" |> unbox<System.Func<string, obj, JS.Promise<bool>>>
     fn.Invoke(prefix, args)
 
 let minimalMuxDeps () : obj =

@@ -3,7 +3,8 @@ module VibeFs.Opencode.ExecutorTool
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.HostTools
@@ -14,6 +15,7 @@ open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ToolHelpers
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Shell.Dyn
 
 [<Global("Buffer")>]
 let private nodeBuffer : obj = jsNative
@@ -43,7 +45,7 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
             | Ok lang ->
                 let tc = extractToolContext context (Dyn.str ctx "directory")
                 let sessionID = Dyn.str tc "sessionID"
-                post sessionID (fun () ->
+                SessionExecutor.enqueuePerSession sessionID (fun () ->
                     let timeout = parseTimeout (Dyn.str args "timeout_type")
                     let deps = if Dyn.isNullish (Dyn.get args "dependencies") then [] else Dyn.get args "dependencies" :?> obj array |> Array.map string |> List.ofArray
                     let options : ExecuteOptions =

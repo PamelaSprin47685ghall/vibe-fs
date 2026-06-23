@@ -3,10 +3,12 @@ module VibeFs.Opencode.MimoTodoTool
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicTodo
 open VibeFs.Opencode.ToolSchema
+open VibeFs.Shell.Dyn
 
 type private TodoItem =
     { content: string
@@ -54,7 +56,7 @@ let mimoTodoTool (_pluginCtx: obj) : obj =
         ])
     define
         (toolDescriptionFor Mimocode)
-        (box {| todos = call1 (arr todoItem) "describe" (box todosDesc)
+        (box {| todos = ToolSchema.call1 (arr todoItem) "describe" (box todosDesc)
                 completedWorkReport = strReq reportDesc |})
         (fun args context ->
             let sessionID = str context "sessionID" |> fun value -> value.Trim()

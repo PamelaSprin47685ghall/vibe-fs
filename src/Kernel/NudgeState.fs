@@ -1,7 +1,5 @@
 module VibeFs.Kernel.NudgeState
 
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.PromptFragments
 
@@ -216,90 +214,3 @@ let handleEvent (state: NudgeShellState) (sessionID: string) (event: NudgeHostEv
     | RetryProgress -> deleteRetryPendingSession state sessionID, false
     | Other -> state, false
 
-let private sessionEventTypes =
-    Set.ofList [
-        "session.created"
-        "session.updated"
-        "session.deleted"
-        "session.delete"
-        "session.close"
-        "session.remove"
-    ]
-
-let getSessionID (eventType: string) (props: obj) : string =
-    let part = Dyn.get props "part"
-    let info = Dyn.get props "info"
-    let candidates =
-        [ Dyn.str props "sessionID"
-          Dyn.str part "sessionID"
-          Dyn.str info "sessionID"
-          if Set.contains eventType sessionEventTypes then
-              Dyn.str info "id"
-          else "" ]
-    candidates |> List.tryFind (fun s -> s <> "") |> Option.defaultValue ""
-
-let getPartsText (parts: obj) : string =
-    if not (Dyn.isArray parts) then ""
-    else
-        (parts :?> obj array)
-        |> Array.choose (fun part ->
-            if Dyn.str part "type" = "text" then
-                let text = Dyn.get part "text"
-                if Dyn.isNullish text then None else Some (string text)
-            else None)
-        |> String.concat "\n"
-
-let isCompletedAssistantMessage (info: obj) : bool =
-    if Dyn.isNullish info then false
-    else
-        let isAssistant = Dyn.str info "role" = "assistant" || Dyn.str info "type" = "assistant"
-        let hasError = not (Dyn.isNullish (Dyn.get info "error"))
-        if not isAssistant || hasError then false
-        else
-            let finishVal = Dyn.get info "finish"
-            if not (Dyn.isNullish finishVal) && Dyn.typeIs finishVal "string" then
-                isTerminalAssistantFinish (string finishVal)
-            else
-                let timeCompleted = Dyn.get (Dyn.get info "time") "completed"
-                not (Dyn.isNullish timeCompleted) && Dyn.typeIs timeCompleted "number"
-
-let isAbortDomainError (error: obj) : bool =
-    match translateJsError error with
-    | MessageAborted -> true
-    | _ -> false
-
-let decodeTodos (todosData: obj) : string list =
-    if Dyn.isArray todosData then
-        (todosData :?> obj array)
-        |> Array.choose (fun todo ->
-            let status = Dyn.str todo "status"
-            match todoStatusOfString status with
-            | Some s when isTerminal s -> None
-            | _ -> Some status)
-        |> Array.toList
-    else []
-
-/// Returns the last completed assistant message's (text, agent) plus whether a
-/// nudge prompt already trails it in the history. The trailing-nudge flag is the
-/// restart-safe per-stop de-dup signal: if the most recent assistant turn was
-/// already followed by a nudge prompt, the stop has been nudged and the agent
-/// has not yet produced fresh work, so we must not nudge again.
-let decodeLastAssistant (messagesData: obj) : string * string option * bool =
-    if Dyn.isArray messagesData then
-        let messagesArr = messagesData :?> obj array
-        let lastAssistantIdx =
-            messagesArr
-            |> Array.tryFindIndexBack (fun msg -> isCompletedAssistantMessage (Dyn.get msg "info"))
-        match lastAssistantIdx with
-        | Some idx ->
-            let msg = messagesArr.[idx]
-            let info = Dyn.get msg "info"
-            let agentVal = Dyn.get info "agent"
-            let agent = if Dyn.isNullish agentVal then None else Some (string agentVal)
-            let text = getPartsText (Dyn.get msg "parts")
-            let alreadyNudged =
-                messagesArr.[idx + 1 ..]
-                |> Array.exists (fun m -> isNudgePrompt (getPartsText (Dyn.get m "parts")))
-            text, agent, alreadyNudged
-        | None -> "", None, false
-    else "", None, false

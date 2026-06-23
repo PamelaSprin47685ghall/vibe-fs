@@ -135,7 +135,7 @@ Common methods can be selected with their short definitions. Uncommon methods in
 /// Pure decision: append the probe iff the current turn (messages after the
 /// last real user message) has no completed select_methodology tool part.
 /// Checks only Native user messages; synthetic probes are invisible.
-let shouldAppendMethodologyProbe (messages: Message list) : bool =
+let shouldAppendMethodologyProbe (messages: Message<'raw> list) : bool =
     let lastUserIdx =
         messages
         |> List.indexed
@@ -158,7 +158,7 @@ let shouldAppendMethodologyProbe (messages: Message list) : bool =
 /// Constructs the synthetic probe user message. Never persisted: id prefix
 /// `methodology-probe-` ensures stripSyntheticBySource removes it on
 /// re-projection.
-let buildProbeMessage (agent: string) (sessionID: string) : Message =
+let buildProbeMessage (agent: string) (sessionID: string) : Message<obj> =
     { info =
           { id = methodologyProbeIdPrefix + "1"
             sessionID = sessionID

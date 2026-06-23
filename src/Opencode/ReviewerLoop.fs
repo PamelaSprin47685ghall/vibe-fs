@@ -7,6 +7,8 @@ open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Opencode.SessionIo
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 let private maxNudges = 3
 

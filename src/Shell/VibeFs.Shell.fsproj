@@ -4,14 +4,20 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="Dyn.fs" />
+    <Compile Include="ErrorClassify.fs" />
     <Compile Include="ReviewRuntime.fs" />
     <Compile Include="PromiseQueue.fs" />
+    <Compile Include="SessionExecutor.fs" />
     <Compile Include="CallStore.fs" />
     <Compile Include="MagicSessionStore.fs" />
     <Compile Include="ExecutorJavascript.fs" />
+    <Compile Include="SubagentIntentsCodec.fs" />
     <Compile Include="OllamaClient.fs" />
     <Compile Include="TreeSitterShell.fs" />
     <Compile Include="FuzzyFinderShell.fs" />
+    <Compile Include="FuzzyIteratorStore.fs" />
+    <Compile Include="WebSearchCodec.fs" />
     <Compile Include="FileSys.fs" />
     <Compile Include="KnowledgeGraphPortLock.fs" />
     <Compile Include="KnowledgeGraphFiles.fs" />

@@ -1,59 +1,39 @@
 module VibeFs.Shell.MagicSessionStore
 
-open System.Collections.Generic
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicCore
 
-type private MagicSessionStoreState =
-    { reportTables: Dictionary<Host, Dictionary<string, string>>
-      backlogCaches: Dictionary<Host, Dictionary<string, BacklogEntry list>> }
-
-type private MagicSessionStore(state: MagicSessionStoreState) =
-    member private this.DictionaryFor(tables: Dictionary<Host, Dictionary<string, 'value>>, host: Host) : Dictionary<string, 'value> =
-        match tables.TryGetValue host with
-        | true, table -> table
-        | false, _ ->
-            let table = Dictionary<string, 'value>()
-            tables.[host] <- table
-            table
+type private MagicSessionStore() =
+    let mutable reportTables = Map.empty<Host, Map<string, string>>
+    let mutable backlogCaches = Map.empty<Host, Map<string, BacklogEntry list>>
 
     member this.CaptureReport(host: Host, callId: string, report: string) : unit =
         if callId <> "" && report.Trim() <> "" then
-            let reportByCall = this.DictionaryFor(state.reportTables, host)
-            reportByCall.[callId] <- report.Trim()
+            let table = defaultArg (Map.tryFind host reportTables) Map.empty
+            reportTables <- Map.add host (Map.add callId (report.Trim()) table) reportTables
 
     member this.TakeReport(host: Host, callId: string) : string =
         if callId = "" then ""
         else
-            let reportByCall = this.DictionaryFor(state.reportTables, host)
-            match reportByCall.TryGetValue callId with
-            | true, report ->
-                reportByCall.Remove callId |> ignore
+            let table = defaultArg (Map.tryFind host reportTables) Map.empty
+            match Map.tryFind callId table with
+            | Some report ->
+                reportTables <- Map.add host (Map.remove callId table) reportTables
                 report
-            | false, _ -> ""
+            | None -> ""
 
     member this.TryGetReport(host: Host, callId: string) : string option =
         if callId = "" then None
-        else
-            let reportByCall = this.DictionaryFor(state.reportTables, host)
-            match reportByCall.TryGetValue callId with
-            | true, report -> Some report
-            | false, _ -> None
+        else Map.tryFind host reportTables |> Option.bind (Map.tryFind callId)
 
     member this.StoreBacklog(host: Host, sessionId: string, backlog: BacklogEntry list) : unit =
-        let backlogBySession = this.DictionaryFor(state.backlogCaches, host)
-        backlogBySession.[sessionId] <- backlog
+        let table = defaultArg (Map.tryFind host backlogCaches) Map.empty
+        backlogCaches <- Map.add host (Map.add sessionId backlog table) backlogCaches
 
     member this.TryGetBacklog(host: Host, sessionId: string) : BacklogEntry list option =
-        let backlogBySession = this.DictionaryFor(state.backlogCaches, host)
-        match backlogBySession.TryGetValue sessionId with
-        | true, backlog -> Some backlog
-        | false, _ -> None
+        Map.tryFind host backlogCaches |> Option.bind (Map.tryFind sessionId)
 
-let private store =
-    MagicSessionStore
-        { reportTables = Dictionary<Host, Dictionary<string, string>>()
-          backlogCaches = Dictionary<Host, Dictionary<string, BacklogEntry list>>() }
+let private store = MagicSessionStore()
 
 let captureReport (host: Host) (callId: string) (report: string) : unit =
     store.CaptureReport(host, callId, report)

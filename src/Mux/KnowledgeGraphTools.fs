@@ -3,7 +3,8 @@ module VibeFs.Mux.KnowledgeGraphTools
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Kernel.KnowledgeGraphMaintenance
@@ -13,39 +14,11 @@ open VibeFs.Mux.Wrappers
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.KnowledgeGraphPortLock
 open VibeFs.Shell.PromiseQueue
-
-let private buildEntries (root: string) (drafts: KnowledgeGraphDraft list) : JS.Promise<KnowledgeGraphEntry list> =
-    promise {
-        let! files = readKnowledgeGraphFiles root
-        let projection = projectLatestWins files
-        let normalizedDrafts = normalizeDraftIds projection drafts
-        let allocate (knownIds: Set<string>) : string =
-            let random = System.Random()
-            match KnowledgeGraph.allocateRandomHexId (fun () -> random.Next(0, 65536)) knownIds with
-            | Ok id -> id
-            | Error message -> failwith message
-        match applyDrafts allocate projection normalizedDrafts with
-        | Ok entries -> return entries
-        | Error error -> return raise (exn error)
-    }
-
-let private extractTexts (item: obj) : string list =
-    if Dyn.typeIs item "string" then [ string item ]
-    else
-        let texts = ResizeArray<string>()
-        let content = Dyn.str item "content"
-        if content <> "" then texts.Add(content)
-        let text = Dyn.str item "text"
-        if text <> "" then texts.Add(text)
-        let parts = Dyn.get item "parts"
-        if not (Dyn.isNullish parts) && Dyn.isArray parts then
-            for p in (parts :?> obj array) do
-                let partText = Dyn.str p "text"
-                if partText <> "" then texts.Add(partText)
-        List.ofSeq texts
+open VibeFs.Shell.Dyn
+open VibeFs.Mux.KnowledgeGraphRuntimeIO
 
 type MuxKnowledgeGraphRuntime(?deps: obj) as this =
-    let registeredJobs = System.Collections.Generic.Dictionary<string, KnowledgeGraphJobContext>()
+    let mutable registeredJobs = Map.empty<string, KnowledgeGraphJobContext>
     let writeQueue = SerialQueue()
     let commandQueue = SerialQueue()
     let backgroundJobs = ResizeArray<JS.Promise<unit>>()
@@ -83,23 +56,7 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
         | None -> ()
 
     member _.TryResolveJobContext(sessionID: string) : JS.Promise<KnowledgeGraphJobContext option> =
-        promise {
-            if System.String.IsNullOrWhiteSpace sessionID then return None
-            else
-                match getChatHistory with
-                | None -> return None
-                | Some getHistory ->
-                    try
-                        let! history = getHistory sessionID
-                        let texts =
-                            history
-                            |> Array.toList
-                            |> List.collect extractTexts
-                        return texts |> List.tryPick tryParseJobMarker
-                    with ex ->
-                        printfn $"[kg] TryResolveJobContext getChatHistory failed for {sessionID}: {ex.Message}"
-                        return None
-        }
+        tryResolveJobContext getChatHistory sessionID
 
     member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<KnowledgeGraphProjection> =
         if sessionID = "" then Promise.lift Map.empty
@@ -114,66 +71,14 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
                         return projection
                 })
 
-    member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
-        promise {
-            if not (knowledgeGraphDirExists directory) then return None
-            else
-                let! projection = this.EnsureSessionSnapshot(sessionID, directory)
-                return buildPreludeSection projection
-        }
-
-    member this.FetchFromSessionSnapshot(sessionID: string, directory: string, entity: string) : JS.Promise<string> =
-        promise {
-            if System.String.IsNullOrWhiteSpace directory then
-                return "No knowledge graph directory provided."
-            elif not (knowledgeGraphDirExists directory) then
-                return "Knowledge graph directory not found."
-            elif sessionID = "" then
-                let! projection = readProjection directory
-                match fetchAnswer projection entity with
-                | Ok answer -> return answer
-                | Error message -> return message
-            else
-                let! projection = this.EnsureSessionSnapshot(sessionID, directory)
-                match fetchAnswer projection entity with
-                | Ok answer -> return answer
-                | Error message -> return message
-        }
-
-    member _.RegisterJob(_sessionID: string, _ctx: KnowledgeGraphJobContext) : unit =
-        registeredJobs.[_sessionID] <- _ctx
-
-    member this.RegisterJobForTesting(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =
-        if System.String.IsNullOrWhiteSpace workspaceRoot then
-            failwith "Knowledge graph job workspaceRoot must be a non-empty directory path."
-
-        let payloadObj = payload
-
-        let readRequiredField (fieldName: string) : string =
-            let value = str payloadObj fieldName
-            if value.Trim() = "" then failwith $"Knowledge graph job payload missing required field '{fieldName}'"
-            else value.Trim()
-
-        let kind =
-            let normalizedTag = kindTag.Trim().ToLowerInvariant()
-            let builders =
-                Map [
-                    "append", fun () -> AppendAfterWork
-                    "daily", fun () -> DailyRewrite(readRequiredField "date")
-                ]
-            match Map.tryFind normalizedTag builders with
-            | Some build -> build ()
-            | None -> failwith $"Unknown knowledge graph job kind: {normalizedTag}"
-
-        this.RegisterJob(sessionID, { workspaceRoot = workspaceRoot; kind = kind })
+    member _.RegisterJob(sessionID: string, ctx: KnowledgeGraphJobContext) : unit =
+        registeredJobs <- Map.add sessionID ctx registeredJobs
 
     member _.TakeJob(sessionID: string) : KnowledgeGraphJobContext option =
-        match registeredJobs.TryGetValue sessionID with
-        | true, ctx -> Some ctx
-        | false, _ -> None
+        Map.tryFind sessionID registeredJobs
 
     member _.DeleteJob(sessionID: string) : unit =
-        registeredJobs.Remove(sessionID) |> ignore
+        registeredJobs <- Map.remove sessionID registeredJobs
 
     member this.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
         if not (knowledgeGraphDirExists workspaceRoot) then Promise.lift ()
@@ -209,9 +114,7 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
                 let! reconstructed = this.TryResolveJobContext(sessionID)
                 let jobCtxOpt =
                     reconstructed |> Option.orElseWith (fun () ->
-                        match registeredJobs.TryGetValue sessionID with
-                        | true, ctx -> Some ctx
-                        | false, _ -> None)
+                        Map.tryFind sessionID registeredJobs)
 
                 match jobCtxOpt with
                 | None -> return "No active knowledge graph job for this session."
@@ -220,22 +123,13 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
                     let todayStr = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
                     let! result = writeQueue.Enqueue(fun () ->
                         promise {
-                            let! entries = buildEntries root drafts
-                            let kind = ctx.kind
-                            let! result =
-                                withKnowledgeGraphPortLock 30000L 1000 root (fun () ->
-                                    promise {
-                                        match kind with
-                                        | AppendAfterWork ->
-                                            do! appendEntries root todayStr entries
-                                            registeredJobs.Remove(sessionID) |> ignore
-                                            return $"Appended {entries.Length} knowledge graph entries."
-                                        | DailyRewrite date ->
-                                            do! rewriteDay root date entries
-                                            registeredJobs.Remove(sessionID) |> ignore
-                                            return $"Rewrote knowledge graph day {date}."
-                                    })
-                            return result
+                            let! entriesResult = buildEntries root drafts
+                            match entriesResult with
+                            | Error e -> return e
+                            | Ok entries ->
+                                let! result = submitForKind root todayStr entries ctx.kind
+                                registeredJobs <- Map.remove sessionID registeredJobs
+                                return result
                         })
 
                     match ctx.kind with
@@ -297,6 +191,56 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
                 let! _ = Promise.all jobs
                 return ()
         }
+
+    member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
+        promise {
+            if not (knowledgeGraphDirExists directory) then return None
+            else
+                let! projection = this.EnsureSessionSnapshot(sessionID, directory)
+                return buildPreludeSection projection
+        }
+
+    member this.FetchFromSessionSnapshot(sessionID: string, directory: string, entity: string) : JS.Promise<string> =
+        promise {
+            if System.String.IsNullOrWhiteSpace directory then
+                return "No knowledge graph directory provided."
+            elif not (knowledgeGraphDirExists directory) then
+                return "Knowledge graph directory not found."
+            elif sessionID = "" then
+                let! projection = readProjection directory
+                match fetchAnswer projection entity with
+                | Ok answer -> return answer
+                | Error message -> return message
+            else
+                let! projection = this.EnsureSessionSnapshot(sessionID, directory)
+                match fetchAnswer projection entity with
+                | Ok answer -> return answer
+                | Error message -> return message
+        }
+
+    member this.RegisterJobForTesting(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =
+        if System.String.IsNullOrWhiteSpace workspaceRoot then
+            failwith "Knowledge graph job workspaceRoot must be a non-empty directory path."
+
+        let payloadObj = payload
+
+        let readRequiredField (fieldName: string) : string =
+            let value = Dyn.str payloadObj fieldName
+            if value.Trim() = "" then failwith $"Knowledge graph job payload missing required field '{fieldName}'"
+            else value.Trim()
+
+        let kind =
+            let normalizedTag = kindTag.Trim().ToLowerInvariant()
+            let builders =
+                Map [
+                    "append", fun () -> AppendAfterWork
+                    "daily", fun () -> DailyRewrite(readRequiredField "date")
+                ]
+            match Map.tryFind normalizedTag builders with
+            | Some build -> build ()
+            | None -> failwith $"Unknown knowledge graph job kind: {normalizedTag}"
+
+        this.RegisterJob(sessionID, { workspaceRoot = workspaceRoot; kind = kind })
 
     member val startMaintenanceIfDue = System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> this.StartMaintenanceIfDue(workspaceRoot)) with get, set
     member val takeBookkeeperLaunchesForTesting = System.Func<obj array>(fun () -> this.TakeBookkeeperLaunchesForTesting()) with get, set

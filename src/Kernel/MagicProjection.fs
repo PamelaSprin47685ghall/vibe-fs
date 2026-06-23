@@ -4,31 +4,31 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.MagicCore
 
-let private isFoldAnchorFor (host: Host) (part: Part) : bool =
+let private isFoldAnchorFor (host: Host) (part: Part<'raw>) : bool =
     isTodoResultFor host part
 
 type FoldRange = { firstResult: int; secondToLast: int }
 
-let private todoIndexesFor (host: Host) (flat: FlatPart list) : int list =
+let private todoIndexesFor (host: Host) (flat: FlatPart<'raw> list) : int list =
     flat
     |> List.indexed
     |> List.choose (fun (index, fp) -> if isFoldAnchorFor host fp.part then Some index else None)
 
-let private todoIndexes (flat: FlatPart list) : int list =
+let private todoIndexes (flat: FlatPart<'raw> list) : int list =
     todoIndexesFor opencode flat
 
-let private todoSegmentEndIndexesFor (host: Host) (flat: FlatPart list) : int list =
+let private todoSegmentEndIndexesFor (host: Host) (flat: FlatPart<'raw> list) : int list =
     todoIndexesFor host flat
 
-let private foldTodoAnchorsFor (host: Host) (flat: FlatPart list) : int list =
+let private foldTodoAnchorsFor (host: Host) (flat: FlatPart<'raw> list) : int list =
     todoSegmentEndIndexesFor host flat
 
 let private requiredFoldAnchorCount (foldAfterFirst: bool) : int =
     if foldAfterFirst then 2 else 3
 
-let private messageTimeOrNull (msg: Message) : obj = msg.info.time
+let private messageTimeOrNull (msg: Message<'raw>) : 'raw = msg.info.time
 
-let private collectUserText (flat: FlatPart list) (fromIdx: int) (toIdx: int) : string list =
+let private collectUserText (flat: FlatPart<'raw> list) (fromIdx: int) (toIdx: int) : string list =
     let lo = max 0 fromIdx
     let hi = min (flat.Length - 1) toIdx
     if lo > hi then []
@@ -41,7 +41,7 @@ let private collectUserText (flat: FlatPart list) (fromIdx: int) (toIdx: int) : 
             else
                 None)
 
-let findFoldRangeFor (host: Host) (flat: FlatPart list) (foldAfterFirst: bool) : FoldRange option =
+let findFoldRangeFor (host: Host) (flat: FlatPart<'raw> list) (foldAfterFirst: bool) : FoldRange option =
     let todoIdxs = foldTodoAnchorsFor host flat
     let minResults = requiredFoldAnchorCount foldAfterFirst
     if todoIdxs.Length < minResults then None
@@ -50,10 +50,10 @@ let findFoldRangeFor (host: Host) (flat: FlatPart list) (foldAfterFirst: bool) :
         let secondToLast = todoIdxs.[todoIdxs.Length - 2]
         if secondToLast <= firstResult then None else Some { firstResult = firstResult; secondToLast = secondToLast }
 
-let findFoldRange (flat: FlatPart list) (foldAfterFirst: bool) : FoldRange option =
+let findFoldRange (flat: FlatPart<'raw> list) (foldAfterFirst: bool) : FoldRange option =
     findFoldRangeFor opencode flat foldAfterFirst
 
-let private buildPrefixUserMessage (id: string) (text: string) (sessionID: string) (time: obj) : Message =
+let private buildPrefixUserMessage (id: string) (text: string) (sessionID: string) (time: 'raw) : Message<'raw> =
     { info =
           { id = id
             sessionID = sessionID
@@ -61,13 +61,13 @@ let private buildPrefixUserMessage (id: string) (text: string) (sessionID: strin
             agent = "orchestrator"
             isError = false
             toolName = ""
-            details = null
+            details = Unchecked.defaultof<'raw>
             time = time }
       parts = [ TextPart text ]
       source = Native
-      raw = null }
+      raw = Unchecked.defaultof<'raw> }
 
-let private buildSyntheticPrefixMessages (host: Host) (messages: Message list) (flat: FlatPart list) (foldedBacklog: BacklogEntry list) (sessionID: string) (errorNotice: string option) : Message list =
+let private buildSyntheticPrefixMessages (host: Host) (messages: Message<'raw> list) (flat: FlatPart<'raw> list) (foldedBacklog: BacklogEntry list) (sessionID: string) (errorNotice: string option) : Message<'raw> list =
     let todoIdxs = foldTodoAnchorsFor host flat
     [ for index in 0 .. foldedBacklog.Length - 1 do
           let fromIdx = if index = 0 then 0 else todoIdxs.[index - 1] + 1
@@ -83,7 +83,7 @@ let private buildSyntheticPrefixMessages (host: Host) (messages: Message list) (
           let syntheticId = magicTodoPrefixPrefix + string (index + 1)
           yield buildPrefixUserMessage syntheticId finalText todoMessage.info.sessionID todoTime ]
 
-let private rebuildVisibleOnly (messages: Message list) (visible: FlatPart list) : Message list =
+let private rebuildVisibleOnly (messages: Message<'raw> list) (visible: FlatPart<'raw> list) : Message<'raw> list =
     let byMessage = visible |> List.groupBy (fun entry -> entry.msgIndex) |> Map.ofList
     messages
     |> List.indexed
@@ -98,7 +98,7 @@ let private rebuildVisibleOnly (messages: Message list) (visible: FlatPart list)
                 |> List.choose (fun (partIdx, part) -> Map.tryFind partIdx partMap)
             if newParts.IsEmpty then None else Some { msg with parts = newParts })
 
-let projectMagicFor (host: Host) (messages: Message list) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : Message list =
+let projectMagicFor (host: Host) (messages: Message<'raw> list) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : Message<'raw> list =
     if messages.IsEmpty then messages
     else
         let flat = flatten messages
@@ -123,5 +123,5 @@ let projectMagicFor (host: Host) (messages: Message list) (backlog: BacklogEntry
             let rebuilt = rebuildVisibleOnly messages visible
             if syntheticPrefixMessages.IsEmpty then rebuilt else syntheticPrefixMessages @ rebuilt
 
-let projectMagic (messages: Message list) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : Message list =
+let projectMagic (messages: Message<'raw> list) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : Message<'raw> list =
     projectMagicFor opencode messages backlog foldAfterFirst sessionID

@@ -11,23 +11,23 @@ let magicReviewToolName = "submit_review"
 type BacklogEntry =
     { report: string }
 
-let isTodoResultFor (host: Host) (part: Part) : bool =
+let isTodoResultFor (host: Host) (part: Part<'raw>) : bool =
     match part with
     | ToolPart(toolName, _, Some state, _) when toolName = magicTodoToolNameFor host && state.status = "completed" -> true
     | _ -> false
 
-let isTodoResult (part: Part) : bool =
+let isTodoResult (part: Part<'raw>) : bool =
     isTodoResultFor opencode part
 
-let isTodoErrorFor (host: Host) (part: Part) : bool =
+let isTodoErrorFor (host: Host) (part: Part<'raw>) : bool =
     match part with
     | ToolPart(toolName, _, Some state, _) when toolName = magicTodoToolNameFor host && state.status = "error" -> true
     | _ -> false
 
-let isTodoError (part: Part) : bool =
+let isTodoError (part: Part<'raw>) : bool =
     isTodoErrorFor opencode part
 
-let lastTodoErrorTextFor (host: Host) (flat: FlatPart list) : string option =
+let lastTodoErrorTextFor (host: Host) (flat: FlatPart<'raw> list) : string option =
     flat
     |> List.tryFindBack (fun fp -> isTodoErrorFor host fp.part)
     |> Option.map (fun fp ->
@@ -35,7 +35,7 @@ let lastTodoErrorTextFor (host: Host) (flat: FlatPart list) : string option =
         | ToolPart(_, _, Some state, _) -> state.error
         | _ -> "")
 
-let isReviewTool (part: Part) : bool =
+let isReviewTool (part: Part<'raw>) : bool =
     match part with
     | ToolPart(toolName, _, _, _) when toolName = magicReviewToolName -> true
     | _ -> false
@@ -79,5 +79,5 @@ let buildBacklogTextWithError (backlog: BacklogEntry list) (userPrompts: string 
 let buildBacklogText (backlog: BacklogEntry list) (userPrompts: string list) : string =
     buildBacklogTextWithError backlog userPrompts None
 
-let lastTodoErrorText (flat: FlatPart list) : string option =
+let lastTodoErrorText (flat: FlatPart<'raw> list) : string option =
     lastTodoErrorTextFor opencode flat

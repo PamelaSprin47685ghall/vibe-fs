@@ -3,15 +3,18 @@ module VibeFs.Opencode.CommandHooks
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Opencode.AgentConfig
+open VibeFs.Opencode.NudgeEventCodec
 open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Kernel.Domain
+open VibeFs.Shell.Dyn
 
 let private abortOrDeleteEvents =
     set [ "stream-abort"; "session.delete"; "session.close"; "session.remove"; "session.deleted" ]
@@ -22,7 +25,7 @@ let cleanUpJobContextIfAbortedOrDeleted (knowledgeGraphRuntime: KnowledgeGraphRu
     if Set.contains eventType abortOrDeleteEvents then
         let rawProps = Dyn.get event "properties"
         let props = if Dyn.isNullish rawProps then event else rawProps
-        let sessionID = VibeFs.Kernel.NudgeState.getSessionID eventType props
+        let sessionID = getSessionID eventType props
         if sessionID <> "" then
             knowledgeGraphRuntime.DeleteJob(sessionID)
 

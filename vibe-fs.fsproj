@@ -20,6 +20,7 @@
     <Compile Include="src/Mux/ReadDedup.fs" />
     <Compile Include="src/Mux/MessagingCodec.fs" />
     <Compile Include="src/Mux/MagicTodo.fs" />
+    <Compile Include="src/Mux/KnowledgeGraphRuntimeIO.fs" />
     <Compile Include="src/Mux/KnowledgeGraphTools.fs" />
     <Compile Include="src/Mux/KnowledgeGraphToolDefs.fs" />
     <Compile Include="src/Mux/MethodologyTool.fs" />
@@ -27,6 +28,8 @@
     <Compile Include="src/Mux/EventHook.fs" />
     <Compile Include="src/Mux/SlashCommands.fs" />
     <Compile Include="src/Mux/Plugin.fs" />
+    <Compile Include="src/Opencode/NudgeEventCodec.fs" />
+    <Compile Include="src/Opencode/NudgeEffect.fs" />
     <Compile Include="src/Opencode/NudgeHook.fs" />
     <Compile Include="src/Opencode/SessionIo.fs" />
     <Compile Include="src/Opencode/ReviewerLoop.fs" />

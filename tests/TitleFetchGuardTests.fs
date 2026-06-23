@@ -3,8 +3,9 @@ module VibeFs.Tests.TitleFetchGuardTests
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Opencode.TitleFetchGuard
+open VibeFs.Shell.Dyn
 
 let signature () =
     equal "title probe signature pinned to opencode ensureTitle string"

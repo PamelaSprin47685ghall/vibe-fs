@@ -149,11 +149,6 @@ let isTerminalAssistantFinish (finish: string) : bool =
 
 let isNudgePrompt (text: string) : bool = text = todoNudgePrompt || text = loopNudgePrompt
 
-let createPromptBody (agent: string option) (text: string) : obj =
-    match agent with
-    | Some a -> box {| agent = a; parts = [| box {| ``type`` = "text"; text = text |} |] |}
-    | None -> box {| parts = [| box {| ``type`` = "text"; text = text |} |] |}
-
 let retryProgressEvents: Set<string> =
     Set.ofList
         [ "session.next.step.started"; "session.next.step.ended"

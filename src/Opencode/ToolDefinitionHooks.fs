@@ -3,13 +3,15 @@ module VibeFs.Opencode.ToolDefinitionHooks
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.MagicTodo
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.HookSchema
 open VibeFs.Opencode.MagicTodo
+open VibeFs.Shell.Dyn
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 

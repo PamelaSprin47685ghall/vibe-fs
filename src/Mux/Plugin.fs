@@ -3,6 +3,7 @@ module VibeFs.Mux.Plugin
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Shell
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.HostTools
 open VibeFs.Shell.CallStore
@@ -17,12 +18,12 @@ open VibeFs.Mux.SlashCommands
 open VibeFs.Mux.KnowledgeGraphTools
 open VibeFs.Mux.KnowledgeGraphToolDefs
 open VibeFs.Mux.MethodologyTool
-open VibeFs.Kernel.Dyn
 open VibeFs.Mux.ReadDedup
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.WorkspaceFiles
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Mux.MessageTransform
+open VibeFs.Shell.Dyn
 
 let muxToolNames =
     [| "coder"; "investigator"; "meditator"; "browser"; "executor"
@@ -204,15 +205,11 @@ let createRegistration (deps: obj) : obj =
                   "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ])
         "__callStore",
             box (createObj
-                [ "resolveCall", box (System.Func<string, obj, bool>(fun callId args -> resolveCall callStore callId args))
-                  "pendingCallIds", box (System.Func<string array>(fun () -> callStore.PendingCalls.Keys |> Seq.toArray))
-                  "hasCall", box (System.Func<string, bool>(fun callId -> hasCall callStore callId))
+                [ "resolveCall", box (System.Func<string, obj, JS.Promise<bool>>(fun callId args -> resolveCallAsync callStore callId args))
+                  "pendingCallIds", box (System.Func<JS.Promise<string array>>(fun () -> pendingCallIdsAsync callStore))
+                  "hasCall", box (System.Func<string, JS.Promise<bool>>(fun callId -> hasCallAsync callStore callId))
                   "resolveFirstMatching",
-                  box (System.Func<string, obj, bool>(fun prefix args ->
-                      callStore.PendingCalls.Keys
-                      |> Seq.tryFind (fun k -> k.StartsWith(prefix))
-                      |> Option.map (fun k -> resolveCall callStore k args)
-                      |> Option.defaultValue false)) ]) ]
+                  box (System.Func<string, obj, JS.Promise<bool>>(fun prefix args -> resolveFirstMatchingAsync callStore prefix args)) ]) ]
     setKey registration "tool.execute.after" (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
         toolExecuteAfter knowledgeGraphRuntime input output)))
     box registration

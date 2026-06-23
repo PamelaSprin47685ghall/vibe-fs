@@ -7,6 +7,36 @@ open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Mux.Wrappers
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
+
+let parseDraftArray (value: obj) : Result<KnowledgeGraphDraft list, string> =
+    if Dyn.isNullish value || not (Dyn.isArray value) then Error "entries must be an array"
+    else
+        let drafts = value :?> obj array
+        let parseDraft (item: obj) : Result<KnowledgeGraphDraft, string> =
+            if Dyn.isNullish item || not (Dyn.typeIs item "object") then Error "entries must contain objects"
+            else
+                let id =
+                    match Dyn.opt item "id" with
+                    | Some rawId ->
+                        let trimmed = (string rawId).Trim()
+                        if trimmed = "" then None else Some trimmed
+                    | None -> None
+                let entityRaw = Dyn.get item "entity"
+                let entities =
+                    if Dyn.isNullish entityRaw then []
+                    elif Dyn.isArray entityRaw then (entityRaw :?> obj array) |> Array.map string |> Array.toList
+                    else [ string entityRaw ]
+                validateDraft { id = id; entity = entities; fact = Dyn.str item "fact" }
+        drafts
+        |> Array.fold
+            (fun acc item ->
+                acc
+                |> Result.bind (fun items ->
+                    parseDraft item |> Result.map (fun draft -> draft :: items)))
+            (Ok [])
+        |> Result.map List.rev
 
 let knowledgeGraphFetchTool (kgRuntime: KnowledgeGraphRuntime) (ctx: obj) : obj =
     define fetchKnowledgeGraph

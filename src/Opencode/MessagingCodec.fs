@@ -2,13 +2,15 @@ module VibeFs.Opencode.MessagingCodec
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.Messaging
+open VibeFs.Shell.Dyn
 
 /// The single FFI boundary between host message objects and the strongly-typed
 /// Kernel tree. All Dyn/JsInterop access for the message chain lives here.
 
-let decodeToolState (state: obj) : ToolState option =
+let decodeToolState (state: obj) : ToolState<obj> option =
     if isNullish state then None
     else
         let input = get state "input"
@@ -21,12 +23,12 @@ let decodeToolState (state: obj) : ToolState option =
               input = input
               operationAction = operationAction }
 
-let private partDecoders: Map<string, obj -> Part> =
+let private partDecoders: Map<string, obj -> Part<obj>> =
     Map [
         "text", fun part -> TextPart (str part "text")
     ]
 
-let decodePart (part: obj) : Part =
+let decodePart (part: obj) : Part<obj> =
     let typ = str part "type"
     match Map.tryFind typ partDecoders with
     | Some decode -> decode part
@@ -35,11 +37,11 @@ let decodePart (part: obj) : Part =
         | "tool" -> ToolPart (str part "tool", str part "callID", decodeToolState (get part "state"), part)
         | _ -> RawPart part
 
-let decodeParts (parts: obj) : Part list =
+let decodeParts (parts: obj) : Part<obj> list =
     if isNullish parts || not (isArray parts) then []
     else (parts :?> obj array) |> Array.map decodePart |> List.ofArray
 
-let decodeMessage (msg: obj) : Message option =
+let decodeMessage (msg: obj) : Message<obj> option =
     if isNullish msg then None
     else
         let info = get msg "info"
@@ -62,7 +64,7 @@ let decodeMessage (msg: obj) : Message option =
                   source = classifySource id
                   raw = msg }
 
-let decodeMessages (messages: obj array) : Message list =
+let decodeMessages (messages: obj array) : Message<obj> list =
     if isNullish messages then []
     else messages |> Array.choose decodeMessage |> List.ofArray
 
@@ -71,7 +73,7 @@ let decodeMessages (messages: obj array) : Message list =
 /// match the host state (preserving object identity for dedup's "keeps ref"
 /// contract); only parts mutated by a pure typed update (e.g.
 /// setPartOutputTyped) get a shallow state rebuild. Raw parts pass through.
-let encodePart (part: Part) : obj =
+let encodePart (part: Part<obj>) : obj =
     match part with
     | TextPart text -> box (createObj [ "type", box "text"; "text", box text ])
     | ToolPart(toolName, callID, Some state, raw) ->
@@ -104,7 +106,7 @@ let encodePart (part: Part) : obj =
         else raw
     | RawPart raw -> raw
 
-let private encodeMessageInfo (info: MessageInfo) : obj =
+let private encodeMessageInfo (info: MessageInfo<obj>) : obj =
     let timeObj = if isNull info.time then box (createObj [ "created", box 0 ]) else info.time
     createObj [
         "id", box info.id
@@ -123,7 +125,7 @@ let private encodeMessageInfo (info: MessageInfo) : obj =
 /// mutated (preserving object identity for "preserves original" contracts);
 /// only messages whose parts were rebuilt by a pure typed update get a shallow
 /// copy with `parts` replaced. Synthetic messages (raw = null) build fresh.
-let encodeMessage (msg: Message) : obj =
+let encodeMessage (msg: Message<obj>) : obj =
     if isNull msg.raw then
         let partsObj = msg.parts |> List.map encodePart |> List.toArray
         box (createObj [ "info", box (encodeMessageInfo msg.info); "parts", box partsObj ])
@@ -137,5 +139,5 @@ let encodeMessage (msg: Message) : obj =
         if partsUnchanged then msg.raw
         else withKey msg.raw "parts" (box encodedParts)
 
-let encodeMessages (messages: Message list) : obj array =
+let encodeMessages (messages: Message<obj> list) : obj array =
     messages |> List.map encodeMessage |> List.toArray

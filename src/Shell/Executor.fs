@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System.Text.RegularExpressions
 open VibeFs.Kernel
+open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Executor
 open VibeFs.Shell.ExecutorJavascript
 
@@ -87,31 +88,39 @@ let getExecutorProjectDir (sessionId: string option) : string =
 let getExecutorTempScriptPath (sessionId: string) (extension: string) : string =
     $"{getExecutorProjectDir (Some sessionId)}/script.{extension}"
 
-type RunOutcome = { stdout: string; stderr: string; code: int option; timedOut: bool }
+type RunOutcome =
+    | Exited of code: int * stdout: string * stderr: string
+    | TimedOut of stdout: string * stderr: string
+    | Signaled of signal: string * stdout: string * stderr: string
+    | SpawnFailed of reason: DomainError
 
-let private awaitChild (child: SpawnedChild) (kill: SpawnedChild -> unit) (timeoutMs: int option) : JS.Promise<RunOutcome> =
-    Promise.create (fun resolve reject ->
+let private awaitChild (child: SpawnedChild) (executable: string) (kill: SpawnedChild -> unit) (timeoutMs: int option) : JS.Promise<RunOutcome> =
+    Promise.create (fun resolve _reject ->
         let stdout = ResizeArray<string>()
         let stderr = ResizeArray<string>()
         let mutable settled = false
         let removeListeners () =
             try child?stdout?removeAllListeners() |> ignore with _ -> ()
             try child?stderr?removeAllListeners() |> ignore with _ -> ()
-        let settle code timedOut =
+        let settle outcome =
             if not settled then
                 settled <- true
                 removeListeners ()
-                resolve { stdout = String.concat "" stdout
-                          stderr = String.concat "" stderr
-                          code = code
-                          timedOut = timedOut }
+                resolve outcome
         child?stdout?on("data", fun (c: obj) -> stdout.Add(string c)) |> ignore
         child?stderr?on("data", fun (c: obj) -> stderr.Add(string c)) |> ignore
-        child?on("error", fun (e: obj) -> reject (e :?> exn)) |> ignore
-        child?on("close", fun (code: obj) ->
-            settle (if isNull code then None else Some(unbox<int> code)) false) |> ignore
+        child?on("error", fun (_e: obj) -> settle (SpawnFailed(ExecutorExecutableMissing executable))) |> ignore
+        child?on("close", fun (code: obj) (signal: obj) ->
+            let capturedOut = String.concat "" stdout
+            let capturedErr = String.concat "" stderr
+            // our own timeout-kill settles TimedOut synchronously before close fires, so a null code here is always an external signal
+            settle (
+                if isNull code then
+                    let sigName = if isNull signal then "unknown" else string signal
+                    Signaled(sigName, capturedOut, capturedErr)
+                else Exited(unbox<int> code, capturedOut, capturedErr))) |> ignore
         let onTimeout () =
-            if not settled then (kill child; settle None true)
+            if not settled then (kill child; settle (TimedOut(String.concat "" stdout, String.concat "" stderr)))
         match timeoutMs with
         | None -> ()
         | Some ms ->
@@ -124,7 +133,7 @@ let private awaitChild (child: SpawnedChild) (kill: SpawnedChild -> unit) (timeo
 let spawnAndRun (command: string) (args: string array) (cwd: string) (timeoutMs: int option)
                 : JS.Promise<RunOutcome> =
     let child = spawnChild command args cwd
-    awaitChild child killTree timeoutMs
+    awaitChild child command killTree timeoutMs
 
 let runScript (interpreter: string) (interpreterArgs: string array) (cwd: string)
               (scriptPath: string) (timeoutMs: int option) : JS.Promise<RunOutcome> =
@@ -150,9 +159,9 @@ let private runPythonProgram (program: string) (dependencies: string list) (cwd:
     promise {
         if not dependencies.IsEmpty then
             let! warm = warmup ()
-            if warm.code <> Some 0 then return warm
-            else
-                return! runScript "uvx" (Array.append baseArgs [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs)
+            match warm with
+            | Exited(0, _, _) -> return! runScript "uvx" (Array.append baseArgs [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs)
+            | _ -> return warm
         else
             return! runScript "uvx" (Array.append baseArgs [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs)
     }
@@ -168,9 +177,6 @@ let private runJavascriptProgram (program: string) (dependencies: string list) (
         return! runScript "npx" [| "--prefix"; projectDir; "--yes"; "--no-install"; "tsx" |] cwd scriptPath (Some timeoutMs)
     }
 
-let private isErrnoException (error: obj) : bool =
-    not (isNull error) && string error?("code") = "ENOENT"
-
 let missingExecutableFor (language: ExecutorLanguage) : string =
     match language with
     | Python -> "uvx"
@@ -179,15 +185,20 @@ let missingExecutableFor (language: ExecutorLanguage) : string =
 
 let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcome: RunOutcome)
                : ExecuteResult =
-    if outcome.timedOut then
+    match outcome with
+    | TimedOut _ ->
         let partial = if output = "" then "(no output before timeout)" else output
         let suffix = $"\n[executor] Killed after {timeout}ms ({options.timeoutType}). Partial output returned."
         Truncated(output = (partial + suffix).Trim(), timeoutType = options.timeoutType)
-    else
-        match outcome.code with
-        | Some 0 -> Completed(output = if output = "" then "(no output)" else output)
-        | Some code -> Failed(output = if output = "" then $"exited with code {code}" else output)
-        | None -> Failed(output = if output = "" then "exited with no code" else output)
+    | Signaled(signal, _, _) ->
+        let partial = if output = "" then "(no output before signal)" else output
+        Failed(output = (partial + $"\n[executor] Killed by signal {signal}.").Trim())
+    | Exited(0, _, _) -> Completed(output = if output = "" then "(no output)" else output)
+    | Exited(code, _, _) -> Failed(output = if output = "" then $"exited with code {code}" else output)
+    | SpawnFailed(ExecutorExecutableMissing exe) ->
+        MissingExecutable(executable = exe,
+                          output = $"Error: '{exe}' executable not found. Please ensure '{exe}' is installed and available on your PATH.")
+    | SpawnFailed reason -> Failed(output = $"spawn failed: {formatDomainError reason}")
 
 type ExecuteDeps = {
     runProgram: string -> ExecutorLanguage -> string list -> string -> string -> int -> JS.Promise<RunOutcome>
@@ -208,17 +219,15 @@ let executeWith (deps: ExecuteDeps) (options: ExecuteOptions) (sessionId: string
         let timeout = timeoutMs options.timeoutType
         let cwd = defaultArg options.cwd (nodeProcess?cwd())
         let program = prepareProgramForExecution options
-        try
-            let! outcome =
-                deps.runProgram program options.language options.dependencies cwd sessionId timeout
-            let output = (outcome.stdout + outcome.stderr).Trim()
-            return mapOutcome options timeout output outcome
-        with error ->
-            if isErrnoException error then
-                let executable = missingExecutableFor options.language
-                return MissingExecutable(executable = executable,
-                                         output = $"Error: '{executable}' executable not found. Please ensure '{executable}' is installed and available on your PATH.")
-            else return Failed(output = $"Error: {error.Message}")
+        let! outcome =
+            deps.runProgram program options.language options.dependencies cwd sessionId timeout
+        let output =
+            match outcome with
+            | Exited(_, stdout, stderr)
+            | TimedOut(stdout, stderr)
+            | Signaled(_, stdout, stderr) -> (stdout + stderr).Trim()
+            | SpawnFailed _ -> ""
+        return mapOutcome options timeout output outcome
     }
 
 let execute (options: ExecuteOptions) (sessionId: string) : JS.Promise<ExecuteResult> =

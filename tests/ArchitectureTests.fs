@@ -1,0 +1,80 @@
+module VibeFs.Tests.ArchitectureTests
+
+open Fable.Core
+open Fable.Core.JsInterop
+open VibeFs.Tests.Assert
+
+[<Import("readFileSync", "node:fs")>]
+let private readFileSync (path: string) (encoding: string) : string = jsNative
+
+[<Import("existsSync", "node:fs")>]
+let private existsSync (path: string) : bool = jsNative
+
+[<Import("readdirSync", "node:fs")>]
+let private readdirSync (path: string) : string array = jsNative
+
+let private requireFile (path: string) : string =
+    check ("arch: exists " + path) (existsSync path)
+    if existsSync path then
+        let content = readFileSync path "utf-8"
+        check ("arch: non-empty " + path) (not (System.String.IsNullOrEmpty content))
+        content
+    else ""
+
+let private fsFiles (dir: string) : string array =
+    check ("arch: dir exists " + dir) (existsSync dir)
+    if existsSync dir then readdirSync dir |> Array.filter (fun f -> f.EndsWith ".fs")
+    else [||]
+
+let private objTypeRe = System.Text.RegularExpressions.Regex(@":\s*obj\b")
+let private boxRe = System.Text.RegularExpressions.Regex(@"\bbox\b")
+let private emptyDefaultRe =
+    System.Text.RegularExpressions.Regex("Option\\.defaultValue\\s*\"")
+
+let kernelBoundary () =
+    let proj = requireFile "src/Kernel/VibeFs.Kernel.fsproj"
+    check "arch: Kernel.fsproj no Shell ProjectReference" (not (proj.Contains "VibeFs.Shell"))
+    check "arch: Kernel.fsproj no Fable.Core" (not (proj.Contains "Fable.Core"))
+    for f in fsFiles "src/Kernel" do
+        let path = "src/Kernel/" + f
+        let content = requireFile path
+        check ("arch: " + f + " createObj-free") (not (content.Contains "createObj"))
+        check ("arch: " + f + " Dyn-free") (not (content.Contains "Dyn."))
+        check ("arch: " + f + " no open Shell") (not (content.Contains "open VibeFs.Shell"))
+        check ("arch: " + f + " obj-type-free") (not (objTypeRe.IsMatch content))
+        check ("arch: " + f + " box-free") (not (boxRe.IsMatch content))
+        check ("arch: " + f + " unbox-free") (not (content.Contains "unbox"))
+
+let kernelNoEmptyDefault () =
+    for f in fsFiles "src/Kernel" do
+        let content = requireFile ("src/Kernel/" + f)
+        check ("arch: " + f + " no empty-string default") (not (emptyDefaultRe.IsMatch content))
+
+let shellLayering () =
+    for f in fsFiles "src/Shell" do
+        let content = requireFile ("src/Shell/" + f)
+        check ("arch: " + f + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
+        check ("arch: " + f + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
+
+/// Phase 2 子集守卫：禁止 Dictionary 字面。mutable/ResizeArray 的 Actor 闭包约束
+/// 需语义分析（非 grep 可判定），此处仅覆盖 Dictionary 禁令。
+let noBuiltinDictionary () =
+    for dir in [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"|] do
+        for f in fsFiles dir do
+            let content = requireFile (dir + "/" + f)
+            check ("arch: " + f + " no Dictionary") (not (content.Contains "Dictionary"))
+
+let fileBodyUnder250 () =
+    for dir in [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"|] do
+        for f in fsFiles dir do
+            let content = requireFile (dir + "/" + f)
+            let lineCount = content.Length - content.Replace("\n", "").Length
+            check ("arch: " + dir + "/" + f + " <=250 lines") (lineCount <= 250)
+
+let noDanglingMarkers () =
+    for dir in [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"|] do
+        for f in fsFiles dir do
+            let content = requireFile (dir + "/" + f)
+            check ("arch: " + f + " no TODO") (not (content.Contains "TODO"))
+            check ("arch: " + f + " no FIXME") (not (content.Contains "FIXME"))
+            check ("arch: " + f + " no HACK") (not (content.Contains "HACK"))

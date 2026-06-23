@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraphCodec
 open VibeFs.Shell.KnowledgeGraphFiles
 
 [<Import("createRequire", "node:module")>]

@@ -5,6 +5,8 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Messaging
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 let private decodeToolStatus (part: obj) : string =
     match Dyn.str part "state" with
@@ -12,7 +14,7 @@ let private decodeToolStatus (part: obj) : string =
     | "input-available" -> "pending"
     | other -> other
 
-let private decodeToolState (part: obj) : ToolState option =
+let private decodeToolState (part: obj) : ToolState<obj> option =
     let output = Dyn.get part "output"
     let input = Dyn.get part "input"
 
@@ -32,7 +34,7 @@ let private decodeToolState (part: obj) : ToolState option =
               input = input
               operationAction = operationAction }
 
-let decodePart (part: obj) : Part =
+let decodePart (part: obj) : Part<obj> =
     match Dyn.str part "type" with
     | "text" -> TextPart (Dyn.str part "text")
     | "dynamic-tool" ->
@@ -44,7 +46,7 @@ let decodePart (part: obj) : Part =
         )
     | _ -> RawPart part
 
-let decodeMessage (sessionID: string) (msg: obj) : Message option =
+let decodeMessage (sessionID: string) (msg: obj) : Message<obj> option =
     if Dyn.isNullish msg then
         None
     else
@@ -65,7 +67,7 @@ let decodeMessage (sessionID: string) (msg: obj) : Message option =
               source = classifySource (Dyn.str msg "id")
               raw = msg }
 
-let decodeMessages (sessionID: string) (messages: obj array) : Message list =
+let decodeMessages (sessionID: string) (messages: obj array) : Message<obj> list =
     messages |> Array.choose (decodeMessage sessionID) |> List.ofArray
 
 let private encodeTextPart (text: string) : obj =
@@ -94,7 +96,7 @@ let private partsEquivalent (left: obj) (right: obj) : bool =
             && outputsEquivalent (Dyn.get left "output") (Dyn.get right "output")
         | _ -> false
 
-let private rawOutputMatchesState (rawPart: obj) (state: ToolState) : bool =
+let private rawOutputMatchesState (rawPart: obj) (state: ToolState<obj>) : bool =
     let rawOutput = Dyn.get rawPart "output"
     if Dyn.isNullish rawOutput then
         state.output = ""
@@ -103,7 +105,7 @@ let private rawOutputMatchesState (rawPart: obj) (state: ToolState) : bool =
     else
         Dyn.str rawOutput "content" = state.output
 
-let private encodeToolPartState (rawPart: obj) (state: ToolState) : obj =
+let private encodeToolPartState (rawPart: obj) (state: ToolState<obj>) : obj =
     let rawOutput = Dyn.get rawPart "output"
     let nextOutput =
         if Dyn.isNullish rawOutput || Dyn.typeIs rawOutput "string" then
@@ -113,7 +115,7 @@ let private encodeToolPartState (rawPart: obj) (state: ToolState) : obj =
     let withState = Dyn.withKey rawPart "state" (box "output-available")
     Dyn.withKey withState "output" nextOutput
 
-let encodePart (part: Part) : obj =
+let encodePart (part: Part<obj>) : obj =
     match part with
     | TextPart text -> box (encodeTextPart text)
     | ToolPart(toolName, callID, Some state, raw) ->
@@ -137,7 +139,7 @@ let encodePart (part: Part) : obj =
             raw
     | RawPart raw -> raw
 
-let encodeMessage (msg: Message) : obj =
+let encodeMessage (msg: Message<obj>) : obj =
     let encodedParts = msg.parts |> List.map encodePart |> List.toArray
     let role =
         match msg.info.role with
@@ -163,5 +165,5 @@ let encodeMessage (msg: Message) : obj =
 
         if partsUnchanged then msg.raw else Dyn.withKey msg.raw "parts" (box encodedParts)
 
-let encodeMessages (messages: Message list) : obj array =
+let encodeMessages (messages: Message<obj> list) : obj array =
     messages |> List.map encodeMessage |> List.toArray

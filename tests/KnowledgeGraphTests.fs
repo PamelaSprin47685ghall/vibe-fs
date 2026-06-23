@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraphCodec
 open VibeFs.Kernel.KnowledgeGraphPrompts
 
 let private ok r =
@@ -170,9 +171,9 @@ let draftValidationSpec () =
 
 let applyDraftsSpec () =
     let counter = ref 0
-    let allocator (_existingIds: Set<string>) : string =
+    let allocator (_existingIds: Set<string>) : Result<string, string> =
         counter.Value <- counter.Value + 1
-        sprintf "%04x" counter.Value
+        Ok (sprintf "%04x" counter.Value)
     let existing = entry "0a3f" ["old e"] "old fact"
     let proj = projection [ existing ]
     let drafts =

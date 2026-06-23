@@ -2,7 +2,7 @@ module VibeFs.Tests.ResolveAiSettingsTests
 
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Mux.AiSettings
 
 let private settingsEqual (label: string) (expectedModel: string option) (expectedThinking: string option) (actual: DelegatedAiSettings) =

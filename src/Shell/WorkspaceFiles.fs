@@ -3,6 +3,7 @@ module VibeFs.Shell.WorkspaceFiles
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.CapsFormat
+open VibeFs.Shell.Dyn
 
 let maxFileSize = 4 * 1_048_576
 
@@ -138,11 +139,11 @@ let private extractImportList (frontmatter: obj option) : string list =
     match frontmatter with
     | None -> []
     | Some fm ->
-        if VibeFs.Kernel.Dyn.isNullish fm then []
+        if Dyn.isNullish fm then []
         else
-            let importVal = VibeFs.Kernel.Dyn.get fm "import"
-            if VibeFs.Kernel.Dyn.isNullish importVal then []
-            elif VibeFs.Kernel.Dyn.isArray importVal then importVal :?> obj array |> Array.map string |> List.ofArray
+            let importVal = Dyn.get fm "import"
+            if Dyn.isNullish importVal then []
+            elif Dyn.isArray importVal then importVal :?> obj array |> Array.map string |> List.ofArray
             else [ string importVal ]
 
 let findCapsFiles (projectRoot: string) : JS.Promise<CapsFile list> =

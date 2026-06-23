@@ -1,7 +1,6 @@
 module VibeFs.Kernel.TreeSitterKernel
 
 open System.Text.RegularExpressions
-open VibeFs.Kernel
 
 /// One syntax problem located in a source file.
 type SyntaxDiagnostic =
@@ -29,9 +28,7 @@ let syntaxCheckMarker = "[syntax-check]"
 let isFileEditTool (tool: string) : bool = Set.contains (tool.ToLowerInvariant ()) fileEditTools
 
 /// Pure parser over a patchText blob: extracts every `*** Add File|Update
-/// File|Move to: <path>` target, de-duplicated, order-preserved.  Lives on its
-/// own so `extractFilePaths` no longer mixes "pull a key off args" with "scan a
-/// patch body" — the two concerns have nothing in common (P38/P39).
+/// File|Move to: <path>` target, de-duplicated, order-preserved.
 let private patchPathRe = Regex(@"^\*\*\* (?:Add File|Update File|Move to): (.+)$")
 
 let pathsFromPatchText (patchText: string) : string list =
@@ -43,27 +40,6 @@ let pathsFromPatchText (patchText: string) : string list =
             if m.Success then Some m.Groups.[1].Value else None)
         |> List.ofSeq
         |> List.distinct
-
-/// Pull file path(s) out of a tool call's args — the args-side concern only:
-/// resolve `path` / `file_path` / `filePath`; when absent, hand the patchText
-/// body to the dedicated `pathsFromPatchText` parser.
-let extractFilePaths (args: obj) : string list =
-    if Dyn.isNullish args then []
-    else
-        let path =
-            [ "path"; "file_path"; "filePath" ]
-            |> List.tryPick (fun key ->
-                let value = Dyn.get args key
-                if Dyn.isNullish value then None else Some(string value))
-        match path with
-        | Some p when p <> "" -> [ p ]
-        | _ ->
-            let patchText = Dyn.get args "patchText"
-            if Dyn.isNullish patchText then []
-            else pathsFromPatchText (string patchText)
-
-let extractFilePath (args: obj) : string option =
-    extractFilePaths args |> List.tryHead
 
 let hasSyntaxCheckMarker (text: string) : bool = text.Contains(syntaxCheckMarker)
 

@@ -1,4 +1,4 @@
-module VibeFs.Kernel.Dyn
+module VibeFs.Shell.Dyn
 
 open Fable.Core
 open Fable.Core.JsInterop

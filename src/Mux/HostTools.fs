@@ -6,7 +6,9 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Executor
-open VibeFs.Kernel.Fuzzy
+open VibeFs.Kernel.FuzzyPath
+open VibeFs.Kernel.FuzzyQuery
+open VibeFs.Kernel.FuzzyFormat
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Mux.Delegate
@@ -15,6 +17,8 @@ open VibeFs.Mux.SubagentTools
 open VibeFs.Shell.FileSys
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzySearch
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 module FuzzyCommandsModule = VibeFs.Shell.FuzzySearch
 
@@ -27,12 +31,6 @@ let private getCwd (config: obj) : string =
     | Some v when not (System.String.IsNullOrWhiteSpace v) -> v
     | _ -> defaultArg (strField config "directory") ""
 
-/// Sub-agent used to summarize large executor output and web-search raw hits.
-/// Both are pure read-only distillation jobs, so we route them through the lightweight
-/// `explore` agent (matches the model-priority rule used by investigator/browser/meditator)
-/// and apply the `executor` role, which under opencode `canUseCanonical` permits only
-/// `agent_report` + `read`. This forbids the summary child from re-entering the host tool
-/// surface (no `investigator`/`coder`/`browser`/`meditator`/`websearch`/`write`/etc.).
 let summarizationAgentId = "explore"
 let summarizationRole = "executor"
 let summarizationAiSettingsAgentId = "explore"
@@ -59,32 +57,6 @@ let private summarizeWhenNeeded (deps: obj) (config: obj) (toolNames: string arr
             let! report = runMuxSubagent deps config summarizationAgentId prompt "Executor summary" opts
             return report
     }
-
-let describeDomainError (error: DomainError) : string =
-    match error with
-    | UpstreamTimeout seconds -> $"upstream timed out after {seconds}s"
-    | UpstreamRefused reason -> $"upstream refused: {reason}"
-    | UnknownJsError message -> message
-    | SystemPanic message -> message
-    | MessageAborted -> "request aborted"
-    | SessionBusy -> "session busy"
-    | TaskWaitBackgrounded -> "task moved to background"
-    | ExecutorExecutableMissing executable -> $"missing executable: {executable}"
-    | ParseError(context, detail) -> $"parse error in {context}: {detail}"
-    | ToolNotPermitted(agent, tool) -> $"tool '{tool}' not permitted for '{agent}'"
-    | InvalidIntent(tool, field, detail) -> $"invalid {tool}.{field}: {detail}"
-
-let private perSessionQueues = System.Collections.Generic.Dictionary<string, VibeFs.Shell.PromiseQueue.SerialQueue>()
-
-let private enqueuePerSession (sessionId: string) (work: unit -> JS.Promise<string>) : JS.Promise<string> =
-    let queue =
-        match perSessionQueues.TryGetValue sessionId with
-        | true, q -> q
-        | false, _ ->
-            let q = VibeFs.Shell.PromiseQueue.SerialQueue()
-            perSessionQueues.[sessionId] <- q
-            q
-    queue.Enqueue(work)
 
 let addIfSome (entries: ResizeArray<string * obj>) (key: string) (v: 'T option) =
     match v with
@@ -147,7 +119,7 @@ let executorTool (deps: obj) (toolNames: string array) (_knowledgeGraphRuntime: 
             promise {
                 let opts = buildExecutorOptions args config
                 let sessionId = Dyn.str config "sessionID"
-                let! execResult = enqueuePerSession sessionId (fun () ->
+                let! execResult = SessionExecutor.enqueuePerSession sessionId (fun () ->
                     promise {
                         let! r = VibeFs.Shell.Executor.execute opts sessionId
                         return match r with
@@ -206,19 +178,19 @@ let writeTool (_deps: obj) : ToolDefinition =
         fun config args ->
             promise {
                 if not (Dyn.has args "file_path") then
-                    return describeDomainError (InvalidIntent ("write", "file_path", "missing required parameter"))
+                    return formatDomainError (InvalidIntent ("write", "file_path", "missing required parameter"))
                 elif not (Dyn.has args "content") then
-                    return describeDomainError (InvalidIntent ("write", "content", "missing required parameter"))
+                    return formatDomainError (InvalidIntent ("write", "content", "missing required parameter"))
                 else
                     let filePath = Dyn.str args "file_path"
                     let content = Dyn.str args "content"
                     if System.String.IsNullOrWhiteSpace filePath then
-                        return describeDomainError (InvalidIntent ("write", "file_path", "must not be empty"))
+                        return formatDomainError (InvalidIntent ("write", "file_path", "must not be empty"))
                     else
                         let! result = write (Some (getCwd config)) filePath content
                         match result with
                         | Ok msg -> return msg
-                        | Error e -> return describeDomainError e
+                        | Error e -> return formatDomainError e
             }
       condition = None }
 

@@ -4,11 +4,12 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 open VibeFs.Shell.TreeSitterShell
 open VibeFs.Kernel.TreeSitterKernel
+open VibeFs.Shell.Dyn
 
 let pluginShape (p: obj) =
     check "plugin.name" (str p "name" = "kunwei")

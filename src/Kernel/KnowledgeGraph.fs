@@ -2,15 +2,11 @@ module VibeFs.Kernel.KnowledgeGraph
 
 open System
 open System.Text.RegularExpressions
-open Fable.Core
-open Fable.Core.JsInterop
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Kernel.PromptFrontMatter
 
 let private idRe = Regex("^[0-9a-f]{4}$")
 
-let private jsonParse (text: string) : obj = emitJsExpr (text) "JSON.parse($0)"
-let private jsonStringify (value: obj) : string = emitJsExpr (value) "JSON.stringify($0)"
 let private truncateTo (s: string) (max: int) = if s.Length > max then s.[.. max - 1] + "..." else s
 
 type KnowledgeGraphId = private KnowledgeGraphId of string
@@ -26,10 +22,6 @@ type KnowledgeGraphFile = { header: KnowledgeGraphHeader; entries: KnowledgeGrap
 
 type KnowledgeGraphProjection = Map<KnowledgeGraphId, KnowledgeGraphEntry>
 
-// Lives in Kernel.KnowledgeGraph (not the sibling KnowledgeGraphRuntimeState module) because F#
-// union cases / records are not re-exported transitively by `open`: existing
-// callers reach `AppendAfterWork` and the `KnowledgeGraphJobContext` record through
-// `open VibeFs.Kernel.KnowledgeGraph`, and the pure state module references them too.
 type KnowledgeGraphJobKind =
     | AppendAfterWork
     | DailyRewrite of date: string
@@ -80,95 +72,21 @@ let tryParseJobMarker (text: string) : KnowledgeGraphJobContext option =
     let fields = parseFrontMatterScalars text
     if Map.tryFind "type" fields <> Some "vibe_knowledge_graph_job" then None
     else
-        let workspaceRoot = Map.tryFind "workspaceRoot" fields |> Option.defaultValue ""
-        let kind = Map.tryFind "kind" fields |> Option.defaultValue ""
-        if workspaceRoot.Trim() = "" then None
-        else
-            match kind with
-            | "append" -> Some { workspaceRoot = workspaceRoot; kind = AppendAfterWork }
+        match Map.tryFind "workspaceRoot" fields, Map.tryFind "kind" fields with
+        | Some ws, Some k when ws.Trim() <> "" ->
+            match k with
+            | "append" -> Some { workspaceRoot = ws; kind = AppendAfterWork }
             | "daily" ->
-                let date = Map.tryFind "date" fields |> Option.defaultValue ""
-                if date.Trim() = "" then None else Some { workspaceRoot = workspaceRoot; kind = DailyRewrite date }
+                match Map.tryFind "date" fields with
+                | Some d when d.Trim() <> "" -> Some { workspaceRoot = ws; kind = DailyRewrite d }
+                | _ -> None
             | _ -> None
+        | _ -> None
 
 let tryParseId (s: string) : KnowledgeGraphId option =
     if idRe.IsMatch s then Some(KnowledgeGraphId s) else None
 
 let idValue (KnowledgeGraphId s) : string = s
-
-let parseHeaderLine (line: string) : Result<KnowledgeGraphHeader, string> =
-    try
-        let o = jsonParse line
-        if Dyn.isNullish o || not (Dyn.typeIs o "object") then Error "bad header"
-        else
-            let t = Dyn.str o "type"
-            let k = Dyn.str o "kind"
-            if t <> "knowledge_graph_header" || string (Dyn.get o "version") <> "1" then Error "bad header"
-            elif k = "day" then Ok(DayHeader(Dyn.str o "date", unbox<bool> (Dyn.get o "rewritten")))
-            else Error "bad header kind"
-    with _ -> Error "header parse failed"
-
-let renderHeader (header: KnowledgeGraphHeader) : string =
-    match header with
-    | DayHeader(date, rewritten) ->
-        jsonStringify (createObj [
-            "type", box "knowledge_graph_header"
-            "version", box 1
-            "kind", box "day"
-            "date", box date
-            "rewritten", box rewritten ])
-
-let parseEntryLine (line: string) : Result<KnowledgeGraphEntry, string> =
-    try
-        let o = jsonParse line
-        if Dyn.isNullish o || not (Dyn.typeIs o "object") then Error "bad entry"
-        else
-            let idStr = Dyn.str o "id"
-            let entityRaw = Dyn.get o "entity"
-            let fact = Dyn.get o "fact"
-            if not (idRe.IsMatch idStr) then Error "bad id"
-            elif Dyn.isNullish entityRaw || not (Dyn.isArray entityRaw) then Error "missing entity"
-            elif Dyn.isNullish fact then Error "missing fact"
-            else
-                let entities = (entityRaw :?> obj array) |> Array.map string |> Array.toList
-                Ok { id = KnowledgeGraphId idStr; entity = entities; fact = string fact }
-    with _ -> Error "entry parse failed"
-
-let renderEntry (entry: KnowledgeGraphEntry) : string =
-    jsonStringify (createObj [
-        "id", box (idValue entry.id)
-        "entity", box (Array.ofList entry.entity)
-        "fact", box entry.fact ])
-
-let parseNdjson (fileName: string) (text: string) : Result<KnowledgeGraphFile, string> =
-    try
-        let lines =
-            text.Split('\n')
-            |> Array.toList
-            |> List.map (fun l -> l.Trim())
-            |> List.filter ((<>) "")
-        match lines with
-        | [] -> Error(fileName + ": empty file")
-        | headerLine :: entryLines ->
-            match parseHeaderLine headerLine with
-            | Error e -> Error e
-            | Ok header ->
-                let rec collect acc remaining =
-                    match remaining with
-                    | [] -> Ok(List.rev acc)
-                    | line :: rest ->
-                        match parseEntryLine line with
-                        | Ok e -> collect (e :: acc) rest
-                        | Error _ -> Ok(List.rev acc)
-                match collect [] entryLines with
-                | Ok entries -> Ok { header = header; entries = entries }
-                | Error e -> Error e
-    with _ -> Error "ndjson parse failed"
-
-let renderNdjson (header: KnowledgeGraphHeader) (entries: KnowledgeGraphEntry list) : string =
-    let h = renderHeader header
-    if entries.IsEmpty then h + "\n"
-    else h + "\n" + (entries |> List.map renderEntry |> String.concat "\n") + "\n"
 
 let projectLatestWins (files: KnowledgeGraphFile list) : KnowledgeGraphProjection =
     files
@@ -229,39 +147,7 @@ let fetchAnswer (projection: KnowledgeGraphProjection) (entityStr: string) : Res
             |> String.concat "\n\n"
             |> Ok
 
-let parseDraftArray (value: obj) : Result<KnowledgeGraphDraft list, string> =
-    if Dyn.isNullish value || not (Dyn.isArray value) then Error "entries must be an array"
-    else
-        let drafts = value :?> obj array
-        let parseDraft (item: obj) : Result<KnowledgeGraphDraft, string> =
-            if Dyn.isNullish item || not (Dyn.typeIs item "object") then Error "entries must contain objects"
-            else
-                let id =
-                    match Dyn.opt item "id" with
-                    | Some rawId ->
-                        let trimmed = (string rawId).Trim()
-                        if trimmed = "" then None else Some trimmed
-                    | None -> None
-                let entityRaw = Dyn.get item "entity"
-                let entities =
-                    if Dyn.isNullish entityRaw then []
-                    elif Dyn.isArray entityRaw then (entityRaw :?> obj array) |> Array.map string |> Array.toList
-                    else [ string entityRaw ]
-                validateDraft
-                    { id = id
-                      entity = entities
-                      fact = Dyn.str item "fact" }
-
-        drafts
-        |> Array.fold
-            (fun acc item ->
-                acc
-                |> Result.bind (fun items ->
-                    parseDraft item |> Result.map (fun draft -> draft :: items)))
-            (Ok [])
-        |> Result.map List.rev
-
-let applyDrafts (allocate: Set<string> -> string) (projection: KnowledgeGraphProjection) (drafts: KnowledgeGraphDraft list)
+let applyDrafts (allocate: Set<string> -> Result<string, string>) (projection: KnowledgeGraphProjection) (drafts: KnowledgeGraphDraft list)
                 : Result<KnowledgeGraphEntry list, string> =
     let initialKnown =
         projection |> Map.toList |> List.map (fun (id, _) -> idValue id) |> Set.ofList
@@ -269,21 +155,23 @@ let applyDrafts (allocate: Set<string> -> string) (projection: KnowledgeGraphPro
         match tryParseId idStr with
         | Some wid when Map.containsKey wid projection -> Some wid
         | _ -> None
+    let entry wid (d: KnowledgeGraphDraft) : KnowledgeGraphEntry =
+        { id = wid; entity = d.entity; fact = d.fact }
     let step state draft =
         state
         |> Result.bind (fun (known, acc) ->
             match validateDraft draft with
             | Error e -> Error e
             | Ok d ->
-                let targetId, nextKnown =
-                    match d.id |> Option.bind reuseExisting with
-                    | Some wid -> wid, known
-                    | None ->
-                        let newId = allocate known
+                match d.id |> Option.bind reuseExisting with
+                | Some wid -> Ok(known, entry wid d :: acc)
+                | None ->
+                    match allocate known with
+                    | Error e -> Error e
+                    | Ok newId ->
                         match tryParseId newId with
-                        | Some wid -> wid, Set.add newId known
-                        | None -> failwith "allocated id invalid"
-                Ok(nextKnown, ({ id = targetId; entity = d.entity; fact = d.fact } : KnowledgeGraphEntry) :: acc))
+                        | Some wid -> Ok(Set.add newId known, entry wid d :: acc)
+                        | None -> Error "allocated id invalid")
     drafts
     |> List.fold step (Ok(initialKnown, []))
     |> Result.map (snd >> List.rev)

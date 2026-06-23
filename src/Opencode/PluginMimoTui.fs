@@ -3,6 +3,8 @@ module VibeFs.Opencode.PluginMimoTui
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 let private dateNow () : float =
     float (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())

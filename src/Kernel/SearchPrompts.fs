@@ -1,23 +1,11 @@
 module VibeFs.Kernel.SearchPrompts
 
-open VibeFs.Kernel.Dyn
 open VibeFs.Kernel.PromptFrontMatter
 
 type SearchResult =
     { title: string
       url: string
       content: string }
-
-let parseSearchResults (results: obj) : SearchResult list =
-    if Dyn.isNullish results || not (Dyn.isArray results) then
-        []
-    else
-        (results :?> obj array)
-        |> Array.map (fun r ->
-            { title = Dyn.str r "title"
-              url = Dyn.str r "url"
-              content = Dyn.str r "content" })
-        |> List.ofArray
 
 type FetchResponse =
     { title: string option

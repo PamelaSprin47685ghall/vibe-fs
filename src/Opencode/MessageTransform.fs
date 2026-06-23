@@ -3,14 +3,15 @@ module VibeFs.Opencode.MessageTransform
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell
+
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.MagicProjection
 open VibeFs.Kernel.Dedup
+open VibeFs.Kernel.MessageDedup
 open VibeFs.Kernel.CapsFormat
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.Methodology
@@ -20,6 +21,8 @@ open VibeFs.Opencode.MessagingCodec
 open VibeFs.Opencode.CapsCodec
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Shell.TreeSitterShell
+open VibeFs.Shell.Dyn
 
 let private defaultExcludedAgents = set [ "browser"; "investigator"; "executor"; "title"; "compaction"; "bookkeeper" ]
 
@@ -34,19 +37,19 @@ let private replaceArrayInPlace (target: obj array) (source: obj array) : unit =
         for item in source do
             targetObj?push(item) |> ignore
 
-let private extractSessionID (messages: Message list) : string =
+let private extractSessionID (messages: Message<obj> list) : string =
     messages
     |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
     |> Option.defaultValue ""
 
-let private resolveAgentFromMessages (registry: ChildAgentRegistry) (messages: Message list) : string option =
+let private resolveAgentFromMessages (registry: ChildAgentRegistry) (messages: Message<obj> list) : string option =
     messages
     |> List.tryPick (fun message ->
         if message.info.agent <> "" then Some message.info.agent
         elif message.info.sessionID <> "" then registry.LookupChildAgent(message.info.sessionID)
         else None)
 
-let private resolveAgent (registry: ChildAgentRegistry) (input: obj) (messages: Message list) : string =
+let private resolveAgent (registry: ChildAgentRegistry) (input: obj) (messages: Message<obj> list) : string =
     let explicit = Dyn.str input "agent"
     if explicit <> "" then explicit
     else
@@ -90,19 +93,19 @@ let private applyReadDedup (messages: obj array) : unit =
                                     | NewContent _ -> ()
 
 module private CapsFileCache =
-    let private cache = System.Collections.Generic.Dictionary<string, VibeFs.Kernel.CapsFormat.CapsFile list>()
+    let mutable private cache = Map.empty<string, VibeFs.Kernel.CapsFormat.CapsFile list>
 
     let getOrLoad (sessionID: string) (directory: string) : JS.Promise<VibeFs.Kernel.CapsFormat.CapsFile list> =
-        match cache.TryGetValue sessionID with
-        | true, files -> Promise.lift files
-        | false, _ ->
+        match Map.tryFind sessionID cache with
+        | Some files -> Promise.lift files
+        | None ->
             promise {
                 let! files = VibeFs.Shell.WorkspaceFiles.findCapsFiles directory
-                if not (cache.ContainsKey sessionID) then cache.[sessionID] <- files
+                if not (Map.containsKey sessionID cache) then cache <- Map.add sessionID files cache
                 return files
             }
 
-let private extractHistoryTexts (messages: Message list) =
+let private extractHistoryTexts (messages: Message<obj> list) =
     messages
     |> Messaging.flatten
     |> List.map (fun fp ->
@@ -117,7 +120,7 @@ let private extractHistoryTexts (messages: Message list) =
 /// yet — never clobber a live (possibly locked) review with a rebuild.  The
 /// history is the single source of truth; the store is its re-buildable
 /// projection.
-let private reconstructReviewState (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (sessionID: string) (messages: Message list) : unit =
+let private reconstructReviewState (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (sessionID: string) (messages: Message<obj> list) : unit =
     if sessionID = "" then ()
     else
         match reviewStore.getReviewState sessionID with

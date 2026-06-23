@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
@@ -14,6 +14,7 @@ open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.KnowledgeGraphFiles
+open VibeFs.Shell.Dyn
 
 
 let writeToolSpec (reg: obj) = promise {
@@ -168,7 +169,7 @@ let executorRejectsInvalidLanguageSpec () = promise {
         ]
     let context = createObj [ "directory", box workspaceDir; "sessionID", box "mimo-invalid-language"; "abort", box null ]
     let! result = ((get executor "execute") $ (args, context)) |> unbox<JS.Promise<string>>
-    check "executor invalid language returns explicit error" (result = "Executor failed: invalid language for executor: expected shell, python, or javascript")
+    check "executor invalid language returns explicit error" (result = "Executor failed: invalid language for tool 'executor': expected shell, python, or javascript")
     do! rmAsync workspaceDir
 }
 
@@ -180,14 +181,14 @@ let executorActorSpec () = promise {
         Promise.create (fun resolve _ ->
             gateResolve.Value <- resolve
             if releaseRequested.Value then resolve ())
-    let first = post "session-1" (fun () ->
+    let first = VibeFs.Shell.SessionExecutor.enqueuePerSession "session-1" (fun () ->
         promise {
             seen.Add "first-start"
             do! gateAsync
             seen.Add "first-end"
             return "one"
         })
-    let second = post "session-1" (fun () ->
+    let second = VibeFs.Shell.SessionExecutor.enqueuePerSession "session-1" (fun () ->
         promise {
             seen.Add "second-start"
             seen.Add "second-end"
@@ -247,11 +248,8 @@ let knowledgeGraphPortLockTimeoutSpec () = promise {
         ]) ]
     let lockRuntime = KnowledgeGraphRuntime(lockClient, workspaceDir, (fun () -> System.DateTime.UtcNow), ChildAgentRegistry.Create(), 0L, 0)
     let submitAttempt = lockRuntime.SubmitFromHistory(sessionID, workspaceDir, [])
-    let! errorText =
-        submitAttempt
-        |> Promise.map (fun _ -> "unexpected-success")
-        |> Promise.catch (fun err -> string err)
-    check "knowledge graph port lock timeout surfaces explicit error" (errorText.Contains "Timed out acquiring knowledge graph port lock")
+    let! result = submitAttempt
+    check "knowledge graph port lock timeout surfaces explicit error" (result.Contains "Timed out acquiring knowledge graph port lock")
     do! Promise.create(fun resolve _ -> server?close(System.Func<unit>(fun () -> resolve ())) |> ignore)
     do! rmAsync workspaceDir
 }

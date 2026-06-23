@@ -1,11 +1,13 @@
 module VibeFs.Tests.FuzzyTests
 
 open VibeFs.Tests.Assert
-open VibeFs.Kernel.Fuzzy
+open VibeFs.Kernel.FuzzyPath
+open VibeFs.Kernel.FuzzyQuery
+open VibeFs.Kernel.FuzzyFormat
 open VibeFs.Shell.FuzzySearch
+open VibeFs.Shell.FuzzyIteratorStore
 open VibeFs.Kernel
 open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.FuzzySearch
 
 let grepDetect () =
     equal "plain word" "plain" (detectGrepMode "foo")
@@ -17,14 +19,14 @@ let grepDetect () =
     check "concrete not wildcard" (not (checkWildcardOnly "getUserById" "plain"))
 
 let iteratorRoundTrip () =
-    let store = createIteratorStore 10
+    let store = createTypedIteratorStore 10
     let state : FuzzyFindState = { query = "my query"; pageSize = 30; pageIndex = 2; externalBasePath = None }
-    let id = storeIterator<FuzzyFindState> store "scope" "ffi_f" state
-    let resumed = consumeIterator<FuzzyFindState> store id
+    let id = storeFindIterator store "scope" state
+    let resumed = consumeFindIterator store id
     check "resume present" resumed.IsSome
     equal "query survives" "my query" resumed.Value.query
     equal "pageIndex survives" 2 resumed.Value.pageIndex
-    check "single-use" ((consumeIterator<FuzzyFindState> store id).IsNone)
+    check "single-use" ((consumeFindIterator store id).IsNone)
 
 let finderConversion () =
     let mockFinder = box {| fileSearch = (fun _ _ -> box {| ok = true; value = box {| items = [||]; totalMatched = 0; totalFiles = 0 |} |}) |}
@@ -55,7 +57,7 @@ let fuzzyFallbackNotice () =
     let plainMatch = box {| relativePath = "b.ts"; lineNumber = 2; lineContent = "y" |}
     let state : FuzzyGrepState =
         { query = "q"; mode = "plain"; smartCase = true; beforeContext = 5; afterContext = 5
-          pageSize = 50; externalBasePath = None; cursor = None }
+          pageSize = 50; externalBasePath = None }
     // Plain empty → no implicit fallback, returns empty.
     let rawEmpty = box {| ok = true; value = box {| items = [||]; totalMatched = 0; nextCursor = null |} |}
     let r = resolveResult rawEmpty
@@ -68,12 +70,10 @@ let fuzzyFallbackNotice () =
 /// find paging uses totalMatched ?? 0 for the next-page decision — so an absent
 /// totalMatched yields NO next iterator (mirrors find-output.ts).
 let findPagingDefault () =
-    let store = createIteratorStore 10
+    let store = createTypedIteratorStore 10
     let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = Some store; finderCache = FinderCache() }
     let state : FuzzyFindState = { query = "q"; pageSize = 30; pageIndex = 0; externalBasePath = None }
-    // Absent totalMatched → default 0 → no next page iterator.
     equal "no totalMatched → no iterator" "" (findNextIterator state store opts 0)
-    // Plenty of matches → iterator stored (non-empty id).
     let id = findNextIterator state store opts 100
     check "many matches → iterator stored" (id <> "")
 
@@ -121,33 +121,34 @@ let totalMatchedSemantics () =
 /// expose them so callers (and these tests) stop depending on literal "ffi_f"
 /// / "ffi_i" duplication.
 let iteratorNamespaceConstants () =
-    equal "find namespace constant" "ffi_f" VibeFs.Shell.FuzzySearch.findIteratorNamespace
-    equal "grep namespace constant" "ffi_i" VibeFs.Shell.FuzzySearch.grepIteratorNamespace
+    equal "find namespace constant" "ffi_f" VibeFs.Shell.FuzzyIteratorStore.findIteratorNamespace
+    equal "grep namespace constant" "ffi_i" VibeFs.Shell.FuzzyIteratorStore.grepIteratorNamespace
 
 /// P2-2: the iterator store must be strongly typed per-state.  Storing a
 /// FuzzyFindState under the find namespace and consuming it as a FuzzyGrepState
 /// MUST fail (return None / raise) — that's the whole point of replacing the
 /// `obj`-based store with one keyed by state type.
 let iteratorStoreStronglyTyped () =
-    let store = VibeFs.Shell.FuzzySearch.createTypedIteratorStore 10
+    let store = VibeFs.Shell.FuzzyIteratorStore.createTypedIteratorStore 10
     let findState : FuzzyFindState = { query = "q"; pageSize = 30; pageIndex = 0; externalBasePath = None }
-    let grepState : FuzzyGrepState =
+    let grepCore : FuzzyGrepState =
         { query = "q"; mode = "plain"; smartCase = true; beforeContext = 0; afterContext = 0
-          pageSize = 50; externalBasePath = None; cursor = None }
+          pageSize = 50; externalBasePath = None }
+    let grepState = { core = grepCore; cursor = None }
 
-    let findId = VibeFs.Shell.FuzzySearch.storeFindIterator store "scope" findState
+    let findId = VibeFs.Shell.FuzzyIteratorStore.storeFindIterator store "scope" findState
     check "find id carries scope" (findId.Contains "scope")
-    check "find id carries namespace" (findId.Contains VibeFs.Shell.FuzzySearch.findIteratorNamespace)
+    check "find id carries namespace" (findId.Contains VibeFs.Shell.FuzzyIteratorStore.findIteratorNamespace)
 
-    let grepId = VibeFs.Shell.FuzzySearch.storeGrepIterator store "scope" grepState
-    check "grep id carries namespace" (grepId.Contains VibeFs.Shell.FuzzySearch.grepIteratorNamespace)
+    let grepId = VibeFs.Shell.FuzzyIteratorStore.storeGrepIterator store "scope" grepState
+    check "grep id carries namespace" (grepId.Contains VibeFs.Shell.FuzzyIteratorStore.grepIteratorNamespace)
 
-    let resumed = VibeFs.Shell.FuzzySearch.consumeFindIterator store findId
+    let resumed = VibeFs.Shell.FuzzyIteratorStore.consumeFindIterator store findId
     check "find resume" resumed.IsSome
-    check "find single-use after typed consume" ((VibeFs.Shell.FuzzySearch.consumeFindIterator store findId).IsNone)
+    check "find single-use after typed consume" ((VibeFs.Shell.FuzzyIteratorStore.consumeFindIterator store findId).IsNone)
 
     // Cross-namespace consumption is a category error, not a silent miss.
-    let crossed = VibeFs.Shell.FuzzySearch.consumeFindIterator store grepId
+    let crossed = VibeFs.Shell.FuzzyIteratorStore.consumeFindIterator store grepId
     check "cross-namespace consume returns None" crossed.IsNone
 
 /// P2-2: fuzzyFind / fuzzyGrep must share a `runWithFinder` finder-acquisition
@@ -191,23 +192,20 @@ let runWithFinderSharedPipeline () =
 /// LLM/client passing `iterator: ""` (instead of omitting the field) should
 /// fall through to the fresh-search branch whenever `pattern` is present.
 let emptyIteratorTreatedAsAbsent () =
-    let store = VibeFs.Shell.FuzzySearch.createIteratorStore 10
+    let store = VibeFs.Shell.FuzzyIteratorStore.createTypedIteratorStore 10
     let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = Some store; finderCache = FinderCache() }
     let params' : FuzzyFindParams = { pattern = Some "q"; path = None; limit = None; iterator = Some "" }
     match resolveFindSearchState params' opts with
     | Ok _ -> check "empty iterator falls through to fresh search" true
     | Error msg ->
-        // Old behaviour: "fuzzy_find iterator error: ..."  New behaviour: Ok.
         check ("empty iterator must not error: " + msg) false
-    // Sanity: a stored iterator id still flows through the consume path.
     let storedId =
-        storeIterator<FuzzyFindState> store "scope" "ffi_f"
+        VibeFs.Shell.FuzzyIteratorStore.storeFindIterator store "scope"
             { query = "q"; pageSize = 30; pageIndex = 0; externalBasePath = None }
     let resumed : FuzzyFindParams = { pattern = None; path = None; limit = None; iterator = Some storedId }
     match resolveFindSearchState resumed opts with
     | Ok _ -> check "stored iterator resumes" true
     | Error _ -> check "stored iterator resumes" false
-    // And an unknown id (non-empty, non-stored) still errors.
     let bogus : FuzzyFindParams = { pattern = None; path = None; limit = None; iterator = Some "nope" }
     match resolveFindSearchState bogus opts with
     | Error _ -> check "unknown iterator still errors" true

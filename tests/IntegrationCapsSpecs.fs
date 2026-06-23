@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Kernel.Message
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Mux.Plugin
@@ -14,6 +14,7 @@ open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.KnowledgeGraphFiles
+open VibeFs.Shell.Dyn
 
 let buildCapsFileReadDataSpec () = promise {
     let! tmpDir = mkdtempAsync "caps-test-"

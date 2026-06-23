@@ -6,11 +6,14 @@ open VibeFs.Kernel
 open VibeFs.Kernel.SubagentPrompts
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.SubagentIntents
+open VibeFs.Shell.SubagentIntentsCodec
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Kernel.Config
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Kernel.HostTools
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 /// Mux host tool name universe. Sourced from ../mux/src/common/utils/tools/toolDefinitions.ts.
 let private muxHostToolNames =
@@ -137,7 +140,6 @@ module Tool =
                                         let! r = runMuxSubagent deps (abortableConfig config controller.signal) agentId prompt title opts
                                         return Some r
                                     with ex ->
-                                        printfn $"[mux] subagent '{agentId}' failed: {ex.Message}"
                                         controller.abort()
                                         return None
                                 })

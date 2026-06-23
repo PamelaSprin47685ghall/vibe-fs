@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 open VibeFs.Opencode.KnowledgeGraphRuntime
@@ -14,6 +14,7 @@ open VibeFs.Mux.KnowledgeGraphTools
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Shell.Dyn
 
 let bookkeeperLaunchCarriesAiSettingsSpec () = promise {
     let createCalls = ResizeArray<obj>()

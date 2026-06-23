@@ -3,8 +3,27 @@ module VibeFs.Shell.TreeSitterShell
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Kernel.Dyn
+open VibeFs.Shell.Dyn
+
 open VibeFs.Kernel.TreeSitterKernel
+
+let extractFilePaths (args: obj) : string list =
+    if isNullish args then []
+    else
+        let path =
+            [ "path"; "file_path"; "filePath" ]
+            |> List.tryPick (fun key ->
+                let value = get args key
+                if isNullish value then None else Some(string value))
+        match path with
+        | Some p when p <> "" -> [ p ]
+        | _ ->
+            let patchText = get args "patchText"
+            if isNullish patchText then []
+            else pathsFromPatchText (string patchText)
+
+let extractFilePath (args: obj) : string option =
+    extractFilePaths args |> List.tryHead
 
 type private Position = { row: int; column: int }
 
@@ -53,8 +72,7 @@ let private tryGetPack () : Result<obj, string> =
     let warmPack (pack: obj) =
         try
             getOrCall pack "downloadAll" |> ignore
-        with ex ->
-            printfn $"[tree-sitter] warmPack downloadAll failed: {ex.Message}"
+        with _ -> ()
         pack
 
     let loadFromRootPackage () =
@@ -196,8 +214,7 @@ let readAndCheckSyntax (filePath: string) (cwd: string) (includeOk: bool) : JS.P
             let! result = checkSyntax content filePath
             return formatSyntaxDiagnostics filePath result includeOk
         with ex ->
-            printfn $"[tree-sitter] checkSyntaxFile failed for {filePath}: {ex.Message}"
-            return None
+            return Some $"[tree-sitter] check failed for {filePath}: {ex.Message}"
     }
 
 let appendSyntaxDiagnostics (filePath: string) (content: string) (includeOk: bool)

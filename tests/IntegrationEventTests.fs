@@ -5,11 +5,12 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.TempWorkspace
-open VibeFs.Kernel.Dyn
+
 open VibeFs.Kernel.PromptFragments
 
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
+open VibeFs.Shell.Dyn
 
 let eventHookSpec (reg: obj) = promise {
     let hook = get reg "eventHook"

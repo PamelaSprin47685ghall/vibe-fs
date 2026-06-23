@@ -13,6 +13,8 @@ open VibeFs.Shell.CallStore
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
+open VibeFs.Shell
+open VibeFs.Shell.Dyn
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
