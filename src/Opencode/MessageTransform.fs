@@ -162,8 +162,8 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                             capsFiles
                             knowledgeGraphPrelude
                     let withProbe =
-                        if agent = "manager" && shouldAppendMethodologyProbe cleaned then
-                            Array.append final [| MessagingCodec.encodeMessage (buildProbeMessage sessionID) |]
+                        if not excluded && shouldAppendMethodologyProbe cleaned then
+                            Array.append final [| MessagingCodec.encodeMessage (buildProbeMessage agent sessionID) |]
                         else final
                     replaceArrayInPlace messagesArr withProbe
     }

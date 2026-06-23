@@ -693,16 +693,17 @@ let muxMethodologyProbeAppendedSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-methodology-probe-"
     let reg = createRegistration (minimalMuxDeps ())
     let tf = muxMessageTransform reg
-    let originalMsg = muxTextMessage "msg-probe" "user" "do the task"
-    let out = createObj [ "messages", box [| originalMsg |] ]
-    let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-methodology-probe-session" ]
-    do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
-    let msgs = unbox<obj[]> (get out "messages")
-    let lastMsg = msgs.[msgs.Length - 1]
-    let lastId = str lastMsg "id"
-    check "methodology probe appended for manager" (lastId.StartsWith "methodology-probe-")
-    let lastText = firstTextPartText lastMsg
-    check "methodology probe mentions select_methodology" (lastText.Contains "select_methodology")
+    for agent in [| "manager"; "coder"; "reviewer"; "meditator" |] do
+        let originalMsg = muxTextMessage ("msg-probe-" + agent) "user" "do the task"
+        let out = createObj [ "messages", box [| originalMsg |] ]
+        let input = createObj [ "agent", box agent; "directory", box workspaceDir; "sessionID", box ("mux-methodology-probe-" + agent) ]
+        do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+        let msgs = unbox<obj[]> (get out "messages")
+        let lastMsg = msgs.[msgs.Length - 1]
+        let lastId = str lastMsg "id"
+        check (agent + " receives methodology probe") (lastId.StartsWith "methodology-probe-")
+        let lastText = firstTextPartText lastMsg
+        check (agent + " probe mentions select_methodology") (lastText.Contains "select_methodology")
     do! rmAsync workspaceDir
 }
 

@@ -158,12 +158,12 @@ let shouldAppendMethodologyProbe (messages: Message list) : bool =
 /// Constructs the synthetic probe user message. Never persisted: id prefix
 /// `methodology-probe-` ensures stripSyntheticBySource removes it on
 /// re-projection.
-let buildProbeMessage (sessionID: string) : Message =
+let buildProbeMessage (agent: string) (sessionID: string) : Message =
     { info =
           { id = methodologyProbeIdPrefix + "1"
             sessionID = sessionID
             role = User
-            agent = "manager"
+            agent = agent
             isError = false
             toolName = ""
             details = null

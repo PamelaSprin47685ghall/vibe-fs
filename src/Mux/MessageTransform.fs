@@ -208,8 +208,8 @@ let messagesTransform
                         Promise.lift (None: string option)
                 let final = buildCapsMessages deduped directory capsFiles knowledgeGraphPrelude
                 let withProbe =
-                    if agent = "manager" && shouldAppendMethodologyProbe cleanedMessages then
-                        Array.append final [| encodeMessage (buildProbeMessage sessionID) |]
+                    if not excluded && shouldAppendMethodologyProbe cleanedMessages then
+                        Array.append final [| encodeMessage (buildProbeMessage agent sessionID) |]
                     else final
                 replaceArrayInPlace messagesArr withProbe
     }

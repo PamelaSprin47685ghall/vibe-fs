@@ -26,7 +26,13 @@ let canUse' () =
     check "submit_review denied for coder" (not (canUse "coder" "submit_review"))
     check "submit_review denied for investigator" (not (canUse "investigator" "submit_review"))
     check "select_methodology for manager" (canUse "manager" "select_methodology")
-    check "select_methodology denied for coder" (not (canUse "coder" "select_methodology"))
+    check "select_methodology for coder" (canUse "coder" "select_methodology")
+    check "select_methodology for reviewer" (canUse "reviewer" "select_methodology")
+    check "select_methodology for meditator" (canUse "meditator" "select_methodology")
+    check "select_methodology denied for browser" (not (canUse "browser" "select_methodology"))
+    check "select_methodology denied for investigator" (not (canUse "investigator" "select_methodology"))
+    check "select_methodology denied for executor" (not (canUse "executor" "select_methodology"))
+    check "select_methodology denied for bookkeeper" (not (canUse "bookkeeper" "select_methodology"))
 
     check "meditator denied read" (not (canUse "meditator" "read"))
     check "executor denied read" (not (canUse "executor" "read"))
@@ -125,7 +131,7 @@ let canUseMatrix () =
         "websearch",                     [ true;  false; false; false; false; false; false; false ]
         "webfetch",                      [ true;  false; false; false; false; false; false; false ]
         "submit_review",                 [ true;  false; false; false; false; false; false; false ]
-        "select_methodology",            [ true;  false; false; false; false; false; false; false ]
+        "select_methodology",            [ true;  false; true;  true;  false; true;  false; false ]
         "todowrite",                     [ true;  false; false; false; false; false; false; false ]
         "todo_write",                    [ true;  false; false; false; false; false; false; false ]
         "question",                      [ true;  false; false; false; false; false; false; false ]

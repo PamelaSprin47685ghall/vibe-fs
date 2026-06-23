@@ -72,12 +72,12 @@ let shouldAppendPendingMethodologyDoesNotCount () =
         shouldAppendMethodologyProbe [ userMsg "u1" "task"; assistantToolMsg "a1" selectMethodologyToolName "pending" ] = true)
 
 let probeMessageShape () =
-    let msg = buildProbeMessage "sess1"
+    let msg = buildProbeMessage "coder" "sess1"
     check "probe msg: id prefix" (msg.info.id.StartsWith(methodologyProbeIdPrefix))
     check "probe msg: user role" (msg.info.role = User)
     check "probe msg: synthetic source" (msg.source = Synthetic "methodology-probe")
     check "probe msg: session id" (msg.info.sessionID = "sess1")
-    check "probe msg: manager agent" (msg.info.agent = "manager")
+    check "probe msg: reflects agent" (msg.info.agent = "coder")
     check "probe msg: single text part" (
         match msg.parts with [ TextPart _ ] -> true | _ -> false)
 

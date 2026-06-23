@@ -174,20 +174,21 @@ let opencodeMethodologyProbeSpec () = promise {
     let! workspaceDir = mkdtempAsync "opencode-methodology-probe-"
     let! p = plugin (box {| directory = workspaceDir |})
     let tf = get p "experimental.chat.messages.transform"
-    let userMsg =
-        box {| info = createObj [ "id", box "msg-user"; "agent", box "manager"; "role", box "user"; "sessionID", box "probe-session" ]
-               parts = [| box {| ``type`` = "text"; text = "do the task" |} |] |}
-    let out = createObj [ "messages", box [| userMsg |] ]
-    do! tf $ (createObj [ "agent", box "manager"; "sessionID", box "probe-session" ], out) |> unbox<JS.Promise<unit>>
-    let msgs = unbox<obj[]> (get out "messages")
-    let lastMsg = msgs.[msgs.Length - 1]
-    let lastInfo = get lastMsg "info"
-    let lastId = str lastInfo "id"
-    check "opencode methodology probe appended for manager" (lastId.StartsWith "methodology-probe-")
-    let parts = get lastMsg "parts"
-    let firstPart = (unbox<obj[]> parts).[0]
-    let probeText = str firstPart "text"
-    check "opencode methodology probe mentions select_methodology" (probeText.Contains "select_methodology")
+    for agent in [| "manager"; "coder"; "reviewer"; "meditator" |] do
+        let userMsg =
+            box {| info = createObj [ "id", box ("msg-user-" + agent); "agent", box agent; "role", box "user"; "sessionID", box ("probe-" + agent) ]
+                   parts = [| box {| ``type`` = "text"; text = "do the task" |} |] |}
+        let out = createObj [ "messages", box [| userMsg |] ]
+        do! tf $ (createObj [ "agent", box agent; "sessionID", box ("probe-" + agent) ], out) |> unbox<JS.Promise<unit>>
+        let msgs = unbox<obj[]> (get out "messages")
+        let lastMsg = msgs.[msgs.Length - 1]
+        let lastInfo = get lastMsg "info"
+        let lastId = str lastInfo "id"
+        check (agent + " receives opencode methodology probe") (lastId.StartsWith "methodology-probe-")
+        let parts = get lastMsg "parts"
+        let firstPart = (unbox<obj[]> parts).[0]
+        let probeText = str firstPart "text"
+        check (agent + " probe mentions select_methodology") (probeText.Contains "select_methodology")
     do! rmAsync workspaceDir
 }
 
@@ -218,7 +219,7 @@ let opencodeMethodologyProbeExcludedAgentsSpec () = promise {
     let! workspaceDir = mkdtempAsync "opencode-methodology-excluded-"
     let! p = plugin (box {| directory = workspaceDir |})
     let tf = get p "experimental.chat.messages.transform"
-    for agent in [| "compaction"; "title" |] do
+    for agent in [| "compaction"; "title"; "browser"; "bookkeeper"; "investigator"; "executor" |] do
         let userMsg =
             box {| info = createObj [ "id", box ("msg-" + agent); "agent", box agent; "role", box "user"; "sessionID", box ("excl-" + agent) ]
                    parts = [| box {| ``type`` = "text"; text = "do the task" |} |] |}
