@@ -11,22 +11,22 @@ type ToolSpec =
 
 let private map (entries: (string * string) list) : Map<string, string> = Map.ofList entries
 
-let private coderSpec : ToolSpec =
+let private coderSpec: ToolSpec =
     { name = "coder"
       description =
         "Execute code changes from structured intents. Each intents[] element spawns its own coder subagent in parallel. Every element must include objective, background, and targets (file + guide per file; optional draft per file); do_not_touch is optional per subagent. "
-        + "IMPORTANT: Subagents start in a fresh session with no manager history. Pack all context into background, do_not_touch, and per-file guide fields. Do NOT assume the coder knows the repo."
+        + "IMPORTANT: Subagents start in a fresh session with no manager history. Pack all context into background, do_not_touch, and per-file guide fields independently. Do NOT assume the coder knows your preferences."
       paramDocs =
         map
             [ "intents",
-              "Non-empty array of coder intents. Each item: objective (what to implement), background (why and prior context), optional do_not_touch[] constraints, and targets[] with file, guide, and optional draft per path. One subagent per item, all parallel."
+              "Non-empty array of coder intents. Each item: objective, background (handover documentation), optional do_not_touch[] constraints, and targets[] with file, guide, and optional draft per path. One subagent per item, all parallel."
               "tdd",
               "TDD phase for this coder call. red = this edit is the RED phase: write the failing test, or the code that fails it; the result must leave tests failing. green = this edit is the GREEN phase: make the failing tests pass. "
               + "Discipline: for a new requirement the requirement comes first; for a bug fix the regression comes first. Always go red before green for any unit of work. "
-              + "You MUST issue a tdd=red coder call before any tdd=green coder call for the same work; a green call with no preceding red in the session is usually a violation and tends to be rejected. Declare the phase truthfully." ]
+              + "You SHOULD issue a tdd=red coder call before any tdd=green coder call for the same work; a green call with no preceding red in the session is usually a violation and tends to be rejected. Declare the phase truthfully." ]
       requiredFields = [ "intents"; "tdd" ] }
 
-let private investigatorSpec : ToolSpec =
+let private investigatorSpec: ToolSpec =
     { name = "investigator"
       description =
         "Search the codebase from structured intents. Each intents[] element spawns its own investigator subagent in parallel. Every element must include objective, background, and questions[]; entries[] is optional. "
@@ -34,13 +34,13 @@ let private investigatorSpec : ToolSpec =
       paramDocs =
         map
             [ "intents",
-              "Non-empty array of investigator intents. Each item: objective, background, questions[] (required KPIs for the report), optional entries[] (paths/symbols to start from). One subagent per item, all parallel." ]
+              "Non-empty array of investigator intents. Each item: objective, background, questions[], optional entries[] (paths/symbols to start from). One subagent per item, all parallel." ]
       requiredFields = [ "intents" ] }
 
-let private meditatorSpec : ToolSpec =
+let private meditatorSpec: ToolSpec =
     { name = "meditator"
       description =
-        "Receive a natural-language intent or question for deep reasoning and delegate to the meditator agent. "
+        "Receive a detailed intent or question for deep reasoning and delegate to the meditator agent. "
         + "IMPORTANT: Subagents do not receive role instructions in their system prompt; the meditator agent gets its task as a user message built from your intent and files. You (the parent) must put full context into the intent and list every file path the agent needs. Do NOT assume the meditator agent knows the project background."
       paramDocs =
         map
@@ -50,7 +50,7 @@ let private meditatorSpec : ToolSpec =
               "File paths listed in the subagent user message for context. Include design docs, relevant code, or background material the agent must read." ]
       requiredFields = [ "intent"; "files" ] }
 
-let private browserSpec : ToolSpec =
+let private browserSpec: ToolSpec =
     { name = "browser"
       description =
         "Receive a natural-language intent for a web task and delegate to the browser agent. "
@@ -61,7 +61,7 @@ let private browserSpec : ToolSpec =
               "Natural-language intent for the web task. Becomes the subagent user message - include URLs, goals, constraints, and any project context the browser agent needs." ]
       requiredFields = [ "intent" ] }
 
-let private executorSpec : ToolSpec =
+let private executorSpec: ToolSpec =
     { name = "executor"
       description =
         "Executes a shell command, Python code, or JavaScript/TypeScript program synchronously with a strict timeout budget. On completion (or timeout) the captured output is either returned directly or summarized when it exceeds 8192 bytes. If executing Python or JavaScript, specify dependencies in the \"dependencies\" argument."
@@ -72,24 +72,27 @@ let private executorSpec : ToolSpec =
               "dependencies", "Dependencies to install (for python or javascript)."
               "timeout_type",
               "Execution timeout budget: 'short' (1s), 'long' (10s), or 'last-resort' (100s). Use 'last-resort' only when absolutely necessary."
-              "mode", "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)." ]
+              "mode",
+              "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)." ]
       requiredFields = [ "language"; "program"; "timeout_type"; "mode" ] }
 
-let private fetchKnowledgeGraphSpec : ToolSpec =
+let private fetchKnowledgeGraphSpec: ToolSpec =
     { name = "knowledge_graph_fetch"
-      description =
-        "Fetch facts for a knowledge graph entity from this session's knowledge graph snapshot. The manager prelude lists available entities. This tool returns only the fact text and does not read the latest disk knowledge graph."
-      paramDocs = map [ "entity", "Knowledge graph entity from the manager prelude." ]
+      description = "Fetch facts for a knowledge graph entity from this session's knowledge graph snapshot. "
+      paramDocs = map [ "entity", "Knowledge graph entity from the prelude." ]
       requiredFields = [ "entity" ] }
 
-let private submitKnowledgeGraphSpec : ToolSpec =
+let private submitKnowledgeGraphSpec: ToolSpec =
     { name = "return_bookkeeper"
       description =
-        "Return knowledge graph draft entries for the current knowledge graph job context. The host decides whether this is an append or daily rewrite job; entries with an id update existing facts, and entries without an id receive a host-assigned id."
-      paramDocs = map [ "entries", "Array of knowledge graph draft entries. Each entry: optional id, required entity (string array), required fact." ]
+        "Return knowledge graph draft entries for the current knowledge graph job context. Entries with an id update existing facts, and entries without an id receive a host-assigned id."
+      paramDocs =
+        map
+            [ "entries",
+              "Array of knowledge graph draft entries. Each entry: optional id, required entity (string array), required fact." ]
       requiredFields = [ "entries" ] }
 
-let private fuzzyFindSpec : ToolSpec =
+let private fuzzyFindSpec: ToolSpec =
     { name = "fuzzy_find"
       description =
         "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported. When more results exist, the response ends with iterator=\"...\"."
@@ -101,7 +104,7 @@ let private fuzzyFindSpec : ToolSpec =
               "iterator", "Opaque single-use iterator from a previous fuzzy_find result." ]
       requiredFields = [] }
 
-let private fuzzyGrepSpec : ToolSpec =
+let private fuzzyGrepSpec: ToolSpec =
     { name = "fuzzy_grep"
       description =
         "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked. Supports automatic regex mode detection. Use mode=fuzzy explicitly for fuzzy matching when exact regex yields no results. When more results exist, the response ends with iterator=\"...\"."
@@ -116,7 +119,7 @@ let private fuzzyGrepSpec : ToolSpec =
               "iterator", "Opaque single-use iterator from a previous fuzzy_grep result." ]
       requiredFields = [] }
 
-let private websearchSpec : ToolSpec =
+let private websearchSpec: ToolSpec =
     { name = "websearch"
       description =
         "Search the web for any topic; raw results are rewritten by a summarizer subagent focused on what_to_summarize, returning clean, ready-to-use content."
@@ -125,11 +128,10 @@ let private websearchSpec : ToolSpec =
             [ "query",
               "Natural language search query. Should be a semantically rich description of the ideal page, not just keywords."
               "numResults", "Number of search results to return (default: 10)"
-              "what_to_summarize",
-              "The question or intent the search should answer. The summarizer subagent focuses on extracting and synthesizing content relevant to this." ]
+              "what_to_summarize", "The question or intent the search should answer." ]
       requiredFields = [ "query"; "what_to_summarize" ] }
 
-let private webfetchSpec : ToolSpec =
+let private webfetchSpec: ToolSpec =
     { name = "webfetch"
       description =
         "Fetch a URL with better extraction for static/docs pages. Supports llms.txt probing, content-focused HTML extraction, metadata, and redirects."
@@ -142,21 +144,32 @@ let private webfetchSpec : ToolSpec =
               "timeout", "Timeout in seconds (max: 120)" ]
       requiredFields = [ "url" ] }
 
-let private submitReviewSpec : ToolSpec =
+let private submitReviewSpec: ToolSpec =
     { name = "submit_review"
       description =
-        "Submit completed work for review. Creates a reviewer sub-agent that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active With-Review Mode."
+        "Submit completed work for review. Creates a reviewer that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active With-Review Mode."
       paramDocs =
         map
             [ "report", "Detailed report of what was done"
               "affectedFiles", "List of file paths that were modified or created" ]
       requiredFields = [ "report"; "affectedFiles" ] }
 
-let all : ToolSpec list =
-    [ coderSpec; investigatorSpec; meditatorSpec; browserSpec; executorSpec
-      fetchKnowledgeGraphSpec; submitKnowledgeGraphSpec; fuzzyFindSpec; fuzzyGrepSpec; websearchSpec; webfetchSpec; submitReviewSpec ]
+let all: ToolSpec list =
+    [ coderSpec
+      investigatorSpec
+      meditatorSpec
+      browserSpec
+      executorSpec
+      fetchKnowledgeGraphSpec
+      submitKnowledgeGraphSpec
+      fuzzyFindSpec
+      fuzzyGrepSpec
+      websearchSpec
+      webfetchSpec
+      submitReviewSpec ]
 
-let private byName : Map<string, ToolSpec> = all |> List.map (fun spec -> spec.name, spec) |> Map.ofList
+let private byName: Map<string, ToolSpec> =
+    all |> List.map (fun spec -> spec.name, spec) |> Map.ofList
 
 let specOf (name: string) : ToolSpec =
     match Map.tryFind name byName with
@@ -165,6 +178,7 @@ let specOf (name: string) : ToolSpec =
 
 let paramDoc (name: string) (field: string) : string =
     let spec = specOf name
+
     match Map.tryFind field spec.paramDocs with
     | Some doc -> doc
     | None -> failwithf "ToolCatalog: unknown param %s.%s" name field

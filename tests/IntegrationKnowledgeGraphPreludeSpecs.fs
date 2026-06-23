@@ -28,7 +28,7 @@ let knowledgeGraphPreludeWithoutCapsSpec () = promise {
     check "knowledge graph prelude is front matter" (firstText.Contains "---\nknowledge_graph:")
     check "knowledge graph prelude includes entity" (firstText.Contains "项目" && firstText.Contains "插件入口" && not (firstText.Contains "0a3f"))
     check "knowledge graph prelude hides facts" (not (firstText.Contains "src/Opencode/Plugin.fs"))
-    check "knowledge graph prelude injects think-wrapped content" (firstText.Contains "<think>")
+    check "knowledge graph prelude injects Kolmolgorov prelude content" (firstText.Contains "# Kolmolgorov 宝典")
     check "knowledge graph prelude preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }
@@ -45,7 +45,7 @@ let coderReceivesKnowledgeGraphPreludeSpec () = promise {
     let msgs = unbox<obj[]> (get out "messages")
     let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
     check "coder knowledge graph prelude injects synthetic messages" (msgs.Length = 2)
-    check "coder knowledge graph prelude has think-wrapped content" (firstText.Contains "<think>")
+    check "coder knowledge graph prelude has Kolmolgorov prelude content" (firstText.Contains "# Kolmolgorov 宝典")
     check "coder knowledge graph prelude is front matter" (firstText.Contains "---\nknowledge_graph:")
     check "coder knowledge graph prelude includes entity" (firstText.Contains "项目" && firstText.Contains "插件入口" && not (firstText.Contains "0a3f"))
     check "coder knowledge graph prelude hides facts" (not (firstText.Contains "src/Opencode/Plugin.fs"))
@@ -66,7 +66,7 @@ let browserDoesNotReceiveKnowledgeGraphPreludeSpec () = promise {
     check "browser still receives injection" (msgs.Length = 2)
     let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
     check "browser injection omits knowledge graph prelude" (not (firstText.Contains "knowledge_graph"))
-    check "browser injection has think-wrapped content" (firstText.Contains "<think>")
+    check "browser injection has Kolmolgorov prelude content" (firstText.Contains "# Kolmolgorov 宝典")
     check "browser injection preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }

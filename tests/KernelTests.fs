@@ -331,7 +331,6 @@ let reviewerVerdictPromptsShared () =
     check "reviewer verdict mentions PASS" (verdict.Contains "PASS")
     check "reviewer verdict mentions REJECT" (verdict.Contains "REJECT")
     check "reviewer verdict mentions feedback" (verdict.Contains "feedback")
-    check "reviewer verdict mentions callId" (verdict.Contains "callId")
 
     let preReview = VibeFs.Kernel.Prompts.ReviewerVerdictPrompts.loopReviewVerdictInstructions
     check "loop-review verdict mentions agent_report" (preReview.Contains "agent_report")

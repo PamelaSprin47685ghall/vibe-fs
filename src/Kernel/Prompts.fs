@@ -34,16 +34,15 @@ let meditatorNudge =
 
 let todoNudgePrompt =
     "There are still incomplete todos. Continue working through the remaining items. "
-    + "If stuck or blocked, explain the situation and ask for guidance. "
+    + "If they are irrelevant, remove them. "
     + "If you want to skip this check, respond with <skip-todo-check />"
 
 let readOnlyRulesFor (host: Host) =
-    "READ-ONLY: You may only use read, search, and discovery tools. "
-    + "You must NOT write, edit, patch, or create files. "
+    "READ-ONLY: You must NOT write, edit, patch, or create files. "
     + "You must NOT run commands or call "
     + todoWritePromptName host
     + " or any mutating tool. "
-    + "You must NOT change workspace state. Output reports only."
+    + "You must NOT change workspace state. Output detailed reports only."
 
 let readOnlyRules = readOnlyRulesFor opencode
 
@@ -60,7 +59,7 @@ let managerSystemPromptFor (host: Host) =
         + todoWriteToolName host
         + " call must provide the full todos list plus a detailed completedWorkReport that can survive context folding."
 
-    "You are the manager agent. Coordinate the overall task, decide when to delegate to subagents, and synthesize their outputs into a final answer that satisfies the user's original goal.\n\n"
+    "You are the manager agent. Coordinate the overall task, work towards the user's original goal.\n\n"
     + todoLine
 
 let managerSystemPrompt = managerSystemPromptFor opencode
@@ -93,8 +92,7 @@ let private reviewerVerdictPrologue (subject: string) =
     $"You are a reviewer evaluating {subject}.\n\n"
     + "Call the agent_report tool to submit your verdict. Use exactly these fields:\n"
     + "- verdict: \"PASS\" if the changes are acceptable, \"REJECT\" otherwise\n"
-    + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n"
-    + "- callId: the callId supplied in this prompt\n\n"
+    + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n\n"
     + "Do not output free-form text as your final answer; the tool call is required."
 
 let private agentReportVerdictInstructions (passMeaning: string) =
@@ -102,8 +100,7 @@ let private agentReportVerdictInstructions (passMeaning: string) =
     + "- verdict: \"PASS\" if "
     + passMeaning
     + ", \"REJECT\" otherwise\n"
-    + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n"
-    + "- callId: the callId supplied in this prompt\n\n"
+    + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n\n"
     + "IMPORTANT: If you accept, verdict MUST be \"PASS\" and feedback MUST be an empty string. "
     + "Do not output free-form text as your final answer; the tool call is required."
 
@@ -145,15 +142,14 @@ let private reviewSubmissionVerdictBody =
     + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. "
     + "The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n"
     + "# Submitting Your Verdict\n\n"
-    + agentReportVerdictInstructions "the reported changes satisfy the original task"
+    + agentReportVerdictInstructions "current implementation is already complete and correct."
 
 let private preReviewVerdictBody =
     readOnlyWorkspaceConstraint
     + "\n\n"
-    + "You are a code reviewer evaluating whether the proposed task is clear and actionable enough to begin work.\n\n"
+    + "You are a code reviewer evaluating whether the proposed task is already finished before beginning work.\n\n"
     + reviewCriteria
-    + "\n\nBased on the task above, judge whether the requirement is specific, coherent, and implementable without guesswork. "
-    + "Reject when the task is ambiguous, underspecified, or self-contradictory.\n\n"
+    + "REJECT when the task needs real work, otherwise PASS.\n\n"
     + "# Submitting Your Verdict\n\n"
     + agentReportVerdictInstructions "the task is clear, specific, and actionable enough to begin work"
 
@@ -275,8 +271,8 @@ let coderPrompt (intent: CoderIntent) : string =
     agentPrompt
         fields
         [ "You are an implementation agent. Read the listed files and related code, then edit or create files to satisfy the objective and each target guide."
-          "Static verification only (read, inspect, type-check). Do NOT run tests or execute code."
-          "Return a concise summary of changes and/or your difficulties." ]
+          "Static verification only (read and think using logic). Do NOT run tests or execute code."
+          "Return a detailed summary of changes and/or your difficulties." ]
 
 let investigatorPrompt (intent: InvestigatorIntent) : string =
     agentPrompt
@@ -284,9 +280,9 @@ let investigatorPrompt (intent: InvestigatorIntent) : string =
           yamlBlockField "background" intent.background
           yamlStringSeqField "questions" (List.ofArray intent.questions)
           yamlStringSeqField "entries" (List.ofArray intent.entries) ]
-        [ "You are a codebase search agent. Explore the workspace and answer every question in `questions`."
+        [ "You are a codebase search agent. Explore the workspace and answer questions."
           "Use fuzzy_find, glob, fuzzy_grep, and read. Report concrete file paths and line-number references, and answer each question explicitly."
-          "Return a structured report with relatedFiles and line ranges." ]
+          "Return your report with relatedFiles and line ranges." ]
 
 let meditatorPrompt (sections: MeditatorFileSection list) (intent: string) : string =
     let fileItem (s: MeditatorFileSection) : string =
@@ -299,15 +295,15 @@ let meditatorPrompt (sections: MeditatorFileSection list) (intent: string) : str
     agentPrompt
         [ yamlSeqField "files" (sections |> List.map fileItem)
           yamlBlockField "question" intent ]
-        [ "You are a deep-reasoning agent. The file contents are provided above; analyze every listed file carefully."
-          "Produce a thorough analysis covering tradeoffs, risks, and concrete recommendations."
-          "Return a conclusive report with reasoning." ]
+        [ "You are in a quiet room with the texts and the question."
+          "No tools, no distractions — just you and the problem."
+          "Read carefully. Turn it over in your mind."
+          "When you are ready, answer with clarity and depth." ]
 
 let browserPrompt (intent: string) : string =
     agentPrompt
         [ yamlBlockField "task" intent ]
-        [ "You are a browser automation agent. Use only stealth-browser-mcp tools to interact with web pages. Do not write files or run shell commands."
-          "Return a clear summary of what you found or did." ]
+        [ "You are a browser automation agent. Use stealth-browser-mcp tools to interact with web pages. Return a detailed report." ]
 
 let executorSummarizerPrompt
     (output: string)
@@ -324,7 +320,7 @@ let executorSummarizerPrompt
           yamlScalarField "timeout_type" timeoutType
           yamlScalarField "mode" mode
           yamlBlockField "raw_output" output ]
-        [ "You are a filter for executor (shell) output. Preserve errors, non-zero exit status, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output."
+        [ "You are a filter for executor output. Preserve errors, non-zero exit status, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output."
           "Do NOT lose any information." ]
 
 let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =
@@ -397,8 +393,7 @@ module ReviewerVerdictPrompts =
         "You are a reviewer evaluating whether a task description is clear and actionable enough to begin work.\n\n"
         + "Call the agent_report tool to submit your verdict. Use exactly these fields:\n"
         + "- verdict: \"PASS\" if the task is clear, specific, and actionable, \"REJECT\" otherwise\n"
-        + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n"
-        + "- callId: the callId supplied in this prompt\n\n"
+        + "- feedback: detailed, actionable feedback when rejecting; empty string when passing\n\n"
         + "Do not output free-form text as your final answer; the tool call is required."
 
 let formatReviewResult (result: ReviewResult) : string =

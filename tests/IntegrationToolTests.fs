@@ -70,7 +70,7 @@ let muxKnowledgeGraphPreludeForManagerSpec () = promise {
         let msgs = unbox<obj[]> (get out "messages")
         check "mux manager knowledge graph prelude injects prefix messages" (msgs.Length >= 2)
         let firstText = firstTextPartText msgs.[0]
-        check "mux manager knowledge graph prelude has think-wrapped content" (firstText.Contains "<think>")
+        check "mux manager knowledge graph prelude has Kolmolgorov prelude content" (firstText.Contains "# Kolmolgorov 宝典")
         check "mux manager knowledge graph prelude has knowledge graph front matter" (firstText.Contains "---\nknowledge_graph:")
         check "mux manager knowledge graph prelude lists entity" (firstText.Contains "项目" && firstText.Contains "插件入口" && not (firstText.Contains "0a3f"))
         check "mux manager knowledge graph prelude hides fact" (not (firstText.Contains "src/Mux/Plugin.fs"))
@@ -94,7 +94,7 @@ let muxKnowledgeGraphPreludeForCoderSpec () = promise {
         let msgs = unbox<obj[]> (get out "messages")
         check "mux coder knowledge graph prelude injects prefix messages" (msgs.Length >= 2)
         let firstText = firstTextPartText msgs.[0]
-        check "mux coder knowledge graph prelude has think-wrapped content" (firstText.Contains "<think>")
+        check "mux coder knowledge graph prelude has Kolmolgorov prelude content" (firstText.Contains "# Kolmolgorov 宝典")
         check "mux coder knowledge graph prelude has knowledge graph front matter" (firstText.Contains "---\nknowledge_graph:")
         check "mux coder knowledge graph prelude lists entity" (firstText.Contains "项目" && firstText.Contains "插件入口" && not (firstText.Contains "0a3f"))
         check "mux coder knowledge graph prelude hides fact" (not (firstText.Contains "src/Mux/Plugin.fs"))
@@ -119,7 +119,7 @@ let muxNoKnowledgeGraphPreludeForExcludedAgentsSpec () = promise {
             let msgs = unbox<obj[]> (get out "messages")
             check (agent + " still receives default prefix") (msgs.Length >= 2)
             let firstText = firstTextPartText msgs.[0]
-            check (agent + " default prefix has think-wrapped content") (firstText.Contains "<think>")
+            check (agent + " default prefix has Kolmolgorov prelude content") (firstText.Contains "# Kolmolgorov 宝典")
             check (agent + " omits knowledge graph prelude") (not (firstText.Contains "knowledge_graph"))
             check (agent + " preserves original") (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
     do! rmAsync workspaceDir
@@ -143,7 +143,7 @@ let muxCapsAndKnowledgeGraphPreludeOrderSpec () = promise {
         let msgs = unbox<obj[]> (get out "messages")
         check "mux caps+kg injects prefix messages" (msgs.Length >= 2)
         let firstText = firstTextPartText msgs.[0]
-        check "mux caps+kg first message has think-wrapped content" (firstText.Contains "<think>")
+        check "mux caps+kg first message has Kolmolgorov prelude content" (firstText.Contains "# Kolmolgorov 宝典")
         check "mux caps+kg first message includes knowledge graph front matter" (firstText.Contains "---\nknowledge_graph:")
         let hasCapsAssistant = msgs.[..msgs.Length - 2] |> Array.exists hasDynamicToolReadPart
         check "mux caps+kg includes assistant caps read before original" hasCapsAssistant
@@ -311,7 +311,7 @@ let muxTopLevelPolicySpec () =
     promise {
         let managerPolicy = getPluginToolPolicy "x" (box "manager")
         let managerRemoves = unbox<string[]> (get managerPolicy "remove")
-        check "mux top-level policy manager keeps write" (not (managerRemoves |> Array.contains "write"))
+        check "mux top-level policy manager removes write" (managerRemoves |> Array.contains "write")
         check "mux top-level policy manager keeps submit_review" (not (managerRemoves |> Array.contains "submit_review"))
         check "mux top-level policy manager removes fuzzy_grep" (managerRemoves |> Array.contains "fuzzy_grep")
         let coderPolicy = getPluginToolPolicy "x" (box "coder")
@@ -320,7 +320,7 @@ let muxTopLevelPolicySpec () =
         check "mux top-level policy coder removes submit_review" (coderRemoves |> Array.contains "submit_review")
         let defaultPolicy = getPluginToolPolicy "x" null
         let defaultRemoves = unbox<string[]> (get defaultPolicy "remove")
-        check "mux top-level policy defaults to manager" (not (defaultRemoves |> Array.contains "write"))
+        check "mux top-level policy default manager removes write" (defaultRemoves |> Array.contains "write")
     }
 
 let muxTopLevelDedupSpec () =
@@ -776,6 +776,7 @@ let run () : JS.Promise<unit> =
             "muxMeditatorReadsFilesFromCwd", muxMeditatorReadsFilesFromCwdSpec
             "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
             "muxSubmitReviewPromptSuppliesCallId", muxSubmitReviewPromptSuppliesCallIdSpec
+            "muxAgentReportWrapperResolvesReviewBySession", muxAgentReportWrapperResolvesReviewBySessionSpec
             "muxSubmitReviewUsesRolledBackHistoryTask", muxSubmitReviewUsesRolledBackHistoryTaskSpec
             "muxLoopReviewPromptUsesFrontMatter", muxLoopReviewPromptUsesFrontMatterSpec
             "muxReturnReviewerRegistered", muxReturnReviewerRegisteredSpec

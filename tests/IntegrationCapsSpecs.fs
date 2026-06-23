@@ -68,7 +68,7 @@ let defaultPreludeWithoutCapsSpec () = promise {
     let msgs = unbox<obj[]> (get out "messages")
     check "default prelude injects synthetic messages without caps or knowledge graph" (msgs.Length = 2)
     let userParts = unbox<obj[]> (get msgs.[0] "parts")
-    check "default prelude injects think-wrapped content" ((str userParts.[0] "text").StartsWith "<think>")
+    check "default prelude injects Kolmolgorov prelude content" ((str userParts.[0] "text").StartsWith "# Kolmolgorov 宝典")
     check "default prelude preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }
@@ -124,7 +124,7 @@ let capsAndMagicOrderSpec () = promise {
     let capsAssistantInfo = get result.[1] "info"
     let magicInfo = get result.[2] "info"
     let magicId : string = str magicInfo "id"
-    check "caps/magic order: caps user first" ((str userParts.[0] "text").StartsWith "<think>")
+    check "caps/magic order: caps user first" ((str userParts.[0] "text").StartsWith "# Kolmolgorov 宝典")
     check "caps/magic order: caps read assistant second" ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
     check "caps/magic order: magic prefix third" (magicId.StartsWith(magicTodoPrefixPrefix : string))
     do! rmAsync workspaceDir
@@ -145,7 +145,7 @@ let bookkeeperDoesNotReceiveCapsSpec () = promise {
     check "bookkeeper still receives injection without caps files" (msgs.Length = 2)
     let firstText = str (unbox<obj[]> (get msgs.[0] "parts")).[0] "text"
     check "bookkeeper injection omits knowledge graph prelude" (not (firstText.Contains "[项目背景和历史]"))
-    check "bookkeeper injection has think-wrapped content" (firstText.StartsWith "<think>")
+    check "bookkeeper injection has Kolmolgorov prelude content" (firstText.StartsWith "# Kolmolgorov 宝典")
     check "bookkeeper injection preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }

@@ -102,15 +102,14 @@ type HostReadExec() =
 
 let private reviewerAgentReportDefinition () : ToolDefinition =
     { name = "agent_report"
-      description = "Submit a review verdict. Provide callId, verdict, and feedback; the wrapper forwards the verdict as the upstream agent_report markdown."
+      description = "Submit a review verdict. Provide verdict and feedback; the wrapper forwards the verdict as the upstream agent_report markdown."
       parameters =
           { ``type`` = "object"
             properties =
                 createObj
-                    [ "callId", box (createObj [ "type", box "string"; "description", box "Internal review call id supplied by the prompt." ])
-                      "verdict", box (createObj [ "type", box "string"; "enum", box [| "PASS"; "REJECT" |]; "description", box "PASS accepts the work; REJECT sends actionable feedback." ])
+                    [ "verdict", box (createObj [ "type", box "string"; "enum", box [| "PASS"; "REJECT" |]; "description", box "PASS accepts the work; REJECT sends actionable feedback." ])
                       "feedback", box (createObj [ "type", box "string"; "description", box "Detailed actionable feedback. Empty string when passing." ]) ]
-            required = Some [| "callId"; "verdict"; "feedback" |]
+            required = Some [| "verdict"; "feedback" |]
             additionalProperties = Some false }
       execute = fun _ _ -> resolveStr "" 
       condition = None }
@@ -214,9 +213,18 @@ let private mkAgentReportOverride (callStore: CallStore) : obj =
                 let execFn =
                     System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
                         promise {
-                            let callId = Dyn.str args "callId"
-                            if callId <> "" then
-                                resolveCall callStore callId args |> ignore
+                            let sessionID =
+                                let a = Dyn.str opts "sessionID"
+                                if a <> "" then a else Dyn.str opts "sessionId"
+
+                            let resolvedBySession =
+                                if sessionID <> "" then
+                                    callStore.PendingCalls.Keys
+                                    |> Seq.tryFind (fun k -> k.StartsWith(sessionID + "-review-"))
+                                    |> Option.map (fun callId -> resolveCall callStore callId args)
+                                    |> Option.defaultValue false
+                                else
+                                    false
 
                             let upstreamArgs = reviewerAgentReportPayload args
                             let raw = tool?execute(upstreamArgs, opts)
