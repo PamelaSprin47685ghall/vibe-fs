@@ -82,6 +82,7 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
             do! services.NudgeHook.handleEvent input
         }))
     setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host services.MagicSession input output))
+    setKey result "experimental.chat.system.transform" (twoArgHook (fun input output -> HookTransform.systemTransform input output))
 
 let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
     promise {

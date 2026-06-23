@@ -23,6 +23,9 @@ let compactingHandlerFor (host: Host) (magicSession: VibeFs.Opencode.MagicTodo.M
 let compactingHandler (magicSession: VibeFs.Opencode.MagicTodo.MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
     MessageTransform.compactingHandler magicSession input output
 
+let systemTransform (input: obj) (output: obj) : JS.Promise<unit> =
+    MessageTransform.systemTransform input output
+
 let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     ToolDefinitionHooks.toolDefinitionFor host input output
 

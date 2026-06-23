@@ -194,3 +194,10 @@ let compactingHandlerFor (host: Host) (magicSession: MagicSession) (input: obj) 
 
 let compactingHandler (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
     compactingHandlerFor opencode magicSession input output
+
+let systemTransform (input: obj) (output: obj) : JS.Promise<unit> =
+    promise {
+        let systemObj = output?system
+        if not (Dyn.isNullish systemObj) then
+            systemObj?length <- 0
+    }

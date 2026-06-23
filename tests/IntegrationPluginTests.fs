@@ -19,6 +19,7 @@ let pluginShape (p: obj) =
     check "plugin.mcp" (typeIs (get p "mcp") "object")
     check "plugin.tool.execute.after" (typeIs (get p "tool.execute.after") "function")
     check "plugin.experimental.chat.messages.transform" (typeIs (get p "experimental.chat.messages.transform") "function")
+    check "plugin.experimental.chat.system.transform" (typeIs (get p "experimental.chat.system.transform") "function")
     check "plugin.command.execute.before" (typeIs (get p "command.execute.before") "function")
 
 let registrationShape (reg: obj) =
@@ -252,11 +253,21 @@ let topLevelExportsSpec () =
     check "top-level collectReadOutputs is function" (typeIs collectReadOutputs "function")
     check "top-level deduplicateReadOutputsWithSeen is function" (typeIs deduplicateReadOutputsWithSeen "function")
 
+let systemTransformSpec (p: obj) = promise {
+    let tf = get p "experimental.chat.system.transform"
+    let systemArray = [| "baseline system prompt"; "extra prompt" |]
+    let output = createObj [ "system", box systemArray ]
+    do! tf $ (createObj [], output) |> unbox<JS.Promise<unit>>
+    let transformedSystem = unbox<obj[]> (get output "system")
+    check "system transform empties system prompt array" (transformedSystem.Length = 0)
+}
+
 let run () : JS.Promise<unit> =
     promise {
         let! workspaceDir = mkdtempAsync "plugin-run-"
         let! p = plugin (box {| directory = workspaceDir |})
         pluginShape p
+        do! systemTransformSpec p
         let reg = createRegistration (createObj [])
         registrationShape reg
         topLevelExportsSpec ()
