@@ -165,14 +165,11 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
 
 let compactingHandlerFor (host: Host) (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
-        let sessionID = Dyn.str input "sessionID"
-        let backlog = magicSession.GetOrRebuildBacklog(sessionID, [])
-        if backlog.IsEmpty then ()
-        else
-            let context = Dyn.get output "context"
-            if not (Dyn.isNullish context) && Dyn.isArray context then
-                let hint = "Preserve the latest " + magicTodoToolNameFor host + " result and the complete Magic Todo backlog in the summary. If earlier user messages are folded, rewrite them into that todo summary as work-period user updates instead of preserving raw user messages verbatim."
-                (box context)?push(box hint) |> ignore
+        ignore host
+        ignore magicSession
+        ignore input
+        ignore output
+        ()
     }
 
 let compactingHandler (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =

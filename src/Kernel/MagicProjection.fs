@@ -73,14 +73,11 @@ let private buildSyntheticPrefixMessages (host: Host) (messages: Message list) (
           let fromIdx = if index = 0 then 0 else todoIdxs.[index - 1] + 1
           let toIdx = todoIdxs.[index] - 1
           let userText = collectUserText flat fromIdx toIdx
-          let messageText = buildBacklogText [ foldedBacklog.[index] ] userText
           let finalText =
               if index = foldedBacklog.Length - 1 then
-                  match errorNotice with
-                  | Some err when err <> "" -> messageText + sectionSep + errorPrefix + err
-                  | _ -> messageText
+                  buildBacklogTextWithError [ foldedBacklog.[index] ] userText errorNotice
               else
-                  messageText
+                  buildBacklogText [ foldedBacklog.[index] ] userText
           let todoMessage = messages.[flat.[todoIdxs.[index]].msgIndex]
           let todoTime = messageTimeOrNull todoMessage
           let syntheticId = magicTodoPrefixPrefix + string (index + 1)

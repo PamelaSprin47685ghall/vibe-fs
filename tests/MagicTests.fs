@@ -77,8 +77,18 @@ let private toolMsg (toolName: string) (id: string) (callID: string) (report: st
       parts = [ ToolPart(toolName, callID, Some (mkState "completed" "Todos updated." input), null) ]
       source = Native; raw = null }
 
-let private backlogEntry (seq: int) (report: string) : BacklogEntry =
-    { sequence = seq; timestamp = ""; report = report }
+let private backlogEntry (_: int) (report: string) : BacklogEntry =
+    { report = report }
+
+let private visibleText (messages: Message list) : string =
+    messages
+    |> List.collect (fun message ->
+        message.parts
+        |> List.choose (function
+            | TextPart text -> Some text
+            | ToolPart(_, _, Some state, _) -> Some state.output
+            | _ -> None))
+    |> String.concat "\n\n"
 
 let replayBacklogOpencodeDoesNotMergeConsecutiveTodoWrite () =
     let msgs = [ todoWriteMsg "m1" "c1" "W1"; todoWriteMsg "m2" "c2" "W2"; todoWriteMsg "m3" "c3" "W3" ]
@@ -323,9 +333,13 @@ let projectMagicDropsFoldedUserMessages () =
     let backlog = [ backlogEntry 1 "R1"; backlogEntry 2 "R2"; backlogEntry 3 "R3" ]
     let r = projectMagic msgs backlog false "test"
     let allJson: string = Fable.Core.JS.JSON.stringify (encodeMessages r)
+    let text = visibleText r
     check "magic fold: hides original folded users" (not (allJson.Contains("\"id\":\"u2\"")))
-    check "magic fold: marks folded users as summary" (allJson.Contains("工作期间收到的用户消息"))
-    check "magic fold: keeps folded user content in projection" (allJson.Contains("please fix this bug"))
+    check "magic fold: uses front matter projection summary" (
+        text.StartsWith("---\n")
+        && text.Contains("\n-\n")
+        && text.Contains("user_message:"))
+    check "magic fold: keeps folded user content in projection" (text.Contains("please fix this bug"))
 
 let projectMagicKeepsReviewInFold () =
     let msgs =
@@ -404,9 +418,22 @@ let magicSessionRefreshesBacklog () =
 
 let buildBacklogTextTest () =
     let text: string = buildBacklogText [ backlogEntry 1 "Did work" ] []
-    check "backlog text: has report" (text.Contains("Did work"))
+    check "backlog text: has front matter" (text.StartsWith("---\n-\n"))
+    check "backlog text: stores reports in front matter" (
+        text.Contains("-\n  user_message: []")
+        && text.Contains("completed_work: |")
+        && text.Contains("Completed work from folded turns. File changes are already on disk.")
+        && text.Contains("Did work"))
     let empty: string = buildBacklogText [] []
-    check "backlog text: empty message" (empty.Contains("已完成工作报告"))
+    check "backlog text: empty front matter" (empty.StartsWith("---\n\n---\n\n"))
+    check "backlog text: empty body still explains folded work" (
+        empty.Contains("Completed work from folded turns. File changes are already on disk."))
+
+let buildBacklogTextWithErrorTest () =
+    let text = buildBacklogTextWithError [ backlogEntry 1 "Did work" ] [] (Some "bad todo state")
+    check "backlog text with error: error moves to body" (
+        text.Contains("Last todo write error: bad todo state")
+        && not (text.Contains("last_todo_write_error:")))
 
 let run () =
     replayBacklogOpencodeDoesNotMergeConsecutiveTodoWrite ()
@@ -441,3 +468,4 @@ let run () =
     magicSessionRefreshesBacklog ()
     magicSessionRefreshesBacklogForMimocode ()
     buildBacklogTextTest ()
+    buildBacklogTextWithErrorTest ()

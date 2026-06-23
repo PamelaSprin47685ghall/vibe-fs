@@ -555,7 +555,12 @@ let muxMagicTodoProjectionSpec () = promise {
                 let parts = unbox<obj[]> (get msg "parts")
                 parts
                 |> Array.choose (fun part -> if str part "type" = "text" then Some (str part "text") else None))
-        check "mux magic todo projection injects folded backlog text" (texts |> Array.exists (fun text -> text.Contains foldHeader && text.Contains "planned phase"))
+        check "mux magic todo projection injects folded backlog text" (
+            texts
+            |> Array.exists (fun text ->
+                text.Contains("Completed work from folded turns. File changes are already on disk.")
+                && text.Contains("user_message:")
+                && text.Contains("planned phase")))
 }
 
 let muxExecutorRoCatPrependsWarningSpec () = promise {

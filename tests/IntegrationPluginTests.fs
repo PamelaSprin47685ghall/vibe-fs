@@ -190,11 +190,7 @@ let mimoConfigSpec () = promise {
     let compactingOutput = createObj [ "context", box compactingContext ]
     do! (get p "experimental.session.compacting") $ (createObj [ "sessionID", box sessionID ], compactingOutput) |> unbox<JS.Promise<unit>>
     let compactingContextAfter = unbox<obj[]> (get compactingOutput "context")
-    check "mimo session.compacting uses task naming" (
-        compactingContextAfter.Length = 1
-        && (string compactingContextAfter.[0]).Contains("task")
-        && (string compactingContextAfter.[0]).Contains("Magic Todo backlog")
-    )
+    check "mimo session.compacting leaves context untouched" (compactingContextAfter.Length = 0)
     do! rmAsync workspaceDir
 }
 
