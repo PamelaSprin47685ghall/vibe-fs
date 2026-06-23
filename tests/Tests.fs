@@ -14,6 +14,7 @@ open VibeFs.Tests.IntegrationPluginTests
 open VibeFs.Tests.IntegrationEventTests
 open VibeFs.Tests.IntegrationDedupTests
 open VibeFs.Tests.IntegrationToolTests
+open VibeFs.Tests.IntegrationOpencodeReviewSpecs
 open VibeFs.Tests.IntegrationChatTests
 open VibeFs.Tests.MagicTests
 open VibeFs.Tests.MethodologyTests
@@ -105,6 +106,7 @@ let private tests : (string * TestBody) list = [
     "IntegrationEventTests.run", Async IntegrationEventTests.run
     "IntegrationDedupTests.run", Async IntegrationDedupTests.run
     "IntegrationToolTests.run", Async IntegrationToolTests.run
+    "IntegrationOpencodeReviewSpecs.run", Async IntegrationOpencodeReviewSpecs.run
     "IntegrationChatTests.run", Async IntegrationChatTests.run
     "KnowledgeGraphTests.run", Async KnowledgeGraphTests.run
     "KnowledgeGraphFileTests.run", Async KnowledgeGraphFileTests.run

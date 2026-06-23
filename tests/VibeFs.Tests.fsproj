@@ -15,6 +15,7 @@
     <Compile Include="IntegrationBookkeeperSpecs.fs" />
     <Compile Include="IntegrationToolDefSpecs.fs" />
     <Compile Include="IntegrationSubagentSpecs.fs" />
+    <Compile Include="IntegrationOpencodeReviewSpecs.fs" />
     <Compile Include="IntegrationMiscSpecs.fs" />
     <Compile Include="ReviewTests.fs" />
     <Compile Include="AgentTests.fs" />
