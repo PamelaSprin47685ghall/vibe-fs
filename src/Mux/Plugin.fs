@@ -16,6 +16,7 @@ open VibeFs.Mux.EventHook
 open VibeFs.Mux.SlashCommands
 open VibeFs.Mux.KnowledgeGraphTools
 open VibeFs.Mux.KnowledgeGraphToolDefs
+open VibeFs.Mux.MethodologyTool
 open VibeFs.Kernel.Dyn
 open VibeFs.Mux.ReadDedup
 open VibeFs.Shell.FuzzyFinderShell
@@ -26,7 +27,7 @@ open VibeFs.Mux.MessageTransform
 let muxToolNames =
     [| "coder"; "investigator"; "meditator"; "browser"; "executor"
        "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
-       "knowledge_graph_fetch"; "return_bookkeeper" |]
+       "knowledge_graph_fetch"; "return_bookkeeper"; "select_methodology" |]
 
 let private canUseMuxTopLevel (agent: string) (toolName: string) : bool =
     canUseCanonical agent toolName
@@ -111,7 +112,8 @@ let createToolCatalog
        yield writeTool deps
        yield readTool deps hostReadExec
        yield knowledgeGraphFetchTool knowledgeGraphRuntime
-       yield returnBookkeeperTool knowledgeGraphRuntime |]
+       yield returnBookkeeperTool knowledgeGraphRuntime
+       yield selectMethodologyTool |]
 
 let private recordsToBookkeeper (tool: string) : bool =
     let allowed =

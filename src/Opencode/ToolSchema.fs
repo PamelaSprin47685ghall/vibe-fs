@@ -46,7 +46,7 @@ let private schemaObject (shape: obj) : obj = call1 schema "object" shape
 
 let private strictObject (shape: obj) : obj = call0 (schemaObject shape) "strict"
 
-let private arrayMin (item: obj) (minCount: int) (desc: string) : obj =
+let arrayMin (item: obj) (minCount: int) (desc: string) : obj =
     call1 (call1 (arr item) "min" (box minCount)) "describe" (box desc)
 
 let coderIntentsSchema (desc: string) : obj =
@@ -99,6 +99,9 @@ let enumReq (values: string array) (desc: string) : obj =
 let enumOpt (values: string array) (desc: string) : obj =
     let e = call1 schema "enum" values
     call1 (call0 e "optional") "describe" (box desc)
+
+let enumArrayMin (values: string array) (minCount: int) (desc: string) : obj =
+    arrayMin (call1 schema "enum" values) minCount desc
 
 let obj (shape: obj) : obj = call1 schema "object" shape
 

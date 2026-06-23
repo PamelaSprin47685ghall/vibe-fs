@@ -34,7 +34,7 @@ let isTodoWriteToolName (toolName: string) : bool =
     || List.contains toolName mimoAliases
 
 let allToolNames (host: Host) : string array =
-    [| "coder"; "investigator"; "meditator"; "browser"; "executor"
+    [| "coder"; "investigator"; "meditator"; "browser"; "executor"; "select_methodology"
        "fuzzy_find"; "fuzzy_grep"; "websearch"; "webfetch"
        "knowledge_graph_fetch"; "return_bookkeeper"; "submit_review"; "return_reviewer"; "read"; "write"
        "bash"; taskToolName host; "grep"; "edit"; "patch"; "apply_patch"

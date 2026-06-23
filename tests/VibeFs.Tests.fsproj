@@ -34,6 +34,7 @@
     <Compile Include="KnowledgeGraphFileTests.fs" />
     <Compile Include="KnowledgeGraphKernelTests.fs" />
     <Compile Include="TitleFetchGuardTests.fs" />
+    <Compile Include="MethodologyTests.fs" />
     <Compile Include="Tests.fs" />
   </ItemGroup>
 </Project>

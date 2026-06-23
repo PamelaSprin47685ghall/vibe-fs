@@ -15,7 +15,7 @@
 
 - 子代理委派：`coder`、`investigator`、`browser`、`meditator`、`executor`
 - 搜索 / 读取 / 执行 / 审查 / 问答 / 写入工具
-- review loop、todo folding、knowledge graph / bookkeeper、nudge
+- review loop、todo folding、knowledge graph / bookkeeper、nudge、methodology probe
 - OpenCode、Mimocode、Mux 三条宿主接线
 
 但真正困难的不是“把工具挂出来”，而是同时满足下面这些约束：

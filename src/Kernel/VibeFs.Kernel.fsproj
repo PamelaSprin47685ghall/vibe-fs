@@ -31,5 +31,6 @@
     <Compile Include="Config.fs" />
     <Compile Include="Fuzzy.fs" />
     <Compile Include="Executor.fs" />
+    <Compile Include="Methodology.fs" />
   </ItemGroup>
 </Project>

@@ -169,3 +169,89 @@ let compactionDoesNotReceiveCapsSpec () = promise {
     check "compaction injection preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
     do! rmAsync workspaceDir
 }
+
+let opencodeMethodologyProbeSpec () = promise {
+    let! workspaceDir = mkdtempAsync "opencode-methodology-probe-"
+    let! p = plugin (box {| directory = workspaceDir |})
+    let tf = get p "experimental.chat.messages.transform"
+    let userMsg =
+        box {| info = createObj [ "id", box "msg-user"; "agent", box "manager"; "role", box "user"; "sessionID", box "probe-session" ]
+               parts = [| box {| ``type`` = "text"; text = "do the task" |} |] |}
+    let out = createObj [ "messages", box [| userMsg |] ]
+    do! tf $ (createObj [ "agent", box "manager"; "sessionID", box "probe-session" ], out) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    let lastMsg = msgs.[msgs.Length - 1]
+    let lastInfo = get lastMsg "info"
+    let lastId = str lastInfo "id"
+    check "opencode methodology probe appended for manager" (lastId.StartsWith "methodology-probe-")
+    let parts = get lastMsg "parts"
+    let firstPart = (unbox<obj[]> parts).[0]
+    let probeText = str firstPart "text"
+    check "opencode methodology probe mentions select_methodology" (probeText.Contains "select_methodology")
+    do! rmAsync workspaceDir
+}
+
+let opencodeMethodologyProbeSuppressedSpec () = promise {
+    let! workspaceDir = mkdtempAsync "opencode-methodology-suppressed-"
+    let! p = plugin (box {| directory = workspaceDir |})
+    let tf = get p "experimental.chat.messages.transform"
+    let userMsg =
+        box {| info = createObj [ "id", box "msg-user"; "agent", box "manager"; "role", box "user"; "sessionID", box "suppress-session" ]
+               parts = [| box {| ``type`` = "text"; text = "do the task" |} |] |}
+    let methodologyResult =
+        box {| info = createObj [ "id", box "msg-method"; "agent", box "manager"; "role", box "assistant"; "sessionID", box "suppress-session" ]
+               parts = [| createObj [
+                   "type", box "tool"
+                   "tool", box "select_methodology"
+                   "callID", box "call-1"
+                   "state", box (createObj [ "status", box "completed"; "output", box "Continue using the selected methodologies." ])
+               ] |] |}
+    let out = createObj [ "messages", box [| userMsg; methodologyResult |] ]
+    do! tf $ (createObj [ "agent", box "manager"; "sessionID", box "suppress-session" ], out) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    let hasProbe = msgs |> Array.exists (fun m -> (str (get m "info") "id").StartsWith "methodology-probe-")
+    check "opencode methodology probe suppressed after completed call" (not hasProbe)
+    do! rmAsync workspaceDir
+}
+
+let opencodeMethodologyProbeExcludedAgentsSpec () = promise {
+    let! workspaceDir = mkdtempAsync "opencode-methodology-excluded-"
+    let! p = plugin (box {| directory = workspaceDir |})
+    let tf = get p "experimental.chat.messages.transform"
+    for agent in [| "compaction"; "title" |] do
+        let userMsg =
+            box {| info = createObj [ "id", box ("msg-" + agent); "agent", box agent; "role", box "user"; "sessionID", box ("excl-" + agent) ]
+                   parts = [| box {| ``type`` = "text"; text = "do the task" |} |] |}
+        let out = createObj [ "messages", box [| userMsg |] ]
+        do! tf $ (createObj [ "agent", box agent; "sessionID", box ("excl-" + agent) ], out) |> unbox<JS.Promise<unit>>
+        let msgs = unbox<obj[]> (get out "messages")
+        let hasProbe = msgs |> Array.exists (fun m -> (str (get m "info") "id").StartsWith "methodology-probe-")
+        check ("opencode " + agent + " does not receive methodology probe") (not hasProbe)
+    do! rmAsync workspaceDir
+}
+
+let opencodeMethodologyProbeStrippedSpec () = promise {
+    let! workspaceDir = mkdtempAsync "opencode-methodology-stripped-"
+    let! p = plugin (box {| directory = workspaceDir |})
+    let tf = get p "experimental.chat.messages.transform"
+    let userMsg =
+        box {| info = createObj [ "id", box "msg-user"; "agent", box "manager"; "role", box "user"; "sessionID", box "strip-session" ]
+               parts = [| box {| ``type`` = "text"; text = "do the task" |} |] |}
+    let methodologyResult =
+        box {| info = createObj [ "id", box "msg-method"; "agent", box "manager"; "role", box "assistant"; "sessionID", box "strip-session" ]
+               parts = [| createObj [
+                   "type", box "tool"
+                   "tool", box "select_methodology"
+                   "callID", box "call-1"
+                   "state", box (createObj [ "status", box "completed"; "output", box "Continue using the selected methodologies." ])
+               ] |] |}
+    let staleProbe =
+        box {| info = createObj [ "id", box "methodology-probe-1"; "agent", box "manager"; "role", box "user"; "sessionID", box "strip-session" ]
+               parts = [| box {| ``type`` = "text"; text = "stale probe" |} |] |}
+    let out = createObj [ "messages", box [| userMsg; methodologyResult; staleProbe |] ]
+    do! tf $ (createObj [ "agent", box "manager"; "sessionID", box "strip-session" ], out) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    let hasProbe = msgs |> Array.exists (fun m -> (str (get m "info") "id").StartsWith "methodology-probe-")
+    check "opencode methodology probe stripped on re-projection" (not hasProbe)
+    do! rmAsync workspaceDir
+}

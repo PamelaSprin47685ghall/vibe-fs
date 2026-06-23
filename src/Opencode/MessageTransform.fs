@@ -13,6 +13,7 @@ open VibeFs.Kernel.MagicProjection
 open VibeFs.Kernel.Dedup
 open VibeFs.Kernel.CapsFormat
 open VibeFs.Kernel.Config
+open VibeFs.Kernel.Methodology
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.MagicTodo
 open VibeFs.Opencode.MessagingCodec
@@ -160,7 +161,11 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                             directory
                             capsFiles
                             knowledgeGraphPrelude
-                    replaceArrayInPlace messagesArr final
+                    let withProbe =
+                        if agent = "manager" && shouldAppendMethodologyProbe cleaned then
+                            Array.append final [| MessagingCodec.encodeMessage (buildProbeMessage sessionID) |]
+                        else final
+                    replaceArrayInPlace messagesArr withProbe
     }
 
 let compactingHandlerFor (host: Host) (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =

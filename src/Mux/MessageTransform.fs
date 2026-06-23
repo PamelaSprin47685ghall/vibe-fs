@@ -12,6 +12,7 @@ open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Kernel.HostTools
+open VibeFs.Kernel.Methodology
 open VibeFs.Mux.KnowledgeGraphTools
 open VibeFs.Mux.MessagingCodec
 open VibeFs.Mux.ReadDedup
@@ -206,5 +207,9 @@ let messagesTransform
                     else
                         Promise.lift (None: string option)
                 let final = buildCapsMessages deduped directory capsFiles knowledgeGraphPrelude
-                replaceArrayInPlace messagesArr final
+                let withProbe =
+                    if agent = "manager" && shouldAppendMethodologyProbe cleanedMessages then
+                        Array.append final [| encodeMessage (buildProbeMessage sessionID) |]
+                    else final
+                replaceArrayInPlace messagesArr withProbe
     }

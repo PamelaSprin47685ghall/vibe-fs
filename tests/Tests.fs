@@ -16,6 +16,7 @@ open VibeFs.Tests.IntegrationDedupTests
 open VibeFs.Tests.IntegrationToolTests
 open VibeFs.Tests.IntegrationChatTests
 open VibeFs.Tests.MagicTests
+open VibeFs.Tests.MethodologyTests
 open VibeFs.Tests.KnowledgeGraphTests
 open VibeFs.Tests.KnowledgeGraphFileTests
 open VibeFs.Tests.KnowledgeGraphKernelTests
@@ -109,6 +110,7 @@ let private tests : (string * TestBody) list = [
     "KnowledgeGraphFileTests.run", Async KnowledgeGraphFileTests.run
     "KnowledgeGraphKernelTests.run", Async KnowledgeGraphKernelTests.run
     "MagicTests.run", Sync (sync MagicTests.run)
+    "MethodologyTests.run", Sync (sync MethodologyTests.run)
     "TitleFetchGuardTests.signature", Sync (sync TitleFetchGuardTests.signature)
     "TitleFetchGuardTests.wrap", Sync (sync TitleFetchGuardTests.wrap)
     "TitleFetchGuardTests.detect", Sync (sync TitleFetchGuardTests.detect)

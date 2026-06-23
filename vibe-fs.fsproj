@@ -22,6 +22,7 @@
     <Compile Include="src/Mux/MagicTodo.fs" />
     <Compile Include="src/Mux/KnowledgeGraphTools.fs" />
     <Compile Include="src/Mux/KnowledgeGraphToolDefs.fs" />
+    <Compile Include="src/Mux/MethodologyTool.fs" />
     <Compile Include="src/Mux/MessageTransform.fs" />
     <Compile Include="src/Mux/EventHook.fs" />
     <Compile Include="src/Mux/SlashCommands.fs" />
@@ -44,6 +45,7 @@
     <Compile Include="src/Opencode/ExecutorTool.fs" />
     <Compile Include="src/Opencode/SearchTools.fs" />
     <Compile Include="src/Opencode/ReviewTools.fs" />
+    <Compile Include="src/Opencode/MethodologyTool.fs" />
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/HookExecute.fs" />
     <Compile Include="src/Opencode/HookTransform.fs" />

@@ -17,6 +17,7 @@ open VibeFs.Kernel.Executor
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.Methodology
 open VibeFs.Mux.BuiltinTools
 open VibeFs.Mux.Plugin
 open VibeFs.Mux.SubagentTools
@@ -75,7 +76,7 @@ let muxKnowledgeGraphPreludeForManagerSpec () = promise {
         check "mux manager knowledge graph prelude has knowledge graph front matter" (firstText.Contains "---\nknowledge_graph:")
         check "mux manager knowledge graph prelude lists entity" (firstText.Contains "项目" && firstText.Contains "插件入口" && not (firstText.Contains "0a3f"))
         check "mux manager knowledge graph prelude hides fact" (not (firstText.Contains "src/Mux/Plugin.fs"))
-        check "mux manager knowledge graph prelude preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
+        check "mux manager knowledge graph prelude preserves original" (msgs |> Array.exists (fun m -> obj.ReferenceEquals(m, originalMsg)))
     do! rmAsync workspaceDir
 }
 
@@ -148,7 +149,7 @@ let muxCapsAndKnowledgeGraphPreludeOrderSpec () = promise {
         check "mux caps+kg first message includes knowledge graph front matter" (firstText.Contains "---\nknowledge_graph:")
         let hasCapsAssistant = msgs.[..msgs.Length - 2] |> Array.exists hasDynamicToolReadPart
         check "mux caps+kg includes assistant caps read before original" hasCapsAssistant
-        check "mux caps+kg preserves original" (obj.ReferenceEquals(msgs.[msgs.Length - 1], originalMsg))
+        check "mux caps+kg preserves original" (msgs |> Array.exists (fun m -> obj.ReferenceEquals(m, originalMsg)))
     do! rmAsync workspaceDir
 }
 
@@ -688,6 +689,125 @@ let muxReadToolListsDirectoriesSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let muxMethodologyProbeAppendedSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-methodology-probe-"
+    let reg = createRegistration (minimalMuxDeps ())
+    let tf = muxMessageTransform reg
+    let originalMsg = muxTextMessage "msg-probe" "user" "do the task"
+    let out = createObj [ "messages", box [| originalMsg |] ]
+    let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-methodology-probe-session" ]
+    do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    let lastMsg = msgs.[msgs.Length - 1]
+    let lastId = str lastMsg "id"
+    check "methodology probe appended for manager" (lastId.StartsWith "methodology-probe-")
+    let lastText = firstTextPartText lastMsg
+    check "methodology probe mentions select_methodology" (lastText.Contains "select_methodology")
+    do! rmAsync workspaceDir
+}
+
+let muxMethodologyProbeSuppressedAfterCallSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-methodology-suppressed-"
+    let reg = createRegistration (minimalMuxDeps ())
+    let tf = muxMessageTransform reg
+    let userMsg = muxTextMessage "msg-user" "user" "do the task"
+    let methodologyResult =
+        createObj [
+            "id", box "msg-method"
+            "role", box "assistant"
+            "parts", box [| createObj [
+                "type", box "dynamic-tool"
+                "toolName", box "select_methodology"
+                "toolCallId", box "call-1"
+                "state", box "output-available"
+                "input", box (createObj [])
+                "output", box "Continue using the selected methodologies."
+            ] |]
+        ]
+    let out = createObj [ "messages", box [| userMsg; methodologyResult |] ]
+    let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-methodology-suppressed-session" ]
+    do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    let lastId = str msgs.[msgs.Length - 1] "id"
+    check "methodology probe suppressed after completed call" (not (lastId.StartsWith "methodology-probe-"))
+    do! rmAsync workspaceDir
+}
+
+let muxMethodologyProbeExcludedAgentsSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-methodology-excluded-"
+    let reg = createRegistration (minimalMuxDeps ())
+    let tf = muxMessageTransform reg
+    for agent in [| "compaction"; "title"; "browser"; "bookkeeper"; "investigator"; "executor" |] do
+        let originalMsg = muxTextMessage ("msg-" + agent) "user" "do the task"
+        let out = createObj [ "messages", box [| originalMsg |] ]
+        let input = createObj [ "agent", box agent; "directory", box workspaceDir; "sessionID", box ("mux-methodology-excl-" + agent) ]
+        do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+        let msgs = unbox<obj[]> (get out "messages")
+        let lastId = str msgs.[msgs.Length - 1] "id"
+        check (agent + " does not receive methodology probe") (not (lastId.StartsWith "methodology-probe-"))
+    do! rmAsync workspaceDir
+}
+
+let muxMethodologyToolExecuteSpec () = promise {
+    let reg = createRegistration (minimalMuxDeps ())
+    let tool = muxToolByName reg "select_methodology"
+    if isNullish tool then
+        check "mux registration exposes select_methodology tool" false
+    else
+        let! result = ((get tool "execute") $ (createObj [], createObj [])) |> unbox<JS.Promise<string>>
+        check "select_methodology execute returns fixed text" (result = methodologyToolResultText)
+}
+
+let muxMethodologyToolSchemaSpec () = promise {
+    let reg = createRegistration (minimalMuxDeps ())
+    let tool = muxToolByName reg "select_methodology"
+    if isNullish tool then
+        check "mux registration exposes select_methodology tool" false
+    else
+        let schema = muxToolSchema tool
+        let props = get schema "properties"
+        let methodsSchema = get props "methods"
+        let planSchema = get props "plan"
+        check "methodology methods is array type" (str methodsSchema "type" = "array")
+        let itemsSchema = get methodsSchema "items"
+        check "methodology methods items is string type" (str itemsSchema "type" = "string")
+        let enumArr = unbox<obj[]> (get itemsSchema "enum")
+        check "methodology methods enum has all values" (enumArr.Length = (List.toArray methodologyEnumValues).Length)
+        check "methodology methods minItems is 1" (unbox<int> (get methodsSchema "minItems") = 1)
+        check "methodology plan is string type" (str planSchema "type" = "string")
+        let required = muxToolSchemaRequired tool
+        check "methodology required includes methods" (required |> Array.contains "methods")
+        check "methodology required includes plan" (required |> Array.contains "plan")
+}
+
+let muxMethodologyProbeStrippedOnReprojectionSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-methodology-strip-"
+    let reg = createRegistration (minimalMuxDeps ())
+    let tf = muxMessageTransform reg
+    let userMsg = muxTextMessage "msg-real" "user" "do the task"
+    let methodologyResult =
+        createObj [
+            "id", box "msg-method"
+            "role", box "assistant"
+            "parts", box [| createObj [
+                "type", box "dynamic-tool"
+                "toolName", box "select_methodology"
+                "toolCallId", box "call-1"
+                "state", box "output-available"
+                "input", box (createObj [])
+                "output", box "Continue using the selected methodologies."
+            ] |]
+        ]
+    let staleProbe = muxTextMessage "methodology-probe-1" "user" "stale probe text"
+    let out = createObj [ "messages", box [| userMsg; methodologyResult; staleProbe |] ]
+    let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-methodology-strip-session" ]
+    do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
+    let msgs = unbox<obj[]> (get out "messages")
+    let hasProbe = msgs |> Array.exists (fun m -> (str m "id").StartsWith "methodology-probe-")
+    check "methodology probe stripped on re-projection" (not hasProbe)
+    do! rmAsync workspaceDir
+}
+
 let run () : JS.Promise<unit> =
     promise {
         let reg = createRegistration (createObj [])
@@ -701,6 +821,10 @@ let run () : JS.Promise<unit> =
             "capsAndMagicOrder", capsAndMagicOrderSpec
             "bookkeeperDoesNotReceiveCaps", bookkeeperDoesNotReceiveCapsSpec
             "compactionDoesNotReceiveCaps", compactionDoesNotReceiveCapsSpec
+            "opencodeMethodologyProbe", opencodeMethodologyProbeSpec
+            "opencodeMethodologyProbeSuppressed", opencodeMethodologyProbeSuppressedSpec
+            "opencodeMethodologyProbeExcludedAgents", opencodeMethodologyProbeExcludedAgentsSpec
+            "opencodeMethodologyProbeStripped", opencodeMethodologyProbeStrippedSpec
             "knowledgeGraphPreludeWithoutCaps", knowledgeGraphPreludeWithoutCapsSpec
             "coderReceivesKnowledgeGraphPrelude", coderReceivesKnowledgeGraphPreludeSpec
             "browserDoesNotReceiveKnowledgeGraphPrelude", browserDoesNotReceiveKnowledgeGraphPreludeSpec
@@ -793,6 +917,12 @@ let run () : JS.Promise<unit> =
             "muxReturnReviewerSecondPassResolves", muxReturnReviewerSecondPassResolvesSpec
             "muxSubmitReviewTerminatedCleansReviewState", muxSubmitReviewTerminatedCleansReviewStateSpec
             "muxExecutorFailureDoesNotBookkeep", muxExecutorFailureDoesNotBookkeepSpec
+            "muxMethodologyProbeAppended", muxMethodologyProbeAppendedSpec
+            "muxMethodologyProbeSuppressedAfterCall", muxMethodologyProbeSuppressedAfterCallSpec
+            "muxMethodologyProbeExcludedAgents", muxMethodologyProbeExcludedAgentsSpec
+            "muxMethodologyToolExecute", muxMethodologyToolExecuteSpec
+            "muxMethodologyToolSchema", muxMethodologyToolSchemaSpec
+            "muxMethodologyProbeStrippedOnReprojection", muxMethodologyProbeStrippedOnReprojectionSpec
         ]
         for (label, spec) in specs do
             do! timedAsync ("IntegrationTool." + label) spec
