@@ -58,6 +58,7 @@ let run () : JS.Promise<unit> =
             "submitKnowledgeGraphSchemaAllowsEmpty", submitKnowledgeGraphSchemaAllowsEmptySpec
             "submitKnowledgeGraphDailyRewrite", submitKnowledgeGraphDailyRewriteSpec
             "submitKnowledgeGraphReconstructsJobFromHistory", submitKnowledgeGraphReconstructsJobFromHistorySpec
+            "submitKnowledgeGraphRejectsSecondCall", submitKnowledgeGraphRejectsSecondCallSpec
             "bookkeeperLaunchCarriesAiSettings", bookkeeperLaunchCarriesAiSettingsSpec
             "bookkeeperFireAndForget", bookkeeperFireAndForgetSpec
             "websearchTriggersBookkeeper", websearchTriggersBookkeeperSpec
@@ -100,6 +101,7 @@ let run () : JS.Promise<unit> =
             "muxReturnBookkeeperNoActiveJob", muxReturnBookkeeperNoActiveJobSpec
             "muxReturnBookkeeperReconstructsJobFromHistory", muxReturnBookkeeperReconstructsJobFromHistorySpec
             "muxReturnBookkeeperAppendDoesNotTriggerMaintenance", muxReturnBookkeeperAppendDoesNotTriggerMaintenanceSpec
+            "muxReturnBookkeeperRejectsSecondCall", muxReturnBookkeeperRejectsSecondCallSpec
             "muxDailyRewriteTriggersNext", muxDailyRewriteTriggersNextSpec
             "muxExecutorRwTriggersMaintenance", muxExecutorRwTriggersMaintenanceSpec
             "muxExecutorModeSchema", muxExecutorModeSchemaSpec

@@ -112,26 +112,32 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
         if not (knowledgeGraphDirExists root) then Promise.lift "Knowledge graph directory not found."
         else
             promise {
-                let! result, kindOpt, parentID =
-                    commandQueue.Enqueue(fun () ->
-                        promise {
-                            let! reconstructed = tryResolveJobContext client root sessionID
-                            match reconstructed |> Option.orElseWith (fun () -> Map.tryFind sessionID registeredJobs) with
-                            | None -> return "No active knowledge graph job for this session.", None, None
-                            | Some ctx ->
-                                let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
-                                try
-                                    let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind portLockTimeoutMs portLockRetryDelayMs (today ()) ctx.workspaceRoot ctx.kind drafts)
-                                    return result, Some ctx.kind, parentID
-                                finally
-                                    registry.UnregisterChildAgent(sessionID)
-                                    registeredJobs <- Map.remove sessionID registeredJobs
-                        })
-                match kindOpt with
-                | Some (DailyRewrite _) ->
-                    this.StartMaintenanceIfDue(root, ?parentSessionID = parentID) |> ignore
-                | _ -> ()
-                return result
+                // Early idempotency gate: if chat history already contains a completed
+                // return_bookkeeper tool call, reject immediately without any IO.
+                let! historyMessages = loadSessionMessages client root sessionID
+                if historyHasCompletedReturnBookkeeper historyMessages then
+                    return rejectSecondReturnBookkeeperMessage
+                else
+                    let! result, kindOpt, parentID =
+                        commandQueue.Enqueue(fun () ->
+                            promise {
+                                let! reconstructed = tryResolveJobContext client root sessionID
+                                match reconstructed |> Option.orElseWith (fun () -> Map.tryFind sessionID registeredJobs) with
+                                | None -> return "No active knowledge graph job for this session.", None, None
+                                | Some ctx ->
+                                    let parentID = registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
+                                    try
+                                        let! result = runWorkspace ctx.workspaceRoot (fun () -> submitForKind portLockTimeoutMs portLockRetryDelayMs (today ()) ctx.workspaceRoot ctx.kind drafts)
+                                        return result, Some ctx.kind, parentID
+                                    finally
+                                        registry.UnregisterChildAgent(sessionID)
+                                        registeredJobs <- Map.remove sessionID registeredJobs
+                            })
+                    match kindOpt with
+                    | Some (DailyRewrite _) ->
+                        this.StartMaintenanceIfDue(root, ?parentSessionID = parentID) |> ignore
+                    | _ -> ()
+                    return result
             }
 
     member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =

@@ -5,12 +5,14 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Shell
 
+open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Kernel.KnowledgeGraphMaintenance
 open VibeFs.Kernel.KnowledgeGraphPrompts
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
+open VibeFs.Mux.MessagingCodec
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.KnowledgeGraphPortLock
 open VibeFs.Shell.PromiseQueue
@@ -111,32 +113,52 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
                 | Some cfg -> latestConfig <- Some cfg
                 | None -> ()
 
-                let! reconstructed = this.TryResolveJobContext(sessionID)
-                let jobCtxOpt =
-                    reconstructed |> Option.orElseWith (fun () ->
-                        Map.tryFind sessionID registeredJobs)
-
-                match jobCtxOpt with
-                | None -> return "No active knowledge graph job for this session."
-                | Some ctx ->
-                    let root = ctx.workspaceRoot
-                    let todayStr = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
-                    let! result = writeQueue.Enqueue(fun () ->
+                let! earlyReject =
+                    match getChatHistory with
+                    | Some getHistory when sessionID <> "" ->
                         promise {
-                            let! entriesResult = buildEntries root drafts
-                            match entriesResult with
-                            | Error e -> return e
-                            | Ok entries ->
-                                let! result = submitForKind root todayStr entries ctx.kind
-                                registeredJobs <- Map.remove sessionID registeredJobs
-                                return result
-                        })
+                            try
+                                let! history = getHistory sessionID
+                                let messages = MessagingCodec.decodeMessages sessionID history
+                                return
+                                    if historyHasCompletedReturnBookkeeper messages then
+                                        Some rejectSecondReturnBookkeeperMessage
+                                    else
+                                        None
+                            with _ ->
+                                return None
+                        }
+                    | _ -> Promise.lift None
 
-                    match ctx.kind with
-                    | DailyRewrite _ -> this.StartMaintenanceIfDue(root) |> ignore
-                    | _ -> ()
+                match earlyReject with
+                | Some msg -> return msg
+                | None ->
+                    let! reconstructed = this.TryResolveJobContext(sessionID)
+                    let jobCtxOpt =
+                        reconstructed |> Option.orElseWith (fun () ->
+                            Map.tryFind sessionID registeredJobs)
 
-                    return result
+                    match jobCtxOpt with
+                    | None -> return "No active knowledge graph job for this session."
+                    | Some ctx ->
+                        let root = ctx.workspaceRoot
+                        let todayStr = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
+                        let! result = writeQueue.Enqueue(fun () ->
+                            promise {
+                                let! entriesResult = buildEntries root drafts
+                                match entriesResult with
+                                | Error e -> return e
+                                | Ok entries ->
+                                    let! result = submitForKind root todayStr entries ctx.kind
+                                    registeredJobs <- Map.remove sessionID registeredJobs
+                                    return result
+                            })
+
+                        match ctx.kind with
+                        | DailyRewrite _ -> this.StartMaintenanceIfDue(root) |> ignore
+                        | _ -> ()
+
+                        return result
             }
 
     member this.StartBookkeeperAppend(prompt: string, result: string, title: string, ?config: obj) : unit =

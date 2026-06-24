@@ -3,6 +3,7 @@ module VibeFs.Kernel.KnowledgeGraph
 open System
 open System.Text.RegularExpressions
 
+open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.PromptFrontMatter
 
 let private idRe = Regex("^[0-9a-f]{4}$")
@@ -184,3 +185,22 @@ let allocateRandomHexId (randomInt: unit -> int) (existingIds: Set<string>) : Re
             if not (Set.contains candidate existingIds) then Ok candidate
             else loop (attempts + 1)
     loop 0
+
+// --- Submit idempotency: reject second return_bookkeeper from history ---
+
+let returnBookkeeperToolName = "return_bookkeeper"
+
+let historyHasCompletedReturnBookkeeper (messages: Message<'raw> list) : bool =
+    messages
+    |> List.exists (fun msg ->
+        msg.parts
+        |> List.exists (fun part ->
+            match part with
+            | ToolPart(toolName, _, Some state, _) ->
+                toolName = returnBookkeeperToolName && state.status = "completed"
+            | _ -> false))
+
+let rejectSecondReturnBookkeeperMessage =
+    "This session already completed return_bookkeeper. The knowledge graph job was submitted and persisted. "
+    + "Do not call return_bookkeeper again. A second call performs no writes and only wastes context. "
+    + "You were instructed to submit exactly one return_bookkeeper call. Follow the prompt."

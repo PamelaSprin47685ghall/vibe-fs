@@ -8,7 +8,8 @@ open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.IntegrationMuxSetup
 
 open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.Executor
+open VibeFs.Kernel.Messaging
+open VibeFs.Kernel.KnowledgeGraphPrompts
 open VibeFs.Mux.Plugin
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.Dyn
@@ -109,6 +110,68 @@ let muxReturnBookkeeperAppendDoesNotTriggerMaintenanceSpec () = promise {
         do! waitForBackgroundJobsForTesting reg
         let launches = takeBookkeeperLaunchesForTesting reg
         check "mux return_bookkeeper append does not trigger maintenance" (launches.Length = 0)
+    do! rmAsync workspaceDir
+}
+
+let muxReturnBookkeeperRejectsSecondCallSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-kg-second-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    let sessionID = "mux-kg-second-session"
+    let messages = ResizeArray<obj>()
+    let deps = muxMutableDepsWithChatHistory sessionID messages
+    let reg = createRegistration deps
+    let submitTool = muxToolByName reg "return_bookkeeper"
+    if isNullish submitTool then
+        check "mux registration exposes return_bookkeeper tool for second call" false
+    else
+        let today = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
+        registerMuxKnowledgeGraphJobForTest reg sessionID workspaceDir "append" (createObj [ "today", box today ])
+
+        // First submit: should succeed.
+        let entries1 = [| knowledgeGraphDraftEntry None ["首次问题"] "首次答案" |]
+        let args1 = createObj [ "entries", box entries1 ]
+        let ctx1 = createObj [ "directory", box workspaceDir; "sessionID", box sessionID ]
+        let! result1 = ((get submitTool "execute") $ (ctx1, args1)) |> unbox<JS.Promise<string>>
+        check "mux first return_bookkeeper succeeds" (result1.Contains "Appended 1 knowledge graph entries")
+
+        let! filesAfterFirst = readAllKnowledgeGraphFiles workspaceDir
+        let entryCountAfterFirst =
+            filesAfterFirst |> List.sumBy (fun f -> f.entries.Length)
+
+        // Simulate chat history now containing marker + completed return_bookkeeper tool.
+        let marker = renderJobMarker { workspaceRoot = workspaceDir; kind = AppendAfterWork }
+        messages.Add(box {| id = sessionID + "-marker"; role = "user"; parts = [| box {| ``type`` = "text"; text = marker |} |] |})
+        messages.Add(box
+            {| id = sessionID + "-tool"
+               role = "assistant"
+               parts =
+                [| box
+                    {| ``type`` = "dynamic-tool"
+                       toolName = "return_bookkeeper"
+                       toolCallId = "mux-kg-second-call"
+                       state = "output-available"
+                       input = createObj [ "entries", box entries1 ]
+                       output = result1 |} |] |})
+
+        // Second submit: should return scold, not append.
+        let entries2 = [| knowledgeGraphDraftEntry None ["二次问题"] "二次答案" |]
+        let args2 = createObj [ "entries", box entries2 ]
+        let ctx2 = createObj [ "directory", box workspaceDir; "sessionID", box sessionID ]
+        let! result2 = ((get submitTool "execute") $ (ctx2, args2)) |> unbox<JS.Promise<string>>
+
+        check "mux second return_bookkeeper returns scold not append success"
+            (not (result2.Contains "Appended") && result2 <> "")
+        check "mux second return_bookkeeper contains rejection phrase"
+            (result2.Contains "already completed" || result2.Contains "Do not call return_bookkeeper again")
+        check "mux second return_bookkeeper does not mention No active job"
+            (not (result2.Contains "No active knowledge graph job"))
+
+        let! filesAfterSecond = readAllKnowledgeGraphFiles workspaceDir
+        let entryCountAfterSecond =
+            filesAfterSecond |> List.sumBy (fun f -> f.entries.Length)
+        check "mux second return_bookkeeper no extra NDJSON entries"
+            (entryCountAfterSecond = entryCountAfterFirst)
+
     do! rmAsync workspaceDir
 }
 

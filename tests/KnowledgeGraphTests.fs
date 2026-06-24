@@ -6,6 +6,7 @@ open VibeFs.Tests.Assert
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphCodec
 open VibeFs.Kernel.KnowledgeGraphPrompts
+open VibeFs.Kernel.Messaging
 
 let private ok r =
     match r with
@@ -205,6 +206,70 @@ let allocateSpec () =
     let existing5 = Set.ofList [ sprintf "%04x" (5 % 65536) ]
     check "allocateRandomHexId exhausted Error" (isErr (allocateRandomHexId always5 existing5))
 
+// --- RED phase: second return_bookkeeper rejection (pure kernel detection) ---
+
+let private mkToolMessage (role: Role) (toolName: string) (callID: string) (status: string) : Message<obj> =
+    { info =
+          { id = callID + "-msg"
+            sessionID = "session-kg"
+            role = role
+            agent = "bookkeeper"
+            isError = false
+            toolName = toolName
+            details = null
+            time = null }
+      parts = [ ToolPart(toolName, callID, Some { status = status; output = ""; error = ""; input = null; operationAction = "" }, null) ]
+      source = Native
+      raw = null }
+
+let private mkTextMessage (role: Role) (text: string) : Message<obj> =
+    { info =
+          { id = text.GetHashCode().ToString() + "-msg"
+            sessionID = "session-kg"
+            role = role
+            agent = "bookkeeper"
+            isError = false
+            toolName = ""
+            details = null
+            time = null }
+      parts = [ TextPart text ]
+      source = Native
+      raw = null }
+
+let private mkMarkerMessage (ctx: KnowledgeGraphJobContext) : Message<obj> =
+    mkTextMessage User (renderJobMarker ctx)
+
+let secondReturnBookkeeperDetectionSpec () =
+    let ctx = { workspaceRoot = "/tmp/kg-root"; kind = AppendAfterWork }
+
+    check "historyHasCompletedReturnBookkeeper empty history is false"
+        (not (historyHasCompletedReturnBookkeeper []))
+
+    check "historyHasCompletedReturnBookkeeper marker-only is false"
+        (not (historyHasCompletedReturnBookkeeper [ mkMarkerMessage ctx ]))
+
+    check "historyHasCompletedReturnBookkeeper pending tool is false"
+        (not (historyHasCompletedReturnBookkeeper [
+            mkMarkerMessage ctx
+            mkToolMessage Assistant "return_bookkeeper" "call-1" "pending"
+        ]))
+
+    check "historyHasCompletedReturnBookkeeper completed tool is true"
+        (historyHasCompletedReturnBookkeeper [
+            mkMarkerMessage ctx
+            mkToolMessage Assistant "return_bookkeeper" "call-1" "completed"
+        ])
+
+    check "historyHasCompletedReturnBookkeeper other tool completed is false"
+        (not (historyHasCompletedReturnBookkeeper [
+            mkToolMessage Assistant "file_read" "call-2" "completed"
+        ]))
+
+    let scold = rejectSecondReturnBookkeeperMessage
+    check "rejectSecondReturnBookkeeperMessage non-empty" (scold <> "")
+    check "rejectSecondReturnBookkeeperMessage is English rejection" (
+        scold.Contains "already completed" && scold.Contains "Do not call return_bookkeeper again")
+
 let run () : JS.Promise<unit> =
     promise {
         idParseSpec ()
@@ -220,4 +285,5 @@ let run () : JS.Promise<unit> =
         draftValidationSpec ()
         applyDraftsSpec ()
         allocateSpec ()
+        secondReturnBookkeeperDetectionSpec ()
     }

@@ -8,6 +8,7 @@ open VibeFs.Shell
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Kernel.Messaging
+open VibeFs.Opencode.MessagingCodec
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.KnowledgeGraphPortLock
 open VibeFs.Shell.ChildAgentRegistry
@@ -87,6 +88,21 @@ let tryResolveJobContext (client: obj) (directory: string) (sessionID: string) :
                             | _ -> None)
                     return texts |> List.tryPick tryParseJobMarker
             with _ -> return None
+    }
+
+/// Load decoded typed messages for a session, mirroring tryResolveJobContext
+/// but returning the full Message list instead of just a job marker.
+let loadSessionMessages (client: obj) (directory: string) (sessionID: string) : JS.Promise<Message<obj> list> =
+    promise {
+        if sessionID.Trim() = "" || isNullish client then return []
+        else
+            try
+                let! result = invoke1 (get client "session") "messages" (box {| path = box {| id = sessionID |}; query = box {| directory = directory |} |})
+                let data = get result "data"
+                if isNullish data || not (isArray data) then return []
+                else
+                    return MessagingCodec.decodeMessages (unbox<obj array> data)
+            with _ -> return []
     }
 
 let private parseModelString (modelString: string) : obj option =

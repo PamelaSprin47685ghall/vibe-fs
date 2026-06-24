@@ -647,3 +647,10 @@
 {"id":"8804","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
 {"id":"373a","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
 {"id":"0cd9","entity":["执行结果模型","类型边防"],"fact":"RunOutcome 密封 DU：Exited|TimedOut|Signaled|SpawnFailed(DomainError)。TimedOut 含超时 kill 与 close 码 null；Signaled 表信号终止。mapOutcome/executeWith 输出拼接须穷尽含 Signaled→Failed；SpawnFailed 文案经内核 formatDomainError；禁止记录式 stdout/stderr 成员与 isErrnoException ENOENT 旁路。"}
+{"id":"f5b5","entity":["集成测试","回归防护"],"fact":"TDD 红色阶段确立：集成测试注册 secondReturnBookkeeper 重复调用拒收规范，强制 Kernel 层实现 historyHasCompletedReturnBookkeeper 探测与 rejectSecondReturnBookkeeperMessage 斥责常量，阻断 JobMarker 残留导致的无效追加。"}
+{"id":"2b84","entity":["知识图谱","幂等纪律"],"fact":"作业提交幂等性由 ChatHistory 显式探测保障：检测到 completed return_bookkeeper 即触发斥责拦截，废弃隐式依赖。"}
+{"id":"ee5c","entity":["集成测试","回归防护"],"fact":"TDD 红色阶段确立：集成测试注册 secondReturnBookkeeper 重复调用拒收规范，强制 Kernel 层实现 historyHasCompletedReturnBookkeeper 探测与 rejectSecondReturnBookkeeperMessage 斥责常量，阻断 JobMarker 残留导致的无效追加。"}
+{"id":"3431","entity":["集成测试","审查协议"],"fact":"Mux 集成测试断言 return_bookkeeper 重复调用拒收文案由中文「已经提交/不要重复/已完成」收敛为英文「already completed / Do not call return_bookkeeper again」，消除宿主语言硬依赖。"}
+{"id":"4791","entity":["代码重构","早期退出"],"fact":"KnowledgeGraphTools.fs 采纳 Guard Clause 惯用法：废弃嵌套 match earlyReject with...None->() 的冗余空分支，改为 if earlyReject.IsSome then return... 前置守卫，消除控制流空洞，提升意图显式度。"}
+{"id":"4d8a","entity":["集成测试","知识图谱"],"fact":"集成测试确立 return_bookkeeper 幂等门禁：调用前探测聊天历史，若已存在 completed 状态的 return_bookkeeper 记录，则立即拒绝后续追加，防止知识图谱重复记账。"}
+{"id":"ac18","entity":["集成测试","重复调用防护"],"fact":"IntegrationSubmitKnowledgeGraphSpecs 修正 return_bookkeeper 重复调用斥责断言：由中文短语（已经提交/不要重复/已完成）改为英文短语（already completed/Do not call return_bookkeeper again）。"}
