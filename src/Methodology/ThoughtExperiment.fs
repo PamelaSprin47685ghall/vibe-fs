@@ -6,7 +6,7 @@ let schema =
     buildSchema
         "thought_experiment"
         "Push idealized or extreme scenarios through rules to test concept boundaries."
-        "When real execution is costly or dangerous (data loss, prod hook, 8192-word payloads)."
+        "When real execution is costly or dangerous (data loss, prod hook, oversized payloads)."
         [ reqStr
               "scenario_setup"
               "Idealized world assumptions (infinite history, zero latency, malicious LLM)."

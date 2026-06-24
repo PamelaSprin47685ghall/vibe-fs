@@ -17,7 +17,7 @@ let schema =
           reqArr
               "boundary_cases"
               2
-              "Edges: null, empty list, duplicate keys, restart mid-review, 8192-word background."
+              "Edges: null, empty list, duplicate keys, restart mid-review, very short background."
           reqArr
               "extreme_cases"
               1

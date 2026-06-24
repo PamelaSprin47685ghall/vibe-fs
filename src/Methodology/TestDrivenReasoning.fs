@@ -6,10 +6,10 @@ let schema =
     buildSchema
         "test_driven_reasoning"
         "Make expected behavior executable before or during implementation."
-        "When behavior can be pinned by tests (schema registry, validateBackgroundWords, architecture gates)."
+        "When behavior can be pinned by tests (schema registry, Args.parse required fields, architecture gates)."
         [ reqStr
               "behavior_claim"
-              "What should hold (54 schemas, background min words, tool names)."
+              "What should hold (54 schemas, required intent/background, tool names)."
           reqArr
               "executable_oracles"
               3

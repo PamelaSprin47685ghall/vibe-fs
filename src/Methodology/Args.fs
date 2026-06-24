@@ -19,12 +19,6 @@ let parse (schema: MethodologySchema) (args: obj) : Result<Map<string, string> *
                     if isNullish raw then ""
                     else string raw |> fun s -> s.Trim()
                 if f.required && text = "" then errors.Add($"{f.name} is required")
-                elif Set.contains f.name notebookMinWordFieldNames && text <> "" then
-                    match validateNotebookMinWords f.name text with
-                    | Error e -> errors.Add e
-                    | Ok _ -> values.Add(f.name, text)
-                elif Set.contains f.name notebookMinWordFieldNames && f.required then
-                    errors.Add($"{f.name} is required")
                 elif text <> "" || f.required then values.Add(f.name, text)
             | FieldKind.StringArray ->
                 let items =

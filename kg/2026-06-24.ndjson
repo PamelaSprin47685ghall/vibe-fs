@@ -895,3 +895,7 @@
 {"id":"1fdb","entity":["审查循环","提示词纪律"],"fact":"wip 参数文档禁止向 LLM 暴露 reviewer-skip / wip=false 等行为后果，确保 LLM 如实报告进度而非策略性跳过审查。"}
 {"id":"f207","entity":["审查循环","提示词纪律"],"fact":"submitReviewWipAcknowledgment 文案禁止出现 no reviewer / wip set to false / starting a reviewer 等泄露实现细节的子串。"}
 {"id":"c655","entity":["测试门禁","审查循环"],"fact":"KernelPromptSpecs 新增 submit_review wip 参数文档与确认文案的负向子串断言，与集成测试整段返回值精确匹配互补，构成双重防护。"}
+{"id":"c700","entity":["方法论笔记本","字数校验"],"fact":"SchemaCommon.fs 移除 countWords、validateNotebookMinWords、validateBackgroundWords 函数，方法论笔记本字段（intent/background）最低字数门禁（8192 词）不再由内核层 SchemaCommon 强制校验。"}
+{"id":"cd62","entity":["方法论笔记本","字段约束"],"fact":"SchemaCommon.fs 中 intent/background 字段最低字数由 8192 硬下限改为 512 建议值且无最低字数要求；notebookMinWords 重命名为 notebookRecommendedWords，notebookMinWordFieldNames 集合移除。"}
+{"id":"198e","entity":["方法论笔记本","字段约束"],"fact":"SchemaCommon.fs 中 notebookMinWords 字段约束由强制最低字数改为推荐字数（notebookRecommendedWords），intent 与 background 字段不再要求至少 N 字，改为推荐约 N 字。"}
+{"id":"a32a","entity":["方法论参数","字段校验"],"fact":"Args.fs 字段校验逻辑精简：移除 notebookMinWordFieldNames 特殊校验分支，统一为必填+非空双条件门控，消除方法论笔记本字段的独立字数验证路径。"}

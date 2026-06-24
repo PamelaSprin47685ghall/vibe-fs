@@ -25,23 +25,21 @@ type MethodologySchema =
       meditatorRole: string
       outputSections: string list }
 
-let notebookMinWords = 8192
+let notebookRecommendedWords = 512
 
 let intentFieldName = "intent"
 
 let backgroundFieldName = "background"
 
-let notebookMinWordFieldNames = Set [ intentFieldName; backgroundFieldName ]
-
 let intentFieldDescription =
-    "Mandatory statement of the fundamental intent this methodology must serve on this turn. Write at least "
-    + string notebookMinWords
-    + " words. Explain what root problem or decision you are using this methodology to crack—not a task checklist, but the underlying why (e.g. why first-principles rebuild instead of patching, why abduction instead of blame). Tie intent to user goals, failure symptoms, and what success would unblock. Do not paste generic methodology lectures."
+    "Mandatory statement of the fundamental intent this methodology must serve on this turn. Aim for about "
+    + string notebookRecommendedWords
+    + " words or more when helpful; there is no minimum word count. Explain what root problem or decision you are using this methodology to crack—not a task checklist, but the underlying why (e.g. why first-principles rebuild instead of patching, why abduction instead of blame). Tie intent to user goals, failure symptoms, and what success would unblock. Do not paste generic methodology lectures."
 
 let backgroundFieldDescription =
-    "Mandatory notebook context for this methodology note. Write at least "
-    + string notebookMinWords
-    + " words (whitespace-separated tokens). Include: current task objective and acceptance criteria; relevant repository paths and symbols; prior attempts and outcomes; constraints from AGENTS.md, README, PRD, or user messages; open questions; risks; and how this methodology should frame the next work step. Do not paste tool catalogs or generic methodology essays—anchor every paragraph to this workspace and this turn."
+    "Mandatory notebook context for this methodology note. Aim for about "
+    + string notebookRecommendedWords
+    + " words or more when helpful; there is no minimum word count. Include: current task objective and acceptance criteria; relevant repository paths and symbols; prior attempts and outcomes; constraints from AGENTS.md, README, PRD, or user messages; open questions; risks; and how this methodology should frame the next work step. Do not paste tool catalogs or generic methodology essays—anchor every paragraph to this workspace and this turn."
 
 let intentField: MethodologyField =
     { name = intentFieldName
@@ -56,18 +54,6 @@ let backgroundField: MethodologyField =
       required = true
       kind = FieldKind.String
       minArrayItems = 0 }
-
-let countWords (text: string) =
-    if isNull text then 0
-    else
-        text.Split([| ' '; '\t'; '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries).Length
-
-let validateNotebookMinWords (fieldName: string) (text: string) =
-    let n = countWords text
-    if n >= notebookMinWords then Ok text
-    else Error $"{fieldName} requires at least {notebookMinWords} words; got {n}."
-
-let validateBackgroundWords (text: string) = validateNotebookMinWords backgroundFieldName text
 
 let methodologyToolName (methodologyId: string) = "methodology_" + methodologyId
 
@@ -147,9 +133,9 @@ let buildSchema
         "Record a durable, structured "
         + methodologyId
         + " methodology notebook entry for this workspace and turn. "
-        + "Fill every required field; intent and background must each be at least "
-        + string notebookMinWords
-        + " words. Method-specific fields capture where and how you are applying this methodology: "
+        + "Fill every required field; intent and background are required with no minimum word count (about "
+        + string notebookRecommendedWords
+        + " words recommended when helpful). Method-specific fields capture where and how you are applying this methodology: "
         + extraNames
         + ". Tool output summarizes your note for the session. Definition: "
         + shortDefinition
