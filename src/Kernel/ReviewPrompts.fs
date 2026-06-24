@@ -166,6 +166,11 @@ let reviewerNudgePrompt =
     + "  return_reviewer({ \"verdict\": \"REJECT\", \"feedback\": \"details...\" }) // Reject\n\n"
     + "verdict MUST be exactly \"PASS\" or \"REJECT\". Do not explain what you plan to do — call the tool immediately."
 
+let submitReviewIsWip (wip: bool option) : bool = defaultArg wip true
+
+let submitReviewWipAcknowledgment : string =
+    "Your progress report was received. No reviewer was started. With-Review Mode is still active — continue working, and call submit_review again with wip set to false when you are ready for final review."
+
 let agentReportReviewInstructions =
     readOnlyWorkspaceConstraint
     + "\n\n"

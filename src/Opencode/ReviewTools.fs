@@ -9,6 +9,7 @@ open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.LoopMessages
+open VibeFs.Kernel.ToolCatalog
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ReviewerLoop
@@ -22,7 +23,7 @@ let private formatReviewResult = VibeFs.Kernel.ReviewPrompts.formatReviewResult
 let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     let client () = Dyn.get ctx "client"
     define "Submit completed work for the reviewer to accept or reject."
-        (box {| report = strReq "Detailed report of what you did"; affectedFiles = strArrayOpt "Files you modified" |})
+        (box {| report = strReq "Detailed report of what you did"; affectedFiles = strArrayOpt "Files you modified"; wip = boolOpt Params.submitReviewWip |})
         (fun args context ->
             let tc = extractToolContext context (Dyn.str ctx "directory")
             let sessionID = Dyn.str tc "sessionID"
@@ -36,16 +37,20 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Sh
                     if Dyn.isNullish (Dyn.get args "affectedFiles") then []
                     else Dyn.get args "affectedFiles" :?> obj array |> Array.map string |> List.ofArray
                 let abort = Dyn.get tc "abortSignal"
+                let wip = submitReviewIsWip (optBool args "wip")
                 promise {
                     try
-                        let task = defaultArg (store.getReviewTask sessionID) ""
-                        let! result = runSubmitReview registry (client ()) store (Dyn.str tc "directory") sessionID report affectedFiles task abort
-                        match result with
-                        | Accepted
-                        | Terminated ->
-                            store.deactivateReview sessionID
-                        | Rejected _ -> ()
-                        return formatReviewResult result
+                        if wip then
+                            return submitReviewWipAcknowledgment
+                        else
+                            let task = defaultArg (store.getReviewTask sessionID) ""
+                            let! result = runSubmitReview registry (client ()) store (Dyn.str tc "directory") sessionID report affectedFiles task abort
+                            match result with
+                            | Accepted
+                            | Terminated ->
+                                store.deactivateReview sessionID
+                            | Rejected _ -> ()
+                            return formatReviewResult result
                     finally
                         store.unlockReview sessionID
                 })

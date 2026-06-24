@@ -151,7 +151,9 @@ let private submitReviewSpec: ToolSpec =
       paramDocs =
         map
             [ "report", "Detailed report of what was done"
-              "affectedFiles", "List of file paths that were modified or created" ]
+              "affectedFiles", "List of file paths that were modified or created"
+              "wip",
+               "Defaults to true when omitted: record progress without starting a reviewer. Set to false to start the reviewer for final review. With-Review Mode stays active until a passing final review." ]
       requiredFields = [ "report"; "affectedFiles" ] }
 
 let all: ToolSpec list =
@@ -225,4 +227,6 @@ module Params =
     let webfetchExtractMain = webfetch "extract_main"
     let webfetchPreferLlmsTxt = webfetch "prefer_llms_txt"
     let webfetchPrompt = webfetch "prompt"
+    let private submitReview = doc "submit_review"
+    let submitReviewWip = submitReview "wip"
     let webfetchTimeout = webfetch "timeout"

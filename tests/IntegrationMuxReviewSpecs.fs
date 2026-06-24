@@ -8,6 +8,7 @@ open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.IntegrationMuxSetup
 
 open VibeFs.Kernel.LoopMessages
+open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Mux.Plugin
 open VibeFs.Shell.Dyn
 
@@ -40,7 +41,7 @@ let muxSubmitReviewTwoRoundPassAcceptsSpec () = promise {
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "PASS" ]
     let submitTool = muxToolByName reg "submit_review"
     let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
-    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |]; "wip", box false ]
     let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
     check "submit_review two PASS rounds reports accepted" (result.Contains "verdict: accepted")
     check "submit_review runs a double-check round" (prompts.Count = 2)
@@ -60,7 +61,7 @@ let muxSubmitReviewRejectKeepsReviewActiveSpec () = promise {
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "REJECT: missing tests" ]
     let submitTool = muxToolByName reg "submit_review"
     let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
-    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |]; "wip", box false ]
     let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
     check "submit_review reject reports rejected verdict" (result.Contains "verdict: rejected")
     check "submit_review reject surfaces feedback" (result.Contains "missing tests")
@@ -80,7 +81,7 @@ let muxSubmitReviewDoubleCheckRejectSpec () = promise {
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "REJECT: cut corners on edge cases" ]
     let submitTool = muxToolByName reg "submit_review"
     let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
-    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |]; "wip", box false ]
     let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
     check "submit_review double-check reject reports rejected" (result.Contains "verdict: rejected")
     check "submit_review double-check reject surfaces feedback" (result.Contains "cut corners")
@@ -100,10 +101,46 @@ let muxSubmitReviewTerminatedCleansReviewStateSpec () = promise {
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "I think it looks fine" ]
     let submitTool = muxToolByName reg "submit_review"
     let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
-    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |]; "wip", box false ]
     let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
     check "submit_review unclear report reports terminated" (result.Contains "verdict: terminated")
     check "submit_review termination deactivates review session" (not (muxIsReviewActiveForTest reg sessionID))
+    do! rmAsync workspaceDir
+}
+
+/// Omitted wip defaults to progress-only; no reviewer is spawned.
+let muxSubmitReviewOmittedWipSkipsReviewerSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-submit-review-omitted-wip-"
+    let sessionID = "mux-submit-review-omitted-wip"
+    let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
+    muxActivateReviewForTest reg sessionID "Implement feature X"
+    let prompts = ResizeArray<string>()
+    let taskService = mockMuxTaskServiceReturningVerdicts prompts []
+    let submitTool = muxToolByName reg "submit_review"
+    let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
+    let args = createObj [ "report", box "Partial progress"; "affectedFiles", box [| "a.ts" |] ]
+    let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+    check "submit_review omitted wip returns kernel acknowledgment" (result = submitReviewWipAcknowledgment)
+    check "submit_review omitted wip does not delegate to reviewer" (prompts.Count = 0)
+    check "submit_review omitted wip keeps review session active" (muxIsReviewActiveForTest reg sessionID)
+    do! rmAsync workspaceDir
+}
+
+/// wip=true records progress without spawning a reviewer; With-Review Mode stays on.
+let muxSubmitReviewWipSkipsReviewerSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-submit-review-wip-"
+    let sessionID = "mux-submit-review-wip"
+    let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
+    muxActivateReviewForTest reg sessionID "Implement feature X"
+    let prompts = ResizeArray<string>()
+    let taskService = mockMuxTaskServiceReturningVerdicts prompts []
+    let submitTool = muxToolByName reg "submit_review"
+    let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
+    let args = createObj [ "report", box "Partial progress"; "affectedFiles", box [| "a.ts" |]; "wip", box true ]
+    let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+    check "submit_review wip returns kernel acknowledgment" (result = submitReviewWipAcknowledgment)
+    check "submit_review wip does not delegate to reviewer" (prompts.Count = 0)
+    check "submit_review wip keeps review session active" (muxIsReviewActiveForTest reg sessionID)
     do! rmAsync workspaceDir
 }
 

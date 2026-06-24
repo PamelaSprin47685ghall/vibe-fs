@@ -134,6 +134,8 @@ let run () : JS.Promise<unit> =
             "muxSubmitReviewRejectKeepsReviewActive", muxSubmitReviewRejectKeepsReviewActiveSpec
             "muxSubmitReviewDoubleCheckReject", muxSubmitReviewDoubleCheckRejectSpec
             "muxSubmitReviewTerminatedCleansReviewState", muxSubmitReviewTerminatedCleansReviewStateSpec
+            "muxSubmitReviewWipSkipsReviewer", muxSubmitReviewWipSkipsReviewerSpec
+            "muxSubmitReviewOmittedWipSkipsReviewer", muxSubmitReviewOmittedWipSkipsReviewerSpec
             "muxExecutorFailureDoesNotBookkeep", muxExecutorFailureDoesNotBookkeepSpec
             "muxTodoWriteMethodologySchema", muxTodoWriteMethodologySchemaSpec
         ] 

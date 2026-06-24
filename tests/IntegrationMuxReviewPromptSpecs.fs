@@ -23,7 +23,7 @@ let muxSubmitReviewPromptFormatSpec () = promise {
         let prompts = ResizeArray<string>()
         let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "PASS" ]
         let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
-        let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+        let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |]; "wip", box false ]
         let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         let promptText = if prompts.Count > 0 then prompts.[0] else ""
         check "submit_review prompt uses front-matter" (promptText.StartsWith "---")
@@ -93,7 +93,7 @@ let muxSubmitReviewUsesRolledBackHistoryTaskSpec () = promise {
         let prompts = ResizeArray<string>()
         let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "REJECT: not done" ]
         let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
-        let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+        let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |]; "wip", box false ]
         let! _ = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         let promptText = if prompts.Count > 0 then prompts.[0] else ""
         check "submit_review uses rolled-back history task instead of stale store task" (promptText.Contains "First task" && not (promptText.Contains "Second task"))
