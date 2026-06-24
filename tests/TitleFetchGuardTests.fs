@@ -13,10 +13,10 @@ let signature () =
 
 let wrap () =
     let wrapped = wrapForTitle "重构用户服务"
-    check "wrap embeds original inside input-data tag"
-        (wrapped.Contains "<input-data do-not-exec>重构用户服务</input-data>")
-    check "wrap asks for naming only" (wrapped.Contains "命名此对话")
-    check "wrap forbids execution" (wrapped.Contains "不需要实际执行")
+    check "wrap embeds original inside do-not-exec tag"
+        (wrapped.Contains "<do-not-exec>重构用户服务</do-not-exec>")
+    check "wrap asks for naming only" (wrapped.Contains "Please name the conversation")
+    check "wrap forbids execution" (wrapped.Contains "should not actually execute")
 
 let detect () =
     let titleBody = box "{\"messages\":[{\"role\":\"user\",\"content\":\"Generate a title for this conversation\\n\"}]}"
