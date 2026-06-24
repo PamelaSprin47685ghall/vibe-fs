@@ -38,14 +38,14 @@ let toolDefinitionSpec () = promise {
     let reportSchema = get todoProps "completedWorkReport"
     let required = unbox<obj[]> (get todoSchema "required") |> Array.map string
     check "tool.definition builds todo report field" (str reportSchema "type" = "string")
-    check "tool.definition builds todo report description" (str reportSchema "description" = VibeFs.Kernel.MagicTodo.reportDesc)
+    check "tool.definition builds todo report description" (str reportSchema "description" = VibeFs.Kernel.WorkBacklog.reportDesc)
     check "tool.definition requires todo report" (required |> Array.contains "completedWorkReport")
     check "tool.definition requires todos" (required |> Array.contains "todos")
-    check "tool.definition builds todos description" (str (get todoProps "todos") "description" = VibeFs.Kernel.MagicTodo.todosDesc)
+    check "tool.definition builds todos description" (str (get todoProps "todos") "description" = VibeFs.Kernel.WorkBacklog.todosDesc)
     let todoItemProps = get (get (get todoProps "todos") "items") "properties"
-    check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = VibeFs.Kernel.MagicTodo.todoContentDesc)
-    check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = VibeFs.Kernel.MagicTodo.todoStatusDesc)
-    check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Kernel.MagicTodo.todoPriorityDesc)
+    check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = VibeFs.Kernel.WorkBacklog.todoContentDesc)
+    check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = VibeFs.Kernel.WorkBacklog.todoStatusDesc)
+    check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Kernel.WorkBacklog.todoPriorityDesc)
 
     let! mimoP = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let mimoTd = get mimoP "tool.definition"

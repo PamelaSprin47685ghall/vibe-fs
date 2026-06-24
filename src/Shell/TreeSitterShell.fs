@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Shell.Dyn
 
 open VibeFs.Kernel.TreeSitterKernel
+open VibeFs.Kernel.PatchParser
 
 let extractFilePaths (args: obj) : string list =
     if isNullish args then []

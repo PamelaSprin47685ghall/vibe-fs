@@ -1,8 +1,8 @@
-module VibeFs.Kernel.MagicTodo
+module VibeFs.Kernel.WorkBacklog
 
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.MagicCore
+open VibeFs.Kernel.BacklogProjectionCore
 
 /// One-line nudge the main agent sees at the top of any bookkeeping-eligible
 /// tool output, reminding it to refresh `todowrite` after the work it just did.

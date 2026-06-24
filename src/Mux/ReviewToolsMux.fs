@@ -7,7 +7,11 @@ open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.ReviewVerdict
+open VibeFs.Kernel.Domain
+open VibeFs.Kernel.ToolCatalog
+open VibeFs.Kernel.ToolCopy
 open VibeFs.Shell.ReviewRuntime
+open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
@@ -69,20 +73,22 @@ let private runReviewRound (deps: obj) (config: obj) (toolNames: string array) (
 
 let submitReviewTool (deps: obj) (toolNames: string array) (reviewStore: ReviewStore) : ToolDefinition =
     { name = "submit_review"
-      description = "Submit completed work for review. Creates a reviewer sub-agent that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active With-Review Mode."
-      parameters = mkSchema (createObj [ "report", box (strProp "Detailed report of what was done"); "affectedFiles", box (strArrayProp "List of file paths that were modified or created") ]) [| "report"; "affectedFiles" |]
+      description = description "submit_review"
+      parameters = mkSchema (createObj [ "report", box (strProp Params.submitReviewReport); "affectedFiles", box (strArrayProp Params.submitReviewAffectedFiles) ]) [| "report"; "affectedFiles" |]
       execute = fun config args ->
-          if strField config "workspaceId" = None then resolveStr "submit_review requires workspaceId"
-          else
+          match fromMuxConfig config with
+          | Error (InvalidIntent (_, "workspaceId", _)) -> resolveStr muxSubmitReviewRequiresWorkspaceId
+          | Error e -> resolveStr (formatDomainError e)
+          | Ok runtime ->
+              let workspaceId = Option.get runtime.Execution.WorkspaceId
               promise {
                   let report = defaultArg (strField args "report") ""
                   let affectedFiles = requireStrArray args "affectedFiles" |> List.ofArray
-                  let workspaceId = Dyn.str config "workspaceId"
                   let! resolvedTask = syncReviewTaskFromHistory deps reviewStore workspaceId
                   if not (reviewStore.tryLockReview workspaceId) then
                       return
-                          if reviewStore.isReviewActive workspaceId then "A review is already in progress for this session."
-                          else "You do not need review. Just continue with your work."
+                          if reviewStore.isReviewActive workspaceId then submitReviewInProgress
+                          else submitReviewNotNeeded
                   else
                       try
                           let originalTask = defaultArg resolvedTask ""

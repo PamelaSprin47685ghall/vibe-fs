@@ -74,7 +74,7 @@ let defaultPreludeWithoutCapsSpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let capsAndMagicOrderSpec () = promise {
+let capsAndBacklogOrderSpec () = promise {
     let! workspaceDir = mkdtempAsync "caps-magic-order-"
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content"
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n"
@@ -125,9 +125,9 @@ let capsAndMagicOrderSpec () = promise {
     let capsAssistantInfo = get result.[1] "info"
     let magicInfo = get result.[2] "info"
     let magicId : string = str magicInfo "id"
-    check "caps/magic order: caps user first" ((str userParts.[0] "text").StartsWith "# Kolmolgorov 宝典")
-    check "caps/magic order: caps read assistant second" ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
-    check "caps/magic order: magic prefix third" (magicId.StartsWith(magicTodoPrefixPrefix : string))
+    check "caps/backlog order: caps user first" ((str userParts.[0] "text").StartsWith "# Kolmolgorov 宝典")
+    check "caps/backlog order: caps read assistant second" ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
+    check "caps/backlog order: backlog prefix third" (magicId.StartsWith(backlogPrefixIdPrefix : string))
     do! rmAsync workspaceDir
 }
 

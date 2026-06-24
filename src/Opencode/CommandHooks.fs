@@ -14,29 +14,28 @@ open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Kernel.Domain
+open VibeFs.Shell.ToolRuntimeContext
+open VibeFs.Shell.OpencodeHookInputCodec
 open VibeFs.Shell.Dyn
 
 let private abortOrDeleteEvents =
     set [ "stream-abort"; "session.delete"; "session.close"; "session.remove"; "session.deleted" ]
 
 let cleanUpJobContextIfAbortedOrDeleted (knowledgeGraphRuntime: KnowledgeGraphRuntime) (input: obj) : unit =
-    let event = Dyn.get input "event"
-    let eventType = Dyn.str event "type"
-    if Set.contains eventType abortOrDeleteEvents then
-        let rawProps = Dyn.get event "properties"
-        let props = if Dyn.isNullish rawProps then event else rawProps
+    match decodeHostEventEnvelope input with
+    | Some { EventType = eventType; Props = props } when Set.contains eventType abortOrDeleteEvents ->
         let sessionID = getSessionID eventType props
-        if sessionID <> "" then
-            knowledgeGraphRuntime.DeleteJob(sessionID)
+        if sessionID <> "" then knowledgeGraphRuntime.DeleteJob(sessionID)
+    | _ -> ()
 
 /// Handle /loop and /loop-review slash commands.
 let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
-        let command = Dyn.str input "command"
+        let command = commandNameFromHookInput input
         if command = "loop" || command = "loop-review" then
-            let sessionID = Dyn.str input "sessionID"
-            let task = (Dyn.str input "arguments").Trim()
+            let sessionID = sessionIdFromHookInput input ""
+            let task = (commandArgumentsFromHookInput input).Trim()
             let parts = ResizeArray<obj>()
             if task = "" then
                 reviewStore.deactivateReview sessionID
@@ -48,7 +47,7 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
                 let msg = buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
                 parts.Add(box {| ``type`` = "text"; text = msg |})
             else
-                let directory = Dyn.str ctx "directory"
+                let directory = pluginDirectoryFromCtx ctx
                 let! result = runReviewerSession childAgentRegistry (Dyn.get ctx "client") reviewStore directory sessionID task
                 match result with
                 | Accepted ->

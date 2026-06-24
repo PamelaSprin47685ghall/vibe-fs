@@ -5,16 +5,15 @@ open Fable.Core.JsInterop
 open VibeFs.Shell
 
 open VibeFs.Kernel.CapsFormat
+open VibeFs.Kernel.CapsSynthPolicy
 open VibeFs.Opencode.CapsPrelude
+open VibeFs.Shell.CapsSynthCommon
 open VibeFs.Shell.Dyn
 
 /// The obj-boundary layer for caps message synthesis: reads info fields off
 /// host message objects and constructs the synthetic user/assistant prefix
 /// objects. Pure formatting (buildCapitalsContext/etc.) stays in
 /// Kernel.CapsFormat; this module is the only site that touches host objects.
-
-let private capsUserPrefix = "caps-synth-user-"
-let private capsAssistantPrefix = "caps-synth-assistant-"
 
 let private messageInfoField (field: obj -> string) (msg: obj) : string =
     let info = get msg "info"
@@ -23,23 +22,14 @@ let private messageInfoField (field: obj -> string) (msg: obj) : string =
 let messageId (msg: obj) : string =
     messageInfoField (fun info -> str info "id") msg
 
-let private isPrefixed (prefix: string) (msg: obj) : bool =
-    let id = messageId msg
-    id <> "" && id.StartsWith prefix
-
 let messageSessionID (msg: obj) : string =
     messageInfoField (fun info -> str info "sessionID") msg
 
 let hasExistingCapsMessages (messages: obj array) : bool =
-    messages.Length > 0 && isPrefixed capsUserPrefix messages.[0]
+    CapsSynthCommon.hasExistingCapsMessages messageId messages
 
 let private stripExistingCapsMessages (messages: obj array) : obj array =
-    if not (hasExistingCapsMessages messages) then messages
-    else
-        messages
-        |> Array.skipWhile (fun msg ->
-            let id = messageId msg
-            id <> "" && id.StartsWith "caps-synth-")
+    stripLeadingCapsSynth messageId messages
 
 let private sessionBox (sessionID: string option) : obj =
     match sessionID with Some s -> box s | None -> box null
@@ -66,10 +56,6 @@ let private buildToolParts (capsFiles: CapsFile list) (fp: string) (sessionID: s
     |> Array.ofList
 
 let private buildUserMessage (userId: string) (sessionID: string option) (preludeText: string option) : obj =
-    let text =
-        match preludeText with
-        | Some prelude when prelude.Trim() <> "" -> prelude.Trim() + "\n\n" + thinkWrapped
-        | _ -> thinkWrapped
     box (createObj [
         "info", box (createObj [
             "id", box userId
@@ -79,7 +65,7 @@ let private buildUserMessage (userId: string) (sessionID: string option) (prelud
             "agent", box "orchestrator"
             "model", box (createObj [ "providerID", box ""; "modelID", box "" ])
         ])
-        "parts", box [| box {| ``type`` = "text"; text = text |} |]
+        "parts", box [| box {| ``type`` = "text"; text = userCapsText preludeText |} |]
     ])
 
 let private assistantInfo (assistantId: string) (parentID: string) (sessionID: string option) (projectRoot: string) : obj =
@@ -108,12 +94,6 @@ let private buildAssistantMessage (assistantId: string) (parentID: string) (sess
         "parts", box parts
     ])
 
-let private findFirstRealMessage (messages: obj array) : obj option =
-    messages
-    |> Array.tryFind (fun msg ->
-        let id = messageId msg
-        id <> "" && not (id.StartsWith capsUserPrefix) && not (id.StartsWith capsAssistantPrefix))
-
 /// Build the synthetic caps prefix: a single user message whose text wraps
 /// thinkText + llmText in <think></think>, followed by optional caps-file
 /// tool reads. The caller decides suppression by passing an empty `capsFiles`
@@ -127,7 +107,7 @@ let buildCapsMessages
     (capsFiles: CapsFile list)
     (preludeText: string option)
     : obj array =
-    match findFirstRealMessage messages with
+    match findFirstNonSynthMessage messageId messages with
     | None -> messages
     | Some _ ->
         let existingStripped =

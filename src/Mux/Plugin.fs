@@ -15,13 +15,19 @@ open VibeFs.Mux.WebTools
 open VibeFs.Mux.EventHook
 open VibeFs.Mux.SlashCommands
 open VibeFs.Mux.KnowledgeGraphTools
+open VibeFs.Mux.KnowledgeGraphTestHooks
 open VibeFs.Mux.KnowledgeGraphToolDefs
 open VibeFs.Mux.ReadDedup
+open VibeFs.Shell.ReadDedupMuxPlugin
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.WorkspaceFiles
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Mux.MessageTransform
+open VibeFs.Mux.BacklogSession
+open VibeFs.Shell.RuntimeScope
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.MuxHookInputCodec
+open VibeFs.Shell.OpencodeHookInputCodec
 
 let muxToolNames =
     [| "coder"; "investigator"; "meditator"; "browser"; "executor"
@@ -29,7 +35,7 @@ let muxToolNames =
        "knowledge_graph_fetch"; "return_bookkeeper" |]
 
 let private canUseMuxTopLevel (agent: string) (toolName: string) : bool =
-    canUseCanonical agent toolName
+    canUseForHost mux agent toolName
 
 let private buildToolPolicy (toolNames: string array) (role: obj) : obj =
     let agent = if Dyn.isNullish role then "manager" else string role
@@ -40,10 +46,10 @@ let getPluginToolPolicy (agentId: string) (role: obj) : obj =
     buildToolPolicy muxToolNames role
 
 let collectReadOutputs (messages: obj array) : string[] =
-    ReadDedup.collectReadOutputs messages
+    ReadDedupMuxPlugin.collectReadOutputs messages
 
 let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : obj[] =
-    ReadDedup.deduplicateReadOutputsWithSeen seenOutputs messages
+    ReadDedupMuxPlugin.deduplicateReadOutputsWithSeen seenOutputs messages
 
 let deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj[] =
     ReadDedup.deduplicateModelReadOutputsWithSeen seenOutputs messages
@@ -92,20 +98,22 @@ let createToolCatalog
     (deps: obj)
     (toolNames: string array)
     (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
-    (hostReadExec: HostReadExec)
+    (hostReadExec: HostFunctionCapture)
     (finderCache: FinderCache)
     (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
+    (sessionScope: VibeFs.Shell.RuntimeScope.RuntimeScope)
     : ToolDefinition array =
+    let iteratorStore = sessionScope.IteratorStore
     [| yield coderTool deps toolNames
        yield investigatorTool deps toolNames
        yield meditatorTool deps toolNames
        yield browserTool deps toolNames
-       yield executorTool deps toolNames null
+       yield executorTool deps toolNames null sessionScope
        yield submitReviewTool deps toolNames reviewStore
        yield websearchTool deps toolNames
        yield webfetchTool
-       yield fuzzyGrepTool finderCache
-       yield fuzzyFindTool finderCache
+       yield fuzzyGrepTool finderCache iteratorStore
+       yield fuzzyFindTool finderCache iteratorStore
        yield writeTool deps
        yield readTool deps hostReadExec
        yield knowledgeGraphFetchTool knowledgeGraphRuntime
@@ -117,11 +125,7 @@ let private recordsToBookkeeper (tool: string) : bool =
            "submit_review"; "websearch"; "webfetch"; "write" |]
     Array.contains tool allowed
 
-let private isReadOnlyExecutor (tool: string) (input: obj) : bool =
-    tool = "executor" && Dyn.str (Dyn.get input "args") "mode" = "ro"
-
-let private bookkeeperInput (input: obj) : string =
-    let args = Dyn.get input "args"
+let private bookkeeperInput (args: obj) : string =
     if Dyn.isNullish args then "" else JS.JSON.stringify args
 
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
@@ -133,47 +137,43 @@ let private toolExecuteAfter
     (output: obj)
     : JS.Promise<unit> =
     promise {
-        let tool = Dyn.str input "tool"
-        let sessionID = Dyn.str input "sessionID"
-        let succeeded = Dyn.str output "error" = ""
-        let originalOutput = Dyn.str output "output"
+        let decoded = decodeMuxToolExecuteAfterInput input deps
+        let succeeded = hookOutputError output = ""
+        let originalOutput = hookOutputText output
         if succeeded
-           && recordsToBookkeeper tool
-           && not (isReadOnlyExecutor tool input) then
-            let dir =
-                let d = Dyn.str input "directory"
-                if d <> "" then d else Dyn.str deps "directory"
-            let workspaceId =
-                let w = Dyn.str input "workspaceId"
-                if w <> "" then w else Dyn.str deps "workspaceId"
+           && recordsToBookkeeper decoded.Tool
+           && not (isReadOnlyExecutorMux decoded.Tool decoded.Args) then
             knowledgeGraphRuntime.StartBookkeeperAppend(
-                bookkeeperInput input,
+                bookkeeperInput decoded.Args,
                 originalOutput,
-                tool,
+                decoded.Tool,
                 config = createObj
-                    [ "sessionID", box sessionID
-                      "directory", box dir
-                      "workspaceId", box workspaceId
+                    [ "sessionID", box decoded.SessionID
+                      "directory", box decoded.Directory
+                      "workspaceId", box decoded.WorkspaceId
                       "taskService", box (Dyn.get deps "taskService") ])
-            setOutput output (VibeFs.Kernel.MagicTodo.withTodoHint originalOutput)
+            setOutput output (VibeFs.Kernel.WorkBacklog.withTodoHint originalOutput)
     }
 
 let createRegistration (deps: obj) : obj =
+    let scope = create ()
+    let backlogSession = BacklogSession(scope)
     let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
-    let hostReadExec = HostReadExec()
+    let hostReadExec = HostFunctionCapture()
     let finderCache = FinderCache()
     let knowledgeGraphRuntime = MuxKnowledgeGraphRuntime(deps)
-    let tools = createToolCatalog deps muxToolNames reviewStore hostReadExec finderCache knowledgeGraphRuntime
+    let tools = createToolCatalog deps muxToolNames reviewStore hostReadExec finderCache knowledgeGraphRuntime scope
     let toolsObj = toolsToObject tools
     let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.Config.getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
-    let wrappers = createAllWrappers toolsObj hostReadExec
+    let wrappers = createAllWrappers toolsObj hostReadExec scope
     let eventHook = createEventHook deps reviewStore
     let slashCommands = createSlashCommands deps muxToolNames reviewStore
     let messagesTransformFn =
         System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
-            messagesTransform deps knowledgeGraphRuntime reviewStore input output)
+            messagesTransform deps scope backlogSession knowledgeGraphRuntime reviewStore input output)
     let getToolPolicy = System.Func<string, obj, obj>(fun (_agentId: string) (role: obj) -> buildToolPolicy muxToolNames role)
     let registration = createObj [
+        "__runtimeScope", box scope
         "toolNames", box muxToolNames
         "tools", box tools
         "wrappers", box wrappers
@@ -189,17 +189,19 @@ let createRegistration (deps: obj) : obj =
         "messagesTransform", box messagesTransformFn
         "getToolPolicy", box getToolPolicy
         "__knowledgeGraphRuntime",
-            box (createObj
-                [ "rawInstance", box knowledgeGraphRuntime
-                  "registerJobForTesting",
-                  box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
-                      knowledgeGraphRuntime.RegisterJobForTesting(sessionID, workspaceRoot, kindTag, payload)))
-                  "startMaintenanceIfDue",
-                  box (System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> knowledgeGraphRuntime.StartMaintenanceIfDue(workspaceRoot)))
-                  "takeBookkeeperLaunchesForTesting",
-                  box (System.Func<obj array>(fun () -> knowledgeGraphRuntime.TakeBookkeeperLaunchesForTesting()))
-                  "waitForBackgroundJobsForTesting",
-                  box (System.Func<JS.Promise<unit>>(fun () -> knowledgeGraphRuntime.WaitForBackgroundJobsForTesting())) ])
+            box (
+                let hooks = knowledgeGraphRuntime.TestHooks
+                createObj
+                    [ "rawInstance", box knowledgeGraphRuntime
+                      "registerJobForTesting",
+                      box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
+                          hooks.RegisterJob(sessionID, workspaceRoot, kindTag, payload)))
+                      "startMaintenanceIfDue",
+                      box (System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> knowledgeGraphRuntime.StartMaintenanceIfDue(workspaceRoot)))
+                      "takeBookkeeperLaunchesForTesting",
+                      box (System.Func<obj array>(fun () -> hooks.TakeLaunches()))
+                      "waitForBackgroundJobsForTesting",
+                      box (System.Func<JS.Promise<unit>>(fun () -> hooks.WaitJobs())) ])
         "__reviewStore",
             box (createObj
                 [ "activateReview",

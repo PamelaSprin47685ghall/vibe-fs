@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 
-open VibeFs.Kernel.MagicCore
+open VibeFs.Kernel.BacklogProjectionCore
 open VibeFs.Opencode.Plugin
 open VibeFs.Shell.Dyn
 
@@ -31,7 +31,7 @@ let private readToolPart (output: string) : obj =
 let private todoToolPart (report: string) : obj =
     createObj [
         "type", box "tool"
-        "tool", box magicTodoToolName
+        "tool", box todoWriteToolNameDefault
         "state", box (createObj [
             "status", box "completed"
             "input", box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
@@ -98,7 +98,7 @@ let opencodeDedupInPlaceSpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let opencodeDedupIgnoresMagicFoldedReadsSpec () = promise {
+let opencodeDedupIgnoresBacklogFoldedReadsSpec () = promise {
     let! workspaceDir = mkdtempAsync "dedup-magic-"
     let! p = plugin (box {| directory = workspaceDir |})
     let sessionID = "dedup-magic-session"
@@ -114,8 +114,8 @@ let opencodeDedupIgnoresMagicFoldedReadsSpec () = promise {
     let messagesRef = get messages "messages"
     do! (get p "experimental.chat.messages.transform") $ (box {| sessionID = sessionID |}, messages) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> messagesRef
-    check "opencode dedup ignores magic folded reads: keeps messages ref" (obj.ReferenceEquals(msgs, unbox<obj[]> (get messages "messages")))
+    check "opencode dedup ignores backlog folded reads: keeps messages ref" (obj.ReferenceEquals(msgs, unbox<obj[]> (get messages "messages")))
     let latest = findMsgById msgs "mg-m6"
-    check "opencode dedup ignores magic folded reads: latest read kept" (readOutputOf latest = "same")
+    check "opencode dedup ignores backlog folded reads: latest read kept" (readOutputOf latest = "same")
     do! rmAsync workspaceDir
 }

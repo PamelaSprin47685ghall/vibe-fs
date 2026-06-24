@@ -106,3 +106,16 @@ let investigatorToolLateClientInjectionSpec () = promise {
     check "investigator tool late injection prompts child investigator agent" (str (get promptCalls.[0] "body") "agent" = "investigator")
     do! rmAsync workspaceDir
 }
+
+let muxCoderInvalidIntentsSpec () = promise {
+    let reg = createRegistration (createObj [])
+    let tools = unbox<obj[]> (get reg "tools")
+    let coder = tools |> Array.find (fun t -> str t "name" = "coder")
+    let execute = get coder "execute"
+    let invalidIntents = [| createObj [ "objective", box "x"; "background", box "y" ] |]
+    let! result =
+        (execute $ (createObj [ "workspaceId", box "mux-invalid-intents"; "cwd", box "/tmp" ], createObj [ "intents", box invalidIntents; "tdd", box "red" ]))
+        |> unbox<JS.Promise<string>>
+    check "mux coder invalid intents mentions parse" (result.Contains "parse")
+    check "mux coder invalid intents mentions Invalid LLM or intents" (result.Contains "Invalid LLM" || result.Contains "intents")
+}

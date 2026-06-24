@@ -8,6 +8,8 @@ open VibeFs.Kernel.SubagentIntents
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
 
+module Params = VibeFs.Kernel.ToolCatalog.Params
+
 /// The opencode plugin SDK's `tool` factory + `tool.schema` (Zod-like) builder.
 [<Import("tool", "@opencode-ai/plugin/tool")>]
 let toolFactory : obj = jsNative
@@ -82,9 +84,9 @@ let knowledgeGraphDraftEntriesReq (desc: string) : obj =
     let entryShape =
         strictObject (
             createObj [
-                "id", strOpt "Optional entry id"
-                "entity", strArrayReq "Knowledge graph entity"
-                "fact", strReq "Knowledge graph fact"
+                "id", strOpt Params.kgEntryId
+                "entity", strArrayReq Params.kgEntryEntity
+                "fact", strReq Params.kgEntryFact
             ])
     call1 (arr entryShape) "describe" (box desc)
 
@@ -110,28 +112,32 @@ let obj (shape: obj) : obj = call1 schema "object" shape
 let define (description: string) (args: obj) (execute: obj -> obj -> JS.Promise<string>) : obj =
     invokeTool toolFactory (box {| description = description; args = args; execute = execute |})
 
-let coder = description "coder"
+let private toolDescription (name: string) : string = VibeFs.Kernel.ToolCatalog.description name
 
-let investigator = description "investigator"
+let coder = toolDescription "coder"
 
-let meditator = description "meditator"
+let investigator = toolDescription "investigator"
 
-let browser = description "browser"
+let meditator = toolDescription "meditator"
 
-let executor = description "executor"
+let browser = toolDescription "browser"
 
-let fuzzyFind = description "fuzzy_find"
+let executor = toolDescription "executor"
 
-let fuzzyGrep = description "fuzzy_grep"
+let fuzzyFind = toolDescription "fuzzy_find"
 
-let websearch = description "websearch"
+let fuzzyGrep = toolDescription "fuzzy_grep"
 
-let webfetch = description "webfetch"
+let websearch = toolDescription "websearch"
 
-let fetchKnowledgeGraph = description "knowledge_graph_fetch"
+let webfetch = toolDescription "webfetch"
 
-let submitKnowledgeGraph = description "return_bookkeeper"
+let fetchKnowledgeGraph = toolDescription "knowledge_graph_fetch"
 
-module Params = VibeFs.Kernel.ToolCatalog.Params
+let submitKnowledgeGraph = toolDescription "return_bookkeeper"
 
-let executorMode = VibeFs.Kernel.ToolCatalog.Params.executorMode
+let submitReview = toolDescription "submit_review"
+
+let submitReviewResult = toolDescription "submit_review_result"
+
+let executorMode = Params.executorMode

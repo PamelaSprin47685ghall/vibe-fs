@@ -6,7 +6,7 @@ open Fable.Core.JsInterop
 open VibeFs.Shell
 
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.MagicTodo
+open VibeFs.Kernel.WorkBacklog
 open VibeFs.Kernel.Methodology
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Shell.Dyn

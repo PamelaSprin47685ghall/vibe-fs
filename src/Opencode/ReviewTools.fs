@@ -9,11 +9,15 @@ open VibeFs.Kernel.ReviewSession
 open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.LoopMessages
+open VibeFs.Kernel.ToolCatalog
+open VibeFs.Kernel.ToolCopy
 open VibeFs.Opencode.ToolSchema
+open VibeFs.Opencode.ToolHelpers
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ReviewerLoop
-open VibeFs.Opencode.ToolHelpers
-open VibeFs.Mux.Wrappers
+open VibeFs.Shell.PromiseStr
+open VibeFs.Shell.ReviewToolsCodec
+open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.Dyn
 
@@ -21,56 +25,65 @@ let private formatReviewResult = VibeFs.Kernel.ReviewPrompts.formatReviewResult
 
 let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     let client () = Dyn.get ctx "client"
-    define "Submit completed work for the reviewer to accept or reject."
-        (box {| report = strReq "Detailed report of what you did"; affectedFiles = strArrayOpt "Files you modified" |})
+    define submitReview
+        (box {| report = strReq Params.submitReviewReport; affectedFiles = strArrayOpt Params.submitReviewAffectedFiles |})
         (fun args context ->
-            let tc = extractToolContext context (Dyn.str ctx "directory")
-            let sessionID = Dyn.str tc "sessionID"
-            if sessionID = "" || not (store.isReviewActive sessionID) then
-                resolveStr "You do not need review. Just continue with your work."
-            elif not (store.tryLockReview sessionID) then
-                resolveStr "A review is already in progress. Wait for it to finish."
-            else
-                let report = Dyn.str args "report"
-                let affectedFiles =
-                    if Dyn.isNullish (Dyn.get args "affectedFiles") then []
-                    else Dyn.get args "affectedFiles" :?> obj array |> Array.map string |> List.ofArray
-                let abort = Dyn.get tc "abortSignal"
-                promise {
-                    try
-                        let task = defaultArg (store.getReviewTask sessionID) ""
-                        let! result = runSubmitReview registry (client ()) store (Dyn.str tc "directory") sessionID report affectedFiles task abort
-                        match result with
-                        | Accepted
-                        | Terminated ->
-                            store.deactivateReview sessionID
-                        | Rejected _ -> ()
-                        return formatReviewResult result
-                    finally
-                        store.unlockReview sessionID
-                })
+            match decodeSubmitReviewArgs args with
+            | Error e -> resolveStr (ToolHelpers.formatDomainError "submit_review" e)
+            | Ok decoded ->
+                let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
+                let sessionID = runtime.Execution.SessionId
+                if sessionID = "" || not (store.isReviewActive sessionID) then
+                    resolveStr submitReviewNotNeeded
+                elif not (store.tryLockReview sessionID) then
+                    resolveStr opencodeSubmitReviewInProgress
+                else
+                    let abort =
+                        match runtime.AbortSignal with
+                        | Some s -> s
+                        | None -> null
+                    promise {
+                        try
+                            let task = defaultArg (store.getReviewTask sessionID) ""
+                            let! result =
+                                runSubmitReview
+                                    registry
+                                    (client ())
+                                    store
+                                    runtime.Execution.Directory
+                                    sessionID
+                                    decoded.Report
+                                    decoded.AffectedFiles
+                                    task
+                                    abort
+                            match result with
+                            | Accepted
+                            | Terminated ->
+                                store.deactivateReview sessionID
+                            | Rejected _ -> ()
+                            return formatReviewResult result
+                        finally
+                            store.unlockReview sessionID
+                    })
 
 let submitReviewResultTool (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     let client () = Dyn.get ctx "client"
-    let pluginDirectory = Dyn.str ctx "directory"
-    define "Submit your review verdict."
-        (box {| verdict = enumReq [| "PASS"; "REJECT" |] "PASS to accept, REJECT to reject"
-                feedback = strOpt "detailed, actionable feedback when rejecting; omit when passing" |})
+    define submitReviewResult
+        (box {| verdict = enumReq [| "PASS"; "REJECT" |] Params.returnReviewerVerdict
+                feedback = strOpt Params.returnReviewerFeedback |})
         (fun args context ->
+            let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
             let sessionID =
-                let id = Dyn.str context "sessionID"
+                let id = runtime.Execution.SessionId
                 if id = "" then "loop" else id
-            let directory =
-                let d = Dyn.str context "directory"
-                if d <> "" then d else pluginDirectory
-            let feedback = defaultArg (optStr args "feedback") ""
+            let directory = runtime.Execution.Directory
             promise {
-                match parseVerdict (Dyn.str args "verdict") with
-                | None -> return reviewerNudgePrompt
-                | Some verdict ->
+                match decodeReturnReviewerArgs args with
+                | Error e -> return ToolHelpers.formatDomainError "return_reviewer" e
+                | Ok decoded ->
                     let! texts = VibeFs.Opencode.SessionIo.readSessionTexts (client ()) sessionID directory
                     let doubleCheckDone = hasDoubleCheckAnchor texts
-                    match decideReviewSubmission verdict feedback doubleCheckDone with
+                    match decideReviewSubmission decoded.Verdict decoded.Feedback doubleCheckDone with
                     | AskDoubleCheck ->
                         let task = defaultArg (inferReviewTaskFromTexts texts) ""
                         return doubleCheckPrompt task

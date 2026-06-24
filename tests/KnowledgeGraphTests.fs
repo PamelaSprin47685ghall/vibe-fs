@@ -6,6 +6,7 @@ open VibeFs.Tests.Assert
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphCodec
 open VibeFs.Kernel.KnowledgeGraphPrompts
+open VibeFs.Kernel.KnowledgeGraphJobTesting
 open VibeFs.Kernel.Messaging
 
 let private ok r =
@@ -116,6 +117,17 @@ let projectionSpec () =
     let proj = projectLatestWins files
     let resolved = Map.find (some (tryParseId "0a3f")) proj
     check "projectLatestWins latest wins" (resolved.entity = ["e"] && resolved.fact = "new fact")
+
+let testingJobKindSpec () =
+    let fields = Map [ "date", "2026-06-18" ]
+    let readField name = Map.tryFind name fields |> Option.defaultValue ""
+    check "parseTestingJobKind append" (parseTestingJobKind "append" readField = AppendAfterWork)
+    check "parseTestingJobKind daily" (parseTestingJobKind "daily" readField = DailyRewrite "2026-06-18")
+    check "parseTestingJobKind trims tag" (parseTestingJobKind "  APPEND  " readField = AppendAfterWork)
+
+    let ctx = buildTestingJobContext "/tmp/ws" "daily" readField
+    check "buildTestingJobContext workspace" (ctx.workspaceRoot = "/tmp/ws")
+    check "buildTestingJobContext kind" (ctx.kind = DailyRewrite "2026-06-18")
 
 let jobMarkerSpec () =
     let appendCtx = { workspaceRoot = "/tmp/kg-root"; kind = AppendAfterWork }
@@ -279,6 +291,7 @@ let run () : JS.Promise<unit> =
         ndjsonParseSpec ()
         ndjsonRenderSpec ()
         projectionSpec ()
+        testingJobKindSpec ()
         jobMarkerSpec ()
         preludeSpec ()
         fetchAnswerSpec ()

@@ -184,5 +184,6 @@ let applyAgentConfigFor (host: Host) (opencodeConfig: obj) (mcps: obj) : obj =
         |> fun builtAgents ->
             match host with
             | Mimocode -> disableMimoWorkflowToolsForAgents builtAgents
-            | Opencode -> builtAgents
+            | Opencode
+            | Mux -> builtAgents
     mergeObj prepared (box {| agent = finalAgents; mcp = mergedMcp |})

@@ -1,0 +1,16 @@
+module VibeFs.Shell.ChatTransformOutputCodec
+
+open Fable.Core.JsInterop
+open VibeFs.Shell.Dyn
+
+let tryGetMessagesArrayFromOutput (output: obj) : obj array option =
+    let messages = Dyn.get output "messages"
+    if Dyn.isNullish messages || not (Dyn.isArray messages) then None
+    else
+        let arr = messages :?> obj array
+        if arr.Length = 0 then None else Some arr
+
+let clearSystemOutputLength (output: obj) : unit =
+    let systemObj = Dyn.get output "system"
+    if not (Dyn.isNullish systemObj) then
+        systemObj?length <- 0

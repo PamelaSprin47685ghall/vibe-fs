@@ -9,6 +9,7 @@ open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
 open VibeFs.Shell.TreeSitterShell
 open VibeFs.Kernel.TreeSitterKernel
+open VibeFs.Kernel.Message
 open VibeFs.Shell.Dyn
 
 let pluginShape (p: obj) =
@@ -172,7 +173,7 @@ let mimoConfigSpec () = promise {
     let output = createObj [ "messages", box messages ]
     do! (get p "experimental.chat.messages.transform") $ (createObj [ "agent", box "manager" ], output) |> unbox<JS.Promise<unit>>
     let transformedMessages = unbox<obj[]> (get output "messages")
-    let prefixMessages = transformedMessages |> Array.filter (fun message -> str (get message "info") "id" |> fun id -> id.StartsWith("magic-todo-prefix-"))
+    let prefixMessages = transformedMessages |> Array.filter (fun message -> str (get message "info") "id" |> fun id -> id.StartsWith(backlogPrefixIdPrefix))
     check "mimo messages.transform emits folded prefix messages" (prefixMessages.Length = 2)
     check "mimo messages.transform prefix keeps folded user note" (
         prefixMessages

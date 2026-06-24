@@ -9,11 +9,7 @@ open VibeFs.Mux.AiSettings
 open VibeFs.Mux.Wrappers
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
-
-[<Global>]
-type AbortController() =
-    member _.signal: obj = jsNative
-    member _.abort(): unit = jsNative
+open VibeFs.Shell.SubagentSpawn
 
 let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
     unbox<JS.Promise<obj>>(taskService?create(input))

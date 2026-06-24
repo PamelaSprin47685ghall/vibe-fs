@@ -1,9 +1,9 @@
-module VibeFs.Shell.MagicSessionStore
+module VibeFs.Shell.SessionProjectionStore
 
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.MagicCore
+open VibeFs.Kernel.BacklogProjectionCore
 
-type private MagicSessionStore() =
+type ProjectionStore() =
     let mutable reportTables = Map.empty<Host, Map<string, string>>
     let mutable backlogCaches = Map.empty<Host, Map<string, BacklogEntry list>>
 
@@ -32,20 +32,3 @@ type private MagicSessionStore() =
 
     member this.TryGetBacklog(host: Host, sessionId: string) : BacklogEntry list option =
         Map.tryFind host backlogCaches |> Option.bind (Map.tryFind sessionId)
-
-let private store = MagicSessionStore()
-
-let captureReport (host: Host) (callId: string) (report: string) : unit =
-    store.CaptureReport(host, callId, report)
-
-let takeReport (host: Host) (callId: string) : string =
-    store.TakeReport(host, callId)
-
-let tryGetReport (host: Host) (callId: string) : string option =
-    store.TryGetReport(host, callId)
-
-let storeBacklog (host: Host) (sessionId: string) (backlog: BacklogEntry list) : unit =
-    store.StoreBacklog(host, sessionId, backlog)
-
-let tryGetBacklog (host: Host) (sessionId: string) : BacklogEntry list option =
-    store.TryGetBacklog(host, sessionId)

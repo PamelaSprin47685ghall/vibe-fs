@@ -191,6 +191,12 @@ let runWithFinderSharedPipeline () =
 /// Empty-string iterator must be treated as "absent", not as a stored key.  An
 /// LLM/client passing `iterator: ""` (instead of omitting the field) should
 /// fall through to the fresh-search branch whenever `pattern` is present.
+let resolveStoreRequiresInjection () =
+    let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = None; finderCache = FinderCache() }
+    match resolveStore opts with
+    | Error msg -> check "missing store message" (msg.Contains "SearchOptions.store")
+    | Ok _ -> check "None store must not fall back to global default" false
+
 let emptyIteratorTreatedAsAbsent () =
     let store = VibeFs.Shell.FuzzyIteratorStore.createTypedIteratorStore 10
     let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = Some store; finderCache = FinderCache() }

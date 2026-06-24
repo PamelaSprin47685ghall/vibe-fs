@@ -6,6 +6,7 @@ open VibeFs.Tests.Assert
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphPrompts
 open VibeFs.Kernel.KnowledgeGraphMaintenance
+open VibeFs.Kernel.KnowledgeGraphRuntimeState
 
 let private some (o: 'a option) : 'a =
     match o with Some v -> v | None -> failwith "expected Some"
@@ -104,6 +105,21 @@ let dueMaintenanceDailySpec () =
     let dailyDue4 = dueMaintenance multiFiles (DateTime(2026, 6, 20))
     equal "daily due schedules oldest past unrewritten only" ["2026-06-10"] dailyDue4
 
+let bookkeeperMaintenanceLaunchSpec () =
+    let root = "/tmp/ws"
+    let date = "2026-06-18"
+    let key, launch = bookkeeperMaintenanceLaunch root date
+    equal "maintenance dedup key" (root + "|daily|" + date) key
+    equal "maintenance agent" "bookkeeper" launch.agent
+    check "maintenance title mentions daily" (launch.title.ToLowerInvariant().Contains "daily")
+    check "maintenance prompt mentions date" (launch.prompt.Contains date)
+    equal "maintenance result tag" "daily:2026-06-18" launch.result
+    let first, s1 = recordLaunchOnce initialKnowledgeGraphState key launch
+    check "recordLaunchOnce first is true" first
+    let second, s2 = recordLaunchOnce s1 key launch
+    check "recordLaunchOnce second is false" (not second)
+    equal "dedup preserves scheduledMaintenance size" 1 (Set.count s2.scheduledMaintenance)
+
 let run () : JS.Promise<unit> =
     promise {
         projectionTextSpec ()
@@ -113,4 +129,5 @@ let run () : JS.Promise<unit> =
         dailyPromptSpec ()
         parseDateSpec ()
         dueMaintenanceDailySpec ()
+        bookkeeperMaintenanceLaunchSpec ()
     }

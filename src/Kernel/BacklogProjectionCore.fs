@@ -1,19 +1,19 @@
-module VibeFs.Kernel.MagicCore
+module VibeFs.Kernel.BacklogProjectionCore
 
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.PromptFrontMatter
 
-let magicTodoToolNameFor (host: Host) : string = todoWriteToolName host
-let magicTodoToolName = magicTodoToolNameFor opencode
-let magicReviewToolName = "submit_review"
+let todoWriteToolNameFor (host: Host) : string = todoWriteToolName host
+let todoWriteToolNameDefault = todoWriteToolNameFor opencode
+let reviewToolName = "submit_review"
 
 type BacklogEntry =
     { report: string }
 
 let isTodoResultFor (host: Host) (part: Part<'raw>) : bool =
     match part with
-    | ToolPart(toolName, _, Some state, _) when toolName = magicTodoToolNameFor host && state.status = "completed" -> true
+    | ToolPart(toolName, _, Some state, _) when toolName = todoWriteToolNameFor host && state.status = "completed" -> true
     | _ -> false
 
 let isTodoResult (part: Part<'raw>) : bool =
@@ -21,7 +21,7 @@ let isTodoResult (part: Part<'raw>) : bool =
 
 let isTodoErrorFor (host: Host) (part: Part<'raw>) : bool =
     match part with
-    | ToolPart(toolName, _, Some state, _) when toolName = magicTodoToolNameFor host && state.status = "error" -> true
+    | ToolPart(toolName, _, Some state, _) when toolName = todoWriteToolNameFor host && state.status = "error" -> true
     | _ -> false
 
 let isTodoError (part: Part<'raw>) : bool =
@@ -37,11 +37,8 @@ let lastTodoErrorTextFor (host: Host) (flat: FlatPart<'raw> list) : string optio
 
 let isReviewTool (part: Part<'raw>) : bool =
     match part with
-    | ToolPart(toolName, _, _, _) when toolName = magicReviewToolName -> true
+    | ToolPart(toolName, _, _, _) when toolName = reviewToolName -> true
     | _ -> false
-
-let magicTodoProjectionPrefix = "magic-todo-projection-"
-let magicTodoPrefixPrefix = "magic-todo-prefix-"
 
 let private indentBlock (text: string) : string =
     text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')

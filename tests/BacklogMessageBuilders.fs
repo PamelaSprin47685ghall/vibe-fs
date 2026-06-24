@@ -1,10 +1,10 @@
-module VibeFs.Tests.MagicMessageBuilders
+module VibeFs.Tests.BacklogMessageBuilders
 
 open Fable.Core
 open Fable.Core.JsInterop
 
 open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.MagicCore
+open VibeFs.Kernel.BacklogProjectionCore
 
 
 let mkInfo (id: string) (role: Role) : MessageInfo<obj> =
@@ -21,18 +21,18 @@ let timedTodoWriteMsg (id: string) (callID: string) (report: string) (created: i
     let input = box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
     let time = box (createObj [ "created", box created; "completed", box completed ])
     { info = { mkInfo id Assistant with time = time }
-      parts = [ ToolPart(magicTodoToolName, callID, Some (mkState "completed" "Todos updated." input), null) ]
+      parts = [ ToolPart(todoWriteToolNameDefault, callID, Some (mkState "completed" "Todos updated." input), null) ]
       source = Native; raw = null }
 
 let todoWriteMsg (id: string) (callID: string) (report: string) : Message<obj> =
     let input = box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
     { info = mkInfo id Assistant
-      parts = [ ToolPart(magicTodoToolName, callID, Some (mkState "completed" "Todos updated." input), null) ]
+      parts = [ ToolPart(todoWriteToolNameDefault, callID, Some (mkState "completed" "Todos updated." input), null) ]
       source = Native; raw = null }
 
 let todoWriteErrorMsg (id: string) (callID: string) (errorText: string) : Message<obj> =
     { info = mkInfo id Assistant
-      parts = [ ToolPart(magicTodoToolName, callID, Some ({ status = "error"; output = ""; error = errorText; input = box (createObj []); operationAction = "" }), null) ]
+      parts = [ ToolPart(todoWriteToolNameDefault, callID, Some ({ status = "error"; output = ""; error = errorText; input = box (createObj []); operationAction = "" }), null) ]
       source = Native; raw = null }
 
 let assistantTextMsg (id: string) (text: string) : Message<obj> =
@@ -46,7 +46,7 @@ let reasoningMsg (id: string) (text: string) : Message<obj> =
 let reviewMsg (id: string) (callID: string) (output: string) : Message<obj> =
     let input = box (createObj [ "review", box "looks good" ])
     { info = mkInfo id Assistant
-      parts = [ ToolPart(magicReviewToolName, callID, Some (mkState "completed" output input), null) ]
+      parts = [ ToolPart(reviewToolName, callID, Some (mkState "completed" output input), null) ]
       source = Native; raw = null }
 
 let taskMsgWithReport (id: string) (callID: string) (report: string) : Message<obj> =

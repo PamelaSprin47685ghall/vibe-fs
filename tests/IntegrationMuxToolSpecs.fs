@@ -10,7 +10,7 @@ open VibeFs.Tests.IntegrationMuxSetup
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.HostTools
 open VibeFs.Mux.Plugin
-open VibeFs.Shell.MagicSessionStore
+open VibeFs.Shell.RuntimeScope
 open VibeFs.Shell.Dyn
 
 
@@ -65,11 +65,12 @@ let muxTodoWriteCapturesCompletedWorkReportSpec () = promise {
         let nativeTodos = unbox<obj[]> (get nativeArgs "todos")
         check "mux todo_write wrapper strips completedWorkReport before native execute" (isNullish (get nativeArgs "completedWorkReport"))
         check "mux todo_write wrapper strips priority before native execute" (isNullish (get nativeTodos.[0] "priority"))
-        check "mux todo_write wrapper captures completedWorkReport" (tryGetReport opencode "todo-call-1" = Some "finished wrapper capture")
+        let scope = unbox<RuntimeScope> (get reg "__runtimeScope")
+        check "mux todo_write wrapper captures completedWorkReport" (scope.Projection.TryGetReport(mux, "todo-call-1") = Some "finished wrapper capture")
         check "mux todo_write wrapper keeps nudge behavior" ((str result "nudge").Contains "meditator")
 }
 
-let muxMagicTodoProjectionSpec () = promise {
+let muxBacklogProjectionSpec () = promise {
     let reg = createRegistration (createObj [])
     let tf = muxMessageTransform reg
     if isNullish tf then
@@ -187,7 +188,7 @@ let muxReadToolReturnsContentSpec () = promise {
         if isNullish readTool then
             check "mux registration exposes read tool" false
         else
-            let ctx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-read-content-session" ]
+            let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-read-content-session"; "sessionID", box "mux-read-content-session" ]
             let args = createObj [ "path", box filePath ]
             let! result = ((get readTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
             check "mux read returns non-nullish content" (not (isNullish result))
@@ -221,7 +222,7 @@ let muxReadToolListsDirectoriesSpec () = promise {
         if isNullish readTool then
             check "mux registration exposes read tool for directory read" false
         else
-            let ctx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-read-directory-session" ]
+            let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-read-directory-session"; "sessionID", box "mux-read-directory-session" ]
             let args = createObj [ "path", box workspaceDir ]
             let! result = ((get readTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
             check "mux read returns directory listing" (result.Contains "note.txt" && result.Contains "total 1")

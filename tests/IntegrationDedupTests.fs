@@ -6,7 +6,7 @@ open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationDedupOpenCodeSpecs
 
-open VibeFs.Kernel.MagicCore
+open VibeFs.Kernel.BacklogProjectionCore
 open VibeFs.Opencode.Plugin
 open VibeFs.Shell.Dyn
 
@@ -178,5 +178,5 @@ let run () : JS.Promise<unit> =
         dedupModelNonReadSpec ()
         dedupModelEmptySpec ()
         do! opencodeDedupInPlaceSpec ()
-        do! opencodeDedupIgnoresMagicFoldedReadsSpec ()
+        do! opencodeDedupIgnoresBacklogFoldedReadsSpec ()
     }

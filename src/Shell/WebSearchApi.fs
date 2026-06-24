@@ -1,4 +1,4 @@
-module VibeFs.Shell.OllamaClient
+module VibeFs.Shell.WebSearchApi
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -25,33 +25,33 @@ let postInit (apiKey: string) (body: string) (signal: obj option) : obj =
 let responseMethod0 (response: obj) (methodName: string) : obj =
     response?(methodName)()
 
-let ollamaApiBase = "https://ollama.com/api"
+let webApiBase = "https://ollama.com/api"
 
-let getOllamaApiKey () : string =
+let getWebApiKey () : string =
     let env = nodeProcess?env
     if Dyn.isNullish env then ""
     else
         let key = env?("OLLAMA_API_KEY")
         if Dyn.isNullish key then "" else string key
 
-let requireOllamaApiKey (apiKey: string) : Result<string, string> =
+let requireWebApiKey (apiKey: string) : Result<string, string> =
     let trimmed = apiKey.Trim()
     if trimmed = "" then Error "Missing OLLAMA_API_KEY environment variable." else Ok trimmed
 
-let private validatedOllamaApiKey () : Result<string, DomainError> =
-    requireOllamaApiKey (getOllamaApiKey ())
+let private validatedWebApiKey () : Result<string, DomainError> =
+    requireWebApiKey (getWebApiKey ())
     |> Result.mapError (fun _ -> UpstreamRefused "Missing OLLAMA_API_KEY environment variable.")
 
-let private normalizeOllamaPath (pathname: string) : string =
+let private normalizeWebApiPath (pathname: string) : string =
     if pathname.StartsWith("/") then pathname else $"/{pathname}"
 
-/// POST JSON to the Ollama API with the bearer key, returning parsed JSON.
-let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Promise<Result<obj, DomainError>> =
+/// POST JSON to the agent backend gateway (OLLAMA_API_KEY bearer), returning parsed JSON.
+let webApiPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Promise<Result<obj, DomainError>> =
     promise {
-        match validatedOllamaApiKey () with
+        match validatedWebApiKey () with
         | Error e -> return Error e
         | Ok apiKey ->
-            let url = $"{ollamaApiBase}{normalizeOllamaPath pathname}"
+            let url = $"{webApiBase}{normalizeWebApiPath pathname}"
             let bodyStr = JS.JSON.stringify(body)
             let init = postInit apiKey bodyStr abortSignal
             try

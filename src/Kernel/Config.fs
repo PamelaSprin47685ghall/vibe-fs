@@ -1,6 +1,7 @@
 module VibeFs.Kernel.Config
 
 open VibeFs.Kernel.HostTools
+open VibeFs.Kernel.ToolPermission
 
 let private repo = "https://github.com/vibheksoni/stealth-browser-mcp.git"
 
@@ -26,58 +27,17 @@ let getStealthBrowserMcpLocalConfig
            "-m"
            "server" |] |}
 
-type Agent = string
-type Tool = string
+type Agent = ToolPermission.Agent
+type Tool = ToolPermission.Tool
 
-let private knownAgents =
-    [ "manager"
-      "investigator"
-      "coder"
-      "reviewer"
-      "browser"
-      "meditator"
-      "executor"
-      "bookkeeper" ]
-
-/// The permission decision as an ordered pattern-match over (agent, tool).
-/// First matching clause wins. The `when` guards express the substring rules
-/// that host / MCP tool naming makes load-bearing (e.g. `stealth-browser-mcp_*`,
-/// `bash_run`, `return_<role>`), so an exact-equality table cannot replace them
-/// (REFACTOR.md §1 D8).
-let canUseCanonical (agent: Agent) (tool: Tool) : bool =
-    let toolMatches (subs: string list) = subs |> List.exists tool.Contains
-
-    match agent, tool with
-    | _, _ when toolMatches [ "agent_report" ] -> true
-    | _, _ when toolMatches [ "bash"; "task" ] || tool = "grep" -> false
-    | _, _ when toolMatches [ "stealth" ] -> agent = "browser"
-    | _, _ when toolMatches [ "return" ] -> toolMatches [ agent ]
-    | "bookkeeper", _ -> false
-    | "meditator", _
-    | "executor", _ -> false
-    | _, _ when toolMatches [ "todo" ] -> true
-    | _, "read" -> true
-    | "reviewer", _
-    | "browser", _ -> false
-    | "investigator", _ when toolMatches [ "executor" ] -> true
-    | _, _ when
-        toolMatches knownAgents
-        || toolMatches [ "question"; "web"; "skill" ]
-        || tool = "submit_review"
-        ->
-        agent <> "investigator" && agent <> "coder"
-    | _, _ when toolMatches [ "write"; "edit"; "patch" ] -> agent <> "investigator" && agent <> "manager"
-    | "manager", _ -> tool <> "fuzzy_grep"
-    | _, _ -> true
+let canUseCanonical (agent: Agent) (tool: Tool) : bool = canUse agent tool
 
 let canUseForHost (host: Host) (agent: Agent) (tool: Tool) : bool =
-    canUseCanonical agent (normalizeToolName host tool)
+    ToolPermission.canUseForHost host agent tool
 
 let canUse (agent: Agent) (tool: Tool) : bool = canUseForHost opencode agent tool
 
 let deniedToolsForHost (host: Host) (agent: Agent) (tools: Tool seq) : Tool list =
-    tools
-    |> Seq.filter (fun tool -> not (canUseForHost host agent tool))
-    |> Seq.toList
+    ToolPermission.deniedToolsForHost host agent tools
 
 let deniedTools (agent: Agent) (tools: Tool seq) : Tool list = deniedToolsForHost opencode agent tools

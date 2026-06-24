@@ -22,7 +22,8 @@ let private agentReportTail =
 
 let private withReportTail (host: Host) (body: string) : string =
     match host with
-    | Opencode -> body
+    | Opencode
+    | Mux -> body
     | Mimocode -> body + agentReportTail
 
 /// Produce one prompt per parallel intent for coder/investigator, exactly one
@@ -37,6 +38,15 @@ let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
     | Browser intent -> [ browserPrompt intent |> wrap ]
     | ExecutorSummary(output, language, program, dependencies, timeoutType, mode) -> [ executorSummarizerPrompt output language program dependencies timeoutType mode |> wrap ]
     | WebsearchSummary(question, raw) -> [ websearchSummarizerPrompt question raw |> wrap ]
+
+let promptsForParallelIntents (host: Host) (constructor: 'a -> SubagentTaskKind) (intents: 'a) : string list =
+    formatPrompt host (constructor intents)
+
+let browserPromptText (host: Host) (intent: string) : string =
+    formatPrompt host (Browser intent) |> List.head
+
+let meditatorPromptText (host: Host) (intent: string) (sections: MeditatorFileSection list) : string =
+    formatPrompt host (Meditator(intent, sections)) |> List.head
 
 let reportSeparator = "\n---\n"
 

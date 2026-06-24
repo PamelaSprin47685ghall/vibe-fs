@@ -71,5 +71,3 @@ let clearTypedIteratorStore (store: TypedIteratorStore) : unit =
     store.findIterators <- Map.empty
     store.grepIterators <- Map.empty
     store.counter <- 0
-
-let mutable globalIteratorStore : TypedIteratorStore = createTypedIteratorStore 200

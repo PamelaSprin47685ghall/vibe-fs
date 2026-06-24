@@ -1,8 +1,9 @@
-module VibeFs.Kernel.MagicProjection
+module VibeFs.Kernel.BacklogProjection
 
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.MagicCore
+open VibeFs.Kernel.BacklogProjectionCore
+open VibeFs.Kernel.Message
 
 let private isFoldAnchorFor (host: Host) (part: Part<'raw>) : bool =
     isTodoResultFor host part
@@ -14,14 +15,8 @@ let private todoIndexesFor (host: Host) (flat: FlatPart<'raw> list) : int list =
     |> List.indexed
     |> List.choose (fun (index, fp) -> if isFoldAnchorFor host fp.part then Some index else None)
 
-let private todoIndexes (flat: FlatPart<'raw> list) : int list =
-    todoIndexesFor opencode flat
-
-let private todoSegmentEndIndexesFor (host: Host) (flat: FlatPart<'raw> list) : int list =
-    todoIndexesFor host flat
-
 let private foldTodoAnchorsFor (host: Host) (flat: FlatPart<'raw> list) : int list =
-    todoSegmentEndIndexesFor host flat
+    todoIndexesFor host flat
 
 let private requiredFoldAnchorCount (foldAfterFirst: bool) : int =
     if foldAfterFirst then 2 else 3
@@ -80,7 +75,7 @@ let private buildSyntheticPrefixMessages (host: Host) (messages: Message<'raw> l
                   buildBacklogText [ foldedBacklog.[index] ] userText
           let todoMessage = messages.[flat.[todoIdxs.[index]].msgIndex]
           let todoTime = messageTimeOrNull todoMessage
-          let syntheticId = magicTodoPrefixPrefix + string (index + 1)
+          let syntheticId = backlogPrefixIdPrefix + string (index + 1)
           yield buildPrefixUserMessage syntheticId finalText todoMessage.info.sessionID todoTime ]
 
 let private rebuildVisibleOnly (messages: Message<'raw> list) (visible: FlatPart<'raw> list) : Message<'raw> list =
@@ -98,7 +93,7 @@ let private rebuildVisibleOnly (messages: Message<'raw> list) (visible: FlatPart
                 |> List.choose (fun (partIdx, part) -> Map.tryFind partIdx partMap)
             if newParts.IsEmpty then None else Some { msg with parts = newParts })
 
-let projectMagicFor (host: Host) (messages: Message<'raw> list) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : Message<'raw> list =
+let projectBacklogFor (host: Host) (messages: Message<'raw> list) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : Message<'raw> list =
     if messages.IsEmpty then messages
     else
         let flat = flatten messages
@@ -123,5 +118,5 @@ let projectMagicFor (host: Host) (messages: Message<'raw> list) (backlog: Backlo
             let rebuilt = rebuildVisibleOnly messages visible
             if syntheticPrefixMessages.IsEmpty then rebuilt else syntheticPrefixMessages @ rebuilt
 
-let projectMagic (messages: Message<'raw> list) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : Message<'raw> list =
-    projectMagicFor opencode messages backlog foldAfterFirst sessionID
+let projectBacklog (messages: Message<'raw> list) (backlog: BacklogEntry list) (foldAfterFirst: bool) (sessionID: string) : Message<'raw> list =
+    projectBacklogFor opencode messages backlog foldAfterFirst sessionID

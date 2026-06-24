@@ -4,15 +4,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Shell
+open VibeFs.Shell.DelegatedAiSettings
 open VibeFs.Shell.Dyn
 
-type DelegatedAiSettings =
-    { modelString: string option
-      thinkingLevel: string option }
-
-let emptySettings : DelegatedAiSettings =
-    { modelString = None
-      thinkingLevel = None }
+type DelegatedAiSettings = VibeFs.Shell.DelegatedAiSettings.DelegatedAiSettings
+let emptySettings = VibeFs.Shell.DelegatedAiSettings.emptySettings
 
 type AiConfigRecord =
     { workspaceId: string

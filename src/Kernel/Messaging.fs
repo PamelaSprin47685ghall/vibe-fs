@@ -53,7 +53,10 @@ type FlatPart<'raw> =
       part: Part<'raw> }
 
 let private synthPrefixes =
-    [ "caps-synth-user-"; "caps-synth-assistant-"; "magic-todo-projection-"; "magic-todo-prefix-"; "methodology-probe-" ]
+    [ "caps-synth-user-"; "caps-synth-assistant-"
+      "backlog-projection-"; "backlog-prefix-"
+      "magic-todo-projection-"; "magic-todo-prefix-"
+      "methodology-probe-" ]
 
 let classifySource (id: string) : Source =
     if id = "" then Native

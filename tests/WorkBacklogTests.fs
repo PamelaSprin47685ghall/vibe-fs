@@ -1,19 +1,21 @@
-module VibeFs.Tests.MagicTests
+module VibeFs.Tests.WorkBacklogTests
 
-open VibeFs.Tests.MagicReplaySpecs
-open VibeFs.Tests.MagicProjectionSpecs
+open VibeFs.Tests.BacklogReplaySpecs
+open VibeFs.Tests.BacklogProjectionSpecs
 
 
 let run () =
+    replayBacklogOpencodeFallsBackToCapturedReportWhenInputMissing ()
+    replayBacklogMuxFallsBackToCapturedReportWhenInputMissing ()
     replayBacklogOpencodeDoesNotMergeConsecutiveTodoWrite ()
     replayBacklogTest ()
     replayEmpty ()
     replaySkipsEmpty ()
     replayBacklogForMimocodeUsesTask ()
     replayBacklogForMimocodeIgnoresActor ()
-    magicSessionCaptureRoundTrip ()
-    magicSessionShareReportTableAcrossInstances ()
-    magicSessionRestoresMimocodeReportDuringBacklogRebuild ()
+    backlogSessionCaptureRoundTrip ()
+    backlogSessionShareReportTableAcrossInstances ()
+    backlogSessionRestoresMimocodeReportDuringBacklogRebuild ()
     replayBacklogForMimocodeMergesConsecutiveWorkReports ()
     replayBacklogForMimocodeMergesConsecutiveTaskBurst ()
     replayBacklogForMimocodeSplitsBurstsOnGap ()
@@ -26,15 +28,15 @@ let run () =
     findFoldRangeForMimocodeRequiresThreeProgressBursts ()
     findFoldRangeForMimocodeUsesLastProgressCallInBurst ()
     findFoldRangeForMimocodeAssistantTextKeepsBurst ()
-    projectMagicFolds ()
-    projectMagicNoFold ()
-    projectMagicForMimocodeUsesTask ()
-    projectMagicHidesErrors ()
-    projectMagicDropsFoldedUserMessages ()
-    projectMagicKeepsReviewInFold ()
-    projectMagicPrefixUsesTodoTime ()
-    projectMagicPrefixStaysStableWhenGrowing ()
-    magicSessionRefreshesBacklog ()
-    magicSessionRefreshesBacklogForMimocode ()
+    projectBacklogFolds ()
+    projectBacklogNoFold ()
+    projectBacklogForMimocodeUsesTask ()
+    projectBacklogHidesErrors ()
+    projectBacklogDropsFoldedUserMessages ()
+    projectBacklogKeepsReviewInFold ()
+    projectBacklogPrefixUsesTodoTime ()
+    projectBacklogPrefixStaysStableWhenGrowing ()
+    backlogSessionRefreshesBacklog ()
+    backlogSessionRefreshesBacklogForMimocode ()
     buildBacklogTextTest ()
     buildBacklogTextWithErrorTest ()

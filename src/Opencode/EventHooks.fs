@@ -4,18 +4,16 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Shell
-open VibeFs.Shell.Dyn
-
+open VibeFs.Shell.OpencodeHookInputCodec
+open VibeFs.Opencode.NudgeEventCodec
 
 let eventHandler (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
     promise {
-        let event = Dyn.get input "event"
-        if Dyn.str event "type" = "stream-abort" then
-            let props = Dyn.get event "properties"
+        match decodeHostEventEnvelope input with
+        | Some { EventType = "stream-abort"; Props = props } ->
             let sessionID =
-                if Dyn.isNullish props then "loop"
-                else
-                    let s = Dyn.str props "sessionID"
-                    if s = "" then "loop" else s
+                let s = getSessionID "stream-abort" props
+                if s = "" then "loop" else s
             reviewStore.deactivateReview sessionID
+        | _ -> ()
     }

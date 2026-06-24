@@ -1,7 +1,5 @@
 module VibeFs.Kernel.TreeSitterKernel
 
-open System.Text.RegularExpressions
-
 /// One syntax problem located in a source file.
 type SyntaxDiagnostic =
     { line: int
@@ -17,34 +15,10 @@ type SyntaxCheckResult =
     | Ok of lang: string * errors: SyntaxDiagnostic array
     | Failed of lang: string * reason: string
 
-/// Tools whose results should be syntax-checked after a write.
-let private fileEditTools: Set<string> =
-    Set.ofList
-        [ "edit"; "write"; "ast_edit"; "ast_grep_replace"; "file_edit_replace_string"
-          "file_edit_insert"; "apply_patch" ]
-
 let syntaxCheckMarker = "[syntax-check]"
-
-let isFileEditTool (tool: string) : bool = Set.contains (tool.ToLowerInvariant ()) fileEditTools
-
-/// Pure parser over a patchText blob: extracts every `*** Add File|Update
-/// File|Move to: <path>` target, de-duplicated, order-preserved.
-let private patchPathRe = Regex(@"^\*\*\* (?:Add File|Update File|Move to): (.+)$")
-
-let pathsFromPatchText (patchText: string) : string list =
-    if System.String.IsNullOrEmpty patchText then []
-    else
-        patchText.Split('\n')
-        |> Seq.choose (fun line ->
-            let m = patchPathRe.Match line
-            if m.Success then Some m.Groups.[1].Value else None)
-        |> List.ofSeq
-        |> List.distinct
 
 let hasSyntaxCheckMarker (text: string) : bool = text.Contains(syntaxCheckMarker)
 
-/// Format a syntax-check result into a human-readable annotation, or None when
-/// the file is clean and `includeOk` is false.
 let formatSyntaxDiagnostics (filePath: string) (result: SyntaxCheckResult)
                             (includeOk: bool) : string option =
     match result with
@@ -63,7 +37,6 @@ let formatSyntaxDiagnostics (filePath: string) (result: SyntaxCheckResult)
                 |> Array.toList
             Some(String.concat "\n" (header :: body))
 
-/// Append a syntax annotation to tool output, skipping when already marked.
 let appendSyntaxDiagnosticsToOutput (currentOutput: string) (filePath: string)
                                     (result: SyntaxCheckResult) : string =
     if hasSyntaxCheckMarker currentOutput then currentOutput

@@ -89,7 +89,10 @@ let private submitKnowledgeGraphSpec: ToolSpec =
       paramDocs =
         map
             [ "entries",
-              "Array of knowledge graph draft entries. Each entry: optional id, required entity (string array), required fact." ]
+              "Array of knowledge graph draft entries. Each entry: optional id, required entity (string array), required fact."
+              "id", "Optional entry id; omit for new facts, set to update an existing fact."
+              "entity", "Knowledge graph entity path segments."
+              "fact", "Knowledge graph fact text." ]
       requiredFields = [ "entries" ] }
 
 let private fuzzyFindSpec: ToolSpec =
@@ -154,6 +157,36 @@ let private submitReviewSpec: ToolSpec =
               "affectedFiles", "List of file paths that were modified or created" ]
       requiredFields = [ "report"; "affectedFiles" ] }
 
+let private submitReviewResultSpec: ToolSpec =
+    { name = "submit_review_result"
+      description = "Submit your review verdict."
+      paramDocs =
+        map
+            [ "verdict", "PASS to accept, REJECT to reject"
+              "feedback", "Detailed, actionable feedback when rejecting; omit when passing" ]
+      requiredFields = [ "verdict" ] }
+
+let private readSpec: ToolSpec =
+    { name = "read"
+      description =
+        "If path is a directory, returns a formatted directory listing (equivalent to ls -la). Use this instead of running `ls` via executor."
+      paramDocs =
+        map
+            [ "path", "The absolute or relative path to read"
+              "offset", "Line to start from, 1-indexed"
+              "limit", "Maximum lines to read" ]
+      requiredFields = [ "path" ] }
+
+let private writeSpec: ToolSpec =
+    { name = "write"
+      description =
+        "Write content to a file. Resolves relative paths against the current working directory, creates parent directories if they don't exist, and runs syntax checking on the written content."
+      paramDocs =
+        map
+            [ "file_path", "The absolute or relative path of the file to write"
+              "content", "The content to write to the file" ]
+      requiredFields = [ "file_path"; "content" ] }
+
 let all: ToolSpec list =
     [ coderSpec
       investigatorSpec
@@ -166,7 +199,10 @@ let all: ToolSpec list =
       fuzzyGrepSpec
       websearchSpec
       webfetchSpec
-      submitReviewSpec ]
+      submitReviewSpec
+      submitReviewResultSpec
+      readSpec
+      writeSpec ]
 
 let private byName: Map<string, ToolSpec> =
     all |> List.map (fun spec -> spec.name, spec) |> Map.ofList
@@ -184,6 +220,14 @@ let paramDoc (name: string) (field: string) : string =
     | None -> failwithf "ToolCatalog: unknown param %s.%s" name field
 
 let description (name: string) : string = (specOf name).description
+
+let private fileEditToolNames =
+    Set.ofList
+        [ "edit"; "write"; "ast_edit"; "ast_grep_replace"; "file_edit_replace_string"
+          "file_edit_insert"; "apply_patch" ]
+
+let isFileEditTool (tool: string) : bool =
+    Set.contains (tool.ToLowerInvariant ()) fileEditToolNames
 
 module Params =
     let private doc tool field = paramDoc tool field
@@ -203,6 +247,9 @@ module Params =
     let executorMode = executor "mode"
     let fetchKnowledgeGraphEntity = doc "knowledge_graph_fetch" "entity"
     let submitKnowledgeGraphEntries = doc "return_bookkeeper" "entries"
+    let kgEntryId = doc "return_bookkeeper" "id"
+    let kgEntryEntity = doc "return_bookkeeper" "entity"
+    let kgEntryFact = doc "return_bookkeeper" "fact"
     let private fuzzyFind = doc "fuzzy_find"
     let fuzzyFindPattern = fuzzyFind "pattern"
     let fuzzyFindPath = fuzzyFind "path"
@@ -226,3 +273,16 @@ module Params =
     let webfetchPreferLlmsTxt = webfetch "prefer_llms_txt"
     let webfetchPrompt = webfetch "prompt"
     let webfetchTimeout = webfetch "timeout"
+    let private submitReview = doc "submit_review"
+    let submitReviewReport = submitReview "report"
+    let submitReviewAffectedFiles = submitReview "affectedFiles"
+    let private returnReviewer = doc "submit_review_result"
+    let returnReviewerVerdict = returnReviewer "verdict"
+    let returnReviewerFeedback = returnReviewer "feedback"
+    let private read = doc "read"
+    let readPath = read "path"
+    let readOffset = read "offset"
+    let readLimit = read "limit"
+    let private write = doc "write"
+    let writeFilePath = write "file_path"
+    let writeContent = write "content"
