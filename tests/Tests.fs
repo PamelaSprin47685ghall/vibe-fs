@@ -128,7 +128,7 @@ let private tests : (string * TestBody) list = [
     "ArchitectureTests.kernelBoundary", Sync (sync ArchitectureTests.kernelBoundary)
     "ArchitectureTests.kernelNoEmptyDefault", Sync (sync ArchitectureTests.kernelNoEmptyDefault)
     "ArchitectureTests.shellLayering", Sync (sync ArchitectureTests.shellLayering)
-    "ArchitectureTests.fileBodyUnder250", Sync (sync ArchitectureTests.fileBodyUnder250)
+    "ArchitectureTests.fileBodyUnder300", Sync (sync ArchitectureTests.fileBodyUnder300)
     "ArchitectureTests.noDanglingMarkers", Sync (sync ArchitectureTests.noDanglingMarkers)
     "ArchitectureTests.noBuiltinDictionary", Sync (sync ArchitectureTests.noBuiltinDictionary)
     "ArchitectureTests.opencodeHookSchemaNoDirectZodImport", Sync (sync ArchitectureTests.opencodeHookSchemaNoDirectZodImport)

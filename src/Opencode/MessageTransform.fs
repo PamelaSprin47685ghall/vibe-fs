@@ -152,11 +152,10 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
             if messagesArr.Length = 0 then ()
             else
                 let messagesList = MessagingCodec.decodeMessages messagesArr
-                let messagesListWithoutProbes = messagesList |> List.filter (fun m -> not (isMethodologyProbeMessage m))
-                let agent = resolveAgent registry input messagesListWithoutProbes
-                let sessionID = extractSessionID messagesListWithoutProbes
-                reconstructReviewState reviewStore sessionID messagesListWithoutProbes
-                let cleaned = Messaging.stripSyntheticBySource messagesListWithoutProbes
+                let agent = resolveAgent registry input messagesList
+                let sessionID = extractSessionID messagesList
+                reconstructReviewState reviewStore sessionID messagesList
+                let cleaned = Messaging.stripSyntheticBySource messagesList
                 if cleaned.IsEmpty then ()
                 else
                     let excluded = defaultExcludedAgents |> Set.contains agent
@@ -177,11 +176,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
                             directory
                             capsFiles
                             knowledgeGraphPrelude
-                    let withProbe =
-                        if not excluded && shouldAppendMethodologyProbe cleaned then
-                            Array.append final [| MessagingCodec.encodeMessage (buildProbeMessage agent sessionID) |]
-                        else final
-                    replaceArrayInPlace messagesArr withProbe
+                    replaceArrayInPlace messagesArr final
     }
 
 let compactingHandlerFor (host: Host) (magicSession: MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =

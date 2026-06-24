@@ -93,7 +93,9 @@ let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Open
         let tool = Dyn.str input "tool"
         let sessionID = Dyn.str input "sessionID"
         let succeeded = Dyn.str output "error" = ""
+        let originalOutput = Dyn.str output "output"
         if succeeded && recordsToBookkeeper tool && not (isReadOnlyExecutor tool input) && (registry.LookupChildAgent sessionID).IsNone then
-            knowledgeGraphRuntime.StartBookkeeperAppend(bookkeeperInput input, Dyn.str output "output", tool, parentSessionID = sessionID)
+            knowledgeGraphRuntime.StartBookkeeperAppend(bookkeeperInput input, originalOutput, tool, parentSessionID = sessionID)
+            setOutput output (VibeFs.Kernel.MagicTodo.withTodoHint originalOutput)
         do! nudgeHook.handleToolExecuteAfter input output
     }

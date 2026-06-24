@@ -37,11 +37,6 @@ let run () : JS.Promise<unit> =
             "capsAndMagicOrder", capsAndMagicOrderSpec
             "bookkeeperDoesNotReceiveCaps", bookkeeperDoesNotReceiveCapsSpec
             "compactionDoesNotReceiveCaps", compactionDoesNotReceiveCapsSpec
-            "opencodeMethodologyProbe", opencodeMethodologyProbeSpec
-            "opencodeMethodologyProbeBuildWithoutInputAgent", opencodeMethodologyProbeBuildWithoutInputAgentSpec
-            "opencodeMethodologyProbeSuppressed", opencodeMethodologyProbeSuppressedSpec
-            "opencodeMethodologyProbeExcludedAgents", opencodeMethodologyProbeExcludedAgentsSpec
-            "opencodeMethodologyProbeStripped", opencodeMethodologyProbeStrippedSpec
             "knowledgeGraphPreludeWithoutCaps", knowledgeGraphPreludeWithoutCapsSpec
             "coderReceivesKnowledgeGraphPrelude", coderReceivesKnowledgeGraphPreludeSpec
             "browserDoesNotReceiveKnowledgeGraphPrelude", browserDoesNotReceiveKnowledgeGraphPreludeSpec
@@ -68,6 +63,10 @@ let run () : JS.Promise<unit> =
             "websearchTriggersBookkeeper", websearchTriggersBookkeeperSpec
             "webfetchTriggersBookkeeper", webfetchTriggersBookkeeperSpec
             "bookkeeperSessionRegisteredInChildAgentRegistry", bookkeeperSessionRegisteredInChildAgentRegistrySpec
+            "bookkeeperAfterHookAddsHintToOutput", bookkeeperAfterHookAddsHintToOutputSpec
+            "bookkeeperAfterHookSkipsHintOnNonBookkeepingTool", bookkeeperAfterHookSkipsHintOnNonBookkeepingToolSpec
+            "bookkeeperAfterHookSkipsHintOnFailure", bookkeeperAfterHookSkipsHintOnFailureSpec
+            "muxBookkeeperAfterHookAddsHintToOutput", muxBookkeeperAfterHookAddsHintToOutputSpec
             "muxDailyMaintenanceLaunch", muxDailyMaintenanceLaunchSpec
             "muxDailyRewriteTriggersNext", muxDailyRewriteTriggersNextSpec
             "toolDefinition", toolDefinitionSpec
@@ -132,12 +131,8 @@ let run () : JS.Promise<unit> =
             "muxSubmitReviewDoubleCheckReject", muxSubmitReviewDoubleCheckRejectSpec
             "muxSubmitReviewTerminatedCleansReviewState", muxSubmitReviewTerminatedCleansReviewStateSpec
             "muxExecutorFailureDoesNotBookkeep", muxExecutorFailureDoesNotBookkeepSpec
-            "muxMethodologyProbeAppended", muxMethodologyProbeAppendedSpec
-            "muxMethodologyProbeSuppressedAfterCall", muxMethodologyProbeSuppressedAfterCallSpec
-            "muxMethodologyProbeExcludedAgents", muxMethodologyProbeExcludedAgentsSpec
             "muxTodoWriteMethodologySchema", muxTodoWriteMethodologySchemaSpec
-            "muxMethodologyProbeStrippedOnReprojection", muxMethodologyProbeStrippedOnReprojectionSpec
-        ]
+        ] 
         for (label, spec) in specs do
             do! timedAsync ("IntegrationTool." + label) spec
     }

@@ -119,8 +119,11 @@ let todoWriteWrapperSpec (reg: obj) = promise {
     let mockTodo = createObj [ "execute", box (System.Func<obj, JS.Promise<string>>(fun _ ->
         (promise { return "Todos updated" }))) ]
     let wrapped = (get tw "wrapper") $ (mockTodo, createObj [])
-    let! result = (get wrapped "execute") $ (createObj []) |> unbox<JS.Promise<string>>
-    check "todo_write wrapper appends reverie nudge" (result.Contains "Think thrice")
+    let! result = (get wrapped "execute") $ (createObj []) |> unbox<JS.Promise<obj>>
+    let output = str result "output"
+    let nudge = str result "nudge"
+    check "todo_write wrapper produces output" (output.Length > 0)
+    check "todo_write wrapper appends reverie nudge" (nudge.Contains "Think thrice")
 }
 
 let toolExecuteAfterSpec (p: obj) = promise {

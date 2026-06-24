@@ -193,8 +193,7 @@ let messagesTransform
                     Set.contains agent alwaysExcludedAgents
                     || (isChildWorkspace deps sessionID && Set.contains agent childWorkspaceExcludedAgents)
                 let typedMessages = decodeMessages sessionID messagesArr
-                let typedMessagesWithoutProbes = typedMessages |> List.filter (fun m -> not (isMethodologyProbeMessage m))
-                let cleanedMessages = stripSyntheticBySource typedMessagesWithoutProbes
+                let cleanedMessages = stripSyntheticBySource typedMessages
                 let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleanedMessages)
                 let afterMagic =
                     if excluded then cleanedMessages
@@ -210,9 +209,5 @@ let messagesTransform
                     else
                         Promise.lift (None: string option)
                 let final = buildCapsMessages deduped directory capsFiles knowledgeGraphPrelude
-                let withProbe =
-                    if not excluded && shouldAppendMethodologyProbe cleanedMessages then
-                        Array.append final [| encodeMessage (buildProbeMessage agent sessionID) |]
-                    else final
-                replaceArrayInPlace messagesArr withProbe
+                replaceArrayInPlace messagesArr final
     }

@@ -124,6 +124,8 @@ let private bookkeeperInput (input: obj) : string =
     let args = Dyn.get input "args"
     if Dyn.isNullish args then "" else JS.JSON.stringify args
 
+let private setOutput (o: obj) (v: string) : unit = o?output <- v
+
 let private toolExecuteAfter
     (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
     (input: obj)
@@ -133,16 +135,18 @@ let private toolExecuteAfter
         let tool = Dyn.str input "tool"
         let sessionID = Dyn.str input "sessionID"
         let succeeded = Dyn.str output "error" = ""
+        let originalOutput = Dyn.str output "output"
         if succeeded
            && recordsToBookkeeper tool
            && not (isReadOnlyExecutor tool input) then
             knowledgeGraphRuntime.StartBookkeeperAppend(
                 bookkeeperInput input,
-                Dyn.str output "output",
+                originalOutput,
                 tool,
                 config = createObj
                     [ "sessionID", box sessionID
                       "directory", box (Dyn.str input "directory") ])
+            setOutput output (VibeFs.Kernel.MagicTodo.withTodoHint originalOutput)
     }
 
 let createRegistration (deps: obj) : obj =

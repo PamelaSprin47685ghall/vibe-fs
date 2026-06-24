@@ -272,3 +272,99 @@ let muxDailyRewriteTriggersNextSpec () = promise {
         check "mux submit day 8 triggers day 9" (launches2.Length = 1 && (str launches2.[0] "prompt").Contains "2026-06-09")
     do! rmAsync workspaceDir
 }
+
+let hintLine = "// HINT: Do you need to update todo?"
+
+let bookkeeperAfterHookAddsHintToOutputSpec () = promise {
+    let! workspaceDir = mkdtempAsync "bookkeeper-hint-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "child-hint-session" "noted" |]
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
+    let toolExecuteAfter = get p "tool.execute.after"
+    let input =
+        createObj [ "tool", box "websearch"
+                    "sessionID", box "hint-parent"
+                    "callID", box "hint-1"
+                    "args", box (createObj [ "query", box "ollama"; "what_to_summarize", box "summary" ]) ]
+    let output = createObj [ "output", box "search results body" ]
+    do! toolExecuteAfter $ (input, output) |> unbox<JS.Promise<unit>>
+    let launches = takeBookkeeperLaunchesForTesting p
+    let afterOutput = str output "output"
+    check "hint: bookkeeper launch records one" (launches.Length = 1)
+    check "hint: bookkeeper launch result stays original" ((str launches.[0] "result") = "search results body")
+    check "hint: bookkeeper launch result excludes HINT" (not ((str launches.[0] "result").Contains hintLine))
+    check "hint: main agent output starts with HINT" (afterOutput.StartsWith hintLine)
+    check "hint: main agent output preserves original body" (afterOutput.Contains "search results body")
+    do! rmAsync workspaceDir
+}
+
+let bookkeeperAfterHookSkipsHintOnNonBookkeepingToolSpec () = promise {
+    let! workspaceDir = mkdtempAsync "bookkeeper-hint-skip-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "child-skip-session" "noted" |]
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
+    let toolExecuteAfter = get p "tool.execute.after"
+    let input =
+        createObj [ "tool", box "fuzzy_find"
+                    "sessionID", box "skip-parent"
+                    "callID", box "skip-1"
+                    "args", box (createObj [ "query", box "x" ]) ]
+    let output = createObj [ "output", box "fuzzy result body" ]
+    do! toolExecuteAfter $ (input, output) |> unbox<JS.Promise<unit>>
+    let launches = takeBookkeeperLaunchesForTesting p
+    check "hint: non-bookkeeping tool skips launch" (launches.Length = 0)
+    check "hint: non-bookkeeping tool keeps original output" ((str output "output") = "fuzzy result body")
+    do! rmAsync workspaceDir
+}
+
+let bookkeeperAfterHookSkipsHintOnFailureSpec () = promise {
+    let! workspaceDir = mkdtempAsync "bookkeeper-hint-fail-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    let mockClient = bookkeeperMockClient [| assistantCompletionMessage "child-fail-session" "noted" |]
+    let! p = plugin (box {| directory = workspaceDir; client = mockClient |})
+    let toolExecuteAfter = get p "tool.execute.after"
+    let input =
+        createObj [ "tool", box "websearch"
+                    "sessionID", box "fail-parent"
+                    "callID", box "fail-1"
+                    "args", box (createObj [ "query", box "x" ]) ]
+    let output = createObj [ "output", box "search results body"; "error", box "boom" ]
+    do! toolExecuteAfter $ (input, output) |> unbox<JS.Promise<unit>>
+    let launches = takeBookkeeperLaunchesForTesting p
+    check "hint: failed tool skips launch" (launches.Length = 0)
+    check "hint: failed tool keeps original output" ((str output "output") = "search results body")
+    do! rmAsync workspaceDir
+}
+
+let muxBookkeeperAfterHookAddsHintToOutputSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-bookkeeper-hint-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    let prompts = ResizeArray<string>()
+    let deps = minimalMuxDeps ()
+    deps?("directory") <- workspaceDir
+    deps?("taskService") <- mockMuxTaskServiceCapturingPrompt prompts
+    let reg = createRegistration deps
+    let after = get reg "tool.execute.after"
+    if isNullish after then
+        check "mux hint: exposes tool.execute.after" false
+    else
+        let input =
+            createObj
+                [ "tool", box "websearch"
+                  "sessionID", box "mux-hint-parent"
+                  "callID", box "mux-hint-1"
+                  "args", box (createObj [ "query", box "ollama" ]) ]
+        let output = createObj [ "output", box "search results body" ]
+        do! after $ (input, output) |> unbox<JS.Promise<unit>>
+        let launches = takeBookkeeperLaunchesForTesting reg
+        let afterOutput = str output "output"
+        check "mux hint: bookkeeper launch records one" (launches.Length = 1)
+        check "mux hint: bookkeeper launch result stays original" ((str launches.[0] "result") = "search results body")
+        check "mux hint: bookkeeper launch result excludes HINT" (not ((str launches.[0] "result").Contains hintLine))
+        check "mux hint: main agent output starts with HINT" (afterOutput.StartsWith hintLine)
+        do! waitForBackgroundJobsForTesting reg
+        check "mux hint: delegated taskService prompt excludes HINT" (
+            prompts
+            |> Seq.forall (fun prompt -> not (prompt.Contains hintLine)))
+    do! rmAsync workspaceDir
+}

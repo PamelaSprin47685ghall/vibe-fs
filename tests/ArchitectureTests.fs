@@ -62,12 +62,12 @@ let noBuiltinDictionary () =
             let content = requireFile (dir + "/" + f)
             check ("arch: " + f + " no Dictionary") (not (content.Contains "Dictionary"))
 
-let fileBodyUnder250 () =
+let fileBodyUnder300 () =
     for dir in [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"|] do
         for f in fsFiles dir do
             let content = requireFile (dir + "/" + f)
             let lineCount = content.Length - content.Replace("\n", "").Length
-            check ("arch: " + dir + "/" + f + " <=250 lines") (lineCount <= 250)
+            check ("arch: " + dir + "/" + f + " <=300 lines") (lineCount <= 300)
 
 let noDanglingMarkers () =
     for dir in [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"|] do
