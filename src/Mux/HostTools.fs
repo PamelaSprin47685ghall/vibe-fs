@@ -45,17 +45,18 @@ let private buildExecutorOptions (args: obj) (config: obj) : ExecuteOptions =
       mode = Dyn.str args "mode"
       cwd = Some (getCwd config) }
 
-let private summarizeWhenNeeded (deps: obj) (config: obj) (toolNames: string array) (options: ExecuteOptions) (output: string) : JS.Promise<string> =
+let private summarizeWhenNeeded (deps: obj) (config: obj) (toolNames: string array) (options: ExecuteOptions) (result: ExecuteResult) : JS.Promise<string> =
     promise {
+        let output = outputFromResult result
         if not (shouldSummarize byteLength output) then
-            return output
+            return formatToolResponse result None
         else
             let langStr = languageToString options.language
             let timeoutStr = timeoutToString options.timeoutType
             let prompt = formatPrompt mimocode (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
             let opts = toolOptions toolNames summarizationRole summarizationAiSettingsAgentId
             let! report = runMuxSubagent deps config summarizationAgentId prompt "Executor summary" opts
-            return report
+            return formatToolResponse result (Some report)
     }
 
 let addIfSome (entries: ResizeArray<string * obj>) (key: string) (v: 'T option) =
@@ -120,13 +121,8 @@ let executorTool (deps: obj) (toolNames: string array) (_knowledgeGraphRuntime: 
                 let opts = buildExecutorOptions args config
                 let sessionId = Dyn.str config "sessionID"
                 let! execResult = SessionExecutor.enqueuePerSession sessionId (fun () ->
-                    promise {
-                        let! r = VibeFs.Shell.Executor.execute opts sessionId
-                        return match r with
-                               | Completed o | Truncated(o, _) | Failed o | MissingExecutable(_, o) -> o
-                    })
-                let! output = summarizeWhenNeeded deps config toolNames opts execResult
-                return output
+                    VibeFs.Shell.Executor.execute opts sessionId)
+                return! summarizeWhenNeeded deps config toolNames opts execResult
             }
       condition = None }
 

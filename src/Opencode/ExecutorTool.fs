@@ -53,9 +53,10 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                           timeoutType = timeout; mode = Dyn.str args "mode"; cwd = Some (Dyn.str tc "directory") }
                     promise {
                         let! result = VibeFs.Shell.Executor.execute options sessionID
-                        let output = match result with Completed o | Truncated(o, _) | Failed o -> o | MissingExecutable(_, o) -> o
+                        let output = outputFromResult result
                         if not (shouldSummarize byteLength output) then
-                            return prependSafetyWarningForExecution output options
+                            let formatted = formatToolResponse result None
+                            return prependSafetyWarningForExecution formatted options
                         else
                             let langStr = languageToString options.language
                             let timeoutStr = timeoutToString options.timeoutType
@@ -63,5 +64,6 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                             let! summary =
                                 runSubagentWithCleanup registry (client ()) "executor" "Executor summary" prompt
                                     (Dyn.str tc "directory") sessionID context
-                            return prependSafetyWarningForExecution summary options
+                            let formatted = formatToolResponse result (Some summary)
+                            return prependSafetyWarningForExecution formatted options
                     }))

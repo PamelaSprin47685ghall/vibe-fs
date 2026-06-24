@@ -256,3 +256,11 @@ let reviewMarkdownCodec () =
     // round-trip on the verdict dimension: format then parse preserves Pass->Accepted, Reject(non-empty)->Rejected
     equal "round-trip pass" Accepted (parseReviewReportMarkdown (formatReviewVerdictMarkdown Pass ""))
     equal "round-trip reject non-empty" (Rejected "needs work") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Reject "needs work"))
+
+/// Executor summary prompt must not instruct the summarizer to preserve exit
+/// status — that metadata now travels in the structured return block, not in
+/// the prose summary.
+let executorSummarizerNoExitStatus () =
+    let prompt = executorSummarizerPrompt "raw" "shell" "echo 1" [] "short" "ro"
+    check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
+    check "summarizer prompt omits non-zero exit" (not (prompt.ToLowerInvariant().Contains "non-zero exit"))

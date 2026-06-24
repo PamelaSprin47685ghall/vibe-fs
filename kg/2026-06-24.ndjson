@@ -533,3 +533,32 @@
 {"id":"6f8a","entity":["集成测试","模块边界"],"fact":"IntegrationBookkeeperSpecs 重构：废弃硬编码 Nudge 追加，改为调用内核 Methodology.todoResultText 动态生成确认文案；通过 Dyn 解析 args.select_methodology 获取方法论列表，确保宿主返回值与内核方法论契约对齐。"}
 {"id":"0188","entity":["权限矩阵","子代理"],"fact":"AgentTests 对 investigator 代理的 todowrite 权限门控由 denied 改为 allowed，消除 investigator 身份对 todo 工具的隐性排斥，与 Config.fs 无条件放行 todo 匹配的门控同向。"}
 {"id":"e9ce","entity":["权限矩阵","meditator代理"],"fact":"meditator代理获得todowrite工具调用许可，消除身份隐性排斥。"}
+{"id":"6329","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"e6f7","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"cdee","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"606a","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"64b0","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"c350","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"5ddb","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"af4d","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"9528","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"94c1","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"f0a5","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"bcaf","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"3cc4","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"3dd8","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"d662","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"b28a","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"5062","entity":["源码核对","命名语义"],"fact":"Magic 前缀无独立领域语义，实指 todo/backlog/projection 子系统；OllamaClient 仅做通用 HTTP POST 代理，web_search/web_fetch 业务逻辑在 SearchTools/WebTools；HostReadExec 为可变回调捕获槽，无读盘本体；TreeSitterKernel 混入正则解析与工具分类，非真正 AST 解析，解析内核在 TreeSitterShell。"}
+{"id":"3640","entity":["宿主适配","重复度评估"],"fact":"Mux/Opencode SubagentTools 差异不仅 Context 类型，含产物类型、权限策略、并行取消机制、Host 参数及 IO 依赖；MessageTransform 流水线高度同构（~150行），分叉在 agent 解析、review 策略、dedup 实现、caps 编码与子 workspace 门控；统一 HostAdapter 最大阻塞为子会话 IO 模型分裂与消息 wire Codec 形态不一致。"}
+{"id":"db71","entity":["错误处理","类型边界"],"fact":"工具执行层普遍返回 JS.Promise<string>，Result<_, DomainError> 在边界被 format 为字符串丢弃；ToolNotPermitted 错误变体定义但无生产代码接入，权限由配置与 hook 过滤；Web 工具缺参校验直接返回拼接错误字符串。"}
+{"id":"c68b","entity":["状态管理","全局可变性"],"fact":"MagicSessionStore 与 FuzzyIteratorStore 为进程级共享 mutable 单例，仅 SessionExecutor/ChildAgentRegistry 部分按 id 分域；fuzzy 工具默认未注入 per-session store 导致状态回落全局；KnowledgeGraphRuntime 生产类型仍为上帝对象，测试后门方法（RegisterJobForTesting 等）挂在生产类上导致集成测试强转耦合。"}
+{"id":"cfc4","entity":["权限系统","字符串匹配"],"fact":"工具权限决策输入为 (agent: string, tool: string) 裸字符串匹配，Config.canUseCanonical 依赖子串规则与 normalizeToolName；ToolId 领域类型存在但未用于运行时权限判断；权限测试覆盖矩阵，但 normalizeToolName 与特定 agent 权限分叉无独立测试。"}
+{"id":"30ae","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"3809","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"9291","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"6cd5","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"5c3f","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"e5bc","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"5751","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"8a37","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}

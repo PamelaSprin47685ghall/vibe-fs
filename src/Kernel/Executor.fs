@@ -122,10 +122,40 @@ type ExecuteOptions =
       cwd: string option }
 
 type ExecuteResult =
-    | Completed of output: string
+    | Completed of output: string * exitCode: int
     | Truncated of output: string * timeoutType: ExecutorTimeoutType
-    | Failed of output: string
+    | Failed of output: string * exitCode: int option * signal: string option
     | MissingExecutable of executable: string * output: string
+
+let outputFromResult (result: ExecuteResult) : string =
+    match result with
+    | Completed(o, _)
+    | Truncated(o, _)
+    | Failed(o, _, _)
+    | MissingExecutable(_, o) -> o
+
+let formatReturnValueBlock (result: ExecuteResult) : string =
+    let lines = ResizeArray<string>()
+    lines.Add "---"
+    lines.Add "executor_return:"
+    match result with
+    | Completed(_, exitCode) ->
+        lines.Add "  status: completed"
+        lines.Add $"  exit_code: {exitCode}"
+    | Truncated _ ->
+        lines.Add "  status: truncated"
+    | Failed(_, exitCodeOpt, signalOpt) ->
+        lines.Add "  status: failed"
+        exitCodeOpt |> Option.iter (fun c -> lines.Add $"  exit_code: {c}")
+        signalOpt |> Option.iter (fun s -> lines.Add $"  signal: {s}")
+    | MissingExecutable _ ->
+        lines.Add "  status: missing_executable"
+    lines.Add "---"
+    String.concat "\n" lines
+
+let formatToolResponse (result: ExecuteResult) (summaryOption: string option) : string =
+    let body = Option.defaultValue (outputFromResult result) summaryOption
+    body + "\n\n" + formatReturnValueBlock result
 
 let readOnlyReadCommands: Set<string> =
     Set.ofList
@@ -163,12 +193,20 @@ let prepareProgramForExecution (options: ExecuteOptions) : string =
 let prependSafetyWarningForExecution (output: string) (options: ExecuteOptions) : string =
     prependSafetyWarning output (prepareProgramForExecution options) options.language
 
-let describeResultTag (result: ExecuteResult) (timeoutType: ExecutorTimeoutType) : string =
+let outputFromResult (result: ExecuteResult) : string =
+    match result with
+    | Completed o | Truncated(o, _) | Failed o | MissingExecutable(_, o) -> o
+
+let describeResultTag (result: ExecuteResult) : string =
     match result with
     | Completed _ -> "The following program has been executed (synchronous)."
-    | Truncated _ -> $"The following program exceeded the {timeoutType} timeout and was killed. Partial output is below."
+    | Truncated(_, timeoutType) -> $"The following program exceeded the {timeoutToString timeoutType} timeout and was killed. Partial output is below."
     | Failed _ -> "The following program exited with a non-zero status."
     | MissingExecutable(executable, _) -> $"The following program could not start because '{executable}' was not found."
+
+let formatToolResponse (result: ExecuteResult) (summary: string option) : string =
+    let body = summary |> Option.defaultValue (outputFromResult result)
+    $"{describeResultTag result}\n\n{body}"
 
 let buildSummaryPrompt (byteLength: string -> int) (truncateToBytes: string -> int -> string) (options: ExecuteOptions) (result: ExecuteResult) : string =
     let rawOutput =
@@ -187,7 +225,7 @@ let buildSummaryPrompt (byteLength: string -> int) (truncateToBytes: string -> i
     let depList = String.concat ", " options.dependencies
     let depInfo = if options.dependencies.IsEmpty then "" else $"Dependencies: {depList}\n\n"
 
-    [ describeResultTag result options.timeoutType
+    [ describeResultTag result
       ""
       "Program:"
       options.program

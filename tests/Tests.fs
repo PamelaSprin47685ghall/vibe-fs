@@ -75,6 +75,7 @@ let private tests : (string * TestBody) list = [
     "KernelPromptSpecs.reviewVerdictDecode", Sync (sync KernelPromptSpecs.reviewVerdictDecode)
     "KernelPromptSpecs.reviewDecisionPolicy", Sync (sync KernelPromptSpecs.reviewDecisionPolicy)
     "KernelPromptSpecs.reviewMarkdownCodec", Sync (sync KernelPromptSpecs.reviewMarkdownCodec)
+    "KernelPromptSpecs.executorSummarizerNoExitStatus", Sync (sync KernelPromptSpecs.executorSummarizerNoExitStatus)
     "KernelPromptSpecs.domainErrorsShared", Sync (sync KernelPromptSpecs.domainErrorsShared)
     "FuzzyTests.grepDetect", Sync (sync FuzzyTests.grepDetect)
     "FuzzyTests.iteratorRoundTrip", Sync (sync FuzzyTests.iteratorRoundTrip)
@@ -99,6 +100,8 @@ let private tests : (string * TestBody) list = [
     "ShellTests.capsFileSizeLimit", Sync (sync ShellTests.capsFileSizeLimit)
     "ShellTests.ollamaFormat", Sync (sync ShellTests.ollamaFormat)
     "ShellTests.summarizerInputCap", Sync (sync ShellTests.summarizerInputCap)
+    "ShellTests.executorToolResponseFormatting", Sync (sync ShellTests.executorToolResponseFormatting)
+    "ShellTests.summarizerPromptOmitsReturnValue", Sync (sync ShellTests.summarizerPromptOmitsReturnValue)
     "ShellTests.readDirectoryListing", Async ShellTests.readDirectoryListing
     "ShellTests.ensureJavascriptProjectRepairsModuleType", Async ShellTests.ensureJavascriptProjectRepairsModuleType
     "ShellTests.rewriteJavascriptRelativeImports", Async ShellTests.rewriteJavascriptRelativeImports

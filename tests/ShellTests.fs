@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Executor
+open VibeFs.Kernel.SubagentPrompts
 open VibeFs.Kernel.SearchPrompts
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
@@ -196,3 +197,54 @@ let safetyWarning () =
     check "plain echo passes" (not ((warn "echo hi").Contains readOnlyWarning))
     check "substring inside word ignored" (not ((warn "echo concatenate").Contains readOnlyWarning))
     check "non-shell language ignored" (not ((prependSafetyWarning "OUT" "grep foo" Python).Contains readOnlyWarning))
+
+/// Executor tool output must append a structured executor_return YAML block
+/// carrying exit_code + status. Tests expect extended ExecuteResult with exit
+/// metadata: Completed(output, exitCode), Failed(output, exitCodeOpt, signalOpt).
+let executorToolResponseFormatting () =
+    let completedResult = Completed("all good", 0)
+    let failedResult = Failed("boom", Some 2, None)
+    let truncatedResult = Truncated("partial", Long)
+    let missingResult = MissingExecutable("bash", "Error: not found")
+
+    equal "outputFromResult completed" "all good" (outputFromResult completedResult)
+    equal "outputFromResult failed" "boom" (outputFromResult failedResult)
+    equal "outputFromResult truncated" "partial" (outputFromResult truncatedResult)
+    equal "outputFromResult missing" "Error: not found" (outputFromResult missingResult)
+
+    let completedBlock = formatReturnValueBlock completedResult
+    check "completed block has executor_return header" (completedBlock.Contains "executor_return")
+    check "completed block has exit_code 0" (completedBlock.Contains "exit_code: 0")
+    check "completed block has status completed" (completedBlock.Contains "completed")
+
+    let failedBlock = formatReturnValueBlock failedResult
+    check "failed block has exit_code 2" (failedBlock.Contains "exit_code: 2")
+    check "failed block has status failed" (failedBlock.Contains "failed")
+
+    let truncatedBlock = formatReturnValueBlock truncatedResult
+    check "truncated block has status truncated" (truncatedBlock.Contains "truncated")
+
+    let missingBlock = formatReturnValueBlock missingResult
+    check "missing block has status missing_executable" (missingBlock.Contains "missing_executable")
+
+    let resp = formatToolResponse completedResult None
+    check "response includes output body" (resp.Contains "all good")
+    check "response includes executor_return" (resp.Contains "executor_return")
+    check "response includes exit_code" (resp.Contains "exit_code")
+
+    let failedResp = formatToolResponse failedResult None
+    check "failed response includes exit_code 2" (failedResp.Contains "exit_code: 2")
+
+    let summary = "SUMMARY: task succeeded"
+    let summaryResp = formatToolResponse completedResult (Some summary)
+    check "summary response uses summary as body" (summaryResp.Contains summary)
+    check "summary response appends return block" (summaryResp.Contains "executor_return")
+    check "summary response has exit_code 0" (summaryResp.Contains "exit_code: 0")
+
+/// When output is summarized, the summarizer prompt must NOT instruct the model
+/// to preserve exit status — that metadata now travels in the structured return
+/// block appended by formatToolResponse.
+let summarizerPromptOmitsReturnValue () =
+    let prompt = executorSummarizerPrompt "raw output" "shell" "echo 1" [] "short" "ro"
+    check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
+    check "summarizer prompt omits non-zero" (not (prompt.ToLowerInvariant().Contains "non-zero"))
