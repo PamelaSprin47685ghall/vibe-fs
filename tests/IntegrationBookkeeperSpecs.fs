@@ -13,6 +13,7 @@ open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Mux.AiSettings
 open VibeFs.Mux.KnowledgeGraphTools
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Shell.Dyn
@@ -183,7 +184,7 @@ let muxToolExecuteAfterTriggersBookkeeperSpec () = promise {
         check "mux tool.execute.after taskService prompt carries job marker" (
             prompts
             |> Seq.exists (fun p ->
-                p.StartsWith("---\n") && p.Contains("type: \"vibe_knowledge_graph_job\"")))
+                p.StartsWith("---\n") && p.Contains("type: vibe_knowledge_graph_job")))
     do! rmAsync workspaceDir
 }
 
@@ -237,9 +238,9 @@ let muxDailyMaintenanceLaunchSpec () = promise {
             prompts
             |> Seq.exists (fun prompt ->
                 prompt.StartsWith("---\n")
-                && prompt.Contains("type: \"vibe_knowledge_graph_job\"")
-                && prompt.Contains("workspaceRoot: \"" + workspaceDir + "\"")
-                && prompt.Contains("kind: \"daily\"")
+                && prompt.Contains("type: vibe_knowledge_graph_job")
+                && prompt.Contains("workspaceRoot: " + workspaceDir)
+                && prompt.Contains("kind: daily")
                 && not (prompt.Contains("[vibe-kg-job]"))))
     do! rmAsync workspaceDir
 }
@@ -274,8 +275,6 @@ let muxDailyRewriteTriggersNextSpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let hintLine = "// HINT: Do you need to update todo?"
-
 let bookkeeperAfterHookAddsHintToOutputSpec () = promise {
     let! workspaceDir = mkdtempAsync "bookkeeper-hint-"
     do! ensureKnowledgeGraphDir workspaceDir
@@ -293,8 +292,9 @@ let bookkeeperAfterHookAddsHintToOutputSpec () = promise {
     let afterOutput = str output "output"
     check "hint: bookkeeper launch records one" (launches.Length = 1)
     check "hint: bookkeeper launch result stays original" ((str launches.[0] "result") = "search results body")
-    check "hint: bookkeeper launch result excludes HINT" (not ((str launches.[0] "result").Contains hintLine))
-    check "hint: main agent output starts with HINT" (afterOutput.StartsWith hintLine)
+    check "hint: bookkeeper launch result excludes todo hint" (not (hasExactHint (str launches.[0] "result") hintTodoRefresh))
+    check "hint: main agent output has YAML front matter" (afterOutput.StartsWith "---")
+    check "hint: main agent output includes todo refresh hint" (hasExactHint afterOutput hintTodoRefresh)
     check "hint: main agent output preserves original body" (afterOutput.Contains "search results body")
     do! rmAsync workspaceDir
 }
@@ -361,11 +361,12 @@ let muxBookkeeperAfterHookAddsHintToOutputSpec () = promise {
         let afterOutput = str output "output"
         check "mux hint: bookkeeper launch records one" (launches.Length = 1)
         check "mux hint: bookkeeper launch result stays original" ((str launches.[0] "result") = "search results body")
-        check "mux hint: bookkeeper launch result excludes HINT" (not ((str launches.[0] "result").Contains hintLine))
-        check "mux hint: main agent output starts with HINT" (afterOutput.StartsWith hintLine)
+        check "mux hint: bookkeeper launch result excludes todo hint" (not (hasExactHint (str launches.[0] "result") hintTodoRefresh))
+        check "mux hint: main agent output has YAML front matter" (afterOutput.StartsWith "---")
+        check "mux hint: main agent output includes todo refresh hint" (hasExactHint afterOutput hintTodoRefresh)
         do! waitForBackgroundJobsForTesting reg
-        check "mux hint: delegated taskService prompt excludes HINT" (
+        check "mux hint: delegated taskService prompt excludes todo refresh hint" (
             prompts
-            |> Seq.forall (fun prompt -> not (prompt.Contains hintLine)))
+            |> Seq.forall (fun prompt -> not (prompt.Contains hintTodoRefresh)))
     do! rmAsync workspaceDir
 }

@@ -6,6 +6,7 @@ open VibeFs.Shell
 open VibeFs.Shell.TreeSitterShell
 open VibeFs.Kernel
 open VibeFs.Kernel.Dedup
+open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Kernel.MessageDedup
 open VibeFs.Shell.Dyn
 
@@ -78,9 +79,9 @@ let private applyDedupToMessages (messages: obj array) (hits: ReadHit list) (rep
                             let originalOutput = Dyn.get part "output"
                             let nextOutput =
                                 if isNullish originalOutput || typeIs originalOutput "string" then
-                                    box dedupMarker
+                                    box (noChangeEnvelope ())
                                 else
-                                    box (Dyn.withKey originalOutput "content" (box dedupMarker))
+                                    box (Dyn.withKey originalOutput "content" (box (noChangeEnvelope ())))
                             Dyn.withKey part "output" nextOutput)
                 Dyn.withKey msg "parts" (box newParts))
 
@@ -167,7 +168,7 @@ let private applyModelDedupToMessages (messages: obj array) (hits: ReadHit list)
                         match List.tryFind (fun hit -> hit.partIndex = j) hitsInMsg with
                         | None -> part
                         | Some _ ->
-                            let newOutput = createObj [ "type", box "text"; "value", box dedupMarker ]
+                            let newOutput = createObj [ "type", box "text"; "value", box (noChangeEnvelope ()) ]
                             Dyn.withKey part "output" (box newOutput))
                 Dyn.withKey msg "content" (box newContent))
 

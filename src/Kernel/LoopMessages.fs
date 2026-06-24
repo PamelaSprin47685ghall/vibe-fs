@@ -31,16 +31,16 @@ let loopFooter =
       "A reviewer will examine your submission. If accepted, you are done. If rejected, you will receive specific feedback to address." ]
 
 let buildLoopMessage (task: string) (bodyLines: string list) : string =
-    frontMatterPrompt [ yamlBlockField taskField task ] (String.concat "\n" (bodyLines @ loopFooter))
+    frontMatterPrompt [ yamlField taskField task ] (String.concat "\n" (bodyLines @ loopFooter))
 
 let buildLoopCommandTemplate (commandName: string) (bodyLines: string list) : string =
-    frontMatterPrompt [ yamlScalarField commandField commandName ] (String.concat "\n" bodyLines)
+    frontMatterPrompt [ yamlField commandField commandName ] (String.concat "\n" bodyLines)
 
 /// Loop cancellation carries a `verdict: cancelled` front-matter anchor so a
 /// restart replay recognizes it structurally, followed by the human-readable
 /// line. Authored once here, consumed verbatim by both hosts' cancel paths.
 let loopCancelledMessage : string =
-    frontMatterPrompt [ yamlPlainField verdictField verdictCancelled ] "With-Review Mode cancelled."
+    frontMatterPrompt [ yamlField verdictField verdictCancelled ] "With-Review Mode cancelled."
 
 // ── Reconstruction from dialogue history ─────────────────────────────────────
 

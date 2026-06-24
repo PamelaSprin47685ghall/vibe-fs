@@ -13,7 +13,7 @@ let private reviewInstructionsProse =
     + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\nreturn_reviewer({ \"verdict\": \"PASS\" })                          // Accept — no feedback needed\nreturn_reviewer({ \"verdict\": \"REJECT\", \"feedback\": \"specific...\" }) // Reject — provide detailed, actionable feedback\n\nIMPORTANT: verdict MUST be exactly \"PASS\" or \"REJECT\". When passing, omit feedback. When rejecting, feedback MUST be detailed and actionable.\n\nYou MUST call return_reviewer before finishing. Do not end the conversation without submitting your verdict."
 
 let reviewInstructions =
-    frontMatterPrompt [ yamlScalarField "role" "reviewer" ] reviewInstructionsProse
+    frontMatterPrompt [ yamlField "role" "reviewer" ] reviewInstructionsProse
 
 let private reviewerVerdictPrologue (subject: string) =
     $"You are a reviewer evaluating {subject}.\n\n"
@@ -35,15 +35,15 @@ let doubleCheckChallenge =
     "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
 
 let doubleCheckPrompt (task: string) : string =
-    let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
+    let taskLine = if task <> "" then [ yamlField taskField task ] else []
 
     frontMatterPrompt
-        ([ yamlScalarField doubleCheckField doubleCheckChallenge ]
+        ([ yamlField doubleCheckField doubleCheckChallenge ]
          @ taskLine)
         "If you insist on PASS, otherwise please REJECT with detailed feedback."
 
 let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) : string =
-    let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
+    let taskLine = if task <> "" then [ yamlField taskField task ] else []
 
     let filesLine =
         if affectedFiles.Length > 0 then
@@ -60,7 +60,7 @@ let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) 
     frontMatterPrompt (taskLine @ filesLine) body
 
 let private reviewerPromptFrontMatter (fields: string list) : string list =
-    [ yamlScalarField "role" "reviewer" ] @ fields
+    [ yamlField "role" "reviewer" ] @ fields
 
 let private reviewSubmissionVerdictBody =
     readOnlyWorkspaceConstraint
@@ -82,7 +82,7 @@ let private preReviewVerdictBody =
     + agentReportVerdictInstructions "the task is clear, specific, and actionable enough to begin work"
 
 let private reviewSubmissionFields (task: string) (report: string) (affectedFiles: string list) : string list =
-    let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
+    let taskLine = if task <> "" then [ yamlField taskField task ] else []
 
     let filesLine =
         if affectedFiles.Length > 0 then
@@ -94,7 +94,7 @@ let private reviewSubmissionFields (task: string) (report: string) (affectedFile
         if System.String.IsNullOrEmpty report then
             []
         else
-            [ yamlBlockField "report" report ]
+            [ yamlField "report" report ]
 
     taskLine @ filesLine @ reportLine
 
@@ -115,20 +115,20 @@ let reviewSubmissionDoubleCheckPrompt
     (affectedFiles: string list)
     : string =
     let fields =
-        [ yamlScalarField "role" "reviewer"; yamlScalarField doubleCheckField doubleCheckChallenge ]
+        [ yamlField "role" "reviewer"; yamlField doubleCheckField doubleCheckChallenge ]
         @ reviewSubmissionFields task report affectedFiles
 
     frontMatterPrompt fields reviewSubmissionVerdictBody
 
 let preReviewVerdictPrompt (task: string) : string =
-    let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
+    let taskLine = if task <> "" then [ yamlField taskField task ] else []
 
     frontMatterPrompt (reviewerPromptFrontMatter taskLine) preReviewVerdictBody
 
 let withReviewCommandTemplate =
     frontMatterPrompt
-        [ yamlScalarField commandField commandWithReview
-          yamlBlockField taskField "$ARGUMENTS" ]
+        [ yamlField commandField commandWithReview
+          yamlField taskField "$ARGUMENTS" ]
         (String.concat
             "\n"
             [ "You are entering With-Review Mode."
@@ -146,8 +146,8 @@ let withReviewCommandTemplate =
 
 let withReviewPrecheckCommandTemplate =
     frontMatterPrompt
-        [ yamlScalarField commandField commandWithReviewPrecheck
-          yamlBlockField taskField "$ARGUMENTS" ]
+        [ yamlField commandField commandWithReviewPrecheck
+          yamlField taskField "$ARGUMENTS" ]
         (String.concat
             "\n"
             [ "You are requesting With-Review Mode with pre-review."
@@ -179,16 +179,16 @@ let formatReviewResult (result: ReviewResult) : string =
     match result with
     | Accepted ->
         frontMatterPrompt
-            [ yamlPlainField verdictField verdictAccepted ]
+            [ yamlField verdictField verdictAccepted ]
             "Review passed. Your changes have been accepted. With-Review Mode has ended."
     | Terminated ->
         frontMatterPrompt
-            [ yamlPlainField verdictField verdictTerminated ]
+            [ yamlField verdictField verdictTerminated ]
             "Review terminated without verdict. With-Review Mode is still active; fix the issues and call submit_review again."
     | Rejected feedback ->
         frontMatterPrompt
-            [ yamlPlainField verdictField verdictRejected
-              yamlBlockField "feedback" feedback ]
+            [ yamlField verdictField verdictRejected
+              yamlField "feedback" feedback ]
             "Address the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."
 
 module ReviewerVerdictPrompts =

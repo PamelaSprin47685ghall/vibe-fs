@@ -80,3 +80,17 @@ let noDanglingMarkers () =
 let opencodeHookSchemaNoDirectZodImport () =
     let content = requireFile "src/Opencode/HookSchema.fs"
     check "arch: HookSchema no direct zod import" (not (content.Contains "import \"z\" \"zod\""))
+
+let private legacyInjectedOutputMarkers = [|
+    "[executor]"
+    "[syntax-check]"
+    "ends with iterator="
+|]
+
+let noLegacyInjectedToolOutputMarkers () =
+    for dir in [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"|] do
+        for f in fsFiles dir do
+            let path = dir + "/" + f
+            let content = requireFile path
+            for marker in legacyInjectedOutputMarkers do
+                check ($"arch: {path} no legacy output marker {marker}") (not (content.Contains marker))

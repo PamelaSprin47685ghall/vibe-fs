@@ -155,7 +155,9 @@ let private runFind (state: FuzzyFindState) (store: TypedIteratorStore) (opts: S
         let totalFiles = optInt value "totalFiles" |> Option.defaultValue 0
         let body = formatFindOutput (Some { items = matches; totalMatched = totalOpt; totalFiles = totalFiles })
         let nextIterator = findNextIterator state store opts totalForPaging
-        let output = if nextIterator = "" then body else sprintf "%s\n\n[iterator=\"%s\"]" body nextIterator
+        let output =
+            if nextIterator = "" then body
+            else VibeFs.Kernel.ToolOutputInfo.withIterator body nextIterator
         { output = output; isError = false }
 
 let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =

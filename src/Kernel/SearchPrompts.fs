@@ -20,7 +20,7 @@ let formatSearchResults (results: SearchResult list) : string =
         let items =
             results
             |> List.map (fun r ->
-                let contentBlock = yamlBlockField "content" r.content
+                let contentBlock = yamlField "content" r.content
 
                 let indentedContentBlock =
                     contentBlock.Split('\n')
@@ -28,9 +28,9 @@ let formatSearchResults (results: SearchResult list) : string =
                     |> String.concat "\n"
 
                 "  - title: "
-                + yamlScalar r.title
+                + yamlStringValue r.title
                 + "\n    url: "
-                + yamlScalar r.url
+                + yamlStringValue r.url
                 + "\n"
                 + indentedContentBlock)
 
@@ -41,7 +41,7 @@ let formatFetchResponse (data: FetchResponse) : string =
 
     let scalarIf (key: string) =
         function
-        | Some v when nonEmpty v -> [ yamlScalarField key v ]
+        | Some v when nonEmpty v -> [ yamlField key v ]
         | _ -> []
 
     let title = scalarIf "title" data.title
@@ -49,12 +49,12 @@ let formatFetchResponse (data: FetchResponse) : string =
 
     let length =
         match data.length with
-        | Some l -> [ yamlScalarField "length" (string l) ]
+        | Some l -> [ yamlField "length" (string l) ]
         | None -> []
 
     let content =
         match data.content with
-        | Some c when nonEmpty c -> [ yamlBlockField "content" c ]
+        | Some c when nonEmpty c -> [ yamlField "content" c ]
         | _ -> []
 
     frontMatter (title @ byline @ length @ content)

@@ -5,8 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicTodo
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.Methodology
+open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Opencode.HookSchema
 open VibeFs.Shell.TreeSitterShell
 open VibeFs.Shell.MagicSessionStore
@@ -68,9 +67,13 @@ let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promis
                 match formatted with
                 | None -> return result
                 | Some f ->
-                    if Dyn.typeIs result "string" then return box (string result + "\n\n" + f)
+                    if Dyn.typeIs result "string" then return box (addSyntax (string result) f)
                     elif Dyn.typeIs result "object" && Dyn.truthy (Dyn.get result "success") then
-                        return Dyn.withKey result "syntax_diagnostics" (box f)
+                        let out = Dyn.str result "output"
+                        let wrapped =
+                            if out <> "" then addSyntax out f
+                            else addSyntax "" f
+                        return Dyn.withKey result "output" (box wrapped)
                     else return result
             with _ -> return result
     }
@@ -78,20 +81,6 @@ let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promis
 let private bindExecute (tool: obj) : obj = tool?execute
 
 let private disabledResult () : JS.Promise<string> = Promise.lift "disabled"
-
-let private appendMeditatorNudge (result: obj) : obj =
-    if Dyn.isNullish result then result
-    elif Dyn.typeIs result "string" then
-        let s = string result
-        if s.Contains(meditatorNudge : string) then result else box $"{s}\n\n{meditatorNudge}"
-    elif Dyn.typeIs result "object" then
-        let success = Dyn.get result "success"
-        if not (Dyn.isNullish success) && unbox<bool> success then
-            let existingNudge = Dyn.get result "nudge"
-            if not (Dyn.isNullish existingNudge) && (string existingNudge).Contains(meditatorNudge : string) then result
-            else Dyn.withKey result "nudge" (box meditatorNudge)
-        else result
-    else result
 
 /// Encapsulates the host's native file_read execute function captured during
 /// wrapper registration. Replaces the old `obj option ref` pseudo-interface
@@ -190,15 +179,14 @@ let private mkTodoWriteWrapper () : obj =
                             if isThenable raw then unbox<JS.Promise<obj>> raw
                             else Promise.lift raw
                         let methodologies = todoMethodologies args
-                        let output = todoResultText methodologies
+                        let output = todoWriteOutput methodologies true
                         let nextResult =
                             if Dyn.typeIs result "object" then
                                 if Dyn.truthy (Dyn.get result "success") then
-                                    Dyn.withKey (Dyn.withKey result "output" (box output)) "nudge" (box meditatorNudge)
-                                else
                                     Dyn.withKey result "output" (box output)
+                                else Dyn.withKey result "output" (box output)
                             else
-                                createObj [ "success", box true; "output", box output; "nudge", box meditatorNudge ]
+                                createObj [ "success", box true; "output", box output ]
                         return nextResult
                     })
 

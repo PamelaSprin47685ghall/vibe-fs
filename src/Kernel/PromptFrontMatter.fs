@@ -1,29 +1,103 @@
 module VibeFs.Kernel.PromptFrontMatter
 
-/// Shared YAML front-matter markdown builders for prompts. Pure string
-/// composition: structured fields go in the front matter, free-text prose
-/// follows after. Presentation only — no persistence coupling.
+/// Shared YAML front-matter builders. All scalar encoding goes through `yamlStringValue`.
 
-let yamlScalar (value: string) : string =
-    "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n") + "\""
+let private normalized (value: string) : string =
+    if isNull value then "" else value.Replace("\r\n", "\n").Replace("\r", "\n")
 
-let yamlScalarField (key: string) (value: string) : string =
-    key + ": " + yamlScalar value
+let private hasLineBreak (value: string) : bool =
+    let s = normalized value
+    s.Contains("\n")
 
-let yamlPlainField (key: string) (value: string) : string =
-    key + ": " + value
+let private isYamlNullWord (s: string) : bool =
+    match s.ToLowerInvariant() with
+    | "null" | "~" -> true
+    | _ -> false
 
-let yamlBlockField (key: string) (value: string) : string =
-    let body = value.Split('\n') |> Array.map (fun line -> "  " + line) |> String.concat "\n"
-    key + ": |\n" + body
+let private isYamlBoolWord (s: string) : bool =
+    match s.ToLowerInvariant() with
+    | "true" | "false" -> true
+    | _ -> false
 
-/// `items` are pre-rendered, already-indented YAML sequence entries
-/// (each must start with `  - `). Empty list renders `key: []`.
+let private isDocumentMarker (s: string) : bool =
+    s = "---" || s = "..."
+
+let private startsWithYamlIndicator (c: char) : bool =
+    c = '-'
+    || c = '?'
+    || c = ':'
+    || c = ','
+    || c = '['
+    || c = ']'
+    || c = '{'
+    || c = '}'
+    || c = '&'
+    || c = '*'
+    || c = '!'
+    || c = '|'
+    || c = '>'
+    || c = '\''
+    || c = '%'
+    || c = '@'
+    || c = '`'
+
+let private needsQuotes (value: string) : bool =
+    let s = normalized value
+    if s = "" then true
+    elif s <> s.Trim() then true
+    elif s.Contains("\"") || s.Contains("\\") then true
+    elif s.Contains("#") then true
+    elif s.Length > 0 && startsWithYamlIndicator s.[0] then true
+    elif s.Contains(": ") then true
+    elif isYamlBoolWord s || isYamlNullWord s || isDocumentMarker s then true
+    else false
+
+let private quoteDouble (value: string) : string =
+    "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\""
+
+let private blockBody (value: string) (linePrefix: string) : string =
+    normalized value
+    |> fun s -> s.Split('\n')
+    |> Array.map (fun line -> linePrefix + line)
+    |> String.concat "\n"
+
+/// Runtime scalar encoding: plain (unquoted) → double-quoted → literal block (only when `\\n` present).
+let yamlStringValue (value: string) : string =
+    let s = normalized value
+    if hasLineBreak s then blockBody s "  "
+    elif needsQuotes s then quoteDouble s
+    else s
+
+/// `key: value` at document indent (no leading spaces on the key line).
+let yamlField (key: string) (value: string) : string =
+    let s = normalized value
+    if hasLineBreak s then
+        key + ": |\n" + blockBody s "  "
+    else
+        key + ": " + yamlStringValue s
+
+/// Nested field under a mapping entry, e.g. `    content: |` under a list item.
+let yamlNestedField (key: string) (value: string) (indent: string) : string =
+    let s = normalized value
+    if hasLineBreak s then
+        indent + key + ": |\n" + blockBody s (indent + "  ")
+    else
+        indent + key + ": " + yamlStringValue s
+
+/// List item `  - key: value` or `  - key: |` with body indented under the item.
+let yamlListItemField (key: string) (value: string) (listMarkerIndent: string) : string =
+    let s = normalized value
+    let prefix = listMarkerIndent + "- "
+    if hasLineBreak s then
+        prefix + key + ": |\n" + blockBody s (listMarkerIndent + "  ")
+    else
+        prefix + key + ": " + yamlStringValue s
+
 let yamlSeqField (key: string) (items: string list) : string =
     if items.IsEmpty then key + ": []" else key + ":\n" + String.concat "\n" items
 
 let yamlStringSeqField (key: string) (values: string list) : string =
-    yamlSeqField key (values |> List.map (fun v -> "  - " + yamlScalar v))
+    yamlSeqField key (values |> List.map (fun v -> "  - " + yamlStringValue v))
 
 let frontMatter (fields: string list) : string =
     "---\n" + String.concat "\n" fields + "\n---"
@@ -31,22 +105,13 @@ let frontMatter (fields: string list) : string =
 let frontMatterPrompt (fields: string list) (prose: string) : string =
     frontMatter fields + "\n\n" + prose
 
-/// Inverse of `yamlScalar`: strip the surrounding quotes and unescape. Returns
-/// None when the value is not a quoted scalar (e.g. a `key: |` block header), so
-/// callers scanning for scalar anchors naturally ignore block fields.
-let parseYamlScalar (raw: string) : string option =
+let parseYamlStringValue (raw: string) : string option =
     let t = raw.Trim()
     if t.Length >= 2 && t.StartsWith("\"") && t.EndsWith("\"") then
-        Some(t.Substring(1, t.Length - 2).Replace("\\n", "\n").Replace("\\\"", "\"").Replace("\\\\", "\\"))
-    else None
+        Some(t.Substring(1, t.Length - 2).Replace("\\\"", "\"").Replace("\\\\", "\\"))
+    else
+        None
 
-/// Parse the top-level scalar-like fields of the YAML front-matter block that
-/// opens `text`. Supports quoted scalars (`key: "value"`), literal block
-/// scalars (`key: |` with two-space-indented body), and plain unquoted simple
-/// scalars (`key: value`). The opening fence MUST be closed by a later top-level
-/// `---`; otherwise the result is empty. Ordinary prose, which practically never
-/// opens with a `---` fence, likewise yields an empty map, making these fields a
-/// collision-free state anchor.
 let parseFrontMatterScalars (text: string) : Map<string, string> =
     if isNull text then
         Map.empty
@@ -85,7 +150,7 @@ let parseFrontMatterScalars (text: string) : Map<string, string> =
                         else
                             let key = line.Substring(0, sep)
                             let raw = line.Substring(sep + 2)
-                            match parseYamlScalar raw with
+                            match parseYamlStringValue raw with
                             | Some value ->
                                 loop (i + 1) (Map.add key value acc)
                             | None when raw = "|" ->

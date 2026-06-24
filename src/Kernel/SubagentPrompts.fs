@@ -19,7 +19,7 @@ let private coderTargetItem (t: CoderTarget) : string =
         | _ -> [||]
 
     Array.concat
-        [ [| "  - file: " + yamlScalar t.file; "    guide: |" |]
+        [ [| "  - file: " + yamlStringValue t.file; "    guide: |" |]
           guideLines
           draftLines ]
     |> String.concat "\n"
@@ -38,8 +38,8 @@ let private agentPrompt fields lines =
 
 let coderPrompt (intent: CoderIntent) : string =
     let fields =
-        [ yamlBlockField "objective" intent.objective
-          yamlBlockField "background" intent.background
+        [ yamlField "objective" intent.objective
+          yamlField "background" intent.background
           yamlSeqField "targets" (intent.targets |> List.map coderTargetItem) ]
         @ (if intent.doNotTouch.Length = 0 then
                []
@@ -54,8 +54,8 @@ let coderPrompt (intent: CoderIntent) : string =
 
 let investigatorPrompt (intent: InvestigatorIntent) : string =
     agentPrompt
-        [ yamlBlockField "objective" intent.objective
-          yamlBlockField "background" intent.background
+        [ yamlField "objective" intent.objective
+          yamlField "background" intent.background
           yamlStringSeqField "questions" (List.ofArray intent.questions)
           yamlStringSeqField "entries" (List.ofArray intent.entries) ]
         [ "You are a codebase search agent. Explore the workspace and answer questions."
@@ -67,12 +67,12 @@ let meditatorPrompt (sections: MeditatorFileSection list) (intent: string) : str
         let body = Option.defaultValue meditatorSkippedSection s.content
         let contentLines = body.Split('\n') |> Array.map (fun line -> "      " + line)
 
-        Array.concat [ [| "  - path: " + yamlScalar s.file; "    content: |" |]; contentLines ]
+        Array.concat [ [| "  - path: " + yamlStringValue s.file; "    content: |" |]; contentLines ]
         |> String.concat "\n"
 
     agentPrompt
         [ yamlSeqField "files" (sections |> List.map fileItem)
-          yamlBlockField "question" intent ]
+          yamlField "question" intent ]
         [ "You are in a quiet room with the texts and the question."
           "No tools, no distractions — just you and the problem."
           "Read carefully. Turn it over in your mind."
@@ -80,7 +80,7 @@ let meditatorPrompt (sections: MeditatorFileSection list) (intent: string) : str
 
 let browserPrompt (intent: string) : string =
     agentPrompt
-        [ yamlBlockField "task" intent ]
+        [ yamlField "task" intent ]
         [ "You are a browser automation agent. Use stealth-browser-mcp tools to interact with web pages. Return a detailed report." ]
 
 let executorSummarizerPrompt
@@ -92,18 +92,18 @@ let executorSummarizerPrompt
     (mode: string)
     : string =
     agentPrompt
-        [ yamlScalarField "language" language
-          yamlBlockField "program" program
+        [ yamlField "language" language
+          yamlField "program" program
           yamlStringSeqField "dependencies" dependencies
-          yamlScalarField "timeout_type" timeoutType
-          yamlScalarField "mode" mode
-          yamlBlockField "raw_output" output ]
+          yamlField "timeout_type" timeoutType
+          yamlField "mode" mode
+          yamlField "raw_output" output ]
         [ "You are a filter for executor output. Preserve errors, stack traces, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output."
           "Do NOT lose any information." ]
 
 let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =
     agentPrompt
-        [ yamlBlockField "question" whatToSummarize
-          yamlBlockField "raw_results" rawResults ]
+        [ yamlField "question" whatToSummarize
+          yamlField "raw_results" rawResults ]
         [ "You are a filter for web search results. Focus on answering the question above using the raw results. Preserve concrete facts. Omit boilerplate and unrelated results. Do not invent details not present in the results."
           "Do NOT lose any information." ]

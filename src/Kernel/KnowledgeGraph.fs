@@ -38,11 +38,11 @@ let private jobKindTag (kind: KnowledgeGraphJobKind) : string * string option =
 
 let private jobMarkerFields (ctx: KnowledgeGraphJobContext) : string list =
     let kind, value = jobKindTag ctx.kind
-    [ yield yamlScalarField "type" "vibe_knowledge_graph_job"
-      yield yamlScalarField "workspaceRoot" ctx.workspaceRoot
-      yield yamlScalarField "kind" kind
+    [ yield yamlField "type" "vibe_knowledge_graph_job"
+      yield yamlField "workspaceRoot" ctx.workspaceRoot
+      yield yamlField "kind" kind
       match value with
-      | Some date when kind = "daily" -> yield yamlScalarField "date" date
+      | Some date when kind = "daily" -> yield yamlField "date" date
       | _ -> () ]
 
 let renderJobMarker (ctx: KnowledgeGraphJobContext) : string =
@@ -109,7 +109,7 @@ let buildPreludeSection (projection: KnowledgeGraphProjection) : string option =
             |> List.collect (fun (_, e) -> e.entity)
             |> normalizeEntities
             |> List.sort
-            |> List.map (fun e -> "  - " + yamlScalar (truncateTo e 160))
+            |> List.map (fun e -> "  - " + yamlStringValue (truncateTo e 160))
         Some(
             frontMatterPrompt
                 [ yamlSeqField "knowledge_graph" entities ]

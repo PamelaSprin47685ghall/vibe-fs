@@ -13,6 +13,7 @@ open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.Dyn
+open VibeFs.Kernel.ToolOutputInfo
 
 
 let toolDefinitionSpec () = promise {
@@ -121,7 +122,7 @@ let mimoTaskExecuteRoundTripSpec () = promise {
         "todos", box [| createObj [ "content", box "Ship parser fix"; "status", box "completed"; "priority", box "high" ] |]
     ]
     let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ]) |> unbox<JS.Promise<string>>
-    check "mimo task execute returns todo update text" (result.Contains "Todos updated.")
+    check "mimo task execute returns todo envelope" (result.StartsWith "---" && result.Contains hintTodosUpdated)
     do! rmAsync workspaceDir
 }
 
@@ -134,7 +135,7 @@ let mimoTaskExecuteNestedReportSpec () = promise {
         "todos", box [| createObj [ "content", box "Build feature"; "status", box "in_progress"; "priority", box "high" ] |]
     ]
     let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ]) |> unbox<JS.Promise<string>>
-    check "mimo task execute still succeeds with explicit top-level report" (result.Contains "Todos updated.")
+    check "mimo task execute still succeeds with explicit top-level report" (result.Contains hintTodosUpdated)
     do! rmAsync workspaceDir
 }
 
@@ -159,7 +160,7 @@ let mimoTaskExecuteStripsTaskIdSpec () = promise {
         "task_id", box "T4"
     ]
     let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ]) |> unbox<JS.Promise<string>>
-    check "mimo task execute ignores stray task_id" (result.Contains "Todos updated.")
+    check "mimo task execute ignores stray task_id" (result.Contains hintTodosUpdated)
     do! rmAsync workspaceDir
 }
 

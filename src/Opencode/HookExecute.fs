@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Shell
 
 open VibeFs.Kernel.HostTools
+open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.HookSchema
@@ -54,7 +55,8 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
             if Dyn.isNullish out || not (Dyn.typeIs out "string") then ()
             else
                 let s = string out
-                if hasSyntaxCheckMarker s then ()
+                let hasSyntax = hasSyntaxInOutput s
+                if hasSyntax then ()
                 else
                     let paths = extractFilePaths (Dyn.get input "args")
                     let! diagnostics =
@@ -65,7 +67,7 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
                         diagnostics
                         |> Array.choose id
                         |> String.concat "\n"
-                    if formatted <> "" then setOutput output (s + "\n\n" + formatted)
+                    if formatted <> "" then setOutput output (addSyntax s formatted)
     }
 
 /// Tools whose every user-facing invocation is durable enough to feed the knowledge graph
@@ -95,7 +97,7 @@ let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Open
         let succeeded = Dyn.str output "error" = ""
         let originalOutput = Dyn.str output "output"
         if succeeded && recordsToBookkeeper tool && not (isReadOnlyExecutor tool input) && (registry.LookupChildAgent sessionID).IsNone then
-            knowledgeGraphRuntime.StartBookkeeperAppend(bookkeeperInput input, originalOutput, tool, parentSessionID = sessionID)
-            setOutput output (VibeFs.Kernel.MagicTodo.withTodoHint originalOutput)
+            knowledgeGraphRuntime.StartBookkeeperAppend(bookkeeperInput input, bodyForBookkeeper originalOutput, tool, parentSessionID = sessionID)
+            setOutput output (withBookkeepingHints originalOutput)
         do! nudgeHook.handleToolExecuteAfter input output
     }

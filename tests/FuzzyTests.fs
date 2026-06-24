@@ -83,12 +83,12 @@ let emptyIteratorNotRendered () =
 /// characterization: lock the exact notice-block output of buildGrepOutput for
 /// the combined (regex + iterator) and regex-only cases before refactoring.
 let grepOutputNotices () =
-    equal "combined regex and iterator notice"
-        "body\n\n[Invalid regex: bad regex, used literal match. iterator=\"iter1\"]"
-        (buildGrepOutput "body" (Some "bad regex") "iter1")
-    equal "regex-only notice"
-        "body\n\n[Invalid regex: bad regex, used literal match]"
-        (buildGrepOutput "body" (Some "bad regex") "")
+    let combined = buildGrepOutput "body" (Some "bad regex") "iter1"
+    check "combined regex notice in body" (combined.Contains "Invalid regex: bad regex")
+    check "combined iterator in front matter" (combined.Contains "iterator: iter1")
+    let regexOnly = buildGrepOutput "body" (Some "bad regex") ""
+    check "regex-only notice in body" (regexOnly.Contains "Invalid regex: bad regex")
+    check "regex-only no iterator key" (not (regexOnly.Contains "iterator:"))
 
 /// totalMatched has three semantics, all guarded here with exact header lines:
 ///   Some n (n ≠ items.Length) — header uses n verbatim

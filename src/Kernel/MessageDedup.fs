@@ -14,7 +14,7 @@ let createDedupState () : DedupState = { seenContents = [] }
 
 let processDedup (state: DedupState) (payload: ReadPayload) : DedupVerdict * DedupState =
     let result = deduplicate state.seenContents payload.content
-    if result.output = dedupMarker then AlreadySeen, state
+    if isNoChangeOutput result.output then AlreadySeen, state
     else NewContent payload, { state with seenContents = result.seenOutputs }
 
 /// Tool names that represent a file-read operation across hosts.

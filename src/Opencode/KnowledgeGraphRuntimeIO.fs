@@ -61,8 +61,7 @@ let submitForKind (portLockTimeoutMs: int64) (portLockRetryDelayMs: int) (todayS
 let private jobMarkerPrompt (ctx: KnowledgeGraphJobContext) (promptText: string) : string =
     prependJobMarker ctx promptText
 
-let private launchResultText (title: string) (childId: string) : string =
-    $"Started {title} in background session {childId}."
+let private launchResultText (_title: string) (_childId: string) : string = ""
 
 let private failedLaunchResult (title: string) (reason: string) : string =
     $"Failed to start {title}: {reason}"

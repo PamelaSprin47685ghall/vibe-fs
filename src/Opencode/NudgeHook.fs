@@ -8,7 +8,7 @@ open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeState
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.Methodology
+open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.ChildAgentRegistry
@@ -45,10 +45,7 @@ type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.Rev
                     else raw :?> obj array |> Array.map string |> Array.toList
                 let out = Dyn.get output "output"
                 if not (Dyn.isNullish out) && Dyn.typeIs out "string" then
-                    let s = string out
-                    let rewritten = todoResultText methodologies
-                    let withNudge = if rewritten.Contains meditatorNudge then rewritten else rewritten + "\n" + meditatorNudge
-                    setOutput output withNudge
+                    setOutput output (todoWriteOutput methodologies true)
         }
 
     member _.handleEvent(input: obj) : JS.Promise<unit> =

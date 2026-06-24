@@ -8,6 +8,7 @@ open VibeFs.Tests.IntegrationMuxSetup
 open VibeFs.Tests.TempWorkspace
 
 open VibeFs.Kernel.PromptFragments
+open VibeFs.Kernel.ToolOutputInfo
 
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
@@ -121,15 +122,14 @@ let todoWriteWrapperSpec (reg: obj) = promise {
     let wrapped = (get tw "wrapper") $ (mockTodo, createObj [])
     let! result = (get wrapped "execute") $ (createObj []) |> unbox<JS.Promise<obj>>
     let output = str result "output"
-    let nudge = str result "nudge"
     check "todo_write wrapper produces output" (output.Length > 0)
-    check "todo_write wrapper appends reverie nudge" (nudge.Contains "Think thrice")
+    check "todo_write wrapper includes meditator hint in envelope" (hasExactHint output hintMeditator)
 }
 
 let toolExecuteAfterSpec (p: obj) = promise {
     let output = createObj [ "output", box "Todos updated" ]
     do! (get p "tool.execute.after") $ (createObj [ "tool", box "todowrite"; "sessionID", box "test-ws"; "callID", box "todo-1" ], output) |> unbox<JS.Promise<unit>>
-    check "tool.execute.after appends reverie nudge" ((unbox<string> (get output "output")).Contains "Think thrice")
+    check "tool.execute.after includes meditator hint" (hasExactHint (unbox<string> (get output "output")) hintMeditator)
 }
 
 let abortedRetrySpec () = promise {

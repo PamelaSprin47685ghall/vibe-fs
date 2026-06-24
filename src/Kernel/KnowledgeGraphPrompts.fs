@@ -10,7 +10,7 @@ open VibeFs.Kernel.PromptFrontMatter
 
 let private inlineEntitySeq (entities: string list) : string =
     if entities.IsEmpty then "[]"
-    else "[" + String.concat ", " (entities |> List.map yamlScalar) + "]"
+    else "[" + String.concat ", " (entities |> List.map yamlStringValue) + "]"
 
 let private entrySeqLines (entries: KnowledgeGraphEntry list) : string list =
     entries
@@ -18,14 +18,14 @@ let private entrySeqLines (entries: KnowledgeGraphEntry list) : string list =
         String.concat "\n" [
             "  - id: " + idValue entry.id
             "    entity: " + inlineEntitySeq entry.entity
-            "    fact: " + yamlScalar entry.fact ])
+            "    fact: " + yamlStringValue entry.fact ])
 
 let private eventSeqLines (entries: KnowledgeGraphEntry list) : string list =
     entries
     |> List.map (fun entry ->
         String.concat "\n" [
             "  - entity: " + inlineEntitySeq entry.entity
-            "    fact: " + yamlScalar entry.fact ])
+            "    fact: " + yamlStringValue entry.fact ])
 
 let yamlSeqField (key: string) (entries: KnowledgeGraphEntry list) : string =
     PromptFrontMatter.yamlSeqField key (entrySeqLines entries)
@@ -94,9 +94,9 @@ let private rewritePruneRules = [
 let buildAppendPrompt (title: string) (workInput: string) (workOutput: string) (projection: KnowledgeGraphProjection) : string =
     frontMatterPrompt [
         yamlSeqField "existing_knowledge_graph" (projection |> Map.toList |> List.map snd)
-        yamlScalarField "work_title" title
-        yamlBlockField "work_input" workInput
-        yamlBlockField "work_output" workOutput
+        yamlField "work_title" title
+        yamlField "work_input" workInput
+        yamlField "work_output" workOutput
     ] (String.concat "\n\n" (
         [ "You are the project KnowledgeGraph bookkeeper."
           "Submit exactly one `return_bookkeeper` call. Reuse existing ids when facts update, omit ids for new durable facts, and return `[]` if nothing durable should be recorded." ]
