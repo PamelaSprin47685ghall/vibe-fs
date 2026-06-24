@@ -47,3 +47,13 @@
 #### 6. Tool (工具) 定义与依赖注入方式过于原始
 * **症状**：工具的定义（`execute` 闭包）里，强耦合了对巨型 `config`/`context` obj 对象的硬编码解析（例如到处都是 `Dyn.str ctx "directory"`）。而且工具内部直接调用了子 Agent 创建、网络请求等高阶副作用。
 * **重构建议**：引入标准的依赖注入（DI）容器或 Reader Monad 模式。工具执行函数的签名应改为 `execute: ToolArgs -> IToolContext -> Async<ToolResult>`。上下文中应直接提供强类型的 `CurrentDirectory`、`AbortToken` 和 `ILogger`，而不是让工具自己去一堆 `obj` 里大海捞针。
+
+#### 7. 文案与提示词分散，重复在各工具执行器里硬编码
+* **症状**：工具描述、参数说明、拒绝语、错误前缀、成功摘要、`completedWorkReport` / `select_methodology` 之类提示词字段说明，分散在 `Opencode/`、`Mux/`、`Mimo-Code/` 的多个工具实现里；同义文案在不同宿主里重复出现，只改业务不改文本会立刻漂移。
+* **调研参考**：`opencode/packages/core/src/tool/tool.ts` 已把 `description`、`input`、`output`、`permission` 分成独立语义层；`mux/src/node/services/tools/mux_agents_read.ts`、`mux/src/node/services/tools/mux_agents_write.ts`、`mux/src/node/services/tools/mux_config_read.ts`、`mux/src/node/services/tools/mux_config_write.ts` 仍把文案直接拼在 `execute` 内；`vibe-fs/src/Opencode/MimoTodoTool.fs` 与 `Kernel/MagicTodo.fs` 已暴露出提示词字段和工具文案重复的问题。
+* **重构建议**：建立统一的文案目录，把 `tool description`、`field description`、`refusal text`、`error prefix`、`success summary`、`prompt snippet` 分层归类；工具实现只引用语义键，不直接写长句。
+
+#### 8. agent 工具权限按字符串直接匹配，缺少语义映射层
+* **症状**：权限判断仍围绕工具名字符串、前缀、子串规则做直接匹配，规则分散在 `Mux`、`Opencode`、`Kernel` 不同位置；新增工具时必须手工补多处字符串分支，容易出现漏配、错配、宿主间语义不一致。
+* **调研参考**：`opencode/packages/core/src/tool/tool.ts` 已证明工具注册可抽象为 canonical tool + permission action；`opencode/packages/core/src/tool/tools.ts` 说明注册层与执行层应分离；`mux` 侧多个工具已经以 `TOOL_DEFINITIONS` 统一描述工具，但权限语义仍未统一上浮成独立映射表。
+* **重构建议**：先把所有 agent/tool 名称映射成有限语义类型（如 read/write/search/edit/submit/notify/capture 等），再用单一 pattern matching 函数按语义分派权限，而不是在权限逻辑里直接匹配裸字符串。字符串只允许存在于最外层注册表或适配层，不允许继续作为核心决策键。

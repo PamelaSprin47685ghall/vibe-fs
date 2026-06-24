@@ -51,7 +51,7 @@ let canUse' () =
     check "coder denied investigator dispatch" (not (canUse "coder" "investigator"))
     check "coder allowed todo" (canUse "coder" "todowrite")
 
-    check "meditator allowed todo" (canUse "meditator" "todowrite")
+    check "meditator denied todo" (not (canUse "meditator" "todowrite"))
 
     check "manager can read" (canUse "manager" "read")
     check "manager can coder dispatch" (canUse "manager" "coder")
@@ -112,8 +112,8 @@ let canUseMatrix () =
         "websearch",                     [ true;  false; false; false; false; false; false; false ]
         "webfetch",                      [ true;  false; false; false; false; false; false; false ]
         "submit_review",                 [ true;  false; false; false; false; false; false; false ]
-        "todowrite",                     [ true;  true;  true;  true;  true;  true;  true;  true  ]
-        "todo_write",                    [ true;  true;  true;  true;  true;  true;  true;  true  ]
+        "todowrite",                     [ true;  true;  true;  true;  true;  false; false; false ]
+        "todo_write",                    [ true;  true;  true;  true;  true;  false; false; false ]
         "question",                      [ true;  false; false; false; false; false; false; false ]
         "ask_user_question",             [ true;  false; false; false; false; false; false; false ]
         "skill",                         [ true;  false; false; false; false; false; false; false ]
@@ -126,7 +126,7 @@ let canUseMatrix () =
         "stealth-browser-mcp_navigate",  [ false; false; false; false; true;  false; false; false ]
         "return_reviewer",               [ false; false; false; true;  false; false; false; false ]
         "return_coder",                  [ false; false; true;  false; false; false; false; false ]
-        "manage_todo_list",              [ true;  true;  true;  true;  true;  true;  true;  true  ]
+        "manage_todo_list",              [ true;  true;  true;  true;  true;  false; false; false ]
     ]
     matrix
     |> List.iter (fun (tool, expected) ->
