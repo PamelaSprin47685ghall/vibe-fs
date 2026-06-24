@@ -126,12 +126,12 @@ let subagentDispatch () =
         VibeFs.Kernel.Subagent.formatPrompt host (VibeFs.Kernel.Subagent.ExecutorSummary("raw shell output", "shell", "echo 1", [ "dep1" ], "short", "ro"))
     check "executor summary prompt count is one" (execPrompts |> List.length = 1)
     let execPrompt = execPrompts |> List.head
-    check "executor summary embeds language" (execPrompt.Contains "language: \"shell\"")
-    check "executor summary embeds program" (execPrompt.Contains "program: |\n  echo 1")
-    check "executor summary embeds dependencies" (execPrompt.Contains "dependencies:\n  - \"dep1\"")
-    check "executor summary embeds timeout_type" (execPrompt.Contains "timeout_type: \"short\"")
-    check "executor summary embeds mode" (execPrompt.Contains "mode: \"ro\"")
-    check "executor summary embeds raw output" (execPrompt.Contains "raw_output: |\n  raw shell output")
+    check "executor summary embeds language" (execPrompt.Contains "language: shell")
+    check "executor summary embeds program" (execPrompt.Contains "program:" && execPrompt.Contains "echo 1")
+    check "executor summary embeds dependencies" (execPrompt.Contains "dependencies:" && execPrompt.Contains "dep1")
+    check "executor summary embeds timeout_type" (execPrompt.Contains "timeout_type: short")
+    check "executor summary embeds mode" (execPrompt.Contains "mode: ro")
+    check "executor summary embeds raw output" (execPrompt.Contains "raw_output:" && execPrompt.Contains "raw shell output")
 
     let webPrompts =
         VibeFs.Kernel.Subagent.formatPrompt host (VibeFs.Kernel.Subagent.WebsearchSummary("ts compiler", "raw search results blob"))
@@ -152,7 +152,7 @@ let loopMessagesShared () =
     let task = "ship S1 refactor"
     let intro = "With-Review Mode is active. Complete the task above, then call submit_review with:"
     let kernelMsg = VibeFs.Kernel.LoopMessages.buildLoopMessage task [ intro ]
-    check "loop message carries task as block field" (kernelMsg.Contains "task: |")
+    check "loop message carries task in front matter" (kernelMsg.Contains "task:" && kernelMsg.Contains task)
     check "loop message embeds task" (kernelMsg.Contains task)
     check "loop message embeds intro" (kernelMsg.Contains intro)
     check "loop message mentions submit_review" (kernelMsg.Contains "submit_review")
@@ -165,16 +165,16 @@ let loopMessagesShared () =
     equal "loop message multiline task round-trips through block front-matter" (Some multilineTask) (Map.tryFind "task" parsedLoopMsg)
 
     let loopTemplate = VibeFs.Kernel.ReviewPrompts.withReviewCommandTemplate
-    check "loop template carries command front-matter" (loopTemplate.Contains "command: \"with-review\"")
-    check "loop template carries task front-matter block placeholder" (loopTemplate.Contains "task: |\n  $ARGUMENTS")
+    check "loop template carries command front-matter" (loopTemplate.Contains "command: with-review")
+    check "loop template carries task placeholder" (loopTemplate.Contains "task:" && loopTemplate.Contains "$ARGUMENTS")
     check "loop template does not say task is repeated below" (not (loopTemplate.Contains "repeated below"))
     check "loop template reuses review criteria" (loopTemplate.Contains "# Evaluation Criteria")
     check "loop template mentions submit_review" (loopTemplate.Contains "submit_review")
     check "loop template forbids finishing early" (loopTemplate.Contains "Do not end the conversation")
 
     let precheckTemplate = VibeFs.Kernel.ReviewPrompts.withReviewPrecheckCommandTemplate
-    check "precheck template carries command front-matter" (precheckTemplate.Contains "command: \"with-review-precheck\"")
-    check "precheck template carries task front-matter block placeholder" (precheckTemplate.Contains "task: |\n  $ARGUMENTS")
+    check "precheck template carries command front-matter" (precheckTemplate.Contains "command: with-review-precheck")
+    check "precheck template carries task placeholder" (precheckTemplate.Contains "task:" && precheckTemplate.Contains "$ARGUMENTS")
     check "precheck template reuses review criteria" (precheckTemplate.Contains "# Evaluation Criteria")
     check "precheck template does not repeat task in body tail" (not (precheckTemplate.EndsWith "$ARGUMENTS"))
 

@@ -1,15 +1,22 @@
 module VibeFs.Kernel.Dedup
 
-/// Marker inserted when an output merely repeats something already shown.
-let dedupMarker = "[No Change Since Previous Read/Write]"
+open VibeFs.Kernel.ToolOutputInfo
 
 type DedupedOutput = { output: string; seenOutputs: string list }
 
+let isNoChangeOutput (output: string) : bool =
+    match tryParse output with
+    | Some msg ->
+        msg.info
+        |> List.exists (function
+            | InfoItem.BodyRef ToolOutputBodyRef.NoChangeSincePreviousReadWrite -> true
+            | _ -> false)
+    | None -> false
+
 /// If `output` was already seen verbatim or is a substring of a previously-seen
-/// output, replace with the marker; otherwise record it.  Pure: the seen list
-/// grows immutably.
+/// output, replace with the no-change envelope; otherwise record it.
 let deduplicate (seenOutputs: string list) (output: string) : DedupedOutput =
     if output.Length > 0 && List.exists (fun (seen: string) -> seen.Contains output) seenOutputs then
-        { output = dedupMarker; seenOutputs = seenOutputs }
+        { output = noChangeEnvelope (); seenOutputs = seenOutputs }
     else
         { output = output; seenOutputs = seenOutputs @ [ output ] }

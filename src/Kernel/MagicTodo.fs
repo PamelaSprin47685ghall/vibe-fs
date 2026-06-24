@@ -4,15 +4,6 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.MagicCore
 
-/// One-line nudge the main agent sees at the top of any bookkeeping-eligible
-/// tool output, reminding it to refresh `todowrite` after the work it just did.
-/// Never injected into the prompt of the bookkeeper sub-agent itself.
-let todoHint = "// HINT: Do you need to update todo?"
-
-let withTodoHint (s: string) : string =
-    if s.Length = 0 then todoHint
-    else todoHint + "\n" + s
-
 let private toolDescriptionHeader =
     "Manage a structured todo list and preserve a compact append-only work backlog. "
     + "Use this tool for multi-step coding work, appending a detailed completed-work handover report after each meaningful progress "

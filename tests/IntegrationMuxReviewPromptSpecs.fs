@@ -27,7 +27,7 @@ let muxSubmitReviewPromptFormatSpec () = promise {
         let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         let promptText = if prompts.Count > 0 then prompts.[0] else ""
         check "submit_review prompt uses front-matter" (promptText.StartsWith "---")
-        check "submit_review prompt carries reviewer role" (promptText.Contains "role: \"reviewer\"")
+        check "submit_review prompt carries reviewer role" (promptText.Contains "role: reviewer")
         check "submit_review prompt drops call_id field" (not (promptText.Contains "call_id"))
         check "submit_review prompt does not ask for tool-level callId" (not (promptText.Contains "callId"))
         check "submit_review prompt reuses review criteria" (promptText.Contains "# Evaluation Criteria")
@@ -113,7 +113,7 @@ let muxLoopReviewPromptUsesFrontMatterSpec () = promise {
     check "loop-review prompt uses front-matter" (promptText.StartsWith "---")
     check "loop-review prompt drops call_id field" (not (promptText.Contains "call_id"))
     check "loop-review prompt does not ask for tool-level callId" (not (promptText.Contains "callId"))
-    check "loop-review prompt carries task block" (promptText.Contains "task: |")
+    check "loop-review prompt carries task" (promptText.Contains "task:" && promptText.Contains "Clarify rollout plan")
     check "loop-review prompt reuses review criteria" (promptText.Contains "# Evaluation Criteria")
     check "loop-review prompt uses agent_report protocol" (promptText.Contains "agent_report")
     check "loop-review prompt drops legacy divider" (not (promptText.Contains "==="))

@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.Executor
+open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Kernel.SubagentPrompts
 open VibeFs.Kernel.SearchPrompts
 open VibeFs.Shell
@@ -162,41 +163,25 @@ let ollamaFormat () =
     let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]
     let formatted = VibeFs.Kernel.SearchPrompts.formatSearchResults results
     check "search results front matter" (formatted.StartsWith "---\nresults:")
-    check "search embeds title A" (formatted.Contains "title: \"A\"")
-    check "search embeds title B" (formatted.Contains "title: \"B\"")
+    check "search embeds title A" (formatted.Contains "title: A")
+    check "search embeds title B" (formatted.Contains "title: B")
     equal "empty search" "No results found." (VibeFs.Kernel.SearchPrompts.formatSearchResults [])
-
-let summarizerInputCap () =
-    let bl (s: string) : int = s.Length
-    let trunc (s: string) (maxBytes: int) : string = if s.Length <= maxBytes then s else s.[..maxBytes - 1]
-    let opts : ExecuteOptions =
-        { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; mode = "ro"; cwd = None }
-    let small = String.replicate 100 "x"
-    let smallPrompt = buildSummaryPrompt bl trunc opts (Completed(small, 0))
-    check "small output kept whole" (smallPrompt.Contains small)
-    check "small output not truncated" (not (smallPrompt.Contains "[Output truncated to 1MB for summarization]"))
-    let marker = "END_OF_OUTPUT_TAIL"
-    let large = String.replicate (1_048_576 + 100 - marker.Length) "x" + marker
-    let tail = marker
-    let largePrompt = buildSummaryPrompt bl trunc opts (Completed(large, 0))
-    check "large output truncated message" (largePrompt.Contains "[Output truncated to 1MB for summarization]")
-    check "large output tail absent" (not (largePrompt.Contains tail))
 
 let safetyWarning () =
     let warn program = prependSafetyWarning "OUT" program Shell
     let warnForExecution program =
         prependSafetyWarningForExecution "OUT" { program = program; language = Shell; dependencies = []; timeoutType = Short; mode = "ro"; cwd = None }
-    check "leading grep warns" ((warn "grep foo").Contains readOnlyWarning)
-    check "grep after && warns" ((warn "cd src && grep foo").Contains readOnlyWarning)
-    check "grep in pipe warns" ((warn "ls a | grep b").Contains readOnlyWarning)
-    check "stripped head pipe passes" (not ((warn "printf hi | head -n 1").Contains readOnlyWarning))
-    check "execution warning uses prepared program" (not ((warnForExecution "printf hi | head -n 1").Contains readOnlyWarning))
-    check "real head command warns" ((warn "head -n 1 file.txt").Contains readOnlyWarning)
-    check "ls after semicolon warns" ((warn "echo ok; ls -la").Contains readOnlyWarning)
-    check "prefixed path warns" ((warn "/usr/bin/grep foo").Contains readOnlyWarning)
-    check "plain echo passes" (not ((warn "echo hi").Contains readOnlyWarning))
-    check "substring inside word ignored" (not ((warn "echo concatenate").Contains readOnlyWarning))
-    check "non-shell language ignored" (not ((prependSafetyWarning "OUT" "grep foo" Python).Contains readOnlyWarning))
+    check "leading grep warns" (hasExactHint (warn "grep foo") hintExecutorMisuse)
+    check "grep after && warns" (hasExactHint (warn "cd src && grep foo") hintExecutorMisuse)
+    check "grep in pipe warns" (hasExactHint (warn "ls a | grep b") hintExecutorMisuse)
+    check "stripped head pipe passes" (not (hasExactHint (warn "printf hi | head -n 1") hintExecutorMisuse))
+    check "execution warning uses prepared program" (not (hasExactHint (warnForExecution "printf hi | head -n 1") hintExecutorMisuse))
+    check "real head command warns" (hasExactHint (warn "head -n 1 file.txt") hintExecutorMisuse)
+    check "ls after semicolon warns" (hasExactHint (warn "echo ok; ls -la") hintExecutorMisuse)
+    check "prefixed path warns" (hasExactHint (warn "/usr/bin/grep foo") hintExecutorMisuse)
+    check "plain echo passes" (not (hasExactHint (warn "echo hi") hintExecutorMisuse))
+    check "substring inside word ignored" (not (hasExactHint (warn "echo concatenate") hintExecutorMisuse))
+    check "non-shell language ignored" (not (hasExactHint (prependSafetyWarning "OUT" "grep foo" Python) hintExecutorMisuse))
 
 /// Executor tool output must prepend a structured return YAML block
 /// carrying exit_code + status. Tests expect extended ExecuteResult with exit
@@ -212,27 +197,33 @@ let executorToolResponseFormatting () =
     equal "outputFromResult truncated" "partial" (outputFromResult truncatedResult)
     equal "outputFromResult missing" "Error: not found" (outputFromResult missingResult)
 
-    let completedBlock = formatReturnValueBlock completedResult
-    check "completed block starts with status header" (completedBlock.Contains "status: completed")
-    check "completed block has exit_code 0" (completedBlock.Contains "exit_code: 0")
-
-    let failedBlock = formatReturnValueBlock failedResult
-    check "failed block has exit_code 2" (failedBlock.Contains "exit_code: 2")
-    check "failed block has status failed" (failedBlock.Contains "status: failed")
-
-    let truncatedBlock = formatReturnValueBlock truncatedResult
-    check "truncated block has status truncated" (truncatedBlock.Contains "status: truncated")
-
-    let missingBlock = formatReturnValueBlock missingResult
-    check "missing block has status missing_executable" (missingBlock.Contains "status: missing_executable")
-
     let resp = formatToolResponse completedResult None
     check "response prepends return block" (resp.StartsWith "---")
     check "response includes output body" (resp.Contains "all good")
-    check "response includes exit_code" (resp.Contains "exit_code")
+    check "response includes exit_code" (resp.Contains "exit_code: 0")
+    check "response includes status completed" (resp.Contains "status: completed")
 
     let failedResp = formatToolResponse failedResult None
     check "failed response includes exit_code 2" (failedResp.Contains "exit_code: 2")
+    check "failed response includes status exit_error" (failedResp.Contains "status: exit_error")
+
+    let truncatedResp = formatToolResponse truncatedResult None
+    check "truncated response includes status killed_timeout" (truncatedResp.Contains "status: killed_timeout")
+    check "truncated response uses truncated body ref" (truncatedResp.Contains seeBelowTruncated)
+    check "truncated response includes timeout_ms" (truncatedResp.Contains "timeout_ms:")
+    check "truncated response omits timeout_type" (not (truncatedResp.Contains "timeout_type:"))
+    check "truncated response includes killed hint in info" (hintTextContains truncatedResp "Killed after")
+    check "truncated body excludes legacy executor suffix" (not (truncatedResp.Contains "[executor]"))
+
+    let signaledResult = Failed("partial out", None, Some "SIGTERM")
+    let signaledResp = formatToolResponse signaledResult None
+    check "signaled response includes status killed_signal" (signaledResp.Contains "status: killed_signal")
+    check "signaled response includes signal" (signaledResp.Contains "signal: SIGTERM")
+    check "signaled response includes killed hint" (hintTextContains signaledResp "Killed by signal")
+    check "signaled body has no legacy suffix" (not (signaledResp.Contains "[executor]"))
+
+    let missingResp = formatToolResponse missingResult None
+    check "missing response includes status missing_executable" (missingResp.Contains "status: missing_executable")
 
     let summary = "SUMMARY: task succeeded"
     let summaryResp = formatToolResponse completedResult (Some summary)
@@ -247,3 +238,8 @@ let summarizerPromptOmitsReturnValue () =
     let prompt = executorSummarizerPrompt "raw output" "shell" "echo 1" [] "short" "ro"
     check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
     check "summarizer prompt omits non-zero" (not (prompt.ToLowerInvariant().Contains "non-zero"))
+    check "summarizer empty deps yaml" (prompt.Contains "dependencies: []")
+    let multiline =
+        executorSummarizerPrompt "line1\nline2" "shell" "echo hi\necho bye" [ "dep1" ] "long" "ro"
+    check "summarizer multiline program uses block field" (multiline.Contains "program: |")
+    check "summarizer multiline raw_output uses block field" (multiline.Contains "raw_output: |")

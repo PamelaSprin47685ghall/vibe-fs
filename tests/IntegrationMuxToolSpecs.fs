@@ -8,6 +8,7 @@ open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.IntegrationMuxSetup
 
 open VibeFs.Kernel.Executor
+open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Kernel.HostTools
 open VibeFs.Mux.Plugin
 open VibeFs.Shell.MagicSessionStore
@@ -66,7 +67,7 @@ let muxTodoWriteCapturesCompletedWorkReportSpec () = promise {
         check "mux todo_write wrapper strips completedWorkReport before native execute" (isNullish (get nativeArgs "completedWorkReport"))
         check "mux todo_write wrapper strips priority before native execute" (isNullish (get nativeTodos.[0] "priority"))
         check "mux todo_write wrapper captures completedWorkReport" (tryGetReport opencode "todo-call-1" = Some "finished wrapper capture")
-        check "mux todo_write wrapper keeps nudge behavior" ((str result "nudge").Contains "meditator")
+        check "mux todo_write wrapper keeps nudge behavior" (hasExactHint (str result "output") hintMeditator)
 }
 
 let muxMagicTodoProjectionSpec () = promise {
@@ -115,7 +116,8 @@ let muxExecutorRoCatPrependsWarningSpec () = promise {
         let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-executor-ro-warning"; "sessionID", box "mux-executor-ro-warning" ]
         let args = createObj [ "language", box "shell"; "program", box "cat /etc/passwd"; "timeout_type", box "short"; "mode", box "ro" ]
         let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-        check "mux executor ro cat does not prepend warning" (not (result.StartsWith readOnlyWarning))
+        check "mux executor ro cat includes misuse hint in envelope" (
+            hasExactHint result hintExecutorMisuse)
     do! rmAsync workspaceDir
 }
 

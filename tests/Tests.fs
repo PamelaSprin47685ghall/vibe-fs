@@ -99,7 +99,7 @@ let private tests : (string * TestBody) list = [
     "ShellTests.capsContextFormat", Sync (sync ShellTests.capsContextFormat)
     "ShellTests.capsFileSizeLimit", Sync (sync ShellTests.capsFileSizeLimit)
     "ShellTests.ollamaFormat", Sync (sync ShellTests.ollamaFormat)
-    "ShellTests.summarizerInputCap", Sync (sync ShellTests.summarizerInputCap)
+
     "ShellTests.executorToolResponseFormatting", Sync (sync ShellTests.executorToolResponseFormatting)
     "ShellTests.summarizerPromptOmitsReturnValue", Sync (sync ShellTests.summarizerPromptOmitsReturnValue)
     "ShellTests.readDirectoryListing", Async ShellTests.readDirectoryListing
@@ -135,6 +135,7 @@ let private tests : (string * TestBody) list = [
     "ArchitectureTests.noDanglingMarkers", Sync (sync ArchitectureTests.noDanglingMarkers)
     "ArchitectureTests.noBuiltinDictionary", Sync (sync ArchitectureTests.noBuiltinDictionary)
     "ArchitectureTests.opencodeHookSchemaNoDirectZodImport", Sync (sync ArchitectureTests.opencodeHookSchemaNoDirectZodImport)
+    "ArchitectureTests.noLegacyInjectedToolOutputMarkers", Sync (sync ArchitectureTests.noLegacyInjectedToolOutputMarkers)
 ]
 
 let private matchesSelector (selectors: string array) (label: string) =

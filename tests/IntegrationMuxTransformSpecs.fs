@@ -43,7 +43,7 @@ let muxTopLevelDedupSpec () =
         let result = deduplicateReadOutputsWithSeen seen window
         check "mux top-level dedup returns array" (result.Length = 1)
         let output = get (unbox<obj[]> (get result.[0] "parts")).[0] "output"
-        check "mux top-level dedup replaces repeat content" (str output "content" = "[No Change Since Previous Read/Write]")
+        check "mux top-level dedup replaces repeat content" (str output "content" = VibeFs.Kernel.ToolOutputInfo.noChangeEnvelope ())
     }
 
 let muxSummarizationSpec () =
@@ -94,7 +94,7 @@ let muxMessagesTransformDedupsRepeatedReadSpec () = promise {
                 parts |> Array.exists (fun part -> str part "toolName" = "read"))
         check "mux messagesTransform keeps both plugin read messages" (readMessages.Length = 2)
         let secondOutput = muxFirstDynamicToolOutput readMessages.[1]
-        check "mux messagesTransform dedups repeated plugin read" (string secondOutput = "[No Change Since Previous Read/Write]")
+        check "mux messagesTransform dedups repeated plugin read" (string secondOutput = VibeFs.Kernel.ToolOutputInfo.noChangeEnvelope ())
 }
 
 let muxMessagesTransformDedupsRepeatedFileReadSpec () = promise {
@@ -118,7 +118,7 @@ let muxMessagesTransformDedupsRepeatedFileReadSpec () = promise {
                 parts |> Array.exists (fun part -> str part "toolName" = "file_read"))
         check "mux messagesTransform keeps both read messages" (readMessages.Length = 2)
         let secondOutput = muxFirstDynamicToolOutput readMessages.[1]
-        check "mux messagesTransform dedups repeated file_read" (str secondOutput "content" = "[No Change Since Previous Read/Write]")
+        check "mux messagesTransform dedups repeated file_read" (str secondOutput "content" = VibeFs.Kernel.ToolOutputInfo.noChangeEnvelope ())
 }
 
 let muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec () = promise {
@@ -141,7 +141,7 @@ let muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec () = promise {
                 parts |> Array.exists (fun part -> str part "toolName" = "read"))
         check "mux messagesTransform keeps both top-level exec read messages" (readMessages.Length = 2)
         let secondOutput = muxFirstDynamicToolOutput readMessages.[1]
-        check "mux messagesTransform dedups repeated read for top-level exec" (str secondOutput "content" = "[No Change Since Previous Read/Write]")
+        check "mux messagesTransform dedups repeated read for top-level exec" (str secondOutput "content" = VibeFs.Kernel.ToolOutputInfo.noChangeEnvelope ())
 }
 
 let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () = promise {

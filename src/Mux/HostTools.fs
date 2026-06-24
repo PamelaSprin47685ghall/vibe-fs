@@ -49,14 +49,16 @@ let private summarizeWhenNeeded (deps: obj) (config: obj) (toolNames: string arr
     promise {
         let output = outputFromResult result
         if not (shouldSummarize byteLength output) then
-            return formatToolResponse result None
+            let formatted = formatToolResponse result None
+            return prependSafetyWarningForExecution formatted options
         else
             let langStr = languageToString options.language
             let timeoutStr = timeoutToString options.timeoutType
             let prompt = formatPrompt mimocode (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
             let opts = toolOptions toolNames summarizationRole summarizationAiSettingsAgentId
             let! report = runMuxSubagent deps config summarizationAgentId prompt "Executor summary" opts
-            return formatToolResponse result (Some report)
+            let formatted = formatToolResponse result (Some report)
+            return prependSafetyWarningForExecution formatted options
     }
 
 let addIfSome (entries: ResizeArray<string * obj>) (key: string) (v: 'T option) =

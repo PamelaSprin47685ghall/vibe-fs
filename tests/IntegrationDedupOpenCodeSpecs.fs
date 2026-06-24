@@ -77,7 +77,7 @@ let opencodeDedupInPlaceSpec () = promise {
     check "opencode dedup keeps first state ref" (obj.ReferenceEquals(stateA, readStateA))
     check "opencode dedup keeps second state ref" (obj.ReferenceEquals(stateB, readStateB))
     check "opencode dedup keeps first read output" (str stateA "output" = stableContent)
-    check "opencode dedup replaces exact duplicate" (str stateB "output" = "[No Change Since Previous Read/Write]")
+    check "opencode dedup replaces exact duplicate" (str stateB "output" = VibeFs.Kernel.ToolOutputInfo.noChangeEnvelope ())
     let supersetContent = stableContent + String.replicate 8 "new content\n"
     let supersetState = createObj [ "output", box supersetContent ]
     let supersetPart = createObj [ "type", box "tool"; "tool", box "read"; "state", box supersetState ]

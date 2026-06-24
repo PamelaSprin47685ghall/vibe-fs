@@ -181,15 +181,15 @@ let inferReviewTaskFromTexts' () =
 /// `key: |` literal block fields without mistaking indented `---` for the close
 /// fence, and (d) return empty for ordinary prose or an unclosed front matter.
 let parseFrontMatterScalars' () =
-    let scalars = parseFrontMatterScalars (frontMatterPrompt [ yamlScalarField "verdict" "rejected"; yamlBlockField "feedback" "line one\n---\nline three" ] "Address the feedback above.")
+    let scalars = parseFrontMatterScalars (frontMatterPrompt [ yamlField "verdict" "rejected"; yamlField "feedback" "line one\n---\nline three" ] "Address the feedback above.")
     equal "scalar verdict parsed" (Some "rejected") (Map.tryFind "verdict" scalars)
     equal "block field parsed" (Some "line one\n---\nline three") (Map.tryFind "feedback" scalars)
 
-    let multi = parseFrontMatterScalars (frontMatter [ yamlScalarField "task" "do thing"; yamlScalarField "verdict" "accepted" ])
+    let multi = parseFrontMatterScalars (frontMatter [ yamlField "task" "do thing"; yamlField "verdict" "accepted" ])
     equal "first scalar" (Some "do thing") (Map.tryFind "task" multi)
     equal "second scalar" (Some "accepted") (Map.tryFind "verdict" multi)
 
-    let block = parseFrontMatterScalars (frontMatter [ yamlBlockField "task" "line one\nline two\n: [] {} \"quoted\"" ])
+    let block = parseFrontMatterScalars (frontMatter [ yamlField "task" "line one\nline two\n: [] {} \"quoted\"" ])
     equal "block scalar parsed" (Some "line one\nline two\n: [] {} \"quoted\"") (Map.tryFind "task" block)
 
     equal "plain prose → empty" Map.empty (parseFrontMatterScalars "just a normal message, no front matter")
@@ -217,7 +217,7 @@ let doubleCheckPromptFormat () =
 let reviewerPromptFormat () =
     let prompt = VibeFs.Kernel.ReviewPrompts.reviewerPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
     check "has front-matter fence" (prompt.Contains "---")
-    check "embeds task as block field" (prompt.Contains "task: |")
+    check "embeds task in front matter" (prompt.Contains "task:" && prompt.Contains "ship S1")
     check "lists affected files in front-matter" (prompt.Contains "affected_files:")
     check "embeds affected file a.fs" (prompt.Contains "a.fs")
     check "carries review criteria" (prompt.Contains "# Evaluation Criteria")
@@ -238,11 +238,11 @@ let reviewerPromptFormat () =
 let muxReviewerVerdictPromptFormat () =
     let prompt = VibeFs.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
     check "mux prompt starts with front-matter" (prompt.StartsWith "---")
-    check "mux prompt carries reviewer role" (prompt.Contains "role: \"reviewer\"")
+    check "mux prompt carries reviewer role" (prompt.Contains "role: reviewer")
     check "mux prompt has no call_id field" (not (prompt.Contains "call_id:"))
-    check "mux prompt carries task block" (prompt.Contains "task: |")
+    check "mux prompt carries task" (prompt.Contains "task:" && prompt.Contains "ship S1")
     check "mux prompt carries affected_files" (prompt.Contains "affected_files:")
-    check "mux prompt carries report block field" (prompt.Contains "report: |")
+    check "mux prompt carries report" (prompt.Contains "report:" && prompt.Contains "changed A and B")
     check "mux prompt reuses review criteria" (prompt.Contains "# Evaluation Criteria")
     check "mux prompt names agent_report" (prompt.Contains "agent_report")
     check "mux prompt does not mention return_reviewer" (not (prompt.Contains "return_reviewer"))
@@ -251,9 +251,9 @@ let muxReviewerVerdictPromptFormat () =
 let muxPreReviewVerdictPromptFormat () =
     let prompt = VibeFs.Kernel.ReviewPrompts.preReviewVerdictPrompt "clarify rollout"
     check "pre-review prompt starts with front-matter" (prompt.StartsWith "---")
-    check "pre-review prompt carries reviewer role" (prompt.Contains "role: \"reviewer\"")
+    check "pre-review prompt carries reviewer role" (prompt.Contains "role: reviewer")
     check "pre-review prompt has no call_id field" (not (prompt.Contains "call_id:"))
-    check "pre-review prompt carries task block" (prompt.Contains "task: |")
+    check "pre-review prompt carries task" (prompt.Contains "task:" && prompt.Contains "clarify rollout")
     check "pre-review prompt reuses review criteria" (prompt.Contains "# Evaluation Criteria")
     check "pre-review prompt names agent_report" (prompt.Contains "agent_report")
     check "pre-review prompt has no legacy divider" (not (prompt.Contains "==="))
@@ -261,6 +261,6 @@ let muxPreReviewVerdictPromptFormat () =
 let reviewInstructionsFrontMatter () =
     let instr = VibeFs.Kernel.ReviewPrompts.reviewInstructions
     check "instructions wrapped in front-matter" (instr.StartsWith "---")
-    check "instructions carry role" (instr.Contains "role: \"reviewer\"")
+    check "instructions carry role" (instr.Contains "role: reviewer")
     check "instructions carry review criteria" (instr.Contains "# Evaluation Criteria")
     check "instructions mention return_reviewer" (instr.Contains "return_reviewer")

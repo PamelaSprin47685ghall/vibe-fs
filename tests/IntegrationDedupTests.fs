@@ -7,6 +7,7 @@ open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationDedupOpenCodeSpecs
 
 open VibeFs.Kernel.MagicCore
+open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Opencode.Plugin
 open VibeFs.Shell.Dyn
 
@@ -40,13 +41,13 @@ let dedupStringOutputSpec () =
     let msgs = [| readMsg "read" (box "same content") "1"; readMsg "file_read" (box "same content") "2" |]
     let r = deduplicateReadOutputs msgs
     check "dedup string: keeps first" (unbox<string> (firstOutput r.[0]) = "same content")
-    check "dedup string: replaces repeat" (unbox<string> (firstOutput r.[1]) = "[No Change Since Previous Read/Write]")
+    check "dedup string: replaces repeat" (unbox<string> (firstOutput r.[1]) = noChangeEnvelope ())
 
 let dedupObjectOutputSpec () =
     let msgs = [| readMsg "file_read" (fileReadOutput "hello") "1"; readMsg "file_read" (fileReadOutput "hello") "2" |]
     let r = deduplicateReadOutputs msgs
     check "dedup object: keeps first content" (str (firstOutput r.[0]) "content" = "hello")
-    check "dedup object: replaces repeat" (str (firstOutput r.[1]) "content" = "[No Change Since Previous Read/Write]")
+    check "dedup object: replaces repeat" (str (firstOutput r.[1]) "content" = noChangeEnvelope ())
 
 let dedupPerPathDifferentSpec () =
     let shared = fileReadOutput "shared bytes"
@@ -58,13 +59,13 @@ let dedupPerPathSameSpec () =
     let out = fileReadOutput "repeat me"
     let msgs = [| readMsgWithPath "file_read" "same.ts" out "1"; readMsgWithPath "file_read" "same.ts" out "2" |]
     let r = deduplicateReadOutputs msgs
-    check "dedup same path: second marked" (str (firstOutput r.[1]) "content" = "[No Change Since Previous Read/Write]")
+    check "dedup same path: second marked" (str (firstOutput r.[1]) "content" = noChangeEnvelope ())
 
 let dedupSubstringSpec () =
     let msgs = [| readMsg "read" (box "hello world foo bar") "1"; readMsg "read" (box "hello world") "2" |]
     let r = deduplicateReadOutputs msgs
     check "dedup substring: keeps first longer output" (unbox<string> (firstOutput r.[0]) = "hello world foo bar")
-    check "dedup substring: marks substring against longer seen" (unbox<string> (firstOutput r.[1]) = "[No Change Since Previous Read/Write]")
+    check "dedup substring: marks substring against longer seen" (unbox<string> (firstOutput r.[1]) = noChangeEnvelope ())
 
 let dedupDifferentSpec () =
     let msgs = [| readMsg "read" (box "unique a") "1"; readMsg "read" (box "unique b") "2" |]
@@ -101,13 +102,13 @@ let dedupAgainstHistorySpec () =
     let history = [| readMsg "file_read" (fileReadOutput "from history") "h1" |]
     let window = [| readMsg "file_read" (fileReadOutput "from history") "w1" |]
     let r = deduplicateReadOutputsAgainstHistory history window
-    check "againstHistory: repeat vs history marked" (str (firstOutput r.[0]) "content" = "[No Change Since Previous Read/Write]")
+    check "againstHistory: repeat vs history marked" (str (firstOutput r.[0]) "content" = noChangeEnvelope ())
 
 let dedupAgainstHistoryWindowSpec () =
     let window = [| readMsg "read" (box "same") "w1"; readMsg "read" (box "same") "w2" |]
     let r = deduplicateReadOutputsAgainstHistory [||] window
     check "againstHistory: window first kept" (unbox<string> (firstOutput r.[0]) = "same")
-    check "againstHistory: window second marked" (unbox<string> (firstOutput r.[1]) = "[No Change Since Previous Read/Write]")
+    check "againstHistory: window second marked" (unbox<string> (firstOutput r.[1]) = noChangeEnvelope ())
 
 let dedupAgainstHistoryPerPathSpec () =
     let shared = fileReadOutput "shared across files"
@@ -125,7 +126,7 @@ let dedupModelTextSpec () =
     let firstOut = get ((unbox<obj[]> (get msgs.[0] "content")).[0]) "output"
     let secondOut = get ((unbox<obj[]> (get msgs.[1] "content")).[0]) "output"
     check "ModelMessage text: first preserved" (str firstOut "value" = "hello")
-    check "ModelMessage text: second replaced" (str secondOut "value" = "[No Change Since Previous Read/Write]")
+    check "ModelMessage text: second replaced" (str secondOut "value" = noChangeEnvelope ())
 
 let dedupModelJsonSpec () =
     let seen, msgs = deduplicateModelReadOutputsWithSeen [||] [|
@@ -134,7 +135,7 @@ let dedupModelJsonSpec () =
     |]
     check "ModelMessage json: returns seen" (seen |> Array.contains "json content")
     let secondOut = get ((unbox<obj[]> (get msgs.[1] "content")).[0]) "output"
-    check "ModelMessage json: second replaced" (str secondOut "value" = "[No Change Since Previous Read/Write]")
+    check "ModelMessage json: second replaced" (str secondOut "value" = noChangeEnvelope ())
 
 let dedupModelDifferentSpec () =
     let _, msgs = deduplicateModelReadOutputsWithSeen [||] [|

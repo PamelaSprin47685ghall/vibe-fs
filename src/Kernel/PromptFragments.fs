@@ -25,9 +25,6 @@ let reviewCriteria =
 7. Is the result natural and intuitive for the user or caller?
 8. Does it fully satisfy the original task without cutting corners?"""
 
-let meditatorNudge =
-    "// Think thrice before acting — NOW consider calling meditator tool to improve reasoning"
-
 let todoNudgePrompt =
     "There are still incomplete todos. Continue working through the remaining items. "
     + "If they are irrelevant, remove them. "

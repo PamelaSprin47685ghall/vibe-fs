@@ -1,6 +1,7 @@
 module VibeFs.Kernel.Executor
 
 open System
+open VibeFs.Kernel.ToolOutputInfo
 
 type StrippedPipe =
     { pipe: string
@@ -111,7 +112,6 @@ type ExecutorTimeoutType = Short | Long | LastResort
 let languages: ExecutorLanguage list = [ Shell; Python; Javascript ]
 let timeoutMs = function Short -> 1000 | Long -> 10000 | LastResort -> 100_000
 let summaryThresholdBytes = 8192
-let rawOutputCapBytes = 1_048_576
 
 type ExecuteOptions =
     { program: string
@@ -134,35 +134,54 @@ let outputFromResult (result: ExecuteResult) : string =
     | Failed(o, _, _)
     | MissingExecutable(_, o) -> o
 
-let formatReturnValueBlock (result: ExecuteResult) : string =
-    let lines = ResizeArray<string>()
-    lines.Add "---"
+let executorKilledAfterTimeoutHint (timeoutMs: int) =
+    $"Killed after {timeoutMs}ms. Partial output below."
+
+let executorKilledBySignalHint (signal: string) =
+    $"Killed by signal {signal}. Partial output below."
+
+let private isSpawnFailedMessage (output: string) =
+    output.StartsWith "spawn failed:"
+
+let private executorInfoItems (result: ExecuteResult) : InfoItem list =
     match result with
-    | Completed(_, exitCode) ->
-        lines.Add "status: completed"
-        lines.Add $"exit_code: {exitCode}"
-    | Truncated _ ->
-        lines.Add "status: truncated"
-    | Failed(_, exitCodeOpt, signalOpt) ->
-        lines.Add "status: failed"
-        exitCodeOpt |> Option.iter (fun c -> lines.Add $"exit_code: {c}")
-        signalOpt |> Option.iter (fun s -> lines.Add $"signal: {s}")
+    | Completed(_, code) ->
+        [ InfoItem.Status "completed"; InfoItem.ExitCode code ]
+    | Truncated(_, timeoutType) ->
+        let ms = timeoutMs timeoutType
+        [ InfoItem.Status "killed_timeout"
+          InfoItem.TimeoutMs ms
+          InfoItem.Hint (executorKilledAfterTimeoutHint ms) ]
+    | Failed(output, code, sig') ->
+        match sig', code with
+        | Some s, _ when s <> "" ->
+            [ InfoItem.Status "killed_signal"
+              InfoItem.Signal s
+              InfoItem.Hint (executorKilledBySignalHint s) ]
+        | _, Some c ->
+            [ InfoItem.Status "exit_error"; InfoItem.ExitCode c ]
+        | _, None when isSpawnFailedMessage output ->
+            [ InfoItem.Status "spawn_failed" ]
+        | _, None ->
+            [ InfoItem.Status "exit_error" ]
     | MissingExecutable _ ->
-        lines.Add "status: missing_executable"
-    lines.Add "---"
-    String.concat "\n" lines
+        [ InfoItem.Status "missing_executable" ]
 
 let formatToolResponse (result: ExecuteResult) (summaryOption: string option) : string =
     let body = Option.defaultValue (outputFromResult result) summaryOption
-    formatReturnValueBlock result + "\n\n" + body
+    let truncated = match result with Truncated _ -> true | _ -> false
+    let ref' =
+        if truncated || summaryOption.IsSome then ToolOutputBodyRef.SeeBelowTruncated
+        else ToolOutputBodyRef.SeeBelow
+    render
+        { empty with
+            info = executorInfoItems result @ [ InfoItem.BodyRef ref' ]
+            body = body }
 
 let readOnlyReadCommands: Set<string> =
     Set.ofList
         [ "head"; "tail"; "sed"; "cat"; "grep"; "rg"; "find"; "less"; "more"
           "diff"; "wc"; "ls"; "tree" ]
-
-let readOnlyWarning =
-    "// 绝对禁止使用 executor 工具仅仅用于查找或者读写文件，请使用 read/investigator/coder 代替！"
 
 let shouldAppendReadOnlyWarning (program: string) (language: ExecutorLanguage) : bool =
     match language with
@@ -176,7 +195,17 @@ let shouldAppendReadOnlyWarning (program: string) (language: ExecutorLanguage) :
     | _ -> false
 
 let prependSafetyWarning (output: string) (program: string) (language: ExecutorLanguage) : string =
-    if shouldAppendReadOnlyWarning program language then $"{readOnlyWarning}\n{output}" else output
+    if not (shouldAppendReadOnlyWarning program language) then output
+    else
+        match tryParse output with
+        | Some msg -> render (appendInfo (InfoItem.Hint hintExecutorMisuse) msg)
+        | None ->
+            render
+                { empty with
+                    info =
+                        [ InfoItem.Hint hintExecutorMisuse
+                          InfoItem.BodyRef ToolOutputBodyRef.SeeBelow ]
+                    body = output }
 
 let shouldSummarize (byteLength: string -> int) (output: string) : bool =
     byteLength output > summaryThresholdBytes
@@ -197,38 +226,6 @@ let timeoutToString (value: ExecutorTimeoutType) : string =
     | Short -> "short"
     | Long -> "long"
     | LastResort -> "last-resort"
-
-let describeResultTag (result: ExecuteResult) : string =
-    match result with
-    | Completed _ -> "The following program has been executed (synchronous)."
-    | Truncated(_, timeoutType) -> $"The following program exceeded the {timeoutToString timeoutType} timeout and was killed. Partial output is below."
-    | Failed _ -> "The following program exited with a non-zero status."
-    | MissingExecutable(executable, _) -> $"The following program could not start because '{executable}' was not found."
-
-let buildSummaryPrompt (byteLength: string -> int) (truncateToBytes: string -> int -> string) (options: ExecuteOptions) (result: ExecuteResult) : string =
-    let rawOutput = outputFromResult result
-
-    let outputForSummary =
-        if byteLength rawOutput > rawOutputCapBytes then
-            truncateToBytes rawOutput rawOutputCapBytes + "\n\n[Output truncated to 1MB for summarization]"
-        else
-            rawOutput
-
-    let depList = String.concat ", " options.dependencies
-    let depInfo = if options.dependencies.IsEmpty then "" else $"Dependencies: {depList}\n\n"
-
-    [ describeResultTag result
-      ""
-      "Program:"
-      options.program
-      ""
-      depInfo.TrimEnd()
-      "Summarize the output. Highlight successes, failures, and key values. Do not invent details."
-      ""
-      "Raw output:"
-      outputForSummary ]
-    |> List.choose (fun s -> if System.String.IsNullOrEmpty(s) then None else Some s)
-    |> String.concat "\n"
 
 let parseLanguage (value: string) : ExecutorLanguage =
     match value.ToLowerInvariant() with

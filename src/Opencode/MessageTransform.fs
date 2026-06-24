@@ -11,6 +11,7 @@ open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.MagicCore
 open VibeFs.Kernel.MagicProjection
 open VibeFs.Kernel.Dedup
+open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Kernel.MessageDedup
 open VibeFs.Kernel.CapsFormat
 open VibeFs.Kernel.Config
@@ -101,7 +102,7 @@ let private applyReadDedup (messages: obj array) : unit =
                                     let verdict, nextState = processDedup pathState payload
                                     setKey seenByPath pathKey (box nextState)
                                     match verdict with
-                                    | AlreadySeen -> setOutput state dedupMarker
+                                    | AlreadySeen -> setOutput state (noChangeEnvelope ())
                                     | NewContent _ -> ()
 
 module private CapsFileCache =

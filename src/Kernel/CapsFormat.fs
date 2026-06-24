@@ -20,7 +20,7 @@ let buildCapitalsContext (files: CapsFile list) : string =
         files |> List.map (fun f ->
             let contentLines = f.content.Split('\n') |> Array.map (fun line -> "      " + line)
             Array.concat [
-                [| "  - label: " + yamlScalar f.label; "    content: |" |]
+                [| "  - label: " + yamlStringValue f.label; "    content: |" |]
                 contentLines
             ] |> String.concat "\n")
     frontMatter [ yamlSeqField "caps" items ]

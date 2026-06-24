@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Dedup
+open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Kernel.MessageDedup
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.Domain
@@ -97,8 +98,9 @@ let dedup' () =
     let r2 = deduplicate r1.seenOutputs "same string"
     let r3 = deduplicate r1.seenOutputs "same"
     check "dedup first" (r1.output = "same string")
-    check "dedup second" (r2.output = dedupMarker)
-    check "dedup substring" (r3.output = dedupMarker)
+    let noChange = noChangeEnvelope ()
+    check "dedup second" (r2.output = noChange)
+    check "dedup substring" (r3.output = noChange)
 
 let jsBoundary' () =
     check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = VibeFs.Kernel.Domain.MessageAborted)

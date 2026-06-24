@@ -121,12 +121,12 @@ let jobMarkerSpec () =
     let appendCtx = { workspaceRoot = "/tmp/kg-root"; kind = AppendAfterWork }
     let rendered = renderJobMarker appendCtx
     check "renderJobMarker is front matter" (rendered.StartsWith("---\n"))
-    check "renderJobMarker includes type field" (rendered.Contains("type: \"vibe_knowledge_graph_job\""))
+    check "renderJobMarker includes type field" (rendered.Contains("type: vibe_knowledge_graph_job"))
     check "renderJobMarker append round-trips" (tryParseJobMarker rendered = Some appendCtx)
 
     let merged = prependJobMarker appendCtx (buildAppendPrompt "T1" "input" "output" Map.empty)
     check "prependJobMarker keeps front matter form" (merged.StartsWith("---\n"))
-    check "prependJobMarker merges workspaceRoot into prompt front matter" (merged.Contains("workspaceRoot: \"/tmp/kg-root\""))
+    check "prependJobMarker merges workspaceRoot into prompt front matter" (merged.Contains("workspaceRoot: /tmp/kg-root"))
     check "prependJobMarker preserves existing knowledge graph prompt fields" (merged.Contains("existing_knowledge_graph: []"))
     check "prependJobMarker merged prompt still parses" (tryParseJobMarker merged = Some appendCtx)
 

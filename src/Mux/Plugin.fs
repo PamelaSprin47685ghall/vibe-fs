@@ -148,14 +148,14 @@ let private toolExecuteAfter
                 if w <> "" then w else Dyn.str deps "workspaceId"
             knowledgeGraphRuntime.StartBookkeeperAppend(
                 bookkeeperInput input,
-                originalOutput,
+                VibeFs.Kernel.ToolOutputInfo.bodyForBookkeeper originalOutput,
                 tool,
                 config = createObj
                     [ "sessionID", box sessionID
                       "directory", box dir
                       "workspaceId", box workspaceId
                       "taskService", box (Dyn.get deps "taskService") ])
-            setOutput output (VibeFs.Kernel.MagicTodo.withTodoHint originalOutput)
+            setOutput output (VibeFs.Kernel.ToolOutputInfo.withBookkeepingHints originalOutput)
     }
 
 let createRegistration (deps: obj) : obj =

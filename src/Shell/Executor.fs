@@ -183,16 +183,16 @@ let missingExecutableFor (language: ExecutorLanguage) : string =
     | Javascript -> "npx"
     | Shell -> if isWindows () then "powershell.exe" else "bash"
 
+let private partialStdout (output: string) =
+    if output = "" then "(no output before termination)" else output
+
 let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcome: RunOutcome)
                : ExecuteResult =
     match outcome with
     | TimedOut _ ->
-        let partial = if output = "" then "(no output before timeout)" else output
-        let suffix = $"\n[executor] Killed after {timeout}ms ({options.timeoutType}). Partial output returned."
-        Truncated(output = (partial + suffix).Trim(), timeoutType = options.timeoutType)
+        Truncated(output = partialStdout output, timeoutType = options.timeoutType)
     | Signaled(signal, _, _) ->
-        let partial = if output = "" then "(no output before signal)" else output
-        Failed((partial + $"\n[executor] Killed by signal {signal}.").Trim(), None, Some signal)
+        Failed(partialStdout output, None, Some signal)
     | Exited(0, _, _) ->
         let body = if output = "" then "(no output)" else output
         Completed(body, 0)

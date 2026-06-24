@@ -7,7 +7,7 @@ open VibeFs.Shell
 
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicTodo
-open VibeFs.Kernel.Methodology
+open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Shell.Dyn
 
@@ -76,4 +76,4 @@ let mimoTodoTool (_pluginCtx: obj) : obj =
             else
                 match decodeTodoItems args with
                 | Error error -> resolveStr error
-                | Ok _ -> resolveStr (todoResultText methodologies))
+                | Ok _ -> resolveStr (todoWriteOutput methodologies false))

@@ -1,6 +1,7 @@
 module VibeFs.Kernel.FuzzyQuery
 
 open System.Text.RegularExpressions
+open VibeFs.Kernel.ToolOutputInfo
 
 let private escapeRegex (pattern: string) : string =
     let escapeChar (m: Match) = "\\" + m.Value
@@ -51,13 +52,9 @@ type FuzzyGrepState =
 type SearchOutcome = { output: string; isError: bool }
 
 let buildGrepOutput (body: string) (regexError: string option) (nextIterator: string) : string =
-    let notices =
-        [
-            regexError |> Option.map (fun error -> sprintf "Invalid regex: %s, used literal match" error)
-            if nextIterator <> "" then Some(sprintf "iterator=\"%s\"" nextIterator) else None
-        ]
-        |> List.choose id
-    if notices.IsEmpty then body
-    else
-        let joined = String.concat ". " notices
-        sprintf "%s\n\n[%s]" body joined
+    let body' =
+        match regexError with
+        | Some error -> body + "\n\nInvalid regex: " + error + ", used literal match"
+        | None -> body
+    if nextIterator = "" then body'
+    else withIterator body' nextIterator
