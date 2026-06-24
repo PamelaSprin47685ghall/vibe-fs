@@ -83,7 +83,6 @@
 {"id":"b503","entity":["架构测试","宿主适配"],"fact":"Opencode HookSchema 方法论字段构建逻辑由宿主 Schema 层收敛至内核 Protocol 层，消除宿主特异性实现细节，确保枚举约束与描述文案的跨层一致性。"}
 {"id":"0bb2","entity":["工具模式","协议收敛"],"fact":"Opencode HookSchema.selectMethodologyFieldDescription 文案修正：在 methodologyCatalog 前追加换行符（\\n\\n），消除提示词与前文指令的粘连，确保方法论选择指令与目录内容的视觉层级分离，提升模型解析意图的清晰度。"}
 {"id":"0bb2","entity":["工具模式","协议收敛"],"fact":"Opencode HookSchema.buildZodMethodologyField 废弃手写 Zod 组装（zEnum+zArray+min+describe+optional），改引内核 Methodology.enumArrayMinOpt 统一编码器；方法论字段构建逻辑由宿主 Schema 层收敛至内核 Protocol 层，消除宿主特异性实现细节，确保枚举约束与描述文案的跨层一致性。本次补丁同步精简 selectMethodologyFieldDescription 文案尾随换行符，维持描述紧凑性。"}
-{"id":"7a39","entity":["产品需求","工作区文档"],"fact":"worktree-refactor 根 PRD.md 为 Magic Todo 与方法论合并 SSOT：流程仍为 suggest→等真实 todowrite/task→下轮抑制；调用目标由独立 select_methodology 改为 todowrite 可选字段。探针段落须与旧 MUST 句同构改写（保留 methodologies 原文句与 system 包裹、SHOULD+可跳过），避免文案漂移。硬约束「投影前无条件剥离全部旧 probe」与失败策略「历史旧 probe 不报错、投影静默剥离」。验收含：输入残留多个旧 probe 时先全剥离再按规则最多追加一个新 probe。"}
 {"id":"fcb4","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs 中 methodologyToolResultText 废弃固定文案，改为接收 methodologies 列表参数并动态生成确认响应；空列表校验抛出 invalidArg。测试 MethodologyTests.fs 同步更新为单例与多例断言，验证动态格式化契约。"}
 {"id":"34be","entity":["工具模式","协议收敛"],"fact":"Opencode HookSchema.buildZodMethodologyField 废弃手写 Zod 组装，改引内核 Methodology.enumArrayMinOpt 统一编码器；方法论字段构建逻辑由宿主 Schema 层收敛至内核 Protocol 层，消除宿主特异性实现细节，确保枚举约束与描述文案的跨层一致性。本次补丁同步精简 selectMethodologyFieldDescription 文案尾随换行符，维持描述紧凑性。"}
 {"id":"8e44","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs 中 methodologyToolResultText 废弃固定文案，改为接收 methodologies 列表参数并动态生成确认响应；空列表校验抛出 invalidArg。测试 MethodologyTests.fs 同步更新为单例与多例断言，验证动态格式化契约。"}
@@ -109,11 +108,6 @@
 {"id":"178a","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs 中 methodologyToolResultText 废弃固定文案，改为接收 methodologies 列表参数并动态生成确认响应；空列表校验抛出 invalidArg。测试 MethodologyTests.fs 同步更新为单例与多例断言，验证动态格式化契约。"}
 {"id":"ac6e","entity":["工具模式","协议收敛"],"fact":"Opencode HookSchema.buildZodMethodologyField 废弃手写 Zod 组装，改引内核 Methodology.enumArrayMinOpt 统一编码器；方法论字段构建逻辑由宿主 Schema 层收敛至内核 Protocol 层，消除宿主特异性实现细节，确保枚举约束与描述文案的跨层一致性。本次补丁同步精简 selectMethodologyFieldDescription 文案尾随换行符，维持描述紧凑性。"}
 {"id":"65cb","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs methodologyProbeText 重构：废弃内联固定文案，提取 methodologyProbeInstructionText 常量（含 todowrite 调用指引），probe 文本改为常量拼接；Opencode HookSchema.fs selectMethodologyFieldDescription 同步复用该常量，消除宿主描述文案漂移。"}
-{"id":"758b","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs methodologyProbeText 重构：废弃内联固定文案，提取 methodologyProbeInstructionText 常量（含 todowrite 调用指引），probe 文本改为常量拼接；Opencode HookSchema.fs selectMethodologyFieldDescription 同步复用该常量，消除宿主描述文案漂移。"}
-{"id":"7ac6","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs methodologyProbeText 重构：废弃内联固定文案，提取 methodologyProbeInstructionText 常量（含 todowrite 调用指引），probe 文本改为常量拼接；Opencode HookSchema.fs selectMethodologyFieldDescription 同步复用该常量，消除宿主描述文案漂移。"}
-{"id":"8e44","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs methodologyProbeText 重构：废弃内联固定文案，提取 methodologyProbeInstructionText 常量（含 todowrite 调用指引），probe 文本改为常量拼接；Opencode HookSchema.fs selectMethodologyFieldDescription 同步复用该常量，消除宿主描述文案漂移。"}
-{"id":"906b","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs methodologyProbeText 重构：废弃内联固定文案，提取 methodologyProbeInstructionText 常量（含 todowrite 调用指引），probe 文本改为常量拼接；Opencode HookSchema.fs selectMethodologyFieldDescription 同步复用该常量，消除宿主描述文案漂移。"}
-{"id":"fcb4","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs methodologyProbeText 重构：废弃内联固定文案，提取 methodologyProbeInstructionText 常量（含 todowrite 调用指引），probe 文本改为常量拼接；Opencode HookSchema.fs selectMethodologyFieldDescription 同步复用该常量，消除宿主描述文案漂移。"}
 {"id":"0e3c","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs 中 methodologyToolResultText 废弃固定文案，改为接收 methodologies 列表参数并动态生成确认响应；空列表校验抛出 invalidArg。测试 MethodologyTests.fs 同步更新为单例与多例断言，验证动态格式化契约。"}
 {"id":"9e54","entity":["工具模式","协议收敛"],"fact":"Opencode HookSchema.buildZodMethodologyField 废弃手写 Zod 组装，改引内核 Methodology.enumArrayMinOpt 统一编码器；方法论字段构建逻辑由宿主 Schema 层收敛至内核 Protocol 层，消除宿主特异性实现细节，确保枚举约束与描述文案的跨层一致性。本次补丁同步精简 selectMethodologyFieldDescription 文案尾随换行符，维持描述紧凑性。"}
 {"id":"a43e","entity":["代码补丁","空操作"],"fact":"补丁文件 .codex-noop 仅含空内容，用于触发空操作或无变更提交，不引入实际逻辑修改。"}
@@ -129,7 +123,6 @@
 {"id":"2aa4","entity":["方法论探针","提示词重构"],"fact":"内核 Methodology.fs methodologyProbeInstructionText 提取为常量：源自 methodologyProbeText 剥离 <important> 标签；selectMethodologyFieldDescription 复用该常量，消除宿主描述文案漂移。"}
 {"id":"246f","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs 中 methodologyProbeText 重构：废弃内联固定文案，提取 methodologyProbeInstructionText 常量（含 todowrite 调用指引），probe 文本改为常量拼接；Opencode HookSchema.fs selectMethodologyFieldDescription 同步复用该常量，消除宿主描述文案漂移。"}
 {"id":"2edd","entity":["方法论探针","抑制条件"],"fact":"Kernel Methodology.fs stripSyntheticBySource 对 methodology probe 的判定由 MUST 改为 SHOULD（Now you MUST Call → Now you SHOULD Call），消除旧版硬阻塞表述，与投影层静默剥离纪律对齐。"}
-{"id":"f75b","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs methodologyProbeText 废弃 MUST 句，改为 SHOULD，消除旧版硬阻塞表述，与投影层静默剥离纪律对齐。"}
 {"id":"f75b","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs methodologyProbeText 废弃 MUST 句，改为 SHOULD，消除旧版硬阻塞表述，与投影层静默剥离纪律对齐。"}
 {"id":"0f35","entity":["方法论探针","提示词重构"],"fact":"内核 Methodology.fs 中 selectMethodologyFieldDescription 由单行描述扩展为多行：追加选择依据（按定义而非关键词氛围）与目录常量引用，支撑 todowrite 可选 methodology 字段的宿主契约落地。"}
 {"id":"0464","entity":["宿主适配","工具装配"],"fact":"Mux/Opencode 共用 Wrappers.createAllWrappers(tools, hostReadExec) 与 createAllWrappersFor(host, tools, hostReadExec) 三参形态；agent_report 覆盖不再依赖 CallStore 实例注入。装配点须与删参后的签名一致否则 FS0039；mkAgentReportOverride 与 mkTodoWriteWrapper、mkFileReadCapture 同列于 createAllWrappersFor 返回数组。"}
@@ -267,12 +260,9 @@
 {"id":"0748","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
 {"id":"d7b2","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
 {"id":"f75b","entity":["方法论探针","提示词纪律"],"fact":"内核 Methodology.fs methodologyProbeText 指令文本由「Now you SHOULD Call the todowrite tool to update todos and select_methodology」修正为「unless no progress」，明确进度停滞时的豁免条件，与投影层静默剥离旧 probe 纪律同向，消除无进展时的冗余调用引导。"}
-{"id":"c4d2","entity":["知识图谱持久化","事件重写","质量控制"],"fact":"kg NDJSON 遇 Git 冲突标记须全文件剔除后方可投影与 bookkeeper 追加；add/add 消解分日：rewrite/日终快照类按 id 并集去重保留末写内容；append/日内事件流类按序并集保留全部事件行。冲突解析器将 >>>>>>> 之后之 post 段行并入保留集以免丢冲突期间已落盘之 append。机械合并后须断言无残留标记、header 可解析、各事实行 JSON 合法。"}
-{"id":"1305","entity":["方法论探针","提示词纪律"],"fact":"内核统一 Fuzzy.fs 已删；行数债务由 Shell 模糊主编排层承担，TypedIteratorStore 等拆独立切片后主编排约二百一十行低于约二百五十行阈值；Mux HostTools 迁出 per-session 执行器后 wc 约二百五十行贴沿；Mux 图谱主编排外提 IO 后约二百四十八行。续验收以当次 wc 与 fileBodyUnder250 探针为准。"}
 {"id":"ecb8","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
 {"id":"501d","entity":["构建管线","工作区文档"],"fact":"README.md 确认 build-and-test 为单入口：主工程单 fsproj 全量转译（Kernel+Shell+宿主），测试编译与 runner 集成；中间产物 bin/obj 统一 artifacts/，清理指令 rm -rf build artifacts。"}
 {"id":"8a5b","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册新增 build-and-test 脚本入口，原独立 build 步骤保留；测试执行与构建流程分离，build-and-test 为新增中间层操作。"}
-{"id":"ef05","entity":["构建","分层","架构"],"fact":"Kernel/Shell 目录下独立 VibeFs.Kernel.fsproj、VibeFs.Shell.fsproj 已 git 移除；分层源码仍保留，工程文件不再按层拆分，编译项改由仓库根级统一 fsproj 承载。"}
 {"id":"3637","entity":["构建管线","Fable转译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
 {"id":"b8c5","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
 {"id":"89a1","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
@@ -311,18 +301,6 @@
 {"id":"0465","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
 {"id":"b351","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
 {"id":"3403","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luz0ro/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
-{"id":"157c","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
-{"id":"03c1","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
-{"id":"229e","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
-{"id":"2415","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
-{"id":"8888","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
-{"id":"89a1","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
-{"id":"8b2d","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
-{"id":"b8c5","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
-{"id":"bd9a","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
-{"id":"bafb","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
-{"id":"643f","entity":["文件操作","测试项目"],"fact":"tests/VibeFs.Tests.fsproj 已从工作区移除，测试项目结构简化。"}
-{"id":"e826","entity":["文件操作","测试项目"],"fact":"tests/VibeFs.Tests.fsproj 已从工作区移除，测试项目结构简化。"}
 {"id":"4343","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
 {"id":"dc50","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
 {"id":"25e9","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
@@ -345,25 +323,17 @@
 {"id":"1a3c","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
 {"id":"445b","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
 {"id":"5c83","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
-{"id":"f75b","entity":["方法论探针","提示词纪律"],"fact":"内核 Methodology.fs methodologyProbeText 指令文本由「Now you SHOULD Call the todowrite tool to update todos and select_methodology」修正为「unless no progress」，明确进度停滞时的豁免条件，与投影层静默剥离旧 probe 纪律同向，消除无进展时的冗余调用引导。"}
-{"id":"c4d2","entity":["知识图谱持久化","事件重写","质量控制"],"fact":"kg NDJSON 遇 Git 冲突标记须全文件剔除后方可投影与 bookkeeper 追加；add/add 消解分日：rewrite/日终快照类按 id 并集去重保留末写内容；append/日内事件流类按序并集保留全部事件行。冲突解析器将 >>>>>>> 之后之 post 段行并入保留集以免丢冲突期间已落盘之 append。机械合并后须断言无残留标记、header 可解析、各事实行 JSON 合法。"}
-{"id":"1305","entity":["方法论探针","提示词纪律"],"fact":"内核统一 Fuzzy.fs 已删；行数债务由 Shell 模糊主编排层承担，TypedIteratorStore 等拆独立切片后主编排约二百一十行低于约二百五十行阈值；Mux HostTools 迁出 per-session 执行器后 wc 约二百五十行贴沿；Mux 图谱主编排外提 IO 后约二百四十八行。续验收以当次 wc 与 fileBodyUnder250 探针为准。"}
 {"id":"7928","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
 {"id":"c9c8","entity":["构建管线","工作区文档"],"fact":"README.md 确认 build-and-test 为单入口：主工程单 fsproj 全量转译（Kernel+Shell+宿主），测试编译与 runner 集成；中间产物 bin/obj 统一 artifacts/，清理指令 rm -rf build artifacts。"}
 {"id":"4998","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册新增 build-and-test 脚本入口，原独立 build 步骤保留；测试执行与构建流程分离，build-and-test 为新增中间层操作。"}
-{"id":"ef05","entity":["构建","分层","架构"],"fact":"Kernel/Shell 目录下独立 VibeFs.Kernel.fsproj、VibeFs.Shell.fsproj 已 git 移除；分层源码仍保留，工程文件不再按层拆分，编译项改由仓库根级统一 fsproj 承载。"}
 {"id":"c7f7","entity":["构建管线","Fable转译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
 {"id":"2482","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
 {"id":"7491","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
 {"id":"2ae6","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
 {"id":"0d01","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
-{"id":"f75b","entity":["方法论探针","提示词纪律"],"fact":"内核 Methodology.fs methodologyProbeText 指令文本由「Now you SHOULD Call the todowrite tool to update todos and select_methodology」修正为「unless no progress」，明确进度停滞时的豁免条件，与投影层静默剥离旧 probe 纪律同向，消除无进展时的冗余调用引导。"}
-{"id":"c4d2","entity":["知识图谱持久化","事件重写","质量控制"],"fact":"kg NDJSON 遇 Git 冲突标记须全文件剔除后方可投影与 bookkeeper 追加；add/add 消解分日：rewrite/日终快照类按 id 并集去重保留末写内容；append/日内事件流类按序并集保留全部事件行。冲突解析器将 >>>>>>> 之后之 post 段行并入保留集以免丢冲突期间已落盘之 append。机械合并后须断言无残留标记、header 可解析、各事实行 JSON 合法。"}
-{"id":"1305","entity":["方法论探针","提示词纪律"],"fact":"内核统一 Fuzzy.fs 已删；行数债务由 Shell 模糊主编排层承担，TypedIteratorStore 等拆独立切片后主编排约二百一十行低于约二百五十行阈值；Mux HostTools 迁出 per-session 执行器后 wc 约二百五十行贴沿；Mux 图谱主编排外提 IO 后约二百四十八行。续验收以当次 wc 与 fileBodyUnder250 探针为准。"}
 {"id":"3dba","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
 {"id":"f9dd","entity":["构建管线","工作区文档"],"fact":"README.md 确认 build-and-test 为单入口：主工程单 fsproj 全量转译（Kernel+Shell+宿主），测试编译与 runner 集成；中间产物 bin/obj 统一 artifacts/，清理指令 rm -rf build artifacts。"}
 {"id":"9431","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册新增 build-and-test 脚本入口，原独立 build 步骤保留；测试执行与构建流程分离，build-and-test 为新增中间层操作。"}
-{"id":"ef05","entity":["构建","分层","架构"],"fact":"Kernel/Shell 目录下独立 VibeFs.Kernel.fsproj、VibeFs.Shell.fsproj 已 git 移除；分层源码仍保留，工程文件不再按层拆分，编译项改由仓库根级统一 fsproj 承载。"}
 {"id":"b6d0","entity":["构建管线","Fable转译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
 {"id":"5fdb","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
 {"id":"a734","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
@@ -387,13 +357,9 @@
 {"id":"ec71","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
 {"id":"c8fe","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
 {"id":"9d61","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
-{"id":"f75b","entity":["方法论探针","提示词纪律"],"fact":"内核 Methodology.fs methodologyProbeText 指令文本由「Now you SHOULD Call the todowrite tool to update todos and select_methodology」修正为「unless no progress」，明确进度停滞时的豁免条件，与投影层静默剥离旧 probe 纪律同向，消除无进展时的冗余调用引导。"}
-{"id":"c4d2","entity":["知识图谱持久化","事件重写","质量控制"],"fact":"kg NDJSON 遇 Git 冲突标记须全文件剔除后方可投影与 bookkeeper 追加；add/add 消解分日：rewrite/日终快照类按 id 并集去重保留末写内容；append/日内事件流类按序并集保留全部事件行。冲突解析器将 >>>>>>> 之后之 post 段行并入保留集以免丢冲突期间已落盘之 append。机械合并后须断言无残留标记、header 可解析、各事实行 JSON 合法。"}
-{"id":"1305","entity":["方法论探针","提示词纪律"],"fact":"内核统一 Fuzzy.fs 已删；行数债务由 Shell 模糊主编排层承担，TypedIteratorStore 等拆独立切片后主编排约二百一十行低于约二百五十行阈值；Mux HostTools 迁出 per-session 执行器后 wc 约二百五十行贴沿；Mux 图谱主编排外提 IO 后约二百四十八行。续验收以当次 wc 与 fileBodyUnder250 探针为准。"}
 {"id":"052c","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
 {"id":"1345","entity":["构建管线","工作区文档"],"fact":"README.md 确认 build-and-test 为单入口：主工程单 fsproj 全量转译（Kernel+Shell+宿主），测试编译与 runner 集成；中间产物 bin/obj 统一 artifacts/，清理指令 rm -rf build artifacts。"}
 {"id":"ba61","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册新增 build-and-test 脚本入口，原独立 build 步骤保留；测试执行与构建流程分离，build-and-test 为新增中间层操作。"}
-{"id":"ef05","entity":["构建","分层","架构"],"fact":"Kernel/Shell 目录下独立 VibeFs.Kernel.fsproj、VibeFs.Shell.fsproj 已 git 移除；分层源码仍保留，工程文件不再按层拆分，编译项改由仓库根级统一 fsproj 承载。"}
 {"id":"8c2c","entity":["构建管线","Fable转译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
 {"id":"d8f7","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
 {"id":"0f6e","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
@@ -421,7 +387,6 @@
 {"id":"1d8a","entity":["Mux.Wrappers.todowrite","refactored implementation"],"fact":"重构后实现：废弃 nudge 追加逻辑，直接返回 Ok (todoResultText methodNames completedWorkReport selectMethodology)，不再拼接硬编码的 Nudge 文本。"}
 {"id":"5625","entity":["Mux.Wrappers.todowrite","patch application"],"fact":"补丁修正 Wrappers.fs todowrite 返回值处理：废弃直接返回 appendMeditatorNudge 结果，改为解析 Dyn 类型；object 类型直接返回，非 object 类型包装为 {success: true, nudge: ...} 对象，消除 F# 类型检查警告。"}
 {"id":"a260","entity":["重构指南","保姆级重构指南"],"fact":"生成保姆级重构指南，确立六项总原则（先语义后形态、先边界后实现、去obj/字符串魔法、纯逻辑前置、编译器站岗、人肉review后置）。路线图分七阶段：A命名纠偏（Magic*→WorkBacklog/SessionProjectionStore等、OllamaClient→WebSearchApi、HostReadExec→HostFunctionCapture、TreeSitterKernel拆分、NudgeHook→SessionLifecycleObserver）、B边界强类型化（obj仅限Codec/Wrapper/Transform/HostAdapter、解码失败显式Result）、C抽公共内核（Mux/Opencode纯逻辑下沉Kernel、宿主仅留glue）、D统一错误模型（Result<'T, DomainError>区分业务失败与系统事故）、E收拢可变状态（显式Session/Workspace Context或Actor串行队列防并发串写）、F拆KnowledgeGraphRuntime（State/Storage/Workflow三层解耦、剔除测试后门）、G重塑工具DI（强类型ToolArgs+IToolContext+Async<ToolResult>替代巨型obj硬读）。验收标准覆盖命名可读性、边界纯洁性、重复代码消除、错误可枚举性、状态隔离性、KG可测试性及工具签名清晰度。回滚策略强调先改可逆层（命名→适配→核心）、单次只碰一个语义块、保留过渡Wrapper。"}
-{"id":"5625","entity":["Mux.Wrappers.todowrite","patch application"],"fact":"补丁修正 Wrappers.fs todowrite 返回值处理：废弃直接返回 appendMeditatorNudge 结果，改为解析 Dyn 类型；object 类型直接返回，非 object 类型包装为 {success: true, nudge: ...} 对象，消除 F# 类型检查警告。"}
 {"id":"2230","entity":["Mux.Wrappers.todowrite","返回值处理"],"fact":"重构 todowrite 执行后处理逻辑：废弃直接返回 appendMeditatorNudge 结果，改为解析 Dyn 类型；object 类型直接返回，非 object 类型包装为 {success: true, nudge: ...} 对象，消除 F# 类型检查警告。"}
 {"id":"1ba5","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
 {"id":"efeb","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
@@ -469,8 +434,6 @@
 {"id":"63f6","entity":["工具限制","执行策略"],"fact":"当前环境仅提供 invalid、return_bookkeeper、todowrite 三个工具，无 read/investigator/coder/bash 等文件操作能力。重构需等待工具能力恢复后由后续会话执行。所有测试文件需添加 open Expecto 和 open Expecto.Expectations 引入。"}
 {"id":"65cb","entity":["内核方法论文档"],"fact":"内核 Methodology.fs 重构：提取 methodologyProbeInstructionText 常量，由 methodologyProbeText 剥离 <hint> 标签生成；methodologyProbeText 改为常量拼接，消除宿主页描述文案漂移。"}
 {"id":"1b58","entity":["消息投影","探针剥离"],"fact":"MessageTransform 重构：废弃 typedMessagesWithoutProbes 显式过滤与 stripSyntheticBySource 仅过滤探针的弱契约，改为 stripSyntheticBySource 作用于 decodeMessages 原始输出（typedMessages），在构建 backlog 前完成全部合成事件剥离；投影层移除 withProbe 条件追加分支，统一 replaceArrayInPlace messagesArr final，消除探针残留与 backlog 重建间的状态分歧。"}
-{"id":"0521","entity":["审查提示词","模块边界"],"fact":"内核 ReviewPrompts 已删除 reviewerVerdictPrompt(subject, fields) 组合函数体；verdict 向 reviewer 的下发文案改仅经 reviewSubmissionFields 拼装字段列表后由 reviewSubmissionVerdictPrompt、reviewSubmissionDoubleCheckPrompt 等既有入口引用，与 reviewerPromptFrontMatter 仅入参 fields、无 callId 标量及 b1bd 三入口不收 callId 之契约同向。ReviewTests.muxReviewerVerdictPromptFormat 以三参 reviewSubmissionVerdictPrompt 锁 front matter 含 role:reviewer 与 task 块且 YAML 不得出现 call_id 字段。仍登记 KernelPromptSpecs.reviewerVerdictPromptsShared 或四参以上旧签名者须改引存活 API 否则 FS0039。"}
-{"id":"2059","entity":["端到端测试","方法论探针","消息重放"],"fact":"纵深防御不变：合成探针不得进 session 历史/UI/导出/SDK；stripSyntheticBySource 剔除 methodology-probe- 等前缀。验收矩阵除「催/抑制 completed todowrite/task」外须覆盖「投影输入含一个或多个残留旧 probe→先全剥离→再最多追加一个新 probe」。Mux/Opencode 重投影 id 不得残留合成前缀。旧历史独立 select_methodology 工具结果只读兼容，新流程不产该独立记录。"}
 {"id":"f8c4","entity":["方法论探针","内核逻辑"],"fact":"内核 Methodology.fs 移除探针生成与探测逻辑：删除 shouldAppendMethodologyProbe、buildProbeMessage、isMethodologyProbeMessage 函数及 selectMethodologyFieldDescription 中 methodologyCatalog 拼接部分，探针逻辑由宿主或投影层接管，内核仅保留常量与纯函数。"}
 {"id":"e41b","entity":["消息投影","探针剥离"],"fact":"MessageTransform 重构：废弃 typedMessagesWithoutProbes 显式过滤与 stripSyntheticBySource 仅过滤探针的弱契约，改为 stripSyntheticBySource 作用于 decodeMessages 原始输出（typedMessages），在构建 backlog 前完成全部合成事件剥离；投影层移除 withProbe 条件追加分支，统一 replaceArrayInPlace messagesArr final，消除探针残留与 backlog 重建间的状态分歧。"}
 {"id":"0230","entity":["知识图谱","作业标记"],"fact":"知识图谱作业标记解析弃用 defaultValue 空串，改用双 Some+Trim 非空门禁，防范空字符串导致的前言元数据解析歧义。"}
@@ -484,7 +447,6 @@
 {"id":"c15a","entity":["方法论","工具响应"],"fact":"内核 Methodology.fs methodologyToolResultText 与 todoResultText 确认文案重构：废弃 'How to proceed...' 句式，改为 'First, recall the procedures for [...] to confirm understanding, then continue with the next work step.'，强化方法论执行前的程序回忆与理解确认纪律。"}
 {"id":"240a","entity":["集成测试","模块边界"],"fact":"IntegrationToolTests 移除方法论探针相关 spec 注册（opencodeMethodologyProbe* 系列），仅保留 compaction 与 knowledgeGraphPrelude 基础规约；断言契约与工具目录精简同向。"}
 {"id":"c493","entity":["诊断进展","测试失败"],"fact":"Vibe-FS 项目测试 3060 pass / 6 fail。已知故障：1. Wrappers.fs 行数超标被 fileBodyUnder250 门禁拦截；2. Methodology 动态文案断言失配；3. IntegrationEventTests 运行时 TypeError。因工具受限，暂无法直接读取文件或执行测试命令。"}
-{"id":"db4c","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
 {"id":"a993","entity":["知识图谱","作业标记"],"fact":"严格解析逻辑已全面覆盖，消除了 TryParse 带来的边缘情况隐患。"}
 {"id":"4eed","entity":["知识图谱","作业标记"],"fact":"严格解析逻辑已全面覆盖，消除了 TryParse 带来的边缘情况隐患。"}
 {"id":"2d17","entity":["知识图谱","作业标记"],"fact":"严格解析逻辑已全面覆盖，消除了 TryParse 带来的边缘情况隐患。"}
@@ -530,7 +492,6 @@
 {"id":"d727","entity":["宿主适配","工具装配"],"fact":"Mux toolExecuteAfter 钩子签名已修正：由仅传 knowledgeGraphRuntime 与 input/output，改为传入 deps 以消费 toolNames 等上下文依赖。"}
 {"id":"24e4","entity":["会话续推","Nudge","合成事件过滤"],"fact":"decideNudge 锚为历史 alreadyNudged（末 completed 助手后尾随 nudge-prompt user），非进程计数，重启安全。Opencode Nudge 三分：NudgeEventCodec / Effect / Hook；abort 判定经 Shell.ErrorClassify 在编排层 open，非编解码文件传递。"}
 {"id":"c15a","entity":["方法论","提示词契约"],"fact":"内核 Methodology.fs methodologyToolResultText 与 todoResultText 确认文案重构：废弃 'First, recall the procedures for [...] to confirm understanding, then continue with the next work step.' 句式，改为 'Great! Now please explain how to apply [...] to the work step.'，强化方法论执行前的程序回忆与理解确认纪律。"}
-{"id":"6f8a","entity":["集成测试","模块边界"],"fact":"IntegrationBookkeeperSpecs 重构：废弃硬编码 Nudge 追加，改为调用内核 Methodology.todoResultText 动态生成确认文案；通过 Dyn 解析 args.select_methodology 获取方法论列表，确保宿主返回值与内核方法论契约对齐。"}
 {"id":"0188","entity":["权限矩阵","子代理"],"fact":"AgentTests 对 investigator 代理的 todowrite 权限门控由 denied 改为 allowed，消除 investigator 身份对 todo 工具的隐性排斥，与 Config.fs 无条件放行 todo 匹配的门控同向。"}
 {"id":"e9ce","entity":["权限矩阵","meditator代理"],"fact":"meditator代理获得todowrite工具调用许可，消除身份隐性排斥。"}
 {"id":"6329","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
@@ -688,22 +649,11 @@
 {"id":"c366","entity":["OMP宿主适配","测试归属"],"fact":"行为测试落 vibe-fs tests/：移植 vibe-omp/src/test/plugin.test.ts 断言为 tests/OmpPluginTests.fs（按需拆 OmpCapsTests/OmpFuzzyTests/OmpReviewTests），注册进 tests/Tests.fs，由 node tests/runner.js 执行。架构门禁落 tests/ArchitectureTests.fs。src/Omp/ 下不放测试文件。需活 host 的子会话用瘦假 pi 保持 hermetic。"}
 {"id":"4246","entity":["OMP宿主适配","验收口径"],"fact":"v1 done 判定：Parity 矩阵每行在 OmpPluginTests 有对应断言且全绿；ompNoEngineRef/ompNoOpencodeRef/ompNoMuxRef 全绿；src/Omp 所有文件 ≤300 行、无 TODO/FIXME/HACK、无 Dictionary；npm run build-and-test 全管线通过；build/src/Omp/Plugin.js 可被 pi host 以 default 加载。"}
 {"id":"1469","entity":["OMP宿主适配","迁移切片"],"fact":"迁移顺序保留 7 切：1)立围栏(空壳+门禁) → 2)纯 codec(Schema/Codec/MessagingCodec) → 3)无状态工具(fuzzy/web) → 4)caps/syntax → 5)权限/子代理/runner → 6)review/nudge → 7)prune 脆弱补丁。每片可编译可测过门禁。"}
-{"id":"88c3","entity":["OMP宿主适配","模块结构"],"fact":"OMP 适配层规划 15 模块：PiResolve、Schema、Codec、MessagingCodec、ChildSession、FuzzyTools、WebTools、RunnerTools、SubagentTools、ReviewTools、MessageTransform、SessionLifecycle、EventHooks、Tools、Plugin。每文件单一职责，≤300行。"}
 {"id":"6524","entity":["OMP宿主适配","分层架构"],"fact":"OMP 适配层仅依赖 Kernel+Shell，禁止引用 Opencode/Mux/engine。语义复用 Kernel，副作用收敛 Shell，OMP 只做协议转换。"}
 {"id":"88c3","entity":["OMP宿主适配","模块结构"],"fact":"OMP 适配层规划 14 模块：PiResolve、Schema、Codec、MessagingCodec、ChildSession、FuzzyTools、WebTools、RunnerTools、SubagentTools、ReviewTools、MessageTransform、SessionLifecycle、Tools、Plugin。每文件单一职责，≤300行。"}
 {"id":"547f","entity":["OMP宿主适配","迁移切片"],"fact":"迁移顺序 7 切：1)立围栏(空壳+门禁) → 2)纯 codec(Schema/Codec/MessagingCodec) → 3)无状态工具(fuzzy/web) → 4)caps/syntax → 5)权限/子代理/runner → 6)review/nudge → 7)prune 隔离补丁。每片可编译可测过门禁。"}
 {"id":"d3e5","entity":["OMP宿主适配","命名映射"],"fact":"host→canonical 映射唯一收敛点 Omp/SubagentTools.fs：editor→coder, greper→investigator, reverie→meditator, browse→browser。不因 OMP UX 名改 Kernel canonical 角色。"}
 {"id":"d6da","entity":["OMP宿主适配","工具裁剪"],"fact":"主会话判定：active 集含 editor/greper/reverie/browse 即判为主会话。主会话恒剥离 bash；剥离 child-only 集含 find/edit/write/lsp/fuzzy_find/fuzzy_grep/runner_wait/runner_abort/submit_review_result/search/glob/ast_edit/ast_grep。裁剪规则放 Kernel.ToolPermission/Kernel.HostTools，OMP 只负责调用。"}
-{"id":"e093","entity":["OMP宿主适配","Parity矩阵"],"fact":"v1 parity 矩阵覆盖 14 工具+7 事件/补丁；工具含 fuzzy_find/fuzzy_grep/websearch/webfetch/runner/runner_wait/runner_abort/submit_review/submit_review_result 及 editor/greper/reverie/browse 四子代理映射；事件含 before_agent_start/tool_result/agent_end/session_start/session_shutdown/启动猴补丁/插件装配。KG/backlog 不入矩阵。新增工具须同时补矩阵行+OmpPluginTests 断言+Kernel 语义分类。"}
-{"id":"cb5e","entity":["OMP宿主适配","禁止事项"],"fact":"禁止清单定稿：不 TS 回流、不造统一巨型宿主抽象、不把 Dyn/obj 越过边界送进 Kernel、不重抄内核常量/提示词/策略、不给缺失能力加静默 fallback、不把 prune 做成长期核心依赖。"}
-{"id":"a1f0","entity":["OMP宿主适配","测试门禁"],"fact":"测试门禁定稿：宿主互斥(OMP 不得反向引用 Opencode/Mux)、常量不复制、fuzzy 迭代 cursor 单次消费、webfetch 拒私网/受限地址、caps 预算/排除/幂等、session_start 裁剪稳定、agent_end runner 优先于 loop、submit_review_result null/空白/文本三态稳定。"}
-{"id":"4246","entity":["OMP宿主适配","验收口径"],"fact":"v1 done 判定：Parity 矩阵每行在 OmpPluginTests 有对应断言且全绿；ompNoEngineRef/ompNoOpencodeRef/ompNoMuxRef 全绿；src/Omp 所有文件 ≤300 行、无 TODO/FIXME/HACK、无 Dictionary；npm run build-and-test 全管线通过；build/src/Omp/Plugin.js 可被 pi host 以 default 加载。"}
-{"id":"7741","entity":["OMP宿主适配","Fable产物"],"fact":"src/Omp/ 前缀 VibeFs.Omp.*；入口 VibeFs.Omp.Plugin 暴露唯一 [<ExportDefault>] 工厂 kunweiExtension(pi:obj):JS.Promise<unit>，WeakSet<pi> 守幂等。产物 build/src/Omp/Plugin.js；package.json 加 ./omp 子路径导出。pi 基址解析归 Omp/PiResolve.fs，缺失即抛错。构建命令不变：npm run build-and-test。"}
-{"id":"c366","entity":["OMP宿主适配","测试归属"],"fact":"行为测试落 vibe-fs tests/：移植 vibe-omp/src/test/plugin.test.ts 断言为 tests/OmpPluginTests.fs（按需拆 OmpCapsTests/OmpFuzzyTests/OmpReviewTests），注册进 tests/Tests.fs，由 node tests/runner.js 执行。架构门禁落 tests/ArchitectureTests.fs。src/Omp/ 下不放测试文件。需活 host 的子会话用瘦假 pi 保持 hermetic。"}
-{"id":"63a5","entity":["OMP宿主适配","v1范围边界"],"fact":"v1 范围内：仅读 host 原生 todo_read/todo_write phases 作 loop nudge 输入信号，todo 工具保留主会话。v1 范围外：不做 WorkBacklog/BacklogProjection 折叠，不强制 completedWorkReport，不做 todo→backlog 投影；不接 knowledge graph（无 kg/ 门控、无 knowledge_graph_fetch、无 return_bookkeeper、无 bookkeeper runtime、无 KG MessageTransform prelude）。"}
-{"id":"c7d2","entity":["OMP宿主适配","v1不做清单"],"fact":"不做 TS 重写，不保留 vibe-me-engine 依赖；不把 obj/Dyn 越过 Kernel 边界；不在 Omp/ 重抄内核常量/提示词/方法论目录/权限矩阵/审查文案；不给缺失能力加静默兜底（pi 基址缺失/browser 缺失显式报错）；不把 prune 猴补丁抬成核心依赖；不把三宿主同名文件强并成共享协议层；不因 OMP UX 名改 Kernel canonical 角色；不把 OMP 专属 typebox schema 渗进 Kernel。"}
-{"id":"bb6b","entity":["OMP宿主适配","架构门禁"],"fact":"静态门禁：ompNoOpencodeRef/ompNoMuxRef/opencodeNoOmpRef/muxNoOmpRef（宿主间零互引）、src/Omp 纳入≤300行+无 Dictionary+无 TODO/FIXME/HACK、ompUsesSharedCapsBuilder（禁本地构 caps）、ompMessageTransformUsesShellCapsCache、ompUsesSubagentToolPolicy（禁本地 child-only/role-toolset 硬编码）、ompReviewUsesKernelVerdict（禁本地实现 null/空白=accept）、ompNoForkedConstants（禁内核常量/长提示词字面量）。行为契约：伪 pi 录所有 registerTool/on/registerCommand/sendMessage，移植 plugin.test.ts 到 F# 集成测。"}
-{"id":"95c1","entity":["OMP宿主适配","跨宿主一致性"],"fact":"一组 Kernel 级测试断言 Opencode/Mux/OMP 三家对同一输入走同一 Kernel 入口、得同一 ReviewSession/Nudge/Caps/权限判定。这是行为层面证明共享语义不共享协议的核心护栏，防止各自分叉出隐藏 if/else。"}
 {"id":"b329","entity":["OMP宿主适配","工具裁剪"],"fact":"session_start 工具裁剪源由 Kernel.ToolPermission+Kernel.HostTools 改为新增 Kernel.OmpSessionTools 独立编译单元，承载 ompSubagentToolNames/ompChildOnlyToolNames/ompAlwaysStripToolNames/filterOmpMainSessionActiveTools 四函数。"}
 {"id":"9232","entity":["OMP宿主适配","工具裁剪"],"fact":"主会话剥离 child-only 工具集新增 browser；裁剪规则判定：activeTools 与 ompSubagentToolNames 有交集⇒主会话，否则按子会话处理。"}
 {"id":"c7ab","entity":["OMP宿主适配","子代理参数面"],"fact":"editor/greper/browse 保持 vibe-omp 旧形状：单字段 intent；reverie 保持 intent+files[]；不升级为 Mux 的 intents[] 多意图模型。intent 最终映射到 Kernel canonical 角色与 prompt 组合，不把 OMP UX 名改写进 Kernel。"}
@@ -784,3 +734,157 @@
 {"id":"3906","entity":["审查循环","宿主适配"],"fact":"wip 早退实现已落地 Opencode ReviewTools.fs 与 Mux ReviewToolsMux.fs：锁成功后 optBool args wip = Some true 直接返确认文案，不进入 runSubmitReview/runReviewRound。Opencode 复用 Mux.Wrappers.optBool。Mux 内层 try/with 用 else 包住防 wip 早退后仍执行 let!。"}
 {"id":"10bb","entity":["审查循环","测试覆盖"],"fact":"Mux 集成测试覆盖 submit_review wip=true 路径：muxSubmitReviewWipSkipsReviewerSpec 断言 result=submitReviewWipAcknowledgment、prompts.Count=0、review 仍激活。登记于 IntegrationToolTests 的 muxSubmitReviewTerminatedCleansReviewState 与 muxExecutorFailureDoesNotBookkeep 之间。"}
 {"id":"3906","entity":["审查循环","宿主适配"],"fact":"submit_review wip 参数默认 true（progress-only），缺省或 wip=true 记录进度不启动 reviewer；wip=false 执行完整审查循环。Kernel submitReviewIsWip 共享常量，Opencode/Mux 双宿主接线完成，集成测试覆盖。"}
+{"id":"bcde","entity":["知识图谱持久化","版本控制"],"fact":"kg/2026-06-24.ndjson 追加 13 行新条目后以 chore(kg) 提交至 detached HEAD 43f38bd，工作区脏改清零。"}
+{"id":"cc3e","entity":["工作区文档","方法论探针","工具模式"],"fact":"README.md 特性描述更新：废弃独立方法论探针条目，改为 todowrite 内嵌方法论字段与 bookkeeping 工具输出的 todo 提示，与工具模式收敛契约对齐。"}
+{"id":"65cb","entity":["内核方法论文档","模块边界"],"fact":"Methodology.fs 职责范围：枚举目录、select_methodology 字段文案、todoResultText；不含消息投影探针逻辑（探针逻辑由宿主/投影层接管）。"}
+{"id":"55a7","entity":["前言元数据","YAML编码"],"fact":"YAML 标量编码三阶：纯文本（无特殊字符/无换行/无YAML保留字）→ 双引号转义（含#/:\\等特殊字符）→ 字面块（含换行时）。纯文本门禁覆盖空串、首尾空白、YAML指示符起始、布尔/null/null/文档标记、冒号空格。双引号转义处理反斜杠与引号。字面块每行前缀缩进。"}
+{"id":"8fee","entity":["前言元数据","YAML编码"],"fact":"YAML 解析支持双引号转义值、字面块值、纯文本值三种形态。双引号解析处理 \\\" 与 \\\\ 转义序列。字面块从下一行开始收集连续缩进行直至非缩进行或结束标记。纯文本值直接 trim 使用。"}
+{"id":"2a89","entity":["前言元数据"],"fact":"frontMatter 函数组装 --- 包裹的 YAML 字段列表；frontMatterPrompt 在 frontMatter 后追加正文段落。yamlField 处理单行与多行值；yamlListItemField 处理列表项内字段；yamlSeqField/yamlStringSeqField 处理序列字段。"}
+{"id":"b6e6","entity":["前言元数据","YAML编解码"],"fact":"PromptFrontMatter 新增 yamlNestedField 函数：支持映射条目下的嵌套字段，含换行内容自动缩进为块体，无换行内容内联为标量值。与 yamlListItemField 并列，完善 YAML front-matter 生成能力。"}
+{"id":"b23f","entity":["工具输出模型","结构化元数据"],"fact":"ToolOutputInfo 模块引入 ToolOutputMessage 类型：info 列表（InfoItem DU：Hint/Syntax/Iterator/Status/ExitCode/Signal/BodyRef）+ body 文本。渲染为 YAML front-matter + 正文，支持解析回结构化形式。"}
+{"id":"1f6d","entity":["工具输出模型","标准化引用"],"fact":"ToolOutputBodyRef 密封 DU 定义三种标准化引用标记：SeeBelow、SeeBelowTruncated、NoChangeSincePreviousReadWrite，对应常量 /See Below/、/See Below, Truncated/、/No Change Since Previous Read/Write/。"}
+{"id":"f9a1","entity":["工具输出模型","提示常量"],"fact":"ToolOutputInfo 定义 hintExecutorMisuse、hintTodoRefresh、hintMeditator、hintTodosUpdated、hintMethodologyFollowup 等提示常量，用于工具输出元数据中的 Hint 项。"}
+{"id":"a9ba","entity":["工具输出模型","知识图谱持久化"],"fact":"bodyForBookkeeper 函数从 ToolOutputMessage 中提取纯 body 文本，剥离 YAML front-matter 元数据，确保知识图谱持久化只记录有效内容。"}
+{"id":"aa1d","entity":["工具输出模型","输出信封"],"fact":"noChangeEnvelope 和 seeBelowEnvelope 函数生成标准化输出信封：noChangeEnvelope 返回仅含 NoChangeSincePreviousReadWrite BodyRef 的 front-matter；seeBelowEnvelope 在 BodyRef 后附加正文。"}
+{"id":"55a7","entity":["前言元数据","YAML编码"],"fact":"LoopMessages.fs buildLoopMessage 内 command 字段编码由 yamlScalarField 改为 yamlField，适配多行命令值场景，消除纯文本编码对含换行命令的截断风险。"}
+{"id":"83d3","entity":["前言元数据","YAML编码"],"fact":"LoopMessages.fs buildLoopMessage 内 taskField 使用 yamlField 编码（非 yamlBlockField），因 task 值为单行标量，与 yamlField 处理纯文本/双引号转义标量的职责对齐，yamlBlockField 仅用于含换行的多行块体。"}
+{"id":"f079","entity":["前言元数据","YAML编码"],"fact":"frontMatterPrompt 中 verdictCancelled 字段由 yamlPlainField 改为 yamlField，确保取消裁决值含特殊字符时正确转义，与 YAML 标量编码三阶（纯文本→双引号→字面块）契约对齐。"}
+{"id":"7991","entity":["知识图谱","前言元数据"],"fact":"KnowledgeGraph.fs 作业标记 YAML 字段编码由 yamlScalarField 改为 yamlField，适配多行值与特殊字符场景，与 LoopMessages 等模块的 YAML 编码契约对齐。"}
+{"id":"0132","entity":["前言元数据","YAML编码"],"fact":"KnowledgeGraph.fs 条目列表编码由 yamlScalar 改为 yamlStringValue，与 YAML 标量编码函数命名契约对齐，消除 yamlScalar 与 yamlField/yamlScalarField 命名体系的不一致。"}
+{"id":"498a","entity":["YAML编码","CapsFormat"],"fact":"CapsFormat.fs 中 YAML 标量值编码函数由 yamlScalar 重命名为 yamlStringValue，与 PromptFrontMatter 模块的 yamlField/yamlPlainField 命名体系对齐，消除 CapsFormat 与前言元数据模块间的编码函数命名分歧。"}
+{"id":"30a7","entity":["代码重构","早期退出"],"fact":"ToolOutputInfo.fs 解析 info 列表的复合条件拆分为独立守卫子句：先边界检查再内容匹配，消除 || 短路隐含的控制流耦合，与 KnowledgeGraphTools.fs 的 Guard Clause 惯用法同向。"}
+{"id":"e440","entity":["前言元数据","YAML编码"],"fact":"Kernel 提示词模块（ReviewPrompts/KnowledgeGraphPrompts/SearchPrompts/SubagentPrompts/MagicCore）统一 YAML 编码函数命名：yamlScalarField/yamlPlainField/yamlBlockField 全部替换为 yamlField，yamlScalar 替换为 yamlStringValue，消除跨模块 YAML 编码函数命名不一致。"}
+{"id":"1bf9","entity":["前言元数据","YAML编码"],"fact":"KnowledgeGraphPrompts.fs 实体列表 YAML 编码由 yamlScalar 改为 yamlStringValue，与 KnowledgeGraph.fs、CapsFormat.fs 的 yamlScalar→yamlStringValue 重命名对齐，消除 YAML 标量编码函数命名体系的不一致。"}
+{"id":"49bc","entity":["构建配置","编译清单"],"fact":"vibe-fs.fsproj 新增 src/Kernel/ToolOutputInfo.fs 编译项，位于 PromptFrontMatter.fs 之后，补全工具输出结构化元数据模块的工程登记。"}
+{"id":"42be","entity":["内核","方法论文档","模块边界"],"fact":"Methodology.fs 移除 methodologyToolResultText 与 todoResultText 函数，仅保留 selectMethodologyToolName 常量与 methodologyEnumValues 枚举列表。确认文案生成逻辑由内核层转移至宿主层或投影层接管，内核不再承担方法论确认响应的动态格式化职责。"}
+{"id":"f509","entity":["执行结果模型","输出格式化"],"fact":"Executor.fs 废弃 formatReturnValueBlock 手写 YAML 拼接，改用 executorInfoItems 生成结构化 InfoItem 列表（Status/ExitCode/Signal），formatToolResponse 经 ToolOutputInfo.render 统一渲染为 front-matter + body 输出信封。"}
+{"id":"a9b9","entity":["读去重","工具输出模型"],"fact":"Dedup.deduplicate 去重标记由硬编码字符串 [No Change Since Previous Read/Write] 改为调用 ToolOutputInfo.noChangeEnvelope 生成结构化信封，与工具输出元数据体系对齐。"}
+{"id":"c5ed","entity":["读去重","工具输出模型"],"fact":"Dedup 新增 isNoChangeOutput 函数，通过解析 ToolOutputInfo 的 BodyRef 密封 DU 判断输出是否无变化，消除字符串脆弱匹配。"}
+{"id":"a6a5","entity":["读去重","分层架构"],"fact":"Dedup 模块移除 dedupMarker 常量，去重逻辑完全依赖 ToolOutputInfo 结构化元数据，与 Kernel.MessageDedup 的 foldDedup/processDedup 裁决同向。"}
+{"id":"4e4a","entity":["执行结果模型","输出格式化"],"fact":"Executor.fs prependSafetyWarning 重构：废弃简单字符串前置，改用 ToolOutputInfo 结构化渲染（InfoItem.Hint hintExecutorMisuse + BodyRef SeeBelow），统一 executor 输出信封格式。"}
+{"id":"f509","entity":["执行结果模型","输出格式化"],"fact":"Executor.fs 显式 open ToolOutputInfo，formatToolResponse 经 ToolOutputInfo.render 统一渲染为 front-matter + body 输出信封，废弃手写 YAML 拼接。"}
+{"id":"7041","entity":["执行结果模型","输出格式化"],"fact":"Executor.fs outputForSummary 截断路径移除截断后缀标记，截断至 rawOutputCapBytes 后不再追加 '[Output truncated to 1MB for summarization]' 文案，纯截断无标记。"}
+{"id":"46e5","entity":["Nudge提示词","提示词精简"],"fact":"PromptFragments.fs 移除 meditatorNudge 常量（原文案含 'Think thrice before acting — NOW consider calling meditator tool'），todoNudgePrompt 直接承接，消除冗余 meditator 调用引导。"}
+{"id":"aa1d","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo 新增 parseOrBody 函数：尝试解析结构化 front-matter，失败时回退为纯 body 文本，消除解析异常导致的输出丢失。"}
+{"id":"5ad4","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo 新增 withBookkeepingHints 函数：在输出中追加 todo 刷新提示，标记 BodyRef 为 SeeBelow，用于知识图谱记账后的输出修饰。"}
+{"id":"239f","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo 新增 addSyntax 函数：在输出中追加语法诊断信息，空语法串跳过追加，标记 BodyRef 为 SeeBelow。"}
+{"id":"ecf2","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo 新增 todoWriteOutput 函数：根据方法论列表生成结构化 todowrite 输出，含方法论跟进提示与可选的 meditator 提示，BodyRef 固定为 SeeBelow。"}
+{"id":"a6a5","entity":["读去重","工具输出模型"],"fact":"MessageDedup.foldDedup 去重判定由 result.output = dedupMarker 字符串比对改为 isNoChangeOutput result.output 结构化检查，与 ToolOutputInfo.BodyRef 密封 DU 体系对齐，消除 dedupMarker 常量的最后引用。"}
+{"id":"d40c","entity":["工具输出模型","提示常量"],"fact":"MagicTodo.fs 移除 todoHint 常量与 withTodoHint 组合器；工具描述头部 todowrite 更新提示逻辑由宿主层 nudge 机制接管，不再由 MagicTodo 模块内联注入。"}
+{"id":"2a5b","entity":["MagicTodo","模块边界"],"fact":"MagicTodo.fs 精简：删除 todoHint/withTodoHint 函数及注释，仅保留 toolDescriptionHeader 工具描述头部，与 Magic 前缀重构（MagicTodo→WorkBacklog）同向。"}
+{"id":"1874","entity":["语法诊断","输出信封"],"fact":"HookExecute.fs 语法诊断触发逻辑重构：优先解析 ToolOutputInfo 结构化元数据检查 InfoItem.Syntax 标记，失败时回退 hasSyntaxCheckMarker 字符串探测，消除对脆弱字符串标记的单一依赖。"}
+{"id":"4057","entity":["工具执行后处理","输出净化"],"fact":"Opencode HookExecute.fs 新增 open VibeFs.Kernel.ToolOutputInfo，使工具执行后处理可直接消费 ToolOutputInfo 模块的结构化输出信封类型与提示常量，与 Mux 侧统一输出格式化契约对齐。"}
+{"id":"e0c7","entity":["工具执行后处理","输出格式化"],"fact":"NudgeHook 模块导入依赖由 Methodology 切换为 ToolOutputInfo，工具执行后处理逻辑从动态文案生成迁移至结构化输出信封组装。"}
+{"id":"02dd","entity":["工具执行后处理","输出净化"],"fact":"Opencode HookExecute.fs 工具执行后处理由 MagicTodo.withTodoHint 改为 ToolOutputInfo.withBookkeepingHints，与 MagicTodo 模块精简及 ToolOutputInfo 结构化输出信封体系对齐。"}
+{"id":"e6c7","entity":["NudgeHook","工具输出模型"],"fact":"Opencode NudgeHook.fs todowrite 输出构建废弃手动 nudge 拼接，改调 ToolOutputInfo.todoWriteOutput 生成结构化信封，与工具输出元数据体系对齐。"}
+{"id":"7ac9","entity":["读去重","消息投影"],"fact":"Opencode MessageTransform.fs 去重标记由硬编码 dedupMarker 字符串改为调用 ToolOutputInfo.noChangeEnvelope 生成结构化信封，与工具输出元数据体系对齐，消除 dedupMarker 在 Opencode 宿主层的最后引用。"}
+{"id":"63d8","entity":["读去重","Mux宿主适配"],"fact":"Mux ReadDedup 去重标记由硬编码 dedupMarker 字符串改为调用 ToolOutputInfo.noChangeEnvelope 生成结构化信封，与工具输出元数据体系对齐，消除 dedupMarker 在 Mux 宿主层的最后引用。"}
+{"id":"40b5","entity":["读去重","工具输出模型"],"fact":"Mux ReadDedup.fs 新增 open VibeFs.Kernel.ToolOutputInfo，使读去重模块可直接消费结构化输出信封类型，与 MessageDedup 侧已完成的 isNoChangeOutput 结构化检查对齐，消除 ReadDedup 对硬编码字符串标记的最后依赖。"}
+{"id":"02dd","entity":["工具执行后处理","输出净化"],"fact":"Mux Plugin.fs 与 Opencode HookExecute.fs 工具执行后处理统一由 MagicTodo.withTodoHint 改为 ToolOutputInfo.withBookkeepingHints，与 MagicTodo 模块精简及 ToolOutputInfo 结构化输出信封体系对齐。"}
+{"id":"63d8","entity":["读去重","Mux宿主适配"],"fact":"Mux ReadDedup 去重标记由硬编码 dedupMarker 字符串改为调用 ToolOutputInfo.noChangeEnvelope 生成结构化信封，消除 dedupMarker 在 Mux 宿主层的最后引用。重构完成：dedupMarker 常量已从 Mux ReadDedup 全量消除。"}
+{"id":"4a64","entity":["Mux.Wrappers","nudge消除"],"fact":"appendMeditatorNudge 函数定义已从 Wrappers.fs 源码中删除，该函数曾用于在工具返回值后追加 meditator 调用引导。此前各工具（Router/Mcp/Git/Worker/Lifecycle/Http/Utils/Config/Plan/Meditator/Server/TodoWrite/FSharp/Agent/Process/Linter/Test/Types/apply_path/patch）的返回值处理已逐个改为解析 Dyn 类型，object 直接返回，非 object 包装为 {success:true, nudge:...}。函数体删除是 nudge 追加逻辑从通用包装层彻底移除的最终步骤。"}
+{"id":"0464","entity":["宿主适配","工具装配"],"fact":"Mux Wrappers.fs 导入依赖由 PromptFragments+Methodology 收敛为 ToolOutputInfo，消除宿主对 PromptFragments 与 Methodology 内核模块的直接依赖，与工具输出结构化信封体系对齐。"}
+{"id":"1d8a","entity":["Mux.Wrappers.todowrite","工具输出模型"],"fact":"todowrite 返回值构建由 todoResultText+nudge 拼接改为 ToolOutputInfo.todoWriteOutput 结构化信封，消除宿主层手动 nudge 构造，与工具输出元数据体系对齐。"}
+{"id":"9fee","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo 新增 withIterator 函数：非空迭代器字符串时渲染 InfoItem.Iterator + BodyRef SeeBelow 结构化信封，空字符串直接返回原 body。"}
+{"id":"8052","entity":["模糊搜索","输出信封"],"fact":"FuzzySearch.fs 迭代器输出由 sprintf 手动拼接改为 ToolOutputInfo.withIterator 结构化信封，消除字符串格式化的偶然复杂度，与工具输出元数据体系对齐。"}
+{"id":"b573","entity":["工具输出信封","语法诊断"],"fact":"Mux Wrappers.fs 语法诊断追加由直接字符串拼接或注入 syntax_diagnostics 键改为调用 ToolOutputInfo.addSyntax 结构化包装：string 结果整体包裹，object 结果改写 output 字段，消除 ad-hoc 键注入对输出信封的污染。"}
+{"id":"edae","entity":["知识图谱运行时","后台任务启动"],"fact":"启动结果文本生成逻辑已废弃，launchResultText 返回空字符串，不再向调用方报告后台会话标识与标题。"}
+{"id":"92f5","entity":["Opencode.MimoTodoTool","重构后实现"],"fact":"重构后实现：解析 select_methodology 参数获取方法论列表，调用 todoResultText methodNames completedWorkReport methodNames 动态生成确认文案，替代硬编码的成功消息。"}
+{"id":"6102","entity":["Opencode","MimoTodoTool","输出信封迁移"],"fact":"MimoTodoTool 成功响应由 Methodology.todoResultText 迁移至 ToolOutputInfo.todoWriteOutput，输出格式从纯文本确认文案升级为结构化输出信封（含 BodyRef SeeBelow 与可选 meditator 提示），与工具输出元数据体系对齐。"}
+{"id":"0d56","entity":["模糊搜索","输出信封"],"fact":"FuzzyQuery.fs 新增 open VibeFs.Kernel.ToolOutputInfo，使 grep 输出构建可直接消费结构化输出信封类型，与 FuzzySearch.fs 的 ToolOutputInfo.withIterator 对齐，消除字符串格式化的偶然复杂度。"}
+{"id":"9281","entity":["工具输出模型","模糊查询"],"fact":"FuzzyQuery.fs 新增 open VibeFs.Kernel.ToolOutputInfo，模糊查询模块开始消费结构化输出信封体系，与 FuzzySearch.fs 的 ToolOutputInfo.withIterator 迁移同向。"}
+{"id":"8131","entity":["语法诊断","输出信封"],"fact":"TreeSitterKernel 新增 open ToolOutputInfo，使语法诊断模块可直接消费结构化输出信封类型，与工具输出元数据体系对齐。"}
+{"id":"9a10","entity":["模糊搜索","输出信封"],"fact":"FuzzyQuery.buildGrepOutput 迭代器输出由手动 notices 列表拼接改为 ToolOutputInfo.withIterator 结构化信封，消除字符串格式化的偶然复杂度，与 FuzzySearch 迭代器输出信封化对齐。"}
+{"id":"c8ff","entity":["语法诊断","输出信封"],"fact":"TreeSitterKernel.fs formatWriteSyntaxResult 重构：废弃 [syntax-check] 前缀与原始字符串拼接，改用 seeBelowEnvelope 包装无错误成功态、addSyntax 结构化包装错误态，与 ToolOutputInfo 输出信封体系对齐。"}
+{"id":"9d39","entity":["语法诊断","输出信封"],"fact":"TreeSitterKernel.fs 移除 syntaxCheckMarker 硬编码字符串常量，新增 hasSyntaxInOutput 函数：通过 tryParse 解析 ToolOutputInfo 结构化元数据检查 InfoItem.Syntax 标记，替代旧版字符串前缀探测，与工具输出结构化信封体系对齐。"}
+{"id":"1874","entity":["语法诊断","输出信封"],"fact":"TreeSitterKernel.fs 删除 hasSyntaxCheckMarker 函数，消除字符串探测回退路径的最后引用。语法诊断触发完全依赖 ToolOutputInfo 结构化 InfoItem.Syntax 标记，不再有字符串脆弱匹配的 fallback。"}
+{"id":"1874","entity":["语法诊断","输出信封"],"fact":"TreeSitterKernel.fs hasSyntaxCheckMarker 最后引用已替换为 hasSyntaxInOutput，语法诊断追加由字符串拼接改为 addSyntax 结构化包装，字符串探测回退路径全量消除。"}
+{"id":"457d","entity":["工具输出模型","知识图谱持久化"],"fact":"Opencode HookExecute.fs bookkeeper 追加入参由 originalOutput 改为 bodyForBookkeeper originalOutput，剥离 YAML front-matter 元数据后持久化，确保知识图谱只记录有效内容体。"}
+{"id":"103d","entity":["语法诊断","输出信封"],"fact":"Opencode HookExecute.fs 语法诊断探测由 hasSyntaxCheckMarker 字符串回退改为 hasSyntaxInOutput 结构化检查，消除字符串探测回退路径在 Opencode 宿主的最后引用。"}
+{"id":"0742","entity":["语法诊断","输出信封"],"fact":"TreeSitterKernel.fs formatWriteSyntaxResult 原始字符串格式化路径已移除 syntaxCheckMarker 前缀，语法诊断输出完全由 ToolOutputInfo 结构化信封承载，消除字符串标记在原始格式化路径的最后残留。"}
+{"id":"214a","entity":["读去重","测试对齐"],"fact":"IntegrationDedupTests 去重标记断言由硬编码字符串 \"[No Change Since Previous Read/Write]\" 改为调用 ToolOutputInfo.noChangeEnvelope，与 Dedup.deduplicate 生产侧结构化信封迁移对齐，消除测试与生产间的字符串脆弱匹配。"}
+{"id":"2cac","entity":["读去重","工具输出模型"],"fact":"Opencode 集成测试去重断言由硬编码字符串比对改为 ToolOutputInfo.noChangeEnvelope 结构化信封调用，与 Dedup 模块 isNoChangeOutput 结构化检查及 Mux ReadDedup 信封化迁移同向，消除字符串脆弱匹配的最后引用。"}
+{"id":"899e","entity":["知识图谱持久化","输出信封"],"fact":"集成测试 bookkeeper 规格新增 ToolOutputInfo 导入，使知识图谱持久化测试可直接消费结构化输出信封，与工具输出元数据体系对齐。"}
+{"id":"6f8a","entity":["集成测试","知识图谱持久化","输出信封"],"fact":"IntegrationBookkeeperSpecs 断言由字符串包含 hintLine 改为 YAML front-matter 前缀检测 + hasHintSubstring hintTodoRefresh 结构化检查，与 ToolOutputInfo 输出信封体系对齐，消除对原始字符串格式的脆弱依赖。"}
+{"id":"6d7f","entity":["工具定义测试","返回值契约"],"fact":"IntegrationToolDefSpecs 中 todowrite 输出断言由纯文本包含检查改为结构化信封格式检查（以 --- 开头且含 hintTodosUpdated 常量），与 ToolOutputInfo 结构化输出信封体系对齐。"}
+{"id":"d9b6","entity":["工具输出模型","集成测试"],"fact":"IntegrationToolDefSpecs 中 todowrite 输出断言由硬编码字符串 \"Todos updated.\" 改为引用 ToolOutputInfo.hintTodosUpdated 常量，消除测试与生产间的字符串脆弱匹配，与工具输出结构化信封体系对齐。"}
+{"id":"4e4a","entity":["执行结果模型","输出格式化"],"fact":"ShellTests.fs 安全警告断言由字符串 readOnlyWarning 包含检测迁移为 hasHintSubstring+hintExecutorMisuse 结构化检测，与 Executor.fs prependSafetyWarning 输出信封化对齐。"}
+{"id":"b6f8","entity":["执行结果模型","输出格式化"],"fact":"ShellTests.fs 移除 formatReturnValueBlock 相关断言，该函数曾用于将 ExecuteResult 格式化为 YAML 状态块；formatToolResponse 已完全迁移至 ToolOutputInfo.render 结构化信封，旧格式化路径测试全量清除。"}
+{"id":"3187","entity":["读去重","集成测试","工具输出模型"],"fact":"IntegrationMuxTransformSpecs 去重标记断言由硬编码字符串 \"[No Change Since Previous Read/Write]\" 改为调用 ToolOutputInfo.noChangeEnvelope，与 Dedup 生产侧结构化信封迁移对齐，消除 Mux 变换测试中字符串脆弱匹配的最后引用。"}
+{"id":"98d9","entity":["执行结果模型","输出格式化"],"fact":"Executor.fs prependSafetyWarning 只读警告由字符串前缀改为 ToolOutputInfo 结构化 Hint 渲染（InfoItem.Hint hintExecutorMisuse + BodyRef SeeBelow），测试断言由 StartsWith readOnlyWarning 改为 hasHintSubstring + hintExecutorMisuse 结构化检查。"}
+{"id":"5ba2","entity":["工具输出模型","输出信封"],"fact":"formatToolResponse 输出包含 status 标签（failed/truncated/missing_executable）与 BodyRef 标记（seeBelowTruncated），结构化信封体系覆盖失败/截断/缺失可执行文件三种执行结果形态。"}
+{"id":"5c16","entity":["测试对齐","工具输出模型"],"fact":"ShellTests.fs 新增 open VibeFs.Kernel.ToolOutputInfo，测试文件与结构化输出信封体系对齐，消除对硬编码字符串标记的依赖。"}
+{"id":"c89d","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo.fs 退出码解析分支显式化：非数值匹配由递归 parseItem 回退改为直接 None+推进索引，消除解析循环中不必要的递归回退路径。"}
+{"id":"86bc","entity":["YAML编码","测试对齐"],"fact":"ReviewTests.fs 测试断言中 yamlScalarField 调用更新为 yamlField，与 Kernel 提示词模块 YAML 编码函数命名统一对齐，消除测试与生产间的编码函数命名分歧。"}
+{"id":"83d3","entity":["前言元数据","YAML编码"],"fact":"yamlBlockField 已全量替换为 yamlField，包括 ReviewTests.fs 测试断言中的 task 字段编码。yamlField 统一处理单行与多行标量值，yamlBlockField 函数不再被引用。"}
+{"id":"575d","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo.InfoItem 密封 DU 新增 TimeoutMs of int 与 TimeoutType of string 变体，使结构化输出信封可承载超时元数据，与 ExecuteResult 的 TimedOut 分支及 timeoutToString 映射对齐。"}
+{"id":"1147","entity":["工具输出模型","输出信封"],"fact":"InfoItem DU 新增 TimeoutMs(int) 与 TimeoutType(string) 分支，YAML 序列化对应 timeout_ms/timeout_type 字段，扩展结构化输出信封承载超时元数据的能力。"}
+{"id":"abb7","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo 新增 InfoItem.TimeoutMs(int) 与 InfoItem.TimeoutType(string) 变体，解析 timeout_ms 与 timeout_type YAML 字段，使超时信息以结构化元数据进入输出信封，消除纯文本截断标记对超时类型的语义丢失。"}
+{"id":"378e","entity":["执行结果模型","输出格式化"],"fact":"Executor.fs executorInfoItems 重构：按 ExecuteResult 四分支（Completed/Truncated/Failed/MissingExecutable）显式构造 InfoItem 列表，消除旧版 match 中 exitCode/signal 条件性缺失。Completed 同时输出 status completed+exit code；Truncated 携带 TimeoutMs/TimeoutType/Hint；Failed 携带 Signal/Hint。"}
+{"id":"19bb","entity":["执行结果模型","输出格式化"],"fact":"新增 executorKilledAfterTimeoutHint/executorKilledBySignalHint 辅助函数，为截断/信号终止输出提供人类可读原因说明，消除旧版纯状态标签无解释的语义缺口。"}
+{"id":"4623","entity":["执行结果模型","输出格式化"],"fact":"mapOutcome 提取 partialStdout 私有辅助函数，统一空输出文案为 (no output before termination)，消除 TimedOut/Signaled 分支内联后缀拼接，与 Exited 分支共享同一空输出门禁。"}
+{"id":"ecf2","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo.todoWriteOutput 空方法论列表产出 hintTodosUpdated，非空列表产出 hintMethodologyFollowup(joined)，BodyRef 固定 SeeBelow。"}
+{"id":"05e3","entity":["方法论枚举","内核常量"],"fact":"methodologyEnumValues 固定 54 项枚举值，methodologyCatalog 包含全部枚举条目。"}
+{"id":"ba8a","entity":["执行结果模型","模式匹配卫生"],"fact":"Executor.fs Failed 分支输出参数未使用，改为通配符 _ 消除未绑定值警告，与模式匹配穷尽纪律同向。"}
+{"id":"68f4","entity":["执行结果模型","输出格式化"],"fact":"Executor.fs 移除 partialStdout 辅助函数；executorInfoItems 的 Truncated 分支废弃 output 参数（改为 _），消除未使用变量与死代码。"}
+{"id":"d5ed","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo.fs 移除 InfoItem.TimeoutType 解析分支，timeout_type 元数据不再经输出信封结构化承载，与 Executor.fs 移除 partialStdout 辅助函数及 Truncated 分支废弃 output 参数同向，消除超时类型在输出信封中的冗余编码路径。"}
+{"id":"abb7","entity":["工具输出模型","输出信封"],"fact":"InfoItem.TimeoutType 变体 YAML 序列化分支已移除，timeout_type 字段不再出现在输出信封 front-matter 中。TimeoutMs(int) 序列化保留。"}
+{"id":"1147","entity":["工具输出模型","输出信封"],"fact":"InfoItem DU 移除 TimeoutType(string) 分支，仅保留 TimeoutMs(int) 与 BodyRef 等既有变体，超时类型信息不再以独立元数据字段进入输出信封。"}
+{"id":"abb7","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo.InfoItem 密封 DU 移除 TimeoutType of string 变体，TimeoutMs of int 保留；timeout_type YAML 字段不再由 InfoItem 承载解析。"}
+{"id":"575d","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo.InfoItem 密封 DU 移除 TimeoutType of string 变体，仅保留 TimeoutMs of int 与 BodyRef 等既有变体。"}
+{"id":"378e","entity":["执行结果模型","输出格式化"],"fact":"executorInfoItems 重构：Truncated 状态标签由 truncated 改为 killed_timeout，移除 TimeoutType InfoItem；Failed 分支按信号优先匹配（signal→exit_code→spawn_failed→fallback），状态标签分化为 killed_signal/exit_error/spawn_failed；新增 isSpawnFailedMessage 辅助函数通过 spawn failed: 前缀启发式检测生成失败。"}
+{"id":"19bb","entity":["执行结果模型","输出格式化"],"fact":"executorKilledAfterTimeoutHint 签名精简：移除 timeoutType 参数，仅保留 timeoutMs 整数入参，消除超时类型在截断提示文案中的语义冗余。"}
+{"id":"5ba2","entity":["工具输出模型","输出信封"],"fact":"formatToolResponse 输出 status 标签由 failed/truncated 改为 exit_error/killed_timeout，与 ExecuteResult 结构化标签体系对齐，消除旧版纯文本状态标签歧义。"}
+{"id":"489c","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo 渲染管线新增 orderInfoForRender 排序函数，在 yamlSeqField 编码前对 info 列表排序，消除 InfoItem 渲染顺序对列表构造顺序的偶然依赖。"}
+{"id":"fa5f","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo 新增 orderInfoForRender 函数：将 InfoItem 列表按 BodyRef 分区，BodyRef 项置于列表末尾，确保正文引用标记在渲染时位于其他元数据之后。"}
+{"id":"f509","entity":["执行结果模型","输出格式化"],"fact":"Executor.fs 移除 describeResultTag 与 buildSummaryPrompt 函数，执行结果摘要提示构建逻辑全量迁移至 ToolOutputInfo 结构化信封体系，旧格式化路径彻底清除。"}
+{"id":"7f3d","entity":["执行结果模型","输出格式化"],"fact":"Executor.fs 移除 rawOutputCapBytes 常量定义（原 1_048_576），outputForSummary 截断路径不再引用该常量，截断行为由调用方或外层编排层接管。"}
+{"id":"b932","entity":["执行摘要提示词","YAML编码"],"fact":"executorSummarizerPrompt 空依赖列表渲染为 dependencies: [] 内联标量；多行 program/raw_output 使用 YAML 字面块标量（program: | / raw_output: |），确保换行内容在 YAML front-matter 中正确保留。"}
+{"id":"7ce5","entity":["执行结果模型","输出格式化","YAML编码"],"fact":"executor 摘要 YAML 值由带引号标量改为纯文本标量（language: shell 而非 language: \"shell\"），与 YAML 编码统一契约对齐。"}
+{"id":"8764","entity":["测试门禁","输出格式化"],"fact":"摘要输入上限测试已从注册表移除，对应 Executor 输出格式化重构后废弃的截断路径校验。"}
+{"id":"a88f","entity":["执行结果模型","输出格式化","Mux宿主适配"],"fact":"HostTools executor summarization 双分支（直接返回/摘要后返回）均经 prependSafetyWarningForExecution 包裹，确保安全警告在格式化输出后统一追加，消除摘要路径遗漏安全警告的缺口。"}
+{"id":"01a7","entity":["审查提示词","测试门禁"],"fact":"ReviewTests 断言 mux prompt 的 task 区块须含具体任务文本（如 ship S1），非仅 YAML 结构标记 task: |。"}
+{"id":"be14","entity":["前言元数据","YAML编码"],"fact":"ReviewTests 断言中 role 字段值由带引号标量（\"reviewer\"）改为纯文本标量（reviewer），与 YAML 编码统一契约（yamlStringValue 纯文本输出）对齐，消除测试断言与生产编码间的引号分歧。"}
+{"id":"6439","entity":["审查提示词","YAML编码"],"fact":"ReviewTests 报告字段断言由 report: |（块标量）改为 report:（纯文本标量），与 YAML 编码统一契约对齐，消除块标量在审查提示词中的最后引用。"}
+{"id":"c99f","entity":["YAML编码","测试对齐"],"fact":"ReviewTests 断言中 YAML 标量值断言由带引号格式（role: \"reviewer\"）改为纯文本格式（role: reviewer），与 yamlField 统一编码函数输出对齐，消除测试与生产间的 YAML 标量编码格式分歧。"}
+{"id":"159a","entity":["前言元数据","YAML编码"],"fact":"YAML front-matter 标量值编码由双引号标量改为纯文本标量（command: with-review 而非 command: \"with-review\"），与 YAML 标量编码三阶契约（纯文本→双引号→字面块）对齐。"}
+{"id":"4aa7","entity":["前言元数据","YAML编码"],"fact":"LoopMessages 构建循环消息中 task 字段编码由块标量（task: |）改为内联标量（task:），与 yamlBlockField→yamlField 统一替换契约对齐。"}
+{"id":"7ce5","entity":["YAML编码","测试对齐"],"fact":"ShellTests.fs 搜索嵌入断言中 YAML 标量值由带引号格式（title: \"A\"）改为纯文本标量（title: A），与 YAML 编码统一契约对齐，消除测试与生产间的引号格式分歧。"}
+{"id":"3090","entity":["前言元数据","YAML编码"],"fact":"知识图谱作业标记 YAML type 字段值由双引号标量改为纯文本标量（type: vibe_knowledge_graph_job 而非 type: \"vibe_knowledge_graph_job\"），与 yamlStringValue 纯文本编码契约对齐。"}
+{"id":"acc9","entity":["集成测试","YAML编码","知识图谱持久化"],"fact":"IntegrationBookkeeperSpecs 断言中 YAML 字段值由带引号标量（type: \"vibe_knowledge_graph_job\"）改为纯文本标量（type: vibe_knowledge_graph_job），与 YAML 编码统一契约（yamlStringValue 纯文本输出）对齐，消除测试断言与生产编码间的引号分歧。"}
+{"id":"fe1e","entity":["工具输出模型","测试对齐"],"fact":"IntegrationEventTests todo_write 包装器断言由 nudge 字符串包含检测迁移为 hasHintSubstring+hintMeditator 结构化信封检测，与 ToolOutputInfo 输出信封体系对齐，消除对硬编码 meditator nudge 文案的脆弱依赖。"}
+{"id":"ee5b","entity":["集成测试","工具输出模型"],"fact":"IntegrationEventTests 工具执行后处理断言由字符串包含 'Think thrice' 改为 hasHintSubstring + hintMeditator 结构化检查，与 ToolOutputInfo 输出信封体系对齐，消除对硬编码 nudge 文案的脆弱依赖。"}
+{"id":"647f","entity":["集成测试","工具输出模型","测试对齐"],"fact":"IntegrationEventTests 中 meditator 提示断言由 hasHintSubstring 模糊匹配改为 hasExactHint 精确匹配，消除工具输出信封中 Hint 项验证的脆弱性，与 ToolOutputInfo 结构化输出信封体系对齐。"}
+{"id":"d018","entity":["工具输出模型","输出信封"],"fact":"hint 检查 API 重构：废弃 hasHintSubstring 的 body 文本回退路径，拆分为 hintsFromOutput（仅解析 front-matter 提取 hint 列表）、hasExactHint（精确匹配）、hintTextContains（片段包含）。消除字符串回退导致的脆弱匹配，与结构化输出信封体系对齐。"}
+{"id":"eb5d","entity":["工具输出模型","测试对齐"],"fact":"hint 断言由 hasHintSubstring 迁移至 hasExactHint/hintTextContains，消除对 body 文本回退的依赖，确保测试仅基于结构化元数据断言。"}
+{"id":"47f0","entity":["集成测试","知识图谱持久化","输出信封"],"fact":"bookkeeper 启动结果与主代理输出的提示断言由 hasHintSubstring 子串匹配改为 hasExactHint 精确匹配，消除子串匹配对提示常量的误判风险，与 ToolOutputInfo 结构化输出信封体系对齐。"}
+{"id":"0c9f","entity":["模糊搜索","输出信封"],"fact":"fuzzy_find 工具描述更新：迭代器指示由 response ends with iterator=... 改为 YAML front matter 含 iterator item，与 ToolOutputInfo 结构化输出信封体系对齐。"}
+{"id":"e4fc","entity":["模糊搜索","工具定义","输出信封"],"fact":"fuzzy_grep 工具描述更新：输出格式说明由原始字符串迭代器标记（iterator=\"...\"）改为 YAML front matter 迭代器项引用，与 ToolOutputInfo 结构化输出信封体系对齐。"}
+{"id":"dc11","entity":["架构测试","工具输出模型","输出信封"],"fact":"ArchitectureTests 新增 noLegacyInjectedToolOutputMarkers 门禁，扫描 src/Kernel/Shell/Mux/Opencode 四目录，禁止 [executor]、[syntax-check]、ends with iterator= 等遗留字符串标记残留，确保工具输出全量经 ToolOutputInfo 结构化信封体系。"}
+{"id":"6d06","entity":["架构测试","测试注册表"],"fact":"Tests.fs 登记 ArchitectureTests.noLegacyInjectedToolOutputMarkers 用例，扫描工具输出中残留的旧式注入标记，与 ToolOutputInfo 结构化信封迁移对齐。"}
+{"id":"29f4","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo 结构化信封已全量部署至 Kernel/Shell/Opencode/Mux 四层，工具输出统一经 YAML front-matter 承载 Hint/Syntax/Iterator/Status/ExitCode/BodyRef 元数据，遗留注入式教练字符串与后缀迭代器标记全量消除。"}
+{"id":"dc11","entity":["架构测试","工具输出模型"],"fact":"ArchitectureTests.noLegacyInjectedToolOutputMarkers 门禁扫描 src/Kernel/Shell/Mux/Opencode 四目录，禁止 [executor]、[syntax-check]、ends with iterator= 等遗留字符串标记残留，确保工具输出全量经 ToolOutputInfo 结构化信封体系。"}
+{"id":"8052","entity":["模糊搜索","输出信封"],"fact":"FuzzySearch/FuzzyQuery 迭代器输出全量迁移至 ToolOutputInfo.withIterator 结构化信封，模糊搜索工具目录文案与信封迭代器字段对齐，消除 sprintf 手动拼接的偶然复杂度。"}
+{"id":"1874","entity":["语法诊断","输出信封"],"fact":"TreeSitterKernel 语法诊断输出全量迁移至 ToolOutputInfo.addSyntax 结构化包装，hasSyntaxCheckMarker 字符串探测回退路径全量消除，诊断追加由字符串拼接改为结构化元数据。"}
+{"id":"a9b9","entity":["读去重","工具输出模型"],"fact":"Dedup/ReadDedup/MessageTransform 去重标记全量迁移至 ToolOutputInfo.noChangeEnvelope 结构化信封，isNoChangeOutput 通过 BodyRef 密封 DU 判断无变化，消除 dedupMarker 硬编码字符串的最后引用。"}
+{"id":"5ad4","entity":["工具执行后处理","输出信封"],"fact":"Mux/Opencode 工具执行后处理（bookkeeper 记账、nudge 追加、语法诊断）全量迁移至 ToolOutputInfo 结构化输出信封，withBookkeepingHints/addSyntax/todoWriteOutput 替代手动字符串拼接与 nudge 注入。"}
+{"id":"29f4","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo.fs 正式纳入 master 分支 Kernel 编译项（251行），承载工具输出 YAML front-matter 元数据体系，含 InfoItem DU、ToolOutputMessage 类型、render/parse 管线。"}
+{"id":"e440","entity":["前言元数据","YAML编码"],"fact":"PromptFrontMatter YAML 编码函数集扩展至 127 行新增，新增 yamlNestedField 函数支持嵌套字段编码，yamlField 统一处理单行与多行标量值，yamlBlockField 全量替换为 yamlField。"}
+{"id":"dc11","entity":["架构测试","工具输出模型"],"fact":"ArchitectureTests.noLegacyInjectedToolOutputMarkers 门禁正式部署 master，扫描 src/Kernel/Shell/Mux/Opencode 四目录，禁止 [executor]、[syntax-check]、ends with iterator= 等遗留字符串标记残留。"}
+{"id":"1874","entity":["语法诊断","输出信封"],"fact":"TreeSitterKernel.fs formatWriteSyntaxResult 全量迁移至 ToolOutputInfo.addSyntax 结构化包装，syntaxCheckMarker 硬编码字符串常量与 hasSyntaxCheckMarker 字符串探测回退路径全量消除。"}
+{"id":"a9b9","entity":["读去重","工具输出模型"],"fact":"Dedup/ReadDedup/MessageTransform 去重标记全量迁移至 ToolOutputInfo.noChangeEnvelope 结构化信封，isNoChangeOutput 通过 BodyRef 密封 DU 判断无变化，dedupMarker 硬编码字符串全量消除。"}
+{"id":"8052","entity":["模糊搜索","输出信封"],"fact":"FuzzySearch/FuzzyQuery 迭代器输出全量迁移至 ToolOutputInfo.withIterator 结构化信封，fuzzy_find/fuzzy_grep 工具描述更新为 YAML front matter 迭代器项引用，sprintf 手动拼接全量消除。"}
+{"id":"98d9","entity":["执行结果模型","输出格式化"],"fact":"Executor.fs prependSafetyWarning 只读警告由字符串前缀改为 ToolOutputInfo 结构化 Hint 渲染，ShellTests 断言由字符串包含迁移为 hasHintSubstring+hintExecutorMisuse 结构化检查，formatReturnValueBlock 旧格式化路径全量清除。"}
+{"id":"acc9","entity":["集成测试","知识图谱持久化","输出信封"],"fact":"IntegrationBookkeeperSpecs 断言由字符串包含 hintLine 改为 YAML front-matter 前缀检测+hasHintSubstring 结构化检查，YAML 字段值由带引号标量改为纯文本标量，与 yamlStringValue 纯文本编码契约对齐。"}
+{"id":"fe1e","entity":["集成测试","工具输出模型","测试对齐"],"fact":"IntegrationEventTests 工具执行后处理断言由字符串包含 'Think thrice' 改为 hasHintSubstring+hintMeditator 结构化检查，todo_write 包装器断言由 nudge 字符串包含检测迁移为结构化信封检测。"}
+{"id":"d9b6","entity":["工具定义测试","返回值契约"],"fact":"IntegrationToolDefSpecs todowrite 输出断言由纯文本包含检查改为结构化信封格式检查（--- 开头+hasHintSubstring hintTodosUpdated），硬编码字符串引用改为 ToolOutputInfo.hintTodosUpdated 常量。"}
+{"id":"c99f","entity":["ReviewTests","YAML编码"],"fact":"ReviewTests 断言中 role/report 字段值由带引号标量/块标量改为纯文本标量，yamlScalarField 调用更新为 yamlField，与 yamlField 统一编码函数输出对齐。"}
+{"id":"7ce5","entity":["ShellTests","YAML编码"],"fact":"ShellTests 搜索嵌入断言中 YAML 标量值由带引号格式改为纯文本标量，新增 open VibeFs.Kernel.ToolOutputInfo 与结构化信封体系对齐。"}
+{"id":"fa5f","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo 新增 orderInfoForRender 排序函数，BodyRef 项置于列表末尾确保正文引用标记在渲染时位于其他元数据之后。"}
+{"id":"9fee","entity":["工具输出模型","输出信封"],"fact":"ToolOutputInfo 新增 withIterator 函数：非空迭代器字符串时渲染 InfoItem.Iterator+BodyRef SeeBelow 结构化信封，空字符串直接返回原 body。"}
+{"id":"0902","entity":["版本控制","工作区布局"],"fact":"master 分支管理协议：worktree-master 持有 master 引用，worktree-0 在释放 master 前先 detach 再 branch -f 转移至 worktree-master。当前 master tip 为 5c28e67（Merge tool output YAML envelope from worktree-0），领先 origin/master 4 提交。worktree-0 处于 detached HEAD 3f10922。"}
+{"id":"d76a","entity":["版本控制","工作区布局"],"fact":"worktree-refactor 与 worktree-0 两棵 worktree 均已标记 prunable，不再活跃使用。"}
+{"id":"0902","entity":["版本控制","工作区布局"],"fact":"master 分支管理协议：worktree-master 持有 master 引用。master tip 5c28e67（Merge tool output YAML envelope from worktree-0）已推送 origin，本地 master 与 origin/master 对齐至 5c28e67。worktree-0 处于 detached HEAD 3f10922。kg/2026-06-24.ndjson 在 master 工作区仍有未提交修改。"}
+{"id":"1a6e","entity":["版本控制","工作区布局"],"fact":"master 从 3f10922 快进至 5c28e67，更新 8 文件（ReviewPrompts.fs/ToolCatalog.fs/ReviewToolsMux.fs/ReviewTools.fs/IntegrationMuxReviewPromptSpecs.fs/IntegrationMuxReviewSpecs.fs/IntegrationToolTests.fs/kg/2026-06-24.ndjson），+105 -35 行。kg/2026-06-24.ndjson 存在合并冲突待解决。stash 已保存。"}
+{"id":"0521","entity":["审查提示词","方法论探针"],"fact":"ReviewPrompts.fs 更新 +5 行，ToolCatalog.fs 更新 +6 -1 行，ReviewToolsMux.fs 更新 +42 行重构（-35 行），ReviewTools.fs 更新 +23 -12 行，集成测试断言同步更新。"}
+{"id":"c4d2","entity":["知识图谱","持久化"],"fact":"kg/2026-06-24.ndjson 在 fast-forward 合并后产生内容冲突，需手工消解冲突标记后方可投影与 bookkeeper 追加。"}
