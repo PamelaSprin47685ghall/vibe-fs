@@ -54,10 +54,13 @@ let mimoTodoTool (_pluginCtx: obj) : obj =
             "status", strReq todoStatusDesc
             "priority", strReq todoPriorityDesc
         ])
+    let enumVals = List.toArray VibeFs.Kernel.Methodology.methodologyEnumValues
+
     define
         (toolDescriptionFor Mimocode)
         (box {| todos = ToolSchema.call1 (arr todoItem) "describe" (box todosDesc)
-                completedWorkReport = strReq reportDesc |})
+                completedWorkReport = strReq reportDesc
+                select_methodology = enumArrayMin enumVals 1 VibeFs.Kernel.Methodology.selectMethodologyFieldDescription |})
         (fun args context ->
             let sessionID = str context "sessionID" |> fun value -> value.Trim()
             let report = str args "completedWorkReport" |> fun value -> value.Trim()

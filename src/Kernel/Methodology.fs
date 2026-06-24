@@ -1,14 +1,23 @@
 module VibeFs.Kernel.Methodology
 
 open VibeFs.Kernel.Messaging
+open VibeFs.Kernel.HostTools
 
 let selectMethodologyToolName = "select_methodology"
 let methodologyProbeIdPrefix = "methodology-probe-"
 
 let methodologyProbeText =
-    "<system>Before the task, please decide which methodologies are useful for this turn. Now you MUST Call the select_methodology tool with one or more methods. </system>"
+    "<important>Before the task, please decide which methodologies are useful for this turn. Now you SHOULD Call the todowrite tool to update todos unless no progress, and select_methodology with one or more relevant methodologies. </important>"
 
-let methodologyToolResultText = "Continue using the selected methodologies."
+let methodologyProbeInstructionText =
+    methodologyProbeText.Replace("<important>", "").Replace("</important>", "")
+
+let methodologyToolResultText (methodologies: string list) =
+    match methodologies with
+    | [] -> invalidArg "methodologies" "methodologyToolResultText requires at least one methodology"
+    | _ ->
+        let joined = String.concat ", " methodologies
+        $"Great! How to proceed with [{joined}] as your methodology?"
 
 let methodologyEnumValues: string list =
     [ "first_principles"
@@ -66,7 +75,7 @@ let methodologyEnumValues: string list =
       "performance_analysis"
       "user_intent_clarification" ]
 
-let methodologyCatalog = """Select the reasoning methodologies that should guide the next work step. Use this before continuing when the task benefits from explicit structure, search-space control, proof discipline, design reasoning, decomposition, verification, or risk control. Choose all useful methodologies by their definitions, not by keyword vibes, and write a concise reason.
+let methodologyCatalog = """Select the reasoning methodologies that should guide the next work step. Use this before continuing when the task benefits from explicit structure, search-space control, proof discipline, design reasoning, decomposition, verification, or risk control. Choose all useful methodologies by their definitions, not by keyword vibes.
 
 Methodology catalog:
 Common methods can be selected with their short definitions. Uncommon methods include trigger conditions; do not avoid them merely because they are less familiar.
@@ -125,10 +134,14 @@ Common methods can be selected with their short definitions. Uncommon methods in
 - dialectical_analysis: use when opposing forces both shape the outcome. Identify thesis, antithesis, tension, dependency, and resolution path instead of flattening the system into one-sided causality.
 - hermeneutic_circle: use when local meaning depends on global context and global meaning depends on local details. Iterate between part and whole until both stabilize, especially for codebase understanding and document interpretation.
 - deconstruction: use when a design or text relies on hidden binaries or authority. Inspect what the framing excludes, which hierarchy it assumes, and where internal tensions make the apparent center unstable.
-- renormalization: use when micro-detail overwhelms macro behavior. Coarse-grain details, preserve only scale-relevant variables, and identify the universal structure that remains stable across levels."""
+ - renormalization: use when micro-detail overwhelms macro behavior. Coarse-grain details, preserve only scale-relevant variables, and identify the universal structure that remains stable across levels."""
+
+let selectMethodologyFieldDescription =
+    "Required when calling this tool: record `select_methodology` with one or more methodology names that must guide the next work step. Choose by definitions, not by keyword vibes.\n\n" + methodologyCatalog
+
 
 /// Pure decision: append the probe iff the current turn (messages after the
-/// last real user message) has no completed select_methodology tool part.
+/// last real user message) has no completed todo tool result.
 /// Checks only Native user messages; synthetic probes are invisible.
 let shouldAppendMethodologyProbe (messages: Message<'raw> list) : bool =
     let lastUserIdx =
@@ -149,13 +162,13 @@ let shouldAppendMethodologyProbe (messages: Message<'raw> list) : bool =
         match lastAssistantToolMsg with
         | None -> true
         | Some msg ->
-            let hasCompletedSelect =
+            let hasCompletedTodo =
                 msg.parts
                 |> List.exists (function
                     | ToolPart(name, _, Some state, _)
-                        when name = selectMethodologyToolName && state.status = "completed" -> true
+                        when isTodoWriteToolName name && state.status = "completed" -> true
                     | _ -> false)
-            not hasCompletedSelect
+            not hasCompletedTodo
 
 /// Constructs the synthetic probe user message. Never persisted: id prefix
 /// `methodology-probe-` ensures stripSyntheticBySource removes it on
@@ -173,3 +186,10 @@ let buildProbeMessage (agent: string) (sessionID: string) : Message<obj> =
       parts = [ TextPart methodologyProbeText ]
       source = Synthetic "methodology-probe"
       raw = null }
+
+/// Check if a message is a methodology probe message (by ID prefix or text content).
+let isMethodologyProbeMessage (m: Message<'raw>) : bool =
+    m.info.id.StartsWith methodologyProbeIdPrefix
+    || (m.parts |> List.exists (function
+        | TextPart text when text.Contains "Before the task, please decide which methodologies are useful for this turn." || text.Contains "Now you SHOULD Call the todowrite tool" -> true
+        | _ -> false))

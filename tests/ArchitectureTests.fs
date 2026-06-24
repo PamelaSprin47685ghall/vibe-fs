@@ -31,10 +31,10 @@ let private boxRe = System.Text.RegularExpressions.Regex(@"\bbox\b")
 let private emptyDefaultRe =
     System.Text.RegularExpressions.Regex("Option\\.defaultValue\\s*\"")
 
+/// Kernel layer must stay free of FFI, Dyn, obj, Shell references.
+/// Enforced at the directory level (src/Kernel/*.fs) regardless of
+/// compilation-unit topology — a single-project merge must not weaken this.
 let kernelBoundary () =
-    let proj = requireFile "src/Kernel/VibeFs.Kernel.fsproj"
-    check "arch: Kernel.fsproj no Shell ProjectReference" (not (proj.Contains "VibeFs.Shell"))
-    check "arch: Kernel.fsproj no Fable.Core" (not (proj.Contains "Fable.Core"))
     for f in fsFiles "src/Kernel" do
         let path = "src/Kernel/" + f
         let content = requireFile path
@@ -56,8 +56,6 @@ let shellLayering () =
         check ("arch: " + f + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
         check ("arch: " + f + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
 
-/// Phase 2 子集守卫：禁止 Dictionary 字面。mutable/ResizeArray 的 Actor 闭包约束
-/// 需语义分析（非 grep 可判定），此处仅覆盖 Dictionary 禁令。
 let noBuiltinDictionary () =
     for dir in [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"|] do
         for f in fsFiles dir do
@@ -78,3 +76,7 @@ let noDanglingMarkers () =
             check ("arch: " + f + " no TODO") (not (content.Contains "TODO"))
             check ("arch: " + f + " no FIXME") (not (content.Contains "FIXME"))
             check ("arch: " + f + " no HACK") (not (content.Contains "HACK"))
+
+let opencodeHookSchemaNoDirectZodImport () =
+    let content = requireFile "src/Opencode/HookSchema.fs"
+    check "arch: HookSchema no direct zod import" (not (content.Contains "import \"z\" \"zod\""))

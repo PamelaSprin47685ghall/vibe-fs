@@ -343,8 +343,6 @@ dotnet tool restore
 npm install
 npm run clean
 npm run build
-npm run build:kernel
-npm run build:shell
 npm run build:tests
 npm run watch
 npm run watch:tests
@@ -356,13 +354,11 @@ npm run test:integration
 
 说明：
 
-- `npm run clean` 清理 `build/`、`build-kernel/`、`build-shell/`、`build-tests/`、`artifacts/`
+- `npm run clean` 清理 `build/`、`build-tests/`、`artifacts/`
 - 所有 MSBuild `bin/`、`obj/` 中间产物统一落到根目录 `artifacts/`，不再散落到 `src/`、`tests/` 下
-- `npm run build` 只编译宿主插件层：`dotnet fable vibe-fs.fsproj --outDir build`，不再顺带测试
-- `npm run build:kernel` 单独编译 `src/Kernel/VibeFs.Kernel.fsproj` 到 `build-kernel/`
-- `npm run build:shell` 单独编译 `src/Shell/VibeFs.Shell.fsproj` 到 `build-shell/`
+- `npm run build` 全量编译：`dotnet fable vibe-fs.fsproj --outDir build`（单一工程，含 Kernel+Shell+宿主适配全部源码）
 - `npm run build:tests` 单独编译 `tests/VibeFs.Tests.fsproj` 到 `build-tests/`
-- `npm run watch` 监听宿主插件工程并输出到 `build/`
+- `npm run watch` 监听主工程并输出到 `build/`
 - `npm run watch:tests` 监听测试工程并输出到 `build-tests/`
 - `npm test` 默认先执行测试编译，再运行 `node tests/runner.js`
 - `npm run test:kernel` 覆盖 `ReviewTests`、`AgentTests`、`KernelTests`、`FuzzyTests`、`DynTests`、`DelegateTests`、`ResolveAiSettingsTests`、`MagicTests`、`KnowledgeGraphKernelTests`、`TitleFetchGuardTests`

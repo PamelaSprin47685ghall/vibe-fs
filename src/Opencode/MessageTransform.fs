@@ -152,10 +152,11 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicS
             if messagesArr.Length = 0 then ()
             else
                 let messagesList = MessagingCodec.decodeMessages messagesArr
-                let agent = resolveAgent registry input messagesList
-                let sessionID = extractSessionID messagesList
-                reconstructReviewState reviewStore sessionID messagesList
-                let cleaned = Messaging.stripSyntheticBySource messagesList
+                let messagesListWithoutProbes = messagesList |> List.filter (fun m -> not (isMethodologyProbeMessage m))
+                let agent = resolveAgent registry input messagesListWithoutProbes
+                let sessionID = extractSessionID messagesListWithoutProbes
+                reconstructReviewState reviewStore sessionID messagesListWithoutProbes
+                let cleaned = Messaging.stripSyntheticBySource messagesListWithoutProbes
                 if cleaned.IsEmpty then ()
                 else
                     let excluded = defaultExcludedAgents |> Set.contains agent

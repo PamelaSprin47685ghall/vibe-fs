@@ -11,7 +11,6 @@ open VibeFs.Kernel.Methodology
 open VibeFs.Mux.Plugin
 open VibeFs.Shell.Dyn
 
-
 let muxMethodologyProbeAppendedSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-methodology-probe-"
     let reg = createRegistration (minimalMuxDeps ())
@@ -35,20 +34,20 @@ let muxMethodologyProbeSuppressedAfterCallSpec () = promise {
     let reg = createRegistration (minimalMuxDeps ())
     let tf = muxMessageTransform reg
     let userMsg = muxTextMessage "msg-user" "user" "do the task"
-    let methodologyResult =
+    let todoResult =
         createObj [
-            "id", box "msg-method"
+            "id", box "msg-todo"
             "role", box "assistant"
             "parts", box [| createObj [
                 "type", box "dynamic-tool"
-                "toolName", box "select_methodology"
+                "toolName", box "todo_write"
                 "toolCallId", box "call-1"
                 "state", box "output-available"
                 "input", box (createObj [])
-                "output", box "Continue using the selected methodologies."
+                "output", box "Todos updated"
             ] |]
         ]
-    let out = createObj [ "messages", box [| userMsg; methodologyResult |] ]
+    let out = createObj [ "messages", box [| userMsg; todoResult |] ]
     let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-methodology-suppressed-session" ]
     do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
@@ -72,36 +71,27 @@ let muxMethodologyProbeExcludedAgentsSpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let muxMethodologyToolExecuteSpec () = promise {
+let muxTodoWriteMethodologySchemaSpec () = promise {
     let reg = createRegistration (minimalMuxDeps ())
-    let tool = muxToolByName reg "select_methodology"
-    if isNullish tool then
-        check "mux registration exposes select_methodology tool" false
+    let wrappers = unbox<obj[]> (get reg "wrappers")
+    let todoWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "todo_write") |> Option.defaultValue null
+    if isNullish todoWrapper then
+        check "mux registration exposes todo_write wrapper for methodology" false
     else
-        let! result = ((get tool "execute") $ (createObj [], createObj [])) |> unbox<JS.Promise<string>>
-        check "select_methodology execute returns fixed text" (result = methodologyToolResultText)
-}
-
-let muxMethodologyToolSchemaSpec () = promise {
-    let reg = createRegistration (minimalMuxDeps ())
-    let tool = muxToolByName reg "select_methodology"
-    if isNullish tool then
-        check "mux registration exposes select_methodology tool" false
-    else
-        let schema = muxToolSchema tool
+        let fakeHostTodo =
+            box {| execute =
+                    System.Func<obj, obj, JS.Promise<obj>>(fun args _ ->
+                        promise { return box {| success = true; count = (unbox<obj[]> (get args "todos")).Length |} }) |}
+        let wrapped = (get todoWrapper "wrapper") $ (fakeHostTodo, createObj [])
+        let schema = get wrapped "parameters"
         let props = get schema "properties"
-        let methodsSchema = get props "methods"
-        let reasonSchema = get props "reason"
-        check "methodology methods is array type" (str methodsSchema "type" = "array")
-        let itemsSchema = get methodsSchema "items"
-        check "methodology methods items is string type" (str itemsSchema "type" = "string")
+        let methodologySchema = get props "select_methodology"
+        check "todo_write select_methodology is array type" (str methodologySchema "type" = "array")
+        let itemsSchema = get methodologySchema "items"
+        check "todo_write select_methodology items is string type" (str itemsSchema "type" = "string")
         let enumArr = unbox<obj[]> (get itemsSchema "enum")
-        check "methodology methods enum has all values" (enumArr.Length = (List.toArray methodologyEnumValues).Length)
-        check "methodology methods minItems is 1" (unbox<int> (get methodsSchema "minItems") = 1)
-        check "methodology reason is string type" (str reasonSchema "type" = "string")
-        let required = muxToolSchemaRequired tool
-        check "methodology required includes methods" (required |> Array.contains "methods")
-        check "methodology required includes reason" (required |> Array.contains "reason")
+        check "todo_write select_methodology enum has all values" (enumArr.Length = (List.toArray methodologyEnumValues).Length)
+        check "todo_write select_methodology minItems is 1" (unbox<int> (get methodologySchema "minItems") = 1)
 }
 
 let muxMethodologyProbeStrippedOnReprojectionSpec () = promise {
@@ -109,21 +99,21 @@ let muxMethodologyProbeStrippedOnReprojectionSpec () = promise {
     let reg = createRegistration (minimalMuxDeps ())
     let tf = muxMessageTransform reg
     let userMsg = muxTextMessage "msg-real" "user" "do the task"
-    let methodologyResult =
+    let todoResult =
         createObj [
-            "id", box "msg-method"
+            "id", box "msg-todo"
             "role", box "assistant"
             "parts", box [| createObj [
                 "type", box "dynamic-tool"
-                "toolName", box "select_methodology"
+                "toolName", box "todo_write"
                 "toolCallId", box "call-1"
                 "state", box "output-available"
                 "input", box (createObj [])
-                "output", box "Continue using the selected methodologies."
+                "output", box "Todos updated"
             ] |]
         ]
     let staleProbe = muxTextMessage "methodology-probe-1" "user" "stale probe text"
-    let out = createObj [ "messages", box [| userMsg; methodologyResult; staleProbe |] ]
+    let out = createObj [ "messages", box [| userMsg; todoResult; staleProbe |] ]
     let input = createObj [ "agent", box "manager"; "directory", box workspaceDir; "sessionID", box "mux-methodology-strip-session" ]
     do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")

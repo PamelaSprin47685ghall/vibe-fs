@@ -225,9 +225,9 @@ let opencodeMethodologyProbeSuppressedSpec () = promise {
         box {| info = createObj [ "id", box "msg-method"; "agent", box "manager"; "role", box "assistant"; "sessionID", box "suppress-session" ]
                parts = [| createObj [
                    "type", box "tool"
-                   "tool", box "select_methodology"
+                   "tool", box "todowrite"
                    "callID", box "call-1"
-                   "state", box (createObj [ "status", box "completed"; "output", box "Continue using the selected methodologies." ])
+                   "state", box (createObj [ "status", box "completed"; "output", box "Todos updated." ])
                ] |] |}
     let out = createObj [ "messages", box [| userMsg; methodologyResult |] ]
     do! tf $ (createObj [ "agent", box "manager"; "sessionID", box "suppress-session" ], out) |> unbox<JS.Promise<unit>>
@@ -264,9 +264,9 @@ let opencodeMethodologyProbeStrippedSpec () = promise {
         box {| info = createObj [ "id", box "msg-method"; "agent", box "manager"; "role", box "assistant"; "sessionID", box "strip-session" ]
                parts = [| createObj [
                    "type", box "tool"
-                   "tool", box "select_methodology"
+                   "tool", box "todowrite"
                    "callID", box "call-1"
-                   "state", box (createObj [ "status", box "completed"; "output", box "Continue using the selected methodologies." ])
+                   "state", box (createObj [ "status", box "completed"; "output", box "Todos updated." ])
                ] |] |}
     let staleProbe =
         box {| info = createObj [ "id", box "methodology-probe-1"; "agent", box "manager"; "role", box "user"; "sessionID", box "strip-session" ]

@@ -25,11 +25,14 @@ let private assistantTextMsg (id: string) (text: string) : Message<obj> =
     { info = mkInfo id Assistant; parts = [ TextPart text ]; source = Native; raw = null }
 
 let probeTextContent () =
-    check "probe text: mentions tool name" (methodologyProbeText.Contains("select_methodology"))
-    check "probe text: mentions methodologies" (methodologyProbeText.Contains("methodologies"))
+    check "probe text: exact fixed text" (
+        methodologyProbeText = "<important>Before the task, please decide which methodologies are useful for this turn. Now you SHOULD Call the todowrite tool to update todos unless no progress, and select_methodology with one or more relevant methodologies. </important>")
 
 let toolResultTextExact () =
-    check "tool result: exact fixed text" (methodologyToolResultText = "Continue using the selected methodologies.")
+    check "tool result: single methodology" (
+        methodologyToolResultText [ "first_principles" ] = "Great! How to proceed with [first_principles] as your methodology?")
+    check "tool result: multiple methodologies" (
+        methodologyToolResultText [ "first_principles"; "deduction" ] = "Great! How to proceed with [first_principles, deduction] as your methodology?")
 
 let enumCount () =
     check "enum: 54 values" (methodologyEnumValues.Length = 54)
@@ -44,39 +47,43 @@ let catalogContainsKeyphrase () =
 let shouldAppendEmptySession () =
     check "empty session: append probe" (shouldAppendMethodologyProbe [ userMsg "u1" "do task" ] = true)
 
-let shouldNotAppendAfterCompletedMethodology () =
-    check "completed methodology: do not append" (
-        shouldAppendMethodologyProbe [ userMsg "u1" "task"; assistantToolMsg "a1" selectMethodologyToolName "completed" ] = false)
+let shouldNotAppendAfterCompletedTodo () =
+    check "completed todowrite: do not append" (
+        shouldAppendMethodologyProbe [ userMsg "u1" "task"; assistantToolMsg "a1" "todowrite" "completed" ] = false)
+    check "completed task: do not append" (
+        shouldAppendMethodologyProbe [ userMsg "u1" "task"; assistantToolMsg "a1" "task" "completed" ] = false)
 
 let shouldAppendAfterOtherTool () =
     check "other tool: still append" (
         shouldAppendMethodologyProbe [ userMsg "u1" "task"; assistantToolMsg "a1" "fuzzy_find" "completed" ] = true)
+    check "old select_methodology tool: still append" (
+        shouldAppendMethodologyProbe [ userMsg "u1" "task"; assistantToolMsg "a1" "select_methodology" "completed" ] = true)
 
-let shouldAppendAfterEarlierMethodologyThenOtherTool () =
-    check "earlier methodology then other tool in new wave: append" (
+let shouldAppendAfterEarlierTodoThenOtherTool () =
+    check "earlier todo then other tool in new wave: append" (
         shouldAppendMethodologyProbe
             [ userMsg "u1" "task"
-              assistantToolMsg "a1" selectMethodologyToolName "completed"
+              assistantToolMsg "a1" "todowrite" "completed"
               assistantToolMsg "a2" "fuzzy_find" "completed" ] = true)
 
-let shouldAppendAfterErroredMethodology () =
-    check "errored methodology: still append" (
-        shouldAppendMethodologyProbe [ userMsg "u1" "task"; assistantToolMsg "a1" selectMethodologyToolName "error" ] = true)
+let shouldAppendAfterErroredTodo () =
+    check "errored todowrite: still append" (
+        shouldAppendMethodologyProbe [ userMsg "u1" "task"; assistantToolMsg "a1" "todowrite" "error" ] = true)
 
-let shouldAppendNewTurnAfterOldMethodology () =
-    check "new turn after old methodology: append" (
+let shouldAppendNewTurnAfterOldTodo () =
+    check "new turn after old todo: append" (
         shouldAppendMethodologyProbe
             [ userMsg "u1" "task1"
-              assistantToolMsg "a1" selectMethodologyToolName "completed"
+              assistantToolMsg "a1" "todowrite" "completed"
               userMsg "u2" "task2" ] = true)
 
 let shouldNotAppendNoUserMessage () =
     check "no user message: do not append" (
-        shouldAppendMethodologyProbe [ assistantToolMsg "a1" selectMethodologyToolName "completed" ] = false)
+        shouldAppendMethodologyProbe [ assistantToolMsg "a1" "todowrite" "completed" ] = false)
 
-let shouldAppendPendingMethodologyDoesNotCount () =
-    check "pending methodology: still append" (
-        shouldAppendMethodologyProbe [ userMsg "u1" "task"; assistantToolMsg "a1" selectMethodologyToolName "pending" ] = true)
+let shouldAppendPendingTodoDoesNotCount () =
+    check "pending todowrite: still append" (
+        shouldAppendMethodologyProbe [ userMsg "u1" "task"; assistantToolMsg "a1" "todowrite" "pending" ] = true)
 
 let probeMessageShape () =
     let msg = buildProbeMessage "coder" "sess1"
@@ -95,11 +102,11 @@ let run () =
     enumAllInCatalog ()
     catalogContainsKeyphrase ()
     shouldAppendEmptySession ()
-    shouldNotAppendAfterCompletedMethodology ()
+    shouldNotAppendAfterCompletedTodo ()
     shouldAppendAfterOtherTool ()
-    shouldAppendAfterEarlierMethodologyThenOtherTool ()
-    shouldAppendAfterErroredMethodology ()
-    shouldAppendNewTurnAfterOldMethodology ()
+    shouldAppendAfterEarlierTodoThenOtherTool ()
+    shouldAppendAfterErroredTodo ()
+    shouldAppendNewTurnAfterOldTodo ()
     shouldNotAppendNoUserMessage ()
-    shouldAppendPendingMethodologyDoesNotCount ()
+    shouldAppendPendingTodoDoesNotCount ()
     probeMessageShape ()

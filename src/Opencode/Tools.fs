@@ -10,7 +10,6 @@ open VibeFs.Opencode.SubagentTools
 open VibeFs.Opencode.ExecutorTool
 open VibeFs.Opencode.SearchTools
 open VibeFs.Opencode.ReviewTools
-open VibeFs.Opencode.MethodologyTool
 open VibeFs.Opencode.MimoTodoTool
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.FuzzyFinderShell
@@ -26,7 +25,6 @@ let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: Finder
         yield "fuzzy_grep", box (fuzzyGrepTool finderCache)
         yield "websearch", box (websearchTool registry ctx)
         yield "webfetch", box (webfetchTool ())
-        yield "select_methodology", box (selectMethodologyTool ())
         if knowledgeGraphEnabled then
             yield "knowledge_graph_fetch", box (knowledgeGraphFetchTool knowledgeGraphRuntime ctx)
             yield "return_bookkeeper", box (returnBookkeeperTool knowledgeGraphRuntime)

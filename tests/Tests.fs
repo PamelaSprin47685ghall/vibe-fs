@@ -131,6 +131,7 @@ let private tests : (string * TestBody) list = [
     "ArchitectureTests.fileBodyUnder250", Sync (sync ArchitectureTests.fileBodyUnder250)
     "ArchitectureTests.noDanglingMarkers", Sync (sync ArchitectureTests.noDanglingMarkers)
     "ArchitectureTests.noBuiltinDictionary", Sync (sync ArchitectureTests.noBuiltinDictionary)
+    "ArchitectureTests.opencodeHookSchemaNoDirectZodImport", Sync (sync ArchitectureTests.opencodeHookSchemaNoDirectZodImport)
 ]
 
 let private matchesSelector (selectors: string array) (label: string) =

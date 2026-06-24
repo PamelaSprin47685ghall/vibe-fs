@@ -25,14 +25,14 @@ let canUseCanonical (agent: Agent) (tool: Tool) : bool =
     | _, _ when toolMatches [ "bash"; "task" ] || tool = "grep" -> false
     | _, _ when toolMatches [ "stealth" ] -> agent = "browser"
     | _, _ when toolMatches [ "return" ] -> toolMatches [ agent ]
-    | _, "select_methodology" -> agent <> "browser" && agent <> "investigator" && agent <> "executor" && agent <> "bookkeeper"
+    | _, _ when toolMatches [ "todo" ] -> true
     | "bookkeeper", _ -> false
     | "meditator", _ | "executor", _ -> false
     | _, "read" -> true
     | "reviewer", _ | "browser", _ -> false
     | "investigator", _ when toolMatches [ "executor" ] -> true
     | _, _ when toolMatches knownAgents
-                     || toolMatches [ "todo"; "question"; "web"; "skill" ]
+                     || toolMatches [ "question"; "web"; "skill" ]
                      || tool = "submit_review" -> agent <> "investigator" && agent <> "coder"
     | _, _ when toolMatches [ "write"; "edit"; "patch" ] -> agent <> "investigator" && agent <> "manager"
     | "manager", _ -> tool <> "fuzzy_grep"

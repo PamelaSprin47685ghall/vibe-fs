@@ -19,6 +19,8 @@ let toolDescriptionFor (host: Host) =
     toolDescriptionHeader
     + "\n- Always provide the full todos list. Partial updates are not supported.\n\n"
     + toolDescriptionTail
+    + "\n\n"
+    + VibeFs.Kernel.Methodology.selectMethodologyFieldDescription
 
 let toolDescription = toolDescriptionFor opencode
 

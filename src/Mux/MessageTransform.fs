@@ -193,7 +193,8 @@ let messagesTransform
                     Set.contains agent alwaysExcludedAgents
                     || (isChildWorkspace deps sessionID && Set.contains agent childWorkspaceExcludedAgents)
                 let typedMessages = decodeMessages sessionID messagesArr
-                let cleanedMessages = stripSyntheticBySource typedMessages
+                let typedMessagesWithoutProbes = typedMessages |> List.filter (fun m -> not (isMethodologyProbeMessage m))
+                let cleanedMessages = stripSyntheticBySource typedMessagesWithoutProbes
                 let backlog = magicSession.GetOrRebuildBacklog(sessionID, cleanedMessages)
                 let afterMagic =
                     if excluded then cleanedMessages

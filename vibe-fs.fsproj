@@ -1,9 +1,65 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="src/Shell/VibeFs.Shell.fsproj" />
+    <PackageReference Include="Thoth.Json" Version="10.4.1" />
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="src/Kernel/HostTools.fs" />
+    <Compile Include="src/Kernel/SubagentIntents.fs" />
+    <Compile Include="src/Kernel/PromptFrontMatter.fs" />
+    <Compile Include="src/Kernel/ReviewSession.fs" />
+    <Compile Include="src/Kernel/ReviewVerdict.fs" />
+    <Compile Include="src/Kernel/LoopMessages.fs" />
+    <Compile Include="src/Kernel/PromptFragments.fs" />
+    <Compile Include="src/Kernel/SearchPrompts.fs" />
+    <Compile Include="src/Kernel/ReviewPrompts.fs" />
+    <Compile Include="src/Kernel/SubagentPrompts.fs" />
+    <Compile Include="src/Kernel/Subagent.fs" />
+    <Compile Include="src/Kernel/ToolCatalog.fs" />
+    <Compile Include="src/Kernel/Nudge.fs" />
+    <Compile Include="src/Kernel/Dedup.fs" />
+    <Compile Include="src/Kernel/Messaging.fs" />
+    <Compile Include="src/Kernel/Message.fs" />
+    <Compile Include="src/Kernel/KnowledgeGraph.fs" />
+    <Compile Include="src/Kernel/KnowledgeGraphCodec.fs" />
+    <Compile Include="src/Kernel/KnowledgeGraphPrompts.fs" />
+    <Compile Include="src/Kernel/KnowledgeGraphMaintenance.fs" />
+    <Compile Include="src/Kernel/KnowledgeGraphRuntimeState.fs" />
+    <Compile Include="src/Kernel/CapsFormat.fs" />
+    <Compile Include="src/Kernel/TreeSitterKernel.fs" />
+    <Compile Include="src/Kernel/MessageDedup.fs" />
+    <Compile Include="src/Kernel/Methodology.fs" />
+    <Compile Include="src/Kernel/MagicCore.fs" />
+    <Compile Include="src/Kernel/MagicProjection.fs" />
+    <Compile Include="src/Kernel/MagicTodo.fs" />
+    <Compile Include="src/Kernel/Domain.fs" />
+    <Compile Include="src/Kernel/NudgeState.fs" />
+    <Compile Include="src/Kernel/Config.fs" />
+    <Compile Include="src/Kernel/FuzzyPath.fs" />
+    <Compile Include="src/Kernel/FuzzyQuery.fs" />
+    <Compile Include="src/Kernel/FuzzyFormat.fs" />
+    <Compile Include="src/Kernel/Executor.fs" />
+    <Compile Include="src/Shell/Dyn.fs" />
+    <Compile Include="src/Shell/ErrorClassify.fs" />
+    <Compile Include="src/Shell/ReviewRuntime.fs" />
+    <Compile Include="src/Shell/PromiseQueue.fs" />
+    <Compile Include="src/Shell/SessionExecutor.fs" />
+    <Compile Include="src/Shell/MagicSessionStore.fs" />
+    <Compile Include="src/Shell/ExecutorJavascript.fs" />
+    <Compile Include="src/Shell/SubagentIntentsCodec.fs" />
+    <Compile Include="src/Shell/OllamaClient.fs" />
+    <Compile Include="src/Shell/TreeSitterShell.fs" />
+    <Compile Include="src/Shell/FuzzyFinderShell.fs" />
+    <Compile Include="src/Shell/FuzzyIteratorStore.fs" />
+    <Compile Include="src/Shell/WebSearchCodec.fs" />
+    <Compile Include="src/Shell/FileSys.fs" />
+    <Compile Include="src/Shell/KnowledgeGraphPortLock.fs" />
+    <Compile Include="src/Shell/KnowledgeGraphFiles.fs" />
+    <Compile Include="src/Shell/WorkspaceFiles.fs" />
+    <Compile Include="src/Shell/Executor.fs" />
+    <Compile Include="src/Shell/FuzzySearch.fs" />
+    <Compile Include="src/Shell/ChildAgentRegistry.fs" />
+    <Compile Include="src/Shell/NudgeRuntime.fs" />
     <Compile Include="src/Mux/AiSettings.fs" />
     <Compile Include="src/Opencode/MessagingCodec.fs" />
     <Compile Include="src/Opencode/CapsPrelude.fs" />
@@ -23,7 +79,6 @@
     <Compile Include="src/Mux/KnowledgeGraphRuntimeIO.fs" />
     <Compile Include="src/Mux/KnowledgeGraphTools.fs" />
     <Compile Include="src/Mux/KnowledgeGraphToolDefs.fs" />
-    <Compile Include="src/Mux/MethodologyTool.fs" />
     <Compile Include="src/Mux/MessageTransform.fs" />
     <Compile Include="src/Mux/EventHook.fs" />
     <Compile Include="src/Mux/SlashCommands.fs" />
@@ -48,7 +103,6 @@
     <Compile Include="src/Opencode/ExecutorTool.fs" />
     <Compile Include="src/Opencode/SearchTools.fs" />
     <Compile Include="src/Opencode/ReviewTools.fs" />
-    <Compile Include="src/Opencode/MethodologyTool.fs" />
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/HookExecute.fs" />
     <Compile Include="src/Opencode/HookTransform.fs" />

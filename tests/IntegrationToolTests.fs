@@ -135,8 +135,7 @@ let run () : JS.Promise<unit> =
             "muxMethodologyProbeAppended", muxMethodologyProbeAppendedSpec
             "muxMethodologyProbeSuppressedAfterCall", muxMethodologyProbeSuppressedAfterCallSpec
             "muxMethodologyProbeExcludedAgents", muxMethodologyProbeExcludedAgentsSpec
-            "muxMethodologyToolExecute", muxMethodologyToolExecuteSpec
-            "muxMethodologyToolSchema", muxMethodologyToolSchemaSpec
+            "muxTodoWriteMethodologySchema", muxTodoWriteMethodologySchemaSpec
             "muxMethodologyProbeStrippedOnReprojection", muxMethodologyProbeStrippedOnReprojectionSpec
         ]
         for (label, spec) in specs do

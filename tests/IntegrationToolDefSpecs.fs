@@ -169,9 +169,37 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () = promise {
     let td = get p "tool.definition"
 
     let extendCalls = ResizeArray<obj>()
+    let arrayCalls = ResizeArray<string>()
+    let minCalls = ResizeArray<int>()
     let describeCalls = ResizeArray<string>()
     let optionalCalls = ResizeArray<string>()
-    let existingReportField = createObj [ "kind", box "existing-report" ]
+    let methodologyField = createObj [ "kind", box "methodology-optional" ]
+    let describedMethodology =
+        createObj [
+            "optional", box (System.Func<obj>(fun () ->
+                optionalCalls.Add("select_methodology")
+                methodologyField))
+        ]
+    let minMethodology =
+        createObj [
+            "describe", box (System.Func<obj, obj>(fun desc ->
+                describeCalls.Add(string desc)
+                describedMethodology))
+        ]
+    let arrayMethodology =
+        createObj [
+            "min", box (System.Func<obj, obj>(fun count ->
+                minCalls.Add(unbox<int> count)
+                minMethodology))
+        ]
+    let existingReportField =
+        createObj [
+            "kind", box "existing-report"
+            "_def", box (createObj [ "typeName", box "ZodString" ])
+            "array", box (System.Func<obj>(fun () ->
+                arrayCalls.Add("select_methodology")
+                arrayMethodology))
+        ]
     let zodLikeParams = createObj [
         "safeExtend", box (System.Func<obj, obj>(fun arg ->
             extendCalls.Add(arg)
@@ -182,6 +210,11 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () = promise {
 
     do! td $ (createObj [ "toolID", box "task" ], taskDef) |> unbox<JS.Promise<unit>>
     check "mimo task.definition rewrites zod-like parameters" (string (get (get taskDef "parameters") "kind") = "extended")
-    check "mimo task.definition reuses existing report field on zod schema" (obj.ReferenceEquals(get extendCalls.[0] "completedWorkReport", existingReportField))
+    check "mimo task.definition does not overwrite existing report field on zod schema" (isNullish (get extendCalls.[0] "completedWorkReport"))
+    check "mimo task.definition builds methodology from zod string template" (obj.ReferenceEquals(get extendCalls.[0] "select_methodology", describedMethodology))
+    check "mimo task.definition calls zod array for methodology" (arrayCalls.Count = 1)
+    check "mimo task.definition calls zod min 1 for methodology" (minCalls.Count = 1 && minCalls.[0] = 1)
+    check "mimo task.definition describes methodology field" (describeCalls.Count = 1 && describeCalls.[0] = VibeFs.Opencode.HookSchema.selectMethodologyFieldDescription)
+    check "mimo task.definition makes methodology required" (optionalCalls.Count = 0)
     do! rmAsync workspaceDir
 }

@@ -1,20 +1,10 @@
 module VibeFs.Tests.AgentTests
 
+open Fable.Core
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Config
 
-
 let canUse' () =
-    check "agent_report for manager" (canUse "manager" "agent_report")
-    check "agent_report for investigator" (canUse "investigator" "agent_report")
-    check "agent_report for coder" (canUse "coder" "agent_report")
-
-    check "bash denied for manager" (not (canUse "manager" "bash"))
-    check "bash_.* denied for coder" (not (canUse "coder" "bash_run"))
-    check "task denied for investigator" (not (canUse "investigator" "task"))
-    check "grep denied exact" (not (canUse "manager" "grep"))
-    check "fuzzy_grep not caught by grep rule" (canUse "investigator" "fuzzy_grep")
-
     check "stealth for browser" (canUse "browser" "stealth-browser-mcp_navigate")
     check "stealth denied for manager" (not (canUse "manager" "stealth-browser-mcp_navigate"))
 
@@ -23,14 +13,6 @@ let canUse' () =
     check "submit_review for manager" (canUse "manager" "submit_review")
     check "submit_review denied for coder" (not (canUse "coder" "submit_review"))
     check "submit_review denied for investigator" (not (canUse "investigator" "submit_review"))
-    check "select_methodology for manager" (canUse "manager" "select_methodology")
-    check "select_methodology for coder" (canUse "coder" "select_methodology")
-    check "select_methodology for reviewer" (canUse "reviewer" "select_methodology")
-    check "select_methodology for meditator" (canUse "meditator" "select_methodology")
-    check "select_methodology denied for browser" (not (canUse "browser" "select_methodology"))
-    check "select_methodology denied for investigator" (not (canUse "investigator" "select_methodology"))
-    check "select_methodology denied for executor" (not (canUse "executor" "select_methodology"))
-    check "select_methodology denied for bookkeeper" (not (canUse "bookkeeper" "select_methodology"))
 
     check "meditator denied read" (not (canUse "meditator" "read"))
     check "executor denied read" (not (canUse "executor" "read"))
@@ -59,7 +41,7 @@ let canUse' () =
     check "investigator can fuzzy_grep" (canUse "investigator" "fuzzy_grep")
     check "investigator denied write" (not (canUse "investigator" "write"))
     check "investigator denied coder dispatch" (not (canUse "investigator" "coder"))
-    check "investigator denied todo" (not (canUse "investigator" "todowrite"))
+    check "investigator allowed todo" (canUse "investigator" "todowrite")
 
     check "coder can read" (canUse "coder" "read")
     check "coder can write" (canUse "coder" "write")
@@ -67,7 +49,9 @@ let canUse' () =
     check "coder can fuzzy_find" (canUse "coder" "fuzzy_find")
     check "coder can fuzzy_grep" (canUse "coder" "fuzzy_grep")
     check "coder denied investigator dispatch" (not (canUse "coder" "investigator"))
-    check "coder denied todo" (not (canUse "coder" "todowrite"))
+    check "coder allowed todo" (canUse "coder" "todowrite")
+
+    check "meditator allowed todo" (canUse "meditator" "todowrite")
 
     check "manager can read" (canUse "manager" "read")
     check "manager can coder dispatch" (canUse "manager" "coder")
@@ -128,9 +112,8 @@ let canUseMatrix () =
         "websearch",                     [ true;  false; false; false; false; false; false; false ]
         "webfetch",                      [ true;  false; false; false; false; false; false; false ]
         "submit_review",                 [ true;  false; false; false; false; false; false; false ]
-        "select_methodology",            [ true;  false; true;  true;  false; true;  false; false ]
-        "todowrite",                     [ true;  false; false; false; false; false; false; false ]
-        "todo_write",                    [ true;  false; false; false; false; false; false; false ]
+        "todowrite",                     [ true;  true;  true;  true;  true;  true;  true;  true  ]
+        "todo_write",                    [ true;  true;  true;  true;  true;  true;  true;  true  ]
         "question",                      [ true;  false; false; false; false; false; false; false ]
         "ask_user_question",             [ true;  false; false; false; false; false; false; false ]
         "skill",                         [ true;  false; false; false; false; false; false; false ]
@@ -143,7 +126,7 @@ let canUseMatrix () =
         "stealth-browser-mcp_navigate",  [ false; false; false; false; true;  false; false; false ]
         "return_reviewer",               [ false; false; false; true;  false; false; false; false ]
         "return_coder",                  [ false; false; true;  false; false; false; false; false ]
-        "manage_todo_list",              [ true;  false; false; false; false; false; false; false ]
+        "manage_todo_list",              [ true;  true;  true;  true;  true;  true;  true;  true  ]
     ]
     matrix
     |> List.iter (fun (tool, expected) ->
