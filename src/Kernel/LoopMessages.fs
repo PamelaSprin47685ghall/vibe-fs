@@ -27,6 +27,7 @@ let isEndVerdict (verdict: string) : bool =
 let loopFooter =
     [ "- report: a detailed description of what you did and why"
       "- affectedFiles: list of every file you modified or created"
+      "- wip (optional): omit or true while the task is not fully complete; false only when the full task is done"
       ""
       "A reviewer will examine your submission. If accepted, you are done. If rejected, you will receive specific feedback to address." ]
 

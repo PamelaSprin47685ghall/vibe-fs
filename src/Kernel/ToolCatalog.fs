@@ -153,7 +153,7 @@ let private submitReviewSpec: ToolSpec =
             [ "report", "Detailed report of what was done"
               "affectedFiles", "List of file paths that were modified or created"
               "wip",
-               "Defaults to true when omitted: record progress without starting a reviewer. Set to false to start the reviewer for final review. With-Review Mode stays active until a passing final review." ]
+               "Optional. Defaults to true when omitted. true means this submission is partial — the task is not fully complete yet. false means you assert the full task is complete in this submission." ]
       requiredFields = [ "report"; "affectedFiles" ] }
 
 let all: ToolSpec list =

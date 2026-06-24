@@ -141,6 +141,7 @@ let withReviewCommandTemplate =
               "Before finishing, you must call submit_review with:"
               "- report: a detailed description of what you did and why"
               "- affectedFiles: every file you modified or created"
+              "- wip: omit or true until the task is fully complete; false only when everything required is done"
               "Defend proactively against reviewer rejection: keep the implementation natural, minimal, complete, and well-tested."
               "Do not end the conversation without submit_review." ])
 
@@ -169,7 +170,7 @@ let reviewerNudgePrompt =
 let submitReviewIsWip (wip: bool option) : bool = defaultArg wip true
 
 let submitReviewWipAcknowledgment : string =
-    "Your progress report was received. No reviewer was started. With-Review Mode is still active — continue working, and call submit_review again with wip set to false when you are ready for final review."
+    "Your progress report was recorded. With-Review Mode is still active — continue working until the task is fully complete, then call submit_review again."
 
 let agentReportReviewInstructions =
     readOnlyWorkspaceConstraint

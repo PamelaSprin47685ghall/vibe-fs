@@ -14,6 +14,7 @@ open VibeFs.Kernel.SearchPrompts
 open VibeFs.Kernel.SubagentPrompts
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.Subagent
+open VibeFs.Kernel.ToolCatalog
 open VibeFs.Kernel.Domain
 open VibeFs.Shell.Dyn
 
@@ -68,7 +69,26 @@ let toolCatalogCentralized () =
     check "return bookkeeper description mentions knowledge graph" (submitSpec.description.Contains "knowledge graph")
     check "return bookkeeper requires entries" (submitSpec.requiredFields = [ "entries" ])
 
-    let allSpecs = VibeFs.Kernel.ToolCatalog.all
+    let submitReviewSpec = specOf "submit_review"
+    check "submit_review spec carries description" (submitReviewSpec.description.Length > 0)
+    check "submit_review param doc for wip" (Map.containsKey "wip" submitReviewSpec.paramDocs)
+    let wipDoc =
+        match Map.tryFind "wip" submitReviewSpec.paramDocs with
+        | Some doc -> doc
+        | None -> ""
+    let wipLower = wipDoc.ToLowerInvariant()
+    check "wip param doc does not mention starting a reviewer" (wipLower.IndexOf("starting a reviewer") < 0)
+    check "wip param doc does not mention start the reviewer" (wipLower.IndexOf("start the reviewer") < 0)
+    check "wip param doc does not mention skip" (wipLower.IndexOf("skip") < 0)
+    check "wip param doc mentions partial or not fully complete"
+        (wipLower.IndexOf("partial") >= 0 || wipLower.IndexOf("not fully complete") >= 0)
+
+    let ackLower = submitReviewWipAcknowledgment.ToLowerInvariant()
+    check "wip acknowledgment does not say No reviewer" (ackLower.IndexOf("no reviewer") < 0)
+    check "wip acknowledgment does not mention wip set to false" (ackLower.IndexOf("wip set to false") < 0)
+    check "wip acknowledgment does not mention starting a reviewer" (ackLower.IndexOf("starting a reviewer") < 0)
+
+    let allSpecs = all
     let names = allSpecs |> List.map (fun spec -> spec.name) |> Set.ofList
     check "catalog covers coder" (Set.contains "coder" names)
     check "catalog covers investigator" (Set.contains "investigator" names)
@@ -77,6 +97,7 @@ let toolCatalogCentralized () =
     check "catalog covers executor" (Set.contains "executor" names)
     check "catalog covers knowledge_graph_fetch" (Set.contains "knowledge_graph_fetch" names)
     check "catalog covers return_bookkeeper" (Set.contains "return_bookkeeper" names)
+    check "catalog covers submit_review" (Set.contains "submit_review" names)
 
 let hostToolsKnowledgeGraphNames () =
     let names = VibeFs.Kernel.HostTools.allToolNames VibeFs.Kernel.HostTools.opencode |> Set.ofArray

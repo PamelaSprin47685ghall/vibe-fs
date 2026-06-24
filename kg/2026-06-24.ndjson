@@ -888,3 +888,10 @@
 {"id":"1a6e","entity":["版本控制","工作区布局"],"fact":"master 从 3f10922 快进至 5c28e67，更新 8 文件（ReviewPrompts.fs/ToolCatalog.fs/ReviewToolsMux.fs/ReviewTools.fs/IntegrationMuxReviewPromptSpecs.fs/IntegrationMuxReviewSpecs.fs/IntegrationToolTests.fs/kg/2026-06-24.ndjson），+105 -35 行。kg/2026-06-24.ndjson 存在合并冲突待解决。stash 已保存。"}
 {"id":"0521","entity":["审查提示词","方法论探针"],"fact":"ReviewPrompts.fs 更新 +5 行，ToolCatalog.fs 更新 +6 -1 行，ReviewToolsMux.fs 更新 +42 行重构（-35 行），ReviewTools.fs 更新 +23 -12 行，集成测试断言同步更新。"}
 {"id":"c4d2","entity":["知识图谱","持久化"],"fact":"kg/2026-06-24.ndjson 在 fast-forward 合并后产生内容冲突，需手工消解冲突标记后方可投影与 bookkeeper 追加。"}
+{"id":"e522","entity":["版本控制","工作区布局"],"fact":"master tip 推进至 465fad9（test: align TitleFetchGuard wrap assertions with English do-not-exec prompt），已推送 origin。新工作树 ../vibe-fs-worktree-1 从 master 465fad9 以 detached HEAD 创建。"}
+{"id":"d6f0","entity":["审查循环","工具参数"],"fact":"submit_review 的 wip 参数语义更新：缺省 true 表示部分提交、任务未完成；false 表示断言任务完整完成。旧文案强调进度记录与 reviewer 启动控制，新文案聚焦任务完成度断言语义。"}
+{"id":"e6d8","entity":["审查提示词","wip确认文案"],"fact":"ReviewPrompts.fs 审查指令文案新增 wip 参数说明：omit or true 直至任务完成，false 仅当全部要求达成时使用。"}
+{"id":"13c5","entity":["审查循环","协议分层"],"fact":"LoopMessages.fs loopFooter 新增 wip (optional) 说明行，与 submit_review wip 参数契约对齐：omit 或 true 表示任务未完成仅记录进度，false 表示完整终审。"}
+{"id":"1fdb","entity":["审查循环","提示词纪律"],"fact":"wip 参数文档禁止向 LLM 暴露 reviewer-skip / wip=false 等行为后果，确保 LLM 如实报告进度而非策略性跳过审查。"}
+{"id":"f207","entity":["审查循环","提示词纪律"],"fact":"submitReviewWipAcknowledgment 文案禁止出现 no reviewer / wip set to false / starting a reviewer 等泄露实现细节的子串。"}
+{"id":"c655","entity":["测试门禁","审查循环"],"fact":"KernelPromptSpecs 新增 submit_review wip 参数文档与确认文案的负向子串断言，与集成测试整段返回值精确匹配互补，构成双重防护。"}
