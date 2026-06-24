@@ -160,6 +160,7 @@ let muxToolExecuteAfterTriggersBookkeeperSpec () = promise {
     let prompts = ResizeArray<string>()
     let deps = minimalMuxDeps ()
     deps?("directory") <- workspaceDir
+    deps?("workspaceId") <- "mux-tool-after"
     deps?("taskService") <- mockMuxTaskServiceCapturingPrompt prompts
     let reg = createRegistration deps
     let after = get reg "tool.execute.after"

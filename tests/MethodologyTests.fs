@@ -7,16 +7,16 @@ open VibeFs.Kernel.Methodology
 
 let toolResultTextExact () =
     check "tool result: single methodology" (
-        methodologyToolResultText [ "first_principles" ] = "Great! First, recall the procedures for [first_principles] to confirm understanding, then continue with the next work step.")
+        methodologyToolResultText [ "first_principles" ] = "Great! Now please explain how to apply [first_principles] to the work step.")
     check "tool result: multiple methodologies" (
-        methodologyToolResultText [ "first_principles"; "deduction" ] = "Great! First, recall the procedures for [first_principles, deduction] to confirm understanding, then continue with the next work step.")
+        methodologyToolResultText [ "first_principles"; "deduction" ] = "Great! Now please explain how to apply [first_principles, deduction] to the work step.")
 
 let todoResultTextExact () =
     check "todo result: empty" (todoResultText [] = "Todos updated.")
     check "todo result: single methodology" (
-        todoResultText [ "first_principles" ] = "Great! First, recall the procedures for [first_principles] to confirm understanding, then continue with the next work step.")
+        todoResultText [ "first_principles" ] = "Great! Now please explain how to apply [first_principles] to the work step.")
     check "todo result: multiple methodologies" (
-        todoResultText [ "first_principles"; "deduction" ] = "Great! First, recall the procedures for [first_principles, deduction] to confirm understanding, then continue with the next work step.")
+        todoResultText [ "first_principles"; "deduction" ] = "Great! Now please explain how to apply [first_principles, deduction] to the work step.")
 
 let enumCount () =
     check "enum: 54 values" (methodologyEnumValues.Length = 54)

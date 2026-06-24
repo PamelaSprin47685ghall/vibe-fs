@@ -529,3 +529,5 @@
 {"id":"853a","entity":["冲突解决策略"],"fact":"采用 git checkout --ours 策略解决未合并冲突，接受当前 master 分支版本，并 git add 标记为已解决。"}
 {"id":"d727","entity":["宿主适配","工具装配"],"fact":"Mux toolExecuteAfter 钩子签名已修正：由仅传 knowledgeGraphRuntime 与 input/output，改为传入 deps 以消费 toolNames 等上下文依赖。"}
 {"id":"24e4","entity":["会话续推","Nudge","合成事件过滤"],"fact":"decideNudge 锚为历史 alreadyNudged（末 completed 助手后尾随 nudge-prompt user），非进程计数，重启安全。Opencode Nudge 三分：NudgeEventCodec / Effect / Hook；abort 判定经 Shell.ErrorClassify 在编排层 open，非编解码文件传递。"}
+{"id":"c15a","entity":["方法论","提示词契约"],"fact":"内核 Methodology.fs methodologyToolResultText 与 todoResultText 确认文案重构：废弃 'First, recall the procedures for [...] to confirm understanding, then continue with the next work step.' 句式，改为 'Great! Now please explain how to apply [...] to the work step.'，强化方法论执行前的程序回忆与理解确认纪律。"}
+{"id":"6f8a","entity":["集成测试","模块边界"],"fact":"IntegrationBookkeeperSpecs 重构：废弃硬编码 Nudge 追加，改为调用内核 Methodology.todoResultText 动态生成确认文案；通过 Dyn 解析 args.select_methodology 获取方法论列表，确保宿主返回值与内核方法论契约对齐。"}
