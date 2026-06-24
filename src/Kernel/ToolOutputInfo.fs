@@ -22,13 +22,13 @@ let hintMeditator =
 
 let hintTodosUpdated = "Todos updated."
 
-let hintMethodologyFollowup (methodologyNames: string) =
-    $"Great! Explain how to apply {methodologyNames} to actual work NOW without getting lost in details!"
+let hintMethodologyFollowup (methodologyId: string) =
+    $"Great! Now apply {methodologyId} to actual work NOW and you MUST think over and then call methodology_{methodologyId} tool asap!"
 
 let hintForMethodologies (methodologies: string list) : string =
     match methodologies with
     | [] -> hintTodosUpdated
-    | names -> hintMethodologyFollowup (String.concat ", " names)
+    | names -> names |> List.map hintMethodologyFollowup |> String.concat " "
 
 type InfoItem =
     | Hint of string

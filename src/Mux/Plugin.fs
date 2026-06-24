@@ -21,12 +21,15 @@ open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.WorkspaceFiles
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Mux.MessageTransform
+open VibeFs.Methodology.MuxTools
 open VibeFs.Shell.Dyn
 
 let muxToolNames =
-    [| "coder"; "investigator"; "meditator"; "browser"; "executor"
-       "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
-       "knowledge_graph_fetch"; "return_bookkeeper" |]
+    Array.append
+        [| "coder"; "investigator"; "meditator"; "browser"; "executor"
+           "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
+           "knowledge_graph_fetch"; "return_bookkeeper" |]
+        methodologyToolNames
 
 let private canUseMuxTopLevel (agent: string) (toolName: string) : bool =
     canUseCanonical agent toolName
@@ -109,7 +112,8 @@ let createToolCatalog
        yield writeTool deps
        yield readTool deps hostReadExec
        yield knowledgeGraphFetchTool knowledgeGraphRuntime
-       yield returnBookkeeperTool knowledgeGraphRuntime |]
+       yield returnBookkeeperTool knowledgeGraphRuntime
+       yield! allMethodologyTools deps toolNames |]
 
 let private recordsToBookkeeper (tool: string) : bool =
     let allowed =

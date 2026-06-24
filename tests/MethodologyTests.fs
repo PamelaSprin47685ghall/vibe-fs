@@ -5,6 +5,8 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Methodology
 open VibeFs.Kernel.ToolOutputInfo
+open VibeFs.Methodology.Registry
+open VibeFs.Methodology.SchemaCommon
 
 let private hintFromTodoOutput (methodologies: string list) =
     match tryParse (todoWriteOutput methodologies false) with
@@ -18,8 +20,9 @@ let todoWriteOutputExact () =
     check "todo envelope: empty methodologies" (hintFromTodoOutput [] = hintTodosUpdated)
     check "todo envelope: single methodology" (
         hintFromTodoOutput [ "first_principles" ] = hintMethodologyFollowup "first_principles")
-    check "todo envelope: multiple methodologies" (
-        hintFromTodoOutput [ "first_principles"; "deduction" ] = hintMethodologyFollowup "first_principles, deduction")
+    let multi =
+        hintMethodologyFollowup "first_principles" + " " + hintMethodologyFollowup "deduction"
+    check "todo envelope: multiple methodologies" (hintFromTodoOutput [ "first_principles"; "deduction" ] = multi)
 
 let enumCount () =
     check "enum: 54 values" (methodologyEnumValues.Length = 54)
@@ -31,8 +34,21 @@ let enumAllInCatalog () =
 let catalogContainsKeyphrase () =
     check "catalog: contains keyphrase" (methodologyCatalog.Contains("Methodology catalog"))
 
+let registryAlignsWithEnum () =
+    check "registry: 54 schemas" (allSchemas.Length = 54)
+    methodologyEnumValues
+    |> List.iter (fun id ->
+        check ("registry has " + id) (tryFindSchema id |> Option.isSome))
+    allSchemas
+    |> List.iter (fun s ->
+        check ("schema has intent " + s.methodologyId) (
+            s.fields |> List.exists (fun f -> f.name = intentFieldName && f.required))
+        check ("schema has background " + s.methodologyId) (
+            s.fields |> List.exists (fun f -> f.name = backgroundFieldName && f.required)))
+
 let run () =
     todoWriteOutputExact ()
     enumCount ()
     enumAllInCatalog ()
     catalogContainsKeyphrase ()
+    registryAlignsWithEnum ()
