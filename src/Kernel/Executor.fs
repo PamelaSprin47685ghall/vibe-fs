@@ -137,25 +137,24 @@ let outputFromResult (result: ExecuteResult) : string =
 let formatReturnValueBlock (result: ExecuteResult) : string =
     let lines = ResizeArray<string>()
     lines.Add "---"
-    lines.Add "executor_return:"
     match result with
     | Completed(_, exitCode) ->
-        lines.Add "  status: completed"
-        lines.Add $"  exit_code: {exitCode}"
+        lines.Add "status: completed"
+        lines.Add $"exit_code: {exitCode}"
     | Truncated _ ->
-        lines.Add "  status: truncated"
+        lines.Add "status: truncated"
     | Failed(_, exitCodeOpt, signalOpt) ->
-        lines.Add "  status: failed"
-        exitCodeOpt |> Option.iter (fun c -> lines.Add $"  exit_code: {c}")
-        signalOpt |> Option.iter (fun s -> lines.Add $"  signal: {s}")
+        lines.Add "status: failed"
+        exitCodeOpt |> Option.iter (fun c -> lines.Add $"exit_code: {c}")
+        signalOpt |> Option.iter (fun s -> lines.Add $"signal: {s}")
     | MissingExecutable _ ->
-        lines.Add "  status: missing_executable"
+        lines.Add "status: missing_executable"
     lines.Add "---"
     String.concat "\n" lines
 
 let formatToolResponse (result: ExecuteResult) (summaryOption: string option) : string =
     let body = Option.defaultValue (outputFromResult result) summaryOption
-    body + "\n\n" + formatReturnValueBlock result
+    formatReturnValueBlock result + "\n\n" + body
 
 let readOnlyReadCommands: Set<string> =
     Set.ofList
