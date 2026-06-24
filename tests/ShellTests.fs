@@ -198,7 +198,7 @@ let safetyWarning () =
     check "substring inside word ignored" (not ((warn "echo concatenate").Contains readOnlyWarning))
     check "non-shell language ignored" (not ((prependSafetyWarning "OUT" "grep foo" Python).Contains readOnlyWarning))
 
-/// Executor tool output must append a structured executor_return YAML block
+/// Executor tool output must prepend a structured return YAML block
 /// carrying exit_code + status. Tests expect extended ExecuteResult with exit
 /// metadata: Completed(output, exitCode), Failed(output, exitCodeOpt, signalOpt).
 let executorToolResponseFormatting () =
@@ -213,23 +213,22 @@ let executorToolResponseFormatting () =
     equal "outputFromResult missing" "Error: not found" (outputFromResult missingResult)
 
     let completedBlock = formatReturnValueBlock completedResult
-    check "completed block has executor_return header" (completedBlock.Contains "executor_return")
+    check "completed block starts with status header" (completedBlock.Contains "status: completed")
     check "completed block has exit_code 0" (completedBlock.Contains "exit_code: 0")
-    check "completed block has status completed" (completedBlock.Contains "completed")
 
     let failedBlock = formatReturnValueBlock failedResult
     check "failed block has exit_code 2" (failedBlock.Contains "exit_code: 2")
-    check "failed block has status failed" (failedBlock.Contains "failed")
+    check "failed block has status failed" (failedBlock.Contains "status: failed")
 
     let truncatedBlock = formatReturnValueBlock truncatedResult
-    check "truncated block has status truncated" (truncatedBlock.Contains "truncated")
+    check "truncated block has status truncated" (truncatedBlock.Contains "status: truncated")
 
     let missingBlock = formatReturnValueBlock missingResult
-    check "missing block has status missing_executable" (missingBlock.Contains "missing_executable")
+    check "missing block has status missing_executable" (missingBlock.Contains "status: missing_executable")
 
     let resp = formatToolResponse completedResult None
+    check "response prepends return block" (resp.StartsWith "---")
     check "response includes output body" (resp.Contains "all good")
-    check "response includes executor_return" (resp.Contains "executor_return")
     check "response includes exit_code" (resp.Contains "exit_code")
 
     let failedResp = formatToolResponse failedResult None
@@ -237,13 +236,13 @@ let executorToolResponseFormatting () =
 
     let summary = "SUMMARY: task succeeded"
     let summaryResp = formatToolResponse completedResult (Some summary)
+    check "summary response prepends return block" (summaryResp.StartsWith "---")
     check "summary response uses summary as body" (summaryResp.Contains summary)
-    check "summary response appends return block" (summaryResp.Contains "executor_return")
     check "summary response has exit_code 0" (summaryResp.Contains "exit_code: 0")
 
 /// When output is summarized, the summarizer prompt must NOT instruct the model
 /// to preserve exit status — that metadata now travels in the structured return
-/// block appended by formatToolResponse.
+/// block prepended by formatToolResponse.
 let summarizerPromptOmitsReturnValue () =
     let prompt = executorSummarizerPrompt "raw output" "shell" "echo 1" [] "short" "ro"
     check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
