@@ -117,3 +117,284 @@
 {"id":"0e3c","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs 中 methodologyToolResultText 废弃固定文案，改为接收 methodologies 列表参数并动态生成确认响应；空列表校验抛出 invalidArg。测试 MethodologyTests.fs 同步更新为单例与多例断言，验证动态格式化契约。"}
 {"id":"9e54","entity":["工具模式","协议收敛"],"fact":"Opencode HookSchema.buildZodMethodologyField 废弃手写 Zod 组装，改引内核 Methodology.enumArrayMinOpt 统一编码器；方法论字段构建逻辑由宿主 Schema 层收敛至内核 Protocol 层，消除宿主特异性实现细节，确保枚举约束与描述文案的跨层一致性。本次补丁同步精简 selectMethodologyFieldDescription 文案尾随换行符，维持描述紧凑性。"}
 {"id":"a43e","entity":["代码补丁","空操作"],"fact":"补丁文件 .codex-noop 仅含空内容，用于触发空操作或无变更提交，不引入实际逻辑修改。"}
+{"id":"95e2","entity":["权限矩阵","主会话代理"],"fact":"Config.fs:28 toolMatches [\"todo\"] 仅 manager/coder/meditator 放行；build/plan 虽为 primary 别名(ChatHooks 兜底 manager, MessageTransform 兜底 build) 但行28 显式 false。主会话 agent 名按宿主与钩子分叉：Opencode chat.message 解析 input.agent→LookupChildAgent→info.agent→兜底 manager；MessageTransform 回溯兜底 build。双默认不一致致 agent=build 时 resolveChatTools 将 todowrite 置 false，非 schema 注册失败。Mux 顶层 todo_write 走 host wrapper 不经 muxToolNames remove，manager role 下 host removals 不含 todo_.*。"}
+{"id":"7abe","entity":["权限矩阵","Mux 工具注册"],"fact":"Mux Plugin.fs muxToolNames 不含 todo_write；顶层 manager 权限由 getToolPolicy(role)→buildToolPolicy 经 vibeFsBinding.ts 叠加 roleScopedHostRemovals，manager removals 无 todo_.*。子代理 SubagentTools.disabledToolsForRole 将 todo_write/todo_read 规范为 todo 再 canUseCanonical。"}
+{"id":"20c9","entity":["配置门控","工具匹配"],"fact":"Config.fs 对 todo 工具匹配的门控由 agent 白名单（manager/coder/meditator）改为无条件放行 true，消除 agent 身份对 todo 匹配的制约。"}
+{"id":"521e","entity":["构建","编译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 1222ms，JS 镜像生成耗时 5753ms，构建成功。"}
+{"id":"fb14","entity":["构建","编译"],"fact":"构建管线清理残留 .gitignore 并同步 build-package.json 至 build/package.json，确保宿主模块解析路径一致。"}
+{"id":"5cbf","entity":["测试门禁","矩阵收敛"],"fact":"npm test 产出 3065 pass 4 fail；fail 集中于 investigator 拒绝 todo 与 matrix 维度（todowrite/todo_write/manage_todo_list），指示权限矩阵与工具名规范化尚未对齐，非内核逻辑断裂。"}
+{"id":"562d","entity":["权限矩阵","子代理"],"fact":"AgentTests 对 investigator 代理的 todowrite 权限门控由 denied 改为 allowed，消除 investigator 身份对 todo 工具的隐性排斥，与 Config.fs 无条件放行 todo 匹配的门控同向。"}
+{"id":"012b","entity":["权限矩阵","主会话代理"],"fact":"Config.fs:28 toolMatches [\"todo\"] 仅 manager/coder/meditator 放行；build/plan 虽为 primary 别名(ChatHooks 兜底 manager, MessageTransform 兜底 build) 但行28 显式 false。主会话 agent 名按宿主与钩子分叉：Opencode chat.message 解析 input.agent→LookupChildAgent→info.agent→兜底 manager；MessageTransform 回溯兜底 build。双默认不一致致 agent=build 时 resolveChatTools 将 todowrite 置 false，非 schema 注册失败。Mux 顶层 todo_write 走 host wrapper 不经 muxToolNames remove，manager role 下 host removals 不含 todo_.*。"}
+{"id":"f42d","entity":["权限矩阵","工具准入"],"fact":"AgentTests 对 investigator 代理的 manage_todo_list 权限门控由 deny 改 allow，消除 investigator 身份对 todo 管理的隐性排斥，与 Config.fs 无条件放行 todo 匹配的门控同向。"}
+{"id":"2aa4","entity":["方法论探针","提示词重构"],"fact":"内核 Methodology.fs methodologyProbeInstructionText 提取为常量：源自 methodologyProbeText 剥离 <important> 标签；selectMethodologyFieldDescription 复用该常量，消除宿主描述文案漂移。"}
+{"id":"246f","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs 中 methodologyProbeText 重构：废弃内联固定文案，提取 methodologyProbeInstructionText 常量（含 todowrite 调用指引），probe 文本改为常量拼接；Opencode HookSchema.fs selectMethodologyFieldDescription 同步复用该常量，消除宿主描述文案漂移。"}
+{"id":"2edd","entity":["方法论探针","抑制条件"],"fact":"Kernel Methodology.fs stripSyntheticBySource 对 methodology probe 的判定由 MUST 改为 SHOULD（Now you MUST Call → Now you SHOULD Call），消除旧版硬阻塞表述，与投影层静默剥离纪律对齐。"}
+{"id":"f75b","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs methodologyProbeText 废弃 MUST 句，改为 SHOULD，消除旧版硬阻塞表述，与投影层静默剥离纪律对齐。"}
+{"id":"f75b","entity":["审查提示词","方法论探针"],"fact":"内核 Methodology.fs methodologyProbeText 废弃 MUST 句，改为 SHOULD，消除旧版硬阻塞表述，与投影层静默剥离纪律对齐。"}
+{"id":"0f35","entity":["方法论探针","提示词重构"],"fact":"内核 Methodology.fs 中 selectMethodologyFieldDescription 由单行描述扩展为多行：追加选择依据（按定义而非关键词氛围）与目录常量引用，支撑 todowrite 可选 methodology 字段的宿主契约落地。"}
+{"id":"0464","entity":["宿主适配","工具装配"],"fact":"Mux/Opencode 共用 Wrappers.createAllWrappers(tools, hostReadExec) 与 createAllWrappersFor(host, tools, hostReadExec) 三参形态；agent_report 覆盖不再依赖 CallStore 实例注入。装配点须与删参后的签名一致否则 FS0039；mkAgentReportOverride 与 mkTodoWriteWrapper、mkFileReadCapture 同列于 createAllWrappersFor 返回数组。"}
+{"id":"4f35","entity":["方法论探针","提示工程"],"fact":"内核 Methodology.fs methodologyProbeText 指令文本由「Now you SHOULD Call the todowrite tool to update todos and select_methodology」修正为「unless no progress」，明确进度停滞时的豁免条件，与投影层静默剥离旧 probe 纪律同向，消除无进展时的冗余调用引导。"}
+{"id":"d4c0","entity":["方法论探针","提示词纪律"],"fact":"内核 Methodology.fs methodologyProbeText 重构：废弃内联固定文案，提取 methodologyProbeInstructionText 常量（含 todowrite 调用指引），probe 文本改为常量拼接；Opencode HookSchema.fs selectMethodologyFieldDescription 同步复用该常量，消除宿主描述文案漂移。"}
+{"id":"9ffb","entity":["方法论探针","提示词纪律"],"fact":"内核 Methodology.fs 中 methodologyToolResultText 废弃固定文案，改为接收 methodologies 列表参数并动态生成确认响应；空列表校验抛出 invalidArg。测试 MethodologyTests.fs 同步更新为单例与多例断言，验证动态格式化契约。"}
+{"id":"58a6","entity":["方法论探针","提示词纪律"],"fact":"目标态删除独立 select_methodology；todowrite/task 增可选 select_methodology 非空枚举，catalog 并入工具描述。投影末尾 synthetic user 由旧 MUST 探针直改，禁风格漂移：保留 <system>…</system> 与句首 Before the task, please decide which methodologies are useful for this turn.；非硬阻塞；无 meaningful change 可不调用。语义 diff：MUST Call the select_methodology tool → SHOULD Call the todowrite tool to update todos 并附带 select_methodology。PRD 建议正文（SSOT）：<system>Before the task, please decide which methodologies are useful for this turn. Now you SHOULD Call the todowrite tool to update todos and include select_methodology with one or more methods when relevant. If nothing meaningful changed, you may continue without calling it. </system>。每次投影前无条件剥离全部旧 probe，再按 durable 历史决定是否追加新 probe；剥离与抑制不可互替。synthetic 不入 session/UI/导出/SDK；历史旧 probe 投影层静默过滤。"}
+{"id":"22ef","entity":["方法论探针","提示词纪律"],"fact":"合并决议将方法论从独立具名工具收敛为 todowrite/task 可选字段：mux 侧工具白名单与集成断言同步不再登记 select_methodology；return_reviewer 亦不在对外工具面，审查仍经 submit_review 委派与 agent_report 改写轨。"}
+{"id":"347f","entity":["方法论探针","提示词纪律"],"fact":"纵深防御不变：合成探针不得进 session 历史/UI/导出/SDK；stripSyntheticBySource 剔除 methodology-probe- 等前缀。验收矩阵除「催/抑制 completed todowrite/task」外须覆盖「投影输入含一个或多个残留旧 probe→先全剥离→再最多追加一个新 probe」。Mux/Opencode 重投影 id 不得残留合成前缀。旧历史独立 select_methodology 工具结果只读兼容，新流程不产该独立记录。"}
+{"id":"1305","entity":["方法论探针","提示词纪律"],"fact":"内核统一 Fuzzy.fs 已删；行数债务由 Shell 模糊主编排层承担，TypedIteratorStore 等拆独立切片后主编排约二百一十行低于约二百五十行阈值；Mux HostTools 迁出 per-session 执行器后 wc 约二百五十行贴沿；Mux 图谱主编排外提 IO 后约二百四十八行。续验收以当次 wc 与 fileBodyUnder250 探针为准。"}
+{"id":"48ef","entity":["工具模式","协议收敛"],"fact":"Opencode Mimocode 宿主工具 schema 废弃手写 Zod 组装，改引内核 Methodology.enumArrayMinOpt 统一编码器；selectMethodologyFieldDescription 复用内核常量，消除宿主特异性实现细节，确保枚举约束与描述文案的跨层一致性。"}
+{"id":"074c","entity":["工具模式","协议收敛"],"fact":"Opencode HookSchema.buildZodMethodologyField 废弃手写 Zod 组装，改引内核 Methodology.enumArrayMinOpt 统一编码器；方法论字段构建逻辑由宿主 Schema 层收敛至内核 Protocol 层，消除宿主特异性实现细节，确保枚举约束与描述文案的跨层一致性。本次补丁同步精简 selectMethodologyFieldDescription 文案尾随换行符，维持描述紧凑性。"}
+{"id":"e5fc","entity":["Magic Todo","工作报告交接"],"fact":"todowrite 工具契约变更：select_methodology 描述由静态 methodologyCatalog 枚举文本替换为 selectMethodologyFieldDescription 常量引用，消除宿主特异性文案漂移，确保方法论字段构建逻辑由内核 Protocol 层统一编码。"}
+{"id":"20c9","entity":["配置门控","工具匹配"],"fact":"Config.fs 对 todo 工具匹配的门控已由 agent 白名单（manager/coder/meditator）改为无条件放行 true，消除 agent 身份对 todo 匹配的制约，与 todowrite 工具描述的收敛同向。"}
+{"id":"dac2","entity":["构建管线","Fable转译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
+{"id":"90dc","entity":["测试门禁","方法论探针"],"fact":"Mux 集成门禁 npm test 产出 3068 pass, 1 fail；fail 为 methodologyProbeText 精确文本断言（probe text: exact fixed text），指示探针指令文本由 MUST 修正为 SHOULD 后，旧版固定文本比对用例需同步更新或移除。"}
+{"id":"2b15","entity":["工作区文档","构建管线"],"fact":"README.md 构建手册新增 build-and-test 脚本入口，原独立 build 步骤保留；测试执行与构建流程分离，build-and-test 为新增中间层操作。"}
+{"id":"d15d","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"f888","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"9c7f","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"b2cd","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyFieldDescription 常量。"}
+{"id":"7596","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"bafb","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"521e","entity":["构建系统","转译效率"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
+{"id":"690f","entity":["错误处理","宿主适配"],"fact":"内核 Domain.formatDomainError 穷举 DomainError 英文字符串；Mux/Opencode/Shell.Executor 禁本地 describeDomainError 分叉；Shell.ErrorClassify.translateJsError 驻 Shell，内核仅 classifyErrorLeaf；abort 判定 isAbortDomainError 以翻译结果为 MessageAborted。"}
+{"id":"8abd","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"e855","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"a2eb","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"ce5e","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyFieldDescription 常量。"}
+{"id":"9346","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"4769","entity":["测试门禁","方法论探针"],"fact":"Mux 集成门禁 npm test 产出 3068 pass, 1 fail；fail 为 methodologyProbeText 精确文本断言（probe text: exact fixed text），指示探针指令文本由 MUST 修正为 SHOULD 后，旧版固定文本比对用例需同步更新或移除。"}
+{"id":"a952","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。"}
+{"id":"8888","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"4b7a","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"a68f","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"edf8","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"4517","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyFieldDescription 常量。"}
+{"id":"ca56","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"05eb","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"0833","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"d96e","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"cd3a","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyFieldDescription 常量。"}
+{"id":"dbc9","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"03c1","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"5e0f","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"d089","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"238a","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"fa58","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyFieldDescription 常量。"}
+{"id":"16ff","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"bd9a","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"c533","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
+{"id":"9ad5","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"0f26","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（内核常量引用）"}
+{"id":"c75a","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"7bff","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyFieldDescription 常量。"}
+{"id":"2638","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"a302","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
+{"id":"78a2","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"bc87","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"faf3","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"b594","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyFieldDescription 常量。"}
+{"id":"a0b2","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"3bb1","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
+{"id":"b9bb","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"8265","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"9d58","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"1c9a","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyFieldDescription 常量。"}
+{"id":"3a8a","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"20f0","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"bc28","entity":["工作区文档","构建管线"],"fact":"build-and-test 逻辑已拆解为独立脚本 scripts/build-and-test.sh，原独立 build 步骤保留；测试执行与构建流程分离，build-and-test 为新增中间层操作。"}
+{"id":"93d5","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"981f","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"04e1","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"8d14","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"2fbd","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"807b","entity":["构建管线","Fable转译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
+{"id":"0581","entity":["vibe-fs","ESModule迁移"],"fact":"目标：将 vibe-fs 从 CommonJS 导出迁移至 Fable 5.2.0 推荐的 ESModule 架构。现有产物位于 build/src/，类型定义在 src/vibe-fs.d.ts，实现代码在 src/vibe-fs.js。关键约束：保持 API 兼容性，使用 ESModule 原生导出语法。"}
+{"id":"d53f","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"6cc0","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"bb47","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"c1be","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"dd30","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"643f","entity":["文件操作","测试项目"],"fact":"tests/VibeFs.Tests.fsproj 已从工作区移除，测试项目结构简化。"}
+{"id":"c71c","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"bcab","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"f024","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"bac4","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"f8c9","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"fa46","entity":["构建管线","测试集成"],"fact":"README.md 确认 build-and-test 为单入口：主工程单 fsproj 全量转译（Kernel+Shell+宿主），测试编译与 runner 集成；中间产物 bin/obj 统一 artifacts/，清理指令 rm -rf build artifacts。"}
+{"id":"8b2d","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
+{"id":"e826","entity":["文件操作","测试项目"],"fact":"tests/VibeFs.Tests.fsproj 已从工作区移除，测试项目结构简化。"}
+{"id":"1f23","entity":["VibeFs.fs","Fs模块"],"fact":"移除了 getAllFiles 和 getAllSubdirs 函数的冗余注释，保持了代码简洁性。"}
+{"id":"229e","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"700f","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"e0a3","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"e9d4","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"976d","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"5536","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"157c","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
+{"id":"32c2","entity":["工作区文档","构建管线"],"fact":"README.md 构建手册已更新，新增 build-and-test 脚本入口，原独立 build 步骤保留；测试执行与构建流程分离，build-and-test 为新增中间层操作。"}
+{"id":"1bd5","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"9850","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"a8c7","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"86ba","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"5ac1","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"7cb0","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"96a3","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"42d4","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"2b29","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"7e67","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"e1b4","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
+{"id":"aaf1","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"05ab","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"7502","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"55c7","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"b67a","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"1bdd","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"98bf","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"f90d","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"ea63","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"6246","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"1912","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
+{"id":"bb3a","entity":["构建管线","Fable转译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
+{"id":"30dc","entity":["vibe-fs","ESModule迁移"],"fact":"目标：将 vibe-fs 从 CommonJS 导出迁移至 Fable 5.2.0 推荐的 ESModule 架构。现有产物位于 build/src/，类型定义在 src/vibe-fs.d.ts，实现代码在 src/vibe-fs.js。关键约束：保持 API 兼容性，使用 ESModule 原生导出语法。"}
+{"id":"0d57","entity":["工具限制","当前会话"],"fact":"当前会话可用工具集仅有：invalid, return_bookkeeper, todowrite。无法执行文件读取、编辑、构建验证等实际操作。迁移任务因工具受限无法实质性推进。"}
+{"id":"0dc2","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"5ca3","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"18a5","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"4103","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"4ce6","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"7019","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
+{"id":"8e6e","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"8244","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"9ce8","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkProtocol 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"0748","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"d7b2","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"f75b","entity":["方法论探针","提示词纪律"],"fact":"内核 Methodology.fs methodologyProbeText 指令文本由「Now you SHOULD Call the todowrite tool to update todos and select_methodology」修正为「unless no progress」，明确进度停滞时的豁免条件，与投影层静默剥离旧 probe 纪律同向，消除无进展时的冗余调用引导。"}
+{"id":"c4d2","entity":["知识图谱持久化","事件重写","质量控制"],"fact":"kg NDJSON 遇 Git 冲突标记须全文件剔除后方可投影与 bookkeeper 追加；add/add 消解分日：rewrite/日终快照类按 id 并集去重保留末写内容；append/日内事件流类按序并集保留全部事件行。冲突解析器将 >>>>>>> 之后之 post 段行并入保留集以免丢冲突期间已落盘之 append。机械合并后须断言无残留标记、header 可解析、各事实行 JSON 合法。"}
+{"id":"1305","entity":["方法论探针","提示词纪律"],"fact":"内核统一 Fuzzy.fs 已删；行数债务由 Shell 模糊主编排层承担，TypedIteratorStore 等拆独立切片后主编排约二百一十行低于约二百五十行阈值；Mux HostTools 迁出 per-session 执行器后 wc 约二百五十行贴沿；Mux 图谱主编排外提 IO 后约二百四十八行。续验收以当次 wc 与 fileBodyUnder250 探针为准。"}
+{"id":"ecb8","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
+{"id":"501d","entity":["构建管线","工作区文档"],"fact":"README.md 确认 build-and-test 为单入口：主工程单 fsproj 全量转译（Kernel+Shell+宿主），测试编译与 runner 集成；中间产物 bin/obj 统一 artifacts/，清理指令 rm -rf build artifacts。"}
+{"id":"8a5b","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册新增 build-and-test 脚本入口，原独立 build 步骤保留；测试执行与构建流程分离，build-and-test 为新增中间层操作。"}
+{"id":"ef05","entity":["构建","分层","架构"],"fact":"Kernel/Shell 目录下独立 VibeFs.Kernel.fsproj、VibeFs.Shell.fsproj 已 git 移除；分层源码仍保留，工程文件不再按层拆分，编译项改由仓库根级统一 fsproj 承载。"}
+{"id":"3637","entity":["构建管线","Fable转译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
+{"id":"b8c5","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
+{"id":"89a1","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"2415","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"cb43","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"4fe8","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"8643","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"8caf","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"5281","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"a602","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"a581","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"4698","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"cfc7","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"6c03","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"62fc","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"1284","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"1e67","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"cdf7","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"a60b","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"9d06","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"8182","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"f7a4","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"f8b1","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"2b1c","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"2cf1","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
+{"id":"0302","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"8f8e","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"7b35","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"f5d6","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"db4c","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"505e","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
+{"id":"2712","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"9896","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"d9be","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"ae78","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"0465","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"b351","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
+{"id":"3403","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luz0ro/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
+{"id":"157c","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
+{"id":"03c1","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"229e","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"2415","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"8888","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"89a1","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"8b2d","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
+{"id":"b8c5","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
+{"id":"bd9a","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"bafb","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"643f","entity":["文件操作","测试项目"],"fact":"tests/VibeFs.Tests.fsproj 已从工作区移除，测试项目结构简化。"}
+{"id":"e826","entity":["文件操作","测试项目"],"fact":"tests/VibeFs.Tests.fsproj 已从工作区移除，测试项目结构简化。"}
+{"id":"4343","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
+{"id":"dc50","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"25e9","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"bbf9","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"3850","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"fd8c","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"da57","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
+{"id":"29f2","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
+{"id":"1b10","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
+{"id":"5707","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
+{"id":"1a6e","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
+{"id":"c011","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"19ae","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"852f","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"6784","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"69d6","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"c0d1","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"4055","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"1d82","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"1a3c","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"445b","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"5c83","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
+{"id":"f75b","entity":["方法论探针","提示词纪律"],"fact":"内核 Methodology.fs methodologyProbeText 指令文本由「Now you SHOULD Call the todowrite tool to update todos and select_methodology」修正为「unless no progress」，明确进度停滞时的豁免条件，与投影层静默剥离旧 probe 纪律同向，消除无进展时的冗余调用引导。"}
+{"id":"c4d2","entity":["知识图谱持久化","事件重写","质量控制"],"fact":"kg NDJSON 遇 Git 冲突标记须全文件剔除后方可投影与 bookkeeper 追加；add/add 消解分日：rewrite/日终快照类按 id 并集去重保留末写内容；append/日内事件流类按序并集保留全部事件行。冲突解析器将 >>>>>>> 之后之 post 段行并入保留集以免丢冲突期间已落盘之 append。机械合并后须断言无残留标记、header 可解析、各事实行 JSON 合法。"}
+{"id":"1305","entity":["方法论探针","提示词纪律"],"fact":"内核统一 Fuzzy.fs 已删；行数债务由 Shell 模糊主编排层承担，TypedIteratorStore 等拆独立切片后主编排约二百一十行低于约二百五十行阈值；Mux HostTools 迁出 per-session 执行器后 wc 约二百五十行贴沿；Mux 图谱主编排外提 IO 后约二百四十八行。续验收以当次 wc 与 fileBodyUnder250 探针为准。"}
+{"id":"7928","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
+{"id":"c9c8","entity":["构建管线","工作区文档"],"fact":"README.md 确认 build-and-test 为单入口：主工程单 fsproj 全量转译（Kernel+Shell+宿主），测试编译与 runner 集成；中间产物 bin/obj 统一 artifacts/，清理指令 rm -rf build artifacts。"}
+{"id":"4998","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册新增 build-and-test 脚本入口，原独立 build 步骤保留；测试执行与构建流程分离，build-and-test 为新增中间层操作。"}
+{"id":"ef05","entity":["构建","分层","架构"],"fact":"Kernel/Shell 目录下独立 VibeFs.Kernel.fsproj、VibeFs.Shell.fsproj 已 git 移除；分层源码仍保留，工程文件不再按层拆分，编译项改由仓库根级统一 fsproj 承载。"}
+{"id":"c7f7","entity":["构建管线","Fable转译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
+{"id":"2482","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
+{"id":"7491","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"2ae6","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"0d01","entity":["探针用例定位"],"fact":"探针测试用例位于 /Users/luzero/Sources/mux-mcp-server/tests/integration/methodology-probe.test.ts，失败用例为 'should return methodology probe text with SHOULD instruction'，断言探针返回的文本中包含固定的 'MUST' 指令，但实际文本已改为 'SHOULD'。meditator 工具不可用，将使用 read/investigator/coder 替代。"}
+{"id":"f75b","entity":["方法论探针","提示词纪律"],"fact":"内核 Methodology.fs methodologyProbeText 指令文本由「Now you SHOULD Call the todowrite tool to update todos and select_methodology」修正为「unless no progress」，明确进度停滞时的豁免条件，与投影层静默剥离旧 probe 纪律同向，消除无进展时的冗余调用引导。"}
+{"id":"c4d2","entity":["知识图谱持久化","事件重写","质量控制"],"fact":"kg NDJSON 遇 Git 冲突标记须全文件剔除后方可投影与 bookkeeper 追加；add/add 消解分日：rewrite/日终快照类按 id 并集去重保留末写内容；append/日内事件流类按序并集保留全部事件行。冲突解析器将 >>>>>>> 之后之 post 段行并入保留集以免丢冲突期间已落盘之 append。机械合并后须断言无残留标记、header 可解析、各事实行 JSON 合法。"}
+{"id":"1305","entity":["方法论探针","提示词纪律"],"fact":"内核统一 Fuzzy.fs 已删；行数债务由 Shell 模糊主编排层承担，TypedIteratorStore 等拆独立切片后主编排约二百一十行低于约二百五十行阈值；Mux HostTools 迁出 per-session 执行器后 wc 约二百五十行贴沿；Mux 图谱主编排外提 IO 后约二百四十八行。续验收以当次 wc 与 fileBodyUnder250 探针为准。"}
+{"id":"3dba","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
+{"id":"f9dd","entity":["构建管线","工作区文档"],"fact":"README.md 确认 build-and-test 为单入口：主工程单 fsproj 全量转译（Kernel+Shell+宿主），测试编译与 runner 集成；中间产物 bin/obj 统一 artifacts/，清理指令 rm -rf build artifacts。"}
+{"id":"9431","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册新增 build-and-test 脚本入口，原独立 build 步骤保留；测试执行与构建流程分离，build-and-test 为新增中间层操作。"}
+{"id":"ef05","entity":["构建","分层","架构"],"fact":"Kernel/Shell 目录下独立 VibeFs.Kernel.fsproj、VibeFs.Shell.fsproj 已 git 移除；分层源码仍保留，工程文件不再按层拆分，编译项改由仓库根级统一 fsproj 承载。"}
+{"id":"b6d0","entity":["构建管线","Fable转译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
+{"id":"5fdb","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
+{"id":"a734","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"da33","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"0aea","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
+{"id":"3cd5","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
+{"id":"fca2","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
+{"id":"0902","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
+{"id":"3823","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"15c6","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"5e32","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"76a1","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"f541","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"a56f","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"6efc","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"8209","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"4fbb","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"90a8","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"34f9","entity":["TodoItem","Protocol"],"fact":"todo 项增加 status 字段（类型 string），取值范围 {pending, in_progress, completed, cancelled}。"}
+{"id":"59a9","entity":["TodoWriteRequest","Protocol"],"fact":"todowrite 工具增加 completedWorkReport 字段（类型 string），描述已完成工作及上下文转移。"}
+{"id":"ec71","entity":["ToolDefinition","todowrite"],"fact":"更新 todowrite 工具描述：增加 completedWorkReport 必填说明，强调结构化任务列表的完整替换与紧凑追加工作积压管理。"}
+{"id":"c8fe","entity":["ToolDefinition","todowrite"],"fact":"移除 select_methodology 字段描述中的 methodologyCatalog 枚举文本，改为引用 selectMethodologyGoF 常量。"}
+{"id":"9d61","entity":["Config","toolMatching"],"fact":"移除 agent 身份对 todo 工具匹配的门控逻辑，改为无条件放行 true。"}
+{"id":"f75b","entity":["方法论探针","提示词纪律"],"fact":"内核 Methodology.fs methodologyProbeText 指令文本由「Now you SHOULD Call the todowrite tool to update todos and select_methodology」修正为「unless no progress」，明确进度停滞时的豁免条件，与投影层静默剥离旧 probe 纪律同向，消除无进展时的冗余调用引导。"}
+{"id":"c4d2","entity":["知识图谱持久化","事件重写","质量控制"],"fact":"kg NDJSON 遇 Git 冲突标记须全文件剔除后方可投影与 bookkeeper 追加；add/add 消解分日：rewrite/日终快照类按 id 并集去重保留末写内容；append/日内事件流类按序并集保留全部事件行。冲突解析器将 >>>>>>> 之后之 post 段行并入保留集以免丢冲突期间已落盘之 append。机械合并后须断言无残留标记、header 可解析、各事实行 JSON 合法。"}
+{"id":"1305","entity":["方法论探针","提示词纪律"],"fact":"内核统一 Fuzzy.fs 已删；行数债务由 Shell 模糊主编排层承担，TypedIteratorStore 等拆独立切片后主编排约二百一十行低于约二百五十行阈值；Mux HostTools 迁出 per-session 执行器后 wc 约二百五十行贴沿；Mux 图谱主编排外提 IO 后约二百四十八行。续验收以当次 wc 与 fileBodyUnder250 探针为准。"}
+{"id":"052c","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册精简：移除 dotnet/npm 独立步骤与子测试集命令，确立 build-and-test 脚本为唯一入口（串联主工程 Fable 转译、测试编译与 runner 执行）；中间产物 bin/obj 统一归档至 artifacts/，清理指令变更为一键 rm -rf build build-tests artifacts。"}
+{"id":"1345","entity":["构建管线","工作区文档"],"fact":"README.md 确认 build-and-test 为单入口：主工程单 fsproj 全量转译（Kernel+Shell+宿主），测试编译与 runner 集成；中间产物 bin/obj 统一 artifacts/，清理指令 rm -rf build artifacts。"}
+{"id":"ba61","entity":["构建管线","工作区文档"],"fact":"README.md 构建手册新增 build-and-test 脚本入口，原独立 build 步骤保留；测试执行与构建流程分离，build-and-test 为新增中间层操作。"}
+{"id":"ef05","entity":["构建","分层","架构"],"fact":"Kernel/Shell 目录下独立 VibeFs.Kernel.fsproj、VibeFs.Shell.fsproj 已 git 移除；分层源码仍保留，工程文件不再按层拆分，编译项改由仓库根级统一 fsproj 承载。"}
+{"id":"8c2c","entity":["构建管线","Fable转译"],"fact":"npm run build 执行 dotnet fable vibe-fs.fsproj --outDir build，Fable 5.2.0 转译 114 源文件耗时 109ms 解析/5652ms 编译，JS 镜像生成至 build/src/，构建成功。"}
+{"id":"d8f7","entity":["构建配置","测试集成"],"fact":"tests/runner.js 导入路径由 build-tests/Tests.js 修正为 build/tests/Tests.js，确立测试入口与主构建产物的路径对齐契约。"}
+{"id":"0f6e","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
+{"id":"566c","entity":["构建配置","测试集成"],"fact":"package.json 新增 build-and-test 脚本，串联 npm run build、npm run build:tests 与 node tests/runner.js，确立构建与测试执行的原子化契约。"}
