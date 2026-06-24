@@ -73,7 +73,10 @@ let decodeLastAssistant (messagesData: obj) : string * string option * bool =
         let messagesArr = messagesData :?> obj array
         let lastAssistantIdx =
             messagesArr
-            |> Array.tryFindIndexBack (fun msg -> isCompletedAssistantMessage (Dyn.get msg "info"))
+            |> Array.tryFindIndexBack (fun msg ->
+                let info = Dyn.get msg "info"
+                isCompletedAssistantMessage info
+                && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
         match lastAssistantIdx with
         | Some idx ->
             let msg = messagesArr.[idx]

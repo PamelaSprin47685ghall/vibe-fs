@@ -107,6 +107,9 @@ let decodeLastAssistantNudge () =
     let assistant text =
         box {| info = box {| role = "assistant"; finish = "stop" |}
                parts = [| box {| ``type`` = "text"; text = text |} |] |}
+    let agentAssistant agent text =
+        box {| info = box {| role = "assistant"; finish = "stop"; agent = agent |}
+               parts = [| box {| ``type`` = "text"; text = text |} |] |}
     let user text =
         box {| info = box {| role = "user" |}
                parts = [| box {| ``type`` = "text"; text = text |} |] |}
@@ -123,6 +126,11 @@ let decodeLastAssistantNudge () =
     let _, _, nudged3 =
         decodeLastAssistant (box [| user "go"; assistant "did work"; user VibeFs.Kernel.PromptFragments.todoNudgePrompt; assistant "more work" |])
     check "assistant after nudge → false" (not nudged3)
+
+    let text4, _, nudged4 =
+        decodeLastAssistant (box [| user "go"; assistant "did work"; user VibeFs.Kernel.PromptFragments.todoNudgePrompt; agentAssistant "compaction" "folded history" |])
+    equal "compaction assistant ignored as last work" "did work" text4
+    check "compaction after nudge preserves already-nudged" nudged4
 
     let _, _, nudgedEmpty = decodeLastAssistant (box [||])
     check "empty history → false" (not nudgedEmpty)

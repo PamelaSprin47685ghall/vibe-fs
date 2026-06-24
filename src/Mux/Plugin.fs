@@ -128,6 +128,7 @@ let private setOutput (o: obj) (v: string) : unit = o?output <- v
 
 let private toolExecuteAfter
     (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
+    (deps: obj)
     (input: obj)
     (output: obj)
     : JS.Promise<unit> =
@@ -139,13 +140,21 @@ let private toolExecuteAfter
         if succeeded
            && recordsToBookkeeper tool
            && not (isReadOnlyExecutor tool input) then
+            let dir =
+                let d = Dyn.str input "directory"
+                if d <> "" then d else Dyn.str deps "directory"
+            let workspaceId =
+                let w = Dyn.str input "workspaceId"
+                if w <> "" then w else Dyn.str deps "workspaceId"
             knowledgeGraphRuntime.StartBookkeeperAppend(
                 bookkeeperInput input,
                 originalOutput,
                 tool,
                 config = createObj
                     [ "sessionID", box sessionID
-                      "directory", box (Dyn.str input "directory") ])
+                      "directory", box dir
+                      "workspaceId", box workspaceId
+                      "taskService", box (Dyn.get deps "taskService") ])
             setOutput output (VibeFs.Kernel.MagicTodo.withTodoHint originalOutput)
     }
 
@@ -202,5 +211,5 @@ let createRegistration (deps: obj) : obj =
                   "tryLockReview", box (System.Func<string, bool>(fun sessionID -> reviewStore.tryLockReview sessionID))
                   "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ]) ]
     setKey registration "tool.execute.after" (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
-        toolExecuteAfter knowledgeGraphRuntime input output)))
+        toolExecuteAfter knowledgeGraphRuntime deps input output)))
     box registration

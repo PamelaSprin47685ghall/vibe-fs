@@ -67,6 +67,8 @@ let run () : JS.Promise<unit> =
             "bookkeeperAfterHookSkipsHintOnNonBookkeepingTool", bookkeeperAfterHookSkipsHintOnNonBookkeepingToolSpec
             "bookkeeperAfterHookSkipsHintOnFailure", bookkeeperAfterHookSkipsHintOnFailureSpec
             "muxBookkeeperAfterHookAddsHintToOutput", muxBookkeeperAfterHookAddsHintToOutputSpec
+            "muxToolExecuteAfterTriggersBookkeeper", muxToolExecuteAfterTriggersBookkeeperSpec
+            "muxToolExecuteAfterSkipsReadOnlyExecutor", muxToolExecuteAfterSkipsReadOnlyExecutorSpec
             "muxDailyMaintenanceLaunch", muxDailyMaintenanceLaunchSpec
             "muxDailyRewriteTriggersNext", muxDailyRewriteTriggersNextSpec
             "toolDefinition", toolDefinitionSpec

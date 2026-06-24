@@ -61,7 +61,9 @@ let private getPartsText (parts: obj) : string =
 let private decodeLastAssistant (messages: obj array) : string * bool =
     let lastAssistantIndex =
         messages
-        |> Array.tryFindIndexBack (fun message -> Dyn.str message "role" = "assistant")
+        |> Array.tryFindIndexBack (fun message ->
+            Dyn.str message "role" = "assistant"
+            && not (isSyntheticAssistantAgent (Dyn.str message "agent")))
 
     match lastAssistantIndex with
     | None -> "", false

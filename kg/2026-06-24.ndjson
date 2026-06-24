@@ -522,3 +522,10 @@
 {"id":"ef8f","entity":["集成测试","工具目录"],"fact":"IntegrationPluginTests 对 Mux 注册产物断言 tools 数量为 14；names 须含 knowledge_graph_fetch、return_bookkeeper、submit_review，且不得含 return_reviewer 与 select_methodology；仍断言 15/16 项或要求上述已剔除具名工具暴露将集成失败。"}
 {"id":"e64d","entity":["集成测试","返回值契约"],"fact":"IntegrationEventTests 中 todo_write 包装器执行契约变更：返回值由 string 类型解构改为 obj 类型，并强制拆解 output 与 nudge 属性分别断言，消除直接字符串匹配的脆弱性。"}
 {"id":"06f8","entity":["集成测试","模块边界"],"fact":"IntegrationMuxMethodologySpecs 剔除 muxMethodologyProbeStrippedOnReprojectionSpec 探针用例，该规格项已移出集成测试套件。"}
+{"id":"cc8b","entity":["宿主适配","工具装配"],"fact":"Mux/Opencode 共用 Wrappers.createAllWrappers(tools, hostReadExec) 与 createAllWrappersFor(host, tools, hostReadExec) 三参形态；agent_report 覆盖不再依赖 CallStore 实例注入。装配点须与删参后的签名一致否则 FS0039；mkAgentReportOverride 与 mkTodoWriteWrapper、mkFileReadCapture 同列于 createAllWrappersFor 返回数组。"}
+{"id":"214d","entity":["版本控制","工作区布局"],"fact":"vibe-fs master 在 91b727a 完成 worktree-refactor 三方合并；图谱 bookkeeper append 后可用独立 chore(kg) 提交收束日文件（例证 079fb1a：verdict 重构与合并决议相关事实 +10 行入库）。推送 origin 成功后本地索引可与 origin/master 对齐至同一提交，工作区仍可出现 kg 日文件未入库修改（如推送后 status 仍示 M kg/2026-06-24.ndjson），须与索引内已提交事实区分，勿将索引外脏改误判为合并未完成或推送失败。"}
+{"id":"09e2","entity":["版本控制","工作区布局"],"fact":"master 分支存在 4 文件未合并冲突（package.json, tests/Tests.fs, vibe-fs.fsproj, future/FSHARP.md），须先解决冲突方可推进构建或测试。"}
+{"id":"0902","entity":["版本控制","工作区布局"],"fact":"master 分支存在 4 文件未合并冲突（package.json, tests/Tests.fs, vibe-fs.fsproj, future/FSHARP.md），须先解决冲突方可推进构建或测试。"}
+{"id":"853a","entity":["冲突解决策略"],"fact":"采用 git checkout --ours 策略解决未合并冲突，接受当前 master 分支版本，并 git add 标记为已解决。"}
+{"id":"d727","entity":["宿主适配","工具装配"],"fact":"Mux toolExecuteAfter 钩子签名已修正：由仅传 knowledgeGraphRuntime 与 input/output，改为传入 deps 以消费 toolNames 等上下文依赖。"}
+{"id":"24e4","entity":["会话续推","Nudge","合成事件过滤"],"fact":"decideNudge 锚为历史 alreadyNudged（末 completed 助手后尾随 nudge-prompt user），非进程计数，重启安全。Opencode Nudge 三分：NudgeEventCodec / Effect / Hook；abort 判定经 Shell.ErrorClassify 在编排层 open，非编解码文件传递。"}

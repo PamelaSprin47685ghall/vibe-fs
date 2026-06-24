@@ -147,6 +147,12 @@ let isTerminalAssistantFinish (finish: string) : bool =
     let normalized = finish.ToLower().Replace("-", "").Replace("_", "").Replace(" ", "")
     not (normalized.Contains("tool")) && not (normalized.Contains("abort"))
 
+let syntheticAssistantAgents: Set<string> =
+    Set.ofList [ "compaction"; "bookkeeper"; "title" ]
+
+let isSyntheticAssistantAgent (agent: string) : bool =
+    Set.contains (agent.Trim().ToLowerInvariant()) syntheticAssistantAgents
+
 let isNudgePrompt (text: string) : bool = text = todoNudgePrompt || text = loopNudgePrompt
 
 let retryProgressEvents: Set<string> =
