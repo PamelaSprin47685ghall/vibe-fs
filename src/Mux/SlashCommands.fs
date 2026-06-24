@@ -7,9 +7,9 @@ open VibeFs.Kernel.Config
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Kernel.Domain
 open VibeFs.Shell.ReviewRuntime
-open VibeFs.Shell.CallStore
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
@@ -66,40 +66,19 @@ let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) 
                         reviewStore.activateReview(Id.workspaceIdValue wid, task, Domain.nowMs ())
                         Promise.lift (buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ])) |}
 
-let private parseLoopReviewVerdict (args: obj option) (report: string) : bool * string =
-    match args with
-    | Some a ->
-        let v = defaultArg (strField a "verdict") "" |> fun s -> s.Trim().ToLowerInvariant()
-        let feedback = defaultArg (strField a "feedback") ""
-        if v = "pass" then true, ""
-        elif v = "reject" then false, feedback
-        else false, report
-    | None -> false, report
-
 let private precheckReview
-    (deps: obj) (toolNames: string array) (callStore: CallStore) (workspaceId: WorkspaceId) (task: string)
-    : JS.Promise<DelegateOutcome * obj option> =
+    (deps: obj) (toolNames: string array) (workspaceId: WorkspaceId) (task: string)
+    : JS.Promise<DelegateOutcome> =
     promise {
         let! config = pluginConfigForSlash deps workspaceId
         let disabledTools = deniedTools "reviewer" (Array.toList toolNames) |> Array.ofList
-        let workspaceIdStr = Id.workspaceIdValue workspaceId
-        let callId = workspaceIdStr + "-loop-review-" + string (Domain.nowMs ())
-        let verdictPromise = registerCallWithTimeout callStore callId 300000
         let experiments =
             createObj
                 [ "subagentRole", box "reviewer"
                   "toolPolicy", box (createObj [ "disabledTools", box disabledTools ]) ]
         let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
-        let promptText = preReviewVerdictPrompt task callId
-        let! outcome = delegateWithTimeout deps config "explore" promptText "Pre-review" (Some opts) 300000
-        let! verdictArgs =
-            promise {
-                try
-                    let! args = verdictPromise
-                    return Some args
-                with _ -> return None
-            }
-        return outcome, verdictArgs
+        let promptText = preReviewVerdictPrompt task
+        return! delegateWithTimeout deps config "explore" promptText "Pre-review" (Some opts) 300000
     }
 
 let private activateReview
@@ -112,7 +91,7 @@ let private activateReview
         buildLoopMessage task [ "Pre-review feedback:"; ""; feedback; ""; "With-Review Mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
 
 let private loopReviewExecute
-    (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (deps: obj) (toolNames: string array) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (workspaceId: WorkspaceId) (args: string) : JS.Promise<string> =
     let task = args.Trim()
     let workspaceIdStr = Id.workspaceIdValue workspaceId
@@ -123,20 +102,20 @@ let private loopReviewExecute
         Promise.lift "With-Review Mode is already active. Submit your work via submit_review."
     else
         promise {
-            let! outcome, verdictArgs = precheckReview deps toolNames callStore workspaceId task
-            let reportText =
-                match outcome with
-                | Report r -> r
-                | TimedOut -> "Pre-review timed out."
-            let isPass, feedback = parseLoopReviewVerdict verdictArgs reportText
+            let! outcome = precheckReview deps toolNames workspaceId task
             match outcome with
             | TimedOut ->
                 return buildLoopMessage task [ "With-Review Mode was NOT activated because the pre-review timed out. Please retry /loop-review." ]
-            | Report _ ->
+            | Report markdown ->
+                let isPass, feedback =
+                    match parseReviewReportMarkdown markdown with
+                    | Accepted -> true, ""
+                    | Rejected fb -> false, fb
+                    | Terminated -> false, markdown
                 return activateReview reviewStore workspaceIdStr task isPass feedback
         }
 
-let createLoopReviewCommand (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let createLoopReviewCommand (deps: obj) (toolNames: string array) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     box
         {| key = "loop-review"
            description = "Pre-review task description with a reviewer sub-agent, then activate With-Review Mode."
@@ -145,7 +124,7 @@ let createLoopReviewCommand (deps: obj) (toolNames: string array) (callStore: Ca
                System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
                    match Id.tryWorkspaceId workspaceIdStr with
                    | None -> Promise.lift "Invalid workspaceId"
-                   | Some wid -> loopReviewExecute deps toolNames callStore reviewStore wid args) |}
+                   | Some wid -> loopReviewExecute deps toolNames reviewStore wid args) |}
 
-let createSlashCommands (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj array =
-    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps toolNames callStore reviewStore |]
+let createSlashCommands (deps: obj) (toolNames: string array) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj array =
+    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps toolNames reviewStore |]

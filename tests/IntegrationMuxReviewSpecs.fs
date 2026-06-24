@@ -26,140 +26,84 @@ let muxSubmitReviewNoActiveReviewSpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let private makeReturnReviewerContext (workspaceDir: string) (sessionID: string) : obj =
-    createObj [
-        "directory", box workspaceDir
-        "workspaceId", box sessionID
-        "sessionID", box sessionID
-    ]
-
 let private reviewActivationHistory (task: string) : obj array =
     [| box (buildLoopMessage task [ "With-Review Mode is active." ]) |]
 
-let private preparePendingReviewCallForTest (reg: obj) (workspaceDir: string) (sessionID: string) : JS.Promise<unit> =
-    promise {
-        muxActivateReviewForTest reg sessionID "Implement feature X"
-        let prompts = ResizeArray<string>()
-        let taskService = mockMuxTaskServiceCapturingPrompt prompts
-        let submitTool = muxToolByName reg "submit_review"
-        if not (isNullish submitTool) then
-            let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
-            let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
-            try
-                let! _ = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-                ()
-            with _ ->
-                muxActivateReviewForTest reg sessionID "Implement feature X"
-    }
-
-let muxReturnReviewerRegisteredSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-return-reviewer-registered-"
-    let reg = createRegistration (muxDepsWithChatHistory "mux-return-reviewer-registered" [||])
-    let returnTool = muxToolByName reg "return_reviewer"
-    check "mux registration exposes return_reviewer tool" (not (isNullish returnTool))
-    do! rmAsync workspaceDir
-}
-
-let muxReturnReviewerRejectsResolveSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-return-reviewer-reject-"
-    let sessionID = "mux-return-reviewer-reject"
+/// submit_review only ends With-Review Mode after BOTH rounds pass: round1 PASS
+/// triggers the double-check round, and only a second PASS finalizes Accepted.
+let muxSubmitReviewTwoRoundPassAcceptsSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-submit-review-two-pass-"
+    let sessionID = "mux-submit-review-two-pass"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
-    do! preparePendingReviewCallForTest reg workspaceDir sessionID
-    let returnTool = muxToolByName reg "return_reviewer"
-    if isNullish returnTool then
-        check "mux registration exposes return_reviewer tool" false
-    else
-        let ctx = makeReturnReviewerContext workspaceDir sessionID
-        let args = createObj [ "feedback", box "needs rework" ]
-        let! result = ((get returnTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-        check "return_reviewer reject reports verdict submitted" (result.Contains "Verdict submitted.")
-        let! pending = muxPendingCallIdsForTest reg
-        check "return_reviewer reject resolves pending review call" (not (pending |> Array.exists (fun id -> id.StartsWith(sessionID + "-review-"))))
+    muxActivateReviewForTest reg sessionID "Implement feature X"
+    let prompts = ResizeArray<string>()
+    let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "PASS" ]
+    let submitTool = muxToolByName reg "submit_review"
+    let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
+    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+    let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+    check "submit_review two PASS rounds reports accepted" (result.Contains "verdict: accepted")
+    check "submit_review runs a double-check round" (prompts.Count = 2)
+    check "submit_review double-check round carries anchor" (prompts.[1].Contains "double-check:")
+    check "submit_review two PASS rounds deactivates review" (not (muxIsReviewActiveForTest reg sessionID))
     do! rmAsync workspaceDir
 }
 
-let muxReturnReviewerFirstPassDoubleCheckSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-return-reviewer-first-pass-"
-    let sessionID = "mux-return-reviewer-first-pass"
+/// A round1 REJECT finalizes immediately with feedback and keeps the review
+/// active so the worker can address it; no double-check round runs.
+let muxSubmitReviewRejectKeepsReviewActiveSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-submit-review-reject-"
+    let sessionID = "mux-submit-review-reject"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
-    do! preparePendingReviewCallForTest reg workspaceDir sessionID
-    let returnTool = muxToolByName reg "return_reviewer"
-    if isNullish returnTool then
-        check "mux registration exposes return_reviewer tool" false
-    else
-        let ctx = makeReturnReviewerContext workspaceDir sessionID
-        let args = createObj [ "feedback", box null ]
-        let! result = ((get returnTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-        check "return_reviewer first pass returns double-check prompt" (result.Contains "double-check:")
-        let! pending = muxPendingCallIdsForTest reg
-        check "return_reviewer first pass does not resolve pending review call" (pending |> Array.exists (fun id -> id.StartsWith(sessionID + "-review-")))
+    muxActivateReviewForTest reg sessionID "Implement feature X"
+    let prompts = ResizeArray<string>()
+    let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "REJECT: missing tests" ]
+    let submitTool = muxToolByName reg "submit_review"
+    let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
+    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+    let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+    check "submit_review reject reports rejected verdict" (result.Contains "verdict: rejected")
+    check "submit_review reject surfaces feedback" (result.Contains "missing tests")
+    check "submit_review reject runs only one round" (prompts.Count = 1)
+    check "submit_review reject keeps review session active" (muxIsReviewActiveForTest reg sessionID)
     do! rmAsync workspaceDir
 }
 
-let muxReturnReviewerSecondPassResolvesSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-return-reviewer-second-pass-"
-    let sessionID = "mux-return-reviewer-second-pass"
-    let anchorHistory = Array.append (reviewActivationHistory "Implement feature X") [| box "---\ndouble-check: confirmed\n---\nok" |]
-    let reg = createRegistration (muxDepsWithChatHistory sessionID anchorHistory)
-    do! preparePendingReviewCallForTest reg workspaceDir sessionID
-    let returnTool = muxToolByName reg "return_reviewer"
-    if isNullish returnTool then
-        check "mux registration exposes return_reviewer tool" false
-    else
-        let ctx = makeReturnReviewerContext workspaceDir sessionID
-        let args = createObj [ "feedback", box null ]
-        let! result = ((get returnTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-        check "return_reviewer second pass reports verdict submitted" (result.Contains "Verdict submitted.")
-        let! pending = muxPendingCallIdsForTest reg
-        check "return_reviewer second pass resolves pending review call" (not (pending |> Array.exists (fun id -> id.StartsWith(sessionID + "-review-"))))
-    do! rmAsync workspaceDir
-}
-
-let muxReturnReviewerRejectKeepsReviewActiveSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-return-reviewer-reject-keeps-"
-    let sessionID = "mux-return-reviewer-reject-keeps"
+/// A round1 PASS followed by a double-check REJECT finalizes rejected and keeps
+/// the review active — the skeptical second round can still catch corner-cutting.
+let muxSubmitReviewDoubleCheckRejectSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-submit-review-double-reject-"
+    let sessionID = "mux-submit-review-double-reject"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
-    do! preparePendingReviewCallForTest reg workspaceDir sessionID
-    let returnTool = muxToolByName reg "return_reviewer"
-    if isNullish returnTool then
-        check "mux registration exposes return_reviewer tool" false
-    else
-        let ctx = makeReturnReviewerContext workspaceDir sessionID
-        let args = createObj [ "feedback", box "needs rework" ]
-        let! result = ((get returnTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-        check "return_reviewer reject reports verdict submitted" (result.Contains "Verdict submitted.")
-        check "return_reviewer reject keeps review session active" (muxIsReviewActiveForTest reg sessionID)
+    muxActivateReviewForTest reg sessionID "Implement feature X"
+    let prompts = ResizeArray<string>()
+    let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "REJECT: cut corners on edge cases" ]
+    let submitTool = muxToolByName reg "submit_review"
+    let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
+    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+    let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+    check "submit_review double-check reject reports rejected" (result.Contains "verdict: rejected")
+    check "submit_review double-check reject surfaces feedback" (result.Contains "cut corners")
+    check "submit_review double-check reject ran two rounds" (prompts.Count = 2)
+    check "submit_review double-check reject keeps review active" (muxIsReviewActiveForTest reg sessionID)
     do! rmAsync workspaceDir
 }
 
+/// An unrecognized reviewer report parses to Terminated, which deactivates the
+/// review (no clear verdict means the loop cannot safely continue gating).
 let muxSubmitReviewTerminatedCleansReviewStateSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-terminated-"
     let sessionID = "mux-submit-review-terminated"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     muxActivateReviewForTest reg sessionID "Implement feature X"
     let prompts = ResizeArray<string>()
-    let taskService = mockMuxTaskServiceCapturingPrompt prompts
+    let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "I think it looks fine" ]
     let submitTool = muxToolByName reg "submit_review"
-    if isNullish submitTool then
-        check "mux registration exposes submit_review tool" false
-    else
-        let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
-        let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
-        let! result =
-            promise {
-                try
-                    let! r = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-                    return r
-                with ex ->
-                    return string ex
-            }
-        check "submit_review reports termination, timeout or error" (
-            result.Contains "Reviewer timed out"
-            || result.Contains "Terminated"
-            || result.Contains "terminated"
-            || result.Contains "timeout"
-            || result.Contains "failed")
-        check "submit_review termination deactivates review session" (not (muxIsReviewActiveForTest reg sessionID))
+    let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
+    let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |] ]
+    let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
+    check "submit_review unclear report reports terminated" (result.Contains "verdict: terminated")
+    check "submit_review termination deactivates review session" (not (muxIsReviewActiveForTest reg sessionID))
     do! rmAsync workspaceDir
 }
 

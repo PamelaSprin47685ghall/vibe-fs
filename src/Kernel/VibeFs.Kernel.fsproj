@@ -8,6 +8,7 @@
     <Compile Include="SubagentIntents.fs" />
     <Compile Include="PromptFrontMatter.fs" />
     <Compile Include="ReviewSession.fs" />
+    <Compile Include="ReviewVerdict.fs" />
     <Compile Include="LoopMessages.fs" />
     <Compile Include="PromptFragments.fs" />
     <Compile Include="SearchPrompts.fs" />

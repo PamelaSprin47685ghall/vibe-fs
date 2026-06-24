@@ -6,7 +6,6 @@ open VibeFs.Kernel
 open VibeFs.Shell
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.HostTools
-open VibeFs.Shell.CallStore
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
@@ -27,7 +26,7 @@ open VibeFs.Shell.Dyn
 
 let muxToolNames =
     [| "coder"; "investigator"; "meditator"; "browser"; "executor"
-       "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
+       "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
        "knowledge_graph_fetch"; "return_bookkeeper"; "select_methodology" |]
 
 let private canUseMuxTopLevel (agent: string) (toolName: string) : bool =
@@ -93,7 +92,6 @@ let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]
 let createToolCatalog
     (deps: obj)
     (toolNames: string array)
-    (callStore: CallStore)
     (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
     (hostReadExec: HostReadExec)
     (finderCache: FinderCache)
@@ -104,8 +102,7 @@ let createToolCatalog
        yield meditatorTool deps toolNames
        yield browserTool deps toolNames
        yield executorTool deps toolNames null
-       yield submitReviewTool deps toolNames callStore reviewStore
-       yield returnReviewerTool deps callStore reviewStore
+       yield submitReviewTool deps toolNames reviewStore
        yield websearchTool deps toolNames
        yield webfetchTool
        yield fuzzyGrepTool finderCache
@@ -119,7 +116,7 @@ let createToolCatalog
 let private recordsToBookkeeper (tool: string) : bool =
     let allowed =
         [| "coder"; "investigator"; "meditator"; "browser"; "executor"
-           "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "write" |]
+           "submit_review"; "websearch"; "webfetch"; "write" |]
     Array.contains tool allowed
 
 let private isReadOnlyExecutor (tool: string) (input: obj) : bool =
@@ -151,17 +148,16 @@ let private toolExecuteAfter
     }
 
 let createRegistration (deps: obj) : obj =
-    let callStore = createCallStore ()
     let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
     let hostReadExec = HostReadExec()
     let finderCache = FinderCache()
     let knowledgeGraphRuntime = MuxKnowledgeGraphRuntime(deps)
-    let tools = createToolCatalog deps muxToolNames callStore reviewStore hostReadExec finderCache knowledgeGraphRuntime
+    let tools = createToolCatalog deps muxToolNames reviewStore hostReadExec finderCache knowledgeGraphRuntime
     let toolsObj = toolsToObject tools
     let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.Config.getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
-    let wrappers = createAllWrappers toolsObj hostReadExec callStore
+    let wrappers = createAllWrappers toolsObj hostReadExec
     let eventHook = createEventHook deps reviewStore
-    let slashCommands = createSlashCommands deps muxToolNames callStore reviewStore
+    let slashCommands = createSlashCommands deps muxToolNames reviewStore
     let messagesTransformFn =
         System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
             messagesTransform deps knowledgeGraphRuntime reviewStore input output)
@@ -202,14 +198,7 @@ let createRegistration (deps: obj) : obj =
                   "isReviewActive", box (System.Func<string, bool>(fun sessionID -> reviewStore.isReviewActive sessionID))
                   "getReviewTask", box (System.Func<string, string option>(fun sessionID -> reviewStore.getReviewTask sessionID))
                   "tryLockReview", box (System.Func<string, bool>(fun sessionID -> reviewStore.tryLockReview sessionID))
-                  "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ])
-        "__callStore",
-            box (createObj
-                [ "resolveCall", box (System.Func<string, obj, JS.Promise<bool>>(fun callId args -> resolveCallAsync callStore callId args))
-                  "pendingCallIds", box (System.Func<JS.Promise<string array>>(fun () -> pendingCallIdsAsync callStore))
-                  "hasCall", box (System.Func<string, JS.Promise<bool>>(fun callId -> hasCallAsync callStore callId))
-                  "resolveFirstMatching",
-                  box (System.Func<string, obj, JS.Promise<bool>>(fun prefix args -> resolveFirstMatchingAsync callStore prefix args)) ]) ]
+                  "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ]) ]
     setKey registration "tool.execute.after" (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
         toolExecuteAfter knowledgeGraphRuntime input output)))
     box registration

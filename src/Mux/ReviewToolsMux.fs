@@ -6,27 +6,13 @@ open VibeFs.Kernel
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.CallStore
+open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Shell.ReviewRuntime
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
-
-let private awaitReviewVerdict (verdictPromise: JS.Promise<obj>) : JS.Promise<ReviewResult> =
-    promise {
-        try
-            let! args = verdictPromise
-            let v = defaultArg (strField args "verdict") "" |> fun s -> s.Trim().ToLowerInvariant()
-            let feedback = defaultArg (strField args "feedback") ""
-            if v = "pass" then return Accepted
-            elif v = "reject" then return Rejected feedback
-            else return Rejected $"Reviewer returned unclear verdict: \"{v}\". Expected \"pass\" or \"reject\"."
-        with ex ->
-            return Terminated
-    }
 
 let private extractHistoryTexts (history: obj array) : string list =
     history
@@ -69,7 +55,19 @@ let private syncReviewTaskFromHistory (deps: obj) (reviewStore: ReviewStore) (se
             | None -> reviewStore.getReviewTask sessionID
     }
 
-let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore) (reviewStore: ReviewStore) : ToolDefinition =
+let private reviewerOpts (toolNames: string array) : obj =
+    let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box (disabledToolsForReviewer toolNames) ]) ]
+    createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
+
+/// Run one reviewer round, delegating to a fresh reviewer sub-agent and parsing
+/// its `reportMarkdown` (authored by the agent_report wrapper) into a verdict.
+let private runReviewRound (deps: obj) (config: obj) (toolNames: string array) (prompt: string) : JS.Promise<ReviewResult> =
+    promise {
+        let! report = delegateToSubAgent deps config "explore" prompt "Review" (Some (reviewerOpts toolNames))
+        return parseReviewReportMarkdown report
+    }
+
+let submitReviewTool (deps: obj) (toolNames: string array) (reviewStore: ReviewStore) : ToolDefinition =
     { name = "submit_review"
       description = "Submit completed work for review. Creates a reviewer sub-agent that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active With-Review Mode."
       parameters = mkSchema (createObj [ "report", box (strProp "Detailed report of what was done"); "affectedFiles", box (strArrayProp "List of file paths that were modified or created") ]) [| "report"; "affectedFiles" |]
@@ -88,14 +86,12 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                   else
                       try
                           let originalTask = defaultArg resolvedTask ""
-                          let callId = workspaceId + "-review-" + string (Domain.nowMs ())
-                          let verdictPromise = registerCallWithTimeout callStore callId 300000
-                          let reviewPrompt = reviewSubmissionVerdictPrompt originalTask report affectedFiles callId
-                          let experiments = createObj [ "subagentRole", box "reviewer"; "toolPolicy", box (createObj [ "disabledTools", box (disabledToolsForReviewer toolNames) ]) ]
-                          let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
                           try
-                              let! _ = delegateToSubAgent deps config "explore" reviewPrompt "Review" (Some opts)
-                              let! verdict = awaitReviewVerdict verdictPromise
+                              let! round1 = runReviewRound deps config toolNames (reviewSubmissionVerdictPrompt originalTask report affectedFiles)
+                              let! verdict =
+                                  match round1 with
+                                  | Accepted -> runReviewRound deps config toolNames (reviewSubmissionDoubleCheckPrompt originalTask report affectedFiles)
+                                  | other -> Promise.lift other
                               match verdict with
                               | Accepted | Terminated -> reviewStore.deactivateReview workspaceId
                               | Rejected _ -> ()
@@ -106,44 +102,4 @@ let submitReviewTool (deps: obj) (toolNames: string array) (callStore: CallStore
                       finally
                           reviewStore.unlockReview workspaceId
               }
-      condition = None }
-
-let returnReviewerTool (deps: obj) (callStore: CallStore) (reviewStore: ReviewStore) : ToolDefinition =
-    let tryResolvePendingReviewCall (sessionID: string) (resolution: obj) : JS.Promise<bool> =
-        resolveFirstMatchingAsync callStore (sessionID + "-review-") resolution
-
-    { name = "return_reviewer"
-      description = "Submit a review verdict for the active review call. feedback:null/empty accepts; non-empty feedback rejects."
-      parameters = mkSchema (createObj [ "feedback", box (createObj [ "type", box "string"; "description", box "Null/empty to accept; detailed feedback to reject" ]) ]) [||]
-      execute = fun config args ->
-          promise {
-              let sessionID = Dyn.str config "sessionID"
-              if sessionID = "" then return "return_reviewer requires sessionID"
-              else
-                  let feedback = defaultArg (strField args "feedback") ""
-                  let verdict = defaultArg (strField args "verdict") "" |> fun s -> s.Trim().ToLowerInvariant()
-                  let isReject = verdict = "reject" || feedback <> ""
-                  if isReject then
-                      let resolution = createObj [ "verdict", box "reject"; "feedback", box feedback ]
-                      do! tryResolvePendingReviewCall sessionID resolution |> Promise.map ignore
-                      return "Verdict submitted."
-                  else
-                      let getHistory = if Dyn.isNullish deps then null else Dyn.get deps "getChatHistory"
-                      if Dyn.isNullish getHistory then
-                          return doubleCheckPrompt (defaultArg (reviewStore.getReviewTask sessionID) "")
-                      else
-                          try
-                              let! history = unbox<JS.Promise<obj array>> (getHistory $ sessionID)
-                              let texts = extractHistoryTexts history
-                              syncReviewProjection reviewStore sessionID (inferReviewTaskFromTexts texts)
-                              if hasDoubleCheckAnchor texts then
-                                  let resolution = createObj [ "verdict", box "pass"; "feedback", box "" ]
-                                  do! tryResolvePendingReviewCall sessionID resolution |> Promise.map ignore
-                                  reviewStore.deactivateReview sessionID
-                                  return "Verdict submitted."
-                              else
-                                  return doubleCheckPrompt (defaultArg (inferReviewTaskFromTexts texts) "")
-                          with ex ->
-                              return doubleCheckPrompt (defaultArg (reviewStore.getReviewTask sessionID) "")
-          }
       condition = None }

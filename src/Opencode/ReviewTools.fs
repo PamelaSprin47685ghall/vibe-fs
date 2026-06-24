@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Shell
 
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Opencode.ToolSchema
@@ -53,7 +54,8 @@ let submitReviewResultTool (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewS
     let client () = Dyn.get ctx "client"
     let pluginDirectory = Dyn.str ctx "directory"
     define "Submit your review verdict."
-        (box {| feedback = strOpt "null to accept, or specific rejection feedback" |})
+        (box {| verdict = enumReq [| "PASS"; "REJECT" |] "PASS to accept, REJECT to reject"
+                feedback = strOpt "detailed, actionable feedback when rejecting; omit when passing" |})
         (fun args context ->
             let sessionID =
                 let id = Dyn.str context "sessionID"
@@ -61,21 +63,17 @@ let submitReviewResultTool (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewS
             let directory =
                 let d = Dyn.str context "directory"
                 if d <> "" then d else pluginDirectory
-            let result =
-                match optStr args "feedback" with
-                | None -> Accepted
-                | Some f ->
-                    let trimmed = f.Trim()
-                    if trimmed = "" then Accepted else Rejected trimmed
+            let feedback = defaultArg (optStr args "feedback") ""
             promise {
-                match result with
-                | Accepted ->
+                match parseVerdict (Dyn.str args "verdict") with
+                | None -> return reviewerNudgePrompt
+                | Some verdict ->
                     let! texts = VibeFs.Opencode.SessionIo.readSessionTexts (client ()) sessionID directory
-                    if hasDoubleCheckAnchor texts then
-                        return if store.resolvePendingReview (sessionID, Accepted) then "Verdict submitted." else "No active review to resolve."
-                    else
+                    let doubleCheckDone = hasDoubleCheckAnchor texts
+                    match decideReviewSubmission verdict feedback doubleCheckDone with
+                    | AskDoubleCheck ->
                         let task = defaultArg (inferReviewTaskFromTexts texts) ""
                         return doubleCheckPrompt task
-                | Rejected _ | Terminated ->
-                    return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve."
+                    | Finalize result ->
+                        return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve."
             })

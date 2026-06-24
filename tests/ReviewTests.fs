@@ -236,10 +236,10 @@ let reviewerPromptFormat () =
     equal "multiline task round-trips through front-matter" (Some multilineTask) (Map.tryFind "task" parsed)
 
 let muxReviewerVerdictPromptFormat () =
-    let prompt = VibeFs.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ] "call-123"
+    let prompt = VibeFs.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
     check "mux prompt starts with front-matter" (prompt.StartsWith "---")
     check "mux prompt carries reviewer role" (prompt.Contains "role: \"reviewer\"")
-    check "mux prompt carries call_id" (prompt.Contains "call_id: \"call-123\"")
+    check "mux prompt has no call_id field" (not (prompt.Contains "call_id:"))
     check "mux prompt carries task block" (prompt.Contains "task: |")
     check "mux prompt carries affected_files" (prompt.Contains "affected_files:")
     check "mux prompt carries report block field" (prompt.Contains "report: |")
@@ -249,10 +249,10 @@ let muxReviewerVerdictPromptFormat () =
     check "mux prompt has no legacy divider" (not (prompt.Contains "==="))
 
 let muxPreReviewVerdictPromptFormat () =
-    let prompt = VibeFs.Kernel.ReviewPrompts.preReviewVerdictPrompt "clarify rollout" "call-456"
+    let prompt = VibeFs.Kernel.ReviewPrompts.preReviewVerdictPrompt "clarify rollout"
     check "pre-review prompt starts with front-matter" (prompt.StartsWith "---")
     check "pre-review prompt carries reviewer role" (prompt.Contains "role: \"reviewer\"")
-    check "pre-review prompt carries call_id" (prompt.Contains "call_id: \"call-456\"")
+    check "pre-review prompt has no call_id field" (not (prompt.Contains "call_id:"))
     check "pre-review prompt carries task block" (prompt.Contains "task: |")
     check "pre-review prompt reuses review criteria" (prompt.Contains "# Evaluation Criteria")
     check "pre-review prompt names agent_report" (prompt.Contains "agent_report")

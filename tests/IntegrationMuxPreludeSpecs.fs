@@ -31,7 +31,7 @@ let computeCountSpec (reg: obj) =
     check "has submit_review tool" (names |> Array.contains "submit_review")
     check "has knowledge_graph_fetch tool" (names |> Array.contains "knowledge_graph_fetch")
     check "has return_bookkeeper tool" (names |> Array.contains "return_bookkeeper")
-    check "has return_reviewer tool" (names |> Array.contains "return_reviewer")
+    check "mux does not expose return_reviewer tool" (not (names |> Array.contains "return_reviewer"))
 
 let muxMessageTransformRegisteredSpec () =
     promise {

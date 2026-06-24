@@ -10,7 +10,7 @@ let private reviewInstructionsProse =
     + "\n\n"
     + "You are a code reviewer performing a rigorous review of submitted work.\n\n"
     + reviewCriteria
-    + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\nreturn_reviewer({ \"feedback\": null })          // Accept — pass with no feedback\nreturn_reviewer({ \"feedback\": \"specific...\" }) // Reject — provide detailed, actionable feedback\n\nIMPORTANT: If you accept, feedback MUST be null. Do not write praise or any other text — it will be misinterpreted as rejection feedback.\n\nYou MUST call return_reviewer before finishing. Do not end the conversation without submitting your verdict."
+    + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\nreturn_reviewer({ \"verdict\": \"PASS\" })                          // Accept — no feedback needed\nreturn_reviewer({ \"verdict\": \"REJECT\", \"feedback\": \"specific...\" }) // Reject — provide detailed, actionable feedback\n\nIMPORTANT: verdict MUST be exactly \"PASS\" or \"REJECT\". When passing, omit feedback. When rejecting, feedback MUST be detailed and actionable.\n\nYou MUST call return_reviewer before finishing. Do not end the conversation without submitting your verdict."
 
 let reviewInstructions =
     frontMatterPrompt [ yamlScalarField "role" "reviewer" ] reviewInstructionsProse
@@ -31,13 +31,14 @@ let private agentReportVerdictInstructions (passMeaning: string) =
     + "IMPORTANT: If you accept, verdict MUST be \"PASS\" and feedback MUST be an empty string. "
     + "Do not output free-form text as your final answer; the tool call is required."
 
+let doubleCheckChallenge =
+    "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
+
 let doubleCheckPrompt (task: string) : string =
     let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
 
     frontMatterPrompt
-        ([ yamlScalarField
-               doubleCheckField
-               "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?" ]
+        ([ yamlScalarField doubleCheckField doubleCheckChallenge ]
          @ taskLine)
         "If you insist on PASS, otherwise please REJECT with detailed feedback."
 
@@ -58,8 +59,8 @@ let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) 
 
     frontMatterPrompt (taskLine @ filesLine) body
 
-let private reviewerPromptFrontMatter (callId: string) (fields: string list) : string list =
-    [ yamlScalarField "role" "reviewer"; yamlScalarField "call_id" callId ] @ fields
+let private reviewerPromptFrontMatter (fields: string list) : string list =
+    [ yamlScalarField "role" "reviewer" ] @ fields
 
 let private reviewSubmissionVerdictBody =
     readOnlyWorkspaceConstraint
@@ -80,15 +81,7 @@ let private preReviewVerdictBody =
     + "# Submitting Your Verdict\n\n"
     + agentReportVerdictInstructions "the task is clear, specific, and actionable enough to begin work"
 
-let reviewerVerdictPrompt (subject: string) (callId: string) (fields: string list) : string =
-    frontMatterPrompt (reviewerPromptFrontMatter callId fields) (reviewerVerdictPrologue subject)
-
-let reviewSubmissionVerdictPrompt
-    (task: string)
-    (report: string)
-    (affectedFiles: string list)
-    (callId: string)
-    : string =
+let private reviewSubmissionFields (task: string) (report: string) (affectedFiles: string list) : string list =
     let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
 
     let filesLine =
@@ -103,12 +96,34 @@ let reviewSubmissionVerdictPrompt
         else
             [ yamlBlockField "report" report ]
 
-    frontMatterPrompt (reviewerPromptFrontMatter callId (taskLine @ filesLine @ reportLine)) reviewSubmissionVerdictBody
+    taskLine @ filesLine @ reportLine
 
-let preReviewVerdictPrompt (task: string) (callId: string) : string =
+let reviewSubmissionVerdictPrompt
+    (task: string)
+    (report: string)
+    (affectedFiles: string list)
+    : string =
+    frontMatterPrompt (reviewerPromptFrontMatter (reviewSubmissionFields task report affectedFiles)) reviewSubmissionVerdictBody
+
+/// Mux double-check round: a fresh reviewer re-examines the same submission with
+/// the skeptical `double-check` framing. Carries the full review context (task,
+/// report, files) plus the `double-check` front-matter anchor so a restart
+/// replay recognizes the second round structurally.
+let reviewSubmissionDoubleCheckPrompt
+    (task: string)
+    (report: string)
+    (affectedFiles: string list)
+    : string =
+    let fields =
+        [ yamlScalarField "role" "reviewer"; yamlScalarField doubleCheckField doubleCheckChallenge ]
+        @ reviewSubmissionFields task report affectedFiles
+
+    frontMatterPrompt fields reviewSubmissionVerdictBody
+
+let preReviewVerdictPrompt (task: string) : string =
     let taskLine = if task <> "" then [ yamlBlockField taskField task ] else []
 
-    frontMatterPrompt (reviewerPromptFrontMatter callId taskLine) preReviewVerdictBody
+    frontMatterPrompt (reviewerPromptFrontMatter taskLine) preReviewVerdictBody
 
 let withReviewCommandTemplate =
     frontMatterPrompt
@@ -147,9 +162,9 @@ let withReviewPrecheckCommandTemplate =
 
 let reviewerNudgePrompt =
     "Submit your review verdict now via return_reviewer:\n"
-    + "  return_reviewer({ \"feedback\": null })          // Accept\n"
-    + "  return_reviewer({ \"feedback\": \"details...\" })  // Reject\n\n"
-    + "Do not explain what you plan to do — call the tool immediately."
+    + "  return_reviewer({ \"verdict\": \"PASS\" })                          // Accept\n"
+    + "  return_reviewer({ \"verdict\": \"REJECT\", \"feedback\": \"details...\" }) // Reject\n\n"
+    + "verdict MUST be exactly \"PASS\" or \"REJECT\". Do not explain what you plan to do — call the tool immediately."
 
 let agentReportReviewInstructions =
     readOnlyWorkspaceConstraint

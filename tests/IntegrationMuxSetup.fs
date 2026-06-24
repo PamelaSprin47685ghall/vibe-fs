@@ -39,7 +39,6 @@ let muxKnowledgeGraphRuntime (reg: obj) : obj =
         if isNullish rt then null else rt
 
 let muxReviewStore (reg: obj) : obj = get reg "__reviewStore"
-let muxCallStore (reg: obj) : obj = get reg "__callStore"
 
 let muxActivateReviewForTest (reg: obj) (sessionID: string) (task: string) : unit =
     let store = muxReviewStore reg
@@ -50,16 +49,6 @@ let muxIsReviewActiveForTest (reg: obj) (sessionID: string) : bool =
     let store = muxReviewStore reg
     let fn = get store "isReviewActive" |> unbox<System.Func<string, bool>>
     fn.Invoke(sessionID)
-
-let muxPendingCallIdsForTest (reg: obj) : JS.Promise<string array> =
-    let store = muxCallStore reg
-    let fn = get store "pendingCallIds" |> unbox<System.Func<JS.Promise<string array>>>
-    fn.Invoke()
-
-let muxResolveFirstMatchingCallForTest (reg: obj) (prefix: string) (args: obj) : JS.Promise<bool> =
-    let store = muxCallStore reg
-    let fn = get store "resolveFirstMatching" |> unbox<System.Func<string, obj, JS.Promise<bool>>>
-    fn.Invoke(prefix, args)
 
 let minimalMuxDeps () : obj =
     createObj
@@ -100,6 +89,27 @@ let mockMuxTaskServiceCapturingPrompt (prompts: ResizeArray<string>) : obj =
           "waitForAgentReport",
           box (System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
               Promise.reject (exn "simulated reviewer timeout"))) ]
+
+/// Mock task service whose reviewer rounds return queued `reportMarkdown`
+/// verdicts in order. The parent submit_review flow consumes one report per
+/// delegate round (round1, then round2 double-check when round1 passes), so the
+/// queue length matches the number of expected reviewer rounds.
+let mockMuxTaskServiceReturningVerdicts (prompts: ResizeArray<string>) (verdicts: string list) : obj =
+    let queue = ResizeArray<string>(verdicts)
+    createObj
+        [ "create",
+          box (System.Func<obj, JS.Promise<obj>>(fun input ->
+              promise {
+                  let promptText = str input "prompt"
+                  if promptText <> "" then prompts.Add(promptText)
+                  return box {| success = true; data = box {| taskId = "reviewer-task-1"; kind = "agent" |} |}
+              }))
+          "waitForAgentReport",
+          box (System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
+              promise {
+                  let report = if queue.Count > 0 then let v = queue.[0] in queue.RemoveAt(0); v else ""
+                  return box {| reportMarkdown = report |}
+              })) ]
 
 let registerMuxKnowledgeGraphJobForTest (reg: obj) (sessionID: string) (workspaceRoot: string) (kindTag: string) (payload: obj) : unit =
     let runtime = muxKnowledgeGraphRuntime reg

@@ -9,7 +9,6 @@
     <Compile Include="ReviewRuntime.fs" />
     <Compile Include="PromiseQueue.fs" />
     <Compile Include="SessionExecutor.fs" />
-    <Compile Include="CallStore.fs" />
     <Compile Include="MagicSessionStore.fs" />
     <Compile Include="ExecutorJavascript.fs" />
     <Compile Include="SubagentIntentsCodec.fs" />

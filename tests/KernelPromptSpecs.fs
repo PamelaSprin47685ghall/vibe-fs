@@ -8,6 +8,8 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.PromptFrontMatter
 open VibeFs.Kernel.ReviewPrompts
+open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Kernel.SearchPrompts
 open VibeFs.Kernel.SubagentPrompts
 open VibeFs.Kernel.SubagentIntents
@@ -217,3 +219,40 @@ let domainErrorsShared () =
     check "err4 is invalid intent" (match err4 with VibeFs.Kernel.Domain.DomainError.InvalidIntent("coder", "tdd", "unknown phase") -> true | _ -> false)
     check "err5 is upstream timeout" (match err5 with VibeFs.Kernel.Domain.DomainError.UpstreamTimeout 30 -> true | _ -> false)
     check "err6 is upstream refused" (match err6 with VibeFs.Kernel.Domain.DomainError.UpstreamRefused "rate limit" -> true | _ -> false)
+
+/// Unified verdict protocol: an explicit `Verdict` enum decoded at the LLM
+/// boundary replaces the old nullable-feedback channel (a string "null" could
+/// no longer masquerade as a verdict). `parseVerdict` is the strict decoder,
+/// `decideReviewSubmission` the shared pure policy, and
+/// formatReviewVerdictMarkdown/parseReviewReportMarkdown the mux text codec pair.
+let reviewVerdictDecode () =
+    equal "PASS decodes to Pass" (Some Pass) (parseVerdict "PASS")
+    equal "REJECT decodes to Reject" (Some Reject) (parseVerdict "REJECT")
+    equal "lowercase pass decodes" (Some Pass) (parseVerdict "pass")
+    equal "mixed-case Reject decodes" (Some Reject) (parseVerdict "  Reject ")
+    equal "string null is not a verdict" None (parseVerdict "null")
+    equal "empty is not a verdict" None (parseVerdict "")
+    equal "garbage is not a verdict" None (parseVerdict "maybe")
+
+let reviewDecisionPolicy () =
+    equal "reject finalizes as rejected with feedback"
+        (Finalize (Rejected "missing tests")) (decideReviewSubmission Reject "missing tests" false)
+    equal "reject with empty feedback still finalizes as rejected"
+        (Finalize (Rejected "")) (decideReviewSubmission Reject "" true)
+    equal "pass before double-check asks for re-evaluation"
+        AskDoubleCheck (decideReviewSubmission Pass "" false)
+    equal "pass after double-check finalizes as accepted"
+        (Finalize Accepted) (decideReviewSubmission Pass "" true)
+
+let reviewMarkdownCodec () =
+    check "format pass is exactly PASS" (formatReviewVerdictMarkdown Pass "" = "PASS")
+    check "format reject embeds feedback" ((formatReviewVerdictMarkdown Reject "fix the leak").Contains "fix the leak")
+    check "format reject starts with REJECT" ((formatReviewVerdictMarkdown Reject "fix the leak").StartsWith "REJECT")
+    check "format reject empty feedback still rejects" ((formatReviewVerdictMarkdown Reject "").StartsWith "REJECT")
+    equal "parse PASS markdown -> Accepted" Accepted (parseReviewReportMarkdown "PASS")
+    equal "parse REJECT markdown -> Rejected feedback" (Rejected "fix the leak") (parseReviewReportMarkdown "REJECT: fix the leak")
+    equal "parse unrecognized markdown -> Terminated" Terminated (parseReviewReportMarkdown "I think it looks fine")
+    equal "parse empty markdown -> Terminated" Terminated (parseReviewReportMarkdown "")
+    // round-trip on the verdict dimension: format then parse preserves Pass->Accepted, Reject(non-empty)->Rejected
+    equal "round-trip pass" Accepted (parseReviewReportMarkdown (formatReviewVerdictMarkdown Pass ""))
+    equal "round-trip reject non-empty" (Rejected "needs work") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Reject "needs work"))

@@ -123,15 +123,13 @@ let run () : JS.Promise<unit> =
             "muxExecutorRoCatPrependsWarning", muxExecutorRoCatPrependsWarningSpec
             "muxMeditatorReadsFilesFromCwd", muxMeditatorReadsFilesFromCwdSpec
             "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
-            "muxSubmitReviewPromptSuppliesCallId", muxSubmitReviewPromptSuppliesCallIdSpec
-            "muxAgentReportWrapperResolvesReviewBySession", muxAgentReportWrapperResolvesReviewBySessionSpec
+            "muxSubmitReviewPromptFormat", muxSubmitReviewPromptFormatSpec
+            "muxAgentReportWrapperFormatsVerdict", muxAgentReportWrapperFormatsVerdictSpec
             "muxSubmitReviewUsesRolledBackHistoryTask", muxSubmitReviewUsesRolledBackHistoryTaskSpec
             "muxLoopReviewPromptUsesFrontMatter", muxLoopReviewPromptUsesFrontMatterSpec
-            "muxReturnReviewerRegistered", muxReturnReviewerRegisteredSpec
-            "muxReturnReviewerRejectsResolve", muxReturnReviewerRejectsResolveSpec
-            "muxReturnReviewerRejectKeepsReviewActive", muxReturnReviewerRejectKeepsReviewActiveSpec
-            "muxReturnReviewerFirstPassDoubleCheck", muxReturnReviewerFirstPassDoubleCheckSpec
-            "muxReturnReviewerSecondPassResolves", muxReturnReviewerSecondPassResolvesSpec
+            "muxSubmitReviewTwoRoundPassAccepts", muxSubmitReviewTwoRoundPassAcceptsSpec
+            "muxSubmitReviewRejectKeepsReviewActive", muxSubmitReviewRejectKeepsReviewActiveSpec
+            "muxSubmitReviewDoubleCheckReject", muxSubmitReviewDoubleCheckRejectSpec
             "muxSubmitReviewTerminatedCleansReviewState", muxSubmitReviewTerminatedCleansReviewStateSpec
             "muxExecutorFailureDoesNotBookkeep", muxExecutorFailureDoesNotBookkeepSpec
             "muxMethodologyProbeAppended", muxMethodologyProbeAppendedSpec

@@ -8,7 +8,6 @@ open VibeFs.Kernel.MagicTodo
 open VibeFs.Kernel.PromptFragments
 open VibeFs.Opencode.HookSchema
 open VibeFs.Shell.TreeSitterShell
-open VibeFs.Shell.CallStore
 open VibeFs.Shell.MagicSessionStore
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
@@ -204,7 +203,7 @@ let private mkFileReadCapture (hostReadExec: HostReadExec) : obj =
             createObj [ "execute", box execFn ])
     createObj [ "targetTool", box "file_read"; "wrapper", box wrapperFn ]
 
-let private mkAgentReportOverride (callStore: CallStore) : obj =
+let private mkAgentReportOverride () : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (tool: obj) (config: obj) ->
             if Dyn.str config "subagentRole" <> "reviewer" then
@@ -214,13 +213,6 @@ let private mkAgentReportOverride (callStore: CallStore) : obj =
                 let execFn =
                     System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
                         promise {
-                            let sessionID =
-                                let a = Dyn.str opts "sessionID"
-                                if a <> "" then a else Dyn.str opts "sessionId"
-
-                            if sessionID <> "" then
-                                do! resolveFirstMatchingAsync callStore (sessionID + "-review-") args |> Promise.map ignore
-
                             let upstreamArgs = reviewerAgentReportPayload args
                             let raw = tool?execute(upstreamArgs, opts)
                             let! result = if isThenable raw then unbox<JS.Promise<obj>> raw else Promise.lift raw
@@ -235,12 +227,12 @@ let private mkAgentReportOverride (callStore: CallStore) : obj =
     createObj [ "targetTool", box "agent_report"; "wrapper", box wrapperFn ]
 
 
-let createAllWrappersFor (host: Host) (tools: obj) (hostReadExec: HostReadExec) (callStore: CallStore) : obj array =
+let createAllWrappersFor (host: Host) (tools: obj) (hostReadExec: HostReadExec) : obj array =
     Array.append
         (mkSyntaxWrappers ())
         [| mkFileReadCapture hostReadExec
            mkTodoWriteWrapper ()
-           mkAgentReportOverride callStore |]
+           mkAgentReportOverride () |]
 
-let createAllWrappers (tools: obj) (hostReadExec: HostReadExec) (callStore: CallStore) : obj array =
-    createAllWrappersFor opencode tools hostReadExec callStore
+let createAllWrappers (tools: obj) (hostReadExec: HostReadExec) : obj array =
+    createAllWrappersFor opencode tools hostReadExec
