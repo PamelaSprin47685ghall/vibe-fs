@@ -19,16 +19,7 @@
     "index.d.ts"
   ],
   "scripts": {
-    "clean": "rm -rf build build-tests artifacts",
-    "build": "dotnet fable vibe-fs.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json",
-    "build:tests": "dotnet fable tests/VibeFs.Tests.fsproj --outDir build-tests",
-    "watch": "dotnet fable watch vibe-fs.fsproj --outDir build",
-    "watch:tests": "dotnet fable watch tests/VibeFs.Tests.fsproj --outDir build-tests",
-    "test": "npm run build:tests && node tests/runner.js",
-    "test:kernel": "npm run build:tests && node tests/runner.js ReviewTests AgentTests KernelTests FuzzyTests DynTests DelegateTests ResolveAiSettingsTests MagicTests KnowledgeGraphKernelTests TitleFetchGuardTests",
-    "test:shell": "npm run build:tests && node tests/runner.js ShellTests KnowledgeGraphFileTests",
-    "test:integration": "npm run build:tests && node tests/runner.js IntegrationKnowledgeGraphPreludeSpecs IntegrationAfterHookSpecs IntegrationMaintenanceSpecs IntegrationSubmitKnowledgeGraphSpecs IntegrationBookkeeperSpecs IntegrationToolDefSpecs IntegrationSubagentSpecs IntegrationMiscSpecs IntegrationPluginTests IntegrationEventTests IntegrationDedupTests IntegrationToolTests IntegrationChatTests KnowledgeGraphTests",
-    "prepare": "npm run build"
+    "build-and-test": "dotnet fable vibe-fs.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && node tests/runner.js"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.1.1",

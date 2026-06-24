@@ -112,4 +112,55 @@
     <Compile Include="src/Opencode/PluginMimo.fs" />
     <Compile Include="src/Opencode/PluginMimoTui.fs" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="tests/Assert.fs" />
+    <Compile Include="tests/TempWorkspace.fs" />
+    <Compile Include="tests/IntegrationToolSetup.fs" />
+    <Compile Include="tests/IntegrationMuxSetup.fs" />
+    <Compile Include="tests/IntegrationCapsSpecs.fs" />
+    <Compile Include="tests/IntegrationKnowledgeGraphPreludeSpecs.fs" />
+    <Compile Include="tests/IntegrationAfterHookSpecs.fs" />
+    <Compile Include="tests/IntegrationMaintenanceSpecs.fs" />
+    <Compile Include="tests/IntegrationSubmitKnowledgeGraphSpecs.fs" />
+    <Compile Include="tests/IntegrationBookkeeperSpecs.fs" />
+    <Compile Include="tests/IntegrationToolDefSpecs.fs" />
+    <Compile Include="tests/IntegrationSubagentSpecs.fs" />
+    <Compile Include="tests/IntegrationOpencodeReviewSpecs.fs" />
+    <Compile Include="tests/IntegrationMuxReviewSpecs.fs" />
+    <Compile Include="tests/IntegrationMuxReviewPromptSpecs.fs" />
+    <Compile Include="tests/IntegrationMiscSpecs.fs" />
+    <Compile Include="tests/IntegrationMuxPreludeSpecs.fs" />
+    <Compile Include="tests/IntegrationMuxKnowledgeGraphSpecs.fs" />
+    <Compile Include="tests/IntegrationMuxTransformSpecs.fs" />
+    <Compile Include="tests/IntegrationMuxToolSpecs.fs" />
+    <Compile Include="tests/IntegrationMuxMethodologySpecs.fs" />
+    <Compile Include="tests/ReviewTests.fs" />
+    <Compile Include="tests/AgentTests.fs" />
+    <Compile Include="tests/AgentNudgeSpecs.fs" />
+    <Compile Include="tests/KernelTests.fs" />
+    <Compile Include="tests/KernelPromptSpecs.fs" />
+    <Compile Include="tests/FuzzyTests.fs" />
+    <Compile Include="tests/ShellTests.fs" />
+    <Compile Include="tests/DynTests.fs" />
+    <Compile Include="tests/DelegateTests.fs" />
+    <Compile Include="tests/ResolveAiSettingsTests.fs" />
+    <Compile Include="tests/IntegrationPluginTests.fs" />
+    <Compile Include="tests/IntegrationEventTests.fs" />
+    <Compile Include="tests/IntegrationDedupOpenCodeSpecs.fs" />
+    <Compile Include="tests/IntegrationDedupTests.fs" />
+    <Compile Include="tests/IntegrationToolTests.fs" />
+    <Compile Include="tests/IntegrationChatTests.fs" />
+    <Compile Include="tests/MagicMessageBuilders.fs" />
+    <Compile Include="tests/MagicReplaySpecs.fs" />
+    <Compile Include="tests/MagicProjectionSpecs.fs" />
+    <Compile Include="tests/MagicTests.fs" />
+    <Compile Include="tests/KnowledgeGraphTests.fs" />
+    <Compile Include="tests/KnowledgeGraphFileTests.fs" />
+    <Compile Include="tests/KnowledgeGraphKernelTests.fs" />
+    <Compile Include="tests/TitleFetchGuardTests.fs" />
+    <Compile Include="tests/MethodologyTests.fs" />
+    <Compile Include="tests/ArchitectureTests.fs" />
+    <Compile Include="tests/Tests.fs" />
+  </ItemGroup>
 </Project>

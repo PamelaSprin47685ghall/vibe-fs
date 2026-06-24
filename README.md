@@ -339,35 +339,16 @@ YAML front-matter 刚好处于中间：
 常用命令：
 
 ```bash
-dotnet tool restore
-npm install
-npm run clean
-npm run build
-npm run build:tests
-npm run watch
-npm run watch:tests
-npm test
-npm run test:kernel
-npm run test:shell
-npm run test:integration
+npm run build-and-test
 ```
 
 说明：
 
-- `npm run clean` 清理 `build/`、`build-tests/`、`artifacts/`
-- 所有 MSBuild `bin/`、`obj/` 中间产物统一落到根目录 `artifacts/`，不再散落到 `src/`、`tests/` 下
-- `npm run build` 全量编译：`dotnet fable vibe-fs.fsproj --outDir build`（单一工程，含 Kernel+Shell+宿主适配全部源码）
-- `npm run build:tests` 单独编译 `tests/VibeFs.Tests.fsproj` 到 `build-tests/`
-- `npm run watch` 监听主工程并输出到 `build/`
-- `npm run watch:tests` 监听测试工程并输出到 `build-tests/`
-- `npm test` 默认先执行测试编译，再运行 `node tests/runner.js`
-- `npm run test:kernel` 覆盖 `ReviewTests`、`AgentTests`、`KernelTests`、`FuzzyTests`、`DynTests`、`DelegateTests`、`ResolveAiSettingsTests`、`MagicTests`、`KnowledgeGraphKernelTests`、`TitleFetchGuardTests`
-- `npm run test:shell` 覆盖 `ShellTests`、`KnowledgeGraphFileTests`
-- `npm run test:integration` 覆盖全部 `Integration*` 与 `KnowledgeGraphTests`
-- `npm run test:kernel` + `npm run test:shell` + `npm run test:integration` 的并集等于 `npm test`
+- `npm run build-and-test` 完整管线：`dotnet fable vibe-fs.fsproj --outDir build`（单工程编译，含 Kernel+Shell+宿主适配+测试）→ `node tests/runner.js`（全部测试）。不设独立编译/watch/子测试集命令。
 - npm 包主导出入口仍是 `build/src/Mux/Plugin.js`
-- 测试入口由 `tests/runner.js` 加载 `build-tests/Tests.js`
+- 测试入口由 `tests/runner.js` 加载 `build/tests/Tests.js`
 - 测试集覆盖 Kernel、Shell、Review、KnowledgeGraph，以及多组集成契约（见 `tests/Tests.fs`）
+- 中间产物：所有 MSBuild `bin/`、`obj/` 统一落到根目录 `artifacts/`；清理直接 `rm -rf build artifacts`
 
 ## 源码入口速览
 
