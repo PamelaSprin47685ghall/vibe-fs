@@ -98,7 +98,7 @@ let executorSummarizerPrompt
           yamlScalarField "timeout_type" timeoutType
           yamlScalarField "mode" mode
           yamlBlockField "raw_output" output ]
-        [ "You are a filter for executor output. Preserve errors, non-zero exit status, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output."
+        [ "You are a filter for executor output. Preserve errors, stack traces, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output."
           "Do NOT lose any information." ]
 
 let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =

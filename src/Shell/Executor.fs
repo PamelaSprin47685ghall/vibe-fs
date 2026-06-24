@@ -192,13 +192,17 @@ let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcom
         Truncated(output = (partial + suffix).Trim(), timeoutType = options.timeoutType)
     | Signaled(signal, _, _) ->
         let partial = if output = "" then "(no output before signal)" else output
-        Failed(output = (partial + $"\n[executor] Killed by signal {signal}.").Trim())
-    | Exited(0, _, _) -> Completed(output = if output = "" then "(no output)" else output)
-    | Exited(code, _, _) -> Failed(output = if output = "" then $"exited with code {code}" else output)
+        Failed((partial + $"\n[executor] Killed by signal {signal}.").Trim(), None, Some signal)
+    | Exited(0, _, _) ->
+        let body = if output = "" then "(no output)" else output
+        Completed(body, 0)
+    | Exited(code, _, _) ->
+        let body = if output = "" then $"exited with code {code}" else output
+        Failed(body, Some code, None)
     | SpawnFailed(ExecutorExecutableMissing exe) ->
-        MissingExecutable(executable = exe,
-                          output = $"Error: '{exe}' executable not found. Please ensure '{exe}' is installed and available on your PATH.")
-    | SpawnFailed reason -> Failed(output = $"spawn failed: {formatDomainError reason}")
+        MissingExecutable(exe,
+                          $"Error: '{exe}' executable not found. Please ensure '{exe}' is installed and available on your PATH.")
+    | SpawnFailed reason -> Failed($"spawn failed: {formatDomainError reason}", None, None)
 
 type ExecuteDeps = {
     runProgram: string -> ExecutorLanguage -> string list -> string -> string -> int -> JS.Promise<RunOutcome>

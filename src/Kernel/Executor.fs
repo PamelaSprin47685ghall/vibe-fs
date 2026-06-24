@@ -193,9 +193,11 @@ let prepareProgramForExecution (options: ExecuteOptions) : string =
 let prependSafetyWarningForExecution (output: string) (options: ExecuteOptions) : string =
     prependSafetyWarning output (prepareProgramForExecution options) options.language
 
-let outputFromResult (result: ExecuteResult) : string =
-    match result with
-    | Completed o | Truncated(o, _) | Failed o | MissingExecutable(_, o) -> o
+let timeoutToString (value: ExecutorTimeoutType) : string =
+    match value with
+    | Short -> "short"
+    | Long -> "long"
+    | LastResort -> "last-resort"
 
 let describeResultTag (result: ExecuteResult) : string =
     match result with
@@ -204,17 +206,8 @@ let describeResultTag (result: ExecuteResult) : string =
     | Failed _ -> "The following program exited with a non-zero status."
     | MissingExecutable(executable, _) -> $"The following program could not start because '{executable}' was not found."
 
-let formatToolResponse (result: ExecuteResult) (summary: string option) : string =
-    let body = summary |> Option.defaultValue (outputFromResult result)
-    $"{describeResultTag result}\n\n{body}"
-
 let buildSummaryPrompt (byteLength: string -> int) (truncateToBytes: string -> int -> string) (options: ExecuteOptions) (result: ExecuteResult) : string =
-    let rawOutput =
-        match result with
-        | Completed o
-        | Truncated(o, _)
-        | Failed o -> o
-        | MissingExecutable(_, o) -> o
+    let rawOutput = outputFromResult result
 
     let outputForSummary =
         if byteLength rawOutput > rawOutputCapBytes then
@@ -255,9 +248,3 @@ let parseTimeout (value: string) : ExecutorTimeoutType =
     | "long" -> Long
     | "lastresort" -> LastResort
     | _ -> Short
-
-let timeoutToString (value: ExecutorTimeoutType) : string =
-    match value with
-    | Short -> "short"
-    | Long -> "long"
-    | LastResort -> "last-resort"

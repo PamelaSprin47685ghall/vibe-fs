@@ -562,3 +562,88 @@
 {"id":"e5bc","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
 {"id":"5751","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
 {"id":"8a37","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"9b5e","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"23bc","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"a9e5","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"a4f7","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"5c5c","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"6764","entity":["执行结果模型","类型边防"],"fact":"RunOutcome 密封 DU：Exited|TimedOut|Signaled|SpawnFailed(DomainError)。TimedOut 含超时 kill 与 close 码 null；Signaled 表信号终止。mapOutcome/executeWith 输出拼接须穷尽含 Signaled→Failed；SpawnFailed 文案经内核 formatDomainError；禁止记录式 stdout/stderr 成员与 isErrnoException ENOENT 旁路。"}
+{"id":"2c22","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"75d7","entity":["执行结果模型","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"da5a","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"d930","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"4265","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"07c2","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"0d99","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"a481","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"8327","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"3f99","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"dc1b","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"82e9","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"dd9b","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"622f","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"2071","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"5318","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"24ce","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"3487","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"bbf0","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"0e16","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"efad","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"a59f","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"2a96","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"1be3","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"8c74","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"25d9","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"e0a0","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"2e05","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"8235","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"e414","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"564a","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"6a52","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"df8a","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"b8ee","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"4f2c","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"2747","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"a194","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"996e","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"152e","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"fdbd","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"dc9d","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"c30e","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"d193","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"3300","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"9e7e","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"bb8c","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"ba08","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"3351","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"af18","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"545f","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"5bad","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"e5b1","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"d0b3","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"ef57","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"09d5","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"f57f","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"8225","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"f4df","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"f683","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"de73","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"4a5c","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"c05b","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"8f68","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"59d3","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"fb52","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"3076","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"6895","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"aace","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"600c","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"13ee","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"4e34","entity":["工具定义","返回值契约"],"fact":"executor 工具输出与返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签（Completed/Failed/Truncated/Signaled）不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"9e92","entity":["工具定义","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"096d","entity":["内核","执行器"],"fact":"Executor.fs 废弃 LastResort 超时分支，缩减为 Short/Long 双态，消除冗余超时域。"}
+{"id":"1290","entity":["执行结果模型","返回值契约"],"fact":"描述函数 extend：timeoutToString 穷举 Short/Long/LastResort 映射，Truncated 标签由静态串改为含超时类型的动态描述，消除硬编码歧义。"}
+{"id":"ba1a","entity":["执行结果模型","类型边防"],"fact":"ExecuteResult 从纯文本输出扩展为携带退出码与信号的结构化密封代数数据类型：Completed(output,exitCode)、Failed(output,exitCode option,signal option)、Truncated(output,reason)、SpawnFailed(DomainError)。这消除了旧版 string 类型在退出码语义上的信息丢失，迫使调用方穷尽匹配。"}
+{"id":"902d","entity":["执行结果模型","返回值契约"],"fact":"工具返回值链路重构：Shell/Kernel 层 ExecuteResult 结构化标签不再压平为纯文本，工具层须透传 exit code 与结果标签；总结逻辑剥离返回值表述，总结后附加结构化 return 块；Opencode 与 Mux 两侧统一此契约。"}
+{"id":"8804","entity":["执行结果模型","外壳编排"],"fact":"mapOutcome 与 executeWith 输出拼接须穷尽含 Signaled 分支；SpawnFailed 经 formatDomainError 转化。SessionExecutor.enqueuePerSession 取代 ChildAgentRegistry.post 及宿主内 Dictionary 按会话队列，实现同会话串行化。"}
+{"id":"373a","entity":["执行结果模型","返回值契约"],"fact":"executor 工具定义修正：描述同步更新，明确返回值包含结构化 exit code 与结果标签，非纯文本摘要。"}
+{"id":"0cd9","entity":["执行结果模型","类型边防"],"fact":"RunOutcome 密封 DU：Exited|TimedOut|Signaled|SpawnFailed(DomainError)。TimedOut 含超时 kill 与 close 码 null；Signaled 表信号终止。mapOutcome/executeWith 输出拼接须穷尽含 Signaled→Failed；SpawnFailed 文案经内核 formatDomainError；禁止记录式 stdout/stderr 成员与 isErrnoException ENOENT 旁路。"}
