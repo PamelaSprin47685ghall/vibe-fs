@@ -140,11 +140,15 @@ let decideNudge isReviewActive lookupChildAgent state sessionID snapshot =
         deleteNudgedSession state sessionID, StandDown
     else
         let state = rememberAgent state sessionID snapshot.agentFromMessage
+        let isWorkerLoopActive =
+            match lookupChildAgent sessionID with
+            | Some "reviewer" -> false
+            | _ -> isReviewActive sessionID
         let context =
             { todos = snapshot.todos
               lastAssistantMessage = snapshot.lastAssistantMessage
               hasActiveRunner = false
-              isLoopActive = isReviewActive sessionID }
+              isLoopActive = isWorkerLoopActive }
         match decide context with
         | NudgeNone
         | NudgeRunner -> deleteNudgedSession state sessionID, StandDown

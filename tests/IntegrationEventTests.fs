@@ -9,9 +9,11 @@ open VibeFs.Tests.TempWorkspace
 
 open VibeFs.Kernel.PromptFragments
 open VibeFs.Kernel.ToolOutputInfo
+open VibeFs.Kernel.LoopMessages
 
 open VibeFs.Mux.Plugin
 open VibeFs.Opencode.Plugin
+open VibeFs.Opencode.NudgeEventCodec
 open VibeFs.Shell.Dyn
 
 let eventHookSpec (reg: obj) = promise {
@@ -193,6 +195,35 @@ let repeatedAssistantSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let opencodeLoopNudgeSpec () = promise {
+    let sessionID = "opencode-loop-nudge-ws"
+    let promptCalls = ResizeArray<obj>()
+    let mkClient () =
+        createObj [ "session", box (createObj [
+            "todo", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                (promise { return box {| data = [||] |} })))
+            "messages", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                (promise { return box {| data = [||] |} })))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                (promise { promptCalls.Add(arg) })))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "opencode-loop-nudge-"
+    let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
+    let cmdHook = get p "command.execute.before"
+    let eventHook = get p "event"
+    let cmdOut = createObj []
+    do! cmdHook $ (createObj [ "command", box "loop"; "sessionID", box sessionID; "arguments", box "Ship the fix" ], cmdOut) |> unbox<JS.Promise<unit>>
+    do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    let nudgeText =
+        if promptCalls.Count = 0 then ""
+        else
+            let body = get promptCalls.[0] "body"
+            getPartsText (get body "parts")
+    check "with-review idle emits loop nudge" (promptCalls.Count = 1 && nudgeText = loopNudgePrompt)
+    do! rmAsync workspaceDir
+}
+
 let reusedSessionSpec () = promise {
     let mutable messages = [|
         box {| info = box {| role = "assistant"; agent = "manager"; finish = "stop"; time = box {| completed = 1 |} |}
@@ -239,5 +270,6 @@ let run () : JS.Promise<unit> =
         do! rmAsync workspaceDir
         do! abortedRetrySpec ()
         do! repeatedAssistantSpec ()
+        do! opencodeLoopNudgeSpec ()
         do! reusedSessionSpec ()
     }

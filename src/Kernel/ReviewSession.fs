@@ -43,10 +43,10 @@ let transition (state: ReviewState) (command: ReviewCommand) : ReviewState * Rev
 let isActive (state: ReviewState) : bool =
     match state with
     | ReviewState.Inactive -> false
+    | ReviewState.Accepted -> false
     | ReviewState.Active _ -> true
     | ReviewState.Locked _ -> true
-    | ReviewState.Accepted -> false
-    | ReviewState.Rejected _ -> false
+    | ReviewState.Rejected _ -> true
 
 let initialState = ReviewState.Inactive
 

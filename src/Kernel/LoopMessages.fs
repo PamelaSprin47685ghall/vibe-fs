@@ -10,6 +10,11 @@ open VibeFs.Kernel.PromptFrontMatter
 /// practically never carries a YAML front-matter block, so these fields are a
 /// collision-free anchor: far safer than scanning prose for marker substrings.
 let taskField = "task"
+
+/// Worker With-Review activation only. Reviewer prompts carry the parent's
+/// requirement under this key so `inferReviewTaskFromTexts` never re-activates
+/// a reviewer child session from its own dialogue history.
+let originalTaskField = "original_task"
 let verdictField = "verdict"
 let verdictAccepted = "accepted"
 let verdictRejected = "rejected"
@@ -52,7 +57,8 @@ let loopCancelledMessage : string =
 /// store is merely a re-buildable projection of it.
 ///
 /// Each fragment is matched on its structured front-matter ONLY:
-///   `task` field         -> (re)activate with that task
+///   `task` field         -> (re)activate with that task (worker With-Review only;
+///                          reviewer prompts use `original_task` instead)
 ///   END verdict          -> accepted / cancelled clear the task
 ///   reject/terminate verdict, or any non-front-matter prose -> task untouched
 let inferReviewTaskFromTexts (texts: string seq) : string option =

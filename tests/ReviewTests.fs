@@ -40,6 +40,8 @@ let registry () =
     check "locked active" (sessionIsActive locked "s1")
     let accepted = reduce locked (RegistryAction.Accept "s1")
     check "accepted not active" (not (sessionIsActive accepted "s1"))
+    let rejected = reduce locked (RegistryAction.Reject("s1", "fix it"))
+    check "rejected still active for With-Review nudge" (sessionIsActive rejected "s1")
     check "clear empties" ((reduce accepted RegistryAction.Clear).IsEmpty)
 
 let resultMapping () =
@@ -175,6 +177,14 @@ let inferReviewTaskFromTexts' () =
     // activate a review.
     equal "prose task line does not activate" None
         (inferReviewTaskFromTexts [ "Here is my plan:\ntask: refactor everything\nlet's go" ])
+    let reviewerChildPrompt =
+        VibeFs.Kernel.ReviewPrompts.reviewerPrompt "worker task from parent" "self-reported changes" [ "src/a.fs" ]
+    equal "reviewerPrompt task must not activate worker With-Review" None
+        (inferReviewTaskFromTexts [ reviewerChildPrompt ])
+    let reviewerVerdictPrompt =
+        VibeFs.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "worker task" "report body" [ "b.fs" ]
+    equal "front matter role: reviewer + task must not activate worker loop" None
+        (inferReviewTaskFromTexts [ reviewerVerdictPrompt ])
 
 /// parseFrontMatterScalars is the structural anchor reader. It must (a) read
 /// only the leading `---` block, (b) keep un-indented scalar fields, (c) parse
@@ -210,14 +220,14 @@ let doubleCheckPromptFormat () =
     check "embeds task" (prompt.Contains "build the login page")
     check "asks for re-submission" (prompt.Contains "REJECT with detailed feedback")
     let multiline = VibeFs.Kernel.ReviewPrompts.doubleCheckPrompt "task with\nnewline and ### markdown"
-    check "multiline task uses block field" (multiline.Contains "task: |")
+    check "multiline original_task uses block field" (multiline.Contains "original_task: |")
     let parsed = VibeFs.Kernel.PromptFrontMatter.parseFrontMatterScalars multiline
-    equal "multiline task round-trips" (Some "task with\nnewline and ### markdown") (Map.tryFind "task" parsed)
+    equal "multiline original_task round-trips" (Some "task with\nnewline and ### markdown") (Map.tryFind "original_task" parsed)
 
 let reviewerPromptFormat () =
     let prompt = VibeFs.Kernel.ReviewPrompts.reviewerPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
     check "has front-matter fence" (prompt.Contains "---")
-    check "embeds task in front matter" (prompt.Contains "task:" && prompt.Contains "ship S1")
+    check "embeds original_task in front matter" (prompt.Contains "original_task:" && prompt.Contains "ship S1")
     check "lists affected files in front-matter" (prompt.Contains "affected_files:")
     check "embeds affected file a.fs" (prompt.Contains "a.fs")
     check "carries review criteria" (prompt.Contains "# Evaluation Criteria")
@@ -233,14 +243,14 @@ let reviewerPromptFormat () =
     let multilineTask = "Line one of task\nLine two with ### markdown\nLine three"
     let mp = VibeFs.Kernel.ReviewPrompts.reviewerPrompt multilineTask "" []
     let parsed = VibeFs.Kernel.PromptFrontMatter.parseFrontMatterScalars mp
-    equal "multiline task round-trips through front-matter" (Some multilineTask) (Map.tryFind "task" parsed)
+    equal "multiline original_task round-trips through front-matter" (Some multilineTask) (Map.tryFind "original_task" parsed)
 
 let muxReviewerVerdictPromptFormat () =
     let prompt = VibeFs.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
     check "mux prompt starts with front-matter" (prompt.StartsWith "---")
     check "mux prompt carries reviewer role" (prompt.Contains "role: reviewer")
     check "mux prompt has no call_id field" (not (prompt.Contains "call_id:"))
-    check "mux prompt carries task" (prompt.Contains "task:" && prompt.Contains "ship S1")
+    check "mux prompt carries original_task" (prompt.Contains "original_task:" && prompt.Contains "ship S1")
     check "mux prompt carries affected_files" (prompt.Contains "affected_files:")
     check "mux prompt carries report" (prompt.Contains "report:" && prompt.Contains "changed A and B")
     check "mux prompt reuses review criteria" (prompt.Contains "# Evaluation Criteria")
@@ -253,7 +263,7 @@ let muxPreReviewVerdictPromptFormat () =
     check "pre-review prompt starts with front-matter" (prompt.StartsWith "---")
     check "pre-review prompt carries reviewer role" (prompt.Contains "role: reviewer")
     check "pre-review prompt has no call_id field" (not (prompt.Contains "call_id:"))
-    check "pre-review prompt carries task" (prompt.Contains "task:" && prompt.Contains "clarify rollout")
+    check "pre-review prompt carries original_task" (prompt.Contains "original_task:" && prompt.Contains "clarify rollout")
     check "pre-review prompt reuses review criteria" (prompt.Contains "# Evaluation Criteria")
     check "pre-review prompt names agent_report" (prompt.Contains "agent_report")
     check "pre-review prompt has no legacy divider" (not (prompt.Contains "==="))

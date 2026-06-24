@@ -96,6 +96,13 @@ let decideNudge' () =
     | Send(text, _) -> check "loop active nudges loop" (text = VibeFs.Kernel.PromptFragments.loopNudgePrompt)
     | StandDown -> check "loop active nudges loop" false
 
+    let lookupReviewer (_: string) = Some "reviewer"
+    let claimedReviewer, _ = tryClaimNudge emptyState "reviewer-child-sess"
+    match snd (decideNudge loopReview lookupReviewer claimedReviewer "reviewer-child-sess" (snapshot [] "ok" false None)) with
+    | Send(text, _) ->
+        check "reviewer child session must not get worker loopNudgePrompt" (text <> VibeFs.Kernel.PromptFragments.loopNudgePrompt)
+    | StandDown -> ()
+
     let stopped = stopSession claimed "s"
     let _, dStop = decideNudge noReview noChild stopped "s" (snapshot [ "a" ] "working" false None)
     equal "stopped → StandDown" StandDown dStop
@@ -134,3 +141,13 @@ let decodeLastAssistantNudge () =
 
     let _, _, nudgedEmpty = decodeLastAssistant (box [||])
     check "empty history → false" (not nudgedEmpty)
+
+let decodeTodosOpenItems () =
+    let todos =
+        decodeTodos
+            (box [|
+                box {| content = "finish feature"; status = "in_progress" |}
+                box {| content = "done item"; status = "completed" |}
+                box {| content = ""; status = "pending" |}
+            |])
+    equal "decodeTodos uses content not status" [ "finish feature" ] todos

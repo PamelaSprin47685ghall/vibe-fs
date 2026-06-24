@@ -61,10 +61,13 @@ let decodeTodos (todosData: obj) : string list =
     if Dyn.isArray todosData then
         (todosData :?> obj array)
         |> Array.choose (fun todo ->
+            let content = Dyn.str todo "content"
             let status = Dyn.str todo "status"
-            match todoStatusOfString status with
-            | Some s when isTerminal s -> None
-            | _ -> Some status)
+            if content = "" || status = "" then None
+            else
+                match todoStatusOfString status with
+                | Some s when isTerminal s -> None
+                | _ -> Some content)
         |> Array.toList
     else []
 

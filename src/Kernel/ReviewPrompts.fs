@@ -35,7 +35,7 @@ let doubleCheckChallenge =
     "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
 
 let doubleCheckPrompt (task: string) : string =
-    let taskLine = if task <> "" then [ yamlField taskField task ] else []
+    let taskLine = if task <> "" then [ yamlField originalTaskField task ] else []
 
     frontMatterPrompt
         ([ yamlField doubleCheckField doubleCheckChallenge ]
@@ -43,7 +43,7 @@ let doubleCheckPrompt (task: string) : string =
         "If you insist on PASS, otherwise please REJECT with detailed feedback."
 
 let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) : string =
-    let taskLine = if task <> "" then [ yamlField taskField task ] else []
+    let taskLine = if task <> "" then [ yamlField originalTaskField task ] else []
 
     let filesLine =
         if affectedFiles.Length > 0 then
@@ -82,7 +82,7 @@ let private preReviewVerdictBody =
     + agentReportVerdictInstructions "the task is clear, specific, and actionable enough to begin work"
 
 let private reviewSubmissionFields (task: string) (report: string) (affectedFiles: string list) : string list =
-    let taskLine = if task <> "" then [ yamlField taskField task ] else []
+    let taskLine = if task <> "" then [ yamlField originalTaskField task ] else []
 
     let filesLine =
         if affectedFiles.Length > 0 then
@@ -121,7 +121,7 @@ let reviewSubmissionDoubleCheckPrompt
     frontMatterPrompt fields reviewSubmissionVerdictBody
 
 let preReviewVerdictPrompt (task: string) : string =
-    let taskLine = if task <> "" then [ yamlField taskField task ] else []
+    let taskLine = if task <> "" then [ yamlField originalTaskField task ] else []
 
     frontMatterPrompt (reviewerPromptFrontMatter taskLine) preReviewVerdictBody
 
