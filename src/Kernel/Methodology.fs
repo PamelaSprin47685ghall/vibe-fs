@@ -19,6 +19,13 @@ let methodologyToolResultText (methodologies: string list) =
         let joined = String.concat ", " methodologies
         $"Great! How to proceed with [{joined}] as your methodology?"
 
+let todoResultText (methodologies: string list) : string =
+    match methodologies with
+    | [] -> "Todos updated."
+    | _ ->
+        let joined = String.concat ", " methodologies
+        $"Great! How to proceed with [{joined}] as your methodology?"
+
 let methodologyEnumValues: string list =
     [ "first_principles"
       "axiomatization"

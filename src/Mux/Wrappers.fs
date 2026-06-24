@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicTodo
 open VibeFs.Kernel.PromptFragments
+open VibeFs.Kernel.Methodology
 open VibeFs.Opencode.HookSchema
 open VibeFs.Shell.TreeSitterShell
 open VibeFs.Shell.MagicSessionStore
@@ -171,6 +172,11 @@ let private captureTodoReport (args: obj) (opts: obj) : unit =
     if report <> "" && toolCallId <> "" then
         captureReport opencode toolCallId report
 
+let private todoMethodologies (args: obj) : string list =
+    let raw = Dyn.get args "select_methodology"
+    if Dyn.isNullish raw || not (Dyn.isArray raw) then []
+    else raw :?> obj array |> Array.map string |> Array.toList
+
 let private mkTodoWriteWrapper () : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (tool: obj) (_config: obj) ->
@@ -183,7 +189,17 @@ let private mkTodoWriteWrapper () : obj =
                         let! result =
                             if isThenable raw then unbox<JS.Promise<obj>> raw
                             else Promise.lift raw
-                        return appendMeditatorNudge result
+                        let methodologies = todoMethodologies args
+                        let output = todoResultText methodologies
+                        let nextResult =
+                            if Dyn.typeIs result "object" then
+                                if Dyn.truthy (Dyn.get result "success") then
+                                    Dyn.withKey (Dyn.withKey result "output" (box output)) "nudge" (box meditatorNudge)
+                                else
+                                    Dyn.withKey result "output" (box output)
+                            else
+                                createObj [ "success", box true; "output", box output; "nudge", box meditatorNudge ]
+                        return nextResult
                     })
 
             createObj

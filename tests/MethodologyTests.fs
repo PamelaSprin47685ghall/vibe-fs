@@ -34,6 +34,13 @@ let toolResultTextExact () =
     check "tool result: multiple methodologies" (
         methodologyToolResultText [ "first_principles"; "deduction" ] = "Great! How to proceed with [first_principles, deduction] as your methodology?")
 
+let todoResultTextExact () =
+    check "todo result: empty" (todoResultText [] = "Todos updated.")
+    check "todo result: single methodology" (
+        todoResultText [ "first_principles" ] = "Great! How to proceed with [first_principles] as your methodology?")
+    check "todo result: multiple methodologies" (
+        todoResultText [ "first_principles"; "deduction" ] = "Great! How to proceed with [first_principles, deduction] as your methodology?")
+
 let enumCount () =
     check "enum: 54 values" (methodologyEnumValues.Length = 54)
 
@@ -98,6 +105,7 @@ let probeMessageShape () =
 let run () =
     probeTextContent ()
     toolResultTextExact ()
+    todoResultTextExact ()
     enumCount ()
     enumAllInCatalog ()
     catalogContainsKeyphrase ()

@@ -7,6 +7,7 @@ open VibeFs.Shell
 
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.MagicTodo
+open VibeFs.Kernel.Methodology
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Shell.Dyn
 
@@ -15,6 +16,11 @@ type private TodoItem =
       status: string }
 
 let private resolveStr (text: string) : JS.Promise<string> = Promise.lift text
+
+let private decodeMethodologies (args: obj) : string list =
+    let raw = get args "select_methodology"
+    if isNullish raw || not (isArray raw) then []
+    else raw :?> obj array |> Array.map string |> Array.toList
 
 let private decodeTodoItems (args: obj) : Result<TodoItem list, string> =
     let rawTodos = get args "todos"
@@ -64,9 +70,10 @@ let mimoTodoTool (_pluginCtx: obj) : obj =
         (fun args context ->
             let sessionID = str context "sessionID" |> fun value -> value.Trim()
             let report = str args "completedWorkReport" |> fun value -> value.Trim()
+            let methodologies = decodeMethodologies args
             if sessionID = "" then resolveStr "task requires sessionID"
             elif report = "" then resolveStr "task requires completedWorkReport"
             else
                 match decodeTodoItems args with
                 | Error error -> resolveStr error
-                | Ok _ -> resolveStr "Todos updated.")
+                | Ok _ -> resolveStr (todoResultText methodologies))

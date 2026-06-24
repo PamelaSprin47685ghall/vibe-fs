@@ -8,6 +8,7 @@ open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeState
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.PromptFragments
+open VibeFs.Kernel.Methodology
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.ChildAgentRegistry
@@ -37,11 +38,17 @@ type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.Rev
     member _.handleToolExecuteAfter(input: obj) (output: obj) : JS.Promise<unit> =
         promise {
             if normalizeToolName host (Dyn.str input "tool") = "todowrite" then
+                let methodologies =
+                    let args = Dyn.get input "args"
+                    let raw = if Dyn.isNullish args then null else Dyn.get args "select_methodology"
+                    if Dyn.isNullish raw || not (Dyn.isArray raw) then []
+                    else raw :?> obj array |> Array.map string |> Array.toList
                 let out = Dyn.get output "output"
                 if not (Dyn.isNullish out) && Dyn.typeIs out "string" then
                     let s = string out
-                    if not (s.Contains meditatorNudge) then
-                        setOutput output (s + "\n" + meditatorNudge)
+                    let rewritten = todoResultText methodologies
+                    let withNudge = if rewritten.Contains meditatorNudge then rewritten else rewritten + "\n" + meditatorNudge
+                    setOutput output withNudge
         }
 
     member _.handleEvent(input: obj) : JS.Promise<unit> =
