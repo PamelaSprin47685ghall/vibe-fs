@@ -17,15 +17,20 @@ open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Kernel.ToolCopy
+open VibeFs.Kernel.ToolResult
 open VibeFs.Shell.WebSearchApi
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Opencode.SessionIo
 open VibeFs.Opencode.ToolHelpers
 open VibeFs.Shell.PromiseStr
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Shell.SubagentToolExecute
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Shell.FuzzySearch
+open VibeFs.Shell.FuzzyToolsCodec
+open VibeFs.Shell.ToolExecute
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.OpencodeClientCodec
 module ToolSchemaModule = VibeFs.Opencode.ToolSchema
 module FuzzyCommandsModule = VibeFs.Shell.FuzzySearch
 
@@ -34,7 +39,7 @@ let private addIfSome (entries: ResizeArray<string * obj>) (key: string) (v: 'T 
     | Some x -> entries.Add(key, box x)
     | None -> ()
 
-let private buildFuzzyTool (description: string) (args: obj) (toolName: string) (buildParams: obj -> 'P) (execute: 'P -> SearchOptions -> JS.Promise<SearchOutcome>) (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
+let private buildFuzzyTool (description: string) (args: obj) (toolName: string) (decode: obj -> Result<'P, DomainError>) (execute: 'P -> SearchOptions -> JS.Promise<SearchOutcome>) (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
     define description
         args
         (fun args context ->
@@ -42,16 +47,18 @@ let private buildFuzzyTool (description: string) (args: obj) (toolName: string) 
             let scopeId = runtime.Execution.SessionId
             if scopeId = "" then resolveStr (toolRequiresActiveSession toolName)
             else
-                let p = buildParams args
-                let o : SearchOptions =
-                    { cwd = runtime.Execution.Directory
-                      scopeId = scopeId
-                      store = Some iteratorStore
-                      finderCache = finderCache }
-                promise {
-                    let! r = execute p o
-                    return r.output
-                })
+                match decode args with
+                | Error e -> resolveStr (wireDecodeFailure toolName e)
+                | Ok p ->
+                    let o : SearchOptions =
+                        { cwd = runtime.Execution.Directory
+                          scopeId = scopeId
+                          store = Some iteratorStore
+                          finderCache = finderCache }
+                    promise {
+                        let! r = execute p o
+                        return r.output
+                    })
 
 let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
     buildFuzzyTool
@@ -59,11 +66,7 @@ let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyI
         (box {| pattern = strMinNullish 1 Params.fuzzyFindPattern; path = strOpt Params.fuzzyFindPath
                 limit = intMinNullish 1 Params.fuzzyFindLimit; iterator = strOpt Params.fuzzyFindIterator |})
         "fuzzy_find"
-        (fun args ->
-            { pattern = optStr args "pattern"
-              path = optStr args "path"
-              limit = optInt args "limit"
-              iterator = optStr args "iterator" })
+        decodeFuzzyFindArgs
         FuzzyCommandsModule.fuzzyFind
         finderCache
         iteratorStore
@@ -76,44 +79,40 @@ let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyI
                 context = intMinNullish 0 Params.fuzzyGrepContext; limit = intMinNullish 1 Params.fuzzyGrepLimit
                 iterator = strOpt Params.fuzzyGrepIterator |})
         "fuzzy_grep"
-        (fun args ->
-            { pattern = optStr args "pattern"
-              path = optStr args "path"
-              exclude = parseExcludeField args
-              caseSensitive = optBool args "caseSensitive"
-              context = optInt args "context"
-              limit = optInt args "limit"
-              iterator = optStr args "iterator" })
+        decodeFuzzyGrepArgs
         FuzzyCommandsModule.fuzzyGrep
         finderCache
         iteratorStore
 
 let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
-    let client () = Dyn.get ctx "client"
     define websearch
         (box {| query = strReq Params.websearchQuery
                 numResults = numOpt Params.websearchNumResults
                 what_to_summarize = strReq Params.websearchWhatToSummarize |})
         (fun args context ->
             match decodeWebsearchArgs args with
-            | Error e -> resolveStr (Domain.formatDomainError e)
+            | Error e -> resolveStr (wireDecodeFailure "websearch" e)
             | Ok ws ->
-                let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
-                promise {
-                    let body = createObj [ "query", box ws.Query; "max_results", box ws.NumResults ]
-                    let! result = webApiPost "web_search" body runtime.AbortSignal
-                    match result with
-                    | Error e -> return webToolFailed "search" e
-                    | Ok data ->
-                        let items = parseSearchResults (Dyn.get data "results")
-                        let rawResults = formatSearchResults items
-                        if items.IsEmpty then
-                            return rawResults
-                        else
-                            let prompt = formatPrompt opencode (WebsearchSummary(ws.WhatToSummarize, rawResults)) |> List.head
-                            return! runSubagentWithCleanup registry (client ()) "executor" "Web search summary" prompt
-                                runtime.Execution.Directory runtime.Execution.SessionId context
-                })
+                match getClientFromPluginCtx ctx with
+                | Error e -> resolveStr (wireEncodeToolError "OpencodeClient" e)
+                | Ok client ->
+                    let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
+                    promise {
+                        let body = createObj [ "query", box ws.Query; "max_results", box ws.NumResults ]
+                        let! result = webApiPost "web_search" body runtime.AbortSignal
+                        match result with
+                        | Error e -> return webToolFailed "search" e
+                        | Ok data ->
+                            let items = parseSearchResults (Dyn.get data "results")
+                            let rawResults = formatSearchResults items
+                            if items.IsEmpty then
+                                return rawResults
+                            else
+                                let prompt = formatPrompt opencode (WebsearchSummary(ws.WhatToSummarize, rawResults)) |> List.head
+                                return! resolveSubagentPromise "executor"
+                                    (runSubagentWithCleanup registry client "executor" "Web search summary" prompt
+                                        runtime.Execution.Directory runtime.Execution.SessionId context)
+                    })
 
 let webfetchTool (ctx: obj) : obj =
     define webfetch
@@ -124,7 +123,7 @@ let webfetchTool (ctx: obj) : obj =
                 timeout = numOpt Params.webfetchTimeout |})
         (fun args context ->
             match decodeWebfetchArgs args with
-            | Error e -> resolveStr (Domain.formatDomainError e)
+            | Error e -> resolveStr (wireDecodeFailure "webfetch" e)
             | Ok wf ->
                 let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
                 promise {

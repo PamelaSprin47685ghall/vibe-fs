@@ -9,6 +9,7 @@ open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Opencode.SessionIo
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.OpencodeClientCodec
 
 let private maxNudges = 3
 
@@ -29,12 +30,15 @@ let createReviewerChild (registry: ChildAgentRegistry) (client: obj) (reviewStor
                     title = title
                 |}
             |}
-        let! createResult = invoke1 createBody "create" (Dyn.get client "session")
-        let childID = Dyn.str (Dyn.get createResult "data") "id"
-        if childID <> "" then
-            reviewStore.addChild(sessionID, childID)
-            registry.RegisterChildAgent(childID, "reviewer", parentID)
-        return childID
+        match getSessionApiFromClient client with
+        | Error _ -> return ""
+        | Ok session ->
+            let! createResult = invoke1 createBody "create" session
+            let childID = Dyn.str (Dyn.get createResult "data") "id"
+            if childID <> "" then
+                reviewStore.addChild(sessionID, childID)
+                registry.RegisterChildAgent(childID, "reviewer", parentID)
+            return childID
     }
 
 let private textParts (parts: string list) : obj array =

@@ -2,6 +2,7 @@ module VibeFs.Shell.WebToolsCodec
 
 open VibeFs.Kernel.Domain
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.DynField
 
 type WebsearchArgs = {
     Query: string
@@ -18,18 +19,6 @@ type WebfetchArgs = {
 }
 
 let private validPreferLlmsTxt = Set [ "auto"; "always"; "never" ]
-
-let private strField (a: obj) (k: string) : string option =
-    let v = Dyn.get a k
-    if Dyn.isNullish v then None else Some(string v)
-
-let private optInt (a: obj) (k: string) : int option =
-    let v = Dyn.get a k
-    if Dyn.isNullish v then None else Some(unbox<int> v)
-
-let private optBool (a: obj) (k: string) : bool option =
-    let v = Dyn.get a k
-    if Dyn.isNullish v then None else Some(unbox<bool> v)
 
 let private optPreferLlmsTxt (a: obj) (k: string) : Result<string option, DomainError> =
     match strField a k with

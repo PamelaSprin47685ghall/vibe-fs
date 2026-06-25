@@ -9,6 +9,7 @@ open VibeFs.Kernel.NudgeState
 open VibeFs.Kernel.HostTools
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.OpencodeClientCodec
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.ErrorClassify
 open VibeFs.Opencode.NudgeEventCodec
@@ -66,20 +67,22 @@ let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<Se
     promise {
         try
             let sessionIDStr = Id.sessionIdValue sessionID
-            let session = Dyn.get client "session"
-            let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
-            let openTodosFromApi = decodeTodos (Dyn.get todoResp "data")
-            let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
-            let messagesData = Dyn.get messagesResp "data"
-            let openTodos =
-                if not (List.isEmpty openTodosFromApi) then openTodosFromApi
-                else recoverOpenTodosFromMessages messagesData
-            let lastAssistantMessage, agentFromMessage, alreadyNudged =
-                decodeLastAssistant messagesData
-            return Some { todos = openTodos
-                          lastAssistantMessage = lastAssistantMessage
-                          alreadyNudged = alreadyNudged
-                          agentFromMessage = agentFromMessage }
+            match getSessionApiFromClient client with
+            | Error _ -> return None
+            | Ok session ->
+                let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
+                let openTodosFromApi = decodeTodos (Dyn.get todoResp "data")
+                let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
+                let messagesData = Dyn.get messagesResp "data"
+                let openTodos =
+                    if not (List.isEmpty openTodosFromApi) then openTodosFromApi
+                    else recoverOpenTodosFromMessages messagesData
+                let lastAssistantMessage, agentFromMessage, alreadyNudged =
+                    decodeLastAssistant messagesData
+                return Some { todos = openTodos
+                              lastAssistantMessage = lastAssistantMessage
+                              alreadyNudged = alreadyNudged
+                              agentFromMessage = agentFromMessage }
         with _ ->
             return None
     }
@@ -88,8 +91,9 @@ let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string opt
     promise {
         let body = createPromptBody agentOpt promptText
         let promptArg = box {| path = box {| id = Id.sessionIdValue sessionID |}; body = body |}
-        let session = Dyn.get client "session"
-        do! invoke1 promptArg "prompt" session |> Promise.map ignore
+        match getSessionApiFromClient client with
+        | Error _ -> ()
+        | Ok session -> do! invoke1 promptArg "prompt" session |> Promise.map ignore
     }
 
 let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)

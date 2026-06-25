@@ -221,6 +221,9 @@ let paramDoc (name: string) (field: string) : string =
 
 let description (name: string) : string = (specOf name).description
 
+let subagentRequiredKeys (toolName: string) : string array =
+    (specOf toolName).requiredFields |> List.toArray
+
 let private fileEditToolNames =
     Set.ofList
         [ "edit"; "write"; "ast_edit"; "ast_grep_replace"; "file_edit_replace_string"

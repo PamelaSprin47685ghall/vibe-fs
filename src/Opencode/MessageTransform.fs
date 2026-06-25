@@ -10,10 +10,12 @@ open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.ReviewReplayPolicy
 open VibeFs.Kernel.BacklogProjectionCore
 open VibeFs.Shell.MessageTransformCore
+open VibeFs.Shell.MessageTransformHostEntry
+open VibeFs.Shell.MessageTransformHostHooks
+open VibeFs.Shell.MessageTransformPipeline
 open VibeFs.Shell.ReadDedupOpenCode
 open VibeFs.Kernel.MessageTransformPolicy
 open VibeFs.Kernel.CapsFormat
-open VibeFs.Kernel.Config
 open VibeFs.Kernel.Methodology
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.BacklogSession
@@ -38,33 +40,44 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                 let messagesList = MessagingCodec.decodeMessages messagesArr
                 let agent = resolveMessagesTransformAgent registry input messagesList "build"
                 let sessionID = extractSessionID messagesList
-                VibeFs.Shell.ReviewReplaySync.replayReviewIfStoreEmpty
-                    reviewStore
-                    sessionID
-                    (messagesList |> Messaging.flatten |> textsFromFlatParts)
                 let cleaned = Messaging.stripSyntheticBySource messagesList
-                if cleaned.IsEmpty then ()
-                else
-                    let excluded = shouldExcludeAgentFromProjection agent false
-                    let backlogOps =
-                        backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
-                    let afterBacklog = applyBacklogProjection sessionID excluded backlogOps cleaned
-                    let encoded = MessagingCodec.encodeMessages afterBacklog
-                    if not excluded then deduplicateOpencodeReadPartsInPlace encoded
-                    let! capsFiles =
-                        if excluded then Promise.lift ([]: CapsFile list)
-                        else CapsFileCache.getOrLoadCapsFilesForScope runtimeScope sessionID directory
-                    let! knowledgeGraphPrelude =
-                        if not excluded && canUse agent "knowledge_graph_fetch" then knowledgeGraphRuntime.BuildPreludeForSession(sessionID, directory)
-                        else Promise.lift (None: string option)
-                    let final =
-                        buildCapsMessages
-                            VibeFs.Shell.FileSys.sha256HexTruncated
-                            encoded
-                            directory
-                            capsFiles
-                            knowledgeGraphPrelude
-                    replaceArrayInPlace messagesArr final
+                let excluded = shouldExcludeAgentFromProjection agent false
+                let backlogOps =
+                    backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
+                let plan = {
+                    SessionID = sessionID
+                    Agent = agent
+                    Directory = directory
+                    Excluded = excluded
+                    Cleaned = cleaned
+                }
+                let replayTexts () =
+                    messagesList |> Messaging.flatten |> textsFromFlatParts
+                let dedupFn excluded encoded =
+                    if excluded then encoded
+                    else
+                        deduplicateOpencodeReadPartsInPlace encoded
+                        encoded
+                let loadCaps () =
+                    loadCapsForScope runtimeScope AllowEmptyDirectory plan
+                let loadKgPrelude () =
+                    loadKgPreludeForAgent false agent plan (fun sid dir -> knowledgeGraphRuntime.BuildPreludeForSession(sid, dir))
+                let buildCaps encoded capsFiles prelude =
+                    buildCapsMessages VibeFs.Shell.FileSys.sha256HexTruncated encoded directory capsFiles prelude
+                let! final =
+                    runHostMessagesTransform
+                        reviewStore
+                        sessionID
+                        IfStoreEmpty
+                        replayTexts
+                        plan
+                        backlogOps
+                        MessagingCodec.encodeMessages
+                        dedupFn
+                        loadCaps
+                        loadKgPrelude
+                        buildCaps
+                if not cleaned.IsEmpty then replaceArrayInPlace messagesArr final
     }
 
 let compactingHandlerFor (_host: Host) (backlogSession: BacklogSession) (input: obj) (output: obj) : JS.Promise<unit> =

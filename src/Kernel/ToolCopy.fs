@@ -1,6 +1,7 @@
 module VibeFs.Kernel.ToolCopy
 
 open VibeFs.Kernel.Domain
+open VibeFs.Kernel.ToolResult
 
 let muxToolRequiresWorkspaceId (title: string) : string =
     $"{title} requires workspaceId"
@@ -23,23 +24,38 @@ let submitReviewInProgress : string =
 let opencodeSubmitReviewInProgress : string =
     "A review is already in progress. Wait for it to finish."
 
-let private contextFailed (context: string) (error: DomainError) : string =
-    $"{context} failed: {formatDomainError error}"
-
 let webSearchRequiredField (field: string) : string =
-    contextFailed "Web search" (InvalidIntent ("websearch", field, "required"))
+    wireEncodeToolError "Web search" (InvalidIntent ("websearch", field, "required"))
 
 let webFetchRequiredField (field: string) : string =
-    contextFailed "Web fetch" (InvalidIntent ("webfetch", field, "required"))
+    wireEncodeToolError "Web fetch" (InvalidIntent ("webfetch", field, "required"))
 
 let toolRequiresActiveSession (toolName: string) : string =
-    contextFailed toolName (InvalidIntent (toolName, "session", "requires an active session"))
+    wireEncodeToolError toolName (InvalidIntent (toolName, "session", "requires an active session"))
 
 let executorRequiresSession : string =
     toolRequiresActiveSession "executor"
 
 let executorInvalidLanguage : string =
-    contextFailed "Executor" (InvalidIntent ("executor", "language", "expected shell, python, or javascript"))
+    wireEncodeToolError "Executor" (InvalidIntent ("executor", "language", "expected shell, python, or javascript"))
 
 let webToolFailed (label: string) (error: DomainError) : string =
-    $"Web {label} failed: {formatDomainError error}"
+    wireEncodeToolError $"Web {label}" error
+
+let reviewAlreadyActiveMessage : string =
+    "With-Review Mode is already active. Submit your work via submit_review."
+
+let preReviewPassedMessage (task: string) : string =
+    $"Pre-review passed. Task \"{task}\" already meets all criteria — no changes needed."
+
+let preReviewCouldNotComplete : string =
+    "Pre-review could not complete."
+
+let withReviewPreReviewFeedbackHeader : string =
+    "=== Pre-review Feedback ==="
+
+let subagentToolFailed (context: string) (error: DomainError) : string =
+    wireEncodeToolError context error
+
+let subagentIntentsMustBeNonEmpty : string =
+    "Error: `intents` must be a non-empty array."

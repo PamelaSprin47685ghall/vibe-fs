@@ -3,6 +3,7 @@ module VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.ToolContext
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.OpencodeContextCodec
 open VibeFs.Shell.ToolContextCodec
 
 type IToolRuntimeContext = {
@@ -10,23 +11,17 @@ type IToolRuntimeContext = {
     AbortSignal: obj option
 }
 
+let private abortSignalOption (signal: obj) : obj option =
+    if Dyn.isNullish signal then None else Some signal
+
 let fromMuxConfig (config: obj) : Result<IToolRuntimeContext, DomainError> =
     decodeMuxConfig config
     |> Result.map (fun execution ->
-        let signal = Dyn.get config "abortSignal"
-        {
-            Execution = execution
-            AbortSignal = if Dyn.isNullish signal then None else Some signal
-        })
+        { Execution = execution; AbortSignal = abortSignalOption (Dyn.get config "abortSignal") })
 
 let fromOpencode (context: obj) (fallbackDir: string) : IToolRuntimeContext =
     let execution = decodeOpencodeToolContext context fallbackDir
-    let signal =
-        if Dyn.isNullish context then None
-        else
-            let a = Dyn.get context "abort"
-            if Dyn.isNullish a then None else Some a
-    { Execution = execution; AbortSignal = signal }
+    { Execution = execution; AbortSignal = abortSignalOption (getAbortSignalFromContext context) }
 
 let pluginDirectoryFromCtx (ctx: obj) : string =
     (fromOpencode ctx "").Execution.Directory

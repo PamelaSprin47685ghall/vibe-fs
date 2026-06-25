@@ -11,6 +11,13 @@ open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.DelegatedAiSettings
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.ToolContextCodec
+open VibeFs.Shell.OpencodeContextCodec
+open VibeFs.Shell.OpencodeSessionPromptCodec
+open VibeFs.Shell.OpencodeSessionSpawnCodec
+open VibeFs.Shell.OpencodeClientCodec
+open VibeFs.Shell.SessionIoSpawn
+open VibeFs.Shell.SubagentToolExecute
 
 [<Global>]
 type DOMException(message: string, name: string) =
@@ -31,52 +38,26 @@ type SubagentLaunchOptions =
 let private noOutputText = "(no output)"
 let private abortedPrefix = "(aborted)"
 
-let private firstString (ctx: obj) (keys: string list) : string option =
-    keys
-    |> List.tryPick (fun key ->
-        let v = Dyn.get ctx key
-        if Dyn.isNullish v then None else Some(string v))
-
 /// Get the abort signal from the opencode context.  The host exposes it as
 /// `context.abort` (an AbortSignal), not `context.abortSignal`.
-let getAbortSignal (context: obj) : obj =
-    if Dyn.isNullish context then null
-    else
-        let abort = Dyn.get context "abort"
-        if Dyn.isNullish abort then null else abort
+let getAbortSignal (context: obj) : obj = getAbortSignalFromContext context
 
 /// Extract the tool-execution context from an opencode tool `context`.
 /// sessionID is returned as null when the host did not provide one, so parent
 /// resolution treats the subagent as a top-level session.
 let extractToolContext (context: obj) (pluginDirectory: string) : obj =
-    let directory = firstString context [ "directory"; "cwd"; "workspaceDir"; "workspace_dir"; "workingDirectory" ]
-    let sessionID = firstString context [ "sessionID"; "sessionId"; "session_id" ]
+    let execution = decodeOpencodeToolContext context pluginDirectory
     box {|
-        directory =
-            match directory with
-            | Some s when s <> "" -> s
-            | _ -> pluginDirectory
+        directory = execution.Directory
         sessionID =
-            match sessionID with
-            | Some s when s <> "" -> box s
-            | _ -> box null
+            if execution.SessionId = "" then box null
+            else box execution.SessionId
         abortSignal = getAbortSignal context
     |}
 
 /// Dynamically invoke a method on `target`, awaiting the resulting promise.
 let invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
     unbox (target?(method)(arg))
-
-let private tryReadPromptModel (payload: obj) : obj option =
-    let promptModel = Dyn.get payload "model"
-    if not (Dyn.isNullish promptModel) then Some promptModel
-    else
-        let modelString = Dyn.str payload "modelString"
-        if modelString = "" then None
-        else
-            let slash = modelString.IndexOf('/')
-            if slash <= 0 || slash >= modelString.Length - 1 then None
-            else Some (box {| providerID = modelString.[0..slash-1]; modelID = modelString.[slash+1..] |})
 
 let private buildPromptBody (options: SubagentLaunchOptions) childID : obj =
     let body = box {| agent = options.agent; parts = [| box {| ``type`` = "text"; text = options.prompt |} |] |}
@@ -85,7 +66,8 @@ let private buildPromptBody (options: SubagentLaunchOptions) childID : obj =
         match options.aiSettings.modelString with
         | None -> body
         | Some modelString ->
-            match tryReadPromptModel (createObj [ "modelString", box modelString ]) with
+            let payload = createObj [ "modelString", box modelString ]
+            match tryDecodePromptModelFromPayload payload with
             | Some model -> Dyn.withKey body "model" model
             | None -> body
     let body =
@@ -98,19 +80,22 @@ let private buildPromptBody (options: SubagentLaunchOptions) childID : obj =
 let extractSessionText (client: obj) (sessionId: string) (directory: string) : JS.Promise<string> =
     promise {
         try
-            let arg =
-                if directory = "" then
-                    box {| path = box {| id = sessionId |} |}
+            match getSessionApiFromClient client with
+            | Error _ -> return noOutputText
+            | Ok session ->
+                let arg =
+                    if directory = "" then
+                        box {| path = box {| id = sessionId |} |}
+                    else
+                        box {| path = box {| id = sessionId |}; query = box {| directory = directory |} |}
+                let! result = invoke1 arg "messages" session
+                let data = Dyn.get result "data"
+                if Dyn.isNullish data then return noOutputText
                 else
-                    box {| path = box {| id = sessionId |}; query = box {| directory = directory |} |}
-            let! result = invoke1 arg "messages" (Dyn.get client "session")
-            let data = Dyn.get result "data"
-            if Dyn.isNullish data then return noOutputText
-            else
-                let messagesList = MessagingCodec.decodeMessages (unbox<obj[]> data)
-                match Messaging.readAssistantText messagesList 0 "\n\n" with
-                | Some text -> return text
-                | None -> return noOutputText
+                    let messagesList = MessagingCodec.decodeMessages (unbox<obj[]> data)
+                    match Messaging.readAssistantText messagesList 0 "\n\n" with
+                    | Some text -> return text
+                    | None -> return noOutputText
         with _ -> return noOutputText
     }
 
@@ -118,24 +103,27 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) : J
 let readSessionTexts (client: obj) (sessionId: string) (directory: string) : JS.Promise<string list> =
     promise {
         try
-            let arg =
-                if directory = "" then
-                    box {| path = box {| id = sessionId |} |}
+            match getSessionApiFromClient client with
+            | Error _ -> return []
+            | Ok session ->
+                let arg =
+                    if directory = "" then
+                        box {| path = box {| id = sessionId |} |}
+                    else
+                        box {| path = box {| id = sessionId |}; query = box {| directory = directory |} |}
+                let! result = invoke1 arg "messages" session
+                let data = Dyn.get result "data"
+                if Dyn.isNullish data then return []
                 else
-                    box {| path = box {| id = sessionId |}; query = box {| directory = directory |} |}
-            let! result = invoke1 arg "messages" (Dyn.get client "session")
-            let data = Dyn.get result "data"
-            if Dyn.isNullish data then return []
-            else
-                let messagesList = MessagingCodec.decodeMessages (unbox<obj[]> data)
-                return
-                    messagesList
-                    |> Messaging.flatten
-                    |> List.map (fun fp ->
-                        match fp.part with
-                        | TextPart text -> text
-                        | ToolPart(_, _, Some state, _) -> state.output
-                        | _ -> "")
+                    let messagesList = MessagingCodec.decodeMessages (unbox<obj[]> data)
+                    return
+                        messagesList
+                        |> Messaging.flatten
+                        |> List.map (fun fp ->
+                            match fp.part with
+                            | TextPart text -> text
+                            | ToolPart(_, _, Some state, _) -> state.output
+                            | _ -> "")
         with _ -> return []
     }
 
@@ -143,68 +131,72 @@ let readSessionTexts (client: obj) (sessionId: string) (directory: string) : JS.
 /// rejects with `AbortError` if the signal fires before the prompt resolves.
 let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
     promise {
-        let session = Dyn.get client "session"
-        if Dyn.isNullish signal then
-            do! session?prompt(args)
-        elif Dyn.truthy (Dyn.get signal "aborted") then
-            return! Promise.reject (DOMException("Aborted", "AbortError"))
-        else
-            let settled = ref false
-            let handlerRef = ref None
-            let abortAsync : JS.Promise<string> =
-                Promise.create (fun resolve _reject ->
-                    let handler = fun () ->
+        match getSessionApiFromClient client with
+        | Error err -> return! Promise.reject (exn (formatDomainError err))
+        | Ok session ->
+            if Dyn.isNullish signal then
+                do! session?prompt(args)
+            elif Dyn.truthy (Dyn.get signal "aborted") then
+                return! Promise.reject (DOMException("Aborted", "AbortError"))
+            else
+                let settled = ref false
+                let handlerRef = ref None
+                let abortAsync : JS.Promise<string> =
+                    Promise.create (fun resolve _reject ->
+                        let handler = fun () ->
+                            if not settled.Value then
+                                settled.Value <- true
+                                match handlerRef.Value with
+                                | Some h -> signal?removeEventListener("abort", h) |> ignore
+                                | None -> ()
+                                resolve "aborted"
+                        handlerRef.Value <- Some handler
+                        signal?addEventListener("abort", handler) |> ignore)
+                let promptAsync : JS.Promise<string> =
+                    promise {
+                        do! session?prompt(args)
                         if not settled.Value then
                             settled.Value <- true
                             match handlerRef.Value with
                             | Some h -> signal?removeEventListener("abort", h) |> ignore
                             | None -> ()
-                            resolve "aborted"
-                    handlerRef.Value <- Some handler
-                    signal?addEventListener("abort", handler) |> ignore)
-            let promptAsync : JS.Promise<string> =
-                promise {
-                    do! session?prompt(args)
-                    if not settled.Value then
-                        settled.Value <- true
-                        match handlerRef.Value with
-                        | Some h -> signal?removeEventListener("abort", h) |> ignore
-                        | None -> ()
-                    return "ok"
-                }
-            try
-                let! winner = Promise.race [ promptAsync; abortAsync ]
-                if winner = "aborted" then return! Promise.reject (DOMException("Aborted", "AbortError"))
-            with err ->
-                match translateJsError err with
-                | MessageAborted -> return! Promise.reject (DOMException("Aborted", "AbortError"))
-                | _ -> return! Promise.reject err
+                        return "ok"
+                    }
+                try
+                    let! winner = Promise.race [ promptAsync; abortAsync ]
+                    if winner = "aborted" then return! Promise.reject (DOMException("Aborted", "AbortError"))
+                with err ->
+                    match translateJsError err with
+                    | MessageAborted -> return! Promise.reject (DOMException("Aborted", "AbortError"))
+                    | _ -> return! Promise.reject err
     }
 
-let startSubagentSession (registry: ChildAgentRegistry) (client: obj) (options: SubagentLaunchOptions) : JS.Promise<string> =
+let startSubagentSession (registry: ChildAgentRegistry) (client: obj) (options: SubagentLaunchOptions) : JS.Promise<Result<string, DomainError>> =
     promise {
-        let parentID = registry.ResolveSubsessionParentID(if options.sessionID = "" then None else Some options.sessionID)
-        let session = Dyn.get client "session"
-        let createBody =
-            box {|
-                query = box {| directory = options.directory |}
-                body = box {| parentID = (match parentID with Some p -> box p | None -> box null); title = options.title |}
-            |}
-        let! createResult = invoke1 createBody "create" session
-        let childID = Dyn.str (Dyn.get createResult "data") "id"
-        if childID = "" then return! Promise.reject (exn "Failed to create child session")
-        else
-            registry.RegisterChildAgent(childID, options.agent, parentID)
-            do! promptWithAbort client (buildPromptBody options childID) null
-            return childID
+        match getSessionApiFromClient client with
+        | Error err -> return Error err
+        | Ok session ->
+            let parentID = registry.ResolveSubsessionParentID(if options.sessionID = "" then None else Some options.sessionID)
+            let createBody =
+                box {|
+                    query = box {| directory = options.directory |}
+                    body = box {| parentID = (match parentID with Some p -> box p | None -> box null); title = options.title |}
+                |}
+            let! createResult = invoke1 createBody "create" session
+            match decodeChildSessionIdFromCreateResult createResult with
+            | Error err -> return Error err
+            | Ok childID ->
+                registry.RegisterChildAgent(childID, options.agent, parentID)
+                do! promptWithAbort client (buildPromptBody options childID) null
+                return Ok childID
     }
 
-let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
-                            (directory: string) (sessionID: string) (context: obj)
-                            (tools: obj) (cleanup: bool) : JS.Promise<string> =
+let runSubagentCoreResult (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
+                          (directory: string) (sessionID: string) (_context: obj)
+                          (tools: obj) (cleanup: bool) : JS.Promise<Result<string, DomainError>> =
     promise {
         try
-            let! childID =
+            let! childResult =
                 startSubagentSession registry client
                     { agent = agent
                       title = title
@@ -213,34 +205,39 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
                       sessionID = sessionID
                       tools = tools
                       aiSettings = emptySettings }
-            let abortAndUnregister () =
-                if cleanup then
-                    let session = Dyn.get client "session"
-                    let abortPromise : JS.Promise<obj> = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
-                    abortPromise |> ignore
-                    registry.UnregisterChildAgent(childID)
-            try
+            match childResult with
+            | Error err -> return Error err
+            | Ok childID ->
+                let abortAndUnregister () =
+                    if cleanup then
+                        match getSessionApiFromClient client with
+                        | Ok session ->
+                            let abortPromise : JS.Promise<obj> = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
+                            abortPromise |> ignore
+                        | Error _ -> ()
+                        registry.UnregisterChildAgent(childID)
                 try
-                    let! text = extractSessionText client childID directory
-                    return if text = "" then noOutputText else text
-                finally
-                    abortAndUnregister ()
-            with err ->
-                match translateJsError err with
-                | MessageAborted ->
-                    abortAndUnregister ()
-                    let! text = extractSessionText client childID directory
-                    return if text = "" then abortedPrefix else $"{abortedPrefix} {text}"
-                | _ -> return! Promise.reject err
-        with _ ->
-            return "Failed to create child session"
+                    try
+                        let! text = extractSessionText client childID directory
+                        return Ok (formatSubagentReport noOutputText abortedPrefix text false)
+                    finally
+                        abortAndUnregister ()
+                with err ->
+                    match translateJsError err with
+                    | MessageAborted ->
+                        abortAndUnregister ()
+                        let! text = extractSessionText client childID directory
+                        return Ok (formatSubagentReport noOutputText abortedPrefix text true)
+                    | other -> return Error other
+        with err ->
+            return Error (translateJsError err)
     }
 
 let runSubagent (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                 (directory: string) (sessionID: string) (context: obj)
-                (tools: obj) : JS.Promise<string> =
-    runSubagentCore registry client agent title prompt directory sessionID context tools false
+                (tools: obj) : JS.Promise<Result<string, DomainError>> =
+    runSubagentCoreResult registry client agent title prompt directory sessionID context tools false
 
 let runSubagentWithCleanup (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
-                           (directory: string) (sessionID: string) (context: obj) : JS.Promise<string> =
-    runSubagentCore registry client agent title prompt directory sessionID context (box null) true
+                           (directory: string) (sessionID: string) (context: obj) : JS.Promise<Result<string, DomainError>> =
+    runSubagentCoreResult registry client agent title prompt directory sessionID context (box null) true

@@ -58,10 +58,24 @@ let getOrLoadCapsFilesNormalizesDirectoryAlias () = promise {
     equal "caps cache alias same length" dot.Length dotSlash.Length
 }
 
+let getOrLoadCapsFilesParallelMissSharesInflight () = promise {
+    let scope = create ()
+    let sessionID = "caps-cache-inflight-" + string (System.DateTime.UtcNow.Ticks)
+    let directory = "."
+    let! pair =
+        [| getOrLoadCapsFilesForScope scope sessionID directory
+           getOrLoadCapsFilesForScope scope sessionID directory |]
+        |> Promise.all
+    check "caps cache parallel miss same list ref"
+        (obj.ReferenceEquals(box pair.[0], box pair.[1]))
+    equal "caps cache parallel miss same length" pair.[0].Length pair.[1].Length
+}
+
 let run () = promise {
     do! getOrLoadCapsFilesCachesPerSession ()
     do! getOrLoadCapsFilesIsolatesDistinctSessions ()
     do! getOrLoadCapsFilesIsolatesDistinctDirectories ()
     do! getOrLoadCapsFilesReusesAfterDirectoryRoundTrip ()
     do! getOrLoadCapsFilesNormalizesDirectoryAlias ()
+    do! getOrLoadCapsFilesParallelMissSharesInflight ()
 }

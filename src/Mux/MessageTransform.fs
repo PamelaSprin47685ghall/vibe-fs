@@ -5,9 +5,11 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Shell
 
-open VibeFs.Kernel.Config
 open VibeFs.Kernel.CapsFormat
 open VibeFs.Shell.MessageTransformCore
+open VibeFs.Shell.MessageTransformHostEntry
+open VibeFs.Shell.MessageTransformHostHooks
+open VibeFs.Shell.MessageTransformPipeline
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
@@ -43,25 +45,39 @@ let messagesTransform
                 let agent = decoded.Agent
                 let sessionID = decoded.SessionID
                 let directory = decoded.Directory
-                VibeFs.Shell.ReviewReplaySync.replayReviewAlwaysSync reviewStore sessionID (extractTextsFromEncodedMessages messagesArr)
                 let excluded =
                     shouldExcludeAgentFromProjection agent (isChildWorkspace deps sessionID)
                 let typedMessages = decodeMessages sessionID messagesArr
                 let cleanedMessages = stripSyntheticBySource typedMessages
                 let backlogOps =
                     backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
-                let afterBacklog =
-                    applyBacklogProjection sessionID excluded backlogOps cleanedMessages
-                let encoded = encodeMessages afterBacklog
-                let deduped = if excluded then encoded else deduplicateReadOutputsWithSeenByPath Map.empty encoded
-                let! capsFiles =
-                    if excluded || directory = "" then Promise.lift ([]: CapsFile list)
-                    else CapsFileCache.getOrLoadCapsFilesForScope runtimeScope sessionID directory
-                let! knowledgeGraphPrelude =
-                    if not excluded && directory <> "" && canUse agent "knowledge_graph_fetch" then
-                        knowledgeGraphRuntime.BuildPreludeForSession(sessionID, directory)
-                    else
-                        Promise.lift (None: string option)
-                let final = buildCapsMessages deduped capsFiles knowledgeGraphPrelude
-                replaceArrayInPlace messagesArr final
+                let plan = {
+                    SessionID = sessionID
+                    Agent = agent
+                    Directory = directory
+                    Excluded = excluded
+                    Cleaned = cleanedMessages
+                }
+                let replayTexts () = extractTextsFromEncodedMessages messagesArr
+                let dedupFn excluded encoded =
+                    if excluded then encoded else deduplicateReadOutputsWithSeenByPath Map.empty encoded
+                let loadCaps () =
+                    loadCapsForScope runtimeScope RequireDirectory plan
+                let loadKgPrelude () =
+                    loadKgPreludeForAgent true agent plan (fun sid dir -> knowledgeGraphRuntime.BuildPreludeForSession(sid, dir))
+                let buildCaps encoded capsFiles prelude = buildCapsMessages encoded capsFiles prelude
+                let! final =
+                    runHostMessagesTransform
+                        reviewStore
+                        sessionID
+                        Always
+                        replayTexts
+                        plan
+                        backlogOps
+                        encodeMessages
+                        dedupFn
+                        loadCaps
+                        loadKgPrelude
+                        buildCaps
+                if not cleanedMessages.IsEmpty then replaceArrayInPlace messagesArr final
     }

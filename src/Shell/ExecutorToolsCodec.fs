@@ -3,6 +3,7 @@ module VibeFs.Shell.ExecutorToolsCodec
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Executor
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.DynField
 
 type ExecutorArgs = {
     Language: ExecutorLanguage
@@ -11,10 +12,6 @@ type ExecutorArgs = {
     TimeoutType: ExecutorTimeoutType
     Mode: string
 }
-
-let private strField (a: obj) (k: string) : string option =
-    let v = Dyn.get a k
-    if Dyn.isNullish v then None else Some(string v)
 
 let private strListField (a: obj) (k: string) : string list =
     let v = Dyn.get a k
@@ -33,6 +30,9 @@ let private parseModeField (value: string) : Result<string, DomainError> =
     match value.Trim() with
     | "ro" | "rw" as m -> Ok m
     | _ -> Error (InvalidIntent ("executor", "mode", "must be ro or rw"))
+
+let peekExecutorMode (args: obj) : string option =
+    strField args "mode" |> Option.map (fun s -> s.Trim())
 
 let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
     match strField args "language" with

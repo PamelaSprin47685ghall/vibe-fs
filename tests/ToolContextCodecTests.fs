@@ -56,6 +56,13 @@ let decodeMuxConfigNoSession () =
         check "mux workspaceId" (ctx.WorkspaceId = Some "ws-1")
     | Error _ -> check "mux no session" false
 
+let decodeMuxConfigLenientMissingWorkspaceId () =
+    let config = createObj [ "cwd", box " /tmp/len "; "sessionId", box "s-len" ]
+    let ctx = decodeMuxConfigLenient config
+    check "lenient no workspaceId" (ctx.WorkspaceId = None)
+    check "lenient cwd trim" (ctx.Directory = "/tmp/len")
+    check "lenient session" (ctx.SessionId = "s-len")
+
 let decodeMuxConfigOkDirectory () =
     let config =
         createObj [
@@ -70,6 +77,7 @@ let decodeMuxConfigOkDirectory () =
     | Error _ -> check "mux ok directory" false
 
 let run () =
+    decodeMuxConfigLenientMissingWorkspaceId ()
     decodeMuxConfigMissingWorkspaceId ()
     decodeMuxConfigEmptyWorkspaceId ()
     decodeMuxConfigSessionIdFromSessionID ()

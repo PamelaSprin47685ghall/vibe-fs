@@ -10,16 +10,14 @@ open VibeFs.Mux.Wrappers
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.SubagentSpawn
+open VibeFs.Shell.DelegateToolsCodec
+open VibeFs.Shell.ToolContextCodec
 
 let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
     unbox<JS.Promise<obj>>(taskService?create(input))
 
 let private taskWait (taskService: obj) (taskId: string) (opts: obj) : JS.Promise<obj> =
     unbox<JS.Promise<obj>>(taskService?waitForAgentReport(taskId, opts))
-
-let private requireWorkspaceId (config: obj) (title: string) : WorkspaceId option =
-    let wid = Dyn.str config "workspaceId"
-    Id.tryWorkspaceId wid
 
 type DelegateOutcome =
     | Report of string
@@ -72,30 +70,25 @@ let private resolveDelegationContext
     (options: obj option)
     : JS.Promise<Result<DelegationContext, string>> =
     promise {
-        match requireWorkspaceId config title with
-        | None -> return Error $"{title.ToLower()} requires workspaceId"
-        | Some wid ->
-            let taskService = Dyn.get config "taskService"
-            if isNull taskService then
-                return Error $"No task service for {title.ToLower()}"
-            else
-                let opts = defaultArg options (box null)
-                let experiments = Dyn.get opts "experiments"
-                let aiSettingsAgentId = Dyn.str opts "aiSettingsAgentId"
-                let! aiSettings =
-                    if aiSettingsAgentId = "" then
-                        Promise.lift emptySettings
-                    else
-                        resolveDelegatedAgentAiSettings deps config aiSettingsAgentId
+        match decodeDelegateConfig config with
+        | Error e -> return Error (formatDomainError e)
+        | Ok host ->
+            let opts = defaultArg options (box null)
+            let optFields = decodeDelegateOptions opts
+            let! aiSettings =
+                if optFields.AiSettingsAgentId = "" then
+                    Promise.lift emptySettings
+                else
+                    resolveDelegatedAgentAiSettings deps config optFields.AiSettingsAgentId
 
-                return
-                    Ok
-                        { workspaceId = wid
-                          taskService = taskService
-                          aiSettings = aiSettings
-                          experiments = experiments
-                          parentRuntimeAiSettings = buildParentRuntimeAiSettings config
-                          abortSignal = Dyn.get config "abortSignal" }
+            return
+                Ok
+                    { workspaceId = host.WorkspaceId
+                      taskService = host.TaskService
+                      aiSettings = aiSettings
+                      experiments = optFields.Experiments
+                      parentRuntimeAiSettings = buildParentRuntimeAiSettings config
+                      abortSignal = host.AbortSignal }
     }
 
 let private translateTaskWaitError (err: exn) (title: string) (taskId: string) : JS.Promise<string> =
@@ -123,24 +116,25 @@ let private createAndWaitTask
                 ctx.experiments
 
         let! createResult = taskCreate ctx.taskService input
-        let success = Dyn.truthy (Dyn.get createResult "success")
+        match decodeTaskCreateResult createResult with
+        | Error e -> return formatDomainError e
+        | Ok created ->
+            if not created.Success then
+                return $"Failed to create {title.ToLower()} task: {created.Error}"
+            else
+                let waitOpts =
+                    box
+                        {| requestingWorkspaceId = Id.workspaceIdValue ctx.workspaceId
+                           abortSignal = ctx.abortSignal
+                           backgroundOnMessageQueued = false |}
 
-        if not success then
-            let err = Dyn.str createResult "error"
-            return $"Failed to create {title.ToLower()} task: {err}"
-        else
-            let taskId = Dyn.str (Dyn.get createResult "data") "taskId"
-            let waitOpts =
-                box
-                    {| requestingWorkspaceId = Id.workspaceIdValue ctx.workspaceId
-                       abortSignal = ctx.abortSignal
-                       backgroundOnMessageQueued = false |}
-
-            try
-                let! report = taskWait ctx.taskService taskId waitOpts
-                return Dyn.str report "reportMarkdown"
-            with err ->
-                return! translateTaskWaitError err title taskId
+                try
+                    let! report = taskWait ctx.taskService created.TaskId waitOpts
+                    match decodeTaskReport report with
+                    | Ok markdown -> return markdown
+                    | Error e -> return formatDomainError e
+                with err ->
+                    return! translateTaskWaitError err title created.TaskId
     }
 
 let delegateToSubAgent

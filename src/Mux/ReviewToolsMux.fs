@@ -11,7 +11,10 @@ open VibeFs.Kernel.Domain
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Kernel.ToolCopy
 open VibeFs.Shell.ReviewRuntime
+open VibeFs.Shell.ReviewToolsCodec
+open VibeFs.Shell.ToolExecute
 open VibeFs.Shell.ToolRuntimeContext
+open VibeFs.Kernel.ToolResult
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
@@ -78,34 +81,37 @@ let submitReviewTool (deps: obj) (toolNames: string array) (reviewStore: ReviewS
       execute = fun config args ->
           match fromMuxConfig config with
           | Error (InvalidIntent (_, "workspaceId", _)) -> resolveStr muxSubmitReviewRequiresWorkspaceId
-          | Error e -> resolveStr (formatDomainError e)
+          | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
           | Ok runtime ->
               let workspaceId = Option.get runtime.Execution.WorkspaceId
               promise {
-                  let report = defaultArg (strField args "report") ""
-                  let affectedFiles = requireStrArray args "affectedFiles" |> List.ofArray
-                  let! resolvedTask = syncReviewTaskFromHistory deps reviewStore workspaceId
-                  if not (reviewStore.tryLockReview workspaceId) then
-                      return
-                          if reviewStore.isReviewActive workspaceId then submitReviewInProgress
-                          else submitReviewNotNeeded
-                  else
-                      try
-                          let originalTask = defaultArg resolvedTask ""
+                  match decodeSubmitReviewArgs args with
+                  | Error e -> return wireDecodeFailure "submit_review" e
+                  | Ok decoded ->
+                      let! resolvedTask = syncReviewTaskFromHistory deps reviewStore workspaceId
+                      if not (reviewStore.tryLockReview workspaceId) then
+                          return
+                              if reviewStore.isReviewActive workspaceId then submitReviewInProgress
+                              else submitReviewNotNeeded
+                      else
                           try
-                              let! round1 = runReviewRound deps config toolNames (reviewSubmissionVerdictPrompt originalTask report affectedFiles)
-                              let! verdict =
-                                  match round1 with
-                                  | Accepted -> runReviewRound deps config toolNames (reviewSubmissionDoubleCheckPrompt originalTask report affectedFiles)
-                                  | other -> Promise.lift other
-                              match verdict with
-                              | Accepted | Terminated -> reviewStore.deactivateReview workspaceId
-                              | Rejected _ -> ()
-                              return formatReviewResult verdict
-                          with ex ->
-                              reviewStore.deactivateReview workspaceId
-                              return! Promise.reject ex
-                      finally
-                          reviewStore.unlockReview workspaceId
+                              let originalTask = defaultArg resolvedTask ""
+                              let report = decoded.Report
+                              let affectedFiles = decoded.AffectedFiles
+                              try
+                                  let! round1 = runReviewRound deps config toolNames (reviewSubmissionVerdictPrompt originalTask report affectedFiles)
+                                  let! verdict =
+                                      match round1 with
+                                      | Accepted -> runReviewRound deps config toolNames (reviewSubmissionDoubleCheckPrompt originalTask report affectedFiles)
+                                      | other -> Promise.lift other
+                                  match verdict with
+                                  | Accepted | Terminated -> reviewStore.deactivateReview workspaceId
+                                  | Rejected _ -> ()
+                                  return formatReviewResult verdict
+                              with ex ->
+                                  reviewStore.deactivateReview workspaceId
+                                  return! Promise.reject ex
+                          finally
+                              reviewStore.unlockReview workspaceId
               }
       condition = None }

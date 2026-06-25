@@ -9,6 +9,7 @@ open VibeFs.Shell.PromiseQueue
 type RuntimeScope() =
     let projection = ProjectionStore()
     let mutable capsFiles = Map.empty<string, CapsFile list>
+    let mutable capsInflight = Map.empty<string, JS.Promise<CapsFile list>>
     let iteratorStore = createTypedIteratorStore 200
     let mutable sessionQueues = Map.empty<string, SerialQueue>
 
@@ -25,6 +26,22 @@ type RuntimeScope() =
 
     member _.ClearCapsFiles() : unit =
         capsFiles <- Map.empty
+        capsInflight <- Map.empty
+
+    member _.GetOrLoadCapsInflight(key: string, load: unit -> JS.Promise<CapsFile list>) : JS.Promise<CapsFile list> =
+        match Map.tryFind key capsInflight with
+        | Some p -> p
+        | None ->
+            let p =
+                load ()
+                |> Promise.map (fun files ->
+                    capsInflight <- Map.remove key capsInflight
+                    files)
+                |> Promise.catch (fun ex ->
+                    capsInflight <- Map.remove key capsInflight
+                    raise ex)
+            capsInflight <- Map.add key p capsInflight
+            p
 
     member _.ClearIterators() : unit =
         clearTypedIteratorStore iteratorStore
@@ -43,12 +60,3 @@ type RuntimeScope() =
         queue.Enqueue(work)
 
 let create () : RuntimeScope = RuntimeScope()
-
-let mutable private defaultScope = create ()
-
-let getDefault () : RuntimeScope = defaultScope
-
-let resetDefaultForTesting () : unit =
-    defaultScope <- create ()
-    defaultScope.ClearIterators()
-    defaultScope.ClearSessionQueues()

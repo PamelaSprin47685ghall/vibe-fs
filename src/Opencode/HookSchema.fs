@@ -20,10 +20,11 @@ let selectMethodologyFieldDescription = VibeFs.Kernel.Methodology.selectMethodol
 /// in, so the label survives into the message history the UI reads. Replacing
 /// the reference dropped `_ui` — the host never saw the new object.
 let setUiLabel (args: obj) (tool: string) : unit =
+    let raw = intentsRawFromArgs args
     let labelResult =
         match tool with
-        | "coder" -> joinCoderUiLabel (Dyn.get args "intents")
-        | "investigator" -> joinInvestigatorUiLabel (Dyn.get args "intents")
+        | "coder" -> joinCoderUiLabel raw
+        | "investigator" -> joinInvestigatorUiLabel raw
         | _ -> Result.Error ""
     match labelResult with
     | Result.Ok label when label <> "" -> args?("_ui") <- box label

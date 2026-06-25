@@ -5,8 +5,15 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Subagent
+open VibeFs.Kernel.SubagentIntents
 open VibeFs.Kernel.SubagentPrompts
 open VibeFs.Shell.WorkspaceFiles
+
+let promptsFromCoderIntents (host: Host) (intents: CoderIntent list) : string list =
+    promptsForParallelIntents host Coder intents
+
+let promptsFromInvestigatorIntents (host: Host) (intents: InvestigatorIntent list) : string list =
+    promptsForParallelIntents host Investigator intents
 
 let parallelPromptsFromIntents
     (host: Host)

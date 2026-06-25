@@ -26,6 +26,7 @@ open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell
 open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.OpencodeClientCodec
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<obj, obj, JS.Promise<unit>>(f))
 
@@ -52,7 +53,11 @@ let private createCoreServices (host: Host) (ctx: obj) =
         if Dyn.isNullish nowMs then System.DateTime.UtcNow
         else System.DateTimeOffset.FromUnixTimeMilliseconds(int64 (unbox<float> nowMs)).UtcDateTime
     let knowledgeGraphEnabled = knowledgeGraphDirExists directory
-    let knowledgeGraphRuntime = KnowledgeGraphRuntime(Dyn.get ctx "client", directory, nowUtc, childAgentRegistry, 30000L, 1000)
+    let knowledgeGraphClient =
+        match getClientFromPluginCtx ctx with
+        | Ok client -> client
+        | Error _ -> box null
+    let knowledgeGraphRuntime = KnowledgeGraphRuntime(knowledgeGraphClient, directory, nowUtc, childAgentRegistry, 30000L, 1000)
     let scope = create ()
     let backlogSession = BacklogSession(host, scope)
     let tools = createTools host childAgentRegistry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled scope

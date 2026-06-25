@@ -7,6 +7,7 @@ open VibeFs.Shell
 
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.ReviewPrompts
+open VibeFs.Kernel.ToolCopy
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.NudgeEventCodec
@@ -17,6 +18,7 @@ open VibeFs.Kernel.Domain
 open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Shell.OpencodeHookInputCodec
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.OpencodeClientCodec
 
 let private abortOrDeleteEvents =
     set [ "stream-abort"; "session.delete"; "session.close"; "session.remove"; "session.deleted" ]
@@ -41,22 +43,25 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
                 reviewStore.deactivateReview sessionID
                 parts.Add(box {| ``type`` = "text"; text = loopCancelledMessage |})
             elif reviewStore.isReviewActive sessionID then
-                parts.Add(box {| ``type`` = "text"; text = "With-Review Mode is already active. Submit your work via submit_review." |})
+                parts.Add(box {| ``type`` = "text"; text = reviewAlreadyActiveMessage |})
             elif command = "loop" then
                 reviewStore.activateReview(sessionID, task, Domain.nowMs ())
                 let msg = buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
                 parts.Add(box {| ``type`` = "text"; text = msg |})
             else
                 let directory = pluginDirectoryFromCtx ctx
-                let! result = runReviewerSession childAgentRegistry (Dyn.get ctx "client") reviewStore directory sessionID task
+                let! result =
+                    match getClientFromPluginCtx ctx with
+                    | Error _ -> Promise.lift Terminated
+                    | Ok client -> runReviewerSession childAgentRegistry client reviewStore directory sessionID task
                 match result with
                 | Accepted ->
-                    parts.Add(box {| ``type`` = "text"; text = $"Pre-review passed. Task \"{task}\" already meets all criteria — no changes needed." |})
+                    parts.Add(box {| ``type`` = "text"; text = preReviewPassedMessage task |})
                 | Terminated ->
-                    parts.Add(box {| ``type`` = "text"; text = "Pre-review could not complete." |})
+                    parts.Add(box {| ``type`` = "text"; text = preReviewCouldNotComplete |})
                 | Rejected feedback ->
                     reviewStore.activateReview(sessionID, task, Domain.nowMs ())
-                    let msg = buildLoopMessage task [ "=== Pre-review Feedback ==="; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]
+                    let msg = buildLoopMessage task [ withReviewPreReviewFeedbackHeader; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]
                     parts.Add(box {| ``type`` = "text"; text = msg |})
             setKey output "parts" (box parts)
     }

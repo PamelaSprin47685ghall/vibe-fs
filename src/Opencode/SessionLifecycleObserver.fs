@@ -11,6 +11,7 @@ open VibeFs.Kernel.PromptFragments
 open VibeFs.Kernel.Methodology
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.OpencodeClientCodec
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.OpencodeHookInputCodec
 open VibeFs.Opencode.NudgeEffect
@@ -18,7 +19,6 @@ open VibeFs.Opencode.NudgeEventCodec
 open VibeFs.Opencode.BacklogSession
 
 type SessionLifecycleObserver(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore, registry: ChildAgentRegistry) =
-    let client () = Dyn.get ctx "client"
     let holder = StateHolder<NudgeShellState>(emptyState)
 
     member _.handleChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
@@ -65,7 +65,10 @@ type SessionLifecycleObserver(host: Host, ctx: obj, reviewStore: VibeFs.Shell.Re
                 with _ ->
                     state, None)
         match claimed with
-        | Some sessionID -> startNudgeFlow holder (client ()) reviewStore registry sessionID
+        | Some sessionID ->
+            match getClientFromPluginCtx ctx with
+            | Ok client -> startNudgeFlow holder client reviewStore registry sessionID
+            | Error _ -> ()
         | None -> ()
         resolvedUnitPromise ()
 

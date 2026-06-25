@@ -12,6 +12,7 @@ open VibeFs.Kernel.FuzzyFormat
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Kernel.ToolCopy
+open VibeFs.Kernel.ToolResult
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
@@ -21,6 +22,9 @@ open VibeFs.Shell.FuzzySearch
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.ExecutorToolsCodec
+open VibeFs.Shell.FileToolsCodec
+open VibeFs.Shell.FuzzyToolsCodec
+open VibeFs.Shell.ToolExecute
 open VibeFs.Shell.ToolRuntimeContext
 
 module FuzzyCommandsModule = VibeFs.Shell.FuzzySearch
@@ -105,13 +109,13 @@ let executorTool (deps: obj) (toolNames: string array) (_knowledgeGraphRuntime: 
             [| "language"; "program"; "timeout_type"; "mode" |]
       execute = fun config args ->
           match fromMuxConfig config with
-          | Error e -> resolveStr (formatDomainError e)
+          | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
           | Ok runtime ->
               let sessionId = runtime.Execution.SessionId
               if sessionId = "" then resolveStr executorRequiresSession
               else
                   match decodeExecutorArgs args with
-                  | Error e -> resolveStr (formatDomainError e)
+                  | Error e -> resolveStr (wireDomainFailure "Executor" e)
                   | Ok decoded ->
                       promise {
                           let opts = toExecuteOptions (Some runtime.Execution.Directory) decoded
@@ -135,27 +139,30 @@ let readTool (_deps: obj) (hostReadExec: HostFunctionCapture) : ToolDefinition =
       execute =
         fun config args ->
             match fromMuxConfig config with
-            | Error e -> resolveStr (formatDomainError e)
+            | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
             | Ok runtime ->
                 let cwd = Some runtime.Execution.Directory
                 promise {
-                    let path = Dyn.str args "path"
-                    let offset = optInt args "offset"
-                    let limit = optInt args "limit"
-                    match hostReadExec.TryGet() with
-                    | Some hostExec ->
-                        let raw = Dyn.call2 hostExec args config
-                        let! result =
-                            if Dyn.typeIs (Dyn.get raw "then") "function" then
-                                unbox<JS.Promise<obj>> raw
+                    match decodeReadArgs args with
+                    | Error e -> return wireDecodeFailure "read" e
+                    | Ok decoded ->
+                        let path = decoded.Path
+                        let offset = decoded.Offset
+                        let limit = decoded.Limit
+                        match hostReadExec.TryGet() with
+                        | Some hostExec ->
+                            let raw = Dyn.call2 hostExec (readArgsForHost decoded) config
+                            let! result =
+                                if Dyn.typeIs (Dyn.get raw "then") "function" then
+                                    unbox<JS.Promise<obj>> raw
+                                else
+                                    Promise.lift raw
+                            if hostReadResultIsDirectoryError result then
+                                return! read cwd path offset limit
                             else
-                                Promise.lift raw
-                        if hostReadResultIsDirectoryError result then
+                                return formatHostReadResult result
+                        | None ->
                             return! read cwd path offset limit
-                        else
-                            return formatHostReadResult result
-                    | None ->
-                        return! read cwd path offset limit
                 }
       condition = None }
 
@@ -171,24 +178,17 @@ let writeTool (_deps: obj) : ToolDefinition =
       execute =
         fun config args ->
             match fromMuxConfig config with
-            | Error e -> resolveStr (formatDomainError e)
+            | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
             | Ok runtime ->
                 let cwd = Some runtime.Execution.Directory
                 promise {
-                    if not (Dyn.has args "file_path") then
-                        return formatDomainError (InvalidIntent ("write", "file_path", "missing required parameter"))
-                    elif not (Dyn.has args "content") then
-                        return formatDomainError (InvalidIntent ("write", "content", "missing required parameter"))
-                    else
-                        let filePath = Dyn.str args "file_path"
-                        let content = Dyn.str args "content"
-                        if System.String.IsNullOrWhiteSpace filePath then
-                            return formatDomainError (InvalidIntent ("write", "file_path", "must not be empty"))
-                        else
-                            let! result = write cwd filePath content
-                            match result with
-                            | Ok msg -> return msg
-                            | Error e -> return formatDomainError e
+                    match decodeWriteArgs args with
+                    | Error e -> return wireDecodeFailure "write" e
+                    | Ok decoded ->
+                        let! result = write cwd decoded.FilePath decoded.Content
+                        match result with
+                        | Ok msg -> return msg
+                        | Error e -> return formatDomainError e
                 }
       condition = None }
 
@@ -208,18 +208,16 @@ let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyI
       parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyFindPattern); "path", box (strProp Params.fuzzyFindPath); "limit", box (numProp Params.fuzzyFindLimit); "iterator", box (strProp Params.fuzzyFindIterator) ]) [||]
       execute = fun config args ->
           match fromMuxConfig config with
-          | Error e -> resolveStr (formatDomainError e)
+          | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
           | Ok runtime ->
-              let p : FuzzyFindParams =
-                  { pattern = strField args "pattern"
-                    path = strField args "path"
-                    limit = optInt args "limit"
-                    iterator = strField args "iterator" }
-              let o = searchOptionsFromRuntime runtime finderCache iteratorStore
-              promise {
-                  let! r = FuzzyCommandsModule.fuzzyFind p o
-                  return r.output
-              }
+              match decodeFuzzyFindArgs args with
+              | Error e -> resolveStr (wireDecodeFailure "fuzzy_find" e)
+              | Ok p ->
+                  let o = searchOptionsFromRuntime runtime finderCache iteratorStore
+                  promise {
+                      let! r = FuzzyCommandsModule.fuzzyFind p o
+                      return r.output
+                  }
       condition = None }
 
 let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyIteratorStore.TypedIteratorStore) : ToolDefinition =
@@ -228,19 +226,14 @@ let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyI
       parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyGrepPattern); "path", box (strProp Params.fuzzyGrepPath); "exclude", box (strProp Params.fuzzyGrepExclude); "caseSensitive", box (boolProp Params.fuzzyGrepCaseSensitive); "context", box (numProp Params.fuzzyGrepContext); "limit", box (numProp Params.fuzzyGrepLimit); "iterator", box (strProp Params.fuzzyGrepIterator) ]) [||]
       execute = fun config args ->
           match fromMuxConfig config with
-          | Error e -> resolveStr (formatDomainError e)
+          | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
           | Ok runtime ->
-              let p : FuzzyGrepParams =
-                  { pattern = strField args "pattern"
-                    path = strField args "path"
-                    exclude = parseExcludeField args
-                    caseSensitive = optBool args "caseSensitive"
-                    context = optInt args "context"
-                    limit = optInt args "limit"
-                    iterator = strField args "iterator" }
-              let o = searchOptionsFromRuntime runtime finderCache iteratorStore
-              promise {
-                  let! r = FuzzyCommandsModule.fuzzyGrep p o
-                  return r.output
-              }
+              match decodeFuzzyGrepArgs args with
+              | Error e -> resolveStr (wireDecodeFailure "fuzzy_grep" e)
+              | Ok p ->
+                  let o = searchOptionsFromRuntime runtime finderCache iteratorStore
+                  promise {
+                      let! r = FuzzyCommandsModule.fuzzyGrep p o
+                      return r.output
+                  }
       condition = None }

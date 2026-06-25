@@ -3,10 +3,7 @@ module VibeFs.Shell.KnowledgeGraphToolsCodec
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Shell.Dyn
-
-let private strField (a: obj) (k: string) : string option =
-    let v = Dyn.get a k
-    if Dyn.isNullish v then None else Some(string v)
+open VibeFs.Shell.DynField
 
 let decodeFetchEntity (args: obj) : Result<string, DomainError> =
     match strField args "entity" with

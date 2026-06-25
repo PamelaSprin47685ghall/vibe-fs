@@ -15,24 +15,19 @@ open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.OpencodeHookInputCodec
 open VibeFs.Shell.TreeSitterShell
 open VibeFs.Shell.ToolRuntimeContext
+open VibeFs.Shell.PatchToolsCodec
+open VibeFs.Shell.ToolExecute
+open VibeFs.Kernel.ToolResult
 open VibeFs.Shell.Dyn
 
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
 
 let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) : unit =
     if toolNameFromHookInput input <> "apply_patch" then ()
-    elif Dyn.typeIs args "string" then
-        setKey output "args" (createObj [ "patchText", args ])
     else
-        let patchText = Dyn.str args "patchText"
-        if patchText <> "" then ()
-        else
-            let patch = Dyn.str args "patch"
-            if patch <> "" then
-                setKey output "args" (createObj [ "patchText", box patch ])
-            else
-                let text = Dyn.str args "text"
-                if text <> "" then setKey output "args" (createObj [ "patchText", box text ])
+        match decodeApplyPatchFields args with
+        | Result.Ok fields -> setKey output "args" (createObj [ "patchText", box fields.PatchText ])
+        | Result.Error e -> setKey output "error" (box (wireEncodeToolError "apply_patch" e))
 
 let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {

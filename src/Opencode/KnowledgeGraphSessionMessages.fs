@@ -6,6 +6,7 @@ open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.Messaging
 open VibeFs.Opencode.MessagingCodec
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.OpencodeClientCodec
 
 let private invoke1 (target: obj) (methodName: string) (arg: obj) : JS.Promise<obj> =
     unbox (target?(methodName)(arg))
@@ -15,11 +16,14 @@ let fetchSessionMessageArray (client: obj) (directory: string) (sessionID: strin
         if sessionID.Trim() = "" || isNullish client then return None
         else
             try
-                let! result =
-                    invoke1 (get client "session") "messages" (box {| path = box {| id = sessionID |}; query = box {| directory = directory |} |})
-                let data = get result "data"
-                if isNullish data || not (isArray data) then return None
-                else return Some (unbox<obj array> data)
+                match getSessionApiFromClient client with
+                | Error _ -> return None
+                | Ok session ->
+                    let! result =
+                        invoke1 session "messages" (box {| path = box {| id = sessionID |}; query = box {| directory = directory |} |})
+                    let data = get result "data"
+                    if isNullish data || not (isArray data) then return None
+                    else return Some (unbox<obj array> data)
             with _ ->
                 return None
     }

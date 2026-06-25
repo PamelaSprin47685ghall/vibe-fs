@@ -4,14 +4,16 @@ open VibeFs.Kernel.Domain
 open VibeFs.Kernel.ToolContext
 open VibeFs.Shell.Dyn
 
-let private firstString (o: obj) (keys: string list) : string option =
+let firstTrimmedString (o: obj) (keys: string list) : string option =
     keys
     |> List.tryPick (fun k ->
         let v = Dyn.get o k
         if Dyn.isNullish v then None
         else
-            let s = string v
+            let s = (string v).Trim()
             if s = "" then None else Some s)
+
+let private firstString (o: obj) (keys: string list) : string option = firstTrimmedString o keys
 
 let decodeOpencodeToolContext (context: obj) (fallbackDir: string) : ToolExecutionContext =
     let directory =
@@ -22,7 +24,11 @@ let decodeOpencodeToolContext (context: obj) (fallbackDir: string) : ToolExecuti
         match firstString context [ "sessionID"; "sessionId"; "session_id" ] with
         | Some s -> s
         | None -> ""
-    { Directory = directory; SessionId = sessionId; WorkspaceId = None }
+    {
+        Directory = directory
+        SessionId = sessionId
+        WorkspaceId = None
+    }
 
 let muxConfigDirectoryFallback (config: obj) : string =
     match firstString config [ "directory"; "cwd"; "workspacePath" ] with
@@ -45,4 +51,25 @@ let decodeMuxConfig (config: obj) : Result<ToolExecutionContext, DomainError> =
             match firstString config [ "sessionID"; "sessionId"; "session_id" ] with
             | Some s -> s
             | None -> ""
-        Ok { Directory = directory; SessionId = sessionId; WorkspaceId = Some workspaceId }
+        Ok {
+            Directory = directory
+            SessionId = sessionId
+            WorkspaceId = Some workspaceId
+        }
+
+let decodeMuxConfigLenient (config: obj) : ToolExecutionContext =
+    match decodeMuxConfig config with
+    | Ok ctx -> ctx
+    | Error _ ->
+        let workspaceId = firstTrimmedString config [ "workspaceId" ]
+        let directory =
+            firstTrimmedString config [ "directory"; "cwd"; "workspacePath" ]
+            |> Option.defaultValue ""
+        let sessionId =
+            firstTrimmedString config [ "sessionID"; "sessionId"; "session_id" ]
+            |> Option.defaultValue ""
+        {
+            Directory = directory
+            SessionId = sessionId
+            WorkspaceId = workspaceId
+        }

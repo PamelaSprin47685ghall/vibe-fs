@@ -13,11 +13,13 @@ open VibeFs.Shell.WebToolsCodec
 open VibeFs.Kernel.Subagent
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Kernel.ToolCopy
+open VibeFs.Kernel.ToolResult
 open VibeFs.Mux.BuiltinTools
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.SubagentTools
 open VibeFs.Mux.Wrappers
 open VibeFs.Shell.WebSearchApi
+open VibeFs.Shell.ToolExecute
 open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Shell.Dyn
 
@@ -26,10 +28,13 @@ let websearchTool (deps: obj) (toolNames: string array) : ToolDefinition =
       description = description "websearch"
       parameters = mkSchema (createObj [ "query", box (strProp Params.websearchQuery); "numResults", box (numProp Params.websearchNumResults); "what_to_summarize", box (strProp Params.websearchWhatToSummarize) ]) [| "query"; "what_to_summarize" |]
       execute = fun config args ->
-          match decodeWebsearchArgs args, fromMuxConfig config with
-          | Error e, _ | _, Error e -> resolveStr (formatDomainError e)
-          | Ok ws, Ok runtime ->
-              promise {
+          match fromMuxConfig config with
+          | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
+          | Ok runtime ->
+              match decodeWebsearchArgs args with
+              | Error e -> resolveStr (wireDecodeFailure "websearch" e)
+              | Ok ws ->
+                  promise {
                   let body = createObj [ "query", box ws.Query; "max_results", box ws.NumResults ]
                   let! result = webApiPost "web_search" body runtime.AbortSignal
                   match result with
@@ -50,10 +55,13 @@ let webfetchTool : ToolDefinition =
       description = description "webfetch"
       parameters = mkSchema (createObj [ "url", box (strProp Params.webfetchUrl); "extract_main", box (boolProp Params.webfetchExtractMain); "prefer_llms_txt", box (strEnumProp Params.webfetchPreferLlmsTxt [| "auto"; "always"; "never" |]); "prompt", box (strProp Params.webfetchPrompt); "timeout", box (numProp Params.webfetchTimeout) ]) [| "url" |]
       execute = fun config args ->
-          match decodeWebfetchArgs args, fromMuxConfig config with
-          | Error e, _ | _, Error e -> resolveStr (formatDomainError e)
-          | Ok wf, Ok runtime ->
-              promise {
+          match fromMuxConfig config with
+          | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
+          | Ok runtime ->
+              match decodeWebfetchArgs args with
+              | Error e -> resolveStr (wireDecodeFailure "webfetch" e)
+              | Ok wf ->
+                  promise {
                   let bodyEntries = ResizeArray<(string * obj)>()
                   bodyEntries.Add("url", box wf.Url)
                   addIfSome bodyEntries "extract_main" wf.ExtractMain

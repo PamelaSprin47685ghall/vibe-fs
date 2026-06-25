@@ -181,7 +181,7 @@ let executorActorSpec () = promise {
         Promise.create (fun resolve _ ->
             gateResolve.Value <- resolve
             if releaseRequested.Value then resolve ())
-    let exec = VibeFs.Shell.SessionExecutor.createForScope (VibeFs.Shell.RuntimeScope.getDefault ())
+    let exec = VibeFs.Shell.SessionExecutor.createForScope (VibeFs.Shell.RuntimeScope.create ())
     let first = exec.EnqueuePerSession("session-1", fun () ->
         promise {
             seen.Add "first-start"

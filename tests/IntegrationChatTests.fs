@@ -132,7 +132,8 @@ let subagentParentSpec () = promise {
     let registry = ChildAgentRegistry.Create()
     let! workspaceDir = mkdtempAsync "subagent-parent-"
     let! result = runSubagent registry mockClient "browser" "Browser" "navigate to example.com" workspaceDir "parent-session-456" (createObj [ "abort", box null ]) null
-    check "runSubagent returns string" (result.Contains "Example Domain")
+    check "runSubagent returns Ok" (result.IsOk)
+    check "runSubagent text" (match result with Ok t -> t.Contains "Example Domain" | _ -> false)
     check "session.create received parentID" (str (get createCalls.[0] "body") "parentID" = "parent-session-456")
     check "session.prompt uses child id" (str (get promptCalls.[0] "path") "id" = "child-session-123")
     check "session.prompt uses browser agent" (str (get promptCalls.[0] "body") "agent" = "browser")
@@ -154,8 +155,8 @@ let nestedSubagentSpec () = promise {
         ]) ]
     let registry = ChildAgentRegistry.Create()
     let! workspaceDir = mkdtempAsync "nested-subagent-"
-    do! runSubagent registry (mkClient ()) "browser" "Browser" "first" workspaceDir "root-session" (createObj [ "abort", box null ]) null |> Promise.map ignore
-    do! runSubagent registry (mkClient ()) "coder" "Coder" "second" workspaceDir "child-1" (createObj [ "abort", box null ]) null |> Promise.map ignore
+    do! runSubagent registry (mkClient ()) "browser" "Browser" "first" workspaceDir "root-session" (createObj [ "abort", box null ]) null |> Promise.map (fun _ -> ())
+    do! runSubagent registry (mkClient ()) "coder" "Coder" "second" workspaceDir "child-1" (createObj [ "abort", box null ]) null |> Promise.map (fun _ -> ())
     check "nested subagent resolves to root parent" (str (get createCalls.[1] "body") "parentID" = "root-session")
     do! rmAsync workspaceDir
 }

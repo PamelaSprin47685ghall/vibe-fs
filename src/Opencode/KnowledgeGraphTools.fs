@@ -9,14 +9,14 @@ open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.PromiseStr
 open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Shell.KnowledgeGraphToolsCodec
-open VibeFs.Kernel.Domain
+open VibeFs.Shell.ToolExecute
 
 let knowledgeGraphFetchTool (kgRuntime: KnowledgeGraphRuntime) (ctx: obj) : obj =
     define fetchKnowledgeGraph
         (box {| entity = strReq Params.fetchKnowledgeGraphEntity |})
         (fun args context ->
             match decodeFetchEntity args with
-            | Error e -> resolveStr (formatDomainError e)
+            | Error e -> resolveStr (wireDecodeFailure "knowledge_graph_fetch" e)
             | Ok entity ->
                 let pluginDirectory = pluginDirectoryFromCtx ctx
                 let runtime = fromOpencode context pluginDirectory
@@ -29,5 +29,5 @@ let returnBookkeeperTool (kgRuntime: KnowledgeGraphRuntime) (ctx: obj) : obj =
             let pluginDirectory = pluginDirectoryFromCtx ctx
             let runtime = fromOpencode context pluginDirectory
             match decodeReturnBookkeeperArgs args with
-            | Error e -> resolveStr (formatDomainError e)
+            | Error e -> resolveStr (wireDecodeFailure "return_bookkeeper" e)
             | Ok drafts -> kgRuntime.Submit(runtime.Execution.SessionId, drafts))

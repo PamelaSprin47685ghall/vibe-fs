@@ -1,6 +1,7 @@
 module VibeFs.Shell.MuxHookInputCodec
 
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.ExecutorToolsCodec
 
 type MuxMessagesTransformInput =
     { Agent: string
@@ -32,7 +33,10 @@ type MuxToolExecuteAfterInput =
 let argsFromMuxToolExecuteInput (input: obj) : obj = Dyn.get input "args"
 
 let isReadOnlyExecutorMux (tool: string) (args: obj) : bool =
-    tool = "executor" && Dyn.str args "mode" = "ro"
+    tool = "executor"
+    && match peekExecutorMode args with
+       | Some mode -> System.String.Equals(mode, "ro", System.StringComparison.OrdinalIgnoreCase)
+       | None -> false
 
 let decodeMuxToolExecuteAfterInput (input: obj) (deps: obj) : MuxToolExecuteAfterInput =
     let tool = Dyn.str input "tool"

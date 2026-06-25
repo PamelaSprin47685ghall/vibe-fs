@@ -34,7 +34,24 @@ open VibeFs.Tests.WebToolsCodecTests
 open VibeFs.Tests.ReviewToolsCodecTests
 open VibeFs.Tests.KnowledgeGraphToolsCodecTests
 open VibeFs.Tests.ExecutorToolsCodecTests
+open VibeFs.Tests.ToolArgsDecodeTests
+open VibeFs.Tests.ToolResultWireTests
+open VibeFs.Tests.SubagentToolExecuteTests
+open VibeFs.Tests.FileToolsCodecTests
+open VibeFs.Tests.FuzzyToolsCodecTests
+open VibeFs.Tests.WorkBacklogToolsCodecTests
+open VibeFs.Tests.PatchToolsCodecTests
+open VibeFs.Tests.HostMessagePartCodecTests
+open VibeFs.Tests.MessagingPartCodecTests
 open VibeFs.Tests.ToolContextCodecTests
+open VibeFs.Tests.OpencodeContextCodecTests
+open VibeFs.Tests.OpencodeSessionPromptCodecTests
+open VibeFs.Tests.OpencodeSessionSpawnCodecTests
+open VibeFs.Tests.SessionIoPromptBodyTests
+open VibeFs.Tests.OpencodeAgentConfigCodecTests
+open VibeFs.Tests.MuxAiSettingsCodecTests
+open VibeFs.Tests.MuxAiSettingsIntegrationTests
+open VibeFs.Tests.AgentConfigApplyTests
 open VibeFs.Tests.KnowledgeGraphWorkflowTests
 open VibeFs.Tests.SessionExecutorScopeTests
 
@@ -149,6 +166,7 @@ let private tests : (string * TestBody) list = [
     "ArchitectureTests.noBuiltinDictionary", Sync (sync ArchitectureTests.noBuiltinDictionary)
     "ArchitectureTests.opencodeHookSchemaNoDirectZodImport", Sync (sync ArchitectureTests.opencodeHookSchemaNoDirectZodImport)
     "ArchitectureTests.hookSchemaNoDuplicateMethodologySchema", Sync (sync ArchitectureTests.hookSchemaNoDuplicateMethodologySchema)
+    "ArchitectureTests.opencodeHookSchemaUsesIntentsRawFromArgs", Sync (sync ArchitectureTests.opencodeHookSchemaUsesIntentsRawFromArgs)
     "ArchitectureTests.opencodeNoMuxRef", Sync (sync ArchitectureTests.opencodeNoMuxRef)
     "ArchitectureTests.muxNoOpencodeRef", Sync (sync ArchitectureTests.muxNoOpencodeRef)
     "ArchitectureTests.muxBacklogUsesMuxHost", Sync (sync ArchitectureTests.muxBacklogUsesMuxHost)
@@ -157,6 +175,14 @@ let private tests : (string * TestBody) list = [
     "ArchitectureTests.muxMessageTransformNoLocalCapsBuilder", Sync (sync ArchitectureTests.muxMessageTransformNoLocalCapsBuilder)
     "ArchitectureTests.muxMessageTransformUsesShellCapsCache", Sync (sync ArchitectureTests.muxMessageTransformUsesShellCapsCache)
     "ArchitectureTests.muxMessageTransformUsesCommonExtractTexts", Sync (sync ArchitectureTests.muxMessageTransformUsesCommonExtractTexts)
+    "ArchitectureTests.messageTransformCommonUsesHostMessagePartCodec", Sync (sync ArchitectureTests.messageTransformCommonUsesHostMessagePartCodec)
+    "ArchitectureTests.readDedupMuxPluginUsesHostMessagePartCodec", Sync (sync ArchitectureTests.readDedupMuxPluginUsesHostMessagePartCodec)
+    "ArchitectureTests.messagingPartCodecExists", Sync (sync ArchitectureTests.messagingPartCodecExists)
+    "ArchitectureTests.opencodeMessagingCodecUsesMessagingPartCodec", Sync (sync ArchitectureTests.opencodeMessagingCodecUsesMessagingPartCodec)
+    "ArchitectureTests.muxMessagingCodecUsesMessagingPartCodec", Sync (sync ArchitectureTests.muxMessagingCodecUsesMessagingPartCodec)
+    "ArchitectureTests.dualHostMessagingCodecUsesEncodeHelpers", Sync (sync ArchitectureTests.dualHostMessagingCodecUsesEncodeHelpers)
+    "ArchitectureTests.messagingWireForkDocumented", Sync (sync ArchitectureTests.messagingWireForkDocumented)
+    "ArchitectureTests.hostObjBoundaryDocumented", Sync (sync ArchitectureTests.hostObjBoundaryDocumented)
     "ArchitectureTests.muxMessageTransformUsesMuxWorkspaceCodec", Sync (sync ArchitectureTests.muxMessageTransformUsesMuxWorkspaceCodec)
     "ArchitectureTests.muxMessageTransformUsesReadDedupMuxPlugin", Sync (sync ArchitectureTests.muxMessageTransformUsesReadDedupMuxPlugin)
     "ArchitectureTests.muxMessageTransformUsesMuxHookInputCodec", Sync (sync ArchitectureTests.muxMessageTransformUsesMuxHookInputCodec)
@@ -165,9 +191,10 @@ let private tests : (string * TestBody) list = [
     "ArchitectureTests.opencodeMessageTransformNoLocalCapsBuilder", Sync (sync ArchitectureTests.opencodeMessageTransformNoLocalCapsBuilder)
     "ArchitectureTests.opencodeMessageTransformUsesShellCapsCache", Sync (sync ArchitectureTests.opencodeMessageTransformUsesShellCapsCache)
     "ArchitectureTests.noReconstructReviewStateInMessageTransforms", Sync (sync ArchitectureTests.noReconstructReviewStateInMessageTransforms)
-    "ArchitectureTests.messageTransformReviewReplayEntry", Sync (sync ArchitectureTests.messageTransformReviewReplayEntry)
+    "ArchitectureTests.messageTransformUsesHostEntry", Sync (sync ArchitectureTests.messageTransformUsesHostEntry)
     "ArchitectureTests.capsFileCacheCompositeKey", Sync (sync ArchitectureTests.capsFileCacheCompositeKey)
     "ArchitectureTests.capsFileCacheNoGetOrLoadCapsFilesDefault", Sync (sync ArchitectureTests.capsFileCacheNoGetOrLoadCapsFilesDefault)
+    "ArchitectureTests.capsFileCacheUsesInflight", Sync (sync ArchitectureTests.capsFileCacheUsesInflight)
     "SubagentToolPolicyTests.run", Sync (sync SubagentToolPolicyTests.run)
     "SubagentPromptBuildTests.run", Sync (sync SubagentPromptBuildTests.run)
     "SubagentSpawnTests.run", Async SubagentSpawnTests.run
@@ -179,7 +206,19 @@ let private tests : (string * TestBody) list = [
     "ArchitectureTests.muxWrappersUsesJsonSchemaBuilders", Sync (sync ArchitectureTests.muxWrappersUsesJsonSchemaBuilders)
     "ArchitectureTests.muxSubagentToolsUsesMuxSpawnUniverse", Sync (sync ArchitectureTests.muxSubagentToolsUsesMuxSpawnUniverse)
     "ArchitectureTests.opencodeSubagentToolsUsesFromOpencode", Sync (sync ArchitectureTests.opencodeSubagentToolsUsesFromOpencode)
+    "ArchitectureTests.opencodeSubagentToolsUsesOpencodeClientCodec", Sync (sync ArchitectureTests.opencodeSubagentToolsUsesOpencodeClientCodec)
     "ArchitectureTests.toolContextCodecUsesKernelType", Sync (sync ArchitectureTests.toolContextCodecUsesKernelType)
+    "ArchitectureTests.toolContextCodecAbortFree", Sync (sync ArchitectureTests.toolContextCodecAbortFree)
+    "ArchitectureTests.toolRuntimeContextAbortFromShellCodec", Sync (sync ArchitectureTests.toolRuntimeContextAbortFromShellCodec)
+    "ArchitectureTests.sessionIoUsesToolContextCodec", Sync (sync ArchitectureTests.sessionIoUsesToolContextCodec)
+    "ArchitectureTests.sessionIoUsesOpencodeContextCodec", Sync (sync ArchitectureTests.sessionIoUsesOpencodeContextCodec)
+    "ArchitectureTests.sessionIoUsesOpencodeSessionPromptCodec", Sync (sync ArchitectureTests.sessionIoUsesOpencodeSessionPromptCodec)
+    "ArchitectureTests.sessionIoUsesOpencodeSessionSpawnCodec", Sync (sync ArchitectureTests.sessionIoUsesOpencodeSessionSpawnCodec)
+    "ArchitectureTests.sessionIoUsesOpencodeClientCodec", Sync (sync ArchitectureTests.sessionIoUsesOpencodeClientCodec)
+    "ArchitectureTests.sessionIoUsesSubagentResultPath", Sync (sync ArchitectureTests.sessionIoUsesSubagentResultPath)
+    "ArchitectureTests.opencodeNoDirectClientSessionDyn", Sync (sync ArchitectureTests.opencodeNoDirectClientSessionDyn)
+    "ArchitectureTests.agentConfigUsesOpencodeAgentConfigWire", Sync (sync ArchitectureTests.agentConfigUsesOpencodeAgentConfigWire)
+    "ArchitectureTests.muxAiSettingsUsesMuxAiSettingsCodec", Sync (sync ArchitectureTests.muxAiSettingsUsesMuxAiSettingsCodec)
     "ArchitectureTests.webToolsUsesWebToolsCodec", Sync (sync ArchitectureTests.webToolsUsesWebToolsCodec)
     "ArchitectureTests.fuzzyIteratorStoreOnRuntimeScope", Sync (sync ArchitectureTests.fuzzyIteratorStoreOnRuntimeScope)
     "ArchitectureTests.fuzzySearchNoDefaultIteratorStore", Sync (sync ArchitectureTests.fuzzySearchNoDefaultIteratorStore)
@@ -191,25 +230,48 @@ let private tests : (string * TestBody) list = [
     "ArchitectureTests.opencodeMessageTransformNoLocalApplyReadDedup", Sync (sync ArchitectureTests.opencodeMessageTransformNoLocalApplyReadDedup)
     "ArchitectureTests.messageTransformUsesChatTransformOutputCodec", Sync (sync ArchitectureTests.messageTransformUsesChatTransformOutputCodec)
     "ArchitectureTests.messageTransformUsesMessageTransformCore", Sync (sync ArchitectureTests.messageTransformUsesMessageTransformCore)
+    "ArchitectureTests.messageTransformUsesPipeline", Sync (sync ArchitectureTests.messageTransformUsesPipeline)
+    "ArchitectureTests.messageTransformUsesCapsKgHostHooks", Sync (sync ArchitectureTests.messageTransformUsesCapsKgHostHooks)
     "ArchitectureTests.messageTransformUsesBacklogSessionOpsFrom", Sync (sync ArchitectureTests.messageTransformUsesBacklogSessionOpsFrom)
     "ArchitectureTests.knowledgeGraphRuntimeUsesWorkflow", Sync (sync ArchitectureTests.knowledgeGraphRuntimeUsesWorkflow)
     "ArchitectureTests.knowledgeGraphBookkeeperLaunchInShell", Sync (sync ArchitectureTests.knowledgeGraphBookkeeperLaunchInShell)
     "ArchitectureTests.knowledgeGraphRuntimeNoLocalLaunchIfDue", Sync (sync ArchitectureTests.knowledgeGraphRuntimeNoLocalLaunchIfDue)
     "ArchitectureTests.muxReviewUsesToolCopy", Sync (sync ArchitectureTests.muxReviewUsesToolCopy)
     "ArchitectureTests.muxReviewUsesFromMuxConfig", Sync (sync ArchitectureTests.muxReviewUsesFromMuxConfig)
+    "ArchitectureTests.muxReviewUsesReviewToolsCodec", Sync (sync ArchitectureTests.muxReviewUsesReviewToolsCodec)
+    "ArchitectureTests.dualHostFuzzyUsesFuzzyToolsCodec", Sync (sync ArchitectureTests.dualHostFuzzyUsesFuzzyToolsCodec)
+    "ArchitectureTests.executeMuxSubagentToolUsesSpawnRoleOnly", Sync (sync ArchitectureTests.executeMuxSubagentToolUsesSpawnRoleOnly)
+    "ArchitectureTests.subagentToolExecuteEmptyBatchGuard", Sync (sync ArchitectureTests.subagentToolExecuteEmptyBatchGuard)
     "ArchitectureTests.opencodeReviewUsesToolCopy", Sync (sync ArchitectureTests.opencodeReviewUsesToolCopy)
     "ArchitectureTests.opencodeReviewUsesFromOpencode", Sync (sync ArchitectureTests.opencodeReviewUsesFromOpencode)
     "ArchitectureTests.opencodeReviewUsesReviewToolsCodec", Sync (sync ArchitectureTests.opencodeReviewUsesReviewToolsCodec)
+    "ArchitectureTests.opencodeToolsUseWireEncodeForClient", Sync (sync ArchitectureTests.opencodeToolsUseWireEncodeForClient)
     "ArchitectureTests.opencodeKgUsesKnowledgeGraphToolsCodec", Sync (sync ArchitectureTests.opencodeKgUsesKnowledgeGraphToolsCodec)
     "ArchitectureTests.muxKgToolDefsUsesKnowledgeGraphToolsCodec", Sync (sync ArchitectureTests.muxKgToolDefsUsesKnowledgeGraphToolsCodec)
     "ArchitectureTests.muxKgToolDefsUsesFromMuxConfig", Sync (sync ArchitectureTests.muxKgToolDefsUsesFromMuxConfig)
     "ArchitectureTests.opencodeSubagentToolsUsesSimpleArgsCodec", Sync (sync ArchitectureTests.opencodeSubagentToolsUsesSimpleArgsCodec)
     "ArchitectureTests.muxSubagentToolsUsesSimpleArgsCodec", Sync (sync ArchitectureTests.muxSubagentToolsUsesSimpleArgsCodec)
     "ArchitectureTests.subagentToolsUseDecodeIntentsField", Sync (sync ArchitectureTests.subagentToolsUseDecodeIntentsField)
+    "ArchitectureTests.subagentToolsUseToolCatalogRequiredKeys", Sync (sync ArchitectureTests.subagentToolsUseToolCatalogRequiredKeys)
+    "ArchitectureTests.kernelToolArgsExists", Sync (sync ArchitectureTests.kernelToolArgsExists)
+    "ArchitectureTests.toolExecuteWireHelperExists", Sync (sync ArchitectureTests.toolExecuteWireHelperExists)
+    "ArchitectureTests.toolArgsDecodeExists", Sync (sync ArchitectureTests.toolArgsDecodeExists)
+    "ArchitectureTests.toolArgsDecodeCoversMajorTools", Sync (sync ArchitectureTests.toolArgsDecodeCoversMajorTools)
+    "ArchitectureTests.decodedToolInvocationNoObj", Sync (sync ArchitectureTests.decodedToolInvocationNoObj)
+    "ArchitectureTests.muxSubagentToolsUsesToolArgsDecode", Sync (sync ArchitectureTests.muxSubagentToolsUsesToolArgsDecode)
+    "ToolArgsDecodeTests.run", Sync (sync ToolArgsDecodeTests.run)
+    "ToolResultWireTests.run", Sync (sync ToolResultWireTests.run)
+    "SubagentToolExecuteTests.run", Async SubagentToolExecuteTests.run
+    "ArchitectureTests.opencodeSubagentToolsUsesToolArgsDecode", Sync (sync ArchitectureTests.opencodeSubagentToolsUsesToolArgsDecode)
+    "ArchitectureTests.sessionIoRunSubagentReturnsResult", Sync (sync ArchitectureTests.sessionIoRunSubagentReturnsResult)
+    "ArchitectureTests.commandHooksUsesToolCopyReviewMessages", Sync (sync ArchitectureTests.commandHooksUsesToolCopyReviewMessages)
     "ArchitectureTests.subagentToolsUseSubagentSpawn", Sync (sync ArchitectureTests.subagentToolsUseSubagentSpawn)
     "ArchitectureTests.muxWrappersSyntaxUsesFromMuxConfig", Sync (sync ArchitectureTests.muxWrappersSyntaxUsesFromMuxConfig)
     "ArchitectureTests.muxHostToolsFuzzyUsesToolCopy", Sync (sync ArchitectureTests.muxHostToolsFuzzyUsesToolCopy)
     "ArchitectureTests.muxHostToolsFuzzyUsesFromMuxConfig", Sync (sync ArchitectureTests.muxHostToolsFuzzyUsesFromMuxConfig)
+    "ArchitectureTests.muxHostToolsFuzzyUsesFuzzyToolsCodec", Sync (sync ArchitectureTests.muxHostToolsFuzzyUsesFuzzyToolsCodec)
+    "ArchitectureTests.opencodeSearchToolsUsesFuzzyToolsCodec", Sync (sync ArchitectureTests.opencodeSearchToolsUsesFuzzyToolsCodec)
+    "ArchitectureTests.fuzzyToolsCodecExists", Sync (sync ArchitectureTests.fuzzyToolsCodecExists)
     "ArchitectureTests.webToolsUsesWebfetchCodec", Sync (sync ArchitectureTests.webToolsUsesWebfetchCodec)
     "ArchitectureTests.opencodeSearchToolsUsesWebToolsCodec", Sync (sync ArchitectureTests.opencodeSearchToolsUsesWebToolsCodec)
     "ArchitectureTests.opencodeSearchToolsUsesToolCopy", Sync (sync ArchitectureTests.opencodeSearchToolsUsesToolCopy)
@@ -219,6 +281,7 @@ let private tests : (string * TestBody) list = [
     "ArchitectureTests.opencodePluginCoreUsesFromOpencode", Sync (sync ArchitectureTests.opencodePluginCoreUsesFromOpencode)
     "ArchitectureTests.opencodeHookExecuteUsesFromOpencode", Sync (sync ArchitectureTests.opencodeHookExecuteUsesFromOpencode)
     "ArchitectureTests.opencodeChatHooksUsesHookInputCodec", Sync (sync ArchitectureTests.opencodeChatHooksUsesHookInputCodec)
+    "ArchitectureTests.chatHooksUsesChatHookOutputCodec", Sync (sync ArchitectureTests.chatHooksUsesChatHookOutputCodec)
     "ArchitectureTests.opencodeMessageTransformUsesHookInputCodec", Sync (sync ArchitectureTests.opencodeMessageTransformUsesHookInputCodec)
     "ArchitectureTests.opencodeMessageTransformUsesResolveMessagesTransformAgent", Sync (sync ArchitectureTests.opencodeMessageTransformUsesResolveMessagesTransformAgent)
     "ArchitectureTests.opencodeCommandHooksUsesFromOpencode", Sync (sync ArchitectureTests.opencodeCommandHooksUsesFromOpencode)
@@ -228,20 +291,43 @@ let private tests : (string * TestBody) list = [
     "ArchitectureTests.opencodeKnowledgeGraphToolsUsesFromOpencode", Sync (sync ArchitectureTests.opencodeKnowledgeGraphToolsUsesFromOpencode)
     "ArchitectureTests.muxKnowledgeGraphStartBookkeeperUsesFromMuxConfig", Sync (sync ArchitectureTests.muxKnowledgeGraphStartBookkeeperUsesFromMuxConfig)
     "ArchitectureTests.muxHostToolsReadWriteUsesToolCatalog", Sync (sync ArchitectureTests.muxHostToolsReadWriteUsesToolCatalog)
+    "ArchitectureTests.muxHostToolsReadWriteUsesFileToolsCodec", Sync (sync ArchitectureTests.muxHostToolsReadWriteUsesFileToolsCodec)
+    "ArchitectureTests.muxWrappersTodoUsesWorkBacklogToolsCodec", Sync (sync ArchitectureTests.muxWrappersTodoUsesWorkBacklogToolsCodec)
+    "ArchitectureTests.opencodeHookExecuteUsesPatchToolsCodec", Sync (sync ArchitectureTests.opencodeHookExecuteUsesPatchToolsCodec)
+    "ArchitectureTests.shellCodecFilesNoLocalStrField", Sync (sync ArchitectureTests.shellCodecFilesNoLocalStrField)
+    "ArchitectureTests.muxDelegateUsesDelegateToolsCodec", Sync (sync ArchitectureTests.muxDelegateUsesDelegateToolsCodec)
+    "ArchitectureTests.muxHookInputCodecExecutorReadOnlyUsesCodec", Sync (sync ArchitectureTests.muxHookInputCodecExecutorReadOnlyUsesCodec)
     "ArchitectureTests.knowledgeGraphSessionMessagesNotInRuntimeIO", Sync (sync ArchitectureTests.knowledgeGraphSessionMessagesNotInRuntimeIO)
     "ArchitectureTests.muxHostToolsExecutorUsesFromMuxConfig", Sync (sync ArchitectureTests.muxHostToolsExecutorUsesFromMuxConfig)
     "ArchitectureTests.muxHostToolsExecutorUsesExecutorToolsCodec", Sync (sync ArchitectureTests.muxHostToolsExecutorUsesExecutorToolsCodec)
+    "ArchitectureTests.muxHostToolsWireDecodeFailures", Sync (sync ArchitectureTests.muxHostToolsWireDecodeFailures)
+    "ArchitectureTests.muxWebToolsUsesWireDecodeFailure", Sync (sync ArchitectureTests.muxWebToolsUsesWireDecodeFailure)
     "ArchitectureTests.kernelToolCopyWebExecutorFields", Sync (sync ArchitectureTests.kernelToolCopyWebExecutorFields)
     "ArchitectureTests.sessionExecutorCreateForScope", Sync (sync ArchitectureTests.sessionExecutorCreateForScope)
     "ArchitectureTests.pluginInjectsSessionScopeForExecutor", Sync (sync ArchitectureTests.pluginInjectsSessionScopeForExecutor)
     "ArchitectureTests.knowledgeGraphRuntimeNoTestDrainMembers", Sync (sync ArchitectureTests.knowledgeGraphRuntimeNoTestDrainMembers)
     "ArchitectureTests.knowledgeGraphRuntimeNoSwapStateMembers", Sync (sync ArchitectureTests.knowledgeGraphRuntimeNoSwapStateMembers)
+    "ArchitectureTests.runtimeScopeNoGetDefault", Sync (sync ArchitectureTests.runtimeScopeNoGetDefault)
     "ArchitectureTests.sessionExecutorNoModuleMutableQueues", Sync (sync ArchitectureTests.sessionExecutorNoModuleMutableQueues)
     "WebToolsCodecTests.run", Sync (sync WebToolsCodecTests.run)
     "ReviewToolsCodecTests.run", Sync (sync ReviewToolsCodecTests.run)
     "KnowledgeGraphToolsCodecTests.run", Sync (sync KnowledgeGraphToolsCodecTests.run)
+    "FileToolsCodecTests.run", Sync (sync FileToolsCodecTests.run)
+    "FuzzyToolsCodecTests.run", Sync (sync FuzzyToolsCodecTests.run)
+    "WorkBacklogToolsCodecTests.run", Sync (sync WorkBacklogToolsCodecTests.run)
+    "PatchToolsCodecTests.run", Sync (sync PatchToolsCodecTests.run)
+    "HostMessagePartCodecTests.run", Sync (sync HostMessagePartCodecTests.run)
+    "MessagingPartCodecTests.run", Sync (sync MessagingPartCodecTests.run)
     "ExecutorToolsCodecTests.run", Sync (sync ExecutorToolsCodecTests.run)
     "ToolContextCodecTests.run", Sync (sync ToolContextCodecTests.run)
+    "OpencodeContextCodecTests.run", Sync (sync OpencodeContextCodecTests.run)
+    "OpencodeSessionPromptCodecTests.run", Sync (sync OpencodeSessionPromptCodecTests.run)
+    "OpencodeSessionSpawnCodecTests.run", Sync (sync OpencodeSessionSpawnCodecTests.run)
+    "SessionIoPromptBodyTests.run", Sync (sync SessionIoPromptBodyTests.run)
+    "OpencodeAgentConfigCodecTests.run", Sync (sync OpencodeAgentConfigCodecTests.run)
+    "MuxAiSettingsCodecTests.run", Sync (sync MuxAiSettingsCodecTests.run)
+    "MuxAiSettingsIntegrationTests.run", Async MuxAiSettingsIntegrationTests.run
+    "AgentConfigApplyTests.run", Sync (sync AgentConfigApplyTests.run)
     "KnowledgeGraphWorkflowTests.run", Async KnowledgeGraphWorkflowTests.run
     "KnowledgeGraphBookkeeperLaunchTests.run", Async KnowledgeGraphBookkeeperLaunchTests.run
     "KnowledgeGraphMaintenanceRunTests.run", Async KnowledgeGraphMaintenanceRunTests.run

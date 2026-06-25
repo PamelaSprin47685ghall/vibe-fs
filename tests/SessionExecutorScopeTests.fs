@@ -6,7 +6,6 @@ open VibeFs.Shell.RuntimeScope
 open VibeFs.Shell.SessionExecutor
 
 let twoScopesSameSessionIdQueuesIsolate () = promise {
-    resetDefaultForTesting ()
     let scopeA = create ()
     let scopeB = create ()
     let execA = createForScope scopeA

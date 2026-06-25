@@ -5,20 +5,12 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel.Dedup
 open VibeFs.Kernel.MessageDedup
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.HostMessagePartCodec
 open VibeFs.Shell.TreeSitterShell
 
 let private readToolNames = Set.ofList [ "read"; "file_read" ]
 
 type private ReadHit = { msgIndex: int; partIndex: int; payload: ReadPayload }
-
-let private tryReadContent (output: obj) : string option =
-    if Dyn.isNullish output then None
-    elif Dyn.typeIs output "string" then
-        let s = string output
-        if s = "" then None else Some s
-    else
-        let s = Dyn.str output "content"
-        if s = "" then None else Some s
 
 let private tryPath (input: obj) : string =
     if Dyn.isNullish input then ""
@@ -32,7 +24,7 @@ let private decodeMuxReadPart (part: obj) : ReadPayload option =
     elif not (Set.contains (Dyn.str part "toolName") readToolNames) then None
     elif Dyn.str part "state" <> "output-available" then None
     else
-        match tryReadContent (Dyn.get part "output") with
+        match decodeDynamicToolReadOutput part with
         | None -> None
         | Some content ->
             let path = tryPath (Dyn.get part "input")
@@ -41,16 +33,11 @@ let private decodeMuxReadPart (part: obj) : ReadPayload option =
 let private collectMuxReadHits (messages: obj array) : ReadHit list =
     messages
     |> Array.mapi (fun i msg ->
-        if Dyn.isNullish msg then [||]
-        else
-            let parts = Dyn.get msg "parts"
-            if Dyn.isNullish parts || not (Dyn.isArray parts) then [||]
-            else
-                (parts :?> obj array)
-                |> Array.mapi (fun j part ->
-                    decodeMuxReadPart part
-                    |> Option.map (fun payload -> { msgIndex = i; partIndex = j; payload = payload }))
-                |> Array.choose id)
+        getMessageParts msg
+        |> Array.mapi (fun j part ->
+            decodeMuxReadPart part
+            |> Option.map (fun payload -> { msgIndex = i; partIndex = j; payload = payload }))
+        |> Array.choose id)
     |> Array.concat
     |> List.ofArray
 
@@ -66,7 +53,7 @@ let private applyDedupToMessages (messages: obj array) (hits: ReadHit list) (rep
             match List.tryFind (fun (idx, _) -> idx = i) msgGroups with
             | None -> msg
             | Some (_, hitsInMsg) ->
-                let parts = (Dyn.get msg "parts") :?> obj array
+                let parts = getMessageParts msg
                 let newParts =
                     parts
                     |> Array.mapi (fun j part ->

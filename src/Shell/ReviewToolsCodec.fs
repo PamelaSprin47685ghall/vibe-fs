@@ -3,6 +3,7 @@ module VibeFs.Shell.ReviewToolsCodec
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.DynField
 
 type SubmitReviewArgs = {
     Report: string
@@ -13,10 +14,6 @@ type ReturnReviewerArgs = {
     Verdict: Verdict
     Feedback: string
 }
-
-let private strField (a: obj) (k: string) : string option =
-    let v = Dyn.get a k
-    if Dyn.isNullish v then None else Some(string v)
 
 let private strListField (a: obj) (k: string) : string list =
     let v = Dyn.get a k
