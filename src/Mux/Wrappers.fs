@@ -3,14 +3,30 @@ module VibeFs.Mux.Wrappers
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
+open VibeFs.Kernel.Domain
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.MagicTodo
+open VibeFs.Kernel.WorkBacklog
 open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Opencode.HookSchema
+open VibeFs.Kernel.PromptFragments
+open VibeFs.Kernel.Methodology
+open VibeFs.Kernel.ReviewPrompts
+open VibeFs.Shell.WorkBacklogSchema
 open VibeFs.Shell.TreeSitterShell
-open VibeFs.Shell.MagicSessionStore
+open VibeFs.Shell.RuntimeScope
+open VibeFs.Shell.SessionProjectionStore
 open VibeFs.Shell
+open VibeFs.Shell.JsonSchemaBuilders
+open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.PromiseStr
+open VibeFs.Shell.WorkBacklogToolsCodec
+open VibeFs.Shell.ToolExecute
+open VibeFs.Shell.DelegateToolsCodec
+open VibeFs.Shell.ToolContextCodec
+open VibeFs.Shell.DynField
+
+let strField = VibeFs.Shell.DynField.strField
+let optInt = VibeFs.Shell.DynField.optInt
 
 type JsonSchema =
     { ``type``: string
@@ -25,17 +41,12 @@ type ToolDefinition =
       execute: obj -> obj -> JS.Promise<string>
       condition: (obj -> bool) option }
 
-let resolveStr (s: string) : JS.Promise<string> = Promise.lift s
+let resolveStr = PromiseStr.resolveStr
 
 let jsonStringify (o: obj) : string = JS.JSON.stringify(o)
 
-let optInt (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<int> v)
 let optBool (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<bool> v)
 let optField (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some v
-
-let strField (a: obj) (k: string) : string option =
-    let v = Dyn.get a k
-    if Dyn.isNullish v then None else Some(string v)
 
 let requireStrArray (a: obj) (k: string) : string array =
     let v = Dyn.get a k
@@ -45,17 +56,18 @@ let requireStrArray (a: obj) (k: string) : string array =
 let mkSchema (props: obj) (required: string array) : JsonSchema =
     { ``type`` = "object"; properties = props; required = Some required; additionalProperties = Some false }
 
-let strProp (desc: string) : obj = createObj [ "type", box "string"; "description", box desc ]
-let numProp (desc: string) : obj = createObj [ "type", box "number"; "description", box desc ]
-let boolProp (desc: string) : obj = createObj [ "type", box "boolean"; "description", box desc ]
-let strEnumProp (desc: string) (values: string array) : obj = createObj [ "type", box "string"; "enum", box values; "description", box desc ]
-let strArrayProp (desc: string) : obj =
-    createObj [ "type", box "array"; "items", box (createObj [ "type", box "string" ]); "description", box desc ]
+let strProp = jsonStrProp
+let numProp = jsonNumProp
+let boolProp = jsonBoolProp
+let strEnumProp = jsonStrEnumProp
+let strArrayProp = jsonStrArrayProp
 
-let requireWorkspaceId (config: obj) (toolName: string) : Result<string, string> =
-    let wid = Dyn.get config "workspaceId"
-    if isNull wid || string wid = "" then Result.Error $"{toolName} requires workspaceId"
-    else Result.Ok(string wid)
+let requireWorkspaceId (config: obj) (toolName: string) : Result<string, DomainError> =
+    decodeMuxConfig config
+    |> Result.map (fun ctx -> defaultArg ctx.WorkspaceId "")
+    |> Result.mapError (function
+        | InvalidIntent (_, "workspaceId", _) -> InvalidIntent (toolName, "workspaceId", "required")
+        | e -> e)
 
 let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promise<obj> =
     promise {
@@ -63,7 +75,11 @@ let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promis
         | None -> return result
         | Some filePath ->
             try
-                let! formatted = readAndCheckSyntax filePath (Dyn.str config "cwd") false
+                let cwd =
+                    match fromMuxConfig config with
+                    | Ok runtime -> runtime.Execution.Directory
+                    | Error _ -> ""
+                let! formatted = readAndCheckSyntax filePath cwd false
                 match formatted with
                 | None -> return result
                 | Some f ->
@@ -85,14 +101,14 @@ let private disabledResult () : JS.Promise<string> = Promise.lift "disabled"
 /// Encapsulates the host's native file_read execute function captured during
 /// wrapper registration. Replaces the old `obj option ref` pseudo-interface
 /// (REFACTOR.md §12): the mutable slot is private, callers go through methods.
-type HostReadExec() =
+type HostFunctionCapture() =
     let mutable captured : obj option = None
     member _.Capture(fn: obj) : unit = captured <- Some fn
     member _.TryGet() : obj option = captured
 
 let private reviewerAgentReportDefinition () : ToolDefinition =
     { name = "agent_report"
-      description = "Submit a review verdict. Provide verdict and feedback; the wrapper forwards the verdict as the upstream agent_report markdown."
+      description = muxReviewerAgentReportDescription
       parameters =
           { ``type`` = "object"
             properties =
@@ -145,59 +161,50 @@ let private mkSyntaxWrappers () : obj array =
     [| mkResultWrapper "file_edit_replace_string" (fun result args config -> applySyntaxCheck result args config)
        mkResultWrapper "file_edit_insert" (fun result args config -> applySyntaxCheck result args config) |]
 
-let private todoItemForNativeWrite (todo: obj) : obj =
-    createObj [ "content", box (Dyn.str todo "content"); "status", box (Dyn.str todo "status") ]
+let private todoItemForNativeWrite (item: TodoItem) : obj =
+    createObj [ "content", box item.Content; "status", box item.Status ]
 
-let private todoArrayForNativeWrite (args: obj) : obj =
-    let todos = Dyn.get args "todos"
-    if Dyn.isNullish todos || not (Dyn.isArray todos) then
-        box [||]
-    else
-        todos :?> obj array |> Array.map todoItemForNativeWrite |> box
+let private todoArrayForNativeWrite (decoded: TodoWriteArgs) : obj =
+    decoded.Todos |> Array.map todoItemForNativeWrite |> box
 
-let private captureTodoReport (args: obj) (opts: obj) : unit =
-    let report = Dyn.str args "completedWorkReport" |> fun value -> value.Trim()
-    let toolCallId = Dyn.str opts "toolCallId"
-    if report <> "" && toolCallId <> "" then
-        captureReport opencode toolCallId report
+let private captureTodoReportFromDecoded (host: Host) (projection: ProjectionStore) (tw: TodoWriteArgs) (o: TodoToolOpts) : unit =
+    if tw.CompletedWorkReport <> "" && o.ToolCallId <> "" then
+        projection.CaptureReport(host, o.ToolCallId, tw.CompletedWorkReport)
 
-let private todoMethodologies (args: obj) : string list =
-    let raw = Dyn.get args "select_methodology"
-    if Dyn.isNullish raw || not (Dyn.isArray raw) then []
-    else raw :?> obj array |> Array.map string |> Array.toList
-
-let private mkTodoWriteWrapper () : obj =
+let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (tool: obj) (_config: obj) ->
             let execFn =
                 System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
                     promise {
-                        captureTodoReport args opts
-                        let nativeArgs = createObj [ "todos", todoArrayForNativeWrite args ]
-                        let raw = tool?execute(nativeArgs, opts)
-                        let! result =
-                            if isThenable raw then unbox<JS.Promise<obj>> raw
-                            else Promise.lift raw
-                        let methodologies = todoMethodologies args
-                        let output = todoWriteOutput methodologies true
-                        let nextResult =
-                            if Dyn.typeIs result "object" then
-                                if Dyn.truthy (Dyn.get result "success") then
+                         match decodeTodoWriteArgs args, decodeTodoToolOpts opts with
+                         | Error e, _ | _, Error e ->
+                             return createObj [ "success", box false; "output", box (wireDecodeFailure "todowrite" e) ]
+                         | Ok tw, Ok o ->
+                            captureTodoReportFromDecoded host projection tw o
+                            let methodologies = tw.SelectMethodology
+                            let nativeArgs = createObj [ "todos", todoArrayForNativeWrite tw ]
+                            let raw = tool?execute(nativeArgs, opts)
+                            let! result =
+                                if isThenable raw then unbox<JS.Promise<obj>> raw
+                                else Promise.lift raw
+                            let output = todoWriteOutput methodologies true
+                            let nextResult =
+                                if Dyn.typeIs result "object" then
                                     Dyn.withKey result "output" (box output)
-                                else Dyn.withKey result "output" (box output)
-                            else
-                                createObj [ "success", box true; "output", box output ]
-                        return nextResult
+                                else
+                                    createObj [ "success", box true; "output", box output ]
+                            return nextResult
                     })
 
             createObj
-                [ "description", box toolDescription
-                  "parameters", buildMagicTodoSchema ()
+                [ "description", box (toolDescriptionFor host)
+                  "parameters", buildWorkBacklogSchema ()
                   "execute", box execFn ])
 
-    createObj [ "targetTool", box (todoWritePromptName opencode); "wrapper", box wrapperFn ]
+    createObj [ "targetTool", box (todoWritePromptName host); "wrapper", box wrapperFn ]
 
-let private mkFileReadCapture (hostReadExec: HostReadExec) : obj =
+let private mkFileReadCapture (hostReadExec: HostFunctionCapture) : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (hostTool: obj) (_config: obj) ->
             hostReadExec.Capture(bindExecute hostTool)
@@ -210,7 +217,7 @@ let private mkFileReadCapture (hostReadExec: HostReadExec) : obj =
 let private mkAgentReportOverride () : obj =
     let wrapperFn =
         System.Func<obj, obj, obj>(fun (tool: obj) (config: obj) ->
-            if Dyn.str config "subagentRole" <> "reviewer" then
+            if decodeSubagentRole config <> "reviewer" then
                 tool
             else
                 let definition = reviewerAgentReportDefinition ()
@@ -231,12 +238,13 @@ let private mkAgentReportOverride () : obj =
     createObj [ "targetTool", box "agent_report"; "wrapper", box wrapperFn ]
 
 
-let createAllWrappersFor (host: Host) (tools: obj) (hostReadExec: HostReadExec) : obj array =
+let createAllWrappersFor (host: Host) (tools: obj) (hostReadExec: HostFunctionCapture) (scope: RuntimeScope) : obj array =
+    let projection = scope.Projection
     Array.append
         (mkSyntaxWrappers ())
         [| mkFileReadCapture hostReadExec
-           mkTodoWriteWrapper ()
+           mkTodoWriteWrapper host projection
            mkAgentReportOverride () |]
 
-let createAllWrappers (tools: obj) (hostReadExec: HostReadExec) : obj array =
-    createAllWrappersFor opencode tools hostReadExec
+let createAllWrappers (tools: obj) (hostReadExec: HostFunctionCapture) (scope: RuntimeScope) : obj array =
+    createAllWrappersFor mux tools hostReadExec scope

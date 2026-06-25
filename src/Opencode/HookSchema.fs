@@ -8,33 +8,23 @@ open VibeFs.Shell
 
 open VibeFs.Kernel.SubagentIntents
 open VibeFs.Shell.SubagentIntentsCodec
-open VibeFs.Kernel.MagicTodo
-open VibeFs.Kernel.Methodology
+open VibeFs.Kernel.WorkBacklog
 open VibeFs.Opencode.ToolSchema
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.WorkBacklogSchema
 
-let selectMethodologyFieldDescription = Methodology.selectMethodologyFieldDescription
-
-let selectMethodologyProperty =
-    createObj [
-        "type", box "array"
-        "description", box selectMethodologyFieldDescription
-        "items", createObj [
-            "type", box "string"
-            "enum", box (List.toArray methodologyEnumValues)
-        ]
-        "minItems", box 1
-    ]
+let selectMethodologyFieldDescription = VibeFs.Kernel.Methodology.selectMethodologyFieldDescription
 
 /// Write `_ui` directly onto the host's args reference when the tool exposes a
 /// UI label (coder/investigator). The host keeps the same args object it passed
 /// in, so the label survives into the message history the UI reads. Replacing
 /// the reference dropped `_ui` — the host never saw the new object.
 let setUiLabel (args: obj) (tool: string) : unit =
+    let raw = intentsRawFromArgs args
     let labelResult =
         match tool with
-        | "coder" -> joinCoderUiLabel (Dyn.get args "intents")
-        | "investigator" -> joinInvestigatorUiLabel (Dyn.get args "intents")
+        | "coder" -> joinCoderUiLabel raw
+        | "investigator" -> joinInvestigatorUiLabel raw
         | _ -> Result.Error ""
     match labelResult with
     | Result.Ok label when label <> "" -> args?("_ui") <- box label
@@ -74,9 +64,6 @@ let rewriteToolJsonSchema (setKey: obj -> string -> obj -> unit) (rewrite: obj -
     else
         let parameters = get output "parameters"
         if not (isNullish parameters) then setKey output "parameters" (rewrite parameters)
-
-let private stringProperty (description: string) : obj =
-    createObj [ "type", box "string"; "description", box description ]
 
 let private stringZodProperty (description: string) : obj =
     createObj [
@@ -158,7 +145,7 @@ let private extendZodTaskSchema (schema: obj) : obj =
                     | Some arr ->
                         match callSchemaMethod arr "min" (box 1) with
                         | Some minArr ->
-                            match callSchemaMethod minArr "describe" (box selectMethodologyFieldDescription) with
+                            match callSchemaMethod minArr "describe" (box VibeFs.Kernel.Methodology.selectMethodologyFieldDescription) with
                             | Some descArr -> extProps <- ("select_methodology", descArr) :: extProps
                             | None -> ()
                         | None -> ()
@@ -174,24 +161,9 @@ let private extendZodTaskSchema (schema: obj) : obj =
                         | None -> schema
     with _ -> schema
 
-let buildMagicTodoSchema () : obj =
-    let todoItem =
-        createObj [
-            "type", box "object"
-            "properties", createObj [ "content", stringProperty todoContentDesc; "status", stringProperty todoStatusDesc; "priority", stringProperty todoPriorityDesc ]
-            "required", box [| box "content"; box "status"; box "priority" |]
-        ]
-    createObj [
-        "type", box "object"
-        "properties", createObj [
-            "todos", createObj [ "type", box "array"; "description", box todosDesc; "items", todoItem ]
-            "completedWorkReport", stringProperty reportDesc
-            "select_methodology", selectMethodologyProperty
-        ]
-        "required", box [| box "todos"; box "completedWorkReport"; box "select_methodology" |]
-    ]
+let buildWorkBacklogSchema () : obj = WorkBacklogSchema.buildWorkBacklogSchema ()
 
-let mergeMagicReportIntoTaskSchema (schema: obj) : obj =
+let mergeWorkBacklogReportIntoTaskSchema (schema: obj) : obj =
     if isNullish schema then schema
     elif hasCallable schema "safeExtend" || hasCallable schema "extend" then
         extendZodTaskSchema schema
@@ -200,7 +172,7 @@ let mergeMagicReportIntoTaskSchema (schema: obj) : obj =
         if isNullish properties then schema
         else
             if isNullish (get properties "completedWorkReport") then
-                properties?("completedWorkReport") <- stringProperty reportDesc
+                properties?("completedWorkReport") <- jsonStringProperty reportDesc
             if isNullish (get properties "select_methodology") then
                 properties?("select_methodology") <- selectMethodologyProperty
             if not (isNullish (get properties "task_id")) then

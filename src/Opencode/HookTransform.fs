@@ -8,20 +8,20 @@ open VibeFs.Opencode.ToolDefinitionHooks
 open VibeFs.Opencode.EventHooks
 open VibeFs.Shell.ChildAgentRegistry
 
-let chatMessageFor (host: Host) (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
-    ChatHooks.chatMessageFor host registry nudgeHook input output
+let chatMessageFor (host: Host) (registry: ChildAgentRegistry) (lifecycleObserver: VibeFs.Opencode.SessionLifecycleObserver.SessionLifecycleObserver) (input: obj) (output: obj) : JS.Promise<unit> =
+    ChatHooks.chatMessageFor host registry lifecycleObserver input output
 
-let chatMessage (registry: ChildAgentRegistry) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (input: obj) (output: obj) : JS.Promise<unit> =
-    ChatHooks.chatMessage registry nudgeHook input output
+let chatMessage (registry: ChildAgentRegistry) (lifecycleObserver: VibeFs.Opencode.SessionLifecycleObserver.SessionLifecycleObserver) (input: obj) (output: obj) : JS.Promise<unit> =
+    ChatHooks.chatMessage registry lifecycleObserver input output
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (magicSession: VibeFs.Opencode.MagicTodo.MagicSession) (knowledgeGraphRuntime: VibeFs.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) (output: obj) : JS.Promise<unit> =
-    MessageTransform.messagesTransform registry directory magicSession knowledgeGraphRuntime reviewStore input output
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: VibeFs.Shell.RuntimeScope.RuntimeScope) (backlogSession: VibeFs.Opencode.BacklogSession.BacklogSession) (knowledgeGraphRuntime: VibeFs.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) (output: obj) : JS.Promise<unit> =
+    MessageTransform.messagesTransform registry directory runtimeScope backlogSession knowledgeGraphRuntime reviewStore input output
 
-let compactingHandlerFor (host: Host) (magicSession: VibeFs.Opencode.MagicTodo.MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
-    MessageTransform.compactingHandlerFor host magicSession input output
+let compactingHandlerFor (host: Host) (backlogSession: VibeFs.Opencode.BacklogSession.BacklogSession) (input: obj) (output: obj) : JS.Promise<unit> =
+    MessageTransform.compactingHandlerFor host backlogSession input output
 
-let compactingHandler (magicSession: VibeFs.Opencode.MagicTodo.MagicSession) (input: obj) (output: obj) : JS.Promise<unit> =
-    MessageTransform.compactingHandler magicSession input output
+let compactingHandler (backlogSession: VibeFs.Opencode.BacklogSession.BacklogSession) (input: obj) (output: obj) : JS.Promise<unit> =
+    MessageTransform.compactingHandler backlogSession input output
 
 let systemTransform (input: obj) (output: obj) : JS.Promise<unit> =
     MessageTransform.systemTransform input output

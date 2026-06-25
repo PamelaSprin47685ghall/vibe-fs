@@ -4,25 +4,12 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Shell
+open VibeFs.Shell.DelegatedAiSettings
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.MuxAiSettingsCodec
 
-type DelegatedAiSettings =
-    { modelString: string option
-      thinkingLevel: string option }
-
-let emptySettings : DelegatedAiSettings =
-    { modelString = None
-      thinkingLevel = None }
-
-type AiConfigRecord =
-    { workspaceId: string
-      runtime: obj
-      cwd: string }
-
-let private decodeAiConfig (config: obj) : AiConfigRecord =
-    { workspaceId = Dyn.str config "workspaceId"
-      runtime = let r = Dyn.get config "runtime" in if Dyn.isNullish r then null else r
-      cwd = Dyn.str config "cwd" }
+type DelegatedAiSettings = VibeFs.Shell.DelegatedAiSettings.DelegatedAiSettings
+let emptySettings = VibeFs.Shell.DelegatedAiSettings.emptySettings
 
 let private loadConfigOrDefault (deps: obj) : obj = deps?loadConfigOrDefault()
 
@@ -31,26 +18,6 @@ let private findWorkspaceEntry (deps: obj) (configFile: obj) (workspaceId: strin
 
 let private resolveAgentFrontmatter (deps: obj) (runtime: obj) (cwd: string) (agentId: string) : JS.Promise<obj> =
     unbox (deps?resolveAgentFrontmatter(runtime, cwd, agentId))
-
-let private normalizeStr (v: obj) : string option =
-    if Dyn.isNullish v then None
-    else
-        let s = (string v).Trim()
-        if s = "" then None else Some s
-
-let modelFromEntry (entry: obj) : string option =
-    normalizeStr (Dyn.get entry "model")
-    |> Option.orElseWith (fun () -> normalizeStr (Dyn.get entry "modelString"))
-
-let private thinkingFromEntry (entry: obj) : string option =
-    normalizeStr (Dyn.get entry "thinkingLevel")
-
-let namedSettingsFromRecord (source: obj) (agentId: string) : DelegatedAiSettings option =
-    if Dyn.isNullish source then None
-    else
-        let entry = Dyn.get source agentId
-        if Dyn.isNullish entry then None
-        else Some { modelString = modelFromEntry entry; thinkingLevel = thinkingFromEntry entry }
 
 let mergeNamedSettings (sources: DelegatedAiSettings option list) : DelegatedAiSettings =
     sources
@@ -63,57 +30,31 @@ let mergeNamedSettings (sources: DelegatedAiSettings option list) : DelegatedAiS
 
 let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) : JS.Promise<DelegatedAiSettings> =
     promise {
-        let cfg = decodeAiConfig config
+        let d = decodeMuxDelegateConfigLenient config
+        let workspaceId = d.Execution.WorkspaceId |> Option.defaultValue ""
+        let runtime = d.Runtime
+        let cwd = d.Cwd
         let configFile = loadConfigOrDefault deps
         let workspace =
-            if cfg.workspaceId = "" then null
-            else
-                let result = findWorkspaceEntry deps configFile cfg.workspaceId
-                Dyn.get result "workspace"
-        let byAgent = Dyn.get workspace "aiSettingsByAgent"
+            if workspaceId = "" then null
+            else readWorkspaceFromFindResult (findWorkspaceEntry deps configFile workspaceId)
         let! descriptorSettings =
             promise {
                 try
-                    let! fm = resolveAgentFrontmatter deps cfg.runtime cfg.cwd agentId
-                    let ai = Dyn.get fm "ai"
-                    return { modelString = normalizeStr (Dyn.get ai "model"); thinkingLevel = thinkingFromEntry ai }
+                    let! fm = resolveAgentFrontmatter deps runtime cwd agentId
+                    return readDescriptorAiFromFrontmatter fm
                 with _ -> return emptySettings
             }
         return
-            mergeNamedSettings [
-                namedSettingsFromRecord byAgent agentId
-                namedSettingsFromRecord (Dyn.get configFile "subagentAiDefaults") agentId
-                namedSettingsFromRecord (Dyn.get configFile "agentAiDefaults") agentId
-                Some descriptorSettings
-                if agentId = "exec" then namedSettingsFromRecord byAgent "exec" else None
-            ]
+            mergeNamedSettings (
+                [ readWorkspaceAiSettingsByAgent workspace agentId ]
+                @ readMuxConfigFileDefaults configFile agentId
+                @ [ Some descriptorSettings ])
     }
-
-let private thinkingLevelMap =
-    [ "med", Some "medium"
-      "off", Some "off"
-      "low", Some "low"
-      "medium", Some "medium"
-      "high", Some "high"
-      "xhigh", Some "xhigh"
-      "max", Some "max" ]
-    |> Map.ofList
-
-let internal coerceThinkingLevel (value: string) : string option =
-    Map.tryFind (value.Trim()) thinkingLevelMap
-    |> Option.defaultValue None
 
 type ParentRuntimeAiSettings =
     { modelString: string option
       thinkingLevel: string option }
-
-let private trimToOption (value: string) =
-    let trimmed = value.Trim()
-    if trimmed = "" then None else Some trimmed
-
-let private readMuxEnvSettings (muxEnv: obj) : ParentRuntimeAiSettings =
-    { modelString = Dyn.str muxEnv "MUX_MODEL_STRING" |> trimToOption
-      thinkingLevel = Dyn.str muxEnv "MUX_THINKING_LEVEL" |> coerceThinkingLevel }
 
 let private toRuntimeAiSettingsObj (settings: ParentRuntimeAiSettings) : obj =
     let fields =
@@ -128,6 +69,9 @@ let private toRuntimeAiSettingsObj (settings: ParentRuntimeAiSettings) : obj =
     | _ -> createObj fields
 
 let buildParentRuntimeAiSettings (config: obj) : obj =
-    let muxEnv = Dyn.get config "muxEnv"
-    if Dyn.isNullish muxEnv then null
-    else muxEnv |> readMuxEnvSettings |> toRuntimeAiSettingsObj
+    let scalars = readParentMuxEnv config
+    if scalars.ModelString.IsNone && scalars.ThinkingLevel.IsNone then null
+    else
+        toRuntimeAiSettingsObj
+            { modelString = scalars.ModelString
+              thinkingLevel = scalars.ThinkingLevel }

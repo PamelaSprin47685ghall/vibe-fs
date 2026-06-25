@@ -34,7 +34,7 @@ let run () : JS.Promise<unit> =
             "capsTransform", capsTransformSpec
             "capsTransformInPlace", capsTransformInPlaceSpec
             "defaultPreludeWithoutCaps", defaultPreludeWithoutCapsSpec
-            "capsAndMagicOrder", capsAndMagicOrderSpec
+            "capsAndBacklogOrder", capsAndBacklogOrderSpec
             "bookkeeperDoesNotReceiveCaps", bookkeeperDoesNotReceiveCapsSpec
             "compactionDoesNotReceiveCaps", compactionDoesNotReceiveCapsSpec
             "knowledgeGraphPreludeWithoutCaps", knowledgeGraphPreludeWithoutCapsSpec
@@ -82,6 +82,7 @@ let run () : JS.Promise<unit> =
             "mimoTaskDefinitionHandlesZodLikeParameters", mimoTaskDefinitionHandlesZodLikeParametersSpec
             "coderTool", coderToolSpec
             "investigatorTool", investigatorToolSpec
+            "muxCoderInvalidIntents", muxCoderInvalidIntentsSpec
             "investigatorToolLateClientInjection", investigatorToolLateClientInjectionSpec
             "writeTool", (fun () -> writeToolSpec reg)
             "loopCommand", (fun () -> loopCommandSpec reg)
@@ -122,7 +123,7 @@ let run () : JS.Promise<unit> =
             "muxMessagesTransformAcceptedSubmitReviewEndsLoop", muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec
             "muxTodoWriteWrapperSchema", muxTodoWriteWrapperSchemaSpec
             "muxTodoWriteCapturesCompletedWorkReport", muxTodoWriteCapturesCompletedWorkReportSpec
-            "muxMagicTodoProjection", muxMagicTodoProjectionSpec
+            "muxBacklogProjection", muxBacklogProjectionSpec
             "muxExecutorRoCatPrependsWarning", muxExecutorRoCatPrependsWarningSpec
             "muxMeditatorReadsFilesFromCwd", muxMeditatorReadsFilesFromCwdSpec
             "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec

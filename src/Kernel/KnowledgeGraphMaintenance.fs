@@ -2,6 +2,7 @@ module VibeFs.Kernel.KnowledgeGraphMaintenance
 
 open System
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraphRuntimeState
 
 /// Pure knowledge graph maintenance scheduling. Given the current knowledge graph files and a clock
 /// value, decide which background daily rewrite jobs are due — without touching
@@ -34,3 +35,17 @@ let dueMaintenance (files: KnowledgeGraphFile list) (now: DateTime) : string lis
         |> List.filter (fun (date, rewritten) -> date < todayStr && not rewritten)
         |> List.map fst
         |> List.truncate 1
+
+let private dailyMaintenanceTitle = "Daily knowledge graph rewrite"
+
+/// Pure launch record + dedup key for one due daily rewrite (no IO).
+let bookkeeperMaintenanceLaunch (workspaceRoot: string) (date: string) : string * BookkeeperLaunch =
+    let resultPrefix = "daily"
+    let promptInfix = "for"
+    let key = workspaceRoot + "|" + resultPrefix + "|" + date
+    let launch =
+        { agent = "bookkeeper"
+          title = dailyMaintenanceTitle
+          prompt = $"{resultPrefix} maintenance due {promptInfix} {date}"
+          result = $"{resultPrefix}:{date}" }
+    key, launch

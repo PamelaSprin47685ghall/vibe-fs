@@ -5,6 +5,20 @@ open VibeFs.Kernel.HostTools
 
 let selectMethodologyToolName = "select_methodology"
 
+let methodologyToolResultText (methodologies: string list) =
+    match methodologies with
+    | [] -> invalidArg "methodologies" "methodologyToolResultText requires at least one methodology"
+    | _ ->
+        let joined = String.concat ", " methodologies
+        $"Great! Now please explain how to apply [{joined}] to the work step."
+
+let todoResultText (methodologies: string list) : string =
+    match methodologies with
+    | [] -> "Todos updated."
+    | _ ->
+        let joined = String.concat ", " methodologies
+        $"Great! Now please explain how to apply [{joined}] to the work step."
+
 let methodologyEnumValues: string list =
     [ "first_principles"
       "axiomatization"

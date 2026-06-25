@@ -117,3 +117,5 @@ let joinCoderUiLabel (intents: obj) : Result<string, string> =
 
 let joinInvestigatorUiLabel (intents: obj) : Result<string, string> =
     joinIntentUiLabel parseInvestigatorIntents (fun i -> i.objective) intents
+
+let intentsRawFromArgs (args: obj) : obj = Dyn.get args "intents"

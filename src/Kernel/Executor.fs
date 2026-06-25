@@ -1,6 +1,7 @@
 module VibeFs.Kernel.Executor
 
 open System
+open VibeFs.Kernel.SubagentPrompts
 open VibeFs.Kernel.ToolOutputInfo
 
 type StrippedPipe =
@@ -238,6 +239,25 @@ let languageToString (value: ExecutorLanguage) : string =
     | Python -> "python"
     | Javascript -> "javascript"
     | Shell -> "shell"
+
+let private summaryInputMaxBytes = 1_048_576
+
+let buildSummaryPrompt
+    (byteLength: string -> int)
+    (truncateToBytes: string -> int -> string)
+    (options: ExecuteOptions)
+    (result: ExecuteResult)
+    : string =
+    let raw = outputFromResult result
+    let capped =
+        if byteLength raw > summaryInputMaxBytes then
+            truncateToBytes raw summaryInputMaxBytes
+            + "\n\n[Output truncated to 1MB for summarization]"
+        else
+            raw
+    let langStr = languageToString options.language
+    let timeoutStr = timeoutToString options.timeoutType
+    executorSummarizerPrompt capped langStr options.program options.dependencies timeoutStr options.mode
 
 let parseTimeout (value: string) : ExecutorTimeoutType =
     match value.Replace("-", "").ToLowerInvariant() with

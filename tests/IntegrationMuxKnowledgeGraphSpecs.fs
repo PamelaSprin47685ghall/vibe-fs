@@ -35,7 +35,7 @@ let muxReturnBookkeeperAppendSpec () = promise {
                 knowledgeGraphDraftEntry None ["新知识"] "Fresh answer"
             |]
             let submitArgs = createObj [ "entries", box entries ]
-            let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-kg-job" ]
+            let submitCtx = muxToolConfig workspaceDir "mux-kg-job"
             let! result = ((get submitTool "execute") $ (submitCtx, submitArgs)) |> unbox<JS.Promise<string>>
             check "mux return_bookkeeper returns a response" (result <> "")
             let! projection = readKnowledgeGraphProjectionAsync workspaceDir
@@ -62,7 +62,7 @@ let muxReturnBookkeeperNoActiveJobSpec () = promise {
     else
         let entries = [| knowledgeGraphDraftEntry None ["问题"] "答案。" |]
         let submitArgs = createObj [ "entries", box entries ]
-        let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-kg-nojob-session" ]
+        let submitCtx = muxToolConfig workspaceDir "mux-kg-nojob-session"
         let! result = ((get submitTool "execute") $ (submitCtx, submitArgs)) |> unbox<JS.Promise<string>>
         check "mux return_bookkeeper rejects unregistered job even with directory" (result = "No active knowledge graph job for this session.")
         let! files = readAllKnowledgeGraphFiles workspaceDir
@@ -81,7 +81,7 @@ let muxReturnBookkeeperReconstructsJobFromHistorySpec () = promise {
     if isNullish submitTool then
         check "mux registration exposes return_bookkeeper tool" false
     else
-        let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box sessionID ]
+        let submitCtx = muxToolConfig workspaceDir sessionID
         let submitArgs = createObj [ "entries", box [| knowledgeGraphDraftEntry None ["历史重建问题"] "历史重建答案" |] ]
         let! result = ((get submitTool "execute") $ (submitCtx, submitArgs)) |> unbox<JS.Promise<string>>
         check "mux return_bookkeeper reconstructs job from history" (result.Contains "Appended 1 knowledge graph entries")
@@ -103,7 +103,7 @@ let muxReturnBookkeeperAppendDoesNotTriggerMaintenanceSpec () = promise {
     if isNullish submitTool then
         check "mux registration exposes return_bookkeeper tool" false
     else
-        let submitCtx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-kg-launch-job" ]
+        let submitCtx = muxToolConfig workspaceDir "mux-kg-launch-job"
         let submitArgs = createObj [ "entries", box [| knowledgeGraphDraftEntry None ["触发问题"] "触发答案" |] ]
         let! result = ((get submitTool "execute") $ (submitCtx, submitArgs)) |> unbox<JS.Promise<string>>
         check "mux return_bookkeeper append accepted" (result <> "")
@@ -130,7 +130,7 @@ let muxReturnBookkeeperRejectsSecondCallSpec () = promise {
         // First submit: should succeed.
         let entries1 = [| knowledgeGraphDraftEntry None ["首次问题"] "首次答案" |]
         let args1 = createObj [ "entries", box entries1 ]
-        let ctx1 = createObj [ "directory", box workspaceDir; "sessionID", box sessionID ]
+        let ctx1 = muxToolConfig workspaceDir sessionID
         let! result1 = ((get submitTool "execute") $ (ctx1, args1)) |> unbox<JS.Promise<string>>
         check "mux first return_bookkeeper succeeds" (result1.Contains "Appended 1 knowledge graph entries")
 
@@ -156,7 +156,7 @@ let muxReturnBookkeeperRejectsSecondCallSpec () = promise {
         // Second submit: should return scold, not append.
         let entries2 = [| knowledgeGraphDraftEntry None ["二次问题"] "二次答案" |]
         let args2 = createObj [ "entries", box entries2 ]
-        let ctx2 = createObj [ "directory", box workspaceDir; "sessionID", box sessionID ]
+        let ctx2 = muxToolConfig workspaceDir sessionID
         let! result2 = ((get submitTool "execute") $ (ctx2, args2)) |> unbox<JS.Promise<string>>
 
         check "mux second return_bookkeeper returns scold not append success"
@@ -186,7 +186,7 @@ let muxExecutorRwTriggersMaintenanceSpec () = promise {
     if isNullish executor then
         check "mux registration exposes executor tool" false
     else
-        let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-executor-maintenance"; "sessionID", box "mux-executor-maintenance" ]
+        let ctx = muxToolConfig workspaceDir "mux-executor-maintenance"
         let args = createObj [ "language", box "shell"; "program", box "printf mux-maintenance"; "timeout_type", box "short"; "mode", box "rw" ]
         let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         check "mux rw executor returns output" (result.Contains "mux-maintenance")

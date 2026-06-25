@@ -25,8 +25,11 @@ type SearchOptions =
       store: TypedIteratorStore option
       finderCache: FinderCache }
 
-let resolveStore (opts: SearchOptions) : TypedIteratorStore =
-    Option.defaultValue globalIteratorStore opts.store
+let resolveStore (opts: SearchOptions) : Result<TypedIteratorStore, string> =
+    match opts.store with
+    | Some s -> Ok s
+    | None ->
+        Error "FuzzySearch requires SearchOptions.store; inject RuntimeScope.IteratorStore from the tool registration path"
 
 let private iteratorError toolName it = $"{toolName} iterator error: unknown, expired, or already consumed iterator \"{it}\""
 
@@ -37,7 +40,9 @@ let private resolveIteratorBranch (store: TypedIteratorStore) iterator consume t
 
 let resolveFindSearchState (params': FuzzyFindParams) (opts: SearchOptions)
     : Result<FuzzyFindState, string> =
-    let store = resolveStore opts
+    match resolveStore opts with
+    | Error msg -> Error msg
+    | Ok store ->
     resolveIteratorBranch store params'.iterator consumeFindIterator "fuzzy_find" (fun () ->
         match params'.pattern with
         | None | Some "" -> Error "pattern is required on the first call"
@@ -51,7 +56,9 @@ let resolveFindSearchState (params': FuzzyFindParams) (opts: SearchOptions)
 
 let resolveGrepIteratorState (params': FuzzyGrepParams) (opts: SearchOptions)
     : Result<GrepIteratorState, string> =
-    let store = resolveStore opts
+    match resolveStore opts with
+    | Error msg -> Error msg
+    | Ok store ->
     resolveIteratorBranch store params'.iterator consumeGrepIterator "fuzzy_grep" (fun () ->
         match params'.pattern with
         | None | Some "" -> Error "pattern is required on the first call"
@@ -162,12 +169,14 @@ let private runFind (state: FuzzyFindState) (store: TypedIteratorStore) (opts: S
 
 let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     promise {
-        let store = resolveStore opts
-        match resolveFindSearchState params' opts with
+        match resolveStore opts with
         | Error msg -> return { output = msg; isError = true }
-        | Ok state ->
-            let! finderResult = acquireFinderFromOptions state.externalBasePath opts
-            return runWithFinder finderResult state.externalBasePath (runFind state store opts)
+        | Ok store ->
+            match resolveFindSearchState params' opts with
+            | Error msg -> return { output = msg; isError = true }
+            | Ok state ->
+                let! finderResult = acquireFinderFromOptions state.externalBasePath opts
+                return runWithFinder finderResult state.externalBasePath (runFind state store opts)
     }
 
 // ─── Grep pipeline ──────────────────────────────────────────────────────────
@@ -201,10 +210,12 @@ let private runGrepWithFinder (state: FuzzyGrepState) (cursor: obj option) (stor
 
 let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     promise {
-        let store = resolveStore opts
-        match resolveGrepIteratorState params' opts with
+        match resolveStore opts with
         | Error msg -> return { output = msg; isError = true }
-        | Ok iteratorState ->
-            let! finderResult = acquireFinderFromOptions iteratorState.core.externalBasePath opts
-            return runWithFinder finderResult iteratorState.core.externalBasePath (runGrepWithFinder iteratorState.core iteratorState.cursor store opts)
+        | Ok store ->
+            match resolveGrepIteratorState params' opts with
+            | Error msg -> return { output = msg; isError = true }
+            | Ok iteratorState ->
+                let! finderResult = acquireFinderFromOptions iteratorState.core.externalBasePath opts
+                return runWithFinder finderResult iteratorState.core.externalBasePath (runGrepWithFinder iteratorState.core iteratorState.cursor store opts)
     }

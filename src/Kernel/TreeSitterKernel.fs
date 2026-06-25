@@ -66,7 +66,6 @@ let formatSyntaxDiagnostics (filePath: string) (result: SyntaxCheckResult)
                 |> Array.toList
             Some(String.concat "\n" (header :: body))
 
-/// Append a syntax annotation to tool output, skipping when already marked.
 let appendSyntaxDiagnosticsToOutput (currentOutput: string) (filePath: string)
                                     (result: SyntaxCheckResult) : string =
     if hasSyntaxInOutput currentOutput then currentOutput

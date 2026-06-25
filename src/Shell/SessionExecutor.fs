@@ -1,16 +1,12 @@
 module VibeFs.Shell.SessionExecutor
 
 open Fable.Core
-open VibeFs.Shell.PromiseQueue
+open VibeFs.Shell.RuntimeScope
 
-let mutable queues : Map<string, SerialQueue> = Map.empty
+/// Per-session serial executor bound to a registration [RuntimeScope].
+/// Production and tests must use [createForScope] with an explicit scope (e.g. [RuntimeScope.create]).
+type SessionExecutor(scope: RuntimeScope) =
+    member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        scope.EnqueuePerSession(sessionId, work)
 
-let enqueuePerSession (sessionId: string) (work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-    let queue =
-        match Map.tryFind sessionId queues with
-        | Some q -> q
-        | None ->
-            let q = SerialQueue()
-            queues <- Map.add sessionId q queues
-            q
-    queue.Enqueue(work)
+let createForScope (scope: RuntimeScope) : SessionExecutor = SessionExecutor(scope)

@@ -13,6 +13,7 @@ open VibeFs.Opencode.SessionIo
 open VibeFs.Mux.Wrappers
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.Dyn
+open VibeFs.Kernel.ToolResult
 
 let private zodField (f: MethodologyField) : string * obj =
     match f.kind with
@@ -36,7 +37,7 @@ let private executeSchema (registry: ChildAgentRegistry) (ctx: obj) (schema: Met
                 let directory = str tc "directory"
                 let sessionID = str tc "sessionID"
                 let prompt = formatPrompt opencode (Meditator(intent, [])) |> List.head
-                return!
+                let! subResult =
                     runSubagent
                         registry
                         (get ctx "client")
@@ -47,6 +48,9 @@ let private executeSchema (registry: ChildAgentRegistry) (ctx: obj) (schema: Met
                         sessionID
                         context
                         (box null)
+                match subResult with
+                | Ok text -> return text
+                | Error err -> return wireEncodeToolError "meditator" err
         }
 
 let methodologyTool (registry: ChildAgentRegistry) (ctx: obj) (schema: MethodologySchema) : obj =

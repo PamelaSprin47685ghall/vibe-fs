@@ -20,8 +20,8 @@ let private importMeta : obj = jsNative
 let private requireFn : string -> obj = createRequire'(string importMeta?url)
 let private pathModule : obj = requireFn("path")
 
-let ollamaFetchInit () =
-    let init = VibeFs.Shell.OllamaClient.postInit "KEY123" "{\"a\":1}" None
+let webApiFetchInit () =
+    let init = VibeFs.Shell.WebSearchApi.postInit "KEY123" "{\"a\":1}" None
     equal "init method POST" "POST" (VibeFs.Shell.Dyn.str init "method")
     let headers = VibeFs.Shell.Dyn.get init "headers"
     equal "init Content-Type" "application/json" (VibeFs.Shell.Dyn.str headers "Content-Type")
@@ -29,22 +29,22 @@ let ollamaFetchInit () =
     check "init Authorization key" (auth.Contains "KEY123")
     equal "init body json" "{\"a\":1}" (VibeFs.Shell.Dyn.str init "body")
     check "init no signal when None" (VibeFs.Shell.Dyn.isNullish (VibeFs.Shell.Dyn.get init "signal"))
-    let withSignal = VibeFs.Shell.OllamaClient.postInit "K" "b" (Some (box "ABORT"))
+    let withSignal = VibeFs.Shell.WebSearchApi.postInit "K" "b" (Some (box "ABORT"))
     check "init signal when Some" (not (VibeFs.Shell.Dyn.isNullish (VibeFs.Shell.Dyn.get withSignal "signal")))
 
-let ollamaResponseMethodCall () =
+let webApiResponseMethodCall () =
     let response =
         createObj
             [ "text", box (fun () -> "body")
               "json", box (fun () -> createObj [ "ok", box "yes" ]) ]
-    equal "response.text() invoked" "body" (unbox<string> (VibeFs.Shell.OllamaClient.responseMethod0 response "text"))
-    let json = VibeFs.Shell.OllamaClient.responseMethod0 response "json"
+    equal "response.text() invoked" "body" (unbox<string> (VibeFs.Shell.WebSearchApi.responseMethod0 response "text"))
+    let json = VibeFs.Shell.WebSearchApi.responseMethod0 response "json"
     equal "response.json() invoked" "yes" (VibeFs.Shell.Dyn.str json "ok")
 
-let ollamaApiKeyValidation () =
-    equal "requireOllamaApiKey trims" (Ok "KEY123") (VibeFs.Shell.OllamaClient.requireOllamaApiKey "  KEY123  ")
-    equal "requireOllamaApiKey rejects missing" (Error "Missing OLLAMA_API_KEY environment variable.") (VibeFs.Shell.OllamaClient.requireOllamaApiKey "")
-    equal "requireOllamaApiKey rejects empty" (Error "Missing OLLAMA_API_KEY environment variable.") (VibeFs.Shell.OllamaClient.requireOllamaApiKey "   ")
+let webApiKeyValidation () =
+    equal "requireWebApiKey trims" (Ok "KEY123") (VibeFs.Shell.WebSearchApi.requireWebApiKey "  KEY123  ")
+    equal "requireWebApiKey rejects missing" (Error "Missing OLLAMA_API_KEY environment variable.") (VibeFs.Shell.WebSearchApi.requireWebApiKey "")
+    equal "requireWebApiKey rejects empty" (Error "Missing OLLAMA_API_KEY environment variable.") (VibeFs.Shell.WebSearchApi.requireWebApiKey "   ")
 
 let executorMapping () =
     let opts : ExecuteOptions =
@@ -159,13 +159,31 @@ let knowledgeGraphPortSerialSpec () = promise {
     check "knowledge graph lock serializes same workspace" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
 }
 
-let ollamaFormat () =
+let webApiSearchFormat () =
     let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]
     let formatted = VibeFs.Kernel.SearchPrompts.formatSearchResults results
     check "search results front matter" (formatted.StartsWith "---\nresults:")
     check "search embeds title A" (formatted.Contains "title: A")
     check "search embeds title B" (formatted.Contains "title: B")
     equal "empty search" "No results found." (VibeFs.Kernel.SearchPrompts.formatSearchResults [])
+
+let ollamaFormat = webApiSearchFormat
+
+let summarizerInputCap () =
+    let bl (s: string) : int = s.Length
+    let trunc (s: string) (maxBytes: int) : string = if s.Length <= maxBytes then s else s.[..maxBytes - 1]
+    let opts : ExecuteOptions =
+        { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; mode = "ro"; cwd = None }
+    let small = String.replicate 100 "x"
+    let smallPrompt = buildSummaryPrompt bl trunc opts (Completed(small, 0))
+    check "small output kept whole" (smallPrompt.Contains small)
+    check "small output not truncated" (not (smallPrompt.Contains "[Output truncated to 1MB for summarization]"))
+    let marker = "END_OF_OUTPUT_TAIL"
+    let large = String.replicate (1_048_576 + 100 - marker.Length) "x" + marker
+    let tail = marker
+    let largePrompt = buildSummaryPrompt bl trunc opts (Completed(large, 0))
+    check "large output truncated message" (largePrompt.Contains "[Output truncated to 1MB for summarization]")
+    check "large output tail absent" (not (largePrompt.Contains tail))
 
 let safetyWarning () =
     let warn program = prependSafetyWarning "OUT" program Shell

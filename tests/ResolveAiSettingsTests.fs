@@ -4,6 +4,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 
 open VibeFs.Mux.AiSettings
+open VibeFs.Shell.MuxAiSettingsCodec
 
 let private settingsEqual (label: string) (expectedModel: string option) (expectedThinking: string option) (actual: DelegatedAiSettings) =
     equal $"{label} model" expectedModel actual.modelString
@@ -16,42 +17,40 @@ let private defaultsEntry (modelString: string) (thinkingLevel: string) =
     createObj [ "modelString", box modelString; "thinkingLevel", box thinkingLevel ]
 
 let mergeSubagentBeforeAgent () =
-    let sub =
-        namedSettingsFromRecord
-            (createObj [ "explore", box (defaultsEntry "openai:subagent" "xhigh") ])
-            "explore"
+    let configFile =
+        createObj [
+            "subagentAiDefaults",
+            box (createObj [ "explore", box (defaultsEntry "openai:subagent" "xhigh") ])
+            "agentAiDefaults",
+            box (createObj [ "explore", box (defaultsEntry "openai:agent" "medium") ])
+        ]
 
-    let agent =
-        namedSettingsFromRecord
-            (createObj [ "explore", box (defaultsEntry "openai:agent" "medium") ])
-            "explore"
-
-    let merged = mergeNamedSettings [ sub; agent ]
+    let merged = mergeNamedSettings (readMuxConfigFileDefaults configFile "explore")
     settingsEqual "subagent wins over agent" (Some "openai:subagent") (Some "xhigh") merged
 
 let modelStringKeyOnConfigDefaults () =
-    let fromModelString =
-        modelFromEntry (createObj [ "modelString", box "anthropic:from-key"; "thinkingLevel", box "low" ])
+    let fromModelStringScalars =
+        decodeAgentAiEntryScalars (
+            createObj [ "modelString", box "anthropic:from-key"; "thinkingLevel", box "low" ])
 
-    equal "modelString key" (Some "anthropic:from-key") fromModelString
+    equal "modelString key" (Some "anthropic:from-key") (fromModelStringScalars.Model |> Option.orElse fromModelStringScalars.ModelString)
 
-    let fromModel =
-        modelFromEntry (createObj [ "model", box "openai:from-model"; "modelString", box "ignored" ])
+    let fromModelScalars =
+        decodeAgentAiEntryScalars (
+            createObj [ "model", box "openai:from-model"; "modelString", box "ignored" ])
 
-    equal "model beats modelString" (Some "openai:from-model") fromModel
+    equal "model beats modelString" (Some "openai:from-model") (fromModelScalars.Model |> Option.orElse fromModelScalars.ModelString)
 
 let blankModelSkipped () =
-    let sub =
-        namedSettingsFromRecord
-            (createObj [ "explore", box (defaultsEntry "" "medium") ])
-            "explore"
+    let configFile =
+        createObj [
+            "subagentAiDefaults",
+            box (createObj [ "explore", box (defaultsEntry "" "medium") ])
+            "agentAiDefaults",
+            box (createObj [ "explore", box (defaultsEntry "anthropic:from-agent-defaults" "low") ])
+        ]
 
-    let agent =
-        namedSettingsFromRecord
-            (createObj [ "explore", box (defaultsEntry "anthropic:from-agent-defaults" "low") ])
-            "explore"
-
-    let merged = mergeNamedSettings [ sub; agent ]
+    let merged = mergeNamedSettings (readMuxConfigFileDefaults configFile "explore")
     settingsEqual "blank subagent model skipped" (Some "anthropic:from-agent-defaults") (Some "medium") merged
 
 let run () =

@@ -5,6 +5,7 @@ open VibeFs.Tests.Assert
 
 open VibeFs.Mux.AiSettings
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.MuxAiSettingsCodec
 
 let private muxEnv (pairs: (string * string) list) : obj =
     createObj [ for k, v in pairs -> k, box v ]

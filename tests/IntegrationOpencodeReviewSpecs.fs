@@ -102,7 +102,7 @@ let invalidVerdictNudgesSpec () = promise {
     let returnTool = returnReviewerTool workspaceDir [||] store
     let! result = execVerdict returnTool (createObj [ "verdict", box "null"; "feedback", box null ]) (reviewerContext workspaceDir sessionID)
     check "opencode return_reviewer invalid verdict does not resolve" (resolved.Value = None)
-    check "opencode return_reviewer invalid verdict nudges for PASS/REJECT" (result.Contains "PASS" && result.Contains "REJECT")
+    check "opencode return_reviewer invalid verdict uses codec error" (result.Contains "return_reviewer" && result.Contains "verdict")
     do! rmAsync workspaceDir
 }
 

@@ -150,7 +150,7 @@ let muxFetchKnowledgeGraphSnapshotSpec () = promise {
     if isNullish fetchTool then
         check "mux registration exposes knowledge_graph_fetch tool" false
     else
-        let context = createObj [ "directory", box workspaceDir; "sessionID", box "mux-kg-fetch-session" ]
+        let context = muxToolConfig workspaceDir "mux-kg-fetch-session"
         let! answer = ((get fetchTool "execute") $ (context, createObj [ "entity", box "项目 入口" ])) |> unbox<JS.Promise<string>>
         check "mux knowledge_graph_fetch returns concatenated facts" (answer.Contains "Old fact 1" && answer.Contains "Old fact 2")
         let! invalid = ((get fetchTool "execute") $ (context, createObj [ "entity", box "" ])) |> unbox<JS.Promise<string>>

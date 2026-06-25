@@ -7,41 +7,17 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Messaging
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
-
-let private decodeToolStatus (part: obj) : string =
-    match Dyn.str part "state" with
-    | "output-available" -> "completed"
-    | "input-available" -> "pending"
-    | other -> other
-
-let private decodeToolState (part: obj) : ToolState<obj> option =
-    let output = Dyn.get part "output"
-    let input = Dyn.get part "input"
-
-    if Dyn.isNullish output && Dyn.isNullish input then
-        None
-    else
-        let operation = if Dyn.isNullish input then null else Dyn.get input "operation"
-        let operationAction = if Dyn.isNullish operation then "" else Dyn.str operation "action"
-
-        Some
-            { status = decodeToolStatus part
-              output =
-                if Dyn.isNullish output then ""
-                elif Dyn.typeIs output "string" then string output
-                else Dyn.str output "content"
-              error = Dyn.str output "error"
-              input = input
-              operationAction = operationAction }
+open VibeFs.Shell.MessagingPartCodec
+open VibeFs.Shell.MessagingEncodeHelpers
 
 let decodePart (part: obj) : Part<obj> =
     match Dyn.str part "type" with
-    | "text" -> TextPart (Dyn.str part "text")
+    | "text" -> TextPart (decodeTextPart part)
     | "dynamic-tool" ->
         ToolPart(
             normalizeToolName opencode (Dyn.str part "toolName"),
             Dyn.str part "toolCallId",
-            decodeToolState part,
+            decodeMuxDynamicToolState part,
             part
         )
     | _ -> RawPart part
@@ -60,10 +36,7 @@ let decodeMessage (sessionID: string) (msg: obj) : Message<obj> option =
                   toolName = ""
                   details = null
                   time = null }
-              parts =
-                let parts = Dyn.get msg "parts"
-                if Dyn.isNullish parts || not (Dyn.isArray parts) then []
-                else (parts :?> obj array) |> Array.map decodePart |> List.ofArray
+              parts = decodePartsFromArray (Dyn.get msg "parts") |> Array.map decodePart |> List.ofArray
               source = classifySource (Dyn.str msg "id")
               raw = msg }
 
@@ -163,7 +136,7 @@ let encodeMessage (msg: Message<obj>) : obj =
                 let arr = rawParts :?> obj array
                 arr.Length = encodedParts.Length && Array.forall2 partsEquivalent arr encodedParts
 
-        if partsUnchanged then msg.raw else Dyn.withKey msg.raw "parts" (box encodedParts)
+        if partsUnchanged then msg.raw else replacePartsOnRawMessage msg.raw encodedParts
 
 let encodeMessages (messages: Message<obj> list) : obj array =
     messages |> List.map encodeMessage |> List.toArray

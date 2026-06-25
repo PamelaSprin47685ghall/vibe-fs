@@ -20,10 +20,10 @@ open VibeFs.Shell.Dyn
 let writeToolSpec (reg: obj) = promise {
     let tools = unbox<obj[]> (get reg "tools")
     let writeDef = tools |> Array.find (fun t -> str t "name" = "write")
-    let! missingPath = (get writeDef "execute") $ (createObj [ "cwd", box "/tmp" ], createObj [ "content", box "x" ]) |> unbox<JS.Promise<string>>
+    let! missingPath = (get writeDef "execute") $ (createObj [ "cwd", box "/tmp"; "workspaceId", box "write-test-ws" ], createObj [ "content", box "x" ]) |> unbox<JS.Promise<string>>
     check "write missing file_path error" (missingPath.Contains "file_path")
     let! tmpDir = mkdtempAsync "write-test-"
-    let! writeResult = (get writeDef "execute") $ (createObj [ "cwd", box tmpDir ], createObj [ "file_path", box "empty.txt"; "content", box "" ]) |> unbox<JS.Promise<string>>
+    let! writeResult = (get writeDef "execute") $ (createObj [ "cwd", box tmpDir; "workspaceId", box "write-test-ws" ], createObj [ "file_path", box "empty.txt"; "content", box "" ]) |> unbox<JS.Promise<string>>
     check "write empty string succeeds" (writeResult.Contains "Successfully wrote")
     do! rmAsync tmpDir
 }
@@ -181,14 +181,15 @@ let executorActorSpec () = promise {
         Promise.create (fun resolve _ ->
             gateResolve.Value <- resolve
             if releaseRequested.Value then resolve ())
-    let first = VibeFs.Shell.SessionExecutor.enqueuePerSession "session-1" (fun () ->
+    let exec = VibeFs.Shell.SessionExecutor.createForScope (VibeFs.Shell.RuntimeScope.create ())
+    let first = exec.EnqueuePerSession("session-1", fun () ->
         promise {
             seen.Add "first-start"
             do! gateAsync
             seen.Add "first-end"
             return "one"
         })
-    let second = VibeFs.Shell.SessionExecutor.enqueuePerSession "session-1" (fun () ->
+    let second = exec.EnqueuePerSession("session-1", fun () ->
         promise {
             seen.Add "second-start"
             seen.Add "second-end"

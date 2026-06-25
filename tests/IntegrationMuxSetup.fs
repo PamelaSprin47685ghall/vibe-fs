@@ -5,6 +5,12 @@ open Fable.Core.JsInterop
 open VibeFs.Shell.Dyn
 
 
+let muxToolConfig (directory: string) (sessionID: string) : obj =
+    createObj
+        [ "directory", box directory
+          "sessionID", box sessionID
+          "workspaceId", box sessionID ]
+
 let muxToolByName (reg: obj) (name: string) : obj =
     let tools = unbox<obj[]> (get reg "tools")
     tools

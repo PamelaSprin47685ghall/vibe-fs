@@ -7,37 +7,33 @@ open VibeFs.Shell
 
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.ToolOutputInfo
+open VibeFs.Kernel.ToolCatalog
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.HookSchema
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.ChildAgentRegistry
+open VibeFs.Shell.OpencodeHookInputCodec
 open VibeFs.Shell.TreeSitterShell
+open VibeFs.Shell.ToolRuntimeContext
+open VibeFs.Shell.PatchToolsCodec
+open VibeFs.Shell.ToolExecute
+open VibeFs.Kernel.ToolResult
 open VibeFs.Shell.Dyn
 
-let private setOutput (o: obj) (v: string) : unit = o?output <- v
-
 let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) : unit =
-    if Dyn.str input "tool" <> "apply_patch" then ()
-    elif Dyn.typeIs args "string" then
-        setKey output "args" (createObj [ "patchText", args ])
+    if toolNameFromHookInput input <> "apply_patch" then ()
     else
-        let patchText = Dyn.str args "patchText"
-        if patchText <> "" then ()
-        else
-            let patch = Dyn.str args "patch"
-            if patch <> "" then
-                setKey output "args" (createObj [ "patchText", box patch ])
-            else
-                let text = Dyn.str args "text"
-                if text <> "" then setKey output "args" (createObj [ "patchText", box text ])
+        match decodeApplyPatchFields args with
+        | Result.Ok fields -> setHookArgs output (createObj [ "patchText", box fields.PatchText ])
+        | Result.Error e -> setHookError output (wireEncodeToolError "apply_patch" e)
 
 let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
-        let args = Dyn.get output "args"
+        let args = argsFromHookOutput output
         if Dyn.isNullish args then ()
         else
-            let tool = Dyn.str input "tool"
+            let tool = toolNameFromHookInput input
             setUiLabel args tool
             if host = Mimocode then
                 rewriteMimocodeApplyPatchArgsForExecute output input args
@@ -48,17 +44,15 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
 
 let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
-        let tool = Dyn.str input "tool"
+        let tool = toolNameFromHookInput input
         if not (isFileEditTool tool) then ()
         else
-            let out = Dyn.get output "output"
-            if Dyn.isNullish out || not (Dyn.typeIs out "string") then ()
-            else
-                let s = string out
-                let hasSyntax = hasSyntaxInOutput s
-                if hasSyntax then ()
+            match hookOutputString output with
+            | None -> ()
+            | Some s ->
+                if hasSyntaxInOutput s then ()
                 else
-                    let paths = extractFilePaths (Dyn.get input "args")
+                    let paths = extractFilePaths (argsFromHookInput input)
                     let! diagnostics =
                         paths
                         |> List.map (fun path -> readAndCheckSyntax path directory false)
@@ -67,14 +61,9 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
                         diagnostics
                         |> Array.choose id
                         |> String.concat "\n"
-                    if formatted <> "" then setOutput output (addSyntax s formatted)
+                    if formatted <> "" then setHookOutputString output (addSyntax s formatted)
     }
 
-/// Tools whose every user-facing invocation is durable enough to feed the knowledge graph
-/// bookkeeper as an input/output black box. Direct write tools join the set via
-/// `isFileEditTool`; subagent and IO tools are listed explicitly. Pure lookups
-/// (fuzzy_find/fuzzy_grep), the knowledge graph/review tools themselves, and host read
-/// tools never record.
 let private bookkeepingSubagentTools =
     Set [ "coder"; "investigator"; "meditator"; "browser"; "executor"; "websearch"; "webfetch"; "write"; "apply_patch"; "patch" ]
 
@@ -83,21 +72,21 @@ let private recordsToBookkeeper (tool: string) : bool =
     || Set.contains tool bookkeepingSubagentTools
 
 let private isReadOnlyExecutor (tool: string) (input: obj) : bool =
-    tool = "executor" && Dyn.str (Dyn.get input "args") "mode" = "ro"
+    tool = "executor" && executorModeFromHookInput input = "ro"
 
 let private bookkeeperInput (input: obj) : string =
-    let args = Dyn.get input "args"
+    let args = argsFromHookInput input
     if Dyn.isNullish args then "" else JS.JSON.stringify args
 
-let toolExecuteAfterFor (host: Host) (directory: string) (nudgeHook: VibeFs.Opencode.NudgeHook.NudgeHook) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (registry: ChildAgentRegistry) (input: obj) (output: obj) : JS.Promise<unit> =
+let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserver: VibeFs.Opencode.SessionLifecycleObserver.SessionLifecycleObserver) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (registry: ChildAgentRegistry) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
-        do! appendSyntaxDiagnostics directory input output
-        let tool = Dyn.str input "tool"
-        let sessionID = Dyn.str input "sessionID"
-        let succeeded = Dyn.str output "error" = ""
-        let originalOutput = Dyn.str output "output"
+        do! appendSyntaxDiagnostics pluginDirectory input output
+        let tool = toolNameFromHookInput input
+        let sessionID = (fromOpencode input pluginDirectory).Execution.SessionId
+        let succeeded = hookOutputError output = ""
+        let originalOutput = hookOutputText output
         if succeeded && recordsToBookkeeper tool && not (isReadOnlyExecutor tool input) && (registry.LookupChildAgent sessionID).IsNone then
             knowledgeGraphRuntime.StartBookkeeperAppend(bookkeeperInput input, bodyForBookkeeper originalOutput, tool, parentSessionID = sessionID)
-            setOutput output (withBookkeepingHints originalOutput)
-        do! nudgeHook.handleToolExecuteAfter input output
+            setHookOutputString output (withBookkeepingHints originalOutput)
+        do! lifecycleObserver.handleToolExecuteAfter input output
     }

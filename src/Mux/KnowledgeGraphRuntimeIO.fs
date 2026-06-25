@@ -7,7 +7,7 @@ open VibeFs.Shell
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.KnowledgeGraphPortLock
+open VibeFs.Shell.KnowledgeGraphStorage
 open VibeFs.Shell.Dyn
 
 let buildEntries (root: string) (drafts: KnowledgeGraphDraft list) : JS.Promise<Result<KnowledgeGraphEntry list, string>> =
@@ -53,17 +53,16 @@ let tryResolveJobContext (getChatHistory: (string -> JS.Promise<obj array>) opti
 let submitForKind (root: string) (todayStr: string) (entries: KnowledgeGraphEntry list) (kind: KnowledgeGraphJobKind)
                  : JS.Promise<string> =
     promise {
-        let! result = withKnowledgeGraphPortLock 30000L 1000 root (fun () ->
-            promise {
-                match kind with
-                | AppendAfterWork ->
-                    do! appendEntries root todayStr entries
-                    return $"Appended {entries.Length} knowledge graph entries."
-                | DailyRewrite date ->
-                    do! rewriteDay root date entries
-                    return $"Rewrote knowledge graph day {date}."
-            })
+        let! result =
+            match kind with
+            | AppendAfterWork ->
+                appendDrafts defaultPortLockTimeoutMs defaultPortLockRetryDelayMs root todayStr entries
+            | DailyRewrite date ->
+                rewriteDayUnderLock defaultPortLockTimeoutMs defaultPortLockRetryDelayMs root date entries
         match result with
         | Error e -> return e
-        | Ok msg -> return msg
+        | Ok () ->
+            match kind with
+            | AppendAfterWork -> return $"Appended {entries.Length} knowledge graph entries."
+            | DailyRewrite date -> return $"Rewrote knowledge graph day {date}."
     }

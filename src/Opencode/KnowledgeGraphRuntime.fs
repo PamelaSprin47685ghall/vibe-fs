@@ -9,11 +9,15 @@ open VibeFs.Kernel.KnowledgeGraphPrompts
 open VibeFs.Kernel.KnowledgeGraphMaintenance
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Shell.KnowledgeGraphFiles
+open VibeFs.Shell.KnowledgeGraphStorage
+open VibeFs.Shell.KnowledgeGraphWorkflow
+open VibeFs.Shell.KnowledgeGraphMaintenanceRun
+open VibeFs.Shell.KnowledgeGraphBookkeeperLaunch
+open VibeFs.Shell.KnowledgeGraphRuntimeTestPorts
 open VibeFs.Shell.PromiseQueue
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Opencode.KnowledgeGraphRuntimeIO
-open VibeFs.Mux.AiSettings
-open VibeFs.Shell.Dyn
+open VibeFs.Shell.DelegatedAiSettings
 
 /// KnowledgeGraph host IO shell (P53/P72): holds the single mutable state cell and
 /// serializes every state+IO change through `commandQueue`. All pure state
@@ -28,7 +32,6 @@ open VibeFs.Shell.Dyn
 type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: unit -> System.DateTime, registry: ChildAgentRegistry, portLockTimeoutMs: int64, portLockRetryDelayMs: int) =
     let mutable state = initialKnowledgeGraphState
     let commandQueue = SerialQueue()
-    let backgroundJobs = ResizeArray<JS.Promise<unit>>()
     let mutable writeQueues = Map.empty<string, SerialQueue>
     let mutable registeredJobs = Map.empty<string, KnowledgeGraphJobContext>
     let workspaceRoot = initialWorkspaceRoot
@@ -36,6 +39,9 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
     let today () = (nowUtc ()).ToString("yyyy-MM-dd")
 
     let applyCmd (cmd: KnowledgeGraphCommand) : unit = state <- reducer state cmd
+
+    let backgroundSink =
+        createSink (fun title result -> applyCmd (UpdateLatestLaunchResultCmd (title, result)))
 
     let getWorkspaceQueue (root: string) =
         match Map.tryFind root writeQueues with
@@ -51,15 +57,25 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
     let effectiveWorkspaceRoot (value: string) : string =
         if System.String.IsNullOrWhiteSpace value then workspaceRoot else value
 
-    let recordBackgroundResult title result =
-        applyCmd (UpdateLatestLaunchResultCmd (title, result))
-
-    let startBackgroundJob (job: JS.Promise<unit>) : unit =
-        backgroundJobs.Add(job)
-        job |> Promise.start
+    let testPorts =
+        createFromStateQueueSink
+            (fun () -> state)
+            (fun s -> state <- s)
+            (fun work -> commandQueue.Enqueue work)
+            backgroundSink
 
     let launchBg root parentID kind title buildPrompt aiSettings =
-        queueBackgroundLaunch client startBackgroundJob (recordBackgroundResult title) root parentID kind title buildPrompt aiSettings registry
+        queueBackgroundLaunch
+            client
+            (trackBackgroundJob backgroundSink)
+            (recordLaunchResult backgroundSink title)
+            root
+            parentID
+            kind
+            title
+            buildPrompt
+            aiSettings
+            registry
 
     member _.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<KnowledgeGraphProjection> =
         if sessionID = "" then Promise.lift Map.empty
@@ -69,33 +85,13 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
                     match Map.tryFind sessionID state.sessionSnapshots with
                     | Some projection -> return projection
                     | None ->
-                        let! projection = readProjection (effectiveWorkspaceRoot directory)
+                        let! projection = readProjectionForRoot (effectiveWorkspaceRoot directory)
                         applyCmd (CacheSnapshotCmd (sessionID, projection))
                         return projection
                 })
 
     member _.RegisterJob(_sessionID: string, _ctx: KnowledgeGraphJobContext) : unit =
         registeredJobs <- Map.add _sessionID _ctx registeredJobs
-
-    member this.RegisterJobForTesting(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =
-        let payloadObj: obj = payload
-
-        let readRequiredField (fieldName: string) : string =
-            let value = str payloadObj fieldName
-            if value.Trim() = "" then failwith $"Knowledge graph job payload missing required field '{fieldName}'"
-            else value.Trim()
-
-        let kind =
-            let normalizedTag = kindTag.Trim().ToLowerInvariant()
-            let builders =
-                Map [
-                    "append", fun () -> AppendAfterWork
-                    "daily", fun () -> DailyRewrite(readRequiredField "date")
-                ]
-            match Map.tryFind normalizedTag builders with
-            | Some build -> build ()
-            | None -> failwith $"Unknown knowledge graph job kind: {normalizedTag}"
-        this.RegisterJob(sessionID, { workspaceRoot = workspaceRoot; kind = kind })
 
     member _.TakeJob(_sessionID: string) : KnowledgeGraphJobContext option =
         Map.tryFind _sessionID registeredJobs
@@ -162,26 +158,17 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
         }
     member _.StartMaintenanceIfDue(workspaceRoot: string, ?parentSessionID: string) : JS.Promise<unit> =
         let root = effectiveWorkspaceRoot workspaceRoot
-        if not (knowledgeGraphDirExists root) then Promise.lift ()
-        else
-            commandQueue.Enqueue(fun () ->
-                promise {
-                    let! files = readKnowledgeGraphFiles root
-                    let projection = projectLatestWins files
-                    let dailyDue = dueMaintenance files (nowUtc ())
-
-                    let launchIfDue (due: string list) kind title resultPrefix promptInfix buildPrompt =
-                        due
-                        |> List.iter (fun value ->
-                            let key = root + "|" + resultPrefix + "|" + value
-                            let launch = { agent = "bookkeeper"; title = title; prompt = $"{resultPrefix} maintenance due {promptInfix} {value}"; result = $"{resultPrefix}:{value}" }
-                            let first, nextState = recordLaunchOnce state key launch
-                            state <- nextState
-                            if first then
-                                launchBg root parentSessionID (kind value) title (fun () -> Promise.lift (buildPrompt value files projection)) emptySettings)
-
-                    launchIfDue dailyDue DailyRewrite "Daily knowledge graph rewrite" "daily" "for" buildDailyPrompt
-                })
+        runMaintenanceIfDue commandQueue
+            { WorkspaceRoot = root
+              GetState = fun () -> state
+              SetState = fun s -> state <- s
+              Now = nowUtc
+              TryLaunch =
+                fun date files projection ->
+                    let _, launch = bookkeeperMaintenanceLaunch root date
+                    launchBg root parentSessionID (DailyRewrite date) launch.title
+                        (fun () -> Promise.lift (buildDailyPrompt date files projection))
+                        emptySettings }
 
     member _.RecordBookkeeperLaunch(agent: string, title: string, prompt: string, result: string) : unit =
         applyCmd (RecordLaunchCmd { agent = agent; title = title; prompt = prompt; result = result })
@@ -195,25 +182,8 @@ type KnowledgeGraphRuntime(client: obj, initialWorkspaceRoot: string, nowUtc: un
             this.StartMaintenanceIfDue(root, ?parentSessionID = parentSessionID) |> ignore
             launchBg root parentSessionID AppendAfterWork title (fun () ->
                 promise {
-                    let! projection = readProjection root
+                    let! projection = readProjectionForRoot root
                     return buildAppendPrompt title prompt result projection
                 }) settings
 
-    /// Test-only projection: drains recorded bookkeeper launches so integration
-    /// tests can assert what the runtime would have fired. Kept on the production
-    /// type because IntegrationToolTests reaches it through the duck-typed
-    /// __knowledgeGraphRuntime surface; it performs no IO and mutates only the test buffer.
-    member _.TakeBookkeeperLaunchesForTesting() : obj array =
-        let launches, nextState = drainLaunches state
-        state <- nextState
-        launches |> List.map box |> List.toArray
-
-    member _.WaitForBackgroundJobsForTesting() : JS.Promise<unit> =
-        promise {
-            do! commandQueue.Enqueue(fun () -> Promise.lift ())
-            let jobs = backgroundJobs |> Seq.toArray
-            backgroundJobs.Clear()
-            if jobs.Length > 0 then
-                let! _ = Promise.all jobs
-                return ()
-        }
+    member internal _.CreateTestPorts() : KnowledgeGraphRuntimeTestPorts = testPorts

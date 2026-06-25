@@ -13,6 +13,8 @@ open VibeFs.Mux.AiSettings
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.Dyn
+open VibeFs.Kernel.Domain
+open VibeFs.Kernel.ToolResult
 open VibeFs.Kernel.ToolOutputInfo
 
 
@@ -39,14 +41,14 @@ let toolDefinitionSpec () = promise {
     let reportSchema = get todoProps "completedWorkReport"
     let required = unbox<obj[]> (get todoSchema "required") |> Array.map string
     check "tool.definition builds todo report field" (str reportSchema "type" = "string")
-    check "tool.definition builds todo report description" (str reportSchema "description" = VibeFs.Kernel.MagicTodo.reportDesc)
+    check "tool.definition builds todo report description" (str reportSchema "description" = VibeFs.Kernel.WorkBacklog.reportDesc)
     check "tool.definition requires todo report" (required |> Array.contains "completedWorkReport")
     check "tool.definition requires todos" (required |> Array.contains "todos")
-    check "tool.definition builds todos description" (str (get todoProps "todos") "description" = VibeFs.Kernel.MagicTodo.todosDesc)
+    check "tool.definition builds todos description" (str (get todoProps "todos") "description" = VibeFs.Kernel.WorkBacklog.todosDesc)
     let todoItemProps = get (get (get todoProps "todos") "items") "properties"
-    check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = VibeFs.Kernel.MagicTodo.todoContentDesc)
-    check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = VibeFs.Kernel.MagicTodo.todoStatusDesc)
-    check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Kernel.MagicTodo.todoPriorityDesc)
+    check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = VibeFs.Kernel.WorkBacklog.todoContentDesc)
+    check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = VibeFs.Kernel.WorkBacklog.todoStatusDesc)
+    check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Kernel.WorkBacklog.todoPriorityDesc)
 
     let! mimoP = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let mimoTd = get mimoP "tool.definition"
@@ -110,6 +112,15 @@ let mimoApplyPatchExecuteBeforeSpec () = promise {
     let correctArgsOut = createObj [ "args", box (createObj [ "patchText", box "already-correct" ]) ]
     do! teb $ (createObj [ "tool", box "apply_patch"; "sessionID", box "s1"; "callID", box "c3" ], correctArgsOut) |> unbox<JS.Promise<unit>>
     check "mimo apply_patch execute.before preserves patchText" (str (get correctArgsOut "args") "patchText" = "already-correct")
+
+    let invalidArgsOut = createObj [ "args", box (createObj []) ]
+    do! teb $ (createObj [ "tool", box "apply_patch"; "sessionID", box "s1"; "callID", box "c4" ], invalidArgsOut) |> unbox<JS.Promise<unit>>
+    let errText = str invalidArgsOut "error"
+    let expected =
+        wireEncodeToolError "apply_patch" (InvalidIntent ("apply_patch", "patchText", "required"))
+    check "mimo apply_patch execute.before invalid args sets error" (errText <> "")
+    check "mimo apply_patch execute.before error uses wireEncodeToolError InvalidIntent" (errText = expected)
+
     do! rmAsync workspaceDir
 }
 

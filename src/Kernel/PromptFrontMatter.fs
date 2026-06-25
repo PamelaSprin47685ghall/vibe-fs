@@ -68,30 +68,19 @@ let yamlStringValue (value: string) : string =
     elif needsQuotes s then quoteDouble s
     else s
 
-/// `key: value` at document indent (no leading spaces on the key line).
-let yamlField (key: string) (value: string) : string =
+let private yamlKeyedField (linePrefix: string) (key: string) (value: string) (blockLinePrefix: string) : string =
     let s = normalized value
     if hasLineBreak s then
-        key + ": |\n" + blockBody s "  "
+        linePrefix + key + ": |\n" + blockBody s blockLinePrefix
     else
-        key + ": " + yamlStringValue s
+        linePrefix + key + ": " + yamlStringValue s
 
-/// Nested field under a mapping entry, e.g. `    content: |` under a list item.
-let yamlNestedField (key: string) (value: string) (indent: string) : string =
-    let s = normalized value
-    if hasLineBreak s then
-        indent + key + ": |\n" + blockBody s (indent + "  ")
-    else
-        indent + key + ": " + yamlStringValue s
+/// `key: value` at document indent (no leading spaces on the key line).
+let yamlField (key: string) (value: string) : string = yamlKeyedField "" key value "  "
 
 /// List item `  - key: value` or `  - key: |` with body indented under the item.
 let yamlListItemField (key: string) (value: string) (listMarkerIndent: string) : string =
-    let s = normalized value
-    let prefix = listMarkerIndent + "- "
-    if hasLineBreak s then
-        prefix + key + ": |\n" + blockBody s (listMarkerIndent + "  ")
-    else
-        prefix + key + ": " + yamlStringValue s
+    yamlKeyedField (listMarkerIndent + "- ") key value (listMarkerIndent + "  ")
 
 let yamlSeqField (key: string) (items: string list) : string =
     if items.IsEmpty then key + ": []" else key + ":\n" + String.concat "\n" items

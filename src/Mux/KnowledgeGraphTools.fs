@@ -14,8 +14,14 @@ open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.MessagingCodec
 open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.KnowledgeGraphPortLock
+open VibeFs.Shell.KnowledgeGraphStorage
+open VibeFs.Shell.KnowledgeGraphWorkflow
+open VibeFs.Shell.KnowledgeGraphMaintenanceRun
+open VibeFs.Shell.KnowledgeGraphBookkeeperLaunch
+open VibeFs.Shell.KnowledgeGraphRuntimeTestPorts
 open VibeFs.Shell.PromiseQueue
+open VibeFs.Shell.ToolRuntimeContext
+open VibeFs.Shell.ToolContextCodec
 open VibeFs.Shell.Dyn
 open VibeFs.Mux.KnowledgeGraphRuntimeIO
 
@@ -23,9 +29,18 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
     let mutable registeredJobs = Map.empty<string, KnowledgeGraphJobContext>
     let writeQueue = SerialQueue()
     let commandQueue = SerialQueue()
-    let backgroundJobs = ResizeArray<JS.Promise<unit>>()
     let mutable state = initialKnowledgeGraphState
+    let backgroundSink =
+        createSink (fun title result ->
+            state <- reducer state (UpdateLatestLaunchResultCmd (title, result)))
     let mutable latestConfig : obj option = None
+
+    let testPorts =
+        createFromStateQueueSink
+            (fun () -> state)
+            (fun s -> state <- s)
+            (fun work -> commandQueue.Enqueue work)
+            backgroundSink
 
     let getChatHistory =
         match deps with
@@ -36,25 +51,20 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
             else None
         | _ -> None
 
-    let recordBackgroundResult title result =
-        state <- reducer state (UpdateLatestLaunchResultCmd (title, result))
-
-    let startBackgroundJob (job: JS.Promise<unit>) : unit =
-        backgroundJobs.Add(job)
-        job |> Promise.start
-
-    let launchBg root kind title promptText =
+    let launchBg root _kind title buildPrompt =
         match latestConfig with
         | Some cfg ->
             let options = Some (box {| aiSettingsAgentId = "bookkeeper" |})
-            promise {
-                try
-                    let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
-                    recordBackgroundResult title "success"
-                with ex ->
-                    recordBackgroundResult title (string ex)
-            }
-            |> startBackgroundJob
+            queueMuxBackgroundLaunch
+                deps
+                cfg
+                "bookkeeper"
+                title
+                options
+                (trackBackgroundJob backgroundSink)
+                (recordLaunchResult backgroundSink title)
+                buildPrompt
+                delegateToSubAgent
         | None -> ()
 
     member _.TryResolveJobContext(sessionID: string) : JS.Promise<KnowledgeGraphJobContext option> =
@@ -68,7 +78,7 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
                     match Map.tryFind sessionID state.sessionSnapshots with
                     | Some projection -> return projection
                     | None ->
-                        let! projection = readProjection directory
+                        let! projection = readProjectionForRoot directory
                         state <- reducer state (CacheSnapshotCmd (sessionID, projection))
                         return projection
                 })
@@ -83,27 +93,19 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
         registeredJobs <- Map.remove sessionID registeredJobs
 
     member this.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
-        if not (knowledgeGraphDirExists workspaceRoot) then Promise.lift ()
-        else
-            commandQueue.Enqueue(fun () ->
-                promise {
-                    let! files = readKnowledgeGraphFiles workspaceRoot
-                    let projection = projectLatestWins files
-                    let dailyDue = dueMaintenance files System.DateTime.UtcNow
-
-                    let launchIfDue (due: string list) kind title resultPrefix promptInfix buildPrompt =
-                        due
-                        |> List.iter (fun value ->
-                            let key = workspaceRoot + "|" + resultPrefix + "|" + value
-                            let launch = { agent = "bookkeeper"; title = title; prompt = $"{resultPrefix} maintenance due {promptInfix} {value}"; result = $"{resultPrefix}:{value}" }
-                            let first, nextState = recordLaunchOnce state key launch
-                            state <- nextState
-                            if first then
-                                let promptText = prependJobMarker { workspaceRoot = workspaceRoot; kind = kind value } (buildPrompt value files projection)
-                                launchBg workspaceRoot (kind value) title promptText)
-
-                    launchIfDue dailyDue DailyRewrite "Daily knowledge graph rewrite" "daily" "for" buildDailyPrompt
-                })
+        runMaintenanceIfDue commandQueue
+            { WorkspaceRoot = workspaceRoot
+              GetState = fun () -> state
+              SetState = fun s -> state <- s
+              Now = fun () -> System.DateTime.UtcNow
+              TryLaunch =
+                fun date files projection ->
+                    let _, launch = bookkeeperMaintenanceLaunch workspaceRoot date
+                    launchBg workspaceRoot (DailyRewrite date) launch.title (fun () ->
+                        Promise.lift (
+                            prependJobMarker { workspaceRoot = workspaceRoot; kind = DailyRewrite date }
+                                (buildDailyPrompt date files projection)))
+            }
 
     member this.Submit(sessionID: string, directory: string, drafts: KnowledgeGraphDraft list, ?config: obj) : JS.Promise<string> =
         if not (knowledgeGraphDirExists directory) then Promise.lift "Knowledge graph directory not found."
@@ -165,8 +167,9 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
         let root =
             match config with
             | Some cfg when not (Dyn.isNullish cfg) ->
-                let dir = Dyn.str cfg "directory"
-                if dir <> "" then dir else defaultArg (strField cfg "cwd") ""
+                match fromMuxConfig cfg with
+                | Ok runtime -> runtime.Execution.Directory
+                | Error _ -> muxConfigDirectoryFallback cfg
             | _ -> ""
         if root = "" || not (knowledgeGraphDirExists root) then ()
         else
@@ -175,44 +178,28 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
             | Some cfg when not (Dyn.isNullish cfg) -> latestConfig <- Some cfg
             | _ -> ()
             this.StartMaintenanceIfDue(root) |> ignore
-            if not (Dyn.isNullish deps) then
-                match latestConfig with
-                | Some cfg when not (Dyn.isNullish cfg) ->
-                    promise {
-                        try
-                            let! projection = readProjection root
-                            let promptText = prependJobMarker { workspaceRoot = root; kind = AppendAfterWork } (buildAppendPrompt title prompt result projection)
-                            let options = Some (box {| aiSettingsAgentId = "bookkeeper" |})
-                            let! _ = delegateToSubAgent deps cfg "bookkeeper" promptText title options
-                            recordBackgroundResult title "success"
-                        with ex ->
-                            recordBackgroundResult title (string ex)
-                    }
-                    |> startBackgroundJob
-                | _ -> ()
+            match latestConfig with
+            | Some cfg when not (Dyn.isNullish deps) && not (Dyn.isNullish cfg) ->
+                let options = Some (box {| aiSettingsAgentId = "bookkeeper" |})
+                queueMuxBackgroundLaunch
+                    deps
+                    cfg
+                    "bookkeeper"
+                    title
+                    options
+                    (trackBackgroundJob backgroundSink)
+                    (recordLaunchResult backgroundSink title)
+                    (fun () ->
+                        promise {
+                            let! projection = readProjectionForRoot root
+                            return
+                                prependJobMarker { workspaceRoot = root; kind = AppendAfterWork }
+                                    (buildAppendPrompt title prompt result projection)
+                        })
+                    delegateToSubAgent
+            | _ -> ()
 
-    member _.TakeBookkeeperLaunchesForTesting() : obj array =
-        let launches, nextState = drainLaunches state
-        state <- nextState
-        launches
-        |> List.map (fun l ->
-            box (createObj [
-                "agent", box l.agent
-                "title", box l.title
-                "prompt", box l.prompt
-                "result", box l.result
-            ]))
-        |> List.toArray
-
-    member _.WaitForBackgroundJobsForTesting() : JS.Promise<unit> =
-        promise {
-            do! commandQueue.Enqueue(fun () -> Promise.lift ())
-            let jobs = backgroundJobs |> Seq.toArray
-            backgroundJobs.Clear()
-            if jobs.Length > 0 then
-                let! _ = Promise.all jobs
-                return ()
-        }
+    member internal _.CreateTestPorts() : KnowledgeGraphRuntimeTestPorts = testPorts
 
     member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
         promise {
@@ -229,7 +216,7 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
             elif not (knowledgeGraphDirExists directory) then
                 return "Knowledge graph directory not found."
             elif sessionID = "" then
-                let! projection = readProjection directory
+                let! projection = readProjectionForRoot directory
                 match fetchAnswer projection entity with
                 | Ok answer -> return answer
                 | Error message -> return message
@@ -240,30 +227,4 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
                 | Error message -> return message
         }
 
-    member this.RegisterJobForTesting(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =
-        if System.String.IsNullOrWhiteSpace workspaceRoot then
-            failwith "Knowledge graph job workspaceRoot must be a non-empty directory path."
-
-        let payloadObj = payload
-
-        let readRequiredField (fieldName: string) : string =
-            let value = Dyn.str payloadObj fieldName
-            if value.Trim() = "" then failwith $"Knowledge graph job payload missing required field '{fieldName}'"
-            else value.Trim()
-
-        let kind =
-            let normalizedTag = kindTag.Trim().ToLowerInvariant()
-            let builders =
-                Map [
-                    "append", fun () -> AppendAfterWork
-                    "daily", fun () -> DailyRewrite(readRequiredField "date")
-                ]
-            match Map.tryFind normalizedTag builders with
-            | Some build -> build ()
-            | None -> failwith $"Unknown knowledge graph job kind: {normalizedTag}"
-
-        this.RegisterJob(sessionID, { workspaceRoot = workspaceRoot; kind = kind })
-
     member val startMaintenanceIfDue = System.Func<string, JS.Promise<unit>>(fun workspaceRoot -> this.StartMaintenanceIfDue(workspaceRoot)) with get, set
-    member val takeBookkeeperLaunchesForTesting = System.Func<obj array>(fun () -> this.TakeBookkeeperLaunchesForTesting()) with get, set
-    member val waitForBackgroundJobsForTesting = System.Func<JS.Promise<unit>>(fun () -> this.WaitForBackgroundJobsForTesting()) with get, set

@@ -3,6 +3,8 @@ module VibeFs.Opencode.MessagingCodec
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Shell
+open VibeFs.Shell.MessagingPartCodec
+open VibeFs.Shell.MessagingEncodeHelpers
 
 open VibeFs.Kernel.Messaging
 open VibeFs.Shell.Dyn
@@ -10,36 +12,16 @@ open VibeFs.Shell.Dyn
 /// The single FFI boundary between host message objects and the strongly-typed
 /// Kernel tree. All Dyn/JsInterop access for the message chain lives here.
 
-let decodeToolState (state: obj) : ToolState<obj> option =
-    if isNullish state then None
-    else
-        let input = get state "input"
-        let operation = if isNullish input then null else get input "operation"
-        let operationAction = if isNullish operation then "" else str operation "action"
-        Some
-            { status = str state "status"
-              output = str state "output"
-              error = str state "error"
-              input = input
-              operationAction = operationAction }
-
-let private partDecoders: Map<string, obj -> Part<obj>> =
-    Map [
-        "text", fun part -> TextPart (str part "text")
-    ]
+let decodeToolState (state: obj) : ToolState<obj> option = decodeOpencodeToolStateBox state
 
 let decodePart (part: obj) : Part<obj> =
-    let typ = str part "type"
-    match Map.tryFind typ partDecoders with
-    | Some decode -> decode part
-    | None ->
-        match typ with
-        | "tool" -> ToolPart (str part "tool", str part "callID", decodeToolState (get part "state"), part)
-        | _ -> RawPart part
+    match str part "type" with
+    | "text" -> TextPart (decodeTextPart part)
+    | "tool" -> ToolPart (str part "tool", str part "callID", decodeToolState (get part "state"), part)
+    | _ -> RawPart part
 
 let decodeParts (parts: obj) : Part<obj> list =
-    if isNullish parts || not (isArray parts) then []
-    else (parts :?> obj array) |> Array.map decodePart |> List.ofArray
+    decodePartsFromArray parts |> Array.map decodePart |> List.ofArray
 
 let decodeMessage (msg: obj) : Message<obj> option =
     if isNullish msg then None
@@ -137,7 +119,7 @@ let encodeMessage (msg: Message<obj>) : obj =
             && (let arr = rawParts :?> obj array
                 arr.Length = encodedParts.Length && Array.forall2 (fun a b -> obj.ReferenceEquals(a, b)) arr encodedParts)
         if partsUnchanged then msg.raw
-        else withKey msg.raw "parts" (box encodedParts)
+        else replacePartsOnRawMessage msg.raw encodedParts
 
 let encodeMessages (messages: Message<obj> list) : obj array =
     messages |> List.map encodeMessage |> List.toArray
