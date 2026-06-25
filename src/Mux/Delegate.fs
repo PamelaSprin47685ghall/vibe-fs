@@ -20,11 +20,6 @@ let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
 let private taskWait (taskService: obj) (taskId: string) (opts: obj) : JS.Promise<obj> =
     unbox<JS.Promise<obj>>(taskService?waitForAgentReport(taskId, opts))
 
-type DelegateOutcome =
-    | Report of string
-    | TimedOut
-
-
 let private createInput
     (workspaceId: WorkspaceId)
     (agentId: string)
@@ -167,38 +162,9 @@ let runMuxSubagent
     : JS.Promise<string> =
     delegateToSubAgent deps config agentId prompt title options
 
-let delegateWithTimeout
-    (deps: obj)
-    (config: obj)
-    (agentId: string)
-    (prompt: string)
-    (title: string)
-    (options: obj option)
-    (timeoutMs: int)
-    : JS.Promise<DelegateOutcome> =
-    promise {
-        let controller = new AbortController()
-        let signal = controller.signal
-        let configWithSignal = Dyn.withKey config "abortSignal" signal
+open VibeFs.Mux.DelegateTimeout
 
-        let workPromise =
-            promise {
-                let! report = delegateToSubAgent deps configWithSignal agentId prompt title options
-                return box (Report report)
-            }
+type DelegateOutcome = DelegateTimeout.DelegateOutcome
 
-        let timeoutPromise =
-            promise {
-                do! Promise.sleep timeoutMs
-                controller.abort()
-                return box TimedOut
-            }
-
-        try
-            let! winner = Promise.race [| workPromise; timeoutPromise |]
-            return unbox<DelegateOutcome> winner
-        with err ->
-            match translateJsError err with
-            | MessageAborted -> return TimedOut
-            | _ -> return! Promise.reject err
-    }
+let delegateWithTimeout deps config agentId prompt title options timeoutMs =
+    DelegateTimeout.delegateWithTimeout delegateToSubAgent deps config agentId prompt title options timeoutMs

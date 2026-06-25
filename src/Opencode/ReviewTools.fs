@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Shell
 
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.LoopMessages

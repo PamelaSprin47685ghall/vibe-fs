@@ -15,14 +15,14 @@ let knowledgeGraphRuntimeUsesWorkflow () =
         (opencode.Contains "recordLaunchResult")
     check "arch: Opencode KnowledgeGraphRuntime no local ResizeArray backgroundJobs"
         (not (opencode.Contains "let backgroundJobs = ResizeArray"))
-    let mux = requireFile "src/Mux/KnowledgeGraphTools.fs" |> nonCommentCode
-    check "arch: Mux KnowledgeGraphTools opens KnowledgeGraphWorkflow"
+    let mux = requireFile "src/Mux/KnowledgeGraphRuntimeMux.fs" |> nonCommentCode
+    check "arch: Mux KnowledgeGraphRuntimeMux opens KnowledgeGraphWorkflow"
         (mux.Contains "KnowledgeGraphWorkflow")
-    check "arch: Mux KnowledgeGraphTools uses trackBackgroundJob"
+    check "arch: Mux KnowledgeGraphRuntimeMux uses trackBackgroundJob"
         (mux.Contains "trackBackgroundJob")
-    check "arch: Mux KnowledgeGraphTools uses recordLaunchResult"
+    check "arch: Mux KnowledgeGraphRuntimeMux uses recordLaunchResult"
         (mux.Contains "recordLaunchResult")
-    check "arch: Mux KnowledgeGraphTools no local ResizeArray backgroundJobs"
+    check "arch: Mux KnowledgeGraphRuntimeMux no local ResizeArray backgroundJobs"
         (not (mux.Contains "let backgroundJobs = ResizeArray"))
 
 let knowledgeGraphBookkeeperLaunchInShell () =
@@ -41,12 +41,12 @@ let knowledgeGraphBookkeeperLaunchInShell () =
         (opencode.Contains "KnowledgeGraphBookkeeperLaunch")
     check "arch: Opencode KnowledgeGraphRuntime calls queueBackgroundLaunch"
         (opencode.Contains "queueBackgroundLaunch")
-    let mux = requireFile "src/Mux/KnowledgeGraphTools.fs" |> nonCommentCode
-    check "arch: Mux KnowledgeGraphTools calls queueMuxBackgroundLaunch"
+    let mux = requireFile "src/Mux/KnowledgeGraphRuntimeMux.fs" |> nonCommentCode
+    check "arch: Mux KnowledgeGraphRuntimeMux calls queueMuxBackgroundLaunch"
         (mux.Contains "queueMuxBackgroundLaunch")
-    check "arch: Mux KnowledgeGraphTools no inline delegate bookkeeper trackBackgroundJob block"
+    check "arch: Mux KnowledgeGraphRuntimeMux no inline delegate bookkeeper trackBackgroundJob block"
         (not (mux.Contains "delegateToSubAgent deps cfg \"bookkeeper\""))
-    for path in [| "src/Opencode/KnowledgeGraphRuntime.fs"; "src/Mux/KnowledgeGraphTools.fs" |] do
+    for path in [| "src/Opencode/KnowledgeGraphRuntime.fs"; "src/Mux/KnowledgeGraphRuntimeMux.fs" |] do
         let code = requireFile path |> nonCommentCode
         check ("arch: " + path + " no TestObservation type")
             (not (code.Contains "TestObservation"))
@@ -56,7 +56,7 @@ let knowledgeGraphBookkeeperLaunchInShell () =
             (code.Contains "CreateTestPorts")
 
 let knowledgeGraphRuntimeNoLocalLaunchIfDue () =
-    for path in [| "src/Opencode/KnowledgeGraphRuntime.fs"; "src/Mux/KnowledgeGraphTools.fs" |] do
+    for path in [| "src/Opencode/KnowledgeGraphRuntime.fs"; "src/Mux/KnowledgeGraphRuntimeMux.fs" |] do
         let code = requireFile path |> nonCommentCode
         check ("arch: " + path + " uses runMaintenanceIfDue")
             (code.Contains "runMaintenanceIfDue")
@@ -77,24 +77,24 @@ let knowledgeGraphSessionMessagesNotInRuntimeIO () =
 
 let knowledgeGraphRuntimeNoTestDrainMembers () =
     let opencode = requireFile "src/Opencode/KnowledgeGraphRuntime.fs" |> nonCommentCode
-    let mux = requireFile "src/Mux/KnowledgeGraphTools.fs" |> nonCommentCode
+    let mux = requireFile "src/Mux/KnowledgeGraphRuntimeMux.fs" |> nonCommentCode
     check "arch: Opencode KnowledgeGraphRuntime no takeBookkeeperLaunchesForTesting"
         (not (opencode.Contains "takeBookkeeperLaunchesForTesting"))
     check "arch: Opencode KnowledgeGraphRuntime no clearBackgroundJobsForTesting"
         (not (opencode.Contains "clearBackgroundJobsForTesting"))
-    check "arch: Mux KnowledgeGraphTools no takeBookkeeperLaunchesForTesting"
+    check "arch: Mux KnowledgeGraphRuntimeMux no takeBookkeeperLaunchesForTesting"
         (not (mux.Contains "takeBookkeeperLaunchesForTesting"))
-    check "arch: Mux KnowledgeGraphTools no clearBackgroundJobsForTesting"
+    check "arch: Mux KnowledgeGraphRuntimeMux no clearBackgroundJobsForTesting"
         (not (mux.Contains "clearBackgroundJobsForTesting"))
 
 let knowledgeGraphRuntimeNoSwapStateMembers () =
     let opencode = requireFile "src/Opencode/KnowledgeGraphRuntime.fs" |> nonCommentCode
-    let mux = requireFile "src/Mux/KnowledgeGraphTools.fs" |> nonCommentCode
+    let mux = requireFile "src/Mux/KnowledgeGraphRuntimeMux.fs" |> nonCommentCode
     check "arch: Opencode KnowledgeGraphRuntime no swapStateForTesting"
         (not (opencode.Contains "swapStateForTesting"))
     check "arch: Opencode KnowledgeGraphRuntime no restoreStateForTesting"
         (not (opencode.Contains "restoreStateForTesting"))
-    check "arch: Mux KnowledgeGraphTools no swapStateForTesting"
+    check "arch: Mux KnowledgeGraphRuntimeMux no swapStateForTesting"
         (not (mux.Contains "swapStateForTesting"))
-    check "arch: Mux KnowledgeGraphTools no restoreStateForTesting"
+    check "arch: Mux KnowledgeGraphRuntimeMux no restoreStateForTesting"
         (not (mux.Contains "restoreStateForTesting"))

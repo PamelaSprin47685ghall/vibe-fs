@@ -6,6 +6,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.ToolCatalog
@@ -19,6 +20,7 @@ open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
 open VibeFs.Shell
+open VibeFs.Shell.PromiseStr
 open VibeFs.Shell.Dyn
 
 let private extractHistoryTexts (history: obj array) : string list =

@@ -2,6 +2,7 @@ module VibeFs.Kernel.KnowledgeGraphMaintenance
 
 open System
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
 
 /// Pure knowledge graph maintenance scheduling. Given the current knowledge graph files and a clock

@@ -7,6 +7,7 @@ open VibeFs.Kernel.Config
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Kernel.Domain
 open VibeFs.Shell.ReviewRuntime
@@ -104,9 +105,9 @@ let private loopReviewExecute
         promise {
             let! outcome = precheckReview deps toolNames workspaceId task
             match outcome with
-            | TimedOut ->
+            | DelegateTimeout.TimedOut ->
                 return buildLoopMessage task [ "With-Review Mode was NOT activated because the pre-review timed out. Please retry /loop-review." ]
-            | Report markdown ->
+            | DelegateTimeout.Report markdown ->
                 let isPass, feedback =
                     match parseReviewReportMarkdown markdown with
                     | Accepted -> true, ""

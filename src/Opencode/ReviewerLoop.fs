@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Opencode.SessionIo
 open VibeFs.Shell

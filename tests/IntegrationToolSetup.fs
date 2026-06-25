@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 
 open VibeFs.Mux.Plugin
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.KnowledgeGraphCodec
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Tests.TempWorkspace

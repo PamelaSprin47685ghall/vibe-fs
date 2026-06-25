@@ -2,6 +2,7 @@ module VibeFs.Omp.KnowledgeGraphTools
 
 open Fable.Core.JsInterop
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Omp.Codec
 open VibeFs.Omp.KnowledgeGraphRuntime

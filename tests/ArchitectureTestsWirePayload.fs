@@ -5,13 +5,15 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.ArchitectureTestsSupport
 
-/// `Opencode/NudgeEventCodec.fs` is no longer the implementation site — it is
-/// a thin re-export of the Shell boundary decoder so callers don't churn.
+/// `Shell/OpencodeSessionEventCodec.fs` is the canonical boundary decoder
+/// for Opencode session event payloads. All Opencode consumers (NudgeEffect,
+/// SessionLifecycleObserver, CommandHooks, EventHooks) open it directly.
+/// The `recoverOpenTodosFromMessages` decoder lives in Shell, not scattered
+/// as private `Dyn.get` soup in NudgeEffect.
+///
 /// Guarded by:
 ///  * the Shell codec must exist and declare every decoder
-///  * the Opencode module must consume it (open + no local definitions)
-///  * the `recoverOpenTodosFromMessages` decoder must live in Shell, not in
-///    `Opencode/NudgeEffect.fs` where it used to be a private `Dyn.get` soup.
+///  * consumers must use these decoders, not inline Dyn access
 let opencodeSessionEventCodecExists () =
     let codec = requireFile "src/Shell/OpencodeSessionEventCodec.fs" |> nonCommentCode
     check "arch: OpencodeSessionEventCodec defines getSessionID"
@@ -30,19 +32,6 @@ let opencodeSessionEventCodecExists () =
         (codec.Contains "let recoverOpenTodosFromMessages")
     check "arch: OpencodeSessionEventCodec defines decodeNudgeHostEvent"
         (codec.Contains "let decodeNudgeHostEvent")
-
-let opencodeNudgeEventCodecIsShellAlias () =
-    let alias = requireFile "src/Opencode/NudgeEventCodec.fs" |> nonCommentCode
-    check "arch: Opencode.NudgeEventCodec opens Shell.OpencodeSessionEventCodec"
-        (alias.Contains "open VibeFs.Shell.OpencodeSessionEventCodec")
-    check "arch: Opencode.NudgeEventCodec must not re-implement getSessionID (with params)"
-        (not (alias.Contains "let getSessionID ("))
-    check "arch: Opencode.NudgeEventCodec must not re-implement decodeNudgeHostEvent (with params)"
-        (not (alias.Contains "let decodeNudgeHostEvent ("))
-    check "arch: Opencode.NudgeEventCodec must not re-implement recoverOpenTodosFromMessages (with params)"
-        (not (alias.Contains "let recoverOpenTodosFromMessages ("))
-    check "arch: Opencode.NudgeEventCodec must not Dyn.get props sessionID"
-        (not (alias.Contains "Dyn.str props \"sessionID\""))
 
 let nudgeEffectRecoversViaCodec () =
     let effect = requireFile "src/Opencode/NudgeEffect.fs" |> nonCommentCode

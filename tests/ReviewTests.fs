@@ -2,9 +2,11 @@ module VibeFs.Tests.ReviewTests
 
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.PromptFrontMatter
+open VibeFs.Kernel.ReviewSession.Types
 open VibeFs.Shell.ReviewRuntime
+
+open VibeFs.Tests.ReviewTestsReplay
+open VibeFs.Tests.ReviewTestsPrompts
 
 let transition' () =
     let task = "review-task"
@@ -69,21 +71,13 @@ let runtime () =
     store.clearReviewSessions ()
     check "cleared" (not (store.isReviewActive "w1"))
 
-/// P2-3: pure reviewer-loop primitives.  promptParts must hand out the initial
-/// task prompt on the first attempt and the short nudge prompt on every retry.
 let promptPartsBranches () =
     let initial = [ "task body"; "extra detail" ]
     let nudge = "please answer"
-    let first = promptParts 0 initial nudge
-    equal "first attempt uses initial parts" initial first
-    let retry1 = promptParts 1 initial nudge
-    equal "retry 1 uses nudge" [ nudge ] retry1
-    let retry5 = promptParts 5 initial nudge
-    equal "retry 5 uses nudge" [ nudge ] retry5
+    equal "first attempt uses initial parts" initial (promptParts 0 initial nudge)
+    equal "retry 1 uses nudge" [ nudge ] (promptParts 1 initial nudge)
+    equal "retry 5 uses nudge" [ nudge ] (promptParts 5 initial nudge)
 
-/// resolvePending must (a) fire the resolver, (b) clear the abort suppressor,
-/// and (c) report whether anything was actually waiting.  The suppressor side
-/// effect is what guarantees an aborted reviewer doesn't double-fire.
 let resolvePendingClearsSuppressor () =
     let mutable resolved : ReviewResult option = None
     let mutable suppressed = 0
@@ -91,186 +85,13 @@ let resolvePendingClearsSuppressor () =
         emptyEffects
         |> fun e -> setPending e "child-1" (fun result -> resolved <- Some result)
         |> fun e -> { e with abortSuppressors = Map.add "child-1" (fun () -> suppressed <- suppressed + 1) e.abortSuppressors }
-
     let next, fired = resolvePending effects "child-1" Accepted
     check "fired flag true" fired
     equal "resolver received verdict" (Some Accepted) resolved
     equal "suppressor invoked exactly once" 1 suppressed
     check "pending cleared" (not (Map.containsKey "child-1" next.pendingResolutions))
     check "suppressor cleared" (not (Map.containsKey "child-1" next.abortSuppressors))
-
-    // Resolving an unknown id is a no-op that reports false, never throws.
     let next2, fired2 = resolvePending next "nonexistent" Accepted
     check "unknown id → fired false" (not fired2)
     equal "pending count untouched on unknown id" next.pendingResolutions.Count next2.pendingResolutions.Count
     equal "suppressor count untouched on unknown id" next.abortSuppressors.Count next2.abortSuppressors.Count
-
-/// disposeSessionTree must terminate every listed id, fire each suppressor, and
-/// remove the entries — even when only some ids carry pending resolvers.  This
-/// is the single path the host uses to clean up a whole reviewer subtree on
-/// abort.
-let disposeSessionTreeTerminatesAll () =
-    let mutable verdicts : (string * ReviewResult) list = []
-    let mutable suppressedOrder : string list = []
-    let resolverFor id = fun result -> verdicts <- (id, result) :: verdicts
-    let suppressorFor id = fun () -> suppressedOrder <- id :: suppressedOrder
-    let effects =
-        emptyEffects
-        |> fun e -> setPending e "root" (resolverFor "root")
-        |> fun e -> setPending e "child-a" (resolverFor "child-a")
-        |> fun e -> setPending e "child-b" (resolverFor "child-b")
-        |> fun e ->
-            { e with
-                abortSuppressors =
-                    e.abortSuppressors
-                    |> Map.add "root" (suppressorFor "root")
-                    |> Map.add "child-a" (suppressorFor "child-a") }
-
-    // Note: child-b has no suppressor — disposal must still remove it cleanly.
-    let next = disposeSessionTree effects [ "root"; "child-a"; "child-b" ]
-    check "all resolvers fired" (verdicts |> List.length = 3)
-    check "all verdicts are Terminated" (verdicts |> List.forall (fun (_, r) -> r = Terminated))
-    check "suppressors fired only where present" (suppressedOrder |> List.length = 2)
-    check "no pending resolvers remain" next.pendingResolutions.IsEmpty
-    check "no suppressors remain" next.abortSuppressors.IsEmpty
-
-    // Ids that were never registered are ignored, not faulted.
-    let next2 = disposeSessionTree next [ "ghost-1"; "ghost-2" ]
-    check "disposing absent ids leaves pending empty" next2.pendingResolutions.IsEmpty
-    check "disposing absent ids leaves suppressors empty" next2.abortSuppressors.IsEmpty
-
-/// Reconstruct the current review task purely from conversation-history text
-/// fragments (assistant text + tool output), in chronological order.  This is
-/// the single source of truth after an opencode restart: the in-memory store is
-/// gone, but the dialogue still carries the structured YAML front-matter that
-/// every producer authors.  Matching is on front-matter fields ONLY — never on
-/// prose substrings — so a user message merely quoting "accepted" can't clear a
-/// live review.
-///   activate  -> front-matter `task` field
-///   cancel    -> front-matter `verdict: cancelled`
-///   accept    -> front-matter `verdict: accepted`
-/// reject/terminated carry `verdict: rejected` / `verdict: terminated`, which
-/// are NOT end verdicts, so the session stays active.
-let inferReviewTaskFromTexts' () =
-    let activate task =
-        buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
-    let accept = VibeFs.Kernel.ReviewPrompts.formatReviewResult Accepted
-    let cancel = loopCancelledMessage
-    let rejected = VibeFs.Kernel.ReviewPrompts.formatReviewResult (Rejected "fix the tests")
-    let terminated = VibeFs.Kernel.ReviewPrompts.formatReviewResult Terminated
-
-    equal "empty -> None" None (inferReviewTaskFromTexts [])
-    equal "only activate -> Some task" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1" ])
-    equal "activate + accept -> None" None (inferReviewTaskFromTexts [ activate "ship S1"; accept ])
-    equal "activate + cancel -> None" None (inferReviewTaskFromTexts [ activate "ship S1"; cancel ])
-    equal "activate + reject -> still active" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1"; rejected ])
-    equal "activate + terminated -> still active" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1"; terminated ])
-    equal "two activates no end -> last task" (Some "ship S2") (inferReviewTaskFromTexts [ activate "ship S1"; activate "ship S2" ])
-    equal "activate + accept + activate -> second active" (Some "ship S2") (inferReviewTaskFromTexts [ activate "ship S1"; accept; activate "ship S2" ])
-    equal "accept without activate -> None" None (inferReviewTaskFromTexts [ accept ])
-    // A user message merely QUOTING the prose must not clear a live review —
-    // only a real front-matter verdict can. This is the anti-fragility the
-    // structured anchor buys over the old `Contains(marker)` scan.
-    equal "prose mention of accepted does not end review" (Some "ship S1")
-        (inferReviewTaskFromTexts [ activate "ship S1"; "I think your changes look accepted to me. With-Review Mode has ended, right?" ])
-    // A stray `task:` line buried in prose (not a front-matter block) must not
-    // activate a review.
-    equal "prose task line does not activate" None
-        (inferReviewTaskFromTexts [ "Here is my plan:\ntask: refactor everything\nlet's go" ])
-    let reviewerChildPrompt =
-        VibeFs.Kernel.ReviewPrompts.reviewerPrompt "worker task from parent" "self-reported changes" [ "src/a.fs" ]
-    equal "reviewerPrompt task must not activate worker With-Review" None
-        (inferReviewTaskFromTexts [ reviewerChildPrompt ])
-    let reviewerVerdictPrompt =
-        VibeFs.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "worker task" "report body" [ "b.fs" ]
-    equal "front matter role: reviewer + task must not activate worker loop" None
-        (inferReviewTaskFromTexts [ reviewerVerdictPrompt ])
-
-/// parseFrontMatterScalars is the structural anchor reader. It must (a) read
-/// only the leading `---` block, (b) keep un-indented scalar fields, (c) parse
-/// `key: |` literal block fields without mistaking indented `---` for the close
-/// fence, and (d) return empty for ordinary prose or an unclosed front matter.
-let parseFrontMatterScalars' () =
-    let scalars = parseFrontMatterScalars (frontMatterPrompt [ yamlField "verdict" "rejected"; yamlField "feedback" "line one\n---\nline three" ] "Address the feedback above.")
-    equal "scalar verdict parsed" (Some "rejected") (Map.tryFind "verdict" scalars)
-    equal "block field parsed" (Some "line one\n---\nline three") (Map.tryFind "feedback" scalars)
-
-    let multi = parseFrontMatterScalars (frontMatter [ yamlField "task" "do thing"; yamlField "verdict" "accepted" ])
-    equal "first scalar" (Some "do thing") (Map.tryFind "task" multi)
-    equal "second scalar" (Some "accepted") (Map.tryFind "verdict" multi)
-
-    let block = parseFrontMatterScalars (frontMatter [ yamlField "task" "line one\nline two\n: [] {} \"quoted\"" ])
-    equal "block scalar parsed" (Some "line one\nline two\n: [] {} \"quoted\"") (Map.tryFind "task" block)
-
-    equal "plain prose → empty" Map.empty (parseFrontMatterScalars "just a normal message, no front matter")
-    equal "no closing fence → empty" Map.empty (parseFrontMatterScalars "---\ntask: \"x\"\nnever closes")
-    equal "indented task not top-level → empty" Map.empty (parseFrontMatterScalars "---\n  task: \"indented\"\n---")
-
-let doubleCheckAnchorReplay () =
-    check "empty history -> no anchor" (not (hasDoubleCheckAnchor []))
-    check "plain prose -> no anchor" (not (hasDoubleCheckAnchor [ "just a message"; "another" ]))
-    let prompt = VibeFs.Kernel.ReviewPrompts.doubleCheckPrompt "ship feature X"
-    check "double-check prompt carries anchor" (hasDoubleCheckAnchor [ prompt ])
-    check "anchor survives mixed history" (hasDoubleCheckAnchor [ "earlier msg"; prompt; "later msg" ])
-
-let doubleCheckPromptFormat () =
-    let prompt = VibeFs.Kernel.ReviewPrompts.doubleCheckPrompt "build the login page"
-    check "has front-matter fence" (prompt.Contains "---")
-    check "has double-check field" (prompt.Contains "double-check:")
-    check "embeds task" (prompt.Contains "build the login page")
-    check "asks for re-submission" (prompt.Contains "REJECT with detailed feedback")
-    let multiline = VibeFs.Kernel.ReviewPrompts.doubleCheckPrompt "task with\nnewline and ### markdown"
-    check "multiline original_task uses block field" (multiline.Contains "original_task: |")
-    let parsed = VibeFs.Kernel.PromptFrontMatter.parseFrontMatterScalars multiline
-    equal "multiline original_task round-trips" (Some "task with\nnewline and ### markdown") (Map.tryFind "original_task" parsed)
-
-let reviewerPromptFormat () =
-    let prompt = VibeFs.Kernel.ReviewPrompts.reviewerPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
-    check "has front-matter fence" (prompt.Contains "---")
-    check "embeds original_task in front matter" (prompt.Contains "original_task:" && prompt.Contains "ship S1")
-    check "lists affected files in front-matter" (prompt.Contains "affected_files:")
-    check "embeds affected file a.fs" (prompt.Contains "a.fs")
-    check "carries review criteria" (prompt.Contains "# Evaluation Criteria")
-    check "worker report is markdown body" (prompt.Contains "# Worker Report")
-    check "embeds report content" (prompt.Contains "changed A and B")
-    check "no ugly Task header" (not (prompt.Contains "=== Task ==="))
-    check "no ugly Change Report header" (not (prompt.Contains "=== Change Report ==="))
-    check "no change_report front-matter field" (not (prompt.Contains "change_report:"))
-    let minimal = VibeFs.Kernel.ReviewPrompts.reviewerPrompt "only task" "" []
-    check "minimal prompt embeds task" (minimal.Contains "only task")
-    check "minimal prompt has no worker report section" (not (minimal.Contains "# Worker Report"))
-    check "minimal prompt omits affected_files when empty" (not (minimal.Contains "affected_files:"))
-    let multilineTask = "Line one of task\nLine two with ### markdown\nLine three"
-    let mp = VibeFs.Kernel.ReviewPrompts.reviewerPrompt multilineTask "" []
-    let parsed = VibeFs.Kernel.PromptFrontMatter.parseFrontMatterScalars mp
-    equal "multiline original_task round-trips through front-matter" (Some multilineTask) (Map.tryFind "original_task" parsed)
-
-let muxReviewerVerdictPromptFormat () =
-    let prompt = VibeFs.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
-    check "mux prompt starts with front-matter" (prompt.StartsWith "---")
-    check "mux prompt carries reviewer role" (prompt.Contains "role: reviewer")
-    check "mux prompt has no call_id field" (not (prompt.Contains "call_id:"))
-    check "mux prompt carries original_task" (prompt.Contains "original_task:" && prompt.Contains "ship S1")
-    check "mux prompt carries affected_files" (prompt.Contains "affected_files:")
-    check "mux prompt carries report" (prompt.Contains "report:" && prompt.Contains "changed A and B")
-    check "mux prompt reuses review criteria" (prompt.Contains "# Evaluation Criteria")
-    check "mux prompt names agent_report" (prompt.Contains "agent_report")
-    check "mux prompt does not mention return_reviewer" (not (prompt.Contains "return_reviewer"))
-    check "mux prompt has no legacy divider" (not (prompt.Contains "==="))
-
-let muxPreReviewVerdictPromptFormat () =
-    let prompt = VibeFs.Kernel.ReviewPrompts.preReviewVerdictPrompt "clarify rollout"
-    check "pre-review prompt starts with front-matter" (prompt.StartsWith "---")
-    check "pre-review prompt carries reviewer role" (prompt.Contains "role: reviewer")
-    check "pre-review prompt has no call_id field" (not (prompt.Contains "call_id:"))
-    check "pre-review prompt carries original_task" (prompt.Contains "original_task:" && prompt.Contains "clarify rollout")
-    check "pre-review prompt reuses review criteria" (prompt.Contains "# Evaluation Criteria")
-    check "pre-review prompt names agent_report" (prompt.Contains "agent_report")
-    check "pre-review prompt has no legacy divider" (not (prompt.Contains "==="))
-
-let reviewInstructionsFrontMatter () =
-    let instr = VibeFs.Kernel.ReviewPrompts.reviewInstructions
-    check "instructions wrapped in front-matter" (instr.StartsWith "---")
-    check "instructions carry role" (instr.Contains "role: reviewer")
-    check "instructions carry review criteria" (instr.Contains "# Evaluation Criteria")
-    check "instructions mention return_reviewer" (instr.Contains "return_reviewer")

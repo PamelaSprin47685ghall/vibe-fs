@@ -5,7 +5,7 @@ open VibeFs.Kernel
 open VibeFs.Shell.NudgeRuntime
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
-open VibeFs.Mux.KnowledgeGraphTools
+open VibeFs.Mux.KnowledgeGraphRuntimeMux
 
 type private DecodedHookEvent =
     { eventType: string

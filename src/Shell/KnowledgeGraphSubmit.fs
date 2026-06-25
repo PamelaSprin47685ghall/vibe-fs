@@ -2,6 +2,7 @@ module VibeFs.Shell.KnowledgeGraphSubmit
 
 open Fable.Core
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Shell.KnowledgeGraphStorage
 

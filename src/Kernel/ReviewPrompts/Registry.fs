@@ -1,0 +1,23 @@
+module VibeFs.Kernel.ReviewPrompts
+
+let reviewInstructionsProse = VibeFs.Kernel.ReviewPrompts.Instructions.reviewInstructionsProse
+let reviewInstructions = VibeFs.Kernel.ReviewPrompts.Instructions.reviewInstructions
+let agentReportReviewInstructions = VibeFs.Kernel.ReviewPrompts.Instructions.agentReportReviewInstructions
+let muxReviewerAgentReportDescription = VibeFs.Kernel.ReviewPrompts.Instructions.muxReviewerAgentReportDescription
+let doubleCheckChallenge = VibeFs.Kernel.ReviewPrompts.Submission.doubleCheckChallenge
+let doubleCheckPrompt = VibeFs.Kernel.ReviewPrompts.Submission.doubleCheckPrompt
+let reviewerPrompt = VibeFs.Kernel.ReviewPrompts.Submission.reviewerPrompt
+let reviewSubmissionVerdictPrompt = VibeFs.Kernel.ReviewPrompts.Submission.reviewSubmissionVerdictPrompt
+let reviewSubmissionDoubleCheckPrompt = VibeFs.Kernel.ReviewPrompts.Submission.reviewSubmissionDoubleCheckPrompt
+let preReviewVerdictPrompt = VibeFs.Kernel.ReviewPrompts.Submission.preReviewVerdictPrompt
+let withReviewCommandTemplate = VibeFs.Kernel.ReviewPrompts.Commands.withReviewCommandTemplate
+let withReviewPrecheckCommandTemplate = VibeFs.Kernel.ReviewPrompts.Commands.withReviewPrecheckCommandTemplate
+let reviewerNudgePrompt = VibeFs.Kernel.ReviewPrompts.OmpVariant.reviewerNudgePrompt
+let reviewInstructionsOmp = VibeFs.Kernel.ReviewPrompts.OmpVariant.reviewInstructionsOmp
+let reviewerNudgePromptOmp = VibeFs.Kernel.ReviewPrompts.OmpVariant.reviewerNudgePromptOmp
+let buildOmpReviewInitialPrompt = VibeFs.Kernel.ReviewPrompts.OmpVariant.buildOmpReviewInitialPrompt
+let submitReviewIsWip = VibeFs.Kernel.ReviewPrompts.Format.submitReviewIsWip
+let submitReviewWipAcknowledgment = VibeFs.Kernel.ReviewPrompts.Format.submitReviewWipAcknowledgment
+let formatReviewResult = VibeFs.Kernel.ReviewPrompts.Format.formatReviewResult
+
+module ReviewerVerdictPrompts = VibeFs.Kernel.ReviewPrompts.Instructions.ReviewerVerdictPrompts

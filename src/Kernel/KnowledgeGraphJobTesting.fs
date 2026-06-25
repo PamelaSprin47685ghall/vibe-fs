@@ -2,6 +2,7 @@ module VibeFs.Kernel.KnowledgeGraphJobTesting
 
 open System
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 
 let private readRequiredField (readField: string -> string) (fieldName: string) : string =
     let value = readField fieldName

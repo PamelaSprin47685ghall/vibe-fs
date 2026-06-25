@@ -12,10 +12,10 @@ open VibeFs.Kernel.ToolOutputInfo
 
 open VibeFs.Shell
 open VibeFs.Shell.OpencodeClientCodec
+open VibeFs.Shell.OpencodeSessionEventCodec
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.OpencodeHookInputCodec
 open VibeFs.Opencode.NudgeEffect
-open VibeFs.Opencode.NudgeEventCodec
 open VibeFs.Opencode.BacklogSession
 
 type SessionLifecycleObserver(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore, registry: ChildAgentRegistry) =

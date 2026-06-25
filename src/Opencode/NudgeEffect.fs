@@ -5,13 +5,14 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.NudgeState
+open VibeFs.Kernel.Nudge.Types
 open VibeFs.Kernel.HostTools
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.OpencodeClientCodec
+open VibeFs.Shell.OpencodeSessionEventCodec
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.ErrorClassify
-open VibeFs.Opencode.NudgeEventCodec
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
     unbox (target?(method)(arg))

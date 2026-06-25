@@ -1,16 +1,15 @@
 module VibeFs.Kernel.ToolOutputInfo
 
 open VibeFs.Kernel.PromptFrontMatter
+open VibeFs.Kernel.ToolOutputInfoTypes
 
-[<RequireQualifiedAccess>]
-type ToolOutputBodyRef =
-    | SeeBelow
-    | SeeBelowTruncated
-    | NoChangeSincePreviousReadWrite
+let seeBelow = ToolOutputInfoTypes.seeBelow
+let seeBelowTruncated = ToolOutputInfoTypes.seeBelowTruncated
+let noChangeSincePreviousReadWrite = ToolOutputInfoTypes.noChangeSincePreviousReadWrite
 
-let seeBelow = "/See Below/"
-let seeBelowTruncated = "/See Below, Truncated/"
-let noChangeSincePreviousReadWrite = "/No Change Since Previous Read/Write/"
+type ToolOutputBodyRef = ToolOutputInfoTypes.ToolOutputBodyRef
+type InfoItem = ToolOutputInfoTypes.InfoItem
+type ToolOutputMessage = ToolOutputInfoTypes.ToolOutputMessage
 
 let hintExecutorMisuse =
     "No executor for reading, searching, writing files. Use read/investigator/coder!"
@@ -29,18 +28,6 @@ let hintForMethodologies (methodologies: string list) : string =
     match methodologies with
     | [] -> hintTodosUpdated
     | names -> names |> List.map hintMethodologyFollowup |> String.concat " "
-
-type InfoItem =
-    | Hint of string
-    | Syntax of string
-    | Iterator of string
-    | Status of string
-    | ExitCode of int
-    | Signal of string
-    | TimeoutMs of int
-    | BodyRef of ToolOutputBodyRef
-
-type ToolOutputMessage = { info: InfoItem list; body: string }
 
 let empty = { info = []; body = "" }
 
@@ -87,73 +74,9 @@ let render (msg: ToolOutputMessage) : string =
         | "" -> fence
         | body -> fence + "\n" + body
 
-let tryParseInfoList (lines: string[]) (startIndex: int) : InfoItem list * int option =
-    let rec parseItem i acc =
-        if i >= lines.Length then acc, None
-        elif lines.[i] = "---" then acc, Some i
-        elif not (lines.[i].StartsWith("  - ")) then acc, Some i
-        else
-            let rest = lines.[i].Substring(4)
-            let sep = rest.IndexOf(": ")
-            if sep <= 0 then parseItem (i + 1) acc
-            else
-                let key = rest.Substring(0, sep)
-                let raw = rest.Substring(sep + 2)
-                let item, next =
-                    match key, raw with
-                    | "hint", r ->
-                        match parseYamlStringValue r with
-                        | Some v -> Some(InfoItem.Hint v), i + 1
-                        | None when r = "|" ->
-                            let v, ni = readBlockAt lines (i + 1) "    "
-                            Some(InfoItem.Hint v), ni
-                        | None -> Some(InfoItem.Hint (r.Trim())), i + 1
-                    | "syntax", r ->
-                        match parseYamlStringValue r with
-                        | Some v -> Some(InfoItem.Syntax v), i + 1
-                        | None when r = "|" ->
-                            let v, ni = readBlockAt lines (i + 1) "    "
-                            Some(InfoItem.Syntax v), ni
-                        | None -> Some(InfoItem.Syntax (r.Trim())), i + 1
-                    | "iterator", r -> Some(InfoItem.Iterator (parseScalarTail r)), i + 1
-                    | "status", r -> Some(InfoItem.Status (parseScalarTail r)), i + 1
-                    | "exit_code", r ->
-                        let t = parseScalarTail r
-                        match System.Int32.TryParse t with
-                        | true, n -> Some(InfoItem.ExitCode n), i + 1
-                        | false, _ -> None, i + 1
-                    | "signal", r -> Some(InfoItem.Signal (parseScalarTail r)), i + 1
-                    | "timeout_ms", r ->
-                        let t = parseScalarTail r
-                        match System.Int32.TryParse t with
-                        | true, n -> Some(InfoItem.TimeoutMs n), i + 1
-                        | false, _ -> None, i + 1
-                    | "tool_output", r ->
-                        let t = parseScalarTail r
-                        let ref' =
-                            if t = seeBelow then ToolOutputBodyRef.SeeBelow
-                            elif t = seeBelowTruncated then ToolOutputBodyRef.SeeBelowTruncated
-                            elif t = noChangeSincePreviousReadWrite then ToolOutputBodyRef.NoChangeSincePreviousReadWrite
-                            else ToolOutputBodyRef.SeeBelow
-                        Some(InfoItem.BodyRef ref'), i + 1
-                    | _ -> None, i + 1
-                match item with
-                | Some it -> parseItem next (acc @ [ it ])
-                | None -> parseItem (i + 1) acc
-    and readBlockAt (lines: string[]) start (prefix: string) =
-        let rec gather j acc =
-            if j >= lines.Length then String.concat "\n" (List.rev acc), j
-            elif lines.[j].StartsWith prefix then
-                gather (j + 1) (lines.[j].Substring(prefix.Length) :: acc)
-            else String.concat "\n" (List.rev acc), j
-        gather start []
-    and parseScalarTail raw =
-        match parseYamlStringValue raw with
-        | Some v -> v
-        | None -> raw.Trim()
-    if startIndex >= lines.Length then [], None
-    elif lines.[startIndex] <> "info:" then [], None
-    else parseItem (startIndex + 1) []
+open VibeFs.Kernel.ToolOutputInfoParse
+
+let tryParseInfoList = ToolOutputInfoParse.tryParseInfoList
 
 let tryParse (text: string) : ToolOutputMessage option =
     if isNull text || text = "" then None

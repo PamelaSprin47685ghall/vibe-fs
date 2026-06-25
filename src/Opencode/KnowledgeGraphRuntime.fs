@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Shell
 
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.KnowledgeGraphPrompts
 open VibeFs.Kernel.KnowledgeGraphMaintenance
 open VibeFs.Kernel.KnowledgeGraphRuntimeState

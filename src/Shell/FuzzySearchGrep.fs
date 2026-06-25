@@ -1,0 +1,75 @@
+module VibeFs.Shell.FuzzySearchGrep
+
+open Fable.Core
+open Fable.Core.JsInterop
+open VibeFs.Shell.Dyn
+open VibeFs.Kernel.FuzzyPath
+open VibeFs.Kernel.FuzzyQuery
+open VibeFs.Kernel.FuzzyFormat
+open VibeFs.Shell.FuzzyIteratorStore
+open VibeFs.Shell.FuzzyFinderShell
+open VibeFs.Shell.FuzzySearchHelpers
+
+let resolveGrepIteratorState (params': FuzzyGrepParams) (opts: SearchOptions)
+    : Result<GrepIteratorState, string> =
+    match resolveStore opts with
+    | Error msg -> Error msg
+    | Ok store ->
+    resolveIteratorBranch store params'.iterator consumeGrepIterator "fuzzy_grep" (fun () ->
+        match params'.pattern with
+        | None | Some "" -> Error "pattern is required on the first call"
+        | Some pattern ->
+            let searchPath = resolveFuzzySearchPath params'.path opts.cwd
+            let externalBasePath = if searchPath.external then Some searchPath.basePath else None
+            let mode = detectGrepMode pattern
+            if checkWildcardOnly pattern mode then
+                Error $"Pattern '{pattern}' matches everything - fuzzy_grep needs a concrete substring or identifier."
+            else
+                Ok { core =
+                        { query = buildQuery searchPath.pathConstraint pattern params'.exclude searchPath.basePath searchPath.external
+                          mode = mode
+                          smartCase = defaultArg params'.caseSensitive false |> not
+                          beforeContext = defaultArg params'.context 0
+                          afterContext = defaultArg params'.context 0
+                          pageSize = defaultArg params'.limit 50
+                          externalBasePath = externalBasePath }
+                     cursor = None })
+
+let private runGrep (finder: FinderLike) (state: FuzzyGrepState) (cursor: obj option) (modeOverride: string option) : obj =
+    let mode = defaultArg modeOverride state.mode
+    let opts = box {| mode = mode; smartCase = state.smartCase; maxMatchesPerFile = min state.pageSize 50; pageSize = state.pageSize; cursor = cursor; beforeContext = state.beforeContext; afterContext = state.afterContext; classifyDefinitions = true |}
+    finder.grep(state.query, opts)
+
+let private typedOf (result: obj) : GrepMatch list * int option * string option * obj =
+    let matches = itemsOf result |> Array.map toGrepMatch |> List.ofArray
+    (matches, optInt result "totalMatched", optStr result "regexFallbackError", Dyn.get result "nextCursor")
+
+let resolveResult (raw: obj) : ResolvedGrep =
+    let value = Dyn.get raw "value"
+    let (matches, total, regexError, cursor) = typedOf value
+    { matches = matches; total = total; regexError = regexError; cursor = cursor }
+
+let private grepNextIterator (state: FuzzyGrepState) (store: TypedIteratorStore) (opts: SearchOptions) (cursor: obj) : string =
+    if Dyn.isNullish cursor then ""
+    else storeGrepIterator store opts.scopeId { core = state; cursor = Some cursor }
+
+let private runGrepWithFinder (state: FuzzyGrepState) (cursor: obj option) (store: TypedIteratorStore) (opts: SearchOptions) (finder: FinderLike) : SearchOutcome =
+    let raw = runGrep finder state cursor None
+    if not (Dyn.truthy (Dyn.get raw "ok")) then { output = errorMsg raw "fuzzy_grep failed"; isError = true }
+    else
+        let resolved = resolveResult raw
+        let body = formatGrepOutput (Some { items = resolved.matches; totalMatched = resolved.total; regexFallbackError = resolved.regexError })
+        let nextIterator = grepNextIterator state store opts resolved.cursor
+        { output = buildGrepOutput body resolved.regexError nextIterator; isError = false }
+
+let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
+    promise {
+        match resolveStore opts with
+        | Error msg -> return { output = msg; isError = true }
+        | Ok store ->
+            match resolveGrepIteratorState params' opts with
+            | Error msg -> return { output = msg; isError = true }
+            | Ok iteratorState ->
+                let! finderResult = acquireFinderFromOptions iteratorState.core.externalBasePath opts
+                return runWithFinder finderResult iteratorState.core.externalBasePath (runGrepWithFinder iteratorState.core iteratorState.cursor store opts)
+    }

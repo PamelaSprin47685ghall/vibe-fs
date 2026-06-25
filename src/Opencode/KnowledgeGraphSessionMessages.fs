@@ -3,6 +3,7 @@ module VibeFs.Opencode.KnowledgeGraphSessionMessages
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.Messaging
 open VibeFs.Opencode.MessagingCodec
 open VibeFs.Shell.Dyn

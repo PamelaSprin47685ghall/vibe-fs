@@ -3,6 +3,7 @@ module VibeFs.Shell.KnowledgeGraphFiles
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.KnowledgeGraphCodec
 
 [<Import("promises", "node:fs")>]

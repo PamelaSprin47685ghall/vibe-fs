@@ -2,6 +2,7 @@ module VibeFs.Kernel.KnowledgeGraphPrompts
 
 open System
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.PromptFrontMatter
 
 /// Pure knowledge graph prompt assembly over Kernel knowledge graph types. Front-matter helpers live

@@ -1,5 +1,8 @@
 module VibeFs.Shell.Dyn
 
+[<NoComparison; NoEquality>]
+type DynModule = private | DynModuleMarker
+
 open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Core.JS

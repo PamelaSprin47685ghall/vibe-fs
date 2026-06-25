@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 open VibeFs.Shell.Dyn
 module Dyn = VibeFs.Shell.Dyn
 open VibeFs.Omp.PluginCore

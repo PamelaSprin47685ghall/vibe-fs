@@ -90,6 +90,58 @@ let shellCodecFilesNoLocalStrField () =
             (not (code.Contains "let hasField "))
     check "arch: Shell DynField exists"
         (requireFile "src/Shell/DynField.fs" |> nonCommentCode |> fun s -> s.Contains "let strField")
+    let dynField = requireFile "src/Shell/DynField.fs" |> nonCommentCode
+    check "arch: DynField defines requiredStrField" (dynField.Contains "let requiredStrField")
+    check "arch: DynField defines strListField" (dynField.Contains "let strListField")
+    let dynMod = requireFile "src/Shell/Dyn.fs" |> nonCommentCode
+    check "arch: Dyn.fs NoComparison NoEquality markers"
+        (dynMod.Contains "NoComparison" && dynMod.Contains "NoEquality")
+
+let private shellBareDynAllowlist =
+    Set.ofList
+        [ "ExecutorJavascript.fs"
+          "FuzzyFinderShell.fs"
+          "FuzzySearch.fs"
+          "FuzzySearchHelpers.fs"
+          "FuzzySearchFind.fs"
+          "FuzzySearchGrep.fs"
+          "OpencodeSessionEventCodecCommon.fs"
+          "OpencodeSessionEventNudge.fs"
+          "MuxHostBindings.fs"
+          "NudgeRuntime.fs"
+          "OmpHostBindings.fs"
+          "OpencodeAgentConfigWire.fs"
+          "ReadDedupMuxPlugin.fs"
+          "ReadDedupOpenCode.fs"
+          "SubagentIo.fs"
+          "ToolRuntimeContext.fs"
+          "TreeSitterPlatform.fs"
+          "WebSearchApi.fs"
+          "WorkspaceFiles.fs" ]
+
+let shellNonCodecMustUseDynFieldHelpers () =
+    for f in fsFiles "src/Shell" do
+        if f = "Dyn.fs" || f = "DynField.fs" || f.EndsWith "Codec.fs" then ()
+        elif Set.contains f shellBareDynAllowlist then ()
+        else
+            let path = "src/Shell/" + f
+            let code = requireFile path |> nonCommentCode
+            check ("arch: " + path + " must not Dyn.str ")
+                (not (code.Contains "Dyn.str "))
+            check ("arch: " + path + " must not Dyn.get ")
+                (not (code.Contains "Dyn.get "))
+
+let mustUseCodecHelper () = shellNonCodecMustUseDynFieldHelpers ()
+
+let muxFileReadWrapperReturnsDisabled () =
+    let wrappers = requireFile "src/Mux/Wrappers.fs" |> nonCommentCode
+    let review = requireFile "src/Mux/WrappersReview.fs" |> nonCommentCode
+    check "arch: Mux Wrappers calls mkFileReadCapture"
+        (wrappers.Contains "mkFileReadCapture")
+    check "arch: Mux WrappersReview defines mkFileReadCapture"
+        (review.Contains "let mkFileReadCapture")
+    check "arch: Mux file_read wrapper returns disabled"
+        (review.Contains "disabled")
 
 let opencodeHookExecuteUsesHookArgsHelpers () =
     let code = requireFile "src/Opencode/HookExecute.fs" |> nonCommentCode

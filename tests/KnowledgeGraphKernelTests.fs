@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.KnowledgeGraphPrompts
 open VibeFs.Kernel.KnowledgeGraphMaintenance
 open VibeFs.Kernel.KnowledgeGraphRuntimeState

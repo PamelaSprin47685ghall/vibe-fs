@@ -41,11 +41,31 @@ let noBuiltinDictionary () =
             check ("arch: " + f + " no Dictionary") (not (content.Contains "Dictionary"))
 
 let fileBodyUnder300 () =
-    for dir in sourceDirs do
-        for f in fsFiles dir do
-            let content = requireFile (dir + "/" + f)
+    // Enforce <=300 lines for production code, Methodology schemas, and tests
+    let scanDirs = [|
+        "src/Kernel"
+        "src/Shell"
+        "src/Mux"
+        "src/Opencode"
+        "src/Omp"
+        "src/Methodology"
+        "tests"
+    |]
+    for dir in scanDirs do
+        for path in fsFilesRecursive dir do
+            let content = requireFile path
             let lineCount = content.Length - content.Replace("\n", "").Length
-            check ("arch: " + dir + "/" + f + " <=300 lines") (lineCount <= 300)
+            check ("arch: " + path + " <=300 lines") (lineCount <= 300)
+
+let returnReviewerCatalogAndHostRegistration () =
+    let catalog = requireFile "src/Kernel/ToolCatalog/Review.fs"
+    check "arch: ToolCatalog lists return_reviewer spec" (catalog.Contains "return_reviewer")
+    let opencodeTools = requireFile "src/Opencode/Tools.fs" |> nonCommentCode
+    let ompReview = requireFile "src/Omp/ReviewToolsRegister.fs" |> nonCommentCode
+    let muxPlugin = requireFile "src/Mux/PluginCatalog.fs" |> nonCommentCode
+    check "arch: Opencode registers return_reviewer tool" (opencodeTools.Contains "return_reviewer")
+    check "arch: OMP registers return_reviewer tool" (ompReview.Contains "return_reviewer")
+    check "arch: Mux muxToolNames omits return_reviewer (agent_report path)" (not (muxPlugin.Contains "\"return_reviewer\""))
 
 let noDanglingMarkers () =
     for dir in sourceDirs do
@@ -114,18 +134,12 @@ let muxBacklogUsesMuxHost () =
                 (not (re.IsMatch code))
 
 let ompBoundary () =
-    for f in fsFiles "src/Omp" do
-        let content = requireFile ("src/Omp/" + f)
-        check ("arch: " + f + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
-        check ("arch: " + f + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
-        check ("arch: " + f + " no engine ref") (not (content.Contains "engine/"))
-
-let ompNoOpencodeRef () = ompBoundary ()
-
-let ompNoMuxRef () =
-    for f in fsFiles "src/Omp" do
-        let content = requireFile ("src/Omp/" + f)
-        check ("arch: " + f + " ompNoMuxRef") (not (content.Contains "VibeFs.Mux"))
+    for path in fsFilesRecursive "src/Omp" do
+        let content = requireFile path
+        let label = path.Replace("src/Omp/", "")
+        check ("arch: " + label + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
+        check ("arch: " + label + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
+        check ("arch: " + label + " no engine ref") (not (content.Contains "engine/"))
 
 let ompNoEngineRef () =
     for f in fsFiles "src/Omp" do

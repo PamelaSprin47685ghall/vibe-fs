@@ -8,14 +8,15 @@ open VibeFs.Shell
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.ToolCopy
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 open VibeFs.Opencode.AgentConfig
-open VibeFs.Opencode.NudgeEventCodec
 open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Shell.OpencodeHookInputCodec
 open VibeFs.Shell.OpencodeClientCodec
+open VibeFs.Shell.OpencodeSessionEventCodec
 
 let private abortOrDeleteEvents =
     set [ "stream-abort"; "session.delete"; "session.close"; "session.remove"; "session.deleted" ]

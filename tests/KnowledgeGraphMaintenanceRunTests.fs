@@ -6,6 +6,7 @@ open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.KnowledgeGraphMaintenance
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Shell.KnowledgeGraphFiles

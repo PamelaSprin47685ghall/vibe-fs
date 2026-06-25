@@ -5,7 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.KnowledgeGraphJobTesting
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
-open VibeFs.Mux.KnowledgeGraphTools
+open VibeFs.Mux.KnowledgeGraphRuntimeMux
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.KnowledgeGraphRuntimeTestPorts
 

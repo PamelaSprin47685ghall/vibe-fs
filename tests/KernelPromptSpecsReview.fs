@@ -1,0 +1,117 @@
+module VibeFs.Tests.KernelPromptSpecsReview
+
+open VibeFs.Tests.Assert
+open VibeFs.Kernel.LoopMessages
+open VibeFs.Kernel.PromptFrontMatter
+open VibeFs.Kernel.ReviewPrompts
+open VibeFs.Kernel.ReviewPrompts.Instructions
+open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
+open VibeFs.Kernel.ReviewVerdict
+open VibeFs.Kernel.SubagentPrompts
+open VibeFs.Kernel.Domain
+
+let loopMessagesShared () =
+    let task = "ship S1 refactor"
+    let intro = "With-Review Mode is active. Complete the task above, then call submit_review with:"
+    let kernelMsg = buildLoopMessage task [ intro ]
+    check "loop message carries task in front matter" (kernelMsg.Contains "task:" && kernelMsg.Contains task)
+    check "loop message embeds task" (kernelMsg.Contains task)
+    check "loop message embeds intro" (kernelMsg.Contains intro)
+    check "loop message mentions submit_review" (kernelMsg.Contains "submit_review")
+    check "loop message lists report field" (kernelMsg.Contains "report")
+    check "loop message lists affectedFiles field" (kernelMsg.Contains "affectedFiles")
+    check "loop message names reviewer" (kernelMsg.Contains "reviewer")
+
+    let multilineTask = "ship S1 refactor\ninclude follow-up cleanup"
+    let parsedLoopMsg = parseFrontMatterScalars (buildLoopMessage multilineTask [ intro ])
+    equal "loop message multiline task round-trips through block front-matter" (Some multilineTask) (Map.tryFind "task" parsedLoopMsg)
+
+    let loopTemplate = withReviewCommandTemplate
+    check "loop template carries command front-matter" (loopTemplate.Contains "command: with-review")
+    check "loop template carries task placeholder" (loopTemplate.Contains "task:" && loopTemplate.Contains "$ARGUMENTS")
+    check "loop template does not say task is repeated below" (not (loopTemplate.Contains "repeated below"))
+    check "loop template reuses review criteria" (loopTemplate.Contains "# Evaluation Criteria")
+    check "loop template mentions submit_review" (loopTemplate.Contains "submit_review")
+    check "loop template forbids finishing early" (loopTemplate.Contains "Do not end the conversation")
+
+    let precheckTemplate = withReviewPrecheckCommandTemplate
+    check "precheck template carries command front-matter" (precheckTemplate.Contains "command: with-review-precheck")
+    check "precheck template carries task placeholder" (precheckTemplate.Contains "task:" && precheckTemplate.Contains "$ARGUMENTS")
+    check "precheck template reuses review criteria" (precheckTemplate.Contains "# Evaluation Criteria")
+    check "precheck template does not repeat task in body tail" (not (precheckTemplate.EndsWith "$ARGUMENTS"))
+
+let reviewerVerdictPromptsShared () =
+    let verdict = ReviewerVerdictPrompts.reviewerVerdictInstructions
+    check "reviewer verdict mentions agent_report" (verdict.Contains "agent_report")
+    check "reviewer verdict mentions PASS" (verdict.Contains "PASS")
+    check "reviewer verdict mentions REJECT" (verdict.Contains "REJECT")
+    check "reviewer verdict mentions feedback" (verdict.Contains "feedback")
+
+    let preReview = ReviewerVerdictPrompts.loopReviewVerdictInstructions
+    check "loop-review verdict mentions agent_report" (preReview.Contains "agent_report")
+    check "loop-review verdict mentions PASS" (preReview.Contains "PASS")
+    check "loop-review verdict mentions REJECT" (preReview.Contains "REJECT")
+    check "loop-review verdict mentions actionable" (preReview.Contains "actionable")
+
+let reviewResultFormattingShared () =
+    let accepted = formatReviewResult ReviewResult.Accepted
+    check "accepted text mentions passed" (accepted.ToLower().Contains "passed" || accepted.ToLower().Contains "accepted")
+    check "accepted text signals with-review ended" (accepted.ToLower().Contains "with-review")
+
+    let rejected = formatReviewResult (ReviewResult.Rejected "missing tests")
+    check "rejected text embeds feedback" (rejected.Contains "missing tests")
+    check "rejected text instructs to retry" (rejected.Contains "submit_review")
+
+    let terminated = formatReviewResult ReviewResult.Terminated
+    check "terminated text mentions terminated" (terminated.ToLower().Contains "terminat")
+
+let domainErrorsShared () =
+    let err1 = DomainError.ExecutorExecutableMissing "npm"
+    let err2 = DomainError.ParseError("json", "missing bracket")
+    let err3 = DomainError.ToolNotPermitted("coder", "bash")
+    let err4 = DomainError.InvalidIntent("coder", "tdd", "unknown phase")
+    let err5 = DomainError.UpstreamTimeout 30
+    let err6 = DomainError.UpstreamRefused "rate limit"
+    check "err1 is executable missing" (match err1 with DomainError.ExecutorExecutableMissing "npm" -> true | _ -> false)
+    check "err2 is parse error" (match err2 with DomainError.ParseError("json", "missing bracket") -> true | _ -> false)
+    check "err3 is tool not permitted" (match err3 with DomainError.ToolNotPermitted("coder", "bash") -> true | _ -> false)
+    check "err4 is invalid intent" (match err4 with DomainError.InvalidIntent("coder", "tdd", "unknown phase") -> true | _ -> false)
+    check "err5 is upstream timeout" (match err5 with DomainError.UpstreamTimeout 30 -> true | _ -> false)
+    check "err6 is upstream refused" (match err6 with DomainError.UpstreamRefused "rate limit" -> true | _ -> false)
+
+let reviewVerdictDecode () =
+    equal "PASS decodes to Pass" (Some Pass) (parseVerdict "PASS")
+    equal "REJECT decodes to Reject" (Some Reject) (parseVerdict "REJECT")
+    equal "lowercase pass decodes" (Some Pass) (parseVerdict "pass")
+    equal "mixed-case Reject decodes" (Some Reject) (parseVerdict "  Reject ")
+    equal "string null is not a verdict" None (parseVerdict "null")
+    equal "empty is not a verdict" None (parseVerdict "")
+    equal "garbage is not a verdict" None (parseVerdict "maybe")
+
+let reviewDecisionPolicy () =
+    equal "reject finalizes as rejected with feedback"
+        (Finalize (Rejected "missing tests")) (decideReviewSubmission Reject "missing tests" false)
+    equal "reject with empty feedback still finalizes as rejected"
+        (Finalize (Rejected "")) (decideReviewSubmission Reject "" true)
+    equal "pass before double-check asks for re-evaluation"
+        AskDoubleCheck (decideReviewSubmission Pass "" false)
+    equal "pass after double-check finalizes as accepted"
+        (Finalize Accepted) (decideReviewSubmission Pass "" true)
+
+let reviewMarkdownCodec () =
+    check "format pass is exactly PASS" (formatReviewVerdictMarkdown Pass "" = "PASS")
+    check "format reject embeds feedback" ((formatReviewVerdictMarkdown Reject "fix the leak").Contains "fix the leak")
+    check "format reject starts with REJECT" ((formatReviewVerdictMarkdown Reject "fix the leak").StartsWith "REJECT")
+    check "format reject empty feedback still rejects" ((formatReviewVerdictMarkdown Reject "").StartsWith "REJECT")
+    equal "parse PASS markdown -> Accepted" Accepted (parseReviewReportMarkdown "PASS")
+    equal "parse REJECT markdown -> Rejected feedback" (Rejected "fix the leak") (parseReviewReportMarkdown "REJECT: fix the leak")
+    equal "parse unrecognized markdown -> Terminated" Terminated (parseReviewReportMarkdown "I think it looks fine")
+    equal "parse empty markdown -> Terminated" Terminated (parseReviewReportMarkdown "")
+    equal "round-trip pass" Accepted (parseReviewReportMarkdown (formatReviewVerdictMarkdown Pass ""))
+    equal "round-trip reject non-empty" (Rejected "needs work") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Reject "needs work"))
+
+let executorSummarizerNoExitStatus () =
+    let prompt = executorSummarizerPrompt "" "raw" "shell" "echo 1" [] "short" "ro"
+    check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
+    check "summarizer prompt omits non-zero exit" (not (prompt.ToLowerInvariant().Contains "non-zero exit"))

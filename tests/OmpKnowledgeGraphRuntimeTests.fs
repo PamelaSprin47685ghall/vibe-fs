@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Omp.KnowledgeGraphRuntime
 
 /// When the kg directory does not exist, Submit must reject without touching

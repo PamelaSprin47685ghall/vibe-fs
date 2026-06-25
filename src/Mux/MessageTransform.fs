@@ -12,11 +12,13 @@ open VibeFs.Shell.MessageTransformHostHooks
 open VibeFs.Shell.MessageTransformPipeline
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Methodology
 open VibeFs.Kernel.MessageTransformPolicy
-open VibeFs.Mux.KnowledgeGraphTools
+open VibeFs.Mux.KnowledgeGraphRuntimeMux
+open VibeFs.Mux.KnowledgeGraphRuntimeMuxQuery
 open VibeFs.Mux.MessagingCodec
 open VibeFs.Shell.ReadDedupMuxPlugin
 open VibeFs.Mux.BacklogSession

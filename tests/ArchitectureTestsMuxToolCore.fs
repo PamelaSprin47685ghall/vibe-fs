@@ -6,7 +6,7 @@ open VibeFs.Tests.Assert
 open VibeFs.Tests.ArchitectureTestsSupport
 
 let muxHostToolsFuzzyUsesToolCopy () =
-    let code = requireFile "src/Mux/HostTools.fs" |> nonCommentCode
+    let code = requireMuxHostTools () |> nonCommentCode
     check "arch: Mux HostTools fuzzy must not use muxFuzzyFindRequiresWorkspaceId"
         (not (code.Contains "muxFuzzyFindRequiresWorkspaceId"))
     check "arch: Mux HostTools fuzzy must not use muxFuzzyGrepRequiresWorkspaceId"
@@ -17,7 +17,7 @@ let muxHostToolsFuzzyUsesToolCopy () =
         (not (code.Contains "fuzzy_grep requires workspaceId"))
 
 let muxHostToolsFuzzyUsesFromMuxConfig () =
-    let code = requireFile "src/Mux/HostTools.fs" |> nonCommentCode
+    let code = requireMuxHostTools () |> nonCommentCode
     check "arch: Mux HostTools opens ToolRuntimeContext"
         (code.Contains "ToolRuntimeContext")
     check "arch: Mux HostTools fuzzy uses fromMuxConfig"
@@ -32,7 +32,7 @@ let muxHostToolsFuzzyUsesFromMuxConfig () =
         (not (code.Contains "Dyn.str config \"workspaceId\""))
 
 let muxHostToolsFuzzyUsesFuzzyToolsCodec () =
-    let code = requireFile "src/Mux/HostTools.fs" |> nonCommentCode
+    let code = requireMuxHostTools () |> nonCommentCode
     check "arch: Mux HostTools opens FuzzyToolsCodec" (code.Contains "FuzzyToolsCodec")
     check "arch: Mux HostTools fuzzy_find uses decodeFuzzyFindArgs" (code.Contains "decodeFuzzyFindArgs")
     check "arch: Mux HostTools fuzzy_grep uses decodeFuzzyGrepArgs" (code.Contains "decodeFuzzyGrepArgs")
@@ -141,7 +141,7 @@ let fuzzyToolsCodecExists () =
 
 let dualHostFuzzyUsesFuzzyToolsCodec () =
     let codec = requireFile "src/Shell/FuzzyToolsCodec.fs" |> nonCommentCode
-    let mux = requireFile "src/Mux/HostTools.fs" |> nonCommentCode
+    let mux = requireMuxHostTools () |> nonCommentCode
     let opencode = requireFile "src/Opencode/SearchTools.fs" |> nonCommentCode
     check "arch: FuzzyToolsCodec defines decodeFuzzyFindArgs"
         (codec.Contains "let decodeFuzzyFindArgs")

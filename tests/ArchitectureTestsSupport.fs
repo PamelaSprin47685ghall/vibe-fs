@@ -21,10 +21,31 @@ let requireFile (path: string) : string =
         content
     else ""
 
+let requireMuxHostTools () : string =
+    requireFile "src/Mux/HostTools.fs" + "\n" + requireFile "src/Mux/HostToolsFuzzy.fs"
+
 let fsFiles (dir: string) : string array =
     check ("arch: dir exists " + dir) (existsSync dir)
     if existsSync dir then readdirSync dir |> Array.filter (fun f -> f.EndsWith ".fs")
     else [||]
+
+[<Import("statSync", "node:fs")>]
+let private statSync (path: string) : obj = jsNative
+
+let private isDirectory (path: string) : bool =
+    let st = statSync path
+    emitJsExpr st "!!$0 && $0.isDirectory()"
+
+let rec fsFilesRecursive (dir: string) : string list =
+    if not (existsSync dir) then []
+    else
+        readdirSync dir
+        |> Array.collect (fun name ->
+            let full = dir + "/" + name
+            if isDirectory full then fsFilesRecursive full |> List.toArray
+            elif name.EndsWith ".fs" then [| full |]
+            else [||])
+        |> Array.toList
 
 let objTypeRe = System.Text.RegularExpressions.Regex(@":\s*obj\b")
 let boxRe = System.Text.RegularExpressions.Regex(@"\bbox\b")

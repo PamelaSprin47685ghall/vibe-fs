@@ -7,6 +7,7 @@ open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 open VibeFs.Opencode.ReviewTools
 open VibeFs.Shell.ReviewRuntime
 open VibeFs.Shell.Dyn

@@ -3,6 +3,7 @@ module VibeFs.Kernel.KnowledgeGraphCodec
 open Thoth.Json
 
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 
 let private versionDecoder : Decoder<int> =
     Decode.oneOf [ Decode.int; Decode.map int Decode.string ]
