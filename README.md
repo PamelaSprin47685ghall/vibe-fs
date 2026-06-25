@@ -329,28 +329,6 @@ YAML front-matter 刚好处于中间：
 
 这个顺序是按“先看不变的规则，再看副作用，再看宿主拼装”排列的。
 
-## 重构进度（对照保姆级指南）
-
-对照 `TASK.md` 与 `保姆级重构指南.md` 的静态盘点（以源码与 `kg/` 重构记录为准，非运行时验证）：
-
-| 项 | 状态 | 说明 |
-| --- | --- | --- |
-| Phase A 命名纠偏 | 完成 | `Magic*`→`WorkBacklog` / `BacklogProjection*` / `SessionProjectionStore`；`OllamaClient`→`WebSearchApi`；`HostReadExec`→`HostFunctionCapture`；`NudgeHook`→`SessionLifecycleObserver`；`TreeSitterKernel` 中补丁路径与工具分类已迁至 `PatchParser` / `ToolCatalog`。 |
-| Phase B 边界强类型化 | 部分 | `Kernel/` 已基本不直接 `Dyn.*`；`Opencode/` 已无 `VibeFs.Mux` 引用（`DelegatedAiSettings`、`PromiseStr` 等上沉 `Shell/`，`tests/ArchitectureTests.fs` 的 `opencodeNoMuxRef` 静态门禁）；`Opencode/`、`Mux/` 的 hook、wrapper、工具 `execute` 仍大量 `obj` + `Dyn`，未完全收敛到 codec 边界。 |
-| Phase C 抽公共内核 | 部分 | 权限、`BacklogProjection*`、`SubagentPrompts`、`ReviewVerdict` 等已上浮；`CapsPrelude`→`Kernel`（`Opencode.CapsPrelude` 仅 re-export），`WorkBacklogSchema`/`BacklogSessionCodec`→`Shell`；caps 前缀/strip SSOT：`Kernel.CapsSynthPolicy` + `Shell.CapsSynthCommon`，双宿主 `CapsCodec` 共用 strip/find/userCapsText，Mux `MessageTransform` 改调 `CapsCodec.buildCapsMessages`（门禁 `muxMessageTransformNoLocalCapsBuilder`）；审查回放：`reconstructReviewState` 已从双宿主 `MessageTransform` 移除，统一 `Shell.ReviewReplaySync`（门禁 `noReconstructReviewStateInMessageTransforms`）。**子代理工具策略**：`Kernel.SubagentToolPolicy.disabledToolNamesForRole` 经 `canUseForHost`→`deniedToolsForHost` 产出禁用列表；Mux `SubagentTools` 仅向 spawn 注入 `toolPolicy.disabledTools`（门禁 `muxSubagentToolsUsesSubagentToolPolicy`，行为测 `SubagentToolPolicyTests`）。Opencode 侧无等价 `toolPolicy` 列表，子代理裁剪仍走 `AgentConfig` / hook 的 allow-deny 映射，属宿主接线差异而非内核缺口。`Mux/` 已无 `VibeFs.Opencode`（`muxNoOpencodeRef` / `opencodeNoMuxRef`）；`BacklogSession.fs` 双份已共享 codec、仅剩宿主键与薄 API 差异。**余量**：`SubagentTools.fs` 仍双份（Mux 已去本地权限 filter，Opencode 仍保留各自 spawn/schema 胶水）；`MessageTransform.fs` 仍双份（caps 构建已去本地重复，其余前处理/replay 胶水仍各写一份）。 |
-| Phase D 统一错误模型 | 部分 | `DomainError` / `formatDomainError` 已在 web、executor、部分 Mux 工具使用；多数工具仍 `resolveStr` 拼字符串，链路未全程 `Result<'T, DomainError>`。 |
-| Phase E 收拢可变状态 | 未做 | `SessionProjectionStore`、`FuzzyIteratorStore`、`SessionExecutor`、`ReviewRuntime`、`Shell.CapsFileCache` 进程级 `mutable` Map 等仍为单例，未改为显式 `SessionContext` 或 actor。 |
-| Phase F 拆 KnowledgeGraphRuntime | 部分 | 纯状态在 `Kernel.KnowledgeGraphRuntimeState`，IO 在 `*RuntimeIO`；测试注册/观测迁至 `Opencode/KnowledgeGraphTestHooks`、`Mux/KnowledgeGraphTestHooks`（`runtime.TestHooks`），生产 `KnowledgeGraphRuntime` 不再公开 `RegisterJobForTesting` 等后门；双宿主 runtime 仍兼管队列与可变状态，编排/存储未完全三层拆开。 |
-| Phase G 工具 DI | 未做 | 无 `IToolContext` / 强类型 `ToolArgs` 统一签名；工具内仍 `Dyn.str ctx "directory"` 等解析。 |
-| TASK §7 文案 SSOT | 部分 | `SubagentPrompts`、`ReviewPrompts`、`Methodology` 等已有内核常量；工具 description、字段说明、拒绝语在 `Opencode`/`Mux` 仍分散硬编码，无统一文案目录。 |
-| TASK §8 权限语义化 | 大体完成 | `ToolPermission.classifyTool` → `ToolSemantic` + `canUseForHost` 为双宿主主路径；工具族以 `Set` 精确匹配为主（`knownAgentSet`、`blockedShellTaskGrepSet`、`todoFamilySet`、`writePatchFamilySet` 等），辅以 `return_` 前缀、`stealth-browser` 前缀等有限规则；`ask_user_question` 等与 `websearch`/`submit_review` 等同入 `SubagentWebSkillOrSubmit`；Mux 侧经 `normalizeToolName` / canonical 集合归一后再分类。新增工具须在 Set 与语义分支补项。 |
-
-本轮已修（对照复审）：双向宿主边界门禁 `opencodeNoMuxRef` / `muxNoOpencodeRef`；Phase C 切片 `Kernel.CapsPrelude`、`Shell.WorkBacklogSchema`、`Shell.BacklogSessionCodec`、**caps 前缀/strip**（`Kernel.CapsSynthPolicy`、`Shell.CapsSynthCommon`、双宿主 `CapsCodec` 接线）、**caps 文件缓存**（`Shell.CapsFileCache`，双宿主 `MessageTransform` 经 `getOrLoadCapsFiles` 加载，门禁 `muxMessageTransformUsesShellCapsCache` / `opencodeMessageTransformUsesShellCapsCache`，`tests/CapsFileCacheTests.fs`，测试首尾 `clearCapsFileCacheForTesting` 避免进程级缓存串测）、**审查回放**（`Shell.ReviewReplaySync`，双宿主 `MessageTransform` 不再本地 `reconstructReviewState`）、**Mux 子代理禁用列表**（`Kernel.SubagentToolPolicy`，`tests/SubagentToolPolicyTests.fs`，架构门禁禁止 `Mux/SubagentTools` 本地 `canUseForHost`/`deniedToolsForHost` 过滤）；KG 测试 API 迁至 `TestHooks`；`ToolPermission` Set 族分类；Mux SessionProjection 宿主键（`muxBacklogUsesMuxHost`）。静态门禁见 `tests/ArchitectureTests.fs`（含 `muxNoOpencodeRef`、`muxMessageTransformNoLocalCapsBuilder`、`opencodeMessageTransformUsesShellCapsCache`、`noReconstructReviewStateInMessageTransforms`、`muxSubagentToolsUsesSubagentToolPolicy`）。
-
-**已知技术债（未在本轮消除）**：`Opencode.MessageTransform.compactingHandlerFor` / `experimental.session.compacting` 仍为 no-op（会话压缩未实现，仅保留接线）；`Shell.CapsFileCache` 仍为进程级 `mutable` Map（归属 Phase E，测试仅能通过 `clearCapsFileCacheForTesting` 复位，不能替代显式作用域）。
-
-**剩余主线**：先收宿主层 `Dyn` 到 codec（Phase B）；Phase C **仍进行中**——caps、审查回放、**Mux 侧 `SubagentToolPolicy` 禁用列表**切片已完成；下一切片优先 **`SubagentTools` 双份去重**（共享 prompt/schema 与 spawn 胶水，`MessageTransform` 除 caps 外仍双份）；并行推进错误 `Result`（Phase D）与全局状态作用域（Phase E，**未做**），继续拆 KG 编排/存储（Phase F 余量）与工具 DI（Phase G，**未做**）及文案目录（§7）。
-
 ## 构建与测试
 
 环境：
