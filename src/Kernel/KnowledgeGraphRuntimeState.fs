@@ -40,7 +40,6 @@ let private updateLatestLaunchResult (state: KnowledgeGraphState) (title: string
         match remaining with
         | [] -> List.rev rev
         | launch :: rest ->
-            let tail = List.rev rev
             if List.exists (fun candidate -> candidate.title = title) (launch :: rest) then
                 loop (launch :: rev) rest
             else if launch.title = title then

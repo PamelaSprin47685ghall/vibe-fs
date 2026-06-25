@@ -13,6 +13,7 @@ open VibeFs.Shell.SubagentSpawn
 open VibeFs.Shell.DelegateToolsCodec
 open VibeFs.Shell.ToolExecute
 open VibeFs.Shell.ToolContextCodec
+open VibeFs.Mux.DelegateTimeout
 
 let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
     unbox<JS.Promise<obj>>(taskService?create(input))
@@ -161,8 +162,6 @@ let runMuxSubagent
     (options: obj option)
     : JS.Promise<string> =
     delegateToSubAgent deps config agentId prompt title options
-
-open VibeFs.Mux.DelegateTimeout
 
 type DelegateOutcome = DelegateTimeout.DelegateOutcome
 

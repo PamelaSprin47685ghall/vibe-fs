@@ -15,9 +15,9 @@ let muxKnowledgeGraphStartBookkeeperUsesFromMuxConfig () =
         (code.Contains "fromMuxConfig")
     check "arch: Mux KnowledgeGraphRuntimeMux uses runtime.Execution.Directory for root"
         (code.Contains "runtime.Execution.Directory")
-    check "arch: Mux KnowledgeGraphTools uses muxConfigDirectoryFallback"
+    check "arch: Mux KnowledgeGraphRuntimeMux uses muxConfigDirectoryFallback"
         (code.Contains "muxConfigDirectoryFallback")
-    check "arch: Mux KnowledgeGraphTools must not Dyn.str config cwd"
+    check "arch: Mux KnowledgeGraphRuntimeMux must not Dyn.str config cwd"
         (not (code.Contains "Dyn.str config \"cwd\""))
 
 let muxKgToolDefsUsesKnowledgeGraphToolsCodec () =
