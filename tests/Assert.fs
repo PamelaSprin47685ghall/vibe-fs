@@ -56,10 +56,7 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
             let! _ = raceWithTimeout (f ()) "TIMEOUT" asyncSpecTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
-            let msg =
-                match ex with
-                | :? System.Exception as e -> string e.Message
-                | _ -> string ex
+            let msg = string ex.Message
             if msg.Contains "TIMEOUT" then
                 failed <- failed + 1
                 failures.Add(label + $" [TIMEOUT>{asyncSpecTimeoutMs}ms]")
@@ -77,10 +74,7 @@ let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<uni
             let! _ = raceWithTimeout (f ()) "TIMEOUT" asyncSuiteTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
-            let msg =
-                match ex with
-                | :? System.Exception as e -> string e.Message
-                | _ -> string ex
+            let msg = string ex.Message
             if msg.Contains "TIMEOUT" then
                 failed <- failed + 1
                 failures.Add(label + $" [TIMEOUT>{asyncSuiteTimeoutMs}ms]")
