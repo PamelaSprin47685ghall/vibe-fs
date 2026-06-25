@@ -37,6 +37,7 @@ let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit>
                         setKey output "parameters" (buildWorkBacklogSchema ())
                 else
                     setKey output "jsonSchema" (buildWorkBacklogSchema ())
+            | Omp -> ()
     }
 
 let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =

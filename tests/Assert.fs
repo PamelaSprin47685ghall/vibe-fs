@@ -12,6 +12,12 @@ let mutable failed = 0
 let private failures = ResizeArray<string>()
 let private timings = ResizeArray<string * float>()
 
+let clearFailuresForRun () : unit =
+    passed <- 0
+    failed <- 0
+    failures.Clear ()
+    timings.Clear ()
+
 let check (label: string) (condition: bool) : unit =
     if condition then passed <- passed + 1
     else failed <- failed + 1; failures.Add label
@@ -19,25 +25,69 @@ let check (label: string) (condition: bool) : unit =
 let equal (label: string) (expected: 'a) (actual: 'a) : unit =
     check label (actual = expected)
 
-/// Time a synchronous test body.
-let timed (label: string) (f: unit -> 'a) : 'a =
-    let start = now ()
-    let r = f ()
-    timings.Add(label, now () - start)
-    r
+[<Emit("Promise.race([$0, new Promise((_, reject) => setTimeout(() => reject(new Error($1)), $2))])")>]
+let private raceWithTimeout (p: JS.Promise<'a>) (msg: string) (ms: int) : JS.Promise<'a> = jsNative
 
-/// Time an asynchronous test body; return a unit promise.
-/// Catches exceptions so one throwing test does not abort the entire suite.
+/// Time a synchronous test body; catches exceptions so one throwing test does not abort the suite.
+let timed (label: string) (f: unit -> unit) : unit =
+    let start = now ()
+    try
+        f ()
+        timings.Add(label, now () - start)
+    with ex ->
+        printfn "ERROR in %s: %A" label ex
+        failed <- failed + 1
+        failures.Add(label + " [THREW]")
+        timings.Add(label, now () - start)
+
+/// Per-spec async ceiling (integration sub-specs use this inside their own loops).
+let asyncSpecTimeoutMs = 1000
+
+/// Suite-level async ceiling: one `*.run` that sequences many sub-specs must not
+/// inherit the 1s per-spec budget (e.g. IntegrationToolTests ~110 cases ≈ 1s+ total).
+let asyncSuiteTimeoutMs = 120_000
+
+/// Time an asynchronous test body with a 1s hard timeout; return a unit promise.
+/// Reject / timeout / throw are all converged into a single failure record.
 let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
     promise {
         let start = now ()
         try
-            let! _ = f ()
+            let! _ = raceWithTimeout (f ()) "TIMEOUT" asyncSpecTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
-            printfn "ERROR in %s: %A" label ex
-            failed <- failed + 1
-            failures.Add(label + " [THREW]")
+            let msg =
+                match ex with
+                | :? System.Exception as e -> string e.Message
+                | _ -> string ex
+            if msg.Contains "TIMEOUT" then
+                failed <- failed + 1
+                failures.Add(label + $" [TIMEOUT>{asyncSpecTimeoutMs}ms]")
+            else
+                printfn "ERROR in %s: %A" label ex
+                failed <- failed + 1
+                failures.Add(label + " [THREW]")
+            timings.Add(label, now () - start)
+    }
+
+let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
+    promise {
+        let start = now ()
+        try
+            let! _ = raceWithTimeout (f ()) "TIMEOUT" asyncSuiteTimeoutMs
+            timings.Add(label, now () - start)
+        with ex ->
+            let msg =
+                match ex with
+                | :? System.Exception as e -> string e.Message
+                | _ -> string ex
+            if msg.Contains "TIMEOUT" then
+                failed <- failed + 1
+                failures.Add(label + $" [TIMEOUT>{asyncSuiteTimeoutMs}ms]")
+            else
+                printfn "ERROR in %s: %A" label ex
+                failed <- failed + 1
+                failures.Add(label + " [THREW]")
             timings.Add(label, now () - start)
     }
 

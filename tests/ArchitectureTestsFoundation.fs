@@ -31,21 +31,24 @@ let shellLayering () =
         check ("arch: " + f + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
         check ("arch: " + f + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
 
+let private sourceDirs =
+    [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"; "src/Omp"|]
+
 let noBuiltinDictionary () =
-    for dir in [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"|] do
+    for dir in sourceDirs do
         for f in fsFiles dir do
             let content = requireFile (dir + "/" + f)
             check ("arch: " + f + " no Dictionary") (not (content.Contains "Dictionary"))
 
 let fileBodyUnder300 () =
-    for dir in [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"|] do
+    for dir in sourceDirs do
         for f in fsFiles dir do
             let content = requireFile (dir + "/" + f)
             let lineCount = content.Length - content.Replace("\n", "").Length
             check ("arch: " + dir + "/" + f + " <=300 lines") (lineCount <= 300)
 
 let noDanglingMarkers () =
-    for dir in [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"|] do
+    for dir in sourceDirs do
         for f in fsFiles dir do
             let content = requireFile (dir + "/" + f)
             check ("arch: " + f + " no TODO") (not (content.Contains "TODO"))
@@ -68,7 +71,7 @@ let private legacyInjectedOutputMarkers = [|
 |]
 
 let noLegacyInjectedToolOutputMarkers () =
-    for dir in [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"|] do
+    for dir in sourceDirs do
         for f in fsFiles dir do
             let path = dir + "/" + f
             let content = requireFile path
@@ -109,3 +112,22 @@ let muxBacklogUsesMuxHost () =
         for re in forbiddenMuxOpencodeProjectionPatterns do
             check ("arch: " + path + " avoids opencode SessionProjection host (" + re.ToString() + ")")
                 (not (re.IsMatch code))
+
+let ompBoundary () =
+    for f in fsFiles "src/Omp" do
+        let content = requireFile ("src/Omp/" + f)
+        check ("arch: " + f + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
+        check ("arch: " + f + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
+        check ("arch: " + f + " no engine ref") (not (content.Contains "engine/"))
+
+let ompNoOpencodeRef () = ompBoundary ()
+
+let ompNoMuxRef () =
+    for f in fsFiles "src/Omp" do
+        let content = requireFile ("src/Omp/" + f)
+        check ("arch: " + f + " ompNoMuxRef") (not (content.Contains "VibeFs.Mux"))
+
+let ompNoEngineRef () =
+    for f in fsFiles "src/Omp" do
+        let content = requireFile ("src/Omp/" + f)
+        check ("arch: " + f + " ompNoEngineRef") (not (content.Contains "engine/"))

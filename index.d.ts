@@ -267,3 +267,46 @@ export function deduplicateModelReadOutputsWithSeen(
   seenOutputs: ReadonlyArray<string>,
   messages: ReadonlyArray<unknown>,
 ): [string[], unknown[]];
+
+declare module "vibe-fs/omp" {
+  export interface OmpReviewStore {
+    activateReview(sessionId: string, task: string, createdAt: number): void;
+    deactivateReview(sessionId: string): void;
+    isReviewActive(sessionId: string): boolean;
+    tryLockReview(sessionId: string): boolean;
+    unlockReview(sessionId: string): void;
+    setPendingReview(sessionId: string, resolve: (result: unknown) => void): void;
+    resolvePendingReview(sessionId: string, result: unknown): boolean;
+    getReviewTask(sessionId: string): string | undefined;
+    addChild(parentId: string, childId: string): void;
+    clearReviewSessions(): void;
+  }
+
+  export interface OmpPluginTestExports {
+    reset(): void;
+    setPendingReviewStateForTest(
+      sessionId: string,
+      parentId: string,
+      pending: unknown,
+    ): void;
+    setRunnerJobStateForTest(sessionId: string, state: string): void;
+    stripHeadTailPipes(text: string): string;
+    buildCapsContext(cwd: string): Promise<string | null>;
+    appendCapsContext(cwd: string, context: string): Promise<string>;
+    stripHostAgentsPrompt(systemPrompt: string | string[]): string | string[];
+    checkSyntax(cwd: string, event: Record<string, unknown>): Promise<void>;
+    getOllamaKey(): string | undefined;
+    readAssistantText(
+      sessionManager: unknown,
+      index: number,
+      separator: string,
+    ): string | undefined;
+    supportsSyntaxDiagnosticsTool(toolName: string): Promise<boolean>;
+    fuzzy: Record<string, unknown>;
+  }
+
+  export const reviewStore: OmpReviewStore;
+  export const _test: OmpPluginTestExports;
+
+  export default function kunweiExtension(pi: unknown): Promise<void>;
+}

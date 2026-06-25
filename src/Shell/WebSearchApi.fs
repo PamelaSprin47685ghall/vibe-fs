@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
+open VibeFs.Kernel.WebFetchGuard
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -33,6 +34,8 @@ let getWebApiKey () : string =
     else
         let key = env?("OLLAMA_API_KEY")
         if Dyn.isNullish key then "" else string key
+
+let getOllamaApiKey () : string = getWebApiKey ()
 
 let requireWebApiKey (apiKey: string) : Result<string, string> =
     let trimmed = apiKey.Trim()
@@ -74,4 +77,17 @@ let webApiPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
                     return Ok json
             with ex ->
                 return Error (UnknownJsError ex.Message)
+    }
+
+let ollamaPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Promise<Result<obj, DomainError>> =
+    let path = if pathname.StartsWith("/") then pathname else $"/{pathname}"
+    webApiPost path body abortSignal
+
+/// `web_fetch` body must pass SSRF validation before POST.
+let ollamaPostWebFetch (body: obj) (abortSignal: obj option) : JS.Promise<Result<obj, DomainError>> =
+    promise {
+        let url = Dyn.str body "url"
+        match validateFetchUrl url with
+        | Error msg -> return Error (UpstreamRefused msg)
+        | Ok () -> return! ollamaPost "/web_fetch" body abortSignal
     }

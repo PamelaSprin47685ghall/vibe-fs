@@ -1,33 +1,36 @@
 module VibeFs.Kernel.HostTools
 
-type Host = Opencode | Mimocode | Mux
+type Host = Opencode | Mimocode | Mux | Omp
 
 let opencode = Opencode
 let mimocode = Mimocode
 let mux = Mux
+let omp = Omp
 
 let todoWriteToolName = function
     | Opencode -> "todowrite"
     | Mimocode -> "task"
     | Mux -> "todowrite"
+    | Omp -> "todowrite"
 
 let todoWritePromptName = function
     | Opencode -> "todo_write"
     | Mimocode -> "task"
     | Mux -> "todo_write"
+    | Omp -> "todo_write"
 
 let taskToolName = function
     | Opencode -> "task"
     | Mimocode -> "actor"
     | Mux -> "task"
+    | Omp -> "task"
 
 let private opencodeAliases = [ "todo_write" ]
 let private mimoAliases = [ "task" ]
 let private muxAliases = [ "todo_write"; "todo_read" ]
+let private ompAliases = [ "todo_write" ]
 
 /// Map a Mux host tool name to the canonical name used by permission classification.
-/// Plugin canonical names pass through unchanged. Sourced from the Mux tool
-/// universe in `toolDefinitions.ts`.
 let normalizeToolNameForMux (toolName: string) : string =
     if toolName.StartsWith "file_edit_" then "edit"
     elif toolName = "file_read" then "read"
@@ -45,18 +48,20 @@ let normalizeToolName (host: Host) (toolName: string) : string =
     | Mimocode, "task" -> "todowrite"
     | Mimocode, "actor" -> "task"
     | Mux, _ -> normalizeToolNameForMux toolName
+    | Omp, "todo_write" -> "todowrite"
     | _ -> toolName
 
 let isTodoWriteToolName (toolName: string) : bool =
     toolName = todoWriteToolName Opencode
     || toolName = todoWriteToolName Mimocode
     || toolName = todoWriteToolName Mux
+    || toolName = todoWriteToolName Omp
     || List.contains toolName opencodeAliases
     || List.contains toolName mimoAliases
     || List.contains toolName muxAliases
+    || List.contains toolName ompAliases
 
 /// Mux child-workspace spawn tool universe for `toolPolicy.disabledTools`.
-/// Sourced from `../mux/src/common/utils/tools/toolDefinitions.ts`.
 let muxSpawnToolUniverse =
     [| "mux_agents_read"; "mux_agents_write"; "agent_skill_list"; "agent_skill_write"; "agent_skill_delete"
        "skills_catalog_search"; "skills_catalog_read"; "mux_config_read"; "mux_config_write"; "file_read"
@@ -69,6 +74,7 @@ let muxSpawnToolUniverse =
 
 let allToolNames (host: Host) : string array =
     [| "coder"; "investigator"; "meditator"; "browser"; "executor"
+       "executor_wait"; "executor_abort"
        "fuzzy_find"; "fuzzy_grep"; "websearch"; "webfetch"
        "knowledge_graph_fetch"; "return_bookkeeper"; "submit_review"; "return_reviewer"; "read"; "write"
        "bash"; taskToolName host; "grep"; "edit"; "patch"; "apply_patch"

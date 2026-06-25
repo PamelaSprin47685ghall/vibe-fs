@@ -5,6 +5,7 @@
 
   <ItemGroup>
     <Compile Include="src/Kernel/HostTools.fs" />
+    <Compile Include="src/Kernel/OmpSessionTools.fs" />
     <Compile Include="src/Kernel/SubagentIntents.fs" />
     <Compile Include="src/Kernel/PromptFrontMatter.fs" />
     <Compile Include="src/Kernel/ToolOutputInfo.fs" />
@@ -15,8 +16,10 @@
     <Compile Include="src/Kernel/SearchPrompts.fs" />
     <Compile Include="src/Kernel/ReviewPrompts.fs" />
     <Compile Include="src/Kernel/SubagentPrompts.fs" />
+    <Compile Include="src/Kernel/OmpPrompts.fs" />
     <Compile Include="src/Kernel/Subagent.fs" />
     <Compile Include="src/Kernel/ToolCatalog.fs" />
+    <Compile Include="src/Kernel/ToolCatalogParams.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />
     <Compile Include="src/Kernel/Dedup.fs" />
     <Compile Include="src/Kernel/Messaging.fs" />
@@ -108,6 +111,7 @@
     <Compile Include="src/Kernel/FuzzyFormat.fs" />
     <Compile Include="src/Kernel/Executor.fs" />
     <Compile Include="src/Kernel/ToolArgs.fs" />
+    <Compile Include="src/Kernel/WebFetchGuard.fs" />
     <Compile Include="src/Shell/Dyn.fs" />
     <Compile Include="src/Methodology/Args.fs" />
     <Compile Include="src/Shell/DynField.fs" />
@@ -136,6 +140,7 @@
     <Compile Include="src/Shell/ExecutorJavascript.fs" />
     <Compile Include="src/Shell/SubagentIntentsCodec.fs" />
     <Compile Include="src/Shell/WebSearchApi.fs" />
+    <Compile Include="src/Shell/SubagentIo.fs" />
     <Compile Include="src/Shell/TreeSitterShell.fs" />
     <Compile Include="src/Shell/FuzzyFinderShell.fs" />
     <Compile Include="src/Shell/WebSearchCodec.fs" />
@@ -168,6 +173,10 @@
     <Compile Include="src/Shell/CapsFileCache.fs" />
     <Compile Include="src/Shell/MessageTransformHostHooks.fs" />
     <Compile Include="src/Shell/MessageTransformHostEntry.fs" />
+    <Compile Include="src/Shell/WebFetch.fs" />
+    <Compile Include="src/Shell/RunnerBackground.fs" />
+    <Compile Include="src/Shell/OmpCaps.fs" />
+    <Compile Include="src/Shell/CapsPrelude.fs" />
     <Compile Include="src/Shell/Executor.fs" />
     <Compile Include="src/Shell/FuzzySearch.fs" />
     <Compile Include="src/Shell/FuzzyToolsCodec.fs" />
@@ -246,6 +255,36 @@
     <Compile Include="src/Opencode/Plugin.fs" />
     <Compile Include="src/Opencode/PluginMimo.fs" />
     <Compile Include="src/Opencode/PluginMimoTui.fs" />
+    <Compile Include="src/Omp/PiResolve.fs" />
+    <Compile Include="src/Omp/Schema.fs" />
+    <Compile Include="src/Omp/Codec.fs" />
+    <Compile Include="src/Omp/MessagingCodec.fs" />
+    <Compile Include="src/Omp/ChildSession.fs" />
+    <Compile Include="src/Omp/MagicTodo.fs" />
+    <Compile Include="src/Omp/ReadDedup.fs" />
+    <Compile Include="src/Omp/KnowledgeGraphRuntimeIO.fs" />
+    <Compile Include="src/Omp/KnowledgeGraphRuntime.fs" />
+    <Compile Include="src/Omp/KnowledgeGraphTools.fs" />
+    <Compile Include="src/Omp/PruneGuard.fs" />
+    <Compile Include="src/Omp/NudgeRuntime.fs" />
+    <Compile Include="src/Omp/CapsCodec.fs" />
+    <Compile Include="src/Omp/MessageTransform.fs" />
+    <Compile Include="src/Omp/FuzzyTools.fs" />
+    <Compile Include="src/Omp/WebTools.fs" />
+    <Compile Include="src/Omp/OmpToolSchema.fs" />
+    <Compile Include="src/Omp/ExecutorTools.fs" />
+    <Compile Include="src/Omp/TodoTool.fs" />
+    <Compile Include="src/Omp/SubagentTools.fs" />
+    <Compile Include="src/Omp/ReviewLoop.fs" />
+    <Compile Include="src/Omp/ReviewTools.fs" />
+    <Compile Include="src/Omp/HookExecute.fs" />
+    <Compile Include="src/Omp/AgentConfig.fs" />
+    <Compile Include="src/Omp/OmpTestHooks.fs" />
+    <Compile Include="src/Omp/SessionLifecycle.fs" />
+    <Compile Include="src/Omp/TitleFetchGuard.fs" />
+    <Compile Include="src/Omp/Tools.fs" />
+    <Compile Include="src/Omp/PluginCore.fs" />
+    <Compile Include="src/Omp/Plugin.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -291,10 +330,30 @@
     <Compile Include="tests/BacklogReplaySpecs.fs" />
     <Compile Include="tests/BacklogProjectionSpecs.fs" />
     <Compile Include="tests/WorkBacklogTests.fs" />
+    <Compile Include="tests/SubagentIoTests.fs" />
     <Compile Include="tests/KnowledgeGraphTests.fs" />
     <Compile Include="tests/KnowledgeGraphFileTests.fs" />
     <Compile Include="tests/KnowledgeGraphKernelTests.fs" />
     <Compile Include="tests/TitleFetchGuardTests.fs" />
+    <Compile Include="tests/OmpKernelTests.fs" />
+    <Compile Include="tests/OmpSessionToolsTests.fs" />
+    <Compile Include="tests/OmpWebFetchTests.fs" />
+    <Compile Include="tests/OmpCapsTests.fs" />
+    <Compile Include="tests/OmpFuzzyTests.fs" />
+    <Compile Include="tests/OmpPluginTests.fs" />
+    <Compile Include="tests/OmpContextTransformTests.fs" />
+    <Compile Include="tests/OmpReviewTests.fs" />
+    <Compile Include="tests/OmpChildSessionTests.fs" />
+    <Compile Include="tests/OmpHelpersTests.fs" />
+    <Compile Include="tests/OmpRunnerTests.fs" />
+    <Compile Include="tests/OmpPluginCoreTests.fs" />
+    <Compile Include="tests/OmpMagicTodoTests.fs" />
+    <Compile Include="tests/OmpPluginCoreIntegrationTests.fs" />
+    <Compile Include="tests/OmpTitleFetchGuardTests.fs" />
+    <Compile Include="tests/OmpAgentConfigTests.fs" />
+    <Compile Include="tests/OmpHookExecuteTests.fs" />
+    <Compile Include="tests/OmpKnowledgeGraphRuntimeTests.fs" />
+    <Compile Include="tests/OmpSessionLifecycleTests.fs" />
     <Compile Include="tests/MethodologyTests.fs" />
     <Compile Include="tests/ReviewReplaySyncTests.fs" />
     <Compile Include="tests/CapsSynthCommonTests.fs" />

@@ -1,0 +1,106 @@
+module VibeFs.Tests.OmpContextTransformTests
+
+open System
+open Fable.Core
+open Fable.Core.JsInterop
+open VibeFs.Tests.Assert
+open VibeFs.Tests.TempWorkspace
+open VibeFs.Omp.KnowledgeGraphRuntime
+open VibeFs.Omp.MessageTransform
+module Dyn = VibeFs.Shell.Dyn
+open VibeFs.Shell.ReviewRuntime
+
+[<Import("createRequire", "node:module")>]
+let private createRequire' : string -> (string -> obj) = jsNative
+
+[<Global("import.meta")>]
+let private importMeta : obj = jsNative
+
+let private requireFn : string -> obj = createRequire'(string importMeta?url)
+let private pathModule : obj = requireFn "path"
+let private join (a: string) (b: string) = unbox<string> (pathModule?join(a, b))
+
+[<Emit("$0[0].parts[0].text")>]
+let private firstEntryTextFromOut (entries: obj array) : string = jsNative
+
+let capsSynthUserPrepended () = promise {
+    let reviewStore = createReviewStore ()
+    let kgRuntime = OmpKnowledgeGraphRuntime(createObj [])
+    let entries =
+        [| createObj [
+               "info", box(createObj [ "id", box "user-1"; "role", box "user" ])
+               "parts", box [| createObj [ "type", box "text"; "text", box "hello" ] |]
+           ] |]
+    let! out = transformEntriesAsync reviewStore kgRuntime "/tmp/ws" "sess-1" (box entries)
+    check "prepends at least caps synth user" (out.Length >= entries.Length + 1)
+    let firstInfo = Dyn.get out.[0] "info"
+    check "caps user id prefix" ((Dyn.str firstInfo "id").StartsWith "caps-synth-user-")
+    let firstText = firstEntryTextFromOut out
+    check "has think prelude" (firstText.Contains "铁律")
+}
+
+let capsReadToolsInContextTransform () = promise {
+    let! root = mkdtempAsync "omp-caps-ctx-"
+    do! writeFileAsync (join root "ARCH.md") "arch-in-context"
+    let reviewStore = createReviewStore ()
+    let kgRuntime = OmpKnowledgeGraphRuntime(createObj [])
+    let entries =
+        [| createObj [
+               "info", box(createObj [ "id", box "user-1"; "role", box "user" ])
+               "parts", box [| createObj [ "type", box "text"; "text", box "hello" ] |]
+           ] |]
+    let! out = transformEntriesAsync reviewStore kgRuntime root "caps-sess" (box entries)
+    try
+        check "prepends user and assistant for caps" (out.Length >= entries.Length + 2)
+        let mutable foundRead = false
+        for entry in out do
+            let parts = Dyn.get entry "parts"
+            if Dyn.isArray parts then
+                for part in unbox<obj array> parts do
+                    if Dyn.str part "type" = "tool" && Dyn.str part "tool" = "read" then
+                        let state = Dyn.get part "state"
+                        let outText = Dyn.str state "output"
+                        if outText.Contains "arch-in-context" then foundRead <- true
+        check "caps file surfaced as read tool output" foundRead
+    with e ->
+        do! rmAsync root
+        raise e
+    do! rmAsync root
+}
+
+let beforeAgentStartOmitsCapsXml () = promise {
+    let! root = mkdtempAsync "omp-before-start-"
+    do! writeFileAsync (join root "ARCH.md") "should-not-be-in-system"
+    let! patch = beforeAgentStart root (box [| "line-one" |])
+    try
+        let sp = Dyn.get patch "systemPrompt"
+        let arr = if Dyn.isArray sp then unbox<string array> sp else [| string sp |]
+        let joined = String.concat "\n" arr
+        check "system prompt has user line" (joined.Contains "line-one")
+        check "system prompt omits caps-context xml" (not (joined.Contains "<caps-context"))
+    with e ->
+        do! rmAsync root
+        raise e
+    do! rmAsync root
+}
+
+let knowledgeGraphPreludeWhenKgPresent () = promise {
+    let! root = mkdtempAsync "omp-kg-ctx-"
+    let kgDir = join root "kg"
+    let fsAsync : obj = requireFn "fs"
+    let promises = unbox<obj> (fsAsync?promises)
+    do! unbox<JS.Promise<unit>> (promises?mkdir(kgDir))
+    do!
+        writeFileAsync
+            (join kgDir "2026-06-25.ndjson")
+            """{"type":"knowledge_graph_header","version":1,"kind":"day","date":"2026-06-25","rewritten":false}
+{"id":"abcd","entity":["Test"],"fact":"fact one"}
+"""
+    let reviewStore = createReviewStore ()
+    let kgRuntime = OmpKnowledgeGraphRuntime(createObj [])
+    let entries = [| createObj [ "id", box "u"; "info", box(createObj [ "role", box "user" ]); "parts", box [||] ] |]
+    let! out = transformEntriesAsync reviewStore kgRuntime root "kg-sess" (box entries)
+    let text = firstEntryTextFromOut out
+    check "kg front matter" (text.Contains "knowledge_graph:")
+    do! rmAsync root
+}

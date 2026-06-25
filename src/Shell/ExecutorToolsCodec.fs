@@ -67,4 +67,5 @@ let toExecuteOptions (cwd: string option) (decoded: ExecutorArgs) : ExecuteOptio
       dependencies = decoded.Dependencies
       timeoutType = decoded.TimeoutType
       mode = decoded.Mode
-      cwd = cwd }
+      cwd = cwd
+      whatToSummarize = "" }

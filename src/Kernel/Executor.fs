@@ -120,7 +120,8 @@ type ExecuteOptions =
       dependencies: string list
       timeoutType: ExecutorTimeoutType
       mode: string
-      cwd: string option }
+      cwd: string option
+      whatToSummarize: string }
 
 type ExecuteResult =
     | Completed of output: string * exitCode: int
@@ -257,7 +258,7 @@ let buildSummaryPrompt
             raw
     let langStr = languageToString options.language
     let timeoutStr = timeoutToString options.timeoutType
-    executorSummarizerPrompt capped langStr options.program options.dependencies timeoutStr options.mode
+    executorSummarizerPrompt options.whatToSummarize capped langStr options.program options.dependencies timeoutStr options.mode
 
 let parseTimeout (value: string) : ExecutorTimeoutType =
     match value.Replace("-", "").ToLowerInvariant() with

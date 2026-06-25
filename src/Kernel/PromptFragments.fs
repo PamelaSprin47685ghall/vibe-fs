@@ -31,9 +31,18 @@ let todoNudgePrompt =
     + "If you want to skip this check, respond with <skip-todo-check />"
 
 let loopNudgePrompt =
-    "You are in With-Review Mode. You must call the submit_review tool to\n"
+    "You are in loop mode. You must call the submit_review tool to\n"
     + "submit your detailed report and list of modified files for review\n"
     + "before finishing. Do not end the conversation without calling submit_review."
+
+let runnerNudgePromptFor (host: Host) =
+    let waitTool, abortTool =
+        match host with
+        | Omp -> "executor_wait", "executor_abort"
+        | _ -> "runner_wait", "runner_abort"
+    $"A background runner task is still active. Call {waitTool} to collect output or {abortTool} to stop it before finishing."
+
+let runnerNudgePrompt = runnerNudgePromptFor opencode
 
 let managerSystemPromptFor (host: Host) =
     let todoLine =

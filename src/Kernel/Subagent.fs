@@ -25,6 +25,7 @@ let private withReportTail (host: Host) (body: string) : string =
     | Opencode
     | Mux -> body
     | Mimocode -> body + agentReportTail
+    | Omp -> body
 
 /// Produce one prompt per parallel intent for coder/investigator, exactly one
 /// prompt for the singleton task kinds.  Host decides whether to append the
@@ -36,7 +37,8 @@ let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
     | Investigator intents -> intents |> List.map (investigatorPrompt >> wrap)
     | Meditator(intent, sections) -> [ meditatorPrompt sections intent |> wrap ]
     | Browser intent -> [ browserPrompt intent |> wrap ]
-    | ExecutorSummary(output, language, program, dependencies, timeoutType, mode) -> [ executorSummarizerPrompt output language program dependencies timeoutType mode |> wrap ]
+    | ExecutorSummary(output, language, program, dependencies, timeoutType, mode) ->
+        [ executorSummarizerPrompt "" output language program dependencies timeoutType mode |> wrap ]
     | WebsearchSummary(question, raw) -> [ websearchSummarizerPrompt question raw |> wrap ]
 
 let promptsForParallelIntents (host: Host) (constructor: 'a -> SubagentTaskKind) (intents: 'a) : string list =

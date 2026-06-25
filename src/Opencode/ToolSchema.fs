@@ -145,6 +145,6 @@ let submitKnowledgeGraph = toolDescription "return_bookkeeper"
 
 let submitReview = toolDescription "submit_review"
 
-let submitReviewResult = toolDescription "submit_review_result"
+let submitReviewResult = toolDescription "return_reviewer"
 
 let executorMode = Params.executorMode

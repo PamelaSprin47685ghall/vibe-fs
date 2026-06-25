@@ -159,8 +159,8 @@ let private submitReviewSpec: ToolSpec =
                "Optional. Defaults to true when omitted. true means this submission is partial — the task is not fully complete yet. false means you assert the full task is complete in this submission." ]
       requiredFields = [ "report"; "affectedFiles" ] }
 
-let private submitReviewResultSpec: ToolSpec =
-    { name = "submit_review_result"
+let private returnReviewerSpec: ToolSpec =
+    { name = "return_reviewer"
       description = "Submit your review verdict."
       paramDocs =
         map
@@ -189,6 +189,18 @@ let private writeSpec: ToolSpec =
               "content", "The content to write to the file" ]
       requiredFields = [ "file_path"; "content" ] }
 
+let private executorWaitSpec: ToolSpec =
+    { name = "executor_wait"
+      description = "Wait for background executor output."
+      paramDocs = map [ "ms", "Wait time in milliseconds." ]
+      requiredFields = [] }
+
+let private executorAbortSpec: ToolSpec =
+    { name = "executor_abort"
+      description = "Abort background executor task."
+      paramDocs = Map.empty
+      requiredFields = [] }
+
 let all: ToolSpec list =
     [ coderSpec
       investigatorSpec
@@ -202,9 +214,11 @@ let all: ToolSpec list =
       websearchSpec
       webfetchSpec
       submitReviewSpec
-      submitReviewResultSpec
+      returnReviewerSpec
       readSpec
-      writeSpec ]
+      writeSpec
+      executorWaitSpec
+      executorAbortSpec ]
 
 let private byName: Map<string, ToolSpec> =
     all |> List.map (fun spec -> spec.name, spec) |> Map.ofList
@@ -233,62 +247,3 @@ let private fileEditToolNames =
 
 let isFileEditTool (tool: string) : bool =
     Set.contains (tool.ToLowerInvariant ()) fileEditToolNames
-
-module Params =
-    let private doc tool field = paramDoc tool field
-    let private coder = doc "coder"
-    let coderIntents = coder "intents"
-    let coderTdd = coder "tdd"
-    let investigatorIntents = doc "investigator" "intents"
-    let private meditator = doc "meditator"
-    let meditatorIntent = meditator "intent"
-    let meditatorFiles = meditator "files"
-    let browserIntent = doc "browser" "intent"
-    let private executor = doc "executor"
-    let executorLanguage = executor "language"
-    let executorProgram = executor "program"
-    let executorDeps = executor "dependencies"
-    let executorTimeout = executor "timeout_type"
-    let executorMode = executor "mode"
-    let fetchKnowledgeGraphEntity = doc "knowledge_graph_fetch" "entity"
-    let submitKnowledgeGraphEntries = doc "return_bookkeeper" "entries"
-    let kgEntryId = doc "return_bookkeeper" "id"
-    let kgEntryEntity = doc "return_bookkeeper" "entity"
-    let kgEntryFact = doc "return_bookkeeper" "fact"
-    let private fuzzyFind = doc "fuzzy_find"
-    let fuzzyFindPattern = fuzzyFind "pattern"
-    let fuzzyFindPath = fuzzyFind "path"
-    let fuzzyFindLimit = fuzzyFind "limit"
-    let fuzzyFindIterator = fuzzyFind "iterator"
-    let private fuzzyGrep = doc "fuzzy_grep"
-    let fuzzyGrepPattern = fuzzyGrep "pattern"
-    let fuzzyGrepPath = fuzzyGrep "path"
-    let fuzzyGrepExclude = fuzzyGrep "exclude"
-    let fuzzyGrepCaseSensitive = fuzzyGrep "caseSensitive"
-    let fuzzyGrepContext = fuzzyGrep "context"
-    let fuzzyGrepLimit = fuzzyGrep "limit"
-    let fuzzyGrepIterator = fuzzyGrep "iterator"
-    let private websearch = doc "websearch"
-    let websearchQuery = websearch "query"
-    let websearchNumResults = websearch "numResults"
-    let websearchWhatToSummarize = websearch "what_to_summarize"
-    let private webfetch = doc "webfetch"
-    let webfetchUrl = webfetch "url"
-    let webfetchExtractMain = webfetch "extract_main"
-    let webfetchPreferLlmsTxt = webfetch "prefer_llms_txt"
-    let webfetchPrompt = webfetch "prompt"
-    let private submitReview = doc "submit_review"
-    let submitReviewWip = submitReview "wip"
-    let submitReviewReport = submitReview "report"
-    let submitReviewAffectedFiles = submitReview "affectedFiles"
-    let webfetchTimeout = webfetch "timeout"
-    let private returnReviewer = doc "submit_review_result"
-    let returnReviewerVerdict = returnReviewer "verdict"
-    let returnReviewerFeedback = returnReviewer "feedback"
-    let private read = doc "read"
-    let readPath = read "path"
-    let readOffset = read "offset"
-    let readLimit = read "limit"
-    let private write = doc "write"
-    let writeFilePath = write "file_path"
-    let writeContent = write "content"
