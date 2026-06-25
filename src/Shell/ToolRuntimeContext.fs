@@ -25,3 +25,12 @@ let fromOpencode (context: obj) (fallbackDir: string) : IToolRuntimeContext =
 
 let pluginDirectoryFromCtx (ctx: obj) : string =
     (fromOpencode ctx "").Execution.Directory
+
+let sessionId (ctx: IToolRuntimeContext) : SessionId = ctx.Execution.SessionId
+
+let workspaceId (ctx: IToolRuntimeContext) : WorkspaceId option = ctx.Execution.WorkspaceId
+
+let sessionIdString (ctx: IToolRuntimeContext) : string = Id.sessionIdValue ctx.Execution.SessionId
+
+let workspaceIdString (ctx: IToolRuntimeContext) : string =
+    ctx.Execution.WorkspaceId |> Option.map Id.workspaceIdValue |> Option.defaultValue ""

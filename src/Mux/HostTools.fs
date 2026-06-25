@@ -113,7 +113,7 @@ let executorTool (deps: obj) (toolNames: string array) (_knowledgeGraphRuntime: 
           match fromMuxConfig config with
           | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
           | Ok runtime ->
-              let sessionId = runtime.Execution.SessionId
+              let sessionId = Id.sessionIdValue runtime.Execution.SessionId
               if sessionId = "" then resolveStr executorRequiresSession
               else
                   match decodeExecutorArgs args with
@@ -197,7 +197,7 @@ let writeTool (_deps: obj) : ToolDefinition =
 let private searchOptionsFromRuntime (runtime: IToolRuntimeContext) (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyIteratorStore.TypedIteratorStore) : SearchOptions =
     let scopeId =
         match runtime.Execution.WorkspaceId with
-        | Some w -> w
+        | Some w -> Id.workspaceIdValue w
         | None -> ""
     { cwd = runtime.Execution.Directory
       scopeId = scopeId

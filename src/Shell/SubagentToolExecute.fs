@@ -52,7 +52,7 @@ let executeOpencodeSubagentTool
             let ctx = spawn.ToolContext
             let tools = box null
             let spawnOne agent title prompt =
-                resolveSubagentPromise toolName (runCore registry client agent title prompt dir sessionID ctx tools false)
+                resolveSubagentPromise toolName (runCore registry client agent title prompt dir (Id.sessionIdValue sessionID) ctx tools false)
             match decoded with
             | CoderBatch intents ->
                 let prompts = promptsFromCoderIntents spawn.Host intents

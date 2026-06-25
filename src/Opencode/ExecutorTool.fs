@@ -46,7 +46,7 @@ let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (session
                 | Error e -> resolveStr (wireEncodeToolError "OpencodeClient" e)
                 | Ok client ->
                     let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
-                    let sessionID = runtime.Execution.SessionId
+                    let sessionID = Id.sessionIdValue runtime.Execution.SessionId
                     if sessionID = "" then resolveStr executorRequiresSession
                     else
                         sessionScope.EnqueuePerSession(sessionID, fun () ->

@@ -38,6 +38,7 @@
     <Compile Include="src/Kernel/TreeSitterKernel.fs" />
     <Compile Include="src/Kernel/MessageDedup.fs" />
     <Compile Include="src/Kernel/MessageTransformPolicy.fs" />
+    <Compile Include="src/Kernel/MethodologyCatalog.fs" />
     <Compile Include="src/Kernel/Methodology.fs" />
     <Compile Include="src/Methodology/SchemaCommon.fs" />
     <Compile Include="src/Methodology/FirstPrinciples.fs" />
@@ -127,6 +128,8 @@
     <Compile Include="src/Shell/SessionExecutor.fs" />
     <Compile Include="src/Shell/OpencodeContextCodec.fs" />
     <Compile Include="src/Shell/ToolContextCodec.fs" />
+    <Compile Include="src/Shell/MuxHostBindings.fs" />
+    <Compile Include="src/Shell/OmpHostBindings.fs" />
     <Compile Include="src/Shell/OpencodeSessionPromptCodec.fs" />
     <Compile Include="src/Shell/OpencodeSessionSpawnCodec.fs" />
     <Compile Include="src/Shell/OpencodeAgentConfigCodec.fs" />
@@ -141,6 +144,7 @@
     <Compile Include="src/Shell/SubagentIntentsCodec.fs" />
     <Compile Include="src/Shell/WebSearchApi.fs" />
     <Compile Include="src/Shell/SubagentIo.fs" />
+    <Compile Include="src/Shell/TreeSitterPlatform.fs" />
     <Compile Include="src/Shell/TreeSitterShell.fs" />
     <Compile Include="src/Shell/FuzzyFinderShell.fs" />
     <Compile Include="src/Shell/WebSearchCodec.fs" />
@@ -152,6 +156,7 @@
     <Compile Include="src/Shell/KnowledgeGraphFiles.fs" />
     <Compile Include="src/Shell/KnowledgeGraphStorage.fs" />
     <Compile Include="src/Shell/KnowledgeGraphWorkflow.fs" />
+    <Compile Include="src/Shell/KnowledgeGraphSubmit.fs" />
     <Compile Include="src/Shell/KnowledgeGraphRuntimeTestPorts.fs" />
     <Compile Include="src/Shell/KnowledgeGraphMaintenanceRun.fs" />
     <Compile Include="src/Shell/WorkspaceFiles.fs" />
@@ -177,6 +182,7 @@
     <Compile Include="src/Shell/RunnerBackground.fs" />
     <Compile Include="src/Shell/OmpCaps.fs" />
     <Compile Include="src/Shell/CapsPrelude.fs" />
+    <Compile Include="src/Shell/TitleFetchGuardCommon.fs" />
     <Compile Include="src/Shell/Executor.fs" />
     <Compile Include="src/Shell/FuzzySearch.fs" />
     <Compile Include="src/Shell/FuzzyToolsCodec.fs" />
@@ -194,8 +200,8 @@
     <Compile Include="src/Shell/SubagentToolExecute.fs" />
     <Compile Include="src/Shell/MuxSubagentToolExecute.fs" />
     <Compile Include="src/Shell/DelegateToolsCodec.fs" />
-    <Compile Include="src/Shell/OpencodeHookInputCodec.fs" />
     <Compile Include="src/Shell/OpencodeSessionEventCodec.fs" />
+    <Compile Include="src/Shell/OpencodeHookInputCodec.fs" />
     <Compile Include="src/Shell/KnowledgeGraphBookkeeperLaunch.fs" />
     <Compile Include="src/Shell/NudgeRuntime.fs" />
     <Compile Include="src/Mux/AiSettings.fs" />
@@ -250,7 +256,7 @@
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/HookExecute.fs" />
     <Compile Include="src/Opencode/HookTransform.fs" />
-    <Compile Include="src/Opencode/TitleFetchGuard.fs" />
+
     <Compile Include="src/Opencode/PluginCore.fs" />
     <Compile Include="src/Opencode/Plugin.fs" />
     <Compile Include="src/Opencode/PluginMimo.fs" />
@@ -280,8 +286,9 @@
     <Compile Include="src/Omp/HookExecute.fs" />
     <Compile Include="src/Omp/AgentConfig.fs" />
     <Compile Include="src/Omp/OmpTestHooks.fs" />
+    <Compile Include="src/Omp/SessionLifecycleHooks.fs" />
     <Compile Include="src/Omp/SessionLifecycle.fs" />
-    <Compile Include="src/Omp/TitleFetchGuard.fs" />
+
     <Compile Include="src/Omp/Tools.fs" />
     <Compile Include="src/Omp/PluginCore.fs" />
     <Compile Include="src/Omp/Plugin.fs" />

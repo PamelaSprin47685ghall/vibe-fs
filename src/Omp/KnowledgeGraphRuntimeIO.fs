@@ -3,19 +3,12 @@ module VibeFs.Omp.KnowledgeGraphRuntimeIO
 open Fable.Core
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.KnowledgeGraphPortLock
+open VibeFs.Shell.KnowledgeGraphSubmit
 open VibeFs.Shell.Dyn
 
 module Dyn = VibeFs.Shell.Dyn
 
-let buildEntries (root: string) (drafts: KnowledgeGraphDraft list) : JS.Promise<Result<KnowledgeGraphEntry list, string>> =
-    promise {
-        let! projection = readProjection root
-        let normalizedDrafts = normalizeDraftIds projection drafts
-        let random = System.Random()
-        return applyDrafts (allocateRandomHexId (fun () -> random.Next(0, 65536))) projection normalizedDrafts
-    }
+let buildEntries = VibeFs.Shell.KnowledgeGraphSubmit.buildEntriesFromDrafts
 
 let extractTexts (entry: obj) : string list =
     if Dyn.typeIs entry "string" then [ string entry ]
@@ -56,18 +49,4 @@ let tryResolveJobContext (getEntries: (unit -> obj array) option) (sessionID: st
 
 let submitForKind (root: string) (todayStr: string) (entries: KnowledgeGraphEntry list) (kind: KnowledgeGraphJobKind)
     : JS.Promise<string> =
-    promise {
-        let! result = withKnowledgeGraphPortLock 30000L 1000 root (fun () ->
-            promise {
-                match kind with
-                | AppendAfterWork ->
-                    do! appendEntries root todayStr entries
-                    return $"Appended {entries.Length} knowledge graph entries."
-                | DailyRewrite date ->
-                    do! rewriteDay root date entries
-                    return $"Rewrote knowledge graph day {date}."
-            })
-        match result with
-        | Error e -> return e
-        | Ok msg -> return msg
-    }
+    VibeFs.Shell.KnowledgeGraphSubmit.submitEntriesForKind 30000L 1000 root todayStr entries kind

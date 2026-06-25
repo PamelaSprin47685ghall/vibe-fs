@@ -1,4 +1,5 @@
 module VibeFs.Mux.AiSettings
+open VibeFs.Kernel.Domain
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -31,7 +32,7 @@ let mergeNamedSettings (sources: DelegatedAiSettings option list) : DelegatedAiS
 let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) : JS.Promise<DelegatedAiSettings> =
     promise {
         let d = decodeMuxDelegateConfigLenient config
-        let workspaceId = d.Execution.WorkspaceId |> Option.defaultValue ""
+        let workspaceId = d.Execution.WorkspaceId |> Option.map Id.workspaceIdValue |> Option.defaultValue ""
         let runtime = d.Runtime
         let cwd = d.Cwd
         let configFile = loadConfigOrDefault deps

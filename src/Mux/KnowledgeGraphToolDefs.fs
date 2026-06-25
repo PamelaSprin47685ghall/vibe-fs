@@ -46,7 +46,7 @@ let knowledgeGraphFetchTool (kgRuntime: MuxKnowledgeGraphRuntime) : ToolDefiniti
                   | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
                   | Ok runtime ->
                       kgRuntime.FetchFromSessionSnapshot(
-                          runtime.Execution.SessionId,
+                          VibeFs.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId,
                           runtime.Execution.Directory,
                           entity)
       condition =
@@ -74,7 +74,7 @@ let returnBookkeeperTool (kgRuntime: MuxKnowledgeGraphRuntime) : ToolDefinition 
                   | Error e -> resolveStr (wireDecodeFailure "return_bookkeeper" e)
                   | Ok drafts ->
                       kgRuntime.Submit(
-                          runtime.Execution.SessionId,
+                          VibeFs.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId,
                           runtime.Execution.Directory,
                           drafts,
                           config)

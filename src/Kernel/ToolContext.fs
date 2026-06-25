@@ -1,7 +1,9 @@
 module VibeFs.Kernel.ToolContext
 
+open VibeFs.Kernel.Domain
+
 type ToolExecutionContext = {
     Directory: string
-    SessionId: string
-    WorkspaceId: string option
+    SessionId: SessionId
+    WorkspaceId: WorkspaceId option
 }

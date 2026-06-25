@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Shell.Dyn
 
-open VibeFs.Omp.TitleFetchGuard
+open VibeFs.Shell.TitleFetchGuardCommon
 
 let signature () =
     equal "omp title probe signature pinned" "Generate a title for this conversation" titleRequestSignature

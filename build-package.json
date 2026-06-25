@@ -6,5 +6,9 @@
   "exports": {
     ".": "./src/Mux/Plugin.js",
     "./omp": "./src/Omp/Plugin.js"
+  },
+  "dependencies": {
+    "highlight.js": "*",
+    "@kreuzberg/tree-sitter-language-pack": "*"
   }
 }

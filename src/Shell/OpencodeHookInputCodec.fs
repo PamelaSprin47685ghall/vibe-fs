@@ -1,4 +1,5 @@
 module VibeFs.Shell.OpencodeHookInputCodec
+open VibeFs.Kernel.Domain
 
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Messaging
@@ -10,7 +11,7 @@ open VibeFs.Shell.ToolContextCodec
 type HostEventEnvelope = { EventType: string; Props: obj }
 
 let sessionIdFromHookInput (input: obj) (fallbackDir: string) : string =
-    (decodeOpencodeToolContext input fallbackDir).SessionId
+    Id.sessionIdValue (decodeOpencodeToolContext input fallbackDir).SessionId
 
 let toolNameFromHookInput (input: obj) : string = Dyn.str input "tool"
 

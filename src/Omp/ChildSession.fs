@@ -6,6 +6,7 @@ open VibeFs.Omp.Codec
 open VibeFs.Omp.MessagingCodec
 open VibeFs.Omp.PiResolve
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.OmpHostBindings
 open VibeFs.Shell.SubagentIo
 module Dyn = VibeFs.Shell.Dyn
 
@@ -37,13 +38,13 @@ let private callOpt (ctx: obj) (key: string) : obj =
 let createChildSession (pi: obj) (ctx: obj) (toolNames: string array) (systemPrompt: obj option) (customTools: obj array)
     : JS.Promise<ChildSession> =
     promise {
-        let createAgentSession = pi?pi?createAgentSession
+        let createAgentSession = getCreateAgentSession pi
         if Dyn.isNullish createAgentSession || not (Dyn.typeIs createAgentSession "function") then
             return failwith "createAgentSession unavailable"
         let! codingAgent = getCodingAgentModule ()
         let sessionManagerType = Dyn.get codingAgent "SessionManager"
         let cwd = string (Dyn.get ctx "cwd")
-        let sm = sessionManagerType?create(cwd)
+        let sm = createSessionManager sessionManagerType cwd
         let sp =
             match systemPrompt with
             | Some v -> v
@@ -62,7 +63,7 @@ let createChildSession (pi: obj) (ctx: obj) (toolNames: string array) (systemPro
                 "sessionManager", box sm
                 "customTools", box customTools
             ]
-        let! wrapper = createAgentSession(body)
+        let! wrapper = unbox<JS.Promise<obj>> (Dyn.call1 createAgentSession (box body))
         let session = Dyn.get wrapper "session"
         let childId =
             let childCtx = createObj [ "sessionManager", Dyn.get session "sessionManager" ]
@@ -86,17 +87,15 @@ let runSubagent (pi: obj) (ctx: obj) (toolNames: string array) (prompt: string) 
     promise {
         let! child = createChildSession pi ctx toolNames None [||]
         let session = child.session
-        let promptFn = session?prompt
-        let waitFn = session?waitForIdle
         let run =
             promise {
-                do! promptFn(prompt)
-                do! waitFn()
+                do! sessionPrompt session prompt
+                do! sessionWaitForIdle session
                 let sm = Dyn.get session "sessionManager"
                 return readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
             }
         let cleanup () =
-            let abort = Dyn.get session "abort"
+            let abort = sessionAbort session
             if Dyn.typeIs abort "function" then Dyn.call0 abort |> ignore
             child.dispose |> Option.iter (fun dispose -> dispose ())
         let! text = raceWithAbortSignal (Option.defaultValue (box null) signal) cleanup run

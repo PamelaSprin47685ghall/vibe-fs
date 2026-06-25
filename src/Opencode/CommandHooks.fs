@@ -13,7 +13,6 @@ open VibeFs.Opencode.NudgeEventCodec
 open VibeFs.Opencode.ReviewerLoop
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Kernel.Domain
 open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Shell.OpencodeHookInputCodec
 open VibeFs.Shell.OpencodeClientCodec

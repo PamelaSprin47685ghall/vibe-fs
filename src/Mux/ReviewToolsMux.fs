@@ -83,7 +83,7 @@ let submitReviewTool (deps: obj) (toolNames: string array) (reviewStore: ReviewS
           | Error (InvalidIntent (_, "workspaceId", _)) -> resolveStr muxSubmitReviewRequiresWorkspaceId
           | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
           | Ok runtime ->
-              let workspaceId = Option.get runtime.Execution.WorkspaceId
+              let workspaceId = runtime.Execution.WorkspaceId |> Option.map Id.workspaceIdValue |> Option.defaultValue ""
               promise {
                   match decodeSubmitReviewArgs args with
                   | Error e -> return wireDecodeFailure "submit_review" e

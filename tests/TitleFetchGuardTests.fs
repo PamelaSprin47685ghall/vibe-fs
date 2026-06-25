@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 
-open VibeFs.Opencode.TitleFetchGuard
+open VibeFs.Shell.TitleFetchGuardCommon
 open VibeFs.Shell.Dyn
 
 let signature () =

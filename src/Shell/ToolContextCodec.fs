@@ -26,7 +26,7 @@ let decodeOpencodeToolContext (context: obj) (fallbackDir: string) : ToolExecuti
         | None -> ""
     {
         Directory = directory
-        SessionId = sessionId
+        SessionId = Id.sessionIdQuick sessionId
         WorkspaceId = None
     }
 
@@ -53,8 +53,8 @@ let decodeMuxConfig (config: obj) : Result<ToolExecutionContext, DomainError> =
             | None -> ""
         Ok {
             Directory = directory
-            SessionId = sessionId
-            WorkspaceId = Some workspaceId
+            SessionId = Id.sessionIdQuick sessionId
+            WorkspaceId = Some (Id.workspaceIdQuick workspaceId)
         }
 
 let decodeMuxConfigLenient (config: obj) : ToolExecutionContext =
@@ -70,6 +70,6 @@ let decodeMuxConfigLenient (config: obj) : ToolExecutionContext =
             |> Option.defaultValue ""
         {
             Directory = directory
-            SessionId = sessionId
-            WorkspaceId = workspaceId
+            SessionId = Id.sessionIdQuick sessionId
+            WorkspaceId = workspaceId |> Option.map Id.workspaceIdQuick
         }

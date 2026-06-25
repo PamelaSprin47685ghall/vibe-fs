@@ -44,7 +44,7 @@ let private buildFuzzyTool (description: string) (args: obj) (toolName: string) 
         args
         (fun args context ->
             let runtime = fromOpencode context ""
-            let scopeId = runtime.Execution.SessionId
+            let scopeId = Id.sessionIdValue runtime.Execution.SessionId
             if scopeId = "" then resolveStr (toolRequiresActiveSession toolName)
             else
                 match decode args with
@@ -111,7 +111,7 @@ let websearchTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =
                                 let prompt = formatPrompt host (WebsearchSummary(ws.WhatToSummarize, rawResults)) |> List.head
                                 return! resolveSubagentPromise "executor"
                                     (runSubagentWithCleanup registry client "executor" "Web search summary" prompt
-                                        runtime.Execution.Directory runtime.Execution.SessionId context)
+                                        runtime.Execution.Directory (Id.sessionIdValue runtime.Execution.SessionId) context)
                     })
 
 let webfetchTool (ctx: obj) : obj =

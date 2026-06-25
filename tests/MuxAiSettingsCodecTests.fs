@@ -19,9 +19,9 @@ let decodeMuxDelegateConfigOk () =
         ]
     match decodeMuxDelegateConfig config with
     | Ok d ->
-        check "delegate workspaceId" (d.Execution.WorkspaceId = Some "ws-delegate")
+        check "delegate workspaceId" (d.Execution.WorkspaceId |> Option.map Id.workspaceIdValue = Some "ws-delegate")
         check "delegate cwd" (d.Cwd = "/tmp/ws")
-        check "delegate session" (d.Execution.SessionId = "sess-1")
+        check "delegate session" (Id.sessionIdValue d.Execution.SessionId = "sess-1")
         check "delegate runtime ref" (obj.ReferenceEquals(d.Runtime, runtime))
     | Error _ -> check "delegate ok" false
 

@@ -82,7 +82,7 @@ let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserve
     promise {
         do! appendSyntaxDiagnostics pluginDirectory input output
         let tool = toolNameFromHookInput input
-        let sessionID = (fromOpencode input pluginDirectory).Execution.SessionId
+        let sessionID = VibeFs.Kernel.Domain.Id.sessionIdValue (fromOpencode input pluginDirectory).Execution.SessionId
         let succeeded = hookOutputError output = ""
         let originalOutput = hookOutputText output
         if succeeded && recordsToBookkeeper tool && not (isReadOnlyExecutor tool input) && (registry.LookupChildAgent sessionID).IsNone then

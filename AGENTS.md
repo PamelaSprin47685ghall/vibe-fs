@@ -2,6 +2,7 @@
 import: 
   - README.md
   - src/Opencode
+  - TASK.md
 ---
 
 - 提交仓库时候带上 kg/ 的变化

@@ -21,53 +21,63 @@ let private pathJoin (a: string) (b: string) : string = jsNative
 
 type private RunnerJobEntry = { status: string }
 
-let mutable private runnerJobs : Map<string, RunnerJobEntry> = Map.empty
+type private RunnerState = {
+    Jobs: Map<string, RunnerJobEntry>
+    ActiveSessions: Set<string>
+    LogBuffers: Map<string, string>
+    ChildByParent: Map<string, string>
+    ChildDispose: Map<string, unit -> unit>
+}
 
-let mutable private activeRunnerSessions : Set<string> = Set.empty
+let private emptyState = {
+    Jobs = Map.empty
+    ActiveSessions = Set.empty
+    LogBuffers = Map.empty
+    ChildByParent = Map.empty
+    ChildDispose = Map.empty
+}
 
-let mutable private logBuffers : Map<string, string> = Map.empty
-
-let mutable private childByParent : Map<string, string> = Map.empty
-
-let mutable private childDispose : Map<string, unit -> unit> = Map.empty
+let mutable private state = emptyState
 
 let registerActiveRunnerSession (sessionId: string) : unit =
-    if sessionId <> "" then activeRunnerSessions <- Set.add sessionId activeRunnerSessions
+    if sessionId <> "" then state <- { state with ActiveSessions = Set.add sessionId state.ActiveSessions }
 
 let unregisterActiveRunnerSession (sessionId: string) : unit =
-    if sessionId <> "" then activeRunnerSessions <- Set.remove sessionId activeRunnerSessions
+    if sessionId <> "" then state <- { state with ActiveSessions = Set.remove sessionId state.ActiveSessions }
 
 let registerRunnerChild (parentSessionId: string) (childSessionId: string) (dispose: unit -> unit) : unit =
     if parentSessionId <> "" && childSessionId <> "" then
-        childByParent <- Map.add parentSessionId childSessionId childByParent
-        childDispose <- Map.add parentSessionId dispose childDispose
+        state <- { state with
+                    ChildByParent = Map.add parentSessionId childSessionId state.ChildByParent
+                    ChildDispose = Map.add parentSessionId dispose state.ChildDispose }
 
 let unregisterRunnerChild (parentSessionId: string) : unit =
     if parentSessionId <> "" then
-        childByParent <- Map.remove parentSessionId childByParent
-        childDispose <- Map.remove parentSessionId childDispose
+        state <- { state with
+                    ChildByParent = Map.remove parentSessionId state.ChildByParent
+                    ChildDispose = Map.remove parentSessionId state.ChildDispose }
 
 let appendRunnerLog (sessionId: string) (chunk: string) : unit =
     if sessionId <> "" && chunk <> "" then
-        let prev = Map.tryFind sessionId logBuffers |> Option.defaultValue ""
-        logBuffers <- Map.add sessionId (prev + chunk) logBuffers
+        let prev = Map.tryFind sessionId state.LogBuffers |> Option.defaultValue ""
+        state <- { state with LogBuffers = Map.add sessionId (prev + chunk) state.LogBuffers }
 
 let private childActiveForParent (parentSessionId: string) : bool =
-    match Map.tryFind parentSessionId childByParent with
+    match Map.tryFind parentSessionId state.ChildByParent with
     | None -> false
     | Some childId -> hasActiveExecutorRun childId
 
 let hasRunningRunnerJob (sessionId: string) : bool =
     hasActiveExecutorRun sessionId
-    || Set.contains sessionId activeRunnerSessions
-    || Map.containsKey sessionId runnerJobs
+    || Set.contains sessionId state.ActiveSessions
+    || Map.containsKey sessionId state.Jobs
     || childActiveForParent sessionId
 
 let getRunnerLogPathForTest (sessionId: string) : string =
     pathJoin (tmpdir ()) $"omp-runner-test-{sessionId}.log"
 
 let private readLogSnippet (sessionId: string) : string =
-    match Map.tryFind sessionId logBuffers with
+    match Map.tryFind sessionId state.LogBuffers with
     | Some buf when buf <> "" -> buf
     | _ ->
         let path = getRunnerLogPathForTest sessionId
@@ -85,35 +95,28 @@ let waitRunnerJob (sessionId: string) (ms: int) : JS.Promise<string> =
     }
 
 let private abortRunnerJobCore (sessionId: string) : unit =
-    let childId = Map.tryFind sessionId childByParent
+    let childId = Map.tryFind sessionId state.ChildByParent
     childId |> Option.iter abortExecutorRun
     abortExecutorRun sessionId
-    match Map.tryFind sessionId childDispose with
+    match Map.tryFind sessionId state.ChildDispose with
     | None -> ()
     | Some dispose ->
         try dispose () with _ -> ()
     unregisterRunnerChild sessionId
     unregisterActiveRunnerSession sessionId
-    runnerJobs <- Map.remove sessionId runnerJobs
-    logBuffers <- Map.remove sessionId logBuffers
+    state <- { state with Jobs = Map.remove sessionId state.Jobs; LogBuffers = Map.remove sessionId state.LogBuffers }
 
 let abortRunnerJob (sessionId: string) : string =
     abortRunnerJobCore sessionId
     "Runner abort requested."
 
 let cleanupRunnerJob (sessionId: string) : JS.Promise<unit> =
-    promise {
-        abortRunnerJobCore sessionId
-    }
+    promise { abortRunnerJobCore sessionId }
 
 let resetRunnerJobsForTesting () : unit =
-    activeRunnerSessions <- Set.empty
-    runnerJobs <- Map.empty
-    logBuffers <- Map.empty
-    childByParent <- Map.empty
-    childDispose <- Map.empty
+    state <- emptyState
     resetSessionExecutorForTesting ()
 
 let setRunnerJobStateForTest (sessionId: string) (status: string) : unit =
     writeFileSync (getRunnerLogPathForTest sessionId) ""
-    runnerJobs <- Map.add sessionId { status = status } runnerJobs
+    state <- { state with Jobs = Map.add sessionId { status = status } state.Jobs }

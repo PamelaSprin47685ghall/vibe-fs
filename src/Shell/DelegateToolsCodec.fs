@@ -31,19 +31,16 @@ let decodeDelegateConfig (config: obj) : Result<DelegateHostConfig, DomainError>
     | Ok ctx ->
         match ctx.WorkspaceId with
         | None -> Error (InvalidIntent ("delegate", "workspaceId", "required"))
-        | Some widStr ->
-            match Id.tryWorkspaceId widStr with
-            | None -> Error (InvalidIntent ("delegate", "workspaceId", "invalid"))
-            | Some wid ->
-                let taskService = Dyn.get config "taskService"
-                if isNull taskService then
-                    Error (InvalidIntent ("delegate", "taskService", "missing"))
-                else
-                    Ok {
-                        WorkspaceId = wid
-                        TaskService = taskService
-                        AbortSignal = Dyn.get config "abortSignal"
-                    }
+        | Some wid ->
+            let taskService = Dyn.get config "taskService"
+            if isNull taskService then
+                Error (InvalidIntent ("delegate", "taskService", "missing"))
+            else
+                Ok {
+                    WorkspaceId = wid
+                    TaskService = taskService
+                    AbortSignal = Dyn.get config "abortSignal"
+                }
 
 let decodeDelegateOptions (options: obj) : DelegateOptionsFields =
     {

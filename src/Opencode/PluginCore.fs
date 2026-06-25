@@ -14,7 +14,7 @@ open VibeFs.Opencode.ToolDefinitionHooks
 open VibeFs.Opencode.EventHooks
 open VibeFs.Opencode.Tools
 open VibeFs.Opencode.HookExecute
-open VibeFs.Opencode.TitleFetchGuard
+open VibeFs.Shell.TitleFetchGuardCommon
 open VibeFs.Opencode.SessionLifecycleObserver
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Opencode.KnowledgeGraphTestHooks

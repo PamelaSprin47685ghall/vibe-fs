@@ -20,7 +20,7 @@ let knowledgeGraphFetchTool (kgRuntime: KnowledgeGraphRuntime) (ctx: obj) : obj 
             | Ok entity ->
                 let pluginDirectory = pluginDirectoryFromCtx ctx
                 let runtime = fromOpencode context pluginDirectory
-                kgRuntime.FetchFromSessionSnapshot(runtime.Execution.SessionId, runtime.Execution.Directory, entity))
+                kgRuntime.FetchFromSessionSnapshot(VibeFs.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId, runtime.Execution.Directory, entity))
 
 let returnBookkeeperTool (kgRuntime: KnowledgeGraphRuntime) (ctx: obj) : obj =
     define submitKnowledgeGraph
@@ -30,4 +30,4 @@ let returnBookkeeperTool (kgRuntime: KnowledgeGraphRuntime) (ctx: obj) : obj =
             let runtime = fromOpencode context pluginDirectory
             match decodeReturnBookkeeperArgs args with
             | Error e -> resolveStr (wireDecodeFailure "return_bookkeeper" e)
-            | Ok drafts -> kgRuntime.Submit(runtime.Execution.SessionId, drafts))
+            | Ok drafts -> kgRuntime.Submit(VibeFs.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId, drafts))

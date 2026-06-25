@@ -36,7 +36,7 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Sh
                 | Error e -> resolveStr (wireEncodeToolError "OpencodeClient" e)
                 | Ok client ->
                     let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
-                    let sessionID = runtime.Execution.SessionId
+                    let sessionID = VibeFs.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId
                     if sessionID = "" || not (store.isReviewActive sessionID) then
                         resolveStr submitReviewNotNeeded
                     elif not (store.tryLockReview sessionID) then
@@ -80,7 +80,7 @@ let submitReviewResultTool (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewS
         (fun args context ->
             let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
             let sessionID =
-                let id = runtime.Execution.SessionId
+                let id = VibeFs.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId
                 if id = "" then "loop" else id
             let directory = runtime.Execution.Directory
             promise {

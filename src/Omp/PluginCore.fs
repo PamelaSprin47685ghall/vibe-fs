@@ -14,7 +14,7 @@ open VibeFs.Omp.Tools
 open VibeFs.Omp.PruneGuard
 open VibeFs.Omp.ReviewTools
 open VibeFs.Omp.SessionLifecycle
-open VibeFs.Omp.TitleFetchGuard
+open VibeFs.Shell.TitleFetchGuardCommon
 open VibeFs.Omp.MessageTransform
 open VibeFs.Shell.OmpCaps
 open VibeFs.Shell.ReviewRuntime

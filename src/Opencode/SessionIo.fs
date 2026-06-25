@@ -51,8 +51,9 @@ let extractToolContext (context: obj) (pluginDirectory: string) : obj =
     box {|
         directory = execution.Directory
         sessionID =
-            if execution.SessionId = "" then box null
-            else box execution.SessionId
+            let s = Id.sessionIdValue execution.SessionId
+            if s = "" then box null
+            else box s
         abortSignal = getAbortSignal context
     |}
 

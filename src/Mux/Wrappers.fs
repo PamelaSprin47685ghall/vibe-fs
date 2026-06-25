@@ -18,6 +18,7 @@ open VibeFs.Shell
 open VibeFs.Shell.JsonSchemaBuilders
 open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.MuxHostBindings
 open VibeFs.Shell.PromiseStr
 open VibeFs.Shell.WorkBacklogToolsCodec
 open VibeFs.Shell.ToolExecute
@@ -64,7 +65,7 @@ let strArrayProp = jsonStrArrayProp
 
 let requireWorkspaceId (config: obj) (toolName: string) : Result<string, DomainError> =
     decodeMuxConfig config
-    |> Result.map (fun ctx -> defaultArg ctx.WorkspaceId "")
+    |> Result.map (fun ctx -> ctx.WorkspaceId |> Option.map Id.workspaceIdValue |> Option.defaultValue "")
     |> Result.mapError (function
         | InvalidIntent (_, "workspaceId", _) -> InvalidIntent (toolName, "workspaceId", "required")
         | e -> e)
@@ -94,7 +95,7 @@ let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promis
             with _ -> return result
     }
 
-let private bindExecute (tool: obj) : obj = tool?execute
+let private bindExecute (tool: obj) : obj = getToolExecute tool
 
 let private disabledResult () : JS.Promise<string> = Promise.lift "disabled"
 
@@ -145,7 +146,7 @@ let private mkResultWrapper (targetTool: string) (callback: obj -> obj -> obj ->
                 let executeFn =
                     System.Func<obj, obj, JS.Promise<obj>>(fun args opts ->
                         promise {
-                            let raw = tool?execute(args, opts)
+                            let raw = invokeToolExecute tool args opts
                             let! v =
                                 if isThenable raw then unbox<JS.Promise<obj>> raw
                                 else Promise.lift raw
@@ -184,7 +185,7 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                             captureTodoReportFromDecoded host projection tw o
                             let methodologies = tw.SelectMethodology
                             let nativeArgs = createObj [ "todos", todoArrayForNativeWrite tw ]
-                            let raw = tool?execute(nativeArgs, opts)
+                            let raw = invokeToolExecute tool nativeArgs opts
                             let! result =
                                 if isThenable raw then unbox<JS.Promise<obj>> raw
                                 else Promise.lift raw
@@ -225,7 +226,7 @@ let private mkAgentReportOverride () : obj =
                     System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
                         promise {
                             let upstreamArgs = reviewerAgentReportPayload args
-                            let raw = tool?execute(upstreamArgs, opts)
+                            let raw = invokeToolExecute tool upstreamArgs opts
                             let! result = if isThenable raw then unbox<JS.Promise<obj>> raw else Promise.lift raw
                             if Dyn.typeIs result "object" && Dyn.truthy (Dyn.get result "success") then
                                 return Dyn.withKey result "report" (box upstreamArgs)

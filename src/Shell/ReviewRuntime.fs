@@ -17,47 +17,54 @@ type ReviewStore =
     abstract member isReviewActive: sessionID: string -> bool
     abstract member addChild: parentID: string * childID: string -> unit
 
+/// Single atomic state cell: the pure registry projection plus the effect
+/// side-table fold together so every store method is one `state <- { ... }`
+/// transition, eliminating the prior split `mutable registry`/`mutable effects`
+/// pair that could interleave mid-update.
+type private ReviewStoreState =
+    { Registry: Registry
+      Effects: SessionEffects }
+
 let createReviewStore () : ReviewStore =
-    let mutable registry = emptyRegistry
-    let mutable effects = emptyEffects
+    let mutable state : ReviewStoreState = { Registry = emptyRegistry; Effects = emptyEffects }
 
     let allDescendantIds sessionId =
         let rec collect id =
-            match Map.tryFind id registry with
+            match Map.tryFind id state.Registry with
             | None -> [ id ]
             | Some session -> id :: (session.childIds |> List.collect collect)
         collect sessionId
 
     { new ReviewStore with
         member _.activateReview(sessionID, task, createdAt) =
-            registry <- reduce registry (RegistryAction.Activate(sessionID, task, createdAt))
+            state <- { state with Registry = reduce state.Registry (RegistryAction.Activate(sessionID, task, createdAt)) }
         member _.deactivateReview(sessionID) =
-            effects <- disposeSessionTree effects (allDescendantIds sessionID)
-            registry <- reduce registry (RegistryAction.Deactivate sessionID)
+            let nextEffects = disposeSessionTree state.Effects (allDescendantIds sessionID)
+            state <- { state with Effects = nextEffects; Registry = reduce state.Registry (RegistryAction.Deactivate sessionID) }
         member _.clearReviewSessions() =
-            effects <- disposeSessionTree effects (Map.keys effects.pendingResolutions |> List.ofSeq)
-            registry <- emptyRegistry
+            let nextEffects = disposeSessionTree state.Effects (Map.keys state.Effects.pendingResolutions |> List.ofSeq)
+            state <- { state with Effects = nextEffects; Registry = emptyRegistry }
         member _.tryLockReview(sessionID) =
-            if not (canTransition registry sessionID (Lock sessionID)) then false
+            if not (canTransition state.Registry sessionID (Lock sessionID)) then false
             else
-                registry <- reduce registry (RegistryAction.Lock(sessionID, sessionID))
+                state <- { state with Registry = reduce state.Registry (RegistryAction.Lock(sessionID, sessionID)) }
                 true
         member _.unlockReview(sessionID) =
-            registry <- reduce registry (RegistryAction.Unlock sessionID)
+            state <- { state with Registry = reduce state.Registry (RegistryAction.Unlock sessionID) }
         member _.setPendingReview(sessionID, resolve) =
-            effects <- setPending effects sessionID resolve
+            state <- { state with Effects = setPending state.Effects sessionID resolve }
         member _.setAbortSuppressor(sessionID, suppress) =
-            effects <- { effects with abortSuppressors = Map.add sessionID suppress effects.abortSuppressors }
+            state <- { state with Effects = { state.Effects with abortSuppressors = Map.add sessionID suppress state.Effects.abortSuppressors } }
         member _.resolvePendingReview(sessionID, result) =
-            registry <- reduce registry (actionFor sessionID result)
-            let next, fired = resolvePending effects sessionID result
-            effects <- next
+            let nextRegistry = reduce state.Registry (actionFor sessionID result)
+            let nextEffects, fired = resolvePending state.Effects sessionID result
+            state <- { state with Registry = nextRegistry; Effects = nextEffects }
             fired
-        member _.getReviewTask(sessionID) = taskOf registry sessionID
-        member _.getReviewState(sessionID) = stateOf registry sessionID
-        member _.isReviewActive(sessionID) = sessionIsActive registry sessionID
+        member _.getReviewTask(sessionID) = taskOf state.Registry sessionID
+        member _.getReviewState(sessionID) = stateOf state.Registry sessionID
+        member _.isReviewActive(sessionID) = sessionIsActive state.Registry sessionID
         member _.addChild(parentID, childID) =
-            registry <- reduce registry (RegistryAction.AddChild(parentID, childID)) }
+            state <- { state with Registry = reduce state.Registry (RegistryAction.AddChild(parentID, childID)) } }
 
 let syncReviewProjection (store: ReviewStore) (sessionID: string) (task: string option) : unit =
     if sessionID = "" then ()

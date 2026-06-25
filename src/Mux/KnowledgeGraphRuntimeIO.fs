@@ -6,19 +6,11 @@ open VibeFs.Shell
 
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphRuntimeState
-open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.KnowledgeGraphStorage
+open VibeFs.Shell.KnowledgeGraphSubmit
 open VibeFs.Shell.Dyn
 
-let buildEntries (root: string) (drafts: KnowledgeGraphDraft list) : JS.Promise<Result<KnowledgeGraphEntry list, string>> =
-    promise {
-        let! files = readKnowledgeGraphFiles root
-        let projection = projectLatestWins files
-        let normalizedDrafts = normalizeDraftIds projection drafts
-        let random = System.Random()
-        let allocate = allocateRandomHexId (fun () -> random.Next(0, 65536))
-        return applyDrafts allocate projection normalizedDrafts
-    }
+let buildEntries = VibeFs.Shell.KnowledgeGraphSubmit.buildEntriesFromDrafts
 
 let extractTexts (item: obj) : string list =
     if Dyn.typeIs item "string" then [ string item ]
@@ -52,17 +44,4 @@ let tryResolveJobContext (getChatHistory: (string -> JS.Promise<obj array>) opti
 
 let submitForKind (root: string) (todayStr: string) (entries: KnowledgeGraphEntry list) (kind: KnowledgeGraphJobKind)
                  : JS.Promise<string> =
-    promise {
-        let! result =
-            match kind with
-            | AppendAfterWork ->
-                appendDrafts defaultPortLockTimeoutMs defaultPortLockRetryDelayMs root todayStr entries
-            | DailyRewrite date ->
-                rewriteDayUnderLock defaultPortLockTimeoutMs defaultPortLockRetryDelayMs root date entries
-        match result with
-        | Error e -> return e
-        | Ok () ->
-            match kind with
-            | AppendAfterWork -> return $"Appended {entries.Length} knowledge graph entries."
-            | DailyRewrite date -> return $"Rewrote knowledge graph day {date}."
-    }
+    VibeFs.Shell.KnowledgeGraphSubmit.submitEntriesForKind defaultPortLockTimeoutMs defaultPortLockRetryDelayMs root todayStr entries kind

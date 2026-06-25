@@ -92,18 +92,21 @@ let private resolveDelegationContext
                       abortSignal = host.AbortSignal }
     }
 
-let private translateTaskWaitError (err: exn) (title: string) (taskId: string) : JS.Promise<string> =
+/// Task-wait failures: backgrounding is a graceful outcome (returned as text on
+/// the Ok channel, never thrown); every other exception becomes a typed
+/// `Error` so callers stop using exceptions as control flow (TASK §5).
+let private translateTaskWaitError (err: exn) (title: string) (taskId: string) : JS.Promise<Result<string, DomainError>> =
     match translateJsError err with
     | TaskWaitBackgrounded ->
-        Promise.lift $"{title} task ({taskId}) moved to background. Use task tools to monitor it."
-    | _ -> Promise.reject err
+        Promise.lift (Ok $"{title} task ({taskId}) moved to background. Use task tools to monitor it.")
+    | other -> Promise.lift (Error other)
 
 let private createAndWaitTask
     (ctx: DelegationContext)
     (agentId: string)
     (prompt: string)
     (title: string)
-    : JS.Promise<string> =
+    : JS.Promise<Result<string, DomainError>> =
     promise {
         let input =
             createInput
@@ -118,7 +121,7 @@ let private createAndWaitTask
 
         let! createResult = taskCreate ctx.taskService input
         match decodeTaskCreateResult createResult with
-        | Error e -> return wireDomainFailure "delegate.create" e
+        | Error e -> return Ok (wireDomainFailure "delegate.create" e)
         | Ok created ->
             let waitOpts =
                 box
@@ -129,8 +132,8 @@ let private createAndWaitTask
             try
                 let! report = taskWait ctx.taskService created.TaskId waitOpts
                 match decodeTaskReport report with
-                | Ok markdown -> return markdown
-                | Error e -> return wireDomainFailure "delegate.report" e
+                | Ok markdown -> return Ok markdown
+                | Error e -> return Ok (wireDomainFailure "delegate.report" e)
             with err ->
                 return! translateTaskWaitError err title created.TaskId
     }
@@ -147,7 +150,11 @@ let delegateToSubAgent
         let! ctxResult = resolveDelegationContext deps config title options
         match ctxResult with
         | Error msg -> return msg
-        | Ok ctx -> return! createAndWaitTask ctx agentId prompt title
+        | Ok ctx ->
+            let! result = createAndWaitTask ctx agentId prompt title
+            match result with
+            | Ok report -> return report
+            | Error e -> return wireDomainFailure "delegate" e
     }
 
 let runMuxSubagent
