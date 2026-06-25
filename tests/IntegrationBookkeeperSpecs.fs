@@ -370,3 +370,34 @@ let muxBookkeeperAfterHookAddsHintToOutputSpec () = promise {
             |> Seq.forall (fun prompt -> not (prompt.Contains hintTodoRefresh)))
     do! rmAsync workspaceDir
 }
+
+let muxToolExecuteAfterSkipsChildWorkspaceSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-tool-after-child-"
+    do! ensureKnowledgeGraphDir workspaceDir
+    let prompts = ResizeArray<string>()
+    let deps = minimalMuxDeps ()
+    deps?("directory") <- workspaceDir
+    deps?("workspaceId") <- "child-session"
+    deps?("taskService") <- mockMuxTaskServiceCapturingPrompt prompts
+    deps?("findWorkspaceEntry") <-
+        box (System.Func<obj, string, obj>(fun _ workspaceId ->
+            if workspaceId = "child-session" then
+                createObj [ "workspace", box (createObj [ "parentWorkspaceId", box "parent-ws" ]) ]
+            else createObj [ "workspace", null ]))
+    let reg = createRegistration deps
+    let after = get reg "tool.execute.after"
+    if isNullish after then
+        check "mux plugin exposes tool.execute.after (child)" false
+    else
+        let writeInput =
+            createObj
+                [ "tool", box "write"
+                  "sessionID", box "child-session"
+                  "callID", box "mux-child-write-1"
+                  "args", box (createObj [ "path", box "child.txt"; "content", box "hi" ]) ]
+        let writeOutput = createObj [ "output", box "wrote file" ]
+        do! after $ (writeInput, writeOutput) |> unbox<JS.Promise<unit>>
+        let launches = takeBookkeeperLaunchesForTesting reg
+        check "mux tool.execute.after skips bookkeeper for child workspace" (launches.Length = 0)
+    do! rmAsync workspaceDir
+}

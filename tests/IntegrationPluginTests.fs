@@ -27,6 +27,8 @@ let registrationShape (reg: obj) =
     check "mux.toolNames" (isArray (get reg "toolNames"))
     check "mux.tools" (isArray (get reg "tools"))
     check "mux.mcpServers" (typeIs (get reg "mcpServers") "object")
+    check "mux.compactingTransform" (typeIs (get reg "compactingTransform") "function")
+    check "mux.tool.execute.after" (typeIs (get reg "tool.execute.after") "function")
     check "mux.contextInjector" (typeIs (get reg "contextInjector") "object")
     let policy = (get reg "getToolPolicy") $ ("x", "manager")
     check "mux.getToolPolicy non-null" (not (isNullish policy) && typeIs policy "object")

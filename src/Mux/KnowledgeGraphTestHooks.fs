@@ -39,5 +39,8 @@ type MuxKnowledgeGraphTestHooks(runtime: MuxKnowledgeGraphRuntime) =
             do! ports.AwaitBackgroundSinkJobs()
         }
 
+    member _.HasJob(sessionID: string) : bool =
+        runtime.HasJobForTest(sessionID)
+
 type MuxKnowledgeGraphRuntime with
     member this.TestHooks : MuxKnowledgeGraphTestHooks = MuxKnowledgeGraphTestHooks(this)

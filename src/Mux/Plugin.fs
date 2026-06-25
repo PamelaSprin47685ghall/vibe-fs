@@ -28,6 +28,9 @@ open VibeFs.Mux.BacklogSession
 open VibeFs.Shell.RuntimeScope
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.MuxHookInputCodec
+open VibeFs.Shell.MuxWorkspaceCodec
+open VibeFs.Kernel.KnowledgeGraphBookkeeperPolicy
+open VibeFs.Shell.ChatTransformOutputCodec
 
 let muxToolNames =
     Array.append
@@ -122,11 +125,6 @@ let createToolCatalog
        yield returnBookkeeperTool knowledgeGraphRuntime
        yield! allMethodologyTools deps toolNames |]
 
-let private recordsToBookkeeper (tool: string) : bool =
-    let allowed =
-        [| "coder"; "investigator"; "meditator"; "browser"; "executor"
-           "submit_review"; "websearch"; "webfetch"; "write" |]
-    Array.contains tool allowed
 
 let private bookkeeperInput (args: obj) : string =
     if Dyn.isNullish args then "" else JS.JSON.stringify args
@@ -142,8 +140,8 @@ let private toolExecuteAfter
         let succeeded = hookOutputErrorMux output = ""
         let originalOutput = hookOutputTextMux output
         if succeeded
-           && recordsToBookkeeper decoded.Tool
-           && not (isReadOnlyExecutorMux decoded.Tool decoded.Args) then
+           && VibeFs.Kernel.KnowledgeGraphBookkeeperPolicy.recordsToBookkeeper decoded.Tool
+           && not (isReadOnlyExecutorMux decoded.Tool decoded.Args) && not (isChildWorkspace deps decoded.SessionID) then
             knowledgeGraphRuntime.StartBookkeeperAppend(
                 bookkeeperInput decoded.Args,
                 VibeFs.Kernel.ToolOutputInfo.bodyForBookkeeper originalOutput,
@@ -156,6 +154,25 @@ let private toolExecuteAfter
             setHookOutputStringMux output (VibeFs.Kernel.ToolOutputInfo.withBookkeepingHints originalOutput)
     }
 
+let private toolExecuteBefore (input: obj) (_output: obj) : JS.Promise<unit> =
+    promise {
+        let tool = toolNameFromHookInputMux input
+        let args = Dyn.get input "args"
+        if not (Dyn.isNullish args) then
+            let raw = Dyn.get args "intents"
+            let labelResult =
+                match tool with
+                | "coder" -> VibeFs.Shell.SubagentIntentsCodec.joinCoderUiLabel raw
+                | "investigator" -> VibeFs.Shell.SubagentIntentsCodec.joinInvestigatorUiLabel raw
+                | _ -> Result.Error ""
+            match labelResult with
+            | Result.Ok label when label <> "" -> args?("_ui") <- box label
+            | _ -> ()
+    }
+
+let private systemTransform (_input: obj) (output: obj) : JS.Promise<unit> =
+    promise { clearSystemOutputLength output }
+
 let createRegistration (deps: obj) : obj =
     let scope = create ()
     let backlogSession = BacklogSession(scope)
@@ -167,11 +184,14 @@ let createRegistration (deps: obj) : obj =
     let toolsObj = toolsToObject tools
     let mcpServers = box {| ``stealth-browser-mcp`` = VibeFs.Kernel.Config.getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
     let wrappers = createAllWrappers toolsObj hostReadExec scope
-    let eventHook = createEventHook deps reviewStore
+    let eventHook = createEventHook deps reviewStore knowledgeGraphRuntime
     let slashCommands = createSlashCommands deps muxToolNames reviewStore
     let messagesTransformFn =
         System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
             messagesTransform deps scope backlogSession knowledgeGraphRuntime reviewStore input output)
+    let compactingTransformFn =
+        System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
+            compactingTransform deps backlogSession input output)
     let getToolPolicy = System.Func<string, obj, obj>(fun (_agentId: string) (role: obj) -> buildToolPolicy muxToolNames role)
     let registration = createObj [
         "__runtimeScope", box scope
@@ -188,6 +208,7 @@ let createRegistration (deps: obj) : obj =
         "eventHook", box eventHook
         "slashCommands", box slashCommands
         "messagesTransform", box messagesTransformFn
+        "compactingTransform", box compactingTransformFn
         "getToolPolicy", box getToolPolicy
         "__knowledgeGraphRuntime",
             box (
@@ -202,7 +223,9 @@ let createRegistration (deps: obj) : obj =
                       "takeBookkeeperLaunchesForTesting",
                       box (System.Func<obj array>(fun () -> hooks.TakeLaunches()))
                       "waitForBackgroundJobsForTesting",
-                      box (System.Func<JS.Promise<unit>>(fun () -> hooks.WaitJobs())) ])
+                      box (System.Func<JS.Promise<unit>>(fun () -> hooks.WaitJobs()))
+                      "hasJobForTesting",
+                      box (System.Func<string, bool>(fun sessionID -> hooks.HasJob(sessionID))) ])
         "__reviewStore",
             box (createObj
                 [ "activateReview",
@@ -215,4 +238,8 @@ let createRegistration (deps: obj) : obj =
                   "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ]) ]
     setKey registration "tool.execute.after" (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
         toolExecuteAfter knowledgeGraphRuntime deps input output)))
+    setKey registration "tool.execute.before" (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
+        toolExecuteBefore input output)))
+    setKey registration "systemTransform" (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
+        systemTransform input output)))
     box registration

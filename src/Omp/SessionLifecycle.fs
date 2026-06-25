@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.OmpSessionTools
 open VibeFs.Kernel.PromptFragments
+open VibeFs.Kernel.KnowledgeGraphBookkeeperPolicy
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Omp.ChildSession
 open VibeFs.Omp.Codec

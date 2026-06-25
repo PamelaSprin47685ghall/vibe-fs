@@ -36,7 +36,8 @@ let normalizeToolNameForMux (toolName: string) : string =
     elif toolName = "file_read" then "read"
     elif toolName = "web_fetch" then "webfetch"
     elif toolName = "web_search" || toolName = "google_search" then "websearch"
-    elif toolName = "todo_write" || toolName = "todo_read" then "todo"
+    elif toolName = "todo_write" then todoWriteToolName Mux
+    elif toolName = "todo_read" then "todo"
     elif toolName.StartsWith "agent_skill_" || toolName.StartsWith "skills_catalog_" then "skill"
     elif toolName = "ask_user_question" then "question"
     elif toolName.StartsWith "task" then "task"
