@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
+open VibeFs.Kernel.ToolResult
 open VibeFs.Shell
 
 open VibeFs.Kernel.ToolCatalog
@@ -11,6 +12,7 @@ open VibeFs.Mux.Wrappers
 open VibeFs.Mux.KnowledgeGraphTools
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.KnowledgeGraphToolsCodec
+open VibeFs.Shell.ToolExecute
 open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Shell.ToolContextCodec
 
@@ -38,10 +40,10 @@ let knowledgeGraphFetchTool (kgRuntime: MuxKnowledgeGraphRuntime) : ToolDefiniti
       execute =
           fun config args ->
               match decodeFetchEntity args with
-              | Error e -> resolveStr (formatDomainError e)
+              | Error e -> resolveStr (wireDecodeFailure "knowledge_graph_fetch" e)
               | Ok entity ->
                   match fromMuxConfig config with
-                  | Error e -> resolveStr (formatDomainError e)
+                  | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
                   | Ok runtime ->
                       kgRuntime.FetchFromSessionSnapshot(
                           runtime.Execution.SessionId,
@@ -66,10 +68,10 @@ let returnBookkeeperTool (kgRuntime: MuxKnowledgeGraphRuntime) : ToolDefinition 
       execute =
           fun config args ->
               match fromMuxConfig config with
-              | Error e -> resolveStr (formatDomainError e)
+              | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
               | Ok runtime ->
                   match decodeReturnBookkeeperArgs args with
-                  | Error e -> resolveStr (formatDomainError e)
+                  | Error e -> resolveStr (wireDecodeFailure "return_bookkeeper" e)
                   | Ok drafts ->
                       kgRuntime.Submit(
                           runtime.Execution.SessionId,

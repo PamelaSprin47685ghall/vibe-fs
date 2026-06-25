@@ -1,6 +1,8 @@
 module VibeFs.Shell.OpencodeHookInputCodec
 
+open Fable.Core.JsInterop
 open VibeFs.Kernel.Messaging
+open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.ToolContextCodec
@@ -36,6 +38,33 @@ let decodeHostEventEnvelope (input: obj) : HostEventEnvelope option =
 let hookOutputError (output: obj) : string = Dyn.str output "error"
 
 let hookOutputText (output: obj) : string = Dyn.str output "output"
+
+let hookOutputString (output: obj) : string option =
+    let out = Dyn.get output "output"
+    if Dyn.isNullish out || not (Dyn.typeIs out "string") then None
+    else Some (unbox<string> out)
+
+let setHookOutputString (output: obj) (text: string) : unit = output?("output") <- text
+
+let partsFromHookOutput (output: obj) : obj = Dyn.get output "parts"
+
+/// Read output.args (tool execute args rewriter payload); absent yields `obj` sentinel.
+let argsFromHookOutput (output: obj) : obj = Dyn.get output "args"
+
+/// Write output.args — host wire SSOT for tool execute args rewriter.
+let setHookArgs (output: obj) (args: obj) : unit = output?("args") <- args
+
+/// Write output.error — host wire SSOT for tool execute error payload.
+let setHookError (output: obj) (error: string) : unit = output?("error") <- box error
+
+/// Write output.parts — host wire SSOT for command/chat reply parts.
+let setHookParts (output: obj) (parts: obj) : unit = output?("parts") <- parts
+
+/// Read output.error optional string (absent → None, present non-string → None).
+let hookOutputErrorOpt (output: obj) : string option =
+    let raw = Dyn.get output "error"
+    if Dyn.isNullish raw || not (Dyn.typeIs raw "string") then None
+    else Some (unbox<string> raw)
 
 let private resolveAgentFromMessage (registry: ChildAgentRegistry) (message: obj) : string option =
     if Dyn.isNullish message then None
@@ -91,3 +120,19 @@ let resolveHookAgent (registry: ChildAgentRegistry) (input: obj) (outputOpt: obj
             | Some output -> resolveAgentFromMessage registry (Dyn.get output "message")
             | None -> None
             |> Option.defaultValue defaultAgent
+
+let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
+
+/// Ensure a slash-command template entry exists in the cfg.command object.
+/// Creates cfg.command as emptyObj if absent; fills `name` only when missing.
+let ensureCommandTemplate (cfg: obj) (name: string) (template: string) (description: string) : unit =
+    let cmd = Dyn.get cfg "command"
+    let cmdObj = if Dyn.isNullish cmd then createObj [] else cmd
+    if Dyn.isNullish (Dyn.get cmdObj name) then
+        setKey cmdObj name (box {| template = template; description = description |})
+    setKey cfg "command" cmdObj
+
+/// Register /loop and /loop-review command templates from ReviewPrompts constants.
+let registerLoopReviewCommands (cfg: obj) : unit =
+    ensureCommandTemplate cfg "loop" withReviewCommandTemplate "Enable With-Review Mode — the next submission must pass through a reviewer before being accepted"
+    ensureCommandTemplate cfg "loop-review" withReviewPrecheckCommandTemplate "Enable With-Review Mode with pre-review — the task is pre-reviewed immediately, and reviewer feedback is prepended to your prompt before any work begins"

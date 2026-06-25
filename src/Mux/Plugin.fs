@@ -27,7 +27,6 @@ open VibeFs.Mux.BacklogSession
 open VibeFs.Shell.RuntimeScope
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.MuxHookInputCodec
-open VibeFs.Shell.OpencodeHookInputCodec
 
 let muxToolNames =
     [| "coder"; "investigator"; "meditator"; "browser"; "executor"
@@ -128,8 +127,6 @@ let private recordsToBookkeeper (tool: string) : bool =
 let private bookkeeperInput (args: obj) : string =
     if Dyn.isNullish args then "" else JS.JSON.stringify args
 
-let private setOutput (o: obj) (v: string) : unit = o?output <- v
-
 let private toolExecuteAfter
     (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
     (deps: obj)
@@ -138,8 +135,8 @@ let private toolExecuteAfter
     : JS.Promise<unit> =
     promise {
         let decoded = decodeMuxToolExecuteAfterInput input deps
-        let succeeded = hookOutputError output = ""
-        let originalOutput = hookOutputText output
+        let succeeded = hookOutputErrorMux output = ""
+        let originalOutput = hookOutputTextMux output
         if succeeded
            && recordsToBookkeeper decoded.Tool
            && not (isReadOnlyExecutorMux decoded.Tool decoded.Args) then
@@ -152,7 +149,7 @@ let private toolExecuteAfter
                       "directory", box decoded.Directory
                       "workspaceId", box decoded.WorkspaceId
                       "taskService", box (Dyn.get deps "taskService") ])
-            setOutput output (VibeFs.Kernel.WorkBacklog.withTodoHint originalOutput)
+            setHookOutputStringMux output (VibeFs.Kernel.WorkBacklog.withTodoHint originalOutput)
     }
 
 let createRegistration (deps: obj) : obj =

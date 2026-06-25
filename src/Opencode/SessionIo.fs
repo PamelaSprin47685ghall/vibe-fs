@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Messaging
+open VibeFs.Kernel.ToolResult
 open VibeFs.Shell.ErrorClassify
 open VibeFs.Opencode.MessagingCodec
 open VibeFs.Shell.ChildAgentRegistry
@@ -132,7 +133,7 @@ let readSessionTexts (client: obj) (sessionId: string) (directory: string) : JS.
 let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
     promise {
         match getSessionApiFromClient client with
-        | Error err -> return! Promise.reject (exn (formatDomainError err))
+        | Error err -> return! Promise.reject (exn (wireEncodeToolError "OpencodeClient" err))
         | Ok session ->
             if Dyn.isNullish signal then
                 do! session?prompt(args)

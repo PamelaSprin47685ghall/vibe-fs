@@ -188,7 +188,7 @@ let writeTool (_deps: obj) : ToolDefinition =
                         let! result = write cwd decoded.FilePath decoded.Content
                         match result with
                         | Ok msg -> return msg
-                        | Error e -> return formatDomainError e
+                        | Error e -> return wireDomainFailure "write" e
                 }
       condition = None }
 

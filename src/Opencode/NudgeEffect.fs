@@ -4,7 +4,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeState
 open VibeFs.Kernel.HostTools
 open VibeFs.Shell
@@ -17,9 +16,6 @@ open VibeFs.Opencode.NudgeEventCodec
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
     unbox (target?(method)(arg))
 
-let setOutput (o: obj) (v: string) : unit =
-    o?("output") <- v
-
 let resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
 
 type StateHolder<'state>(initialState: 'state) =
@@ -29,39 +25,6 @@ type StateHolder<'state>(initialState: 'state) =
         let nextState, result = transition state
         state <- nextState
         result
-
-let private recoverOpenTodosFromMessages (messagesData: obj) : string list =
-    if not (Dyn.isArray messagesData) then []
-    else
-        (messagesData :?> obj array)
-        |> Array.rev
-        |> Array.tryPick (fun message ->
-            let parts = Dyn.get message "parts"
-            if not (Dyn.isArray parts) then None
-            else
-                (parts :?> obj array)
-                |> Array.rev
-                |> Array.tryPick (fun part ->
-                    if Dyn.str part "type" <> "tool" || Dyn.str part "tool" <> "task" then None
-                    else
-                        let state = Dyn.get part "state"
-                        let input = Dyn.get state "input"
-                        let todos = Dyn.get input "todos"
-                        if not (Dyn.isArray todos) then None
-                        else
-                            let openItems =
-                                (todos :?> obj array)
-                                |> Array.choose (fun todo ->
-                                    let content = Dyn.str todo "content"
-                                    let status = Dyn.str todo "status"
-                                    if content = "" || status = "" then None
-                                    else
-                                        match todoStatusOfString status with
-                                        | Some s when isTerminal s -> None
-                                        | _ -> Some content)
-                            Some openItems))
-        |> Option.defaultValue [||]
-        |> Array.toList
 
 let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<SessionSnapshot option> =
     promise {

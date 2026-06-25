@@ -6,7 +6,6 @@ open VibeFs.Kernel
 open VibeFs.Shell
 
 open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ToolCopy
 open VibeFs.Kernel.ReviewSession
 open VibeFs.Opencode.AgentConfig
@@ -17,7 +16,6 @@ open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Kernel.Domain
 open VibeFs.Shell.ToolRuntimeContext
 open VibeFs.Shell.OpencodeHookInputCodec
-open VibeFs.Shell.Dyn
 open VibeFs.Shell.OpencodeClientCodec
 
 let private abortOrDeleteEvents =
@@ -63,15 +61,9 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
                     reviewStore.activateReview(sessionID, task, Domain.nowMs ())
                     let msg = buildLoopMessage task [ withReviewPreReviewFeedbackHeader; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]
                     parts.Add(box {| ``type`` = "text"; text = msg |})
-            setKey output "parts" (box parts)
+            setHookParts output (box parts)
     }
 
 /// Register /loop and /loop-review command templates in the opencode config.
-let registerCommands (cfg: obj) : unit =
-    let cmd = Dyn.get cfg "command"
-    let cmdObj = if Dyn.isNullish cmd then emptyObj () else cmd
-    if Dyn.isNullish (Dyn.get cmdObj "loop") then
-        setKey cmdObj "loop" (box {| template = withReviewCommandTemplate; description = "Enable With-Review Mode — the next submission must pass through a reviewer before being accepted" |})
-    if Dyn.isNullish (Dyn.get cmdObj "loop-review") then
-        setKey cmdObj "loop-review" (box {| template = withReviewPrecheckCommandTemplate; description = "Enable With-Review Mode with pre-review — the task is pre-reviewed immediately, and reviewer feedback is prepended to your prompt before any work begins" |})
-    setKey cfg "command" cmdObj
+/// Delegates to OpencodeHookInputCodec.registerLoopReviewCommands.
+let registerCommands (cfg: obj) : unit = registerLoopReviewCommands cfg

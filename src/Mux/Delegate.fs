@@ -11,6 +11,7 @@ open VibeFs.Shell
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.SubagentSpawn
 open VibeFs.Shell.DelegateToolsCodec
+open VibeFs.Shell.ToolExecute
 open VibeFs.Shell.ToolContextCodec
 
 let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
@@ -71,7 +72,7 @@ let private resolveDelegationContext
     : JS.Promise<Result<DelegationContext, string>> =
     promise {
         match decodeDelegateConfig config with
-        | Error e -> return Error (formatDomainError e)
+        | Error e -> return Error (wireDomainFailure "delegate" e)
         | Ok host ->
             let opts = defaultArg options (box null)
             let optFields = decodeDelegateOptions opts
@@ -117,24 +118,21 @@ let private createAndWaitTask
 
         let! createResult = taskCreate ctx.taskService input
         match decodeTaskCreateResult createResult with
-        | Error e -> return formatDomainError e
+        | Error e -> return wireDomainFailure "delegate.create" e
         | Ok created ->
-            if not created.Success then
-                return $"Failed to create {title.ToLower()} task: {created.Error}"
-            else
-                let waitOpts =
-                    box
-                        {| requestingWorkspaceId = Id.workspaceIdValue ctx.workspaceId
-                           abortSignal = ctx.abortSignal
-                           backgroundOnMessageQueued = false |}
+            let waitOpts =
+                box
+                    {| requestingWorkspaceId = Id.workspaceIdValue ctx.workspaceId
+                       abortSignal = ctx.abortSignal
+                       backgroundOnMessageQueued = false |}
 
-                try
-                    let! report = taskWait ctx.taskService created.TaskId waitOpts
-                    match decodeTaskReport report with
-                    | Ok markdown -> return markdown
-                    | Error e -> return formatDomainError e
-                with err ->
-                    return! translateTaskWaitError err title created.TaskId
+            try
+                let! report = taskWait ctx.taskService created.TaskId waitOpts
+                match decodeTaskReport report with
+                | Ok markdown -> return markdown
+                | Error e -> return wireDomainFailure "delegate.report" e
+            with err ->
+                return! translateTaskWaitError err title created.TaskId
     }
 
 let delegateToSubAgent

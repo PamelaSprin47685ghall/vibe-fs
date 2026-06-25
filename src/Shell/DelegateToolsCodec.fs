@@ -57,15 +57,25 @@ let decodeTaskCreateResult (createResult: obj) : Result<TaskCreateResult, Domain
     else
         let success = Dyn.truthy (Dyn.get createResult "success")
         let err = defaultArg (strField createResult "error") ""
-        let data = Dyn.get createResult "data"
-        let taskId =
-            if Dyn.isNullish data then ""
-            else defaultArg (strField data "taskId") ""
-        Ok { Success = success; Error = err; TaskId = taskId }
+        if not success then
+            let msg = if err <> "" then err else "create failed"
+            Error (InvalidIntent ("delegate.create", "taskService", msg))
+        else
+            let data = Dyn.get createResult "data"
+            let taskId =
+                if Dyn.isNullish data then ""
+                else defaultArg (strField data "taskId") ""
+            if taskId.Trim() = "" then
+                Error (InvalidIntent ("delegate.create", "taskId", "missing or empty"))
+            else
+                Ok { Success = true; Error = ""; TaskId = taskId }
 
 let decodeTaskReport (report: obj) : Result<string, DomainError> =
     if Dyn.isNullish report then
         Error (InvalidIntent ("delegate", "report", "missing"))
     else
         let markdown = defaultArg (strField report "reportMarkdown") ""
-        Ok markdown
+        if markdown.Trim() = "" then
+            Error (InvalidIntent ("delegate.report", "reportMarkdown", "missing or empty"))
+        else
+            Ok markdown

@@ -10,7 +10,6 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.OpencodeHookInputCodec
 open VibeFs.Shell.ChatHookOutputCodec
-open VibeFs.Shell.Dyn
 open VibeFs.Shell.OpencodeAgentConfigWire
 
 let private resolveAgent (registry: ChildAgentRegistry) (input: obj) (output: obj) : string =
@@ -20,7 +19,7 @@ let chatMessageFor (host: Host) (registry: ChildAgentRegistry) (lifecycleObserve
     promise {
         let agent = resolveAgent registry input output
         let sessionID = VibeFs.Kernel.Domain.Id.sessionIdQuick (sessionIdFromHookInput input "")
-        do! lifecycleObserver.handleChatMessage(sessionID, agent, Dyn.get output "parts")
+        do! lifecycleObserver.handleChatMessage(sessionID, agent, partsFromHookOutput output)
         match chatMessageFromHookOutput output with
         | None -> ()
         | Some message ->

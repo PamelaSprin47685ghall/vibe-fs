@@ -10,7 +10,6 @@ open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.PromptFragments
 open VibeFs.Kernel.Methodology
 open VibeFs.Shell
-open VibeFs.Shell.Dyn
 open VibeFs.Shell.OpencodeClientCodec
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.OpencodeHookInputCodec
@@ -40,28 +39,28 @@ type SessionLifecycleObserver(host: Host, ctx: obj, reviewStore: VibeFs.Shell.Re
         promise {
             if normalizeToolName host (toolNameFromHookInput input) = "todowrite" then
                 let methodologies = selectMethodologiesFromHookArgs (argsFromHookInput input)
-                let out = Dyn.get output "output"
-                if not (Dyn.isNullish out) && Dyn.typeIs out "string" then
+                match hookOutputString output with
+                | Some _ ->
                     let rewritten = todoResultText methodologies
                     let withNudge = if rewritten.Contains meditatorNudge then rewritten else rewritten + "\n" + meditatorNudge
-                    setOutput output withNudge
+                    setHookOutputString output withNudge
+                | None -> ()
         }
 
     member _.handleEvent(input: obj) : JS.Promise<unit> =
         let claimed =
             holder.Mutate(fun state ->
                 try
-                    let event = Dyn.get input "event"
-                    let eventType = Dyn.str event "type"
-                    let rawProps = Dyn.get event "properties"
-                    let props = if Dyn.isNullish rawProps then event else rawProps
-                    let sessionIDStr = getSessionID eventType props
-                    match Id.trySessionId sessionIDStr with
+                    match decodeHostEventEnvelope input with
                     | None -> state, None
-                    | Some sessionID ->
-                        let nudgeEvent = decodeNudgeHostEvent eventType props
-                        let nextState, wantsNudge = NudgeState.handleEvent state (Id.sessionIdValue sessionID) nudgeEvent
-                        nextState, (if wantsNudge then Some sessionID else None)
+                    | Some { EventType = eventType; Props = props } ->
+                        let sessionIDStr = getSessionID eventType props
+                        match Id.trySessionId sessionIDStr with
+                        | None -> state, None
+                        | Some sessionID ->
+                            let nudgeEvent = decodeNudgeHostEvent eventType props
+                            let nextState, wantsNudge = NudgeState.handleEvent state (Id.sessionIdValue sessionID) nudgeEvent
+                            nextState, (if wantsNudge then Some sessionID else None)
                 with _ ->
                     state, None)
         match claimed with

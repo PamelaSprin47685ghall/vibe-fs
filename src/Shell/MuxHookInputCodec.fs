@@ -1,5 +1,6 @@
 module VibeFs.Shell.MuxHookInputCodec
 
+open Fable.Core.JsInterop
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.ExecutorToolsCodec
 
@@ -31,6 +32,27 @@ type MuxToolExecuteAfterInput =
       Args: obj }
 
 let argsFromMuxToolExecuteInput (input: obj) : obj = Dyn.get input "args"
+
+let hookOutputErrorMux (output: obj) : string = Dyn.str output "error"
+
+let hookOutputTextMux (output: obj) : string = Dyn.str output "output"
+
+let setHookOutputStringMux (output: obj) (text: string) : unit = output?("output") <- text
+
+/// Read output.args (tool execute args rewriter payload); absent yields `obj` sentinel.
+let argsFromHookOutputMux (output: obj) : obj = Dyn.get output "args"
+
+/// Write output.args — host wire SSOT for tool execute args rewriter (Mux).
+let setHookArgsMux (output: obj) (args: obj) : unit = output?("args") <- args
+
+/// Write output.error — host wire SSOT for tool execute error payload (Mux).
+let setHookErrorMux (output: obj) (error: string) : unit = output?("error") <- box error
+
+/// Read output.error optional string (absent → None, present non-string → None).
+let hookOutputErrorOptMux (output: obj) : string option =
+    let raw = Dyn.get output "error"
+    if Dyn.isNullish raw || not (Dyn.typeIs raw "string") then None
+    else Some (unbox<string> raw)
 
 let isReadOnlyExecutorMux (tool: string) (args: obj) : bool =
     tool = "executor"

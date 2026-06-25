@@ -20,18 +20,16 @@ open VibeFs.Shell.ToolExecute
 open VibeFs.Kernel.ToolResult
 open VibeFs.Shell.Dyn
 
-let private setOutput (o: obj) (v: string) : unit = o?output <- v
-
 let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) : unit =
     if toolNameFromHookInput input <> "apply_patch" then ()
     else
         match decodeApplyPatchFields args with
-        | Result.Ok fields -> setKey output "args" (createObj [ "patchText", box fields.PatchText ])
-        | Result.Error e -> setKey output "error" (box (wireEncodeToolError "apply_patch" e))
+        | Result.Ok fields -> setHookArgs output (createObj [ "patchText", box fields.PatchText ])
+        | Result.Error e -> setHookError output (wireEncodeToolError "apply_patch" e)
 
 let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
-        let args = Dyn.get output "args"
+        let args = argsFromHookOutput output
         if Dyn.isNullish args then ()
         else
             let tool = toolNameFromHookInput input
@@ -48,10 +46,9 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
         let tool = toolNameFromHookInput input
         if not (isFileEditTool tool) then ()
         else
-            let out = Dyn.get output "output"
-            if Dyn.isNullish out || not (Dyn.typeIs out "string") then ()
-            else
-                let s = string out
+            match hookOutputString output with
+            | None -> ()
+            | Some s ->
                 if hasSyntaxCheckMarker s then ()
                 else
                     let paths = extractFilePaths (argsFromHookInput input)
@@ -63,7 +60,7 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
                         diagnostics
                         |> Array.choose id
                         |> String.concat "\n"
-                    if formatted <> "" then setOutput output (s + "\n\n" + formatted)
+                    if formatted <> "" then setHookOutputString output (s + "\n\n" + formatted)
     }
 
 /// Tools whose every user-facing invocation is durable enough to feed the knowledge graph
@@ -94,6 +91,6 @@ let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserve
         let originalOutput = hookOutputText output
         if succeeded && recordsToBookkeeper tool && not (isReadOnlyExecutor tool input) && (registry.LookupChildAgent sessionID).IsNone then
             knowledgeGraphRuntime.StartBookkeeperAppend(bookkeeperInput input, originalOutput, tool, parentSessionID = sessionID)
-            setOutput output (VibeFs.Kernel.WorkBacklog.withTodoHint originalOutput)
+            setHookOutputString output (VibeFs.Kernel.WorkBacklog.withTodoHint originalOutput)
         do! lifecycleObserver.handleToolExecuteAfter input output
     }

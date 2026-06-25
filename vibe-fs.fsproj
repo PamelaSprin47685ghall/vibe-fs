@@ -128,6 +128,7 @@
     <Compile Include="src/Shell/MuxSubagentToolExecute.fs" />
     <Compile Include="src/Shell/DelegateToolsCodec.fs" />
     <Compile Include="src/Shell/OpencodeHookInputCodec.fs" />
+    <Compile Include="src/Shell/OpencodeSessionEventCodec.fs" />
     <Compile Include="src/Shell/KnowledgeGraphBookkeeperLaunch.fs" />
     <Compile Include="src/Shell/NudgeRuntime.fs" />
     <Compile Include="src/Mux/AiSettings.fs" />
@@ -218,6 +219,7 @@
     <Compile Include="tests/ShellTests.fs" />
     <Compile Include="tests/DynTests.fs" />
     <Compile Include="tests/DelegateTests.fs" />
+    <Compile Include="tests/DelegateToolsCodecTests.fs" />
     <Compile Include="tests/ResolveAiSettingsTests.fs" />
     <Compile Include="tests/IntegrationPluginTests.fs" />
     <Compile Include="tests/IntegrationEventTests.fs" />
@@ -258,6 +260,7 @@
     <Compile Include="tests/OpencodeSessionSpawnCodecTests.fs" />
     <Compile Include="tests/SessionIoPromptBodyTests.fs" />
     <Compile Include="tests/OpencodeAgentConfigCodecTests.fs" />
+    <Compile Include="tests/OpencodeSessionEventCodecTests.fs" />
     <Compile Include="tests/MuxAiSettingsCodecTests.fs" />
     <Compile Include="tests/MuxAiSettingsIntegrationTests.fs" />
     <Compile Include="tests/AgentConfigApplyTests.fs" />
@@ -267,6 +270,21 @@
     <Compile Include="tests/SessionExecutorScopeTests.fs" />
     <Compile Include="tests/ToolResultWireTests.fs" />
     <Compile Include="tests/ArchitectureTestsSupport.fs" />
+    <Compile Include="tests/ArchitectureTestsFoundation.fs" />
+    <Compile Include="tests/ArchitectureTestsMessageTransform.fs" />
+    <Compile Include="tests/ArchitectureTestsSubagent.fs" />
+    <Compile Include="tests/ArchitectureTestsSubagentToolExec.fs" />
+    <Compile Include="tests/ArchitectureTestsRuntime.fs" />
+    <Compile Include="tests/ArchitectureTestsRuntimeKg.fs" />
+    <Compile Include="tests/ArchitectureTestsWireToolExec.fs" />
+    <Compile Include="tests/ArchitectureTestsWireHook.fs" />
+    <Compile Include="tests/ArchitectureTestsWirePipeline.fs" />
+    <Compile Include="tests/ArchitectureTestsWire.fs" />
+    <Compile Include="tests/ArchitectureTestsWirePayload.fs" />
+    <Compile Include="tests/ArchitectureTestsMuxToolCore.fs" />
+    <Compile Include="tests/ArchitectureTestsMuxToolAux.fs" />
+    <Compile Include="tests/ArchitectureTestsMuxTools.fs" />
+    <Compile Include="tests/ArchitectureTestsOpencodeTools.fs" />
     <Compile Include="tests/ArchitectureTests.fs" />
     <Compile Include="tests/Tests.fs" />
   </ItemGroup>
