@@ -138,6 +138,7 @@ let private tests : (string * TestBody) list =
     "KernelPromptSpecs.toolCatalogCentralized", Sync (sync KernelPromptSpecs.toolCatalogCentralized)
     "KernelPromptSpecs.hostToolsKnowledgeGraphNames", Sync (sync KernelPromptSpecs.hostToolsKnowledgeGraphNames)
     "KernelPromptSpecs.subagentDispatch", Sync (sync KernelPromptSpecs.subagentDispatch)
+    "KernelPromptSpecs.mimocodeFormatPromptAppendsAgentReportTail", Sync (sync KernelPromptSpecs.mimocodeFormatPromptAppendsAgentReportTail)
     "KernelPromptSpecs.subagentJoinReports", Sync (sync KernelPromptSpecs.subagentJoinReports)
     "KernelTests.dynDeleteKey", Sync (sync KernelTests.dynDeleteKey)
     "KernelPromptSpecs.loopMessagesShared", Sync (sync KernelPromptSpecs.loopMessagesShared)
@@ -248,6 +249,7 @@ let private tests : (string * TestBody) list =
     "SubagentPromptBuildTests.run", Sync (sync SubagentPromptBuildTests.run)
     "SubagentSpawnTests.run", Async SubagentSpawnTests.run
     "ArchitectureTests.subagentToolsUseKernelPromptHelpers", Sync (sync ArchitectureTestsSubagent.subagentToolsUseKernelPromptHelpers)
+    "ArchitectureTests.opencodeSubagentToolExecuteUsesHostNotLiteralOpencode", Sync (sync ArchitectureTestsSubagent.opencodeSubagentToolExecuteUsesHostNotLiteralOpencode)
     "ArchitectureTests.muxSubagentToolsUsesToolCopy", Sync (sync ArchitectureTestsSubagent.muxSubagentToolsUsesToolCopy)
     "ArchitectureTests.muxSubagentToolsUsesFromMuxConfig", Sync (sync ArchitectureTestsSubagent.muxSubagentToolsUsesFromMuxConfig)
     "ArchitectureTests.muxSubagentToolsUsesSubagentToolPolicy", Sync (sync ArchitectureTestsSubagent.muxSubagentToolsUsesSubagentToolPolicy)
@@ -363,6 +365,7 @@ let private tests : (string * TestBody) list =
     "ArchitectureTests.toolExecuteWireHelperExists", Sync (sync ArchitectureTestsWireToolExec.toolExecuteWireHelperExists)
     "ArchitectureTests.muxPluginToolExecuteAfterUsesMuxHookInputCodec", Sync (sync ArchitectureTestsWireHook.muxPluginToolExecuteAfterUsesMuxHookInputCodec)
     "ArchitectureTests.opencodeToolSchemaDescriptionsFromCatalog", Sync (sync ArchitectureTestsOpencodeTools.opencodeToolSchemaDescriptionsFromCatalog)
+    "ArchitectureTests.opencodeToolsUseHostForSummarizerPrompts", Sync (sync ArchitectureTestsOpencodeTools.opencodeToolsUseHostForSummarizerPrompts)
     "WebToolsCodecTests.run", Sync (sync WebToolsCodecTests.run)
     "ReviewToolsCodecTests.run", Sync (sync ReviewToolsCodecTests.run)
     "KnowledgeGraphToolsCodecTests.run", Sync (sync KnowledgeGraphToolsCodecTests.run)

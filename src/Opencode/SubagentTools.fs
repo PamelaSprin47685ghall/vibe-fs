@@ -15,35 +15,35 @@ open VibeFs.Shell.OpencodeClientCodec
 open VibeFs.Shell.PromiseStr
 open VibeFs.Shell.SubagentToolExecute
 
-let private spawnCtx (registry: ChildAgentRegistry) (ctx: obj) (client: obj) (context: obj) =
-    { Registry = registry; Client = client; PluginCtx = ctx; ToolContext = context }
+let private spawnCtx (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (client: obj) (context: obj) =
+    { Host = host; Registry = registry; Client = client; PluginCtx = ctx; ToolContext = context }
 
-let private executeSubagent (registry: ChildAgentRegistry) (ctx: obj) (toolName: string) (args: obj) (context: obj) =
+let private executeSubagent (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (toolName: string) (args: obj) (context: obj) =
     match getClientFromPluginCtx ctx with
     | Error e -> resolveStr (wireEncodeToolError "OpencodeClient" e)
     | Ok client ->
-        executeOpencodeSubagentTool runSubagentCoreResult (spawnCtx registry ctx client context) toolName args
+        executeOpencodeSubagentTool runSubagentCoreResult (spawnCtx host registry ctx client context) toolName args
 
-let coderTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
+let coderTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let coderRequiredKeys = subagentRequiredKeys "coder"
     define coder
         (subagentZodShape coderRequiredKeys (createObj [ "intents", coderIntentsSchema Params.coderIntents; "tdd", enumReq [| "red"; "green" |] Params.coderTdd; "_ui", uiParam ]))
-        (fun args context -> executeSubagent registry ctx "coder" args context)
+        (fun args context -> executeSubagent host registry ctx "coder" args context)
 
-let investigatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
+let investigatorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let investigatorRequiredKeys = subagentRequiredKeys "investigator"
     define investigator
         (subagentZodShape investigatorRequiredKeys (createObj [ "intents", investigatorIntentsSchema Params.investigatorIntents; "_ui", uiParam ]))
-        (fun args context -> executeSubagent registry ctx "investigator" args context)
+        (fun args context -> executeSubagent host registry ctx "investigator" args context)
 
-let meditatorTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
+let meditatorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let meditatorRequiredKeys = subagentRequiredKeys "meditator"
     define meditator
         (subagentZodShape meditatorRequiredKeys (createObj [ "intent", strReq Params.meditatorIntent; "files", strArrayReq Params.meditatorFiles ]))
-        (fun args context -> executeSubagent registry ctx "meditator" args context)
+        (fun args context -> executeSubagent host registry ctx "meditator" args context)
 
-let browserTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
+let browserTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let browserRequiredKeys = subagentRequiredKeys "browser"
     define browser
         (subagentZodShape browserRequiredKeys (createObj [ "intent", strReq Params.browserIntent ]))
-        (fun args context -> executeSubagent registry ctx "browser" args context)
+        (fun args context -> executeSubagent host registry ctx "browser" args context)

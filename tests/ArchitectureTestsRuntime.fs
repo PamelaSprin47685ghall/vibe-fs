@@ -223,8 +223,8 @@ let pluginInjectsSessionScopeForExecutor () =
     let executor = requireFile "src/Opencode/ExecutorTool.fs" |> nonCommentCode
     check "arch: Opencode PluginCore createTools passes scope"
         (pluginCore.Contains "createTools host childAgentRegistry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled scope")
-    check "arch: Opencode Tools passes sessionScope to executorTool"
-        (tools.Contains "executorTool registry ctx sessionScope")
+    check "arch: Opencode Tools passes host and sessionScope to executorTool"
+        (tools.Contains "executorTool host registry ctx sessionScope")
     check "arch: Opencode ExecutorTool uses sessionScope.EnqueuePerSession"
         (executor.Contains "sessionScope.EnqueuePerSession")
 

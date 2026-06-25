@@ -81,6 +81,20 @@ let subagentToolsUseKernelPromptHelpers () =
     check "arch: Mux SubagentTools must not call formatPrompt Host.Mimocode (Browser"
         (not (mux.Contains "formatPrompt Host.Mimocode (Browser"))
 
+let opencodeSubagentToolExecuteUsesHostNotLiteralOpencode () =
+    let shellExec = requireFile "src/Shell/SubagentToolExecute.fs" |> nonCommentCode
+    check "arch: SubagentToolExecute must not hardcode promptsFromCoderIntents opencode"
+        (not (shellExec.Contains "promptsFromCoderIntents opencode"))
+    check "arch: SubagentToolExecute must not hardcode meditatorPromptFromFiles opencode"
+        (not (shellExec.Contains "meditatorPromptFromFiles opencode"))
+    check "arch: SubagentToolExecute must not hardcode browserPromptText opencode"
+        (not (shellExec.Contains "browserPromptText opencode"))
+    check "arch: SubagentToolExecute threads Host into prompt helpers (spawn.Host or execute host param)"
+        ((shellExec.Contains "spawn.Host")
+         || (shellExec.Contains "promptsFromCoderIntents spawn.Host")
+         || (shellExec.Contains "executeOpencodeSubagentToolFor")
+         || (shellExec.Contains "promptsFromCoderIntents host"))
+
 let subagentToolsUseDecodeIntentsField () =
     let codec = requireFile "src/Shell/SubagentSimpleArgsCodec.fs" |> nonCommentCode
     let decode = requireFile "src/Shell/ToolArgsDecode.fs" |> nonCommentCode

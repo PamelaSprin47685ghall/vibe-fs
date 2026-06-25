@@ -20,14 +20,14 @@ let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: Finder
     let iteratorStore = sessionScope.IteratorStore
     let tools =
         createObj [
-            yield "coder", box (coderTool registry ctx)
-            yield "investigator", box (investigatorTool registry ctx)
-            yield "meditator", box (meditatorTool registry ctx)
-            yield "browser", box (browserTool registry ctx)
-            yield "executor", box (executorTool registry ctx sessionScope)
+            yield "coder", box (coderTool host registry ctx)
+            yield "investigator", box (investigatorTool host registry ctx)
+            yield "meditator", box (meditatorTool host registry ctx)
+            yield "browser", box (browserTool host registry ctx)
+            yield "executor", box (executorTool host registry ctx sessionScope)
             yield "fuzzy_find", box (fuzzyFindTool finderCache iteratorStore)
             yield "fuzzy_grep", box (fuzzyGrepTool finderCache iteratorStore)
-            yield "websearch", box (websearchTool registry ctx)
+            yield "websearch", box (websearchTool host registry ctx)
             yield "webfetch", box (webfetchTool ctx)
             if knowledgeGraphEnabled then
                 yield "knowledge_graph_fetch", box (knowledgeGraphFetchTool knowledgeGraphRuntime ctx)
@@ -37,5 +37,5 @@ let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: Finder
             if host = Mimocode then
                 yield todoWriteToolName host, box (mimoTodoTool ctx)
         ]
-    registerMethodologyTools registry ctx tools
+    registerMethodologyTools registry ctx host tools
     tools

@@ -10,7 +10,8 @@ open VibeFs.Shell.SubagentToolExecute
 open VibeFs.Tests.IntegrationToolSetup
 
 let private stubSpawn () =
-    { Registry = ChildAgentRegistry.Create()
+    { Host = VibeFs.Kernel.HostTools.opencode
+      Registry = ChildAgentRegistry.Create()
       Client = createObj []
       PluginCtx = createObj [ "directory", box "/proj" ]
       ToolContext = createObj [ "directory", box "/proj"; "sessionID", box "s-parent" ] }

@@ -25,7 +25,7 @@ let private zodField (f: MethodologyField) : string * obj =
 let private methodologyArgs (schema: MethodologySchema) : obj =
     createObj (schema.fields |> List.map zodField)
 
-let private executeSchema (registry: ChildAgentRegistry) (ctx: obj) (schema: MethodologySchema) : obj -> obj -> JS.Promise<string> =
+let private executeSchema (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (schema: MethodologySchema) : obj -> obj -> JS.Promise<string> =
     fun args context ->
         promise {
             match parse schema args with
@@ -36,7 +36,7 @@ let private executeSchema (registry: ChildAgentRegistry) (ctx: obj) (schema: Met
                 let tc = extractToolContext context (str ctx "directory")
                 let directory = str tc "directory"
                 let sessionID = str tc "sessionID"
-                let prompt = formatPrompt opencode (Meditator(intent, [])) |> List.head
+                let prompt = formatPrompt host (Meditator(intent, [])) |> List.head
                 let! subResult =
                     runSubagent
                         registry
@@ -53,9 +53,9 @@ let private executeSchema (registry: ChildAgentRegistry) (ctx: obj) (schema: Met
                 | Error err -> return wireEncodeToolError "meditator" err
         }
 
-let methodologyTool (registry: ChildAgentRegistry) (ctx: obj) (schema: MethodologySchema) : obj =
-    define schema.toolDescription (methodologyArgs schema) (executeSchema registry ctx schema)
+let methodologyTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (schema: MethodologySchema) : obj =
+    define schema.toolDescription (methodologyArgs schema) (executeSchema host registry ctx schema)
 
-let registerMethodologyTools (registry: ChildAgentRegistry) (ctx: obj) (target: obj) : unit =
+let registerMethodologyTools (registry: ChildAgentRegistry) (ctx: obj) (host: Host) (target: obj) : unit =
     for schema in allSchemas do
-        target?(schema.toolName) <- box (methodologyTool registry ctx schema)
+        target?(schema.toolName) <- box (methodologyTool host registry ctx schema)

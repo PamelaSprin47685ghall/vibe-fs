@@ -84,7 +84,7 @@ let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyI
         finderCache
         iteratorStore
 
-let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
+let websearchTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =
     define websearch
         (box {| query = strReq Params.websearchQuery
                 numResults = numOpt Params.websearchNumResults
@@ -108,7 +108,7 @@ let websearchTool (registry: ChildAgentRegistry) (ctx: obj) : obj =
                             if items.IsEmpty then
                                 return rawResults
                             else
-                                let prompt = formatPrompt opencode (WebsearchSummary(ws.WhatToSummarize, rawResults)) |> List.head
+                                let prompt = formatPrompt host (WebsearchSummary(ws.WhatToSummarize, rawResults)) |> List.head
                                 return! resolveSubagentPromise "executor"
                                     (runSubagentWithCleanup registry client "executor" "Web search summary" prompt
                                         runtime.Execution.Directory runtime.Execution.SessionId context)

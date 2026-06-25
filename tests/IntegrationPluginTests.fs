@@ -112,6 +112,16 @@ let mimoConfigSpec () = promise {
     check "mimo manager tools.task present" (not (isNullish (get managerTools "task")))
     check "mimo manager tools.actor false" (unbox<bool> (get managerTools "actor") = false)
     check "mimo manager tools.workflow false" (unbox<bool> (get managerTools "workflow") = false)
+    check "mimo config build exists" (not (isNullish (get agents "build")))
+    check "mimo config plan exists" (not (isNullish (get agents "plan")))
+    check "mimo manager tools.glob present" (not (isNullish (get managerTools "glob")))
+    check "mimo manager tools.skill present" (not (isNullish (get managerTools "skill")))
+    let coder = get agents "coder"
+    check "mimo config coder exists" (not (isNullish coder))
+    let coderTools = get coder "tools"
+    check "mimo config coder tools.question false" (not (unbox<bool> (get coderTools "question")))
+    check "mimo config coder tools.glob present" (not (isNullish (get coderTools "glob")))
+    check "mimo config coder tools.skill present" (not (isNullish (get coderTools "skill")))
     let taskParams =
         createObj [
             "type", box "object"

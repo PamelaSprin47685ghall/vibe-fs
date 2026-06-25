@@ -285,3 +285,16 @@ let executorSummarizerNoExitStatus () =
     let prompt = executorSummarizerPrompt "" "raw" "shell" "echo 1" [] "short" "ro"
     check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
     check "summarizer prompt omits non-zero exit" (not (prompt.ToLowerInvariant().Contains "non-zero exit"))
+
+/// Mimocode With-Review parity: agent_report tail must come from formatPrompt host branch only.
+let mimocodeFormatPromptAppendsAgentReportTail () =
+    let browserPrompts =
+        VibeFs.Kernel.Subagent.formatPrompt Mimocode (VibeFs.Kernel.Subagent.Browser "open google.com")
+    let mimocodeBody = browserPrompts |> List.head
+    check "mimocode browser prompt contains MUST call the agent_report"
+        (mimocodeBody.Contains "MUST call the agent_report")
+    let opencodePrompts =
+        VibeFs.Kernel.Subagent.formatPrompt Opencode (VibeFs.Kernel.Subagent.Browser "open google.com")
+    let opencodeBody = opencodePrompts |> List.head
+    check "opencode browser prompt does not append agent_report tail"
+        (not (opencodeBody.Contains "MUST call the agent_report"))

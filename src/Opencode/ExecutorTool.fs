@@ -29,7 +29,7 @@ let private nodeBuffer : obj = jsNative
 let private byteLength (s: string) : int = nodeBuffer?byteLength(s, "utf-8")
 let private resolveStr (text: string) : JS.Promise<string> = Promise.lift text
 
-let executorTool (registry: ChildAgentRegistry) (ctx: obj) (sessionScope: RuntimeScope) : obj =
+let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (sessionScope: RuntimeScope) : obj =
     define executor
         (box {|
             language = enumReq [| "shell"; "python"; "javascript" |] Params.executorLanguage
@@ -60,7 +60,7 @@ let executorTool (registry: ChildAgentRegistry) (ctx: obj) (sessionScope: Runtim
                                 else
                                     let langStr = languageToString options.language
                                     let timeoutStr = timeoutToString options.timeoutType
-                                    let prompt = formatPrompt opencode (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
+                                    let prompt = formatPrompt host (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
                                     let! summary =
                                         resolveSubagentPromise "executor"
                                             (runSubagentWithCleanup registry client "executor" "Executor summary" prompt

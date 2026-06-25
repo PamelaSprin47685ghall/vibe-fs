@@ -17,7 +17,8 @@ open VibeFs.Shell.ToolExecute
 open VibeFs.Shell.ToolRuntimeContext
 
 type OpencodeSubagentSpawn =
-    { Registry: ChildAgentRegistry
+    { Host: Host
+      Registry: ChildAgentRegistry
       Client: obj
       PluginCtx: obj
       ToolContext: obj }
@@ -54,20 +55,20 @@ let executeOpencodeSubagentTool
                 resolveSubagentPromise toolName (runCore registry client agent title prompt dir sessionID ctx tools false)
             match decoded with
             | CoderBatch intents ->
-                let prompts = promptsFromCoderIntents opencode intents
+                let prompts = promptsFromCoderIntents spawn.Host intents
                 if prompts.IsEmpty then return subagentIntentsMustBeNonEmpty
                 else return! runParallelSpawns prompts (spawnOne "coder" "Coder")
             | InvestigatorBatch intents ->
-                let prompts = promptsFromInvestigatorIntents opencode intents
+                let prompts = promptsFromInvestigatorIntents spawn.Host intents
                 if prompts.IsEmpty then return subagentIntentsMustBeNonEmpty
                 else return! runParallelSpawns prompts (spawnOne "investigator" "Investigator")
             | Typed (Meditator m) ->
-                let! promptResult = meditatorPromptFromFiles opencode dir m.Intent m.Files
+                let! promptResult = meditatorPromptFromFiles spawn.Host dir m.Intent m.Files
                 match promptResult with
                 | Error e -> return subagentToolFailed "meditator" e
                 | Ok prompt -> return! spawnOne "meditator" "Meditator" prompt
             | Typed (Browser b) ->
-                return! spawnOne "browser" "Browser" (browserPromptText opencode b.Intent)
+                return! spawnOne "browser" "Browser" (browserPromptText spawn.Host b.Intent)
             | Typed _ ->
                 return subagentToolFailed toolName (InvalidIntent (toolName, "tool", "not a subagent tool"))
     }
