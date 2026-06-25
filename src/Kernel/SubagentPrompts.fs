@@ -84,6 +84,7 @@ let browserPrompt (intent: string) : string =
         [ "You are a browser automation agent. Use stealth-browser-mcp tools to interact with web pages. Return a detailed report." ]
 
 let executorSummarizerPrompt
+    (whatToSummarize: string)
     (output: string)
     (language: string)
     (program: string)
@@ -92,7 +93,8 @@ let executorSummarizerPrompt
     (mode: string)
     : string =
     agentPrompt
-        [ yamlField "language" language
+        [ yamlField "what_to_summarize" whatToSummarize
+          yamlField "language" language
           yamlField "program" program
           yamlStringSeqField "dependencies" dependencies
           yamlField "timeout_type" timeoutType

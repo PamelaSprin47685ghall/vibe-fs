@@ -12,6 +12,12 @@
       "import": "./build/src/Mux/Plugin.js",
       "require": "./build/src/Mux/Plugin.js",
       "default": "./build/src/Mux/Plugin.js"
+    },
+    "./omp": {
+      "types": "./index.d.ts",
+      "import": "./build/src/Omp/Plugin.js",
+      "require": "./build/src/Omp/Plugin.js",
+      "default": "./build/src/Omp/Plugin.js"
     }
   },
   "files": [

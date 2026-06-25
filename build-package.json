@@ -4,6 +4,7 @@
   "type": "module",
   "main": "src/Mux/Plugin.js",
   "exports": {
-    ".": "./src/Mux/Plugin.js"
+    ".": "./src/Mux/Plugin.js",
+    "./omp": "./src/Omp/Plugin.js"
   }
 }

@@ -261,6 +261,6 @@ let reviewMarkdownCodec () =
 /// status — that metadata now travels in the structured return block, not in
 /// the prose summary.
 let executorSummarizerNoExitStatus () =
-    let prompt = executorSummarizerPrompt "raw" "shell" "echo 1" [] "short" "ro"
+    let prompt = executorSummarizerPrompt "" "raw" "shell" "echo 1" [] "short" "ro"
     check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
     check "summarizer prompt omits non-zero exit" (not (prompt.ToLowerInvariant().Contains "non-zero exit"))

@@ -5,6 +5,7 @@
 
   <ItemGroup>
     <Compile Include="src/Kernel/HostTools.fs" />
+    <Compile Include="src/Kernel/OmpSessionTools.fs" />
     <Compile Include="src/Kernel/SubagentIntents.fs" />
     <Compile Include="src/Kernel/PromptFrontMatter.fs" />
     <Compile Include="src/Kernel/ToolOutputInfo.fs" />
@@ -15,6 +16,7 @@
     <Compile Include="src/Kernel/SearchPrompts.fs" />
     <Compile Include="src/Kernel/ReviewPrompts.fs" />
     <Compile Include="src/Kernel/SubagentPrompts.fs" />
+    <Compile Include="src/Kernel/OmpPrompts.fs" />
     <Compile Include="src/Kernel/Subagent.fs" />
     <Compile Include="src/Kernel/ToolCatalog.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />
@@ -40,6 +42,7 @@
     <Compile Include="src/Kernel/FuzzyQuery.fs" />
     <Compile Include="src/Kernel/FuzzyFormat.fs" />
     <Compile Include="src/Kernel/Executor.fs" />
+    <Compile Include="src/Kernel/WebFetchGuard.fs" />
     <Compile Include="src/Shell/Dyn.fs" />
     <Compile Include="src/Shell/ErrorClassify.fs" />
     <Compile Include="src/Shell/ReviewRuntime.fs" />
@@ -48,7 +51,6 @@
     <Compile Include="src/Shell/MagicSessionStore.fs" />
     <Compile Include="src/Shell/ExecutorJavascript.fs" />
     <Compile Include="src/Shell/SubagentIntentsCodec.fs" />
-    <Compile Include="src/Shell/OllamaClient.fs" />
     <Compile Include="src/Shell/TreeSitterShell.fs" />
     <Compile Include="src/Shell/FuzzyFinderShell.fs" />
     <Compile Include="src/Shell/FuzzyIteratorStore.fs" />
@@ -57,6 +59,10 @@
     <Compile Include="src/Shell/KnowledgeGraphPortLock.fs" />
     <Compile Include="src/Shell/KnowledgeGraphFiles.fs" />
     <Compile Include="src/Shell/WorkspaceFiles.fs" />
+    <Compile Include="src/Shell/WebFetch.fs" />
+    <Compile Include="src/Shell/RunnerBackground.fs" />
+    <Compile Include="src/Shell/OmpCaps.fs" />
+    <Compile Include="src/Shell/OllamaClient.fs" />
     <Compile Include="src/Shell/Executor.fs" />
     <Compile Include="src/Shell/FuzzySearch.fs" />
     <Compile Include="src/Shell/ChildAgentRegistry.fs" />
@@ -112,6 +118,26 @@
     <Compile Include="src/Opencode/Plugin.fs" />
     <Compile Include="src/Opencode/PluginMimo.fs" />
     <Compile Include="src/Opencode/PluginMimoTui.fs" />
+    <Compile Include="src/Omp/PiResolve.fs" />
+    <Compile Include="src/Omp/Schema.fs" />
+    <Compile Include="src/Omp/Codec.fs" />
+    <Compile Include="src/Omp/MessagingCodec.fs" />
+    <Compile Include="src/Omp/ChildSession.fs" />
+    <Compile Include="src/Omp/PruneGuard.fs" />
+    <Compile Include="src/Omp/NudgeRuntime.fs" />
+    <Compile Include="src/Omp/MessageTransform.fs" />
+    <Compile Include="src/Omp/FuzzyTools.fs" />
+    <Compile Include="src/Omp/WebTools.fs" />
+    <Compile Include="src/Omp/OmpToolSchema.fs" />
+    <Compile Include="src/Omp/ExecutorTools.fs" />
+    <Compile Include="src/Omp/RunnerTools.fs" />
+    <Compile Include="src/Omp/TodoTool.fs" />
+    <Compile Include="src/Omp/SubagentTools.fs" />
+    <Compile Include="src/Omp/ReviewTools.fs" />
+    <Compile Include="src/Omp/SessionLifecycle.fs" />
+    <Compile Include="src/Omp/Tools.fs" />
+    <Compile Include="src/Omp/OmpTestHooks.fs" />
+    <Compile Include="src/Omp/Plugin.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -160,6 +186,16 @@
     <Compile Include="tests/KnowledgeGraphFileTests.fs" />
     <Compile Include="tests/KnowledgeGraphKernelTests.fs" />
     <Compile Include="tests/TitleFetchGuardTests.fs" />
+    <Compile Include="tests/OmpKernelTests.fs" />
+    <Compile Include="tests/OmpSessionToolsTests.fs" />
+    <Compile Include="tests/OmpWebFetchTests.fs" />
+    <Compile Include="tests/OmpCapsTests.fs" />
+    <Compile Include="tests/OmpFuzzyTests.fs" />
+    <Compile Include="tests/OmpPluginTests.fs" />
+    <Compile Include="tests/OmpReviewTests.fs" />
+    <Compile Include="tests/OmpChildSessionTests.fs" />
+    <Compile Include="tests/OmpHelpersTests.fs" />
+    <Compile Include="tests/OmpRunnerTests.fs" />
     <Compile Include="tests/MethodologyTests.fs" />
     <Compile Include="tests/ArchitectureTests.fs" />
     <Compile Include="tests/Tests.fs" />

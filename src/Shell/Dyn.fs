@@ -39,6 +39,8 @@ let has (o: obj) (key: string) : bool =
 
 let typeIs (o: obj) (ty: string) : bool = jsType o = ty
 
+let call0 (f: obj) : obj = f $ ()
+
 let call1 (f: obj) (a: obj) : obj = f $ a
 
 let call2 (f: obj) (a: obj) (b: obj) : obj = f $ (a, b)

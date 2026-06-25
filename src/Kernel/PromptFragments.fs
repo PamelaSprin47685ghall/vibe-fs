@@ -31,9 +31,12 @@ let todoNudgePrompt =
     + "If you want to skip this check, respond with <skip-todo-check />"
 
 let loopNudgePrompt =
-    "You are in With-Review Mode. You must call the submit_review tool to\n"
+    "You are in loop mode. You must call the submit_review tool to\n"
     + "submit your detailed report and list of modified files for review\n"
     + "before finishing. Do not end the conversation without calling submit_review."
+
+let runnerNudgePrompt =
+    "A background runner task is still active. Call runner_wait to collect output or runner_abort to stop it before finishing."
 
 let managerSystemPromptFor (host: Host) =
     let todoLine =

@@ -58,6 +58,10 @@ type ResolvedFuzzySearchPath =
       pathConstraint: string option
       external: bool }
 
+type ExternalBasePathTestResult =
+    { basePath: string
+      pathConstraint: string option }
+
 let private normalizeTrimmed (trimmed: string) : string option =
     let stripLeadingDotSlash (t: string) =
         if t.StartsWith("./") then t.[2..] else t
@@ -134,3 +138,7 @@ let resolveExternalPath (inputPath: string option) (cwd: string) : string option
     let resolved = resolveFuzzySearchPath inputPath cwd
     if not resolved.external then None, None
     else Some resolved.basePath, resolved.pathConstraint
+
+let resolveExternalBasePathForTest (absPath: string) : ExternalBasePathTestResult =
+    let basePath, pathConstraint = resolveExternalBasePath absPath
+    { basePath = basePath; pathConstraint = pathConstraint }

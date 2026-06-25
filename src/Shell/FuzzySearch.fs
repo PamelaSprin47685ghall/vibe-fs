@@ -108,6 +108,10 @@ let optInt (o: obj) (key: string) : int option =
     let value = Dyn.get o key
     if Dyn.isNullish value then None else Some(unbox<int> value)
 
+let optBool (o: obj) (key: string) : bool option =
+    let value = Dyn.get o key
+    if Dyn.isNullish value then None else Some(unbox<bool> value)
+
 let itemsOf (value: obj) : obj array =
     let items = Dyn.get value "items"
     if Dyn.isNullish items || not (Dyn.isArray items) then [||] else items :?> obj array

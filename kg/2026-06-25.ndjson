@@ -1,0 +1,11 @@
+{"type":"knowledge_graph_header","version":1,"kind":"day","date":"2026-06-25","rewritten":false}
+{"id":"091c","entity":["源码卫生","Fable编译约束"],"fact":"OmpChildSessionTests.fs 已弃用的 := 赋值语法已改为 cell.Value <- expr，消除 FSHARP code 3370 警告。"}
+{"id":"1bc3","entity":["OMP宿主适配","工作区状态"],"fact":"OMP 适配层 19 模块全量物理落盘至 src/Omp/，配套 Kernel 扩展（OmpPrompts/OmpSessionTools/WebFetchGuard）与 Shell 扩展（OmpCaps/RunnerBackground/WebFetch）同步就位，9 测试模块（Omp*Tests.fs）覆盖全门禁。"}
+{"id":"1c26","entity":["工作区文档","版本控制"],"fact":"保姆式方案.md、保姆级重构指南.md、TASK.md 三文件已从工作区删除，AGENTS.md 已修改。"}
+{"id":"8da5","entity":["知识图谱","持久化"],"fact":"kg/2026-06-25.ndjson 新日文件已创建，为当日知识图谱追加目标文件。"}
+{"id":"361c","entity":["OMP宿主适配","模块结构"],"fact":"OMP 适配层 19 模块全量物理落盘：PiResolve、Schema、Codec、MessagingCodec、ChildSession、OmpToolSchema、FuzzyTools、WebTools、ExecutorTools、RunnerTools、SubagentTools、ReviewTools、TodoTool、MessageTransform、SessionLifecycle、PruneGuard、NudgeRuntime、Tools、Plugin。"}
+{"id":"ef68","entity":["OMP宿主适配","测试套件"],"fact":"OMP 测试套件 9 模块全量物理落盘：OmpKernelTests、OmpSessionToolsTests、OmpWebFetchTests、OmpCapsTests、OmpPluginTests、OmpHelpersTests、OmpFuzzyTests、OmpRunnerTests、OmpReviewTests、OmpChildSessionTests。"}
+{"id":"2b14","entity":["OMP宿主适配","分层架构"],"fact":"Kernel 层新增 OmpPrompts（OMP 专属 prompt 常量）、OmpSessionTools（OMP 工具名 SSOT 四常量集）、WebFetchGuard（SSRF 纯解析门禁）三编译项。Shell 层新增 OmpCaps（OMP caps 实现）、RunnerBackground（runner 后台态模拟）、WebFetch（validateFetchUrlForOmp 导出）三编译项。"}
+{"id":"0902","entity":["版本控制","工作区布局"],"fact":"oh-my-pi 分支从 master 创建，用于 OMP 宿主适配的独立开发线。"}
+{"id":"091c","entity":["源码卫生","Fable编译约束"],"fact":"全仓 ref cell 赋值语法由 := 统一迁移为 .Value <- expr，消除 FSHARP code 3370 警告。"}
+{"id":"1c26","entity":["工作区文档","版本控制"],"fact":"TASK.md、保姆式方案.md、保姆级重构指南.md 三文件已从工作区删除，AGENTS.md 已修改。"}

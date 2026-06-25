@@ -25,6 +25,17 @@ open VibeFs.Tests.KnowledgeGraphFileTests
 open VibeFs.Tests.KnowledgeGraphKernelTests
 open VibeFs.Tests.TitleFetchGuardTests
 open VibeFs.Tests.ArchitectureTests
+open VibeFs.Tests.OmpKernelTests
+open VibeFs.Tests.OmpSessionToolsTests
+open VibeFs.Tests.OmpWebFetchTests
+open VibeFs.Tests.OmpCapsTests
+open VibeFs.Tests.OmpFuzzyTests
+open VibeFs.Tests.OmpPluginTests
+open VibeFs.Tests.OmpReviewTests
+open VibeFs.Tests.OmpHelpersTests
+open VibeFs.Tests.OmpRunnerTests
+open VibeFs.Tests.OmpChildSessionTests
+open VibeFs.Omp.Plugin
 
 type private TestBody =
     | Sync of (unit -> unit)
@@ -98,6 +109,8 @@ let private tests : (string * TestBody) list = [
     "ShellTests.capsFileShape", Sync (sync ShellTests.capsFileShape)
     "ShellTests.capsContextFormat", Sync (sync ShellTests.capsContextFormat)
     "ShellTests.capsFileSizeLimit", Sync (sync ShellTests.capsFileSizeLimit)
+    "ShellTests.stripHeadTailPipesOutsideQuotes", Sync (sync ShellTests.stripHeadTailPipesOutsideQuotes)
+    "ShellTests.stripHeadTailPipesHeadTailChain", Sync (sync ShellTests.stripHeadTailPipesHeadTailChain)
     "ShellTests.ollamaFormat", Sync (sync ShellTests.ollamaFormat)
 
     "ShellTests.executorToolResponseFormatting", Sync (sync ShellTests.executorToolResponseFormatting)
@@ -136,6 +149,64 @@ let private tests : (string * TestBody) list = [
     "ArchitectureTests.noBuiltinDictionary", Sync (sync ArchitectureTests.noBuiltinDictionary)
     "ArchitectureTests.opencodeHookSchemaNoDirectZodImport", Sync (sync ArchitectureTests.opencodeHookSchemaNoDirectZodImport)
     "ArchitectureTests.noLegacyInjectedToolOutputMarkers", Sync (sync ArchitectureTests.noLegacyInjectedToolOutputMarkers)
+    "ArchitectureTests.ompBoundary", Sync (sync ArchitectureTests.ompBoundary)
+    "ArchitectureTests.ompNoOpencodeRef", Sync (sync ArchitectureTests.ompNoOpencodeRef)
+    "ArchitectureTests.ompNoMuxRef", Sync (sync ArchitectureTests.ompNoMuxRef)
+    "ArchitectureTests.ompNoEngineRef", Sync (sync ArchitectureTests.ompNoEngineRef)
+    "OmpKernelTests.filterOmpMainSessionTools", Sync (sync OmpKernelTests.filterOmpMainSessionTools)
+    "OmpKernelTests.validateFetchUrlBlocksPrivate", Sync (sync OmpKernelTests.validateFetchUrlBlocksPrivate)
+    "OmpKernelTests.reviewInstructionsCanonicalVerdictTool", Sync (sync OmpKernelTests.reviewInstructionsCanonicalVerdictTool)
+    "OmpSessionToolsTests.mainSessionStripsChildOnlyAndBash", Sync (sync OmpSessionToolsTests.mainSessionStripsChildOnlyAndBash)
+    "OmpSessionToolsTests.childSessionKeepsChildTools", Sync (sync OmpSessionToolsTests.childSessionKeepsChildTools)
+    "OmpWebFetchTests.blocksLocalhostAndPrivateRanges", Sync (sync OmpWebFetchTests.blocksLocalhostAndPrivateRanges)
+    "OmpWebFetchTests.rejectsUnsupportedScheme", Sync (sync OmpWebFetchTests.rejectsUnsupportedScheme)
+    "OmpCapsTests.buildCapsFromUppercaseFiles", Async OmpCapsTests.buildCapsFromUppercaseFiles
+    "OmpCapsTests.stripHostDirContext", Sync (sync OmpCapsTests.stripHostDirContext)
+    "OmpCapsTests.appendCapsIdempotent", Async OmpCapsTests.appendCapsIdempotent
+    "OmpCapsTests.capsSkipsExcludedDirs", Async OmpCapsTests.capsSkipsExcludedDirs
+    "OmpCapsTests.capsRespectsFileCountBudget", Async OmpCapsTests.capsRespectsFileCountBudget
+    "OmpFuzzyTests.fuzzyFindIteratorSingleUse", Sync (sync OmpFuzzyTests.fuzzyFindIteratorSingleUse)
+    "OmpFuzzyTests.fuzzyGrepIteratorSingleUse", Sync (sync OmpFuzzyTests.fuzzyGrepIteratorSingleUse)
+    "OmpFuzzyTests.registeredFuzzyToolsExposeIteratorParam", Async OmpFuzzyTests.registeredFuzzyToolsExposeIteratorParam
+    "OmpKernelTests.executorSummarizerPromptCarriesWhatToSummarize", Sync (sync OmpKernelTests.executorSummarizerPromptCarriesWhatToSummarize)
+    "OmpPluginTests.registersCoreToolsIdempotent", Async OmpPluginTests.registersCoreToolsIdempotent
+    "OmpPluginTests.sessionStartStripsMainSessionTools", Async OmpPluginTests.sessionStartStripsMainSessionTools
+    "OmpPluginTests.fuzzyDescriptionsMatchMuxWording", Sync (sync OmpPluginTests.fuzzyDescriptionsMatchMuxWording)
+    "OmpPluginTests.readAssistantTextFromEntries", Sync (sync OmpPluginTests.readAssistantTextFromEntries)
+    "OmpPluginTests.subagentPromptsContainKernelFragments", Sync (sync OmpPluginTests.subagentPromptsContainKernelFragments)
+    "OmpPluginTests.executorToolSchemaFourFields", Async OmpPluginTests.executorToolSchemaFourFields
+    "OmpPluginTests.browserErrorsWithoutBrowserHost", Async OmpPluginTests.browserErrorsWithoutBrowserHost
+    "OmpPluginTests.reviewChildInitialPromptUsesReturnReviewer", Sync (sync OmpPluginTests.reviewChildInitialPromptUsesReturnReviewer)
+    "OmpPluginTests.fuzzyGrepExcludeAnyOfLength2", Async OmpPluginTests.fuzzyGrepExcludeAnyOfLength2
+    "OmpPluginTests.agentEndRunnerNudgeBeforeLoop", Async OmpPluginTests.agentEndRunnerNudgeBeforeLoop
+    "OmpPluginTests.agentEndLoopNudgeWhenActive", Async OmpPluginTests.agentEndLoopNudgeWhenActive
+    "OmpPluginTests.agentEndSkipsLoopNudgeWhenPendingMessages", Async OmpPluginTests.agentEndSkipsLoopNudgeWhenPendingMessages
+    "OmpReviewTests.loopInputHandledMessageAndNotify", Async OmpReviewTests.loopInputHandledMessageAndNotify
+    "OmpReviewTests.returnReviewerVerdictPassReject", Async OmpReviewTests.returnReviewerVerdictPassReject
+    "OmpReviewTests.returnReviewerViaSetPendingStateForTest", Async OmpReviewTests.returnReviewerViaSetPendingStateForTest
+    "OmpReviewTests.runReviewLoopChildToolNames", Async OmpReviewTests.runReviewLoopChildToolNames
+    "OmpReviewTests.runReviewLoopAcceptsWhenPendingResolved", Async OmpReviewTests.runReviewLoopAcceptsWhenPendingResolved
+    "OmpChildSessionTests.createChildSessionReviewToolNames", Async OmpChildSessionTests.createChildSessionReviewToolNames
+    "OmpChildSessionTests.createChildSessionRunnerToolNames", Async OmpChildSessionTests.createChildSessionRunnerToolNames
+    "OmpRunnerTests.waitRunnerJobAfterAppendLog", Async OmpRunnerTests.waitRunnerJobAfterAppendLog
+    "OmpRunnerTests.setRunnerJobStateForTestHasRunning", Sync (sync OmpRunnerTests.setRunnerJobStateForTestHasRunning)
+    "OmpRunnerTests.abortRunnerJobClearsRunning", Sync (sync OmpRunnerTests.abortRunnerJobClearsRunning)
+    "OmpRunnerTests.cleanupRunnerJobClearsRunning", Async OmpRunnerTests.cleanupRunnerJobClearsRunning
+    "OmpRunnerTests.hasRunningWhenActiveExecutorRun", Sync (sync OmpRunnerTests.hasRunningWhenActiveExecutorRun)
+    "OmpRunnerTests.abortExecutorRunClearsActive", Sync (sync OmpRunnerTests.abortExecutorRunClearsActive)
+    "OmpRunnerTests.executorChildToolNamesMatchOmpSessionTools", Sync (sync OmpRunnerTests.executorChildToolNamesMatchOmpSessionTools)
+    "OmpHelpersTests.checkSyntaxBadJson", Async OmpHelpersTests.checkSyntaxBadJson
+    "OmpHelpersTests.checkSyntaxValidJson", Async OmpHelpersTests.checkSyntaxValidJson
+    "OmpHelpersTests.checkSyntaxBrokenJsonReports_intentionalWarningFork", Async OmpHelpersTests.checkSyntaxBrokenJsonReports_intentionalWarningFork
+    "OmpHelpersTests.supportsSyntaxDiagnosticsFileEditTools", Async OmpHelpersTests.supportsSyntaxDiagnosticsFileEditTools
+    "OmpHelpersTests.supportsSyntaxDiagnosticsGrepFalse", Sync (sync OmpHelpersTests.supportsSyntaxDiagnosticsGrepFalse)
+    "OmpHelpersTests.stripHeadTailViaKernel", Sync (sync OmpHelpersTests.stripHeadTailViaKernel)
+    "OmpHelpersTests.stripHeadTailChain", Sync (sync OmpHelpersTests.stripHeadTailChain)
+    "OmpHelpersTests.getOllamaApiKeyFromEnv", Sync (sync OmpHelpersTests.getOllamaApiKeyFromEnv)
+    "OmpHelpersTests.getOllamaApiKeyMissingWhenUnset", Sync (sync OmpHelpersTests.getOllamaApiKeyMissingWhenUnset)
+    "OmpHelpersTests.fuzzyGrepCursorSingleUse", Sync (sync OmpHelpersTests.fuzzyGrepCursorSingleUse)
+    "OmpHelpersTests.fuzzyFindCursorSingleUse", Sync (sync OmpHelpersTests.fuzzyFindCursorSingleUse)
+    "OmpHelpersTests.fuzzyResolveExternalBasePath", Sync (sync OmpHelpersTests.fuzzyResolveExternalBasePath)
 ]
 
 let private matchesSelector (selectors: string array) (label: string) =
@@ -150,6 +221,8 @@ let private selectedTests (selectors: string array) =
 
 let runAll (args: string array) : JS.Promise<int> =
     promise {
+        clearFailuresForRun ()
+        resetOmpPluginTestState ()
         let runnableTests = selectedTests args
         if List.isEmpty runnableTests then
             printfn "No tests matched selectors: %A" args
@@ -157,7 +230,7 @@ let runAll (args: string array) : JS.Promise<int> =
         else
             for (label, body) in runnableTests do
                 match body with
-                | Sync f -> let _ = timed label f in ()
+                | Sync f -> timed label f
                 | Async f -> do! timedAsync label f
             return summary ()
     }

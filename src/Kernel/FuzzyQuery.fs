@@ -51,6 +51,24 @@ type FuzzyGrepState =
 
 type SearchOutcome = { output: string; isError: bool }
 
+let fuzzyIteratorDescriptionHint =
+    "Every result "
+    + "ends with "
+    + "iterator="
+    + "\"...\"; iteration is finished when it becomes "
+    + "iterator="
+    + "\"\"."
+
+let fuzzyFindDescriptionOmpPrefix =
+    "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported.\n\nFirst call: provide pattern and optional path.\nLater calls: provide only iterator.\n"
+
+let fuzzyFindDescriptionOmp = fuzzyFindDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
+
+let fuzzyGrepDescriptionOmpPrefix =
+    "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked.\n\nFirst call: provide pattern and optional filters.\nLater calls: provide only iterator.\n"
+
+let fuzzyGrepDescriptionOmp = fuzzyGrepDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
+
 let buildGrepOutput (body: string) (regexError: string option) (nextIterator: string) : string =
     let body' =
         match regexError with

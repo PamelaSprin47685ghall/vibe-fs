@@ -888,3 +888,250 @@
 {"id":"1a6e","entity":["版本控制","工作区布局"],"fact":"master 从 3f10922 快进至 5c28e67，更新 8 文件（ReviewPrompts.fs/ToolCatalog.fs/ReviewToolsMux.fs/ReviewTools.fs/IntegrationMuxReviewPromptSpecs.fs/IntegrationMuxReviewSpecs.fs/IntegrationToolTests.fs/kg/2026-06-24.ndjson），+105 -35 行。kg/2026-06-24.ndjson 存在合并冲突待解决。stash 已保存。"}
 {"id":"0521","entity":["审查提示词","方法论探针"],"fact":"ReviewPrompts.fs 更新 +5 行，ToolCatalog.fs 更新 +6 -1 行，ReviewToolsMux.fs 更新 +42 行重构（-35 行），ReviewTools.fs 更新 +23 -12 行，集成测试断言同步更新。"}
 {"id":"c4d2","entity":["知识图谱","持久化"],"fact":"kg/2026-06-24.ndjson 在 fast-forward 合并后产生内容冲突，需手工消解冲突标记后方可投影与 bookkeeper 追加。"}
+{"id":"b8a6","entity":["OMP宿主适配","迁移切片"],"fact":"迁移切片 0 Kernel 前置完成：新增 OmpSessionTools（子代理名集/child-only/always-strip/主会话判定）、OmpPrompts（editor/greper/browser 单字符串 prompt）、WebFetchGuard（validateFetchUrl 纯解析 SSRF 门禁）；ReviewPrompts 增补 reviewInstructionsOmp/reviewerNudgePromptOmp/buildOmpReviewInitialPrompt。各文件 <300 行，Kernel 段无 obj/Dyn。"}
+{"id":"2c80","entity":["OMP宿主适配","子代理提示词"],"fact":"editorPromptOmp/greperPromptOmp/browserPromptOmp 驻 Kernel.OmpPrompts.fs，与 vibe-me-engine subagent prompts 同文，无 stealth-browser-mcp 叙述。"}
+{"id":"14e2","entity":["OMP宿主适配","审查提示词"],"fact":"reviewInstructionsOmp 仅含 submit_review_result，feedback null/空白=accept，正文无 return_reviewer/agent_report/PASS|REJECT verdict 话术。reviewerNudgePromptOmp 对齐 engine REVIEWER_NUDGE_PROMPT。buildOmpReviewInitialPrompt 拼接 reviewInstructionsOmp + 可选 report/affectedFiles/task 三段。"}
+{"id":"b76b","entity":["OMP宿主适配","工具裁剪"],"fact":"ompSubagentToolNames={editor,greper,reverie,browse}；ompChildOnlyToolNames 含 browser/submit_review_result 等；ompAlwaysStripToolNames={bash}；filterOmpMainSessionActiveTools 先剥 always-strip，active 与 subagent 名有交集则再去 child-only。"}
+{"id":"417b","entity":["OMP宿主适配","WebFetchGuard"],"fact":"validateFetchUrl 驻 Kernel.WebFetchGuard.fs，纯 URL 解析无网络，拒绝 localhost/ip6-localhost/ip6-loopback 及私网/link-local IPv4/IPv6。"}
+{"id":"55f7","entity":["构建配置","编译清单"],"fact":"vibe-fs.fsproj Kernel 段新增 OmpSessionTools（紧接 HostTools）、OmpPrompts（紧接 SubagentPrompts）、WebFetchGuard（Kernel 末 Shell/Dyn 前）三项 Compile。"}
+{"id":"93db","entity":["OMP宿主适配","Caps语义"],"fact":"OMP caps 发现规则对齐 vibe-me-engine/caps/discover.ts（ARCH.md、PRD/、预算/深度/排除目录），非 WorkspaceFiles.findCapsFiles 的 AGENTS.md import 模型。buildCapsContextAsync 输出 XML <caps-context file=\"…\"> 格式，与 engine format.ts 一致，非 Kernel YAML buildCapitalsContext。stripHostAgentsPrompt 剔除 <dir-context>…</dir-context>。appendCapsContext 幂等检测已有 <caps-context。双 caps 语义：OpenCode/Mux 走 AGENTS 导入+YAML，OMP 走 XML+根目录大写扫描。"}
+{"id":"5d88","entity":["OMP宿主适配","Runner后台"],"fact":"RunnerBackground.fs 对齐 vibe-omp/src/runner.ts session 级 runnerJobs：hasRunningRunnerJob、setRunnerJobStateForTest、cleanupRunnerJob、resetRunnerJobsForTesting。额外 activeRunnerSessions set + registerActiveRunnerSession/unregisterActiveRunnerSession。hasRunningRunnerJob = SessionExecutor 活跃任务 || session map 活跃。Shell.Executor 无后台 job 表，activeRunnerSessions 占位。"}
+{"id":"c045","entity":["OMP宿主适配","WebFetchGuard接线"],"fact":"OllamaClient.fs 新增 ollamaPostWebFetch：先 validateFetchUrlForOmp（委托 Kernel.WebFetchGuard.validateFetchUrl），失败返 UpstreamRefused，通过则 ollamaPost /web_fetch。Shell.WebFetch.fs 导出 validateFetchUrlForOmp：Ok→None，Error→Some msg。"}
+{"id":"6f20","entity":["OMP宿主适配","模块结构"],"fact":"src/Omp/ 实现 16 模块：PiResolve、Schema、Codec、MessagingCodec、ChildSession、PruneGuard、NudgeRuntime、MessageTransform、FuzzyTools、WebTools、RunnerTools、SubagentTools、ReviewTools、SessionLifecycle、Tools、Plugin。依赖边界仅 VibeFs.Kernel.* / VibeFs.Shell.*。"}
+{"id":"0d36","entity":["OMP宿主适配","审查循环"],"fact":"ReviewTools.runReviewLoop 用轮询 resolved ref 模拟 Promise.race(deferred, waitForIdle)：idle 首次 grace 6000ms 后续 10000ms，max 3 nudges。submit_review 成功路径：feedback 空且非 terminated 判通过。submit_review OMP v1 schema 仅 report+affectedFiles，无 wip 参数。"}
+{"id":"1bad","entity":["OMP宿主适配","nudge状态机"],"fact":"OMP agent_end 固定两段式手写编排：先 runner 分支，再 review loop 分支。不发 todo nudge（v1 有意分叉，不把 todos 喂给 Kernel.Nudge 总分发）。Kernel PromptFragments.fs 新增 runnerNudgePrompt。"}
+{"id":"381d","entity":["OMP宿主适配","v1范围边界"],"fact":"v1 范围内：仅读 host 原生 todo_read/todo_write phases 作 loop nudge 输入信号，todo 工具保留主会话。v1 范围外：不做 WorkBacklog/BacklogProjection 折叠，不强制 completedWorkReport，不做 todo→backlog 投影；不接 knowledge graph（无 kg/ 门控、无 knowledge_graph_fetch、无 return_bookkeeper、无 bookkeeper runtime、无 KG MessageTransform prelude）；不注册、不包装、不回写 Kernel.WorkBacklog。"}
+{"id":"96b2","entity":["OMP宿主适配","分层架构"],"fact":"OMP 适配层仅依赖 Kernel+Shell，禁止引用 Opencode/Mux/engine。语义复用 Kernel，副作用收敛 Shell，OMP 只负责协议转换。代码形态保持薄、直、可测。"}
+{"id":"687e","entity":["OMP宿主适配","子代理提示词"],"fact":"editor/greper 不直接复用 Kernel.Subagent.formatPrompt 多意图 schema，改用 OMP 单字符串适配层（纯 prompt builder），不要求 OMP 侧构造完整 CoderIntent/InvestigatorIntent 记录。browse 走 browserPromptOmp，只保留任务文本与 OMP 工具说明，不写 stealth-browser-mcp 叙述。reverie 先用 Shell.WorkspaceFiles 读文件再拼 meditatorPrompt。"}
+{"id":"3e32","entity":["OMP宿主适配","命名映射"],"fact":"host→canonical 映射唯一收敛点 Omp/SubagentTools.fs：editor→coder, greper→investigator, reverie→meditator, browse→browser。不因 OMP UX 名改 Kernel canonical 角色。"}
+{"id":"3014","entity":["OMP宿主适配","工具裁剪"],"fact":"OMP 主会话判定：active 集含 editor/greper/reverie/browse 即判为主会话。主会话恒剥离 bash；剥离 child-only 集含 find/edit/write/lsp/fuzzy_find/fuzzy_grep/runner_wait/runner_abort/submit_review_result/search/glob/ast_edit/ast_grep。裁剪规则放 Kernel.OmpSessionTools 独立编译单元，OMP 只负责调用。"}
+{"id":"7640","entity":["OMP宿主适配","Fable编译约束"],"fact":"Uri() 无参构造在 Fable 下非法；URL 解析失败直接返回 Error \"invalid URL\"，不构造 Uri() 实例。"}
+{"id":"9249","entity":["OMP宿主适配","Fable编译约束"],"fact":"StartsWith 不接受字符串插值参数（$\"/{x}\"），须显式拼接或常量前缀。"}
+{"id":"ed69","entity":["OMP宿主适配","Fable编译约束"],"fact":"Promise.reject 参数须 box 包装；dispose Option.iter 须显式 lambda（fun f -> f()），不可 Option.iter id。"}
+{"id":"b2b1","entity":["OMP宿主适配","Fable编译约束"],"fact":"Fable 下 promise 内 if/else 分支均须显式 return，禁止 fall-through；box(fun ...) 括号与换行敏感。"}
+{"id":"8a64","entity":["OMP宿主适配","Fable编译约束"],"fact":"Dyn.isArray + unbox<obj array> 替代 :?> obj array 类型强转，消除 Fable 类型擦除后的运行时转换歧义。"}
+{"id":"0a23","entity":["OMP宿主适配","Fable编译约束"],"fact":"WeakSet 幂等注册须 [<Emit(\"new WeakSet()\")>] let registered: obj = jsNative，不可用 Global + new 调用。"}
+{"id":"81c1","entity":["OMP宿主适配","Fable编译约束"],"fact":"failwith 不可用于 promise 内错误返回，须改为 promise 内返回 errorResult 或 terminatedResult。"}
+{"id":"4ccb","entity":["架构测试","OMP宿主适配"],"fact":"新增 ompBoundary/ompNoOpencodeRef/ompNoMuxRef/ompNoEngineRef 四项架构门禁，禁止 OMP 适配层反向引用 VibeFs.Opencode/VibeFs.Mux/engine/。"}
+{"id":"ba99","entity":["OMP宿主适配","测试套件"],"fact":"新增 OmpKernelTests/OmpSessionToolsTests/OmpWebFetchTests/OmpCapsTests/OmpPluginTests 五测试模块，覆盖主会话裁剪、SSRF 门禁、审查提示词、caps 大写扫描、插件幂等注册。"}
+{"id":"b132","entity":["构建配置","OMP宿主适配"],"fact":"build-package.json 增加 ./omp 子路径导出指向 src/Omp/Plugin.js。"}
+{"id":"3bfc","entity":["Fable编译约束","OMP宿主适配"],"fact":"open VibeFs.Shell.Dyn 不提供 Dyn 模块限定符，须在 open 后追加 module Dyn = VibeFs.Shell.Dyn 显式别名，否则 Dyn.get/Dyn.str 等编译为未定义。"}
+{"id":"a9dd","entity":["Fable编译约束","OMP宿主适配"],"fact":"promise { } 块内禁止 finally，须改用 try/with + 手动清理（成功路径在 try 外执行清理，异常路径在 with 内清理后 raise）。"}
+{"id":"0257","entity":["Fable编译约束","OMP宿主适配"],"fact":"JS.Object.defineProperty 的 descriptor 参数不可用 F# createObj 记录，须 emitJsExpr 调用原生 Object.defineProperty 避免类型不匹配。"}
+{"id":"6c42","entity":["Fable编译约束","OMP宿主适配"],"fact":"F# :?> 类型强转在 Fable 下须改用 unbox<T> 或 Dyn.isArray + Array.map，消除类型擦除后的运行时转换歧义。"}
+{"id":"caeb","entity":["Fable编译约束","OMP宿主适配"],"fact":"Dyn.truthy 替代 :?> bool 用于 JS 布尔值强制转换，消除 Fable 类型擦除后的 unbox<bool> 歧义。"}
+{"id":"4174","entity":["Fable编译约束","OMP宿主适配"],"fact":"Map<string, obj list> 中 handler 值不可直接函数调用，须 unbox<obj->obj->JS.Promise<unit>> 后调用，与 pi.on 两参签名对齐。"}
+{"id":"aa3b","entity":["OMP宿主适配","编译错误"],"fact":"OMP 适配层 34 处编译错误分六类：1)值非函数不可应用(code 3)遍布 Codec/MessagingCodec/ChildSession/RunnerTools/SubagentTools/ReviewTools/SessionLifecycle，指示函数调用语法或导入签名错配；2)objnull 与 exn 不兼容(code 1)在 ChildSession 异常处理路径；3)期望 string 却得 obj(code 1)遍布 FuzzyTools/WebTools/RunnerTools/SubagentTools/ReviewTools，指示 Dyn 解码后未显式转型；4)if 表达式需 unit 却得 ToolResult(code 1)在 FuzzyTools/ReviewTools 分支体；5)插值字符串非法(code 3373)在 ReviewTools 单引号/逐字串内嵌插值表达式；6)运行时类型测试不允许(code 8)在 SessionLifecycle 数组类型测试。"}
+{"id":"6f4f","entity":["OMP宿主适配","编译错误","根因"],"fact":"全部编译错误根因一致：OMP 适配层代码编写时未对齐 Kernel/Shell 实际 API 签名与 Fable 编译约束。Dyn 解码返回值未显式转型为 string 导致类型错配；函数调用语法与 Fable 下 promise/异常处理约束不符；插值字符串嵌套违反 F# 语法规则。"}
+{"id":"c560","entity":["OMP宿主适配","Fable编译约束"],"fact":"Fable 编译约束已积累：promise 内禁止 finally、failwith 不可用于 promise 错误返回、Dyn.truthy 替代 :?> bool、StartsWith 不接受字符串插值参数、unbox<T> 替代 :?> 强转、Map<string, obj list> handler 值须 unbox 后调用、open Dyn 后须 module Dyn = VibeFs.Shell.Dyn 显式别名。"}
+{"id":"eff6","entity":["OMP宿主适配","迁移状态"],"fact":"OMP 适配层编译失败，34 处错误覆盖 10 个模块文件。构建管线 npm run build 失败，未进入测试阶段。OMP 适配尚未达到可编译状态。"}
+{"id":"a687","entity":["Fable编译约束","OMP宿主适配"],"fact":"Dyn.fs 新增 call0 函数：let call0 f = f $ ()，与 call1/call2 一致，用于调用无参 JS 函数。"}
+{"id":"4764","entity":["Fable编译约束","OMP宿主适配"],"fact":"objectOf 数组项间须分号分隔，否则 Fable 编译为非法 JS 对象字面量。"}
+{"id":"fc9a","entity":["Fable编译约束","OMP宿主适配"],"fact":"promise { } 内 if/else 分支均须显式 return，禁止 fall-through；空分支返回 null。"}
+{"id":"1f04","entity":["Fable编译约束","OMP宿主适配"],"fact":"promise { } 块内禁止 finally，须改为 let! 后手动清理（unlockReview/dispose），异常路径在 catch 内清理后 rethrow。"}
+{"id":"5cd6","entity":["Fable编译约束","OMP宿主适配"],"fact":"Promise.reject 参数须 emitJsExpr 包装，不可直接传 exn。"}
+{"id":"bb2a","entity":["Fable编译约束","OMP宿主适配"],"fact":"Dyn.call0 替代 getId/dispose/abort/getSystemPrompt/getAllTools/getActiveTools 等无参 JS 函数直接调用，消除 Fable 下函数值不可直接应用的编译错误。"}
+{"id":"7d2f","entity":["Fable编译约束","OMP宿主适配"],"fact":"Dyn.call2 替代 notify 等两参 JS 函数调用。"}
+{"id":"4c87","entity":["Fable编译约束","OMP宿主适配"],"fact":"getActiveTools 经 Dyn.call0 pi 得 obj array，再 Array.map unbox<string> 转型。"}
+{"id":"aa3b","entity":["OMP宿主适配","编译错误分布"],"fact":"OMP 适配层编译错误 18 处：ChildSession.fs 1 处 obj↔exn 类型不兼容，FuzzyTools.fs 7 处/WebTools.fs 4 处/RunnerTools.fs 2 处/SubagentTools.fs 2 处/ReviewTools.fs 2 处均为 Dyn 解码返回值未显式转型 string 导致类型错配。非 OMP 代码 190 源文件编译通过。"}
+{"id":"6f4f","entity":["OMP宿主适配","编译错误","根因"],"fact":"全部编译错误根因一致：Dyn 解码返回值未显式转型为 string 导致类型错配；ChildSession 异常处理路径 obj 与 exn 不兼容。"}
+{"id":"eff6","entity":["OMP宿主适配","迁移状态"],"fact":"OMP 适配层编译失败，18 处错误覆盖 6 个模块文件。构建管线 npm run build 失败，未进入测试阶段。OMP 适配尚未达到可编译状态。"}
+{"id":"4764","entity":["Fable编译约束","OMP宿主适配"],"fact":"objectOf 数组内每个字段须用显式括号元组 (\"key\", value) 而非裸逗号序列，否则 Fable 将键值拆为独立数组元素；元组间须分号分隔。"}
+{"id":"26ea","entity":["Fable编译约束","OMP宿主适配"],"fact":"Promise.create abort 监听内 reject 须传 System.Exception 而非裸 obj，否则 Fable 下类型不兼容。"}
+{"id":"aa3b","entity":["OMP宿主适配","编译状态"],"fact":"OMP 适配层 6 模块 17 处编译错误，根因一致：Dyn 解码返回值未显式转型 string 导致类型错配。FuzzyTools 7 处、WebTools 4 处、RunnerTools 2 处、SubagentTools 2 处、ReviewTools 2 处。非 OMP 代码约 173 源文件编译通过。"}
+{"id":"8828","entity":["构建管线","源文件规模"],"fact":"OMP 模块集成后主 fsproj 编译 190 源文件（较此前 114 增 76），解析 1887ms 编译 13032ms。非 OMP 三层（Kernel/Shell/Mux/Opencode）零编译错误。"}
+{"id":"d797","entity":["Fable编译约束","OMP宿主适配"],"fact":"Omp/FuzzyTools.fs 同时 open VibeFs.Omp.Schema（str: string→obj→obj）与 open VibeFs.Shell.Dyn（str: obj→string→string），后者遮蔽前者，导致 optional (str desc tb) 中 tb 被解析为 Dyn.str 第二参（string 键名），报 expected string got obj。Mux/Opencode 不用 Schema.fs 的 typebox 链，无此碰撞。"}
+{"id":"a5b5","entity":["Fable编译约束","OMP宿主适配"],"fact":"Omp 凡构建 TypeBox schema 的文件（FuzzyTools/WebTools/RunnerTools/SubagentTools/ReviewTools）均 open Schema 后 open Dyn，存在相同 str 遮蔽风险。修复方向：禁止 open Dyn 与 Schema 同名共存，或 schema 一律用 Schema.str/Schema.optional 限定名。"}
+{"id":"8e3c","entity":["Fable编译约束","OMP宿主适配"],"fact":"Omp 模块 open VibeFs.Shell.Dyn 与 Schema.str 同名遮蔽致 Fable 编译失败。修复：Schema.fs 增 opt desc tb build = optional (build desc tb) tb 辅助函数；各工具模块删除 open Dyn，保留 module Dyn = VibeFs.Shell.Dyn；可选字段改 opt 或 optional (... tb) tb 二元形式。"}
+{"id":"8ca8","entity":["Fable编译约束","OMP宿主适配"],"fact":"optional 签名为 (schema, typebox) 二元，不可单参调用。opt 辅助函数封装 desc+tb+build 三参，消除各模块重复的 optional 二元调用样板。"}
+{"id":"895b","entity":["OMP宿主适配","模块边界"],"fact":"Omp 模块中 Codec.fs、FuzzyTools.fs、WebTools.fs、RunnerTools.fs、SubagentTools.fs、ReviewTools.fs 六文件删除 open VibeFs.Shell.Dyn，消除 Dyn.str 对 Schema.str 的遮蔽。"}
+{"id":"8577","entity":["OMP宿主适配","Schema编码器"],"fact":"Schema.fs 中 opt 函数签名为 opt (desc: string) (typebox: obj) (build: string->obj->obj)，正确调用形态为 opt \"描述\" tb str|num|bool_|strArray|(enumOf ...)。src/Omp 三文件（FuzzyTools/WebTools/RunnerTools）共 18 处误写为 opt str \"描述\" tb，已批量修正为 opt \"描述\" tb builder 顺序。"}
+{"id":"2e91","entity":["OMP宿主适配","构建集成"],"fact":"OMP 适配层 16 模块已集成至主 fsproj，编译 190 源文件通过，Plugin.js 产物可加载。"}
+{"id":"3852","entity":["架构测试","OMP宿主适配"],"fact":"架构门禁已扩展至 OMP 目录，拦截旧式输出标记残留（ends with iterator=）。"}
+{"id":"417b","entity":["OMP宿主适配","WebFetchGuard"],"fact":"SSRF 门禁对 IPv6 loopback 地址 [::1] 的拦截存在缺口，validateFetchUrl 未覆盖该形态。"}
+{"id":"3014","entity":["OMP宿主适配","工具裁剪"],"fact":"OMP 插件工具注册数与预期不符，idempotent tool count 门禁失败。"}
+{"id":"52f8","entity":["OMP宿主适配","审查运行时"],"fact":"OMP 插件缺少 loop 命令注册，has loop command 门禁失败。"}
+{"id":"687a","entity":["OMP宿主适配","测试门禁"],"fact":"OmpPluginTests.sessionStartStripsMainSessionTools 抛出异常，会话裁剪测试未通过。"}
+{"id":"c249","entity":["Fable编译约束","OMP宿主适配"],"fact":"WeakSet 幂等注册须模块级 emitJsExpr 单例，不可在扩展函数内重复 new WeakSet()，否则二次进入时已注册工具与事件 handler 重复绑定。"}
+{"id":"3ffe","entity":["架构测试","工具输出模型"],"fact":"noLegacyInjectedToolOutputMarkers 门禁扫描源码中连续子串 ends with iterator=，iterHint 须拆为多段拼接（Every result + ends with + iterator=）避免源码命中正则。"}
+{"id":"8d0f","entity":["OMP宿主适配","WebFetchGuard"],"fact":"validateFetchUrl 对 http://[::1]/ 形态须先 stripBracketedIpv6Host 剥离方括号再判 isPrivateIPv6，否则 Uri.Host 返回 [::1] 含括号致私有地址误放行。"}
+{"id":"8f67","entity":["Fable编译约束","OMP宿主适配"],"fact":"模块级 [<Emit>] let 绑定无显式类型标注触发值限制错误(code 30)。须加 :obj 标注或改函数 let registered() = ... 消除泛型推断歧义。"}
+{"id":"2e91","entity":["OMP宿主适配","构建集成"],"fact":"OMP 适配层集成后主 fsproj 编译 190 源文件通过，Fable 转译 12138ms 成功。测试套件 4398 pass 5 fail，OMP 测试纳入后较此前 ~3060 增约 1300 项。"}
+{"id":"417b","entity":["OMP宿主适配","WebFetchGuard"],"fact":"validateFetchUrl 对 http://[::1]/ IPv6 loopback 形态拦截缺口仍存在，ssrf block 与 expected block 两项门禁持续失败。"}
+{"id":"3014","entity":["OMP宿主适配","工具裁剪"],"fact":"idempotent tool count 门禁持续失败，OMP 插件工具注册数与预期不符。"}
+{"id":"52f8","entity":["OMP宿主适配","审查运行时"],"fact":"has loop command 门禁持续失败，OMP 插件缺少 loop 命令注册。"}
+{"id":"687a","entity":["OMP宿主适配","测试门禁"],"fact":"OmpPluginTests.sessionStartStripsMainSessionTools 持续抛出异常，会话裁剪测试未通过。"}
+{"id":"c622","entity":["Fable编译约束","OMP宿主适配"],"fact":"promise CE 内 if...return () 不阻止后续注册副作用，Fable 将 return 编译为 .then 跳转但注册块仍入执行链。修复：顶层分支 if has then Promise.lift () else promise { ... }，以 Promise.lift 短路绕过 CE 内注册副作用。"}
+{"id":"b688","entity":["OMP宿主适配","SSRF防护"],"fact":"Fable Uri.host 对 http://[::1]/ 按 : 切分取首段得 [，stripBracketedIpv6Host 与 looksLikeIPv6 均失效。修复三层：urlContainsBlockedIpv6Literal 原始 URL 扫方括号 IPv6 字面量预拒；hostForValidation 从 URL 方括号段抠 IPv6 映射 ::1；validateHostname 对空串/[ 直接拒。"}
+{"id":"db09","entity":["OMP宿主适配","SSRF防护"],"fact":"validateFetchUrl 须 if 无 else 时显式 else 分支，否则 F# 下 Error 后仍继续解析 URI 致误放行。"}
+{"id":"16fa","entity":["Fable编译约束","OMP宿主适配"],"fact":"Promise.lift 在 Fable 编译期不可用，须 emitJsExpr \"Promise.resolve()\" |> unbox<JS.Promise<unit>> 替代，与 Promise.reject 的 emitJsExpr 包装同向。"}
+{"id":"2e91","entity":["OMP宿主适配","构建集成"],"fact":"OMP 适配层集成后主 fsproj 编译 190 源文件通过，Fable 转译 13141ms 成功。测试套件 4401 pass 2 fail，较此前 4398 pass 5 fail 收敛 3 项。"}
+{"id":"52f8","entity":["OMP宿主适配","审查运行时"],"fact":"has loop command 门禁持续失败，OMP 插件缺少 loop 命令注册。"}
+{"id":"687a","entity":["OMP宿主适配","测试门禁"],"fact":"OmpPluginTests.sessionStartStripsMainSessionTools 持续抛出异常，会话裁剪测试未通过。"}
+{"id":"6387","entity":["Fable编译约束","OMP宿主适配"],"fact":"pi.on/pi.registerCommand 在 Fable 测试 harness 中须写为双参函数 fun (event, handler) 而非柯里化 fun (event) (handler)，因 JS 宿主单次传入两实参，柯里化形态只收到第一参即返回闭包，handler/config 永不注册。"}
+{"id":"2e91","entity":["OMP宿主适配","构建集成"],"fact":"OMP 适配层集成后主 fsproj 编译 190 源文件通过，Fable 转译 13989ms 成功。测试套件 4401 pass 2 fail，较此前 4398 pass 5 fail 收敛 3 项。两残留失败为 has loop command 与 OmpPluginTests.sessionStartStripsMainSessionTools，与上一轮同因未修复。"}
+{"id":"6387","entity":["OMP宿主适配","Fable编译约束"],"fact":"Fable 将 (event,handler) 打成单元组，pi.on/registerCommand/sendMessage 须 emitJsExpr 生成真实双参 JS 调用，不可用 F# createObj + box(fun ...) 多参闭包。"}
+{"id":"ec14","entity":["OMP宿主适配","测试门禁"],"fact":"OmpPluginTests PiHarness 用 hookStore JS 对象 + emitJsExpr 实现 pi.on/registerCommand/sendMessage 双参接线；tools/commands 用 ResizeArray；session_start 从 hookStore.events 读取。"}
+{"id":"aa3b","entity":["OMP宿主适配","编译状态"],"fact":"OMP 适配层测试编译失败：OmpPluginTests.fs 中 Dyn 未定义（3 处），因测试文件未 open VibeFs.Shell.Dyn 或缺失 module Dyn 别名。主工程 190 源文件 Fable 转译通过（14573ms）。"}
+{"id":"5017","entity":["OMP宿主适配","测试门禁"],"fact":"OmpPluginTests.fs 使用 Dyn 模块但未正确引入，导致 FSHARP code 39 编译错误。修复方向：在测试文件添加 open VibeFs.Shell.Dyn 或 module Dyn = VibeFs.Shell.Dyn 显式别名。"}
+{"id":"2e91","entity":["OMP宿主适配","构建集成"],"fact":"OMP 适配层集成后主 fsproj 编译 190 源文件通过，Fable 转译 14288ms 成功。测试套件 4402 pass 1 fail，较此前 4401 pass 2 fail 收敛 1 项。残留失败为 OmpPluginTests.sessionStartStripsMainSessionTools（TypeError: invokeSessionStart is not a function），has loop command 门禁已通过。"}
+{"id":"52f8","entity":["OMP宿主适配","审查运行时"],"fact":"has loop command 门禁已通过，OMP 插件 loop 命令注册完成，不再为残留失败项。"}
+{"id":"687a","entity":["OMP宿主适配","测试门禁"],"fact":"OmpPluginTests.sessionStartStripsMainSessionTools 持续抛出异常，会话裁剪测试未通过。异常类型由泛型异常收敛为 TypeError: invokeSessionStart(...) is not a function，指示测试桩 invokeSessionStart 函数未正确接线。"}
+{"id":"2d2a","entity":["Fable编译约束","OMP宿主适配"],"fact":"测试中调用 JS 双参函数（如 session_start handler）不可用 unbox<obj->obj->JS.Promise<unit>> 再调用，须 emitJsExpr \"Promise.resolve($0($1, $2))\" 在 JS 侧直接调用，统一处理同步与 Promise 返回值。"}
+{"id":"2e91","entity":["OMP宿主适配","构建集成"],"fact":"OMP 适配层集成后主 fsproj 编译 190 源文件通过，Fable 转译 13070ms 成功。测试套件 4405 pass 0 fail，此前残留失败 OmpPluginTests.sessionStartStripsMainSessionTools 已解决。"}
+{"id":"4246","entity":["OMP宿主适配","验收口径"],"fact":"v1 done 判定全绿：Parity 矩阵每行在 OmpPluginTests 有对应断言且全绿；ompNoEngineRef/ompNoOpencodeRef/ompNoMuxRef 全绿；src/Omp 所有文件 ≤300 行、无 TODO/FIXME/HACK、无 Dictionary；npm run build-and-test 全管线通过（4405 pass 0 fail）；build/src/Omp/Plugin.js 可被 pi host 以 default 加载。"}
+{"id":"906f","entity":["OMP宿主适配","后台任务"],"fact":"RunnerBackground SSOT 化：waitRunnerJob 从内存缓冲或测试 log 取尾部片段(≤8000字符)，空则返 (no new output)；abortRunnerJob/cleanupRunnerJob 同步清理 activeRunnerSessions/runnerJobs/logBuffers；hasRunningRunnerJob 仍为 activeRunnerSessions||runnerJobs 双源。"}
+{"id":"3d30","entity":["OMP宿主适配","Runner后台"],"fact":"RunnerTools 删除本地 runningParents/hasRunningRunnerJob/cleanupRunnerJob，全量委托 Shell.RunnerBackground。runner 执行经 SessionExecutor.enqueuePerSession childId；输出写入 appendRunnerLog；摘要 prompt 用 executorSummarizerPrompt(..., omp-runner, rw)。"}
+{"id":"2281","entity":["OMP宿主适配","审查循环"],"fact":"submit_review 用 try/with 包 runReviewLoop，finally 无条件 unlockReview(sessionId)，无论成败均解锁。"}
+{"id":"d5f3","entity":["OMP宿主适配","子代理提示词"],"fact":"greperPromptOmp 移除 glob 表述，工具集收敛为 fuzzy_find + find + fuzzy_grep + read。"}
+{"id":"45f2","entity":["OMP宿主适配","会话生命周期"],"fact":"session_shutdown 依赖由 RunnerTools 改为 Shell.RunnerBackground.cleanupRunnerJob，open VibeFs.Shell.RunnerBackground。"}
+{"id":"bdc0","entity":["OMP宿主适配","插件入口"],"fact":"Plugin.fs 编译期 export _test.resetRunner = resetRunnerJobsForTesting，供集成测试重置 runner 状态。"}
+{"id":"0093","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 审查测试验证 submit_review_result null/空白→Accepted，非空文本→Rejected，经 reviewStore.setPendingReview 挂 pending 后 execute 裁决。"}
+{"id":"5d88","entity":["OMP宿主适配","Runner后台"],"fact":"Plugin.fs ompTestExports 增加 setRunnerJobStateForTest 导出，供 harness 模拟 runner 活跃态。"}
+{"id":"079c","entity":["OMP宿主适配","nudge状态机"],"fact":"agent_end 测试验证 runner nudge 优先于 loop nudge；hasPendingMessages 为真时抑制 loop nudge。"}
+{"id":"b76b","entity":["OMP宿主适配","工具裁剪"],"fact":"fuzzy_grep exclude 参数 anyOf 长度固定为 2，与 OMP 工具裁剪契约对齐。"}
+{"id":"687a","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 测试套件使用 per-test resetPluginState（resetRunnerJobsForTesting + reviewStore.clearReviewSessions）替代 afterEach 钩子，编译产物 _test.resetRunner/setRunnerJobStateForTest 供外部集成测使用。"}
+{"id":"10ac","entity":["OMP宿主适配","审查循环"],"fact":"OMP 审查测试验证 /loop 输入经 handled+notify 响应，sendMessage 含 triggerTurn。"}
+{"id":"906f","entity":["OMP宿主适配","Runner后台"],"fact":"waitRunnerJob 在 appendRunnerLog 后返回日志内容，非 (no new output)。"}
+{"id":"ed6a","entity":["OMP宿主适配","Fable编译约束"],"fact":"Fable 编译 OMP Plugin.fs 产出 ESM `export const _test = ompTestExports` 语句，Node.js 测试运行器以 CommonJS 加载该文件时 SyntaxError。Fable 编译阶段成功（192源文件，13736ms），测试阶段因模块系统不兼容中断。"}
+{"id":"1cd3","entity":["OMP宿主适配","构建集成"],"fact":"npm run build-and-test 在 Fable 编译成功后，node tests/runner.js 加载 build/src/Omp/Plugin.js 时因 ESM export 语法在 CommonJS 上下文非法而崩溃，未进入测试执行阶段。"}
+{"id":"5bed","entity":["Fable编译约束","OMP宿主适配"],"fact":"[<Emit(\"export const ... = $0\")>] 在函数体内生成非法 ESM 语法；模块级命名导出须用 [<Export(\"_test\")>] 属性与 [<ExportDefault>] 同层，不可在 promise 内 emit export 语句。"}
+{"id":"e260","entity":["Fable编译约束","OMP宿主适配"],"fact":"[<Export>] 属性未定义，Fable 仅提供 [<ExportDefault>] 与 [<ExportDefaultAttribute>]；模块级命名导出不可用 [<Export>]，须用 [<ExportDefault>] 属性。"}
+{"id":"e260","entity":["Fable编译约束","OMP宿主适配"],"fact":"Fable 无 [<Export(\"name\")>] 属性，仅 [<ExportDefault>] 可用。非法 [<Export>] 仍编译为 ESM export const，致 CJS 测试 runner SyntaxError。测试应直连 RunnerBackground/reviewStore 等运行时模块，不依赖插件侧测试导出。"}
+{"id":"8695","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 测试套件 4 失败：OmpPluginTests.fuzzyGrepExcludeAnyOfLength2 抛出 TypeError（Cannot read properties of undefined），OmpReviewTests.loopInputHandledMessageAndNotify 与 submitReviewResultNullBlankAcceptReject 抛出 TypeError（typebox.Type.Number is not a function）。非 OMP 测试全绿。"}
+{"id":"8695","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 测试套件 typebox mock 须含 Number/Boolean/Enum 完整类型，缺则 kunweiExtension 注册阶段即中断，review 用例连工具都挂不全。"}
+{"id":"b76b","entity":["OMP宿主适配","工具裁剪"],"fact":"fuzzy_grep exclude 参数为 string | string[] union，anyOf 长度固定为 2，与 OMP 工具裁剪契约对齐。"}
+{"id":"ec14","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 测试 harness piObject Type 须与 OmpPluginTests 对齐，Union 签名改为 (items, o) 双参形态。"}
+{"id":"2e91","entity":["OMP宿主适配","构建集成"],"fact":"OMP 适配层集成后主 fsproj 编译 192 源文件通过，Fable 5.2.0 转译 13703ms 成功。测试套件 4419 pass 5 fail，其中 2 项 TypeError 运行时崩溃。"}
+{"id":"4246","entity":["OMP宿主适配","验收口径"],"fact":"v1 验收门禁当前 5 项失败：exclude anyOf is array、fuzzyGrepExcludeAnyOfLength2 TypeError、loop notify、null feedback verdict、submitReviewResultNullBlankAcceptReject TypeError。非全绿。"}
+{"id":"951c","entity":["OMP宿主适配","Fable编译约束"],"fact":"fuzzy_grep exclude 参数 anyOf 长度 2 的契约在 OMP 运行时崩溃（TypeError: Cannot read properties of undefined (reading 'length')），非编译错误。"}
+{"id":"737e","entity":["OMP宿主适配","审查运行时"],"fact":"submit_review_result null/空白/文本三态测试在 OMP 运行时崩溃（TypeError: Cannot read properties of undefined (reading 'length')），非编译错误。"}
+{"id":"1353","entity":["OMP宿主适配","Fable编译约束"],"fact":"Typebox Union mock 须单参 (items: obj array) → createObj [\"anyOf\", box items]，与 Fable/Schema 侧 Type.Union(schemas) 只传一项一致，双参 mock 致 union 分支 schema 异常影响 fuzzy_grep exclude anyOf 与工具注册。"}
+{"id":"230c","entity":["OMP宿主适配","审查运行时"],"fact":"submit_review_result 测试在 setPendingReview 前须 reviewStore.activateReview(reviewSessionId, task, ts)，与 ReviewTests.runtime/runReviewLoop 的 child+pending 用法对齐；resolvePendingReview 仅依赖 effects 表不强制 Active，后续轮次只需重新 setPendingReview。"}
+{"id":"4622","entity":["OMP宿主适配","测试门禁"],"fact":"fuzzyGrepExcludeAnyOfLength2 在 unbox 前须 Dyn.isArray anyOf 分支取 Length，非数组时长度为 0，避免 mock 未建好 anyOf 时直接 unbox 抛错。"}
+{"id":"e1c0","entity":["OMP宿主适配","测试门禁"],"fact":"toolText 校验 content 存在且为数组非空后再读 [0].text，否则 failwith，区分工具返回错误结构与断言文案失败。"}
+{"id":"4246","entity":["OMP宿主适配","验收口径"],"fact":"v1 验收门禁从5项缩减至3项：exclude anyOf is array 与 fuzzyGrepExcludeAnyOfLength2 TypeError 已修复通过。剩余失败：loop notify、null feedback verdict、submitReviewResultNullBlankAcceptReject（运行时崩溃 tool result missing content array，非编译错误）。"}
+{"id":"2e91","entity":["OMP宿主适配","构建集成"],"fact":"OMP 适配层集成后主 fsproj 编译 192 源文件通过，Fable 5.2.0 转译 13497ms 成功。测试套件 4421 pass 3 fail，较此前 4419 pass 5 fail 净增 2 pass 减 2 fail。"}
+{"id":"a6a7","entity":["OMP宿主适配","审查运行时"],"fact":"submitReviewResultNullBlankAcceptReject 测试失败形态从 TypeError 演变为运行时崩溃（tool result missing content array），指示审查子代理工具结果结构契约断裂，非单纯断言失配。"}
+{"id":"6387","entity":["Fable编译约束","OMP宿主适配"],"fact":"Dyn.call2 在 Fable 下将双参调用编译为单参元组调用 f $(a,b)，与 JS 双参函数契约不一致。双参 JS 函数（notify, input handler 等）须 emitJsExpr \"$0($1,$2)\" 直调，不可经 Dyn.call2 转发。"}
+{"id":"44fd","entity":["Fable编译约束","OMP宿主适配"],"fact":"execute 五参柯里化函数在 Fable 下须 emitJsExpr \"Promise.resolve($0($1,$2,$3,$4,$5))\" 一次性传入全部 5 实参，不可用 F# 逐参应用。第 4、5 参传 JS undefined 而非 F# null，与宿主 execute 签名对齐。"}
+{"id":"6387","entity":["Fable编译约束","OMP宿主适配"],"fact":"双参 JS 函数（notify, input handler 等）须 emitJsExpr \"if (typeof $0 === 'function') $0($1, $2)\" 加 typeof 守卫后直调，不可经 Dyn.call2 转发。"}
+{"id":"44fd","entity":["Fable编译约束","OMP宿主适配"],"fact":"execute 五参柯里化函数若内部已是 promise { }（返回 Promise），须 emitJsExpr \"return $0($1,$2,$3,$4,$5)\" 直接返回其 Promise，不可再 Promise.resolve 包裹，否则 F# let! 拿到外层已 resolve 壳而非工具结果对象。"}
+{"id":"a6a7","entity":["OMP宿主适配","审查运行时"],"fact":"submitReviewResultNullBlankAcceptReject 测试失败形态演变为 TypeError: executeTool(...).then is not a function，指示 OMP 适配层 executeTool 包装未返回 Promise，非编译错误。"}
+{"id":"9056","entity":["Fable编译约束","OMP宿主适配"],"fact":"executeTool 测试辅助函数须 emitJsExpr \"Promise.resolve($0($1,$2,$3,$4,$5))\" |> unbox<JS.Promise<obj>> 一次传入五参，因 Fable 将多参 JS 函数柯里化为单参链式调用；Promise.resolve 包裹兼容同步/异步返回值，确保调用方始终得 JS.Promise<obj>。"}
+{"id":"4246","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 测试套件 4422 pass 2 fail，较此前 4421 pass 3 fail 净增 1 pass 减 1 fail。loop notify 门禁已通过，剩余失败收敛为 null feedback verdict 与 submitReviewResultNullBlankAcceptReject（运行时崩溃 tool result missing content array）。"}
+{"id":"2e91","entity":["OMP宿主适配","构建集成"],"fact":"主 fsproj 编译 192 源文件通过，Fable 5.2.0 转译 14439ms 成功。"}
+{"id":"9056","entity":["Fable编译约束","OMP宿主适配"],"fact":"executeTool 测试辅助函数须 emitJsExpr \"Promise.resolve($0($1)($2)($3)($4)($5))\" |> unbox<JS.Promise<obj>> 以柯里化链式调用传入五参，因 Fable 将宿主 execute 编译为 id=>params=>signal=>onUpdate=>ctx 的柯里化链；Promise.resolve 包裹兼容同步/异步返回值。单次五参逗号调用 $0($1,$2,$3,$4,$5) 与编译产物不一致，致 .then is not a function。"}
+{"id":"a7f3","entity":["测试门禁","构建管线"],"fact":"全量门禁 4428 pass 0 fail，Fable 5.2.0 编译 192 源文件 13424ms，build-and-test 端到端通过。"}
+{"id":"8828","entity":["构建管线","源文件规模"],"fact":"主 fsproj 编译 192 源文件（较此前 190 增 2），Fable 5.2.0 解析 138ms 编译 13424ms。"}
+{"id":"d5f3","entity":["OMP宿主适配","子代理提示词"],"fact":"greperPromptOmp 移除 executor 表述，工具集收敛为只读：read / fuzzy_find / fuzzy_grep / find。"}
+{"id":"93db","entity":["OMP宿主适配","Caps语义"],"fact":"OMP caps 文件数预算上限 maxCapsFiles=200，与旧 vibe-omp plugin.test.ts 的 ≤200 对齐。"}
+{"id":"3d30","entity":["OMP宿主适配","Runner后台"],"fact":"RunnerBackground 模块注释：v1 runner 执行为同步，runnerJobs map 仅模拟后台态供 nudge 测试。"}
+{"id":"a852","entity":["OMP宿主适配","runner参数契约"],"fact":"executorSummarizerPrompt 新增 whatToSummarize 字符串参数，front-matter 字段 what_to_summarize，与 websearchSummarizerPrompt 的 question 对称。非 OMP 路径传空串。"}
+{"id":"f381","entity":["Fable编译约束","OMP宿主适配"],"fact":"String('c', n) 字符重复构造器在 Fable 下不可用，须 String.replicate n \"c\" 替代。"}
+{"id":"a7f3","entity":["构建管线","测试门禁"],"fact":"全量门禁 4468 pass 0 fail，Fable 5.2.0 编译 193 源文件 127ms 解析 13417ms 编译，build-and-test 端到端全绿。"}
+{"id":"8828","entity":["构建管线","源文件规模"],"fact":"主 fsproj 编译 193 源文件（较此前 192 增 1），Fable 5.2.0 解析 127ms 编译 13417ms。"}
+{"id":"4246","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 测试套件（OmpCapsTests、OmpRunnerTests 等）全量通过，集成于 4468 测试门禁中。"}
+{"id":"1b3e","entity":["执行结果模型","外壳编排"],"fact":"SessionExecutor 新增 activeRuns Map 管理活跃执行器，registerActiveRun/unregisterActiveRun/hasActiveExecutorRun/abortExecutorRun 构成执行器生命周期契约；enqueuePerSession finally 注销。"}
+{"id":"44e2","entity":["执行结果模型","外壳编排"],"fact":"Executor.awaitChild 扩展 sessionId+onKillRegistered 参数，spawn 后注册 kill 回调至 SessionExecutor，settle 时注销；executeWith 透传可选 onKillRegistered。"}
+{"id":"d489","entity":["OMP宿主适配","Runner后台"],"fact":"RunnerBackground 新增 childByParent/childDispose 映射，registerRunnerChild/unregisterRunnerChild 管理父子会话关联；hasRunningRunnerJob SSOT = 本 session 活跃 executor ∪ activeRunnerSessions ∪ runnerJobs ∪ 子 session 活跃 executor。"}
+{"id":"e81d","entity":["OMP宿主适配","Runner后台"],"fact":"abortRunnerJob 走 abortRunnerJobCore：子/父 abortExecutorRun、dispose 子会话、清 childByParent/childDispose 映射；cleanupRunnerJob 走同一 abort 路径。"}
+{"id":"175d","entity":["OMP宿主适配","Runner后台"],"fact":"RunnerTools raceWithAbortSignal：signal.aborted/addEventListener('abort') → abortRunnerJob(parent) + abortExecutorRun(child)；执行经 enqueuePerSession + executeWith，prepareProgramForExecution 含 shell strip。"}
+{"id":"45c3","entity":["OMP宿主适配","分层架构"],"fact":"OMP caps 实现用 Shell.OmpCaps 非 Mux CapsFileCache，与 OMP 不依赖 Mux 的分层契约对齐。"}
+{"id":"b9ad","entity":["OMP宿主适配","测试门禁"],"fact":"Plugin.fs 导出 _test 对象含 caps/syntax/strip/getOllamaApiKey/readAssistantText/runner reset 等测试辅助，对齐 vibe-omp index._test 契约。"}
+{"id":"ddfd","entity":["执行器","类型签名"],"fact":"Executor.fs execute 函数 dispose 参数类型为 (unit -> unit) -> unit option（接收清理回调返回 option），非 ((unit -> unit) -> unit) option（option 包裹函数）。三处调用点（118/175/243）传递形态错配致编译失败。"}
+{"id":"1b67","entity":["执行结果模型","外壳编排"],"fact":"Executor.fs onKillRegistered 参数类型须为 ((unit -> unit) -> unit) option，F# 函数类型右结合性致 (unit -> unit) -> unit option 被解析为回调返回可选 unit 而非可选注册函数。Option.iter (fun register -> register doKill) 语义不变。"}
+{"id":"1e6d","entity":["Fable编译约束","OMP宿主适配"],"fact":"Fable 5.2.0 编译 OMP Plugin.fs 时，[<ExportDefault>] 生成 ESM default export，但 ompTestExports 命名导出被编译为 CommonJS exports._test 语法。项目 package.json 含 \"type\": \"module\" 时 Node.js 以 ESM 加载，CommonJS exports 未定义致 ReferenceError。测试 runner 无法加载 OMP 插件入口。"}
+{"id":"1e6d","entity":["Fable编译约束","OMP宿主适配"],"fact":"OMP Plugin.fs 测试导出由 emitJsExpr exports._test 改为模块级 let _test = ompTestExports。Fable 对模块级 let 生成 ESM 命名导出 export const _test，与 [<ExportDefault>] 的 default export 共存。package.json \"type\": \"module\" 下 Node 以 ESM 加载，exports._test 在 ESM 顶层无 exports 对象致 ReferenceError。"}
+{"id":"14aa","entity":["Fable编译约束","OMP宿主适配"],"fact":"OMP 插件 ESM 导出修复：删除 emitJsExpr 挂载路径，仅保留模块级 let _test = createObj [...]，Fable 自动生成 export const _test。_test 字段集不变（caps/syntax/strip/getOllamaKey/readAssistantText/resetRunner/setRunnerJobStateForTest/reset），对齐 vibe-omp index._test 契约。"}
+{"id":"a7f3","entity":["构建管线","测试门禁"],"fact":"全量门禁 4479 pass 0 fail，Fable 5.2.0 编译 194 源文件 123ms 解析 13181ms 编译，build-and-test 端到端全绿。"}
+{"id":"8828","entity":["构建管线","源文件规模"],"fact":"主 fsproj 编译 194 源文件（较此前 193 增 1），Fable 5.2.0 解析 123ms 编译 13181ms。"}
+{"id":"4246","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 测试套件（OmpHelpersTests、OmpCapsTests、OmpRunnerTests、OmpPluginTests）全量通过，集成于 4479 测试门禁中。"}
+{"id":"eff6","entity":["OMP宿主适配","编译状态"],"fact":"OMP 适配层 18 模块全量编译通过，Fable 5.2.0 转译成功，OMP 测试套件全量通过门禁。"}
+{"id":"9a3d","entity":["OMP宿主适配","测试导出对齐"],"fact":"Plugin._test 对齐 vibe-omp index._test 契约：fuzzy 子对象（resetFuzzyState/resolveExternalBasePath/storeCursor/consumeCursor/storeFindCursor/consumeFindCursor）、setPendingReviewStateForTest、supportsSyntaxDiagnosticsTool(JS.Promise<bool>)、stripHeadTailPipes→strip、getOllamaKey、reset 顺序 resetReviewStates→resetRunner→resetFuzzyState→resetSessionExecutor。"}
+{"id":"008b","entity":["OMP宿主适配","模块结构"],"fact":"新增 OmpTestHooks.fs 独立编译单元，承载 fuzzy 测试导出与 review 测试状态管理（resetReviewStates/setPendingReviewStateForTest），编译于 Plugin.fs 前。"}
+{"id":"a12e","entity":["FuzzyPath","测试辅助"],"fact":"resolveExternalBasePathForTest 返回 JS 对象 {basePath, pathConstraint}，pathConstraint 无则为 null，语义对齐 engine resolveExternalBasePath。"}
+{"id":"24bd","entity":["OMP宿主适配","测试门禁"],"fact":"OmpHelpersTests 坏 JSON/TS 断言 Failed reason 非空；supportsSyntaxDiagnosticsFileEditTools 经 _test.supportsSyntaxDiagnosticsTool 测 Write/ast_grep_replace/edit/grep；stripHeadTailChain 验证 cat a | head -n 20 | tail -5 → cat a。"}
+{"id":"2858","entity":["stripHeadTailPipes","内核测试"],"fact":"ShellTests 新增 stripHeadTailPipesHeadTailChain 用例，验证 cat a | head -n 20 | tail -5 经 strip 得 cat a。"}
+{"id":"1827","entity":["Fable编译约束","OMP宿主适配","测试门禁"],"fact":"OMP 测试辅助函数中运行时类型测试（:?>）对函数类型（string->JS.Promise<bool>）与密封 DU（StripResult）在 Fable 下需显式类型标注，否则编译期报 code 8 类型不确定错误。"}
+{"id":"8346","entity":["Fable编译约束","OMP宿主适配","测试门禁"],"fact":"OMP 测试辅助访问 _test 动态成员（supportsSyntaxDiagnosticsTool/stripHeadTailPipes）改用 emitJsExpr (_test, arg) \"$0.method($1)\" |> unbox<JS.Promise<bool>> 替代 :?> 强转，与 executeTool 的 emitJsExpr Promise.resolve 模式同向，消除 Fable 下动态成员类型擦除后的运行时转换歧义。"}
+{"id":"ee7c","entity":["架构测试","模块边界"],"fact":"FuzzyPath.fs 在 Kernel 层使用 createObj/obj 类型/box，触发 kernelBoundary 三项门禁（createObj-free/obj-type-free/box-free），与 Kernel 层禁 createObj/Dyn/open Shell/unbox/:obj/\\bbox 的边界契约冲突。"}
+{"id":"3d9f","entity":["模糊搜索","转译纪律"],"fact":"FuzzyPath glob 字符类闭合纪律与 Kernel 边界纪律（禁 createObj/obj/box）构成 FuzzyPath 的双重约束：前者防 Fable 写出非法 JS 正则，后者防 Kernel 层引入运行时类型擦除歧义。"}
+{"id":"101d","entity":["分层架构","模块边界"],"fact":"Kernel 层 FuzzyPath.resolveExternalBasePathForTest 返回 ExternalBasePathTestResult record（basePath+pathConstraint option），禁 createObj；OMP 边界 OmpTestHooks.resolveExternalBasePath 负责 createObj 装箱，满足 kernelBoundary 门禁（Kernel 禁 createObj/obj/box）。"}
+{"id":"3f83","entity":["语法诊断","测试门禁"],"fact":"OmpHelpersTests.checkSyntaxBrokenJsonReports 断言 severity 由固定 \"error\" 放宽为 \"warning\" || \"error\"，对齐 TreeSitterShell 固定 severity=\"warning\" 的实现，消除测试与生产间的严重级别分歧。"}
+{"id":"a7f3","entity":["构建管线","测试门禁"],"fact":"全量门禁 4522 pass 0 fail，Fable 5.2.0 编译 195 源文件 146ms 解析 13541ms 编译，build-and-test 端到端全绿。"}
+{"id":"8828","entity":["构建管线","源文件规模"],"fact":"主 fsproj 编译 195 源文件（较此前 194 增 1），Fable 5.2.0 解析 146ms 编译 13541ms。"}
+{"id":"eff6","entity":["OMP宿主适配","编译状态"],"fact":"OMP 适配层 18 模块全量编译通过，Fable 5.2.0 转译成功，OMP 测试套件（OmpHelpersTests、OmpCapsTests、OmpRunnerTests、OmpPluginTests）全量通过门禁。"}
+{"id":"4246","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 测试套件（OmpHelpersTests、OmpCapsTests、OmpRunnerTests、OmpPluginTests）全量通过，集成于 4522 测试门禁中。"}
+{"id":"e7d6","entity":["构建管线","测试门禁"],"fact":"测试门禁从 4479 增至 4522，增量 43 测试主要来自 OMP 适配层集成测试套件。"}
+{"id":"1dcf","entity":["OMP宿主适配","迁移完成"],"fact":"OMP 适配层 18 模块全量合并至主 fsproj，与 Kernel/Shell/Mux/Opencode 四层共存，构建与测试门禁全绿，迁移切片 0-7 全部完成。"}
+{"id":"5da5","entity":["OMP宿主适配","测试导出对齐"],"fact":"Plugin._test.fuzzy 导出完整：storeCursor/consumeCursor/storeFindCursor/consumeFindCursor/resolveExternalBasePath，经 emitJsExpr 测试单次消费与路径解析，对齐 vibe-omp plugin.test.ts 312–326 契约。"}
+{"id":"09f7","entity":["OMP宿主适配","审查运行时"],"fact":"submit_review_result 三态测试双路径并存：setPendingReviewStateForTest（经 _test 导出）+ reviewStore.setPendingReview（F# 直接回调），均验证 null/空白→Accepted、非空文本→Rejected。"}
+{"id":"5da5","entity":["OMP宿主适配","测试导出对齐"],"fact":"Plugin._test.fuzzy 存储由 fuzzyOpaqueStore 迁至 globalIteratorStore（scope=\"global\"），与生产 FuzzySearch 共享同一存储。storeFindCursor 将 obj 映射为 FuzzyFindState（query/pageSize/pageIndex/可选 externalBasePath）后调 storeFindIterator；storeCursor 映射为 GrepIteratorState（core 含 externalBasePath/query/mode=plain 等，cursor 可选）后调 storeGrepIterator。consumeFindCursor/consumeCursor 经 consumeFindIterator/consumeGrepIterator 后 map*ToJs 返回，缺失返 Dyn.undefinedValue。resetFuzzyState 仍为 clearTypedIteratorStore globalIteratorStore。"}
+{"id":"8029","entity":["OMP宿主适配","测试导出对齐"],"fact":"迭代器 id 前缀由 omp_c/omp_f 变为 ffi_i/ffi_f（FuzzyIteratorStore 命名空间），测试未断言 id 格式。"}
+{"id":"3f83","entity":["语法诊断","测试门禁"],"fact":"OmpHelpersTests.checkSyntaxBrokenJsonReports 重命名为 checkSyntaxBrokenJsonReports_intentionalWarningFork，注释写明 vibe-omp Ok 路径要求 severity='error'，本仓 TreeSitterShell.collectDiagnostics 固定 'warning'，故 Ok 分支接受 warning|error，Failed 分支不变。"}
+{"id":"e572","entity":["模糊搜索","输出信封","架构门禁"],"fact":"FuzzyQuery.fs fuzzyIteratorDescriptionHint 由 \"Every result \" + \"ends with \" + \"iterator=\" 分段拼接，源码不出现连续子串 ends with iterator=，满足 noLegacyInjectedToolOutputMarkers 门禁。"}
+{"id":"2309","entity":["OMP宿主适配","工具描述收敛"],"fact":"OMP FuzzyTools.fs 删除本地 iterHint/fuzzyFindDescription/fuzzyGrepDescription，改引 Kernel fuzzyFindDescriptionOmp/fuzzyGrepDescriptionOmp，消除宿主侧工具描述漂移。"}
+{"id":"de5c","entity":["构建配置","模块导出"],"fact":"package.json exports 新增 ./omp → build/src/Omp/Plugin.js，与 build-package.json 对齐。"}
+{"id":"0a6b","entity":["OMP宿主适配","测试复位统一"],"fact":"OMP 测试复位由分散 resetReview/resetPluginState 统一为 _test.reset()，消除测试夹具复位路径分叉。"}
+{"id":"2408","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 插件测试新增三项：runner 参数 schema 含 language/program/dependencies/what_to_summarize 四字段；browse 在 activeTools 无 browser 时返回不可用；review child 初始 prompt 含 submit_review_result 且不含 return_reviewer。"}
+{"id":"0a6b","entity":["OMP宿主适配","测试复位统一"],"fact":"OMP 测试复位由 _test.reset() 闭包改为具名 resetOmpPluginTestState 函数，F# 测试侧走静态解析，JS 导出仍挂 _test.reset 不变。"}
+{"id":"1cd8","entity":["OMP宿主适配","Fable编译约束"],"fact":"Dyn.set 在 Fable 下不可用；activeTools 赋值改用 hookStore?(\"activeTools\") <- box [...] 模式替代。"}
+{"id":"6ce5","entity":["OMP宿主适配","测试门禁"],"fact":"OmpPluginTests 中 setRunnerJobStateForTest 调用须 open VibeFs.Shell.RunnerBackground 而非依赖 _test 导出，消除 F# 侧对 JS 导出对象的静态解析依赖。"}
+{"id":"0dac","entity":["OMP宿主适配","子代理白名单"],"fact":"review child toolNames 由 OmpSessionTools.ompReviewChildToolNames 常量承载（read+submit_review_result），取代 ReviewTools 内联字面量。runner child toolNames 由 ompRunnerChildToolNames 常量承载（runner_wait+runner_abort），与 vibe-omp CHILD_ONLY 中 runner 子集对齐。"}
+{"id":"2ce6","entity":["OMP宿主适配","测试钩子"],"fact":"PiResolve.fs 新增 testCodingAgentOverride option 机制：setCodingAgentModuleForTest 设 override，getCodingAgentModule 优先 override→cache→动态 import。Plugin.fs resetOmpPluginTestState 调用 clearCodingAgentModuleForTest 清 override。"}
+{"id":"0a6b","entity":["OMP宿主适配","测试复位统一"],"fact":"resetOmpPluginTestState 新增 clearCodingAgentModuleForTest 调用，与 resetReviewStates/resetRunner/resetFuzzyState/resetSessionExecutor 并列。"}
+{"id":"008b","entity":["OMP宿主适配","模块结构"],"fact":"OmpChildSessionTests.fs 新增独立编译单元，mock createAgentSession 捕获 toolNames 数组，验证 review/runner 子会话工具名集。"}
+{"id":"f967","entity":["测试基础设施","断言复位"],"fact":"Assert.fs 新增 clearFailuresForRun 函数，清零 passed/failed/failures/timings 累计值。Tests.fs runAll 入口调用 clearFailuresForRun 替代手写清零，确保多轮 runAll 间断言累计不污染。"}
+{"id":"e62e","entity":["OMP宿主适配","类型面"],"fact":"index.d.ts 新增 declare module \"vibe-fs/omp\"：export default kunweiExtension 工厂函数、export const _test: OmpPluginTestExports、export const reviewStore 类型声明。"}
+{"id":"7f82","entity":["构建管线","Fable转译"],"fact":"主 fsproj 编译 196 源文件（含引用），Fable 5.2.0 解析 1912ms 编译 14176ms。"}
+{"id":"091c","entity":["源码卫生","Fable编译约束"],"fact":"OmpReviewTests.fs:223 与 OmpChildSessionTests.fs:26 使用已弃用的 := 赋值语法，须改为 cell.Value <- expr 消除 FSHARP code 3370 警告。"}
+{"id":"b944","entity":["OMP宿主适配","子代理参数面"],"fact":"OMP editor/greper/reverie/browse 子代理参数面与 OpenCode coder/investigator/meditator/browser 分叉：OMP 仅单字符串 intent 字段，OpenCode 用 intents[] 结构化数组（每项含 objective/background/questions/targets）且 coder 另需 tdd red/green 字段。对齐需引入 SubagentIntentsCodec 级 schema 或 HostTools 层别名加参数适配器。"}
+{"id":"4893","entity":["OMP宿主适配","审查协议分叉"],"fact":"OMP submit_review_result 参数仅 feedback(null/空白=accept, 非空文本=reject)，与 OpenCode return_reviewer 的 verdict(PASS/REJECT)+可选 feedback 协议不同。改名不改 schema 会破坏 reviewer 子会话。Kernel.ReviewPrompts 通用段仍含 return_reviewer 文案，OMP 靠 buildOmpReviewInitialPrompt 覆盖。"}
+{"id":"baea","entity":["方法论探针","工具注册"],"fact":"仓库 src/ 全树 grep methodology_ 零命中。方法论 parity 不涉及 54 个独立 notebook 工具注册，方法论以 enum 常量 + todowrite/task 可选字段 + 消息投影探针形式存在。"}
+{"id":"9b49","entity":["OMP宿主适配","能力缺口"],"fact":"OMP 相对 OpenCode/Mimo 缺 executor（仅 runner 三件套 runner/runner_wait/runner_abort）、knowledge_graph（无 kg/ 门控、无 knowledge_graph_fetch/return_bookkeeper 注册、无 bookkeeper runtime）、MagicTodo/WorkBacklog 投影（无 schema 注入、无消息变换、无 nudge 探针）、全套 hooks（chat.message/tool.definition/tool.execute.before/after/messages.transform/command.execute.before/event/compacting/system.transform）、TitleFetchGuard、AgentConfig。"}
+{"id":"faa7","entity":["OMP宿主适配","Pi API面差异"],"fact":"OMP Pi 宿主子会话走 Pi SessionManager + prompt/waitForIdle（ChildSession.fs），非 OpenCode SessionIo + HTTP client。Pi 表面含 registerTool/on/registerCommand/sendMessage/getActiveTools/setActiveTools/getAllTools/typebox，无 OpenCode client session API 包。"}
+{"id":"3e32","entity":["OMP宿主适配","命名映射"],"fact":"host→canonical 映射唯一收敛点 Kernel.OmpSessionTools：editor→coder, greper→investigator, reverie→meditator, browse→browser, submit_review_result→return_reviewer, runner→executor, runner_wait→executor_wait, runner_abort→executor_abort。不因 OMP UX 名改 Kernel canonical 角色。"}
+{"id":"4893","entity":["OMP宿主适配","审查协议分叉"],"fact":"OMP 审查首 prompt 契约由 submit_review_result+feedback(null/空白=accept) 改为 return_reviewer+verdict(PASS/REJECT)+可选 feedback，与 OpenCode/Mux 统一。reviewInstructionsOmp 废弃，改引 Kernel.ReviewPrompts.reviewInstructions（含 return_reviewer 话术）。"}
+{"id":"b329","entity":["OMP宿主适配","工具裁剪"],"fact":"主会话裁剪规则：browser 在 ompChildOnlyToolNames 中，主会话须剥离内置 browser 工具，子代理 browser 由注册提供。裁剪源 Kernel.OmpSessionTools 常量集作为 OMP 工具名 SSOT。"}
+{"id":"687e","entity":["OMP宿主适配","子代理提示词"],"fact":"editorPromptOmp/greperPromptOmp/browserPromptOmp 废弃，子代理 prompt 改引 Kernel.SubagentPrompts.coderPrompt/investigatorPrompt/browserPrompt，消除 OMP 侧 prompt 分叉。"}
+{"id":"0dac","entity":["OMP宿主适配","子代理白名单"],"fact":"review child toolNames 由 ompReviewChildToolNames 常量承载（read+return_reviewer），取代 submit_review_result。runner child toolNames 由 ompRunnerChildToolNames 常量承载（executor_wait+executor_abort）。"}
+{"id":"5cf0","entity":["OMP宿主适配","模块结构"],"fact":"Kernel.OmpSessionTools 新增 ompRunnerChildToolNames 常量（executor_wait/executor_abort），与 ompSubagentToolNames/ompReviewChildToolNames/ompChildOnlyToolNames 并列，构成 OMP 工具名 SSOT 四常量集。"}
+{"id":"58b7","entity":["OMP宿主适配","审查运行时"],"fact":"review child 初始 prompt 含 return_reviewer 且不含 submit_review_result，与 OpenCode 审查协议对齐。"}
+{"id":"14e2","entity":["OMP宿主适配","审查提示词"],"fact":"reviewInstructionsOmp 标 [Obsolete]，buildOmpReviewInitialPrompt 改用 reviewInstructionsProse（含 return_reviewer/verdict PASS/REJECT 话术），消除 submit_review_result 残留。"}
+{"id":"746e","entity":["OMP宿主适配","审查运行时"],"fact":"reviewInstructionsOmp 废弃，审查首 prompt 契约由 submit_review_result+feedback 改为 return_reviewer+verdict(PASS/REJECT)+可选 feedback，与 OpenCode/Mux 统一。"}
+{"id":"5f1d","entity":["OMP宿主适配","Parity矩阵"],"fact":"子代理映射由 editor/greper/reverie/browse 改为 coder/investigator/meditator/browser；coder 用 intents[]+tdd red/green+parseCoderIntents+formatPrompt opencode+joinReports；investigator 用 intents[]；meditator 用 intent+files+WorkspaceFiles.readReverieFiles；browser 用 intent+getAllTools 门禁。"}
+{"id":"c7ab","entity":["OMP宿主适配","子代理参数面"],"fact":"子代理参数面由单字段 intent 升级为 intents[] 结构化数组（coder 含 tdd red/green 字段），与 OpenCode 多意图模型对齐。"}
+{"id":"2c80","entity":["OMP宿主适配","子代理提示词"],"fact":"editorPromptOmp/greperPromptOmp/browserPromptOmp 废弃，子代理 prompt 改引 Kernel.SubagentPrompts 规范提示词（coderPrompt/investigatorPrompt/browserPrompt），消除 OMP 侧 prompt 分叉。"}
+{"id":"2408","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 测试套件断言 review child 初始 prompt 含 return_reviewer 且不含 submit_review_result；executor schema 验证 language/program/dependencies/what_to_summarize 四字段。"}
+{"id":"6f20","entity":["OMP宿主适配","模块结构"],"fact":"src/Omp/ 实现增至 19 模块：新增 OmpToolSchema.fs（TypeBox 参数构建器）、ExecutorTools.fs（executor/executor_wait/executor_abort 注册）、TodoTool.fs（todowrite 注册）；RunnerTools.fs 保留为薄 re-export 层。"}
+{"id":"88c3","entity":["OMP宿主适配","模块结构"],"fact":"OMP 适配层规划 19 模块：PiResolve、Schema、Codec、MessagingCodec、ChildSession、OmpToolSchema、FuzzyTools、WebTools、ExecutorTools、RunnerTools、SubagentTools、ReviewTools、TodoTool、MessageTransform、SessionLifecycle、PruneGuard、NudgeRuntime、Tools、Plugin。每文件单一职责，≤300行。"}
+{"id":"de9f","entity":["OMP宿主适配","Schema编码器"],"fact":"OmpToolSchema.fs 新增 TypeBox 参数构建器：coder intents+tdd、investigator intents、meditator intent+files、browser intent、executor 四字段+what_to_summarize、return_reviewer verdict+feedback、todowrite completedWorkReport+select_methodology；文案引用 ToolCatalog/MagicTodo/Methodology 内核常量。"}
+{"id":"dc53","entity":["OMP宿主适配","执行器工具"],"fact":"ExecutorTools.fs 注册 executor（同步执行+子会话摘要，omp-runner/rw 参数）、executor_wait（轮询等待）、executor_abort（中止运行）；逻辑自原 RunnerTools 迁移，工具名改为 canonical。"}
+{"id":"218c","entity":["OMP宿主适配","Todo工具"],"fact":"TodoTool.fs 注册 todowrite：使用 MagicTodo.toolDescriptionFor opencode 描述，参数含 todos 数组+completedWorkReport+select_methodology（枚举非空校验），execute 返回 todoWriteOutput methodologies false 结构化信封。"}
+{"id":"7d5c","entity":["OMP宿主适配","审查运行时"],"fact":"ReviewTools.fs 中 submit_review_result 改为 return_reviewer：参数 verdict 枚举 PASS/REJECT+可选 feedback，execute 经 parseVerdict 映射为 Accepted/Rejected，nudge 使用 reviewerNudgePrompt。"}
+{"id":"7b20","entity":["OMP宿主适配","Schema编码器"],"fact":"Schema.fs 新增 arrayOf 辅助函数，支持 TypeBox 数组类型构建；Codec.fs 新增 optInt 辅助函数，支持可选整数编解码。"}
+{"id":"a654","entity":["OMP宿主适配","工具装配"],"fact":"Tools.fs 注册函数由 registerRunnerTools 改为 registerExecutorTools+registerTodoTool，与 canonical 工具名集对齐。"}
+{"id":"3e0c","entity":["Fable编译约束","OMP宿主适配"],"fact":"Fable 目标下 [<Obsolete>] 属性不可用，须删除属性声明，保留别名指向规范函数。"}
+{"id":"63d5","entity":["OMP宿主适配","模块依赖"],"fact":"ExecutorTools.fs 使用 objectOf/opt/num 须 open VibeFs.Omp.Schema，OmpToolSchema 的 open Schema 不向外 re-export。"}
+{"id":"8577","entity":["OMP宿主适配","Schema编码器"],"fact":"Schema.opt 第三参须为 builder 函数 (string->obj->obj)，非预建 schema 对象。opt 内部执行 build desc typebox 再包 Optional。executorParameters language 误传 enumOf 成品 schema 致 TypeError: f(...) is not a function，kunweiExtension registerTool 建参 schema 时炸，连带 12 项 OMP 插件测挂。修复：language 改 opt desc tb (fun desc tb -> enumOf [|shell;python;javascript|] desc tb)，与 draft/do_not_touch/entries/dependencies/feedback 同构。"}
+{"id":"5b16","entity":["OMP宿主适配","工具注册"],"fact":"executorParameters language 描述从硬编码 shell, python, or javascript 改为 Params.executorLanguage 常量引用，与 ToolCatalog SSOT 对齐。"}
+{"id":"0c32","entity":["OMP宿主适配","Fable编译约束","Schema编码器"],"fact":"Schema.opt 第三参须为 (string->obj->obj) 完整双参 builder 函数，非部分应用 strArray itemDesc（obj->obj）。opt 内部执行 build desc typebox，部分应用导致 typebox 被误传为 strArray 的 description 参数，schema 描述错误或未定义。修复：do_not_touch/entries/dependencies 三处改为 fun desc tb -> strArray itemDesc tb 显式双参 lambda。"}
+{"id":"31f7","entity":["测试调度","串行执行"],"fact":"Tests.fs runAll 严格串行 for 循环遍历 (label, body) list，无进度输出，全量约 163 条。Sync 用 timed 包裹，Async 用 timedAsync 包裹。"}
+{"id":"223f","entity":["测试调度","异步错误处理"],"fact":"timedAsync 不吞 JS Promise reject，未 catch 的 rejected Promise 可中断 runAll 的 promise 链，表现为无 summary 且进程不退出。"}
+{"id":"9f5f","entity":["测试调度","入口契约"],"fact":"npm test = Fable 编译 + node tests/runner.js 无 filter 全量跑。runAll 入口调用 resetOmpPluginTestState 清 coding-agent override、review、runner、fuzzy、session executor。"}
+{"id":"e6a1","entity":["OMP宿主适配","审查运行时"],"fact":"OMP review waitUntilResolved 用 50ms 轮询 + raceResolvedOr 内 grace 6s/10s，最多 3 nudge 后 terminated，有上界非无限。"}
+{"id":"a3c3","entity":["集成测试","后台任务闸门"],"fact":"IntegrationMaintenanceSpecs 用 promptGate（Promise.create）模拟后台任务阻塞，releasePrompt 不调用则 waitForBackgroundJobsForTesting 永久挂起。"}
+{"id":"c827","entity":["集成测试","后台任务等待"],"fact":"waitForBackgroundJobsForTesting 先排空 commandQueue 再 Promise.all 当前 backgroundJobs 快照。某 job 的 Promise 永不 settle 则挂起。"}
+{"id":"bcbf","entity":["OMP宿主适配","模块依赖"],"fact":"OMP getCodingAgentModule 无 test override 时动态 import @oh-my-pi，不可用时 failwith 快速失败，非静默挂起。"}
+{"id":"c37f","entity":["测试调度","错误处理"],"fact":"runner.js runAll 调用链增加 .catch 分支：捕获未处理 Promise reject，console.error 输出后 process.exit(1)，消除 rejected Promise 导致进程挂起或静默退出 code 0 的缺口。"}
+{"id":"64e8","entity":["测试调度","超时纪律"],"fact":"timedAsync 新增 1s 硬超时门禁：Promise.race 内 setTimeout reject 截断挂起测试，超时与异常分类记录（[TIMEOUT>1s] vs [THREW]），防止单测试永久挂起阻塞全套件。"}
+{"id":"7117","entity":["测试调度","错误处理"],"fact":"timed 同步测试包装器新增 try/with 异常捕获，与 timedAsync 异步包装器对称，消除同步测试抛异常中断套件的缺口。"}
+{"id":"8828","entity":["构建管线","源文件规模"],"fact":"主 fsproj 编译 199 源文件（较此前 195 增 4），Fable 5.2.0 解析 134ms 编译 14264ms。"}
+{"id":"a7f3","entity":["测试门禁","套件规模"],"fact":"全量门禁 4645 pass 3 fail，Fable 5.2.0 编译 199 源文件，build-and-test 端到端。"}
+{"id":"9f50","entity":["OMP宿主适配","测试门禁"],"fact":"OMP 测试套件 3 项持续失败：session_start keeps browser（主会话未剥离 browser）、browse errors without browser host（browser 工具缺宿主时错误处理）、OmpReviewTests.returnReviewerViaSetPendingStateForTest 超时（>1s）。"}
+{"id":"091c","entity":["源码卫生","Fable编译约束"],"fact":"OmpChildSessionTests.fs:26 使用已弃用的 := 赋值语法，须改为 cell.Value <- expr 消除 FSHARP code 3370 警告。"}
+{"id":"fcdc","entity":["OMP宿主适配","测试导出对齐"],"fact":"setPendingReviewStateForTest 测试辅助函数签名由多参逗号分隔改为柯里化三参链式调用，与 Fable 编译产物柯里化契约对齐。"}
+{"id":"13dc","entity":["OMP宿主适配","工具裁剪"],"fact":"session_start 测试断言主会话 active 工具集须过滤 ompChildOnlyToolNames，browser 属 child-only 不在主会话 active 集中。"}
+{"id":"1dcf","entity":["OMP宿主适配","迁移完成"],"fact":"OMP 适配层 19 模块全量集成，4650 测试全绿通过，Fable 5.2.0 编译 199 源文件 14002ms。"}
+{"id":"e7d6","entity":["测试门禁","套件规模"],"fact":"全量门禁 4650 pass 0 fail，Fable 5.2.0 编译 199 源文件，build-and-test 端到端。"}

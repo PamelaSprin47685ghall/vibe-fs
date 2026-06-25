@@ -79,6 +79,14 @@ let capsContextFormat () =
 let capsFileSizeLimit () =
     equal "caps file size limit 4MB" (4 * 1_048_576) VibeFs.Shell.WorkspaceFiles.maxFileSize
 
+let stripHeadTailPipesOutsideQuotes () =
+    let r = strip "cat f | head -n 5"
+    equal "strip head -n 5 outside quotes" "cat f" r.script
+
+let stripHeadTailPipesHeadTailChain () =
+    let r = strip "cat a | head -n 20 | tail -5"
+    equal "strip head then tail chain" "cat a" r.script
+
 let readDirectoryListing () = promise {
     let! workspaceDir = mkdtempAsync "read-dir-"
     let nestedDir = unbox<string> (pathModule?join(workspaceDir, "nested"))
@@ -235,11 +243,11 @@ let executorToolResponseFormatting () =
 /// to preserve exit status — that metadata now travels in the structured return
 /// block prepended by formatToolResponse.
 let summarizerPromptOmitsReturnValue () =
-    let prompt = executorSummarizerPrompt "raw output" "shell" "echo 1" [] "short" "ro"
+    let prompt = executorSummarizerPrompt "" "raw output" "shell" "echo 1" [] "short" "ro"
     check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
     check "summarizer prompt omits non-zero" (not (prompt.ToLowerInvariant().Contains "non-zero"))
     check "summarizer empty deps yaml" (prompt.Contains "dependencies: []")
     let multiline =
-        executorSummarizerPrompt "line1\nline2" "shell" "echo hi\necho bye" [ "dep1" ] "long" "ro"
+        executorSummarizerPrompt "" "line1\nline2" "shell" "echo hi\necho bye" [ "dep1" ] "long" "ro"
     check "summarizer multiline program uses block field" (multiline.Contains "program: |")
     check "summarizer multiline raw_output uses block field" (multiline.Contains "raw_output: |")

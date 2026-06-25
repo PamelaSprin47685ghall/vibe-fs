@@ -7,6 +7,7 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Executor
 open VibeFs.Shell.ExecutorJavascript
+open VibeFs.Shell.SessionExecutor
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -94,11 +95,14 @@ type RunOutcome =
     | Signaled of signal: string * stdout: string * stderr: string
     | SpawnFailed of reason: DomainError
 
-let private awaitChild (child: SpawnedChild) (executable: string) (kill: SpawnedChild -> unit) (timeoutMs: int option) : JS.Promise<RunOutcome> =
+let private awaitChild (child: SpawnedChild) (executable: string) (kill: SpawnedChild -> unit)
+                       (timeoutMs: int option) (sessionId: string option)
+                       (onKillRegistered: ((unit -> unit) -> unit) option) : JS.Promise<RunOutcome> =
     Promise.create (fun resolve _reject ->
         let stdout = ResizeArray<string>()
         let stderr = ResizeArray<string>()
         let mutable settled = false
+        let doKill () = kill child
         let removeListeners () =
             try child?stdout?removeAllListeners() |> ignore with _ -> ()
             try child?stderr?removeAllListeners() |> ignore with _ -> ()
@@ -106,21 +110,26 @@ let private awaitChild (child: SpawnedChild) (executable: string) (kill: Spawned
             if not settled then
                 settled <- true
                 removeListeners ()
+                unregisterActiveRun (defaultArg sessionId "")
                 resolve outcome
+        match sessionId with
+        | Some sid when sid <> "" ->
+            registerActiveRun sid doKill
+            onKillRegistered |> Option.iter (fun register -> register doKill)
+        | _ -> ()
         child?stdout?on("data", fun (c: obj) -> stdout.Add(string c)) |> ignore
         child?stderr?on("data", fun (c: obj) -> stderr.Add(string c)) |> ignore
         child?on("error", fun (_e: obj) -> settle (SpawnFailed(ExecutorExecutableMissing executable))) |> ignore
         child?on("close", fun (code: obj) (signal: obj) ->
             let capturedOut = String.concat "" stdout
             let capturedErr = String.concat "" stderr
-            // our own timeout-kill settles TimedOut synchronously before close fires, so a null code here is always an external signal
             settle (
                 if isNull code then
                     let sigName = if isNull signal then "unknown" else string signal
                     Signaled(sigName, capturedOut, capturedErr)
                 else Exited(unbox<int> code, capturedOut, capturedErr))) |> ignore
         let onTimeout () =
-            if not settled then (kill child; settle (TimedOut(String.concat "" stdout, String.concat "" stderr)))
+            if not settled then (doKill (); settle (TimedOut(String.concat "" stdout, String.concat "" stderr)))
         match timeoutMs with
         | None -> ()
         | Some ms ->
@@ -131,50 +140,63 @@ let private awaitChild (child: SpawnedChild) (executable: string) (kill: Spawned
             |> Promise.start)
 
 let spawnAndRun (command: string) (args: string array) (cwd: string) (timeoutMs: int option)
+                (sessionId: string option) (onKillRegistered: ((unit -> unit) -> unit) option)
                 : JS.Promise<RunOutcome> =
     let child = spawnChild command args cwd
-    awaitChild child command killTree timeoutMs
+    awaitChild child command killTree timeoutMs sessionId onKillRegistered
+
+let abortExecutorRun (sessionId: string) : unit = VibeFs.Shell.SessionExecutor.abortExecutorRun sessionId
 
 let runScript (interpreter: string) (interpreterArgs: string array) (cwd: string)
-              (scriptPath: string) (timeoutMs: int option) : JS.Promise<RunOutcome> =
-    spawnAndRun interpreter (Array.append interpreterArgs [| scriptPath |]) cwd timeoutMs
+              (scriptPath: string) (timeoutMs: int option) (sessionId: string option)
+              (onKillRegistered: ((unit -> unit) -> unit) option) : JS.Promise<RunOutcome> =
+    spawnAndRun interpreter (Array.append interpreterArgs [| scriptPath |]) cwd timeoutMs sessionId onKillRegistered
 
-let private runShellProgram (program: string) (cwd: string) (sessionId: string) (timeoutMs: int) : JS.Promise<RunOutcome> =
+let private runShellProgram (program: string) (cwd: string) (sessionId: string) (timeoutMs: int)
+                            (onKillRegistered: ((unit -> unit) -> unit) option) : JS.Promise<RunOutcome> =
     let extension = if isWindows () then "ps1" else "sh"
     let scriptPath = createTempScript (getExecutorTempScriptPath sessionId extension) program
+    let sid = Some sessionId
     if isWindows ()
-    then runScript "powershell.exe" [| "-ExecutionPolicy"; "Bypass"; "-File" |] cwd scriptPath (Some timeoutMs)
-    else runScript "bash" [||] cwd scriptPath (Some timeoutMs)
+    then runScript "powershell.exe" [| "-ExecutionPolicy"; "Bypass"; "-File" |] cwd scriptPath (Some timeoutMs) sid onKillRegistered
+    else runScript "bash" [||] cwd scriptPath (Some timeoutMs) sid onKillRegistered
 
 let private runPythonProgram (program: string) (dependencies: string list) (cwd: string)
-                             (sessionId: string) (timeoutMs: int) : JS.Promise<RunOutcome> =
+                             (sessionId: string) (timeoutMs: int)
+                             (onKillRegistered: ((unit -> unit) -> unit) option) : JS.Promise<RunOutcome> =
     let scriptPath = createTempScript (getExecutorTempScriptPath sessionId "py") program
     let baseArgs =
         [| yield "--isolated"
            for dep in dependencies do
                yield "--with"
                yield dep |]
+    let sid = Some sessionId
     let warmup () =
-        spawnAndRun "uvx" (Array.append baseArgs [| "--from"; "python"; "python"; "-c"; "pass" |]) cwd None
+        spawnAndRun "uvx" (Array.append baseArgs [| "--from"; "python"; "python"; "-c"; "pass" |]) cwd None None None
     promise {
         if not dependencies.IsEmpty then
             let! warm = warmup ()
             match warm with
-            | Exited(0, _, _) -> return! runScript "uvx" (Array.append baseArgs [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs)
+            | Exited(0, _, _) ->
+                return!
+                    runScript "uvx" (Array.append baseArgs [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs) sid onKillRegistered
             | _ -> return warm
         else
-            return! runScript "uvx" (Array.append baseArgs [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs)
+            return!
+                runScript "uvx" (Array.append baseArgs [| "--from"; "python"; "python" |]) cwd scriptPath (Some timeoutMs) sid onKillRegistered
     }
 
 let private runJavascriptProgram (program: string) (dependencies: string list) (cwd: string)
-                                 (sessionId: string) (timeoutMs: int) : JS.Promise<RunOutcome> =
+                                 (sessionId: string) (timeoutMs: int)
+                                 (onKillRegistered: ((unit -> unit) -> unit) option) : JS.Promise<RunOutcome> =
     promise {
         let projectDir = getExecutorProjectDir (Some sessionId)
         do! ensureJavascriptProject projectDir dependencies
         let! rewritten = rewriteJavascriptModuleSpecifiers program cwd
         let body = $"{createJavascriptPrelude cwd}{rewritten}"
         let scriptPath = createTempScript $"{projectDir}/script.mts" body
-        return! runScript "npx" [| "--prefix"; projectDir; "--yes"; "--no-install"; "tsx" |] cwd scriptPath (Some timeoutMs)
+        return!
+            runScript "npx" [| "--prefix"; projectDir; "--yes"; "--no-install"; "tsx" |] cwd scriptPath (Some timeoutMs) (Some sessionId) onKillRegistered
     }
 
 let missingExecutableFor (language: ExecutorLanguage) : string =
@@ -205,26 +227,29 @@ let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcom
     | SpawnFailed reason -> Failed($"spawn failed: {formatDomainError reason}", None, None)
 
 type ExecuteDeps = {
-    runProgram: string -> ExecutorLanguage -> string list -> string -> string -> int -> JS.Promise<RunOutcome>
+    runProgram:
+        string -> ExecutorLanguage -> string list -> string -> string -> int -> ((unit -> unit) -> unit) option
+        -> JS.Promise<RunOutcome>
 }
 
 let private defaultRunProgram (program: string) (language: ExecutorLanguage) (dependencies: string list)
-                              (cwd: string) (sessionId: string) (timeout: int) : JS.Promise<RunOutcome> =
+                              (cwd: string) (sessionId: string) (timeout: int)
+                              (onKillRegistered: ((unit -> unit) -> unit) option) : JS.Promise<RunOutcome> =
     match language with
-    | Shell -> runShellProgram program cwd sessionId timeout
-    | Python -> runPythonProgram program dependencies cwd sessionId timeout
-    | Javascript -> runJavascriptProgram program dependencies cwd sessionId timeout
+    | Shell -> runShellProgram program cwd sessionId timeout onKillRegistered
+    | Python -> runPythonProgram program dependencies cwd sessionId timeout onKillRegistered
+    | Javascript -> runJavascriptProgram program dependencies cwd sessionId timeout onKillRegistered
 
 let defaultExecuteDeps : ExecuteDeps = { runProgram = defaultRunProgram }
 
 let executeWith (deps: ExecuteDeps) (options: ExecuteOptions) (sessionId: string)
-                : JS.Promise<ExecuteResult> =
+                (onKillRegistered: ((unit -> unit) -> unit) option) : JS.Promise<ExecuteResult> =
     promise {
         let timeout = timeoutMs options.timeoutType
         let cwd = defaultArg options.cwd (nodeProcess?cwd())
         let program = prepareProgramForExecution options
         let! outcome =
-            deps.runProgram program options.language options.dependencies cwd sessionId timeout
+            deps.runProgram program options.language options.dependencies cwd sessionId timeout onKillRegistered
         let output =
             match outcome with
             | Exited(_, stdout, stderr)
@@ -235,4 +260,4 @@ let executeWith (deps: ExecuteDeps) (options: ExecuteOptions) (sessionId: string
     }
 
 let execute (options: ExecuteOptions) (sessionId: string) : JS.Promise<ExecuteResult> =
-    executeWith defaultExecuteDeps options sessionId
+    executeWith defaultExecuteDeps options sessionId None

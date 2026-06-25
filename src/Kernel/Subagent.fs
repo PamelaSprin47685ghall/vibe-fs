@@ -35,7 +35,8 @@ let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
     | Investigator intents -> intents |> List.map (investigatorPrompt >> wrap)
     | Meditator(intent, sections) -> [ meditatorPrompt sections intent |> wrap ]
     | Browser intent -> [ browserPrompt intent |> wrap ]
-    | ExecutorSummary(output, language, program, dependencies, timeoutType, mode) -> [ executorSummarizerPrompt output language program dependencies timeoutType mode |> wrap ]
+    | ExecutorSummary(output, language, program, dependencies, timeoutType, mode) ->
+        [ executorSummarizerPrompt "" output language program dependencies timeoutType mode |> wrap ]
     | WebsearchSummary(question, raw) -> [ websearchSummarizerPrompt question raw |> wrap ]
 
 let reportSeparator = "\n---\n"
