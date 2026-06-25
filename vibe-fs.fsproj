@@ -324,7 +324,6 @@
     <Compile Include="src/Omp/KnowledgeGraph/Submit.fs" />
     <Compile Include="src/Omp/KnowledgeGraph/Maintenance.fs" />
     <Compile Include="src/Omp/KnowledgeGraph/Runtime.fs" />
-    <Compile Include="src/Omp/KnowledgeGraphRuntime.fs" />
     <Compile Include="src/Omp/KnowledgeGraphTools.fs" />
     <Compile Include="src/Omp/PruneGuard.fs" />
     <Compile Include="src/Omp/NudgeRuntime.fs" />

@@ -8,7 +8,7 @@ open VibeFs.Omp.MessagingCodec
 open VibeFs.Omp.PruneGuard
 open VibeFs.Omp.ReviewTools
 open VibeFs.Omp.PiResolve
-open VibeFs.Omp.KnowledgeGraphRuntime
+open VibeFs.Omp.KnowledgeGraph.Runtime
 open VibeFs.Omp.MessageTransform
 open VibeFs.Omp.OmpTestHooks
 open VibeFs.Omp.PluginCore

@@ -1,7 +1,7 @@
 module VibeFs.Shell.Dyn
 
 [<NoComparison; NoEquality>]
-type DynModule = private | DynModuleMarker
+type DynSentinel = interface end
 
 open Fable.Core
 open Fable.Core.JsInterop

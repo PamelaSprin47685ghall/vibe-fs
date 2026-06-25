@@ -12,6 +12,7 @@ open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Kernel.Domain
 open VibeFs.Shell.ReviewRuntime
 open VibeFs.Mux.Delegate
+open VibeFs.Mux.DelegateTimeout
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
 open VibeFs.Shell
@@ -79,7 +80,7 @@ let private precheckReview
                   "toolPolicy", box (createObj [ "disabledTools", box disabledTools ]) ]
         let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
         let promptText = preReviewVerdictPrompt task
-        return! delegateWithTimeout deps config "explore" promptText "Pre-review" (Some opts) 300000
+        return! Delegate.delegateWithTimeout deps config "explore" promptText "Pre-review" (Some opts) 300000
     }
 
 let private activateReview

@@ -9,7 +9,7 @@ open VibeFs.Shell.Dyn
 open VibeFs.Shell.FuzzyFinderShell
 open VibeFs.Omp.AgentConfig
 open VibeFs.Omp.Codec
-open VibeFs.Omp.KnowledgeGraphRuntime
+open VibeFs.Omp.KnowledgeGraph.Runtime
 open VibeFs.Omp.Tools
 open VibeFs.Omp.PruneGuard
 open VibeFs.Omp.ReviewTools

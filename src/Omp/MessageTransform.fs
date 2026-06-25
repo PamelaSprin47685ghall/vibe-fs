@@ -11,7 +11,7 @@ open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.MessageTransformPolicy
 open VibeFs.Omp.CapsCodec
 open VibeFs.Omp.ChildSession
-open VibeFs.Omp.KnowledgeGraphRuntime
+open VibeFs.Omp.KnowledgeGraph.Runtime
 open VibeFs.Omp.MagicTodo
 open VibeFs.Omp.MessagingCodec
 open VibeFs.Omp.ReadDedup

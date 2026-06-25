@@ -99,9 +99,11 @@ let ompReviewUsesReviewRuntime () =
 let ompKnowledgeGraphRuntimeSplit () =
     check "arch: Omp KnowledgeGraph Runtime.fs exists"
         (existsSync "src/Omp/KnowledgeGraph/Runtime.fs")
-    let facade = requireFile "src/Omp/KnowledgeGraphRuntime.fs" |> nonCommentCode
-    check "arch: Omp KnowledgeGraphRuntime.fs is thin facade or re-export"
-        (facade.Length < 400)
+    check "arch: Omp KnowledgeGraphRuntime.fs is consumed via KnowledgeGraph.Runtime"
+        (existsSync "src/Omp/KnowledgeGraph/Runtime.fs")
+    let runtime = requireFile "src/Omp/KnowledgeGraph/Runtime.fs" |> nonCommentCode
+    check "arch: Omp KnowledgeGraph Runtime.fs is sole runtime home"
+        (runtime.Length > 0 && runtime.Contains "OmpKnowledgeGraphRuntime")
 
 let ompCapsCodecExists () =
     let code = requireFile "src/Omp/CapsCodec.fs" |> nonCommentCode

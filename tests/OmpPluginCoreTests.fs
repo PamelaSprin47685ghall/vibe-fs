@@ -56,7 +56,7 @@ let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool
     let ctx = createObj [ "sessionManager", box sessionMgr ]
     let event = createObj [ "type", box evtType ]
     let pi, getHandlers = capturePi ()
-    registerAbortHandler pi reviewStore (VibeFs.Omp.KnowledgeGraphRuntime.OmpKnowledgeGraphRuntime(createObj []))
+    registerAbortHandler pi reviewStore (VibeFs.Omp.KnowledgeGraph.Runtime.OmpKnowledgeGraphRuntime(createObj []))
     let handlers = getHandlers ()
     check $"{evtType} captured exactly one handler" (handlers.Length = 1)
     let handler = handlers.[0]
