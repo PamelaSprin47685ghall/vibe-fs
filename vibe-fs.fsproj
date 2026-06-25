@@ -42,6 +42,10 @@
     <Compile Include="src/Kernel/ToolCatalog/Registry.fs" />
     <Compile Include="src/Kernel/ToolCatalogParams.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />
+    <Compile Include="src/Kernel/Nudge/Coordinator.fs" />
+    <Compile Include="src/Kernel/Nudge/TodoStatus.fs" />
+    <Compile Include="src/Kernel/Nudge/RetryProgress.fs" />
+    <Compile Include="src/Kernel/Nudge/SubmitReviewHooks.fs" />
     <Compile Include="src/Kernel/Dedup.fs" />
     <Compile Include="src/Kernel/Messaging.fs" />
     <Compile Include="src/Kernel/ReviewReplayPolicy.fs" />

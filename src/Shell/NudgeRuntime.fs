@@ -4,6 +4,8 @@ open Fable.Core
 open VibeFs.Shell.Dyn
 open VibeFs.Kernel
 open VibeFs.Kernel.Nudge
+open VibeFs.Kernel.Nudge.TodoStatus
+open VibeFs.Kernel.Nudge.SubmitReviewHooks
 open VibeFs.Kernel.NudgeState
 open VibeFs.Kernel.Nudge.Types
 

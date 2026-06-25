@@ -23,7 +23,6 @@ open VibeFs.Tests.ArchitectureTestsOpencodeTools
 open VibeFs.Tests.ArchitectureTestsOpencodeToolsReview
 open VibeFs.Tests.ArchitectureTestsOpencodeToolsSearch
 open VibeFs.Tests.ArchitectureTestsOpencodeToolsExecutor
-open VibeFs.Tests.ArchitectureTestsOmp
 open VibeFs.Tests.TestsTestBody
 
 let architectureTestEntriesPartB () : (string * TestBody) list =

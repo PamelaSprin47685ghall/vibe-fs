@@ -1,6 +1,7 @@
 module VibeFs.Shell.OpencodeSessionEventNudge
 
 open VibeFs.Kernel.Nudge
+open VibeFs.Kernel.Nudge.RetryProgress
 open VibeFs.Kernel.NudgeState
 open VibeFs.Kernel.Nudge.Types
 open VibeFs.Shell.Dyn

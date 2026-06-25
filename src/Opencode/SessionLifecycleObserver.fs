@@ -6,6 +6,8 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeState
+open VibeFs.Kernel.Nudge.SubmitReviewHooks
+open VibeFs.Kernel.Nudge.TodoStatus
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Methodology
 open VibeFs.Kernel.ToolOutputInfo

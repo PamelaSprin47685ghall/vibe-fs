@@ -11,32 +11,29 @@ type BookkeeperLaunch =
       result: string }
 
 /// Single-responsibility immutable aggregate of all knowledge graph host state (P52/P53).
-/// Every field is updated only by the pure transition functions below; the IO
-/// shell applies them through the `reducer`. `scheduledMaintenance` is a
-/// process-level dedup set: a workspace+kind+value triple queues a background
-/// rewrite at most once per cycle; keys accumulate for the lifetime of the process
-/// and reset on restart, so a killed process retries accumulated work.
 type KnowledgeGraphState =
     { sessionSnapshots: Map<string, KnowledgeGraphProjection>
       bookkeeperLaunches: BookkeeperLaunch list
       scheduledMaintenance: Set<string> }
 
-let initialKnowledgeGraphState : KnowledgeGraphState =
+let emptyState : KnowledgeGraphState =
     { sessionSnapshots = Map.empty
       bookkeeperLaunches = []
       scheduledMaintenance = Set.empty }
 
-let private cacheSnapshot (state: KnowledgeGraphState) (sessionID: string) (projection: KnowledgeGraphProjection) : KnowledgeGraphState =
+let initialKnowledgeGraphState : KnowledgeGraphState = emptyState
+
+let cacheSnapshot (state: KnowledgeGraphState) (sessionID: string) (projection: KnowledgeGraphProjection) : KnowledgeGraphState =
     { state with sessionSnapshots = Map.add sessionID projection state.sessionSnapshots }
 
-let private appendLaunch (state: KnowledgeGraphState) (launch: BookkeeperLaunch) : KnowledgeGraphState =
-    { state with bookkeeperLaunches = state.bookkeeperLaunches @ [ launch ] }
+let appendLaunch (state: KnowledgeGraphState) (launch: BookkeeperLaunch) : KnowledgeGraphState =
+    { state with bookkeeperLaunches = launch :: state.bookkeeperLaunches }
 
-let private recordLaunch (state: KnowledgeGraphState) (launch: BookkeeperLaunch) : KnowledgeGraphState =
+let recordLaunch (state: KnowledgeGraphState) (launch: BookkeeperLaunch) : KnowledgeGraphState =
     appendLaunch state launch
 
-let private updateLatestLaunchResult (state: KnowledgeGraphState) (title: string) (result: string) : KnowledgeGraphState =
-    let rec loop rev remaining =
+let updateLatestLaunchResult (state: KnowledgeGraphState) (title: string) (result: string) : KnowledgeGraphState =
+    let rec loop (rev: BookkeeperLaunch list) (remaining: BookkeeperLaunch list) : BookkeeperLaunch list =
         match remaining with
         | [] -> List.rev rev
         | launch :: rest ->
@@ -48,8 +45,6 @@ let private updateLatestLaunchResult (state: KnowledgeGraphState) (title: string
                 List.rev rev @ remaining
     { state with bookkeeperLaunches = loop [] state.bookkeeperLaunches }
 
-/// Dedup by workspace+kind+value triple: returns whether this is the first
-/// launch for the triple (caller queues the job only then) and the next state.
 let recordLaunchOnce (state: KnowledgeGraphState) (key: string) (launch: BookkeeperLaunch) : bool * KnowledgeGraphState =
     if Set.contains key state.scheduledMaintenance then false, state
     else true, { appendLaunch state launch with scheduledMaintenance = Set.add key state.scheduledMaintenance }
@@ -64,10 +59,6 @@ let normalizeDraftIds (projection: KnowledgeGraphProjection) (drafts: KnowledgeG
         | Some knowledgeGraphId when Map.containsKey knowledgeGraphId projection -> draft
         | _ -> { draft with id = None })
 
-/// Unified command type covering every state change in the runtime (P53). The
-/// reducer is the single pure dispatch; multi-value transitions
-/// (recordLaunchOnce/drainLaunches) stay available as standalone functions so
-/// callers needing their extra return value read it in the same tick.
 type KnowledgeGraphCommand =
     | CacheSnapshotCmd of sessionID: string * projection: KnowledgeGraphProjection
     | RecordLaunchCmd of launch: BookkeeperLaunch

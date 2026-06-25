@@ -3,6 +3,7 @@ module VibeFs.Tests.AgentNudgeSpecsWip
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Nudge
+open VibeFs.Kernel.Nudge.SubmitReviewHooks
 open VibeFs.Kernel.NudgeState
 open VibeFs.Kernel.Nudge.Types
 open VibeFs.Kernel.PromptFragments

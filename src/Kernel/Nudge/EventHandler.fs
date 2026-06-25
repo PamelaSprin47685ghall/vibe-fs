@@ -1,6 +1,7 @@
 module VibeFs.Kernel.Nudge.EventHandler
 
 open VibeFs.Kernel.PromptFragments
+open VibeFs.Kernel.Nudge.TodoStatus
 open VibeFs.Kernel.Nudge.Types
 open VibeFs.Kernel.Nudge.Transitions
 

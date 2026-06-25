@@ -2,6 +2,8 @@ module VibeFs.Shell.OpencodeSessionEventCodec
 
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Nudge
+open VibeFs.Kernel.Nudge.TodoStatus
+open VibeFs.Kernel.Nudge.SubmitReviewHooks
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.OpencodeSessionEventCodecCommon
 open VibeFs.Shell.OpencodeSessionEventNudge
