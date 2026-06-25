@@ -35,6 +35,7 @@ let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit>
                         setKey output "parameters" (buildMagicTodoSchema ())
                 else
                     setKey output "jsonSchema" (buildMagicTodoSchema ())
+            | Omp -> ()
     }
 
 let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =

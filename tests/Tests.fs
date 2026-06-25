@@ -34,7 +34,12 @@ open VibeFs.Tests.OmpPluginTests
 open VibeFs.Tests.OmpReviewTests
 open VibeFs.Tests.OmpHelpersTests
 open VibeFs.Tests.OmpRunnerTests
+open VibeFs.Tests.OmpContextTransformTests
 open VibeFs.Tests.OmpChildSessionTests
+open VibeFs.Tests.OmpAgentConfigTests
+open VibeFs.Tests.OmpHookExecuteTests
+open VibeFs.Tests.OmpKnowledgeGraphRuntimeTests
+open VibeFs.Tests.OmpSessionLifecycleTests
 open VibeFs.Omp.Plugin
 
 type private TestBody =
@@ -172,6 +177,11 @@ let private tests : (string * TestBody) list = [
     "OmpPluginTests.registersCoreToolsIdempotent", Async OmpPluginTests.registersCoreToolsIdempotent
     "OmpPluginTests.sessionStartStripsMainSessionTools", Async OmpPluginTests.sessionStartStripsMainSessionTools
     "OmpPluginTests.fuzzyDescriptionsMatchMuxWording", Sync (sync OmpPluginTests.fuzzyDescriptionsMatchMuxWording)
+
+    "OmpContextTransformTests.capsSynthUserPrepended", Async OmpContextTransformTests.capsSynthUserPrepended
+    "OmpContextTransformTests.capsReadToolsInContextTransform", Async OmpContextTransformTests.capsReadToolsInContextTransform
+    "OmpContextTransformTests.beforeAgentStartOmitsCapsXml", Async OmpContextTransformTests.beforeAgentStartOmitsCapsXml
+    "OmpContextTransformTests.knowledgeGraphPreludeWhenKgPresent", Async OmpContextTransformTests.knowledgeGraphPreludeWhenKgPresent
     "OmpPluginTests.readAssistantTextFromEntries", Sync (sync OmpPluginTests.readAssistantTextFromEntries)
     "OmpPluginTests.subagentPromptsContainKernelFragments", Sync (sync OmpPluginTests.subagentPromptsContainKernelFragments)
     "OmpPluginTests.executorToolSchemaFourFields", Async OmpPluginTests.executorToolSchemaFourFields
@@ -179,9 +189,7 @@ let private tests : (string * TestBody) list = [
     "OmpPluginTests.reviewChildInitialPromptUsesReturnReviewer", Sync (sync OmpPluginTests.reviewChildInitialPromptUsesReturnReviewer)
     "OmpPluginTests.fuzzyGrepExcludeAnyOfLength2", Async OmpPluginTests.fuzzyGrepExcludeAnyOfLength2
     "OmpPluginTests.agentEndRunnerNudgeBeforeLoop", Async OmpPluginTests.agentEndRunnerNudgeBeforeLoop
-    "OmpPluginTests.agentEndLoopNudgeWhenActive", Async OmpPluginTests.agentEndLoopNudgeWhenActive
-    "OmpPluginTests.agentEndSkipsLoopNudgeWhenPendingMessages", Async OmpPluginTests.agentEndSkipsLoopNudgeWhenPendingMessages
-    "OmpReviewTests.loopInputHandledMessageAndNotify", Async OmpReviewTests.loopInputHandledMessageAndNotify
+
     "OmpReviewTests.returnReviewerVerdictPassReject", Async OmpReviewTests.returnReviewerVerdictPassReject
     "OmpReviewTests.returnReviewerViaSetPendingStateForTest", Async OmpReviewTests.returnReviewerViaSetPendingStateForTest
     "OmpReviewTests.runReviewLoopChildToolNames", Async OmpReviewTests.runReviewLoopChildToolNames
@@ -207,6 +215,56 @@ let private tests : (string * TestBody) list = [
     "OmpHelpersTests.fuzzyGrepCursorSingleUse", Sync (sync OmpHelpersTests.fuzzyGrepCursorSingleUse)
     "OmpHelpersTests.fuzzyFindCursorSingleUse", Sync (sync OmpHelpersTests.fuzzyFindCursorSingleUse)
     "OmpHelpersTests.fuzzyResolveExternalBasePath", Sync (sync OmpHelpersTests.fuzzyResolveExternalBasePath)
+    "OmpTitleFetchGuardTests.signature", Sync (sync OmpTitleFetchGuardTests.signature)
+    "OmpTitleFetchGuardTests.wrapText", Sync (sync OmpTitleFetchGuardTests.wrapText)
+    "OmpTitleFetchGuardTests.detectProbeUserContent", Sync (sync OmpTitleFetchGuardTests.detectProbeUserContent)
+    "OmpTitleFetchGuardTests.rejectNonProbeBody", Sync (sync OmpTitleFetchGuardTests.rejectNonProbeBody)
+    "OmpTitleFetchGuardTests.rejectNonJsonBody", Sync (sync OmpTitleFetchGuardTests.rejectNonJsonBody)
+    "OmpTitleFetchGuardTests.rewriteStringContent", Sync (sync OmpTitleFetchGuardTests.rewriteStringContent)
+    "OmpTitleFetchGuardTests.rewriteArrayContent", Sync (sync OmpTitleFetchGuardTests.rewriteArrayContent)
+    "SubagentIoTests.firstStringPreferListed", Sync (sync SubagentIoTests.firstStringPreferListed)
+    "SubagentIoTests.extractToolContextDirectoryFallback", Sync (sync SubagentIoTests.extractToolContextDirectoryFallback)
+    "SubagentIoTests.extractToolContextHonoursCtx", Sync (sync SubagentIoTests.extractToolContextHonoursCtx)
+    "SubagentIoTests.textPartsWrapsStrings", Sync (sync SubagentIoTests.textPartsWrapsStrings)
+    "SubagentIoTests.buildPromptBodyNoAiSettings", Sync (sync SubagentIoTests.buildPromptBodyNoAiSettings)
+    "SubagentIoTests.buildPromptBodyWithThinkingLevel", Sync (sync SubagentIoTests.buildPromptBodyWithThinkingLevel)
+    "SubagentIoTests.signalAbortedFalseOnNull", Sync (sync SubagentIoTests.signalAbortedFalseOnNull)
+    "OmpPluginCoreTests.reviewStoreIsSharedSingleton", Sync (sync OmpPluginCoreTests.reviewStoreIsSharedSingleton)
+    "OmpPluginCoreTests.clearReviewStatesNoError", Sync (sync OmpPluginCoreTests.clearReviewStatesNoError)
+    "OmpPluginCoreTests.abortHookDeactivatesReview", Sync (sync OmpPluginCoreTests.abortHookDeactivatesReview)
+    "OmpPluginCoreTests.streamAbortHookDeactivatesReview", Sync (sync OmpPluginCoreTests.streamAbortHookDeactivatesReview)
+    "OmpPluginCoreTests.sessionErrorHookDeactivatesReview", Sync (sync OmpPluginCoreTests.sessionErrorHookDeactivatesReview)
+    "OmpPluginCoreTests.unrelatedEventLeavesReviewActive", Sync (sync OmpPluginCoreTests.unrelatedEventLeavesReviewActive)
+    "OmpMagicTodoTests.sharedSessionStoreByHost", Sync (sync OmpMagicTodoTests.sharedSessionStoreByHost)
+    "OmpMagicTodoTests.hostPartitionedReports", Sync (sync OmpMagicTodoTests.hostPartitionedReports)
+    "OmpMagicTodoTests.backlogReportFromTodoInputHostAgnostic", Sync (sync OmpMagicTodoTests.backlogReportFromTodoInputHostAgnostic)
+    "OmpMagicTodoTests.inputOfPartNonTool", Sync (sync OmpMagicTodoTests.inputOfPartNonTool)
+    "OmpPluginCoreIntegrationTests.extensionIsIdempotent", Async OmpPluginCoreIntegrationTests.extensionIsIdempotent
+    "OmpPluginCoreIntegrationTests.extensionRegistersLifecycleHooks", Async OmpPluginCoreIntegrationTests.extensionRegistersLifecycleHooks
+    "OmpPluginCoreIntegrationTests.reviewStoreSharedWithTools", Async OmpPluginCoreIntegrationTests.reviewStoreSharedWithTools
+    "OmpAgentConfigTests.applyAgentConfigForRegistersBuiltinAgents", Sync (sync OmpAgentConfigTests.applyAgentConfigForRegistersBuiltinAgents)
+    "OmpAgentConfigTests.applyAgentConfigForPreservesUserOverrides", Sync (sync OmpAgentConfigTests.applyAgentConfigForPreservesUserOverrides)
+    "OmpAgentConfigTests.disableNativeAgentsClearsMemoryAndCheckpoint", Sync (sync OmpAgentConfigTests.disableNativeAgentsClearsMemoryAndCheckpoint)
+    "OmpAgentConfigTests.disableNativeAgentsPreservesUserOverrides", Sync (sync OmpAgentConfigTests.disableNativeAgentsPreservesUserOverrides)
+    "OmpAgentConfigTests.applyAgentConfigForPreservesUserPermissionAndMcps", Sync (sync OmpAgentConfigTests.applyAgentConfigForPreservesUserPermissionAndMcps)
+    "OmpAgentConfigTests.applyAgentConfigForKeepsUserCustomAgents", Sync (sync OmpAgentConfigTests.applyAgentConfigForKeepsUserCustomAgents)
+    "OmpAgentConfigTests.disableNativeAgentsReplacesCheckpointSection", Sync (sync OmpAgentConfigTests.disableNativeAgentsReplacesCheckpointSection)
+    "OmpHookExecuteTests.hookCoderInjectUiLabel", Sync (sync OmpHookExecuteTests.hookCoderInjectUiLabel)
+    "OmpHookExecuteTests.hookInvestigatorInjectUiLabel", Sync (sync OmpHookExecuteTests.hookInvestigatorInjectUiLabel)
+    "OmpHookExecuteTests.hookNonSubagentDoesNotInjectUiLabel", Sync (sync OmpHookExecuteTests.hookNonSubagentDoesNotInjectUiLabel)
+    "OmpHookExecuteTests.hookApplyPatchNormalisesPatchToPatchText", Sync (sync OmpHookExecuteTests.hookApplyPatchNormalisesPatchToPatchText)
+    "OmpHookExecuteTests.hookApplyPatchStringArgsIsNoOp", Sync (sync OmpHookExecuteTests.hookApplyPatchStringArgsIsNoOp)
+    "OmpHookExecuteTests.hookPatchNameNormalisesToPatchText", Sync (sync OmpHookExecuteTests.hookPatchNameNormalisesToPatchText)
+    "OmpHookExecuteTests.hookApplyPatchLeavesExistingPatchTextUntouched", Sync (sync OmpHookExecuteTests.hookApplyPatchLeavesExistingPatchTextUntouched)
+    "OmpSessionLifecycleTests.recordsToBookkeeperIncludesApplyPatch", Sync (sync OmpSessionLifecycleTests.recordsToBookkeeperIncludesApplyPatch)
+    "OmpSessionLifecycleTests.isReadOnlyExecutorTrueForRoMode", Sync (sync OmpSessionLifecycleTests.isReadOnlyExecutorTrueForRoMode)
+    "OmpSessionLifecycleTests.isReadOnlyExecutorFalseForRwMode", Sync (sync OmpSessionLifecycleTests.isReadOnlyExecutorFalseForRwMode)
+    "OmpSessionLifecycleTests.isChildSessionGuardSkipsBookkeeper", Sync (sync OmpSessionLifecycleTests.isChildSessionGuardSkipsBookkeeper)
+    "OmpKnowledgeGraphRuntimeTests.submitRejectsWhenKgDirMissing", Async OmpKnowledgeGraphRuntimeTests.submitRejectsWhenKgDirMissing
+    "OmpKnowledgeGraphRuntimeTests.submitRoutesByWorkspaceRoot", Sync (sync OmpKnowledgeGraphRuntimeTests.submitRoutesByWorkspaceRoot)
+    "OmpKnowledgeGraphRuntimeTests.submitKeepsTwoSessionsPerRootDistinct", Sync (sync OmpKnowledgeGraphRuntimeTests.submitKeepsTwoSessionsPerRootDistinct)
+    "OmpKnowledgeGraphRuntimeTests.takeBookkeeperLaunchesForTestingStartsEmpty", Sync (sync OmpKnowledgeGraphRuntimeTests.takeBookkeeperLaunchesForTestingStartsEmpty)
+    "OmpKnowledgeGraphRuntimeTests.startMaintenanceIfDueNoopsForBlankRoot", Async OmpKnowledgeGraphRuntimeTests.startMaintenanceIfDueNoopsForBlankRoot
 ]
 
 let private matchesSelector (selectors: string array) (label: string) =

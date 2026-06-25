@@ -35,8 +35,14 @@ let loopNudgePrompt =
     + "submit your detailed report and list of modified files for review\n"
     + "before finishing. Do not end the conversation without calling submit_review."
 
-let runnerNudgePrompt =
-    "A background runner task is still active. Call runner_wait to collect output or runner_abort to stop it before finishing."
+let runnerNudgePromptFor (host: Host) =
+    let waitTool, abortTool =
+        match host with
+        | Omp -> "executor_wait", "executor_abort"
+        | _ -> "runner_wait", "runner_abort"
+    $"A background runner task is still active. Call {waitTool} to collect output or {abortTool} to stop it before finishing."
+
+let runnerNudgePrompt = runnerNudgePromptFor opencode
 
 let managerSystemPromptFor (host: Host) =
     let todoLine =

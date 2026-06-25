@@ -156,6 +156,27 @@ let private submitReviewSpec: ToolSpec =
                "Defaults to true when omitted: record progress without starting a reviewer. Set to false to start the reviewer for final review. With-Review Mode stays active until a passing final review." ]
       requiredFields = [ "report"; "affectedFiles" ] }
 
+let private returnReviewerSpec: ToolSpec =
+    { name = "return_reviewer"
+      description = "Submit your review verdict."
+      paramDocs =
+        map
+            [ "verdict", "PASS to accept, REJECT to reject"
+              "feedback", "Detailed, actionable feedback when rejecting; omit when passing." ]
+      requiredFields = [ "verdict" ] }
+
+let private executorWaitSpec: ToolSpec =
+    { name = "executor_wait"
+      description = "Wait for background executor output."
+      paramDocs = map [ "ms", "Wait time in milliseconds." ]
+      requiredFields = [] }
+
+let private executorAbortSpec: ToolSpec =
+    { name = "executor_abort"
+      description = "Abort background executor task."
+      paramDocs = Map.empty
+      requiredFields = [] }
+
 let all: ToolSpec list =
     [ coderSpec
       investigatorSpec
@@ -168,7 +189,10 @@ let all: ToolSpec list =
       fuzzyGrepSpec
       websearchSpec
       webfetchSpec
-      submitReviewSpec ]
+      submitReviewSpec
+      returnReviewerSpec
+      executorWaitSpec
+      executorAbortSpec ] 
 
 let private byName: Map<string, ToolSpec> =
     all |> List.map (fun spec -> spec.name, spec) |> Map.ofList

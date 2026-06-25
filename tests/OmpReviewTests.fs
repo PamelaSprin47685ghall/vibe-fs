@@ -8,6 +8,7 @@ open VibeFs.Kernel.ReviewSession
 open VibeFs.Omp.ChildSession
 open VibeFs.Omp.PiResolve
 open VibeFs.Omp.Plugin
+open VibeFs.Omp.ReviewLoop
 open VibeFs.Omp.ReviewTools
 open VibeFs.Shell.ReviewRuntime
 open VibeFs.Shell.RunnerBackground

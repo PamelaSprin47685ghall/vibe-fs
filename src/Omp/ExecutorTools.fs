@@ -15,35 +15,23 @@ module Dyn = VibeFs.Shell.Dyn
 open VibeFs.Shell.Executor
 open VibeFs.Shell.RunnerBackground
 open VibeFs.Shell.SessionExecutor
+open VibeFs.Shell.SubagentIo
+
+[<Global("Buffer")>]
+let private nodeBuffer : obj = jsNative
+let private byteLength (s: string) : int = nodeBuffer?byteLength(s, "utf-8")
 
 let executorMaxWaitMs = 60_000
 let executorMinWaitMs = 500
 
-let private raceWithAbortSignal (signal: obj) (onAbort: unit -> unit) (work: JS.Promise<'T>) : JS.Promise<'T> =
-    if Dyn.isNullish signal then work
-    else
-        promise {
-            let abortPromise =
-                Promise.create (fun _resolve reject ->
-                    let fire () =
-                        try onAbort () with _ -> ()
-                        reject (emitJsExpr () "Object.assign(new Error('Aborted'), { name: 'AbortError' })")
-                    if Dyn.truthy (Dyn.get signal "aborted") then fire ()
-                    else
-                        try signal?addEventListener("abort", box fire)
-                        with _ -> ())
-            return! Promise.race [ work; abortPromise ]
-        }
-
 let registerExecutorTools (pi: obj) : unit =
     let tb = Dyn.get pi "typebox"
-    let desc = VibeFs.Kernel.ToolCatalog.description "executor"
 
     pi?registerTool(
         createObj [
             "name", box "executor"
             "label", box "Executor"
-            "description", box desc
+            "description", box (description "executor")
             "parameters", executorParameters tb
             "execute",
                 box(fun (_id: string) (params': obj) (signal: obj) (_onUpdate: obj) (ctx: obj) ->
@@ -54,6 +42,10 @@ let registerExecutorTools (pi: obj) : unit =
                             if l = "" then "shell" else l
                         let program = Dyn.str params' "program"
                         let what = Dyn.str params' "what_to_summarize"
+                        let timeoutType = parseTimeout (Dyn.str params' "timeout_type")
+                        let mode =
+                            let m = Dyn.str params' "mode"
+                            if m = "" then "rw" else m
                         let deps =
                             let d = Dyn.get params' "dependencies"
                             if Dyn.isNullish d || not (Dyn.isArray d) then []
@@ -91,8 +83,8 @@ let registerExecutorTools (pi: obj) : unit =
                                     { program = program
                                       language = parseLanguage lang
                                       dependencies = deps
-                                      timeoutType = LastResort
-                                      mode = "rw"
+                                      timeoutType = timeoutType
+                                      mode = mode
                                       cwd = Some (Dyn.str ctx "cwd") }
                                 let runWork =
                                     enqueuePerSession childId (fun () ->
@@ -108,14 +100,18 @@ let registerExecutorTools (pi: obj) : unit =
                                     if childId <> "" then abortExecutorRun childId
                                 let! result = raceWithAbortSignal signal onSignalAbort runWork
                                 let output = outputFromResult result
-                                let summaryPrompt =
-                                    executorSummarizerPrompt what output lang program deps "omp-runner" "rw"
-                                do! childSession?prompt(summaryPrompt) |> unbox<JS.Promise<unit>>
-                                do! childSession?waitForIdle() |> unbox<JS.Promise<unit>>
-                                let sm = Dyn.get childSession "sessionManager"
-                                let text = readAssistantText sm 0 "\n\n" |> Option.defaultValue "(no output)"
-                                finishJob ()
-                                return textResult text
+                                if not (shouldSummarize byteLength output) then
+                                    finishJob ()
+                                    return textResult output
+                                else
+                                    let summaryPrompt =
+                                        executorSummarizerPrompt what output lang program deps "executor" mode
+                                    do! childSession?prompt(summaryPrompt) |> unbox<JS.Promise<unit>>
+                                    do! childSession?waitForIdle() |> unbox<JS.Promise<unit>>
+                                    let sm = Dyn.get childSession "sessionManager"
+                                    let text = readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
+                                    finishJob ()
+                                    return textResult text
                         with ex ->
                             finishJob ()
                             if hasErrorName ex "AbortError" then return textResult "Executor aborted."
@@ -127,7 +123,7 @@ let registerExecutorTools (pi: obj) : unit =
         createObj [
             "name", box "executor_wait"
             "label", box "Executor Wait"
-            "description", box "Wait for background executor output."
+            "description", box (description "executor_wait")
             "defaultInactive", box true
             "parameters", objectOf [| ("ms", opt "Wait time in milliseconds." tb num) |] tb
             "execute",
@@ -147,7 +143,7 @@ let registerExecutorTools (pi: obj) : unit =
         createObj [
             "name", box "executor_abort"
             "label", box "Executor Abort"
-            "description", box "Abort background executor task."
+            "description", box (description "executor_abort")
             "defaultInactive", box true
             "parameters", objectOf [||] tb
             "execute",

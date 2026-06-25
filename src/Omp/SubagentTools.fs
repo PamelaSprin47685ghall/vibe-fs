@@ -32,7 +32,7 @@ let registerSubagentTools (pi: obj) : unit =
                         | Error message -> return errorResult message
                         | Ok intents ->
                             try
-                                let prompts = formatPrompt opencode (Coder intents)
+                                let prompts = formatPrompt omp (Coder intents)
                                 let! reports =
                                     prompts
                                     |> List.map (fun prompt -> runSubagent pi ctx coderChildTools prompt (Some signal))
@@ -55,7 +55,7 @@ let registerSubagentTools (pi: obj) : unit =
                         | Error message -> return errorResult message
                         | Ok intents ->
                             try
-                                let prompts = formatPrompt opencode (Investigator intents)
+                                let prompts = formatPrompt omp (Investigator intents)
                                 let! reports =
                                     prompts
                                     |> List.map (fun prompt -> runSubagent pi ctx investigatorChildTools prompt (Some signal))
@@ -88,7 +88,7 @@ let registerSubagentTools (pi: obj) : unit =
                                     (List.toArray readResults)
                                 |> Array.toList
                             let intent = Dyn.str params' "intent"
-                            let prompt = formatPrompt opencode (Meditator(intent, sections)) |> List.head
+                            let prompt = formatPrompt omp (Meditator(intent, sections)) |> List.head
                             let! text = runSubagent pi ctx [||] prompt (Some signal)
                             return textResult text
                         with ex -> return asErrorResult ex
@@ -113,7 +113,7 @@ let registerSubagentTools (pi: obj) : unit =
                                 return errorResult "Built-in browser tool is unavailable in this session."
                             else
                                 let intent = Dyn.str params' "intent"
-                                let prompt = formatPrompt opencode (Browser intent) |> List.head
+                                let prompt = formatPrompt omp (Browser intent) |> List.head
                                 let! text = runSubagent pi ctx [| "browser" |] prompt (Some signal)
                                 return textResult text
                         with ex -> return asErrorResult ex

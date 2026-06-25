@@ -7,7 +7,7 @@ let mainSessionStripsChildOnlyAndBash () =
     let active =
         [| "read"; "edit"; "write"; "find"; "fuzzy_find"; "fuzzy_grep"; "lsp"; "browser"; "search"; "glob"
            "bash"; "coder"; "investigator"; "meditator"; "browser"; "executor"; "executor_wait"; "executor_abort"
-           "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "todowrite"; "todo_read" |]
+           "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "todowrite" |]
     let filtered = filterOmpMainSessionActiveTools active
     let set = Set.ofArray filtered
     check "keeps read" (set.Contains "read")

@@ -24,6 +24,7 @@ let private withReportTail (host: Host) (body: string) : string =
     match host with
     | Opencode -> body
     | Mimocode -> body + agentReportTail
+    | Omp -> body
 
 /// Produce one prompt per parallel intent for coder/investigator, exactly one
 /// prompt for the singleton task kinds.  Host decides whether to append the

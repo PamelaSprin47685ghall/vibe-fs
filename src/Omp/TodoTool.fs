@@ -34,7 +34,7 @@ let registerTodoTool (pi: obj) : unit =
         createObj [
             "name", box "todowrite"
             "label", box "Todo Write"
-            "description", box (toolDescriptionFor opencode)
+            "description", box (toolDescriptionFor omp)
             "parameters", todowriteParameters tb
             "execute",
                 box(fun (_id: string) (params': obj) (_s: obj) (_u: obj) (_ctx: obj) ->

@@ -9,15 +9,14 @@ open VibeFs.Kernel.WebFetchGuard
 let private mainSessionActive =
     [| "read"; "edit"; "write"; "find"; "fuzzy_find"; "fuzzy_grep"; "lsp"; "browser"; "search"; "glob"
        "ast_edit"; "ast_grep"; "bash"; "coder"; "investigator"; "meditator"; "executor"; "executor_wait"
-       "executor_abort"; "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "todowrite"
-       "todo_read" |]
+       "executor_abort"; "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "todowrite" |]
 
 let filterOmpMainSessionTools () =
     let filtered = filterOmpMainSessionActiveTools mainSessionActive
     let set = Set.ofArray filtered
     for name in
         [| "read"; "coder"; "investigator"; "meditator"; "executor"; "submit_review"; "websearch"; "webfetch"
-           "todowrite"; "todo_read" |] do
+           "todowrite" |] do
         check ("main keeps " + name) (set.Contains name)
     for name in
         [| "find"; "edit"; "write"; "lsp"; "fuzzy_find"; "fuzzy_grep"; "executor_wait"; "executor_abort"

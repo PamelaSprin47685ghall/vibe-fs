@@ -1,28 +1,17 @@
-module VibeFs.Opencode.AgentConfig
+module VibeFs.Omp.AgentConfig
 
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel
-open VibeFs.Shell
-
-open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Config
+open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.PromptFragments
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Shell.Dyn
-
-[<Global("process")>]
-let private nodeProcess : obj = jsNative
-
-let envVar (name: string) : string =
-    let v = nodeProcess?env?(name)
-    if isNull v then "" else string v
+module Dyn = VibeFs.Shell.Dyn
 
 let emptyObj () : obj = createObj []
 let setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
-let assignInto (target: obj) (source: obj) : obj = Dyn.assignInto target source
-
-let private emptyMcps : obj = [||] :> obj
 
 type private BuiltinAgentSpec =
     { name: string
@@ -30,10 +19,8 @@ type private BuiltinAgentSpec =
       systemPrompt: string
       defaultMcps: string array }
 
-let private defaultPrimaryAliases = Set [ "manager"; "build"; "plan" ]
-
-let private builtinAgentSpecs =
-    [ { name = "manager"; defaultMode = "primary"; systemPrompt = managerSystemPrompt; defaultMcps = [||] }
+let private ompBuiltinAgentSpecs =
+    [ { name = "manager"; defaultMode = "primary"; systemPrompt = managerSystemPromptFor omp; defaultMcps = [||] }
       { name = "build"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
       { name = "plan"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
       { name = "coder"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
@@ -44,51 +31,51 @@ let private builtinAgentSpecs =
       { name = "browser"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [| "stealth-browser-mcp" |] }
       { name = "executor"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] } ]
 
-let private tryFindBuiltinAgent name =
-    builtinAgentSpecs |> List.tryFind (fun spec -> spec.name = name)
-
 let private mergeObj (a: obj) (b: obj) : obj =
     let result = emptyObj ()
     Dyn.assignInto result a |> ignore
     Dyn.assignInto result b |> ignore
     result
 
-let private mapToolNames (host: Host) (f: string -> 'a) : obj =
-    allToolNames host
+let private mapToolNames (f: string -> 'a) : obj =
+    allToolNames omp
     |> Seq.map (fun name -> name, box (f name))
     |> createObj
 
-let private toolDefaultsFor (host: Host) (agentName: string) : obj =
-    mapToolNames host (canUseForHost host agentName)
+let private toolDefaultsFor (agentName: string) : obj =
+    mapToolNames (fun name -> canUseForHost omp agentName name)
 
-let private permissionDefaultsFor (host: Host) (agentName: string) : obj =
-    mapToolNames host (fun name -> if canUseForHost host agentName name then "allow" else "deny")
+let private permissionDefaultsFor (agentName: string) : obj =
+    mapToolNames (fun name -> if canUseForHost omp agentName name then "allow" else "deny")
 
-let private withRoleDefaultsFor (host: Host) (name: string) (userAgent: obj) : obj =
-    let spec = tryFindBuiltinAgent name
+let private primaryAliases = Set [ "manager"; "build"; "plan" ]
+
+let private withRoleDefaultsFor (name: string) (userAgent: obj) : obj =
+    let spec = ompBuiltinAgentSpecs |> List.tryFind (fun s -> s.name = name)
     let userPrompt = Dyn.str userAgent "prompt"
     let prompt =
-        if userPrompt <> "" then userPrompt
-        else spec |> Option.map (fun value -> value.systemPrompt) |> Option.defaultValue ""
+        if userPrompt <> ""
+        then userPrompt
+        else spec |> Option.map (fun s -> s.systemPrompt) |> Option.defaultValue ""
     let userMode = Dyn.str userAgent "mode"
     let mode =
-        if userMode <> "" then userMode
-        else spec |> Option.map (fun value -> value.defaultMode) |> Option.defaultValue "subagent"
-    let primaryDefaultMode = if defaultPrimaryAliases |> Set.contains name then "primary" else "subagent"
+        if userMode <> ""
+        then userMode
+        else spec |> Option.map (fun s -> s.defaultMode) |> Option.defaultValue "subagent"
+    let primaryDefaultMode = if primaryAliases |> Set.contains name then "primary" else "subagent"
     let effectiveMode = if mode <> "" then mode else primaryDefaultMode
     let userPerm = Dyn.get userAgent "permission"
     let userTools = Dyn.get userAgent "tools"
     let userMcps = Dyn.get userAgent "mcps"
+    let emptyJsArray : obj = [||] :> obj
     let mcps =
         if Dyn.isNullish userMcps then
             spec
-            |> Option.map (fun value -> if value.defaultMcps.Length = 0 then emptyMcps else box value.defaultMcps)
-            |> Option.defaultValue emptyMcps
-        else
-            userMcps
-
-    let perm = mergeObj (permissionDefaultsFor host name) userPerm
-    let tools = mergeObj (toolDefaultsFor host name) userTools
+            |> Option.map (fun s -> if s.defaultMcps.Length = 0 then emptyJsArray else box s.defaultMcps)
+            |> Option.defaultValue emptyJsArray
+        else userMcps
+    let perm = mergeObj (permissionDefaultsFor name) userPerm
+    let tools = mergeObj (toolDefaultsFor name) userTools
     let result = mergeObj (emptyObj ()) userAgent
     setKey result "prompt" (box prompt)
     setKey result "mode" (box effectiveMode)
@@ -96,8 +83,6 @@ let private withRoleDefaultsFor (host: Host) (name: string) (userAgent: obj) : o
     setKey result "tools" tools
     setKey result "mcps" mcps
     result
-
-let private emptyJsArray : obj = [||] :> obj
 
 let private zeroedPushCaps : obj =
     createObj [
@@ -113,16 +98,9 @@ let private zeroedPushCaps : obj =
         "open_notes", box 0
     ]
 
-let private nativeAgentDisableOverrides : obj =
-    createObj [
-        "dream", box {| disable = true |}
-        "distill", box {| disable = true |}
-        "checkpoint-writer", box {| disable = true |}
-    ]
-
 let private disabledCheckpointSection : obj =
     createObj [
-        "thresholds", box emptyJsArray
+        "thresholds", box ([||] :> obj)
         "push_caps", box zeroedPushCaps
         "memory_reconcile_on_search", box false
     ]
@@ -135,25 +113,9 @@ let private injectAgentDisables (agents: obj) : unit =
     for name in [|"dream"; "distill"; "checkpoint-writer"|] do
         let ua = Dyn.get agents name
         if Dyn.isNullish ua then setKey agents name (createObj [ "disable", box true ])
-        elif Dyn.isNullish (Dyn.get ua "disable") then
-            ua?disable <- box true
+        elif Dyn.isNullish (Dyn.get ua "disable") then ua?disable <- box true
 
-let private disableMimoWorkflowToolsForAgents (agentMap: obj) : obj =
-    for name in Dyn.keys agentMap do
-        let agent = Dyn.get agentMap name
-        let agentObj = if Dyn.isNullish agent then emptyObj () else agent
-        let permissions =
-            let current = Dyn.get agentObj "permission"
-            mergeObj (if Dyn.isNullish current then emptyObj () else current) (createObj [ "workflow", box "deny" ])
-        let tools =
-            let current = Dyn.get agentObj "tools"
-            mergeObj (if Dyn.isNullish current then emptyObj () else current) (createObj [ "workflow", box false ])
-        setKey agentObj "permission" permissions
-        setKey agentObj "tools" tools
-        setKey agentMap name agentObj
-    agentMap
-
-let disableMimoMemoryAndCheckpoint (cfg: obj) : obj =
+let disableNativeAgents (cfg: obj) : obj =
     let existingAgent = Dyn.get cfg "agent"
     let agentMap = if Dyn.isNullish existingAgent then emptyObj () else existingAgent
     injectAgentDisables agentMap
@@ -166,23 +128,17 @@ let disableMimoMemoryAndCheckpoint (cfg: obj) : obj =
             "memory", box disabledMemorySection
         ]))
 
-let applyAgentConfigFor (host: Host) (opencodeConfig: obj) (mcps: obj) : obj =
-    let prepared = disableMimoMemoryAndCheckpoint opencodeConfig
+let applyAgentConfigFor (ompConfig: obj) : obj =
+    let prepared = disableNativeAgents ompConfig
     let userAgent = Dyn.get prepared "agent"
-    let configMcp = Dyn.get prepared "mcp"
-    let mergedMcp = if Dyn.isNullish configMcp then mcps else mergeObj configMcp mcps
     let agents = mergeObj userAgent (emptyObj ())
-    for name in builtinAgentSpecs |> List.map (fun spec -> spec.name) do
+    for name in ompBuiltinAgentSpecs |> List.map (fun s -> s.name) do
         if Dyn.isNullish (Dyn.get agents name) then setKey agents name (emptyObj ())
     let finalAgents =
         Dyn.keys agents
         |> Seq.map (fun name ->
             let ua = Dyn.get agents name
             let uaObj = if Dyn.isNullish ua then emptyObj () else ua
-            name, withRoleDefaultsFor host name uaObj)
+            name, withRoleDefaultsFor name uaObj)
         |> createObj
-        |> fun builtAgents ->
-            match host with
-            | Mimocode -> disableMimoWorkflowToolsForAgents builtAgents
-            | _ -> builtAgents
-    mergeObj prepared (box {| agent = finalAgents; mcp = mergedMcp |})
+    mergeObj prepared (box {| agent = finalAgents |})

@@ -6,9 +6,29 @@ open VibeFs.Omp.Codec
 open VibeFs.Omp.MessagingCodec
 open VibeFs.Omp.PiResolve
 open VibeFs.Shell.Dyn
+open VibeFs.Shell.SubagentIo
 module Dyn = VibeFs.Shell.Dyn
 
 type ChildSession = { session: obj; dispose: (unit -> unit) option }
+
+/// Process-scoped registry of child session ids whose tool calls must not feed
+/// the bookkeeper. Mirrors `Shell.ChildAgentRegistry` semantics but kept local
+/// to Omp: `tool_result` only sees the host ctx, and matching the parent
+/// session id against this set is enough to suppress child-agent noise without
+/// requiring a full Kernel.Domain state machine on the hot path.
+let mutable private childSessionIds : Set<string> = Set.empty
+
+let markChildSession (id: string) =
+    if id <> "" then childSessionIds <- Set.add id childSessionIds
+
+let unmarkChildSession (id: string) =
+    if id <> "" then childSessionIds <- Set.remove id childSessionIds
+
+let isChildSession (id: string) : bool =
+    id <> "" && Set.contains id childSessionIds
+
+let clearChildSessionsForTest () : unit =
+    childSessionIds <- Set.empty
 
 let private callOpt (ctx: obj) (key: string) : obj =
     let g = Dyn.get ctx key
@@ -44,9 +64,20 @@ let createChildSession (pi: obj) (ctx: obj) (toolNames: string array) (systemPro
             ]
         let! wrapper = createAgentSession(body)
         let session = Dyn.get wrapper "session"
+        let childId =
+            let childCtx = createObj [ "sessionManager", Dyn.get session "sessionManager" ]
+            getSessionIdFromContext childCtx |> Option.defaultValue ""
+        if childId <> "" then markChildSession childId
         let dispose =
             let d = Dyn.get wrapper "dispose"
-            if Dyn.typeIs d "function" then Some (fun () -> Dyn.call0 d |> ignore) else None
+            if Dyn.typeIs d "function" then
+                let wrapped () =
+                    try
+                        Dyn.call0 d |> ignore
+                    finally
+                        unmarkChildSession childId
+                Some wrapped
+            else None
         return { session = session; dispose = dispose }
     }
 
@@ -62,24 +93,13 @@ let runSubagent (pi: obj) (ctx: obj) (toolNames: string array) (prompt: string) 
                 do! promptFn(prompt)
                 do! waitFn()
                 let sm = Dyn.get session "sessionManager"
-                return readAssistantText sm 0 "\n\n" |> Option.defaultValue "(no output)"
+                return readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
             }
-        let abortErr = createAbortError ()
-        let rejectAbort () = emitJsExpr abortErr "Promise.reject($0)" |> unbox<JS.Promise<string>>
-        let! text =
-            match signal with
-            | None -> run
-            | Some s when Dyn.truthy (Dyn.get s "aborted") -> rejectAbort ()
-            | Some s ->
-                let abortP =
-                    Promise.create (fun _resolve reject ->
-                        s?addEventListener(
-                            "abort",
-                            (fun _ -> reject (System.Exception "Aborted")),
-                            createObj [ "once", box true ]))
-                Promise.race [ run; abortP ]
-        let abort = Dyn.get session "abort"
-        if Dyn.typeIs abort "function" then Dyn.call0 abort |> ignore
-        child.dispose |> Option.iter (fun dispose -> dispose ())
+        let cleanup () =
+            let abort = Dyn.get session "abort"
+            if Dyn.typeIs abort "function" then Dyn.call0 abort |> ignore
+            child.dispose |> Option.iter (fun dispose -> dispose ())
+        let! text = raceWithAbortSignal (Option.defaultValue (box null) signal) cleanup run
+        cleanup ()
         return text
     }

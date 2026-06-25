@@ -49,7 +49,10 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
             let! _ = raceWithTimeout (f ()) "TIMEOUT" 1000
             timings.Add(label, now () - start)
         with ex ->
-            let msg = string ex.Message
+            let msg =
+                match ex with
+                | :? System.Exception as e -> string e.Message
+                | _ -> string ex
             if msg.Contains "TIMEOUT" then
                 failed <- failed + 1
                 failures.Add(label + " [TIMEOUT>1s]")

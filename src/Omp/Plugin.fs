@@ -1,16 +1,17 @@
 module VibeFs.Omp.Plugin
 
-open Fable.Core.JsInterop
 open Fable.Core
+open Fable.Core.JsInterop
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Omp.MessageTransform
 open VibeFs.Omp.MessagingCodec
 open VibeFs.Omp.PruneGuard
 open VibeFs.Omp.ReviewTools
-open VibeFs.Omp.SessionLifecycle
-open VibeFs.Omp.OmpTestHooks
 open VibeFs.Omp.PiResolve
+open VibeFs.Omp.KnowledgeGraphRuntime
+open VibeFs.Omp.MessageTransform
+open VibeFs.Omp.OmpTestHooks
+open VibeFs.Omp.PluginCore
 open VibeFs.Omp.Tools
 
 open VibeFs.Shell.OllamaClient
@@ -22,21 +23,6 @@ open VibeFs.Shell.TreeSitterShell
 
 let private registered: obj = emitJsExpr () "new WeakSet()"
 
-let reviewStore = createReviewStore ()
-
-[<ExportDefault>]
-let kunweiExtension (pi: obj) : JS.Promise<unit> =
-    if registered?has(pi) then
-        emitJsExpr () "Promise.resolve()" |> unbox<JS.Promise<unit>>
-    else
-        promise {
-            registered?add(pi) |> ignore
-            registerAllTools pi reviewStore
-            registerInputHandler pi reviewStore
-            registerSessionLifecycle pi reviewStore
-            do! patchDisablePrune ()
-        }
-
 let private supportsSyntaxDiagnosticsTool (toolName: string) : JS.Promise<bool> =
     promise { return isFileEditTool toolName }
 
@@ -46,6 +32,22 @@ let resetOmpPluginTestState () : unit =
     resetRunnerJobsForTesting ()
     resetFuzzyState ()
     resetSessionExecutorForTesting ()
+    resetOmpToolsTestState ()
+
+/// Public test-visible `reviewStore` handle. Backed by the same singleton
+/// `PluginCore.reviewStore` cell that the registered tools use, so tests
+/// that pre-activate a review see it through the tool path.
+let reviewStore : ReviewStore = reviewStore
+
+[<ExportDefault>]
+let kunweiExtension (pi: obj) : JS.Promise<unit> =
+    promise {
+        if registered?has(pi) then
+            ()
+        else
+            registered?add(pi) |> ignore
+            do! pluginFor pi
+    }
 
 let _test =
     createObj [
@@ -64,4 +66,8 @@ let _test =
         "stripHeadTailPipes", box strip
         "supportsSyntaxDiagnosticsTool", box supportsSyntaxDiagnosticsTool
         "reset", box resetOmpPluginTestState
+        "transformEntries",
+            box(fun (entries: obj array) (cwd: string) (sessionId: string) ->
+                let kgRuntime = OmpKnowledgeGraphRuntime(createObj [])
+                transformEntriesAsync reviewStore kgRuntime cwd sessionId (box entries))
     ]

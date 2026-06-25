@@ -33,7 +33,7 @@ let private createPiHarness () : PiHarness =
                 box
                     [| "read"; "edit"; "write"; "find"; "fuzzy_find"; "fuzzy_grep"; "lsp"; "browser"; "search"; "glob"
                        "bash"; "coder"; "investigator"; "meditator"; "executor"; "executor_wait"; "executor_abort"
-                       "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "todowrite"; "todo_read" |]
+                       "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "todowrite" |]
         ]
     { hookStore = hookStore; tools = tools; commands = commands; messages = messages }
 
@@ -133,7 +133,7 @@ let sessionStartStripsMainSessionTools () = promise {
     for name in ompSubagentToolNames do
         if not (childOnly.Contains name) then
             check ("session_start keeps " + name) (active.Contains name)
-    for name in [| "executor"; "submit_review"; "websearch"; "webfetch"; "todowrite"; "todo_read"; "read" |] do
+    for name in [| "executor"; "submit_review"; "websearch"; "webfetch"; "todowrite"; "read" |] do
         check ("session_start keeps " + name) (active.Contains name)
     for name in ompAlwaysStripToolNames do
         check ("session_start strips " + name) (not (active.Contains name))
@@ -262,7 +262,7 @@ let executorToolSchemaFourFields () = promise {
     let runner = h.tools |> Seq.find (fun t -> str t "name" = "executor")
     let parameters = Dyn.get runner "parameters"
     let properties = Dyn.get parameters "properties"
-    for field in [| "language"; "program"; "dependencies"; "what_to_summarize" |] do
+    for field in [| "language"; "program"; "dependencies"; "timeout_type"; "mode" |] do
         check ("runner schema has " + field) (Dyn.has properties field)
 }
 
@@ -318,3 +318,41 @@ let agentEndSkipsLoopNudgeWhenPendingMessages () = promise {
     do! invokeHandler h "agent_end" (createObj []) ctxEnd
     check "no loop reminder when pending" (h.messages.Count = countAfterLoop)
 }
+
+let private todoPhaseEntries () : obj array =
+    let task = createObj [ "status", box "pending" ]
+    let phase = createObj [ "tasks", box [| task |] ]
+    let entry =
+        createObj [
+            "customType", box "todo-phases"
+            "content", box [| phase |]
+        ]
+    [| entry |]
+
+let agentEndTodoNudgeWhenOpenPhases () = promise {
+    resetPluginState ()
+    let h = createPiHarness ()
+    let pi = piObject h
+    do! kunweiExtension pi
+    let sm =
+        createObj [
+            "getSessionId", box(fun () -> box "session-todo")
+            "getEntries", box(fun () -> box (todoPhaseEntries ()))
+        ]
+    let ctxEnd =
+        createObj [
+            "sessionManager", box sm
+            "hasPendingMessages", box(fun () -> box false)
+        ]
+    do! invokeHandler h "agent_end" (createObj []) ctxEnd
+    equal "todo reminder type" "kunwei-todo-reminder" (lastMessageCustomType h)
+}
+
+let runnerNudgePromptUsesExecutorToolNames () =
+    let text = VibeFs.Omp.NudgeRuntime.runnerReminderContent ()
+    check "runner nudge names executor_wait" (text.Contains "executor_wait")
+    check "runner nudge names executor_abort" (text.Contains "executor_abort")
+    check "runner nudge avoids legacy runner_wait" (not (text.Contains "runner_wait"))
+
+
+
