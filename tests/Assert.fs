@@ -44,7 +44,7 @@ let timed (label: string) (f: unit -> unit) : unit =
 let asyncSpecTimeoutMs = 1000
 
 /// Suite-level async ceiling: one `*.run` that sequences many sub-specs must not
-/// inherit the 1s per-spec budget (e.g. IntegrationToolTests ~110 cases ≈ 1s+ total).
+/// inherit the 1s per-spec budget (e.g. other Integration*.run suites).
 let asyncSuiteTimeoutMs = 120_000
 
 /// Time an asynchronous test body with a 1s hard timeout; return a unit promise.

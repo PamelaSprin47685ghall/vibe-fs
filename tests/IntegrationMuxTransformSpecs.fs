@@ -75,7 +75,7 @@ let muxSummarizationToolPolicySpec () =
         check $"summary child strips {removed}" (Set.contains removed disabled)
 
 let muxMessagesTransformDedupsRepeatedReadSpec () = promise {
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let tf = muxMessageTransform reg
     if isNullish tf then
         check "mux messagesTransform exposed for read dedup" false
@@ -98,7 +98,7 @@ let muxMessagesTransformDedupsRepeatedReadSpec () = promise {
 }
 
 let muxMessagesTransformDedupsRepeatedFileReadSpec () = promise {
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let tf = muxMessageTransform reg
     if isNullish tf then
         check "mux messagesTransform exposed for file_read dedup" false
@@ -122,7 +122,7 @@ let muxMessagesTransformDedupsRepeatedFileReadSpec () = promise {
 }
 
 let muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec () = promise {
-    let reg = createRegistration (minimalMuxDeps ())
+    let reg = sharedMuxRegistration ()
     let tf = muxMessageTransform reg
     if isNullish tf then
         check "mux messagesTransform exposed for top-level exec read dedup" false
@@ -145,7 +145,7 @@ let muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec () = promise {
 }
 
 let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () = promise {
-    let reg = createRegistration (minimalMuxDeps ())
+    let reg = sharedMuxRegistration ()
     let tf = muxMessageTransform reg
     let sessionID = "mux-review-accepted-history"
     muxActivateReviewForTest reg sessionID "Ship feature"

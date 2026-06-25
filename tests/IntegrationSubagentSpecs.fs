@@ -108,7 +108,7 @@ let investigatorToolLateClientInjectionSpec () = promise {
 }
 
 let muxCoderInvalidIntentsSpec () = promise {
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let tools = unbox<obj[]> (get reg "tools")
     let coder = tools |> Array.find (fun t -> str t "name" = "coder")
     let execute = get coder "execute"

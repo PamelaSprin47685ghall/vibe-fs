@@ -19,7 +19,7 @@ let muxReturnBookkeeperAppendSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-kg-submit-"
     do! ensureKnowledgeGraphDir workspaceDir
     do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目"; "插件入口"] "Old answer" ]
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let submitTool = muxToolByName reg "return_bookkeeper"
     if isNullish submitTool then
         check "mux registration exposes return_bookkeeper tool" false
@@ -28,7 +28,7 @@ let muxReturnBookkeeperAppendSpec () = promise {
         if isNullish runtime then
             check "mux registration exposes knowledge graph runtime for testing" false
         else
-            let today = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
+            let today = integrationKnowledgeGraphToday
             registerMuxKnowledgeGraphJobForTest reg "mux-kg-job" workspaceDir "append" (createObj [ "today", box today ])
             let entries = [|
                 knowledgeGraphDraftEntry (Some "0a3f") ["项目"; "插件入口"] "Updated answer"
@@ -55,7 +55,7 @@ let muxReturnBookkeeperAppendSpec () = promise {
 let muxReturnBookkeeperNoActiveJobSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-kg-nojob-"
     do! ensureKnowledgeGraphDir workspaceDir
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let submitTool = muxToolByName reg "return_bookkeeper"
     if isNullish submitTool then
         check "mux registration exposes return_bookkeeper tool" false
@@ -96,8 +96,8 @@ let muxReturnBookkeeperAppendDoesNotTriggerMaintenanceSpec () = promise {
     do! ensureKnowledgeGraphDir workspaceDir
     do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-18") (DayHeader("2026-06-18", false)) [
         for i in 1 .. 10 do yield knowledgeGraphEntry (sprintf "%04x" i) [sprintf "积压问题 %d" i] "Candidate" ]
-    let today = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
-    let reg = createRegistration (minimalMuxDeps ())
+    let today = integrationKnowledgeGraphToday
+    let reg = sharedMuxRegistration ()
     registerMuxKnowledgeGraphJobForTest reg "mux-kg-launch-job" workspaceDir "append" (createObj [ "today", box today ])
     let submitTool = muxToolByName reg "return_bookkeeper"
     if isNullish submitTool then
@@ -124,7 +124,7 @@ let muxReturnBookkeeperRejectsSecondCallSpec () = promise {
     if isNullish submitTool then
         check "mux registration exposes return_bookkeeper tool for second call" false
     else
-        let today = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
+        let today = integrationKnowledgeGraphToday
         registerMuxKnowledgeGraphJobForTest reg sessionID workspaceDir "append" (createObj [ "today", box today ])
 
         // First submit: should succeed.

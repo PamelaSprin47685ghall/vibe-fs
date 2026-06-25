@@ -35,7 +35,7 @@ let computeCountSpec (reg: obj) =
 
 let muxMessageTransformRegisteredSpec () =
     promise {
-        let reg = createRegistration (minimalMuxDeps ())
+        let reg = sharedMuxRegistration ()
         let tf = muxMessageTransform reg
         check "mux registration exposes messagesTransform" (not (isNullish tf))
         check "mux messagesTransform is callable" (typeIs tf "function")
@@ -45,7 +45,7 @@ let muxKnowledgeGraphPreludeForManagerSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-kg-prelude-manager-"
     do! ensureKnowledgeGraphDir workspaceDir
     do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目"; "插件入口"] "Mux 主入口是 src/Mux/Plugin.fs。" ]
-    let reg = createRegistration (minimalMuxDeps ())
+    let reg = sharedMuxRegistration ()
     let tf = muxMessageTransform reg
     let originalMsg = muxTextMessage "msg-manager" "user" "go"
     let out = createObj [ "messages", box [| originalMsg |] ]
@@ -69,7 +69,7 @@ let muxKnowledgeGraphPreludeForCoderSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-kg-prelude-coder-"
     do! ensureKnowledgeGraphDir workspaceDir
     do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目"; "插件入口"] "Mux 主入口是 src/Mux/Plugin.fs。" ]
-    let reg = createRegistration (minimalMuxDeps ())
+    let reg = sharedMuxRegistration ()
     let tf = muxMessageTransform reg
     let originalMsg = muxTextMessage "msg-coder" "user" "go"
     let out = createObj [ "messages", box [| originalMsg |] ]
@@ -93,7 +93,7 @@ let muxNoKnowledgeGraphPreludeForExcludedAgentsSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-kg-prelude-excluded-"
     do! ensureKnowledgeGraphDir workspaceDir
     do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目"; "插件入口"] "Mux 主入口是 src/Mux/Plugin.fs。" ]
-    let reg = createRegistration (minimalMuxDeps ())
+    let reg = sharedMuxRegistration ()
     let tf = muxMessageTransform reg
     if isNullish tf then
         check "mux messagesTransform exposed for excluded agents" false
@@ -118,7 +118,7 @@ let muxCapsAndKnowledgeGraphPreludeOrderSpec () = promise {
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content"
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "AGENTS.md"))) "---\nimport:\n  - CAPS.md\n---\n"
     do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [ knowledgeGraphEntry "0a3f" ["项目"; "插件入口"] "Mux 主入口是 src/Mux/Plugin.fs。" ]
-    let reg = createRegistration (minimalMuxDeps ())
+    let reg = sharedMuxRegistration ()
     let tf = muxMessageTransform reg
     let originalMsg = muxTextMessage "msg-order" "user" "go"
     let out = createObj [ "messages", box [| originalMsg |] ]
@@ -145,7 +145,7 @@ let muxFetchKnowledgeGraphSnapshotSpec () = promise {
     do! writeKnowledgeGraphFileAsync (dayPath workspaceDir "2026-06-14") (DayHeader("2026-06-14", true)) [
         knowledgeGraphEntry "0a3f" entity "Old fact 1"
         knowledgeGraphEntry "b912" entity "Old fact 2" ]
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let fetchTool = muxToolByName reg "knowledge_graph_fetch"
     if isNullish fetchTool then
         check "mux registration exposes knowledge_graph_fetch tool" false

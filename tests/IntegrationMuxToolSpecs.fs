@@ -16,7 +16,7 @@ open VibeFs.Shell.Dyn
 
 
 let muxTodoWriteWrapperSchemaSpec () = promise {
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let wrappers = unbox<obj[]> (get reg "wrappers")
     let todoWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "todo_write")
     if isNullish todoWrapper then
@@ -41,7 +41,7 @@ let muxTodoWriteWrapperSchemaSpec () = promise {
 }
 
 let muxTodoWriteCapturesCompletedWorkReportSpec () = promise {
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let wrappers = unbox<obj[]> (get reg "wrappers")
     let todoWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "todo_write")
     if isNullish todoWrapper then
@@ -72,7 +72,7 @@ let muxTodoWriteCapturesCompletedWorkReportSpec () = promise {
 }
 
 let muxBacklogProjectionSpec () = promise {
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let tf = muxMessageTransform reg
     if isNullish tf then
         check "mux messagesTransform exposed for magic todo projection" false
@@ -109,7 +109,7 @@ let muxBacklogProjectionSpec () = promise {
 
 let muxExecutorRoCatPrependsWarningSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-executor-ro-warning-"
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let executor = muxToolByName reg "executor"
     if isNullish executor then
         check "mux registration exposes executor tool for ro warning" false
@@ -126,7 +126,7 @@ let muxMeditatorReadsFilesFromCwdSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-meditator-files-"
     let filePath = pathModule?join(workspaceDir, "note.md")
     do! writeFileAsync filePath "deep context"
-    let reg = createRegistration (minimalMuxDeps ())
+    let reg = sharedMuxRegistration ()
     let meditator = muxToolByName reg "meditator"
     if isNullish meditator then
         check "mux registration exposes meditator tool" false
@@ -155,7 +155,7 @@ let muxMeditatorReadsFilesFromCwdSpec () = promise {
 }
 
 let muxExecutorModeSchemaSpec () = promise {
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let modeSchema = muxExecutorModeSchema reg
     check "mux executor mode schema exists" (not (isNullish modeSchema))
     check "mux executor mode schema enum ro/rw" (enumValues modeSchema = [| "ro"; "rw" |])
@@ -169,7 +169,7 @@ let muxReadToolReturnsContentSpec () = promise {
     let filePath = pathModule?join(workspaceDir, "sample.txt")
     let fileContent = "line1\nline2\nline3\nline4\nline5"
     do! writeFileAsync filePath fileContent
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let wrappers = unbox<obj[]> (get reg "wrappers")
     let fileReadWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "file_read")
     if isNullish fileReadWrapper then
@@ -203,7 +203,7 @@ let muxReadToolReturnsContentSpec () = promise {
 let muxReadToolListsDirectoriesSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-read-directory-"
     do! writeFileAsync (pathModule?join(workspaceDir, "note.txt")) "alpha\nbeta"
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let wrappers = unbox<obj[]> (get reg "wrappers")
     let fileReadWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "file_read")
     if isNullish fileReadWrapper then

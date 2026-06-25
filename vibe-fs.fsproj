@@ -324,7 +324,7 @@
     <Compile Include="tests/IntegrationEventTests.fs" />
     <Compile Include="tests/IntegrationDedupOpenCodeSpecs.fs" />
     <Compile Include="tests/IntegrationDedupTests.fs" />
-    <Compile Include="tests/IntegrationToolTests.fs" />
+    <Compile Include="tests/IntegrationToolSpecCatalog.fs" />
     <Compile Include="tests/IntegrationChatTests.fs" />
     <Compile Include="tests/BacklogMessageBuilders.fs" />
     <Compile Include="tests/BacklogReplaySpecs.fs" />

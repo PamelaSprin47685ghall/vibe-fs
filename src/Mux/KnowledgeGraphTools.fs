@@ -35,6 +35,15 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
             state <- reducer state (UpdateLatestLaunchResultCmd (title, result)))
     let mutable latestConfig : obj option = None
 
+    let nowUtc =
+        match deps with
+        | Some d when not (Dyn.isNullish d) ->
+            let getNow = Dyn.get d "nowUtc"
+            if not (Dyn.isNullish getNow) && Dyn.typeIs getNow "function" then
+                fun () -> unbox<System.DateTime> (getNow $ null)
+            else fun () -> System.DateTime.UtcNow
+        | _ -> fun () -> System.DateTime.UtcNow
+
     let testPorts =
         createFromStateQueueSink
             (fun () -> state)
@@ -97,7 +106,7 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
             { WorkspaceRoot = workspaceRoot
               GetState = fun () -> state
               SetState = fun s -> state <- s
-              Now = fun () -> System.DateTime.UtcNow
+              Now = nowUtc
               TryLaunch =
                 fun date files projection ->
                     let _, launch = bookkeeperMaintenanceLaunch workspaceRoot date
@@ -144,7 +153,7 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
                     | None -> return "No active knowledge graph job for this session."
                     | Some ctx ->
                         let root = ctx.workspaceRoot
-                        let todayStr = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
+                        let todayStr = (nowUtc ()).ToString("yyyy-MM-dd")
                         let! result = writeQueue.Enqueue(fun () ->
                             promise {
                                 let! entriesResult = buildEntries root drafts

@@ -16,7 +16,7 @@ open VibeFs.Tests.ResolveAiSettingsTests
 open VibeFs.Tests.IntegrationPluginTests
 open VibeFs.Tests.IntegrationEventTests
 open VibeFs.Tests.IntegrationDedupTests
-open VibeFs.Tests.IntegrationToolTests
+open VibeFs.Tests.IntegrationToolSpecCatalog
 open VibeFs.Tests.IntegrationOpencodeReviewSpecs
 open VibeFs.Tests.IntegrationChatTests
 open VibeFs.Tests.WorkBacklogTests
@@ -98,7 +98,12 @@ type private TestBody =
 
 let private sync (f: unit -> 'a) : unit -> unit = fun () -> ignore (f ())
 
-let private tests : (string * TestBody) list = [
+let private integrationToolFlatTests : (string * TestBody) list =
+    integrationToolSpecs ()
+    |> List.map (fun (shortName, spec) -> "IntegrationTool." + shortName, Async spec)
+
+let private tests : (string * TestBody) list =
+    [
     "ReviewTests.transition'", Sync (sync ReviewTests.transition')
     "ReviewTests.registry", Sync (sync ReviewTests.registry)
     "ReviewTests.resultMapping", Sync (sync ReviewTests.resultMapping)
@@ -184,7 +189,6 @@ let private tests : (string * TestBody) list = [
     "IntegrationPluginTests.run", Async IntegrationPluginTests.run
     "IntegrationEventTests.run", Async IntegrationEventTests.run
     "IntegrationDedupTests.run", Async IntegrationDedupTests.run
-    "IntegrationToolTests.run", Async IntegrationToolTests.run
     "IntegrationOpencodeReviewSpecs.run", Async IntegrationOpencodeReviewSpecs.run
     "IntegrationChatTests.run", Async IntegrationChatTests.run
     "KnowledgeGraphTests.run", Async KnowledgeGraphTests.run
@@ -499,7 +503,8 @@ let private tests : (string * TestBody) list = [
     "OmpKnowledgeGraphRuntimeTests.submitKeepsTwoSessionsPerRootDistinct", Sync (sync OmpKnowledgeGraphRuntimeTests.submitKeepsTwoSessionsPerRootDistinct)
     "OmpKnowledgeGraphRuntimeTests.takeBookkeeperLaunchesForTestingStartsEmpty", Sync (sync OmpKnowledgeGraphRuntimeTests.takeBookkeeperLaunchesForTestingStartsEmpty)
     "OmpKnowledgeGraphRuntimeTests.startMaintenanceIfDueNoopsForBlankRoot", Async OmpKnowledgeGraphRuntimeTests.startMaintenanceIfDueNoopsForBlankRoot
-]
+    ]
+    @ integrationToolFlatTests
 
 let private matchesSelector (selectors: string array) (label: string) =
     selectors.Length = 0

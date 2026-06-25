@@ -12,7 +12,7 @@ open VibeFs.Mux.Plugin
 open VibeFs.Shell.Dyn
 
 let muxTodoWriteMethodologySchemaSpec () = promise {
-    let reg = createRegistration (minimalMuxDeps ())
+    let reg = sharedMuxRegistration ()
     let wrappers = unbox<obj[]> (get reg "wrappers")
     let todoWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "todo_write") |> Option.defaultValue null
     if isNullish todoWrapper then

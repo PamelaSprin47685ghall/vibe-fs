@@ -239,7 +239,7 @@ let knowledgeGraphPortLockTimeoutSpec () = promise {
         server?once("listening", System.Func<unit>(fun () -> resolve ())) |> ignore
         server?once("error", System.Func<obj, unit>(fun error -> reject (exn (string error)))) |> ignore
         server?listen(port, "127.0.0.1") |> ignore)
-    let knowledgeGraphRuntime = KnowledgeGraphRuntime(null, workspaceDir, (fun () -> System.DateTime.UtcNow), ChildAgentRegistry.Create(), 0L, 0)
+    let knowledgeGraphRuntime = KnowledgeGraphRuntime(null, workspaceDir, (fun () -> System.DateTime(2026, 6, 25)), ChildAgentRegistry.Create(), 0L, 0)
     let marker = renderJobMarker { workspaceRoot = workspaceDir; kind = AppendAfterWork }
     let sessionID = "kg-lock-session"
     let lockClient =
@@ -247,7 +247,7 @@ let knowledgeGraphPortLockTimeoutSpec () = promise {
             "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
                 (promise { return box {| data = [| userTextMessage sessionID marker |] |} })))
         ]) ]
-    let lockRuntime = KnowledgeGraphRuntime(lockClient, workspaceDir, (fun () -> System.DateTime.UtcNow), ChildAgentRegistry.Create(), 0L, 0)
+    let lockRuntime = KnowledgeGraphRuntime(lockClient, workspaceDir, (fun () -> System.DateTime(2026, 6, 25)), ChildAgentRegistry.Create(), 0L, 0)
     let submitAttempt = lockRuntime.SubmitFromHistory(sessionID, workspaceDir, [])
     let! result = submitAttempt
     check "knowledge graph port lock timeout surfaces explicit error" (result.Contains "Timed out acquiring knowledge graph port lock")

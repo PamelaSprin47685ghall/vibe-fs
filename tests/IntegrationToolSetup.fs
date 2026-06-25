@@ -3,6 +3,7 @@ module VibeFs.Tests.IntegrationToolSetup
 open Fable.Core
 open Fable.Core.JsInterop
 
+open VibeFs.Mux.Plugin
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraphCodec
 open VibeFs.Shell.KnowledgeGraphFiles
@@ -18,6 +19,27 @@ let private importMeta : obj = jsNative
 let requireFn : string -> obj = createRequire'(string importMeta?url)
 let fsAsync : obj = requireFn("fs")?promises
 let pathModule : obj = requireFn("path")
+
+/// Fixed calendar day for integration tests that append knowledge graph NDJSON (time-independent).
+let integrationKnowledgeGraphToday = "2026-06-25"
+
+let muxDepsWithFixedNow () : obj =
+    createObj
+        [ "loadConfigOrDefault", box (fun () -> createObj [])
+          "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
+          "resolveAgentFrontmatter",
+          box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
+          "nowUtc", box (System.Func<unit, System.DateTime>(fun () -> System.DateTime(2026, 6, 25))) ]
+
+let mutable cachedMuxRegistration : obj option = None
+
+let sharedMuxRegistration () : obj =
+    match cachedMuxRegistration with
+    | Some reg -> reg
+    | None ->
+        let reg = createRegistration (muxDepsWithFixedNow ())
+        cachedMuxRegistration <- Some reg
+        reg
 
 let unlinkAsync (p: string) : JS.Promise<unit> =
     unbox (fsAsync?unlink(p))

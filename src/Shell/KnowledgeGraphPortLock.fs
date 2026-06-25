@@ -31,24 +31,25 @@ let private closeServer (server: obj) : JS.Promise<unit> =
             server?close(closeHandler) |> ignore
         with _ -> resolve ())
 
-let rec private acquireLoopUntil (port: int) (deadlineMs: int64) (retryDelayMs: int) : JS.Promise<Result<obj, string>> =
+let rec private acquireLoopUntil (port: int) (deadlineMs: int64) (retryDelayMs: int) (instantFail: bool) : JS.Promise<Result<obj, string>> =
     promise {
         try
             let! server = listenServer port
             return Ok server
         with _ ->
-            if System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() >= deadlineMs then
+            if instantFail || System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() >= deadlineMs then
                 return Error $"Timed out acquiring knowledge graph port lock on 127.0.0.1:{port}"
             else
-                do! Promise.sleep retryDelayMs
-                return! acquireLoopUntil port deadlineMs retryDelayMs
+                if retryDelayMs > 0 then do! Promise.sleep retryDelayMs
+                return! acquireLoopUntil port deadlineMs retryDelayMs instantFail
     }
 
 let withKnowledgeGraphPortLock (timeoutMs: int64) (retryDelayMs: int) (workspaceRoot: string) (work: unit -> JS.Promise<'a>) : JS.Promise<Result<'a, string>> =
     promise {
         let port = lockPortForPath workspaceRoot
-        let deadlineMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + timeoutMs
-        let! acquired = acquireLoopUntil port deadlineMs retryDelayMs
+        let instantFail = timeoutMs <= 0L
+        let deadlineMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + max timeoutMs 0L
+        let! acquired = acquireLoopUntil port deadlineMs retryDelayMs instantFail
         match acquired with
         | Error e -> return Error e
         | Ok server ->

@@ -13,7 +13,7 @@ open VibeFs.Shell.Dyn
 
 let muxSubmitReviewPromptFormatSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-prompt-"
-    let reg = createRegistration (minimalMuxDeps ())
+    let reg = sharedMuxRegistration ()
     let submitTool = muxToolByName reg "submit_review"
     if isNullish submitTool then
         check "mux registration exposes submit_review tool" false
@@ -39,7 +39,7 @@ let muxSubmitReviewPromptFormatSpec () = promise {
 
 let muxAgentReportWrapperFormatsVerdictSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-agent-report-wrapper-"
-    let reg = createRegistration (minimalMuxDeps ())
+    let reg = sharedMuxRegistration ()
     let wrappers = unbox<obj[]> (get reg "wrappers")
     let agentReportWrapper = wrappers |> Array.tryFind (fun w -> str w "targetTool" = "agent_report") |> Option.defaultValue null
     if isNullish agentReportWrapper then

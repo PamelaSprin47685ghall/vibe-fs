@@ -15,7 +15,7 @@ open VibeFs.Shell.Dyn
 
 let muxSubmitReviewNoActiveReviewSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-no-active-"
-    let reg = createRegistration (minimalMuxDeps ())
+    let reg = sharedMuxRegistration ()
     let submitTool = muxToolByName reg "submit_review"
     if isNullish submitTool then
         check "mux registration exposes submit_review tool" false
@@ -146,7 +146,7 @@ let muxSubmitReviewWipSkipsReviewerSpec () = promise {
 
 let muxExecutorFailureDoesNotBookkeepSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-executor-fail-"
-    let reg = createRegistration (createObj [])
+    let reg = sharedMuxRegistration ()
     let executor = muxToolByName reg "executor"
     if isNullish executor then
         check "mux registration exposes executor tool" false

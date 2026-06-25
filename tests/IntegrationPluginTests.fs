@@ -270,7 +270,7 @@ let run () : JS.Promise<unit> =
         let! p = plugin (box {| directory = workspaceDir |})
         pluginShape p
         do! systemTransformSpec p
-        let reg = createRegistration (createObj [])
+        let reg = VibeFs.Tests.IntegrationToolSetup.sharedMuxRegistration ()
         registrationShape reg
         topLevelExportsSpec ()
         do! syntaxSpec ()
