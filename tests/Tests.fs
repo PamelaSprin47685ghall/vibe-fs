@@ -58,6 +58,7 @@ let private tests : (string * TestBody) list = [
     "AgentNudgeSpecs.shouldSuppress'", Sync (sync AgentNudgeSpecs.shouldSuppress')
     "AgentNudgeSpecs.decideNudge'", Sync (sync AgentNudgeSpecs.decideNudge')
     "AgentNudgeSpecs.decodeLastAssistantNudge", Sync (sync AgentNudgeSpecs.decodeLastAssistantNudge)
+    "AgentNudgeSpecs.submitReviewWipNudgeDedup", Sync (sync AgentNudgeSpecs.submitReviewWipNudgeDedup)
     "AgentNudgeSpecs.decodeTodosOpenItems", Sync (sync AgentNudgeSpecs.decodeTodosOpenItems)
     "KernelTests.headTail'", Sync (sync KernelTests.headTail')
     "KernelTests.stripLexer'", Sync (sync KernelTests.stripLexer')

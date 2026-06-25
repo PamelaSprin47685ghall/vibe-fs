@@ -27,7 +27,11 @@ type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.Rev
             if isNudgePrompt text then state, ()
             else
                 let agentOpt = if agent <> "" then Some agent else None
-                resumeSession (rememberAgent state sid agentOpt) sid, ())
+                let nextState =
+                    state
+                    |> rememberAgent <| sid <| agentOpt
+                    |> resumeSession <| sid
+                nextState, ())
         resolvedUnitPromise ()
 
     member _.handleCommandExecuteBefore(input: obj) (_output: obj) : JS.Promise<unit> =
@@ -37,7 +41,9 @@ type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.Rev
 
     member _.handleToolExecuteAfter(input: obj) (output: obj) : JS.Promise<unit> =
         promise {
-            if normalizeToolName host (Dyn.str input "tool") = "todowrite" then
+            let sessionIDStr = Dyn.str input "sessionID"
+            let tool = normalizeToolName host (Dyn.str input "tool")
+            if tool = "todowrite" then
                 let methodologies =
                     let args = Dyn.get input "args"
                     let raw = if Dyn.isNullish args then null else Dyn.get args "select_methodology"
@@ -46,6 +52,10 @@ type NudgeHook(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.Rev
                 let out = Dyn.get output "output"
                 if not (Dyn.isNullish out) && Dyn.typeIs out "string" then
                     setOutput output (todoWriteOutput methodologies true)
+            elif tool = "submit_review" then
+                let out = Dyn.get output "output"
+                if not (Dyn.isNullish out) && Dyn.typeIs out "string" && isSubmitReviewWipProgressOutput (string out) then
+                    holder.Mutate(fun state -> resumeSession state sessionIDStr, ())
         }
 
     member _.handleEvent(input: obj) : JS.Promise<unit> =

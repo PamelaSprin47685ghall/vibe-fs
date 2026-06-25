@@ -8,6 +8,7 @@ open VibeFs.Tests.IntegrationMuxSetup
 open VibeFs.Tests.TempWorkspace
 
 open VibeFs.Kernel.PromptFragments
+open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Kernel.LoopMessages
 
@@ -102,6 +103,48 @@ let reviewerRejectRenudgesLoopSpec () = promise {
     do! hook $ (streamEnd "verdict: rejected\nfeedback: needs rework", helpers) |> unbox<JS.Promise<unit>>
     do! Promise.sleep 0
     check "reviewer reject reopens loop nudge on fresh assistant output" (nudges.Count = 2 && nudges.[1] = loopNudgePrompt)
+}
+
+let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () = promise {
+    let sessionID = "review-wip-nudge-ws"
+    let mutable history = [| muxTextMessage "review-wip-assistant-1" "assistant" "implemented first pass" |]
+    let reg =
+        createRegistration
+            (createObj [
+                "loadConfigOrDefault", box (fun () -> createObj [])
+                "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
+                "resolveAgentFrontmatter", box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
+                "getChatHistory", box (System.Func<string, JS.Promise<obj array>>(fun workspaceId -> promise { return if workspaceId = sessionID then history else [||] }))
+            ])
+    muxActivateReviewForTest reg sessionID "Implement feature X"
+    let nudges = ResizeArray<string>()
+    let mutable nudgeCount = 0
+    let helpers =
+        createObj [
+            "getTodos", box (System.Func<obj, JS.Promise<obj>>(fun _ -> promise { return box [||] }))
+            "nudge", box (System.Func<obj, obj, JS.Promise<bool>>(fun _ws msg ->
+                promise {
+                    nudges.Add(string msg)
+                    nudgeCount <- nudgeCount + 1
+                    history <- Array.append history [| muxTextMessage ($"review-wip-nudge-{nudgeCount}") "user" (string msg) |]
+                    return true
+                }))
+        ]
+    let hook = get reg "eventHook"
+    let streamEnd text =
+        createObj [ "type", box "stream-end"; "workspaceId", box sessionID
+                    "properties", box (createObj [ "parts", box [| box {| ``type`` = "text"; text = text |} |] ]) ]
+
+    do! hook $ (streamEnd "implemented first pass", helpers) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    check "active review emits first loop nudge" (nudges.Count = 1 && nudges.[0] = loopNudgePrompt)
+
+    history <-
+        Array.append history
+            [| muxDynamicToolMessage "review-wip-tool" "submit_review" "wip-call" (createObj []) (box submitReviewWipAcknowledgment) |]
+    do! hook $ (streamEnd "continued after wip report", helpers) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    check "wip submit_review does not permanently suppress loop nudge" (nudges.Count = 2 && nudges.[1] = loopNudgePrompt)
 }
 
 let syntaxWrapperSpec (reg: obj) = promise {
@@ -256,12 +299,58 @@ let reusedSessionSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let opencodeFreshChatMessageRearmsLoopNudgeSpec () = promise {
+    let sessionID = "opencode-fresh-chat-ws"
+    let promptCalls = ResizeArray<obj>()
+    let mutable messages : obj array = [||]
+    let mkClient () =
+        createObj [ "session", box (createObj [
+            "todo", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                (promise { return box {| data = [||] |} })))
+            "messages", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                (promise { return box {| data = messages |} })))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                (promise { promptCalls.Add(arg) })))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "opencode-fresh-chat-"
+    let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
+    let cmdHook = get p "command.execute.before"
+    let eventHook = get p "event"
+    let chatHook = get p "chat.message"
+    let cmdOut = createObj []
+    do! cmdHook $ (createObj [ "command", box "loop"; "sessionID", box sessionID; "arguments", box "Ship the fix" ], cmdOut) |> unbox<JS.Promise<unit>>
+    do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    let textOf i =
+        if promptCalls.Count <= i then ""
+        else
+            let body = get promptCalls.[i] "body"
+            getPartsText (get body "parts")
+    check "first with-review idle emits loop nudge" (promptCalls.Count = 1 && textOf 0 = loopNudgePrompt)
+
+    // chat.message arrives BEFORE session.messages refresh on the host.
+    do! chatHook $ (createObj [ "sessionID", box sessionID; "agent", box "manager" ],
+                    createObj [ "parts", box [| box {| ``type`` = "text"; text = "still working on it" |} |] ]) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    // host eventually catches up: history now contains the new assistant turn.
+    messages <- Array.append messages [|
+        box {| info = box {| role = "assistant"; agent = "manager"; finish = "stop"; time = box {| completed = 2 |} |}
+               parts = [| box {| ``type`` = "text"; text = "still working on it" |} |] |}
+    |]
+    do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    check "new assistant turn in history re-arms loop nudge on next idle"
+        (promptCalls.Count = 2 && textOf 1 = loopNudgePrompt)
+    do! rmAsync workspaceDir
+}
+
 let run () : JS.Promise<unit> =
     promise {
         let reg = createRegistration (createObj [])
         do! eventHookSpec reg
         do! repeatedTodoNudgeSpec ()
         do! reviewerRejectRenudgesLoopSpec ()
+        do! muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec ()
         do! syntaxWrapperSpec reg
         do! todoWriteWrapperSpec reg
         let! workspaceDir = mkdtempAsync "tool-execute-after-"
@@ -271,5 +360,6 @@ let run () : JS.Promise<unit> =
         do! abortedRetrySpec ()
         do! repeatedAssistantSpec ()
         do! opencodeLoopNudgeSpec ()
+        do! opencodeFreshChatMessageRearmsLoopNudgeSpec ()
         do! reusedSessionSpec ()
     }

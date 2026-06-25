@@ -43,6 +43,32 @@ let getPartsText (parts: obj) : string =
             else None)
         |> String.concat "\n"
 
+let private messageHasSubmitReviewWipProgress (message: obj) : bool =
+    let parts = Dyn.get message "parts"
+    if not (Dyn.isArray parts) then false
+    else
+        (parts :?> obj array)
+        |> Array.exists (fun part ->
+            Dyn.str part "type" = "tool"
+            && isSubmitReviewToolName (Dyn.str part "tool")
+            && (let state = Dyn.get part "state"
+                if Dyn.isNullish state then ""
+                else string (Dyn.get state "output"))
+               |> isSubmitReviewWipProgressOutput)
+
+let private messageIsUserNudgePrompt (message: obj) : bool =
+    let info = Dyn.get message "info"
+    Dyn.str info "role" = "user" && isNudgePrompt (getPartsText (Dyn.get message "parts"))
+
+let private alreadyNudgedAfterIndex (messages: obj array) (idx: int) : bool =
+    messages.[idx + 1 ..]
+    |> Array.fold
+        (fun nudged message ->
+            if messageHasSubmitReviewWipProgress message then false
+            elif messageIsUserNudgePrompt message then true
+            else nudged)
+        false
+
 let isCompletedAssistantMessage (info: obj) : bool =
     if Dyn.isNullish info then false
     else
@@ -87,9 +113,7 @@ let decodeLastAssistant (messagesData: obj) : string * string option * bool =
             let agentVal = Dyn.get info "agent"
             let agent = if Dyn.isNullish agentVal then None else Some (string agentVal)
             let text = getPartsText (Dyn.get msg "parts")
-            let alreadyNudged =
-                messagesArr.[idx + 1 ..]
-                |> Array.exists (fun m -> isNudgePrompt (getPartsText (Dyn.get m "parts")))
+            let alreadyNudged = alreadyNudgedAfterIndex messagesArr idx
             text, agent, alreadyNudged
         | None -> "", None, false
     else "", None, false

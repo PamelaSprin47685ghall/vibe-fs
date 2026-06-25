@@ -3,11 +3,16 @@ module VibeFs.Kernel.NudgeState
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.PromptFragments
 
+type FreshAssistantSnapshot =
+    { lastAssistantMessage: string
+      agentFromMessage: string option }
+
 type NudgeShellState =
     { nudgedSessions: Set<string>
       stoppedSessions: Set<string>
       retryPendingSessions: Set<string>
       sessionAgents: Map<string, string>
+      freshAssistantSnapshots: Map<string, FreshAssistantSnapshot>
       lastNudgedSession: string option }
 
 /// Snapshot of a session at the moment a nudge is considered. `alreadyNudged`
@@ -78,6 +83,7 @@ let emptyState =
       stoppedSessions = Set.empty
       retryPendingSessions = Set.empty
       sessionAgents = Map.empty
+      freshAssistantSnapshots = Map.empty
       lastNudgedSession = None }
 
 let private hasStoppedSession state sessionID = Set.contains sessionID state.stoppedSessions
@@ -97,6 +103,16 @@ let rememberAgent state sessionID agentOpt =
     | Some agent when agent <> "" -> { state with sessionAgents = Map.add sessionID agent state.sessionAgents }
     | _ -> state
 
+let storeFreshAssistantSnapshot state sessionID lastAssistantMessage agentOpt =
+    let snapshot =
+        { lastAssistantMessage = lastAssistantMessage
+          agentFromMessage = agentOpt }
+    { state with freshAssistantSnapshots = Map.add sessionID snapshot state.freshAssistantSnapshots }
+
+let takeFreshAssistantSnapshot state sessionID =
+    let snapshot = Map.tryFind sessionID state.freshAssistantSnapshots
+    { state with freshAssistantSnapshots = Map.remove sessionID state.freshAssistantSnapshots }, snapshot
+
 let stopSession state sessionID =
     { state with
         nudgedSessions = Set.add sessionID state.nudgedSessions
@@ -106,7 +122,9 @@ let stopSession state sessionID =
 
 let clearSession state sessionID =
     let next = resumeSession state sessionID
-    { next with sessionAgents = Map.remove sessionID next.sessionAgents }
+    { next with
+        sessionAgents = Map.remove sessionID next.sessionAgents
+        freshAssistantSnapshots = Map.remove sessionID next.freshAssistantSnapshots }
 
 let addRetryPendingSession state sessionID =
     { state with retryPendingSessions = Set.add sessionID state.retryPendingSessions }
@@ -131,13 +149,13 @@ let private selectNudgePrompt = function
     | _ -> None
 
 let decideNudge isReviewActive lookupChildAgent state sessionID snapshot =
-    if not (hasNudgedSession state sessionID) || hasStoppedSession state sessionID then
+    if hasStoppedSession state sessionID then
         state, StandDown
     elif snapshot.alreadyNudged then
         // A nudge prompt already trails the last assistant turn in the history:
         // this stop was nudged before (possibly in a prior process), and the
         // agent has not yet produced fresh work. Stand down — no double nudge.
-        deleteNudgedSession state sessionID, StandDown
+        state, StandDown
     else
         let state = rememberAgent state sessionID snapshot.agentFromMessage
         let isWorkerLoopActive =
@@ -151,10 +169,10 @@ let decideNudge isReviewActive lookupChildAgent state sessionID snapshot =
               isLoopActive = isWorkerLoopActive }
         match decide context with
         | NudgeNone
-        | NudgeRunner -> deleteNudgedSession state sessionID, StandDown
+        | NudgeRunner -> state, StandDown
         | action ->
             match selectNudgePrompt action with
-            | None -> deleteNudgedSession state sessionID, StandDown
+            | None -> state, StandDown
             | Some promptText ->
                 let agentOpt = getAgent state sessionID |> Option.orElse (lookupChildAgent sessionID)
                 { state with lastNudgedSession = Some sessionID }, Send(promptText, agentOpt)
@@ -217,4 +235,3 @@ let handleEvent (state: NudgeShellState) (sessionID: string) (event: NudgeHostEv
     | SessionStatusRetry -> addRetryPendingSession state sessionID, false
     | RetryProgress -> deleteRetryPendingSession state sessionID, false
     | Other -> state, false
-

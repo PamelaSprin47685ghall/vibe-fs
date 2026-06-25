@@ -160,6 +160,41 @@ let nestedSubagentSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+/// Regression: parent tool context already aborted must cascade to child session
+/// (no child prompt, host session.abort, registry cleanup, "(aborted)" result).
+let subagentParentAlreadyAbortedSpec () = promise {
+    let promptCalls = ResizeArray<obj>()
+    let abortCalls = ResizeArray<obj>()
+    let childSessionId = "child-abort-cascade-1"
+    let mockClient =
+        createObj [ "session", box (createObj [
+            "create", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (promise { return box {| data = box {| id = childSessionId |} |} })))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                (promise { promptCalls.Add(arg) })))
+            "messages", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (promise {
+                    return box {| data = [|
+                        box {| info = box {| role = "assistant" |}; parts = [| box {| ``type`` = "text"; text = "should not be returned" |} |] |}
+                    |] |}
+                })))
+            "abort", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                (promise { abortCalls.Add(arg) })))
+        ]) ]
+    let registry = ChildAgentRegistry.Create()
+    let! workspaceDir = mkdtempAsync "subagent-parent-abort-"
+    let abortedParentSignal = createObj [ "aborted", box true ]
+    let parentContext = createObj [ "abort", box abortedParentSignal ]
+    let! result =
+        runSubagent registry mockClient "investigator" "Investigator" "trace the fault" workspaceDir "parent-aborted-session" parentContext null
+    check "already-aborted parent yields (aborted)" (result = "(aborted)")
+    check "child session.prompt not called when parent aborted" (promptCalls.Count = 0)
+    check "host session.abort called once for child" (abortCalls.Count = 1)
+    check "session.abort path targets child session" (str (get abortCalls.[0] "path") "id" = childSessionId)
+    check "child session not left in ChildAgentRegistry" (registry.LookupChildAgent childSessionId |> Option.isNone)
+    do! rmAsync workspaceDir
+}
+
 let run () : JS.Promise<unit> =
     promise {
         do! chatMessageSpec ()
@@ -168,4 +203,5 @@ let run () : JS.Promise<unit> =
         do! websearchBoundariesSpec ()
         do! subagentParentSpec ()
         do! nestedSubagentSpec ()
+        do! subagentParentAlreadyAbortedSpec ()
     }

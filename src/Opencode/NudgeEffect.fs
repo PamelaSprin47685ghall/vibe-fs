@@ -62,7 +62,7 @@ let private recoverOpenTodosFromMessages (messagesData: obj) : string list =
         |> Option.defaultValue [||]
         |> Array.toList
 
-let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<SessionSnapshot option> =
+let private collectSnapshot (_holder: StateHolder<NudgeShellState>) (client: obj) (sessionID: SessionId) : JS.Promise<SessionSnapshot option> =
     promise {
         try
             let sessionIDStr = Id.sessionIdValue sessionID
@@ -98,7 +98,7 @@ let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
                           (sessionID: SessionId) : JS.Promise<unit> =
     promise {
         try
-            let! snapshotOpt = collectSnapshot client sessionID
+            let! snapshotOpt = collectSnapshot holder client sessionID
             match snapshotOpt with
             | None -> holder.Mutate(fun (state: NudgeShellState) -> clearSession state (Id.sessionIdValue sessionID), ())
             | Some snapshot ->

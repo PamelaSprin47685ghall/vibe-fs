@@ -23,7 +23,8 @@ type SubagentLaunchOptions =
       directory: string
       sessionID: string
       tools: obj
-      aiSettings: DelegatedAiSettings }
+      aiSettings: DelegatedAiSettings
+      abortSignal: obj }
 
 /// Placeholder for a subagent session that produced no assistant text. Distinct
 /// from the executor's "(no output)" (shell stdout): same string, different
@@ -195,7 +196,6 @@ let startSubagentSession (registry: ChildAgentRegistry) (client: obj) (options: 
         if childID = "" then return! Promise.reject (exn "Failed to create child session")
         else
             registry.RegisterChildAgent(childID, options.agent, parentID)
-            do! promptWithAbort client (buildPromptBody options childID) null
             return childID
     }
 
@@ -203,34 +203,44 @@ let private runSubagentCore (registry: ChildAgentRegistry) (client: obj) (agent:
                             (directory: string) (sessionID: string) (context: obj)
                             (tools: obj) (cleanup: bool) : JS.Promise<string> =
     promise {
+        let signal = getAbortSignal context
+        let launchOptions =
+            { agent = agent
+              title = title
+              prompt = prompt
+              directory = directory
+              sessionID = sessionID
+              tools = tools
+              aiSettings = emptySettings
+              abortSignal = signal }
+        let hostCleanupDone = ref false
+        let hostAbortAndUnregister (childID: string) =
+            if not hostCleanupDone.Value then
+                hostCleanupDone.Value <- true
+                let session = Dyn.get client "session"
+                let abortPromise : JS.Promise<obj> = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
+                abortPromise |> ignore
+                registry.UnregisterChildAgent(childID)
         try
-            let! childID =
-                startSubagentSession registry client
-                    { agent = agent
-                      title = title
-                      prompt = prompt
-                      directory = directory
-                      sessionID = sessionID
-                      tools = tools
-                      aiSettings = emptySettings }
-            let abortAndUnregister () =
-                if cleanup then
-                    let session = Dyn.get client "session"
-                    let abortPromise : JS.Promise<obj> = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
-                    abortPromise |> ignore
-                    registry.UnregisterChildAgent(childID)
+            let! childID = startSubagentSession registry client launchOptions
+            let cleanupChildIfRequested () =
+                if cleanup then hostAbortAndUnregister childID
             try
+                do! promptWithAbort client (buildPromptBody launchOptions childID) signal
                 try
                     let! text = extractSessionText client childID directory
                     return if text = "" then noOutputText else text
                 finally
-                    abortAndUnregister ()
+                    cleanupChildIfRequested ()
             with err ->
                 match translateJsError err with
                 | MessageAborted ->
-                    abortAndUnregister ()
-                    let! text = extractSessionText client childID directory
-                    return if text = "" then abortedPrefix else $"{abortedPrefix} {text}"
+                    hostAbortAndUnregister childID
+                    if not (Dyn.isNullish signal) && Dyn.truthy (Dyn.get signal "aborted") then
+                        return abortedPrefix
+                    else
+                        let! text = extractSessionText client childID directory
+                        return if text = "" then abortedPrefix else $"{abortedPrefix} {text}"
                 | _ -> return! Promise.reject err
         with _ ->
             return "Failed to create child session"

@@ -58,6 +58,34 @@ let private getPartsText (parts: obj) : string =
             else None)
         |> String.concat "\n"
 
+let private messageHasSubmitReviewWipProgress (message: obj) : bool =
+    let parts = Dyn.get message "parts"
+    if not (Dyn.isArray parts) then false
+    else
+        (parts :?> obj array)
+        |> Array.exists (fun part ->
+            Dyn.str part "type" = "dynamic-tool"
+            && isSubmitReviewToolName (Dyn.str part "toolName")
+            && (let direct = Dyn.get part "output"
+                if not (Dyn.isNullish direct) then string direct
+                else
+                    let state = Dyn.get part "state"
+                    if Dyn.isNullish state || Dyn.typeIs state "string" then ""
+                    else string (Dyn.get state "output"))
+               |> isSubmitReviewWipProgressOutput)
+
+let private messageIsUserNudgePrompt (message: obj) : bool =
+    Dyn.str message "role" = "user" && isNudgePrompt (getPartsText (Dyn.get message "parts"))
+
+let private alreadyNudgedAfterIndex (messages: obj array) (index: int) : bool =
+    messages.[index + 1 ..]
+    |> Array.fold
+        (fun nudged message ->
+            if messageHasSubmitReviewWipProgress message then false
+            elif messageIsUserNudgePrompt message then true
+            else nudged)
+        false
+
 let private decodeLastAssistant (messages: obj array) : string * bool =
     let lastAssistantIndex =
         messages
@@ -69,11 +97,7 @@ let private decodeLastAssistant (messages: obj array) : string * bool =
     | None -> "", false
     | Some index ->
         let text = getPartsText (Dyn.get messages.[index] "parts")
-        let alreadyNudged =
-            messages.[index + 1 ..]
-            |> Array.exists (fun message ->
-                Dyn.str message "role" = "user"
-                && isNudgePrompt (getPartsText (Dyn.get message "parts")))
+        let alreadyNudged = alreadyNudgedAfterIndex messages index
         text, alreadyNudged
 
 let private collectSnapshot
@@ -157,12 +181,11 @@ type NudgeRuntime
                 if Dyn.isNullish helpers || stopReason = "queued-message" then
                     return ()
                 else
-                    let wantsNudge =
-                        holder.Mutate(fun state -> handleEvent state workspaceId SessionIdle)
-
-                    if wantsNudge then
-                        startNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage
-
+                    // Dedup is delegated to Kernel.decideNudge via snapshot.alreadyNudged
+                    // (history tail is the single source of truth). No in-process gate here:
+                    // a repeat stream-end for the same stop yields StandDown from decideNudge
+                    // without firing a second send.
+                    startNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage
                     return ()
             | StreamAbort workspaceId
             | AbortedError workspaceId ->

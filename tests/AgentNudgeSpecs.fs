@@ -4,6 +4,8 @@ open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Nudge
 open VibeFs.Kernel.NudgeState
+open VibeFs.Kernel.PromptFragments
+open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Opencode.NudgeEventCodec
 
 
@@ -77,8 +79,9 @@ let private noChild (_: string) = None
 /// `alreadyNudged`, read from the dialogue history, NOT an in-memory counter —
 /// so a restart that wipes the counter can never resurrect a duplicate nudge.
 let decideNudge' () =
-    let _, d0 = decideNudge noReview noChild emptyState "s" (snapshot [ "a" ] "working" false None)
-    equal "unclaimed → StandDown" StandDown d0
+    match snd (decideNudge noReview noChild emptyState "s" (snapshot [ "a" ] "working" false None)) with
+    | Send(text, _) -> check "unclaimed fresh history nudges todo" (text = VibeFs.Kernel.PromptFragments.todoNudgePrompt)
+    | StandDown -> check "unclaimed fresh history nudges todo" false
 
     let claimed, _ = tryClaimNudge emptyState "s"
     match snd (decideNudge noReview noChild claimed "s" (snapshot [ "a" ] "working" false None)) with
@@ -141,6 +144,60 @@ let decodeLastAssistantNudge () =
 
     let _, _, nudgedEmpty = decodeLastAssistant (box [||])
     check "empty history → false" (not nudgedEmpty)
+
+    let wipToolPart =
+        box {| ``type`` = "tool"
+               tool = "submit_review"
+               callID = "wip-call"
+               state = box {| output = submitReviewWipAcknowledgment |} |}
+    let assistantWithWipTool =
+        box {| info = box {| role = "assistant"; finish = "stop" |}
+               parts = [| wipToolPart |] |}
+    let _, _, nudgedWipOnly =
+        decodeLastAssistant (box [| user "go"; assistant "did work"; assistantWithWipTool |])
+    check "wip submit_review tool after work → alreadyNudged false" (not nudgedWipOnly)
+
+    let _, _, nudgedLoopThenWip =
+        decodeLastAssistant
+            (box
+                [| user "go"
+                   assistant "did work"
+                   user loopNudgePrompt
+                   assistantWithWipTool |])
+    check "loop nudge then wip tool clears dedup → alreadyNudged false" (not nudgedLoopThenWip)
+
+let alreadyNudgedFromTailTexts' () =
+    check "tail loop nudge only → true" (alreadyNudgedFromTailTexts [ loopNudgePrompt ])
+    check "tail wip ack only → false" (not (alreadyNudgedFromTailTexts [ submitReviewWipAcknowledgment ]))
+    check "loop nudge then wip ack → false"
+        (not (alreadyNudgedFromTailTexts [ loopNudgePrompt; submitReviewWipAcknowledgment ]))
+    check "todo nudge tail → true" (alreadyNudgedFromTailTexts [ todoNudgePrompt ])
+    check "empty tail → false" (not (alreadyNudgedFromTailTexts []))
+
+let submitReviewWipToolClearsNudgeDedup' () =
+    check "submit_review wip output clears" (submitReviewWipToolClearsNudgeDedup "submit_review" submitReviewWipAcknowledgment)
+    check "other tool does not clear" (not (submitReviewWipToolClearsNudgeDedup "read" submitReviewWipAcknowledgment))
+    check "submit_review non-wip output does not clear"
+        (not (submitReviewWipToolClearsNudgeDedup "submit_review" "Review passed."))
+
+let decideNudgeWipNeutralAlreadyNudged' () =
+    let loopReview (_: string) = true
+    let claimed, _ = tryClaimNudge emptyState "s"
+    let snap =
+        snapshot [] "still implementing" false None
+        |> fun s -> { s with alreadyNudged = false }
+    match snd (decideNudge loopReview noChild claimed "s" snap) with
+    | Send(text, _) -> check "wip-neutral snapshot allows loop nudge" (text = loopNudgePrompt)
+    | StandDown -> check "wip-neutral snapshot allows loop nudge" false
+
+    let snapStillNudged = snapshot [] "still implementing" true None
+    let _, d = decideNudge loopReview noChild claimed "s" snapStillNudged
+    equal "history still nudged → StandDown" StandDown d
+
+let submitReviewWipNudgeDedup () =
+    alreadyNudgedFromTailTexts' ()
+    submitReviewWipToolClearsNudgeDedup' ()
+    decideNudgeWipNeutralAlreadyNudged' ()
 
 let decodeTodosOpenItems () =
     let todos =
