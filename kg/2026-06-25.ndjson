@@ -9,3 +9,4 @@
 {"id":"0902","entity":["版本控制","工作区布局"],"fact":"oh-my-pi 分支从 master 创建，用于 OMP 宿主适配的独立开发线。"}
 {"id":"091c","entity":["源码卫生","Fable编译约束"],"fact":"全仓 ref cell 赋值语法由 := 统一迁移为 .Value <- expr，消除 FSHARP code 3370 警告。"}
 {"id":"1c26","entity":["工作区文档","版本控制"],"fact":"TASK.md、保姆式方案.md、保姆级重构指南.md 三文件已从工作区删除，AGENTS.md 已修改。"}
+{"id":"c657","entity":["版本控制","工作区布局"],"fact":"oh-my-pi 分支从 210e47e 快进推送至 9101ea4，OMP 宿主适配开发线已同步至 origin。"}

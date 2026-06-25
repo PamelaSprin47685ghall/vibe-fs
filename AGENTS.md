@@ -1,8 +1,6 @@
 ---
 import: 
   - README.md
-  - ../vibe-omp/src/index.ts
-  - ../vibe-omp/vibe-me-engine/src/index.ts
   - ../oh-my-pi/README.md
 ---
 
