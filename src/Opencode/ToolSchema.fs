@@ -55,7 +55,7 @@ let subagentZodShape (requiredKeys: string array) (shape: obj) : obj =
     let shapeKeys = Set.ofArray (Dyn.keys shape)
     for k in requiredKeys do
         if not (Set.contains k shapeKeys) then failwithf "Opencode subagent Zod shape missing required field %s" k
-    strictObject shape
+    shape
 
 let arrayMin (item: obj) (minCount: int) (desc: string) : obj =
     call1 (call1 (arr item) "min" (box minCount)) "describe" (box desc)
