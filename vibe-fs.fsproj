@@ -272,6 +272,7 @@
     <Compile Include="src/Omp/FuzzyTools.fs" />
     <Compile Include="src/Omp/WebTools.fs" />
     <Compile Include="src/Omp/OmpToolSchema.fs" />
+    <Compile Include="src/Methodology/OmpTools.fs" />
     <Compile Include="src/Omp/ExecutorTools.fs" />
     <Compile Include="src/Omp/TodoTool.fs" />
     <Compile Include="src/Omp/SubagentTools.fs" />

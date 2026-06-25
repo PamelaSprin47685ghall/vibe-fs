@@ -4,58 +4,103 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.Config
 open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.LoopMessages
 open VibeFs.Omp.Codec
 open VibeFs.Kernel.BacklogProjection
+open VibeFs.Kernel.CapsFormat
 open VibeFs.Kernel.Messaging
+open VibeFs.Kernel.MessageTransformPolicy
 open VibeFs.Omp.CapsCodec
+open VibeFs.Omp.ChildSession
 open VibeFs.Omp.KnowledgeGraphRuntime
 open VibeFs.Omp.MagicTodo
 open VibeFs.Omp.MessagingCodec
 open VibeFs.Omp.ReadDedup
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.FileSys
+open VibeFs.Shell.MessageTransformCore
+open VibeFs.Shell.MessageTransformHostEntry
+open VibeFs.Shell.MessageTransformPipeline
 open VibeFs.Shell.OmpCaps
 open VibeFs.Shell.ReviewRuntime
 open VibeFs.Shell.TreeSitterShell
 
 module Dyn = VibeFs.Shell.Dyn
 
-/// Omp 路径不实现 Opencode 风格的 `resolveAgent`（无 ChildAgentRegistry
-/// 注入），假定主代理永远是 `manager`。若未来需要支持子 agent 上下文
-/// prelude，从 ctx.sessionManager.agentName 读即可。
-let private managerAgent = "manager"
+let private defaultBacklogSession = BacklogSession omp
 
-let private defaultBacklogSession = BacklogSession(omp)
+let private resolveAgent (ctx: obj) : string =
+    let sm = Dyn.get ctx "sessionManager"
+    if Dyn.isNullish sm then "manager"
+    else
+        let name = Dyn.str sm "agentName"
+        if name <> "" then name else "manager"
 
-let transformEntriesAsync (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) (cwd: string) (sessionId: string)
-    (entriesObj: obj) : JS.Promise<obj array> =
+let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) (cwd: string) (sessionId: string)
+    (entriesObj: obj) (agent: string) : JS.Promise<obj array> =
     promise {
-        if Dyn.isNullish entriesObj || not (Dyn.isArray entriesObj) then return entriesObj :?> obj array
+        if Dyn.isNullish entriesObj || not (Dyn.isArray entriesObj) then return unbox<obj array> entriesObj
         else
-            let entriesArr = entriesObj :?> obj array
+            let entriesArr = unbox<obj array> entriesObj
             if entriesArr.Length = 0 then return entriesArr
             else
                 kgRuntime.BindGetEntries(fun () -> entriesArr)
                 let messagesList = decodeEntries sessionId entriesArr
-                inferReviewTaskFromTexts (extractHistoryTexts messagesList)
-                |> syncReviewProjection reviewStore sessionId
+                let excluded = shouldExcludeAgentFromProjection agent (isChildSession sessionId)
                 let cleaned = stripSyntheticBySource messagesList
-                let backlog = defaultBacklogSession.GetOrRebuildBacklog(sessionId, cleaned)
-                let afterMagic = projectBacklogFor defaultBacklogSession.Host cleaned backlog false sessionId
-                let encoded = encodeMessages afterMagic
-                applyReadDedup encoded
-                let! capsFiles = findOmpCapsFiles cwd
-                let! knowledgeGraphPrelude =
-                    if canUse managerAgent "knowledge_graph_fetch" then
-                        kgRuntime.BuildPreludeForSession(sessionId, cwd)
+                let backlogOps =
+                    backlogSessionOpsFrom defaultBacklogSession.Host (fun sid msgs -> defaultBacklogSession.GetOrRebuildBacklog(sid, msgs))
+                let plan = {
+                    SessionID = sessionId
+                    Agent = agent
+                    Directory = cwd
+                    Excluded = excluded
+                    Cleaned = cleaned
+                }
+                let replayTexts () = extractHistoryTexts messagesList |> Seq.ofList
+                let dedupFn excluded encoded =
+                    if excluded then encoded
                     else
-                        Promise.lift (None: string option)
-                let final =
-                    if hasExistingCapsMessages encoded then encoded
-                    else buildCapsEntries sha256HexTruncated encoded cwd capsFiles knowledgeGraphPrelude
-                return final
+                        applyReadDedup encoded
+                        encoded
+                let loadCaps () : JS.Promise<CapsFile list> =
+                    promise {
+                        if plan.Excluded || cwd = "" then return ([] : CapsFile list)
+                        else
+                            let! ompFiles = findOmpCapsFiles cwd
+                            return
+                                ompFiles
+                                |> List.map (fun (f: OmpCapsFile) ->
+                                    { filePath = f.filePath
+                                      label = f.label
+                                      content = f.content } : CapsFile)
+                    }
+                let loadKgPrelude () =
+                    if plan.Excluded then Promise.lift None
+                    elif not (canUse agent "knowledge_graph_fetch") then Promise.lift None
+                    else kgRuntime.BuildPreludeForSession(sessionId, cwd)
+                let buildCaps encoded (capsFiles: CapsFile list) prelude =
+                    let ompCaps =
+                        capsFiles
+                        |> List.map (fun f -> { filePath = f.filePath; label = f.label; content = f.content } : OmpCapsFile)
+                    buildCapsEntries sha256HexTruncated encoded cwd ompCaps prelude
+                return!
+                    runHostMessagesTransform
+                        reviewStore
+                        sessionId
+                        IfStoreEmpty
+                        replayTexts
+                        plan
+                        backlogOps
+                        encodeMessages
+                        dedupFn
+                        loadCaps
+                        loadKgPrelude
+                        buildCaps
     }
+
+let transformEntriesAsync (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) (cwd: string) (sessionId: string)
+    (entriesObj: obj) : JS.Promise<obj array> =
+    transformEntriesAsyncWithAgent reviewStore kgRuntime cwd sessionId entriesObj "manager"
 
 let beforeAgentStart (_cwd: string) (systemPrompt: obj) : JS.Promise<obj> =
     promise {
@@ -86,41 +131,14 @@ let registerContextTransform (pi: obj) (reviewStore: ReviewStore) (kgRuntime: Om
         promise {
             let cwd = Dyn.str ctx "cwd"
             let sessionId = getSessionIdFromContext ctx |> Option.defaultValue ""
+            let agent = resolveAgent ctx
             let entries = Dyn.get event "entries"
             if Dyn.isNullish entries then return event
             else
-                let! transformed = transformEntriesAsync reviewStore kgRuntime cwd sessionId entries
+                let! transformed = transformEntriesAsyncWithAgent reviewStore kgRuntime cwd sessionId entries agent
                 event?entries <- transformed
                 return event
         }
     pi?on("context", box run)
     pi?on("before_context", box run)
 
-/// Host-agnostic entrypoint mirroring Opencode's `messagesTransform`. The
-/// `output.entries` array is rewritten in-place when a `context` event lands,
-/// and we expose this as a stand-alone function so future `experimental.chat
-/// .messages.transform`-style plumbing can call it without going through the
-/// `pi?on("context", ...)` registration path.
-let messagesTransform (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) (cwd: string)
-                      (sessionId: string) (input: obj) (output: obj) : JS.Promise<unit> =
-    promise {
-        let entries =
-            let fromOutput = Dyn.get output "entries"
-            if Dyn.isNullish fromOutput then Dyn.get input "entries" else fromOutput
-        if Dyn.isNullish entries then ()
-        else
-            let! transformed = transformEntriesAsync reviewStore kgRuntime cwd sessionId entries
-            output?entries <- transformed
-    }
-
-/// Omp has no host-driven compacting pass; kept as a no-op to mirror the
-/// opencode signature so a future `experimental.session.compacting` hook in
-/// the pi host can wire through without an F# change.
-let compactingHandler (_backlogSession: BacklogSession) (_input: obj) (_output: obj) : JS.Promise<unit> =
-    Promise.lift ()
-
-/// Omp's `before_agent_start` is a separate hook (`beforeAgentStart` above);
-/// the opencode-style `system.transform` has no pi analogue today, so this is
-/// a passthrough.
-let systemTransform (_input: obj) (_output: obj) : JS.Promise<unit> =
-    Promise.lift ()

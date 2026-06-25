@@ -9,6 +9,8 @@ open VibeFs.Omp.KnowledgeGraphRuntime
 open VibeFs.Omp.MessageTransform
 module Dyn = VibeFs.Shell.Dyn
 open VibeFs.Shell.ReviewRuntime
+open VibeFs.Kernel.LoopMessages
+open VibeFs.Kernel.PromptFrontMatter
 
 [<Import("createRequire", "node:module")>]
 let private createRequire' : string -> (string -> obj) = jsNative
@@ -103,4 +105,20 @@ let knowledgeGraphPreludeWhenKgPresent () = promise {
     let text = firstEntryTextFromOut out
     check "kg front matter" (text.Contains "knowledge_graph:")
     do! rmAsync root
+}
+
+let reviewReplayIfStoreEmptyOnTransform () = promise {
+    let reviewStore = createReviewStore ()
+    let kgRuntime = OmpKnowledgeGraphRuntime(createObj [])
+    let sessionId = "omp-review-if-empty"
+    reviewStore.activateReview(sessionId, "task A", 1L)
+    let historyTaskB =
+        frontMatterPrompt [ yamlField taskField "task B" ] "With-Review body from history"
+    let entries =
+        [| createObj [
+               "info", box(createObj [ "id", box "user-hist"; "role", box "user" ])
+               "parts", box [| createObj [ "type", box "text"; "text", box historyTaskB ] |]
+           ] |]
+    let! _ = transformEntriesAsync reviewStore kgRuntime "/tmp/ws" sessionId (box entries)
+    equal "review replay IfStoreEmpty: store task unchanged when already active" (Some "task A") (reviewStore.getReviewTask sessionId)
 }

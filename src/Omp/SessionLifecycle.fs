@@ -90,16 +90,7 @@ let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) (kgRuntime: Om
                 let hasPending =
                     let fn = Dyn.get ctx "hasPendingMessages"
                     Dyn.typeIs fn "function" && Dyn.truthy (Dyn.call0 fn)
-                if hasRunningRunnerJob sessionId then
-                    if tryRunnerNudge sessionId then
-                        pi?sendMessage(
-                            createObj [
-                                "customType", box "kunwei-runner-reminder"
-                                "content", box (runnerReminderContent ())
-                                "display", box false
-                            ],
-                            createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
-                elif reviewStore.isReviewActive sessionId && not (Dyn.isNullish sm) && not hasPending then
+                if reviewStore.isReviewActive sessionId && not (Dyn.isNullish sm) && not hasPending then
                     let last = lastAssistantMessage sm
                     if tryLoopNudge sessionId last then
                         pi?sendMessage(
