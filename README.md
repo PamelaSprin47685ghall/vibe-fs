@@ -116,7 +116,7 @@ JS/Node 无线程级并发，但有大量异步交错。策略不是到处加锁
 
 ### Methodology：每法一 schema，注册为工具
 
-`src/Methodology/`：每种推理法一个 `*.fs`（`SchemaCommon` + `Args` + `Registry.allSchemas`），经 `Methodology.OpencodeTools` / `Methodology.MuxTools` 注册为 `methodology_<id>` 工具（共 53 个）。`Kernel.Methodology` 维护 `select_methodology` 枚举与 `todowrite`/`task` 必填字段文案；OMP 在 `todowrite` schema 与 `tool_result` 后处理侧消费同一枚举，不单独注册 53 个 notebook 工具。
+`src/Methodology/`：每种推理法一个 `*.fs`（`SchemaCommon` + `Args` + `Registry.allSchemas`），经 `Methodology.OpencodeTools` / `Methodology.MuxTools` / `Methodology.OmpTools` 注册为 `methodology_<id>` 工具（共 53 个）。`Kernel.Methodology` 维护 `select_methodology` 枚举与 `todowrite`/`task` 必填字段文案；OMP 经 `Methodology.OmpTools.registerMethodologyTools`（TypeBox schema，经 `OmpToolSchema.methodologyParameters`）注册同一批 `methodology_<id>` 工具，并在 `todowrite` schema 与 `tool_result` 后处理侧消费同一 `select_methodology` 枚举。
 
 ### knowledge graph 不是全局常开，是目录门控
 

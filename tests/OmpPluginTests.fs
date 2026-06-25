@@ -50,7 +50,15 @@ let private piObject (h: PiHarness) : obj =
                         "Null", box(fun (_: obj) -> createObj [ "type", box "null" ])
                         "Union", box(fun (items: obj array) -> createObj [ "anyOf", box items ])
                         "Enum", box(fun (values: obj array) (o: obj) -> createObj [ "type", box "enum"; "values", box values ])
-                        "Array", box(fun (items: obj) -> createObj [ "type", box "array"; "items", box items ])
+                        "Array",
+                            box(System.Func<obj, obj, obj>(fun (items: obj) (opts: obj) ->
+                                let result = createObj [ "type", box "array"; "items", box items ]
+                                if not (Dyn.isNullish opts) then
+                                    let mi = Dyn.get opts "minItems"
+                                    if not (Dyn.isNullish mi) then result?("minItems") <- mi
+                                    let d = Dyn.get opts "description"
+                                    if not (Dyn.isNullish d) then result?("description") <- d
+                                result))
                         "Optional", box(fun (schema: obj) -> schema)
                     ])
         ]
@@ -115,7 +123,29 @@ let registersCoreToolsIdempotent () = promise {
         [ "fuzzy_find"; "fuzzy_grep"; "coder"; "investigator"; "meditator"; "browser"; "websearch"; "webfetch"; "executor"
           "submit_review"; "return_reviewer"; "todowrite" ] do
         check ("has tool " + expected) (names.Contains expected)
+    let methodologyCount = names |> Set.filter (fun n -> n.StartsWith "methodology_") |> Set.count
+    check "OMP parity: registers methodology_first_principles" (names.Contains "methodology_first_principles")
+    check "OMP parity: registers at least 53 methodology_* tools" (methodologyCount >= 53)
     check "has loop command" (h1.commands |> Seq.exists (fun c -> str c "name" = "loop"))
+}
+
+let methodologySchemaCarriesMinItems () = promise {
+    resetPluginState ()
+    let h = createPiHarness ()
+    let pi = piObject h
+    do! kunweiExtension pi
+    let abduction =
+        h.tools |> Seq.tryFind (fun t -> str t "name" = "methodology_abduction")
+    check "methodology_abduction tool registered" (abduction.IsSome)
+    match abduction with
+    | None -> ()
+    | Some tool ->
+        let props = Dyn.get (Dyn.get tool "parameters") "properties"
+        let dt = Dyn.get props "discriminating_tests"
+        check "discriminating_tests present" (not (Dyn.isNullish dt))
+        let mi = Dyn.get dt "minItems"
+        check "discriminating_tests has minItems" (not (Dyn.isNullish mi))
+        check "discriminating_tests minItems >= 2" (unbox<int> mi >= 2)
 }
 
 let sessionStartStripsMainSessionTools () = promise {
@@ -223,7 +253,7 @@ let agentEndRunnerNudgeBeforeLoop () = promise {
             "hasPendingMessages", box(fun () -> box false)
         ]
     do! invokeHandler h "agent_end" (createObj []) ctx
-    equal "runner reminder type" "kunwei-runner-reminder" (lastMessageCustomType h)
+    check "Opencode parity: no runner nudge on agent_end" (h.messages.Count = 0)
 }
 
 let agentEndLoopNudgeWhenActive () = promise {
@@ -349,7 +379,7 @@ let agentEndTodoNudgeWhenOpenPhases () = promise {
 }
 
 let runnerNudgePromptUsesExecutorToolNames () =
-    let text = VibeFs.Omp.NudgeRuntime.runnerReminderContent ()
+    let text = VibeFs.Kernel.PromptFragments.runnerNudgePromptFor VibeFs.Kernel.HostTools.omp
     check "runner nudge names executor_wait" (text.Contains "executor_wait")
     check "runner nudge names executor_abort" (text.Contains "executor_abort")
     check "runner nudge avoids legacy runner_wait" (not (text.Contains "runner_wait"))

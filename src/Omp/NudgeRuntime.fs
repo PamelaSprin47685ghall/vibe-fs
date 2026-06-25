@@ -15,14 +15,6 @@ let private tryNudge (sessionId: string) (context: NudgeContext) : NudgeAction o
     coordinator <- next
     if action = NudgeNone then None else Some action
 
-let tryRunnerNudge (sessionId: string) : bool =
-    let ctx =
-        { todos = []
-          lastAssistantMessage = ""
-          hasActiveRunner = true
-          isLoopActive = false }
-    tryNudge sessionId ctx |> Option.map (fun a -> a = NudgeRunner) |> Option.defaultValue false
-
 let tryLoopNudge (sessionId: string) (lastAssistantMessage: string) : bool =
     let ctx =
         { todos = []
@@ -41,8 +33,6 @@ let tryTodoNudge (sessionId: string) (sessionManager: obj) (lastAssistantMessage
               hasActiveRunner = false
               isLoopActive = false }
         tryNudge sessionId ctx |> Option.map (fun a -> a = NudgeTodo) |> Option.defaultValue false
-
-let runnerReminderContent () = runnerNudgePromptFor omp
 
 let loopReminderContent () = loopNudgePrompt
 

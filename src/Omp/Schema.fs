@@ -27,3 +27,6 @@ let objectOf (fields: (string * obj) array) (typebox: obj) =
 
 let arrayOf (item: obj) (description: string) (typebox: obj) =
     typebox?Type?Array(item, createObj [ "description", box description ])
+
+let arrayMin (item: obj) (minCount: int) (description: string) (typebox: obj) =
+    typebox?Type?Array(item, createObj [ "minItems", box minCount; "description", box description ])
