@@ -101,6 +101,9 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
     member _.DeleteJob(sessionID: string) : unit =
         registeredJobs <- Map.remove sessionID registeredJobs
 
+    member _.HasJobForTest(sessionID: string) : bool =
+        Map.containsKey sessionID registeredJobs
+
     member this.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
         runMaintenanceIfDue commandQueue
             { WorkspaceRoot = workspaceRoot

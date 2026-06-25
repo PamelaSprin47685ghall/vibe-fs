@@ -33,6 +33,9 @@ type MuxToolExecuteAfterInput =
 
 let argsFromMuxToolExecuteInput (input: obj) : obj = Dyn.get input "args"
 
+/// Read the tool name from a Mux tool-execute hook input.
+let toolNameFromHookInputMux (input: obj) : string = Dyn.str input "tool"
+
 let hookOutputErrorMux (output: obj) : string = Dyn.str output "error"
 
 let hookOutputTextMux (output: obj) : string = Dyn.str output "output"

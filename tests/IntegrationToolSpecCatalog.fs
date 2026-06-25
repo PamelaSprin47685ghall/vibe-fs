@@ -135,4 +135,10 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
         "muxSubmitReviewOmittedWipSkipsReviewer", muxSubmitReviewOmittedWipSkipsReviewerSpec
         "muxExecutorFailureDoesNotBookkeep", muxExecutorFailureDoesNotBookkeepSpec
         "muxTodoWriteMethodologySchema", muxTodoWriteMethodologySchemaSpec
+        "muxCompactingTransformProjectsBacklog", muxCompactingTransformProjectsBacklogSpec
+        "muxToolExecuteAfterSkipsChildWorkspace", muxToolExecuteAfterSkipsChildWorkspaceSpec
+        "muxEventHookAbortDeactivatesReview", muxEventHookAbortDeactivatesReviewSpec
+        "muxEventHookAbortCleansUpKnowledgeGraphJob", muxEventHookAbortCleansUpKnowledgeGraphJobSpec
+        "muxToolExecuteBeforeSetsUiLabel", muxToolExecuteBeforeSetsUiLabelSpec
+        "muxSystemTransformClearsOutputLength", muxSystemTransformClearsOutputLengthSpec
     ]

@@ -81,3 +81,21 @@ let messagesTransform
                         buildCaps
                 if not cleanedMessages.IsEmpty then replaceArrayInPlace messagesArr final
     }
+
+let compactingTransform (deps: obj) (backlogSession: BacklogSession) (input: obj) (output: obj) : JS.Promise<unit> =
+    promise {
+        match tryGetMessagesArrayFromOutput output with
+        | None -> ()
+        | Some messagesArr ->
+            let decoded = decodeMuxMessagesTransformInput input deps
+            let sessionID = decoded.SessionID
+            let typedMessages = decodeMessages sessionID messagesArr
+            let cleaned = stripSyntheticBySource typedMessages
+            if cleaned.IsEmpty then ()
+            else
+                let backlogOps =
+                    backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
+                let afterBacklog = applyBacklogProjection sessionID false backlogOps cleaned
+                let encoded = encodeMessages afterBacklog
+                replaceArrayInPlace messagesArr encoded
+    }

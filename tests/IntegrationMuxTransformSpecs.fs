@@ -161,3 +161,38 @@ let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () = promise {
         do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
         check "mux accepted submit_review history clears active review" (not (muxIsReviewActiveForTest reg sessionID))
 }
+
+let muxCompactingTransformProjectsBacklogSpec () = promise {
+    let reg = sharedMuxRegistration ()
+    let compactingTransform = get reg "compactingTransform"
+    if isNullish compactingTransform then
+        check "mux registration exposes compactingTransform" false
+    else
+        let todoInput report content status priority =
+            createObj
+                [ "completedWorkReport", box report
+                  "todos", box [| createObj [ "content", box content; "status", box status; "priority", box priority ] |] ]
+        let todoOutput count = createObj [ "success", box true; "count", box count ]
+        let messages =
+            [| muxTextMessage "compact-user-1" "user" "plan phase"
+               muxDynamicToolMessage "compact-1" "todo_write" "compact-call-a" (todoInput "planned compact phase" "Plan change" "in_progress" "high") (todoOutput 1)
+               muxTextMessage "compact-user-2" "user" "implement phase"
+               muxDynamicToolMessage "compact-2" "todo_write" "compact-call-b" (todoInput "implemented compact phase" "Implement change" "completed" "high") (todoOutput 1)
+               muxTextMessage "compact-user-3" "user" "verify phase"
+               muxDynamicToolMessage "compact-3" "todo_write" "compact-call-c" (todoInput "verified compact phase" "Verify change" "completed" "medium") (todoOutput 1) |]
+        let out = createObj [ "messages", box messages ]
+        let input = createObj [ "agent", box "manager"; "sessionID", box "mux-compacting-session" ]
+        do! (compactingTransform $ (input, out)) |> unbox<JS.Promise<unit>>
+        let transformed = unbox<obj[]> (get out "messages")
+        let texts =
+            transformed
+            |> Array.collect (fun msg ->
+                let parts = unbox<obj[]> (get msg "parts")
+                parts
+                |> Array.choose (fun part -> if str part "type" = "text" then Some (str part "text") else None))
+        check "mux compacting transform injects folded backlog text" (
+            texts
+            |> Array.exists (fun text ->
+                text.Contains("Completed work from folded turns. File changes are already on disk.")
+                && text.Contains("planned compact phase")))
+}

@@ -45,8 +45,8 @@ let messageTransformUsesMessageTransformCore () =
     check "arch: Opencode MessageTransform uses applyBacklogProjection in compacting path"
         (opencode.Contains "applyBacklogProjection")
     let mux = requireFile "src/Mux/MessageTransform.fs" |> nonCommentCode
-    check "arch: Mux MessageTransform must not call applyBacklogProjection directly"
-        (not (mux.Contains "applyBacklogProjection"))
+    check "arch: Mux MessageTransform uses applyBacklogProjection in compacting path"
+        (mux.Contains "applyBacklogProjection")
     let core = requireFile "src/Shell/MessageTransformCore.fs" |> nonCommentCode
     check "arch: MessageTransformCore defines applyBacklogProjection"
         (core.Contains "let applyBacklogProjection")

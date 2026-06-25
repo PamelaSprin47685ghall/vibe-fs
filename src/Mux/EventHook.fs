@@ -5,6 +5,7 @@ open VibeFs.Kernel
 open VibeFs.Shell.NudgeRuntime
 open VibeFs.Shell
 open VibeFs.Shell.Dyn
+open VibeFs.Mux.KnowledgeGraphTools
 
 type private DecodedHookEvent =
     { eventType: string
@@ -44,7 +45,7 @@ let private parseHookEvent (event: obj) : NudgeRuntimeEvent =
         | "error" when decoded.errorType = "aborted" -> AbortedError decoded.workspaceId
         | _ -> Ignore
 
-let createEventHook (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let createEventHook (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime) : obj =
     let getChatHistory =
         if Dyn.isNullish deps then None
         else
@@ -52,7 +53,16 @@ let createEventHook (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewS
             if Dyn.isNullish getter then None
             else Some (fun (workspaceId: string) -> unbox<JS.Promise<obj array>> (Dyn.call1 getter workspaceId))
 
+    let cleanupOnAbort (event: obj) : unit =
+        match parseHookEvent event with
+        | NudgeRuntime.StreamAbort workspaceId
+        | NudgeRuntime.AbortedError workspaceId when workspaceId <> "" ->
+            reviewStore.deactivateReview workspaceId
+            knowledgeGraphRuntime.DeleteJob workspaceId
+        | _ -> ()
+
     let runtime = createNudgeRuntime reviewStore getChatHistory
     let fn = System.Func<obj, obj, JS.Promise<unit>>(fun event helpers ->
+        cleanupOnAbort event
         runtime.HandleEvent(parseHookEvent event, helpers))
     box fn

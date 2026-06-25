@@ -238,6 +238,26 @@ export interface PluginSlashCommandDefinition {
   execute: (workspaceId: string, args: string) => Promise<string | null>;
 }
 
+/** Payload the Mux host passes after tool execution (mirrors `MuxHookInputCodec.decodeMuxToolExecuteAfterInput`). */
+export interface PluginToolExecuteAfterInput {
+  /** Normalized tool name (e.g. `write`, `coder`, `executor`). */
+  tool: string;
+  sessionID?: string;
+  workspaceId?: string;
+  /** Workspace root; falls back to deps.directory when omitted. */
+  directory?: string;
+  /** Tool arguments as executed (JSON-serialized for bookkeeper when recorded). */
+  args?: unknown;
+  callID?: string;
+}
+
+/** Mutable tool result envelope; `output` may be rewritten in-place on success. */
+export interface PluginToolExecuteAfterOutput {
+  output?: string;
+  /** When non-empty, the hook treats the call as failed and skips bookkeeper append. */
+  error?: string;
+}
+
 export interface PluginRegistration {
   toolNames: string[];
   tools: PluginToolDefinition[];
@@ -249,6 +269,55 @@ export interface PluginRegistration {
   messagesTransform?: (
     input: { workspacePath?: string; workspaceId?: string; effectiveAgentId?: string } & Record<string, unknown>,
     output: { messages: unknown[] },
+  ) => Promise<void>;
+  /**
+   * Post-tool hook for bookkeeper bookkeeping and output hints.
+   * F# `createRegistration` also exposes the same handler under the wire key `tool.execute.after`.
+   */
+  toolExecuteAfter?: (
+    input: PluginToolExecuteAfterInput,
+    output: PluginToolExecuteAfterOutput,
+  ) => Promise<void>;
+  /**
+   * Runs backlog projection on the message list after session compaction (Opencode: `experimental.session.compacting`).
+   */
+  compactingTransform?: (
+    input: { sessionID?: string; workspaceId?: string; workspacePath?: string } & Record<string, unknown>,
+    output: { messages: unknown[] },
+  ) => Promise<void>;
+  /** Mux plugin hook for post-tool bookkeeping (runtime key `tool.execute.after`). */
+  readonly ["tool.execute.after"]?: (
+    input: {
+      tool: string;
+      sessionID?: string;
+      workspaceId?: string;
+      directory?: string;
+      callID?: string;
+      args?: unknown;
+    } & Record<string, unknown>,
+    output: { output: string; error: string; args?: unknown },
+  ) => Promise<void>;
+  /**
+   * Pre-tool hook (runtime key `tool.execute.before`). Sets the `_ui` label on
+   * `output.args` in place; the host keeps the same args reference it passed in.
+   */
+  readonly ["tool.execute.before"]?: (
+    input: {
+      tool: string;
+      sessionID?: string;
+      workspaceId?: string;
+      args?: unknown;
+      callID?: string;
+    } & Record<string, unknown>,
+    output: { args?: unknown } & Record<string, unknown>,
+  ) => Promise<void>;
+  /**
+   * System prompt transform (runtime key `systemTransform`). Clears the system
+   * output by setting `system.length = 0`.
+   */
+  readonly ["systemTransform"]?: (
+    input: { system?: { length?: number } | null } & Record<string, unknown>,
+    output: { system?: { length: number; content?: unknown } | null } & Record<string, unknown>,
   ) => Promise<void>;
   getToolPolicy: (agentId: string, role?: string) => MuxToolPolicy | null;
 }

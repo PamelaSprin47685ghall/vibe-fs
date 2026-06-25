@@ -8,6 +8,7 @@ open VibeFs.Shell
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Kernel.ToolCatalog
+open VibeFs.Kernel.KnowledgeGraphBookkeeperPolicy
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.HookSchema
@@ -63,13 +64,6 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
                         |> String.concat "\n"
                     if formatted <> "" then setHookOutputString output (addSyntax s formatted)
     }
-
-let private bookkeepingSubagentTools =
-    Set [ "coder"; "investigator"; "meditator"; "browser"; "executor"; "websearch"; "webfetch"; "write"; "apply_patch"; "patch" ]
-
-let private recordsToBookkeeper (tool: string) : bool =
-    isFileEditTool tool
-    || Set.contains tool bookkeepingSubagentTools
 
 let private isReadOnlyExecutor (tool: string) (input: obj) : bool =
     tool = "executor" && executorModeFromHookInput input = "ro"

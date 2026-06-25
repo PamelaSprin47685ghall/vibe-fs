@@ -15,7 +15,7 @@ let decodePart (part: obj) : Part<obj> =
     | "text" -> TextPart (decodeTextPart part)
     | "dynamic-tool" ->
         ToolPart(
-            normalizeToolName opencode (Dyn.str part "toolName"),
+            normalizeToolName mux (Dyn.str part "toolName"),
             Dyn.str part "toolCallId",
             decodeMuxDynamicToolState part,
             part
