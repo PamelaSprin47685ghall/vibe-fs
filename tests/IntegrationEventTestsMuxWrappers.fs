@@ -1,10 +1,10 @@
-module VibeFs.Tests.IntegrationEventTestsMuxWrappers
+module Wanxiangshu.Tests.IntegrationEventTestsMuxWrappers
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Shell.Dyn
 
 let syntaxWrapperSpec (reg: obj) = promise {
     let wrappers = unbox<obj[]> (get reg "wrappers")

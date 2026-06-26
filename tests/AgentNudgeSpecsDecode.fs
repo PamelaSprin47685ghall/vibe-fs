@@ -1,8 +1,8 @@
-module VibeFs.Tests.AgentNudgeSpecsDecode
+module Wanxiangshu.Tests.AgentNudgeSpecsDecode
 
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.OpencodeSessionEventCodec
 
 let decodeTodosOpenItems () =
     let todos =

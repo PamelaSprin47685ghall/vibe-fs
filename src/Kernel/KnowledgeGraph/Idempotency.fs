@@ -1,6 +1,6 @@
-module VibeFs.Kernel.KnowledgeGraph.Idempotency
+module Wanxiangshu.Kernel.KnowledgeGraph.Idempotency
 
-open VibeFs.Kernel.Messaging
+open Wanxiangshu.Kernel.Messaging
 
 let returnBookkeeperToolName = "return_bookkeeper"
 

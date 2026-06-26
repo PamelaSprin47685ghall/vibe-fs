@@ -1,4 +1,4 @@
-module VibeFs.Kernel.HostTools
+module Wanxiangshu.Kernel.HostTools
 
 type Host = Opencode | Mimocode | Mux | Omp
 

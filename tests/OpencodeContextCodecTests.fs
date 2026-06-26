@@ -1,10 +1,10 @@
-module VibeFs.Tests.OpencodeContextCodecTests
+module Wanxiangshu.Tests.OpencodeContextCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeContextCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeContextCodec
 
 let abortNullWhenContextNull () =
     let signal = getAbortSignalFromContext null

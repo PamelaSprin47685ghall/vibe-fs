@@ -1,6 +1,6 @@
-module VibeFs.Shell.FuzzyIteratorStore
+module Wanxiangshu.Shell.FuzzyIteratorStore
 
-open VibeFs.Kernel.FuzzyQuery
+open Wanxiangshu.Kernel.FuzzyQuery
 
 type GrepIteratorState = { core: FuzzyGrepState; cursor: obj option }
 

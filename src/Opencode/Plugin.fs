@@ -1,8 +1,8 @@
-module VibeFs.Opencode.Plugin
+module Wanxiangshu.Opencode.Plugin
 
 open Fable.Core
-open VibeFs.Kernel.HostTools
-open VibeFs.Opencode.PluginCore
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Opencode.PluginCore
 
 /// The opencode plugin entry point. This file is loaded directly by the host;
 /// its compiled module must export exactly one factory, because the host's

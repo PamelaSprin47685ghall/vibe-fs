@@ -1,9 +1,9 @@
-module VibeFs.Shell.ExecutorJavascript
+module Wanxiangshu.Shell.ExecutorJavascript
 
 open Fable.Core
 open Fable.Core.JsInterop
 open System.Text.RegularExpressions
-open VibeFs.Kernel
+open Wanxiangshu.Kernel
 
 [<Import("join", "node:path")>]
 let private join (a: string) (b: string) : string = jsNative

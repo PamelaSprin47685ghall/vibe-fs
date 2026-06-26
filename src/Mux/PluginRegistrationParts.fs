@@ -1,21 +1,21 @@
-module VibeFs.Mux.PluginRegistrationParts
+module Wanxiangshu.Mux.PluginRegistrationParts
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Config
-open VibeFs.Shell
-open VibeFs.Mux.Wrappers
-open VibeFs.Mux.WrappersReview
-open VibeFs.Mux.EventHook
-open VibeFs.Mux.SlashCommands
-open VibeFs.Mux.MessageTransform
-open VibeFs.Mux.PluginCatalog
-open VibeFs.Mux.BacklogSession
-open VibeFs.Shell.RuntimeScope
-open VibeFs.Shell.WorkspaceFiles
-open VibeFs.Mux.KnowledgeGraphRuntimeMux
-open VibeFs.Mux.KnowledgeGraphTestHooks
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Shell
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Mux.WrappersReview
+open Wanxiangshu.Mux.EventHook
+open Wanxiangshu.Mux.SlashCommands
+open Wanxiangshu.Mux.MessageTransform
+open Wanxiangshu.Mux.PluginCatalog
+open Wanxiangshu.Mux.BacklogSession
+open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.WorkspaceFiles
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
+open Wanxiangshu.Mux.KnowledgeGraphTestHooks
 
 let createWrapperExecution (toolsObj: obj) (hostReadExec: HostFunctionCapture) (scope: RuntimeScope) : obj =
     createAllWrappers toolsObj hostReadExec scope
@@ -25,7 +25,7 @@ let createMessageTransforms
     (scope: RuntimeScope)
     (backlogSession: BacklogSession)
     (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
-    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     : obj * obj =
     let messagesTransformFn =
         System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
@@ -37,7 +37,7 @@ let createMessageTransforms
 
 let createEventHooksSlashAndPolicy
     (deps: obj)
-    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
     : obj * obj * obj =
     let eventHook = createEventHook deps reviewStore knowledgeGraphRuntime
@@ -49,7 +49,7 @@ let createContextInjector () : obj =
     box {| inject = (fun (projectPath: string) ->
         promise {
             let! files = findCapsFiles projectPath
-            return if List.isEmpty files then box null else box (VibeFs.Kernel.CapsFormat.buildCapitalsContext files)
+            return if List.isEmpty files then box null else box (Wanxiangshu.Kernel.CapsFormat.buildCapitalsContext files)
         } :> obj) |}
 
 let createKnowledgeGraphTestSurface (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime) : obj =
@@ -65,7 +65,7 @@ let createKnowledgeGraphTestSurface (knowledgeGraphRuntime: MuxKnowledgeGraphRun
           "waitForBackgroundJobsForTesting", box (System.Func<JS.Promise<unit>>(fun () -> hooks.WaitJobs()))
           "hasJobForTesting", box (System.Func<string, bool>(fun sessionID -> hooks.HasJob(sessionID))) ]
 
-let createReviewTestSurface (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let createReviewTestSurface (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     createObj
         [ "activateReview",
           box (System.Func<string, string, int64, unit>(fun sessionID task createdAt ->

@@ -1,10 +1,10 @@
-module VibeFs.Tests.SubagentToolPolicyTests
+module Wanxiangshu.Tests.SubagentToolPolicyTests
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Config
-open VibeFs.Kernel.ToolPermission
-open VibeFs.Kernel.SubagentToolPolicy
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Kernel.ToolPermission
+open Wanxiangshu.Kernel.SubagentToolPolicy
 
 let private manualDeniedForMux (extraNames: string array) (role: string) : Set<string> =
     Seq.append extraNames muxSpawnToolUniverse

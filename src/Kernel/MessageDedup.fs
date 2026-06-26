@@ -1,6 +1,6 @@
-module VibeFs.Kernel.MessageDedup
+module Wanxiangshu.Kernel.MessageDedup
 
-open VibeFs.Kernel.Dedup
+open Wanxiangshu.Kernel.Dedup
 
 type ReadPayload = { path: string; content: string }
 

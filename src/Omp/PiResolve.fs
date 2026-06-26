@@ -1,4 +1,4 @@
-module VibeFs.Omp.PiResolve
+module Wanxiangshu.Omp.PiResolve
 
 open Fable.Core
 open Fable.Core.JsInterop

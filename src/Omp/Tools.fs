@@ -1,18 +1,18 @@
-module VibeFs.Omp.Tools
+module Wanxiangshu.Omp.Tools
 
-open VibeFs.Omp.FuzzyTools
-open VibeFs.Omp.KnowledgeGraph.Runtime
-open VibeFs.Omp.KnowledgeGraphTools
-open VibeFs.Omp.MessageTransform
-open VibeFs.Omp.ReviewTools
-open VibeFs.Omp.ExecutorTools
-open VibeFs.Omp.SubagentTools
-open VibeFs.Omp.TodoTool
-open VibeFs.Omp.WebTools
-open VibeFs.Methodology.OmpTools
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.ReviewRuntime
+open Wanxiangshu.Omp.FuzzyTools
+open Wanxiangshu.Omp.KnowledgeGraph.Runtime
+open Wanxiangshu.Omp.KnowledgeGraphTools
+open Wanxiangshu.Omp.MessageTransform
+open Wanxiangshu.Omp.ReviewTools
+open Wanxiangshu.Omp.ExecutorTools
+open Wanxiangshu.Omp.SubagentTools
+open Wanxiangshu.Omp.TodoTool
+open Wanxiangshu.Omp.WebTools
+open Wanxiangshu.Methodology.OmpTools
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.ReviewRuntime
 
 let registerAllTools (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) : unit =
     let finderCache = FinderCache()
@@ -24,6 +24,6 @@ let registerAllTools (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowled
     registerMethodologyTools pi
     registerLoopFeatures pi reviewStore
     registerContextTransform pi reviewStore kgRuntime
-    ensureKnowledgeGraphTools pi kgRuntime (VibeFs.Shell.Dyn.str pi "cwd")
+    ensureKnowledgeGraphTools pi kgRuntime (Wanxiangshu.Shell.Dyn.str pi "cwd")
 
 let resetOmpToolsTestState () = resetOmpKgToolsTestState ()

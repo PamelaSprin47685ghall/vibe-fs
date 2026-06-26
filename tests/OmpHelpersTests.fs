@@ -1,13 +1,13 @@
-module VibeFs.Tests.OmpHelpersTests
+module Wanxiangshu.Tests.OmpHelpersTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Executor
-open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Omp.Plugin
-open VibeFs.Shell.TreeSitterShell
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Kernel.TreeSitterKernel
+open Wanxiangshu.Omp.Plugin
+open Wanxiangshu.Shell.TreeSitterShell
+open Wanxiangshu.Shell.Dyn
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative

@@ -1,14 +1,14 @@
-module VibeFs.Shell.ExecutorSpawn
+module Wanxiangshu.Shell.ExecutorSpawn
 
 open Fable.Core
 open Fable.Core.JsInterop
 open System.Text.RegularExpressions
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Executor
-open VibeFs.Shell.ExecutorJavascript
-open VibeFs.Shell.SessionExecutor
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Shell.ExecutorJavascript
+open Wanxiangshu.Shell.SessionExecutor
+module Dyn = Wanxiangshu.Shell.Dyn
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -36,7 +36,7 @@ let private join (a: string) (b: string) : string = jsNative
 [<Import("mkdirSync", "node:fs")>]
 let private mkdirSync (dir: string) (opts: obj) : unit = jsNative
 
-let executorLogDir : string = join (tmpdir ()) "omp-kunwei-executor"
+let executorLogDir : string = join (tmpdir ()) "omp-wanxiangshu-executor"
 
 let private sanitizeId (id: string) : string = Regex.Replace(id, "/", "-")
 

@@ -1,8 +1,8 @@
-module VibeFs.Shell.ToolContextCodec
+module Wanxiangshu.Shell.ToolContextCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.ToolContext
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ToolContext
+open Wanxiangshu.Shell.Dyn
 
 let firstTrimmedString (o: obj) (keys: string list) : string option =
     keys

@@ -1,9 +1,9 @@
-module VibeFs.Kernel.ReviewPrompts.Format
+module Wanxiangshu.Kernel.ReviewPrompts.Format
 
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 let submitReviewIsWip (wip: bool option) : bool = defaultArg wip true
 

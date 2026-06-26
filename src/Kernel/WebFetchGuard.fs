@@ -1,4 +1,4 @@
-module VibeFs.Kernel.WebFetchGuard
+module Wanxiangshu.Kernel.WebFetchGuard
 
 open System
 

@@ -1,12 +1,12 @@
-module VibeFs.Tests.KernelPromptSpecsHost
+module Wanxiangshu.Tests.KernelPromptSpecsHost
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.ReviewPrompts.Instructions
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.ReviewPrompts.Instructions
 
 let hostKernel' () =
     let coderIntent =

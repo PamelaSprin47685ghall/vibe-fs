@@ -1,8 +1,8 @@
-module VibeFs.Kernel.CapsFormat
+module Wanxiangshu.Kernel.CapsFormat
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 /// A discovered capability file: its absolute path, display label, and content.
 type CapsFile = { filePath: string; label: string; content: string }

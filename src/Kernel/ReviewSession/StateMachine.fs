@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ReviewSession.StateMachine
+module Wanxiangshu.Kernel.ReviewSession.StateMachine
 
-open VibeFs.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewSession.Types
 
 let transition (state: ReviewState) (command: ReviewCommand) : ReviewState * ReviewEvent option =
     match state, command with

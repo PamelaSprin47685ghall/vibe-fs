@@ -1,17 +1,17 @@
-module VibeFs.Kernel.ToolCatalog
+module Wanxiangshu.Kernel.ToolCatalog
 
-open VibeFs.Kernel.ToolCatalog.ToolSpec
-open VibeFs.Kernel.ToolCatalog.Subagent
-open VibeFs.Kernel.ToolCatalog.Search
-open VibeFs.Kernel.ToolCatalog.Web
-open VibeFs.Kernel.ToolCatalog.Executor
-open VibeFs.Kernel.ToolCatalog.KnowledgeGraph
-open VibeFs.Kernel.ToolCatalog.Review
-open VibeFs.Kernel.ToolCatalog.FileIO
+open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
+open Wanxiangshu.Kernel.ToolCatalog.Subagent
+open Wanxiangshu.Kernel.ToolCatalog.Search
+open Wanxiangshu.Kernel.ToolCatalog.Web
+open Wanxiangshu.Kernel.ToolCatalog.Executor
+open Wanxiangshu.Kernel.ToolCatalog.KnowledgeGraph
+open Wanxiangshu.Kernel.ToolCatalog.Review
+open Wanxiangshu.Kernel.ToolCatalog.FileIO
 
-type ToolSpec = VibeFs.Kernel.ToolCatalog.ToolSpec.ToolSpec
+type ToolSpec = Wanxiangshu.Kernel.ToolCatalog.ToolSpec.ToolSpec
 
-let isFileEditTool = VibeFs.Kernel.ToolCatalog.Classification.isFileEditTool
+let isFileEditTool = Wanxiangshu.Kernel.ToolCatalog.Classification.isFileEditTool
 
 let all: ToolSpec list =
     [ coderSpec

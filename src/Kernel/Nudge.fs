@@ -1,4 +1,4 @@
-module VibeFs.Kernel.Nudge
+module Wanxiangshu.Kernel.Nudge
 
 open System.Text.RegularExpressions
 

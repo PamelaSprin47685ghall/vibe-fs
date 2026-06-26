@@ -1,12 +1,12 @@
-module VibeFs.Tests.OmpPluginCoreIntegrationTests
+module Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.RunnerBackground
-open VibeFs.Omp.Plugin
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Omp.Plugin
+module Dyn = Wanxiangshu.Shell.Dyn
 
 type private PiHarness =
     { hookStore: obj
@@ -65,25 +65,25 @@ let private piObject (h: PiHarness) : obj =
     pi?("typebox") <- tb
     pi
 
-/// `kunweiExtension` must be idempotent at the tool-registration level.
+/// `wanxiangshuExtension` must be idempotent at the tool-registration level.
 let extensionIsIdempotent () = promise {
     resetOmpPluginTestState ()
     let h = createHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let count1 = h.tools.Count
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     check "second registration did not add tools" (h.tools.Count = count1)
 }
 
-/// `kunweiExtension` registers the lifecycle hooks `before_agent_start`,
+/// `wanxiangshuExtension` registers the lifecycle hooks `before_agent_start`,
 /// `tool_result`, `agent_end`, `session_start`, `session_shutdown`, and
 /// `input` — all of these handlers should be present in the harness.
 let extensionRegistersLifecycleHooks () = promise {
     resetOmpPluginTestState ()
     let h = createHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let events = Dyn.get h.hookStore "events"
     let has name = Dyn.truthy (Dyn.get events name) && (unbox<obj array> (Dyn.get events name)).Length > 0
     check "before_agent_start hook" (has "before_agent_start")
@@ -96,13 +96,13 @@ let extensionRegistersLifecycleHooks () = promise {
     check "context hook" (has "context")
 }
 
-/// After `kunweiExtension`, the shared `reviewStore` is wired such that
+/// After `wanxiangshuExtension`, the shared `reviewStore` is wired such that
 /// pre-activation through the exposed handle is visible to a tool.
 let reviewStoreSharedWithTools () = promise {
     resetOmpPluginTestState ()
     let h = createHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let sessionId = "shared-store-1"
     reviewStore.activateReview(sessionId, "t", 0L)
     check "plugin pre-activation visible" (reviewStore.isReviewActive sessionId)

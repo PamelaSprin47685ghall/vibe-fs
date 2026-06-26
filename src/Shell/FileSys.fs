@@ -1,11 +1,11 @@
-module VibeFs.Shell.FileSys
+module Wanxiangshu.Shell.FileSys
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Shell.TreeSitterShell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.TreeSitterKernel
+open Wanxiangshu.Shell.TreeSitterShell
 
 [<Import("createHash", "node:crypto")>]
 let private createHash (algorithm: string) : obj = jsNative

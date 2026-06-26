@@ -1,9 +1,9 @@
-module VibeFs.Shell.FuzzyToolsCodec
+module Wanxiangshu.Shell.FuzzyToolsCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.FuzzyQuery
-open VibeFs.Shell.DynField
-open VibeFs.Shell.FuzzySearch
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Shell.DynField
+open Wanxiangshu.Shell.FuzzySearch
 
 let private patternRequiredOnFirstCall = "pattern is required on the first call"
 

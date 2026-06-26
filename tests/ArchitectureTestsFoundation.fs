@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsFoundation
+module Wanxiangshu.Tests.ArchitectureTestsFoundation
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 /// Kernel layer must stay free of FFI, Dyn, obj, Shell references.
 /// Enforced at the directory level (src/Kernel/*.fs) regardless of
@@ -16,7 +16,7 @@ let kernelBoundary () =
         let path = "src/Kernel/" + f
         let content = requireFile path
         check ("arch: " + f + " Dyn-free") (not (content.Contains "Dyn."))
-        check ("arch: " + f + " no open Shell") (not (content.Contains "open VibeFs.Shell"))
+        check ("arch: " + f + " no open Shell") (not (content.Contains "open Wanxiangshu.Shell"))
 
 let kernelNoEmptyDefault () =
     for f in fsFilesRelative "src/Kernel" do
@@ -26,8 +26,8 @@ let kernelNoEmptyDefault () =
 let shellLayering () =
     for f in fsFilesRelative "src/Shell" do
         let content = requireFile ("src/Shell/" + f)
-        check ("arch: " + f + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
-        check ("arch: " + f + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
+        check ("arch: " + f + " no Opencode ref") (not (content.Contains "Wanxiangshu.Opencode"))
+        check ("arch: " + f + " no Mux ref") (not (content.Contains "Wanxiangshu.Mux"))
 
 let private sourceDirs =
     [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"; "src/Omp"|]
@@ -115,13 +115,13 @@ let private forbiddenMuxOpencodeProjectionPatterns =
 let opencodeNoMuxRef () =
     for f in fsFilesRelative "src/Opencode" do
         let content = requireFile ("src/Opencode/" + f)
-        check ("arch: Opencode/" + f + " no VibeFs.Mux ref") (not (content.Contains "VibeFs.Mux"))
+        check ("arch: Opencode/" + f + " no Wanxiangshu.Mux ref") (not (content.Contains "Wanxiangshu.Mux"))
 
 /// Mux adapter must not depend on Opencode modules.
 let muxNoOpencodeRef () =
     for f in fsFilesRelative "src/Mux" do
         let content = requireFile ("src/Mux/" + f)
-        check ("arch: Mux/" + f + " no VibeFs.Opencode ref") (not (content.Contains "VibeFs.Opencode"))
+        check ("arch: Mux/" + f + " no Wanxiangshu.Opencode ref") (not (content.Contains "Wanxiangshu.Opencode"))
 
 /// Mux backlog / SessionProjection must not route through the Opencode host key.
 let muxBacklogUsesMuxHost () =
@@ -135,8 +135,8 @@ let ompBoundary () =
     for path in fsFilesRecursive "src/Omp" do
         let content = requireFile path
         let label = path.Replace("src/Omp/", "")
-        check ("arch: " + label + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
-        check ("arch: " + label + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
+        check ("arch: " + label + " no Opencode ref") (not (content.Contains "Wanxiangshu.Opencode"))
+        check ("arch: " + label + " no Mux ref") (not (content.Contains "Wanxiangshu.Mux"))
         check ("arch: " + label + " no engine ref") (not (content.Contains "engine/"))
 
 let ompNoEngineRef () =

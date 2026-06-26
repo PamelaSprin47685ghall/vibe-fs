@@ -1,8 +1,8 @@
-module VibeFs.Shell.RunnerBackground
+module Wanxiangshu.Shell.RunnerBackground
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell.SessionExecutor
+open Wanxiangshu.Shell.SessionExecutor
 
 [<Import("writeFileSync", "node:fs")>]
 let private writeFileSync (path: string) (content: string) : unit = jsNative

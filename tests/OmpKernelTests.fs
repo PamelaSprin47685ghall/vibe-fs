@@ -1,10 +1,10 @@
-module VibeFs.Tests.OmpKernelTests
+module Wanxiangshu.Tests.OmpKernelTests
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.OmpSessionTools
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.WebFetchGuard
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.OmpSessionTools
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.WebFetchGuard
 
 let private mainSessionActive =
     [| "read"; "edit"; "write"; "find"; "fuzzy_find"; "fuzzy_grep"; "lsp"; "browser"; "search"; "glob"

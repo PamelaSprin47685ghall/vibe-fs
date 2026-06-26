@@ -1,11 +1,11 @@
-module VibeFs.Tests.OmpRunnerTests
+module Wanxiangshu.Tests.OmpRunnerTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.OmpSessionTools
-open VibeFs.Shell.RunnerBackground
-open VibeFs.Shell.SessionExecutor
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.OmpSessionTools
+open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Shell.SessionExecutor
 
 let private reset () = resetRunnerJobsForTesting ()
 

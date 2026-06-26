@@ -1,25 +1,25 @@
-module VibeFs.Tests.TestsArchitectureRegistry
+module Wanxiangshu.Tests.TestsArchitectureRegistry
 
 open Fable.Core
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsFoundation
-open VibeFs.Tests.ArchitectureTestsMessageTransform
-open VibeFs.Tests.ArchitectureTestsMessageTransformCaps
-open VibeFs.Tests.ArchitectureTestsSubagent
-open VibeFs.Tests.ArchitectureTestsSubagentToolExec
-open VibeFs.Tests.ArchitectureTestsRuntime
-open VibeFs.Tests.ArchitectureTestsRuntimeSession
-open VibeFs.Tests.ArchitectureTestsRuntimeKg
-open VibeFs.Tests.ArchitectureTestsWireToolExec
-open VibeFs.Tests.ArchitectureTestsWireHook
-open VibeFs.Tests.ArchitectureTestsWirePipeline
-open VibeFs.Tests.ArchitectureTestsWirePayload
-open VibeFs.Tests.ArchitectureTestsMuxToolCore
-open VibeFs.Tests.ArchitectureTestsMuxToolAux
-open VibeFs.Tests.ArchitectureTestsMuxToolAuxKg
-open VibeFs.Tests.ArchitectureTestsOpencodeTools
-open VibeFs.Tests.ArchitectureTestsOmp
-open VibeFs.Tests.TestsTestBody
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsFoundation
+open Wanxiangshu.Tests.ArchitectureTestsMessageTransform
+open Wanxiangshu.Tests.ArchitectureTestsMessageTransformCaps
+open Wanxiangshu.Tests.ArchitectureTestsSubagent
+open Wanxiangshu.Tests.ArchitectureTestsSubagentToolExec
+open Wanxiangshu.Tests.ArchitectureTestsRuntime
+open Wanxiangshu.Tests.ArchitectureTestsRuntimeSession
+open Wanxiangshu.Tests.ArchitectureTestsRuntimeKg
+open Wanxiangshu.Tests.ArchitectureTestsWireToolExec
+open Wanxiangshu.Tests.ArchitectureTestsWireHook
+open Wanxiangshu.Tests.ArchitectureTestsWirePipeline
+open Wanxiangshu.Tests.ArchitectureTestsWirePayload
+open Wanxiangshu.Tests.ArchitectureTestsMuxToolCore
+open Wanxiangshu.Tests.ArchitectureTestsMuxToolAux
+open Wanxiangshu.Tests.ArchitectureTestsMuxToolAuxKg
+open Wanxiangshu.Tests.ArchitectureTestsOpencodeTools
+open Wanxiangshu.Tests.ArchitectureTestsOmp
+open Wanxiangshu.Tests.TestsTestBody
 
 let architectureTestEntriesPartA () : (string * TestBody) list =
     [
@@ -121,7 +121,7 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
     "ArchitectureTests.messageTransformUsesPipeline", Sync (sync ArchitectureTestsWirePipeline.messageTransformUsesPipeline)
     ]
 
-open VibeFs.Tests.TestsArchitectureRegistryB
+open Wanxiangshu.Tests.TestsArchitectureRegistryB
 
 let architectureTestEntries () : (string * TestBody) list =
     architectureTestEntriesPartA () @ architectureTestEntriesPartB ()

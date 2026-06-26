@@ -1,27 +1,27 @@
-module VibeFs.Omp.SessionLifecycleHooks
+module Wanxiangshu.Omp.SessionLifecycleHooks
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.OmpSessionTools
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Omp.ChildSession
-open VibeFs.Omp.Codec
-open VibeFs.Omp.HookExecute
-open VibeFs.Omp.MessageTransform
-open VibeFs.Omp.OmpTestHooks
-open VibeFs.Omp.MessagingCodec
-open VibeFs.Omp.KnowledgeGraph.Runtime
-open VibeFs.Omp.NudgeRuntime
-open VibeFs.Omp.KnowledgeGraphTools
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.WorkBacklog
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Shell.RunnerBackground
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Shell.FuzzyIteratorStore
-open VibeFs.Shell.ReviewRuntime
+open Wanxiangshu.Kernel.OmpSessionTools
+open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.TreeSitterKernel
+open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.HookExecute
+open Wanxiangshu.Omp.MessageTransform
+open Wanxiangshu.Omp.OmpTestHooks
+open Wanxiangshu.Omp.MessagingCodec
+open Wanxiangshu.Omp.KnowledgeGraph.Runtime
+open Wanxiangshu.Omp.NudgeRuntime
+open Wanxiangshu.Omp.KnowledgeGraphTools
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Shell.ReviewRuntime
 
 /// Tools whose every user-facing invocation is durable enough to feed the
 /// knowledge graph bookkeeper as an input/output black box. Direct write
@@ -88,7 +88,7 @@ let agentEndHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : unit =
             if tryLoopNudge sessionId last then
                 pi?sendMessage(
                     createObj [
-                        "customType", box "kunwei-loop-reminder"
+                        "customType", box "wanxiangshu-loop-reminder"
                         "content", box (loopReminderContent ())
                         "display", box false
                     ],
@@ -98,7 +98,7 @@ let agentEndHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : unit =
             if tryTodoNudge sessionId sm last then
                 pi?sendMessage(
                     createObj [
-                        "customType", box "kunwei-todo-reminder"
+                        "customType", box "wanxiangshu-todo-reminder"
                         "content", box (todoReminderContent ())
                         "display", box false
                     ],

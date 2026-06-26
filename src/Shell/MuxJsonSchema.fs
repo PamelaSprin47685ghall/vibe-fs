@@ -1,8 +1,8 @@
-module VibeFs.Shell.MuxJsonSchema
+module Wanxiangshu.Shell.MuxJsonSchema
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Shell.JsonSchemaBuilders
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Shell.JsonSchemaBuilders
 
 let muxStrReq = jsonStrReq
 let muxStrOpt = jsonStrProp

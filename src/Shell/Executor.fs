@@ -1,12 +1,12 @@
-module VibeFs.Shell.Executor
+module Wanxiangshu.Shell.Executor
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Executor
-open VibeFs.Shell.ExecutorSpawn
-open VibeFs.Shell.ExecutorSpawnRunners
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Shell.ExecutorSpawn
+open Wanxiangshu.Shell.ExecutorSpawnRunners
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -17,7 +17,7 @@ let defaultExecuteDeps = ExecutorSpawnRunners.defaultExecuteDeps
 let missingExecutableFor = ExecutorSpawn.missingExecutableFor
 
 let abortExecutorRun (sessionId: string) : unit =
-    VibeFs.Shell.SessionExecutor.abortExecutorRun sessionId
+    Wanxiangshu.Shell.SessionExecutor.abortExecutorRun sessionId
 
 let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcome: RunOutcome)
                : ExecuteResult =

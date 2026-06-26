@@ -1,16 +1,16 @@
-module VibeFs.Tests.IntegrationMuxReviewSpecs
+module Wanxiangshu.Tests.IntegrationMuxReviewSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Tests.IntegrationMuxSetup
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.IntegrationMuxSetup
 
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Mux.Plugin
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Shell.Dyn
 
 
 let muxSubmitReviewNoActiveReviewSpec () = promise {

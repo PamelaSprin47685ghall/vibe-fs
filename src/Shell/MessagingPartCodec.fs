@@ -1,9 +1,9 @@
 // Kernel Messaging tree decode (tool state, text parts, host wire shapes).
 // For dedup / text projection on msg.parts only, use HostMessagePartCodec.
-module VibeFs.Shell.MessagingPartCodec
+module Wanxiangshu.Shell.MessagingPartCodec
 
-open VibeFs.Kernel.Messaging
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell.Dyn
 
 let operationActionFromInput (input: obj) : string =
     if Dyn.isNullish input then ""

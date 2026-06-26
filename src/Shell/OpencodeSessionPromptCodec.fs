@@ -1,7 +1,7 @@
-module VibeFs.Shell.OpencodeSessionPromptCodec
+module Wanxiangshu.Shell.OpencodeSessionPromptCodec
 
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 let tryDecodePromptModelFromModelString (modelString: string) : obj option =
     if modelString = "" then None

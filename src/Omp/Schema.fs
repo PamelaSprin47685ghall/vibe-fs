@@ -1,4 +1,4 @@
-module VibeFs.Omp.Schema
+module Wanxiangshu.Omp.Schema
 
 open Fable.Core.JsInterop
 

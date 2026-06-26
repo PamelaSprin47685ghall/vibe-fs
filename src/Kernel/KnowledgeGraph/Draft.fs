@@ -1,8 +1,8 @@
-module VibeFs.Kernel.KnowledgeGraph.Draft
+module Wanxiangshu.Kernel.KnowledgeGraph.Draft
 
 open System
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Id
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Id
 
 let private normalizeEntities (entities: string list) : string list =
     entities

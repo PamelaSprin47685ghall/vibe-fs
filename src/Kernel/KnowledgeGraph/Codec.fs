@@ -1,9 +1,9 @@
-module VibeFs.Kernel.KnowledgeGraph.Codec
+module Wanxiangshu.Kernel.KnowledgeGraph.Codec
 
 open Thoth.Json
 
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
 
 let private versionDecoder : Decoder<int> =
     Decode.oneOf [ Decode.int; Decode.map int Decode.string ]

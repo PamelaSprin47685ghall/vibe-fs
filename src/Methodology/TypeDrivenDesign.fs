@@ -1,6 +1,6 @@
-module VibeFs.Methodology.TypeDrivenDesign
+module Wanxiangshu.Methodology.TypeDrivenDesign
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ToolCatalog.Params
+module Wanxiangshu.Kernel.ToolCatalog.Params
 
-open VibeFs.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.ToolCatalog
 
 let private doc tool field = paramDoc tool field
 let private coder = doc "coder"

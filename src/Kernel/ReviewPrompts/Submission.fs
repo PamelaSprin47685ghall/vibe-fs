@@ -1,8 +1,8 @@
-module VibeFs.Kernel.ReviewPrompts.Submission
+module Wanxiangshu.Kernel.ReviewPrompts.Submission
 
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.ReviewPrompts.Instructions
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.ReviewPrompts.Instructions
 
 let doubleCheckChallenge =
     "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"

@@ -1,22 +1,22 @@
-module VibeFs.Opencode.ReviewerLoop
+module Wanxiangshu.Opencode.ReviewerLoop
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Opencode.SessionIo
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeClientCodec
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Opencode.SessionIo
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeClientCodec
 
 let private maxNudges = 3
 
 /// Create a reviewer child session under the given parent, register it, and
 /// return the child id (empty string on failure).
-let createReviewerChild (registry: ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+let createReviewerChild (registry: ChildAgentRegistry) (client: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
                         (directory: string) (parentID: string option)
                         (sessionID: string) (title: string) : JS.Promise<string> =
     promise {
@@ -50,7 +50,7 @@ let private textParts (parts: string list) : obj array =
 /// up to `maxNudges` times if the reviewer hasn't submitted.  Loop control is
 /// delegated to the pure `decideAfterRound` / `promptParts` primitives in
 /// `Kernel.ReviewSession`.
-let runReviewerLoop (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+let runReviewerLoop (client: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
                     (childID: string) (initialParts: string list) (abortSignal: obj)
                     : JS.Promise<ReviewResult> =
     promise {
@@ -87,7 +87,7 @@ let runReviewerLoop (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.Revie
 
 /// Run a pre-review session (used by /loop-review): create a reviewer child,
 /// prompt it with review instructions + task, wait for the verdict.
-let runReviewerSession (registry: ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+let runReviewerSession (registry: ChildAgentRegistry) (client: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
                        (directory: string) (sessionID: string) (task: string)
                        : JS.Promise<ReviewResult> =
     promise {
@@ -102,7 +102,7 @@ let runReviewerSession (registry: ChildAgentRegistry) (client: obj) (reviewStore
 /// Run a submit-review (used by the submit_review tool): create a reviewer
 /// child, prompt it with review instructions + change report + affected files +
 /// original task, wait for the verdict.
-let runSubmitReview (registry: ChildAgentRegistry) (client: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+let runSubmitReview (registry: ChildAgentRegistry) (client: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
                     (directory: string) (sessionID: string)
                     (report: string) (affectedFiles: string list)
                     (task: string) (abortSignal: obj)

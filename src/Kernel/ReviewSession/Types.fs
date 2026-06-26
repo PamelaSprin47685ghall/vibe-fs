@@ -1,4 +1,4 @@
-module VibeFs.Kernel.ReviewSession.Types
+module Wanxiangshu.Kernel.ReviewSession.Types
 
 [<RequireQualifiedAccess>]
 type ReviewState =

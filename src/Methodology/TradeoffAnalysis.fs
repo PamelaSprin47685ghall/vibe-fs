@@ -1,6 +1,6 @@
-module VibeFs.Methodology.TradeoffAnalysis
+module Wanxiangshu.Methodology.TradeoffAnalysis
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

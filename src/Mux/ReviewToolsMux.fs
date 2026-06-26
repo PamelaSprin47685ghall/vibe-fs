@@ -1,27 +1,27 @@
-module VibeFs.Mux.ReviewToolsMux
+module Wanxiangshu.Mux.ReviewToolsMux
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Kernel.ReviewVerdict
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.ToolCopy
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Shell.ReviewToolsCodec
-open VibeFs.Shell.ToolExecute
-open VibeFs.Shell.ToolRuntimeContext
-open VibeFs.Kernel.ToolResult
-open VibeFs.Mux.Delegate
-open VibeFs.Mux.Wrappers
-open VibeFs.Mux.SubagentTools
-open VibeFs.Shell
-open VibeFs.Shell.PromiseStr
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewVerdict
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.ToolCopy
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.ReviewToolsCodec
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Mux.Delegate
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Mux.SubagentTools
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.PromiseStr
+open Wanxiangshu.Shell.Dyn
 
 let private extractHistoryTexts (history: obj array) : string list =
     history

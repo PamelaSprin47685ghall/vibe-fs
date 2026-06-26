@@ -1,7 +1,7 @@
-module VibeFs.Tests.ArchitectureTestsRuntime
+module Wanxiangshu.Tests.ArchitectureTestsRuntime
 
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let toolContextCodecUsesKernelType () =
     let codec = requireFile "src/Shell/ToolContextCodec.fs" |> nonCommentCode
@@ -83,7 +83,7 @@ let sessionIoUsesOpencodeSessionSpawnCodec () =
 let agentConfigUsesOpencodeAgentConfigWire () =
     let code = requireFile "src/Opencode/AgentConfig.fs" |> nonCommentCode
     let wire = requireFile "src/Shell/OpencodeAgentConfigWire.fs" |> nonCommentCode
-    check "arch: OpencodeAgentConfigWire module exists" (wire.Contains "module VibeFs.Shell.OpencodeAgentConfigWire")
+    check "arch: OpencodeAgentConfigWire module exists" (wire.Contains "module Wanxiangshu.Shell.OpencodeAgentConfigWire")
     check "arch: AgentConfig uses decodeUserAgentScalars"
         (code.Contains "decodeUserAgentScalars")
     check "arch: AgentConfig uses encodeAgentScalarsRecord"

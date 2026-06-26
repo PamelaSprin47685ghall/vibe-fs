@@ -1,10 +1,10 @@
-module VibeFs.Shell.ChatHookOutputCodec
+module Wanxiangshu.Shell.ChatHookOutputCodec
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Config
-open VibeFs.Kernel.HostTools
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeAgentConfigCodec
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeAgentConfigCodec
 
 let chatMessageFromHookOutput (output: obj) : obj option =
     let message = Dyn.get output "message"

@@ -1,20 +1,20 @@
-module VibeFs.Tests.OmpReviewTests
+module Wanxiangshu.Tests.OmpReviewTests
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.OmpPluginTestsHarness
-open VibeFs.Kernel.OmpSessionTools
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Omp.ChildSession
-open VibeFs.Omp.PiResolve
-open VibeFs.Omp.Plugin
-open VibeFs.Omp.ReviewLoop
-open VibeFs.Omp.ReviewTools
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Shell.RunnerBackground
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.OmpPluginTestsHarness
+open Wanxiangshu.Kernel.OmpSessionTools
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Omp.PiResolve
+open Wanxiangshu.Omp.Plugin
+open Wanxiangshu.Omp.ReviewLoop
+open Wanxiangshu.Omp.ReviewTools
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private jsUndefined : obj = emitJsExpr () "undefined"
 let private notifyCapture (notifications: ResizeArray<string>) : obj =
@@ -25,7 +25,7 @@ let loopInputHandledMessageAndNotify () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let notifications = ResizeArray<string>()
     let ctx =
         createObj [
@@ -62,7 +62,7 @@ let returnReviewerVerdictPassReject () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let tool = h.tools |> Seq.find (fun t -> str t "name" = "return_reviewer")
     let reviewSessionId = "review-child-1"
     let task = "review loop task"
@@ -87,7 +87,7 @@ let returnReviewerViaSetPendingStateForTest () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let tool = h.tools |> Seq.find (fun t -> str t "name" = "return_reviewer")
     let reviewSessionId = "review-child-1"
     let parentSessionId = "parent-1"

@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsWirePipeline
+module Wanxiangshu.Tests.ArchitectureTestsWirePipeline
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let messageTransformUsesBacklogSessionOpsFrom () =
     let core = requireFile "src/Shell/MessageTransformCore.fs" |> nonCommentCode

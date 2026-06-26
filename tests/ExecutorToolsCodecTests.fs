@@ -1,11 +1,11 @@
-module VibeFs.Tests.ExecutorToolsCodecTests
+module Wanxiangshu.Tests.ExecutorToolsCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Executor
-open VibeFs.Shell.ExecutorToolsCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Shell.ExecutorToolsCodec
 
 let decodeExecutorInvalidLanguage () =
     let args =

@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsSubagentToolExec
+module Wanxiangshu.Tests.ArchitectureTestsSubagentToolExec
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let muxSubagentToolsUsesToolArgsDecode () =
     let mux = requireFile "src/Mux/SubagentTools.fs" |> nonCommentCode

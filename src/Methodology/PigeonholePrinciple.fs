@@ -1,6 +1,6 @@
-module VibeFs.Methodology.PigeonholePrinciple
+module Wanxiangshu.Methodology.PigeonholePrinciple
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

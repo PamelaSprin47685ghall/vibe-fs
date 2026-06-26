@@ -1,15 +1,15 @@
-module VibeFs.Tests.IntegrationEventTests
+module Wanxiangshu.Tests.IntegrationEventTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.IntegrationEventTestsMux
-open VibeFs.Tests.IntegrationEventTestsMuxWrappers
-open VibeFs.Tests.IntegrationEventTestsOpencode
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Mux.Plugin
-open VibeFs.Opencode.Plugin
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.IntegrationEventTestsMux
+open Wanxiangshu.Tests.IntegrationEventTestsMuxWrappers
+open Wanxiangshu.Tests.IntegrationEventTestsOpencode
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Shell.Dyn
 
 let eventHookSpec (reg: obj) = promise {
     let hook = get reg "eventHook"

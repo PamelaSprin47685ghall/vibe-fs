@@ -1,10 +1,10 @@
-module VibeFs.Tests.OpencodeAgentConfigCodecTests
+module Wanxiangshu.Tests.OpencodeAgentConfigCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeAgentConfigCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeAgentConfigCodec
 
 let decodeScalarsEmptyPromptAndMode () =
     let userAgent = createObj []

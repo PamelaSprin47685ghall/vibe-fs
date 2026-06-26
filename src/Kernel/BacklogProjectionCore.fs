@@ -1,10 +1,10 @@
-module VibeFs.Kernel.BacklogProjectionCore
+module Wanxiangshu.Kernel.BacklogProjectionCore
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 let todoWriteToolNameFor (host: Host) : string = todoWriteToolName host
 let todoWriteToolNameDefault = todoWriteToolNameFor opencode

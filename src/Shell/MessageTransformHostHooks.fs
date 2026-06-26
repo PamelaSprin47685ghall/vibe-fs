@@ -1,11 +1,11 @@
-module VibeFs.Shell.MessageTransformHostHooks
+module Wanxiangshu.Shell.MessageTransformHostHooks
 
 open Fable.Core
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Kernel.Config
-open VibeFs.Shell.CapsFileCache
-open VibeFs.Shell.MessageTransformPipeline
-open VibeFs.Shell.RuntimeScope
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Shell.CapsFileCache
+open Wanxiangshu.Shell.MessageTransformPipeline
+open Wanxiangshu.Shell.RuntimeScope
 
 type CapsLoadPolicy =
     | RequireDirectory

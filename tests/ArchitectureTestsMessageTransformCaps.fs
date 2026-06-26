@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsMessageTransformCaps
+module Wanxiangshu.Tests.ArchitectureTestsMessageTransformCaps
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let muxMessageTransformUsesReadDedupMuxPlugin () =
     let code = requireFile "src/Mux/MessageTransform.fs" |> nonCommentCode

@@ -1,15 +1,15 @@
-module VibeFs.Tests.IntegrationToolDefSpecs
+module Wanxiangshu.Tests.IntegrationToolDefSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
 open System
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Opencode.Plugin
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Shell.Dyn
 
-open VibeFs.Tests.IntegrationToolDefSpecsMimo
+open Wanxiangshu.Tests.IntegrationToolDefSpecsMimo
 
 let toolDefinitionSpec () = promise {
     let! workspaceDir = mkdtempAsync "tool-definition-"
@@ -33,15 +33,15 @@ let toolDefinitionSpec () = promise {
     let reportSchema = get todoProps "completedWorkReport"
     let required = unbox<obj[]> (get todoSchema "required") |> Array.map string
     check "tool.definition builds todo report field" (str reportSchema "type" = "string")
-    check "tool.definition builds todo report description" (str reportSchema "description" = VibeFs.Kernel.WorkBacklog.reportDesc)
+    check "tool.definition builds todo report description" (str reportSchema "description" = Wanxiangshu.Kernel.WorkBacklog.reportDesc)
     check "tool.definition requires todo report" (required |> Array.contains "completedWorkReport")
     check "tool.definition requires todos" (required |> Array.contains "todos")
-    check "tool.definition builds todos description" (str (get todoProps "todos") "description" = VibeFs.Kernel.WorkBacklog.todosDesc)
+    check "tool.definition builds todos description" (str (get todoProps "todos") "description" = Wanxiangshu.Kernel.WorkBacklog.todosDesc)
     let todoItemProps = get (get (get todoProps "todos") "items") "properties"
-    check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = VibeFs.Kernel.WorkBacklog.todoContentDesc)
-    check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = VibeFs.Kernel.WorkBacklog.todoStatusDesc)
-    check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = VibeFs.Kernel.WorkBacklog.todoPriorityDesc)
-    let! mimoP = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+    check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = Wanxiangshu.Kernel.WorkBacklog.todoContentDesc)
+    check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = Wanxiangshu.Kernel.WorkBacklog.todoStatusDesc)
+    check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = Wanxiangshu.Kernel.WorkBacklog.todoPriorityDesc)
+    let! mimoP = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let mimoTd = get mimoP "tool.definition"
     let taskParams =
         createObj [

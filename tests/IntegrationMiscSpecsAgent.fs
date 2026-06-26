@@ -1,13 +1,13 @@
-module VibeFs.Tests.IntegrationMiscSpecsAgent
+module Wanxiangshu.Tests.IntegrationMiscSpecsAgent
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Opencode.Plugin
-open VibeFs.Opencode.AgentConfig
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Opencode.AgentConfig
+open Wanxiangshu.Shell.Dyn
 
 let agentConfigSpec () = promise {
     let! workspaceDir = mkdtempAsync "agent-config-"
@@ -89,7 +89,7 @@ let disableMimoMemoryAndCheckpointPreservesUserAgentSpec () = promise {
 
 let applyAgentConfigForMimoDisablesWorkflowSpec () = promise {
     let cfg = createObj []
-    let next = applyAgentConfigFor VibeFs.Kernel.HostTools.mimocode cfg (createObj [])
+    let next = applyAgentConfigFor Wanxiangshu.Kernel.HostTools.mimocode cfg (createObj [])
     let agents = get next "agent"
     for name in [| "manager"; "build"; "plan"; "coder"; "investigator"; "meditator"; "bookkeeper"; "reviewer"; "browser"; "executor" |] do
         let agent = get agents name

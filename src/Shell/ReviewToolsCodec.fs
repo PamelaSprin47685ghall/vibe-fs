@@ -1,9 +1,9 @@
-module VibeFs.Shell.ReviewToolsCodec
+module Wanxiangshu.Shell.ReviewToolsCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.ReviewVerdict
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.DynField
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ReviewVerdict
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
 
 type SubmitReviewArgs = {
     Report: string

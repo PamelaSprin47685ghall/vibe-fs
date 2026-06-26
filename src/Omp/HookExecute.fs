@@ -1,10 +1,10 @@
-module VibeFs.Omp.HookExecute
+module Wanxiangshu.Omp.HookExecute
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.SubagentIntentsCodec
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.SubagentIntentsCodec
+module Dyn = Wanxiangshu.Shell.Dyn
 
 /// Inject a UI label into the host-side args object so the chat UI sees a one-line
 /// summary before the agent finishes. Mirrors `Opencode.HookSchema.setUiLabel`

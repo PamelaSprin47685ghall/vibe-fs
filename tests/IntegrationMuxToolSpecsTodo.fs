@@ -1,15 +1,15 @@
-module VibeFs.Tests.IntegrationMuxToolSpecsTodo
+module Wanxiangshu.Tests.IntegrationMuxToolSpecsTodo
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Tests.IntegrationMuxSetup
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Mux.Plugin
-open VibeFs.Shell.RuntimeScope
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.IntegrationMuxSetup
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.Dyn
 
 let muxTodoWriteWrapperSchemaSpec () = promise {
     let reg = sharedMuxRegistration ()

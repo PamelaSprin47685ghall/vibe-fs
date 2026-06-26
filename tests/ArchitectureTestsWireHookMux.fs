@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsWireHookMux
+module Wanxiangshu.Tests.ArchitectureTestsWireHookMux
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let muxPluginToolExecuteAfterUsesMuxHookInputCodec () =
     let code = requireFile "src/Mux/PluginCatalog.fs" |> nonCommentCode

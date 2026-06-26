@@ -1,15 +1,15 @@
-module VibeFs.Omp.KnowledgeGraphRuntimeIO
+module Wanxiangshu.Omp.KnowledgeGraphRuntimeIO
 
 open Fable.Core
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Shell.KnowledgeGraphSubmit
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Shell.KnowledgeGraphSubmit
+open Wanxiangshu.Shell.Dyn
 
-module Dyn = VibeFs.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
-let buildEntries = VibeFs.Shell.KnowledgeGraphSubmit.buildEntriesFromDrafts
+let buildEntries = Wanxiangshu.Shell.KnowledgeGraphSubmit.buildEntriesFromDrafts
 
 let extractTexts (entry: obj) : string list =
     if Dyn.typeIs entry "string" then [ string entry ]
@@ -50,4 +50,4 @@ let tryResolveJobContext (getEntries: (unit -> obj array) option) (sessionID: st
 
 let submitForKind (root: string) (todayStr: string) (entries: KnowledgeGraphEntry list) (kind: KnowledgeGraphJobKind)
     : JS.Promise<string> =
-    VibeFs.Shell.KnowledgeGraphSubmit.submitEntriesForKind 30000L 1000 root todayStr entries kind
+    Wanxiangshu.Shell.KnowledgeGraphSubmit.submitEntriesForKind 30000L 1000 root todayStr entries kind

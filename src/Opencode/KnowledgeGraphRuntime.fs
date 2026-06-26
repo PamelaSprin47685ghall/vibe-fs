@@ -1,24 +1,24 @@
-module VibeFs.Opencode.KnowledgeGraphRuntime
+module Wanxiangshu.Opencode.KnowledgeGraphRuntime
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Prompts
-open VibeFs.Kernel.KnowledgeGraph.Maintenance
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.KnowledgeGraphStorage
-open VibeFs.Shell.KnowledgeGraphWorkflow
-open VibeFs.Shell.KnowledgeGraphMaintenanceRun
-open VibeFs.Shell.KnowledgeGraphBookkeeperLaunch
-open VibeFs.Shell.KnowledgeGraphRuntimeTestPorts
-open VibeFs.Shell.PromiseQueue
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Opencode.KnowledgeGraphRuntimeIO
-open VibeFs.Shell.DelegatedAiSettings
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Prompts
+open Wanxiangshu.Kernel.KnowledgeGraph.Maintenance
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.KnowledgeGraphStorage
+open Wanxiangshu.Shell.KnowledgeGraphWorkflow
+open Wanxiangshu.Shell.KnowledgeGraphMaintenanceRun
+open Wanxiangshu.Shell.KnowledgeGraphBookkeeperLaunch
+open Wanxiangshu.Shell.KnowledgeGraphRuntimeTestPorts
+open Wanxiangshu.Shell.PromiseQueue
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Opencode.KnowledgeGraphRuntimeIO
+open Wanxiangshu.Shell.DelegatedAiSettings
 
 /// KnowledgeGraph host IO shell (P53/P72): holds the single mutable state cell and
 /// serializes every state+IO change through `commandQueue`. All pure state

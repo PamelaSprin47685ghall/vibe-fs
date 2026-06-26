@@ -337,7 +337,7 @@ export function deduplicateModelReadOutputsWithSeen(
   messages: ReadonlyArray<unknown>,
 ): [string[], unknown[]];
 
-declare module "vibe-fs/omp" {
+declare module "wanxiangshu/omp" {
   export interface OmpReviewStore {
     activateReview(sessionId: string, task: string, createdAt: number): void;
     deactivateReview(sessionId: string): void;
@@ -377,5 +377,5 @@ declare module "vibe-fs/omp" {
   export const reviewStore: OmpReviewStore;
   export const _test: OmpPluginTestExports;
 
-  export default function kunweiExtension(pi: unknown): Promise<void>;
+  export default function wanxiangshuExtension(pi: unknown): Promise<void>;
 }

@@ -1,13 +1,13 @@
-module VibeFs.Shell.NudgeRuntime
+module Wanxiangshu.Shell.NudgeRuntime
 
 open Fable.Core
-open VibeFs.Shell.Dyn
-open VibeFs.Kernel
-open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.Nudge.TodoStatus
-open VibeFs.Kernel.Nudge.SubmitReviewHooks
-open VibeFs.Kernel.NudgeState
-open VibeFs.Kernel.Nudge.Types
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
+open Wanxiangshu.Kernel.NudgeState
+open Wanxiangshu.Kernel.Nudge.Types
 
 type NudgeRuntimeEvent =
     | Ignore
@@ -130,7 +130,7 @@ let private collectSnapshot
 
 let private runNudgeFlow
     (holder: StateHolder<NudgeShellState>)
-    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (getChatHistory: (string -> JS.Promise<obj array>) option)
     (helpers: obj)
     (workspaceId: string)
@@ -162,7 +162,7 @@ let private runNudgeFlow
 
 let private startNudgeFlow
     (holder: StateHolder<NudgeShellState>)
-    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (getChatHistory: (string -> JS.Promise<obj array>) option)
     (helpers: obj)
     (workspaceId: string)
@@ -171,7 +171,7 @@ let private startNudgeFlow
     runNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage |> Promise.start
 
 type NudgeRuntime
-    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore,
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore,
      getChatHistory: (string -> JS.Promise<obj array>) option) =
 
     let holder = StateHolder<NudgeShellState>(emptyState)
@@ -193,7 +193,7 @@ type NudgeRuntime
         }
 
 let createNudgeRuntime
-    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (getChatHistory: (string -> JS.Promise<obj array>) option)
     : NudgeRuntime =
     NudgeRuntime(reviewStore, getChatHistory)

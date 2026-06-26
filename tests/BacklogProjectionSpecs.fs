@@ -1,18 +1,18 @@
-module VibeFs.Tests.BacklogProjectionSpecs
+module Wanxiangshu.Tests.BacklogProjectionSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.BacklogMessageBuilders
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.BacklogMessageBuilders
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Message
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.BacklogProjection
-open VibeFs.Opencode.BacklogSession
-open VibeFs.Opencode.MessagingCodec
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.RuntimeScope
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Message
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.BacklogProjection
+open Wanxiangshu.Opencode.BacklogSession
+open Wanxiangshu.Opencode.MessagingCodec
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.RuntimeScope
 
 
 let projectBacklogFolds () =

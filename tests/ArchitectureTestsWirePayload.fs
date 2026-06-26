@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsWirePayload
+module Wanxiangshu.Tests.ArchitectureTestsWirePayload
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 /// `Shell/OpencodeSessionEventCodec.fs` is the canonical boundary decoder
 /// for Opencode session event payloads. All Opencode consumers (NudgeEffect,

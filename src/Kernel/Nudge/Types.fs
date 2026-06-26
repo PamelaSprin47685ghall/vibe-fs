@@ -1,4 +1,4 @@
-module VibeFs.Kernel.Nudge.Types
+module Wanxiangshu.Kernel.Nudge.Types
 
 type FreshAssistantSnapshot =
     { lastAssistantMessage: string

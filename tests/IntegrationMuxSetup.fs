@@ -1,8 +1,8 @@
-module VibeFs.Tests.IntegrationMuxSetup
+module Wanxiangshu.Tests.IntegrationMuxSetup
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 
 let muxToolConfig (directory: string) (sessionID: string) : obj =

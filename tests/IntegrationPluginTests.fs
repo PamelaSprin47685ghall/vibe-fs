@@ -1,16 +1,16 @@
-module VibeFs.Tests.IntegrationPluginTests
+module Wanxiangshu.Tests.IntegrationPluginTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationPluginTestsCommon
-open VibeFs.Tests.IntegrationPluginTestsMimo
-open VibeFs.Mux.Plugin
-open VibeFs.Opencode.Plugin
-open VibeFs.Shell.TreeSitterShell
-open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationPluginTestsCommon
+open Wanxiangshu.Tests.IntegrationPluginTestsMimo
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Shell.TreeSitterShell
+open Wanxiangshu.Kernel.TreeSitterKernel
+open Wanxiangshu.Shell.Dyn
 
 let syntaxSpec () = promise {
     let! result = checkSyntax "const x = 1;" "test.js"
@@ -93,7 +93,7 @@ let run () : JS.Promise<unit> =
         let! p = plugin (box {| directory = workspaceDir |})
         pluginShape p
         do! systemTransformSpec p
-        let reg = VibeFs.Tests.IntegrationToolSetup.sharedMuxRegistration ()
+        let reg = Wanxiangshu.Tests.IntegrationToolSetup.sharedMuxRegistration ()
         registrationShape reg
         topLevelExportsSpec ()
         do! syntaxSpec ()

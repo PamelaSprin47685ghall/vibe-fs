@@ -1,28 +1,28 @@
-module VibeFs.Opencode.ExecutorTool
+module Wanxiangshu.Opencode.ExecutorTool
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Executor
-open VibeFs.Kernel.HostTools
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Kernel.HostTools
 
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.ToolCopy
-open VibeFs.Opencode.ToolSchema
-open VibeFs.Opencode.SessionIo
-open VibeFs.Kernel.ToolResult
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.ExecutorToolsCodec
-open VibeFs.Shell.RuntimeScope
-open VibeFs.Shell.ToolRuntimeContext
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeClientCodec
-open VibeFs.Shell.ToolExecute
-open VibeFs.Shell.SubagentToolExecute
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.ToolCopy
+open Wanxiangshu.Opencode.ToolSchema
+open Wanxiangshu.Opencode.SessionIo
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.ExecutorToolsCodec
+open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.SubagentToolExecute
 
 [<Global("Buffer")>]
 let private nodeBuffer : obj = jsNative
@@ -52,7 +52,7 @@ let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (session
                         sessionScope.EnqueuePerSession(sessionID, fun () ->
                             let options = toExecuteOptions (Some runtime.Execution.Directory) decoded
                             promise {
-                                let! result = VibeFs.Shell.Executor.execute options sessionID
+                                let! result = Wanxiangshu.Shell.Executor.execute options sessionID
                                 let output = outputFromResult result
                                 if not (shouldSummarize byteLength output) then
                                     let formatted = formatToolResponse result None

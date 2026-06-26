@@ -1,6 +1,6 @@
-module VibeFs.Methodology.RiskAnalysis
+module Wanxiangshu.Methodology.RiskAnalysis
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

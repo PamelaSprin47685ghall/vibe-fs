@@ -1,6 +1,6 @@
-module VibeFs.Methodology.AnalysisSynthesis
+module Wanxiangshu.Methodology.AnalysisSynthesis
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

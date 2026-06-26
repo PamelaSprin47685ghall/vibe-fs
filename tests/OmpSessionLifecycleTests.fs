@@ -1,11 +1,11 @@
-module VibeFs.Tests.OmpSessionLifecycleTests
+module Wanxiangshu.Tests.OmpSessionLifecycleTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Omp.ChildSession
-open VibeFs.Omp.SessionLifecycle
-open VibeFs.Omp.SessionLifecycleHooks
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Omp.SessionLifecycle
+open Wanxiangshu.Omp.SessionLifecycleHooks
 
 /// `recordsToBookkeeper` must accept every file-edit tool via `isFileEditTool`
 /// (apply_patch, edit, write, ast_edit, …) plus the explicit subagent and IO

@@ -1,4 +1,4 @@
-module VibeFs.Shell.KnowledgeGraphPortLock
+module Wanxiangshu.Shell.KnowledgeGraphPortLock
 
 open Fable.Core
 open Fable.Core.JsInterop

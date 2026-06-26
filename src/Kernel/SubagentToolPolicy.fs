@@ -1,7 +1,7 @@
-module VibeFs.Kernel.SubagentToolPolicy
+module Wanxiangshu.Kernel.SubagentToolPolicy
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.ToolPermission
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.ToolPermission
 
 /// Union of caller-supplied names and the host tool universe, then emit every name
 /// denied for `role` under `canUseForHost` (used for Mux `toolPolicy.disabledTools`).

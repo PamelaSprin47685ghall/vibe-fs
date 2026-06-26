@@ -1,13 +1,13 @@
-module VibeFs.Omp.ReviewToolsLoop
+module Wanxiangshu.Omp.ReviewToolsLoop
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Omp.Codec
-open VibeFs.Omp.ReviewLoop
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Shell.ReviewRuntime
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.ReviewLoop
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ReviewRuntime
 
 let loopCommand = "loop"
 
@@ -32,7 +32,7 @@ let handleLoopReviewCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: 
                     store.activateReview(sessionId, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
                     pi?sendMessage(
                         createObj [
-                            "customType", box "kunwei-loop-precheck"
+                            "customType", box "wanxiangshu-loop-precheck"
                             "content",
                                 box(
                                     String.concat
@@ -63,7 +63,7 @@ let handleLoopCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: obj) :
                 store.activateReview(sessionId, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
                 pi?sendMessage(
                     createObj [
-                        "customType", box "kunwei-loop-activate"
+                        "customType", box "wanxiangshu-loop-activate"
                         "content",
                             box(
                                 String.concat

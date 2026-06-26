@@ -1,8 +1,8 @@
-module VibeFs.Shell.ErrorClassify
+module Wanxiangshu.Shell.ErrorClassify
 
 open Fable.Core
-open VibeFs.Shell.Dyn
-open VibeFs.Kernel.Domain
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.Domain
 
 let translateJsError (error: obj) : DomainError =
     let rec classify (value: obj) (seen: obj list) =

@@ -1,16 +1,16 @@
-module VibeFs.Opencode.KnowledgeGraphRuntimeIO
+module Wanxiangshu.Opencode.KnowledgeGraphRuntimeIO
 
 open Fable.Core
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Shell.KnowledgeGraphSubmit
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Shell.KnowledgeGraphSubmit
 
-let buildEntries = VibeFs.Shell.KnowledgeGraphSubmit.buildEntriesFromDrafts
+let buildEntries = Wanxiangshu.Shell.KnowledgeGraphSubmit.buildEntriesFromDrafts
 
 let submitForKind (portLockTimeoutMs: int64) (portLockRetryDelayMs: int) (todayStr: string) (root: string) (kind: KnowledgeGraphJobKind) (drafts: KnowledgeGraphDraft list) : JS.Promise<string> =
-    VibeFs.Shell.KnowledgeGraphSubmit.submitDraftsForKind portLockTimeoutMs portLockRetryDelayMs root todayStr drafts kind
+    Wanxiangshu.Shell.KnowledgeGraphSubmit.submitDraftsForKind portLockTimeoutMs portLockRetryDelayMs root todayStr drafts kind
 
-let tryResolveJobContext = VibeFs.Opencode.KnowledgeGraphSessionMessages.tryResolveJobContext
+let tryResolveJobContext = Wanxiangshu.Opencode.KnowledgeGraphSessionMessages.tryResolveJobContext
 
-let loadSessionMessages = VibeFs.Opencode.KnowledgeGraphSessionMessages.loadSessionMessages
+let loadSessionMessages = Wanxiangshu.Opencode.KnowledgeGraphSessionMessages.loadSessionMessages

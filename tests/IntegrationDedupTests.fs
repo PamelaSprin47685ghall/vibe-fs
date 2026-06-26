@@ -1,28 +1,28 @@
-module VibeFs.Tests.IntegrationDedupTests
+module Wanxiangshu.Tests.IntegrationDedupTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationDedupOpenCodeSpecs
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationDedupOpenCodeSpecs
 
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Opencode.Plugin
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Shell.Dyn
 
 let private deduplicateReadOutputs (messages: obj array) : obj array =
-    VibeFs.Mux.ReadDedup.deduplicateReadOutputsWithSeen [||] messages
+    Wanxiangshu.Mux.ReadDedup.deduplicateReadOutputsWithSeen [||] messages
 
 let private deduplicateReadOutputsAgainstHistory (history: obj array) (messages: obj array) : obj array =
-    let seenByPath = VibeFs.Mux.ReadDedup.collectReadOutputsByPath history
-    VibeFs.Mux.ReadDedup.deduplicateReadOutputsWithSeenByPath seenByPath messages
+    let seenByPath = Wanxiangshu.Mux.ReadDedup.collectReadOutputsByPath history
+    Wanxiangshu.Mux.ReadDedup.deduplicateReadOutputsWithSeenByPath seenByPath messages
 
 let private deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj array =
-    VibeFs.Mux.ReadDedup.deduplicateModelReadOutputsWithSeen seenOutputs messages
+    Wanxiangshu.Mux.ReadDedup.deduplicateModelReadOutputsWithSeen seenOutputs messages
 
 let private collectReadOutputs (messages: obj array) : string[] =
-    VibeFs.Mux.ReadDedup.collectReadOutputs messages
+    Wanxiangshu.Mux.ReadDedup.collectReadOutputs messages
 
 let private fileReadOutput (content: string) : obj =
     box {| success = true; file_size = content.Length; modifiedTime = "2024-01-01T00:00:00.000Z"; lines_read = 1; content = content |}

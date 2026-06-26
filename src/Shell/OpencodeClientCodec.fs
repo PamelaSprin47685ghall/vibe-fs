@@ -1,7 +1,7 @@
-module VibeFs.Shell.OpencodeClientCodec
+module Wanxiangshu.Shell.OpencodeClientCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.Dyn
 
 let getClientFromPluginCtx (ctx: obj) : Result<obj, DomainError> =
     let client = Dyn.get ctx "client"

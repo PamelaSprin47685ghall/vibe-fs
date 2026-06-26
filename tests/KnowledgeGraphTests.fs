@@ -1,13 +1,13 @@
-module VibeFs.Tests.KnowledgeGraphTests
+module Wanxiangshu.Tests.KnowledgeGraphTests
 
 open Fable.Core
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.JobTesting
-open VibeFs.Kernel.Messaging
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.JobTesting
+open Wanxiangshu.Kernel.Messaging
 
-open VibeFs.Tests.KnowledgeGraphTestsCodec
+open Wanxiangshu.Tests.KnowledgeGraphTestsCodec
 
 let private ok r =
     match r with

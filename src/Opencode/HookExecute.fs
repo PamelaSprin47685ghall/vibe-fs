@@ -1,26 +1,26 @@
-module VibeFs.Opencode.HookExecute
+module Wanxiangshu.Opencode.HookExecute
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.KnowledgeGraph.BookkeeperPolicy
-open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Opencode.AgentConfig
-open VibeFs.Opencode.HookSchema
-open VibeFs.Opencode.KnowledgeGraphRuntime
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.OpencodeHookInputCodec
-open VibeFs.Shell.TreeSitterShell
-open VibeFs.Shell.ToolRuntimeContext
-open VibeFs.Shell.PatchToolsCodec
-open VibeFs.Shell.ToolExecute
-open VibeFs.Kernel.ToolResult
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.KnowledgeGraph.BookkeeperPolicy
+open Wanxiangshu.Kernel.TreeSitterKernel
+open Wanxiangshu.Opencode.AgentConfig
+open Wanxiangshu.Opencode.HookSchema
+open Wanxiangshu.Opencode.KnowledgeGraphRuntime
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.OpencodeHookInputCodec
+open Wanxiangshu.Shell.TreeSitterShell
+open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Shell.PatchToolsCodec
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Shell.Dyn
 
 let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) : unit =
     if toolNameFromHookInput input <> "apply_patch" then ()
@@ -72,11 +72,11 @@ let private bookkeeperInput (input: obj) : string =
     let args = argsFromHookInput input
     if Dyn.isNullish args then "" else JS.JSON.stringify args
 
-let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserver: VibeFs.Opencode.SessionLifecycleObserver.SessionLifecycleObserver) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (registry: ChildAgentRegistry) (input: obj) (output: obj) : JS.Promise<unit> =
+let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserver: Wanxiangshu.Opencode.SessionLifecycleObserver.SessionLifecycleObserver) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (registry: ChildAgentRegistry) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         do! appendSyntaxDiagnostics pluginDirectory input output
         let tool = toolNameFromHookInput input
-        let sessionID = VibeFs.Kernel.Domain.Id.sessionIdValue (fromOpencode input pluginDirectory).Execution.SessionId
+        let sessionID = Wanxiangshu.Kernel.Domain.Id.sessionIdValue (fromOpencode input pluginDirectory).Execution.SessionId
         let succeeded = hookOutputError output = ""
         let originalOutput = hookOutputText output
         if succeeded && recordsToBookkeeper tool && not (isReadOnlyExecutor tool input) && (registry.LookupChildAgent sessionID).IsNone then

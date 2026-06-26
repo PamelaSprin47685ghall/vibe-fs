@@ -1,12 +1,12 @@
-module VibeFs.Shell.OpencodeSessionEventNudge
+module Wanxiangshu.Shell.OpencodeSessionEventNudge
 
-open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.Nudge.RetryProgress
-open VibeFs.Kernel.NudgeState
-open VibeFs.Kernel.Nudge.Types
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.ErrorClassify
-open VibeFs.Shell.OpencodeSessionEventCodecCommon
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.Nudge.RetryProgress
+open Wanxiangshu.Kernel.NudgeState
+open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 
 /// Pure event type to NudgeHostEvent mappings — no payload inspection required.
 let private pureMap =

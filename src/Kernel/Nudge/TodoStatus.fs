@@ -1,7 +1,7 @@
-module VibeFs.Kernel.Nudge.TodoStatus
+module Wanxiangshu.Kernel.Nudge.TodoStatus
 
-open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.PromptFragments
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.PromptFragments
 
 /// Terminal todo statuses that should NOT count as open work.
 type TodoStatus = Completed | Cancelled | Abandoned | InProgress | Pending

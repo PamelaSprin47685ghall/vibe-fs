@@ -1,15 +1,15 @@
-module VibeFs.Tests.IntegrationEventTestsOpencode
+module Wanxiangshu.Tests.IntegrationEventTestsOpencode
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Opencode.Plugin
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeSessionEventCodec
 
 let toolExecuteAfterSpec (p: obj) = promise {
     let output = createObj [ "output", box "Todos updated" ]

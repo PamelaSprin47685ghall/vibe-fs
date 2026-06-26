@@ -1,10 +1,10 @@
-module VibeFs.Shell.KnowledgeGraphStorage
+module Wanxiangshu.Shell.KnowledgeGraphStorage
 
 open Fable.Core
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.KnowledgeGraphPortLock
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.KnowledgeGraphPortLock
 
 let defaultPortLockTimeoutMs = 30000L
 let defaultPortLockRetryDelayMs = 1000

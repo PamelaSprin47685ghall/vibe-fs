@@ -1,10 +1,10 @@
-module VibeFs.Tests.ToolContextCodecTests
+module Wanxiangshu.Tests.ToolContextCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.ToolContextCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.ToolContextCodec
 
 let decodeMuxConfigMissingWorkspaceId () =
     let config = createObj []

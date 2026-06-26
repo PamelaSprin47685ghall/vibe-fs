@@ -1,8 +1,8 @@
-module VibeFs.Kernel.SearchPrompts
+module Wanxiangshu.Kernel.SearchPrompts
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 type SearchResult =
     { title: string

@@ -1,8 +1,8 @@
-module VibeFs.Kernel.ReviewSession.Query
+module Wanxiangshu.Kernel.ReviewSession.Query
 
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Kernel.ReviewSession.StateMachine
-open VibeFs.Kernel.ReviewSession.Registry
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewSession.StateMachine
+open Wanxiangshu.Kernel.ReviewSession.Registry
 
 let sessionIsActive registry id =
     Map.tryFind id registry |> Option.map (fun s -> isActive s.state) |> Option.defaultValue false

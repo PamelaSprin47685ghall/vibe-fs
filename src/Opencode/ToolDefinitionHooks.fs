@@ -1,18 +1,18 @@
-module VibeFs.Opencode.ToolDefinitionHooks
+module Wanxiangshu.Opencode.ToolDefinitionHooks
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.WorkBacklog
-open VibeFs.Opencode.AgentConfig
-open VibeFs.Opencode.HookSchema
-open VibeFs.Opencode.BacklogSession
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeHookInputCodec
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Opencode.AgentConfig
+open Wanxiangshu.Opencode.HookSchema
+open Wanxiangshu.Opencode.BacklogSession
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeHookInputCodec
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 

@@ -1,8 +1,8 @@
-module VibeFs.Shell.OpencodeSessionSpawnCodec
+module Wanxiangshu.Shell.OpencodeSessionSpawnCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.DynField
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
 
 let decodeChildSessionIdFromCreateResult (createResult: obj) : Result<string, DomainError> =
     if Dyn.isNullish createResult then

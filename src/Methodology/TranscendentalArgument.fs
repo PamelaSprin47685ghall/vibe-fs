@@ -1,6 +1,6 @@
-module VibeFs.Methodology.TranscendentalArgument
+module Wanxiangshu.Methodology.TranscendentalArgument
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

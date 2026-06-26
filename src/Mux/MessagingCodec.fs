@@ -1,14 +1,14 @@
-module VibeFs.Mux.MessagingCodec
+module Wanxiangshu.Mux.MessagingCodec
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.MessagingPartCodec
-open VibeFs.Shell.MessagingEncodeHelpers
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.MessagingPartCodec
+open Wanxiangshu.Shell.MessagingEncodeHelpers
 
 let decodePart (part: obj) : Part<obj> =
     match Dyn.str part "type" with

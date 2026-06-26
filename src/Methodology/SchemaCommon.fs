@@ -1,4 +1,4 @@
-module VibeFs.Methodology.SchemaCommon
+module Wanxiangshu.Methodology.SchemaCommon
 
 open System
 open System.Text
@@ -148,7 +148,7 @@ let buildSchema
       meditatorRole = meditatorRole
       outputSections = outputSections }
 
-let toToolCatalogSpec (schema: MethodologySchema) : VibeFs.Kernel.ToolCatalog.ToolSpec =
+let toToolCatalogSpec (schema: MethodologySchema) : Wanxiangshu.Kernel.ToolCatalog.ToolSpec =
     let paramDocs =
         schema.fields
         |> List.map (fun f -> f.name, f.description)

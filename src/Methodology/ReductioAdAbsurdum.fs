@@ -1,6 +1,6 @@
-module VibeFs.Methodology.ReductioAdAbsurdum
+module Wanxiangshu.Methodology.ReductioAdAbsurdum
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

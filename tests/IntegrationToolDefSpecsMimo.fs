@@ -1,20 +1,20 @@
-module VibeFs.Tests.IntegrationToolDefSpecsMimo
+module Wanxiangshu.Tests.IntegrationToolDefSpecsMimo
 
 open Fable.Core
 open Fable.Core.JsInterop
 open System
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Opencode.Plugin
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.ToolResult
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Shell.Dyn
 
 let mimoApplyPatchExecuteBeforeSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-apply-patch-before-"
-    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+    let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let teb = get p "tool.execute.before"
     let stringArgsOut = createObj [ "args", box "*** Begin Patch\n*** End Patch" ]
     do! teb $ (createObj [ "tool", box "apply_patch"; "sessionID", box "s1"; "callID", box "c1" ], stringArgsOut) |> unbox<JS.Promise<unit>>
@@ -37,7 +37,7 @@ let mimoApplyPatchExecuteBeforeSpec () = promise {
 
 let mimoTaskExecuteRoundTripSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-before-after-"
-    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+    let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let taskTool = get (get p "tool") "task"
     let args = createObj [
         "completedWorkReport", box "Detailed backlog report"
@@ -50,7 +50,7 @@ let mimoTaskExecuteRoundTripSpec () = promise {
 
 let mimoTaskExecuteNestedReportSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-nested-report-"
-    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+    let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let taskTool = get (get p "tool") "task"
     let args = createObj [
         "completedWorkReport", box "Nested report is no longer supported"
@@ -63,7 +63,7 @@ let mimoTaskExecuteNestedReportSpec () = promise {
 
 let mimoTaskExecuteInPlaceStripSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-inplace-"
-    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+    let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let teb = get p "tool.execute.before"
     let originalArgs = createObj [ "completedWorkReport", box "top-level report text"; "todos", box [||] ]
     let beforeOut = createObj [ "args", box originalArgs ]
@@ -74,7 +74,7 @@ let mimoTaskExecuteInPlaceStripSpec () = promise {
 
 let mimoTaskExecuteStripsTaskIdSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-strip-task-id-"
-    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+    let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let taskTool = get (get p "tool") "task"
     let args = createObj [
         "completedWorkReport", box "noop report"
@@ -88,7 +88,7 @@ let mimoTaskExecuteStripsTaskIdSpec () = promise {
 
 let mimoTaskDefinitionHandlesZodLikeParametersSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-zod-params-"
-    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+    let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let td = get p "tool.definition"
     let extendCalls = ResizeArray<obj>()
     let arrayCalls = ResizeArray<string>()
@@ -135,7 +135,7 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () = promise {
     check "mimo task.definition builds methodology from zod string template" (obj.ReferenceEquals(get extendCalls.[0] "select_methodology", describedMethodology))
     check "mimo task.definition calls zod array for methodology" (arrayCalls.Count = 1)
     check "mimo task.definition calls zod min 1 for methodology" (minCalls.Count = 1 && minCalls.[0] = 1)
-    check "mimo task.definition describes methodology field" (describeCalls.Count = 1 && describeCalls.[0] = VibeFs.Opencode.HookSchema.selectMethodologyFieldDescription)
+    check "mimo task.definition describes methodology field" (describeCalls.Count = 1 && describeCalls.[0] = Wanxiangshu.Opencode.HookSchema.selectMethodologyFieldDescription)
     check "mimo task.definition makes methodology required" (optionalCalls.Count = 0)
     do! rmAsync workspaceDir
 }

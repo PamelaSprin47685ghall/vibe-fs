@@ -1,18 +1,18 @@
-module VibeFs.Methodology.OmpTools
+module Wanxiangshu.Methodology.OmpTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Methodology.SchemaCommon
-open VibeFs.Methodology.Args
-open VibeFs.Methodology.Registry
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.HostTools
-open VibeFs.Omp.ChildSession
-open VibeFs.Omp.Codec
-open VibeFs.Omp.OmpToolSchema
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.Args
+open Wanxiangshu.Methodology.Registry
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.OmpToolSchema
+open Wanxiangshu.Shell.Dyn
 
-module Dyn = VibeFs.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private executeSchema (pi: obj) (schema: MethodologySchema) =
     fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->

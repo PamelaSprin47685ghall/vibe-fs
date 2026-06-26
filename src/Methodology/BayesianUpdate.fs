@@ -1,6 +1,6 @@
-module VibeFs.Methodology.BayesianUpdate
+module Wanxiangshu.Methodology.BayesianUpdate
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

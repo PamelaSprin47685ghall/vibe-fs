@@ -1,8 +1,8 @@
-module VibeFs.Shell.PatchToolsCodec
+module Wanxiangshu.Shell.PatchToolsCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.DynField
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
 
 type ApplyPatchFields = { PatchText: string }
 

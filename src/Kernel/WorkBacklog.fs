@@ -1,8 +1,8 @@
-module VibeFs.Kernel.WorkBacklog
+module Wanxiangshu.Kernel.WorkBacklog
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.BacklogProjectionCore
 
 let private toolDescriptionHeader =
     "Manage a structured todo list and preserve a compact append-only work backlog. "
@@ -20,7 +20,7 @@ let toolDescriptionFor (host: Host) =
     + "\n- Always provide the full todos list. Partial updates are not supported.\n\n"
     + toolDescriptionTail
     + "\n\n"
-    + VibeFs.Kernel.Methodology.selectMethodologyFieldDescription
+    + Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription
 
 let toolDescription = toolDescriptionFor opencode
 

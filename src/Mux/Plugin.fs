@@ -1,10 +1,10 @@
-module VibeFs.Mux.Plugin
+module Wanxiangshu.Mux.Plugin
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Mux.PluginCatalog
-open VibeFs.Mux.ReadDedup
-open VibeFs.Shell.WorkspaceFiles
+open Wanxiangshu.Mux.PluginCatalog
+open Wanxiangshu.Mux.ReadDedup
+open Wanxiangshu.Shell.WorkspaceFiles
 
 let muxToolNames = PluginCatalog.muxToolNames
 
@@ -12,10 +12,10 @@ let getPluginToolPolicy (agentId: string) (role: obj) : obj =
     buildToolPolicy muxToolNames role
 
 let collectReadOutputs (messages: obj array) : string[] =
-    VibeFs.Shell.ReadDedupMuxPlugin.collectReadOutputs messages
+    Wanxiangshu.Shell.ReadDedupMuxPlugin.collectReadOutputs messages
 
 let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : obj[] =
-    VibeFs.Shell.ReadDedupMuxPlugin.deduplicateReadOutputsWithSeen seenOutputs messages
+    Wanxiangshu.Shell.ReadDedupMuxPlugin.deduplicateReadOutputsWithSeen seenOutputs messages
 
 let deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj[] =
     ReadDedup.deduplicateModelReadOutputsWithSeen seenOutputs messages
@@ -50,4 +50,4 @@ let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]
 
 let createToolCatalog = PluginCatalog.createToolCatalog
 
-let createRegistration = VibeFs.Mux.PluginRegistration.createRegistration
+let createRegistration = Wanxiangshu.Mux.PluginRegistration.createRegistration

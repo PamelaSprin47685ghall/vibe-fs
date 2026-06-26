@@ -1,12 +1,12 @@
-module VibeFs.Omp.ReadDedup
+module Wanxiangshu.Omp.ReadDedup
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.MessageDedup
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.TreeSitterShell
+open Wanxiangshu.Kernel.MessageDedup
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.TreeSitterShell
 
-module Dyn = VibeFs.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private setOutput (state: obj) (v: string) : unit = state?output <- v
 

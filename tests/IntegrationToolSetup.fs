@@ -1,15 +1,15 @@
-module VibeFs.Tests.IntegrationToolSetup
+module Wanxiangshu.Tests.IntegrationToolSetup
 
 open Fable.Core
 open Fable.Core.JsInterop
 
-open VibeFs.Mux.Plugin
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Codec
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Codec
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Shell.Dyn
 
 [<Import("createRequire", "node:module")>]
 let private createRequire' : string -> (string -> obj) = jsNative

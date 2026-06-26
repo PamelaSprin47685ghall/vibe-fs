@@ -1,18 +1,18 @@
-module VibeFs.Opencode.NudgeEffect
+module Wanxiangshu.Opencode.NudgeEffect
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.NudgeState
-open VibeFs.Kernel.Nudge.Types
-open VibeFs.Kernel.HostTools
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeClientCodec
-open VibeFs.Shell.OpencodeSessionEventCodec
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.ErrorClassify
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.NudgeState
+open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.ErrorClassify
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
     unbox (target?(method)(arg))
@@ -61,7 +61,7 @@ let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string opt
     }
 
 let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
-                          (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+                          (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
                           (registry: ChildAgentRegistry)
                           (sessionID: SessionId) : JS.Promise<unit> =
     promise {
@@ -92,7 +92,7 @@ let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
     }
 
 let startNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
-                    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+                    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
                     (registry: ChildAgentRegistry)
                     (sessionID: SessionId) : unit =
     runNudgeFlow holder client reviewStore registry sessionID |> Promise.start

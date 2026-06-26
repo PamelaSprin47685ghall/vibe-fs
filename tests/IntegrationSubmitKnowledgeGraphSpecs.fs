@@ -1,17 +1,17 @@
-module VibeFs.Tests.IntegrationSubmitKnowledgeGraphSpecs
+module Wanxiangshu.Tests.IntegrationSubmitKnowledgeGraphSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Opencode.Plugin
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.Dyn
 
-open VibeFs.Tests.IntegrationSubmitKnowledgeGraphSpecsAppend
+open Wanxiangshu.Tests.IntegrationSubmitKnowledgeGraphSpecsAppend
 
 let submitKnowledgeGraphRejectsSecondCallSpec () = promise {
     let! workspaceDir = mkdtempAsync "kg-second-call-"

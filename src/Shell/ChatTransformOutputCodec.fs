@@ -1,7 +1,7 @@
-module VibeFs.Shell.ChatTransformOutputCodec
+module Wanxiangshu.Shell.ChatTransformOutputCodec
 
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 let tryGetMessagesArrayFromOutput (output: obj) : obj array option =
     let messages = Dyn.get output "messages"

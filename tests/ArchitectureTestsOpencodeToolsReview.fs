@@ -1,7 +1,7 @@
-module VibeFs.Tests.ArchitectureTestsOpencodeToolsReview
+module Wanxiangshu.Tests.ArchitectureTestsOpencodeToolsReview
 
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let opencodeReviewUsesToolCopy () =
     let code = requireFile "src/Opencode/ReviewTools.fs" |> nonCommentCode

@@ -1,11 +1,11 @@
-module VibeFs.Shell.MuxAiSettingsCodec
+module Wanxiangshu.Shell.MuxAiSettingsCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.ToolContext
-open VibeFs.Shell.DelegatedAiSettings
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.DynField
-open VibeFs.Shell.ToolContextCodec
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ToolContext
+open Wanxiangshu.Shell.DelegatedAiSettings
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
+open Wanxiangshu.Shell.ToolContextCodec
 
 module ConfigKeys =
     let subagentAiDefaults = "subagentAiDefaults"

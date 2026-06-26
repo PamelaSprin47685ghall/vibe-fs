@@ -1,6 +1,6 @@
 /// Shared assertion toolkit for the test suite.  A tiny problem should not pay
 /// a framework tax — these mutable counters are the only cross-file state.
-module VibeFs.Tests.Assert
+module Wanxiangshu.Tests.Assert
 
 open Fable.Core
 

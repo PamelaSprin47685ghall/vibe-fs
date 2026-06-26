@@ -1,6 +1,6 @@
-module VibeFs.Methodology.HermeneuticCircle
+module Wanxiangshu.Methodology.HermeneuticCircle
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

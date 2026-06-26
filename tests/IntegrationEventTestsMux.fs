@@ -1,14 +1,14 @@
-module VibeFs.Tests.IntegrationEventTestsMux
+module Wanxiangshu.Tests.IntegrationEventTestsMux
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.IntegrationMuxSetup
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Mux.Plugin
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.IntegrationMuxSetup
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Shell.Dyn
 
 let repeatedTodoNudgeSpec () = promise {
     let mutable history = [| muxTextMessage "repeat-assistant-1" "assistant" "first" |]

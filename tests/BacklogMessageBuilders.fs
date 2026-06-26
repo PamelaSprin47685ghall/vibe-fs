@@ -1,10 +1,10 @@
-module VibeFs.Tests.BacklogMessageBuilders
+module Wanxiangshu.Tests.BacklogMessageBuilders
 
 open Fable.Core
 open Fable.Core.JsInterop
 
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.BacklogProjectionCore
 
 
 let mkInfo (id: string) (role: Role) : MessageInfo<obj> =

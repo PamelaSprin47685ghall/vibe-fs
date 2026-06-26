@@ -1,6 +1,6 @@
-module VibeFs.Methodology.MonteCarloSampling
+module Wanxiangshu.Methodology.MonteCarloSampling
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

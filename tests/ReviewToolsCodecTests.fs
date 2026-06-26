@@ -1,10 +1,10 @@
-module VibeFs.Tests.ReviewToolsCodecTests
+module Wanxiangshu.Tests.ReviewToolsCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.ReviewToolsCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.ReviewToolsCodec
 
 let decodeSubmitReviewMissingReport () =
     let args = createObj [ "affectedFiles", box [| "a.fs" |] ]
@@ -30,7 +30,7 @@ let decodeReturnReviewerReject () =
     let args = createObj [ "verdict", box "REJECT"; "feedback", box "fix tests" ]
     match decodeReturnReviewerArgs args with
     | Ok rr ->
-        check "return_reviewer reject verdict" (rr.Verdict = VibeFs.Kernel.ReviewVerdict.Reject)
+        check "return_reviewer reject verdict" (rr.Verdict = Wanxiangshu.Kernel.ReviewVerdict.Reject)
         check "return_reviewer feedback" (rr.Feedback = "fix tests")
     | Error _ -> check "return_reviewer reject" false
 

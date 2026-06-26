@@ -1,15 +1,15 @@
-module VibeFs.Omp.MagicTodo
+module Wanxiangshu.Omp.MagicTodo
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.WorkBacklog
-open VibeFs.Shell.BacklogSessionCodec
-open VibeFs.Shell.SessionProjectionStore
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Shell.BacklogSessionCodec
+open Wanxiangshu.Shell.SessionProjectionStore
 
 let private projection = ProjectionStore()
 
-let backlogReportFromTodoInput = VibeFs.Shell.BacklogSessionCodec.backlogReportFromTodoInput
+let backlogReportFromTodoInput = Wanxiangshu.Shell.BacklogSessionCodec.backlogReportFromTodoInput
 
 type BacklogSession(host: Host) =
     member _.Host = host
@@ -21,7 +21,7 @@ type BacklogSession(host: Host) =
         projection.TakeReport(host, callID)
 
     member this.ReplayBacklog(messages: Message<obj> list) : BacklogEntry list =
-        replayBacklogWith host (VibeFs.Shell.BacklogSessionCodec.reportFromFlatPartWithProjection host projection) messages
+        replayBacklogWith host (Wanxiangshu.Shell.BacklogSessionCodec.reportFromFlatPartWithProjection host projection) messages
 
     member this.GetOrRebuildBacklog(sessionID: string, messages: Message<obj> list) : BacklogEntry list =
         if messages.Length > 0 then

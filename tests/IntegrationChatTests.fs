@@ -1,12 +1,12 @@
-module VibeFs.Tests.IntegrationChatTests
+module Wanxiangshu.Tests.IntegrationChatTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
 
-open VibeFs.Opencode.Plugin
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Shell.Dyn
 
 let chatMessageSpec () = promise {
     let! workspaceDir = mkdtempAsync "chat-message-"

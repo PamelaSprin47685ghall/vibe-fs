@@ -1,15 +1,15 @@
-module VibeFs.Tests.KernelPromptSpecsReview
+module Wanxiangshu.Tests.KernelPromptSpecsReview
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.ReviewPrompts.Instructions
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Kernel.ReviewVerdict
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.Domain
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.ReviewPrompts.Instructions
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewVerdict
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.Domain
 
 let loopMessagesShared () =
     let task = "ship S1 refactor"

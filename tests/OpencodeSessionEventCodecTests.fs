@@ -1,7 +1,7 @@
-module VibeFs.Tests.OpencodeSessionEventCodecTests
+module Wanxiangshu.Tests.OpencodeSessionEventCodecTests
 
-open VibeFs.Tests.OpencodeSessionEventCodecTestsSession
-open VibeFs.Tests.OpencodeSessionEventCodecTestsNudge
+open Wanxiangshu.Tests.OpencodeSessionEventCodecTestsSession
+open Wanxiangshu.Tests.OpencodeSessionEventCodecTestsNudge
 
 let run () =
     getSessionIDFromPropsPrefersPropsKey ()

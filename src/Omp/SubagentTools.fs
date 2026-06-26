@@ -1,17 +1,17 @@
-module VibeFs.Omp.SubagentTools
+module Wanxiangshu.Omp.SubagentTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Omp.ChildSession
-open VibeFs.Omp.Codec
-open VibeFs.Omp.OmpToolSchema
-open VibeFs.Shell.SubagentIntentsCodec
-open VibeFs.Shell.WorkspaceFiles
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.OmpToolSchema
+open Wanxiangshu.Shell.SubagentIntentsCodec
+open Wanxiangshu.Shell.WorkspaceFiles
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private coderChildTools = [| "read"; "edit"; "write"; "find"; "fuzzy_find"; "fuzzy_grep"; "lsp" |]
 let private investigatorChildTools = [| "read"; "find"; "fuzzy_find"; "fuzzy_grep" |]

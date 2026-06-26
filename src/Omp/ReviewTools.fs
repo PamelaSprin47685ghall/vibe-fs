@@ -1,6 +1,6 @@
-module VibeFs.Omp.ReviewTools
+module Wanxiangshu.Omp.ReviewTools
 
-open VibeFs.Omp.ReviewToolsRegister
+open Wanxiangshu.Omp.ReviewToolsRegister
 
 let registerLoopFeatures = ReviewToolsRegister.registerLoopFeatures
 let registerInputHandler = ReviewToolsRegister.registerInputHandler

@@ -1,4 +1,4 @@
-module VibeFs.Kernel.Yaml
+module Wanxiangshu.Kernel.Yaml
 
 open Fable.Core
 open Fable.Core.JsInterop

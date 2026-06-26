@@ -1,4 +1,4 @@
-module VibeFs.Kernel.SubagentIntents
+module Wanxiangshu.Kernel.SubagentIntents
 
 
 type CoderTarget =

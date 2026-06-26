@@ -1,13 +1,13 @@
-module VibeFs.Tests.OmpPluginCoreTests
+module Wanxiangshu.Tests.OmpPluginCoreTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Omp.PluginCore
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Omp.PluginCore
 
 /// Verify the reviewStore singleton is wired into the CoreServices so the
 /// registered tools see the same instance that tests manipulate.
@@ -56,7 +56,7 @@ let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool
     let ctx = createObj [ "sessionManager", box sessionMgr ]
     let event = createObj [ "type", box evtType ]
     let pi, getHandlers = capturePi ()
-    registerAbortHandler pi reviewStore (VibeFs.Omp.KnowledgeGraph.Runtime.OmpKnowledgeGraphRuntime(createObj []))
+    registerAbortHandler pi reviewStore (Wanxiangshu.Omp.KnowledgeGraph.Runtime.OmpKnowledgeGraphRuntime(createObj []))
     let handlers = getHandlers ()
     check $"{evtType} captured exactly one handler" (handlers.Length = 1)
     let handler = handlers.[0]

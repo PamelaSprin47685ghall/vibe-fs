@@ -1,7 +1,7 @@
-module VibeFs.Shell.SessionProjectionStore
+module Wanxiangshu.Shell.SessionProjectionStore
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.BacklogProjectionCore
 
 type ProjectionStore() =
     let mutable reportTables = Map.empty<Host, Map<string, string>>

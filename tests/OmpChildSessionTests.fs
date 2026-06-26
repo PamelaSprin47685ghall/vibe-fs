@@ -1,13 +1,13 @@
-module VibeFs.Tests.OmpChildSessionTests
+module Wanxiangshu.Tests.OmpChildSessionTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.OmpSessionTools
-open VibeFs.Omp.ChildSession
-open VibeFs.Omp.PiResolve
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.OmpSessionTools
+open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Omp.PiResolve
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private reset () = clearCodingAgentModuleForTest ()
 

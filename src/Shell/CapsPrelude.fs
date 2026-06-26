@@ -1,4 +1,4 @@
-module VibeFs.Shell.CapsPrelude
+module Wanxiangshu.Shell.CapsPrelude
 
 let thinkText =
     """# Kolmolgorov 宝典

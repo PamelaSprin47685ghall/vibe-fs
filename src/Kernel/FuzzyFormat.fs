@@ -1,4 +1,4 @@
-module VibeFs.Kernel.FuzzyFormat
+module Wanxiangshu.Kernel.FuzzyFormat
 
 type FileAnnotation =
     { gitStatus: string option

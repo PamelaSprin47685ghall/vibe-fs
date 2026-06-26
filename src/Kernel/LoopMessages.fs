@@ -1,6 +1,6 @@
-module VibeFs.Kernel.LoopMessages
+module Wanxiangshu.Kernel.LoopMessages
 
-open VibeFs.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 /// Structured front-matter field names and verdict values are the single source
 /// of truth shared by every producer — slash-command activation, the

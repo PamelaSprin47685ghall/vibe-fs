@@ -41,3 +41,27 @@
 {"id":"2bb8","entity":["模式构建","类型边防"],"fact":"fuzzyGrep caseSensitive 参数 schema 由 boolOpt（nullish 布尔）迁移至 boolOptional（非空可选布尔），null 在 schema 边界被拒绝，undefined 表示未提供。与 fuzzy_find/fuzzy_grep 工具参数类型边防同向收敛。"}
 {"id":"d9dc","entity":["待办契约","协议语义"],"fact":"todowrite/task 的 wip 参数默认值为 true（省略或 true 表示任务未完成），仅显式设为 false 时标记任务完全完成。此默认语义在 LoopMessages.fs 工具描述中固化。"}
 {"id":"dab2","entity":["验收口径","构建管线"],"fact":"全仓绿测 SSOT=仓库根 npm run build-and-test：Fable 零 Compilation failed 且 node tests/runner.js failed=0 与同次 exit 联判。转译绿或历史 README passed 数不可替代当次门禁。当次全绿批次约 11024 passed/0 failed/558 tests，Fable 解析约 519 源文件。"}
+{"id":"c14b","entity":["项目标识","身份分层"],"fact":"项目身份在五层独立表达：npm 包名 vibe-fs、F# 命名空间 VibeFs、OMP 插件 ID kunwei、导出函数 kunweiExtension、自定义事件标签 kunwei-*（kunwei-loop-precheck/kunwei-loop-activate/kunwei-loop-reminder/kunwei-todo-reminder/omp-kunwei-executor）。五层须同步重命名，不可遗漏。"}
+{"id":"beba","entity":["项目标识","重命名范围"],"fact":"重命名波及 ~10 核心源文件（模块声明+open 语句）、~30 测试文件（open VibeFs.Tests.*）、3 构建/配置（build-package.json/vibe-fs.fsproj/index.d.ts）、3 文档文件、1 自动生成 AssemblyInfo、1 目录名。kunwei 为 OMP 宿主插件注册 ID，kunweiExtension 为 OMP 插件入口导出函数，kunwei-* 为 OMP 生命周期事件标签。"}
+{"id":"57cb","entity":["项目结构","分层架构","规模分布"],"fact":"vibe-fs 纯 F# 项目，源文件约 368 + 测试约 110，总计约 478 文件。Shell 层最重（~65 文件，承载全部副作用：执行器/IO/编解码/文件系统/网络），Kernel 层纯函数优先（~46 文件），三宿主并行（Mux ~25/Omp ~40/Opencode ~30），Methodology 体系 34 种（~55 文件），Tests 约 110 文件。"}
+{"id":"77ac","entity":["项目结构","数据流架构"],"fact":"Command → Shell(解码) → Mux/Omp/Opencode → Kernel(纯函数) → 事件 → Shell(持久化/广播)。Methodology 推理与 KnowledgeGraph 投影作为横向层贯穿数据流。"}
+{"id":"4083","entity":["项目结构","潜在架构问题","编解码重复"],"fact":"Mux/Omp/Opencode 三宿主各有独立 MessagingCodec/CapsCodec，Shell 层亦有对应编解码（Shell/MessagingPartCodec.fs + Shell/HostMessagePartCodec.fs），编解码文件约 25+，信号表明类型系统边界需要收缩、Dyn/运行时类型推导消化器过多。"}
+{"id":"cc5f","entity":["项目结构","潜在架构问题","消息变换三份"],"fact":"Mux/MessageTransform.fs、Omp/MessageTransform.fs、Opencode/MessageTransform.fs 三宿主各自实现消息变换，外加 Shell/MessageTransformPipeline.fs 管道层，存在重复。"}
+{"id":"e912","entity":["项目结构","潜在架构问题","工具注册重复"],"fact":"三宿主各有一套工具注册逻辑（Omp/Tools.fs、Mux/SlashCommands.fs、Opencode/Tools.fs），工具注册逻辑未统一收敛。"}
+{"id":"c14b","entity":["项目标识","身份分层"],"fact":"五层身份（npm包名vibe-fs→wanxiangshu、F#命名空间VibeFs→Wanxiangshu、OMP插件ID kunwei→wanxiangshu、导出函数kunweiExtension→wanxiangshuExtension、事件标签kunwei-*→wanxiangshu-*）全量同步替换完成，覆盖src/Kernel/Methodology/Shell/Mux/Omp/Opencode及tests全树.fs文件。"}
+{"id":"bae3","entity":["项目标识","重命名范围"],"fact":"全树机械替换：VibeFs→Wanxiangshu（命名空间/模块声明/opens）、kunwei→wanxiangshu（插件ID/事件标签）、kunweiExtension→wanxiangshuExtension（导出函数名）。替换为纯语义等价，无行为变更。"}
+{"id":"9d45","entity":["项目标识","重命名范围"],"fact":"fsproj 文件由 vibe-fs.fsproj 重命名为 wanxiangshu.fsproj，构建脚本 dotnet fable 引用同步更新。package.json exports 路径（build/src/Mux/Plugin.js, ./omp）未随项目名变更——产物目录结构独立于项目标识。"}
+{"id":"aaef","entity":["项目标识","重命名范围"],"fact":"README.md 与 multi/PRD.md、multi/DEV_TALK.md 全量替换：vibe-fs→wanxiangshu、VibeFs→Wanxiangshu、kunweiExtension→wanxiangshuExtension、vibe-fs/omp→wanxiangshu/omp。PRD/DEV_TALK 无大写命名空间引用。"}
+{"id":"2790","entity":["项目标识"],"fact":"README 标题由 wanxiangshu 改为 万象术，确立中文项目名称为官方展示标题。"}
+{"id":"8cfe","entity":["项目文档","项目关系"],"fact":"multi/PRD.md 为 Squad 项目产品需求文档，非 wanxiangshu 自身 PRD。Squad 为独立插件，依赖 wanxiangshu /loop review 机制与 Kernel/Shell 模块，两插件互不 import 仅在 prompt/slash-command 层协同。"}
+{"id":"462f","entity":["项目文档","项目关系"],"fact":"Squad 复用 wanxiangshu Shell.PromiseQueue.SerialQueue 串行化 master git 操作；复用 wanxiangshu nudge 机制（maxNudges=3）；复用 wanxiangshu Kernel/Shell 既有模块（F#+Fable→JS 同构）。"}
+{"id":"2139","entity":["项目文档","项目关系"],"fact":"Squad 检测 wanxiangshu 安装采用启发式（检测 opencode 配置插件列表或全局锚点），无标准互查 API。有 wanxiangshu 时走 /loop review 路径，无 wanxiangshu 时 slave 降级为不 review 直接提交。"}
+{"id":"61a4","entity":["项目文档","项目关系"],"fact":"Squad 事件 frontmatter 解析不走 wanxiangshu Kernel 轻量标量解析器（不认数组/嵌套），改走 Shell 层完整 yaml 包解析。"}
+{"id":"2139","entity":["项目文档","项目关系"],"fact":"万象阵 检测 wanxiangshu 安装采用启发式（检测 opencode 配置插件列表或全局锚点），无标准互查 API。有 wanxiangshu 时走 /loop review 路径，无 wanxiangshu 时 slave 降级为不 review 直接提交。"}
+{"id":"462f","entity":["项目文档","项目关系"],"fact":"万象阵 复用 wanxiangshu Shell.PromiseQueue.SerialQueue 串行化 master git 操作；复用 wanxiangshu nudge 机制（maxNudges=3）；复用 wanxiangshu Kernel/Shell 既有模块（F#+Fable→JS 同构）。"}
+{"id":"8cfe","entity":["项目文档","项目关系"],"fact":"multi/PRD.md 为万象阵项目产品需求文档，非 wanxiangshu 自身 PRD。万象阵为独立插件，依赖 wanxiangshu /loop review 机制与 Kernel/Shell 模块，两插件互不 import 仅在 prompt/slash-command 层协同。"}
+{"id":"61a4","entity":["项目文档","项目关系"],"fact":"万象阵事件 frontmatter 解析不走 wanxiangshu Kernel 轻量标量解析器（不认数组/嵌套），改走 Shell 层完整 yaml 包解析。"}
+{"id":"8cfe","entity":["项目文档","项目关系"],"fact":"multi/PRD.md 为万象阵项目产品需求文档，非 wanxiangshu 自身 PRD。万象阵为独立插件，依赖 wanxiangshu /loop review 机制与 Kernel/Shell 模块，两插件互不 import 仅在 prompt/slash-command 层协同。"}
+{"id":"2139","entity":["项目文档","项目关系"],"fact":"万象阵检测 wanxiangshu 安装采用启发式（检测 opencode 配置插件列表或全局锚点），无标准互查 API。有 wanxiangshu 时走 /loop review 路径，无 wanxiangshu 时 slave 降级为不 review 直接提交。"}
+{"id":"462f","entity":["项目文档","项目关系"],"fact":"万象阵复用 wanxiangshu Shell.PromiseQueue.SerialQueue 串行化 master git 操作；复用 wanxiangshu nudge 机制（maxNudges=3）；复用 wanxiangshu Kernel/Shell 既有模块（F#+Fable→JS 同构）。"}
+{"id":"5bab","entity":["版本控制","工作区布局"],"fact":"git worktree list 确认当前仅存一个活动 worktree：/home/kunweiz/Desktop/vibe/wanxiangshu 对应 master 分支 8b8d7ac；worktree-0 已完成并入后移除，符合 worktree-refactor 三方合并收尾态。"}

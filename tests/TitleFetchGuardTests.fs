@@ -1,11 +1,11 @@
-module VibeFs.Tests.TitleFetchGuardTests
+module Wanxiangshu.Tests.TitleFetchGuardTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
+open Wanxiangshu.Tests.Assert
 
-open VibeFs.Shell.TitleFetchGuardCommon
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.TitleFetchGuardCommon
+open Wanxiangshu.Shell.Dyn
 
 let signature () =
     equal "title probe signature pinned to opencode ensureTitle string"

@@ -1,14 +1,14 @@
-module VibeFs.Opencode.CapsCodec
+module Wanxiangshu.Opencode.CapsCodec
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Kernel.CapsSynthPolicy
-open VibeFs.Opencode.CapsPrelude
-open VibeFs.Shell.CapsSynthCommon
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Kernel.CapsSynthPolicy
+open Wanxiangshu.Opencode.CapsPrelude
+open Wanxiangshu.Shell.CapsSynthCommon
+open Wanxiangshu.Shell.Dyn
 
 /// The obj-boundary layer for caps message synthesis: reads info fields off
 /// host message objects and constructs the synthetic user/assistant prefix

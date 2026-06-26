@@ -1,9 +1,9 @@
-module VibeFs.Tests.OpencodeSessionPromptCodecTests
+module Wanxiangshu.Tests.OpencodeSessionPromptCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.OpencodeSessionPromptCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.OpencodeSessionPromptCodec
 
 let private providerId (m: obj) = unbox<string> m?providerID
 let private modelId (m: obj) = unbox<string> m?modelID

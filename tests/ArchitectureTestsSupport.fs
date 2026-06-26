@@ -1,8 +1,8 @@
-module VibeFs.Tests.ArchitectureTestsSupport
+module Wanxiangshu.Tests.ArchitectureTestsSupport
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
+open Wanxiangshu.Tests.Assert
 
 [<Import("readFileSync", "node:fs")>]
 let readFileSync (path: string) (encoding: string) : string = jsNative

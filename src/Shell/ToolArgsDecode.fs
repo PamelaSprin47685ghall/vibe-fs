@@ -1,28 +1,28 @@
-module VibeFs.Shell.ToolArgsDecode
+module Wanxiangshu.Shell.ToolArgsDecode
 
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.ToolArgs
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.SubagentIntentsCodec
-open VibeFs.Shell.SubagentSimpleArgsCodec
-open VibeFs.Shell.WebToolsCodec
-open VibeFs.Shell.ExecutorToolsCodec
-open VibeFs.Shell.WorkBacklogToolsCodec
-open VibeFs.Shell.KnowledgeGraphToolsCodec
-open VibeFs.Shell.PatchToolsCodec
-open VibeFs.Shell.ReviewToolsCodec
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ToolArgs
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.SubagentIntentsCodec
+open Wanxiangshu.Shell.SubagentSimpleArgsCodec
+open Wanxiangshu.Shell.WebToolsCodec
+open Wanxiangshu.Shell.ExecutorToolsCodec
+open Wanxiangshu.Shell.WorkBacklogToolsCodec
+open Wanxiangshu.Shell.KnowledgeGraphToolsCodec
+open Wanxiangshu.Shell.PatchToolsCodec
+open Wanxiangshu.Shell.ReviewToolsCodec
 
-let private mapRead (r: FileToolsCodec.ReadArgs) : VibeFs.Kernel.ToolArgs.ReadArgs =
+let private mapRead (r: FileToolsCodec.ReadArgs) : Wanxiangshu.Kernel.ToolArgs.ReadArgs =
     { Path = r.Path; Offset = r.Offset; Limit = r.Limit }
 
-let private mapWrite (w: FileToolsCodec.WriteArgs) : VibeFs.Kernel.ToolArgs.WriteArgs =
+let private mapWrite (w: FileToolsCodec.WriteArgs) : Wanxiangshu.Kernel.ToolArgs.WriteArgs =
     { FilePath = w.FilePath; Content = w.Content }
 
-let private mapWebsearch (w: WebToolsCodec.WebsearchArgs) : VibeFs.Kernel.ToolArgs.WebsearchArgs =
+let private mapWebsearch (w: WebToolsCodec.WebsearchArgs) : Wanxiangshu.Kernel.ToolArgs.WebsearchArgs =
     { Query = w.Query; NumResults = w.NumResults; WhatToSummarize = w.WhatToSummarize }
 
-let private mapWebfetch (w: WebToolsCodec.WebfetchArgs) : VibeFs.Kernel.ToolArgs.WebfetchArgs =
+let private mapWebfetch (w: WebToolsCodec.WebfetchArgs) : Wanxiangshu.Kernel.ToolArgs.WebfetchArgs =
     {
         Url = w.Url
         ExtractMain = w.ExtractMain
@@ -31,7 +31,7 @@ let private mapWebfetch (w: WebToolsCodec.WebfetchArgs) : VibeFs.Kernel.ToolArgs
         Timeout = w.Timeout
     }
 
-let private mapExecutor (e: ExecutorToolsCodec.ExecutorArgs) : VibeFs.Kernel.ToolArgs.ExecutorArgs =
+let private mapExecutor (e: ExecutorToolsCodec.ExecutorArgs) : Wanxiangshu.Kernel.ToolArgs.ExecutorArgs =
     {
         Language = e.Language
         Program = e.Program
@@ -40,10 +40,10 @@ let private mapExecutor (e: ExecutorToolsCodec.ExecutorArgs) : VibeFs.Kernel.Too
         Mode = e.Mode
     }
 
-let private mapTodoItem (t: WorkBacklogToolsCodec.TodoItem) : VibeFs.Kernel.ToolArgs.TodoItem =
+let private mapTodoItem (t: WorkBacklogToolsCodec.TodoItem) : Wanxiangshu.Kernel.ToolArgs.TodoItem =
     { Content = t.Content; Status = t.Status; Priority = t.Priority }
 
-let private mapTodoWrite (tw: WorkBacklogToolsCodec.TodoWriteArgs) : VibeFs.Kernel.ToolArgs.TodoWriteArgs =
+let private mapTodoWrite (tw: WorkBacklogToolsCodec.TodoWriteArgs) : Wanxiangshu.Kernel.ToolArgs.TodoWriteArgs =
     {
         CompletedWorkReport = tw.CompletedWorkReport
         Todos = tw.Todos |> Array.map mapTodoItem

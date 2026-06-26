@@ -1,9 +1,9 @@
-module VibeFs.Shell.ExecutorToolsCodec
+module Wanxiangshu.Shell.ExecutorToolsCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Executor
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.DynField
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
 
 type ExecutorArgs = {
     Language: ExecutorLanguage

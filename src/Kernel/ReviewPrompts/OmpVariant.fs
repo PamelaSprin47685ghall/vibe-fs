@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ReviewPrompts.OmpVariant
+module Wanxiangshu.Kernel.ReviewPrompts.OmpVariant
 
-open VibeFs.Kernel.ReviewPrompts.Instructions
+open Wanxiangshu.Kernel.ReviewPrompts.Instructions
 
 let reviewerNudgePrompt =
     "Submit your review verdict now via return_reviewer:\n"

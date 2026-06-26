@@ -1,8 +1,8 @@
-module VibeFs.Kernel.KnowledgeGraph.Fetch
+module Wanxiangshu.Kernel.KnowledgeGraph.Fetch
 
 open System
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Id
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Id
 
 let fetchAnswer (projection: KnowledgeGraphProjection) (entityStr: string) : Result<string, string> =
     let query = entityStr.Trim()

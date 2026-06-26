@@ -1,13 +1,13 @@
-module VibeFs.Opencode.BacklogSession
+module Wanxiangshu.Opencode.BacklogSession
 
 open Fable.Core.JsInterop
-open VibeFs.Shell
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.WorkBacklog
-open VibeFs.Shell.BacklogSessionCodec
-open VibeFs.Shell.RuntimeScope
+open Wanxiangshu.Shell
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Shell.BacklogSessionCodec
+open Wanxiangshu.Shell.RuntimeScope
 
 let backlogReportFromTodoInput = BacklogSessionCodec.backlogReportFromTodoInput
 

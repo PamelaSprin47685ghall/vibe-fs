@@ -1,14 +1,14 @@
-module VibeFs.Tests.ToolArgsDecodeTests
+module Wanxiangshu.Tests.ToolArgsDecodeTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Executor
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Kernel.ToolArgs
-open VibeFs.Shell.ToolArgsDecode
-open VibeFs.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Kernel.ToolArgs
+open Wanxiangshu.Shell.ToolArgsDecode
+open Wanxiangshu.Tests.IntegrationToolSetup
 
 let decodeCoderBatchOk () =
     let args = createObj [ "intents", box [| sampleCoderIntent "fix" "a.ts" |] ]

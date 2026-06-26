@@ -1,26 +1,26 @@
-module VibeFs.Tests.OmpPluginTests
+module Wanxiangshu.Tests.OmpPluginTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.OmpPluginTestsHarness
-open VibeFs.Omp.Plugin
-open VibeFs.Kernel.FuzzyQuery
-open VibeFs.Omp.MessagingCodec
-open VibeFs.Kernel.OmpSessionTools
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.OmpPluginTestsHarness
+open Wanxiangshu.Omp.Plugin
+open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Omp.MessagingCodec
+open Wanxiangshu.Kernel.OmpSessionTools
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let registersCoreToolsIdempotent () = promise {
     resetPluginState ()
     let h1 = createPiHarness ()
     let pi1 = piObject h1
-    do! kunweiExtension pi1
+    do! wanxiangshuExtension pi1
     let count1 = h1.tools.Count
-    do! kunweiExtension pi1
+    do! wanxiangshuExtension pi1
     check "idempotent tool count" (h1.tools.Count = count1)
     let names = toolNames h1
     for expected in
@@ -37,7 +37,7 @@ let methodologySchemaCarriesMinItems () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let abduction =
         h.tools |> Seq.tryFind (fun t -> Dyn.str t "name" = "methodology_abduction")
     check "methodology_abduction tool registered" (abduction.IsSome)
@@ -56,7 +56,7 @@ let sessionStartStripsMainSessionTools () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let handler = eventHandler h "session_start"
     do!
         emitJsExpr (handler, createObj [], createObj [])
@@ -122,7 +122,7 @@ let fuzzyGrepExcludeAnyOfLength2 () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let fuzzyGrep = h.tools |> Seq.find (fun t -> Dyn.str t "name" = "fuzzy_grep")
     let parameters = Dyn.get fuzzyGrep "parameters"
     check "fuzzy_grep has parameters" (not (Dyn.isNullish parameters))
@@ -144,7 +144,7 @@ let executorToolSchemaFourFields () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let runner = h.tools |> Seq.find (fun t -> Dyn.str t "name" = "executor")
     let parameters = Dyn.get runner "parameters"
     let properties = Dyn.get parameters "properties"
@@ -157,7 +157,7 @@ let browserErrorsWithoutBrowserHost () = promise {
     let h = createPiHarness ()
     h.hookStore?("activeTools") <- box [| "read"; "coder" |]
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let browse = h.tools |> Seq.find (fun t -> Dyn.str t "name" = "browser")
     let execute = Dyn.get browse "execute"
     let jsUndef = emitJsExpr () "undefined"

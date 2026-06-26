@@ -1,9 +1,9 @@
-module VibeFs.Shell.FuzzyFinderShell
+module Wanxiangshu.Shell.FuzzyFinderShell
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell.PromiseQueue
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell.PromiseQueue
 
 type FinderLike =
     abstract member fileSearch: query: string * opts: obj -> obj

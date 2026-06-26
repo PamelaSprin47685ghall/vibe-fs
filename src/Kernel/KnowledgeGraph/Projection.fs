@@ -1,10 +1,10 @@
-module VibeFs.Kernel.KnowledgeGraph.Projection
+module Wanxiangshu.Kernel.KnowledgeGraph.Projection
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Id
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Id
 
 let private truncateTo (s: string) (max: int) = if s.Length > max then s.[.. max - 1] + "..." else s
 

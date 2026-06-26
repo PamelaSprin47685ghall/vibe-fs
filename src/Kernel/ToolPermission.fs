@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ToolPermission
+module Wanxiangshu.Kernel.ToolPermission
 
-open VibeFs.Kernel.HostTools
+open Wanxiangshu.Kernel.HostTools
 
 type Agent = string
 type Tool = string

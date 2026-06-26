@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ToolCatalog.Executor
+module Wanxiangshu.Kernel.ToolCatalog.Executor
 
-open VibeFs.Kernel.ToolCatalog.ToolSpec
+open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 
 let internal executorSpec: ToolSpec =
     { name = "executor"

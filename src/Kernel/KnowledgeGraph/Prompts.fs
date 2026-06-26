@@ -1,12 +1,12 @@
-module VibeFs.Kernel.KnowledgeGraph.Prompts
+module Wanxiangshu.Kernel.KnowledgeGraph.Prompts
 
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.Yaml
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.Yaml
 
 let private entryItem (entry: KnowledgeGraphEntry) : obj =
     createObj [ "id", box (idValue entry.id); "entity", box (List.toArray entry.entity); "fact", box entry.fact ]

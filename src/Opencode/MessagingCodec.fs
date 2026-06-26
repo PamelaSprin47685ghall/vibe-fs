@@ -1,13 +1,13 @@
-module VibeFs.Opencode.MessagingCodec
+module Wanxiangshu.Opencode.MessagingCodec
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell
-open VibeFs.Shell.MessagingPartCodec
-open VibeFs.Shell.MessagingEncodeHelpers
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.MessagingPartCodec
+open Wanxiangshu.Shell.MessagingEncodeHelpers
 
-open VibeFs.Kernel.Messaging
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell.Dyn
 
 /// The single FFI boundary between host message objects and the strongly-typed
 /// Kernel tree. All Dyn/JsInterop access for the message chain lives here.

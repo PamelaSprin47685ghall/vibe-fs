@@ -1,11 +1,11 @@
-module VibeFs.Tests.BacklogReplaySpecsMimocode
+module Wanxiangshu.Tests.BacklogReplaySpecsMimocode
 
-open VibeFs.Tests.Assert
-open VibeFs.Tests.BacklogMessageBuilders
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.BacklogProjection
-open VibeFs.Opencode.BacklogSession
-open VibeFs.Shell.RuntimeScope
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.BacklogMessageBuilders
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.BacklogProjection
+open Wanxiangshu.Opencode.BacklogSession
+open Wanxiangshu.Shell.RuntimeScope
 
 let private scope () = create ()
 

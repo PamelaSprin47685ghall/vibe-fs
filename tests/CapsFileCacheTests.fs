@@ -1,9 +1,9 @@
-module VibeFs.Tests.CapsFileCacheTests
+module Wanxiangshu.Tests.CapsFileCacheTests
 
 open Fable.Core
-open VibeFs.Tests.Assert
-open VibeFs.Shell.CapsFileCache
-open VibeFs.Shell.RuntimeScope
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.CapsFileCache
+open Wanxiangshu.Shell.RuntimeScope
 
 let getOrLoadCapsFilesCachesPerSession () = promise {
     let scope = create ()

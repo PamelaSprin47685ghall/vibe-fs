@@ -1,13 +1,13 @@
-module VibeFs.Opencode.EventHooks
+module Wanxiangshu.Opencode.EventHooks
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
-open VibeFs.Shell.OpencodeHookInputCodec
-open VibeFs.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.OpencodeHookInputCodec
+open Wanxiangshu.Shell.OpencodeSessionEventCodec
 
-let eventHandler (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
+let eventHandler (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
     promise {
         match decodeHostEventEnvelope input with
         | Some { EventType = "stream-abort"; Props = props } ->

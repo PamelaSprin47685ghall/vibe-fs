@@ -1,6 +1,6 @@
-module VibeFs.Kernel.KnowledgeGraph.BookkeeperPolicy
+module Wanxiangshu.Kernel.KnowledgeGraph.BookkeeperPolicy
 
-open VibeFs.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.ToolCatalog
 
 /// Subagent and IO tools that always feed the knowledge graph bookkeeper when
 /// they succeed. File mutations also qualify via `isFileEditTool` (edit, write,

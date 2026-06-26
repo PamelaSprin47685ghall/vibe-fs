@@ -1,17 +1,17 @@
-module VibeFs.Omp.KnowledgeGraph.Runtime
+module Wanxiangshu.Omp.KnowledgeGraph.Runtime
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Maintenance
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Omp.KnowledgeGraphRuntimeIO
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.PromiseQueue
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Maintenance
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Omp.KnowledgeGraphRuntimeIO
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.PromiseQueue
 
-module Dyn = VibeFs.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 type OmpKnowledgeGraphRuntime(pi: obj) =
     let mutable state = initialKnowledgeGraphState
@@ -53,7 +53,7 @@ type OmpKnowledgeGraphRuntime(pi: obj) =
         tryResolveJobContext magicGetEntries.Value sessionID ""
 
     member this.EnsureSessionSnapshot(sessionID: string, directory: string) : JS.Promise<KnowledgeGraphProjection> =
-        VibeFs.Omp.KnowledgeGraph.Snapshot.ensureSessionSnapshot
+        Wanxiangshu.Omp.KnowledgeGraph.Snapshot.ensureSessionSnapshot
             commandQueue
             (fun () -> state)
             applyCmd
@@ -68,7 +68,7 @@ type OmpKnowledgeGraphRuntime(pi: obj) =
         registeredJobs <- Map.remove sessionID registeredJobs
 
     member this.Submit(sessionID: string, directory: string, drafts: KnowledgeGraphDraft list) : JS.Promise<string> =
-        VibeFs.Omp.KnowledgeGraph.Submit.submit
+        Wanxiangshu.Omp.KnowledgeGraph.Submit.submit
             magicGetEntries.Value
             this.TryResolveJobContext
             (fun () -> registeredJobs)
@@ -83,14 +83,14 @@ type OmpKnowledgeGraphRuntime(pi: obj) =
             knowledgeGraphDirExists
 
     member this.BuildPreludeForSession(sessionID: string, directory: string) : JS.Promise<string option> =
-        VibeFs.Omp.KnowledgeGraph.Snapshot.buildPreludeForSession
+        Wanxiangshu.Omp.KnowledgeGraph.Snapshot.buildPreludeForSession
             (fun sid dir -> this.EnsureSessionSnapshot(sid, dir))
             sessionID
             directory
             knowledgeGraphDirExists
 
     member this.FetchFromSessionSnapshot(sessionID: string, directory: string, entity: string) : JS.Promise<string> =
-        VibeFs.Omp.KnowledgeGraph.Fetch.fetchFromSessionSnapshot
+        Wanxiangshu.Omp.KnowledgeGraph.Fetch.fetchFromSessionSnapshot
             (fun sid dir -> this.EnsureSessionSnapshot(sid, dir))
             sessionID
             directory
@@ -98,7 +98,7 @@ type OmpKnowledgeGraphRuntime(pi: obj) =
             knowledgeGraphDirExists
 
     member this.StartMaintenanceIfDue(workspaceRoot: string) : JS.Promise<unit> =
-        VibeFs.Omp.KnowledgeGraph.Maintenance.startMaintenanceIfDue
+        Wanxiangshu.Omp.KnowledgeGraph.Maintenance.startMaintenanceIfDue
             commandQueue
             (fun () -> state)
             (fun newState -> state <- newState)
@@ -108,7 +108,7 @@ type OmpKnowledgeGraphRuntime(pi: obj) =
             knowledgeGraphDirExists
 
     member this.StartBookkeeperAppend(prompt: string, result: string, title: string, workspaceRoot: string) : unit =
-        VibeFs.Omp.KnowledgeGraph.Maintenance.startBookkeeperAppend
+        Wanxiangshu.Omp.KnowledgeGraph.Maintenance.startBookkeeperAppend
             pi
             applyCmd
             recordBackgroundResult

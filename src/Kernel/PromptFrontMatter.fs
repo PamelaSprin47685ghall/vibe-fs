@@ -1,8 +1,8 @@
-module VibeFs.Kernel.PromptFrontMatter
+module Wanxiangshu.Kernel.PromptFrontMatter
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Yaml
+open Wanxiangshu.Kernel.Yaml
 
 type FrontMatterField = string * obj
 

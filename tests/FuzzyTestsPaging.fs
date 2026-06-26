@@ -1,13 +1,13 @@
-module VibeFs.Tests.FuzzyTestsPaging
+module Wanxiangshu.Tests.FuzzyTestsPaging
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.FuzzyPath
-open VibeFs.Kernel.FuzzyQuery
-open VibeFs.Kernel.FuzzyFormat
-open VibeFs.Shell.FuzzySearch
-open VibeFs.Shell.FuzzyIteratorStore
-open VibeFs.Kernel
-open VibeFs.Shell.FuzzyFinderShell
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.FuzzyPath
+open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Kernel.FuzzyFormat
+open Wanxiangshu.Shell.FuzzySearch
+open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell.FuzzyFinderShell
 
 let findPagingDefault () =
     let store = createTypedIteratorStore 10
@@ -48,37 +48,37 @@ let totalMatchedSemantics () =
     equal "find None header" "1 matching file (5 total indexed)" findNone
 
 let iteratorNamespaceConstants () =
-    equal "find namespace constant" "ffi_f" VibeFs.Shell.FuzzyIteratorStore.findIteratorNamespace
-    equal "grep namespace constant" "ffi_i" VibeFs.Shell.FuzzyIteratorStore.grepIteratorNamespace
+    equal "find namespace constant" "ffi_f" Wanxiangshu.Shell.FuzzyIteratorStore.findIteratorNamespace
+    equal "grep namespace constant" "ffi_i" Wanxiangshu.Shell.FuzzyIteratorStore.grepIteratorNamespace
 
 let iteratorStoreStronglyTyped () =
-    let store = VibeFs.Shell.FuzzyIteratorStore.createTypedIteratorStore 10
+    let store = Wanxiangshu.Shell.FuzzyIteratorStore.createTypedIteratorStore 10
     let findState : FuzzyFindState = { query = "q"; pageSize = 30; pageIndex = 0; externalBasePath = None }
     let grepCore : FuzzyGrepState =
         { query = "q"; mode = "plain"; smartCase = true; beforeContext = 0; afterContext = 0
           pageSize = 50; externalBasePath = None }
     let grepState = { core = grepCore; cursor = None }
-    let findId = VibeFs.Shell.FuzzyIteratorStore.storeFindIterator store "scope" findState
+    let findId = Wanxiangshu.Shell.FuzzyIteratorStore.storeFindIterator store "scope" findState
     check "find id carries scope" (findId.Contains "scope")
-    check "find id carries namespace" (findId.Contains VibeFs.Shell.FuzzyIteratorStore.findIteratorNamespace)
-    let grepId = VibeFs.Shell.FuzzyIteratorStore.storeGrepIterator store "scope" grepState
-    check "grep id carries namespace" (grepId.Contains VibeFs.Shell.FuzzyIteratorStore.grepIteratorNamespace)
-    let resumed = VibeFs.Shell.FuzzyIteratorStore.consumeFindIterator store findId
+    check "find id carries namespace" (findId.Contains Wanxiangshu.Shell.FuzzyIteratorStore.findIteratorNamespace)
+    let grepId = Wanxiangshu.Shell.FuzzyIteratorStore.storeGrepIterator store "scope" grepState
+    check "grep id carries namespace" (grepId.Contains Wanxiangshu.Shell.FuzzyIteratorStore.grepIteratorNamespace)
+    let resumed = Wanxiangshu.Shell.FuzzyIteratorStore.consumeFindIterator store findId
     check "find resume" resumed.IsSome
-    check "find single-use after typed consume" ((VibeFs.Shell.FuzzyIteratorStore.consumeFindIterator store findId).IsNone)
-    let crossed = VibeFs.Shell.FuzzyIteratorStore.consumeFindIterator store grepId
+    check "find single-use after typed consume" ((Wanxiangshu.Shell.FuzzyIteratorStore.consumeFindIterator store findId).IsNone)
+    let crossed = Wanxiangshu.Shell.FuzzyIteratorStore.consumeFindIterator store grepId
     check "cross-namespace consume returns None" crossed.IsNone
 
 let runWithFinderSharedPipeline () =
     let mutable released = 0
     let fakeFinder =
-        { new VibeFs.Shell.FuzzyFinderShell.FinderLike with
+        { new Wanxiangshu.Shell.FuzzyFinderShell.FinderLike with
             member _.fileSearch(_, _) = box null
             member _.grep(_, _) = box null
             member _.destroy() = released <- released + 1
             member _.isDestroyed = false }
     let outcome =
-        VibeFs.Shell.FuzzySearch.runWithFinder
+        Wanxiangshu.Shell.FuzzySearch.runWithFinder
             (Ok fakeFinder)
             (Some "/external/path")
             (fun _ -> { output = "ok"; isError = false })
@@ -86,14 +86,14 @@ let runWithFinderSharedPipeline () =
     equal "external finder released exactly once" 1 released
     let mutable releasedOnError = 0
     let fakeFinder2 =
-        { new VibeFs.Shell.FuzzyFinderShell.FinderLike with
+        { new Wanxiangshu.Shell.FuzzyFinderShell.FinderLike with
             member _.fileSearch(_, _) = box null
             member _.grep(_, _) = box null
             member _.destroy() = releasedOnError <- releasedOnError + 1
             member _.isDestroyed = false }
     let mutable raised = false
     try
-        VibeFs.Shell.FuzzySearch.runWithFinder
+        Wanxiangshu.Shell.FuzzySearch.runWithFinder
             (Ok fakeFinder2)
             (Some "/external/path")
             (fun _ -> failwith "boom")
@@ -109,14 +109,14 @@ let resolveStoreRequiresInjection () =
     | Ok _ -> check "None store must not fall back to global default" false
 
 let emptyIteratorTreatedAsAbsent () =
-    let store = VibeFs.Shell.FuzzyIteratorStore.createTypedIteratorStore 10
+    let store = Wanxiangshu.Shell.FuzzyIteratorStore.createTypedIteratorStore 10
     let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = Some store; finderCache = FinderCache() }
     let params' : FuzzyFindParams = { pattern = Some "q"; path = None; limit = None; iterator = Some "" }
     match resolveFindSearchState params' opts with
     | Ok _ -> check "empty iterator falls through to fresh search" true
     | Error msg -> check ("empty iterator must not error: " + msg) false
     let storedId =
-        VibeFs.Shell.FuzzyIteratorStore.storeFindIterator store "scope"
+        Wanxiangshu.Shell.FuzzyIteratorStore.storeFindIterator store "scope"
             { query = "q"; pageSize = 30; pageIndex = 0; externalBasePath = None }
     let resumed : FuzzyFindParams = { pattern = None; path = None; limit = None; iterator = Some storedId }
     match resolveFindSearchState resumed opts with

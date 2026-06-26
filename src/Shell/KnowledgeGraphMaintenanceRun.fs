@@ -1,12 +1,12 @@
-module VibeFs.Shell.KnowledgeGraphMaintenanceRun
+module Wanxiangshu.Shell.KnowledgeGraphMaintenanceRun
 
 open Fable.Core
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Maintenance
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.PromiseQueue
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Maintenance
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.PromiseQueue
 
 type MaintenanceRunHost =
     { WorkspaceRoot: string

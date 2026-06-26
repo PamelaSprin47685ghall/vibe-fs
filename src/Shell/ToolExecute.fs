@@ -1,11 +1,11 @@
-module VibeFs.Shell.ToolExecute
+module Wanxiangshu.Shell.ToolExecute
 
 open Fable.Core
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Kernel.ToolArgs
-open VibeFs.Kernel.ToolResult
-open VibeFs.Shell.ToolArgsDecode
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Kernel.ToolArgs
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Shell.ToolArgsDecode
 
 let wireDecodeFailure (toolName: string) (error: DomainError) : string =
     wireEncodeToolError toolName error

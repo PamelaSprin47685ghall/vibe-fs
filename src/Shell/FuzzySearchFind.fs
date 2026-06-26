@@ -1,13 +1,13 @@
-module VibeFs.Shell.FuzzySearchFind
+module Wanxiangshu.Shell.FuzzySearchFind
 
 open Fable.Core
-open VibeFs.Shell.Dyn
-open VibeFs.Kernel.FuzzyPath
-open VibeFs.Kernel.FuzzyQuery
-open VibeFs.Kernel.FuzzyFormat
-open VibeFs.Shell.FuzzyIteratorStore
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.FuzzySearchHelpers
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.FuzzyPath
+open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Kernel.FuzzyFormat
+open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell.FuzzySearchHelpers
 
 let resolveFindSearchState (params': FuzzyFindParams) (opts: SearchOptions)
     : Result<FuzzyFindState, string> =
@@ -45,7 +45,7 @@ let private runFind (state: FuzzyFindState) (store: TypedIteratorStore) (opts: S
         let nextIterator = findNextIterator state store opts totalForPaging
         let output =
             if nextIterator = "" then body
-            else VibeFs.Kernel.ToolOutputInfo.withIterator body nextIterator
+            else Wanxiangshu.Kernel.ToolOutputInfo.withIterator body nextIterator
         { output = output; isError = false }
 
 let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =

@@ -1,11 +1,11 @@
-module VibeFs.Tests.DelegateTests
+module Wanxiangshu.Tests.DelegateTests
 
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
+open Wanxiangshu.Tests.Assert
 
-open VibeFs.Mux.AiSettings
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.MuxAiSettingsCodec
+open Wanxiangshu.Mux.AiSettings
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.MuxAiSettingsCodec
 
 let private muxEnv (pairs: (string * string) list) : obj =
     createObj [ for k, v in pairs -> k, box v ]

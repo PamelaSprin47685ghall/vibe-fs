@@ -1,6 +1,6 @@
-module VibeFs.Shell.ChildAgentRegistry
+module Wanxiangshu.Shell.ChildAgentRegistry
 
-open VibeFs.Kernel.Domain
+open Wanxiangshu.Kernel.Domain
 
 type ChildAgentRegistry private (state: WorkspaceState ref) =
 
@@ -63,5 +63,5 @@ type ChildAgentRegistry private (state: WorkspaceState ref) =
         | Some childId ->
             state.Value <- reduce state.Value (ChildUnregistered childId)
 
-/// Per-session serial execution is provided by VibeFs.Shell.SessionExecutor.
+/// Per-session serial execution is provided by Wanxiangshu.Shell.SessionExecutor.
 

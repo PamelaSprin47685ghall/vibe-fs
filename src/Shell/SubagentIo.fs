@@ -1,9 +1,9 @@
-module VibeFs.Shell.SubagentIo
+module Wanxiangshu.Shell.SubagentIo
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
 
 /// Host-side AI model settings used by subagent prompt bodies.  Mirrors the
 /// shape of `Mux.AiSettings.DelegatedAiSettings` so the shell layer can build

@@ -1,14 +1,14 @@
-module VibeFs.Tests.ReviewReplaySyncTests
+module Wanxiangshu.Tests.ReviewReplaySyncTests
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.ReviewReplayPolicy
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Shell.ReviewReplaySync
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ReviewReplayPolicy
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.ReviewReplaySync
 
 let textsFromFlatPartsIncludesToolOutput () =
     let toolState =
@@ -45,14 +45,14 @@ let syncReviewFromTextsActivatesFromTexts () =
 let syncReviewFromTextsDeactivatesOnEndVerdict () =
     let store = createReviewStore ()
     store.activateReview ("s3", "active-task", 1L)
-    let accept = VibeFs.Kernel.ReviewPrompts.formatReviewResult Accepted
+    let accept = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult Accepted
     syncReviewFromTexts store "s3" [ accept ]
     check "end verdict deactivates review" (not (store.isReviewActive "s3"))
 
 let syncReviewFromTextsPreservesActiveOnReject () =
     let store = createReviewStore ()
     let activate = buildLoopMessage "active-task" [ "With-Review Mode is active." ]
-    let rejected = VibeFs.Kernel.ReviewPrompts.formatReviewResult (Rejected "fix tests")
+    let rejected = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Rejected "fix tests")
     syncReviewFromTexts store "s4" [ activate; rejected ]
     equal "reject keeps task active" (Some "active-task") (store.getReviewTask "s4")
     check "reject keeps session active" (store.isReviewActive "s4")

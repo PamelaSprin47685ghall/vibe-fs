@@ -1,35 +1,35 @@
 /// Flat catalog of IntegrationTool integration specs (one runner entry per spec).
-module VibeFs.Tests.IntegrationToolSpecCatalog
+module Wanxiangshu.Tests.IntegrationToolSpecCatalog
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.IntegrationCapsSpecs
-open VibeFs.Tests.IntegrationKnowledgeGraphPreludeSpecs
-open VibeFs.Tests.IntegrationAfterHookSpecs
-open VibeFs.Tests.IntegrationMaintenanceSpecs
-open VibeFs.Tests.IntegrationSubmitKnowledgeGraphSpecs
-open VibeFs.Tests.IntegrationSubmitKnowledgeGraphSpecsAppend
-open VibeFs.Tests.IntegrationBookkeeperSpecs
-open VibeFs.Tests.IntegrationBookkeeperSpecsMux
-open VibeFs.Tests.IntegrationBookkeeperSpecsHint
-open VibeFs.Tests.IntegrationToolDefSpecs
-open VibeFs.Tests.IntegrationToolDefSpecsMimo
-open VibeFs.Tests.IntegrationSubagentSpecs
-open VibeFs.Tests.IntegrationMiscSpecs
-open VibeFs.Tests.IntegrationMiscSpecsAgent
-open VibeFs.Tests.IntegrationMiscSpecsExecutorKg
-open VibeFs.Tests.IntegrationMuxPreludeSpecs
-open VibeFs.Tests.IntegrationMuxKnowledgeGraphSpecsBookkeeper
-open VibeFs.Tests.IntegrationMuxKnowledgeGraphSpecs
-open VibeFs.Tests.IntegrationMuxTransformSpecs
-open VibeFs.Tests.IntegrationMuxToolSpecs
-open VibeFs.Tests.IntegrationMuxToolSpecsTodo
-open VibeFs.Tests.IntegrationMuxToolSpecsRead
-open VibeFs.Tests.IntegrationMuxToolSpecsHooks
-open VibeFs.Tests.IntegrationMuxMethodologySpecs
-open VibeFs.Tests.IntegrationMuxReviewSpecs
-open VibeFs.Tests.IntegrationMuxReviewPromptSpecs
-open VibeFs.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.IntegrationCapsSpecs
+open Wanxiangshu.Tests.IntegrationKnowledgeGraphPreludeSpecs
+open Wanxiangshu.Tests.IntegrationAfterHookSpecs
+open Wanxiangshu.Tests.IntegrationMaintenanceSpecs
+open Wanxiangshu.Tests.IntegrationSubmitKnowledgeGraphSpecs
+open Wanxiangshu.Tests.IntegrationSubmitKnowledgeGraphSpecsAppend
+open Wanxiangshu.Tests.IntegrationBookkeeperSpecs
+open Wanxiangshu.Tests.IntegrationBookkeeperSpecsMux
+open Wanxiangshu.Tests.IntegrationBookkeeperSpecsHint
+open Wanxiangshu.Tests.IntegrationToolDefSpecs
+open Wanxiangshu.Tests.IntegrationToolDefSpecsMimo
+open Wanxiangshu.Tests.IntegrationSubagentSpecs
+open Wanxiangshu.Tests.IntegrationMiscSpecs
+open Wanxiangshu.Tests.IntegrationMiscSpecsAgent
+open Wanxiangshu.Tests.IntegrationMiscSpecsExecutorKg
+open Wanxiangshu.Tests.IntegrationMuxPreludeSpecs
+open Wanxiangshu.Tests.IntegrationMuxKnowledgeGraphSpecsBookkeeper
+open Wanxiangshu.Tests.IntegrationMuxKnowledgeGraphSpecs
+open Wanxiangshu.Tests.IntegrationMuxTransformSpecs
+open Wanxiangshu.Tests.IntegrationMuxToolSpecs
+open Wanxiangshu.Tests.IntegrationMuxToolSpecsTodo
+open Wanxiangshu.Tests.IntegrationMuxToolSpecsRead
+open Wanxiangshu.Tests.IntegrationMuxToolSpecsHooks
+open Wanxiangshu.Tests.IntegrationMuxMethodologySpecs
+open Wanxiangshu.Tests.IntegrationMuxReviewSpecs
+open Wanxiangshu.Tests.IntegrationMuxReviewPromptSpecs
+open Wanxiangshu.Tests.IntegrationToolSetup
 
 let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
     let reg = sharedMuxRegistration ()

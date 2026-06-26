@@ -1,19 +1,19 @@
-module VibeFs.Tests.OmpPluginTestsAgentEnd
+module Wanxiangshu.Tests.OmpPluginTestsAgentEnd
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.OmpPluginTestsHarness
-open VibeFs.Omp.Plugin
-open VibeFs.Shell.RunnerBackground
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.OmpPluginTestsHarness
+open Wanxiangshu.Omp.Plugin
+open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let agentEndRunnerNudgeBeforeLoop () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     setRunnerJobStateForTest "session-1" "running"
     let ctx =
         createObj [
@@ -33,7 +33,7 @@ let agentEndLoopNudgeWhenActive () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let ctxLoop =
         createObj [
             "sessionManager", box(createObj [ "getSessionId", box(fun () -> box "session-2") ])
@@ -54,14 +54,14 @@ let agentEndLoopNudgeWhenActive () = promise {
             "hasPendingMessages", box(fun () -> box false)
         ]
     do! invokeHandler h "agent_end" (createObj []) ctxEnd
-    equal "loop reminder type" "kunwei-loop-reminder" (lastMessageCustomType h)
+    equal "loop reminder type" "wanxiangshu-loop-reminder" (lastMessageCustomType h)
 }
 
 let agentEndSkipsLoopNudgeWhenPendingMessages () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let ctxLoop =
         createObj [
             "sessionManager", box(createObj [ "getSessionId", box(fun () -> box "session-3") ])
@@ -90,7 +90,7 @@ let agentEndTodoNudgeWhenOpenPhases () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     let sm =
         createObj [
             "getSessionId", box(fun () -> box "session-todo")
@@ -102,11 +102,11 @@ let agentEndTodoNudgeWhenOpenPhases () = promise {
             "hasPendingMessages", box(fun () -> box false)
         ]
     do! invokeHandler h "agent_end" (createObj []) ctxEnd
-    equal "todo reminder type" "kunwei-todo-reminder" (lastMessageCustomType h)
+    equal "todo reminder type" "wanxiangshu-todo-reminder" (lastMessageCustomType h)
 }
 
 let runnerNudgePromptUsesExecutorToolNames () =
-    let text = VibeFs.Kernel.PromptFragments.runnerNudgePromptFor VibeFs.Kernel.HostTools.omp
+    let text = Wanxiangshu.Kernel.PromptFragments.runnerNudgePromptFor Wanxiangshu.Kernel.HostTools.omp
     check "runner nudge names executor_wait" (text.Contains "executor_wait")
     check "runner nudge names executor_abort" (text.Contains "executor_abort")
     check "runner nudge avoids legacy runner_wait" (not (text.Contains "runner_wait"))

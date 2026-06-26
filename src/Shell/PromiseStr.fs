@@ -1,4 +1,4 @@
-module VibeFs.Shell.PromiseStr
+module Wanxiangshu.Shell.PromiseStr
 
 open Fable.Core
 

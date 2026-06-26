@@ -1,17 +1,17 @@
-module VibeFs.Tests.IntegrationBookkeeperSpecs
+module Wanxiangshu.Tests.IntegrationBookkeeperSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Opencode.Plugin
-open VibeFs.Opencode.KnowledgeGraphRuntime
-open VibeFs.Mux.AiSettings
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Opencode.KnowledgeGraphRuntime
+open Wanxiangshu.Mux.AiSettings
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Shell.Dyn
 
 let bookkeeperLaunchCarriesAiSettingsSpec () = promise {
     let createCalls = ResizeArray<obj>()

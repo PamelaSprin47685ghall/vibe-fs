@@ -1,12 +1,12 @@
-module VibeFs.Shell.MessageTransformHostEntry
+module Wanxiangshu.Shell.MessageTransformHostEntry
 
 open Fable.Core
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Kernel.Messaging
-open VibeFs.Shell.MessageTransformCore
-open VibeFs.Shell.MessageTransformPipeline
-open VibeFs.Shell.ReviewReplaySync
-open VibeFs.Shell.ReviewRuntime
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell.MessageTransformCore
+open Wanxiangshu.Shell.MessageTransformPipeline
+open Wanxiangshu.Shell.ReviewReplaySync
+open Wanxiangshu.Shell.ReviewRuntime
 
 type ReviewReplayMode =
     | IfStoreEmpty

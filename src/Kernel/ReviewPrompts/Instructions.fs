@@ -1,7 +1,7 @@
-module VibeFs.Kernel.ReviewPrompts.Instructions
+module Wanxiangshu.Kernel.ReviewPrompts.Instructions
 
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.PromptFragments
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.PromptFragments
 
 let reviewInstructionsProse =
     readOnlyWorkspaceConstraint

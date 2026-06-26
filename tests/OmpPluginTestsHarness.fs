@@ -1,10 +1,10 @@
-module VibeFs.Tests.OmpPluginTestsHarness
+module Wanxiangshu.Tests.OmpPluginTestsHarness
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Omp.Plugin
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Omp.Plugin
 
 type PiHarness =
     { hookStore: obj

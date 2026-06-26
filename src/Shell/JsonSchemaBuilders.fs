@@ -1,4 +1,4 @@
-module VibeFs.Shell.JsonSchemaBuilders
+module Wanxiangshu.Shell.JsonSchemaBuilders
 
 open Fable.Core.JsInterop
 

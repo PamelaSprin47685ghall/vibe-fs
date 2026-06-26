@@ -1,10 +1,10 @@
-module VibeFs.Kernel.KnowledgeGraph.Job
+module Wanxiangshu.Kernel.KnowledgeGraph.Job
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.Yaml
-open VibeFs.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.Yaml
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
 
 let private jobKindTag (kind: KnowledgeGraphJobKind) : string * string option =
     match kind with

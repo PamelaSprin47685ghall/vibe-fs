@@ -1,13 +1,13 @@
-module VibeFs.Tests.FuzzyTests
+module Wanxiangshu.Tests.FuzzyTests
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.FuzzyPath
-open VibeFs.Kernel.FuzzyQuery
-open VibeFs.Kernel.FuzzyFormat
-open VibeFs.Shell.FuzzySearch
-open VibeFs.Shell.FuzzyIteratorStore
-open VibeFs.Kernel
-open VibeFs.Shell.FuzzyFinderShell
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.FuzzyPath
+open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Kernel.FuzzyFormat
+open Wanxiangshu.Shell.FuzzySearch
+open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell.FuzzyFinderShell
 
 let grepDetect () =
     equal "plain word" "plain" (detectGrepMode "foo")

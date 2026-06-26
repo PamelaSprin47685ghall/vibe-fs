@@ -1,7 +1,7 @@
-module VibeFs.Kernel.ReviewVerdict
+module Wanxiangshu.Kernel.ReviewVerdict
 
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
 
 /// The reviewer's intent, decoded once at the LLM boundary. An explicit enum
 /// replaces the old nullable-feedback channel: a string "null" can no longer

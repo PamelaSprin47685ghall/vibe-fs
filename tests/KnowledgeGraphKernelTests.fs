@@ -1,13 +1,13 @@
-module VibeFs.Tests.KnowledgeGraphKernelTests
+module Wanxiangshu.Tests.KnowledgeGraphKernelTests
 
 open System
 open Fable.Core
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Prompts
-open VibeFs.Kernel.KnowledgeGraph.Maintenance
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Prompts
+open Wanxiangshu.Kernel.KnowledgeGraph.Maintenance
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
 
 let private some (o: 'a option) : 'a =
     match o with Some v -> v | None -> failwith "expected Some"

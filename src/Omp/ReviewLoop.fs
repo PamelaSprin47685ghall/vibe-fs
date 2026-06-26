@@ -1,16 +1,16 @@
-module VibeFs.Omp.ReviewLoop
+module Wanxiangshu.Omp.ReviewLoop
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.OmpSessionTools
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Omp.ChildSession
-open VibeFs.Omp.Codec
-open VibeFs.Omp.MessagingCodec
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Shell.ReviewRuntime
+open Wanxiangshu.Kernel.OmpSessionTools
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.MessagingCodec
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ReviewRuntime
 
 type JsReviewResult = { accepted: bool option; feedback: string option; terminated: bool option }
 

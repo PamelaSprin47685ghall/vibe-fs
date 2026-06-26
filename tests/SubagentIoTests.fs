@@ -1,11 +1,11 @@
-module VibeFs.Tests.SubagentIoTests
+module Wanxiangshu.Tests.SubagentIoTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.SubagentIo
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.SubagentIo
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private ctx (values: (string * obj) list) : obj =
     let o = createObj []

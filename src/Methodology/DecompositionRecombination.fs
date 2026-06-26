@@ -1,6 +1,6 @@
-module VibeFs.Methodology.DecompositionRecombination
+module Wanxiangshu.Methodology.DecompositionRecombination
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

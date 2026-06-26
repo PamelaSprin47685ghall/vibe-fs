@@ -1,10 +1,10 @@
-module VibeFs.Opencode.PluginMimoTui
+module Wanxiangshu.Opencode.PluginMimoTui
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
 
 let private dateNow () : float =
     float (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())

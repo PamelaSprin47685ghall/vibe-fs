@@ -1,10 +1,10 @@
-module VibeFs.Tests.DelegateToolsCodecTests
+module Wanxiangshu.Tests.DelegateToolsCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.DelegateToolsCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.DelegateToolsCodec
 
 let decodeTaskCreateResultSuccessFalse () =
     let createResult =

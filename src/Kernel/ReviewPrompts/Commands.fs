@@ -1,8 +1,8 @@
-module VibeFs.Kernel.ReviewPrompts.Commands
+module Wanxiangshu.Kernel.ReviewPrompts.Commands
 
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.PromptFragments
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.PromptFragments
 
 let withReviewCommandTemplate =
     frontMatterPrompt

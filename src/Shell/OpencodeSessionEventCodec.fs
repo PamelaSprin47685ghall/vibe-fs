@@ -1,12 +1,12 @@
-module VibeFs.Shell.OpencodeSessionEventCodec
+module Wanxiangshu.Shell.OpencodeSessionEventCodec
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.Nudge.TodoStatus
-open VibeFs.Kernel.Nudge.SubmitReviewHooks
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeSessionEventCodecCommon
-open VibeFs.Shell.OpencodeSessionEventNudge
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
+open Wanxiangshu.Shell.OpencodeSessionEventNudge
 
 /// Host wire → typed nudge state transition boundary.
 ///

@@ -1,12 +1,12 @@
-module VibeFs.Tests.KnowledgeGraphTestsCodec
+module Wanxiangshu.Tests.KnowledgeGraphTestsCodec
 
 open System
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Codec
-open VibeFs.Kernel.KnowledgeGraph.Prompts
-open VibeFs.Kernel.KnowledgeGraph.JobTesting
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Codec
+open Wanxiangshu.Kernel.KnowledgeGraph.Prompts
+open Wanxiangshu.Kernel.KnowledgeGraph.JobTesting
 
 let private ok r =
     match r with

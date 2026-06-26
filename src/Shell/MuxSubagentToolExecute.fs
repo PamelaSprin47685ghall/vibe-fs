@@ -1,18 +1,18 @@
-module VibeFs.Shell.MuxSubagentToolExecute
+module Wanxiangshu.Shell.MuxSubagentToolExecute
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.ToolArgs
-open VibeFs.Kernel.ToolCopy
-open VibeFs.Shell.SubagentPromptBuild
-open VibeFs.Shell.SubagentSpawn
-open VibeFs.Shell.ToolArgsDecode
-open VibeFs.Shell.ToolExecute
-open VibeFs.Shell.ToolRuntimeContext
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.ToolArgs
+open Wanxiangshu.Kernel.ToolCopy
+open Wanxiangshu.Shell.SubagentPromptBuild
+open Wanxiangshu.Shell.SubagentSpawn
+open Wanxiangshu.Shell.ToolArgsDecode
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.ToolRuntimeContext
 
 type MuxSubagentSpawn =
     { ToolNames: string array

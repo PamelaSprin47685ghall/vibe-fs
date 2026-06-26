@@ -1,27 +1,27 @@
-module VibeFs.Tests.TestsEntriesOmp
+module Wanxiangshu.Tests.TestsEntriesOmp
 
-open VibeFs.Tests.TestsTestBody
-open VibeFs.Tests.OmpKernelTests
-open VibeFs.Tests.OmpSessionToolsTests
-open VibeFs.Tests.OmpWebFetchTests
-open VibeFs.Tests.OmpCapsTests
-open VibeFs.Tests.OmpFuzzyTests
-open VibeFs.Tests.OmpPluginTests
-open VibeFs.Tests.OmpPluginTestsAgentEnd
-open VibeFs.Tests.OmpReviewTests
-open VibeFs.Tests.OmpHelpersTests
-open VibeFs.Tests.OmpRunnerTests
-open VibeFs.Tests.OmpContextTransformTests
-open VibeFs.Tests.OmpChildSessionTests
-open VibeFs.Tests.OmpAgentConfigTests
-open VibeFs.Tests.OmpHookExecuteTests
-open VibeFs.Tests.OmpKnowledgeGraphRuntimeTests
-open VibeFs.Tests.OmpSessionLifecycleTests
-open VibeFs.Tests.OmpPluginCoreTests
-open VibeFs.Tests.OmpTitleFetchGuardTests
-open VibeFs.Tests.OmpMagicTodoTests
-open VibeFs.Tests.OmpPluginCoreIntegrationTests
-open VibeFs.Tests.SubagentIoTests
+open Wanxiangshu.Tests.TestsTestBody
+open Wanxiangshu.Tests.OmpKernelTests
+open Wanxiangshu.Tests.OmpSessionToolsTests
+open Wanxiangshu.Tests.OmpWebFetchTests
+open Wanxiangshu.Tests.OmpCapsTests
+open Wanxiangshu.Tests.OmpFuzzyTests
+open Wanxiangshu.Tests.OmpPluginTests
+open Wanxiangshu.Tests.OmpPluginTestsAgentEnd
+open Wanxiangshu.Tests.OmpReviewTests
+open Wanxiangshu.Tests.OmpHelpersTests
+open Wanxiangshu.Tests.OmpRunnerTests
+open Wanxiangshu.Tests.OmpContextTransformTests
+open Wanxiangshu.Tests.OmpChildSessionTests
+open Wanxiangshu.Tests.OmpAgentConfigTests
+open Wanxiangshu.Tests.OmpHookExecuteTests
+open Wanxiangshu.Tests.OmpKnowledgeGraphRuntimeTests
+open Wanxiangshu.Tests.OmpSessionLifecycleTests
+open Wanxiangshu.Tests.OmpPluginCoreTests
+open Wanxiangshu.Tests.OmpTitleFetchGuardTests
+open Wanxiangshu.Tests.OmpMagicTodoTests
+open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
+open Wanxiangshu.Tests.SubagentIoTests
 
 let ompTestEntries () : (string * TestBody) list =
     [

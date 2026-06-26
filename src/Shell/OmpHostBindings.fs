@@ -1,7 +1,7 @@
-module VibeFs.Shell.OmpHostBindings
+module Wanxiangshu.Shell.OmpHostBindings
 
 open Fable.Core
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 let getCreateAgentSession (pi: obj) : obj =
     Dyn.get (Dyn.get pi "pi") "createAgentSession"

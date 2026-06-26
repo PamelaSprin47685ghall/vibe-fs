@@ -1,8 +1,8 @@
-module VibeFs.Tests.ToolResultWireTests
+module Wanxiangshu.Tests.ToolResultWireTests
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.ToolResult
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ToolResult
 
 let wireEncodeResultOk () =
     check "wireEncodeResult Ok" (wireEncodeResult (Ok "done") = "done")

@@ -1,10 +1,10 @@
-module VibeFs.Omp.MessagingCodecEncode
+module Wanxiangshu.Omp.MessagingCodecEncode
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Messaging
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private encodePart (part: Part<obj>) : obj =
     match part with

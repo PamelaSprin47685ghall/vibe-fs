@@ -1,6 +1,6 @@
-module VibeFs.Methodology.DimensionalReduction
+module Wanxiangshu.Methodology.DimensionalReduction
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

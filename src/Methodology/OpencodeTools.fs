@@ -1,19 +1,19 @@
-module VibeFs.Methodology.OpencodeTools
+module Wanxiangshu.Methodology.OpencodeTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Methodology.SchemaCommon
-open VibeFs.Methodology.Args
-open VibeFs.Methodology.Registry
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.HostTools
-open VibeFs.Opencode.ToolSchema
-open VibeFs.Opencode.ToolHelpers
-open VibeFs.Opencode.SessionIo
-open VibeFs.Mux.Wrappers
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.Dyn
-open VibeFs.Kernel.ToolResult
+open Wanxiangshu.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.Args
+open Wanxiangshu.Methodology.Registry
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Opencode.ToolSchema
+open Wanxiangshu.Opencode.ToolHelpers
+open Wanxiangshu.Opencode.SessionIo
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.ToolResult
 
 let private zodField (f: MethodologyField) : string * obj =
     match f.kind with

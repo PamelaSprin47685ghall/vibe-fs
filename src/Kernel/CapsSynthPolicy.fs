@@ -1,4 +1,4 @@
-module VibeFs.Kernel.CapsSynthPolicy
+module Wanxiangshu.Kernel.CapsSynthPolicy
 
 let capsUserPrefix = "caps-synth-user-"
 let capsAssistantPrefix = "caps-synth-assistant-"

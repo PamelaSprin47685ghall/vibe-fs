@@ -1,6 +1,6 @@
-module VibeFs.Shell.OpencodeContextCodec
+module Wanxiangshu.Shell.OpencodeContextCodec
 
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 let getAbortSignalFromContext (context: obj) : obj =
     if Dyn.isNullish context then null

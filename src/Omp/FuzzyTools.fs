@@ -1,13 +1,13 @@
-module VibeFs.Omp.FuzzyTools
+module Wanxiangshu.Omp.FuzzyTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Omp.Codec
-open VibeFs.Omp.Schema
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.FuzzySearch
-open VibeFs.Kernel.FuzzyQuery
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.Schema
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell.FuzzySearch
+open Wanxiangshu.Kernel.FuzzyQuery
 
 let private scopeId (ctx: obj) =
     let sid = Dyn.str ctx "sessionId"

@@ -1,7 +1,7 @@
-module VibeFs.Tests.ArchitectureTestsSubagentSession
+module Wanxiangshu.Tests.ArchitectureTestsSubagentSession
 
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let sessionIoRunSubagentReturnsResult () =
     let sessionIo =

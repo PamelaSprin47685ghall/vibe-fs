@@ -1,10 +1,10 @@
-module VibeFs.Tests.WebToolsCodecTests
+module Wanxiangshu.Tests.WebToolsCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.WebToolsCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.WebToolsCodec
 
 let decodeWebsearchMissingQuery () =
     let args = createObj [ "what_to_summarize", box "summarize this" ]

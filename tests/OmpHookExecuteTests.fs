@@ -1,10 +1,10 @@
-module VibeFs.Tests.OmpHookExecuteTests
+module Wanxiangshu.Tests.OmpHookExecuteTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.Dyn
-open VibeFs.Omp.HookExecute
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Omp.HookExecute
 
 /// applyToolResultHook on a `coder` invocation must mirror the agent's intents
 /// onto `_ui` so the chat UI shows a one-line summary before the agent finishes.

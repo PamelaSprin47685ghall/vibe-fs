@@ -1,8 +1,8 @@
-module VibeFs.Kernel.Methodology
+module Wanxiangshu.Kernel.Methodology
 
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.MethodologyCatalog
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.MethodologyCatalog
 
 let selectMethodologyToolName = "select_methodology"
 
@@ -76,7 +76,7 @@ let methodologyEnumValues: string list =
       "performance_analysis"
       "user_intent_clarification" ]
 
-let methodologyCatalog = VibeFs.Kernel.MethodologyCatalog.methodologyCatalog
+let methodologyCatalog = Wanxiangshu.Kernel.MethodologyCatalog.methodologyCatalog
 
 let selectMethodologyFieldDescription =
     "Required when calling this tool: record `select_methodology` with one or more methodology names that must guide the next work step. Choose by definitions, not by keyword vibes.\n\n"

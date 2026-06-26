@@ -1,21 +1,21 @@
-module VibeFs.Tests.IntegrationMaintenanceSpecs
+module Wanxiangshu.Tests.IntegrationMaintenanceSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
 
-open VibeFs.Kernel.Message
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Mux.Plugin
-open VibeFs.Opencode.Plugin
-open VibeFs.Opencode.KnowledgeGraphRuntime
-open VibeFs.Mux.AiSettings
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Message
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Opencode.KnowledgeGraphRuntime
+open Wanxiangshu.Mux.AiSettings
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.Dyn
 
 let dailyMaintenanceLaunchSpec () = promise {
     let! workspaceDir = mkdtempAsync "daily-maintenance-"

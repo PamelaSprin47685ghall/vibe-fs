@@ -1,4 +1,4 @@
-module VibeFs.Kernel.ExecutorStrip
+module Wanxiangshu.Kernel.ExecutorStrip
 
 type StrippedPipe =
     { pipe: string

@@ -1,10 +1,10 @@
-module VibeFs.Kernel.SubagentPrompts
+module Wanxiangshu.Kernel.SubagentPrompts
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.PromptFragments
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.PromptFragments
 
 let meditatorSkippedSection = "(skipped)"
 

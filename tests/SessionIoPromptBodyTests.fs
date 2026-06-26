@@ -1,10 +1,10 @@
-module VibeFs.Tests.SessionIoPromptBodyTests
+module Wanxiangshu.Tests.SessionIoPromptBodyTests
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Core.JS
-open VibeFs.Tests.Assert
-open VibeFs.Shell.OpencodeSessionPromptCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.OpencodeSessionPromptCodec
 
 let private isNullish (o: obj) : bool = isNull o || jsTypeof o = "undefined"
 

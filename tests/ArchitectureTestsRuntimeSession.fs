@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsRuntimeSession
+module Wanxiangshu.Tests.ArchitectureTestsRuntimeSession
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let private sessionIoSubagentCode () =
     (requireFile "src/Opencode/SessionIo.fs" |> nonCommentCode)

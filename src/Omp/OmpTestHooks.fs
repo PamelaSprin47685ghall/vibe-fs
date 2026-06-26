@@ -1,14 +1,14 @@
-module VibeFs.Omp.OmpTestHooks
+module Wanxiangshu.Omp.OmpTestHooks
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.FuzzyPath
-open VibeFs.Kernel.FuzzyQuery
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.FuzzyIteratorStore
-open VibeFs.Shell.ReviewRuntime
+open Wanxiangshu.Kernel.FuzzyPath
+open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Shell.ReviewRuntime
 
 // Test-only iterator namespace; runtime fuzzy_find/fuzzy_grep use per-session scope in FuzzyTools.scopeId.
 let private fuzzyScope = "global"

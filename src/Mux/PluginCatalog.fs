@@ -1,28 +1,28 @@
-module VibeFs.Mux.PluginCatalog
+module Wanxiangshu.Mux.PluginCatalog
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Config
-open VibeFs.Mux.Wrappers
-open VibeFs.Mux.WrappersReview
-open VibeFs.Mux.KnowledgeGraphToolDefs
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.MuxWorkspaceCodec
-open VibeFs.Mux.SubagentTools
-open VibeFs.Mux.ReviewToolsMux
-open VibeFs.Mux.BuiltinTools
-open VibeFs.Mux.WebTools
-open VibeFs.Mux.KnowledgeGraphRuntimeMux
-open VibeFs.Mux.KnowledgeGraphRuntimeMuxSubmit
-open VibeFs.Methodology.MuxTools
-open VibeFs.Shell.RuntimeScope
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.MuxHookInputCodec
-open VibeFs.Kernel.KnowledgeGraph.BookkeeperPolicy
-open VibeFs.Shell.ChatTransformOutputCodec
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Mux.WrappersReview
+open Wanxiangshu.Mux.KnowledgeGraphToolDefs
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell.MuxWorkspaceCodec
+open Wanxiangshu.Mux.SubagentTools
+open Wanxiangshu.Mux.ReviewToolsMux
+open Wanxiangshu.Mux.BuiltinTools
+open Wanxiangshu.Mux.WebTools
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMuxSubmit
+open Wanxiangshu.Methodology.MuxTools
+open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.MuxHookInputCodec
+open Wanxiangshu.Kernel.KnowledgeGraph.BookkeeperPolicy
+open Wanxiangshu.Shell.ChatTransformOutputCodec
 
 let muxToolNames =
     Array.append
@@ -54,11 +54,11 @@ let toolsToObject (tools: ToolDefinition array) : obj =
 let createToolCatalog
     (deps: obj)
     (toolNames: string array)
-    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (hostReadExec: HostFunctionCapture)
     (finderCache: FinderCache)
     (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
-    (sessionScope: VibeFs.Shell.RuntimeScope.RuntimeScope)
+    (sessionScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
     : ToolDefinition array =
     let iteratorStore = sessionScope.IteratorStore
     [| yield coderTool deps toolNames
@@ -91,18 +91,18 @@ let toolExecuteAfter
         let succeeded = hookOutputErrorMux output = ""
         let originalOutput = hookOutputTextMux output
         if succeeded
-           && VibeFs.Kernel.KnowledgeGraph.BookkeeperPolicy.recordsToBookkeeper decoded.Tool
+           && Wanxiangshu.Kernel.KnowledgeGraph.BookkeeperPolicy.recordsToBookkeeper decoded.Tool
            && not (isReadOnlyExecutorMux decoded.Tool decoded.Args) && not (isChildWorkspace deps decoded.SessionID) then
             knowledgeGraphRuntime.StartBookkeeperAppend(
                 bookkeeperInput decoded.Args,
-                VibeFs.Kernel.ToolOutputInfo.bodyForBookkeeper originalOutput,
+                Wanxiangshu.Kernel.ToolOutputInfo.bodyForBookkeeper originalOutput,
                 decoded.Tool,
                 config = createObj
                     [ "sessionID", box decoded.SessionID
                       "directory", box decoded.Directory
                       "workspaceId", box decoded.WorkspaceId
                       "taskService", box (Dyn.get deps "taskService") ])
-            setHookOutputStringMux output (VibeFs.Kernel.ToolOutputInfo.withBookkeepingHints originalOutput)
+            setHookOutputStringMux output (Wanxiangshu.Kernel.ToolOutputInfo.withBookkeepingHints originalOutput)
     }
 
 let toolExecuteBefore (input: obj) (_output: obj) : JS.Promise<unit> =
@@ -113,8 +113,8 @@ let toolExecuteBefore (input: obj) (_output: obj) : JS.Promise<unit> =
             let raw = Dyn.get args "intents"
             let labelResult =
                 match tool with
-                | "coder" -> VibeFs.Shell.SubagentIntentsCodec.joinCoderUiLabel raw
-                | "investigator" -> VibeFs.Shell.SubagentIntentsCodec.joinInvestigatorUiLabel raw
+                | "coder" -> Wanxiangshu.Shell.SubagentIntentsCodec.joinCoderUiLabel raw
+                | "investigator" -> Wanxiangshu.Shell.SubagentIntentsCodec.joinInvestigatorUiLabel raw
                 | _ -> Result.Error ""
             match labelResult with
             | Result.Ok label when label <> "" -> args?("_ui") <- box label

@@ -1,9 +1,9 @@
-module VibeFs.Omp.KnowledgeGraph.Fetch
+module Wanxiangshu.Omp.KnowledgeGraph.Fetch
 
 open Fable.Core
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Shell.KnowledgeGraphFiles
 
 let fetchFromSessionSnapshot
     (ensureSnapshot: string -> string -> JS.Promise<KnowledgeGraphProjection>)

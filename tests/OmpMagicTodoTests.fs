@@ -1,13 +1,13 @@
-module VibeFs.Tests.OmpMagicTodoTests
+module Wanxiangshu.Tests.OmpMagicTodoTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Shell.BacklogSessionCodec
-open VibeFs.Omp.MagicTodo
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell.BacklogSessionCodec
+open Wanxiangshu.Omp.MagicTodo
+module Dyn = Wanxiangshu.Shell.Dyn
 
 /// Two `BacklogSession(omp)` instances must share the same backing store.
 let sharedSessionStoreByHost () =
@@ -42,4 +42,4 @@ let backlogReportFromTodoInputHostAgnostic () =
 
 let inputOfPartNonTool () =
     let p : Part<obj> = TextPart "hi"
-    equal "non-tool returns null" null (VibeFs.Shell.BacklogSessionCodec.inputOfPart p)
+    equal "non-tool returns null" null (Wanxiangshu.Shell.BacklogSessionCodec.inputOfPart p)

@@ -1,6 +1,6 @@
-module VibeFs.Kernel.TreeSitterKernel
+module Wanxiangshu.Kernel.TreeSitterKernel
 
-open VibeFs.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.ToolOutputInfo
 
 open System.Text.RegularExpressions
 

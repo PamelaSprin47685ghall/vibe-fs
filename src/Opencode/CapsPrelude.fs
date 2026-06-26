@@ -1,7 +1,7 @@
-module VibeFs.Opencode.CapsPrelude
+module Wanxiangshu.Opencode.CapsPrelude
 
-open VibeFs.Kernel.CapsPrelude
+open Wanxiangshu.Kernel.CapsPrelude
 
-let thinkText = VibeFs.Kernel.CapsPrelude.thinkText
-let llmText = VibeFs.Kernel.CapsPrelude.llmText
-let thinkWrapped = VibeFs.Kernel.CapsPrelude.thinkWrapped
+let thinkText = Wanxiangshu.Kernel.CapsPrelude.thinkText
+let llmText = Wanxiangshu.Kernel.CapsPrelude.llmText
+let thinkWrapped = Wanxiangshu.Kernel.CapsPrelude.thinkWrapped

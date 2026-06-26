@@ -1,13 +1,13 @@
-module VibeFs.Tests.IntegrationDedupOpenCodeSpecs
+module Wanxiangshu.Tests.IntegrationDedupOpenCodeSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
 
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Opencode.Plugin
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Shell.Dyn
 
 
 let private findMsgById (msgs: obj[]) (idPrefix: string) : obj =
@@ -77,7 +77,7 @@ let opencodeDedupInPlaceSpec () = promise {
     check "opencode dedup keeps first state ref" (obj.ReferenceEquals(stateA, readStateA))
     check "opencode dedup keeps second state ref" (obj.ReferenceEquals(stateB, readStateB))
     check "opencode dedup keeps first read output" (str stateA "output" = stableContent)
-    check "opencode dedup replaces exact duplicate" (str stateB "output" = VibeFs.Kernel.ToolOutputInfo.noChangeEnvelope ())
+    check "opencode dedup replaces exact duplicate" (str stateB "output" = Wanxiangshu.Kernel.ToolOutputInfo.noChangeEnvelope ())
     let supersetContent = stableContent + String.replicate 8 "new content\n"
     let supersetState = createObj [ "output", box supersetContent ]
     let supersetPart = createObj [ "type", box "tool"; "tool", box "read"; "state", box supersetState ]

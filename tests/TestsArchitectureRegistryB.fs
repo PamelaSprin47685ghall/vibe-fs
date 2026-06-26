@@ -1,29 +1,29 @@
-module VibeFs.Tests.TestsArchitectureRegistryB
+module Wanxiangshu.Tests.TestsArchitectureRegistryB
 
 open Fable.Core
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsFoundation
-open VibeFs.Tests.ArchitectureTestsMessageTransform
-open VibeFs.Tests.ArchitectureTestsSubagent
-open VibeFs.Tests.ArchitectureTestsSubagentCatalog
-open VibeFs.Tests.ArchitectureTestsSubagentSession
-open VibeFs.Tests.ArchitectureTestsSubagentToolExec
-open VibeFs.Tests.ArchitectureTestsRuntime
-open VibeFs.Tests.ArchitectureTestsRuntimeSession
-open VibeFs.Tests.ArchitectureTestsRuntimeKg
-open VibeFs.Tests.ArchitectureTestsWireToolExec
-open VibeFs.Tests.ArchitectureTestsWireHook
-open VibeFs.Tests.ArchitectureTestsWireHookMux
-open VibeFs.Tests.ArchitectureTestsWirePipeline
-open VibeFs.Tests.ArchitectureTestsWirePayload
-open VibeFs.Tests.ArchitectureTestsMuxToolCore
-open VibeFs.Tests.ArchitectureTestsMuxToolAux
-open VibeFs.Tests.ArchitectureTestsMuxToolAuxKg
-open VibeFs.Tests.ArchitectureTestsOpencodeTools
-open VibeFs.Tests.ArchitectureTestsOpencodeToolsReview
-open VibeFs.Tests.ArchitectureTestsOpencodeToolsSearch
-open VibeFs.Tests.ArchitectureTestsOpencodeToolsExecutor
-open VibeFs.Tests.TestsTestBody
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsFoundation
+open Wanxiangshu.Tests.ArchitectureTestsMessageTransform
+open Wanxiangshu.Tests.ArchitectureTestsSubagent
+open Wanxiangshu.Tests.ArchitectureTestsSubagentCatalog
+open Wanxiangshu.Tests.ArchitectureTestsSubagentSession
+open Wanxiangshu.Tests.ArchitectureTestsSubagentToolExec
+open Wanxiangshu.Tests.ArchitectureTestsRuntime
+open Wanxiangshu.Tests.ArchitectureTestsRuntimeSession
+open Wanxiangshu.Tests.ArchitectureTestsRuntimeKg
+open Wanxiangshu.Tests.ArchitectureTestsWireToolExec
+open Wanxiangshu.Tests.ArchitectureTestsWireHook
+open Wanxiangshu.Tests.ArchitectureTestsWireHookMux
+open Wanxiangshu.Tests.ArchitectureTestsWirePipeline
+open Wanxiangshu.Tests.ArchitectureTestsWirePayload
+open Wanxiangshu.Tests.ArchitectureTestsMuxToolCore
+open Wanxiangshu.Tests.ArchitectureTestsMuxToolAux
+open Wanxiangshu.Tests.ArchitectureTestsMuxToolAuxKg
+open Wanxiangshu.Tests.ArchitectureTestsOpencodeTools
+open Wanxiangshu.Tests.ArchitectureTestsOpencodeToolsReview
+open Wanxiangshu.Tests.ArchitectureTestsOpencodeToolsSearch
+open Wanxiangshu.Tests.ArchitectureTestsOpencodeToolsExecutor
+open Wanxiangshu.Tests.TestsTestBody
 
 let architectureTestEntriesPartB () : (string * TestBody) list =
     [

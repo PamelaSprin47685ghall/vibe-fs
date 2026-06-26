@@ -1,12 +1,12 @@
-module VibeFs.Shell.OpencodeHookInputCodec
-open VibeFs.Kernel.Domain
+module Wanxiangshu.Shell.OpencodeHookInputCodec
+open Wanxiangshu.Kernel.Domain
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.ToolContextCodec
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ToolContextCodec
 
 type HostEventEnvelope = { EventType: string; Props: obj }
 

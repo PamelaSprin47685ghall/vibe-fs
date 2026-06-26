@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsMuxToolAuxKg
+module Wanxiangshu.Tests.ArchitectureTestsMuxToolAuxKg
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let muxKnowledgeGraphStartBookkeeperUsesFromMuxConfig () =
     let muxCore = requireFile "src/Mux/KnowledgeGraphRuntimeMux.fs" |> nonCommentCode

@@ -1,7 +1,7 @@
-module VibeFs.Tests.ArchitectureTestsOpencodeToolsSearch
+module Wanxiangshu.Tests.ArchitectureTestsOpencodeToolsSearch
 
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let opencodeSearchToolsUsesFuzzyToolsCodec () =
     let search = requireFile "src/Opencode/SearchTools.fs" |> nonCommentCode

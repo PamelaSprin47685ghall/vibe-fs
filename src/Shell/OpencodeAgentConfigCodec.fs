@@ -1,8 +1,8 @@
-module VibeFs.Shell.OpencodeAgentConfigCodec
+module Wanxiangshu.Shell.OpencodeAgentConfigCodec
 
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.DynField
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
 
 type PermissionOverrides = Map<string, string>
 type ToolsOverrides = Map<string, bool>

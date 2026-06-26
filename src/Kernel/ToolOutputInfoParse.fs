@@ -1,8 +1,8 @@
-module VibeFs.Kernel.ToolOutputInfoParse
+module Wanxiangshu.Kernel.ToolOutputInfoParse
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.ToolOutputInfoTypes
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
 [<Emit("Object.keys($0)")>]
 let private objectKeys (o: obj) : string array = jsNative

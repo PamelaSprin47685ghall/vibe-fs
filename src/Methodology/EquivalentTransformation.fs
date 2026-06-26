@@ -1,6 +1,6 @@
-module VibeFs.Methodology.EquivalentTransformation
+module Wanxiangshu.Methodology.EquivalentTransformation
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

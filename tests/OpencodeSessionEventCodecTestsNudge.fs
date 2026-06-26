@@ -1,11 +1,11 @@
-module VibeFs.Tests.OpencodeSessionEventCodecTestsNudge
+module Wanxiangshu.Tests.OpencodeSessionEventCodecTestsNudge
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.OpencodeSessionEventCodec
-open VibeFs.Kernel.NudgeState
-open VibeFs.Kernel.Nudge.Types
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Kernel.NudgeState
+open Wanxiangshu.Kernel.Nudge.Types
 
 let private part (text: string) : obj = box {| ``type`` = "text"; text = text |}
 

@@ -1,7 +1,7 @@
-module VibeFs.Tests.DynTests
+module Wanxiangshu.Tests.DynTests
 
-open VibeFs.Shell.Dyn
-open VibeFs.Tests.Assert
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Tests.Assert
 
 
 /// Verify the nullish guards treat BOTH null and a genuine JS undefined as absent.

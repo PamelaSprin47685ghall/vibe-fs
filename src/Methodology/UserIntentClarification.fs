@@ -1,6 +1,6 @@
-module VibeFs.Methodology.UserIntentClarification
+module Wanxiangshu.Methodology.UserIntentClarification
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

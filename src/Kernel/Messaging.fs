@@ -1,4 +1,4 @@
-module VibeFs.Kernel.Messaging
+module Wanxiangshu.Kernel.Messaging
 
 /// Host-agnostic message model. `'raw` carries the original host object reference
 /// through the Kernel without being inspected; only Host codec layers instantiate it.

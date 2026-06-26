@@ -1,7 +1,7 @@
-module VibeFs.Tests.OmpSessionToolsTests
+module Wanxiangshu.Tests.OmpSessionToolsTests
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.OmpSessionTools
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.OmpSessionTools
 
 let mainSessionStripsChildOnlyAndBash () =
     let active =

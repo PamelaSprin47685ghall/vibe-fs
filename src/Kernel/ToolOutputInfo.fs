@@ -1,9 +1,9 @@
-module VibeFs.Kernel.ToolOutputInfo
+module Wanxiangshu.Kernel.ToolOutputInfo
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.ToolOutputInfoTypes
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
 let seeBelow = ToolOutputInfoTypes.seeBelow
 let seeBelowTruncated = ToolOutputInfoTypes.seeBelowTruncated
@@ -76,7 +76,7 @@ let render (msg: ToolOutputMessage) : string =
         | "" -> fence
         | body -> fence + "\n" + body
 
-open VibeFs.Kernel.ToolOutputInfoParse
+open Wanxiangshu.Kernel.ToolOutputInfoParse
 
 let tryParse (text: string) : ToolOutputMessage option =
     if isNull text || text = "" then None

@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ToolCatalog.Review
+module Wanxiangshu.Kernel.ToolCatalog.Review
 
-open VibeFs.Kernel.ToolCatalog.ToolSpec
+open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 
 let internal submitReviewSpec: ToolSpec =
     { name = "submit_review"

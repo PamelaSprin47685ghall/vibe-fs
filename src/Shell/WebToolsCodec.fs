@@ -1,8 +1,8 @@
-module VibeFs.Shell.WebToolsCodec
+module Wanxiangshu.Shell.WebToolsCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.DynField
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
 
 type WebsearchArgs = {
     Query: string

@@ -1,32 +1,32 @@
-module VibeFs.Mux.BuiltinTools
+module Wanxiangshu.Mux.BuiltinTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Executor
-open VibeFs.Kernel.FuzzyPath
-open VibeFs.Kernel.FuzzyQuery
-open VibeFs.Kernel.FuzzyFormat
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.ToolCopy
-open VibeFs.Kernel.ToolResult
-open VibeFs.Mux.Delegate
-open VibeFs.Mux.Wrappers
-open VibeFs.Mux.WrappersReview
-open VibeFs.Mux.SubagentTools
-open VibeFs.Shell.FileSys
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell
-open VibeFs.Shell.PromiseStr
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.ExecutorToolsCodec
-open VibeFs.Shell.FileToolsCodec
-open VibeFs.Mux.BuiltinToolsFuzzy
-open VibeFs.Shell.ToolExecute
-open VibeFs.Shell.ToolRuntimeContext
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Kernel.FuzzyPath
+open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Kernel.FuzzyFormat
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.ToolCopy
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Mux.Delegate
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Mux.WrappersReview
+open Wanxiangshu.Mux.SubagentTools
+open Wanxiangshu.Shell.FileSys
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.PromiseStr
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ExecutorToolsCodec
+open Wanxiangshu.Shell.FileToolsCodec
+open Wanxiangshu.Mux.BuiltinToolsFuzzy
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.ToolRuntimeContext
 
 [<Global("Buffer")>]
 let private nodeBuffer : obj = jsNative
@@ -96,7 +96,7 @@ let private hostReadResultIsDirectoryError (result: obj) : bool =
         && not (Dyn.truthy success)
         && error.StartsWith "Path is a directory, not a file:"
 
-let executorTool (deps: obj) (toolNames: string array) (_knowledgeGraphRuntime: obj) (sessionScope: VibeFs.Shell.RuntimeScope.RuntimeScope) : ToolDefinition =
+let executorTool (deps: obj) (toolNames: string array) (_knowledgeGraphRuntime: obj) (sessionScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) : ToolDefinition =
     { name = "executor"
       description = description "executor"
       parameters =
@@ -122,7 +122,7 @@ let executorTool (deps: obj) (toolNames: string array) (_knowledgeGraphRuntime: 
                           let opts = toExecuteOptions (Some runtime.Execution.Directory) decoded
                           let! execResult =
                               sessionScope.EnqueuePerSession(sessionId, fun () ->
-                                  VibeFs.Shell.Executor.execute opts sessionId)
+                                  Wanxiangshu.Shell.Executor.execute opts sessionId)
                           return! summarizeWhenNeeded deps config toolNames opts execResult
                       }
       condition = None }

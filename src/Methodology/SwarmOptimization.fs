@@ -1,6 +1,6 @@
-module VibeFs.Methodology.SwarmOptimization
+module Wanxiangshu.Methodology.SwarmOptimization
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema
