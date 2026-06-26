@@ -26,3 +26,7 @@
 {"id":"99fe","entity":["[验收口径, 源码变更]"],"fact":"bookkeeper 回合若工作输入仅为 Foundation 或 Registry 探针体/登记行局部 oldString-newString 替换且回报编辑已成功，可记接线或扫描面收敛事实，不构成全仓绿测充分条件；SSOT 仍须同次 Fable 零 Compilation failed、runner failed=0 与已登记探针联判。"}
 {"id":"5efa","entity":["架构测试","共享辅助","编译顺序"],"fact":"ArchitectureTestsSupport 中 fsFilesRelative 递归调用 fsFilesRecursive，二者须同文件内先声明 fsFilesRecursive 再声明 fsFilesRelative；逆序触发 F# 前向引用 FS0039，与探针用相对路径枚举扫子目录（KnowledgeGraph/ToolCatalog 等）之 a23e/340d/7f9f 纪律同链。"}
 {"id":"df88","entity":["架构测试","源码扫描"],"fact":"Support 三档扫盘分工不变：fsFiles 仅目录顶层 .fs；fsFilesRecursive 产出全路径列表供 requireFile/行数断言；fsFilesRelative 产出相对正斜杠路径供 arch 标签与 dir+\"/\"+name 拼接一致，实现面依赖 fsFilesRecursive 已定义。"}
+{"id":"939e","entity":["消息变换","宿主编排","全量历史"],"fact":"OpenCode messagesTransform 钩子 input 含 sessionID/agent/directory 字段，无 client 对象；全量会话历史须经 PluginCore 注入的 getChatHistory 委托获取，非 messagesTransform 输入直接提供。"}
+{"id":"3682","entity":["消息变换","宿主编排","全量历史"],"fact":"Mux messagesTransform 的 deps 对象含 getChatHistory 委托与 BacklogSession/ReviewStore 等运行时服务；Mux 可经 deps.getChatHistory 检索全量会话历史，但当前 Always 模式仅消费 transform 输入的消息切片。"}
+{"id":"f317","entity":["消息变换","宿主编排","全量历史"],"fact":"OMP context 事件 entries 已为全量历史，非截断切片；OMP 可经 pi.sendMessage/getEntries API 获取完整会话，extractHistoryTexts 从 entries 提取文本供审查回放与积压投影。"}
+{"id":"8da3","entity":["消息变换","宿主编排","审查回放"],"fact":"三宿主审查回放均依赖全量历史而非截断切片：OpenCode 经 getChatHistory 委托、Mux 经 deps.getChatHistory、OMP 经 context entries 全量历史，当前实现均消费截断输入构成 Defect 1。"}
