@@ -1,13 +1,13 @@
 // Caps file lists are cached per (sessionID, directory) on RuntimeScope.CapsFiles.
 // Concurrent misses for the same key share one in-flight load via GetOrLoadCapsInflight.
-module VibeFs.Shell.CapsFileCache
+module Wanxiangshu.Shell.CapsFileCache
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Shell.FileSys
-open VibeFs.Shell.WorkspaceFiles
-open VibeFs.Shell.RuntimeScope
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Shell.FileSys
+open Wanxiangshu.Shell.WorkspaceFiles
+open Wanxiangshu.Shell.RuntimeScope
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative

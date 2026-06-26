@@ -1,9 +1,9 @@
-module VibeFs.Shell.MessageTransformPipeline
+module Wanxiangshu.Shell.MessageTransformPipeline
 
 open Fable.Core
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Kernel.Messaging
-open VibeFs.Shell.MessageTransformCore
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell.MessageTransformCore
 
 type MessageTransformPlan = {
     SessionID: string

@@ -1,4 +1,4 @@
-module VibeFs.Kernel.MessageTransformPolicy
+module Wanxiangshu.Kernel.MessageTransformPolicy
 
 let defaultExcludedAgents =
     set [ "browser"; "investigator"; "executor"; "title"; "compaction"; "bookkeeper" ]

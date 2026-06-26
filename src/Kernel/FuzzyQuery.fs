@@ -1,7 +1,7 @@
-module VibeFs.Kernel.FuzzyQuery
+module Wanxiangshu.Kernel.FuzzyQuery
 
 open System.Text.RegularExpressions
-open VibeFs.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.ToolOutputInfo
 
 let private escapeRegex (pattern: string) : string =
     let escapeChar (m: Match) = "\\" + m.Value

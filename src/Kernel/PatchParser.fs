@@ -1,4 +1,4 @@
-module VibeFs.Kernel.PatchParser
+module Wanxiangshu.Kernel.PatchParser
 
 open System.Text.RegularExpressions
 

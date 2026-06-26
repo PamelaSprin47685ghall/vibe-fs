@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ToolCatalog.FileIO
+module Wanxiangshu.Kernel.ToolCatalog.FileIO
 
-open VibeFs.Kernel.ToolCatalog.ToolSpec
+open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 
 let internal readSpec: ToolSpec =
     { name = "read"

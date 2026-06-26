@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ToolResult
+module Wanxiangshu.Kernel.ToolResult
 
-open VibeFs.Kernel.Domain
+open Wanxiangshu.Kernel.Domain
 
 type ToolResult = { Text: string }
 

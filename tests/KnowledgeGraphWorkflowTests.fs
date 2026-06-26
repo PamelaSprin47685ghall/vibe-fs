@@ -1,8 +1,8 @@
-module VibeFs.Tests.KnowledgeGraphWorkflowTests
+module Wanxiangshu.Tests.KnowledgeGraphWorkflowTests
 
 open Fable.Core
-open VibeFs.Tests.Assert
-open VibeFs.Shell.KnowledgeGraphWorkflow
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.KnowledgeGraphWorkflow
 
 let drainPendingJobsClearsSink () =
     let recorded = ResizeArray<string * string>()

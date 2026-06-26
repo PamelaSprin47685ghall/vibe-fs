@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsMessageTransformCaps
+module Wanxiangshu.Tests.ArchitectureTestsMessageTransformCaps
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let muxMessageTransformUsesReadDedupMuxPlugin () =
     let code = requireFile "src/Mux/MessageTransform.fs" |> nonCommentCode
@@ -68,8 +68,6 @@ let messageTransformUsesHostEntry () =
         (hostEntry.Contains "type ReviewReplayMode")
     check "arch: MessageTransformHostEntry defines runHostMessagesTransform"
         (hostEntry.Contains "let runHostMessagesTransform")
-    check "arch: MessageTransformHostEntry defines replayReviewForMode"
-        (hostEntry.Contains "let replayReviewForMode")
     for path in [| "src/Opencode/MessageTransform.fs"; "src/Mux/MessageTransform.fs" |] do
         let code = requireFile path |> nonCommentCode
         check ("arch: " + path + " opens MessageTransformHostEntry")
@@ -84,8 +82,8 @@ let messageTransformUsesHostEntry () =
     check "arch: Opencode MessageTransform uses IfStoreEmpty replay mode"
         (opencode.Contains "IfStoreEmpty")
     let mux = requireFile "src/Mux/MessageTransform.fs" |> nonCommentCode
-    check "arch: Mux MessageTransform uses Always replay mode"
-        (mux.Contains "Always")
+    check "arch: Mux MessageTransform uses IfStoreEmpty replay mode"
+        (mux.Contains "IfStoreEmpty")
 
 let capsFileCacheCompositeKey () =
     let code = requireFile "src/Shell/CapsFileCache.fs" |> nonCommentCode

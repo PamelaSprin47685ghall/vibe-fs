@@ -1,8 +1,8 @@
-module VibeFs.Tests.AgentTests
+module Wanxiangshu.Tests.AgentTests
 
 open Fable.Core
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Config
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Config
 
 let canUse' () =
     check "stealth for browser" (canUse "browser" "stealth-browser-mcp_navigate")

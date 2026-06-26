@@ -1,16 +1,16 @@
-module VibeFs.Tests.IntegrationPluginTestsMimo
+module Wanxiangshu.Tests.IntegrationPluginTestsMimo
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Kernel.Message
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Kernel.Message
+open Wanxiangshu.Shell.Dyn
 
 let mimoConfigSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-plugin-config-"
-    let! p = VibeFs.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
-    VibeFs.Tests.IntegrationPluginTestsCommon.pluginShape p
+    let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
+    Wanxiangshu.Tests.IntegrationPluginTestsCommon.pluginShape p
     let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>>
     let agents = get cfg "agent"
     let manager = get agents "manager"
@@ -133,7 +133,7 @@ let mimoTuiTodoFallbackSpec () = promise {
             "command", box (createObj [ "register", box (System.Func<obj, obj>(fun _ -> box (fun () -> ()))) ])
             "route", box (createObj [ "current", box routeCurrent ])
         ]
-    let pluginObj = VibeFs.Opencode.PluginMimoTui.plugin
+    let pluginObj = Wanxiangshu.Opencode.PluginMimoTui.plugin
     do! (get pluginObj "tui") $ (api, null, null) |> unbox<JS.Promise<unit>>
     let todosAfterInstall = call1 (get (get (get api "state") "session") "todo") (box sessionID) |> unbox<obj array>
     check "mimo tui todo fallback recovers task todos" (todosAfterInstall.Length = 1)

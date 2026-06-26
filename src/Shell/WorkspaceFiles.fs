@@ -1,9 +1,9 @@
-module VibeFs.Shell.WorkspaceFiles
+module Wanxiangshu.Shell.WorkspaceFiles
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Shell.Dyn
 
 let maxFileSize = 4 * 1_048_576
 

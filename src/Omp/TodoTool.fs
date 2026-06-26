@@ -1,13 +1,13 @@
-module VibeFs.Omp.TodoTool
+module Wanxiangshu.Omp.TodoTool
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.WorkBacklog
-open VibeFs.Kernel.Methodology
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Omp.Codec
-open VibeFs.Omp.OmpToolSchema
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.OmpToolSchema
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private decodeMethodologies (params': obj) : string list =
     let raw = Dyn.get params' "select_methodology"

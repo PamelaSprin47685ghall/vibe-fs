@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ToolCatalog.Web
+module Wanxiangshu.Kernel.ToolCatalog.Web
 
-open VibeFs.Kernel.ToolCatalog.ToolSpec
+open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 
 let internal websearchSpec: ToolSpec =
     { name = "websearch"

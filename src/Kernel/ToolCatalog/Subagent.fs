@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ToolCatalog.Subagent
+module Wanxiangshu.Kernel.ToolCatalog.Subagent
 
-open VibeFs.Kernel.ToolCatalog.ToolSpec
+open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 
 let internal coderSpec: ToolSpec =
     { name = "coder"

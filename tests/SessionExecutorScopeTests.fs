@@ -1,9 +1,9 @@
-module VibeFs.Tests.SessionExecutorScopeTests
+module Wanxiangshu.Tests.SessionExecutorScopeTests
 
 open Fable.Core
-open VibeFs.Tests.Assert
-open VibeFs.Shell.RuntimeScope
-open VibeFs.Shell.SessionExecutor
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.SessionExecutor
 
 let twoScopesSameSessionIdQueuesIsolate () = promise {
     let scopeA = create ()

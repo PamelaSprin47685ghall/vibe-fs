@@ -1,4 +1,4 @@
-module VibeFs.Shell.JsArrayMutate
+module Wanxiangshu.Shell.JsArrayMutate
 
 open Fable.Core.JsInterop
 

@@ -1,16 +1,16 @@
-module VibeFs.Tests.IntegrationOpencodeReviewSpecs
+module Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Opencode.ReviewTools
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Opencode.ReviewTools
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.Dyn
 
 let private opencodeTextMessage (sessionID: string) (id: string) (text: string) : obj =
     box {| info = createObj [ "id", box id; "agent", box "reviewer"; "sessionID", box sessionID; "role", box "assistant" ]

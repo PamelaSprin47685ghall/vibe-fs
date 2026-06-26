@@ -1,9 +1,9 @@
-module VibeFs.Tests.WorkBacklogTests
+module Wanxiangshu.Tests.WorkBacklogTests
 
-open VibeFs.Tests.BacklogReplaySpecs
-open VibeFs.Tests.BacklogReplaySpecsMimocode
-open VibeFs.Tests.BacklogReplaySpecsFold
-open VibeFs.Tests.BacklogProjectionSpecs
+open Wanxiangshu.Tests.BacklogReplaySpecs
+open Wanxiangshu.Tests.BacklogReplaySpecsMimocode
+open Wanxiangshu.Tests.BacklogReplaySpecsFold
+open Wanxiangshu.Tests.BacklogProjectionSpecs
 
 
 let run () =

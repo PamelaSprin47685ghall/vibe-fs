@@ -1,4 +1,4 @@
-module VibeFs.Kernel.ToolCatalog.ToolSpec
+module Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 
 /// Pure description of a tool: name, prose description shown to the model,
 /// per-parameter doc strings, and the required parameter list.  Every adapter

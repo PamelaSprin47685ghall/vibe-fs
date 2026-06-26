@@ -1,8 +1,8 @@
-module VibeFs.Shell.TreeSitterPlatform
+module Wanxiangshu.Shell.TreeSitterPlatform
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 type internal Position = { row: int; column: int }
 

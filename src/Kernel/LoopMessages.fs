@@ -1,6 +1,6 @@
-module VibeFs.Kernel.LoopMessages
+module Wanxiangshu.Kernel.LoopMessages
 
-open VibeFs.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 /// Structured front-matter field names and verdict values are the single source
 /// of truth shared by every producer — slash-command activation, the
@@ -32,7 +32,7 @@ let isEndVerdict (verdict: string) : bool =
 let loopFooter =
     [ "- report: a detailed description of what you did and why"
       "- affectedFiles: list of every file you modified or created"
-      "- wip (optional): omit or true while the task is not fully complete; false only when the full task is done"
+      "- wip (optional, defaults to true): omit or true while the task is not fully complete; false only when the full task is done"
       ""
       "A reviewer will examine your submission. If accepted, you are done. If rejected, you will receive specific feedback to address." ]
 

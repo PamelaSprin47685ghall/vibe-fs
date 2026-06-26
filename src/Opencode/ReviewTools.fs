@@ -1,34 +1,34 @@
-module VibeFs.Opencode.ReviewTools
+module Wanxiangshu.Opencode.ReviewTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Kernel.ReviewVerdict
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.ToolCopy
-open VibeFs.Opencode.ToolSchema
-open VibeFs.Opencode.SessionIo
-open VibeFs.Shell.ToolExecute
-open VibeFs.Kernel.ToolResult
-open VibeFs.Opencode.ReviewerLoop
-open VibeFs.Shell.PromiseStr
-open VibeFs.Shell.ReviewToolsCodec
-open VibeFs.Shell.ToolRuntimeContext
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeClientCodec
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewVerdict
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.ToolCopy
+open Wanxiangshu.Opencode.ToolSchema
+open Wanxiangshu.Opencode.SessionIo
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Opencode.ReviewerLoop
+open Wanxiangshu.Shell.PromiseStr
+open Wanxiangshu.Shell.ReviewToolsCodec
+open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeClientCodec
 
-let private formatReviewResult = VibeFs.Kernel.ReviewPrompts.formatReviewResult
+let private formatReviewResult = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult
 
-let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     define submitReview
-        (box {| report = strReq Params.submitReviewReport; affectedFiles = strArrayOpt Params.submitReviewAffectedFiles; wip = boolOpt Params.submitReviewWip |})
+        (box {| report = strReq Params.submitReviewReport; affectedFiles = strArrayOpt Params.submitReviewAffectedFiles; wip = boolOptional Params.submitReviewWip |})
         (fun args context ->
             match decodeSubmitReviewArgs args with
             | Error e -> resolveStr (wireDecodeFailure "submit_review" e)
@@ -37,7 +37,7 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Sh
                 | Error e -> resolveStr (wireEncodeToolError "OpencodeClient" e)
                 | Ok client ->
                     let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
-                    let sessionID = VibeFs.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId
+                    let sessionID = Wanxiangshu.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId
                     if sessionID = "" || not (store.isReviewActive sessionID) then
                         resolveStr submitReviewNotNeeded
                     elif not (store.tryLockReview sessionID) then
@@ -74,14 +74,14 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Sh
                                 store.unlockReview sessionID
                         })
 
-let submitReviewResultTool (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     define submitReviewResult
         (box {| verdict = enumReq [| "PASS"; "REJECT" |] Params.returnReviewerVerdict
                 feedback = strOpt Params.returnReviewerFeedback |})
         (fun args context ->
             let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
             let sessionID =
-                let id = VibeFs.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId
+                let id = Wanxiangshu.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId
                 if id = "" then "loop" else id
             let directory = runtime.Execution.Directory
             promise {
@@ -91,7 +91,7 @@ let submitReviewResultTool (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewS
                     match getClientFromPluginCtx ctx with
                     | Error e -> return wireEncodeToolError "OpencodeClient" e
                     | Ok client ->
-                        let! texts = VibeFs.Opencode.SessionIo.readSessionTexts client sessionID directory
+                        let! texts = Wanxiangshu.Opencode.SessionIo.readSessionTexts client sessionID directory
                         let doubleCheckDone = hasDoubleCheckAnchor texts
                         match decideReviewSubmission decoded.Verdict decoded.Feedback doubleCheckDone with
                         | AskDoubleCheck ->

@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsOmp
+module Wanxiangshu.Tests.ArchitectureTestsOmp
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let ompMessageTransformUsesProjectionPolicy () =
     let code = requireFile "src/Omp/MessageTransform.fs" |> nonCommentCode
@@ -38,7 +38,7 @@ let ompMessagingCodecUsesShellPartCodec () =
 let ompCodecUsesDynModule () =
     let code = requireFile "src/Omp/Codec.fs" |> nonCommentCode
     check "arch: Omp Codec aliases Shell Dyn"
-        (code.Contains "module Dyn = VibeFs.Shell.Dyn")
+        (code.Contains "module Dyn = Wanxiangshu.Shell.Dyn")
     check "arch: Omp Codec defines getSessionIdFromContext"
         (code.Contains "let getSessionIdFromContext")
 
@@ -78,8 +78,8 @@ let ompPluginUsesPluginCore () =
 let ompPluginNoOpencodeMuxRefs () =
     for f in fsFiles "src/Omp" do
         let content = requireFile ("src/Omp/" + f)
-        check ("arch: Omp/" + f + " no VibeFs.Opencode") (not (content.Contains "VibeFs.Opencode"))
-        check ("arch: Omp/" + f + " no VibeFs.Mux") (not (content.Contains "VibeFs.Mux"))
+        check ("arch: Omp/" + f + " no Wanxiangshu.Opencode") (not (content.Contains "Wanxiangshu.Opencode"))
+        check ("arch: Omp/" + f + " no Wanxiangshu.Mux") (not (content.Contains "Wanxiangshu.Mux"))
 
 let ompUsesOmpToolSchema () =
     let schema = requireFile "src/Omp/OmpToolSchema.fs" |> nonCommentCode

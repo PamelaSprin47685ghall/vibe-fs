@@ -1,14 +1,14 @@
-module VibeFs.Tests.KnowledgeGraphBookkeeperLaunchTests
+module Wanxiangshu.Tests.KnowledgeGraphBookkeeperLaunchTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.DelegatedAiSettings
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.KnowledgeGraphBookkeeperLaunch
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.DelegatedAiSettings
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.KnowledgeGraphBookkeeperLaunch
 
 let sessionApiOfNullClient () =
     check "sessionApiOf null" (sessionApiOf (box null) |> Option.isNone)

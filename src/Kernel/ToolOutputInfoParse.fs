@@ -1,77 +1,50 @@
-module VibeFs.Kernel.ToolOutputInfoParse
+module Wanxiangshu.Kernel.ToolOutputInfoParse
 
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.ToolOutputInfoTypes
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
-let private readBlockAt (lines: string[]) start (prefix: string) =
-    let rec gather j acc =
-        if j >= lines.Length then String.concat "\n" (List.rev acc), j
-        elif lines.[j].StartsWith prefix then
-            gather (j + 1) (lines.[j].Substring(prefix.Length) :: acc)
-        else String.concat "\n" (List.rev acc), j
-    gather start []
+[<Emit("Object.keys($0)")>]
+let private objectKeys (o: obj) : string array = jsNative
 
-let private parseScalarTail raw =
-    match parseYamlStringValue raw with
-    | Some v -> v
-    | None -> raw.Trim()
+[<Emit("Array.isArray($0)")>]
+let private isArray (o: obj) : bool = jsNative
 
-let private parseInfoItemLine (lines: string[]) (i: int) : InfoItem option * int =
-    if i >= lines.Length || not (lines.[i].StartsWith("  - ")) then None, i + 1
+let private parseInfoItem (item: obj) : InfoItem option =
+    if isNull item then None
     else
-        let rest = lines.[i].Substring(4)
-        let sep = rest.IndexOf(": ")
-        if sep <= 0 then None, i + 1
+        let keys = objectKeys item
+        if keys.Length = 0 then None
         else
-            let key = rest.Substring(0, sep)
-            let raw = rest.Substring(sep + 2)
-            match key, raw with
-            | "hint", r ->
-                match parseYamlStringValue r with
-                | Some v -> Some(InfoItem.Hint v), i + 1
-                | None when r = "|" ->
-                    let v, ni = readBlockAt lines (i + 1) "    "
-                    Some(InfoItem.Hint v), ni
-                | None -> Some(InfoItem.Hint (r.Trim())), i + 1
-            | "syntax", r ->
-                match parseYamlStringValue r with
-                | Some v -> Some(InfoItem.Syntax v), i + 1
-                | None when r = "|" ->
-                    let v, ni = readBlockAt lines (i + 1) "    "
-                    Some(InfoItem.Syntax v), ni
-                | None -> Some(InfoItem.Syntax (r.Trim())), i + 1
-            | "iterator", r -> Some(InfoItem.Iterator (parseScalarTail r)), i + 1
-            | "status", r -> Some(InfoItem.Status (parseScalarTail r)), i + 1
-            | "exit_code", r ->
-                let t = parseScalarTail r
-                match System.Int32.TryParse t with
-                | true, n -> Some(InfoItem.ExitCode n), i + 1
-                | false, _ -> None, i + 1
-            | "signal", r -> Some(InfoItem.Signal (parseScalarTail r)), i + 1
-            | "timeout_ms", r ->
-                let t = parseScalarTail r
-                match System.Int32.TryParse t with
-                | true, n -> Some(InfoItem.TimeoutMs n), i + 1
-                | false, _ -> None, i + 1
-            | "tool_output", r ->
-                let t = parseScalarTail r
+            let key = keys.[0]
+            let value = item?(key)
+            let strValue = if isNull value then "" else string value
+            match key with
+            | "hint" -> Some (InfoItem.Hint strValue)
+            | "syntax" -> Some (InfoItem.Syntax strValue)
+            | "iterator" -> Some (InfoItem.Iterator strValue)
+            | "status" -> Some (InfoItem.Status strValue)
+            | "exit_code" ->
+                match System.Int32.TryParse strValue with
+                | true, n -> Some (InfoItem.ExitCode n)
+                | false, _ -> None
+            | "signal" -> Some (InfoItem.Signal strValue)
+            | "timeout_ms" ->
+                match System.Int32.TryParse strValue with
+                | true, n -> Some (InfoItem.TimeoutMs n)
+                | false, _ -> None
+            | "tool_output" ->
                 let ref' =
-                    if t = seeBelow then ToolOutputBodyRef.SeeBelow
-                    elif t = seeBelowTruncated then ToolOutputBodyRef.SeeBelowTruncated
-                    elif t = noChangeSincePreviousReadWrite then ToolOutputBodyRef.NoChangeSincePreviousReadWrite
+                    if strValue = seeBelow then ToolOutputBodyRef.SeeBelow
+                    elif strValue = seeBelowTruncated then ToolOutputBodyRef.SeeBelowTruncated
+                    elif strValue = noChangeSincePreviousReadWrite then ToolOutputBodyRef.NoChangeSincePreviousReadWrite
                     else ToolOutputBodyRef.SeeBelow
-                Some(InfoItem.BodyRef ref'), i + 1
-            | _ -> None, i + 1
+                Some (InfoItem.BodyRef ref')
+            | _ -> None
 
-let tryParseInfoList (lines: string[]) (startIndex: int) : InfoItem list * int option =
-    let rec loop i acc =
-        if i >= lines.Length then acc, None
-        elif lines.[i] = "---" then acc, Some i
-        else
-            let item, next = parseInfoItemLine lines i
-            match item with
-            | Some it -> loop next (acc @ [ it ])
-            | None -> loop (if next > i then next else i + 1) acc
-    if startIndex >= lines.Length then [], None
-    elif lines.[startIndex] <> "info:" then [], None
-    else loop (startIndex + 1) []
+let parseInfoItems (parsed: obj) : InfoItem list =
+    if isNull parsed then []
+    else
+        let info = parsed?("info")
+        if isNull info || not (isArray info) then []
+        else (unbox<obj array> info) |> Array.choose parseInfoItem |> Array.toList

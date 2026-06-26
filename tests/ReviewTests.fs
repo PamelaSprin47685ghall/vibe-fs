@@ -1,12 +1,12 @@
-module VibeFs.Tests.ReviewTests
+module Wanxiangshu.Tests.ReviewTests
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Shell.ReviewRuntime
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Shell.ReviewRuntime
 
-open VibeFs.Tests.ReviewTestsReplay
-open VibeFs.Tests.ReviewTestsPrompts
+open Wanxiangshu.Tests.ReviewTestsReplay
+open Wanxiangshu.Tests.ReviewTestsPrompts
 
 let transition' () =
     let task = "review-task"

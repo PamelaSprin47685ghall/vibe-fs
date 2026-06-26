@@ -1,13 +1,13 @@
-module VibeFs.Opencode.KnowledgeGraphSessionMessages
+module Wanxiangshu.Opencode.KnowledgeGraphSessionMessages
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.Messaging
-open VibeFs.Opencode.MessagingCodec
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeClientCodec
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Opencode.MessagingCodec
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeClientCodec
 
 let private invoke1 (target: obj) (methodName: string) (arg: obj) : JS.Promise<obj> =
     unbox (target?(methodName)(arg))

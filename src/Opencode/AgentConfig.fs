@@ -1,17 +1,17 @@
-module VibeFs.Opencode.AgentConfig
+module Wanxiangshu.Opencode.AgentConfig
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Config
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeAgentConfigCodec
-open VibeFs.Shell.OpencodeAgentConfigWire
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeAgentConfigCodec
+open Wanxiangshu.Shell.OpencodeAgentConfigWire
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative

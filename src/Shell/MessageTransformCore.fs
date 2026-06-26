@@ -1,10 +1,10 @@
-module VibeFs.Shell.MessageTransformCore
+module Wanxiangshu.Shell.MessageTransformCore
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.BacklogProjection
-open VibeFs.Kernel.WorkBacklog
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.BacklogProjection
+open Wanxiangshu.Kernel.WorkBacklog
 
 type BacklogSessionOps = {
     Host: Host

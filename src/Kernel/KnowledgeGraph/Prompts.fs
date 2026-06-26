@@ -1,44 +1,30 @@
-module VibeFs.Kernel.KnowledgeGraph.Prompts
+module Wanxiangshu.Kernel.KnowledgeGraph.Prompts
 
 open System
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.PromptFrontMatter
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.Yaml
 
-/// Pure knowledge graph prompt assembly over Kernel knowledge graph types. Front-matter helpers live
-/// in the shared Kernel.PromptFrontMatter module; only knowledge-graph-specific entry
-/// rendering stays here.
+let private entryItem (entry: KnowledgeGraphEntry) : obj =
+    createObj [ "id", box (idValue entry.id); "entity", box (List.toArray entry.entity); "fact", box entry.fact ]
 
-let private inlineEntitySeq (entities: string list) : string =
-    if entities.IsEmpty then "[]"
-    else "[" + String.concat ", " (entities |> List.map yamlStringValue) + "]"
+let private eventItem (entry: KnowledgeGraphEntry) : obj =
+    createObj [ "entity", box (List.toArray entry.entity); "fact", box entry.fact ]
 
-let private entrySeqLines (entries: KnowledgeGraphEntry list) : string list =
-    entries
-    |> List.map (fun entry ->
-        String.concat "\n" [
-            "  - id: " + idValue entry.id
-            "    entity: " + inlineEntitySeq entry.entity
-            "    fact: " + yamlStringValue entry.fact ])
+let kgYamlSeqField (key: string) (entries: KnowledgeGraphEntry list) : FrontMatterField =
+    yamlSeqField key (entries |> List.map entryItem)
 
-let private eventSeqLines (entries: KnowledgeGraphEntry list) : string list =
-    entries
-    |> List.map (fun entry ->
-        String.concat "\n" [
-            "  - entity: " + inlineEntitySeq entry.entity
-            "    fact: " + yamlStringValue entry.fact ])
-
-let kgYamlSeqField (key: string) (entries: KnowledgeGraphEntry list) : string =
-    VibeFs.Kernel.PromptFrontMatter.yamlSeqField key (entrySeqLines entries)
-
-let private kgYamlEventSeqField (key: string) (entries: KnowledgeGraphEntry list) : string =
-    VibeFs.Kernel.PromptFrontMatter.yamlSeqField key (eventSeqLines entries)
+let private kgYamlEventSeqField (key: string) (entries: KnowledgeGraphEntry list) : FrontMatterField =
+    yamlSeqField key (entries |> List.map eventItem)
 
 let projectionText (projection: KnowledgeGraphProjection) : string =
-    kgYamlSeqField "knowledge_graph" (projection |> Map.toList |> List.map snd)
+    stringifyFields [ kgYamlSeqField "knowledge_graph" (projection |> Map.toList |> List.map snd) ]
 
 let filesText (entries: KnowledgeGraphEntry list) : string =
-    kgYamlSeqField "entries" entries
+    stringifyFields [ kgYamlSeqField "entries" entries ]
 
 let entriesForDay (files: KnowledgeGraphFile list) (date: string) : KnowledgeGraphEntry list =
     files
@@ -85,9 +71,6 @@ let private bookkeeperQualityRules = [
     "Keep the entity vocabulary small and strong, preferably using domain-specific terms."
 ]
 
-/// Daily rewrites also prune the existing knowledge graph: judge each entry by
-/// whether a future reader will act on it, and keep the knowledge graph short and
-/// high-signal rather than exhaustive.
 let private rewritePruneRules = [
     "Actively filter out low-value content already in the knowledge graph: drop trivia no future reader will act on, remove transient details that have since stopped mattering, and merge overlapping facts into single canonical entries. Use judgment — prefer a shorter, higher-signal knowledge graph over exhaustive preservation."
 ]

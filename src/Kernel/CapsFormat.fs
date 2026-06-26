@@ -1,6 +1,8 @@
-module VibeFs.Kernel.CapsFormat
+module Wanxiangshu.Kernel.CapsFormat
 
-open VibeFs.Kernel.PromptFrontMatter
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 /// A discovered capability file: its absolute path, display label, and content.
 type CapsFile = { filePath: string; label: string; content: string }
@@ -18,11 +20,7 @@ let stableFingerprint (hashFn: string -> string) (capsFiles: CapsFile list) : st
 let buildCapitalsContext (files: CapsFile list) : string =
     let items =
         files |> List.map (fun f ->
-            let contentLines = f.content.Split('\n') |> Array.map (fun line -> "      " + line)
-            Array.concat [
-                [| "  - label: " + yamlStringValue f.label; "    content: |" |]
-                contentLines
-            ] |> String.concat "\n")
+            createObj [ "label", box f.label; "content", box f.content ])
     frontMatter [ yamlSeqField "caps" items ]
 
 let formatReadOutput (filePath: string) (content: string) : string =

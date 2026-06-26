@@ -1,11 +1,11 @@
-module VibeFs.Shell.FuzzySearch
+module Wanxiangshu.Shell.FuzzySearch
 
 // Thin facade re-exporting the public API from FuzzySearchHelpers/Find/Grep
-// for backward compatibility. All consumers use module VibeFs.Shell.FuzzySearch.
+// for backward compatibility. All consumers use module Wanxiangshu.Shell.FuzzySearch.
 
-open VibeFs.Shell.FuzzySearchHelpers
-open VibeFs.Shell.FuzzySearchFind
-open VibeFs.Shell.FuzzySearchGrep
+open Wanxiangshu.Shell.FuzzySearchHelpers
+open Wanxiangshu.Shell.FuzzySearchFind
+open Wanxiangshu.Shell.FuzzySearchGrep
 
 // Re-export types
 type SearchOptions = FuzzySearchHelpers.SearchOptions

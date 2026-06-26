@@ -1,10 +1,10 @@
-module VibeFs.Tests.OpencodeSessionSpawnCodecTests
+module Wanxiangshu.Tests.OpencodeSessionSpawnCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.OpencodeSessionSpawnCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.OpencodeSessionSpawnCodec
 
 let decodeOkId () =
     let createResult = createObj [ "data", createObj [ "id", box "  child-abc  " ] ]

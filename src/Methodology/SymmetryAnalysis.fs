@@ -1,6 +1,6 @@
-module VibeFs.Methodology.SymmetryAnalysis
+module Wanxiangshu.Methodology.SymmetryAnalysis
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

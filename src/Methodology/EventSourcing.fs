@@ -1,6 +1,6 @@
-module VibeFs.Methodology.EventSourcing
+module Wanxiangshu.Methodology.EventSourcing
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

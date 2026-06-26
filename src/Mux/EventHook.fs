@@ -1,11 +1,11 @@
-module VibeFs.Mux.EventHook
+module Wanxiangshu.Mux.EventHook
 
 open Fable.Core
-open VibeFs.Kernel
-open VibeFs.Shell.NudgeRuntime
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
-open VibeFs.Mux.KnowledgeGraphRuntimeMux
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell.NudgeRuntime
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
 
 type private DecodedHookEvent =
     { eventType: string
@@ -45,7 +45,7 @@ let private parseHookEvent (event: obj) : NudgeRuntimeEvent =
         | "error" when decoded.errorType = "aborted" -> AbortedError decoded.workspaceId
         | _ -> Ignore
 
-let createEventHook (deps: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime) : obj =
+let createEventHook (deps: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime) : obj =
     let getChatHistory =
         if Dyn.isNullish deps then None
         else

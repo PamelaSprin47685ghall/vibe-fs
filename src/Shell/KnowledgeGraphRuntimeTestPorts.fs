@@ -1,8 +1,8 @@
-module VibeFs.Shell.KnowledgeGraphRuntimeTestPorts
+module Wanxiangshu.Shell.KnowledgeGraphRuntimeTestPorts
 
 open Fable.Core
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Shell.KnowledgeGraphWorkflow
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Shell.KnowledgeGraphWorkflow
 
 type KnowledgeGraphRuntimeTestPorts =
     { SwapState: (KnowledgeGraphState -> KnowledgeGraphState * obj) -> obj

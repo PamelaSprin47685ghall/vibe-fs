@@ -1,17 +1,17 @@
-module VibeFs.Tests.KnowledgeGraphMaintenanceRunTests
+module Wanxiangshu.Tests.KnowledgeGraphMaintenanceRunTests
 
 open System
 open Fable.Core
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Maintenance
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.KnowledgeGraphMaintenanceRun
-open VibeFs.Shell.PromiseQueue
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Maintenance
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.KnowledgeGraphMaintenanceRun
+open Wanxiangshu.Shell.PromiseQueue
 
 let runMaintenanceIfDueInvokesTryLaunchOnce () = promise {
     let! workspaceDir = mkdtempAsync "kg-maint-run-"

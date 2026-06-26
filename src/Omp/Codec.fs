@@ -1,9 +1,9 @@
-module VibeFs.Omp.Codec
+module Wanxiangshu.Omp.Codec
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Omp.Schema
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Omp.Schema
+module Dyn = Wanxiangshu.Shell.Dyn
 
 type ToolTextResult = { ``type``: string; text: string }
 

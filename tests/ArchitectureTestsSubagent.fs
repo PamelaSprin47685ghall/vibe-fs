@@ -1,7 +1,7 @@
-module VibeFs.Tests.ArchitectureTestsSubagent
+module Wanxiangshu.Tests.ArchitectureTestsSubagent
 
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let muxSubagentToolsUsesToolCopy () =
     let mux = requireFile "src/Mux/SubagentTools.fs" |> nonCommentCode

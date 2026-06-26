@@ -1,10 +1,10 @@
-module VibeFs.Tests.KnowledgeGraphToolsCodecTests
+module Wanxiangshu.Tests.KnowledgeGraphToolsCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.KnowledgeGraphToolsCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.KnowledgeGraphToolsCodec
 
 let decodeFetchEntityMissing () =
     let args = createObj []

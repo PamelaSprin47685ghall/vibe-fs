@@ -1,7 +1,7 @@
-module VibeFs.Kernel.Nudge.SubmitReviewHooks
+module Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 
-open VibeFs.Kernel.Nudge.TodoStatus
-open VibeFs.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Kernel.ReviewPrompts
 
 let isSubmitReviewWipProgressOutput (text: string) : bool =
     text.Trim() = submitReviewWipAcknowledgment

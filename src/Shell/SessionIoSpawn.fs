@@ -1,4 +1,4 @@
-module VibeFs.Shell.SessionIoSpawn
+module Wanxiangshu.Shell.SessionIoSpawn
 
 let formatSubagentReport (noOutputText: string) (abortedPrefix: string) (text: string) (aborted: bool) : string =
     if aborted then

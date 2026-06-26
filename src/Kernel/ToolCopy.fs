@@ -1,7 +1,7 @@
-module VibeFs.Kernel.ToolCopy
+module Wanxiangshu.Kernel.ToolCopy
 
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.ToolResult
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ToolResult
 
 let muxToolRequiresWorkspaceId (title: string) : string =
     $"{title} requires workspaceId"

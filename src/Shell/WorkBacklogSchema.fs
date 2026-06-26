@@ -1,9 +1,9 @@
-module VibeFs.Shell.WorkBacklogSchema
+module Wanxiangshu.Shell.WorkBacklogSchema
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Methodology
-open VibeFs.Kernel.WorkBacklog
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Shell.Dyn
 
 let jsonStringProperty (description: string) : obj =
     createObj [ "type", box "string"; "description", box description ]

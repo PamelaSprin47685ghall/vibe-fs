@@ -1,11 +1,11 @@
-module VibeFs.Shell.BacklogSessionCodec
+module Wanxiangshu.Shell.BacklogSessionCodec
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.SessionProjectionStore
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.SessionProjectionStore
 
 let inputOfPart (part: Part<obj>) : obj =
     match part with

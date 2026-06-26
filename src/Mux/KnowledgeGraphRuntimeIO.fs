@@ -1,17 +1,17 @@
-module VibeFs.Mux.KnowledgeGraphRuntimeIO
+module Wanxiangshu.Mux.KnowledgeGraphRuntimeIO
 
 open Fable.Core
-open VibeFs.Kernel
-open VibeFs.Shell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Shell.KnowledgeGraphStorage
-open VibeFs.Shell.KnowledgeGraphSubmit
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Shell.KnowledgeGraphStorage
+open Wanxiangshu.Shell.KnowledgeGraphSubmit
+open Wanxiangshu.Shell.Dyn
 
-let buildEntries = VibeFs.Shell.KnowledgeGraphSubmit.buildEntriesFromDrafts
+let buildEntries = Wanxiangshu.Shell.KnowledgeGraphSubmit.buildEntriesFromDrafts
 
 let extractTexts (item: obj) : string list =
     if Dyn.typeIs item "string" then [ string item ]
@@ -45,4 +45,4 @@ let tryResolveJobContext (getChatHistory: (string -> JS.Promise<obj array>) opti
 
 let submitForKind (root: string) (todayStr: string) (entries: KnowledgeGraphEntry list) (kind: KnowledgeGraphJobKind)
                  : JS.Promise<string> =
-    VibeFs.Shell.KnowledgeGraphSubmit.submitEntriesForKind defaultPortLockTimeoutMs defaultPortLockRetryDelayMs root todayStr entries kind
+    Wanxiangshu.Shell.KnowledgeGraphSubmit.submitEntriesForKind defaultPortLockTimeoutMs defaultPortLockRetryDelayMs root todayStr entries kind

@@ -1,7 +1,7 @@
-module VibeFs.Kernel.ReviewSession.Registry
+module Wanxiangshu.Kernel.ReviewSession.Registry
 
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Kernel.ReviewSession.StateMachine
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewSession.StateMachine
 
 [<RequireQualifiedAccess>]
 type RegistryAction =

@@ -1,11 +1,11 @@
-module VibeFs.Tests.BacklogReplaySpecsFold
+module Wanxiangshu.Tests.BacklogReplaySpecsFold
 
-open VibeFs.Tests.Assert
-open VibeFs.Tests.BacklogMessageBuilders
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.BacklogProjection
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.BacklogMessageBuilders
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.BacklogProjection
 
 let findFoldRangeTest () =
     let flat =

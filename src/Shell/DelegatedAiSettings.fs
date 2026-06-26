@@ -1,4 +1,4 @@
-module VibeFs.Shell.DelegatedAiSettings
+module Wanxiangshu.Shell.DelegatedAiSettings
 
 type DelegatedAiSettings =
     { modelString: string option

@@ -1,9 +1,9 @@
-module VibeFs.Kernel.KnowledgeGraph.Maintenance
+module Wanxiangshu.Kernel.KnowledgeGraph.Maintenance
 
 open System
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
 
 /// Pure knowledge graph maintenance scheduling. Given the current knowledge graph files and a clock
 /// value, decide which background daily rewrite jobs are due — without touching

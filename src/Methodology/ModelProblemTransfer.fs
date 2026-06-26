@@ -1,6 +1,6 @@
-module VibeFs.Methodology.ModelProblemTransfer
+module Wanxiangshu.Methodology.ModelProblemTransfer
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

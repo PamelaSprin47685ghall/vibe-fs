@@ -1,4 +1,4 @@
-module VibeFs.Kernel.OmpPrompts
+module Wanxiangshu.Kernel.OmpPrompts
 
 let editorPromptOmp =
     "You are a code editing assistant. Given a task description, implement the necessary code changes in the workspace. "

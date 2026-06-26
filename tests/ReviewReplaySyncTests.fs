@@ -1,12 +1,14 @@
-module VibeFs.Tests.ReviewReplaySyncTests
+module Wanxiangshu.Tests.ReviewReplaySyncTests
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.ReviewReplayPolicy
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Shell.ReviewReplaySync
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ReviewReplayPolicy
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.ReviewReplaySync
 
 let textsFromFlatPartsIncludesToolOutput () =
     let toolState =
@@ -32,38 +34,46 @@ let textsFromFlatPartsIncludesToolOutput () =
     let texts = textsFromFlatParts flat |> Seq.toList
     equal "tool output collected" [ "tool-body" ] texts
 
-let replayReviewIfStoreEmptyNoOpWhenStoreHasState () =
-    let store = createReviewStore ()
-    store.activateReview ("s1", "existing", 1L)
-    replayReviewIfStoreEmpty store "s1" [ "ignored" ]
-    equal "task unchanged when store already has state" (Some "existing") (store.getReviewTask "s1")
-
-let replayReviewAlwaysSyncActivatesFromTexts () =
+let syncReviewFromTextsActivatesFromTexts () =
     let store = createReviewStore ()
     let activate =
         frontMatterPrompt [ yamlField taskField "from-replay" ] "body"
-    replayReviewAlwaysSync store "s2" [ activate ]
+    syncReviewFromTexts store "s2" [ activate ]
     equal "replay activates task" (Some "from-replay") (store.getReviewTask "s2")
     check "replay marks session active" (store.isReviewActive "s2")
 
-let replayReviewIfStoreEmptyActivatesWhenEmpty () =
+let syncReviewFromTextsDeactivatesOnEndVerdict () =
     let store = createReviewStore ()
-    let activate = frontMatterPrompt [ yamlField taskField "empty-store-task" ] "body"
-    replayReviewIfStoreEmpty store "s3" [ activate ]
-    equal "empty store replay activates" (Some "empty-store-task") (store.getReviewTask "s3")
+    store.activateReview ("s3", "active-task", 1L)
+    let accept = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult Accepted
+    syncReviewFromTexts store "s3" [ accept ]
+    check "end verdict deactivates review" (not (store.isReviewActive "s3"))
 
-let replayReviewIfStoreEmptySkipsWhenActiveButAlwaysSyncUpdates () =
+let syncReviewFromTextsPreservesActiveOnReject () =
     let store = createReviewStore ()
-    store.activateReview ("s4", "held", 1L)
-    replayReviewIfStoreEmpty store "s4" [ frontMatterPrompt [ yamlField taskField "ignored" ] "body" ]
-    equal "if-store-empty skips active session" (Some "held") (store.getReviewTask "s4")
-    let update = frontMatterPrompt [ yamlField taskField "synced" ] "body"
-    replayReviewAlwaysSync store "s4" [ update ]
-    equal "always sync updates task" (Some "synced") (store.getReviewTask "s4")
+    let activate = buildLoopMessage "active-task" [ "With-Review Mode is active." ]
+    let rejected = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Rejected "fix tests")
+    syncReviewFromTexts store "s4" [ activate; rejected ]
+    equal "reject keeps task active" (Some "active-task") (store.getReviewTask "s4")
+    check "reject keeps session active" (store.isReviewActive "s4")
+
+/// Regression: when the task: anchor is missing from replay texts (e.g. truncated
+/// by compaction), inferReviewTaskFromTexts correctly returns None — proving the
+/// bug is in the DATA source, not the fold logic.
+let truncatedTextsLoseAnchor () =
+    let texts = [ "some prose without front matter" ]
+    equal "missing anchor → None" None (inferReviewTaskFromTexts texts)
+
+/// Regression: full texts with the anchor correctly recover the task.
+let fullTextsRecoverAnchor () =
+    let activate = buildLoopMessage "ship feature" [ "With-Review Mode is active." ]
+    let texts = [ activate; "working on it" ]
+    equal "full texts with anchor → Some" (Some "ship feature") (inferReviewTaskFromTexts texts)
 
 let run () =
     textsFromFlatPartsIncludesToolOutput ()
-    replayReviewIfStoreEmptyNoOpWhenStoreHasState ()
-    replayReviewAlwaysSyncActivatesFromTexts ()
-    replayReviewIfStoreEmptyActivatesWhenEmpty ()
-    replayReviewIfStoreEmptySkipsWhenActiveButAlwaysSyncUpdates ()
+    syncReviewFromTextsActivatesFromTexts ()
+    syncReviewFromTextsDeactivatesOnEndVerdict ()
+    syncReviewFromTextsPreservesActiveOnReject ()
+    truncatedTextsLoseAnchor ()
+    fullTextsRecoverAnchor ()

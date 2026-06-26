@@ -1,13 +1,13 @@
-module VibeFs.Tests.IntegrationChatTestsSubagent
+module Wanxiangshu.Tests.IntegrationChatTestsSubagent
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Opencode.Plugin
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Opencode.SessionIo
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Opencode.SessionIo
+open Wanxiangshu.Shell.Dyn
 
 let websearchBoundariesSpec () = promise {
     let! workspaceDir = mkdtempAsync "websearch-boundaries-"

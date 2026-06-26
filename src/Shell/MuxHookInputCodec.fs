@@ -1,8 +1,8 @@
-module VibeFs.Shell.MuxHookInputCodec
+module Wanxiangshu.Shell.MuxHookInputCodec
 
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.ExecutorToolsCodec
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ExecutorToolsCodec
 
 type MuxMessagesTransformInput =
     { Agent: string

@@ -1,7 +1,7 @@
-module VibeFs.Shell.WebSearchCodec
+module Wanxiangshu.Shell.WebSearchCodec
 
-open VibeFs.Shell.Dyn
-open VibeFs.Kernel.SearchPrompts
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.SearchPrompts
 
 let parseSearchResults (results: obj) : SearchResult list =
     if Dyn.isNullish results || not (Dyn.isArray results) then

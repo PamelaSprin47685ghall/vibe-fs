@@ -1,39 +1,30 @@
-module VibeFs.Kernel.SubagentPrompts
+module Wanxiangshu.Kernel.SubagentPrompts
 
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.PromptFragments
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.PromptFragments
 
 let meditatorSkippedSection = "(skipped)"
 
 type MeditatorFileSection =
     { file: string; content: string option }
 
-let private coderTargetItem (t: CoderTarget) : string =
-    let guideLines = t.guide.Split('\n') |> Array.map (fun line -> "      " + line)
-
-    let draftLines =
-        match t.draft with
-        | Some draft when not (System.String.IsNullOrWhiteSpace draft) ->
-            Array.append [| "    draft: |" |] (draft.Split('\n') |> Array.map (fun line -> "      " + line))
-        | _ -> [||]
-
-    Array.concat
-        [ [| "  - file: " + yamlStringValue t.file; "    guide: |" |]
-          guideLines
-          draftLines ]
-    |> String.concat "\n"
+let private coderTargetItem (t: CoderTarget) : obj =
+    let fields =
+        [ "file", box t.file; "guide", box t.guide ]
+        @ (match t.draft with
+           | Some draft when not (System.String.IsNullOrWhiteSpace draft) -> [ "draft", box draft ]
+           | _ -> [])
+    createObj fields
 
 let private agentPrompt fields lines =
     let actualLines =
-        if
-            lines
-            |> List.exists (fun (l: string) -> l.StartsWith("You are an implementation agent"))
-        then
+        if lines |> List.exists (fun (l: string) -> l.StartsWith("You are an implementation agent")) then
             lines
         else
             readOnlyRules :: lines
-
     frontMatterPrompt fields (String.concat "\n\n" actualLines)
 
 let coderPrompt (intent: CoderIntent) : string =
@@ -41,11 +32,8 @@ let coderPrompt (intent: CoderIntent) : string =
         [ yamlField "objective" intent.objective
           yamlField "background" intent.background
           yamlSeqField "targets" (intent.targets |> List.map coderTargetItem) ]
-        @ (if intent.doNotTouch.Length = 0 then
-               []
-           else
-               [ yamlStringSeqField "do_not_touch" (List.ofArray intent.doNotTouch) ])
-
+        @ (if intent.doNotTouch.Length = 0 then []
+           else [ yamlStringSeqField "do_not_touch" (List.ofArray intent.doNotTouch) ])
     agentPrompt
         fields
         [ "You are an implementation agent. Read the listed files and related code, then edit or create files to satisfy the objective and each target guide."
@@ -63,13 +51,8 @@ let investigatorPrompt (intent: InvestigatorIntent) : string =
           "Return your report with relatedFiles and line ranges." ]
 
 let meditatorPrompt (sections: MeditatorFileSection list) (intent: string) : string =
-    let fileItem (s: MeditatorFileSection) : string =
-        let body = Option.defaultValue meditatorSkippedSection s.content
-        let contentLines = body.Split('\n') |> Array.map (fun line -> "      " + line)
-
-        Array.concat [ [| "  - path: " + yamlStringValue s.file; "    content: |" |]; contentLines ]
-        |> String.concat "\n"
-
+    let fileItem (s: MeditatorFileSection) : obj =
+        createObj [ "path", box s.file; "content", box (Option.defaultValue meditatorSkippedSection s.content) ]
     agentPrompt
         [ yamlSeqField "files" (sections |> List.map fileItem)
           yamlField "question" intent ]

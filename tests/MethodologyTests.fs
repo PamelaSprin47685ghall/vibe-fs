@@ -1,12 +1,12 @@
-module VibeFs.Tests.MethodologyTests
+module Wanxiangshu.Tests.MethodologyTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Methodology
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Methodology.Registry
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Methodology.Registry
+open Wanxiangshu.Methodology.SchemaCommon
 
 let private hintFromTodoOutput (methodologies: string list) =
     match tryParse (todoWriteOutput methodologies false) with

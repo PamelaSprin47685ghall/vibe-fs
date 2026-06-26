@@ -1,13 +1,13 @@
-module VibeFs.Tests.OmpFuzzyTests
+module Wanxiangshu.Tests.OmpFuzzyTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Omp.Plugin
-open VibeFs.Shell.FuzzyIteratorStore
-open VibeFs.Kernel.FuzzyQuery
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Omp.Plugin
+open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Kernel.FuzzyQuery
 
 let private createPiHarness () =
     let tools = ResizeArray<obj>()
@@ -84,7 +84,7 @@ let fuzzyGrepIteratorSingleUse () =
 let registeredFuzzyToolsExposeIteratorParam () = promise {
     let tools, hookStore = createPiHarness ()
     let pi = piObject hookStore
-    do! kunweiExtension pi
+    do! wanxiangshuExtension pi
     for toolName in [| "fuzzy_find"; "fuzzy_grep" |] do
         let tool = tools |> Seq.find (fun t -> str t "name" = toolName)
         let props = Dyn.get (Dyn.get tool "parameters") "properties"

@@ -1,8 +1,8 @@
-module VibeFs.Methodology.Args
+module Wanxiangshu.Methodology.Args
 
 open System
-open VibeFs.Methodology.SchemaCommon
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Methodology.SchemaCommon
+open Wanxiangshu.Shell.Dyn
 
 let parse (schema: MethodologySchema) (args: obj) : Result<Map<string, string> * Map<string, string list>, string> =
     if isNullish args then Error "missing tool arguments"

@@ -1,10 +1,10 @@
-module VibeFs.Tests.OmpCapsTests
+module Wanxiangshu.Tests.OmpCapsTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Shell.OmpCaps
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Shell.OmpCaps
 
 [<Import("createRequire", "node:module")>]
 let private createRequire' : string -> (string -> obj) = jsNative

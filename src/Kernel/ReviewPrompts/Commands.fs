@@ -1,8 +1,8 @@
-module VibeFs.Kernel.ReviewPrompts.Commands
+module Wanxiangshu.Kernel.ReviewPrompts.Commands
 
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.PromptFragments
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.PromptFragments
 
 let withReviewCommandTemplate =
     frontMatterPrompt
@@ -20,7 +20,7 @@ let withReviewCommandTemplate =
               "Before finishing, you must call submit_review with:"
               "- report: a detailed description of what you did and why"
               "- affectedFiles: every file you modified or created"
-              "- wip: omit or true until the task is fully complete; false only when everything required is done"
+              "- wip (optional, defaults to true): omit or true until the task is fully complete; false only when everything required is done"
               "Defend proactively against reviewer rejection: keep the implementation natural, minimal, complete, and well-tested."
               "Do not end the conversation without submit_review." ])
 

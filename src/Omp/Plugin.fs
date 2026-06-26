@@ -1,25 +1,25 @@
-module VibeFs.Omp.Plugin
+module Wanxiangshu.Omp.Plugin
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Executor
-open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Omp.MessagingCodec
-open VibeFs.Omp.PruneGuard
-open VibeFs.Omp.ReviewTools
-open VibeFs.Omp.PiResolve
-open VibeFs.Omp.KnowledgeGraph.Runtime
-open VibeFs.Omp.MessageTransform
-open VibeFs.Omp.OmpTestHooks
-open VibeFs.Omp.PluginCore
-open VibeFs.Omp.Tools
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Kernel.TreeSitterKernel
+open Wanxiangshu.Omp.MessagingCodec
+open Wanxiangshu.Omp.PruneGuard
+open Wanxiangshu.Omp.ReviewTools
+open Wanxiangshu.Omp.PiResolve
+open Wanxiangshu.Omp.KnowledgeGraph.Runtime
+open Wanxiangshu.Omp.MessageTransform
+open Wanxiangshu.Omp.OmpTestHooks
+open Wanxiangshu.Omp.PluginCore
+open Wanxiangshu.Omp.Tools
 
-open VibeFs.Shell.WebSearchApi
-open VibeFs.Shell.OmpCaps
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Shell.RunnerBackground
-open VibeFs.Shell.SessionExecutor
-open VibeFs.Shell.TreeSitterShell
+open Wanxiangshu.Shell.WebSearchApi
+open Wanxiangshu.Shell.OmpCaps
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Shell.SessionExecutor
+open Wanxiangshu.Shell.TreeSitterShell
 
 let private registered: obj = emitJsExpr () "new WeakSet()"
 
@@ -40,7 +40,7 @@ let resetOmpPluginTestState () : unit =
 let reviewStore : ReviewStore = reviewStore
 
 [<ExportDefault>]
-let kunweiExtension (pi: obj) : JS.Promise<unit> =
+let wanxiangshuExtension (pi: obj) : JS.Promise<unit> =
     promise {
         if registered?has(pi) then
             ()

@@ -1,14 +1,14 @@
-module VibeFs.Shell.FuzzySearchGrep
+module Wanxiangshu.Shell.FuzzySearchGrep
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
-open VibeFs.Kernel.FuzzyPath
-open VibeFs.Kernel.FuzzyQuery
-open VibeFs.Kernel.FuzzyFormat
-open VibeFs.Shell.FuzzyIteratorStore
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.FuzzySearchHelpers
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.FuzzyPath
+open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Kernel.FuzzyFormat
+open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell.FuzzySearchHelpers
 
 let resolveGrepIteratorState (params': FuzzyGrepParams) (opts: SearchOptions)
     : Result<GrepIteratorState, string> =

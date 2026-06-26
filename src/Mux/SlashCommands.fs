@@ -1,22 +1,22 @@
-module VibeFs.Mux.SlashCommands
+module Wanxiangshu.Mux.SlashCommands
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Config
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Kernel.ReviewVerdict
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Mux.Delegate
-open VibeFs.Mux.DelegateTimeout
-open VibeFs.Mux.Wrappers
-open VibeFs.Mux.SubagentTools
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewVerdict
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Mux.Delegate
+open Wanxiangshu.Mux.DelegateTimeout
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Mux.SubagentTools
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -50,7 +50,7 @@ let private pluginConfigForSlash (deps: obj) (workspaceId: WorkspaceId) : JS.Pro
             return slashConfigFromCtx deps workspaceId ctx
     }
 
-let createLoopOnlyCommand (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let createLoopOnlyCommand (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     box {| key = "loop"
            description = "Activate With-Review Mode. AI completes task, submits for review."
            inputHint = "<task description>"
@@ -84,7 +84,7 @@ let private precheckReview
     }
 
 let private activateReview
-    (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (workspaceIdStr: string) (task: string)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (workspaceIdStr: string) (task: string)
     (isPass: bool) (feedback: string) : string =
     reviewStore.activateReview(workspaceIdStr, task, Domain.nowMs ())
     if isPass then
@@ -93,7 +93,7 @@ let private activateReview
         buildLoopMessage task [ "Pre-review feedback:"; ""; feedback; ""; "With-Review Mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
 
 let private loopReviewExecute
-    (deps: obj) (toolNames: string array) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore)
+    (deps: obj) (toolNames: string array) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (workspaceId: WorkspaceId) (args: string) : JS.Promise<string> =
     let task = args.Trim()
     let workspaceIdStr = Id.workspaceIdValue workspaceId
@@ -117,7 +117,7 @@ let private loopReviewExecute
                 return activateReview reviewStore workspaceIdStr task isPass feedback
         }
 
-let createLoopReviewCommand (deps: obj) (toolNames: string array) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
+let createLoopReviewCommand (deps: obj) (toolNames: string array) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     box
         {| key = "loop-review"
            description = "Pre-review task description with a reviewer sub-agent, then activate With-Review Mode."
@@ -128,5 +128,5 @@ let createLoopReviewCommand (deps: obj) (toolNames: string array) (reviewStore: 
                    | None -> Promise.lift "Invalid workspaceId"
                    | Some wid -> loopReviewExecute deps toolNames reviewStore wid args) |}
 
-let createSlashCommands (deps: obj) (toolNames: string array) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj array =
+let createSlashCommands (deps: obj) (toolNames: string array) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj array =
     [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps toolNames reviewStore |]

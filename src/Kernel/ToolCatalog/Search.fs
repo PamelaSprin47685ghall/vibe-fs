@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ToolCatalog.Search
+module Wanxiangshu.Kernel.ToolCatalog.Search
 
-open VibeFs.Kernel.ToolCatalog.ToolSpec
+open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 
 let internal fuzzyFindSpec: ToolSpec =
     { name = "fuzzy_find"

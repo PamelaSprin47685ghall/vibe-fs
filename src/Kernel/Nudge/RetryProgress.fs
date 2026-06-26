@@ -1,4 +1,4 @@
-module VibeFs.Kernel.Nudge.RetryProgress
+module Wanxiangshu.Kernel.Nudge.RetryProgress
 
 let retryProgressEvents: Set<string> =
     Set.ofList

@@ -1,4 +1,4 @@
-module VibeFs.Kernel.OmpSessionTools
+module Wanxiangshu.Kernel.OmpSessionTools
 
 let ompSubagentToolNames =
     [| "coder"; "investigator"; "meditator"; "browser" |]

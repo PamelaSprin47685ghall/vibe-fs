@@ -1,16 +1,16 @@
-module VibeFs.Tests.KernelTests
+module Wanxiangshu.Tests.KernelTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Dedup
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Kernel.MessageDedup
-open VibeFs.Kernel.Executor
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Messaging
-open VibeFs.Shell.ErrorClassify
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Dedup
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.MessageDedup
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Shell.Dyn
 
 
 let headTail' () =
@@ -103,13 +103,13 @@ let dedup' () =
     check "dedup substring" (r3.output = noChange)
 
 let jsBoundary' () =
-    check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = VibeFs.Kernel.Domain.MessageAborted)
+    check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = Wanxiangshu.Kernel.Domain.MessageAborted)
     let nestedCause : obj = createObj [ "name", box "TypeError"; "message", box "terminated"; "cause", box (createObj [ "name", box "AbortError"; "message", box "aborted" ]) ]
-    check "abort nested via cause" (translateJsError nestedCause = VibeFs.Kernel.Domain.MessageAborted)
+    check "abort nested via cause" (translateJsError nestedCause = Wanxiangshu.Kernel.Domain.MessageAborted)
     let nestedError : obj = createObj [ "name", box "TypeError"; "error", box (createObj [ "name", box "AbortError" ]) ]
-    check "abort nested via error" (translateJsError nestedError = VibeFs.Kernel.Domain.MessageAborted)
+    check "abort nested via error" (translateJsError nestedError = Wanxiangshu.Kernel.Domain.MessageAborted)
     let nonAbort : obj = createObj [ "name", box "RangeError"; "message", box "out of range" ]
-    check "non-abort stays unknown" (translateJsError nonAbort = VibeFs.Kernel.Domain.UnknownJsError "out of range")
+    check "non-abort stays unknown" (translateJsError nonAbort = Wanxiangshu.Kernel.Domain.UnknownJsError "out of range")
     let msgs : Message<obj> list =
         [ { info =
                 { id = ""; sessionID = ""; role = Assistant; agent = ""
@@ -121,14 +121,14 @@ let jsBoundary' () =
     check "assistant text read" (text = Some "hello")
 
 let knowledgeGraphFetchAnswer () =
-    let kgId = match VibeFs.Kernel.KnowledgeGraph.tryParseId "0a3f" with Some value -> value | None -> failwith "0a3f should parse"
+    let kgId = match Wanxiangshu.Kernel.KnowledgeGraph.tryParseId "0a3f" with Some value -> value | None -> failwith "0a3f should parse"
     let projection =
         Map.ofList [
-            kgId, ({ id = kgId; entity = ["project entry"]; fact = "Fact text" } : VibeFs.Kernel.KnowledgeGraph.KnowledgeGraphEntry)
+            kgId, ({ id = kgId; entity = ["project entry"]; fact = "Fact text" } : Wanxiangshu.Kernel.KnowledgeGraph.KnowledgeGraphEntry)
         ]
-    check "knowledge graph fetch existing" (VibeFs.Kernel.KnowledgeGraph.fetchAnswer projection "project entry" = Ok "Fact text")
-    check "knowledge graph fetch invalid entity" (VibeFs.Kernel.KnowledgeGraph.fetchAnswer projection "" = Error "Invalid knowledge graph entity: ")
-    check "knowledge graph fetch missing entity" (VibeFs.Kernel.KnowledgeGraph.fetchAnswer projection "missing entity" = Error "Knowledge graph entity not found in this session snapshot: missing entity")
+    check "knowledge graph fetch existing" (Wanxiangshu.Kernel.KnowledgeGraph.fetchAnswer projection "project entry" = Ok "Fact text")
+    check "knowledge graph fetch invalid entity" (Wanxiangshu.Kernel.KnowledgeGraph.fetchAnswer projection "" = Error "Invalid knowledge graph entity: ")
+    check "knowledge graph fetch missing entity" (Wanxiangshu.Kernel.KnowledgeGraph.fetchAnswer projection "missing entity" = Error "Knowledge graph entity not found in this session snapshot: missing entity")
 
 /// `Dyn.deleteKey` is the primitive HookExecute leans on to clear Mimocode
 /// task extras off the original args reference.

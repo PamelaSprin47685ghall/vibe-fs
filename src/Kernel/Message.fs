@@ -1,4 +1,4 @@
-module VibeFs.Kernel.Message
+module Wanxiangshu.Kernel.Message
 
 let capsSynthUserPrefix = "caps-synth-user-"
 let capsSynthAssistantPrefix = "caps-synth-assistant-"

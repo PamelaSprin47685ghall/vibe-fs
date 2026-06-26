@@ -1,9 +1,9 @@
-module VibeFs.Tests.HostMessagePartCodecTests
+module Wanxiangshu.Tests.HostMessagePartCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.HostMessagePartCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.HostMessagePartCodec
 
 let getMessagePartsEmptyWhenNull () =
     let parts = getMessageParts null

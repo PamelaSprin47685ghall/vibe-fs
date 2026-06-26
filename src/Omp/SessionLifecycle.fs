@@ -1,9 +1,9 @@
-module VibeFs.Omp.SessionLifecycle
+module Wanxiangshu.Omp.SessionLifecycle
 
 open Fable.Core.JsInterop
-open VibeFs.Omp.KnowledgeGraph.Runtime
-open VibeFs.Omp.SessionLifecycleHooks
-open VibeFs.Shell.ReviewRuntime
+open Wanxiangshu.Omp.KnowledgeGraph.Runtime
+open Wanxiangshu.Omp.SessionLifecycleHooks
+open Wanxiangshu.Shell.ReviewRuntime
 
 let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) : unit =
     pi?on("before_agent_start", box (fun (event: obj) (ctx: obj) -> beforeAgentStartHandler event ctx))

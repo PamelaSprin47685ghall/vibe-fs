@@ -1,10 +1,10 @@
-module VibeFs.Omp.NudgeRuntime
+module Wanxiangshu.Omp.NudgeRuntime
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.Nudge.Coordinator
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Omp.MessagingCodec
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.Nudge.Coordinator
+open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Omp.MessagingCodec
 
 let mutable private coordinator = freshCoordinator
 

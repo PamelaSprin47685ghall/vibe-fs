@@ -1,7 +1,7 @@
-module VibeFs.Shell.SubagentIntentsCodec
+module Wanxiangshu.Shell.SubagentIntentsCodec
 
-open VibeFs.Shell.Dyn
-open VibeFs.Kernel.SubagentIntents
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.SubagentIntents
 
 let private requireNonEmpty (field: string) (value: string) (tool: string) : Result<string, string> =
     if System.String.IsNullOrWhiteSpace value then Result.Error $"Invalid LLM input for {tool}: {field} is required"

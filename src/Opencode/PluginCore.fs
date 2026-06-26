@@ -1,37 +1,37 @@
-module VibeFs.Opencode.PluginCore
+module Wanxiangshu.Opencode.PluginCore
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Core.JS
-open VibeFs.Kernel
-open VibeFs.Kernel.Config
-open VibeFs.Kernel.HostTools
-open VibeFs.Opencode.AgentConfig
-open VibeFs.Opencode.CommandHooks
-open VibeFs.Opencode.ChatHooks
-open VibeFs.Opencode.MessageTransform
-open VibeFs.Opencode.ToolDefinitionHooks
-open VibeFs.Opencode.EventHooks
-open VibeFs.Opencode.Tools
-open VibeFs.Opencode.HookExecute
-open VibeFs.Shell.TitleFetchGuardCommon
-open VibeFs.Opencode.SessionLifecycleObserver
-open VibeFs.Opencode.KnowledgeGraphRuntime
-open VibeFs.Opencode.KnowledgeGraphTestHooks
-open VibeFs.Opencode.BacklogSession
-open VibeFs.Shell.RuntimeScope
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell
-open VibeFs.Shell.ToolRuntimeContext
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeClientCodec
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Opencode.AgentConfig
+open Wanxiangshu.Opencode.CommandHooks
+open Wanxiangshu.Opencode.ChatHooks
+open Wanxiangshu.Opencode.MessageTransform
+open Wanxiangshu.Opencode.ToolDefinitionHooks
+open Wanxiangshu.Opencode.EventHooks
+open Wanxiangshu.Opencode.Tools
+open Wanxiangshu.Opencode.HookExecute
+open Wanxiangshu.Shell.TitleFetchGuardCommon
+open Wanxiangshu.Opencode.SessionLifecycleObserver
+open Wanxiangshu.Opencode.KnowledgeGraphRuntime
+open Wanxiangshu.Opencode.KnowledgeGraphTestHooks
+open Wanxiangshu.Opencode.BacklogSession
+open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeClientCodec
 
 let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) = box (System.Func<obj, obj, JS.Promise<unit>>(f))
 
 type private CoreServices = {
-    ReviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore
+    ReviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore
     ChildAgentRegistry: ChildAgentRegistry
     SessionLifecycleObserver: SessionLifecycleObserver
     Directory: string
@@ -43,7 +43,7 @@ type private CoreServices = {
 }
 
 let private createCoreServices (host: Host) (ctx: obj) =
-    let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
+    let reviewStore = Wanxiangshu.Shell.ReviewRuntime.createReviewStore ()
     let childAgentRegistry = ChildAgentRegistry.Create()
     let finderCache = FinderCache()
     let lifecycleObserver = createSessionLifecycleObserver host ctx reviewStore childAgentRegistry
@@ -61,7 +61,7 @@ let private createCoreServices (host: Host) (ctx: obj) =
     let scope = create ()
     let backlogSession = BacklogSession(host, scope)
     let tools = createTools host childAgentRegistry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled scope
-    let mcps = box {| ``type`` = "local"; command = VibeFs.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
+    let mcps = box {| ``type`` = "local"; command = Wanxiangshu.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
     let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
     {
         ReviewStore = reviewStore
@@ -80,7 +80,8 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
     setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
     setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBeforeFor host input output))
     setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host services.Directory services.SessionLifecycleObserver services.KnowledgeGraphRuntime services.ChildAgentRegistry input output))
-    setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform services.ChildAgentRegistry services.Directory services.RuntimeScope services.BacklogSession services.KnowledgeGraphRuntime services.ReviewStore input output))
+    let client = match getClientFromPluginCtx ctx with Ok c -> c | Error _ -> box null
+    setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform services.ChildAgentRegistry services.Directory services.RuntimeScope services.BacklogSession services.KnowledgeGraphRuntime services.ReviewStore client input output))
     setKey result "command.execute.before" (twoArgHook (fun input output ->
         promise {
             do! services.SessionLifecycleObserver.handleCommandExecuteBefore input output
@@ -100,8 +101,8 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         installTitleFetchGuard ()
         let services = createCoreServices host ctx
         let result = emptyObj ()
-        setKey result "id" (box "kunwei")
-        setKey result "name" (box "kunwei")
+        setKey result "id" (box "wanxiangshu")
+        setKey result "name" (box "wanxiangshu")
         setKey result "mcp" services.McpMap
         setKey result "tool" services.Tools
         setKey

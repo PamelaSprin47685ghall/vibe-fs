@@ -1,19 +1,19 @@
-module VibeFs.Mux.Delegate
+module Wanxiangshu.Mux.Delegate
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.ErrorClassify
-open VibeFs.Mux.AiSettings
-open VibeFs.Mux.Wrappers
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.SubagentSpawn
-open VibeFs.Shell.DelegateToolsCodec
-open VibeFs.Shell.ToolExecute
-open VibeFs.Shell.ToolContextCodec
-open VibeFs.Mux.DelegateTimeout
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Mux.AiSettings
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.SubagentSpawn
+open Wanxiangshu.Shell.DelegateToolsCodec
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.ToolContextCodec
+open Wanxiangshu.Mux.DelegateTimeout
 
 let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
     unbox<JS.Promise<obj>>(taskService?create(input))

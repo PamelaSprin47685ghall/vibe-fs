@@ -1,12 +1,12 @@
-module VibeFs.Tests.MuxAiSettingsCodecTests
+module Wanxiangshu.Tests.MuxAiSettingsCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.DelegatedAiSettings
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.MuxAiSettingsCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.DelegatedAiSettings
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.MuxAiSettingsCodec
 
 let decodeMuxDelegateConfigOk () =
     let runtime = createObj [ "x", box 1 ]

@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsMessageTransform
+module Wanxiangshu.Tests.ArchitectureTestsMessageTransform
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let opencodeMessageTransformUsesProjectionPolicy () =
     let code = requireFile "src/Opencode/MessageTransform.fs" |> nonCommentCode

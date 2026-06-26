@@ -1,9 +1,9 @@
-module VibeFs.Shell.TitleFetchGuardCommon
+module Wanxiangshu.Shell.TitleFetchGuardCommon
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
 
 let titleRequestSignature = "Generate a title for this conversation"
 

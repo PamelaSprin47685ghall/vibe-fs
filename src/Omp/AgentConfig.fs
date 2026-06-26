@@ -1,14 +1,14 @@
-module VibeFs.Omp.AgentConfig
+module Wanxiangshu.Omp.AgentConfig
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Config
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let emptyObj () : obj = createObj []
 let setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v

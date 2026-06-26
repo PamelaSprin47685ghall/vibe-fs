@@ -1,9 +1,9 @@
-module VibeFs.Kernel.Executor
+module Wanxiangshu.Kernel.Executor
 
 open System
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Kernel.ExecutorStrip
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.ExecutorStrip
 
 type StrippedPipe = ExecutorStrip.StrippedPipe
 type StripResult = ExecutorStrip.StripResult

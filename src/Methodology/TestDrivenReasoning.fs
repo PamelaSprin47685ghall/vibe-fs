@@ -1,6 +1,6 @@
-module VibeFs.Methodology.TestDrivenReasoning
+module Wanxiangshu.Methodology.TestDrivenReasoning
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

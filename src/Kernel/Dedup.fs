@@ -1,6 +1,6 @@
-module VibeFs.Kernel.Dedup
+module Wanxiangshu.Kernel.Dedup
 
-open VibeFs.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.ToolOutputInfo
 
 type DedupedOutput = { output: string; seenOutputs: string list }
 

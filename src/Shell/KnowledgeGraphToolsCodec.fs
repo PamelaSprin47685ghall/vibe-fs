@@ -1,10 +1,10 @@
-module VibeFs.Shell.KnowledgeGraphToolsCodec
+module Wanxiangshu.Shell.KnowledgeGraphToolsCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.DynField
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
 
 let decodeFetchEntity (args: obj) : Result<string, DomainError> =
     match strField args "entity" with

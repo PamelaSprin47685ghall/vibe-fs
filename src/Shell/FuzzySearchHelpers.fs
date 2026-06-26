@@ -1,12 +1,12 @@
-module VibeFs.Shell.FuzzySearchHelpers
+module Wanxiangshu.Shell.FuzzySearchHelpers
 
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
-open VibeFs.Kernel.FuzzyQuery
-open VibeFs.Kernel.FuzzyPath
-open VibeFs.Kernel.FuzzyFormat
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.FuzzyIteratorStore
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Kernel.FuzzyPath
+open Wanxiangshu.Kernel.FuzzyFormat
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell.FuzzyIteratorStore
 
 let parseExcludeField (args: obj) : string list =
     let v = Dyn.get args "exclude"

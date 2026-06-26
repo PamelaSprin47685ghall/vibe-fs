@@ -1,9 +1,9 @@
-module VibeFs.Tests.SubagentSpawnTests
+module Wanxiangshu.Tests.SubagentSpawnTests
 
 open Fable.Core
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Subagent
-open VibeFs.Shell.SubagentSpawn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Shell.SubagentSpawn
 
 let joinReportsEmptyList () =
     equal "joinReports empty" "" (joinReports [])

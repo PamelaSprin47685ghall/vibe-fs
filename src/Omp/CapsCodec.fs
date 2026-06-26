@@ -1,11 +1,11 @@
-module VibeFs.Omp.CapsCodec
+module Wanxiangshu.Omp.CapsCodec
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Shell.CapsPrelude
-open VibeFs.Shell.OmpCaps
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Shell.CapsPrelude
+open Wanxiangshu.Shell.OmpCaps
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let capsUserPrefix = "caps-synth-user-"
 let capsAssistantPrefix = "caps-synth-assistant-"

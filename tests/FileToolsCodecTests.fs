@@ -1,11 +1,11 @@
-module VibeFs.Tests.FileToolsCodecTests
+module Wanxiangshu.Tests.FileToolsCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.FileToolsCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.FileToolsCodec
 
 let decodeReadMissingPath () =
     let args = createObj [ "offset", box 1; "limit", box 10 ]

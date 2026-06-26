@@ -1,5 +1,5 @@
-module VibeFs.Tests.IntegrationMuxToolSpecs
+module Wanxiangshu.Tests.IntegrationMuxToolSpecs
 
-open VibeFs.Tests.IntegrationMuxToolSpecsTodo
-open VibeFs.Tests.IntegrationMuxToolSpecsRead
-open VibeFs.Tests.IntegrationMuxToolSpecsHooks
+open Wanxiangshu.Tests.IntegrationMuxToolSpecsTodo
+open Wanxiangshu.Tests.IntegrationMuxToolSpecsRead
+open Wanxiangshu.Tests.IntegrationMuxToolSpecsHooks

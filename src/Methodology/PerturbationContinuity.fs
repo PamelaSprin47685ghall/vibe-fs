@@ -1,6 +1,6 @@
-module VibeFs.Methodology.PerturbationContinuity
+module Wanxiangshu.Methodology.PerturbationContinuity
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

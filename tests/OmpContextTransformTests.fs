@@ -1,16 +1,16 @@
-module VibeFs.Tests.OmpContextTransformTests
+module Wanxiangshu.Tests.OmpContextTransformTests
 
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Omp.KnowledgeGraph.Runtime
-open VibeFs.Omp.MessageTransform
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.PromptFrontMatter
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Omp.KnowledgeGraph.Runtime
+open Wanxiangshu.Omp.MessageTransform
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 [<Import("createRequire", "node:module")>]
 let private createRequire' : string -> (string -> obj) = jsNative

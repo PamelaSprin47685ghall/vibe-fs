@@ -1,9 +1,9 @@
-module VibeFs.Tests.MessagingPartCodecTests
+module Wanxiangshu.Tests.MessagingPartCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.MessagingPartCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.MessagingPartCodec
 
 let muxPartStateToKernelStatusMaps () =
     check "output-available -> completed" (muxPartStateToKernelStatus "output-available" = "completed")

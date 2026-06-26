@@ -1,10 +1,10 @@
-module VibeFs.Tests.PatchToolsCodecTests
+module Wanxiangshu.Tests.PatchToolsCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.PatchToolsCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.PatchToolsCodec
 
 let decodeMissingPatchObject () =
     let args = createObj [ "other", box "x" ]

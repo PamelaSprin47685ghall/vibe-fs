@@ -1,14 +1,14 @@
-module VibeFs.Tests.AgentNudgeSpecs
+module Wanxiangshu.Tests.AgentNudgeSpecs
 
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.Nudge.Coordinator
-open VibeFs.Kernel.NudgeState
-open VibeFs.Kernel.Nudge.Types
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.Nudge.Coordinator
+open Wanxiangshu.Kernel.NudgeState
+open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Shell.OpencodeSessionEventCodec
 
 
 let private nudgeContext todos msg runner loopActive =
@@ -82,12 +82,12 @@ let private noChild (_: string) = None
 /// so a restart that wipes the counter can never resurrect a duplicate nudge.
 let decideNudge' () =
     match snd (decideNudge noReview noChild emptyState "s" (snapshot [ "a" ] "working" false None)) with
-    | Send(text, _) -> check "unclaimed fresh history nudges todo" (text = VibeFs.Kernel.PromptFragments.todoNudgePrompt)
+    | Send(text, _) -> check "unclaimed fresh history nudges todo" (text = Wanxiangshu.Kernel.PromptFragments.todoNudgePrompt)
     | StandDown -> check "unclaimed fresh history nudges todo" false
 
     let claimed, _ = tryClaimNudge emptyState "s"
     match snd (decideNudge noReview noChild claimed "s" (snapshot [ "a" ] "working" false None)) with
-    | Send(text, _) -> check "claimed fresh stop nudges todo" (text = VibeFs.Kernel.PromptFragments.todoNudgePrompt)
+    | Send(text, _) -> check "claimed fresh stop nudges todo" (text = Wanxiangshu.Kernel.PromptFragments.todoNudgePrompt)
     | StandDown -> check "claimed fresh stop nudges todo" false
 
     let _, dDup = decideNudge noReview noChild claimed "s" (snapshot [ "a" ] "working" true None)
@@ -98,14 +98,14 @@ let decideNudge' () =
 
     let loopReview (_: string) = true
     match snd (decideNudge loopReview noChild claimed "s" (snapshot [] "ok" false None)) with
-    | Send(text, _) -> check "loop active nudges loop" (text = VibeFs.Kernel.PromptFragments.loopNudgePrompt)
+    | Send(text, _) -> check "loop active nudges loop" (text = Wanxiangshu.Kernel.PromptFragments.loopNudgePrompt)
     | StandDown -> check "loop active nudges loop" false
 
     let lookupReviewer (_: string) = Some "reviewer"
     let claimedReviewer, _ = tryClaimNudge emptyState "reviewer-child-sess"
     match snd (decideNudge loopReview lookupReviewer claimedReviewer "reviewer-child-sess" (snapshot [] "ok" false None)) with
     | Send(text, _) ->
-        check "reviewer child session must not get worker loopNudgePrompt" (text <> VibeFs.Kernel.PromptFragments.loopNudgePrompt)
+        check "reviewer child session must not get worker loopNudgePrompt" (text <> Wanxiangshu.Kernel.PromptFragments.loopNudgePrompt)
     | StandDown -> ()
 
     let stopped = stopSession claimed "s"
@@ -132,15 +132,15 @@ let decodeLastAssistantNudge () =
     check "no trailing nudge → false" (not nudged1)
 
     let _, _, nudged2 =
-        decodeLastAssistant (box [| user "go"; assistant "did work"; user VibeFs.Kernel.PromptFragments.todoNudgePrompt |])
+        decodeLastAssistant (box [| user "go"; assistant "did work"; user Wanxiangshu.Kernel.PromptFragments.todoNudgePrompt |])
     check "trailing todo nudge → true" nudged2
 
     let _, _, nudged3 =
-        decodeLastAssistant (box [| user "go"; assistant "did work"; user VibeFs.Kernel.PromptFragments.todoNudgePrompt; assistant "more work" |])
+        decodeLastAssistant (box [| user "go"; assistant "did work"; user Wanxiangshu.Kernel.PromptFragments.todoNudgePrompt; assistant "more work" |])
     check "assistant after nudge → false" (not nudged3)
 
     let text4, _, nudged4 =
-        decodeLastAssistant (box [| user "go"; assistant "did work"; user VibeFs.Kernel.PromptFragments.todoNudgePrompt; agentAssistant "compaction" "folded history" |])
+        decodeLastAssistant (box [| user "go"; assistant "did work"; user Wanxiangshu.Kernel.PromptFragments.todoNudgePrompt; agentAssistant "compaction" "folded history" |])
     equal "compaction assistant ignored as last work" "did work" text4
     check "compaction after nudge preserves already-nudged" nudged4
 

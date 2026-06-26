@@ -1,7 +1,7 @@
-module VibeFs.Shell.SessionExecutor
+module Wanxiangshu.Shell.SessionExecutor
 
 open Fable.Core
-open VibeFs.Shell.RuntimeScope
+open Wanxiangshu.Shell.RuntimeScope
 
 let mutable private activeRuns : Map<string, unit -> unit> = Map.empty
 

@@ -1,14 +1,14 @@
-module VibeFs.Tests.IntegrationMuxReviewPromptSpecs
+module Wanxiangshu.Tests.IntegrationMuxReviewPromptSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Tests.IntegrationMuxSetup
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.IntegrationMuxSetup
 
-open VibeFs.Mux.Plugin
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Shell.Dyn
 
 
 let muxSubmitReviewPromptFormatSpec () = promise {

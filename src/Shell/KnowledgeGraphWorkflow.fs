@@ -1,4 +1,4 @@
-module VibeFs.Shell.KnowledgeGraphWorkflow
+module Wanxiangshu.Shell.KnowledgeGraphWorkflow
 
 open Fable.Core
 

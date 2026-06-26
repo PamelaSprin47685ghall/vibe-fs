@@ -1,16 +1,16 @@
-module VibeFs.Tests.SubagentToolExecuteTests
+module Wanxiangshu.Tests.SubagentToolExecuteTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.MuxSubagentToolExecute
-open VibeFs.Shell.SubagentToolExecute
-open VibeFs.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.MuxSubagentToolExecute
+open Wanxiangshu.Shell.SubagentToolExecute
+open Wanxiangshu.Tests.IntegrationToolSetup
 
 let private stubSpawn () =
-    { Host = VibeFs.Kernel.HostTools.opencode
+    { Host = Wanxiangshu.Kernel.HostTools.opencode
       Registry = ChildAgentRegistry.Create()
       Client = createObj []
       PluginCtx = createObj [ "directory", box "/proj" ]

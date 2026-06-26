@@ -1,17 +1,17 @@
-module VibeFs.Tests.IntegrationMuxTransformSpecs
+module Wanxiangshu.Tests.IntegrationMuxTransformSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Tests.IntegrationMuxSetup
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.IntegrationMuxSetup
 
-open VibeFs.Kernel.Methodology
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Mux.Plugin
-open VibeFs.Mux.BuiltinTools
-open VibeFs.Mux.SubagentTools
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Mux.BuiltinTools
+open Wanxiangshu.Mux.SubagentTools
+open Wanxiangshu.Shell.Dyn
 
 
 let muxTopLevelPolicySpec () =
@@ -43,7 +43,7 @@ let muxTopLevelDedupSpec () =
         let result = deduplicateReadOutputsWithSeen seen window
         check "mux top-level dedup returns array" (result.Length = 1)
         let output = get (unbox<obj[]> (get result.[0] "parts")).[0] "output"
-        check "mux top-level dedup replaces repeat content" (str output "content" = VibeFs.Kernel.ToolOutputInfo.noChangeEnvelope ())
+        check "mux top-level dedup replaces repeat content" (str output "content" = Wanxiangshu.Kernel.ToolOutputInfo.noChangeEnvelope ())
     }
 
 let muxSummarizationSpec () =
@@ -94,7 +94,7 @@ let muxMessagesTransformDedupsRepeatedReadSpec () = promise {
                 parts |> Array.exists (fun part -> str part "toolName" = "read"))
         check "mux messagesTransform keeps both plugin read messages" (readMessages.Length = 2)
         let secondOutput = muxFirstDynamicToolOutput readMessages.[1]
-        check "mux messagesTransform dedups repeated plugin read" (string secondOutput = VibeFs.Kernel.ToolOutputInfo.noChangeEnvelope ())
+        check "mux messagesTransform dedups repeated plugin read" (string secondOutput = Wanxiangshu.Kernel.ToolOutputInfo.noChangeEnvelope ())
 }
 
 let muxMessagesTransformDedupsRepeatedFileReadSpec () = promise {
@@ -118,7 +118,7 @@ let muxMessagesTransformDedupsRepeatedFileReadSpec () = promise {
                 parts |> Array.exists (fun part -> str part "toolName" = "file_read"))
         check "mux messagesTransform keeps both read messages" (readMessages.Length = 2)
         let secondOutput = muxFirstDynamicToolOutput readMessages.[1]
-        check "mux messagesTransform dedups repeated file_read" (str secondOutput "content" = VibeFs.Kernel.ToolOutputInfo.noChangeEnvelope ())
+        check "mux messagesTransform dedups repeated file_read" (str secondOutput "content" = Wanxiangshu.Kernel.ToolOutputInfo.noChangeEnvelope ())
 }
 
 let muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec () = promise {
@@ -141,7 +141,7 @@ let muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec () = promise {
                 parts |> Array.exists (fun part -> str part "toolName" = "read"))
         check "mux messagesTransform keeps both top-level exec read messages" (readMessages.Length = 2)
         let secondOutput = muxFirstDynamicToolOutput readMessages.[1]
-        check "mux messagesTransform dedups repeated read for top-level exec" (str secondOutput "content" = VibeFs.Kernel.ToolOutputInfo.noChangeEnvelope ())
+        check "mux messagesTransform dedups repeated read for top-level exec" (str secondOutput "content" = Wanxiangshu.Kernel.ToolOutputInfo.noChangeEnvelope ())
 }
 
 let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () = promise {
@@ -152,14 +152,17 @@ let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () = promise {
     if isNullish tf then
         check "mux messagesTransform exposed for accepted review replay" false
     else
-        let accepted = formatReviewResult VibeFs.Kernel.ReviewSession.ReviewResult.Accepted
+        let accepted = formatReviewResult Wanxiangshu.Kernel.ReviewSession.ReviewResult.Accepted
         let messages =
             [| muxTextMessage "loop-task" "assistant" "---\ntask: Ship feature\n---\nWith-Review Mode is active."
                muxDynamicToolMessage "submit-review" "submit_review" "call-review" (createObj []) (box accepted) |]
         let out = createObj [ "messages", box messages ]
         let input = createObj [ "agent", box "manager"; "sessionID", box sessionID ]
         do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
-        check "mux accepted submit_review history clears active review" (not (muxIsReviewActiveForTest reg sessionID))
+        // With IfStoreEmpty (Defect 1 fix), transform does NOT clear an active review
+        // when store is non-empty — verdict resolution is the tool path's job, not replay's.
+        // This prevents the mid-session silent deactivation bug.
+        check "mux transform preserves active review when store non-empty" (muxIsReviewActiveForTest reg sessionID)
 }
 
 let muxCompactingTransformProjectsBacklogSpec () = promise {

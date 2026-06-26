@@ -1,17 +1,17 @@
-module VibeFs.Tests.IntegrationMiscSpecsExecutorKg
+module Wanxiangshu.Tests.IntegrationMiscSpecsExecutorKg
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Opencode.KnowledgeGraphRuntime
-open VibeFs.Opencode.Plugin
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Opencode.KnowledgeGraphRuntime
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.Dyn
 
 let executorModeSchemaSpec () = promise {
     let! workspaceDir = mkdtempAsync "executor-mode-schema-"
@@ -51,7 +51,7 @@ let executorActorSpec () = promise {
         Promise.create (fun resolve _ ->
             gateResolve.Value <- resolve
             if releaseRequested.Value then resolve ())
-    let exec = VibeFs.Shell.SessionExecutor.createForScope (VibeFs.Shell.RuntimeScope.create ())
+    let exec = Wanxiangshu.Shell.SessionExecutor.createForScope (Wanxiangshu.Shell.RuntimeScope.create ())
     let first = exec.EnqueuePerSession("session-1", fun () ->
         promise {
             seen.Add "first-start"
@@ -74,7 +74,7 @@ let executorActorSpec () = promise {
 
 let knowledgeGraphWorkspaceSerializationSpec () = promise {
     let seen = System.Collections.Generic.List<string>()
-    let queue = VibeFs.Shell.PromiseQueue.SerialQueue()
+    let queue = Wanxiangshu.Shell.PromiseQueue.SerialQueue()
     let releaseRequested = ref false
     let gateResolve = ref (fun () -> ())
     let gateAsync : JS.Promise<unit> =
@@ -99,7 +99,7 @@ let knowledgeGraphWorkspaceSerializationSpec () = promise {
 let knowledgeGraphPortLockTimeoutSpec () = promise {
     let! workspaceDir = mkdtempAsync "kg-port-lock-timeout-"
     do! ensureKnowledgeGraphDir workspaceDir
-    let port = VibeFs.Shell.KnowledgeGraphPortLock.lockPortForPath workspaceDir
+    let port = Wanxiangshu.Shell.KnowledgeGraphPortLock.lockPortForPath workspaceDir
     let net = requireFn("node:net")
     let server = net?createServer()
     do! Promise.create(fun resolve reject ->

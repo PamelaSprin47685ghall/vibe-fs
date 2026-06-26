@@ -1,6 +1,6 @@
-module VibeFs.Kernel.PromptFragments
+module Wanxiangshu.Kernel.PromptFragments
 
-open VibeFs.Kernel.HostTools
+open Wanxiangshu.Kernel.HostTools
 
 let readOnlyRulesFor (host: Host) =
     "READ-ONLY: You must NOT write, edit, patch, or create files. "

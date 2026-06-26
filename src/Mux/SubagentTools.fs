@@ -1,17 +1,17 @@
-module VibeFs.Mux.SubagentTools
+module Wanxiangshu.Mux.SubagentTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.Config
-open VibeFs.Kernel.SubagentToolPolicy
-open VibeFs.Mux.Delegate
-open VibeFs.Mux.Wrappers
-open VibeFs.Kernel.HostTools
-open VibeFs.Shell.MuxJsonSchema
-open VibeFs.Shell.MuxSubagentToolExecute
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Kernel.SubagentToolPolicy
+open Wanxiangshu.Mux.Delegate
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Shell.MuxJsonSchema
+open Wanxiangshu.Shell.MuxSubagentToolExecute
 
 let private disabledToolsForRole (toolNames: string array) (role: string) : string array =
     SubagentToolPolicy.disabledToolNamesForRole mux toolNames role muxSpawnToolUniverse

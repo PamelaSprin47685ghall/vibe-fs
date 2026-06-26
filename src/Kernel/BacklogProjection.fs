@@ -1,9 +1,9 @@
-module VibeFs.Kernel.BacklogProjection
+module Wanxiangshu.Kernel.BacklogProjection
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.Message
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.Message
 
 let private isFoldAnchorFor (host: Host) (part: Part<'raw>) : bool =
     isTodoResultFor host part

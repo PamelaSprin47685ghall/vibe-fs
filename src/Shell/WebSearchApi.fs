@@ -1,10 +1,10 @@
-module VibeFs.Shell.WebSearchApi
+module Wanxiangshu.Shell.WebSearchApi
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.WebFetchGuard
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.WebFetchGuard
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative

@@ -1,26 +1,26 @@
-module VibeFs.Opencode.SessionLifecycleObserver
+module Wanxiangshu.Opencode.SessionLifecycleObserver
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.NudgeState
-open VibeFs.Kernel.Nudge.SubmitReviewHooks
-open VibeFs.Kernel.Nudge.TodoStatus
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Methodology
-open VibeFs.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.NudgeState
+open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
+open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.ToolOutputInfo
 
-open VibeFs.Shell
-open VibeFs.Shell.OpencodeClientCodec
-open VibeFs.Shell.OpencodeSessionEventCodec
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.OpencodeHookInputCodec
-open VibeFs.Opencode.NudgeEffect
-open VibeFs.Opencode.BacklogSession
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.OpencodeHookInputCodec
+open Wanxiangshu.Opencode.NudgeEffect
+open Wanxiangshu.Opencode.BacklogSession
 
-type SessionLifecycleObserver(host: Host, ctx: obj, reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore, registry: ChildAgentRegistry) =
+type SessionLifecycleObserver(host: Host, ctx: obj, reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore, registry: ChildAgentRegistry) =
     let holder = StateHolder<NudgeShellState>(emptyState)
 
     member _.handleChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
@@ -78,5 +78,5 @@ type SessionLifecycleObserver(host: Host, ctx: obj, reviewStore: VibeFs.Shell.Re
         | None -> ()
         resolvedUnitPromise ()
 
-let createSessionLifecycleObserver (host: Host) (ctx: obj) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (registry: ChildAgentRegistry) : SessionLifecycleObserver =
+let createSessionLifecycleObserver (host: Host) (ctx: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (registry: ChildAgentRegistry) : SessionLifecycleObserver =
     SessionLifecycleObserver(host, ctx, reviewStore, registry)

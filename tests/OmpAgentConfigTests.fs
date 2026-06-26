@@ -1,10 +1,10 @@
-module VibeFs.Tests.OmpAgentConfigTests
+module Wanxiangshu.Tests.OmpAgentConfigTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.Dyn
-open VibeFs.Omp.AgentConfig
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Omp.AgentConfig
 
 /// applyAgentConfigFor must hand back a config with the canonical 10 Omp agents
 /// registered, each carrying the right `mode` (primary for manager/build/plan,

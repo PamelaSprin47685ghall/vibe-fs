@@ -1,6 +1,8 @@
-module VibeFs.Kernel.SearchPrompts
+module Wanxiangshu.Kernel.SearchPrompts
 
-open VibeFs.Kernel.PromptFrontMatter
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 type SearchResult =
     { title: string
@@ -20,41 +22,14 @@ let formatSearchResults (results: SearchResult list) : string =
         let items =
             results
             |> List.map (fun r ->
-                let contentBlock = yamlField "content" r.content
-
-                let indentedContentBlock =
-                    contentBlock.Split('\n')
-                    |> Array.map (fun line -> "    " + line)
-                    |> String.concat "\n"
-
-                "  - title: "
-                + yamlStringValue r.title
-                + "\n    url: "
-                + yamlStringValue r.url
-                + "\n"
-                + indentedContentBlock)
-
+                createObj [ "title", box r.title; "url", box r.url; "content", box r.content ])
         frontMatter [ yamlSeqField "results" items ]
 
 let formatFetchResponse (data: FetchResponse) : string =
     let nonEmpty (s: string) = not (System.String.IsNullOrEmpty s)
-
-    let scalarIf (key: string) =
-        function
-        | Some v when nonEmpty v -> [ yamlField key v ]
-        | _ -> []
-
-    let title = scalarIf "title" data.title
-    let byline = scalarIf "byline" data.byline
-
-    let length =
-        match data.length with
-        | Some l -> [ yamlField "length" (string l) ]
-        | None -> []
-
-    let content =
-        match data.content with
-        | Some c when nonEmpty c -> [ yamlField "content" c ]
-        | _ -> []
-
-    frontMatter (title @ byline @ length @ content)
+    let fields =
+        [ match data.title with Some v when nonEmpty v -> yield yamlField "title" v | _ -> ()
+          match data.byline with Some v when nonEmpty v -> yield yamlField "byline" v | _ -> ()
+          match data.length with Some l -> yield ("length", box l) | None -> ()
+          match data.content with Some c when nonEmpty c -> yield yamlField "content" c | _ -> () ]
+    frontMatter fields

@@ -1,7 +1,7 @@
-module VibeFs.Tests.OmpWebFetchTests
+module Wanxiangshu.Tests.OmpWebFetchTests
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.WebFetchGuard
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.WebFetchGuard
 
 let blocksLocalhostAndPrivateRanges () =
     let blocked =

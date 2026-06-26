@@ -1,7 +1,7 @@
-module VibeFs.Shell.SubagentSimpleArgsCodec
+module Wanxiangshu.Shell.SubagentSimpleArgsCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.Dyn
 
 type MeditatorArgs = { Intent: string; Files: string array }
 

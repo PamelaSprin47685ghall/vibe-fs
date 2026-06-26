@@ -1,18 +1,18 @@
-module VibeFs.Tests.IntegrationAfterHookSpecs
+module Wanxiangshu.Tests.IntegrationAfterHookSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
 
-open VibeFs.Kernel.Message
-open VibeFs.Mux.Plugin
-open VibeFs.Opencode.Plugin
-open VibeFs.Mux.AiSettings
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Message
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Mux.AiSettings
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.Dyn
 
 let afterHookRecordsDirectWriteSpec () = promise {
     let! workspaceDir = mkdtempAsync "after-hook-write-"

@@ -1,9 +1,9 @@
-module VibeFs.Kernel.Nudge.Decision
+module Wanxiangshu.Kernel.Nudge.Decision
 
-open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.Nudge.Types
-open VibeFs.Kernel.Nudge.Transitions
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.Nudge.Transitions
 
 let private hasStoppedSession state sessionID = Set.contains sessionID state.stoppedSessions
 let private getAgent state sessionID = Map.tryFind sessionID state.sessionAgents

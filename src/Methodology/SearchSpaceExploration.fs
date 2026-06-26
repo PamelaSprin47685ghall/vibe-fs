@@ -1,6 +1,6 @@
-module VibeFs.Methodology.SearchSpaceExploration
+module Wanxiangshu.Methodology.SearchSpaceExploration
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

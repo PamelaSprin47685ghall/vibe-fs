@@ -1,20 +1,20 @@
-module VibeFs.Omp.WebTools
+module Wanxiangshu.Omp.WebTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.SearchPrompts
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.WebFetchGuard
-open VibeFs.Omp.Codec
-open VibeFs.Omp.ChildSession
-open VibeFs.Omp.Schema
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Shell.WebSearchApi
-open VibeFs.Shell.FuzzySearch
-open VibeFs.Shell.WebSearchCodec
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.HostTools
+open Wanxiangshu.Kernel.SearchPrompts
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.WebFetchGuard
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Omp.Schema
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.WebSearchApi
+open Wanxiangshu.Shell.FuzzySearch
+open Wanxiangshu.Shell.WebSearchCodec
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.HostTools
 
 let private buildWebsearch (pi: obj) : obj =
     let tb = Dyn.get pi "typebox"

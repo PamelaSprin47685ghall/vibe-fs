@@ -1,9 +1,9 @@
-module VibeFs.Kernel.Nudge.EventHandler
+module Wanxiangshu.Kernel.Nudge.EventHandler
 
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.Nudge.TodoStatus
-open VibeFs.Kernel.Nudge.Types
-open VibeFs.Kernel.Nudge.Transitions
+open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.Nudge.Transitions
 
 let handleSessionNextStepEnded state finish sessionID =
     let state = deleteRetryPendingSession state sessionID

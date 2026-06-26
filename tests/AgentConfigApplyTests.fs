@@ -1,11 +1,11 @@
-module VibeFs.Tests.AgentConfigApplyTests
+module Wanxiangshu.Tests.AgentConfigApplyTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.HostTools
-open VibeFs.Opencode.AgentConfig
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Opencode.AgentConfig
+open Wanxiangshu.Shell.Dyn
 
 let applyAgentConfigForNullCoderEntryUsesDefaults () =
     let cfg =

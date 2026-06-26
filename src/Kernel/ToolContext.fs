@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ToolContext
+module Wanxiangshu.Kernel.ToolContext
 
-open VibeFs.Kernel.Domain
+open Wanxiangshu.Kernel.Domain
 
 type ToolExecutionContext = {
     Directory: string

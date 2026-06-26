@@ -1,11 +1,11 @@
-module VibeFs.Mux.DelegateTimeout
+module Wanxiangshu.Mux.DelegateTimeout
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.ErrorClassify
-open VibeFs.Shell.SubagentSpawn
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Shell.SubagentSpawn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 type DelegateOutcome =
     | Report of string

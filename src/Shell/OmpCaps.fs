@@ -1,9 +1,9 @@
-module VibeFs.Shell.OmpCaps
+module Wanxiangshu.Shell.OmpCaps
 
 open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 type OmpCapsFile = { filePath: string; label: string; content: string }
 

@@ -1,15 +1,15 @@
-module VibeFs.Omp.KnowledgeGraphTools
+module Wanxiangshu.Omp.KnowledgeGraphTools
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Omp.Codec
-open VibeFs.Omp.KnowledgeGraph.Runtime
-open VibeFs.Omp.Schema
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.KnowledgeGraph.Runtime
+open Wanxiangshu.Omp.Schema
 
-module Dyn = VibeFs.Shell.Dyn
-module Params = VibeFs.Kernel.ToolCatalog.Params
+module Dyn = Wanxiangshu.Shell.Dyn
+module Params = Wanxiangshu.Kernel.ToolCatalog.Params
 
 let parseDraftArray (value: obj) : Result<KnowledgeGraphDraft list, string> =
     if Dyn.isNullish value || not (Dyn.isArray value) then Error "entries must be an array"
@@ -93,7 +93,7 @@ let registerKnowledgeGraphTools (pi: obj) (kgRuntime: OmpKnowledgeGraphRuntime) 
 let mutable private kgToolsRegistered = false
 
 let ensureKnowledgeGraphTools (pi: obj) (kgRuntime: OmpKnowledgeGraphRuntime) (cwd: string) : unit =
-    if not kgToolsRegistered && cwd <> "" && VibeFs.Shell.KnowledgeGraphFiles.knowledgeGraphDirExists cwd then
+    if not kgToolsRegistered && cwd <> "" && Wanxiangshu.Shell.KnowledgeGraphFiles.knowledgeGraphDirExists cwd then
         registerKnowledgeGraphTools pi kgRuntime
         kgToolsRegistered <- true
 

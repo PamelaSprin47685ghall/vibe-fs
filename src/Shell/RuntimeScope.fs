@@ -1,10 +1,10 @@
-module VibeFs.Shell.RuntimeScope
+module Wanxiangshu.Shell.RuntimeScope
 
 open Fable.Core
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Shell.SessionProjectionStore
-open VibeFs.Shell.FuzzyIteratorStore
-open VibeFs.Shell.PromiseQueue
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Shell.SessionProjectionStore
+open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Shell.PromiseQueue
 
 type RuntimeScope() =
     let projection = ProjectionStore()

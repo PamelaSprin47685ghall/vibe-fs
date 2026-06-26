@@ -1,26 +1,26 @@
-module VibeFs.Omp.PluginCore
+module Wanxiangshu.Omp.PluginCore
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.HostTools
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Omp.AgentConfig
-open VibeFs.Omp.Codec
-open VibeFs.Omp.KnowledgeGraph.Runtime
-open VibeFs.Omp.Tools
-open VibeFs.Omp.PruneGuard
-open VibeFs.Omp.ReviewTools
-open VibeFs.Omp.SessionLifecycle
-open VibeFs.Shell.TitleFetchGuardCommon
-open VibeFs.Omp.MessageTransform
-open VibeFs.Shell.OmpCaps
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Shell.RunnerBackground
-open VibeFs.Shell.SessionExecutor
-open VibeFs.Shell.TreeSitterShell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Omp.AgentConfig
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.KnowledgeGraph.Runtime
+open Wanxiangshu.Omp.Tools
+open Wanxiangshu.Omp.PruneGuard
+open Wanxiangshu.Omp.ReviewTools
+open Wanxiangshu.Omp.SessionLifecycle
+open Wanxiangshu.Shell.TitleFetchGuardCommon
+open Wanxiangshu.Omp.MessageTransform
+open Wanxiangshu.Shell.OmpCaps
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Shell.SessionExecutor
+open Wanxiangshu.Shell.TreeSitterShell
 
 type CoreServices =
     { ReviewStore: ReviewStore
@@ -71,7 +71,7 @@ let registerAbortHandler (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKno
                     match getSessionIdFromContext ctx with
                     | Some sid ->
                         reviewStore.deactivateReview sid
-                        VibeFs.Omp.NudgeRuntime.clearNudgeSession sid
+                        Wanxiangshu.Omp.NudgeRuntime.clearNudgeSession sid
                         kgRuntime.DeleteJob sid
                     | None -> ()
             }))

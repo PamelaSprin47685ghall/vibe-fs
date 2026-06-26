@@ -1,7 +1,7 @@
-module VibeFs.Tests.ArchitectureTestsSubagentCatalog
+module Wanxiangshu.Tests.ArchitectureTestsSubagentCatalog
 
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let subagentToolsUseToolCatalogRequiredKeys () =
     let catalog = requireFile "src/Kernel/ToolCatalog/Registry.fs" |> nonCommentCode

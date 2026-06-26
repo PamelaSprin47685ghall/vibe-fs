@@ -1,19 +1,19 @@
-module VibeFs.Opencode.SubagentTools
+module Wanxiangshu.Opencode.SubagentTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Opencode.ToolSchema
-open VibeFs.Opencode.SessionIo
-open VibeFs.Kernel.ToolResult
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.OpencodeClientCodec
-open VibeFs.Shell.PromiseStr
-open VibeFs.Shell.SubagentToolExecute
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Opencode.ToolSchema
+open Wanxiangshu.Opencode.SessionIo
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Shell.PromiseStr
+open Wanxiangshu.Shell.SubagentToolExecute
 
 let private spawnCtx (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (client: obj) (context: obj) =
     { Host = host; Registry = registry; Client = client; PluginCtx = ctx; ToolContext = context }

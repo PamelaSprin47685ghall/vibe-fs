@@ -1,18 +1,18 @@
-module VibeFs.Tests.IntegrationSubagentSpecs
+module Wanxiangshu.Tests.IntegrationSubagentSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
 
-open VibeFs.Mux.Plugin
-open VibeFs.Opencode.Plugin
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Mux.AiSettings
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Mux.AiSettings
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.Dyn
 
 
 let investigatorToolSpec () = promise {

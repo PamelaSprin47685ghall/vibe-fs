@@ -1,20 +1,20 @@
-module VibeFs.Shell.SubagentToolExecute
+module Wanxiangshu.Shell.SubagentToolExecute
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.ToolArgs
-open VibeFs.Kernel.ToolCopy
-open VibeFs.Kernel.ToolResult
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.SubagentPromptBuild
-open VibeFs.Shell.SubagentSpawn
-open VibeFs.Shell.ToolArgsDecode
-open VibeFs.Shell.ToolExecute
-open VibeFs.Shell.ToolRuntimeContext
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.ToolArgs
+open Wanxiangshu.Kernel.ToolCopy
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.SubagentPromptBuild
+open Wanxiangshu.Shell.SubagentSpawn
+open Wanxiangshu.Shell.ToolArgsDecode
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.ToolRuntimeContext
 
 type OpencodeSubagentSpawn =
     { Host: Host

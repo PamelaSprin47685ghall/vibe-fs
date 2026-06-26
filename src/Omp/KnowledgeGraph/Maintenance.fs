@@ -1,18 +1,18 @@
-module VibeFs.Omp.KnowledgeGraph.Maintenance
+module Wanxiangshu.Omp.KnowledgeGraph.Maintenance
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Maintenance
-open VibeFs.Kernel.KnowledgeGraph.Prompts
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Omp.ChildSession
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.PromiseQueue
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Maintenance
+open Wanxiangshu.Kernel.KnowledgeGraph.Prompts
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.PromiseQueue
 
-module Dyn = VibeFs.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private bookkeeperChildTools = [| "read"; "return_bookkeeper" |]
 

@@ -1,8 +1,8 @@
-module VibeFs.Tests.KernelPromptSpecs
+module Wanxiangshu.Tests.KernelPromptSpecs
 
-open VibeFs.Tests.KernelPromptSpecsHost
-open VibeFs.Tests.KernelPromptSpecsSubagent
-open VibeFs.Tests.KernelPromptSpecsReview
+open Wanxiangshu.Tests.KernelPromptSpecsHost
+open Wanxiangshu.Tests.KernelPromptSpecsSubagent
+open Wanxiangshu.Tests.KernelPromptSpecsReview
 
 let hostKernel' () = KernelPromptSpecsHost.hostKernel' ()
 let toolCatalogCentralized () = KernelPromptSpecsHost.toolCatalogCentralized ()

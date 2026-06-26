@@ -1,7 +1,7 @@
-module VibeFs.Shell.ReviewRuntime
+module Wanxiangshu.Shell.ReviewRuntime
 
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
 
 /// The full host-facing review store: pure registry kernel plus effect side-table.
 type ReviewStore =

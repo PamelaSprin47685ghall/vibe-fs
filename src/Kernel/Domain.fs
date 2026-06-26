@@ -1,4 +1,4 @@
-module VibeFs.Kernel.Domain
+module Wanxiangshu.Kernel.Domain
 
 type SessionId = private SessionId of string
 type WorkspaceId = private WorkspaceId of string

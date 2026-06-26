@@ -1,17 +1,17 @@
-module VibeFs.Tests.IntegrationSubmitKnowledgeGraphSpecsAppend
+module Wanxiangshu.Tests.IntegrationSubmitKnowledgeGraphSpecsAppend
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Codec
-open VibeFs.Opencode.Plugin
-open VibeFs.Opencode.KnowledgeGraphRuntime
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Codec
+open Wanxiangshu.Opencode.Plugin
+open Wanxiangshu.Opencode.KnowledgeGraphRuntime
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.Dyn
 
 let submitKnowledgeGraphAppendSpec () = promise {
     let! workspaceDir = mkdtempAsync "submit-kg-append-"

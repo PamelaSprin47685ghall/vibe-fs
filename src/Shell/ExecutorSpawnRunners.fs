@@ -1,10 +1,10 @@
-module VibeFs.Shell.ExecutorSpawnRunners
+module Wanxiangshu.Shell.ExecutorSpawnRunners
 
 open Fable.Core
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Executor
-open VibeFs.Shell.ExecutorJavascript
-open VibeFs.Shell.ExecutorSpawn
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Shell.ExecutorJavascript
+open Wanxiangshu.Shell.ExecutorSpawn
 
 let private runShellProgram (program: string) (cwd: string) (sessionId: string) (timeoutMs: int)
                             (onKillRegistered: ((unit -> unit) -> unit) option) : JS.Promise<RunOutcome> =

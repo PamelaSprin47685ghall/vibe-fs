@@ -1,8 +1,8 @@
-module VibeFs.Shell.OpencodeSessionEventCodecCommon
+module Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 
-open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.Nudge.TodoStatus
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Shell.Dyn
 
 /// Session lifecycle event types that carry `id` on `info` rather than `sessionID`.
 let sessionEventTypes =

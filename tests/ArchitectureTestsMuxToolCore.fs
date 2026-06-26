@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsMuxToolCore
+module Wanxiangshu.Tests.ArchitectureTestsMuxToolCore
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let muxHostToolsFuzzyUsesToolCopy () =
     let code = requireMuxHostTools () |> nonCommentCode

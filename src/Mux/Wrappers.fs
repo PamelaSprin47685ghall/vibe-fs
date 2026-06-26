@@ -1,31 +1,31 @@
-module VibeFs.Mux.Wrappers
+module Wanxiangshu.Mux.Wrappers
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.WorkBacklog
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.Methodology
-open VibeFs.Shell.WorkBacklogSchema
-open VibeFs.Shell.TreeSitterShell
-open VibeFs.Shell.RuntimeScope
-open VibeFs.Shell.SessionProjectionStore
-open VibeFs.Shell
-open VibeFs.Shell.JsonSchemaBuilders
-open VibeFs.Shell.ToolRuntimeContext
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.MuxHostBindings
-open VibeFs.Shell.WorkBacklogToolsCodec
-open VibeFs.Shell.ToolExecute
-open VibeFs.Shell.ToolContextCodec
-open VibeFs.Shell.DynField
-open VibeFs.Mux.WrappersReview
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Shell.WorkBacklogSchema
+open Wanxiangshu.Shell.TreeSitterShell
+open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.SessionProjectionStore
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.JsonSchemaBuilders
+open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.MuxHostBindings
+open Wanxiangshu.Shell.WorkBacklogToolsCodec
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.ToolContextCodec
+open Wanxiangshu.Shell.DynField
+open Wanxiangshu.Mux.WrappersReview
 
-let strField = VibeFs.Shell.DynField.strField
-let optInt = VibeFs.Shell.DynField.optInt
+let strField = Wanxiangshu.Shell.DynField.strField
+let optInt = Wanxiangshu.Shell.DynField.optInt
 
 type JsonSchema =
     { ``type``: string

@@ -1,11 +1,11 @@
-module VibeFs.Shell.ReadDedupOpenCode
+module Wanxiangshu.Shell.ReadDedupOpenCode
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Dedup
-open VibeFs.Kernel.MessageDedup
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.TreeSitterShell
+open Wanxiangshu.Kernel.Dedup
+open Wanxiangshu.Kernel.MessageDedup
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.TreeSitterShell
 
 let private setOutput (o: obj) (v: string) : unit = o?output <- v
 

@@ -1,4 +1,4 @@
-module VibeFs.Tests.TempWorkspace
+module Wanxiangshu.Tests.TempWorkspace
 
 open Fable.Core
 open Fable.Core.JsInterop

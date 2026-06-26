@@ -1,19 +1,19 @@
-module VibeFs.Tests.IntegrationMuxKnowledgeGraphSpecsBookkeeper
+module Wanxiangshu.Tests.IntegrationMuxKnowledgeGraphSpecsBookkeeper
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Tests.IntegrationMuxSetup
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.IntegrationMuxSetup
 
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.KnowledgeGraph.Prompts
-open VibeFs.Mux.Plugin
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.KnowledgeGraph.Prompts
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.Dyn
 
 
 let muxReturnBookkeeperAppendSpec () = promise {

@@ -1,13 +1,13 @@
-module VibeFs.Mux.KnowledgeGraphTestHooks
+module Wanxiangshu.Mux.KnowledgeGraphTestHooks
 
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.KnowledgeGraph.JobTesting
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Mux.KnowledgeGraphRuntimeMux
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.KnowledgeGraphRuntimeTestPorts
+open Wanxiangshu.Kernel.KnowledgeGraph.JobTesting
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.KnowledgeGraphRuntimeTestPorts
 
 type MuxKnowledgeGraphTestHooks(runtime: MuxKnowledgeGraphRuntime) =
     member _.RegisterJob(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =

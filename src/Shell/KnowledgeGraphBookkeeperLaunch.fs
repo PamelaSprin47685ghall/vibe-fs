@@ -1,12 +1,12 @@
-module VibeFs.Shell.KnowledgeGraphBookkeeperLaunch
+module Wanxiangshu.Shell.KnowledgeGraphBookkeeperLaunch
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.DelegatedAiSettings
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.DelegatedAiSettings
+open Wanxiangshu.Shell.Dyn
 
 let private invoke1 (target: obj) (methodName: string) (arg: obj) : JS.Promise<obj> =
     unbox (target?(methodName)(arg))

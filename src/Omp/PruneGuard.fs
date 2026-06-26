@@ -1,10 +1,10 @@
-module VibeFs.Omp.PruneGuard
+module Wanxiangshu.Omp.PruneGuard
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Omp.PiResolve
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Omp.PiResolve
 
 [<Import("join", "node:path")>]
 let private pathJoin (a: string) (b: string) : string = jsNative

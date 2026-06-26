@@ -1,7 +1,7 @@
-module VibeFs.Kernel.ReviewReplayPolicy
+module Wanxiangshu.Kernel.ReviewReplayPolicy
 
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.LoopMessages
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.LoopMessages
 
 let textsFromFlatParts (flat: FlatPart<'raw> seq) : string seq =
     flat

@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ReviewSession.Effects
+module Wanxiangshu.Kernel.ReviewSession.Effects
 
-open VibeFs.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ReviewSession.Types
 
 type SessionEffects =
     { pendingResolutions: Map<string, ReviewResult -> unit>

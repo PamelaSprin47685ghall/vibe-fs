@@ -1,14 +1,14 @@
-module VibeFs.Omp.ChildSession
+module Wanxiangshu.Omp.ChildSession
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Omp.Codec
-open VibeFs.Omp.MessagingCodec
-open VibeFs.Omp.PiResolve
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OmpHostBindings
-open VibeFs.Shell.SubagentIo
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.MessagingCodec
+open Wanxiangshu.Omp.PiResolve
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OmpHostBindings
+open Wanxiangshu.Shell.SubagentIo
+module Dyn = Wanxiangshu.Shell.Dyn
 
 type ChildSession = { session: obj; dispose: (unit -> unit) option }
 

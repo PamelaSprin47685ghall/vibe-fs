@@ -1,9 +1,9 @@
 {
-  "name": "vibe-fs",
+  "name": "wanxiangshu",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "vibe-me reimagined in F# compiled to JavaScript via Fable",
+  "description": "wanxiangshu: multi-agent plugin runtime in F#→JS via Fable",
   "main": "build/src/Mux/Plugin.js",
   "types": "index.d.ts",
   "exports": {
@@ -25,7 +25,7 @@
     "index.d.ts"
   ],
   "scripts": {
-    "build-and-test": "dotnet fable vibe-fs.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && node tests/runner.js"
+    "build-and-test": "dotnet fable wanxiangshu.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && node tests/runner.js"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.1.1",

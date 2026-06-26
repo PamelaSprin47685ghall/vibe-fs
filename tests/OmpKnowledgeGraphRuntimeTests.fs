@@ -1,11 +1,11 @@
-module VibeFs.Tests.OmpKnowledgeGraphRuntimeTests
+module Wanxiangshu.Tests.OmpKnowledgeGraphRuntimeTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Omp.KnowledgeGraph.Runtime
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Omp.KnowledgeGraph.Runtime
 
 /// When the kg directory does not exist, Submit must reject without touching
 /// the writeQueues map. This is the cheap guard that prevents queue allocations

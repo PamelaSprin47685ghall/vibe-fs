@@ -1,6 +1,6 @@
-module VibeFs.Shell.MessageTransformCommon
+module Wanxiangshu.Shell.MessageTransformCommon
 
-open VibeFs.Shell.HostMessagePartCodec
+open Wanxiangshu.Shell.HostMessagePartCodec
 
 let extractTextsFromEncodedMessages (messages: obj array) : string seq =
     messages

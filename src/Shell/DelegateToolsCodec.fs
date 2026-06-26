@@ -1,9 +1,9 @@
-module VibeFs.Shell.DelegateToolsCodec
+module Wanxiangshu.Shell.DelegateToolsCodec
 
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.DynField
-open VibeFs.Shell.ToolContextCodec
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
+open Wanxiangshu.Shell.ToolContextCodec
 
 type DelegateHostConfig = {
     WorkspaceId: WorkspaceId

@@ -1,23 +1,23 @@
-module VibeFs.Mux.BuiltinToolsFuzzy
+module Wanxiangshu.Mux.BuiltinToolsFuzzy
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.ToolResult
-open VibeFs.Mux.Wrappers
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.ToolExecute
-open VibeFs.Shell.FuzzySearch
-open VibeFs.Shell.PromiseStr
-open VibeFs.Shell.FuzzyToolsCodec
-open VibeFs.Shell.ToolContextCodec
-open VibeFs.Shell.ToolRuntimeContext
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.FuzzySearch
+open Wanxiangshu.Shell.PromiseStr
+open Wanxiangshu.Shell.FuzzyToolsCodec
+open Wanxiangshu.Shell.ToolContextCodec
+open Wanxiangshu.Shell.ToolRuntimeContext
 
-module FuzzyCommandsModule = VibeFs.Shell.FuzzySearch
+module FuzzyCommandsModule = Wanxiangshu.Shell.FuzzySearch
 
-let private searchOptionsFromRuntime (runtime: IToolRuntimeContext) (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyIteratorStore.TypedIteratorStore) : SearchOptions =
+let private searchOptionsFromRuntime (runtime: IToolRuntimeContext) (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : SearchOptions =
     let scopeId =
         match runtime.Execution.WorkspaceId with
         | Some w -> Id.workspaceIdValue w
@@ -27,7 +27,7 @@ let private searchOptionsFromRuntime (runtime: IToolRuntimeContext) (finderCache
       store = Some iteratorStore
       finderCache = finderCache }
 
-let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyIteratorStore.TypedIteratorStore) : ToolDefinition =
+let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : ToolDefinition =
     { name = "fuzzy_find"
       description = description "fuzzy_find"
       parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyFindPattern); "path", box (strProp Params.fuzzyFindPath); "limit", box (numProp Params.fuzzyFindLimit); "iterator", box (strProp Params.fuzzyFindIterator) ]) [||]
@@ -45,7 +45,7 @@ let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyI
                   }
       condition = None }
 
-let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyIteratorStore.TypedIteratorStore) : ToolDefinition =
+let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : ToolDefinition =
     { name = "fuzzy_grep"
       description = description "fuzzy_grep"
       parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyGrepPattern); "path", box (strProp Params.fuzzyGrepPath); "exclude", box (strProp Params.fuzzyGrepExclude); "caseSensitive", box (boolProp Params.fuzzyGrepCaseSensitive); "context", box (numProp Params.fuzzyGrepContext); "limit", box (numProp Params.fuzzyGrepLimit); "iterator", box (strProp Params.fuzzyGrepIterator) ]) [||]

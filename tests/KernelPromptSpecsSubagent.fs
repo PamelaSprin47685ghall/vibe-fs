@@ -1,9 +1,9 @@
-module VibeFs.Tests.KernelPromptSpecsSubagent
+module Wanxiangshu.Tests.KernelPromptSpecsSubagent
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Kernel.Subagent
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Kernel.Subagent
 
 let subagentDispatch () =
     let host = opencode

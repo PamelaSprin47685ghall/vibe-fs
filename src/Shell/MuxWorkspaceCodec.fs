@@ -1,6 +1,6 @@
-module VibeFs.Shell.MuxWorkspaceCodec
+module Wanxiangshu.Shell.MuxWorkspaceCodec
 
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 let private findWorkspaceEntry (deps: obj) (workspaceId: string) : obj =
     if Dyn.isNullish deps || workspaceId = "" then null

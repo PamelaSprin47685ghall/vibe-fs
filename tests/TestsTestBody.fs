@@ -1,4 +1,4 @@
-module VibeFs.Tests.TestsTestBody
+module Wanxiangshu.Tests.TestsTestBody
 
 open Fable.Core
 

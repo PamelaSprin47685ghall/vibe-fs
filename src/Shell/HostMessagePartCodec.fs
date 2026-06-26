@@ -1,7 +1,7 @@
 // msg.parts text / read-dedup projection; full Part decode → MessagingPartCodec.
-module VibeFs.Shell.HostMessagePartCodec
+module Wanxiangshu.Shell.HostMessagePartCodec
 
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 let private tryReadContentFromOutput (output: obj) : string option =
     if Dyn.isNullish output then None

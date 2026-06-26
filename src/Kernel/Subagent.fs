@@ -1,8 +1,8 @@
-module VibeFs.Kernel.Subagent
+module Wanxiangshu.Kernel.Subagent
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Kernel.SubagentPrompts
 
 /// Every kind of subagent task that needs prompt construction. One union case
 /// per logical task; coder/investigator carry many intents because each intent

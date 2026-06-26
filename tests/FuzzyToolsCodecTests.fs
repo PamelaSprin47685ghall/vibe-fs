@@ -1,9 +1,9 @@
-module VibeFs.Tests.FuzzyToolsCodecTests
+module Wanxiangshu.Tests.FuzzyToolsCodecTests
 
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.FuzzyToolsCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.FuzzyToolsCodec
 
 let private okFind args =
     match decodeFuzzyFindArgs args with

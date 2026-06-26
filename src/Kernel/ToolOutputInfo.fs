@@ -1,7 +1,9 @@
-module VibeFs.Kernel.ToolOutputInfo
+module Wanxiangshu.Kernel.ToolOutputInfo
 
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.ToolOutputInfoTypes
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
 let seeBelow = ToolOutputInfoTypes.seeBelow
 let seeBelowTruncated = ToolOutputInfoTypes.seeBelowTruncated
@@ -55,14 +57,14 @@ let private orderInfoForRender (items: InfoItem list) : InfoItem list =
     rest @ bodyRefs
 
 let private renderInfoItem = function
-    | InfoItem.Hint h -> yamlListItemField "hint" h "  "
-    | InfoItem.Syntax s -> yamlListItemField "syntax" s "  "
-    | InfoItem.Iterator i -> yamlListItemField "iterator" i "  "
-    | InfoItem.Status s -> yamlListItemField "status" s "  "
-    | InfoItem.ExitCode n -> yamlListItemField "exit_code" (string n) "  "
-    | InfoItem.Signal s -> yamlListItemField "signal" s "  "
-    | InfoItem.TimeoutMs n -> yamlListItemField "timeout_ms" (string n) "  "
-    | InfoItem.BodyRef r -> yamlListItemField "tool_output" (bodyRefValue r) "  "
+    | InfoItem.Hint h -> createObj [ "hint", box h ]
+    | InfoItem.Syntax s -> createObj [ "syntax", box s ]
+    | InfoItem.Iterator i -> createObj [ "iterator", box i ]
+    | InfoItem.Status s -> createObj [ "status", box s ]
+    | InfoItem.ExitCode n -> createObj [ "exit_code", box n ]
+    | InfoItem.Signal s -> createObj [ "signal", box s ]
+    | InfoItem.TimeoutMs n -> createObj [ "timeout_ms", box n ]
+    | InfoItem.BodyRef r -> createObj [ "tool_output", box (bodyRefValue r) ]
 
 let render (msg: ToolOutputMessage) : string =
     if msg.info.IsEmpty && msg.body = "" then ""
@@ -74,9 +76,7 @@ let render (msg: ToolOutputMessage) : string =
         | "" -> fence
         | body -> fence + "\n" + body
 
-open VibeFs.Kernel.ToolOutputInfoParse
-
-let tryParseInfoList = ToolOutputInfoParse.tryParseInfoList
+open Wanxiangshu.Kernel.ToolOutputInfoParse
 
 let tryParse (text: string) : ToolOutputMessage option =
     if isNull text || text = "" then None
@@ -84,33 +84,12 @@ let tryParse (text: string) : ToolOutputMessage option =
         let lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
         if lines.Length < 2 || lines.[0] <> "---" then None
         else
-            let infoLineIndex =
-                lines
-                |> Array.mapi (fun i line -> i, line)
-                |> Array.tryFind (fun (_, line) -> line = "info:")
-                |> Option.map fst
-            match infoLineIndex with
-            | None ->
-                let close =
-                    lines.[1..]
-                    |> Array.tryFindIndex ((=) "---")
-                    |> Option.map (fun i -> i + 1)
-                match close with
-                | Some ci ->
-                    let body =
-                        if ci + 1 >= lines.Length then ""
-                        else String.concat "\n" lines.[ci + 1 ..]
-                    Some { info = []; body = body }
-                | None -> None
-            | Some iInfo ->
-                let info, closeOpt = tryParseInfoList lines iInfo
-                match closeOpt with
-                | Some ci ->
-                    let body =
-                        if ci + 1 >= lines.Length then ""
-                        else String.concat "\n" lines.[ci + 1 ..]
-                    Some { info = info; body = body }
-                | None -> None
+            let parsed = parseFrontMatter text
+            if isNull parsed then None
+            else
+                let body = bodyAfterFrontMatter text
+                let info = parseInfoItems parsed
+                Some { info = info; body = body }
 
 let bodyForBookkeeper (text: string) : string =
     match tryParse text with

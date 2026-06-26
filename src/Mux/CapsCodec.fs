@@ -1,12 +1,12 @@
-module VibeFs.Mux.CapsCodec
+module Wanxiangshu.Mux.CapsCodec
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Kernel.CapsSynthPolicy
-open VibeFs.Shell.CapsSynthCommon
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.FileSys
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Kernel.CapsSynthPolicy
+open Wanxiangshu.Shell.CapsSynthCommon
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.FileSys
 
 let messageId (msg: obj) : string = str msg "id"
 

@@ -1,14 +1,14 @@
-module VibeFs.Tests.AgentNudgeSpecsWip
+module Wanxiangshu.Tests.AgentNudgeSpecsWip
 
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Nudge
-open VibeFs.Kernel.Nudge.SubmitReviewHooks
-open VibeFs.Kernel.NudgeState
-open VibeFs.Kernel.Nudge.Types
-open VibeFs.Kernel.PromptFragments
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
+open Wanxiangshu.Kernel.NudgeState
+open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Shell.OpencodeSessionEventCodec
 
 let private snapshot todos msg alreadyNudged agent : SessionSnapshot =
     { todos = todos; lastAssistantMessage = msg; alreadyNudged = alreadyNudged; agentFromMessage = agent }

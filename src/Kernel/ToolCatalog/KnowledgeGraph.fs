@@ -1,6 +1,6 @@
-module VibeFs.Kernel.ToolCatalog.KnowledgeGraph
+module Wanxiangshu.Kernel.ToolCatalog.KnowledgeGraph
 
-open VibeFs.Kernel.ToolCatalog.ToolSpec
+open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 
 let internal fetchKnowledgeGraphSpec: ToolSpec =
     { name = "knowledge_graph_fetch"

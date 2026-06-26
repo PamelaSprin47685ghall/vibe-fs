@@ -1,14 +1,29 @@
-module VibeFs.Kernel.KnowledgeGraph.Job
+module Wanxiangshu.Kernel.KnowledgeGraph.Job
 
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.KnowledgeGraph.Types
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.Yaml
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
 
 let private jobKindTag (kind: KnowledgeGraphJobKind) : string * string option =
     match kind with
     | AppendAfterWork -> "append", None
     | DailyRewrite date -> "daily", Some date
 
-let private jobMarkerFields (ctx: KnowledgeGraphJobContext) : string list =
+[<Emit("Object.assign({}, $0, $1)")>]
+let private assignObjects (baseObj: obj) (overrideObj: obj) : obj = jsNative
+
+let private markerObject (ctx: KnowledgeGraphJobContext) : obj =
+    let kind, value = jobKindTag ctx.kind
+    let fields =
+        [ "type", box "vibe_knowledge_graph_job"
+          "workspaceRoot", box ctx.workspaceRoot
+          "kind", box kind ]
+        @ (match value with Some date when kind = "daily" -> [ "date", box date ] | _ -> [])
+    createObj fields
+
+let private jobMarkerFields (ctx: KnowledgeGraphJobContext) : FrontMatterField list =
     let kind, value = jobKindTag ctx.kind
     [ yield yamlField "type" "vibe_knowledge_graph_job"
       yield yamlField "workspaceRoot" ctx.workspaceRoot
@@ -21,25 +36,19 @@ let renderJobMarker (ctx: KnowledgeGraphJobContext) : string =
     frontMatter (jobMarkerFields ctx)
 
 let prependJobMarker (ctx: KnowledgeGraphJobContext) (text: string) : string =
-    let markerFields = jobMarkerFields ctx
-    if System.String.IsNullOrEmpty text then
-        frontMatter markerFields
+    let normalized = if isNull text then "" else text.Replace("\r\n", "\n").Replace("\r", "\n")
+    if normalized = "" then
+        frontMatter (jobMarkerFields ctx)
     else
-        let normalized = text.Replace("\r\n", "\n").Replace("\r", "\n")
-        let lines = normalized.Split('\n')
-        if lines.Length < 2 || lines.[0] <> "---" then
-            frontMatterPrompt markerFields normalized
+        let parsed = parseFrontMatter normalized
+        if isNull parsed then
+            frontMatterPrompt (jobMarkerFields ctx) normalized
         else
-            match lines.[1..] |> Array.tryFindIndex ((=) "---") with
-            | None -> frontMatterPrompt markerFields normalized
-            | Some relativeCloseIndex ->
-                let closeIndex = relativeCloseIndex + 1
-                let existingFields = lines.[1 .. closeIndex - 1] |> Array.toList
-                let remainder =
-                    if closeIndex + 1 >= lines.Length then ""
-                    else lines.[closeIndex + 1 ..] |> String.concat "\n"
-                let merged = frontMatter (markerFields @ existingFields)
-                if remainder = "" then merged else merged + "\n" + remainder
+            let body = bodyAfterFrontMatter normalized
+            let merged = assignObjects parsed (markerObject ctx)
+            let yamlStr = stringify merged
+            let fm = "---\n" + yamlStr.TrimEnd('\n') + "\n---"
+            match body with "" -> fm | _ -> fm + "\n" + body
 
 let tryParseJobMarker (text: string) : KnowledgeGraphJobContext option =
     let fields = parseFrontMatterScalars text

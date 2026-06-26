@@ -1,6 +1,6 @@
-module VibeFs.Kernel.Nudge.Transitions
+module Wanxiangshu.Kernel.Nudge.Transitions
 
-open VibeFs.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.Nudge.Types
 
 let private hasStoppedSession state sessionID = Set.contains sessionID state.stoppedSessions
 let private hasRetryPendingSession state sessionID = Set.contains sessionID state.retryPendingSessions

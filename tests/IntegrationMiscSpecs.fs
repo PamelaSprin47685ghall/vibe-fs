@@ -1,12 +1,12 @@
-module VibeFs.Tests.IntegrationMiscSpecs
+module Wanxiangshu.Tests.IntegrationMiscSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Mux.Plugin
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Shell.Dyn
 
 let writeToolSpec (reg: obj) = promise {
     let tools = unbox<obj[]> (get reg "tools")

@@ -1,14 +1,14 @@
-module VibeFs.Opencode.ToolSchema
+module Wanxiangshu.Opencode.ToolSchema
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
 
-module Params = VibeFs.Kernel.ToolCatalog.Params
+module Params = Wanxiangshu.Kernel.ToolCatalog.Params
 
 /// The opencode plugin SDK's `tool` factory + `tool.schema` (Zod-like) builder.
 [<Import("tool", "@opencode-ai/plugin/tool")>]
@@ -41,6 +41,9 @@ let intMinNullish (minVal: int) (desc: string) : obj =
     call1 (call0 n "nullish") "describe" (box desc)
 
 let boolOpt (desc: string) : obj = call1 (call0 (call0 schema "boolean") "nullish") "describe" (box desc)
+
+/// Non-nullish optional boolean: `true | false | undefined`. `null` is rejected at the schema boundary.
+let boolOptional (desc: string) : obj = call1 (call0 (call0 schema "boolean") "optional") "describe" (box desc)
 
 let excludeOpt (desc: string) : obj =
     let s = str ()
@@ -119,7 +122,7 @@ let obj (shape: obj) : obj = call1 schema "object" shape
 let define (description: string) (args: obj) (execute: obj -> obj -> JS.Promise<string>) : obj =
     invokeTool toolFactory (box {| description = description; args = args; execute = execute |})
 
-let private toolDescription (name: string) : string = VibeFs.Kernel.ToolCatalog.description name
+let private toolDescription (name: string) : string = Wanxiangshu.Kernel.ToolCatalog.description name
 
 let coder = toolDescription "coder"
 

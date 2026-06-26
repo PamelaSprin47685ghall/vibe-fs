@@ -1,22 +1,22 @@
-module VibeFs.Omp.ExecutorTools
+module Wanxiangshu.Omp.ExecutorTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Executor
-open VibeFs.Kernel.OmpSessionTools
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Omp.ChildSession
-open VibeFs.Omp.Codec
-open VibeFs.Omp.MessagingCodec
-open VibeFs.Omp.OmpToolSchema
-open VibeFs.Omp.Schema
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Shell.Executor
-open VibeFs.Shell.RunnerBackground
-open VibeFs.Shell.RuntimeScope
-open VibeFs.Shell.SessionExecutor
-open VibeFs.Shell.SubagentIo
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Kernel.OmpSessionTools
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.MessagingCodec
+open Wanxiangshu.Omp.OmpToolSchema
+open Wanxiangshu.Omp.Schema
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.Executor
+open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.SessionExecutor
+open Wanxiangshu.Shell.SubagentIo
 
 [<Global("Buffer")>]
 let private nodeBuffer : obj = jsNative

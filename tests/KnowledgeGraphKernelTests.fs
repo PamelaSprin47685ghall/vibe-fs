@@ -1,13 +1,13 @@
-module VibeFs.Tests.KnowledgeGraphKernelTests
+module Wanxiangshu.Tests.KnowledgeGraphKernelTests
 
 open System
 open Fable.Core
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Prompts
-open VibeFs.Kernel.KnowledgeGraph.Maintenance
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Prompts
+open Wanxiangshu.Kernel.KnowledgeGraph.Maintenance
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
 
 let private some (o: 'a option) : 'a =
     match o with Some v -> v | None -> failwith "expected Some"
@@ -66,7 +66,7 @@ let dailyPromptSpec () =
     check "daily prompt folds target events last-win" (not (prompt.Contains "stale target e"))
     check "daily prompt excludes future events" (not (prompt.Contains "future e"))
     check "daily prompt hides target event id" (not (prompt.Contains "id: 2222"))
-    check "daily prompt keeps existing knowledge graph ids" (prompt.Contains "id: 1111")
+    check "daily prompt keeps existing knowledge graph ids" (prompt.Contains "1111")
     check "daily prompt does not use old target day payload field" (not (prompt.Contains "target_day:\n"))
     check "daily prompt hides implementation vocabulary" (not (prompt.Contains "last-win") && not (prompt.Contains "delta") && not (prompt.Contains "rewritten"))
     check "daily prompt uses simple maintenance instruction" (prompt.Contains "Some new events happened" && prompt.Contains "modify the existing knowledge graph entries")

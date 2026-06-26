@@ -1,31 +1,31 @@
-module VibeFs.Mux.KnowledgeGraphRuntimeMuxQuery
+module Wanxiangshu.Mux.KnowledgeGraphRuntimeMuxQuery
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Kernel.KnowledgeGraph.Maintenance
-open VibeFs.Kernel.KnowledgeGraph.Prompts
-open VibeFs.Mux.Delegate
-open VibeFs.Mux.Wrappers
-open VibeFs.Mux.MessagingCodec
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.KnowledgeGraphStorage
-open VibeFs.Shell.KnowledgeGraphWorkflow
-open VibeFs.Shell.KnowledgeGraphMaintenanceRun
-open VibeFs.Shell.KnowledgeGraphBookkeeperLaunch
-open VibeFs.Shell.KnowledgeGraphRuntimeTestPorts
-open VibeFs.Shell.PromiseQueue
-open VibeFs.Shell.ToolRuntimeContext
-open VibeFs.Shell.ToolContextCodec
-open VibeFs.Shell.Dyn
-open VibeFs.Mux.KnowledgeGraphRuntimeIO
-open VibeFs.Mux.KnowledgeGraphRuntimeMux
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Kernel.KnowledgeGraph.Maintenance
+open Wanxiangshu.Kernel.KnowledgeGraph.Prompts
+open Wanxiangshu.Mux.Delegate
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Mux.MessagingCodec
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.KnowledgeGraphStorage
+open Wanxiangshu.Shell.KnowledgeGraphWorkflow
+open Wanxiangshu.Shell.KnowledgeGraphMaintenanceRun
+open Wanxiangshu.Shell.KnowledgeGraphBookkeeperLaunch
+open Wanxiangshu.Shell.KnowledgeGraphRuntimeTestPorts
+open Wanxiangshu.Shell.PromiseQueue
+open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Shell.ToolContextCodec
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeIO
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
 
 type MuxKnowledgeGraphRuntime with
 

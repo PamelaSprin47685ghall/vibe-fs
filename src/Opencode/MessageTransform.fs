@@ -1,38 +1,39 @@
-module VibeFs.Opencode.MessageTransform
+module Wanxiangshu.Opencode.MessageTransform
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.ReviewReplayPolicy
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Shell.MessageTransformCore
-open VibeFs.Shell.MessageTransformHostEntry
-open VibeFs.Shell.MessageTransformHostHooks
-open VibeFs.Shell.MessageTransformPipeline
-open VibeFs.Shell.ReadDedupOpenCode
-open VibeFs.Kernel.MessageTransformPolicy
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Kernel.Methodology
-open VibeFs.Opencode.AgentConfig
-open VibeFs.Opencode.BacklogSession
-open VibeFs.Opencode.MessagingCodec
-open VibeFs.Opencode.CapsCodec
-open VibeFs.Opencode.KnowledgeGraphRuntime
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.OpencodeHookInputCodec
-open VibeFs.Shell.ChatTransformOutputCodec
-open VibeFs.Shell.JsArrayMutate
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ReviewReplayPolicy
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Shell.MessageTransformCore
+open Wanxiangshu.Shell.MessageTransformHostEntry
+open Wanxiangshu.Shell.MessageTransformHostHooks
+open Wanxiangshu.Shell.MessageTransformPipeline
+open Wanxiangshu.Shell.ReadDedupOpenCode
+open Wanxiangshu.Kernel.MessageTransformPolicy
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Opencode.AgentConfig
+open Wanxiangshu.Opencode.BacklogSession
+open Wanxiangshu.Opencode.MessagingCodec
+open Wanxiangshu.Opencode.CapsCodec
+open Wanxiangshu.Opencode.KnowledgeGraphRuntime
+open Wanxiangshu.Opencode.SessionIo
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.OpencodeHookInputCodec
+open Wanxiangshu.Shell.ChatTransformOutputCodec
+open Wanxiangshu.Shell.JsArrayMutate
 
 let private extractSessionID (messages: Message<obj> list) : string =
     messages
     |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
     |> Option.defaultValue ""
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: VibeFs.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) (output: obj) : JS.Promise<unit> =
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
@@ -51,8 +52,11 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                     Excluded = excluded
                     Cleaned = cleaned
                 }
-                let replayTexts () =
-                    messagesList |> Messaging.flatten |> textsFromFlatParts
+                let replayTexts () : JS.Promise<string seq> =
+                    promise {
+                        let! texts = readSessionTexts client sessionID directory
+                        return texts :> string seq
+                    }
                 let dedupFn excluded encoded =
                     if excluded then encoded
                     else
@@ -63,7 +67,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                 let loadKgPrelude () =
                     loadKgPreludeForAgent false agent plan (fun sid dir -> knowledgeGraphRuntime.BuildPreludeForSession(sid, dir))
                 let buildCaps encoded capsFiles prelude =
-                    buildCapsMessages VibeFs.Shell.FileSys.sha256HexTruncated encoded directory capsFiles prelude
+                    buildCapsMessages Wanxiangshu.Shell.FileSys.sha256HexTruncated encoded directory capsFiles prelude
                 let! final =
                     runHostMessagesTransform
                         reviewStore

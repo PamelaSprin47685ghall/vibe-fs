@@ -1,7 +1,7 @@
-module VibeFs.Shell.MuxHostBindings
+module Wanxiangshu.Shell.MuxHostBindings
 
 open Fable.Core
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 /// Centralized Mux host tool.execute access (replaces inline `tool?execute` in Wrappers).
 let getToolExecute (tool: obj) : obj = Dyn.get tool "execute"

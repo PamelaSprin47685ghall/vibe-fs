@@ -1,19 +1,19 @@
-module VibeFs.Opencode.HookSchema
+module Wanxiangshu.Opencode.HookSchema
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.HostTools
-open VibeFs.Shell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Shell.SubagentIntentsCodec
-open VibeFs.Kernel.WorkBacklog
-open VibeFs.Opencode.ToolSchema
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.WorkBacklogSchema
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Shell.SubagentIntentsCodec
+open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Opencode.ToolSchema
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.WorkBacklogSchema
 
-let selectMethodologyFieldDescription = VibeFs.Kernel.Methodology.selectMethodologyFieldDescription
+let selectMethodologyFieldDescription = Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription
 
 /// Write `_ui` directly onto the host's args reference when the tool exposes a
 /// UI label (coder/investigator). The host keeps the same args object it passed
@@ -145,7 +145,7 @@ let private extendZodTaskSchema (schema: obj) : obj =
                     | Some arr ->
                         match callSchemaMethod arr "min" (box 1) with
                         | Some minArr ->
-                            match callSchemaMethod minArr "describe" (box VibeFs.Kernel.Methodology.selectMethodologyFieldDescription) with
+                            match callSchemaMethod minArr "describe" (box Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription) with
                             | Some descArr -> extProps <- ("select_methodology", descArr) :: extProps
                             | None -> ()
                         | None -> ()

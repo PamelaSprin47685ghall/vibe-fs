@@ -1,22 +1,22 @@
-module VibeFs.Opencode.SessionIoSubagent
+module Wanxiangshu.Opencode.SessionIoSubagent
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.ToolResult
-open VibeFs.Shell.ErrorClassify
-open VibeFs.Opencode.MessagingCodec
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.DelegatedAiSettings
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeClientCodec
-open VibeFs.Shell.OpencodeContextCodec
-open VibeFs.Shell.OpencodeSessionPromptCodec
-open VibeFs.Shell.OpencodeSessionSpawnCodec
-open VibeFs.Shell.SessionIoSpawn
-open VibeFs.Shell.SubagentToolExecute
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Opencode.MessagingCodec
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.DelegatedAiSettings
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Shell.OpencodeContextCodec
+open Wanxiangshu.Shell.OpencodeSessionPromptCodec
+open Wanxiangshu.Shell.OpencodeSessionSpawnCodec
+open Wanxiangshu.Shell.SessionIoSpawn
+open Wanxiangshu.Shell.SubagentToolExecute
 
 [<Global>]
 type DOMException(message: string, name: string) =

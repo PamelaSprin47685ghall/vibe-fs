@@ -1,10 +1,10 @@
-module VibeFs.Tests.WorkBacklogToolsCodecTests
+module Wanxiangshu.Tests.WorkBacklogToolsCodecTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.WorkBacklogToolsCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.WorkBacklogToolsCodec
 
 let decodeTodoMissingCompletedWorkReport () =
     let args =

@@ -1,15 +1,15 @@
-module VibeFs.Mux.WrappersReview
+module Wanxiangshu.Mux.WrappersReview
 
 open Fable.Core
 open Fable.Core.JsInterop
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.DynField
-open VibeFs.Shell.MuxHostBindings
-open VibeFs.Shell.DelegateToolsCodec
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
+open Wanxiangshu.Shell.MuxHostBindings
+open Wanxiangshu.Shell.DelegateToolsCodec
 
-let private strField = VibeFs.Shell.DynField.strField
+let private strField = Wanxiangshu.Shell.DynField.strField
 
 /// Encapsulates the host's native file_read execute function captured during
 /// wrapper registration. Replaces the old `obj option ref` pseudo-interface

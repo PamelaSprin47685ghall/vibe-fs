@@ -1,8 +1,8 @@
-module VibeFs.Shell.OpencodeAgentConfigWire
+module Wanxiangshu.Shell.OpencodeAgentConfigWire
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.HostTools
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Shell.Dyn
 
 let emptyObj () : obj = createObj []
 

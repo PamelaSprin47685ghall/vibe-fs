@@ -1,11 +1,11 @@
-module VibeFs.Tests.IntegrationPluginTestsCommon
+module Wanxiangshu.Tests.IntegrationPluginTestsCommon
 
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.Dyn
 
 let pluginShape (p: obj) =
-    check "plugin.name" (str p "name" = "kunwei")
+    check "plugin.name" (str p "name" = "wanxiangshu")
     check "plugin.tool" (typeIs (get p "tool") "object")
     check "plugin.config" (typeIs (get p "config") "function")
     check "plugin.event" (typeIs (get p "event") "function")

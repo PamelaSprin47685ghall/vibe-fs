@@ -1,4 +1,4 @@
-module VibeFs.Kernel.MethodologyCatalog
+module Wanxiangshu.Kernel.MethodologyCatalog
 
 let methodologyCatalog =
     """Select the reasoning methodologies that should guide the next work step. Use this before continuing when the task benefits from explicit structure, search-space control, proof discipline, design reasoning, decomposition, verification, or risk control. Choose all useful methodologies by their definitions, not by keyword vibes.

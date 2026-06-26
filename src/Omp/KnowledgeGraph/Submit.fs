@@ -1,13 +1,13 @@
-module VibeFs.Omp.KnowledgeGraph.Submit
+module Wanxiangshu.Omp.KnowledgeGraph.Submit
 
 open Fable.Core
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Kernel.Messaging
-open VibeFs.Omp.KnowledgeGraphRuntimeIO
-open VibeFs.Omp.MessagingCodec
-open VibeFs.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Omp.KnowledgeGraphRuntimeIO
+open Wanxiangshu.Omp.MessagingCodec
+open Wanxiangshu.Shell.KnowledgeGraphFiles
 
 let submit
     (magicGetEntries: (unit -> obj array) option)

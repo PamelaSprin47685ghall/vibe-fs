@@ -1,11 +1,11 @@
-module VibeFs.Opencode.ToolHelpers
+module Wanxiangshu.Opencode.ToolHelpers
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Shell
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
 
 let formatDomainError (context: string) (error: DomainError) : string =
     $"{context} failed: {Domain.formatDomainError error}"

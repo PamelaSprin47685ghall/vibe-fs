@@ -1,7 +1,7 @@
-module VibeFs.Kernel.Config
+module Wanxiangshu.Kernel.Config
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.ToolPermission
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.ToolPermission
 
 let private repo = "https://github.com/vibheksoni/stealth-browser-mcp.git"
 

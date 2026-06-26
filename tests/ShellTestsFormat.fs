@@ -1,11 +1,11 @@
-module VibeFs.Tests.ShellTestsFormat
+module Wanxiangshu.Tests.ShellTestsFormat
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.Executor
-open VibeFs.Kernel.SearchPrompts
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Shell
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Kernel.SearchPrompts
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Shell
 
 let webApiSearchFormat () =
     let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]

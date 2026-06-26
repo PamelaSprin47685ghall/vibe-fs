@@ -1,11 +1,11 @@
-module VibeFs.Tests.OpencodeSessionEventCodecTestsSession
+module Wanxiangshu.Tests.OpencodeSessionEventCodecTestsSession
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Shell.OpencodeSessionEventCodec
 
-module Dyn = VibeFs.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private part (text: string) : obj = box {| ``type`` = "text"; text = text |}
 
@@ -46,7 +46,7 @@ let getSessionIDNonLifecycleSkipsInfoId () =
 
 let getPartsTextEmptyOnNonArray () =
     equal "getPartsText empty on null" "" (getPartsText null)
-    equal "getPartsText empty on undefined" "" (getPartsText VibeFs.Shell.Dyn.undefinedValue)
+    equal "getPartsText empty on undefined" "" (getPartsText Wanxiangshu.Shell.Dyn.undefinedValue)
 
 let getPartsTextEmptyOnEmptyArray () =
     equal "getPartsText empty on []" "" (getPartsText [||])
@@ -59,7 +59,7 @@ let getPartsTextConcatsTextParts () =
     equal "getPartsText joins text parts" "first\nsecond" (getPartsText (box parts))
 
 let getPartsTextSkipsNonStringText () =
-    let parts = [| box {| ``type`` = "text"; text = VibeFs.Shell.Dyn.undefinedValue |} |]
+    let parts = [| box {| ``type`` = "text"; text = Wanxiangshu.Shell.Dyn.undefinedValue |} |]
     equal "getPartsText skips non-string text payloads" "" (getPartsText (box parts))
 
 let isCompletedAssistantMessageNonAssistant () =
@@ -83,7 +83,7 @@ let isCompletedAssistantMessageTimeCompleted () =
 
 let decodeTodosEmptyOnNonArray () =
     equal "decodeTodos empty on null" [] (decodeTodos null)
-    equal "decodeTodos empty on undefined" [] (decodeTodos VibeFs.Shell.Dyn.undefinedValue)
+    equal "decodeTodos empty on undefined" [] (decodeTodos Wanxiangshu.Shell.Dyn.undefinedValue)
 
 let decodeTodosDropsTerminalStatus () =
     let todos =
@@ -144,7 +144,7 @@ let decodeLastAssistantDetectsSyntheticAgent () =
 let decodeLastAssistantDetectsAlreadyNudged () =
     let info = box {| role = "assistant"; finish = "stop" |}
     let msgAssistant = messageOf info (box [| part "done" |])
-    let nudgePart = part VibeFs.Kernel.PromptFragments.todoNudgePrompt
+    let nudgePart = part Wanxiangshu.Kernel.PromptFragments.todoNudgePrompt
     let msgNudge = messageOf (box {| role = "user" |}) (box [| nudgePart |])
     let _, _, nudged = decodeLastAssistant (box [| msgAssistant; msgNudge |])
     check "already-nudged detected" nudged

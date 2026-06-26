@@ -1,9 +1,9 @@
-module VibeFs.Shell.SubagentSpawn
+module Wanxiangshu.Shell.SubagentSpawn
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Subagent
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Shell.Dyn
 
 [<Global>]
 type AbortController() =

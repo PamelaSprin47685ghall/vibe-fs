@@ -1,14 +1,14 @@
-module VibeFs.Tests.SubagentPromptBuildTests
+module Wanxiangshu.Tests.SubagentPromptBuildTests
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Kernel.SubagentPrompts
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.SubagentIntentsCodec
-open VibeFs.Shell.SubagentPromptBuild
-open VibeFs.Shell.WorkspaceFiles
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Kernel.SubagentPrompts
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.SubagentIntentsCodec
+open Wanxiangshu.Shell.SubagentPromptBuild
+open Wanxiangshu.Shell.WorkspaceFiles
 
 let private coderSample : CoderIntent =
     { objective = "fix bug"

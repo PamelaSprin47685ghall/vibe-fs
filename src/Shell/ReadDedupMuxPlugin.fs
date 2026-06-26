@@ -1,13 +1,13 @@
-module VibeFs.Shell.ReadDedupMuxPlugin
+module Wanxiangshu.Shell.ReadDedupMuxPlugin
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Dedup
-open VibeFs.Kernel.MessageDedup
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.HostMessagePartCodec
-open VibeFs.Shell.TreeSitterShell
+open Wanxiangshu.Kernel.Dedup
+open Wanxiangshu.Kernel.MessageDedup
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.HostMessagePartCodec
+open Wanxiangshu.Shell.TreeSitterShell
 
 let private readToolNames = Set.ofList [ "read"; "file_read" ]
 
@@ -78,7 +78,7 @@ let collectReadOutputs (messages: obj array) : string[] =
 let collectReadOutputsByPath (messages: obj array) : Map<string, string list> =
     collectMuxReadHits messages
     |> List.map (fun hit -> hit.payload)
-    |> VibeFs.Kernel.MessageDedup.collectReadOutputsByPath
+    |> Wanxiangshu.Kernel.MessageDedup.collectReadOutputsByPath
 
 let deduplicateReadOutputsWithSeenByPath
     (seenByPath: Map<string, string list>)

@@ -1,9 +1,9 @@
-module VibeFs.Shell.FileToolsCodec
+module Wanxiangshu.Shell.FileToolsCodec
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Domain
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.DynField
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
 
 type ReadArgs = {
     Path: string

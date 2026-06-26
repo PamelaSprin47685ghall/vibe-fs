@@ -1,18 +1,18 @@
-module VibeFs.Tests.IntegrationBookkeeperSpecsMux
+module Wanxiangshu.Tests.IntegrationBookkeeperSpecsMux
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Tests.IntegrationMuxSetup
-open VibeFs.Mux.Plugin
-open VibeFs.Mux.KnowledgeGraphRuntimeMux
-open VibeFs.Mux.KnowledgeGraphRuntimeMuxSubmit
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.IntegrationMuxSetup
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMuxSubmit
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Shell.Dyn
 
 let muxToolExecuteAfterTriggersBookkeeperSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-tool-after-"

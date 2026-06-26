@@ -1,10 +1,10 @@
-module VibeFs.Shell.ToolRuntimeContext
+module Wanxiangshu.Shell.ToolRuntimeContext
 
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.ToolContext
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeContextCodec
-open VibeFs.Shell.ToolContextCodec
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ToolContext
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeContextCodec
+open Wanxiangshu.Shell.ToolContextCodec
 
 type IToolRuntimeContext = {
     Execution: ToolExecutionContext

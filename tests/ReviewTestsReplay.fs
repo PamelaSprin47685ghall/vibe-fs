@@ -1,10 +1,10 @@
-module VibeFs.Tests.ReviewTestsReplay
+module Wanxiangshu.Tests.ReviewTestsReplay
 
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.PromptFrontMatter
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 let disposeSessionTreeTerminatesAll () =
     let mutable verdicts : (string * ReviewResult) list = []
@@ -35,10 +35,10 @@ let disposeSessionTreeTerminatesAll () =
 let inferReviewTaskFromTexts' () =
     let activate task =
         buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
-    let accept = VibeFs.Kernel.ReviewPrompts.formatReviewResult Accepted
+    let accept = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult Accepted
     let cancel = loopCancelledMessage
-    let rejected = VibeFs.Kernel.ReviewPrompts.formatReviewResult (Rejected "fix the tests")
-    let terminated = VibeFs.Kernel.ReviewPrompts.formatReviewResult Terminated
+    let rejected = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Rejected "fix the tests")
+    let terminated = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult Terminated
     equal "empty -> None" None (inferReviewTaskFromTexts [])
     equal "only activate -> Some task" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1" ])
     equal "activate + accept -> None" None (inferReviewTaskFromTexts [ activate "ship S1"; accept ])
@@ -53,11 +53,11 @@ let inferReviewTaskFromTexts' () =
     equal "prose task line does not activate" None
         (inferReviewTaskFromTexts [ "Here is my plan:\ntask: refactor everything\nlet's go" ])
     let reviewerChildPrompt =
-        VibeFs.Kernel.ReviewPrompts.reviewerPrompt "worker task from parent" "self-reported changes" [ "src/a.fs" ]
+        Wanxiangshu.Kernel.ReviewPrompts.reviewerPrompt "worker task from parent" "self-reported changes" [ "src/a.fs" ]
     equal "reviewerPrompt task must not activate worker With-Review" None
         (inferReviewTaskFromTexts [ reviewerChildPrompt ])
     let reviewerVerdictPrompt =
-        VibeFs.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "worker task" "report body" [ "b.fs" ]
+        Wanxiangshu.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "worker task" "report body" [ "b.fs" ]
     equal "front matter role: reviewer + task must not activate worker loop" None
         (inferReviewTaskFromTexts [ reviewerVerdictPrompt ])
 
@@ -72,4 +72,5 @@ let parseFrontMatterScalars' () =
     equal "block scalar parsed" (Some "line one\nline two\n: [] {} \"quoted\"") (Map.tryFind "task" block)
     equal "plain prose → empty" Map.empty (parseFrontMatterScalars "just a normal message, no front matter")
     equal "no closing fence → empty" Map.empty (parseFrontMatterScalars "---\ntask: \"x\"\nnever closes")
-    equal "indented task not top-level → empty" Map.empty (parseFrontMatterScalars "---\n  task: \"indented\"\n---")
+    let indented = parseFrontMatterScalars "---\n  task: \"indented\"\n---"
+    equal "indented task IS valid YAML top-level key" (Some "indented") (Map.tryFind "task" indented)

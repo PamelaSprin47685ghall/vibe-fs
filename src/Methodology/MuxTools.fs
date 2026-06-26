@@ -1,16 +1,16 @@
-module VibeFs.Methodology.MuxTools
+module Wanxiangshu.Methodology.MuxTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Methodology.SchemaCommon
-open VibeFs.Methodology.Args
-open VibeFs.Methodology.Registry
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.HostTools
-open VibeFs.Mux.Delegate
-open VibeFs.Mux.SubagentTools
-open VibeFs.Mux.Wrappers
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.Args
+open Wanxiangshu.Methodology.Registry
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Mux.Delegate
+open Wanxiangshu.Mux.SubagentTools
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Shell.Dyn
 
 let private fieldProperty (f: MethodologyField) : string * obj =
     let desc = f.description

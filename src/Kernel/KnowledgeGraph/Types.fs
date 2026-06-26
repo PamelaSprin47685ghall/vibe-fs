@@ -1,4 +1,4 @@
-module VibeFs.Kernel.KnowledgeGraph.Types
+module Wanxiangshu.Kernel.KnowledgeGraph.Types
 
 open System
 

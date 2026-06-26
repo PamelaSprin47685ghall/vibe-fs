@@ -1,10 +1,10 @@
-module VibeFs.Omp.MessagingCodec
+module Wanxiangshu.Omp.MessagingCodec
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Messaging
-open VibeFs.Shell.Dyn
-module Dyn = VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private toObjArray (value: obj) : obj array =
     if Dyn.isNullish value || not (Dyn.isArray value) then [||]
@@ -153,7 +153,7 @@ let extractHistoryTexts (messages: Message<obj> list) : string list =
         | ToolPart(_, _, Some state, _) -> state.output
         | _ -> "")
 
-open VibeFs.Omp.MessagingCodecEncode
+open Wanxiangshu.Omp.MessagingCodecEncode
 
 let encodeMessage = MessagingCodecEncode.encodeMessage
 let encodeMessages = MessagingCodecEncode.encodeMessages

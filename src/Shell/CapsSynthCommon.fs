@@ -1,7 +1,7 @@
-module VibeFs.Shell.CapsSynthCommon
+module Wanxiangshu.Shell.CapsSynthCommon
 
-open VibeFs.Kernel.CapsPrelude
-open VibeFs.Kernel.CapsSynthPolicy
+open Wanxiangshu.Kernel.CapsPrelude
+open Wanxiangshu.Kernel.CapsSynthPolicy
 
 let hasExistingCapsMessages (messageId: obj -> string) (messages: obj array) : bool =
     if messages.Length = 0 then false

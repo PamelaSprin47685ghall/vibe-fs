@@ -1,6 +1,6 @@
-module VibeFs.Shell.DynField
+module Wanxiangshu.Shell.DynField
 
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 let hasField (a: obj) (k: string) : bool = Dyn.has a k
 

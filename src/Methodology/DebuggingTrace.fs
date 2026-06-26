@@ -1,6 +1,6 @@
-module VibeFs.Methodology.DebuggingTrace
+module Wanxiangshu.Methodology.DebuggingTrace
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

@@ -1,16 +1,16 @@
-module VibeFs.Tests.IntegrationMuxToolSpecsRead
+module Wanxiangshu.Tests.IntegrationMuxToolSpecsRead
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.TempWorkspace
-open VibeFs.Tests.IntegrationToolSetup
-open VibeFs.Tests.IntegrationMuxSetup
-open VibeFs.Kernel.Executor
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Kernel.HostTools
-open VibeFs.Mux.Plugin
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.IntegrationMuxSetup
+open Wanxiangshu.Kernel.Executor
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Shell.Dyn
 
 let muxExecutorRoCatPrependsWarningSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-executor-ro-warning-"

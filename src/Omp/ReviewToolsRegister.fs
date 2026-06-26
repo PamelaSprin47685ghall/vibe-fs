@@ -1,21 +1,21 @@
-module VibeFs.Omp.ReviewToolsRegister
+module Wanxiangshu.Omp.ReviewToolsRegister
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Kernel.ReviewSession
-open VibeFs.Kernel.ReviewSession.Types
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Omp.Codec
-open VibeFs.Omp.OmpToolSchema
-open VibeFs.Omp.ReviewLoop
-open VibeFs.Omp.ReviewToolsLoop
-open VibeFs.Omp.Schema
-open VibeFs.Shell.DynField
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Shell.ReviewRuntime
+open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.ReviewSession
+open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.OmpToolSchema
+open Wanxiangshu.Omp.ReviewLoop
+open Wanxiangshu.Omp.ReviewToolsLoop
+open Wanxiangshu.Omp.Schema
+open Wanxiangshu.Shell.DynField
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ReviewRuntime
 
-let private optBool = VibeFs.Shell.DynField.optBool
+let private optBool = Wanxiangshu.Shell.DynField.optBool
 
 let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
     let tb = Dyn.get pi "typebox"
@@ -77,12 +77,12 @@ let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
                         match getSessionIdFromContext ctx with
                         | None -> return errorResult "No pending review to resolve."
                         | Some sessionId ->
-                            match VibeFs.Kernel.ReviewVerdict.parseVerdict (Dyn.str params' "verdict") with
+                            match Wanxiangshu.Kernel.ReviewVerdict.parseVerdict (Dyn.str params' "verdict") with
                             | None -> return textResult reviewerNudgePrompt
-                            | Some VibeFs.Kernel.ReviewVerdict.Pass ->
+                            | Some Wanxiangshu.Kernel.ReviewVerdict.Pass ->
                                 if not (store.resolvePendingReview(sessionId, Accepted)) then return errorResult "No pending review to resolve."
                                 else return { textResult "Review submitted: accepted." with display = Some false }
-                            | Some VibeFs.Kernel.ReviewVerdict.Reject ->
+                            | Some Wanxiangshu.Kernel.ReviewVerdict.Reject ->
                                 let fb = (Dyn.str params' "feedback").Trim()
                                 if fb = "" then return textResult reviewerNudgePrompt
                                 elif not (store.resolvePendingReview(sessionId, Rejected fb)) then return errorResult "No pending review to resolve."

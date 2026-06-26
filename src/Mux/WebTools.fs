@@ -1,28 +1,28 @@
-module VibeFs.Mux.WebTools
+module Wanxiangshu.Mux.WebTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Shell
-open VibeFs.Shell.PromiseStr
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.PromiseStr
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.SearchPrompts
-open VibeFs.Shell.WebSearchCodec
-open VibeFs.Shell.WebToolsCodec
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.ToolCopy
-open VibeFs.Kernel.ToolResult
-open VibeFs.Mux.BuiltinTools
-open VibeFs.Mux.Delegate
-open VibeFs.Mux.SubagentTools
-open VibeFs.Mux.Wrappers
-open VibeFs.Shell.WebSearchApi
-open VibeFs.Shell.ToolExecute
-open VibeFs.Shell.ToolRuntimeContext
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.SearchPrompts
+open Wanxiangshu.Shell.WebSearchCodec
+open Wanxiangshu.Shell.WebToolsCodec
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.ToolCopy
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Mux.BuiltinTools
+open Wanxiangshu.Mux.Delegate
+open Wanxiangshu.Mux.SubagentTools
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Shell.WebSearchApi
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Shell.Dyn
 
 let websearchTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = "websearch"

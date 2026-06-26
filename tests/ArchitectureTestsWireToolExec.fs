@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsWireToolExec
+module Wanxiangshu.Tests.ArchitectureTestsWireToolExec
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let toolExecuteWireHelperExists () =
     let code = requireFile "src/Shell/ToolExecute.fs" |> nonCommentCode

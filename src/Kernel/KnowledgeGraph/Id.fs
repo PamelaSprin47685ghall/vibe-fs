@@ -1,7 +1,7 @@
-module VibeFs.Kernel.KnowledgeGraph.Id
+module Wanxiangshu.Kernel.KnowledgeGraph.Id
 
 open System.Text.RegularExpressions
-open VibeFs.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
 
 let private idRe = Regex("^[0-9a-f]{4}$")
 

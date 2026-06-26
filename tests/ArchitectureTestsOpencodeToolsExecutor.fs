@@ -1,7 +1,7 @@
-module VibeFs.Tests.ArchitectureTestsOpencodeToolsExecutor
+module Wanxiangshu.Tests.ArchitectureTestsOpencodeToolsExecutor
 
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let opencodeExecutorUsesToolCopy () =
     let code = requireFile "src/Opencode/ExecutorTool.fs" |> nonCommentCode

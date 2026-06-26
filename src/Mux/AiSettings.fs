@@ -1,16 +1,16 @@
-module VibeFs.Mux.AiSettings
-open VibeFs.Kernel.Domain
+module Wanxiangshu.Mux.AiSettings
+open Wanxiangshu.Kernel.Domain
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
-open VibeFs.Shell.DelegatedAiSettings
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.MuxAiSettingsCodec
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.DelegatedAiSettings
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.MuxAiSettingsCodec
 
-type DelegatedAiSettings = VibeFs.Shell.DelegatedAiSettings.DelegatedAiSettings
-let emptySettings = VibeFs.Shell.DelegatedAiSettings.emptySettings
+type DelegatedAiSettings = Wanxiangshu.Shell.DelegatedAiSettings.DelegatedAiSettings
+let emptySettings = Wanxiangshu.Shell.DelegatedAiSettings.emptySettings
 
 let private loadConfigOrDefault (deps: obj) : obj = deps?loadConfigOrDefault()
 

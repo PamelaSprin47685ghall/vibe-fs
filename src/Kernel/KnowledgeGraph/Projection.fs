@@ -1,8 +1,10 @@
-module VibeFs.Kernel.KnowledgeGraph.Projection
+module Wanxiangshu.Kernel.KnowledgeGraph.Projection
 
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.Id
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.Id
 
 let private truncateTo (s: string) (max: int) = if s.Length > max then s.[.. max - 1] + "..." else s
 
@@ -26,7 +28,7 @@ let buildPreludeSection (projection: KnowledgeGraphProjection) : string option =
             |> List.collect (fun (_, e) -> e.entity)
             |> normalizeEntities
             |> List.sort
-            |> List.map (fun e -> "  - " + yamlStringValue (truncateTo e 160))
+            |> List.map (fun e -> box (truncateTo e 160))
         Some(
             frontMatterPrompt
                 [ yamlSeqField "knowledge_graph" entities ]

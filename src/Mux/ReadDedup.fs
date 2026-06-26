@@ -1,42 +1,42 @@
-module VibeFs.Mux.ReadDedup
+module Wanxiangshu.Mux.ReadDedup
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Dedup
-open VibeFs.Kernel.ToolOutputInfo
-open VibeFs.Kernel.MessageDedup
-open VibeFs.Shell.TreeSitterShell
+open Wanxiangshu.Kernel.Dedup
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.MessageDedup
+open Wanxiangshu.Shell.TreeSitterShell
 
 let collectReadOutputs (messages: obj array) : string[] =
-    VibeFs.Shell.ReadDedupMuxPlugin.collectReadOutputs messages
+    Wanxiangshu.Shell.ReadDedupMuxPlugin.collectReadOutputs messages
 
 let collectReadOutputsByPath (messages: obj array) : Map<string, string list> =
-    VibeFs.Shell.ReadDedupMuxPlugin.collectReadOutputsByPath messages
+    Wanxiangshu.Shell.ReadDedupMuxPlugin.collectReadOutputsByPath messages
 
 let deduplicateReadOutputsWithSeenByPath
     (seenByPath: Map<string, string list>)
     (messages: obj array)
     : obj[] =
-    VibeFs.Shell.ReadDedupMuxPlugin.deduplicateReadOutputsWithSeenByPath seenByPath messages
+    Wanxiangshu.Shell.ReadDedupMuxPlugin.deduplicateReadOutputsWithSeenByPath seenByPath messages
 
 let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : obj[] =
-    VibeFs.Shell.ReadDedupMuxPlugin.deduplicateReadOutputsWithSeen seenOutputs messages
+    Wanxiangshu.Shell.ReadDedupMuxPlugin.deduplicateReadOutputsWithSeen seenOutputs messages
 
 let private readToolNames = Set.ofList [ "read"; "file_read" ]
 
 type private ReadHit = { msgIndex: int; partIndex: int; payload: ReadPayload }
 
 let private tryReadContent (output: obj) : string option =
-    if VibeFs.Shell.Dyn.isNullish output then None
-    elif VibeFs.Shell.Dyn.typeIs output "string" then
+    if Wanxiangshu.Shell.Dyn.isNullish output then None
+    elif Wanxiangshu.Shell.Dyn.typeIs output "string" then
         let s = string output
         if s = "" then None else Some s
     else
-        let s = VibeFs.Shell.Dyn.str output "content"
+        let s = Wanxiangshu.Shell.Dyn.str output "content"
         if s = "" then None else Some s
 
 let private tryPath (input: obj) : string =
-    if VibeFs.Shell.Dyn.isNullish input then ""
+    if Wanxiangshu.Shell.Dyn.isNullish input then ""
     else
         match extractFilePaths input with
         | path :: _ -> path
@@ -44,15 +44,15 @@ let private tryPath (input: obj) : string =
 
 
 let private decodeModelReadPart (part: obj) : ReadPayload option =
-    if VibeFs.Shell.Dyn.str part "type" <> "tool-result" then None
-    elif not (Set.contains (VibeFs.Shell.Dyn.str part "toolName") readToolNames) then None
+    if Wanxiangshu.Shell.Dyn.str part "type" <> "tool-result" then None
+    elif not (Set.contains (Wanxiangshu.Shell.Dyn.str part "toolName") readToolNames) then None
     else
-        let output = VibeFs.Shell.Dyn.get part "output"
-        if VibeFs.Shell.Dyn.isNullish output then None
+        let output = Wanxiangshu.Shell.Dyn.get part "output"
+        if Wanxiangshu.Shell.Dyn.isNullish output then None
         else
-            let outputType = VibeFs.Shell.Dyn.str output "type"
-            let outputValue = VibeFs.Shell.Dyn.get output "value"
-            if VibeFs.Shell.Dyn.isNullish outputValue then None
+            let outputType = Wanxiangshu.Shell.Dyn.str output "type"
+            let outputValue = Wanxiangshu.Shell.Dyn.get output "value"
+            if Wanxiangshu.Shell.Dyn.isNullish outputValue then None
             else
                 let content =
                     if outputType = "text" then string outputValue
@@ -63,16 +63,16 @@ let private decodeModelReadPart (part: obj) : ReadPayload option =
                     else ""
                 if content = "" then None
                 else
-                    let path = tryPath (VibeFs.Shell.Dyn.get part "input")
+                    let path = tryPath (Wanxiangshu.Shell.Dyn.get part "input")
                     Some { path = path; content = content }
 
 let private collectModelReadHits (messages: obj array) : ReadHit list =
     messages
     |> Array.mapi (fun i msg ->
-        if VibeFs.Shell.Dyn.isNullish msg then [||]
+        if Wanxiangshu.Shell.Dyn.isNullish msg then [||]
         else
-            let content = VibeFs.Shell.Dyn.get msg "content"
-            if VibeFs.Shell.Dyn.isNullish content || not (VibeFs.Shell.Dyn.isArray content) then [||]
+            let content = Wanxiangshu.Shell.Dyn.get msg "content"
+            if Wanxiangshu.Shell.Dyn.isNullish content || not (Wanxiangshu.Shell.Dyn.isArray content) then [||]
             else
                 (content :?> obj array)
                 |> Array.mapi (fun j part ->
@@ -94,8 +94,8 @@ let private applyModelDedupToMessages (messages: obj array) (hits: ReadHit list)
             match List.tryFind (fun (idx, _) -> idx = i) msgGroups with
             | None -> msg
             | Some (_, hitsInMsg) ->
-                let contentObj = VibeFs.Shell.Dyn.get msg "content"
-                if VibeFs.Shell.Dyn.isNullish contentObj || not (VibeFs.Shell.Dyn.isArray contentObj) then msg
+                let contentObj = Wanxiangshu.Shell.Dyn.get msg "content"
+                if Wanxiangshu.Shell.Dyn.isNullish contentObj || not (Wanxiangshu.Shell.Dyn.isArray contentObj) then msg
                 else
                     let content = contentObj :?> obj array
                     let newContent =
@@ -105,8 +105,8 @@ let private applyModelDedupToMessages (messages: obj array) (hits: ReadHit list)
                             | None -> part
                             | Some _ ->
                                 let newOutput = createObj [ "type", box "text"; "value", box (noChangeEnvelope ()) ]
-                                VibeFs.Shell.Dyn.withKey part "output" (box newOutput))
-                    VibeFs.Shell.Dyn.withKey msg "content" (box newContent))
+                                Wanxiangshu.Shell.Dyn.withKey part "output" (box newOutput))
+                    Wanxiangshu.Shell.Dyn.withKey msg "content" (box newContent))
 
 let deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj[] =
     let hits = collectModelReadHits messages

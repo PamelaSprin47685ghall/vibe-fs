@@ -1,8 +1,8 @@
-module VibeFs.Kernel.KnowledgeGraph.JobTesting
+module Wanxiangshu.Kernel.KnowledgeGraph.JobTesting
 
 open System
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
 
 let private readRequiredField (readField: string -> string) (fieldName: string) : string =
     let value = readField fieldName

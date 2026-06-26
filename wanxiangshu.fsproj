@@ -7,6 +7,7 @@
     <Compile Include="src/Kernel/HostTools.fs" />
     <Compile Include="src/Kernel/OmpSessionTools.fs" />
     <Compile Include="src/Kernel/SubagentIntents.fs" />
+    <Compile Include="src/Kernel/Yaml.fs" />
     <Compile Include="src/Kernel/PromptFrontMatter.fs" />
     <Compile Include="src/Kernel/ToolOutputInfoTypes.fs" />
     <Compile Include="src/Kernel/ToolOutputInfoParse.fs" />

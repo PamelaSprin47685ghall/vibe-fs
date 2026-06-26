@@ -1,4 +1,4 @@
-module VibeFs.Kernel.ToolCatalog.Classification
+module Wanxiangshu.Kernel.ToolCatalog.Classification
 
 let private fileEditToolNames =
     Set.ofList

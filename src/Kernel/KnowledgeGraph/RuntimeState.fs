@@ -1,8 +1,8 @@
-module VibeFs.Kernel.KnowledgeGraph.RuntimeState
+module Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
 
 open System
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
 
 type BookkeeperLaunch =
     { agent: string

@@ -1,6 +1,6 @@
-module VibeFs.Shell.WebFetch
+module Wanxiangshu.Shell.WebFetch
 
-open VibeFs.Kernel.WebFetchGuard
+open Wanxiangshu.Kernel.WebFetchGuard
 
 /// OMP / Ollama webfetch SSRF gate — pure URL parse, no network.
 let validateFetchUrlForOmp (url: string) : string option =

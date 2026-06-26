@@ -1,30 +1,30 @@
-module VibeFs.Omp.MessageTransform
+module Wanxiangshu.Omp.MessageTransform
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.Config
-open VibeFs.Kernel.HostTools
-open VibeFs.Omp.Codec
-open VibeFs.Kernel.BacklogProjection
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.MessageTransformPolicy
-open VibeFs.Omp.CapsCodec
-open VibeFs.Omp.ChildSession
-open VibeFs.Omp.KnowledgeGraph.Runtime
-open VibeFs.Omp.MagicTodo
-open VibeFs.Omp.MessagingCodec
-open VibeFs.Omp.ReadDedup
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.FileSys
-open VibeFs.Shell.MessageTransformCore
-open VibeFs.Shell.MessageTransformHostEntry
-open VibeFs.Shell.MessageTransformPipeline
-open VibeFs.Shell.OmpCaps
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Shell.TreeSitterShell
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Kernel.BacklogProjection
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.MessageTransformPolicy
+open Wanxiangshu.Omp.CapsCodec
+open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Omp.KnowledgeGraph.Runtime
+open Wanxiangshu.Omp.MagicTodo
+open Wanxiangshu.Omp.MessagingCodec
+open Wanxiangshu.Omp.ReadDedup
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.FileSys
+open Wanxiangshu.Shell.MessageTransformCore
+open Wanxiangshu.Shell.MessageTransformHostEntry
+open Wanxiangshu.Shell.MessageTransformPipeline
+open Wanxiangshu.Shell.OmpCaps
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.TreeSitterShell
 
-module Dyn = VibeFs.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private defaultBacklogSession = BacklogSession omp
 
@@ -56,7 +56,8 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (kgRuntime: OmpKno
                     Excluded = excluded
                     Cleaned = cleaned
                 }
-                let replayTexts () = extractHistoryTexts messagesList |> Seq.ofList
+                let replayTexts () : JS.Promise<string seq> =
+                    Promise.lift (extractHistoryTexts messagesList |> Seq.ofList)
                 let dedupFn excluded encoded =
                     if excluded then encoded
                     else

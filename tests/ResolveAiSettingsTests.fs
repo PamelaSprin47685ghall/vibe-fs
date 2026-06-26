@@ -1,10 +1,10 @@
-module VibeFs.Tests.ResolveAiSettingsTests
+module Wanxiangshu.Tests.ResolveAiSettingsTests
 
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
+open Wanxiangshu.Tests.Assert
 
-open VibeFs.Mux.AiSettings
-open VibeFs.Shell.MuxAiSettingsCodec
+open Wanxiangshu.Mux.AiSettings
+open Wanxiangshu.Shell.MuxAiSettingsCodec
 
 let private settingsEqual (label: string) (expectedModel: string option) (expectedThinking: string option) (actual: DelegatedAiSettings) =
     equal $"{label} model" expectedModel actual.modelString

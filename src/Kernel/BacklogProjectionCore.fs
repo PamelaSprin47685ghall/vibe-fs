@@ -1,8 +1,10 @@
-module VibeFs.Kernel.BacklogProjectionCore
+module Wanxiangshu.Kernel.BacklogProjectionCore
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.PromptFrontMatter
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 let todoWriteToolNameFor (host: Host) : string = todoWriteToolName host
 let todoWriteToolNameDefault = todoWriteToolNameFor opencode
@@ -40,28 +42,14 @@ let isReviewTool (part: Part<'raw>) : bool =
     | ToolPart(toolName, _, _, _) when toolName = reviewToolName -> true
     | _ -> false
 
-let private indentBlock (text: string) : string =
-    text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
-    |> Array.map (fun line -> "      " + line)
-    |> String.concat "\n"
+let private completedWorkItem (userPrompts: string list) (entry: BacklogEntry) : obj =
+    let userMsgField =
+        if userPrompts.IsEmpty then box [||]
+        else box (userPrompts |> List.map (fun text -> box (text.Trim())) |> List.toArray)
+    createObj [ "user_message", userMsgField; "completed_work", box (entry.report.Trim()) ]
 
-let private renderUserMessages (userPrompts: string list) : string =
-    if userPrompts.IsEmpty then
-        "  user_message: []"
-    else
-        "  user_message:\n"
-        + (userPrompts
-           |> List.map (fun text -> "    - |\n" + indentBlock (text.Trim()))
-           |> String.concat "\n")
-
-let private renderCompletedWorkEntry (userPrompts: string list) (report: BacklogEntry) : string =
-    "-\n"
-    + renderUserMessages userPrompts
-    + "\n  completed_work: |\n"
-    + indentBlock (report.report.Trim())
-
-let private projectionFrontMatter (backlog: BacklogEntry list) (userPrompts: string list) : string list =
-    backlog |> List.map (renderCompletedWorkEntry userPrompts)
+let private projectionRootValue (backlog: BacklogEntry list) (userPrompts: string list) : obj =
+    box (backlog |> List.map (completedWorkItem userPrompts) |> List.toArray)
 
 let private projectionBody (errorNotice: string option) : string =
     let baseText = "Completed work from folded turns. File changes are already on disk."
@@ -71,7 +59,7 @@ let private projectionBody (errorNotice: string option) : string =
     | _ -> baseText
 
 let buildBacklogTextWithError (backlog: BacklogEntry list) (userPrompts: string list) (errorNotice: string option) : string =
-    frontMatterPrompt (projectionFrontMatter backlog userPrompts) (projectionBody errorNotice)
+    frontMatterPromptRoot (projectionRootValue backlog userPrompts) (projectionBody errorNotice)
 
 let buildBacklogText (backlog: BacklogEntry list) (userPrompts: string list) : string =
     buildBacklogTextWithError backlog userPrompts None

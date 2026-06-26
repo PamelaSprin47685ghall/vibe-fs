@@ -1,22 +1,22 @@
-module VibeFs.Opencode.Tools
+module Wanxiangshu.Opencode.Tools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.HostTools
-open VibeFs.Opencode.ToolSchema
-open VibeFs.Opencode.KnowledgeGraphTools
-open VibeFs.Opencode.SubagentTools
-open VibeFs.Opencode.ExecutorTool
-open VibeFs.Opencode.SearchTools
-open VibeFs.Opencode.ReviewTools
-open VibeFs.Opencode.MimoTodoTool
-open VibeFs.Methodology.OpencodeTools
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.RuntimeScope
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Opencode.ToolSchema
+open Wanxiangshu.Opencode.KnowledgeGraphTools
+open Wanxiangshu.Opencode.SubagentTools
+open Wanxiangshu.Opencode.ExecutorTool
+open Wanxiangshu.Opencode.SearchTools
+open Wanxiangshu.Opencode.ReviewTools
+open Wanxiangshu.Opencode.MimoTodoTool
+open Wanxiangshu.Methodology.OpencodeTools
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell.RuntimeScope
 
-let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (knowledgeGraphRuntime: VibeFs.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphEnabled: bool) (sessionScope: RuntimeScope) : obj =
+let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (knowledgeGraphRuntime: Wanxiangshu.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphEnabled: bool) (sessionScope: RuntimeScope) : obj =
     let iteratorStore = sessionScope.IteratorStore
     let tools =
         createObj [

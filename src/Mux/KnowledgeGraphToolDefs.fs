@@ -1,23 +1,23 @@
-module VibeFs.Mux.KnowledgeGraphToolDefs
+module Wanxiangshu.Mux.KnowledgeGraphToolDefs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.ToolResult
-open VibeFs.Shell
-open VibeFs.Shell.PromiseStr
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.PromiseStr
 
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Mux.Wrappers
-open VibeFs.Mux.KnowledgeGraphRuntimeMux
-open VibeFs.Mux.KnowledgeGraphRuntimeMuxSubmit
-open VibeFs.Mux.KnowledgeGraphRuntimeMuxQuery
-open VibeFs.Shell.KnowledgeGraphFiles
-open VibeFs.Shell.KnowledgeGraphToolsCodec
-open VibeFs.Shell.ToolExecute
-open VibeFs.Shell.ToolRuntimeContext
-open VibeFs.Shell.ToolContextCodec
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Mux.Wrappers
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMuxSubmit
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMuxQuery
+open Wanxiangshu.Shell.KnowledgeGraphFiles
+open Wanxiangshu.Shell.KnowledgeGraphToolsCodec
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Shell.ToolContextCodec
 
 let private knowledgeGraphDraftEntrySchema : obj =
     createObj
@@ -49,7 +49,7 @@ let knowledgeGraphFetchTool (kgRuntime: MuxKnowledgeGraphRuntime) : ToolDefiniti
                   | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
                   | Ok runtime ->
                       kgRuntime.FetchFromSessionSnapshot(
-                          VibeFs.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId,
+                          Wanxiangshu.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId,
                           runtime.Execution.Directory,
                           entity)
       condition =
@@ -77,7 +77,7 @@ let returnBookkeeperTool (kgRuntime: MuxKnowledgeGraphRuntime) : ToolDefinition 
                   | Error e -> resolveStr (wireDecodeFailure "return_bookkeeper" e)
                   | Ok drafts ->
                       kgRuntime.Submit(
-                          VibeFs.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId,
+                          Wanxiangshu.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId,
                           runtime.Execution.Directory,
                           drafts,
                           config)

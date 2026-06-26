@@ -1,38 +1,38 @@
-module VibeFs.Mux.MessageTransform
+module Wanxiangshu.Mux.MessageTransform
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.CapsFormat
-open VibeFs.Shell.MessageTransformCore
-open VibeFs.Shell.MessageTransformHostEntry
-open VibeFs.Shell.MessageTransformHostHooks
-open VibeFs.Shell.MessageTransformPipeline
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraph.RuntimeState
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Methodology
-open VibeFs.Kernel.MessageTransformPolicy
-open VibeFs.Mux.KnowledgeGraphRuntimeMux
-open VibeFs.Mux.KnowledgeGraphRuntimeMuxQuery
-open VibeFs.Mux.MessagingCodec
-open VibeFs.Shell.ReadDedupMuxPlugin
-open VibeFs.Mux.BacklogSession
-open VibeFs.Mux.CapsCodec
-open VibeFs.Shell.ReviewRuntime
-open VibeFs.Shell.JsArrayMutate
-open VibeFs.Shell.MessageTransformCommon
-open VibeFs.Shell.MuxHookInputCodec
-open VibeFs.Shell.MuxWorkspaceCodec
-open VibeFs.Shell.ChatTransformOutputCodec
+open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Shell.MessageTransformCore
+open Wanxiangshu.Shell.MessageTransformHostEntry
+open Wanxiangshu.Shell.MessageTransformHostHooks
+open Wanxiangshu.Shell.MessageTransformPipeline
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.KnowledgeGraph
+open Wanxiangshu.Kernel.KnowledgeGraph.Types
+open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.MessageTransformPolicy
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMuxQuery
+open Wanxiangshu.Mux.MessagingCodec
+open Wanxiangshu.Shell.ReadDedupMuxPlugin
+open Wanxiangshu.Mux.BacklogSession
+open Wanxiangshu.Mux.CapsCodec
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.JsArrayMutate
+open Wanxiangshu.Shell.MessageTransformCommon
+open Wanxiangshu.Shell.MuxHookInputCodec
+open Wanxiangshu.Shell.MuxWorkspaceCodec
+open Wanxiangshu.Shell.ChatTransformOutputCodec
 
 let messagesTransform
     (deps: obj)
-    (runtimeScope: VibeFs.Shell.RuntimeScope.RuntimeScope)
+    (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
     (backlogSession: BacklogSession)
     (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
     (reviewStore: ReviewStore)
@@ -60,7 +60,8 @@ let messagesTransform
                     Excluded = excluded
                     Cleaned = cleanedMessages
                 }
-                let replayTexts () = extractTextsFromEncodedMessages messagesArr
+                let replayTexts () : JS.Promise<string seq> =
+                    Promise.lift (extractTextsFromEncodedMessages messagesArr)
                 let dedupFn excluded encoded =
                     if excluded then encoded else deduplicateReadOutputsWithSeenByPath Map.empty encoded
                 let loadCaps () =
@@ -72,7 +73,7 @@ let messagesTransform
                     runHostMessagesTransform
                         reviewStore
                         sessionID
-                        Always
+                        IfStoreEmpty
                         replayTexts
                         plan
                         backlogOps

@@ -1,7 +1,7 @@
-module VibeFs.Tests.ArchitectureTestsOpencodeTools
+module Wanxiangshu.Tests.ArchitectureTestsOpencodeTools
 
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let opencodeToolSchemaDescriptionsFromCatalog () =
     let code = requireFile "src/Opencode/ToolSchema.fs" |> nonCommentCode
@@ -40,7 +40,7 @@ let opencodeKgUsesKnowledgeGraphToolsCodec () =
     check "arch: Opencode KnowledgeGraphTools opens KnowledgeGraphToolsCodec" (code.Contains "KnowledgeGraphToolsCodec")
     check "arch: Opencode KnowledgeGraphTools uses decodeFetchEntity" (code.Contains "decodeFetchEntity")
     check "arch: Opencode KnowledgeGraphTools uses decodeReturnBookkeeperArgs" (code.Contains "decodeReturnBookkeeperArgs")
-    check "arch: Opencode KnowledgeGraphTools must not open Dyn" (not (code.Contains "open VibeFs.Shell.Dyn"))
+    check "arch: Opencode KnowledgeGraphTools must not open Dyn" (not (code.Contains "open Wanxiangshu.Shell.Dyn"))
     check "arch: Opencode KnowledgeGraphTools must not Dyn.get args entries" (not (code.Contains "Dyn.get args \"entries\""))
     check "arch: Opencode KnowledgeGraphTools must not parseDraftArray" (not (code.Contains "parseDraftArray"))
     check "arch: Opencode KnowledgeGraphTools fetch must not Dyn.str args entity" (not (code.Contains "Dyn.str args \"entity\""))

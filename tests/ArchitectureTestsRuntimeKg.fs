@@ -1,9 +1,9 @@
-module VibeFs.Tests.ArchitectureTestsRuntimeKg
+module Wanxiangshu.Tests.ArchitectureTestsRuntimeKg
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.ArchitectureTestsSupport
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let knowledgeGraphRuntimeUsesWorkflow () =
     let opencode = requireFile "src/Opencode/KnowledgeGraphRuntime.fs" |> nonCommentCode

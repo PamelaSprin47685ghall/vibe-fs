@@ -1,14 +1,14 @@
-module VibeFs.Omp.OmpToolSchema
+module Wanxiangshu.Omp.OmpToolSchema
 
 open Fable.Core.JsInterop
-open VibeFs.Kernel.WorkBacklog
-open VibeFs.Kernel.Methodology
-open VibeFs.Kernel.SubagentIntents
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Omp.Schema
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Omp.Schema
+open Wanxiangshu.Methodology.SchemaCommon
 
-module Params = VibeFs.Kernel.ToolCatalog.Params
+module Params = Wanxiangshu.Kernel.ToolCatalog.Params
 
 let private methodologyField (f: MethodologyField) (tb: obj) : string * obj =
     match f.kind, f.required, f.minArrayItems with

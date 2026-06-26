@@ -1,45 +1,45 @@
-module VibeFs.Opencode.SearchTools
+module Wanxiangshu.Opencode.SearchTools
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell
 
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.FuzzyPath
-open VibeFs.Kernel.FuzzyQuery
-open VibeFs.Kernel.FuzzyFormat
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.SearchPrompts
-open VibeFs.Shell.WebSearchCodec
-open VibeFs.Shell.WebToolsCodec
-open VibeFs.Shell.ToolRuntimeContext
-open VibeFs.Kernel.Subagent
-open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.ToolCopy
-open VibeFs.Kernel.ToolResult
-open VibeFs.Shell.WebSearchApi
-open VibeFs.Opencode.ToolSchema
-open VibeFs.Opencode.SessionIo
-open VibeFs.Opencode.ToolHelpers
-open VibeFs.Shell.PromiseStr
-open VibeFs.Shell.ChildAgentRegistry
-open VibeFs.Shell.SubagentToolExecute
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Shell.FuzzySearch
-open VibeFs.Shell.FuzzyToolsCodec
-open VibeFs.Shell.ToolExecute
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.OpencodeClientCodec
-module ToolSchemaModule = VibeFs.Opencode.ToolSchema
-module FuzzyCommandsModule = VibeFs.Shell.FuzzySearch
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.FuzzyPath
+open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Kernel.FuzzyFormat
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.SearchPrompts
+open Wanxiangshu.Shell.WebSearchCodec
+open Wanxiangshu.Shell.WebToolsCodec
+open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.ToolCopy
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Shell.WebSearchApi
+open Wanxiangshu.Opencode.ToolSchema
+open Wanxiangshu.Opencode.SessionIo
+open Wanxiangshu.Opencode.ToolHelpers
+open Wanxiangshu.Shell.PromiseStr
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.SubagentToolExecute
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell.FuzzySearch
+open Wanxiangshu.Shell.FuzzyToolsCodec
+open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.OpencodeClientCodec
+module ToolSchemaModule = Wanxiangshu.Opencode.ToolSchema
+module FuzzyCommandsModule = Wanxiangshu.Shell.FuzzySearch
 
 let private addIfSome (entries: ResizeArray<string * obj>) (key: string) (v: 'T option) =
     match v with
     | Some x -> entries.Add(key, box x)
     | None -> ()
 
-let private buildFuzzyTool (description: string) (args: obj) (toolName: string) (decode: obj -> Result<'P, DomainError>) (execute: 'P -> SearchOptions -> JS.Promise<SearchOutcome>) (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
+let private buildFuzzyTool (description: string) (args: obj) (toolName: string) (decode: obj -> Result<'P, DomainError>) (execute: 'P -> SearchOptions -> JS.Promise<SearchOutcome>) (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
     define description
         args
         (fun args context ->
@@ -60,7 +60,7 @@ let private buildFuzzyTool (description: string) (args: obj) (toolName: string) 
                         return r.output
                     })
 
-let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
+let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
     buildFuzzyTool
         ToolSchemaModule.fuzzyFind
         (box {| pattern = strMinNullish 1 Params.fuzzyFindPattern; path = strOpt Params.fuzzyFindPath
@@ -71,11 +71,11 @@ let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyI
         finderCache
         iteratorStore
 
-let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
+let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
     buildFuzzyTool
         ToolSchemaModule.fuzzyGrep
         (box {| pattern = strMinNullish 1 Params.fuzzyGrepPattern; path = strOpt Params.fuzzyGrepPath
-                exclude = excludeOpt Params.fuzzyGrepExclude; caseSensitive = boolOpt Params.fuzzyGrepCaseSensitive
+                exclude = excludeOpt Params.fuzzyGrepExclude; caseSensitive = boolOptional Params.fuzzyGrepCaseSensitive
                 context = intMinNullish 0 Params.fuzzyGrepContext; limit = intMinNullish 1 Params.fuzzyGrepLimit
                 iterator = strOpt Params.fuzzyGrepIterator |})
         "fuzzy_grep"
@@ -117,7 +117,7 @@ let websearchTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =
 let webfetchTool (ctx: obj) : obj =
     define webfetch
         (box {| url = strReq Params.webfetchUrl
-                extract_main = boolOpt Params.webfetchExtractMain
+                extract_main = boolOptional Params.webfetchExtractMain
                 prefer_llms_txt = enumOpt [| "auto"; "always"; "never" |] Params.webfetchPreferLlmsTxt
                 prompt = strOpt Params.webfetchPrompt
                 timeout = numOpt Params.webfetchTimeout |})

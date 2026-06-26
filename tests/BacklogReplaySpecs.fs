@@ -1,18 +1,18 @@
-module VibeFs.Tests.BacklogReplaySpecs
+module Wanxiangshu.Tests.BacklogReplaySpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.BacklogMessageBuilders
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.BacklogProjection
-open VibeFs.Opencode.BacklogSession
-open VibeFs.Shell.RuntimeScope
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.BacklogMessageBuilders
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.BacklogProjection
+open Wanxiangshu.Opencode.BacklogSession
+open Wanxiangshu.Shell.RuntimeScope
 
-open VibeFs.Tests.BacklogReplaySpecsMimocode
-open VibeFs.Tests.BacklogReplaySpecsFold
+open Wanxiangshu.Tests.BacklogReplaySpecsMimocode
+open Wanxiangshu.Tests.BacklogReplaySpecsFold
 
 let private scope () = create ()
 

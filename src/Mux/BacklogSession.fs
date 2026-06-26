@@ -1,11 +1,11 @@
-module VibeFs.Mux.BacklogSession
+module Wanxiangshu.Mux.BacklogSession
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.WorkBacklog
-open VibeFs.Kernel.Messaging
-open VibeFs.Shell.BacklogSessionCodec
-open VibeFs.Shell.RuntimeScope
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell.BacklogSessionCodec
+open Wanxiangshu.Shell.RuntimeScope
 
 type BacklogSession(scope: RuntimeScope) =
     let projection = scope.Projection

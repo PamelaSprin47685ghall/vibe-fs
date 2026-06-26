@@ -1,6 +1,6 @@
-module VibeFs.Kernel.Nudge.Coordinator
+module Wanxiangshu.Kernel.Nudge.Coordinator
 
-open VibeFs.Kernel.Nudge
+open Wanxiangshu.Kernel.Nudge
 
 /// Per-session dedup state: the last non-none action and the assistant message
 /// it was fired against.  Suppress only when BOTH repeat — overlapping events

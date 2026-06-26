@@ -1,8 +1,8 @@
-module VibeFs.Kernel.ReviewPrompts.Submission
+module Wanxiangshu.Kernel.ReviewPrompts.Submission
 
-open VibeFs.Kernel.LoopMessages
-open VibeFs.Kernel.PromptFrontMatter
-open VibeFs.Kernel.ReviewPrompts.Instructions
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.ReviewPrompts.Instructions
 
 let doubleCheckChallenge =
     "Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
@@ -15,7 +15,7 @@ let doubleCheckPrompt (task: string) : string =
          @ taskLine)
         "If you insist on PASS, otherwise please REJECT with detailed feedback."
 
-let private reviewerPromptFrontMatter (fields: string list) : string list =
+let private reviewerPromptFrontMatter (fields: FrontMatterField list) : FrontMatterField list =
     [ yamlField "role" "reviewer" ] @ fields
 
 let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) : string =
@@ -35,7 +35,7 @@ let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) 
 
     frontMatterPrompt (taskLine @ filesLine) body
 
-let private reviewSubmissionFields (task: string) (report: string) (affectedFiles: string list) : string list =
+let private reviewSubmissionFields (task: string) (report: string) (affectedFiles: string list) : FrontMatterField list =
     let taskLine = if task <> "" then [ yamlField originalTaskField task ] else []
 
     let filesLine =

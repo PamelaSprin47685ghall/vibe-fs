@@ -1,4 +1,4 @@
-module VibeFs.Shell.Dyn
+module Wanxiangshu.Shell.Dyn
 
 [<NoComparison; NoEquality>]
 type DynSentinel = interface end

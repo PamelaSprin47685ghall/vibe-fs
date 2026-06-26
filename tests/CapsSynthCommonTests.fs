@@ -1,11 +1,11 @@
-module VibeFs.Tests.CapsSynthCommonTests
+module Wanxiangshu.Tests.CapsSynthCommonTests
 
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Kernel.CapsPrelude
-open VibeFs.Kernel.CapsSynthPolicy
-open VibeFs.Shell.CapsSynthCommon
-open VibeFs.Shell.Dyn
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.CapsPrelude
+open Wanxiangshu.Kernel.CapsSynthPolicy
+open Wanxiangshu.Shell.CapsSynthCommon
+open Wanxiangshu.Shell.Dyn
 
 let private msg (id: string) : obj = createObj [ "id", box id ]
 

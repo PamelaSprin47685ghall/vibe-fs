@@ -1,6 +1,6 @@
-module VibeFs.Methodology.Falsification
+module Wanxiangshu.Methodology.Falsification
 
-open VibeFs.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.SchemaCommon
 
 let schema =
     buildSchema

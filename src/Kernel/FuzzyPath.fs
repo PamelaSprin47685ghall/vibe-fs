@@ -1,4 +1,4 @@
-module VibeFs.Kernel.FuzzyPath
+module Wanxiangshu.Kernel.FuzzyPath
 
 open System.Text.RegularExpressions
 

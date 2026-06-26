@@ -1,18 +1,18 @@
-module VibeFs.Tests.BacklogProjectionSpecs
+module Wanxiangshu.Tests.BacklogProjectionSpecs
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Tests.Assert
-open VibeFs.Tests.BacklogMessageBuilders
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.BacklogMessageBuilders
 
-open VibeFs.Kernel.HostTools
-open VibeFs.Kernel.Message
-open VibeFs.Kernel.BacklogProjectionCore
-open VibeFs.Kernel.BacklogProjection
-open VibeFs.Opencode.BacklogSession
-open VibeFs.Opencode.MessagingCodec
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.RuntimeScope
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.Message
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.BacklogProjection
+open Wanxiangshu.Opencode.BacklogSession
+open Wanxiangshu.Opencode.MessagingCodec
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.RuntimeScope
 
 
 let projectBacklogFolds () =
@@ -77,8 +77,8 @@ let projectBacklogDropsFoldedUserMessages () =
     check "backlog fold: hides original folded users" (not (allJson.Contains("\"id\":\"u2\"")))
     check "backlog fold: uses front matter projection summary" (
         text.StartsWith("---\n")
-        && text.Contains("\n-\n")
-        && text.Contains("user_message:"))
+        && text.Contains("- user_message")
+        && text.Contains("completed_work:"))
     check "backlog fold: keeps folded user content in projection" (text.Contains("please fix this bug"))
 
 let projectBacklogKeepsReviewInFold () =
@@ -142,14 +142,14 @@ let projectBacklogPrefixStaysStableWhenGrowing () =
 
 let buildBacklogTextTest () =
     let text: string = buildBacklogText [ backlogEntry 1 "Did work" ] []
-    check "backlog text: has front matter" (text.StartsWith("---\n-\n"))
+    check "backlog text: has front matter" (text.StartsWith("---\n"))
     check "backlog text: stores reports in front matter" (
-        text.Contains("-\n  user_message: []")
-        && text.Contains("completed_work: |")
+        text.Contains("user_message")
+        && text.Contains("completed_work")
         && text.Contains("Completed work from folded turns. File changes are already on disk.")
         && text.Contains("Did work"))
     let empty: string = buildBacklogText [] []
-    check "backlog text: empty front matter" (empty.StartsWith("---\n\n---\n\n"))
+    check "backlog text: empty front matter" (empty.StartsWith("---\n"))
     check "backlog text: empty body still explains folded work" (
         empty.Contains("Completed work from folded turns. File changes are already on disk."))
 

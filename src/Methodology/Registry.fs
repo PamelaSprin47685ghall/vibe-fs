@@ -1,60 +1,60 @@
-module VibeFs.Methodology.Registry
+module Wanxiangshu.Methodology.Registry
 
-open VibeFs.Methodology.SchemaCommon
-open VibeFs.Methodology.FirstPrinciples
-open VibeFs.Methodology.Axiomatization
-open VibeFs.Methodology.Deduction
-open VibeFs.Methodology.Induction
-open VibeFs.Methodology.Abduction
-open VibeFs.Methodology.Analogy
-open VibeFs.Methodology.Specialization
-open VibeFs.Methodology.Generalization
-open VibeFs.Methodology.WorkingBackwards
-open VibeFs.Methodology.AnalysisSynthesis
-open VibeFs.Methodology.AuxiliaryConstruction
-open VibeFs.Methodology.EquivalentTransformation
-open VibeFs.Methodology.DecompositionRecombination
-open VibeFs.Methodology.ModelProblemTransfer
-open VibeFs.Methodology.ConstructiveMethod
-open VibeFs.Methodology.ReductioAdAbsurdum
-open VibeFs.Methodology.Invariance
-open VibeFs.Methodology.SymmetryAnalysis
-open VibeFs.Methodology.DimensionalReduction
-open VibeFs.Methodology.PerturbationContinuity
-open VibeFs.Methodology.PigeonholePrinciple
-open VibeFs.Methodology.Duality
-open VibeFs.Methodology.QuotientSpace
-open VibeFs.Methodology.CategoryMapping
-open VibeFs.Methodology.Relaxation
-open VibeFs.Methodology.SearchSpaceExploration
-open VibeFs.Methodology.BranchAndBound
-open VibeFs.Methodology.DynamicProgramming
-open VibeFs.Methodology.MonteCarloSampling
-open VibeFs.Methodology.SimulatedAnnealing
-open VibeFs.Methodology.SwarmOptimization
-open VibeFs.Methodology.SystemsThinking
-open VibeFs.Methodology.RootCauseAnalysis
-open VibeFs.Methodology.StateMachineReasoning
-open VibeFs.Methodology.TypeDrivenDesign
-open VibeFs.Methodology.EventSourcing
-open VibeFs.Methodology.Operationalism
-open VibeFs.Methodology.BayesianUpdate
-open VibeFs.Methodology.Falsification
-open VibeFs.Methodology.ThoughtExperiment
-open VibeFs.Methodology.TranscendentalArgument
-open VibeFs.Methodology.ConceptualAnalysis
-open VibeFs.Methodology.DialecticalAnalysis
-open VibeFs.Methodology.HermeneuticCircle
-open VibeFs.Methodology.Deconstruction
-open VibeFs.Methodology.Renormalization
-open VibeFs.Methodology.Simplification
-open VibeFs.Methodology.TradeoffAnalysis
-open VibeFs.Methodology.RiskAnalysis
-open VibeFs.Methodology.TestDrivenReasoning
-open VibeFs.Methodology.DebuggingTrace
-open VibeFs.Methodology.SecurityReview
-open VibeFs.Methodology.PerformanceAnalysis
-open VibeFs.Methodology.UserIntentClarification
+open Wanxiangshu.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.FirstPrinciples
+open Wanxiangshu.Methodology.Axiomatization
+open Wanxiangshu.Methodology.Deduction
+open Wanxiangshu.Methodology.Induction
+open Wanxiangshu.Methodology.Abduction
+open Wanxiangshu.Methodology.Analogy
+open Wanxiangshu.Methodology.Specialization
+open Wanxiangshu.Methodology.Generalization
+open Wanxiangshu.Methodology.WorkingBackwards
+open Wanxiangshu.Methodology.AnalysisSynthesis
+open Wanxiangshu.Methodology.AuxiliaryConstruction
+open Wanxiangshu.Methodology.EquivalentTransformation
+open Wanxiangshu.Methodology.DecompositionRecombination
+open Wanxiangshu.Methodology.ModelProblemTransfer
+open Wanxiangshu.Methodology.ConstructiveMethod
+open Wanxiangshu.Methodology.ReductioAdAbsurdum
+open Wanxiangshu.Methodology.Invariance
+open Wanxiangshu.Methodology.SymmetryAnalysis
+open Wanxiangshu.Methodology.DimensionalReduction
+open Wanxiangshu.Methodology.PerturbationContinuity
+open Wanxiangshu.Methodology.PigeonholePrinciple
+open Wanxiangshu.Methodology.Duality
+open Wanxiangshu.Methodology.QuotientSpace
+open Wanxiangshu.Methodology.CategoryMapping
+open Wanxiangshu.Methodology.Relaxation
+open Wanxiangshu.Methodology.SearchSpaceExploration
+open Wanxiangshu.Methodology.BranchAndBound
+open Wanxiangshu.Methodology.DynamicProgramming
+open Wanxiangshu.Methodology.MonteCarloSampling
+open Wanxiangshu.Methodology.SimulatedAnnealing
+open Wanxiangshu.Methodology.SwarmOptimization
+open Wanxiangshu.Methodology.SystemsThinking
+open Wanxiangshu.Methodology.RootCauseAnalysis
+open Wanxiangshu.Methodology.StateMachineReasoning
+open Wanxiangshu.Methodology.TypeDrivenDesign
+open Wanxiangshu.Methodology.EventSourcing
+open Wanxiangshu.Methodology.Operationalism
+open Wanxiangshu.Methodology.BayesianUpdate
+open Wanxiangshu.Methodology.Falsification
+open Wanxiangshu.Methodology.ThoughtExperiment
+open Wanxiangshu.Methodology.TranscendentalArgument
+open Wanxiangshu.Methodology.ConceptualAnalysis
+open Wanxiangshu.Methodology.DialecticalAnalysis
+open Wanxiangshu.Methodology.HermeneuticCircle
+open Wanxiangshu.Methodology.Deconstruction
+open Wanxiangshu.Methodology.Renormalization
+open Wanxiangshu.Methodology.Simplification
+open Wanxiangshu.Methodology.TradeoffAnalysis
+open Wanxiangshu.Methodology.RiskAnalysis
+open Wanxiangshu.Methodology.TestDrivenReasoning
+open Wanxiangshu.Methodology.DebuggingTrace
+open Wanxiangshu.Methodology.SecurityReview
+open Wanxiangshu.Methodology.PerformanceAnalysis
+open Wanxiangshu.Methodology.UserIntentClarification
 
 let allSchemas: MethodologySchema list =
     [ FirstPrinciples.schema
@@ -112,7 +112,7 @@ let allSchemas: MethodologySchema list =
       PerformanceAnalysis.schema
       UserIntentClarification.schema ]
 
-let allToolSpecs: VibeFs.Kernel.ToolCatalog.ToolSpec list =
+let allToolSpecs: Wanxiangshu.Kernel.ToolCatalog.ToolSpec list =
     allSchemas |> List.map toToolCatalogSpec
 
 let tryFindSchema methodologyId =

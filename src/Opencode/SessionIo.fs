@@ -1,16 +1,16 @@
-module VibeFs.Opencode.SessionIo
+module Wanxiangshu.Opencode.SessionIo
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Domain
-open VibeFs.Kernel.Messaging
-module Dyn = VibeFs.Shell.Dyn
-open VibeFs.Shell.ToolContextCodec
-open VibeFs.Shell.OpencodeClientCodec
-open VibeFs.Opencode.MessagingCodec
-open VibeFs.Opencode.SessionIoSubagent
-open VibeFs.Shell.ChildAgentRegistry
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.Messaging
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ToolContextCodec
+open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Opencode.MessagingCodec
+open Wanxiangshu.Opencode.SessionIoSubagent
+open Wanxiangshu.Shell.ChildAgentRegistry
 
 /// Extract the tool-execution context from an opencode tool `context`.
 /// sessionID is returned as null when the host did not provide one, so parent

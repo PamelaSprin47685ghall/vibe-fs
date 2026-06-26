@@ -1,13 +1,13 @@
-module VibeFs.Shell.TreeSitterShell
+module Wanxiangshu.Shell.TreeSitterShell
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Shell.Dyn
-open VibeFs.Shell.TreeSitterPlatform
+open Wanxiangshu.Kernel
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.TreeSitterPlatform
 
-open VibeFs.Kernel.TreeSitterKernel
-open VibeFs.Kernel.PatchParser
+open Wanxiangshu.Kernel.TreeSitterKernel
+open Wanxiangshu.Kernel.PatchParser
 
 let extractFilePaths (args: obj) : string list =
     if isNullish args then []

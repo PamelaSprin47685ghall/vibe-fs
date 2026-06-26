@@ -1,4 +1,4 @@
-module VibeFs.Kernel.ToolOutputInfoTypes
+module Wanxiangshu.Kernel.ToolOutputInfoTypes
 
 [<RequireQualifiedAccess>]
 type ToolOutputBodyRef =

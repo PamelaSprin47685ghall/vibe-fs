@@ -1,22 +1,22 @@
-module VibeFs.Mux.PluginRegistration
+module Wanxiangshu.Mux.PluginRegistration
 
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel
-open VibeFs.Kernel.Config
-open VibeFs.Shell
-open VibeFs.Mux.PluginCatalog
-open VibeFs.Mux.PluginRegistrationParts
-open VibeFs.Mux.BacklogSession
-open VibeFs.Mux.KnowledgeGraphRuntimeMux
-open VibeFs.Shell.RuntimeScope
-open VibeFs.Shell.FuzzyFinderShell
-open VibeFs.Mux.WrappersReview
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Shell
+open Wanxiangshu.Mux.PluginCatalog
+open Wanxiangshu.Mux.PluginRegistrationParts
+open Wanxiangshu.Mux.BacklogSession
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
+open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Mux.WrappersReview
 
 let private createScope (deps: obj) =
     let scope = create ()
     let backlogSession = BacklogSession(scope)
-    let reviewStore = VibeFs.Shell.ReviewRuntime.createReviewStore ()
+    let reviewStore = Wanxiangshu.Shell.ReviewRuntime.createReviewStore ()
     let hostReadExec = HostFunctionCapture()
     let finderCache = FinderCache()
     let knowledgeGraphRuntime = MuxKnowledgeGraphRuntime(deps)
