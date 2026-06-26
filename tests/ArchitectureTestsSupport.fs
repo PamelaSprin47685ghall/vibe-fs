@@ -47,6 +47,23 @@ let rec fsFilesRecursive (dir: string) : string list =
             else [||])
         |> Array.toList
 
+/// Relative `.fs` paths under `dir`, recursive. Use when arch scans must include
+/// modules that have been split into subdirectories (e.g.
+/// `src/Kernel/KnowledgeGraph/Prompts.fs`); labels are forward-slash relative
+/// paths so they match how callers build `dir + "/" + name` paths.
+let rec fsFilesRelative (dir: string) : string list =
+    if not (existsSync dir) then []
+    else
+        readdirSync dir
+        |> Array.collect (fun name ->
+            let full = dir + "/" + name
+            if isDirectory full then
+                fsFilesRecursive full |> List.toArray
+                |> Array.map (fun p -> p.Substring(dir.Length + 1))
+            elif name.EndsWith ".fs" then [| name |]
+            else [||])
+        |> Array.toList
+
 let objTypeRe = System.Text.RegularExpressions.Regex(@":\s*obj\b")
 let boxRe = System.Text.RegularExpressions.Regex(@"\bbox\b")
 let emptyDefaultRe =

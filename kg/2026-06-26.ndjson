@@ -11,3 +11,18 @@
 {"id":"3c5b","entity":["验收口径","源码变更"],"fact":"bookkeeper 当次 work_input 仅为 tests 层中央入口单行级增补 JsInterop open 且回报 Edit applied successfully 时，可记 Fable 互操作接线事实，全仓 SSOT 仍须同次转译零 Compilation failed、runner failed=0 与已登记探针联判。"}
 {"id":"00ec","entity":["测试运行器","可观测性"],"fact":"默认同批跑测时进程参数兼承载用例选择器与详细日志开关；在按标签筛选可执行用例前须剔除仅用于开启详细验收日志的短开关项，防止其进入选择器匹配而被误当作测试标签。"}
 {"id":"579f","entity":["测试运行器","命令行界面"],"fact":"详细日志开关与用例选择器共用同一参数数组时二者须解耦：净化后的参数数组专供 matchesSelector 类过滤，详细模式开关不得参与可跑用例集合的枚举。"}
+{"id":"d39a","entity":["架构探针共享辅助","源码扫描","文件体量铁律"],"fact":"架构探针 Support 辅助在既有全路径递归枚举之外，增补「相对根目录的递归源文件路径列表」：目录存在则 readdir 递归，子目录分支将全路径去根前缀后拼接为相对斜杠路径，叶节点仅收扩展名为源文件后缀的项；动机=内核或测试树经子目录化拆分后，体量与架构门禁仍须一次遍历覆盖子文件夹内分片，避免浅层单层枚举漏扫导致假绿或标签仍绑已瘦身单体路径。"}
+{"id":"7f9f","entity":["架构测试","共享辅助","源码扫描"],"fact":"共享辅助层提供相对根目录的递归源文件枚举：自给定根递归遍历，目录分支委托深层全路径收集再截去根前缀，仅保留相对路径且扩展名为.fs；动机=内核工具目录、知识图谱子目录等物理拆分后，体量与边界探针若只扫单层会漏计分片，须与全树递归枚举能力同链接线。"}
+{"id":"0b5a","entity":["文件体量铁律","探针扫描"],"fact":"架构体量门禁在将扫描面扩至递归子目录时，相对路径标签须与 requireFile 所用完整路径在逻辑上一致：枚举产出为根下相对路径，探针断言 arch 标签仍跟完整路径时，二者通过同一递归遍历 SSOT 对齐，避免目录化拆分后假绿或漏红灯。"}
+{"id":"a23e","entity":["架构测试","共享辅助","源码扫描"],"fact":"Support 层三档扫盘分工：fsFiles 仅目录顶层 .fs；fsFilesRecursive 递归返回全路径；fsFilesRelative 递归返回相对正斜杠路径，供探针在模块已拆入子目录（如内核知识图谱子树）时用「根路径+相对名」拼 arch 标签，与 fileBodyUnder200 等门禁用 fsFilesRecursive 全路径扫描互补。"}
+{"id":"dcb7","entity":["架构探针","源码扫描"],"fact":"Foundation 切片内核边界、Shell 分层、禁 Dictionary、禁空默认等门禁遍历已改 fsFilesRelative 替代浅层 fsFiles，与 ToolCatalog 子目录化后须递归扫全树、标签仍跟 src/层/相对路径之纪律同向，避免子文件夹漏扫假绿。"}
+{"id":"2e78","entity":["架构门禁","源码卫生"],"fact":"生产四层源码根上的 TODO/FIXME/HACK 标记探针须与递归相对路径枚举同链：逐子目录收集 .fs 再全文扫描，禁仅浅层单层枚举；与体量探针、Support 层递归列表及子目录化后「门禁跟物理树」纪律同向，避免子目录内残留标记未红灯。"}
+{"id":"575e","entity":["架构测试","宿主隔离","源码扫描"],"fact":"Foundation 层双向宿主隔离探针 opencodeNoMuxRef、muxNoOpencodeRef 对 src/Opencode 与 src/Mux 下 .fs 的遍历须改用 Support 层 fsFilesRelative 递归相对路径枚举，替代仅顶层 fsFiles 浅扫；arch 标签仍用相对路径拼接，与 ToolCatalog 子目录化后「门禁须跟物理树」纪律同向，避免子目录新增引用漏扫假绿。"}
+{"id":"cfcc","entity":["验收口径","知识图谱记账"],"fact":"bookkeeper 当次 work_input 仅为 ArchitectureTestsFoundation 两行级 fsFiles→fsFilesRelative 替换且回报 Edit applied successfully，可记探针扫描面收敛事实，不构成 npm run build-and-test 绿测充分条件；全仓 SSOT 仍须同次 Fable 零 Compilation failed、runner failed=0 与已登记探针联判。"}
+{"id":"340d","entity":["架构测试","源码扫描","遗留标记门禁"],"fact":"ArchitectureTestsFoundation 以 sourceDirs 单点枚举五层生产源码根；noLegacyInjectedToolOutputMarkers 须对每个根用 fsFilesRelative 递归收集相对路径 .fs 再拼接全路径 requireFile 扫描，禁止仍用浅层 fsFiles 仅扫顶层文件，与 ToolCatalog 等子目录化后其它递归体量/边界门禁同向，避免遗留注入输出标记漏检。"}
+{"id":"985c","entity":["[验收口径, 探针登记, 构建管线]"],"fact":"中央架构登记外提片将体量门禁 Sync 标签与 sync 薄包装目标由三百行探针符号改为二百行探针符号时，须与 Foundation 探针函数体、体内行数断言及 scanDirs 范围同批一致；单点改 Registry 一行不构成 npm run build-and-test 绿测充分条件。"}
+{"id":"a181","entity":["[架构测试, 第五宿主适配, 宿主隔离]"],"fact":"第五宿主实现树禁引 engine 路径类门禁及同类边界探针，对源码树的文件枚举须用递归相对路径列表而非仅顶层单层枚举，否则子目录分片漏扫导致假绿。"}
+{"id":"13a5","entity":["[架构测试, 共享辅助, 源码扫描]"],"fact":"Support 层提供相对根目录的递归源文件枚举与全路径递归枚举分工：体量与边界探针在目录化拆分后须跟物理树扫描面，禁止仅扫单层目录。"}
+{"id":"99fe","entity":["[验收口径, 源码变更]"],"fact":"bookkeeper 回合若工作输入仅为 Foundation 或 Registry 探针体/登记行局部 oldString-newString 替换且回报编辑已成功，可记接线或扫描面收敛事实，不构成全仓绿测充分条件；SSOT 仍须同次 Fable 零 Compilation failed、runner failed=0 与已登记探针联判。"}
+{"id":"5efa","entity":["架构测试","共享辅助","编译顺序"],"fact":"ArchitectureTestsSupport 中 fsFilesRelative 递归调用 fsFilesRecursive，二者须同文件内先声明 fsFilesRecursive 再声明 fsFilesRelative；逆序触发 F# 前向引用 FS0039，与探针用相对路径枚举扫子目录（KnowledgeGraph/ToolCatalog 等）之 a23e/340d/7f9f 纪律同链。"}
+{"id":"df88","entity":["架构测试","源码扫描"],"fact":"Support 三档扫盘分工不变：fsFiles 仅目录顶层 .fs；fsFilesRecursive 产出全路径列表供 requireFile/行数断言；fsFilesRelative 产出相对正斜杠路径供 arch 标签与 dir+\"/\"+name 拼接一致，实现面依赖 fsFilesRecursive 已定义。"}

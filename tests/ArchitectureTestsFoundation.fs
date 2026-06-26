@@ -9,7 +9,7 @@ open VibeFs.Tests.ArchitectureTestsSupport
 /// Enforced at the directory level (src/Kernel/*.fs) regardless of
 /// compilation-unit topology — a single-project merge must not weaken this.
 let kernelBoundary () =
-    for f in fsFiles "src/Kernel" do
+    for f in fsFilesRelative "src/Kernel" do
         let path = "src/Kernel/" + f
         let content = requireFile path
         check ("arch: " + f + " createObj-free") (not (content.Contains "createObj"))
@@ -21,12 +21,12 @@ let kernelBoundary () =
         check ("arch: " + f + " unbox-free") (not (code.Contains "unbox"))
 
 let kernelNoEmptyDefault () =
-    for f in fsFiles "src/Kernel" do
+    for f in fsFilesRelative "src/Kernel" do
         let content = requireFile ("src/Kernel/" + f)
         check ("arch: " + f + " no empty-string default") (not (emptyDefaultRe.IsMatch content))
 
 let shellLayering () =
-    for f in fsFiles "src/Shell" do
+    for f in fsFilesRelative "src/Shell" do
         let content = requireFile ("src/Shell/" + f)
         check ("arch: " + f + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
         check ("arch: " + f + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
@@ -36,7 +36,7 @@ let private sourceDirs =
 
 let noBuiltinDictionary () =
     for dir in sourceDirs do
-        for f in fsFiles dir do
+        for f in fsFilesRelative dir do
             let content = requireFile (dir + "/" + f)
             check ("arch: " + f + " no Dictionary") (not (content.Contains "Dictionary"))
 
@@ -69,7 +69,7 @@ let returnReviewerCatalogAndHostRegistration () =
 
 let noDanglingMarkers () =
     for dir in sourceDirs do
-        for f in fsFiles dir do
+        for f in fsFilesRelative dir do
             let content = requireFile (dir + "/" + f)
             check ("arch: " + f + " no TODO") (not (content.Contains "TODO"))
             check ("arch: " + f + " no FIXME") (not (content.Contains "FIXME"))
@@ -92,7 +92,7 @@ let private legacyInjectedOutputMarkers = [|
 
 let noLegacyInjectedToolOutputMarkers () =
     for dir in sourceDirs do
-        for f in fsFiles dir do
+        for f in fsFilesRelative dir do
             let path = dir + "/" + f
             let content = requireFile path
             for marker in legacyInjectedOutputMarkers do
@@ -115,13 +115,13 @@ let private forbiddenMuxOpencodeProjectionPatterns =
 
 /// Opencode adapter must not depend on Mux modules (shared semantics live in Kernel/Shell).
 let opencodeNoMuxRef () =
-    for f in fsFiles "src/Opencode" do
+    for f in fsFilesRelative "src/Opencode" do
         let content = requireFile ("src/Opencode/" + f)
         check ("arch: Opencode/" + f + " no VibeFs.Mux ref") (not (content.Contains "VibeFs.Mux"))
 
 /// Mux adapter must not depend on Opencode modules.
 let muxNoOpencodeRef () =
-    for f in fsFiles "src/Mux" do
+    for f in fsFilesRelative "src/Mux" do
         let content = requireFile ("src/Mux/" + f)
         check ("arch: Mux/" + f + " no VibeFs.Opencode ref") (not (content.Contains "VibeFs.Opencode"))
 
@@ -142,6 +142,6 @@ let ompBoundary () =
         check ("arch: " + label + " no engine ref") (not (content.Contains "engine/"))
 
 let ompNoEngineRef () =
-    for f in fsFiles "src/Omp" do
+    for f in fsFilesRelative "src/Omp" do
         let content = requireFile ("src/Omp/" + f)
         check ("arch: " + f + " ompNoEngineRef") (not (content.Contains "engine/"))
