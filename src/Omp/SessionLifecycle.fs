@@ -1,7 +1,7 @@
 module VibeFs.Omp.SessionLifecycle
 
 open Fable.Core.JsInterop
-open VibeFs.Omp.KnowledgeGraphRuntime
+open VibeFs.Omp.KnowledgeGraph.Runtime
 open VibeFs.Omp.SessionLifecycleHooks
 open VibeFs.Shell.ReviewRuntime
 

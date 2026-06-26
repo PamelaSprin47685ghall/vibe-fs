@@ -5,7 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
-open VibeFs.Omp.KnowledgeGraphRuntime
+open VibeFs.Omp.KnowledgeGraph.Runtime
 open VibeFs.Omp.MessageTransform
 module Dyn = VibeFs.Shell.Dyn
 open VibeFs.Shell.ReviewRuntime

@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 open VibeFs.Shell.Dyn
 module Dyn = VibeFs.Shell.Dyn
 open VibeFs.Omp.PluginCore
@@ -55,7 +56,7 @@ let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool
     let ctx = createObj [ "sessionManager", box sessionMgr ]
     let event = createObj [ "type", box evtType ]
     let pi, getHandlers = capturePi ()
-    registerAbortHandler pi reviewStore (VibeFs.Omp.KnowledgeGraphRuntime.OmpKnowledgeGraphRuntime(createObj []))
+    registerAbortHandler pi reviewStore (VibeFs.Omp.KnowledgeGraph.Runtime.OmpKnowledgeGraphRuntime(createObj []))
     let handlers = getHandlers ()
     check $"{evtType} captured exactly one handler" (handlers.Length = 1)
     let handler = handlers.[0]

@@ -7,10 +7,12 @@ open VibeFs.Kernel.Config
 open VibeFs.Kernel.LoopMessages
 open VibeFs.Kernel.ReviewPrompts
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 open VibeFs.Kernel.ReviewVerdict
 open VibeFs.Kernel.Domain
 open VibeFs.Shell.ReviewRuntime
 open VibeFs.Mux.Delegate
+open VibeFs.Mux.DelegateTimeout
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.SubagentTools
 open VibeFs.Shell
@@ -78,7 +80,7 @@ let private precheckReview
                   "toolPolicy", box (createObj [ "disabledTools", box disabledTools ]) ]
         let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
         let promptText = preReviewVerdictPrompt task
-        return! delegateWithTimeout deps config "explore" promptText "Pre-review" (Some opts) 300000
+        return! Delegate.delegateWithTimeout deps config "explore" promptText "Pre-review" (Some opts) 300000
     }
 
 let private activateReview
@@ -104,9 +106,9 @@ let private loopReviewExecute
         promise {
             let! outcome = precheckReview deps toolNames workspaceId task
             match outcome with
-            | TimedOut ->
+            | DelegateTimeout.TimedOut ->
                 return buildLoopMessage task [ "With-Review Mode was NOT activated because the pre-review timed out. Please retry /loop-review." ]
-            | Report markdown ->
+            | DelegateTimeout.Report markdown ->
                 let isPass, feedback =
                     match parseReviewReportMarkdown markdown with
                     | Accepted -> true, ""

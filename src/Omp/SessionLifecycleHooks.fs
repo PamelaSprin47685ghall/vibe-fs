@@ -11,7 +11,7 @@ open VibeFs.Omp.HookExecute
 open VibeFs.Omp.MessageTransform
 open VibeFs.Omp.OmpTestHooks
 open VibeFs.Omp.MessagingCodec
-open VibeFs.Omp.KnowledgeGraphRuntime
+open VibeFs.Omp.KnowledgeGraph.Runtime
 open VibeFs.Omp.NudgeRuntime
 open VibeFs.Omp.KnowledgeGraphTools
 open VibeFs.Kernel.HostTools

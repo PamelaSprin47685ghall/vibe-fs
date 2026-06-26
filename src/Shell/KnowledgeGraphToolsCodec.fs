@@ -2,6 +2,7 @@ module VibeFs.Shell.KnowledgeGraphToolsCodec
 
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.DynField
 

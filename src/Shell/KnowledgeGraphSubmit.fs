@@ -2,7 +2,8 @@ module VibeFs.Shell.KnowledgeGraphSubmit
 
 open Fable.Core
 open VibeFs.Kernel.KnowledgeGraph
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Kernel.KnowledgeGraph.Types
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
 open VibeFs.Shell.KnowledgeGraphStorage
 
 let buildEntriesFromDrafts (root: string) (drafts: KnowledgeGraphDraft list)

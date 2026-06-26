@@ -2,9 +2,10 @@ module VibeFs.Omp.KnowledgeGraphTools
 
 open Fable.Core.JsInterop
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Omp.Codec
-open VibeFs.Omp.KnowledgeGraphRuntime
+open VibeFs.Omp.KnowledgeGraph.Runtime
 open VibeFs.Omp.Schema
 
 module Dyn = VibeFs.Shell.Dyn

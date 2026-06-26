@@ -8,7 +8,7 @@ open VibeFs.Shell
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.ToolOutputInfo
 open VibeFs.Kernel.ToolCatalog
-open VibeFs.Kernel.KnowledgeGraphBookkeeperPolicy
+open VibeFs.Kernel.KnowledgeGraph.BookkeeperPolicy
 open VibeFs.Kernel.TreeSitterKernel
 open VibeFs.Opencode.AgentConfig
 open VibeFs.Opencode.HookSchema

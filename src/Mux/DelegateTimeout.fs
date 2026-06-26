@@ -1,0 +1,49 @@
+module VibeFs.Mux.DelegateTimeout
+
+open Fable.Core
+open Fable.Core.JsInterop
+open VibeFs.Kernel.Domain
+open VibeFs.Shell.ErrorClassify
+open VibeFs.Shell.SubagentSpawn
+module Dyn = VibeFs.Shell.Dyn
+
+type DelegateOutcome =
+    | Report of string
+    | TimedOut
+
+let delegateWithTimeout
+    (delegateToSubAgent: obj -> obj -> string -> string -> string -> obj option -> JS.Promise<string>)
+    (deps: obj)
+    (config: obj)
+    (agentId: string)
+    (prompt: string)
+    (title: string)
+    (options: obj option)
+    (timeoutMs: int)
+    : JS.Promise<DelegateOutcome> =
+    promise {
+        let controller = new AbortController()
+        let signal = controller.signal
+        let configWithSignal = Dyn.withKey config "abortSignal" signal
+
+        let workPromise =
+            promise {
+                let! report = delegateToSubAgent deps configWithSignal agentId prompt title options
+                return box (Report report)
+            }
+
+        let timeoutPromise =
+            promise {
+                do! Promise.sleep timeoutMs
+                controller.abort()
+                return box TimedOut
+            }
+
+        try
+            let! winner = Promise.race [| workPromise; timeoutPromise |]
+            return unbox<DelegateOutcome> winner
+        with err ->
+            match translateJsError err with
+            | MessageAborted -> return TimedOut
+            | _ -> return! Promise.reject err
+    }

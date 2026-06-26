@@ -2,6 +2,7 @@ module VibeFs.Shell.KnowledgeGraphStorage
 
 open Fable.Core
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.KnowledgeGraphPortLock
 

@@ -3,9 +3,9 @@ module VibeFs.Mux.KnowledgeGraphTestHooks
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open VibeFs.Kernel.KnowledgeGraphJobTesting
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
-open VibeFs.Mux.KnowledgeGraphTools
+open VibeFs.Kernel.KnowledgeGraph.JobTesting
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
+open VibeFs.Mux.KnowledgeGraphRuntimeMux
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.KnowledgeGraphRuntimeTestPorts
 

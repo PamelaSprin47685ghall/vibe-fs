@@ -5,7 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Shell
 open VibeFs.Shell.OpencodeHookInputCodec
-open VibeFs.Opencode.NudgeEventCodec
+open VibeFs.Shell.OpencodeSessionEventCodec
 
 let eventHandler (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
     promise {

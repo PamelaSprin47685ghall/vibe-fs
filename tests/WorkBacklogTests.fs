@@ -1,6 +1,8 @@
 module VibeFs.Tests.WorkBacklogTests
 
 open VibeFs.Tests.BacklogReplaySpecs
+open VibeFs.Tests.BacklogReplaySpecsMimocode
+open VibeFs.Tests.BacklogReplaySpecsFold
 open VibeFs.Tests.BacklogProjectionSpecs
 
 

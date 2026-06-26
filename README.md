@@ -208,7 +208,7 @@ npm 包主导出入口：`build/src/Mux/Plugin.js`（`"."`）；OMP：`build/src
 3. `src/Opencode/PluginCore.fs`：OpenCode / Mimocode 共用插件装配
 4. `src/Opencode/Tools.fs`：OpenCode 工具总表（含 `registerMethodologyTools`）
 5. `src/Mux/HostTools.fs` + `src/Mux/Plugin.fs`：Mux 内建工具与 `methodology_*` 注册
-6. `src/Opencode/KnowledgeGraphRuntime.fs` + `src/Mux/KnowledgeGraphTools.fs` + `src/Omp/KnowledgeGraphRuntime.fs`：三宿主 KG runtime
+6. `src/Opencode/KnowledgeGraphRuntime.fs` + `src/Mux/KnowledgeGraphRuntimeMux.fs` + `src/Omp/KnowledgeGraphRuntime.fs`：三宿主 KG runtime
 7. `src/Opencode/MessageTransform.fs` + `src/Mux/MessageTransform.fs` + `src/Omp/MessageTransform.fs`：caps prelude、KG prelude、Magic todo、read dedup、review replay
 8. `src/Shell/OpencodeSessionEventCodec.fs` + `src/Opencode/NudgeEventCodec.fs`（薄 alias）：Opencode session event payload 边界编解码
 

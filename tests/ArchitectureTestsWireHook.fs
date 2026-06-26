@@ -156,7 +156,7 @@ let opencodeEventHooksUsesEventEnvelopeCodec () =
         (code.Contains "OpencodeHookInputCodec")
     check "arch: Opencode EventHooks uses decodeHostEventEnvelope"
         (code.Contains "decodeHostEventEnvelope")
-    check "arch: Opencode EventHooks uses getSessionID from NudgeEventCodec"
+    check "arch: Opencode EventHooks uses getSessionID from OpencodeSessionEventCodec"
         (code.Contains "getSessionID")
     check "arch: Opencode EventHooks must not Dyn.str props sessionID"
         (not (code.Contains "Dyn.str props \"sessionID\""))
@@ -172,31 +172,3 @@ let opencodeToolDefinitionHooksUsesHookInputCodec () =
     check "arch: Opencode ToolDefinitionHooks must not Dyn.str input toolID"
         (not (code.Contains "Dyn.str input \"toolID\""))
 
-let muxPluginToolExecuteAfterUsesMuxHookInputCodec () =
-    let code = requireFile "src/Mux/Plugin.fs" |> nonCommentCode
-    check "arch: Mux Plugin opens MuxHookInputCodec"
-        (code.Contains "MuxHookInputCodec")
-    check "arch: Mux Plugin toolExecuteAfter uses decodeMuxToolExecuteAfterInput"
-        (code.Contains "decodeMuxToolExecuteAfterInput")
-    check "arch: Mux Plugin toolExecuteAfter uses hookOutputErrorMux"
-        (code.Contains "hookOutputErrorMux")
-    check "arch: Mux Plugin toolExecuteAfter uses hookOutputTextMux"
-        (code.Contains "hookOutputTextMux")
-    check "arch: Mux Plugin toolExecuteAfter uses setHookOutputStringMux"
-        (code.Contains "setHookOutputStringMux")
-    check "arch: Mux Plugin toolExecuteAfter must not Dyn.str input tool"
-        (not (code.Contains "Dyn.str input \"tool\""))
-    check "arch: Mux Plugin toolExecuteAfter must not Dyn.str input sessionID"
-        (not (code.Contains "Dyn.str input \"sessionID\""))
-    check "arch: Mux Plugin toolExecuteAfter must not Dyn.str input directory"
-        (not (code.Contains "Dyn.str input \"directory\""))
-    check "arch: Mux Plugin toolExecuteAfter must not Dyn.str input workspaceId"
-        (not (code.Contains "Dyn.str input \"workspaceId\""))
-    check "arch: Mux Plugin toolExecuteAfter must not local setOutput"
-        (not (code.Contains "let private setOutput"))
-    check "arch: Mux Plugin toolExecuteAfter must not Dyn.str output output"
-        (not (code.Contains "Dyn.str output \"output\""))
-    check "arch: Mux Plugin toolExecuteAfter must not Dyn.str output error"
-        (not (code.Contains "Dyn.str output \"error\""))
-    check "arch: Mux Plugin toolExecuteAfter must not direct write output output"
-        (not (code.Contains "o?output <- v"))

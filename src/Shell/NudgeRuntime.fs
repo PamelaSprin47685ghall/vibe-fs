@@ -4,7 +4,10 @@ open Fable.Core
 open VibeFs.Shell.Dyn
 open VibeFs.Kernel
 open VibeFs.Kernel.Nudge
+open VibeFs.Kernel.Nudge.TodoStatus
+open VibeFs.Kernel.Nudge.SubmitReviewHooks
 open VibeFs.Kernel.NudgeState
+open VibeFs.Kernel.Nudge.Types
 
 type NudgeRuntimeEvent =
     | Ignore
@@ -181,10 +184,6 @@ type NudgeRuntime
                 if Dyn.isNullish helpers || stopReason = "queued-message" then
                     return ()
                 else
-                    // Dedup is delegated to Kernel.decideNudge via snapshot.alreadyNudged
-                    // (history tail is the single source of truth). No in-process gate here:
-                    // a repeat stream-end for the same stop yields StandDown from decideNudge
-                    // without firing a second send.
                     startNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage
                     return ()
             | StreamAbort workspaceId
@@ -198,3 +197,5 @@ let createNudgeRuntime
     (getChatHistory: (string -> JS.Promise<obj array>) option)
     : NudgeRuntime =
     NudgeRuntime(reviewStore, getChatHistory)
+
+

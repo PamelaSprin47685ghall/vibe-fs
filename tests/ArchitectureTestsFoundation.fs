@@ -9,7 +9,7 @@ open VibeFs.Tests.ArchitectureTestsSupport
 /// Enforced at the directory level (src/Kernel/*.fs) regardless of
 /// compilation-unit topology — a single-project merge must not weaken this.
 let kernelBoundary () =
-    for f in fsFiles "src/Kernel" do
+    for f in fsFilesRelative "src/Kernel" do
         let path = "src/Kernel/" + f
         let content = requireFile path
         check ("arch: " + f + " createObj-free") (not (content.Contains "createObj"))
@@ -21,12 +21,12 @@ let kernelBoundary () =
         check ("arch: " + f + " unbox-free") (not (code.Contains "unbox"))
 
 let kernelNoEmptyDefault () =
-    for f in fsFiles "src/Kernel" do
+    for f in fsFilesRelative "src/Kernel" do
         let content = requireFile ("src/Kernel/" + f)
         check ("arch: " + f + " no empty-string default") (not (emptyDefaultRe.IsMatch content))
 
 let shellLayering () =
-    for f in fsFiles "src/Shell" do
+    for f in fsFilesRelative "src/Shell" do
         let content = requireFile ("src/Shell/" + f)
         check ("arch: " + f + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
         check ("arch: " + f + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
@@ -36,20 +36,40 @@ let private sourceDirs =
 
 let noBuiltinDictionary () =
     for dir in sourceDirs do
-        for f in fsFiles dir do
+        for f in fsFilesRelative dir do
             let content = requireFile (dir + "/" + f)
             check ("arch: " + f + " no Dictionary") (not (content.Contains "Dictionary"))
 
 let fileBodyUnder300 () =
-    for dir in sourceDirs do
-        for f in fsFiles dir do
-            let content = requireFile (dir + "/" + f)
+    // Enforce <=300 lines for production code, Methodology schemas, and tests
+    let scanDirs = [|
+        "src/Kernel"
+        "src/Shell"
+        "src/Mux"
+        "src/Opencode"
+        "src/Omp"
+        "src/Methodology"
+        "tests"
+    |]
+    for dir in scanDirs do
+        for path in fsFilesRecursive dir do
+            let content = requireFile path
             let lineCount = content.Length - content.Replace("\n", "").Length
-            check ("arch: " + dir + "/" + f + " <=300 lines") (lineCount <= 300)
+            check ("arch: " + path + " <=300 lines") (lineCount <= 300)
+
+let returnReviewerCatalogAndHostRegistration () =
+    let catalog = requireFile "src/Kernel/ToolCatalog/Review.fs"
+    check "arch: ToolCatalog lists return_reviewer spec" (catalog.Contains "return_reviewer")
+    let opencodeTools = requireFile "src/Opencode/Tools.fs" |> nonCommentCode
+    let ompReview = requireFile "src/Omp/ReviewToolsRegister.fs" |> nonCommentCode
+    let muxPlugin = requireFile "src/Mux/PluginCatalog.fs" |> nonCommentCode
+    check "arch: Opencode registers return_reviewer tool" (opencodeTools.Contains "return_reviewer")
+    check "arch: OMP registers return_reviewer tool" (ompReview.Contains "return_reviewer")
+    check "arch: Mux muxToolNames omits return_reviewer (agent_report path)" (not (muxPlugin.Contains "\"return_reviewer\""))
 
 let noDanglingMarkers () =
     for dir in sourceDirs do
-        for f in fsFiles dir do
+        for f in fsFilesRelative dir do
             let content = requireFile (dir + "/" + f)
             check ("arch: " + f + " no TODO") (not (content.Contains "TODO"))
             check ("arch: " + f + " no FIXME") (not (content.Contains "FIXME"))
@@ -72,7 +92,7 @@ let private legacyInjectedOutputMarkers = [|
 
 let noLegacyInjectedToolOutputMarkers () =
     for dir in sourceDirs do
-        for f in fsFiles dir do
+        for f in fsFilesRelative dir do
             let path = dir + "/" + f
             let content = requireFile path
             for marker in legacyInjectedOutputMarkers do
@@ -95,13 +115,13 @@ let private forbiddenMuxOpencodeProjectionPatterns =
 
 /// Opencode adapter must not depend on Mux modules (shared semantics live in Kernel/Shell).
 let opencodeNoMuxRef () =
-    for f in fsFiles "src/Opencode" do
+    for f in fsFilesRelative "src/Opencode" do
         let content = requireFile ("src/Opencode/" + f)
         check ("arch: Opencode/" + f + " no VibeFs.Mux ref") (not (content.Contains "VibeFs.Mux"))
 
 /// Mux adapter must not depend on Opencode modules.
 let muxNoOpencodeRef () =
-    for f in fsFiles "src/Mux" do
+    for f in fsFilesRelative "src/Mux" do
         let content = requireFile ("src/Mux/" + f)
         check ("arch: Mux/" + f + " no VibeFs.Opencode ref") (not (content.Contains "VibeFs.Opencode"))
 
@@ -114,20 +134,14 @@ let muxBacklogUsesMuxHost () =
                 (not (re.IsMatch code))
 
 let ompBoundary () =
-    for f in fsFiles "src/Omp" do
-        let content = requireFile ("src/Omp/" + f)
-        check ("arch: " + f + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
-        check ("arch: " + f + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
-        check ("arch: " + f + " no engine ref") (not (content.Contains "engine/"))
-
-let ompNoOpencodeRef () = ompBoundary ()
-
-let ompNoMuxRef () =
-    for f in fsFiles "src/Omp" do
-        let content = requireFile ("src/Omp/" + f)
-        check ("arch: " + f + " ompNoMuxRef") (not (content.Contains "VibeFs.Mux"))
+    for path in fsFilesRecursive "src/Omp" do
+        let content = requireFile path
+        let label = path.Replace("src/Omp/", "")
+        check ("arch: " + label + " no Opencode ref") (not (content.Contains "VibeFs.Opencode"))
+        check ("arch: " + label + " no Mux ref") (not (content.Contains "VibeFs.Mux"))
+        check ("arch: " + label + " no engine ref") (not (content.Contains "engine/"))
 
 let ompNoEngineRef () =
-    for f in fsFiles "src/Omp" do
+    for f in fsFilesRelative "src/Omp" do
         let content = requireFile ("src/Omp/" + f)
         check ("arch: " + f + " ompNoEngineRef") (not (content.Contains "engine/"))

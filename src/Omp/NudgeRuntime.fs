@@ -2,6 +2,7 @@ module VibeFs.Omp.NudgeRuntime
 
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Nudge
+open VibeFs.Kernel.Nudge.Coordinator
 open VibeFs.Kernel.PromptFragments
 open VibeFs.Omp.MessagingCodec
 

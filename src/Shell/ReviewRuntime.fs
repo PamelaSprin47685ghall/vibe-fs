@@ -1,6 +1,7 @@
 module VibeFs.Shell.ReviewRuntime
 
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 
 /// The full host-facing review store: pure registry kernel plus effect side-table.
 type ReviewStore =
@@ -45,7 +46,7 @@ let createReviewStore () : ReviewStore =
             let nextEffects = disposeSessionTree state.Effects (Map.keys state.Effects.pendingResolutions |> List.ofSeq)
             state <- { state with Effects = nextEffects; Registry = emptyRegistry }
         member _.tryLockReview(sessionID) =
-            if not (canTransition state.Registry sessionID (Lock sessionID)) then false
+            if not (canTransition state.Registry sessionID (ReviewCommand.Lock sessionID)) then false
             else
                 state <- { state with Registry = reduce state.Registry (RegistryAction.Lock(sessionID, sessionID)) }
                 true

@@ -3,10 +3,12 @@ module VibeFs.Tests.AgentNudgeSpecs
 open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.Nudge
+open VibeFs.Kernel.Nudge.Coordinator
 open VibeFs.Kernel.NudgeState
+open VibeFs.Kernel.Nudge.Types
 open VibeFs.Kernel.PromptFragments
 open VibeFs.Kernel.ReviewPrompts
-open VibeFs.Opencode.NudgeEventCodec
+open VibeFs.Shell.OpencodeSessionEventCodec
 
 
 let private nudgeContext todos msg runner loopActive =
@@ -165,46 +167,3 @@ let decodeLastAssistantNudge () =
                    user loopNudgePrompt
                    assistantWithWipTool |])
     check "loop nudge then wip tool clears dedup → alreadyNudged false" (not nudgedLoopThenWip)
-
-let alreadyNudgedFromTailTexts' () =
-    check "tail loop nudge only → true" (alreadyNudgedFromTailTexts [ loopNudgePrompt ])
-    check "tail wip ack only → false" (not (alreadyNudgedFromTailTexts [ submitReviewWipAcknowledgment ]))
-    check "loop nudge then wip ack → false"
-        (not (alreadyNudgedFromTailTexts [ loopNudgePrompt; submitReviewWipAcknowledgment ]))
-    check "todo nudge tail → true" (alreadyNudgedFromTailTexts [ todoNudgePrompt ])
-    check "empty tail → false" (not (alreadyNudgedFromTailTexts []))
-
-let submitReviewWipToolClearsNudgeDedup' () =
-    check "submit_review wip output clears" (submitReviewWipToolClearsNudgeDedup "submit_review" submitReviewWipAcknowledgment)
-    check "other tool does not clear" (not (submitReviewWipToolClearsNudgeDedup "read" submitReviewWipAcknowledgment))
-    check "submit_review non-wip output does not clear"
-        (not (submitReviewWipToolClearsNudgeDedup "submit_review" "Review passed."))
-
-let decideNudgeWipNeutralAlreadyNudged' () =
-    let loopReview (_: string) = true
-    let claimed, _ = tryClaimNudge emptyState "s"
-    let snap =
-        snapshot [] "still implementing" false None
-        |> fun s -> { s with alreadyNudged = false }
-    match snd (decideNudge loopReview noChild claimed "s" snap) with
-    | Send(text, _) -> check "wip-neutral snapshot allows loop nudge" (text = loopNudgePrompt)
-    | StandDown -> check "wip-neutral snapshot allows loop nudge" false
-
-    let snapStillNudged = snapshot [] "still implementing" true None
-    let _, d = decideNudge loopReview noChild claimed "s" snapStillNudged
-    equal "history still nudged → StandDown" StandDown d
-
-let submitReviewWipNudgeDedup () =
-    alreadyNudgedFromTailTexts' ()
-    submitReviewWipToolClearsNudgeDedup' ()
-    decideNudgeWipNeutralAlreadyNudged' ()
-
-let decodeTodosOpenItems () =
-    let todos =
-        decodeTodos
-            (box [|
-                box {| content = "finish feature"; status = "in_progress" |}
-                box {| content = "done item"; status = "completed" |}
-                box {| content = ""; status = "pending" |}
-            |])
-    equal "decodeTodos uses content not status" [ "finish feature" ] todos

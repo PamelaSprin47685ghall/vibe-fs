@@ -3,6 +3,7 @@ module VibeFs.Shell.KnowledgeGraphBookkeeperLaunch
 open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.DelegatedAiSettings
 open VibeFs.Shell.Dyn

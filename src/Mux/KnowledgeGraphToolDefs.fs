@@ -6,10 +6,13 @@ open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Kernel.ToolResult
 open VibeFs.Shell
+open VibeFs.Shell.PromiseStr
 
 open VibeFs.Kernel.ToolCatalog
 open VibeFs.Mux.Wrappers
-open VibeFs.Mux.KnowledgeGraphTools
+open VibeFs.Mux.KnowledgeGraphRuntimeMux
+open VibeFs.Mux.KnowledgeGraphRuntimeMuxSubmit
+open VibeFs.Mux.KnowledgeGraphRuntimeMuxQuery
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.KnowledgeGraphToolsCodec
 open VibeFs.Shell.ToolExecute

@@ -1,7 +1,7 @@
 module VibeFs.Shell.KnowledgeGraphRuntimeTestPorts
 
 open Fable.Core
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
 open VibeFs.Shell.KnowledgeGraphWorkflow
 
 type KnowledgeGraphRuntimeTestPorts =

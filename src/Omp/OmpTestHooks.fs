@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel.FuzzyPath
 open VibeFs.Kernel.FuzzyQuery
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.FuzzyIteratorStore
 open VibeFs.Shell.ReviewRuntime

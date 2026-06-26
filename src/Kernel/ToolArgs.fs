@@ -2,6 +2,7 @@ module VibeFs.Kernel.ToolArgs
 
 open VibeFs.Kernel.Executor
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 
 type ReadArgs = { Path: string; Offset: int option; Limit: int option }
 

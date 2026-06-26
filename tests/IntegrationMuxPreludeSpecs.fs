@@ -8,6 +8,7 @@ open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Tests.IntegrationMuxSetup
 
 open VibeFs.Kernel.KnowledgeGraph
+open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Mux.Plugin
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.Dyn

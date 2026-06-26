@@ -1,6 +1,7 @@
 module VibeFs.Kernel.ReviewVerdict
 
 open VibeFs.Kernel.ReviewSession
+open VibeFs.Kernel.ReviewSession.Types
 
 /// The reviewer's intent, decoded once at the LLM boundary. An explicit enum
 /// replaces the old nullable-feedback channel: a string "null" can no longer
@@ -29,8 +30,8 @@ type ReviewDecision =
 
 let decideReviewSubmission (verdict: Verdict) (feedback: string) (doubleCheckDone: bool) : ReviewDecision =
     match verdict with
-    | Reject -> Finalize(Rejected feedback)
-    | Pass when doubleCheckDone -> Finalize Accepted
+    | Reject -> Finalize(ReviewResult.Rejected feedback)
+    | Pass when doubleCheckDone -> Finalize ReviewResult.Accepted
     | Pass -> AskDoubleCheck
 
 // ── mux reportMarkdown text codec ────────────────────────────────────────────
@@ -51,11 +52,11 @@ let formatReviewVerdictMarkdown (verdict: Verdict) (feedback: string) : string =
 
 let parseReviewReportMarkdown (markdown: string) : ReviewResult =
     let trimmed = (if isNull markdown then "" else markdown).Trim()
-    if trimmed.ToUpperInvariant() = "PASS" then Accepted
+    if trimmed.ToUpperInvariant() = "PASS" then ReviewResult.Accepted
     elif trimmed.ToUpperInvariant().StartsWith "REJECT" then
         let afterColon =
             match trimmed.IndexOf(':') with
             | i when i >= 0 -> trimmed.Substring(i + 1).Trim()
             | _ -> ""
-        Rejected afterColon
-    else Terminated
+        ReviewResult.Rejected afterColon
+    else ReviewResult.Terminated

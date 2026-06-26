@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open VibeFs.Kernel
 open VibeFs.Kernel.Domain
 open VibeFs.Shell
+open VibeFs.Shell.PromiseStr
 
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.SearchPrompts

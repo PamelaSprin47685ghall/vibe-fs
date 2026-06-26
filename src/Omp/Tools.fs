@@ -1,7 +1,7 @@
 module VibeFs.Omp.Tools
 
 open VibeFs.Omp.FuzzyTools
-open VibeFs.Omp.KnowledgeGraphRuntime
+open VibeFs.Omp.KnowledgeGraph.Runtime
 open VibeFs.Omp.KnowledgeGraphTools
 open VibeFs.Omp.MessageTransform
 open VibeFs.Omp.ReviewTools
