@@ -7,6 +7,8 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.BacklogSessionCodec
 open Wanxiangshu.Omp.MagicTodo
+open Wanxiangshu.Tests.BacklogMessageBuilders
+open Wanxiangshu.Kernel.BacklogProjectionCore
 module Dyn = Wanxiangshu.Shell.Dyn
 
 /// Two `BacklogSession(omp)` instances must share the same backing store.
@@ -43,3 +45,24 @@ let backlogReportFromTodoInputHostAgnostic () =
 let inputOfPartNonTool () =
     let p : Part<obj> = TextPart "hi"
     equal "non-tool returns null" null (Wanxiangshu.Shell.BacklogSessionCodec.inputOfPart p)
+
+/// Mirror BacklogReplaySpecs.opencode: CaptureReport on BacklogSession(omp), replay
+/// with empty completedWorkReport in input, captured report is returned.
+let replayBacklogOmpFallsBackToCapturedReport () =
+    let session = Wanxiangshu.Omp.MagicTodo.BacklogSession omp
+    let callID = "omp-fallback-c1"
+    session.CaptureReport(callID, "captured omp report")
+    let input = box (createObj [ "completedWorkReport", box "" ])
+    let msgs =
+        [ { info = { mkInfo "m1" Assistant with sessionID = "test" }
+            parts =
+              [ ToolPart(
+                  todoWriteToolName Omp,
+                  callID,
+                  Some(mkState "completed" "Todos updated." input),
+                  null) ]
+            source = Native
+            raw = null } ]
+    let backlog = Wanxiangshu.Omp.MagicTodo.replayBacklogFor omp msgs
+    check "omp replay: one entry" (backlog.Length = 1)
+    equal "omp replay: captured report preserved" "captured omp report" backlog.[0].report

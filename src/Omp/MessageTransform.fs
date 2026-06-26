@@ -15,6 +15,7 @@ open Wanxiangshu.Omp.KnowledgeGraph.Runtime
 open Wanxiangshu.Omp.MagicTodo
 open Wanxiangshu.Omp.MessagingCodec
 open Wanxiangshu.Omp.ReadDedup
+open Wanxiangshu.Omp.ToolResultEvent
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FileSys
 open Wanxiangshu.Shell.MessageTransformCore
@@ -113,8 +114,8 @@ let appendToolResultSyntax (cwd: string) (event: obj) : JS.Promise<unit> =
     promise {
         let toolName = Dyn.str event "toolName"
         if toolName <> "read" && toolName <> "write" && toolName <> "edit" then return ()
-        let args = Dyn.get event "args"
-        let content = Dyn.str event "content"
+        let args = getToolInput event
+        let content = getToolResultText event
         let paths = extractFilePaths args
         match paths |> List.tryHead with
         | None -> ()
@@ -123,8 +124,7 @@ let appendToolResultSyntax (cwd: string) (event: obj) : JS.Promise<unit> =
             match extra with
             | None -> ()
             | Some diag ->
-                let existing = Dyn.str event "content"
-                event?content <- existing + "\n" + diag
+                setToolResultText event (content + "\n" + diag)
     }
 
 let registerContextTransform (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) : unit =

@@ -20,6 +20,7 @@ open Wanxiangshu.Tests.OmpSessionLifecycleTests
 open Wanxiangshu.Tests.OmpPluginCoreTests
 open Wanxiangshu.Tests.OmpTitleFetchGuardTests
 open Wanxiangshu.Tests.OmpMagicTodoTests
+open Wanxiangshu.Tests.OmpToolResultEventTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.SubagentIoTests
 
@@ -110,6 +111,20 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpMagicTodoTests.hostPartitionedReports", Sync (sync OmpMagicTodoTests.hostPartitionedReports)
     "OmpMagicTodoTests.backlogReportFromTodoInputHostAgnostic", Sync (sync OmpMagicTodoTests.backlogReportFromTodoInputHostAgnostic)
     "OmpMagicTodoTests.inputOfPartNonTool", Sync (sync OmpMagicTodoTests.inputOfPartNonTool)
+    "OmpMagicTodoTests.replayBacklogOmpFallsBackToCapturedReport", Sync (sync OmpMagicTodoTests.replayBacklogOmpFallsBackToCapturedReport)
+    "OmpToolResultEventTests.getToolInputPrefersInputOverArgs", Sync (sync OmpToolResultEventTests.getToolInputPrefersInputOverArgs)
+    "OmpToolResultEventTests.getToolInputFallsBackToArgs", Sync (sync OmpToolResultEventTests.getToolInputFallsBackToArgs)
+    "OmpToolResultEventTests.getToolInputReturnsNullishWhenNeitherPresent", Sync (sync OmpToolResultEventTests.getToolInputReturnsNullishWhenNeitherPresent)
+    "OmpToolResultEventTests.getToolCallIdPrefersToolCallId", Sync (sync OmpToolResultEventTests.getToolCallIdPrefersToolCallId)
+    "OmpToolResultEventTests.getToolCallIdFallsBackToCallId", Sync (sync OmpToolResultEventTests.getToolCallIdFallsBackToCallId)
+    "OmpToolResultEventTests.getToolCallIdFallsBackToCallID", Sync (sync OmpToolResultEventTests.getToolCallIdFallsBackToCallID)
+    "OmpToolResultEventTests.getToolCallIdReturnsEmptyWhenNonePresent", Sync (sync OmpToolResultEventTests.getToolCallIdReturnsEmptyWhenNonePresent)
+    "OmpToolResultEventTests.getToolResultTextFromContentArray", Sync (sync OmpToolResultEventTests.getToolResultTextFromContentArray)
+    "OmpToolResultEventTests.getToolResultTextFromContentArrayMixed", Sync (sync OmpToolResultEventTests.getToolResultTextFromContentArrayMixed)
+    "OmpToolResultEventTests.getToolResultTextFromStringContent", Sync (sync OmpToolResultEventTests.getToolResultTextFromStringContent)
+    "OmpToolResultEventTests.setToolResultTextLeavesReadableText", Sync (sync OmpToolResultEventTests.setToolResultTextLeavesReadableText)
+    "OmpToolResultEventTests.setToolResultTextPreservesArrayForm", Sync (sync OmpToolResultEventTests.setToolResultTextPreservesArrayForm)
+    "OmpToolResultEventTests.setToolResultTextContentIsStringAfterWrite", Sync (sync OmpToolResultEventTests.setToolResultTextContentIsStringAfterWrite)
     "OmpPluginCoreIntegrationTests.extensionIsIdempotent", Async OmpPluginCoreIntegrationTests.extensionIsIdempotent
     "OmpPluginCoreIntegrationTests.extensionRegistersLifecycleHooks", Async OmpPluginCoreIntegrationTests.extensionRegistersLifecycleHooks
     "OmpPluginCoreIntegrationTests.reviewStoreSharedWithTools", Async OmpPluginCoreIntegrationTests.reviewStoreSharedWithTools

@@ -41,12 +41,22 @@ let private normalizePatchArgs (toolName: string) (args: obj) : unit =
                 if fromText <> "" then
                     args?patchText <- box fromText
 
-/// Apply the Omp post-tool argument normalisations that must run before any
-/// downstream consumer (reviewer child, executor logs, kg bookkeeper) reads
-/// the args reference. Currently: patch argument unification to `patchText`
-/// and `_ui` label injection for subagent intents. Pure argument mutation,
-/// no IO; called from `SessionLifecycle.tool_result` since pi does not
-/// expose a `tool.execute.before` hook distinct from `tool_result`.
-let applyToolResultHook (toolName: string) (args: obj) : unit =
+/// Shared pre-execute normalisation: patch argument unification to `patchText`
+/// and `_ui` label injection for subagent intents. Called by both the
+/// `tool_call` pre-execute hook and the `tool_result` post-execute hook
+/// (the latter via `applyToolCallHook` to keep the logic in one place).
+let applyPreExecuteHook (toolName: string) (args: obj) : unit =
     normalizePatchArgs toolName args
     setUiLabel args toolName
+
+/// Apply the Omp pre-tool argument normalisations that must run before any
+/// downstream consumer reads the args reference. pi exposes a `tool_call`
+/// hook that fires pre-execute — this is the right insertion point.
+let applyToolCallHook (toolName: string) (args: obj) : unit =
+    applyPreExecuteHook toolName args
+
+/// Apply the Omp post-tool argument normalisations. pi does not expose a
+/// `tool.execute.before` hook distinct from `tool_result`, so the same
+/// normalisation also runs here for idempotency.
+let applyToolResultHook (toolName: string) (args: obj) : unit =
+    applyPreExecuteHook toolName args
