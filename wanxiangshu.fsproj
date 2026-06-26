@@ -323,6 +323,7 @@
     <Compile Include="src/Omp/ChildSession.fs" />
     <Compile Include="src/Omp/MagicTodo.fs" />
     <Compile Include="src/Omp/ReadDedup.fs" />
+    <Compile Include="src/Omp/ToolResultEvent.fs" />
     <Compile Include="src/Omp/KnowledgeGraphRuntimeIO.fs" />
     <Compile Include="src/Omp/KnowledgeGraph/Fetch.fs" />
     <Compile Include="src/Omp/KnowledgeGraph/Snapshot.fs" />
@@ -348,6 +349,7 @@
     <Compile Include="src/Omp/HookExecute.fs" />
     <Compile Include="src/Omp/AgentConfig.fs" />
     <Compile Include="src/Omp/OmpTestHooks.fs" />
+    <Compile Include="src/Omp/SessionCompacting.fs" />
     <Compile Include="src/Omp/SessionLifecycleHooks.fs" />
     <Compile Include="src/Omp/SessionLifecycle.fs" />
 
@@ -447,12 +449,14 @@
     <Compile Include="tests/OmpRunnerTests.fs" />
     <Compile Include="tests/OmpPluginCoreTests.fs" />
     <Compile Include="tests/OmpMagicTodoTests.fs" />
+    <Compile Include="tests/OmpToolResultEventTests.fs" />
     <Compile Include="tests/OmpPluginCoreIntegrationTests.fs" />
     <Compile Include="tests/OmpTitleFetchGuardTests.fs" />
     <Compile Include="tests/OmpAgentConfigTests.fs" />
     <Compile Include="tests/OmpHookExecuteTests.fs" />
     <Compile Include="tests/OmpKnowledgeGraphRuntimeTests.fs" />
     <Compile Include="tests/OmpSessionLifecycleTests.fs" />
+    <Compile Include="tests/OmpSessionCompactingTests.fs" />
     <Compile Include="tests/MethodologyTests.fs" />
     <Compile Include="tests/ReviewReplaySyncTests.fs" />
     <Compile Include="tests/CapsSynthCommonTests.fs" />

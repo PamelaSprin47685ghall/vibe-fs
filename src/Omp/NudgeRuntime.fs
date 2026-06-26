@@ -4,6 +4,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.Coordinator
 open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Omp.MessagingCodec
 
 let mutable private coordinator = freshCoordinator
@@ -16,25 +17,23 @@ let private tryNudge (sessionId: string) (context: NudgeContext) : NudgeAction o
     coordinator <- next
     if action = NudgeNone then None else Some action
 
-let tryLoopNudge (sessionId: string) (lastAssistantMessage: string) : bool =
+let tryLoopNudge (sessionId: string) (lastAssistantMessage: string) : NudgeAction option =
     let ctx =
         { todos = []
           lastAssistantMessage = lastAssistantMessage
-          hasActiveRunner = false
+          hasActiveRunner = hasRunningRunnerJob sessionId
           isLoopActive = true }
-    tryNudge sessionId ctx |> Option.map (fun a -> a = NudgeLoop) |> Option.defaultValue false
+    tryNudge sessionId ctx
 
-let tryTodoNudge (sessionId: string) (sessionManager: obj) (lastAssistantMessage: string) : bool =
+let tryTodoNudge (sessionId: string) (sessionManager: obj) (lastAssistantMessage: string) : NudgeAction option =
     let openTodos = openTodoStatuses sessionManager
-    if List.isEmpty openTodos then false
-    else
-        let ctx =
-            { todos = openTodos
-              lastAssistantMessage = lastAssistantMessage
-              hasActiveRunner = false
-              isLoopActive = false }
-        tryNudge sessionId ctx |> Option.map (fun a -> a = NudgeTodo) |> Option.defaultValue false
+    let ctx =
+        { todos = openTodos
+          lastAssistantMessage = lastAssistantMessage
+          hasActiveRunner = hasRunningRunnerJob sessionId
+          isLoopActive = false }
+    tryNudge sessionId ctx
 
 let loopReminderContent () = loopNudgePrompt
-
 let todoReminderContent () = todoNudgePrompt
+let runnerReminderContent () = runnerNudgePromptFor omp

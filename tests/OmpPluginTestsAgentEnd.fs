@@ -26,7 +26,7 @@ let agentEndRunnerNudgeBeforeLoop () = promise {
             "hasPendingMessages", box(fun () -> box false)
         ]
     do! invokeHandler h "agent_end" (createObj []) ctx
-    check "Opencode parity: no runner nudge on agent_end" (h.messages.Count = 0)
+    equal "runner reminder type" "wanxiangshu-runner-reminder" (lastMessageCustomType h)
 }
 
 let agentEndLoopNudgeWhenActive () = promise {

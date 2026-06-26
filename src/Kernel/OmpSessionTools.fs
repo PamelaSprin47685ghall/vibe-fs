@@ -42,3 +42,5 @@ let filterOmpMainSessionActiveTools (activeTools: string seq) : string array =
         withoutAlwaysStrip |> Array.filter (fun name -> not (childOnlySet.Contains name))
     else
         withoutAlwaysStrip
+
+let isChildOnlyTool (name: string) : bool = Set.contains name childOnlySet
