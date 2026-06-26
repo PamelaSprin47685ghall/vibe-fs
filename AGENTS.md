@@ -1,7 +1,6 @@
 ---
 import: 
   - README.md
-  - multi/BACKPORT.md
 ---
 
 - 提交仓库时候带上 kg/ 的变化

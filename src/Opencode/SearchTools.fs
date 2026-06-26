@@ -75,7 +75,7 @@ let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: VibeFs.Shell.FuzzyI
     buildFuzzyTool
         ToolSchemaModule.fuzzyGrep
         (box {| pattern = strMinNullish 1 Params.fuzzyGrepPattern; path = strOpt Params.fuzzyGrepPath
-                exclude = excludeOpt Params.fuzzyGrepExclude; caseSensitive = boolOpt Params.fuzzyGrepCaseSensitive
+                exclude = excludeOpt Params.fuzzyGrepExclude; caseSensitive = boolOptional Params.fuzzyGrepCaseSensitive
                 context = intMinNullish 0 Params.fuzzyGrepContext; limit = intMinNullish 1 Params.fuzzyGrepLimit
                 iterator = strOpt Params.fuzzyGrepIterator |})
         "fuzzy_grep"
@@ -117,7 +117,7 @@ let websearchTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =
 let webfetchTool (ctx: obj) : obj =
     define webfetch
         (box {| url = strReq Params.webfetchUrl
-                extract_main = boolOpt Params.webfetchExtractMain
+                extract_main = boolOptional Params.webfetchExtractMain
                 prefer_llms_txt = enumOpt [| "auto"; "always"; "never" |] Params.webfetchPreferLlmsTxt
                 prompt = strOpt Params.webfetchPrompt
                 timeout = numOpt Params.webfetchTimeout |})

@@ -11,7 +11,7 @@ let internal submitReviewSpec: ToolSpec =
             [ "report", "Detailed report of what was done"
               "affectedFiles", "List of file paths that were modified or created"
               "wip",
-               "Optional. Defaults to true when omitted. true means this submission is partial — the task is not fully complete yet. false means you assert the full task is complete in this submission." ]
+               "Optional, defaults to true when omitted. true records partial progress; false asserts full completion." ]
       requiredFields = [ "report"; "affectedFiles" ] }
 
 let internal returnReviewerSpec: ToolSpec =

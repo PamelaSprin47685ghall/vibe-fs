@@ -28,7 +28,7 @@ let private formatReviewResult = VibeFs.Kernel.ReviewPrompts.formatReviewResult
 
 let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: VibeFs.Shell.ReviewRuntime.ReviewStore) : obj =
     define submitReview
-        (box {| report = strReq Params.submitReviewReport; affectedFiles = strArrayOpt Params.submitReviewAffectedFiles; wip = boolOpt Params.submitReviewWip |})
+        (box {| report = strReq Params.submitReviewReport; affectedFiles = strArrayOpt Params.submitReviewAffectedFiles; wip = boolOptional Params.submitReviewWip |})
         (fun args context ->
             match decodeSubmitReviewArgs args with
             | Error e -> resolveStr (wireDecodeFailure "submit_review" e)
