@@ -1,0 +1,8 @@
+Opencode HookSchema:
+setUiLabel: 将 _ui 字段写入 host args 引用（不替换引用，防止丢失）。
+mergeWorkBacklogReportIntoTaskSchema: 为 Mimocode 的 task 工具扩展 completedWorkReport + select_methodology 字段。
+extendZodTaskSchema: 使用 Zod safeExtend/extend 动态添加字段。
+buildWorkBacklogSchema: JSON Schema 格式完整 schema。
+stripUiFromJsonSchema: 移除 _ui 字段（给 reviewer 等下游用）。
+rewriteToolJsonSchema: 重写工具的 jsonSchema/parameters。
+fusedTaskToolDescription: Mimocode 的 task 工具描述 = toolDescriptionFor Mimocode。

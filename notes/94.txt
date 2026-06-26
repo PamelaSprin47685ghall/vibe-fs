@@ -1,0 +1,11 @@
+Shell FileToolsCodec:
+ReadArgs = { Path; Offset; Limit }
+WriteArgs = { FilePath; Content }
+decodeReadArgs: path 必填验证。
+readArgsForHost: 构建 host read 参数对象（含可选 offset/limit）。
+decodeWriteArgs: file_path + content 必填验证。
+Shell FileSys:
+read: 路径解析 → stat → 目录列表/文件读取 + 行号。
+write: mkdir parent → writeFile → syntax check → formatWriteSyntaxResult。
+sha256HexTruncated: sha256 → 16 位 hex（能力文件指纹）。
+resolve/basename/extname/dirname: path 模块封装。

@@ -1,0 +1,7 @@
+Omp ReviewTools:
+registerLoopFeatures: 注册 /loop 和 /loop-review 命令 + submit_review + return_reviewer 工具。
+handleLoopCommand: 激活/取消循环模式，发送循环激活消息。
+handleLoopReviewCommand: 先预审查 (runPreReviewerSession) → Rejected → 激活循环 + 发送预审查反馈。
+submit_review 工具实现：检查 isReviewActive → tryLockReview → wip 处理 → runReviewLoop → unlockReview。
+return_reviewer 工具实现：parseVerdict → Pass/Reject → resolvePendingReview。
+Omp 审查使用 ChildSession (子 session) + runReviewLoop (nudge 循环)，与 Opencode 的 ReviewerLoop 结构相同但 API 不同。

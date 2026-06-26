@@ -1,0 +1,8 @@
+Mux ReviewToolsMux:
+submitReviewTool: 验证 workspaceId → syncReviewTaskFromHistory → tryLockReview → wip 处理 → 两轮审查（review + double-check）。
+runReviewRound: delegateToSubAgent → parseReviewReportMarkdown。
+reviewerOpts: 设置 reviewer role + disabledTools。
+syncReviewTaskFromHistory: 从消息历史推断审查任务 → 同步到 store。
+disabledToolsForReviewer: reviewer 角色禁用工具列表。
+Mux 审查使用 workspace task API 委托审查任务，与 Opencode 的 client session 创建不同。
+SlashCommands: /loop 和 /loop-review 命令，/loop-review 包含预审查步骤。

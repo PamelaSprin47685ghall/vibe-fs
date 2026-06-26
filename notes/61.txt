@@ -1,0 +1,12 @@
+Opencode PluginCore 注册流程：
+pluginFor: 创建 CoreServices → 注册 hooks → 返回插件对象。
+registerHooks:
+  chat.message: 过滤工具权限。
+  tool.definition: 重写 todowrite schema。
+  tool.execute.before: 注入 UI label + rewriteMimocodeApplyPatchArgs。
+  tool.execute.after: 语法检查 + 知识图 bookkeeper 记录 + lifecycle observer。
+  experimental.chat.messages.transform: 消息变换管道。
+  command.execute.before: /loop 和 /loop-review 命令处理。
+  event: 审查清理 + 知识图 job 清理 + lifecycle observer。
+  experimental.session.compacting: 回溯折叠。
+  experimental.chat.system.transform: 系统消息长度清零。

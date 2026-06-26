@@ -1,0 +1,7 @@
+Opencode HookExecute:
+toolExecuteBefore: 注入 UI label (coder/investigator) + 重写 apply_patch 参数。
+toolExecuteAfterFor: 语法检查 + bookkeeper 记录 + lifecycle observer。
+isReadOnlyExecutor: mode=ro 的 executor 不记录到 bookkeeper。
+bookkeeperInput: args → JSON 字符串，作为 bookkeeper 的 work_input。
+recordsToBookkeeper: isFileEditTool || bookkeepingSubagentTools (coder/investigator/meditator/browser/executor/websearch/webfetch/write/apply_patch/patch)。
+appendSyntaxDiagnostics: 文件编辑工具输出后追加语法诊断。

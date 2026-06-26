@@ -1,0 +1,8 @@
+消息模型 Message<'raw>：
+Role = User | Assistant | ToolResult | System
+Part<'raw> = TextPart | ToolPart(toolName, callID, state?, raw) | RawPart
+ToolState<'raw> = { status; output; error; input; operationAction }
+MessageInfo<'raw> = { id; sessionID; role; agent; isError; toolName; details; time }
+Source = Native | Synthetic(kind)
+'raw 是 host 原生对象引用，Kernel 不解析，Shell 编解码。
+classifySource: 前缀匹配合成消息 (caps-synth-*, backlog-projection-*, magic-todo-*, methodology-probe-*)。

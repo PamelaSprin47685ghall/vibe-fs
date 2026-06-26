@@ -1,0 +1,8 @@
+DomainError 关键原则：
+isAbort: 仅 MessageAborted 返回 true，其他所有错误（包括 SessionBusy）返回 false。
+containsAbortText: 消息含 "abort" 子串 → MessageAborted。
+ChildSessionMeta = { agent; parentSessionId }
+WorkspaceState = { childSessions: Map<ChildId, ChildSessionMeta> }
+WorkspaceEvent = ChildRegistered | ChildUnregistered
+reduce: 纯函数状态机，事件驱动 child session 注册/注销。
+nowMs: DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()，Shell 层唯一时间源。

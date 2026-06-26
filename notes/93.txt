@@ -1,0 +1,14 @@
+Shell PatchToolsCodec:
+ApplyPatchFields = { PatchText }
+decodeApplyPatchFields: 支持三种参数格式 — 字符串直接作为 patchText，对象从 patchText/patch/text 字段提取。
+Shell ExecutorToolsCodec:
+ExecutorArgs = { Language; Program; Dependencies; TimeoutType; Mode }
+decodeExecutorArgs: 验证 language/program/mode 必填。
+toExecuteOptions: ExecutorArgs → ExecuteOptions。
+peekExecutorMode: 提前提取 mode 字段（用于 bookkeeper 过滤）。
+Shell WebToolsCodec:
+WebsearchArgs/WebfetchArgs 解码 + 字段验证。
+optPreferLlmsTxt: "auto"/"always"/"never" 枚举验证。
+Shell ReviewToolsCodec:
+SubmitReviewArgs/ReturnReviewerArgs 解码。
+decodeReturnReviewerArgs: verdict 严格解析 (PASS/REJECT)。

@@ -1,0 +1,9 @@
+Opencode ReviewerLoop:
+createReviewerChild: 通过 client session API 创建子 session。
+runReviewerLoop: prompt → waitForIdle → 循环 nudge (最多 maxNudges=3 次)。
+decideAfterRound: Resolved → Finish; PromptFailed → Finish(Terminated); NoResult → Nudge/Finish。
+promptParts: 首轮 initialParts，后续轮 nudgePrompt。
+runSubmitReview: 创建 reviewer → runReviewerLoop。
+runReviewerSession: 预审查模式，返回 ReviewResult。
+runReviewLoop (OMP): 与 Opencode 类似但使用 ChildSession + pi API。
+ReviewerLoop 在 Opencode 中使用 client session API（子 session），OMP 中使用 createChildSession。

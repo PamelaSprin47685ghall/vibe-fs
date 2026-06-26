@@ -1,0 +1,11 @@
+Shell OpencodeAgentConfigCodec:
+PermissionOverrides = Map<string, string>
+ToolsOverrides = Map<string, bool>
+UserAgentScalars = { Prompt; Mode; Permission; Tools; Mcps }
+decodeUserAgentScalars: host user agent → 类型化配置。
+encodeAgentScalarsRecord: 类型化配置 → host 对象。
+mergePermissionOverrides/mergeToolsOverrides: 默认值 + 用户覆盖。
+OpencodeAgentConfigWire:
+applyAgentConfigFor: 禁用原生记忆/检查点 → 注入 vibe 代理 → 合并工具权限 → 返回新配置。
+disableMimoMemoryAndCheckpoint: 禁用 dream/distill/checkpoint-writer + checkpoint/memory 配置。
+disableMimoWorkflowToolsForAgents: Mimocode 模式下禁用所有 agent 的 workflow 工具。

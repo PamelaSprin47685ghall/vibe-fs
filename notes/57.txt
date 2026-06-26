@@ -1,0 +1,9 @@
+Shell SubagentIntentsCodec:
+coder/investigator intents 参数验证和解析。
+parseCoderIntent: objective/background 非空 + targets 非空数组 + do_not_touch 可选。
+parseInvestigatorIntent: objective/background/entries 非空 + questions 非空数组。
+foldArrayResult: 数组遍历累积 Result，任一失败则短路。
+joinCoderUiLabel/joinInvestigatorUiLabel: intents → UI label 字符串（分号分隔的 objectives）。
+intentsRawFromArgs: 从 args 提取原始 intents 字段。
+SubagentSimpleArgsCodec: meditator/browser 简单参数解码（无 intents 数组）。
+ToolArgsDecode: decodeToolInvocation 将 toolName + args → DecodedToolInvocation。

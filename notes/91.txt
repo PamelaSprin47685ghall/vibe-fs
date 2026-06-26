@@ -1,0 +1,10 @@
+Shell MuxAiSettingsCodec:
+DelegatedAiSettings = { modelString; thinkingLevel }
+MuxDelegateAiConfig = { Execution; Runtime; Cwd }
+decodeMuxDelegateConfig/decodeMuxDelegateConfigLenient: 严格/宽松解析。
+readMuxConfigFileDefaults: 从配置文件读取 subagentAiDefaults + agentAiDefaults。
+readWorkspaceAiSettingsByAgent: 从 workspace 配置读取 aiSettingsByAgent。
+readDescriptorAiFromFrontmatter: 从 front-matter 读取 ai 设置。
+buildParentRuntimeAiSettings: 从 MUX_MODEL_STRING/MUX_THINKING_LEVEL 环境变量构建。
+mergeNamedSettings: 多源设置合并（先到先得）。
+coerceThinkingLevel: 规范化 thinking level 字符串 (med/off/low/medium/high/xhigh/max)。

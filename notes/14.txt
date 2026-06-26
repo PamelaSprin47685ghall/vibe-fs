@@ -1,0 +1,8 @@
+LoopMessages 循环消息协议：
+taskField/originalTaskField/verdictField/commandField — front-matter 键名。
+verdictAccepted/Rejected/Terminated/Cancelled — 裁定值。
+isEndVerdict: accepted/cancelled 终止循环，reject/terminate 保持活跃。
+loopCancelledMessage: front-matter { verdict: cancelled } + "With-Review Mode cancelled."。
+buildLoopMessage: task + body → front-matter { task } + body + loopFooter。
+inferReviewTaskFromTexts: 纯函数 fold 历史文本 → 当前审查任务。task 字段激活，END verdict 清除。
+hasDoubleCheckAnchor: 检查历史中是否含 double-check 前注。

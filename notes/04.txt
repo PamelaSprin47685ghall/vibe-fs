@@ -1,0 +1,7 @@
+Domain.fs 强类型 ID 体系：
+SessionId, WorkspaceId, AgentId, ToolId, CallId, ChildId — 均为 private constructor 的包装类型。
+Id.sessionId/workspaceId/agentId 返回 Result，Id.sessionIdQuick 跳过验证（运行时边界用）。
+Id.trySessionId 返回 Option，用于 host 端宽松解析。
+DomainError DU: MessageAborted | SessionBusy | TaskWaitBackgrounded | ExecutorExecutableMissing | ParseError | ToolNotPermitted | InvalidIntent | UpstreamTimeout | UpstreamRefused | SystemPanic | UnknownJsError
+formatDomainError: 每个 case → 确定字符串，无 fallback。
+classifyErrorLeaf: host error name/tag → DomainError，含 AbortError/SessionBusyError 模式匹配。

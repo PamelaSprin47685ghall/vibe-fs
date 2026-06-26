@@ -1,0 +1,8 @@
+Omp Plugin 注册流程：
+pluginFor: 安装 title fetch guard → patchDisablePrune → createCoreServices → applyAgentConfigIfSupported → registerHooks。
+registerHooks:
+  registerAllTools: 注册所有工具 (fuzzy/executor/subagent/todo/methodology/review/context transform/kg tools)。
+  registerInputHandler: /loop 命令输入处理。
+  registerSessionLifecycle: before_agent_start/tool_result/agent_end/session_start/session_shutdown 钩子。
+  registerAbortHandler: session 中止/删除事件 → 清理审查 + nudge + KG job。
+patchDisablePrune: 修改 pi 的 DEFAULT_PRUNE_CONFIG，设置 protectTokens/minimumSavings 为 Double.MaxValue 禁用压缩。

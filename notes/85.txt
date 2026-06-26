@@ -1,0 +1,9 @@
+MessagingPartCodec 消息部件编解码：
+decodeOpencodeToolStateBox: 解析 opencode 工具状态对象 → ToolState<obj>。
+decodeMuxDynamicToolState: 解析 Mux dynamic-tool 状态 → ToolState<obj>。
+muxPartStateToKernelStatus: "output-available" → "completed", "input-available" → "pending"。
+operationActionFromInput: 从 input.operation.action 提取操作行为。
+toolOutputAndErrorFromHostOutput: 从 host output 对象提取 output/error。
+decodeTextPart: 提取 text part 的文本内容。
+decodePartsFromArray: 安全的 parts 数组提取。
+HostMessagePartCodec: 轻量级 part 读取（用于去重/文本投影）。

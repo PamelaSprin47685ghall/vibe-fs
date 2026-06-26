@@ -1,0 +1,7 @@
+Shell ErrorClassify 错误分类：
+translateJsError: obj → DomainError，递归遍历 error.cause 链。
+循环引用检测：seen 列表防止无限递归。
+classifyErrorLeaf: name/_tag 模式匹配 + message abort 文本检查。
+关键映射：AbortError/MessageAbortedError → MessageAborted; SessionBusyError → SessionBusy; ForegroundWaitBackgroundedError → TaskWaitBackgrounded。
+isAbortDomainError: translateJsError 结果 = MessageAborted。
+Shell 层统一错误翻译，Kernel 层 DomainError 是纯 DU 无 host 依赖。

@@ -1,0 +1,9 @@
+Opencode PluginMimo + PluginMimoTui:
+PluginMimo: Mimocode 宿主插件入口，使用 pluginFor mimocode ctx。
+PluginMimoTui: Mimocode TUI 插件，提供子代理切换 UI。
+installTodoFallback: 当 todo API 返回空时从消息历史恢复 todo。
+fetchVisibleChildren: 获取可见子 session（过滤 checkpoint-writer）。
+showSubagentDialog: 显示子代理切换对话框。
+registerCommands: 注册 /subagents 命令。
+MimoTodoTool: Mimocode 的 task 工具 — 验证 completedWorkReport + todos + select_methodology。
+Mimocode 的 task 工具通过工具定义钩子 (tool.definition) 扩展 Zod schema 添加 completedWorkReport/select_methodology 字段。

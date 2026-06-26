@@ -1,0 +1,11 @@
+Dedup 读取去重：
+DedupedOutput = { output; seenOutputs }
+deduplicate: 新输出是任一已见输出的子串 → 返回 NoChange 信封；否则追加到已见列表。
+isNoChangeOutput: 解析输出是否含 NoChangeSincePreviousReadWrite body ref。
+ReadPayload = { path; content }
+DedupVerdict = AlreadySeen | NewContent
+processDedup: 按路径去重。
+foldDedup: 批量去重，返回新状态 + (输出列表, 是否替换标记列表)。
+Opencode 实现 (ReadDedupOpenCode): 原地修改消息数组的 state.output，替换为 noChangeEnvelope。
+Omp 实现 (ReadDedup): 同模式，适配 OMP 的消息结构。
+Mux 实现 (ReadDedupMuxPlugin): 处理 dynamic-tool 类型部件。

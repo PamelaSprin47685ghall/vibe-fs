@@ -1,0 +1,8 @@
+Omp MessageTransform:
+transformEntriesAsyncWithAgent: 宿主消息变换 — 解码 → 清洗 → 回溯 → 编码 → 去重 → caps → KG → 构建合成消息。
+resolveAgent: 从 sessionManager 提取 agent 名。
+beforeAgentStart: 剥离 host agents prompt 中的 <dir-context>。
+appendToolResultSyntax: read/write/edit 工具输出后追加语法诊断。
+registerContextTransform: 注册 context/before_context 事件处理器。
+Omp 的消息变换通过 pi.on("context") 和 pi.on("before_context") 触发，与 Opencode 的 experimental.chat.messages.transform 对应。
+OmpCapsCodec: OMP 版本的能力文件合成消息构建。

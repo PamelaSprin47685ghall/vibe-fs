@@ -1,0 +1,12 @@
+Shell KnowledgeGraphFiles 文件 IO:
+kg 目录结构：workspaceRoot/kg/<date>.ndjson
+dayPath: kg/<date>.ndjson
+ensureKnowledgeGraphDir: 创建 kg 目录。
+readKnowledgeGraphFiles: 读取所有 .ndjson 文件（排除 snapshot.ndjson），按文件名排序。
+ensureTodayFile: 今日文件不存在则创建含 header 的空文件。
+appendEntries: 追加 entry 行到今日文件。
+rewriteDay: 原子重写 — 先写 .tmp 再 rename。
+listDayFiles: 列出所有日期。
+readProjection: 读文件 → projectLatestWins。
+withKnowledgeGraphPortLock: 端口锁互斥（基于 workspaceRoot hash → 49152-65535 端口）。
+appendEntriesUnderLock / rewriteDayUnderLock: 加锁写入。

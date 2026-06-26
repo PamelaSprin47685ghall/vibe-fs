@@ -1,0 +1,7 @@
+Nudge 轻推系统核心：
+NudgeAction = NudgeTodo | NudgeLoop | NudgeRunner | NudgeNone
+NudgeContext = { todos; lastAssistantMessage; hasActiveRunner; isLoopActive }
+decide: 优先级 — 有开放 todo → NudgeTodo；有活跃 runner → NudgeRunner；循环活跃 → NudgeLoop；否则 NudgeNone。
+抑制条件：消息以 ? 结尾（疑问）或含 <skip-todo-check/> / <skip-loop-check/> → NudgeNone。
+isInsideCodeFence: 代码 fence 内的 ? 不触发 nudge，避免误判代码中的问号。
+Coordinator: 跨 session 去重状态机，同一消息不重复发送相同 nudge。

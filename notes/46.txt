@@ -1,0 +1,12 @@
+Shell FuzzySearch 体系：
+SearchOptions = { cwd; scopeId; store; finderCache }
+TypedIteratorStore = { findIterators; grepIterators; counter; maxIterators }
+storeFindIterator/storeGrepIterator: 存储分页状态，返回迭代器 ID。
+consumeFindIterator/consumeGrepIterator: 消费迭代器（一次性）。
+clearTypedIteratorScope: 清理指定 scope 的所有迭代器（session 关闭时）。
+FuzzySearchHelpers:
+acquireFinderFromOptions: 外部路径 → createFinder，缓存路径 → finderCache.Get。
+runWithFinder: 执行后释放外部 finder。
+resolveIteratorBranch: 有 iterator → consume，无 → onFresh。
+FuzzySearchFind/Grep: 具体搜索执行 + 迭代器管理。
+FinderCache: 按 cwd 缓存 FinderLike 实例，惰性创建 + 队列保护并发。

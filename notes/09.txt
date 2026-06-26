@@ -1,0 +1,14 @@
+ToolPermission 权限矩阵：
+ToolSemantic = AgentReport | BlockedShellTaskGrep | StealthBrowser | ReturnRoleEcho | TodoFamily | Read | WritePatchFamily | FuzzyGrep | SubagentWebSkillOrSubmit | Other
+classifyTool: 工具名 → 语义分类，先 normalizeToolName。
+canUseSemantic: (agent, semantic, tool) → bool，规则表：
+  - AgentReport: 全允许
+  - BlockedShellTaskGrep: 全禁止
+  - StealthBrowser: 仅 browser agent
+  - ReturnRoleEcho: 仅 return_{agent}
+  - bookkeeper/meditator/executor: 全禁止
+  - TodoFamily/Read: 全允许
+  - reviewer/browser: 全禁止
+  - investigator: 仅 SubagentWebSkillOrSubmit 中的 executor 允许
+  - WritePatchFamily: investigator/manager 禁止
+deniedToolsForHost: 给定 host+agent，过滤不可用工具。

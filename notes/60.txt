@@ -1,0 +1,9 @@
+Shell DelegateToolsCodec:
+DelegateHostConfig = { WorkspaceId; TaskService; AbortSignal }
+DelegateOptionsFields = { Experiments; AiSettingsAgentId }
+decodeDelegateConfig: config → DelegateHostConfig，验证 workspaceId 和 taskService。
+decodeDelegateOptions: 解析子代理选项（experiments + aiSettingsAgentId）。
+decodeTaskCreateResult: task.create 结果 → TaskCreateResult。
+decodeTaskReport: task.waitForAgentReport 结果 → reportMarkdown。
+decodeSubagentRole: 从 config 提取 subagentRole。
+Mux 的 delegate 机制通过 taskService (workspace task API) 创建子工作区任务。

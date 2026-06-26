@@ -1,0 +1,8 @@
+WorkBacklog 工作回溯：
+toolDescription: todowrite 工具描述，强调 completedWorkReport 的重要性。
+replayBacklogWith: 纯函数 — 从消息列表重放回溯，提取 todo 结果中的 report。
+reportOf 参数注入 host 特定的报告提取逻辑。
+BacklogEntry 仅含 report 字段，append-only 列表。
+Mux/Opencode/Omp 的 BacklogSession 封装 GetOrRebuildBacklog:
+  有消息 → ReplayBacklog → StoreBacklog 缓存；无消息 → TryGetBacklog。
+reportFromFlatPartWithProjection: 优先取 input.completedWorkReport，次之取投影缓存。

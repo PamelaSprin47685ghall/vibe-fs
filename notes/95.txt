@@ -1,0 +1,9 @@
+Shell RuntimeScope:
+RuntimeScope = 宿主运行时作用域，持有 ProjectionStore + CapsFiles 缓存 + IteratorStore + SessionQueues。
+ProjectionStore: 按 Host 分组的 report 缓存 + backlog 缓存。
+CapsFiles: 按 key(sessionID+\0+directory) 缓存，含并发加载去重 (GetOrLoadCapsInflight)。
+IteratorStore: 模糊搜索迭代器状态存储。
+SessionQueues: 每 session 串行执行队列。
+EnqueuePerSession: 按 session ID 串行化异步工作。
+ClearCapsFiles/ClearIterators/ClearSessionQueues: 测试清理。
+Scope 在插件注册时创建，贯穿整个插件生命周期。

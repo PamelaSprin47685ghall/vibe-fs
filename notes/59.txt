@@ -1,0 +1,10 @@
+Shell OpencodeClientCodec + HookInputCodec:
+getClientFromPluginCtx: 从插件上下文提取 client 对象。
+getSessionApiFromClient: 从 client 提取 session API (create + prompt)。
+OpencodeHookInputCodec:
+sessionIdFromHookInput/toolNameFromHookInput/argsFromHookInput: 读取 hook input。
+hookOutputError/hookOutputText/hookOutputString/setHookOutputString: 读写 hook output。
+resolveMessagesTransformAgent: 显式 agent → 子 agent → 消息推断 → default。
+resolveHookAgent: 类似但用于 chat hook。
+registerLoopReviewCommands: 注册 /loop 和 /loop-review 命令模板。
+ensureCommandTemplate: 确保 cfg.command 中存在指定命令模板。

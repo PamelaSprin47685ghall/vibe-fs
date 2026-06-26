@@ -1,0 +1,6 @@
+架构总览：三层 + 三宿主
+Kernel = 纯 F# 代数类型 + 纯函数，零副作用，零 host 依赖，可测试可审计可重放。
+Shell = Fable 编译到 JS 的宿主适配层，Dyn<'T> 桥接 host obj 与 Kernel 类型，IO 在 Shell 完成。
+Host = Opencode (CLI+TUI), Mux (多工作区网关), Omp (oh-my-pi 编辑器插件)。各宿主共享 Kernel，独立 Shell 适配。
+HostTools.Host DU = Opencode | Mimocode | Mux | Omp，贯穿权限/工具名/回溯。
+核心循环：Host 事件 → Shell 解码 → Kernel 纯函数 → Shell 编码 → Host 输出。

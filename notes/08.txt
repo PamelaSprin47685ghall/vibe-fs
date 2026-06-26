@@ -1,0 +1,8 @@
+ToolCatalog 工具注册中心：
+ToolSpec = { name; description; paramDocs; requiredFields }
+all: 所有工具规格列表，硬编码。
+specOf/paramDoc/description: 按名查询。
+ToolCatalog.Params: 每个参数字段 doc string 常量，单真相源。
+Classification.isFileEditTool: edit/write/ast_edit/ast_grep_replace/file_edit_replace_string/file_edit_insert/apply_patch。
+subagentRequiredKeys: 子代理工具必须字段列表（来自 ToolSpec.requiredFields）。
+Kernel 层仅描述规格，不执行。执行在 Shell/Mux/Omp/Opencode 各自实现。

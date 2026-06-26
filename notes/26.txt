@@ -1,0 +1,11 @@
+KnowledgeGraph Maintenance + RuntimeState:
+parseDate: "yyyy-MM-dd" → DateTime option。
+dayFileSummary: 文件列表 → (date, rewritten) 排序列表。
+dueMaintenance: 纯函数 — 给定文件 + 当前时间 → 需要重写的过昨日文件列表（最多 1 个）。
+bookkeeperMaintenanceLaunch: 纯函数构建 BookkeeperLaunch 记录 + dedup key。
+RuntimeState:
+KnowledgeGraphState = { sessionSnapshots; bookkeeperLaunches; scheduledMaintenance }
+BookkeeperLaunch = { agent; title; prompt; result }
+cacheSnapshot/recordLaunch/updateLatestLaunchResult/recordLaunchOnce/drainLaunches: 状态转换函数。
+normalizeDraftIds: 草稿中不存在于投影的 id → None，确保新条目分配新 id。
+KnowledgeGraphCommand DU: 命令式状态机 reducer。

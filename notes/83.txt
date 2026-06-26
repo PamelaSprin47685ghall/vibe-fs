@@ -1,0 +1,8 @@
+Mux EventHook + KnowledgeGraphRuntime:
+createEventHook: 解析 stream-end/stream-abort/error 事件 → NudgeRuntimeEvent。
+cleanupOnAbort: 中止事件 → 清理审查状态 + KG job。
+Mux KnowledgeGraphRuntimeMux: Mux 版 KG 运行时，使用 SerialQueue + commandQueue + writeQueue。
+Submit: 历史幂等检查 → 解析 job context → 串行化写入 → 启动维护。
+StartBookkeeperAppend: 记录 launch → 启动维护 → 后台启动 bookkeeper (通过 delegateToSubAgent)。
+StartMaintenanceIfDue: commandQueue 串行化维护检查。
+Mux 使用 delegateToSubAgent 创建 bookkeeper 任务，与 Opencode 的 client session API 和 OMP 的 ChildSession 不同。

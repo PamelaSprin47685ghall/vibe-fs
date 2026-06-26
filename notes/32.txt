@@ -1,0 +1,11 @@
+Subagent 子代理系统：
+SubagentTaskKind = Coder | Investigator | Meditator | Browser | ExecutorSummary | WebsearchSummary
+formatPrompt: 任务类型 → 提示文本列表（coder/investigator 每个 intent 一个提示）。
+CoderIntent = { objective; background; targets; doNotTouch }
+InvestigatorIntent = { objective; background; questions; entries }
+MeditatorFileSection = { file; content option }
+coderPrompt: front-matter(objective, background, targets) + 只读约束 + 实施说明。
+investigatorPrompt: front-matter + 搜索说明。
+meditatorPrompt: 文件内容 sections + 问题 → 纯思考环境提示。
+executorSummarizerPrompt: 原始输出 → 摘要过滤提示。
+websearchSummarizerPrompt: 搜索结果 → 摘要提示。

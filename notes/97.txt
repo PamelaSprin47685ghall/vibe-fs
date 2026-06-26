@@ -1,0 +1,9 @@
+BacklogSessionCodec:
+backlogReportFromTodoInput: 从工具 input 提取 completedWorkReport。
+reportFromFlatPartWithProjection: 从 flat part 提取报告 — 优先 input.completedWorkReport，次之投影缓存。
+BacklogSession 三宿主实现：
+  Opencode: BacklogSession(host, scope)，使用 RuntimeScope.Projection。
+  Mux: BacklogSession(scope)，使用 RuntimeScope.Projection。
+  Omp: BacklogSession(host) + MagicTodo 使用静态 ProjectionStore。
+replayBacklogWith: 纯函数重放消息 → BacklogEntry list。
+projectBacklogFor: 回溯投影 → 消息折叠。

@@ -1,0 +1,9 @@
+Shell ChildAgentRegistry:
+基于 Domain.WorkspaceState 的事件溯源状态机包装。
+RegisterChildAgent: 注册子 session ID + agent 名 + 父 session ID。
+LookupChildAgent: session ID → agent 名。
+ResolveSubsessionParentID: 递归查找最顶层父 session ID（非 child session）。
+UnregisterChildAgent: 注销。
+parseChildId/parseSessionId: 严格/宽松解析。
+每 session 串行执行由 SessionExecutor 提供，非本模块职责。
+在 Opencode 的 NudgeEffect 和 Mux 的 EventHook 中用于查找子 session 的 agent。

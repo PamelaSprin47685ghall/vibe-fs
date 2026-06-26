@@ -1,0 +1,11 @@
+Opencode NudgeEffect:
+StateHolder<'state>: 可变状态持有器 + Mutate 转换函数。
+collectSnapshot: 从 client API 收集待办 + 消息历史 → SessionSnapshot。
+sendNudge: 通过 client session API 发送 nudge prompt。
+runNudgeFlow: collectSnapshot → decideNudge → Send → recordSend。
+startNudgeFlow: fire-and-forget 启动 nudge 流。
+SessionLifecycleObserver:
+handleChatMessage: 用户消息 → resumeSession。
+handleCommandExecuteBefore: resumeSession。
+handleToolExecuteAfter: todowrite → 注入 methodology hint + meditator hint; submit_review wip → resumeSession。
+handleEvent: decodeHostEventEnvelope → NudgeState.handleEvent → 触发 nudge。

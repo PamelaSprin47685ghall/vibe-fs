@@ -1,0 +1,8 @@
+TodoStatus + SubmitReviewHooks:
+TodoStatus = Completed | Cancelled | Abandoned | InProgress | Pending
+isTerminal: Completed/Cancelled/Abandoned 为终态。
+isTerminalAssistantFinish: 不包含 "tool"/"abort" 的 finish 原因。
+isSyntheticAssistantAgent: compaction/bookkeeper/title 不触发 nudge。
+alreadyNudgedFromTailTexts: 从消息尾部向前扫描，submit_review wip ack 清除 nudge 标记，nudge prompt 设置标记。
+submitReviewWipToolClearsNudgeDedup: wip 进度提交清除去重状态。
+RetryProgress: 重试进度事件/部件类型集合，用于过滤不触发 nudge 的事件。

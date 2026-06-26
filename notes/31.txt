@@ -1,0 +1,9 @@
+Caps 能力文件系统：
+CapsFile = { filePath; label; content }
+CapsSynthPolicy: 合成消息 ID 前缀 caps-synth-user-/caps-synth-assistant-。
+stableFingerprint: hashFn(filePath + \0 + content + \0 + ...)，指纹稳定。
+buildCapitalsContext: 能力文件 → YAML front-matter 上下文。
+userCapsText: prelude + thinkWrapped，无 prelude 则纯 thinkWrapped。
+findFirstNonSynthMessage: 跳过合成消息找到第一个真实消息作为锚点。
+stripLeadingCapsSynth: 剥离开头所有合成消息。
+Opencode/Omp/Mux 各自实现 buildCapsMessages，适配宿主消息结构。

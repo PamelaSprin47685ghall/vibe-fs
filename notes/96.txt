@@ -1,0 +1,9 @@
+Mux PluginCatalog:
+buildToolPolicy: 工具名数组 + role → { add; remove }，用于 Mux 子工作区工具策略。
+muxToolNames: 所有 Mux 工具名（含 methodology 工具）。
+canUseMuxTopLevel: canUseForHost mux。
+createToolCatalog: 创建所有工具定义数组。
+工具条件: knowledge_graph_fetch/return_bookkeeper 仅在 kg 目录存在时显示。
+Stealth Browser MCP: 从 STEALTH_BROWSER_MCP_REF 环境变量配置。
+Mux 的 MCP 服务器通过 uvx 启动，配置在 mcpServers 中返回。
+PluginRegistration: 组装所有注册对象 → 返回 host。

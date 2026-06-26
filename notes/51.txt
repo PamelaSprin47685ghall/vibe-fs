@@ -1,0 +1,10 @@
+Shell SubagentIo + SubagentSpawn:
+ToolContext = { Directory; SessionID; AbortSignal }
+buildPromptBody: agent + prompt + tools + aiSettings → host prompt body。
+raceWithAbortSignal: 工作 Promise vs AbortSignal，signal 触发时执行 onAbort 清理。
+SubagentSpawn:
+runParallelSpawns: Promise.all 并行执行多个提示。
+runParallelSpawnsWithAbort: 任一失败 → controller.abort() 取消所有。
+SubagentPromptBuild:
+promptsFromCoderIntents/promptsFromInvestigatorIntents: intents → 提示列表。
+meditatorPromptFromFiles: 读取文件 → 构建 meditator 提示。

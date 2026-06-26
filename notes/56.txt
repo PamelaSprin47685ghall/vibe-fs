@@ -1,0 +1,10 @@
+Shell WebSearchApi:
+webApiPost: POST JSON → Ollama API gateway (OLLAMA_API_KEY Bearer auth)。
+ollamaPost: 路径标准化 + webApiPost。
+ollamaPostWebFetch: SSRF 验证 + ollamaPost。
+getOllamaApiKey: 从环境变量读取。
+postInit: 构建 POST init 对象含 headers/body/signal。
+webApiBase = "https://ollama.com/api"。
+所有 web 工具 (websearch/webfetch) 通过此 API 通信。
+WebSearchCodec.parseSearchResults: host 搜索结果 → SearchResult list。
+WebToolsCodec: WebsearchArgs/WebfetchArgs 解码 + 字段验证。

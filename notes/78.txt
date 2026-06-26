@@ -1,0 +1,8 @@
+Mux Plugin 注册流程：
+createRegistration: createScope → createWrapperExecution → createMessageTransforms → createEventHooksSlashAndPolicy → assembleRegistrationObject。
+createScope: 创建 RuntimeScope + BacklogSession + ReviewStore + HostFunctionCapture + FinderCache + KnowledgeGraphRuntime + 工具目录。
+createToolCatalog: 创建所有工具定义 (coder/investigator/meditator/browser/executor/submit_review/websearch/webfetch/fuzzy_grep/fuzzy_find/write/read/kg tools + methodology)。
+toolExecuteAfter: 知识图 bookkeeper 记录 + 追加 bookkeeping hints。
+toolExecuteBefore: 注入 UI label。
+systemTransform: 系统消息长度清零。
+Mux 使用 workspace task API 创建子任务，与 Opencode 的 client session API 不同。

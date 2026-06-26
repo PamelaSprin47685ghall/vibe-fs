@@ -1,0 +1,9 @@
+Shell ReviewRuntime:
+ReviewStore 抽象接口：激活/停用/锁定/解锁/设置pending/解析pending/查询。
+ReviewStoreState = { Registry; Effects } — 单原子状态 cell。
+createReviewStore: 闭包封装 mutable state，每个方法执行 state <- { ... } 原子更新。
+allDescendantIds: 递归收集所有子 session ID（用于 disposeSessionTree）。
+tryLockReview: 先 canTransition 检查再 reduce Lock，返回是否成功。
+resolvePendingReview: 同时更新 Registry (actionFor) + Effects (resolvePending)。
+syncReviewProjection: 从历史推断 task 与 store 同步 — 检测到不同 task 则 deactivate + reactivate。
+deactivateReview: 先 dispose 子 session 树再 deactivate 自身。

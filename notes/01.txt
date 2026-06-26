@@ -1,0 +1,6 @@
+Host enum 驱动全系统差异：
+todoWriteToolName: Opencode/Mux/Omp → "todowrite", Mimocode → "task"
+taskToolName: Opencode/Mux/Omp → "task", Mimocode → "actor"
+normalizeToolName: 各宿主工具名 → 规范名，Mux 特殊处理 file_edit_* → edit, web_search → websearch
+allToolNames: 统一工具宇宙，包含 coder/investigator/meditator/browser/executor/fuzzy_*/web*/知识图/审查等。
+HostTools.normalizeToolNameForMux: Mux 工具别名规范化，是权限/回溯/去重的前置条件。

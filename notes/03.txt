@@ -1,0 +1,7 @@
+FlatPart<'raw> = { msgIndex; partIndex; isUser; part }
+flatten: Message<'raw> list → FlatPart<'raw> list，按 msg 顺序展平每个 part。
+setPartOutputTyped: 纯函数复制 ToolPart 并替换 state.output。
+partCallID/partTextStr/partIsText/partIsTool: Part 查询函数。
+readAssistantText: 从指定索引起收集 assistant TextPart，join 拼接。
+stripSyntheticBySource: 过滤 Source = Native 的消息，移除合成消息。
+整个 Messaging.fs 零 host 依赖，纯 Kernel。

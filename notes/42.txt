@@ -1,0 +1,11 @@
+Shell ExecutorSpawn + ExecutorSpawnRunners:
+spawnAndRun: child_process.spawn + 超时 + kill 树。
+awaitChild: Promise.create 封装 stdout/stderr 收集 + close/error 事件 + 超时。
+killTree: 平台相关 — win32 taskkill /F /T /PID，Unix SIGKILL 进程组。
+runShellProgram: 临时脚本文件 + bash/powershell 执行。
+runPythonProgram: uvx --isolated --with deps python 执行。
+runJavascriptProgram: es-module-lexer 解析 imports → tsx 执行。
+ExecutorJavascript:
+rewriteJavascriptModuleSpecifiers: 相对路径 import → file:// URL 重写。
+ensureJavascriptProject: package.json + npm install 依赖。
+createJavascriptPrelude: ESM → CommonJS 兼容垫片 (createRequire)。

@@ -1,0 +1,6 @@
+ToolResult.fs 极简：
+ToolResult = { Text: string }
+wireEncodeToolError: context + DomainError → 字符串，前缀 "context failed: "。
+wireEncodeResult: Result<string, DomainError> → 字符串，Ok 直通，Error 编码。
+整个模块仅 13 行。不承载复杂错误结构，错误在边界处立即字符串化。
+对比 ToolOutputInfo 承载结构化元信息 (hint/status/exit_code/iterator) + body 分离。

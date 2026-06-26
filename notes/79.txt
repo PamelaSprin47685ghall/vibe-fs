@@ -1,0 +1,8 @@
+Mux Wrappers:
+createAllWrappers: 语法检查 wrapper + 文件读取 capture + todowrite wrapper + agent_report override。
+mkTodoWriteWrapper: 捕获 completedWorkReport → 存储到 ProjectionStore + 返回 methodology hint 输出。
+mkFileReadCapture: 捕获 host file_read 执行函数，供 read 工具后续使用。
+mkAgentReportOverride: reviewer 模式下重写 agent_report 工具 → 使用 PASS/REJECT 枚举 + feedback 字段。
+mkSyntaxWrappers: file_edit_replace_string/file_edit_insert 执行后追加语法诊断。
+ToolDefinition = { name; description; parameters; execute; condition }
+Mux 工具定义的 parameters 使用 JSON Schema，与 Opencode 的 Zod 不同。

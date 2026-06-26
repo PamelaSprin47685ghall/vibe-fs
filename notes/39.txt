@@ -1,0 +1,10 @@
+FuzzyFormat 格式化：
+FileAnnotation = { gitStatus; totalFrecencyScore; accessFrecencyScore }
+hotFrecency = 25, warmFrecency = 20
+fileAnnotation: git status → "[modified in git]" / frecency → "[VERY often touched file]" / ""。
+GrepMatch = { relativePath; lineNumber; lineContent; contextBefore; contextAfter; annotation }
+formatGrepOutput: 匹配列表 → 带上下文和文件标注的文本输出。
+FindMatch = { relativePath; annotation }
+formatFindOutput: 文件列表 → 带标注的输出。
+grepMaxLineLength = 500，超长行截断。
+迭代器输出格式：YAML front-matter 含 iterator 字段，后续调用凭 iterator 继续。

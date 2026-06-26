@@ -1,0 +1,10 @@
+Mux MessagingCodec:
+decodePart: 解析 dynamic-tool 类型 → ToolPart (normalizeToolName mux)。
+decodeMessage: msg 对象 → Message<obj>。
+encodePart: Part<obj> → host part 对象，尽量复用 raw 引用。
+encodeMessage: 消息编码，parts 未变时返回 raw 引用（对象恒等性优化）。
+outputsEquivalent: 输出对象深度比较（JSON.stringify fallback）。
+partsEquivalent: part 级比较（type/text/state/output）。
+encodeToolPartState: 更新 tool part 的 output。
+Mux 消息结构与 Opencode 不同（使用 dynamic-tool 类型），编解码各自适配。
+MuxReadDedup: Mux 版读取去重，处理 dynamic-tool 类型部件。

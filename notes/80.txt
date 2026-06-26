@@ -1,0 +1,8 @@
+Mux Delegate 子代理机制：
+delegateToSubAgent: 通过 workspace task API 创建子任务。
+resolveDelegationContext: 解析 Mux 配置 → { workspaceId; taskService; aiSettings; experiments; abortSignal }。
+createAndWaitTask: taskService.create → taskService.waitForAgentReport → 解析 reportMarkdown。
+createInput: 构建子任务输入（workspaceId/agentId/prompt/title/modelString/thinkingLevel/parentRuntimeAiSettings）。
+translateTaskWaitError: TaskWaitBackgrounded → 优雅返回（非异常）。
+DelegateTimeout.delegateWithTimeout: 添加超时控制，超时返回 TimedOut。
+Mux 子代理通过 workspace task 实现，与 Opencode 的 client session 创建不同。
