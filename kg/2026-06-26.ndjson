@@ -30,3 +30,8 @@
 {"id":"3682","entity":["消息变换","宿主编排","全量历史"],"fact":"Mux messagesTransform 的 deps 对象含 getChatHistory 委托与 BacklogSession/ReviewStore 等运行时服务；Mux 可经 deps.getChatHistory 检索全量会话历史，但当前 Always 模式仅消费 transform 输入的消息切片。"}
 {"id":"f317","entity":["消息变换","宿主编排","全量历史"],"fact":"OMP context 事件 entries 已为全量历史，非截断切片；OMP 可经 pi.sendMessage/getEntries API 获取完整会话，extractHistoryTexts 从 entries 提取文本供审查回放与积压投影。"}
 {"id":"8da3","entity":["消息变换","宿主编排","审查回放"],"fact":"三宿主审查回放均依赖全量历史而非截断切片：OpenCode 经 getChatHistory 委托、Mux 经 deps.getChatHistory、OMP 经 context entries 全量历史，当前实现均消费截断输入构成 Defect 1。"}
+{"id":"9502","entity":["消息变换","宿主编排","全量历史"],"fact":"OpenCode messagesTransform 钩子 input 含 sessionID/agent/directory 字段，无 client 对象；全量会话历史须经 PluginCore 注入的 getChatHistory 委托获取，非 messagesTransform 输入直接提供。client 在插件注册时从 ctx.client 提取（PluginCore.fs:57-59），传入 KnowledgeGraphRuntime 而非 messagesTransform。"}
+{"id":"07a7","entity":["消息变换","宿主编排","全量历史"],"fact":"Mux messagesTransform 的 deps 对象含 getChatHistory 委托与 BacklogSession/ReviewStore 等运行时服务；Mux 可经 deps.getChatHistory 检索全量会话历史，但当前 Always 模式仅消费 transform 输入的消息切片。"}
+{"id":"554a","entity":["消息变换","宿主编排","全量历史"],"fact":"OMP context 事件 entries 已为全量历史，非截断切片；OMP 可经 pi.sendMessage/getEntries API 获取完整会话，extractHistoryTexts 从 entries 提取文本供审查回放与积压投影。"}
+{"id":"2683","entity":["消息变换","宿主编排","审查回放"],"fact":"三宿主审查回放均依赖全量历史而非截断切片：OpenCode 经 getChatHistory 委托、Mux 经 deps.getChatHistory、OMP 经 context entries 全量历史，当前实现均消费截断输入构成 Defect 1。"}
+{"id":"ae61","entity":["OpenCode客户端API","会话消息读取"],"fact":"OpenCode 全量历史读取 API 模式：getClientFromPluginCtx 从插件上下文提取 client → getSessionApiFromClient 获取 session API → session.messages({ path: { id: sessionId }, query: { directory } }) → 结果 result.data 为全量消息数组。readSessionTexts 驻 Shell.SessionIo 封装此流程。"}

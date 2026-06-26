@@ -60,7 +60,8 @@ let messagesTransform
                     Excluded = excluded
                     Cleaned = cleanedMessages
                 }
-                let replayTexts () = extractTextsFromEncodedMessages messagesArr
+                let replayTexts () : JS.Promise<string seq> =
+                    Promise.lift (extractTextsFromEncodedMessages messagesArr)
                 let dedupFn excluded encoded =
                     if excluded then encoded else deduplicateReadOutputsWithSeenByPath Map.empty encoded
                 let loadCaps () =
@@ -72,7 +73,7 @@ let messagesTransform
                     runHostMessagesTransform
                         reviewStore
                         sessionID
-                        Always
+                        IfStoreEmpty
                         replayTexts
                         plan
                         backlogOps

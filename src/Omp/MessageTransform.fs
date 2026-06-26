@@ -56,7 +56,8 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (kgRuntime: OmpKno
                     Excluded = excluded
                     Cleaned = cleaned
                 }
-                let replayTexts () = extractHistoryTexts messagesList |> Seq.ofList
+                let replayTexts () : JS.Promise<string seq> =
+                    Promise.lift (extractHistoryTexts messagesList |> Seq.ofList)
                 let dedupFn excluded encoded =
                     if excluded then encoded
                     else

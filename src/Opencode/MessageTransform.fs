@@ -22,6 +22,7 @@ open VibeFs.Opencode.BacklogSession
 open VibeFs.Opencode.MessagingCodec
 open VibeFs.Opencode.CapsCodec
 open VibeFs.Opencode.KnowledgeGraphRuntime
+open VibeFs.Opencode.SessionIo
 open VibeFs.Shell.ChildAgentRegistry
 open VibeFs.Shell.OpencodeHookInputCodec
 open VibeFs.Shell.ChatTransformOutputCodec
@@ -32,7 +33,7 @@ let private extractSessionID (messages: Message<obj> list) : string =
     |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
     |> Option.defaultValue ""
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: VibeFs.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) (output: obj) : JS.Promise<unit> =
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: VibeFs.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
@@ -51,8 +52,11 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                     Excluded = excluded
                     Cleaned = cleaned
                 }
-                let replayTexts () =
-                    messagesList |> Messaging.flatten |> textsFromFlatParts
+                let replayTexts () : JS.Promise<string seq> =
+                    promise {
+                        let! texts = readSessionTexts client sessionID directory
+                        return texts :> string seq
+                    }
                 let dedupFn excluded encoded =
                     if excluded then encoded
                     else

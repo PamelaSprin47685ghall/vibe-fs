@@ -68,8 +68,6 @@ let messageTransformUsesHostEntry () =
         (hostEntry.Contains "type ReviewReplayMode")
     check "arch: MessageTransformHostEntry defines runHostMessagesTransform"
         (hostEntry.Contains "let runHostMessagesTransform")
-    check "arch: MessageTransformHostEntry defines replayReviewForMode"
-        (hostEntry.Contains "let replayReviewForMode")
     for path in [| "src/Opencode/MessageTransform.fs"; "src/Mux/MessageTransform.fs" |] do
         let code = requireFile path |> nonCommentCode
         check ("arch: " + path + " opens MessageTransformHostEntry")
@@ -84,8 +82,8 @@ let messageTransformUsesHostEntry () =
     check "arch: Opencode MessageTransform uses IfStoreEmpty replay mode"
         (opencode.Contains "IfStoreEmpty")
     let mux = requireFile "src/Mux/MessageTransform.fs" |> nonCommentCode
-    check "arch: Mux MessageTransform uses Always replay mode"
-        (mux.Contains "Always")
+    check "arch: Mux MessageTransform uses IfStoreEmpty replay mode"
+        (mux.Contains "IfStoreEmpty")
 
 let capsFileCacheCompositeKey () =
     let code = requireFile "src/Shell/CapsFileCache.fs" |> nonCommentCode

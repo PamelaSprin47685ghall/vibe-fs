@@ -80,7 +80,8 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
     setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
     setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBeforeFor host input output))
     setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host services.Directory services.SessionLifecycleObserver services.KnowledgeGraphRuntime services.ChildAgentRegistry input output))
-    setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform services.ChildAgentRegistry services.Directory services.RuntimeScope services.BacklogSession services.KnowledgeGraphRuntime services.ReviewStore input output))
+    let client = match getClientFromPluginCtx ctx with Ok c -> c | Error _ -> box null
+    setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform services.ChildAgentRegistry services.Directory services.RuntimeScope services.BacklogSession services.KnowledgeGraphRuntime services.ReviewStore client input output))
     setKey result "command.execute.before" (twoArgHook (fun input output ->
         promise {
             do! services.SessionLifecycleObserver.handleCommandExecuteBefore input output

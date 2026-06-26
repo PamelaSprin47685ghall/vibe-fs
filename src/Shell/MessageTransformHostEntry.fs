@@ -12,16 +12,11 @@ type ReviewReplayMode =
     | IfStoreEmpty
     | Always
 
-let replayReviewForMode (mode: ReviewReplayMode) (store: ReviewStore) (sessionID: string) (texts: string seq) : unit =
-    match mode with
-    | Always -> replayReviewAlwaysSync store sessionID texts
-    | IfStoreEmpty -> replayReviewIfStoreEmpty store sessionID texts
-
 let runHostMessagesTransform
     (reviewStore: ReviewStore)
     (sessionID: string)
     (reviewReplayMode: ReviewReplayMode)
-    (replayTexts: unit -> string seq)
+    (replayTexts: unit -> JS.Promise<string seq>)
     (plan: MessageTransformPlan)
     (backlogOps: BacklogSessionOps)
     (encodeMessages: Message<obj> list -> obj array)
@@ -31,7 +26,14 @@ let runHostMessagesTransform
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
     : JS.Promise<obj array> =
     promise {
-        replayReviewForMode reviewReplayMode reviewStore sessionID (replayTexts ())
+        let shouldReplay =
+            sessionID <> "" &&
+            match reviewReplayMode with
+            | Always -> true
+            | IfStoreEmpty -> reviewStore.getReviewState sessionID |> Option.isNone
+        if shouldReplay then
+            let! texts = replayTexts ()
+            syncReviewFromTexts reviewStore sessionID texts
         return!
             if plan.Cleaned.IsEmpty then Promise.lift [||]
             else

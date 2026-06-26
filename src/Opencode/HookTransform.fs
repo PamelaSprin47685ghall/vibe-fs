@@ -14,8 +14,8 @@ let chatMessageFor (host: Host) (registry: ChildAgentRegistry) (lifecycleObserve
 let chatMessage (registry: ChildAgentRegistry) (lifecycleObserver: VibeFs.Opencode.SessionLifecycleObserver.SessionLifecycleObserver) (input: obj) (output: obj) : JS.Promise<unit> =
     ChatHooks.chatMessage registry lifecycleObserver input output
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: VibeFs.Shell.RuntimeScope.RuntimeScope) (backlogSession: VibeFs.Opencode.BacklogSession.BacklogSession) (knowledgeGraphRuntime: VibeFs.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (input: obj) (output: obj) : JS.Promise<unit> =
-    MessageTransform.messagesTransform registry directory runtimeScope backlogSession knowledgeGraphRuntime reviewStore input output
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: VibeFs.Shell.RuntimeScope.RuntimeScope) (backlogSession: VibeFs.Opencode.BacklogSession.BacklogSession) (knowledgeGraphRuntime: VibeFs.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: VibeFs.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
+    MessageTransform.messagesTransform registry directory runtimeScope backlogSession knowledgeGraphRuntime reviewStore client input output
 
 let compactingHandlerFor (host: Host) (backlogSession: VibeFs.Opencode.BacklogSession.BacklogSession) (input: obj) (output: obj) : JS.Promise<unit> =
     MessageTransform.compactingHandlerFor host backlogSession input output

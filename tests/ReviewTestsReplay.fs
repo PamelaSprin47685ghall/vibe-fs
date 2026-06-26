@@ -72,4 +72,5 @@ let parseFrontMatterScalars' () =
     equal "block scalar parsed" (Some "line one\nline two\n: [] {} \"quoted\"") (Map.tryFind "task" block)
     equal "plain prose → empty" Map.empty (parseFrontMatterScalars "just a normal message, no front matter")
     equal "no closing fence → empty" Map.empty (parseFrontMatterScalars "---\ntask: \"x\"\nnever closes")
-    equal "indented task not top-level → empty" Map.empty (parseFrontMatterScalars "---\n  task: \"indented\"\n---")
+    let indented = parseFrontMatterScalars "---\n  task: \"indented\"\n---"
+    equal "indented task IS valid YAML top-level key" (Some "indented") (Map.tryFind "task" indented)

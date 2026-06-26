@@ -98,6 +98,7 @@ let coreTestEntries () : (string * TestBody) list =
     "ReviewTests.disposeSessionTreeTerminatesAll", Sync (sync ReviewTestsReplay.disposeSessionTreeTerminatesAll)
     "ReviewTests.inferReviewTaskFromTexts'", Sync (sync ReviewTestsReplay.inferReviewTaskFromTexts')
     "ReviewTests.parseFrontMatterScalars'", Sync (sync ReviewTestsReplay.parseFrontMatterScalars')
+    "KernelPromptSpecsReview.yamlFrontMatterRoundTrip", Sync (sync KernelPromptSpecsReview.yamlFrontMatterRoundTrip)
     "ReviewTests.doubleCheckAnchorReplay", Sync (sync ReviewTestsPrompts.doubleCheckAnchorReplay)
     "ReviewTests.doubleCheckPromptFormat", Sync (sync ReviewTestsPrompts.doubleCheckPromptFormat)
     "ReviewTests.reviewerPromptFormat", Sync (sync ReviewTestsPrompts.reviewerPromptFormat)

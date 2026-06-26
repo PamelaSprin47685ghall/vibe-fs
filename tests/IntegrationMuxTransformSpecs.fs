@@ -159,7 +159,10 @@ let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () = promise {
         let out = createObj [ "messages", box messages ]
         let input = createObj [ "agent", box "manager"; "sessionID", box sessionID ]
         do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
-        check "mux accepted submit_review history clears active review" (not (muxIsReviewActiveForTest reg sessionID))
+        // With IfStoreEmpty (Defect 1 fix), transform does NOT clear an active review
+        // when store is non-empty — verdict resolution is the tool path's job, not replay's.
+        // This prevents the mid-session silent deactivation bug.
+        check "mux transform preserves active review when store non-empty" (muxIsReviewActiveForTest reg sessionID)
 }
 
 let muxCompactingTransformProjectsBacklogSpec () = promise {
