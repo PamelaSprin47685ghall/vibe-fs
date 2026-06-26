@@ -1,9 +1,0 @@
-Shell MuxSubagentToolExecute:
-executeMuxSubagentTool: 通用 Mux 子代理工具执行。
-decodeToolInvocation: 参数解码 → CoderBatch/InvestigatorBatch/Typed。
-CoderBatch: promptsFromCoderIntents → runParallelSpawnsWithAbort。
-InvestigatorBatch: promptsFromInvestigatorIntents → runParallelSpawnsWithAbort。
-Meditator: meditatorPromptFromFiles → runOne。
-Browser: browserPromptText → runOne。
-MuxJsonSchema: Mux 版 JSON Schema 构建 — muxCoderIntentsSchema/muxInvestigatorIntentsSchema。
-Mux 使用 JSON Schema 定义参数，与 Opencode 的 Zod 和 OMP 的 typebox 不同。

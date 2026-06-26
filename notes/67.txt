@@ -1,6 +1,0 @@
-Opencode Tools 注册：
-createTools: 创建所有工具对象 — coder/investigator/meditator/browser/executor/fuzzy_find/fuzzy_grep/websearch/webfetch/knowledge_graph_fetch/return_bookkeeper/submit_review/return_reviewer + Mimocode 的 task + 所有 methodology 工具。
-MimoTodoTool: Mimocode 的 task 工具实现，验证 completedWorkReport + todos + select_methodology。
-知识图工具在 knowledgeGraphEnabled 时注册（检测 kg 目录存在）。
-registerMethodologyTools: 将 54 个 methodology 工具注入 tools 对象。
-Tools 对象作为插件注册的一部分返回给 host。

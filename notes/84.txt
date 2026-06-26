@@ -1,8 +1,0 @@
-CapsPrelude thinkText + llmText:
-thinkText = Kolmogorov 宝典（~800 字中文设计哲学）。
-llmText = 铁律（工具调用规则 + 编码铁律 + 工作方式）。
-thinkWrapped = thinkText + "\n\n" + llmText。
-内容作为 system prompt 的一部分注入到每个会话的用户消息前。
-Kernel.CapsPrelude 与 Shell.CapsPrelude 内容相同，分别供 Kernel 和 Shell 层使用。
-userCapsText: preludeText + thinkWrapped，preludeText 通常为知识图谱前注。
-设计目的：将设计原则和工具使用规则以不可绕过的方式注入每个对话的开头。

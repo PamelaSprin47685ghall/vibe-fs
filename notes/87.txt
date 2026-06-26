@@ -1,9 +1,0 @@
-Omp TodoTool + OmpToolSchema:
-registerTodoTool: todowrite 工具注册 — 验证 completedWorkReport + select_methodology + todos → 返回 todoWriteOutput。
-OmpToolSchema:
-methodologyParameters: 方法论字段 → typebox 参数。
-coderParameters/investigatorParameters/meditatorParameters/browserParameters: 子代理参数定义。
-executorParameters: executor 参数（含 what_to_summarize）。
-returnReviewerParameters: PASS/REJECT 枚举 + feedback。
-todowriteParameters: todos 数组 + completedWorkReport + select_methodology 枚举数组。
-Omp 使用 typebox 定义参数 schema，与 Opencode 的 Zod 和 Mux 的 JSON Schema 不同。

@@ -1,9 +1,0 @@
-Omp MessagingCodec (Encode + Decode):
-decodeEntry: entry 对象 → Message<obj>，支持 message 和 info 两种 entry 结构。
-decodeEntries: entries 数组 → Message<obj> list。
-encodeMessage: Message<obj> → host entry 对象，尽量复用 raw 引用（性能优化）。
-decodeToolState: state 对象 → ToolState<obj> option。
-readAssistantText: 从 sessionManager.getEntries 读取 assistant 文本。
-openTodoStatuses: 从 todo-phases custom entry 提取开放待办。
-extractHistoryTexts: messages → flatten → text list。
-Omp 消息结构与 Opencode 不同（使用 info/parts 而非 message/content），编解码各自适配。

@@ -1,9 +1,0 @@
-Shell OpencodeSessionEventCodec:
-decodeNudgeHostEvent: event type + props → NudgeHostEvent。
-pureMap: 无需 payload 的事件类型直接映射 (stream-abort/session.delete/session.idle)。
-extractorMap: 需解析 payload 的事件类型 — session.next.prompted/message.updated/message.part.updated/session.next.step.failed/session.next.tool.failed/session.next.step.ended/session.error/session.status。
-decodeLastAssistant: 定位最后完成的 assistant 消息 → (text, agent, alreadyNudged)。
-alreadyNudgedAfterIndex: 检查 nudge prompt 是否已在尾部。
-createPromptBody: 构建 session.prompt 的 host wire body。
-decodeTodos: 待办列表 → 开放待办内容列表。
-recoverOpenTodosFromMessages: 从消息历史恢复开放待办（API 不可用时的 fallback）。

@@ -1,8 +1,0 @@
-ReviewReplayPolicy 审查重放：
-textsFromFlatParts: FlatPart → text/tool output 文本序列。
-reviewTaskFromTexts = inferReviewTaskFromTexts（LoopMessages）。
-审查重放是重启恢复的关键：host 重启后 in-memory ReviewStore 丢失，但对话历史仍存。
-replayReviewIfStoreEmpty: 仅 store 为空时重放，避免重复激活。
-replayReviewAlwaysSync: 无条件重放同步。
-syncReviewProjection: 从历史推断的 task 与 store 状态同步 — 不同则 deactivate + reactivate。
-ReviewRuntime.ReviewStore 抽象接口封装所有审查操作。

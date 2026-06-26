@@ -1,8 +1,0 @@
-Omp SessionLifecycleHooks:
-toolResultHandler: 应用工具结果钩子 — 语法检查 + todowrite 输出重写 + bookkeeper 记录。
-recordsToBookkeeper: isFileEditTool || bookkeepingSubagentTools，排除只读 executor。
-agentEndHandler: 审查 nudge (isReviewActive + tryLoopNudge) / todo nudge (tryTodoNudge)。
-sessionStartHandler: 过滤工具列表 + 注册 KG 工具（如 kg 目录存在）。
-sessionShutdownHandler: 清理 nudge + 迭代器 + 审查 + KG job + runner。
-beforeAgentStartHandler: 剥离 host agents prompt 中的 <dir-context>。
-Omp NudgeRuntime: 独立于 Opencode 的 nudge 实现，使用 pi 的 sendMessage 而非 client session API。

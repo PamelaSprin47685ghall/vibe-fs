@@ -1,9 +1,0 @@
-Opencode ToolSchema (Zod):
-define: tool factory 封装 — description + args + execute。
-schema 原语: str/arr/tuple/union/strMin/strReq/strOpt/numOpt/boolOpt/enumReq/enumOpt。
-subagentZodShape: 验证 Zod shape 包含必需字段。
-coderIntentsSchema/investigatorIntentsSchema: 嵌套 Zod 对象定义。
-knowledgeGraphDraftEntriesReq: entry 对象数组 (id/entity/fact)。
-enumArrayMin: 枚举数组最小长度。
-uiParam: _ui 字段（LLM 不可见，由 tool.execute.before 注入）。
-Opencode 使用 Zod schema 定义工具参数，编译为 JSON Schema 给 LLM。

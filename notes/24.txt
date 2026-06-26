@@ -1,9 +1,0 @@
-KnowledgeGraph Draft + Projection:
-validateDraft: id 格式验证 (4 hex)，entity 非空，fact 非空。
-normalizeEntities: 去重 + 去空 + trim。
-applyDrafts: 纯函数 — 已有 id 复用，新 id 分配，返回 KnowledgeGraphEntry list。
-projectLatestWins: 文件列表 → 投影，后出现的 entry 覆盖同 id 前驱。
-buildPreludeSection: 投影 → YAML front-matter 知识图谱实体列表。
-Fetch:
-fetchAnswer: entity 字符串匹配（精确匹配或 token 部分匹配），返回按 id 排序的事实拼接。
-返回 Error 时含友好消息 "Knowledge graph entity not found in this session snapshot: ..."。

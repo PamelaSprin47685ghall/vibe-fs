@@ -1,6 +1,0 @@
-WebFetchGuard SSRF 防护：
-validateFetchUrl: URL → Ok/Error。
-防护范围：私有 IPv4 (127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 0.0.0.0/8, 224.0.0.0/4) + 私有 IPv6 (::1, fc00::/7, fe80::/10) + IPv4-mapped IPv6。
-localhost 主机名拦截。
-仅允许 http/https scheme。
-Dual 实现：Kernel 层 validateFetchUrl 纯函数，Shell 层 OMP 的 validateFetchUrlForOmp 包装。

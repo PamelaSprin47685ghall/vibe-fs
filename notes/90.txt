@@ -1,9 +1,0 @@
-Omp OmpTestHooks:
-globalIteratorStore: 测试用全局迭代器存储。
-resetFuzzyState: 清空迭代器。
-resolveExternalBasePath: 测试用外部路径解析。
-createFuzzyTestExports: 导出模糊搜索测试函数 (storeCursor/consumeCursor/storeFindCursor/consumeFindCursor)。
-resetReviewStates: 清空审查 session。
-setPendingReviewStateForTest: 设置待审查状态。
-OmpPlugin 测试导出：
-_test 对象包含 appendCapsContext/buildCapsContext/stripHostAgentsPrompt/checkSyntax/fuzzy/getOllamaKey/readAssistantText/resetRunner/setRunnerJobStateForTest/setPendingReviewStateForTest/stripHeadTailPipes/supportsSyntaxDiagnosticsTool/reset/transformEntries。

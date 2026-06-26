@@ -1,9 +1,0 @@
-PromptFrontMatter YAML 前注引擎：
-yamlStringValue: 智能编码 — 纯文本 → 无引号，含特殊字符 → 双引号，含换行 → literal block。
-frontMatter: fields → "---\n...\n---"。
-frontMatterPrompt: frontMatter + "\n\n" + prose。
-yamlField/yamlSeqField/yamlListItemField: 字段构造器。
-parseFrontMatterScalars: 从文本解析回 Map<string, string>，用于 LoopMessages.inferReviewTaskFromTexts。
-parseYamlStringValue: 双引号值解码（含转义）。
-readBlock: literal block 读取（以 "  " 缩进的行）。
-设计目标：结构化的 front-matter 作为 LLM 输出的可靠锚点，避免正则扫描脆弱文案。

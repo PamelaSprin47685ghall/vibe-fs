@@ -1,9 +1,0 @@
-ReviewPrompts 审查提示体系：
-reviewInstructionsProse: 只读约束 + 审查标准 + 提交流程。
-reviewSubmissionVerdictPrompt: front-matter(role/original_task/report/affected_files) + review body。
-doubleCheckPrompt: 二次确认提示，含 doubleCheck 前注。
-preReviewVerdictPrompt: 预审查提示。
-formatReviewResult: Accepted/Terminated/Rejected → front-matter(verdict) + 说明。
-submitReviewWipAcknowledgment: wip 提交确认文本。
-reviewerPrompt: 通用审查提示，含 original_task + affected_files。
-OmpVariant: OMP 宿主专用审查提示变体，使用 return_reviewer 工具而非 agent_report。

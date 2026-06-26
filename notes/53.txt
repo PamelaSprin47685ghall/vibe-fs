@@ -1,9 +1,0 @@
-Shell WorkBacklogSchema + WorkBacklogToolsCodec:
-buildWorkBacklogSchema: JSON Schema 格式的 todowrite 参数定义。
-selectMethodologyProperty: enum 数组类型，枚举值来自 methodologyEnumValues。
-TodoItem = { Content; Status; Priority }
-TodoWriteArgs = { CompletedWorkReport; Todos; SelectMethodology }
-decodeTodoWriteArgs: 验证 completedWorkReport 非空 + todos 数组每个 item 含 content/status/priority。
-decodeTodoToolOpts: 提取 toolCallId。
-JsonSchemaBuilders: JSON Schema 构造辅助函数 — jsonStrProp/numProp/boolProp/strEnumProp/strArrayProp 等。
-Mux 使用这些构建工具注册的 JSON Schema 参数。

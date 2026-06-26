@@ -1,8 +1,0 @@
-Opencode AgentConfig:
-applyAgentConfigFor: 禁用原生记忆/检查点 → 合并用户配置 → 注入 vibe 代理配置 → 返回新配置。
-withRoleDefaultsFor: 每个内置代理应用默认权限/工具/MCP。
-builtinAgentSpecs: manager/build/plan/coder/investigator/meditator/bookkeeper/reviewer/browser/executor。
-primaryAliases: manager/build/plan 默认为 primary 模式。
-Omp AgentConfig: 与 Opencode 结构相同但使用 OMP 的配置 API。
-Omp 的 applyAgentConfigIfSupported: 通过 pi.getConfig/setConfig 应用配置。
-Mux 配置通过 getToolPolicy 动态返回工具策略，无需 AgentConfig。

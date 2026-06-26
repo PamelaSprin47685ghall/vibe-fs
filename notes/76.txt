@@ -1,9 +1,0 @@
-Omp KnowledgeGraph Runtime:
-OmpKnowledgeGraphRuntime: OMP 版 KG 运行时，与 Opencode 的 KnowledgeGraphRuntime 结构相同但使用 pi API。
-Submit: 通过 runWorkspace (per-workspace 串行队列) 串行化写入。
-StartBookkeeperAppend: 创建 bookkeeper 子 session → prompt → 记录结果。
-StartMaintenanceIfDue: commandQueue 串行化维护检查。
-EnsureSessionSnapshot: 缓存投影。
-FetchFromSessionSnapshot: 从投影查询。
-MagicTodo: OMP 版 BacklogSession，使用 ProjectionStore 缓存回溯。
-OMP 使用 pi.getEntries/magicGetEntries 替代 Opencode 的 client session API。

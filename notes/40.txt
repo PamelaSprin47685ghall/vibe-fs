@@ -1,7 +1,0 @@
-Shell Dyn 动态对象桥接：
-Dyn 是 Kernel 与 Host 之间的类型安全边界突破。每个 host 的 `obj` 通过 Dyn 读取/写入。
-isNullish/typeIs/get/str/opt/keys/assignInto/withKey/clone/call0/call1/call2 — 所有 host 对象操作。
-核心原则：Dyn 只出现在 Shell 层，Kernel 层绝不引用 Dyn。
-DynField 扩展：hasField/strField/optInt/optBool/requiredStrField。
-DynSentinel: 标记类型，防止 Dyn 泄漏到 Kernel 泛型参数中。
-每个宿主适配器 (Opencode/Mux/Omp 的 MessagingCodec) 负责在 Shell 边界处将 Dyn 对象解码为 Kernel 类型。

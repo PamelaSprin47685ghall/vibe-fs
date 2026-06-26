@@ -1,8 +1,0 @@
-Opencode SubagentTools:
-coderTool/investigatorTool/meditatorTool/browserTool: 使用 Zod schema 定义参数 → executeSubagent。
-executeSubagent: getClientFromPluginCtx → executeOpencodeSubagentTool。
-subagentZodShape: 验证 Zod shape 包含 subagentRequiredKeys。
-Opencode 的子代理工具通过 client session API 创建子 session 执行。
-Mux 子代理工具通过 delegateToSubAgent (workspace task API) 执行。
-OMP 子代理工具通过 createChildSession (pi API) 执行。
-三宿主共享 Kernel 的 Subagent 提示构建逻辑，宿主差异仅在执行路径。

@@ -1,8 +1,0 @@
-ReviewVerdict 审查裁决编解码：
-Verdict = Pass | Reject — 显式 DU，不再用可空字符串暗示 accept。
-parseVerdict: 严格大小写不敏感解析，非 PASS/REJECT → None。
-ReviewDecision = Finalize of ReviewResult | AskDoubleCheck
-decideReviewSubmission: Reject → Finalize(Rejected); Pass + doubleCheckDone → Finalize(Accepted); Pass → AskDoubleCheck。
-formatReviewVerdictMarkdown: Pass → "PASS", Reject → "REJECT: <feedback>"。
-parseReviewReportMarkdown: "PASS" → Accepted, "REJECT:*" → Rejected(feedback), 其他 → Terminated。
-这是 Mux 审查通信的编解码对，通过 agent_report 的 reportMarkdown 字段传递。

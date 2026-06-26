@@ -1,8 +1,0 @@
-Omp ChildSession:
-createChildSession: 通过 pi 的 createAgentSession 创建子 session。
-runSubagent: createChildSession → sessionPrompt → sessionWaitForIdle → readAssistantText。
-markChildSession/unmarkChildSession: 全局可变 Set<string> 跟踪子 session ID。
-isChildSession: 检查 session 是否子 session（bookkeeper 过滤用）。
-clearChildSessionsForTest: 测试清理。
-ChildSession 是 OMP 子代理执行的核心，与 Opencode 的 SessionIo 对应。
-工具列表：coderChildTools = [read; edit; write; find; fuzzy_find; fuzzy_grep; lsp]; investigatorChildTools = [read; find; fuzzy_find; fuzzy_grep]。

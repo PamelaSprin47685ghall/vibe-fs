@@ -1,8 +1,0 @@
-Shell 串行队列 SerialQueue:
-Promise 链实现的无锁串行队列，替代 F# MailboxProcessor。
-tail 锁住队尾 Promise，每个 Enqueue 在 tail 后链式执行。
-Promise.catch 吞噬前序异常防止队列卡死，但当前任务异常通过 create/reject 传播。
-withTimeout: Promise.race + sleep 超时。
-RuntimeScope.EnqueuePerSession: 每 session 独立队列，同 session 工具调用串行化。
-SessionExecutor: 封装 EnqueuePerSession 的注册对象。
-PromiseQueue 是并发控制的基础设施，被知识图/执行器/运行时作用域使用。

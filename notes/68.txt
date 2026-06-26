@@ -1,8 +1,0 @@
-Opencode ReviewTools:
-submitReviewTool: 验证 session → tryLockReview → wip 检查 → 创建 reviewer session → runSubmitReview。
-submitReviewResultTool (return_reviewer): 解析 verdict → decideReviewSubmission (含 double-check) → resolvePendingReview。
-formatReviewResult: Accepted/Terminated → deactivateReview + 格式结果；Rejected → 保持活跃。
-opencodeSubmitReviewInProgress: "A review is already in progress. Wait for it to finish."。
-submitReviewNotNeeded: "You do not need review. Just continue with your work."。
-submitReviewWipAcknowledgment: wip 提交确认。
-doubleCheckPrompt: 二次确认提示（首次 Pass 时触发）。

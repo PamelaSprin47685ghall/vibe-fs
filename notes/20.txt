@@ -1,8 +1,0 @@
-Nudge Shell 状态机：
-NudgeShellState = { nudgedSessions; stoppedSessions; retryPendingSessions; sessionAgents; freshAssistantSnapshots; lastNudgedSession }
-NudgeDecision = StandDown | Send(promptText, agentOpt)
-NudgeHostEvent DU — 30+ 事件变体，分 MessageOutcome/PartOutcome/StepFailOutcome/ToolFailOutcome/SessionErrorOutcome。
-handleEvent: 事件 → 状态转换 + 是否触发 nudge。
-tryClaimNudge: 仅在无 stopped/retry/nudged 标记时 claim。
-recordSend: Delivered → 删除 nudged; Aborted → stop; Busy → 删除; Failed → add retry。
-storeFreshAssistantSnapshot/takeFreshAssistantSnapshot: 异步边界快照。

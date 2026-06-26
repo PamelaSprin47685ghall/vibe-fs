@@ -1,8 +1,0 @@
-Opencode SessionIo:
-extractToolContext: context + directory → { directory; sessionID; abortSignal }。
-readSessionTexts: 读取 session 消息历史 → 文本列表（用于 inferReviewTaskFromTexts）。
-invoke1: 动态方法调用 + await promise。
-runSubagentCoreResult: 完整子代理执行流程 — 创建子 session → prompt → 等待 → 提取文本 → 清理。
-promptWithAbort: prompt 与 AbortSignal 竞速，signal 触发时 reject AbortError。
-buildPromptBody: agent + parts + tools + model/thinkingLevel → host prompt body。
-formatSubagentReport: 格式化子代理报告（含 abort 前缀）。

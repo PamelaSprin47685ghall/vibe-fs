@@ -1,7 +1,0 @@
-Omp PiResolve + PruneGuard:
-getPiBase: 查找 @oh-my-pi 安装路径 (PI_BASE env → ~/.cache/.bun/install/global → ~/.bun/install/global)。
-getCodingAgentModule: 动态导入 pi-coding-agent/src/index.ts。
-patchDisablePrune: 修改 pi 的 DEFAULT_PRUNE_CONFIG，设置 protectTokens/minimumSavings 为 Double.MaxValue。
-目的：禁用 pi 的对话历史压缩功能，让 vibe 的消息变换管道完全控制上下文。
-setCodingAgentModuleForTest/clearCodingAgentModuleForTest: 测试用重写。
-Omp Schema: typebox 封装 — str/num/bool_/strArray/optional/opt/union/enumOf/objectOf/arrayOf/arrayMin。

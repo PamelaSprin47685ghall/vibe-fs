@@ -1,6 +1,0 @@
-ToolArgs DU — 所有工具参数的统一类型：
-Read | Write | Meditator | Browser | Websearch | Webfetch | Executor | TodoWrite | KnowledgeGraphFetch | ReturnBookkeeper | ApplyPatch | SubmitReview
-每个 case 有对应的 Args record，与 Shell.ToolArgsDecode.decodeToolInvocation 形成编解码对。
-ToolArgsDecode.DecodedToolInvocation = Typed of ToolArgs | CoderBatch | InvestigatorBatch
-子代理工具返回 CoderBatch/InvestigatorBatch 而非 Typed，因为其参数结构特殊（intents 数组）。
-decodeToolInvocation: toolName 字符串分发到对应解码器。

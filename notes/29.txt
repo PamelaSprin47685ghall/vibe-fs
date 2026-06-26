@@ -1,8 +1,0 @@
-MessageTransform 消息变换管道：
-MessageTransformPlan = { SessionID; Agent; Directory; Excluded; Cleaned }
-runMessageTransformPipeline: 清洗 → 回溯投影 → 编码 → 去重 → caps 注入 → KG 前注 → 构建合成消息。
-applyBacklogProjection: 回溯折叠（非 excluded 时）。
-Caps 注入：合成 user 消息 + 文件读取 tool 消息，前置到消息列表。
-KG 前注：知识图谱实体列表 front-matter，附在系统提示前。
-去重：读取输出内容去重，重复内容替换为 NoChange 信封。
-审查重放：从消息历史恢复审查状态（IfStoreEmpty 或 Always 模式）。

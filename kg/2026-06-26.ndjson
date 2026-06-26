@@ -380,3 +380,13 @@
 {"id":"829d","entity":["OMP宿主适配","生命周期钩子","工具裁剪"],"fact":"OMP turn_start钩子注册：SessionLifecycle.fs在session_start注册行后补pi.on(\"turn_start\", ...)，入口为SessionLifecycleHooks.turnStartHandler调用applyActiveToolFilterForMainSession，每轮工具可见性增加保险层检查点。"}
 {"id":"bb95","entity":["钩子系统","注释规范"],"fact":"HookExecute.fs过时注释修正：setUiLabel注释删除对tool.execute.before hook缺失的引用说明；applyToolResultHook注释明确tool_result后处理为幂等保险，覆盖tool_call钩子时序边缘情况未触发场景。"}
 {"id":"de2c","entity":["OMP宿主适配","测试门禁"],"fact":"OMP生命周期钩子集成测试补全：turn_start工具恢复与tool_call child-only阻断具独立测试方法，TestsEntriesOmp.fs注册条目已更新。"}
+{"id":"4974","entity":["项目文档","方法论工具注册"],"fact":"PRD.md 与 README.md 工具计数与引用口径同步更新：methodology_* 工具描述由固定数字改为\"Registry 全部 methodology\"，消除硬编码计数，改以注册表为 SSOT；README 补充\"54 个结构化方法论笔记本工具 `methodology_*`\"说明文本，编辑已落盘。"}
+{"id":"cfd7","entity":["项目文档","架构说明"],"fact":"README.md Kernel章节已更新：反映92个.fs文件的子目录结构（ReviewSession/Nudge/KnowledgeGraph/ToolCatalog等子目录含编译单元清单）、模块分类与判断标准，取代原有扁平六类列举，文档版本与源码同根作为唯一时效架构规格说明。"}
+{"id":"57cb","entity":["项目结构","分层架构","规模分布"],"fact":"vibe-fs纯F#项目，源文件约368+测试约110，总计约478文件。Shell层97个.fs文件按功能分簇：文件系统、搜索后端、执行器、tree-sitter、远端API、动态类型与错误分类、OMP专属边界能力、串行与并发、子代理与session、编解码边界、review/nudge runtime、积压投影。Kernel层纯函数优先（~46文件），三宿主并行（Mux~25/Omp~40/Opencode~30），Methodology体系34种（~55文件），Tests约110文件。"}
+{"id":"7353","entity":["模块子目录化","重构进度"],"fact":"内核ReviewSession与Nudge子目录化：ReviewSession拆StateMachine/Types两片；Nudge拆Transitions/Decision两片加原有Nudge.fs汇总。Kernel.NudgeRegistry门面以AutoOpen Types再导出Decision/Transitions/Coordinator构造子。"}
+{"id":"4b3d","entity":["模块子目录化","重构进度"],"fact":"内核P1四单体子目录化完成廿五编译单元：ReviewPrompts六片、NudgeState五片、ReviewSession六片（含StateMachine/Types）、KnowledgeGraph八片。"}
+{"id":"b3b8","entity":["项目文档","结构同步"],"fact":"README.md项目结构节同步更新：反映92个.fs文件子目录结构（ReviewSession/Nudge/KnowledgeGraph/ToolCatalog等子目录含编译单元清单），取代原有扁平列举，文档版本与源码同根作唯一时效架构规格说明。"}
+{"id":"9828","entity":["项目结构","模块边界"],"fact":"README项目结构节同步更新：Opencode路径统一改为Opopen；Omp/KnowledgeGraph拆为子目录（Runtime.fs迁移至子目录）；Opencode session event编解码路径对应调整。文档版本与源码同根作唯一时效架构规格说明。"}
+{"id":"35f9","entity":["知识图谱","目录门控"],"fact":"KnowledgeGraph 日维护：OpenCode/Mux runtime 经 `Shell.KnowledgeGraphMaintenanceRun.runMaintenanceIfDue`；禁止在 Opencode/Mux 再抄一套未共享的 `launchIfDue` 调度（OMP 在 `Omp/KnowledgeGraph/Maintenance` 内维护，与 Shell 策略语义对齐）"}
+{"id":"0d1c","entity":["项目文档","方法论体系"],"fact":"README Methodology目录行更新：工具计数由53修正为54，注册范围由Opencode/Mux扩展至Opencode/Mux/Omp三宿主，文档口径与当前实现态同步。"}
+{"id":"b3b8","entity":["项目文档","项目结构"],"fact":"README.md 项目结构节同步更新：src/五层（Kernel 92 .fs、Shell 97 .fs、Methodology 60 .fs、OpopenCode 35 .fs、Mux 27 .fs、Omp 39 .fs）与 tests（150+ .fs、含 27 个 ArchitectureTests*）补入文件数量统计，文档版本与源码同根作唯一时效架构规格说明。"}

@@ -1,8 +1,0 @@
-Shell TitleFetchGuardCommon:
-titleRequestSignature = "Generate a title for this conversation"
-installTitleFetchGuard: 全局 fetch 拦截器 — 检测标题生成请求 → 重写用户消息内容。
-isTitleRequestBody: 检测 LLM 标题请求 body（含 signature 的 JSON messages）。
-rewriteTitleMessages: 将用户消息包裹在 <do-not-exec> 标签中，防止标题请求误执行代码。
-wrapForTitle: 用户文本 → "Please name the conversation... <do-not-exec>... </do-not-exec>"。
-wrapArrayContentInPlace: 数组格式 content 的逐 part 包裹。
-目的：阻止 LLM 在标题生成阶段意外执行工具调用。

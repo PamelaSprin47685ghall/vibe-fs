@@ -1,8 +1,0 @@
-ExecutorStrip 管道剥离：
-StrippedPipe = { pipe; name; count }，记录被剥离的 head/tail 管道。
-StripResult = { script; stripped }，剥离后脚本 + 剥离记录。
-strip: 递归扫描脚本，剥离以 head/tail 结尾的管道片段。
-保留字符串字面量（单引号/双引号）和注释（#）内的内容不误剥。
-parsePipe: 只允许 allowedPipeCommands = { head, tail }。
-递归直到无可剥离管道，返回最终脚本 + 所有剥离记录。
-目的：防止 executor 仅用于读取文件前几行，应使用 read 工具。

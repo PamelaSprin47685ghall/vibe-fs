@@ -1,9 +1,0 @@
-KnowledgeGraph Job + Prompts:
-renderJobMarker: front-matter(type=vibe_knowledge_graph_job, workspaceRoot, kind, date?)。
-prependJobMarker: 在已有文本前插入/合并作业标记，支持已有 front-matter 合并。
-tryParseJobMarker: 从文本解析回 KnowledgeGraphJobContext。
-buildAppendPrompt: 现有知识图投影 + 工作标题/输入/输出 → bookkeeper append 提示。
-buildDailyPrompt: 现有知识图 + 新事实增量 → bookkeeper daily rewrite 提示。
-bookkeeperQualityRules: 质量规则 — 现代中文压缩，记录稳定知识，entity 用中文抽象概念。
-rewritePruneRules: 每日重写时裁剪低价值条目，保持知识图短而高信号。
-Prompts.Prompts 使用 kgYamlSeqField 而非 yamlSeqField，实体序列化含 id/entity/fact。

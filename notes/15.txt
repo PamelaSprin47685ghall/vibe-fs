@@ -1,9 +1,0 @@
-ReviewSession 审查状态机：
-ReviewState = Inactive | Active(task) | Locked(task, reviewerId) | Accepted | Rejected(feedback)
-ReviewCommand = Activate | Submit | Lock | Unlock | Accept | Reject
-ReviewEvent = Activated | Submitted | LockAcquired | LockReleased | Accepted | Rejected
-transition: (state, command) → (nextState, event option)。非法转换返回 (state, None)。
-isActive: Active/Locked/Rejected 为活跃。
-applyCommand: session + command → updated session，版本号递增。
-decideAfterRound: 审查轮次决策 — Resolved → Finish, PromptFailed → Finish(Terminated), NoResult → Nudge/Finish。
-promptParts: 首轮用 initialParts，后续轮用 nudgePrompt。
