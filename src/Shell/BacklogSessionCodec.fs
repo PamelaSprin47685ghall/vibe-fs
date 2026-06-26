@@ -21,7 +21,7 @@ let reportFromFlatPartWithProjection (host: Host) (projection: ProjectionStore) 
     | ToolPart(_, callID, Some state, _) ->
         let explicit = backlogReportFromTodoInput host state.input
         if explicit <> "" then explicit
-        elif host = Opencode || host = Mux then
+        elif host = Opencode || host = Mux || host = Omp then
             projection.TryGetReport(host, callID) |> Option.defaultValue ""
         else ""
     | _ -> ""
