@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Omp.MagicTodo
 open Wanxiangshu.Omp.MessagingCodec
@@ -20,7 +21,6 @@ let sessionCompactingHandler (_pi: obj) (event: obj) (_ctx: obj) : JS.Promise<ob
             else
                 let arr = unbox<obj array> messagesArr
                 decodeEntries sessionId arr
-        let excluded = false
         let cleaned = stripSyntheticBySource messagesList
         if cleaned.IsEmpty then return createObj []
         else

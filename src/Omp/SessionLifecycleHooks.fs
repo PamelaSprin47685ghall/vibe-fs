@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Omp.Codec
@@ -78,13 +79,25 @@ let beforeAgentStartHandler (pi: obj) (event: obj) (ctx: obj) : JS.Promise<obj> 
 
 /// tool_call handler: pre-execute hook on Pi. Normalises the tool arguments
 /// (patch unification + `_ui` label injection) before the tool runs.
-let toolCallHandler (_pi: obj) (_reviewStore: ReviewStore) (_kgRuntime: OmpKnowledgeGraphRuntime) (event: obj) (_ctx: obj) : JS.Promise<unit> =
+/// Also blocks child-session-only tools when invoked from the main session.
+let toolCallHandler (_pi: obj) (_reviewStore: ReviewStore) (_kgRuntime: OmpKnowledgeGraphRuntime) (event: obj) (ctx: obj) : JS.Promise<obj> =
     promise {
         let toolName = Dyn.str event "toolName"
         let args = getToolInput event
         applyToolCallHook toolName args
-        return ()
+        match getSessionIdFromContext ctx with
+        | Some sessionId when not (isChildSession sessionId) && isChildOnlyTool toolName ->
+            return createObj [
+                "block", box true
+                "reason", box (sprintf "Tool '%s' is child-session-only; delegate via a subagent." toolName)
+            ]
+        | _ -> return None
     }
+
+/// turn_start handler: re-applies active-tool filtering at the start of each
+/// turn so that tool visibility changes mid-session are caught immediately.
+let turnStartHandler (pi: obj) (_event: obj) (ctx: obj) : JS.Promise<unit> =
+    applyActiveToolFilterForMainSession pi ctx
 
 let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) (event: obj) (ctx: obj) : JS.Promise<unit> =
     promise {
@@ -129,7 +142,16 @@ let agentEndHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : unit =
             Dyn.typeIs fn "function" && Dyn.truthy (Dyn.call0 fn)
         if reviewStore.isReviewActive sessionId && not (Dyn.isNullish sm) && not hasPending then
             let last = lastAssistantMessage sm
-            if tryLoopNudge sessionId last then
+            match tryLoopNudge sessionId last with
+            | Some NudgeRunner ->
+                pi?sendMessage(
+                    createObj [
+                        "customType", box "wanxiangshu-runner-reminder"
+                        "content", box (runnerReminderContent ())
+                        "display", box false
+                    ],
+                    createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
+            | Some NudgeLoop ->
                 pi?sendMessage(
                     createObj [
                         "customType", box "wanxiangshu-loop-reminder"
@@ -137,9 +159,19 @@ let agentEndHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : unit =
                         "display", box false
                     ],
                     createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
+            | _ -> ()
         elif not (Dyn.isNullish sm) && not hasPending then
             let last = lastAssistantMessage sm
-            if tryTodoNudge sessionId sm last then
+            match tryTodoNudge sessionId sm last with
+            | Some NudgeRunner ->
+                pi?sendMessage(
+                    createObj [
+                        "customType", box "wanxiangshu-runner-reminder"
+                        "content", box (runnerReminderContent ())
+                        "display", box false
+                    ],
+                    createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
+            | Some NudgeTodo ->
                 pi?sendMessage(
                     createObj [
                         "customType", box "wanxiangshu-todo-reminder"
@@ -147,6 +179,7 @@ let agentEndHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : unit =
                         "display", box false
                     ],
                     createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
+            | _ -> ()
 
 let sessionStartHandler (pi: obj) (kgRuntime: OmpKnowledgeGraphRuntime) (ctx: obj) : JS.Promise<unit> =
     promise {

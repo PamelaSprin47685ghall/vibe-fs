@@ -12,5 +12,6 @@ let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) (kgRuntime: Om
     pi?on("tool_result", box (fun (event: obj) (ctx: obj) -> toolResultHandler pi reviewStore kgRuntime event ctx))
     pi?on("agent_end", box (fun (_event: obj) (ctx: obj) -> agentEndHandler pi reviewStore ctx))
     pi?on("session_start", box (fun (_event: obj) (ctx: obj) -> sessionStartHandler pi kgRuntime ctx))
+    pi?on("turn_start", box (fun (_event: obj) (ctx: obj) -> turnStartHandler pi ctx))
     pi?on("session.compacting", box (fun (event: obj) (ctx: obj) -> sessionCompactingHandler pi event ctx))
     pi?on("session_shutdown", box (fun (_event: obj) (ctx: obj) -> sessionShutdownHandler reviewStore kgRuntime ctx))

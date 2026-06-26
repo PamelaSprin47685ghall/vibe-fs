@@ -23,6 +23,7 @@ open Wanxiangshu.Tests.OmpMagicTodoTests
 open Wanxiangshu.Tests.OmpToolResultEventTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.SubagentIoTests
+open Wanxiangshu.Tests.OmpSessionCompactingTests
 
 let ompTestEntries () : (string * TestBody) list =
     [
@@ -151,4 +152,14 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpKnowledgeGraphRuntimeTests.submitKeepsTwoSessionsPerRootDistinct", Sync (sync OmpKnowledgeGraphRuntimeTests.submitKeepsTwoSessionsPerRootDistinct)
     "OmpKnowledgeGraphRuntimeTests.takeBookkeeperLaunchesForTestingStartsEmpty", Sync (sync OmpKnowledgeGraphRuntimeTests.takeBookkeeperLaunchesForTestingStartsEmpty)
     "OmpKnowledgeGraphRuntimeTests.startMaintenanceIfDueNoopsForBlankRoot", Async OmpKnowledgeGraphRuntimeTests.startMaintenanceIfDueNoopsForBlankRoot
+    "OmpSessionCompactingTests.sessionCompactingHandlerEmptyMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerEmptyMessages
+    "OmpSessionCompactingTests.sessionCompactingHandlerNullMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerNullMessages
+    "OmpSessionCompactingTests.sessionCompactingHandlerWithMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerWithMessages
+    "OmpSessionCompactingTests.sessionCompactingPreservesCompletedWorkReport", Async OmpSessionCompactingTests.sessionCompactingPreservesCompletedWorkReport
+    "OmpSessionCompactingTests.sessionCompactingStripsSynthetic", Async OmpSessionCompactingTests.sessionCompactingStripsSynthetic
+    "OmpPluginTests.extensionRegistersLifecycleHooks", Async OmpPluginTests.extensionRegistersLifecycleHooks
+    "OmpPluginTests.toolCallHookCanBeInvoked", Async OmpPluginTests.toolCallHookCanBeInvoked
+    "OmpPluginTests.sessionCompactingHookCanBeInvoked", Async OmpPluginTests.sessionCompactingHookCanBeInvoked
+    "OmpPluginTests.toolCallBlocksChildOnlyInMainSession", Async OmpPluginTests.toolCallBlocksChildOnlyInMainSession
+    "OmpPluginTests.turnStartRestoresMainSessionTools", Async OmpPluginTests.turnStartRestoresMainSessionTools
     ]

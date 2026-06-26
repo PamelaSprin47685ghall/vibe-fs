@@ -333,3 +333,50 @@
 {"id":"7ba7","entity":["冲突处理","操作记录"],"fact":"清理kg/2026-06-26.ndjson冲突标记(sed删除<<<<<<<=======>>>>>>>)后git rebase --continue失败：标准输入非终端导致nano编辑器异常退出，staged changes未提交。失败模式为nano依赖tty的提交流程不适配非交互环境。"}
 {"id":"6d43","entity":["冲突处理","版本控制"],"fact":"kg日NDJSON冲突须先剔<<<<<<<=======>>>>>>>冲突标记，再提交。冲突标记清除路径已记录于id:6d43，本次为同路径重复作业。"}
 {"id":"6d43","entity":["冲突处理","操作记录"],"fact":"清理kg/2026-06-26.ndjson冲突标记(sed删除<<<<<<<=======>>>>>>>)后git rebase --continue失败：标准输入非终端导致nano编辑器异常退出，staged changes未提交。失败模式为nano依赖tty的提交流程不适配非交互环境。"}
+{"id":"32f5","entity":["OMP宿主适配","生命周期钩子"],"fact":"OMP插件须注册七项生命周期钩子：session_start、before_agent_start、tool_call、tool_result、session.compacting、agent_end、session_shutdown；扩展测试验证注册存在性与可调用性。"}
+{"id":"1f98","entity":["OMP宿主适配","工具调用钩子"],"fact":"tool_call钩子处理器可被正常调用：传入含toolName与input的事件对象，emitJsExpr Promise.resolve路径无异常抛出。"}
+{"id":"03db","entity":["OMP宿主适配","会话压缩钩子"],"fact":"session.compacting钩子处理器返回非空对象：传入含sessionId与messages数组的事件，emitJsExpr Promise.resolve<obj>路径返回有效结果。"}
+{"id":"f3ca","entity":["OMP宿主适配","测试注册表","测试门禁"],"fact":"OMP积压投影测试模块OmpSessionCompactingTests（5个测试方法）与OmpPluginTests缺失生命周期钩子测试（extensionRegistersLifecycleHooks/toolCallHookCanBeInvoked/sessionCompactingHookCanBeInvoked）已全量注册至TestsEntriesOmp.fs并补入fsproj编译条目，P0测试缺口闭合。"}
+{"id":"dc2e","entity":["NudgeRuntime","注入改造"],"fact":"NudgeRuntime 将硬编码 hasActiveRunner=false 改为注入 hasRunningRunnerJob(sessionId)，返回 NudgeAction option 以区分 runner/loop/todo nudge 类型"}
+{"id":"ff16","entity":["NudgeAction","消息分发模式"],"fact":"agentEndHandler 从布尔判断改为 match 模式：Some NudgeRunner 触发 runner-reminder，Some NudgeLoop 触发 loop-reminder，Some NudgeTodo 触发 todo-reminder，NudgeNone/None 无动作"}
+{"id":"2025","entity":["消息内容函数","职责分离"],"fact":"runnerReminderContent/loopReminderContent/todoReminderContent 定义在 NudgeRuntime，handler 只负责 dispatch 和发送；内容生成与分发逻辑内聚于同一模块"}
+{"id":"b283","entity":["测试断言","对齐注入行为"],"fact":"agentEndRunnerNudgeBeforeLoop 断言从 h.messages.Count=0 改为验证 lastMessageCustomType=wanxiangshu-runner-reminder，与 hasRunningRunnerJob 注入后的预期行为对齐"}
+{"id":"cc80","entity":["OMP宿主适配","模块依赖"],"fact":"SessionCompacting.fs依赖BacklogSession类型，必须open Kernel.HostTools模块；第12行BacklogSession omp调用前须确保模块可见。"}
+{"id":"dd28","entity":["Fable编译约束","类型系统"],"fact":"Fable将JS.Constructors.Object.keys返回类型推断为List<_>，List类型不支持.Length属性；须用Seq.length替代以兼容Fable序列类型。"}
+{"id":"d66a","entity":["构建依赖","构建产物","语法高亮"],"fact":"构建输出中TreeSitterPlatform.js引用highlight.js包但该包未在build目录存在，导致node tests/runner.js执行阶段抛出ERR_MODULE_NOT_FOUND；npm run build-and-test全链绿测SSOT仍须Fable编译零失败且runner exit=0，当前因依赖缺失未达门禁。"}
+{"id":"b596","entity":["消息投影","上下文完整性"],"fact":"消息上下文(context)字段在投影或backlog重建过程中存在被静默丢弃或类型降级的稳定缺陷：三测试失败表明context字段在消息生命周期中某节点丢失或非数组化，破坏断言。"}
+{"id":"a9a8","entity":["消息投影","OMP宿主适配"],"fact":"OMP会话压缩解码器格式契约：tool part须含type=\"tool\"、tool字段、callID字段、state对象（input/status/output/error），旧格式tool_use+toolName+顶层input不匹配decodePart，3处函数4个tool part修正后测试通过。"}
+{"id":"f19e","entity":["类型边防","边界编解码"],"fact":"decodePart强类型匹配门禁：字段名与嵌套结构双校验，运行时类型推导胶水归零，测试夹具必须对齐decodePart契约。"}
+{"id":"e1e1","entity":["全量测试","构建验证","门禁"],"fact":"npm run build-and-test 全仓绿测验证通过：Fable 5.2.0 编译 523 源文件零失败，node tests/runner.js 11809 passed 0 failed exit=0，SSOT 条件满足"}
+{"id":"3239","entity":["构建产物","转译链"],"fact":"Fable 转译产出 build/src/<层>/<模块>.js 共 581 模块；MSBuild 中间产物归集 artifacts/bin artifacts/obj"}
+{"id":"d62f","entity":["性能基线","集成测试"],"fact":"最慢集成测试 IntegrationEventTests 493ms；前 25 慢测中 OmpHelpersTests 占两席（220ms/215ms），OMP 编解码路径为当前性能热点"}
+{"id":"448c","entity":["项目规模","体量分布"],"fact":"源文件约 523，测试文件约 110；Shell 层最重约 65 文件，Kernel 层约 46 文件，Methodology 体系 34 种约 55 文件"}
+{"id":"6280","entity":["架构门禁","文件体量"],"fact":"fileBodyUnder200 主门禁遍历五层生产源码递归 .fs；fileBodyUnder300 过渡门禁；tests/ 全树纳入扫描；超标典型面 Shell 模糊搜索/会话编解码/Mux 知识图谱/执行器"}
+{"id":"814b","entity":["测试架构","切片封顶"],"fact":"ArchitectureTests 十二子切片封顶：Foundation/MessageTransform/Subagent/SubagentToolExec/Runtime/RuntimeKg/WireToolExec/WireHook/WirePipeline/MuxToolCore/MuxToolAux/OpencodeTools；聚合桩降为空壳 stub"}
+{"id":"df8d","entity":["知识图谱提交","构建验证"],"fact":"bookkeeper 当次 work_output 为全仓绿测验证事实：Fable 零 Compilation failed、runner failed=0、已登记探针联判通过；work_input 仅 executor 触发验证，不记绿测充分条件"}
+{"id":"6d98","entity":["OMP能力对照","REQ.md"],"fact":"本轮完成6项后 REQ.md 重写：compacting/tool_call/before_agent_start/HookExecute/runner nudge/生命周期钩子测试从仍缺失移至已追平；仍缺失表仅余 stealth-browser MCP、command.execute.before 统一入口、experimental.chat.system.transform 三项；优先级清零 P0、P1 移为 browser MCP、P2 command.execute.before、P3 system.transform 命名对齐；OMP v1 核心能力已全部追平。"}
+{"id":"5889","entity":["全仓绿测","构建验证"],"fact":"npm run build-and-test SSOT 满足：Fable 5.2.0 编译 523 源文件零 Compilation failed，node tests/runner.js 11809 passed 0 failed exit=0。任何同轮变更均须以此联判。"}
+{"id":"5ecb","entity":["测试覆盖","OMP宿主适配"],"fact":"OmpSessionCompactingTests 已补全注册并集成至全仓绿测，compacting 路径 P0 测试缺口闭合。"}
+{"id":"a4a0","entity":["OMP宿主适配","测试注册表"],"fact":"extensionRegistersLifecycleHooks 集成断言已补入 IntegrationToolSpecCatalog，tool_call 与 session.compacting 显式验证可调用性，生命周期钩子注册覆盖完整。"}
+{"id":"d9dc","entity":["待办契约","协议语义"],"fact":"todowrite/task wip 参数默认 true：省略或 true 表示任务未完成，仅显式 false 标记完成；completedWorkReport 为必填字段。"}
+{"id":"e52b","entity":["OMP宿主适配","续推状态机"],"fact":"OMP nudge hasActiveRunner 恒 false，无 NudgeRunner nudge 对等实现；OMP executor 空闲检测未定义，属产品决策待定项。"}
+{"id":"a181","entity":["架构测试","第五宿主适配"],"fact":"架构探针对 OMP 源码树执行递归相对路径扫描，禁仅顶层单层枚举；ompBoundary 探针确保 OMP 不引用 engine/Opencode/Mux。"}
+{"id":"50d2","entity":["OMP宿主适配","钩子系统"],"fact":"OMP七生命周期钩子全量注册；REQ.md「仍缺失」三项重估：tool_call等价tool.execute.before已确认，system.transform等价before_agent_start已确认，browser MCP动态注入仍部分缺失"}
+{"id":"6d98","entity":["OMP能力对照","REQ文档"],"fact":"OMP能力对照更新：原三项缺失中command.execute.before等价物tool_call事件已确认存在，experimental.chat.system.transform等价物before_agent_start已确认存在；仅browser MCP动态注入因config-writer未暴露ExtensionAPI仍部分缺失"}
+{"id":"85dd","entity":["OMP宿主适配","REQ文档"],"fact":"REQ.md追平状态更新：原P0/P1三项中两项经oh-my-pi源码核查确认为误判（tool_call/system.transform均有等价实现），仅browser MCP动态注入仍属部分缺失；优先级调整P1移为browser MCP"}
+{"id":"4cd9","entity":["事件溯源","宿主编排"],"fact":"oh-my-pi事件系统完整清单：30+事件分四类；tool_call支持block阻断；context事件深拷贝消息可安全修改；session.compacting触发时机在摘要生成前；before_agent_start支持systemPrompt链式替换"}
+{"id":"a2ef","entity":["钩子系统","工具输出模型"],"fact":"ExtensionContext工具可见性控制API：getActiveTools读取当前激活集，setActiveTools动态切换，tool_call单次阻断；与OMP工具裁剪规则形成双层控制"}
+{"id":"8db8","entity":["模块边界","知识图谱"],"fact":"MCP配置注入边界：config-writer.ts有addMCPServer原子写API但未通过ExtensionAPI对外暴露，插件仅能通过exec间接操作.omp/mcp.json，无类型安全"}
+{"id":"32f5","entity":["OMP宿主适配","生命周期钩子"],"fact":"OMP SessionLifecycle层实际注册10个pi.on()事件：before_agent_start、tool_call、tool_result、agent_end、session_start、session.compacting、session_shutdown（7项目标事件）加abort/event清理、input拦截、context/before_context消息变换（3项扩展事件）；pi.on()注册点集中于SessionLifecycle.fs第10-16行、PluginCore.fs第64-77行、ReviewToolsRegister.fs第93-102行、MessageTransform.fs第143-144行。setActiveTools为内部方法调用（beforeAgentStartHandler/sessionStartHandler），非独立pi.on()事件注册。"}
+{"id":"50d2","entity":["OMP宿主适配","REQ文档"],"fact":"REQ.md原P0三项重估后仅browser MCP动态注入仍属部分缺失；tool_call等价tool.execute.before已确认存在，system.transform等价before_agent_start已确认存在。turn_start/turn_end当前版本零注册（src/全树grep零命中），属有意留白非实现遗漏；tool_call block能力handler已注册但返回值阻断路径未利用，属实现缺口待补。"}
+{"id":"4e60","entity":["OMP宿主适配","事件钩子","阻断能力"],"fact":"tool_call事件handler当前实现仅参数归一化（patch统一+_ui注入），无返回值阻断逻辑；Pi事件模型block机制要求handler返回阻断信号（如{block:true,reason:...}），当前路径未使用。"}
+{"id":"65e5","entity":["宿主适配","事件机制"],"fact":"Opencode宿主Hook注册使用setKey机制（tool.definition/tool.execute.before/tool.execute.after/chat.message/event），与OMP pi.on()机制属不同宿主API，不可混用。"}
+{"id":"c9df","entity":["工具阻断协议","宿主适配"],"fact":"Opopen侧阻断协议通过setHookError写output.error字段实现，非空error值触发宿主中断工具执行；当前HookExecute.fs的toolExecuteBeforeFor从未调用setHookError用于阻断，唯一调用点为apply_patch参数重写失败上报，阻断能力协议就位但实现空缺。"}
+{"id":"33fa","entity":["工具阻断协议","Pi事件模型"],"fact":"Pi侧tool_call handler返回值决议模型：handler返回Promise含{block:bool,reason:string}对象，Pi runtime await后检查block字段，true则取消工具执行并注入reason；当前OMP SessionLifecycleHooks handler返回Promise<unit>始终return()，未利用block路径，REQ.md列为P2待补。"}
+{"id":"e8f3","entity":["工具过滤","OMP宿主适配"],"fact":"filterOmpMainSessionActiveTools四集合过滤：ompSubagentToolNames(4子代理工具)作为主会话判断依据、ompAlwaysStripToolNames(bash恒剥离)、ompChildOnlyToolNames(14个child-only工具仅主会话剥离)；过滤发生在工具注册阶段非执行阶段，调用点SessionLifecycleHooks.fs:63,76,174。"}
+{"id":"1d40","entity":["会话标识","子代理"],"fact":"OMP isChildSession通过childSessionIds进程级可变集合判定；markChildSession在createChildSession第71行调用，dispose包装第75-80行清理；使用点包括toolResultHandler抑制子代理KG写入与MessageTransform投影排除KG权限检查。"}
+{"id":"cf4d","entity":["工具阻断","三宿主现状"],"fact":"三宿主阻断能力统一空缺：Opopen协议就位(setHookError路径)未接入、OMP handler未利用block返回值、Mux对称路径待确认；阻断实现依赖前置条件判断(权限不足/子会话不可用工具)，handler内插入条件分支后返回{block=true,reason}即可触发Pi runtime自动取消，无需新增数据结构。"}
+{"id":"f6ad","entity":["OMP宿主适配","工具阻断协议","Pi事件模型"],"fact":"OMP tool_call block能力补全：toolCallHandler返回值从JS.Promise<unit>扩展为JS.Promise<obj>，主会话命中child-only工具集时返回{block:true,reason}触发Pi runtime自动取消；isChildOnlyTool纯函数（Kernel/OmpSessionTools）提供工具集判定；阻断路径实现闭环。"}
+{"id":"829d","entity":["OMP宿主适配","生命周期钩子","工具裁剪"],"fact":"OMP turn_start钩子注册：SessionLifecycle.fs在session_start注册行后补pi.on(\"turn_start\", ...)，入口为SessionLifecycleHooks.turnStartHandler调用applyActiveToolFilterForMainSession，每轮工具可见性增加保险层检查点。"}
+{"id":"bb95","entity":["钩子系统","注释规范"],"fact":"HookExecute.fs过时注释修正：setUiLabel注释删除对tool.execute.before hook缺失的引用说明；applyToolResultHook注释明确tool_result后处理为幂等保险，覆盖tool_call钩子时序边缘情况未触发场景。"}
+{"id":"de2c","entity":["OMP宿主适配","测试门禁"],"fact":"OMP生命周期钩子集成测试补全：turn_start工具恢复与tool_call child-only阻断具独立测试方法，TestsEntriesOmp.fs注册条目已更新。"}

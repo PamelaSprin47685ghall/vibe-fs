@@ -7,9 +7,7 @@ open Wanxiangshu.Shell.SubagentIntentsCodec
 module Dyn = Wanxiangshu.Shell.Dyn
 
 /// Inject a UI label into the host-side args object so the chat UI sees a one-line
-/// summary before the agent finishes. Mirrors `Opencode.HookSchema.setUiLabel`
-/// but writes directly to the host args reference because pi does not expose a
-/// `tool.execute.before` hook distinct from `tool_result`.
+/// summary before the agent finishes. Mirrors `Opencode.HookSchema.setUiLabel`.
 let private setUiLabel (args: obj) (toolName: string) : unit =
     let labelResult =
         match toolName with
@@ -55,8 +53,8 @@ let applyPreExecuteHook (toolName: string) (args: obj) : unit =
 let applyToolCallHook (toolName: string) (args: obj) : unit =
     applyPreExecuteHook toolName args
 
-/// Apply the Omp post-tool argument normalisations. pi does not expose a
-/// `tool.execute.before` hook distinct from `tool_result`, so the same
-/// normalisation also runs here for idempotency.
+/// Apply the Omp post-tool argument normalisations. Runs the same normalisation
+/// as a post-execute idempotency guard — the `tool_call` pre-hook might not
+/// fire under race conditions, so `tool_result` is the last safe insertion point.
 let applyToolResultHook (toolName: string) (args: obj) : unit =
     applyPreExecuteHook toolName args
