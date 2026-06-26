@@ -7,8 +7,8 @@ open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphMaintenance
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Kernel.KnowledgeGraph.Maintenance
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.KnowledgeGraphMaintenanceRun
 open VibeFs.Shell.PromiseQueue

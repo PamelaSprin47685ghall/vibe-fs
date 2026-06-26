@@ -13,7 +13,7 @@ open VibeFs.Shell.MessageTransformPipeline
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
 open VibeFs.Kernel.HostTools
 open VibeFs.Kernel.Methodology
 open VibeFs.Kernel.MessageTransformPolicy

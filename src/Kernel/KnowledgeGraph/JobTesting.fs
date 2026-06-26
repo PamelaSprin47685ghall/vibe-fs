@@ -1,4 +1,4 @@
-module VibeFs.Kernel.KnowledgeGraphJobTesting
+module VibeFs.Kernel.KnowledgeGraph.JobTesting
 
 open System
 open VibeFs.Kernel.KnowledgeGraph

@@ -3,8 +3,8 @@ module VibeFs.Omp.KnowledgeGraph.Snapshot
 open Fable.Core
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphPrompts
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Kernel.KnowledgeGraph.Prompts
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.PromiseQueue
 

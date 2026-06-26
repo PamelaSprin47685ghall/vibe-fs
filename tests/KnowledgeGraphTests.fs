@@ -4,7 +4,7 @@ open Fable.Core
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphJobTesting
+open VibeFs.Kernel.KnowledgeGraph.JobTesting
 open VibeFs.Kernel.Messaging
 
 open VibeFs.Tests.KnowledgeGraphTestsCodec

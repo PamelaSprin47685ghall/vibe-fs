@@ -1,4 +1,4 @@
-module VibeFs.Kernel.KnowledgeGraphPrompts
+module VibeFs.Kernel.KnowledgeGraph.Prompts
 
 open System
 open VibeFs.Kernel.KnowledgeGraph
@@ -28,17 +28,17 @@ let private eventSeqLines (entries: KnowledgeGraphEntry list) : string list =
             "  - entity: " + inlineEntitySeq entry.entity
             "    fact: " + yamlStringValue entry.fact ])
 
-let yamlSeqField (key: string) (entries: KnowledgeGraphEntry list) : string =
-    PromptFrontMatter.yamlSeqField key (entrySeqLines entries)
+let kgYamlSeqField (key: string) (entries: KnowledgeGraphEntry list) : string =
+    VibeFs.Kernel.PromptFrontMatter.yamlSeqField key (entrySeqLines entries)
 
-let private yamlEventSeqField (key: string) (entries: KnowledgeGraphEntry list) : string =
-    PromptFrontMatter.yamlSeqField key (eventSeqLines entries)
+let private kgYamlEventSeqField (key: string) (entries: KnowledgeGraphEntry list) : string =
+    VibeFs.Kernel.PromptFrontMatter.yamlSeqField key (eventSeqLines entries)
 
 let projectionText (projection: KnowledgeGraphProjection) : string =
-    yamlSeqField "knowledge_graph" (projection |> Map.toList |> List.map snd)
+    kgYamlSeqField "knowledge_graph" (projection |> Map.toList |> List.map snd)
 
 let filesText (entries: KnowledgeGraphEntry list) : string =
-    yamlSeqField "entries" entries
+    kgYamlSeqField "entries" entries
 
 let entriesForDay (files: KnowledgeGraphFile list) (date: string) : KnowledgeGraphEntry list =
     files
@@ -94,7 +94,7 @@ let private rewritePruneRules = [
 
 let buildAppendPrompt (title: string) (workInput: string) (workOutput: string) (projection: KnowledgeGraphProjection) : string =
     frontMatterPrompt [
-        yamlSeqField "existing_knowledge_graph" (projection |> Map.toList |> List.map snd)
+        kgYamlSeqField "existing_knowledge_graph" (projection |> Map.toList |> List.map snd)
         yamlField "work_title" title
         yamlField "work_input" workInput
         yamlField "work_output" workOutput
@@ -116,8 +116,8 @@ let private existingEntriesForDaily (date: string) (files: KnowledgeGraphFile li
 
 let buildDailyPrompt (date: string) (files: KnowledgeGraphFile list) (_projection: KnowledgeGraphProjection) : string =
     frontMatterPrompt [
-        yamlSeqField "existing_knowledge_graph" (existingEntriesForDaily date files)
-        yamlEventSeqField "new_facts" (deltaEntriesForDay date files)
+        kgYamlSeqField "existing_knowledge_graph" (existingEntriesForDaily date files)
+        kgYamlEventSeqField "new_facts" (deltaEntriesForDay date files)
     ] (String.concat "\n\n" (
         [ "You are the project KnowledgeGraph bookkeeper."
           "You are given existing knowledge graph entries. Some new events happened. Organize and merge the new facts, then modify the existing knowledge graph entries."

@@ -8,9 +8,9 @@ open VibeFs.Shell
 open VibeFs.Kernel.Messaging
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
-open VibeFs.Kernel.KnowledgeGraphMaintenance
-open VibeFs.Kernel.KnowledgeGraphPrompts
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
+open VibeFs.Kernel.KnowledgeGraph.Maintenance
+open VibeFs.Kernel.KnowledgeGraph.Prompts
 open VibeFs.Mux.Delegate
 open VibeFs.Mux.Wrappers
 open VibeFs.Mux.MessagingCodec

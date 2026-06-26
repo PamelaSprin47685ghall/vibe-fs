@@ -7,7 +7,7 @@ open VibeFs.Tests.TempWorkspace
 open VibeFs.Tests.IntegrationToolSetup
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphCodec
+open VibeFs.Kernel.KnowledgeGraph.Codec
 open VibeFs.Opencode.Plugin
 open VibeFs.Opencode.KnowledgeGraphRuntime
 open VibeFs.Shell.KnowledgeGraphFiles

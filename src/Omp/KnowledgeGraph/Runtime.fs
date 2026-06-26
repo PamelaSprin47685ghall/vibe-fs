@@ -4,8 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphMaintenance
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Kernel.KnowledgeGraph.Maintenance
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
 open VibeFs.Omp.KnowledgeGraphRuntimeIO
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.KnowledgeGraphFiles

@@ -21,7 +21,7 @@ open VibeFs.Methodology.MuxTools
 open VibeFs.Shell.RuntimeScope
 open VibeFs.Shell.Dyn
 open VibeFs.Shell.MuxHookInputCodec
-open VibeFs.Kernel.KnowledgeGraphBookkeeperPolicy
+open VibeFs.Kernel.KnowledgeGraph.BookkeeperPolicy
 open VibeFs.Shell.ChatTransformOutputCodec
 
 let muxToolNames =
@@ -91,7 +91,7 @@ let toolExecuteAfter
         let succeeded = hookOutputErrorMux output = ""
         let originalOutput = hookOutputTextMux output
         if succeeded
-           && VibeFs.Kernel.KnowledgeGraphBookkeeperPolicy.recordsToBookkeeper decoded.Tool
+           && VibeFs.Kernel.KnowledgeGraph.BookkeeperPolicy.recordsToBookkeeper decoded.Tool
            && not (isReadOnlyExecutorMux decoded.Tool decoded.Args) && not (isChildWorkspace deps decoded.SessionID) then
             knowledgeGraphRuntime.StartBookkeeperAppend(
                 bookkeeperInput decoded.Args,

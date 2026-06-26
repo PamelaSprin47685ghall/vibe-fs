@@ -4,7 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphCodec
+open VibeFs.Kernel.KnowledgeGraph.Codec
 
 [<Import("promises", "node:fs")>]
 let private fsPromises : obj = jsNative

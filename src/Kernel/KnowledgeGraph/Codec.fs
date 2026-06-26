@@ -1,4 +1,4 @@
-module VibeFs.Kernel.KnowledgeGraphCodec
+module VibeFs.Kernel.KnowledgeGraph.Codec
 
 open Thoth.Json
 

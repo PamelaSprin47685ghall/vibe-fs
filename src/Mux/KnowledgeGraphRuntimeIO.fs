@@ -6,7 +6,7 @@ open VibeFs.Shell
 
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
 open VibeFs.Shell.KnowledgeGraphStorage
 open VibeFs.Shell.KnowledgeGraphSubmit
 open VibeFs.Shell.Dyn

@@ -6,7 +6,7 @@ open VibeFs.Tests.Assert
 open VibeFs.Tests.TempWorkspace
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphCodec
+open VibeFs.Kernel.KnowledgeGraph.Codec
 open VibeFs.Shell.KnowledgeGraphFiles
 
 [<Import("createRequire", "node:module")>]

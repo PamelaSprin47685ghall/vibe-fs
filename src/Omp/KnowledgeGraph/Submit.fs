@@ -3,7 +3,7 @@ module VibeFs.Omp.KnowledgeGraph.Submit
 open Fable.Core
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
 open VibeFs.Kernel.Messaging
 open VibeFs.Omp.KnowledgeGraphRuntimeIO
 open VibeFs.Omp.MessagingCodec

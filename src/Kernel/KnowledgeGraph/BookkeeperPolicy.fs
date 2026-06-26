@@ -1,4 +1,4 @@
-module VibeFs.Kernel.KnowledgeGraphBookkeeperPolicy
+module VibeFs.Kernel.KnowledgeGraph.BookkeeperPolicy
 
 open VibeFs.Kernel.ToolCatalog
 

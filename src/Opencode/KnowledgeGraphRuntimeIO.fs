@@ -3,7 +3,7 @@ module VibeFs.Opencode.KnowledgeGraphRuntimeIO
 open Fable.Core
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
 open VibeFs.Shell.KnowledgeGraphSubmit
 
 let buildEntries = VibeFs.Shell.KnowledgeGraphSubmit.buildEntriesFromDrafts

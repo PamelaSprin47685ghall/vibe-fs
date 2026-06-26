@@ -10,7 +10,7 @@ open VibeFs.Tests.IntegrationMuxSetup
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
 open VibeFs.Kernel.Messaging
-open VibeFs.Kernel.KnowledgeGraphPrompts
+open VibeFs.Kernel.KnowledgeGraph.Prompts
 open VibeFs.Mux.Plugin
 open VibeFs.Shell.KnowledgeGraphFiles
 open VibeFs.Shell.Dyn

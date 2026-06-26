@@ -5,9 +5,9 @@ open Fable.Core
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphPrompts
-open VibeFs.Kernel.KnowledgeGraphMaintenance
-open VibeFs.Kernel.KnowledgeGraphRuntimeState
+open VibeFs.Kernel.KnowledgeGraph.Prompts
+open VibeFs.Kernel.KnowledgeGraph.Maintenance
+open VibeFs.Kernel.KnowledgeGraph.RuntimeState
 
 let private some (o: 'a option) : 'a =
     match o with Some v -> v | None -> failwith "expected Some"

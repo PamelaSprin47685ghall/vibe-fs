@@ -1,6 +1,7 @@
 module VibeFs.Tests.Tests
 
 open Fable.Core
+open Fable.Core.JsInterop
 open VibeFs.Tests.Assert
 open VibeFs.Tests.ReviewTests
 open VibeFs.Tests.AgentTests
@@ -85,6 +86,41 @@ open VibeFs.Tests.OmpPluginCoreIntegrationTests
 open VibeFs.Tests.SubagentIoTests
 open VibeFs.Omp.Plugin
 
+[<Import("appendFileSync", "node:fs")>]
+let private appendFile (path: string) (content: string) (encoding: string) : unit = jsNative
+
+[<Import("mkdirSync", "node:fs")>]
+let private mkdirSync (path: string) (opts: obj) : unit = jsNative
+
+[<Emit("process.env.VIBE_FS_TEST_VERBOSE")>]
+let private envVerbose () : string = jsNative
+
+[<Emit("process.argv")>]
+let private cliArgv () : obj = jsNative
+
+let private verboseEnabledFromArgs () : bool =
+    let envVal = envVerbose ()
+    let envHit = not (isNull envVal) && envVal = "1"
+    let argvObj = cliArgv ()
+    let cliHit =
+        try
+            let arr : string[] = unbox argvObj
+            arr |> Array.exists (fun a -> a = "--verbose")
+        with _ -> false
+    envHit || cliHit
+
+let private initVerboseLog () : unit =
+    if verboseEnabledFromArgs () then
+        let ts = System.DateTime.Now.ToString("yyyyMMdd-HHmmss")
+        let logDir = "tests/logs"
+        let logPath = sprintf "%s/%s.verbose.log" logDir ts
+        try mkdirSync logDir (createObj [ "recursive", box true ]) with _ -> ()
+        let header =
+            sprintf "# vibe-fs verbose test log\n# timestamp: %s\n# switch: %s\n"
+                ts (if (envVerbose ()) = "1" then "VIBE_FS_TEST_VERBOSE=1" else "--verbose")
+        appendFile logPath header "utf8"
+        Assert.setVerbose (Some logPath)
+
 let private integrationToolFlatTests : (string * TestBody) list =
     integrationToolSpecs ()
     |> List.map (fun (shortName, spec) -> "IntegrationTool." + shortName, Async spec)
@@ -109,8 +145,11 @@ let private selectedTests (selectors: string array) =
 let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
+        let selectors =
+            args |> Array.filter (fun a -> a <> "--verbose" && a <> "-v")
+        initVerboseLog ()
         resetOmpPluginTestState ()
-        let runnableTests = selectedTests args
+        let runnableTests = selectedTests selectors
         if List.isEmpty runnableTests then
             printfn "No tests matched selectors: %A" args
             return 1

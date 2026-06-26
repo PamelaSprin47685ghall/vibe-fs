@@ -1,4 +1,4 @@
-module VibeFs.Kernel.KnowledgeGraphRuntimeState
+module VibeFs.Kernel.KnowledgeGraph.RuntimeState
 
 open System
 open VibeFs.Kernel.KnowledgeGraph

@@ -4,9 +4,9 @@ open System
 open VibeFs.Tests.Assert
 open VibeFs.Kernel.KnowledgeGraph
 open VibeFs.Kernel.KnowledgeGraph.Types
-open VibeFs.Kernel.KnowledgeGraphCodec
-open VibeFs.Kernel.KnowledgeGraphPrompts
-open VibeFs.Kernel.KnowledgeGraphJobTesting
+open VibeFs.Kernel.KnowledgeGraph.Codec
+open VibeFs.Kernel.KnowledgeGraph.Prompts
+open VibeFs.Kernel.KnowledgeGraph.JobTesting
 
 let private ok r =
     match r with

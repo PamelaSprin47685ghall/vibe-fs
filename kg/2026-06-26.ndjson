@@ -1,0 +1,13 @@
+{"type":"knowledge_graph_header","version":1,"kind":"day","date":"2026-06-26","rewritten":false}
+{"id":"40de","entity":["测试运行器","工作区卫生"],"fact":"本地测试日志落盘目录以 gitignore 通配忽略全部内容，runner 或探针输出可写该目录而不纳入版本控制；与 AGENTS 报告禁令、bookkeeper 略过临时进度闲聊同向。"}
+{"id":"f234","entity":["知识图谱记账","事实粒度"],"fact":"bookkeeper 回合若工作输入仅为 executor 创建测试日志隔离目录且 work_output 为通配 gitignore 内容，可记工作区卫生类不变量，不构成 npm run build-and-test 绿测充分条件。"}
+{"id":"27ac","entity":["验收口径","测试运行器"],"fact":"tests 层 Assert 模块支持可选逐条验收日志：入口经 --verbose 或环境变量 VIBE_FS_TEST_VERBOSE=1 启用后，每条 check/equal 以 PASS/FAIL 行含标签与失败时 expected/got 详情追加写入指定路径（Node appendFileSync utf8），与 timedAsync 1s 单测超时、asyncSuiteTimeoutMs 套件超时分层纪律正交；属可测性增强非门禁结论变更，单点启用 verbose 不构成 npm run build-and-test 绿测充分条件。"}
+{"id":"e9a5","entity":["测试运行器","错误隔离"],"fact":"逐条 verbose 日志计数经 verboseCheckCount 暴露，clearFailuresForRun 重置 passed/failed 时同步清零 verboseChecksLogged，避免跨 run 计数污染。"}
+{"id":"aca3","entity":["测试运行器","可观测性"],"fact":"汇总阶段在 verbose 已启用且 verboseLogPath 为 Some 时，向该路径以 utf8 追加页脚行，内容含 passed、failed、verboseChecksLogged 计数；并向控制台打印 verbose log 路径一行，与 timedAsync/asyncSuiteTimeoutMs 分层超时同属 Assert 层纪律，闭合长套件跑完后检查轨迹落盘。"}
+{"id":"ab36","entity":["测试运行器","运行入口"],"fact":"runAll 每次执行时在 clearFailuresForRun 之后、resetOmpPluginTestState 之前调用 initVerboseLog，于整轮测试开始前统一初始化详细日志，与仅清空失败列表而不初始化日志之旧序正交。"}
+{"id":"6dcb","entity":["测试运行器","详细日志"],"fact":"中央 runner 源文件在扁平集成规格表之前可初始化详细日志：当环境变量 VIBE_FS_TEST_VERBOSE 为 1 或进程参数含 --verbose 时，于 tests/logs 目录按时间戳创建 .verbose.log，并通过断言辅助模块将可选日志路径注入，与异步超时失败标签、进程级 RUNALL_REJECTED 退出码诊断同向，属默认可跑路径上的可选观测增强而非探针语义变更。"}
+{"id":"ec30","entity":["测试基础设施","宿主互操作"],"fact":"测试轨经 Fable 互操作绑定 Node 文件系统追加写与递归建目录 API，用于详细模式下创建 tests/logs 并写入 UTF-8 头行（时间戳与开关来源）；失败时静默忽略建目录异常，避免非详细模式污染默认 runner。"}
+{"id":"2eba","entity":["中央测试入口","Fable互操作"],"fact":"中央测试运行器编译单元在并列 open Fable.Core 之外增补 open Fable.Core.JsInterop，与转译链下集成测及插件验收轨以 createObj 等 JsInterop 符号做夹具之纪律同向；属接线层作用域收敛，不构成 npm run build-and-test 绿测充分条件。"}
+{"id":"3c5b","entity":["验收口径","源码变更"],"fact":"bookkeeper 当次 work_input 仅为 tests 层中央入口单行级增补 JsInterop open 且回报 Edit applied successfully 时，可记 Fable 互操作接线事实，全仓 SSOT 仍须同次转译零 Compilation failed、runner failed=0 与已登记探针联判。"}
+{"id":"00ec","entity":["测试运行器","可观测性"],"fact":"默认同批跑测时进程参数兼承载用例选择器与详细日志开关；在按标签筛选可执行用例前须剔除仅用于开启详细验收日志的短开关项，防止其进入选择器匹配而被误当作测试标签。"}
+{"id":"579f","entity":["测试运行器","命令行界面"],"fact":"详细日志开关与用例选择器共用同一参数数组时二者须解耦：净化后的参数数组专供 matchesSelector 类过滤，详细模式开关不得参与可跑用例集合的枚举。"}
