@@ -107,7 +107,7 @@ let searchToolsFuzzyGrepTool () =
 let searchToolsWebsearchTool () =
     let registry = ChildAgentRegistry.Create()
     let ctx = createObj []
-    let tool = websearchTool Opencode registry ctx
+    let tool = websearchTool Opencode registry ctx (Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState())
     check "websearch tool non-null" (not (isNull tool))
 
 let searchToolsWebfetchTool () =
