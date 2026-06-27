@@ -15,8 +15,10 @@ open Wanxiangshu.Shell.FuzzySearch
 open Wanxiangshu.Shell.WebSearchCodec
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
-let private buildWebsearch (pi: obj) : obj =
+let private buildWebsearch (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : obj =
     let tb = Dyn.get pi "typebox"
     createObj [
         "name", box "websearch"
@@ -59,6 +61,8 @@ let private buildWebsearch (pi: obj) : obj =
                                         [| "read" |]
                                         prompt
                                         abort
+                                        fallbackRuntime
+                                        fallbackConfigOpt
                                 return textResult summary
                 })
     ]
@@ -114,6 +118,6 @@ let private buildWebfetch (pi: obj) : obj =
                 })
     ]
 
-let registerWebTools (pi: obj) : unit =
-    pi?registerTool(buildWebsearch pi)
+let registerWebTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : unit =
+    pi?registerTool(buildWebsearch pi fallbackRuntime fallbackConfigOpt)
     pi?registerTool(buildWebfetch pi)

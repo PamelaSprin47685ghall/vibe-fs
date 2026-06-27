@@ -41,13 +41,6 @@ let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: Finder
     registerMethodologyTools registry ctx host fallbackRuntime tools
     tools
 
-// Legacy 8-arg overload for callers/tests that do not need consumed tracking.
-let createToolsLegacy (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (knowledgeGraphRuntime: Wanxiangshu.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphEnabled: bool) (sessionScope: RuntimeScope) : obj =
-    createTools host registry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled sessionScope (FallbackRuntimeState())
-
 // Test helper that supplies an empty fallback runtime.
 let createToolsForTests (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (knowledgeGraphRuntime: Wanxiangshu.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphEnabled: bool) (sessionScope: RuntimeScope) : obj =
     createTools host registry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled sessionScope (FallbackRuntimeState())
-
-// Marker to prevent unused-value warnings on the legacy helpers in this module.
-let private _keep = (createToolsLegacy, createToolsForTests)

@@ -7,6 +7,7 @@ open Wanxiangshu.Omp.MessagingCodec
 open Wanxiangshu.Omp.PiResolve
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OmpHostBindings
+open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.SubagentIo
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -35,7 +36,7 @@ let private callOpt (ctx: obj) (key: string) : obj =
     let g = Dyn.get ctx key
     if Dyn.typeIs g "function" then Dyn.call0 g else box null
 
-let createChildSession (pi: obj) (ctx: obj) (toolNames: string array) (systemPrompt: obj option) (customTools: obj array)
+let createChildSession (pi: obj) (ctx: obj) (toolNames: string array) (systemPrompt: obj option) (customTools: obj array) (modelOverride: string option)
     : JS.Promise<ChildSession> =
     promise {
         let createAgentSession = getCreateAgentSession pi
@@ -49,13 +50,17 @@ let createChildSession (pi: obj) (ctx: obj) (toolNames: string array) (systemPro
             match systemPrompt with
             | Some v -> v
             | None -> callOpt ctx "getSystemPrompt"
+        let model =
+            match modelOverride with
+            | Some m -> box m
+            | None -> Dyn.get ctx "model"
         let body =
             createObj [
                 "cwd", box cwd
                 "hasUI", box false
                 "toolNames", box toolNames
                 "modelRegistry", Dyn.get ctx "modelRegistry"
-                "model", Dyn.get ctx "model"
+                "model", model
                 "thinkingLevel", callOpt ctx "getThinkingLevel"
                 "systemPrompt", sp
                 "agentsMdSearch", Dyn.get ctx "agentsMdSearch"
@@ -82,11 +87,25 @@ let createChildSession (pi: obj) (ctx: obj) (toolNames: string array) (systemPro
         return { session = session; dispose = dispose }
     }
 
-let runSubagent (pi: obj) (ctx: obj) (toolNames: string array) (prompt: string) (signal: obj option)
+let runSubagent (pi: obj) (ctx: obj) (toolNames: string array) (prompt: string) (signal: obj option) (fallbackRuntime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState) (fallbackConfigOpt: Wanxiangshu.Kernel.FallbackKernel.Types.FallbackConfig option)
     : JS.Promise<string> =
     promise {
-        let! child = createChildSession pi ctx toolNames None [||]
+        let modelOverride, defaultChain =
+            match fallbackConfigOpt with
+            | Some cfg ->
+                let firstModel =
+                    match cfg.DefaultChain with
+                    | first :: _ -> Some (sprintf "%s/%s%s" first.ProviderID first.ModelID (match first.Variant with Some v -> ":" + v | None -> ""))
+                    | [] -> None
+                firstModel, Some cfg.DefaultChain
+            | None -> None, None
+        let! child = createChildSession pi ctx toolNames None [||] modelOverride
         let session = child.session
+        let childId =
+            let childCtx = createObj [ "sessionManager", Dyn.get session "sessionManager" ]
+            getSessionIdFromContext childCtx |> Option.defaultValue ""
+        if childId <> "" then
+            defaultChain |> Option.iter (fun chain -> fallbackRuntime.SetChain childId chain)
         let run =
             promise {
                 do! sessionPrompt session prompt
@@ -100,5 +119,9 @@ let runSubagent (pi: obj) (ctx: obj) (toolNames: string array) (prompt: string) 
             child.dispose |> Option.iter (fun dispose -> dispose ())
         let! text = raceWithAbortSignal (Option.defaultValue (box null) signal) cleanup run
         cleanup ()
+        if childId <> "" && fallbackRuntime.GetConsumed childId <> Some false then
+            let pst = fallbackRuntime.GetOrCreateState childId
+            if pst.Phase = Wanxiangshu.Kernel.FallbackKernel.Types.FallbackPhase.Exhausted then
+                return failwith "Fallback exhausted for child session"
         return text
     }

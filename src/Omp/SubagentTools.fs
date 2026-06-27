@@ -11,12 +11,14 @@ open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.OmpToolSchema
 open Wanxiangshu.Shell.SubagentIntentsCodec
 open Wanxiangshu.Shell.WorkspaceFiles
+open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Kernel.FallbackKernel.Types
 module Dyn = Wanxiangshu.Shell.Dyn
 
 let private coderChildTools = [| "read"; "edit"; "write"; "find"; "fuzzy_find"; "fuzzy_grep"; "lsp" |]
 let private investigatorChildTools = [| "read"; "find"; "fuzzy_find"; "fuzzy_grep" |]
 
-let registerSubagentTools (pi: obj) : unit =
+let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : unit =
     let tb = Dyn.get pi "typebox"
 
     pi?registerTool(
@@ -35,7 +37,7 @@ let registerSubagentTools (pi: obj) : unit =
                                 let prompts = formatPrompt omp (Coder intents)
                                 let! reports =
                                     prompts
-                                    |> List.map (fun prompt -> runSubagent pi ctx coderChildTools prompt (Some signal))
+                                    |> List.map (fun prompt -> runSubagent pi ctx coderChildTools prompt (Some signal) fallbackRuntime fallbackConfigOpt)
                                     |> Promise.all
                                 return textResult (joinReports reports)
                             with ex -> return asErrorResult ex
@@ -58,7 +60,7 @@ let registerSubagentTools (pi: obj) : unit =
                                 let prompts = formatPrompt omp (Investigator intents)
                                 let! reports =
                                     prompts
-                                    |> List.map (fun prompt -> runSubagent pi ctx investigatorChildTools prompt (Some signal))
+                                    |> List.map (fun prompt -> runSubagent pi ctx investigatorChildTools prompt (Some signal) fallbackRuntime fallbackConfigOpt)
                                     |> Promise.all
                                 return textResult (joinReports reports)
                             with ex -> return asErrorResult ex
@@ -89,7 +91,7 @@ let registerSubagentTools (pi: obj) : unit =
                                 |> Array.toList
                             let intent = Dyn.str params' "intent"
                             let prompt = formatPrompt omp (Meditator(intent, sections)) |> List.head
-                            let! text = runSubagent pi ctx [||] prompt (Some signal)
+                            let! text = runSubagent pi ctx [||] prompt (Some signal) fallbackRuntime fallbackConfigOpt
                             return textResult text
                         with ex -> return asErrorResult ex
                     })
@@ -114,7 +116,7 @@ let registerSubagentTools (pi: obj) : unit =
                             else
                                 let intent = Dyn.str params' "intent"
                                 let prompt = formatPrompt omp (Browser intent) |> List.head
-                                let! text = runSubagent pi ctx [| "browser" |] prompt (Some signal)
+                                let! text = runSubagent pi ctx [| "browser" |] prompt (Some signal) fallbackRuntime fallbackConfigOpt
                                 return textResult text
                         with ex -> return asErrorResult ex
                     })

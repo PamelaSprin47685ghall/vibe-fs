@@ -32,7 +32,9 @@ type CoreServices =
       KnowledgeGraphRuntime: OmpKnowledgeGraphRuntime
       FinderCache: FinderCache
       Pi: obj
-      FallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option }
+      FallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option
+      FallbackRuntime: FallbackRuntimeState
+      FallbackConfig: FallbackConfig option }
 
 let reviewStore : ReviewStore = createReviewStore ()
 
@@ -57,7 +59,9 @@ let private createCoreServices (pi: obj) : CoreServices =
       KnowledgeGraphRuntime = kgRuntime
       FinderCache = finderCache
       Pi = pi
-      FallbackHandler = fallbackHandler }
+      FallbackHandler = fallbackHandler
+      FallbackRuntime = fallbackRuntime
+      FallbackConfig = fallbackConfigOpt }
 
 /// Apply AgentConfig to the host's config object if the host exposes both
 /// `getConfig` and `setConfig`. Without `getConfig` we have no base to merge
@@ -117,7 +121,7 @@ let registerAbortHandler (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKno
             }))
 
 let private registerHooks (pi: obj) (services: CoreServices) : unit =
-    registerAllTools pi services.ReviewStore services.KnowledgeGraphRuntime
+    registerAllTools pi services.ReviewStore services.KnowledgeGraphRuntime services.FallbackRuntime services.FallbackConfig
     registerInputHandler pi services.ReviewStore
     registerSessionLifecycle pi services.ReviewStore services.KnowledgeGraphRuntime
     registerAbortHandler pi services.ReviewStore services.KnowledgeGraphRuntime services.FallbackHandler
