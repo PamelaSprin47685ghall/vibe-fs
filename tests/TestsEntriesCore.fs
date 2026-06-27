@@ -1,5 +1,7 @@
 module Wanxiangshu.Tests.TestsEntriesCore
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TestsTestBody
+open Wanxiangshu.Tests.TestsEntriesFallback
 open Wanxiangshu.Tests.ReviewTests
 open Wanxiangshu.Tests.ReviewTestsReplay
 open Wanxiangshu.Tests.ReviewTestsPrompts
@@ -290,11 +292,9 @@ let coreTestEntries () : (string * TestBody) list =
     "ConfigTests.run", Sync (sync ConfigTests.run)
     "JsonSchemaBuildersTests.run", Sync (sync JsonSchemaBuildersTests.run)
     "ExecutorStripTests.run", Sync (sync ExecutorStripTests.run)
-    "WebFetchGuardTests.run", Sync (sync WebFetchGuardTests.run)
-    "ReviewVerdictTests.run", Sync (sync ReviewVerdictTests.run)
-    "ToolCopyTests.run", Sync (sync ToolCopyTests.run)
-    "JsArrayMutateTests.run", Sync (sync JsArrayMutateTests.run)
     ]
+    @ TestsEntriesFallback.tailTestEntries ()
+    @ fallbackTestEntries()
     @ TestsEntriesFuzzy.fuzzyTestEntries()
     @ TestsEntriesDomain.domainTestEntries()
     @ TestsEntriesCoverage.coverageTestEntries()

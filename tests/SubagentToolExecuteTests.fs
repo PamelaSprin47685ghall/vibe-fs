@@ -14,7 +14,8 @@ let private stubSpawn () =
       Registry = ChildAgentRegistry.Create()
       Client = createObj []
       PluginCtx = createObj [ "directory", box "/proj" ]
-      ToolContext = createObj [ "directory", box "/proj"; "sessionID", box "s-parent" ] }
+      ToolContext = createObj [ "directory", box "/proj"; "sessionID", box "s-parent" ]
+      FallbackRuntime = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState() }
 
 let private stubMuxSpawn role =
     { ToolNames = [||]
@@ -29,9 +30,10 @@ let private validMuxConfig () =
 
 let executeOpencodeDecodeFailureNeverCallsRunCore () = promise {
     let mutable runCoreCalls = 0
-    let runCore _ _ _ _ _ _ _ _ _ _ =
-        runCoreCalls <- runCoreCalls + 1
-        Promise.lift (Ok "should not run")
+    let runCore : RunSubagentCoreResult =
+        fun _ _ _ _ _ _ _ _ _ _ _ ->
+            runCoreCalls <- runCoreCalls + 1
+            Promise.lift (Ok "should not run" : Result<string, DomainError>)
     let args = createObj [ "intents", box [||] ]
     let! out = executeOpencodeSubagentTool runCore (stubSpawn ()) "coder" args
     check "opencode empty intents rejects before runCore" (runCoreCalls = 0)
@@ -40,9 +42,10 @@ let executeOpencodeDecodeFailureNeverCallsRunCore () = promise {
 
 let executeOpencodeMissingIntentsNeverCallsRunCore () = promise {
     let mutable runCoreCalls = 0
-    let runCore _ _ _ _ _ _ _ _ _ _ =
-        runCoreCalls <- runCoreCalls + 1
-        Promise.lift (Ok "should not run")
+    let runCore : RunSubagentCoreResult =
+        fun _ _ _ _ _ _ _ _ _ _ _ ->
+            runCoreCalls <- runCoreCalls + 1
+            Promise.lift (Ok "should not run" : Result<string, DomainError>)
     let! out = executeOpencodeSubagentTool runCore (stubSpawn ()) "coder" (createObj [])
     check "opencode missing intents rejects before runCore" (runCoreCalls = 0)
     check "opencode missing intents uses formatDomainError" (out.Contains "coder failed:")
@@ -73,9 +76,10 @@ let executeMuxInvalidConfigNeverCallsRunMux () = promise {
 
 let executeOpencodeValidIntentCallsRunCore () = promise {
     let mutable runCoreCalls = 0
-    let runCore _ _ _ _ _ _ _ _ _ _ =
-        runCoreCalls <- runCoreCalls + 1
-        Promise.lift (Ok "child report")
+    let runCore : RunSubagentCoreResult =
+        fun _ _ _ _ _ _ _ _ _ _ _ ->
+            runCoreCalls <- runCoreCalls + 1
+            Promise.lift (Ok "child report" : Result<string, DomainError>)
     let args = createObj [ "intents", box [| sampleCoderIntent "fix" "a.ts" |] ]
     let! out = executeOpencodeSubagentTool runCore (stubSpawn ()) "coder" args
     check "opencode valid intent invokes runCore" (runCoreCalls = 1)

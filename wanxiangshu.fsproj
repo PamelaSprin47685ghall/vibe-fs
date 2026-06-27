@@ -7,8 +7,12 @@
     <Compile Include="src/Kernel/HostTools.fs" />
     <Compile Include="src/Kernel/OmpSessionTools.fs" />
     <Compile Include="src/Kernel/SubagentIntents.fs" />
-    <Compile Include="src/Kernel/Yaml.fs" />
-    <Compile Include="src/Kernel/PromptFrontMatter.fs" />
+     <Compile Include="src/Kernel/Yaml.fs" />
+     <Compile Include="src/Kernel/FallbackKernel/Types.fs" />
+     <Compile Include="src/Kernel/FallbackKernel/Decision.fs" />
+     <Compile Include="src/Kernel/FallbackKernel/Recovery.fs" />
+     <Compile Include="src/Kernel/FallbackKernel/StateMachine.fs" />
+     <Compile Include="src/Kernel/PromptFrontMatter.fs" />
     <Compile Include="src/Kernel/ToolOutputInfoTypes.fs" />
     <Compile Include="src/Kernel/ToolOutputInfoParse.fs" />
     <Compile Include="src/Kernel/ToolOutputInfo.fs" />
@@ -162,6 +166,10 @@
     <Compile Include="src/Shell/CapsSynthCommon.fs" />
     <Compile Include="src/Shell/ReviewReplaySync.fs" />
     <Compile Include="src/Shell/PromiseQueue.fs" />
+    <Compile Include="src/Shell/FallbackConfigCodec.fs" />
+    <Compile Include="src/Shell/FallbackRuntimeState.fs" />
+    <Compile Include="src/Shell/FallbackMessageCodec.fs" />
+    <Compile Include="src/Shell/FallbackEventBridge.fs" />
     <Compile Include="src/Shell/PromiseStr.fs" />
     <Compile Include="src/Shell/SessionProjectionStore.fs" />
     <Compile Include="src/Shell/FuzzyIteratorStore.fs" />
@@ -280,6 +288,7 @@
     <Compile Include="src/Mux/KnowledgeGraphTestHooks.fs" />
     <Compile Include="src/Mux/KnowledgeGraphToolDefs.fs" />
     <Compile Include="src/Mux/MessageTransform.fs" />
+    <Compile Include="src/Mux/FallbackHooks.fs" />
     <Compile Include="src/Mux/EventHook.fs" />
     <Compile Include="src/Mux/SlashCommands.fs" />
     <Compile Include="src/Mux/PluginCatalog.fs" />
@@ -288,6 +297,7 @@
     <Compile Include="src/Mux/Plugin.fs" />
     <Compile Include="src/Opencode/NudgeEffect.fs" />
     <Compile Include="src/Opencode/SessionLifecycleObserver.fs" />
+    <Compile Include="src/Opencode/FallbackHooks.fs" />
     <Compile Include="src/Opencode/SessionIoSubagent.fs" />
     <Compile Include="src/Opencode/SessionIo.fs" />
     <Compile Include="src/Opencode/ReviewerLoop.fs" />
@@ -312,6 +322,7 @@
     <Compile Include="src/Opencode/Tools.fs" />
     <Compile Include="src/Opencode/HookExecute.fs" />
     <Compile Include="src/Opencode/HookTransform.fs" />
+    <Compile Include="src/Opencode/FallbackConfigLoader.fs" />
 
     <Compile Include="src/Opencode/PluginCore.fs" />
     <Compile Include="src/Opencode/Plugin.fs" />
@@ -356,6 +367,7 @@
     <Compile Include="src/Omp/SessionLifecycle.fs" />
 
     <Compile Include="src/Omp/Tools.fs" />
+    <Compile Include="src/Omp/FallbackHooks.fs" />
     <Compile Include="src/Omp/PluginCore.fs" />
     <Compile Include="src/Omp/Plugin.fs" />
   </ItemGroup>
@@ -578,8 +590,16 @@
     <Compile Include="tests/OmpToolsCoverageTests.fs" />
     <Compile Include="tests/PluginMimoTuiTests.fs" />
     <Compile Include="tests/MuxCoverageTests.fs" />
-    <Compile Include="tests/TestsEntriesCoverage.fs" />
-    <Compile Include="tests/TestsEntriesCore.fs" />
+     <Compile Include="tests/TestsEntriesCoverage.fs" />
+     <Compile Include="tests/FallbackKernelTests.fs" />
+     <Compile Include="tests/FallbackConfigCodecTests.fs" />
+     <Compile Include="tests/FallbackRuntimeStateTests.fs" />
+     <Compile Include="tests/FallbackEventBridgeTests.fs" />
+     <Compile Include="tests/FallbackMessageCodecTests.fs" />
+     <Compile Include="tests/FallbackIntegrationTests.fs" />
+     <Compile Include="tests/ArchitectureTestsFallback.fs" />
+     <Compile Include="tests/TestsEntriesFallback.fs" />
+     <Compile Include="tests/TestsEntriesCore.fs" />
     <Compile Include="tests/TestsEntriesCodec.fs" />
     <Compile Include="tests/TestsEntriesOmp.fs" />
     <Compile Include="tests/ArchitectureTests.fs" />

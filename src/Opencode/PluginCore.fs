@@ -6,6 +6,7 @@ open Fable.Core.JS
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Opencode.AgentConfig
 open Wanxiangshu.Opencode.CommandHooks
 open Wanxiangshu.Opencode.ChatHooks
@@ -24,6 +25,7 @@ open Wanxiangshu.Shell.FuzzyFinderShell
 open Wanxiangshu.Shell.KnowledgeGraphFiles
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell
+open Wanxiangshu.Shell.FallbackConfigCodec
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
@@ -40,14 +42,33 @@ type private CoreServices = {
     BacklogSession: BacklogSession
     Tools: obj
     McpMap: obj
+    FallbackConfig: FallbackConfig option
 }
 
 let private createCoreServices (host: Host) (ctx: obj) =
     let reviewStore = Wanxiangshu.Shell.ReviewRuntime.createReviewStore ()
     let childAgentRegistry = ChildAgentRegistry.Create()
     let finderCache = FinderCache()
-    let lifecycleObserver = createSessionLifecycleObserver host ctx reviewStore childAgentRegistry
+    let client =
+        match getClientFromPluginCtx ctx with
+        | Ok c -> c
+        | Error _ -> box null
     let directory = pluginDirectoryFromCtx ctx
+
+    // Fallback config: read AGENTS.md frontmatter `models:` section
+    let fallbackConfigOpt = Wanxiangshu.Opencode.FallbackConfigLoader.loadFallbackConfig directory
+    let fallbackRuntime = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
+    let fallbackConfigLookup : Wanxiangshu.Shell.FallbackEventBridge.ConfigLookup =
+        match fallbackConfigOpt with
+        | Some cfg -> (fun _ -> cfg)
+        | None -> (fun _ -> Wanxiangshu.Shell.FallbackConfigCodec.emptyConfig)
+    let fallbackHandler =
+        match fallbackConfigOpt with
+        | Some _ ->
+            Some (Wanxiangshu.Opencode.FallbackHooks.createOpencodeFallbackHandler
+                    client fallbackRuntime fallbackConfigLookup childAgentRegistry)
+        | None -> None
+    let lifecycleObserver = createSessionLifecycleObserver (host, ctx, reviewStore, childAgentRegistry, fallbackHandler, fallbackRuntime)
     let nowUtc () =
         let nowMs = Dyn.get ctx "nowMs"
         if Dyn.isNullish nowMs then System.DateTime.UtcNow
@@ -60,7 +81,7 @@ let private createCoreServices (host: Host) (ctx: obj) =
     let knowledgeGraphRuntime = KnowledgeGraphRuntime(knowledgeGraphClient, directory, nowUtc, childAgentRegistry, 30000L, 1000)
     let scope = create ()
     let backlogSession = BacklogSession(host, scope)
-    let tools = createTools host childAgentRegistry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled scope
+    let tools = createTools host childAgentRegistry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled scope fallbackRuntime
     let mcps = box {| ``type`` = "local"; command = Wanxiangshu.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
     let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
     {
@@ -73,6 +94,7 @@ let private createCoreServices (host: Host) (ctx: obj) =
         BacklogSession = backlogSession
         Tools = tools
         McpMap = mcpMap
+        FallbackConfig = fallbackConfigOpt
     }
 
 let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices) =
@@ -95,6 +117,32 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
         }))
     setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host services.BacklogSession input output))
     setKey result "experimental.chat.system.transform" (twoArgHook (fun input output -> HookTransform.systemTransform input output))
+
+let private applyFallbackModelOverrides (cfg: obj) (fbCfgOpt: FallbackConfig option) : unit =
+    match fbCfgOpt with
+    | None -> ()
+    | Some fbCfg ->
+        let overrides = Wanxiangshu.Opencode.FallbackConfigLoader.buildAgentModelOverrides fbCfg
+        let agentObj = Dyn.get cfg "agent"
+        if Dyn.isNullish agentObj then ()
+        else
+            let agentKeys : string[] = unbox (JS.Object.keys agentObj)
+            for kv in overrides do
+                for i = 0 to agentKeys.Length - 1 do
+                    let origKey = agentKeys.[i]
+                    if normalizeAgentName origKey = kv.Key then
+                        let a = Dyn.get agentObj origKey
+                        if not (Dyn.isNullish a) then setKey a "model" (box kv.Value)
+            match Wanxiangshu.Opencode.FallbackConfigLoader.defaultPreferredModel fbCfg with
+            | Some dm ->
+                let hasOverride (origKey: string) =
+                    overrides |> Seq.exists (fun kv -> kv.Key = normalizeAgentName origKey)
+                for i = 0 to agentKeys.Length - 1 do
+                    let k = agentKeys.[i]
+                    if not (hasOverride k) then
+                        let a = Dyn.get agentObj k
+                        if not (Dyn.isNullish a) then setKey a "model" (box dm)
+            | None -> ()
 
 let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
     promise {
@@ -124,6 +172,7 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
             promise {
                 let next = applyAgentConfigFor host cfg services.McpMap
                 registerCommands cfg
+                applyFallbackModelOverrides next services.FallbackConfig
                 return assignInto cfg next
             }))
         registerHooks result host ctx services

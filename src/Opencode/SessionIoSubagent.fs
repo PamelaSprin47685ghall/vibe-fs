@@ -10,6 +10,7 @@ open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Opencode.MessagingCodec
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.DelegatedAiSettings
+open Wanxiangshu.Shell.FallbackRuntimeState
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.OpencodeContextCodec
@@ -31,17 +32,11 @@ type SubagentLaunchOptions =
       tools: obj
       aiSettings: DelegatedAiSettings }
 
-/// Placeholder for a subagent session that produced no assistant text. Distinct
-/// from the executor's "(no output)" (shell stdout): same string, different
-/// domain fact, so each stays local to its own module (REFACTOR.md §0).
 let noOutputText = "(no output)"
 let abortedPrefix = "(aborted)"
 
-/// Get the abort signal from the opencode context.  The host exposes it as
-/// `context.abort` (an AbortSignal), not `context.abortSignal`.
 let getAbortSignal (context: obj) : obj = getAbortSignalFromContext context
 
-/// Dynamically invoke a method on `target`, awaiting the resulting promise.
 let invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
     unbox (target?(method)(arg))
 
@@ -62,7 +57,6 @@ let buildPromptBody (options: SubagentLaunchOptions) childID : obj =
         | _ -> body
     createObj [ "path", box {| id = childID |}; "body", body ]
 
-/// Pull the latest assistant text from a session's messages.
 let extractSessionText (client: obj) (sessionId: string) (directory: string) : JS.Promise<string> =
     promise {
         try
@@ -85,8 +79,6 @@ let extractSessionText (client: obj) (sessionId: string) (directory: string) : J
         with _ -> return noOutputText
     }
 
-/// Prompt a session and race it against an AbortSignal. The returned promise
-/// rejects with `AbortError` if the signal fires before the prompt resolves.
 let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
     promise {
         match getSessionApiFromClient client with
@@ -148,7 +140,7 @@ let startSubagentSession (registry: ChildAgentRegistry) (client: obj) (options: 
                 return Ok childID
     }
 
-let runSubagentCoreResult (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
+let runSubagentCoreResult (runtime: FallbackRuntimeState) (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                           (directory: string) (sessionID: string) (context: obj)
                           (tools: obj) (cleanup: bool) : JS.Promise<Result<string, DomainError>> =
     promise {
@@ -190,11 +182,24 @@ let runSubagentCoreResult (registry: ChildAgentRegistry) (client: obj) (agent: s
                         else
                             let! text = extractSessionText client childID directory
                             return Ok (formatSubagentReport noOutputText abortedPrefix text true)
-                    | other -> return Error other
+                    | other ->
+                        // Fallback closed-loop recovery: if model error was consumed by fallback,
+                        // do not reject; instead extract whatever text exists and return success.
+                        do! Promise.lift ()
+                        match runtime.GetConsumed childID with
+                        | Some true ->
+                            let! text = extractSessionText client childID directory
+                            return Ok (formatSubagentReport noOutputText abortedPrefix text false)
+                        | _ -> return Error other
         with err ->
             return Error (translateJsError err)
     }
 
-let runSubagentWithCleanup (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
+let runSubagentWithCleanup (runtime: FallbackRuntimeState) (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                            (directory: string) (sessionID: string) (context: obj) : JS.Promise<Result<string, DomainError>> =
-    runSubagentCoreResult registry client agent title prompt directory sessionID context (box null) true
+    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context (box null) true
+
+let runSubagent (runtime: FallbackRuntimeState) (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
+                (directory: string) (sessionID: string) (context: obj)
+                (tools: obj) : JS.Promise<Result<string, DomainError>> =
+    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context tools false

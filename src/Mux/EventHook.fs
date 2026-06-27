@@ -5,7 +5,11 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Shell.NudgeRuntime
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.FallbackEventBridge
+open Wanxiangshu.Shell.FallbackConfigCodec
 open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
+open Wanxiangshu.Mux.FallbackHooks
 
 type private DecodedHookEvent =
     { eventType: string
@@ -62,7 +66,23 @@ let createEventHook (deps: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.Re
         | _ -> ()
 
     let runtime = createNudgeRuntime reviewStore getChatHistory
+
+    let fallbackRuntime = FallbackRuntimeState()
+    let directory =
+        if Dyn.isNullish deps then "" else Dyn.str deps "directory"
+    let fallbackConfigOpt = loadFallbackConfig directory
+    let configLookup : ConfigLookup =
+        match fallbackConfigOpt with
+        | Some cfg -> (fun _ -> cfg)
+        | None -> (fun _ -> emptyConfig)
+    let fallbackHandler =
+        createMuxFallbackHandler fallbackRuntime configLookup deps
+
     let fn = System.Func<obj, obj, JS.Promise<unit>>(fun event helpers ->
-        cleanupOnAbort event
-        runtime.HandleEvent(parseHookEvent event, helpers))
+        promise {
+            cleanupOnAbort event
+            let! fbResult = fallbackHandler event
+            if not fbResult.Consumed then
+                do! runtime.HandleEvent(parseHookEvent event, helpers)
+        })
     box fn

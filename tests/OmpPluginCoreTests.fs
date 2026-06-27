@@ -5,8 +5,11 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Omp.PluginCore
 
 /// Verify the reviewStore singleton is wired into the CoreServices so the
@@ -45,6 +48,18 @@ let private capturePi () : obj * (unit -> obj array) =
         if Dyn.isNullish raw || not (Dyn.isArray raw) then [||] else unbox<obj array> raw
     pi, getHandlers
 
+let private makeFakeRuntime () : FallbackRuntimeState =
+    FallbackRuntimeState()
+
+let private makeFakeConfig () : FallbackConfig =
+    { DefaultChain = [ { ProviderID = "oai"; ModelID = "gpt5"; Variant = None; Temperature = None; TopP = None; MaxTokens = None; ReasoningEffort = None; Thinking = false } ]
+      AgentChains = Map.ofList []
+      MaxRetries = 2
+      LoopMaxContinues = 3 }
+
+let private invokeFallbackHandler (handler: obj) (event: obj) (ctx: obj) : unit =
+    emitJsExpr (handler, event, ctx) "(($0)($1, $2))" |> ignore
+
 /// Drive the registered abort handler with `evtType` against a sessionId
 /// resolved through a `sessionManager.getSessionId` ctx, and assert review
 /// state matches `expectActive`.
@@ -56,7 +71,7 @@ let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool
     let ctx = createObj [ "sessionManager", box sessionMgr ]
     let event = createObj [ "type", box evtType ]
     let pi, getHandlers = capturePi ()
-    registerAbortHandler pi reviewStore (Wanxiangshu.Omp.KnowledgeGraph.Runtime.OmpKnowledgeGraphRuntime(createObj []))
+    registerAbortHandler pi reviewStore (Wanxiangshu.Omp.KnowledgeGraph.Runtime.OmpKnowledgeGraphRuntime(createObj [])) None
     let handlers = getHandlers ()
     check $"{evtType} captured exactly one handler" (handlers.Length = 1)
     let handler = handlers.[0]
@@ -93,3 +108,52 @@ let unrelatedEventLeavesReviewActive () =
     reviewStore.activateReview(sid, "task", 0L)
     check "precondition: review active" (reviewStore.isReviewActive sid)
     driveAbort "session.idle" sid true
+
+/// OMP session.error must be routed through the fallback handler before
+/// review cleanup. Previously the translator looked for `props.error`, which
+/// was never set, so the event bypassed fallback entirely.
+let ompErrorEventRoutesToFallback () =
+    let sessionMgr = createObj [ "getSessionId", box(fun () -> box "omp-fb-error-sid") ]
+    let ctx = createObj [ "sessionManager", box sessionMgr ]
+    let event = createObj [
+        "type", box "session.error"
+        "error", box(createObj [ "name", box "APIError"; "message", box "rate limit"; "statusCode", box "429"; "isRetryable", box "true" ])
+    ]
+    let pi, getHandlers = capturePi ()
+    let runtime = makeFakeRuntime ()
+    let mutable handlerCalled = false
+    let fakeHandler (rawEvent: obj) : JS.Promise<FallbackHookResult> =
+        handlerCalled <- true
+        Promise.lift { Consumed = false; State = runtime.GetOrCreateState "omp-fb-error-sid" }
+    registerAbortHandler pi reviewStore (Wanxiangshu.Omp.KnowledgeGraph.Runtime.OmpKnowledgeGraphRuntime(createObj [])) (Some fakeHandler)
+    let handlers : obj array = getHandlers ()
+    check "exactly one handler registered" (handlers.Length = 1)
+    invokeFallbackHandler handlers.[0] event ctx
+    check "fallback handler saw session.error" handlerCalled
+
+/// Non-terminal OMP events (session.idle) must also reach the fallback
+/// handler so scan completion / CheckTodoState can fire.
+let ompIdleEventRoutesToFallback () =
+    let sessionMgr = createObj [ "getSessionId", box(fun () -> box "omp-fb-idle-sid") ]
+    let ctx = createObj [ "sessionManager", box sessionMgr ]
+    let event = createObj [ "type", box "session.idle" ]
+    let pi, getHandlers = capturePi ()
+    let runtime = makeFakeRuntime ()
+    let mutable handlerCalled = false
+    let fakeHandler (rawEvent: obj) : JS.Promise<FallbackHookResult> =
+        handlerCalled <- true
+        Promise.lift { Consumed = false; State = runtime.GetOrCreateState "omp-fb-idle-sid" }
+    registerAbortHandler pi reviewStore (Wanxiangshu.Omp.KnowledgeGraph.Runtime.OmpKnowledgeGraphRuntime(createObj [])) (Some fakeHandler)
+    let handlers : obj array = getHandlers ()
+    invokeFallbackHandler handlers.[0] event ctx
+    check "fallback handler saw session.idle" handlerCalled
+
+let run () =
+    reviewStoreIsSharedSingleton ()
+    clearReviewStatesNoError ()
+    abortHookDeactivatesReview ()
+    streamAbortHookDeactivatesReview ()
+    sessionErrorHookDeactivatesReview ()
+    unrelatedEventLeavesReviewActive ()
+    ompErrorEventRoutesToFallback ()
+    ompIdleEventRoutesToFallback ()

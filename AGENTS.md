@@ -1,8 +1,9 @@
 ---
 import: 
   - README.md
-  - ../opencode-auto-fallback
-  - ../opencode-auto-resume
+  - PRD-FB.md
+  - ../opencode-auto-fallback/README.md
+  - ../opencode-auto-resume/README.md
 ---
 
 - 提交仓库时候带上 kg/ 的变化

@@ -8,6 +8,9 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Shell.DelegatedAiSettings
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MuxAiSettingsCodec
+open Wanxiangshu.Shell.FallbackConfigCodec
+open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.FallbackKernel.Recovery
 
 type DelegatedAiSettings = Wanxiangshu.Shell.DelegatedAiSettings.DelegatedAiSettings
 let emptySettings = Wanxiangshu.Shell.DelegatedAiSettings.emptySettings
@@ -29,6 +32,23 @@ let mergeNamedSettings (sources: DelegatedAiSettings option list) : DelegatedAiS
               thinkingLevel = acc.thinkingLevel |> Option.orElse s.thinkingLevel }
         | None -> acc) emptySettings
 
+let private modelStringFromFallbackModel (m: FallbackModel) : string =
+    match m.Variant with
+    | Some v -> sprintf "%s/%s:%s" m.ProviderID m.ModelID v
+    | None -> sprintf "%s/%s" m.ProviderID m.ModelID
+
+let private readDescriptorModelsFromFrontmatter (fm: obj) (agentId: string) : DelegatedAiSettings =
+    match extractFallbackConfig fm with
+    | None -> emptySettings
+    | Some cfg ->
+        let normId = normalizeAgentName agentId
+        let chain =
+            Map.tryFind normId cfg.AgentChains
+            |> Option.orElse (Some cfg.DefaultChain)
+            |> Option.defaultValue []
+        { modelString = chain |> List.tryHead |> Option.map modelStringFromFallbackModel
+          thinkingLevel = None }
+
 let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) : JS.Promise<DelegatedAiSettings> =
     promise {
         let d = decodeMuxDelegateConfigLenient config
@@ -39,18 +59,20 @@ let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) 
         let workspace =
             if workspaceId = "" then null
             else readWorkspaceFromFindResult (findWorkspaceEntry deps configFile workspaceId)
-        let! descriptorSettings =
+        let! fm =
             promise {
                 try
                     let! fm = resolveAgentFrontmatter deps runtime cwd agentId
-                    return readDescriptorAiFromFrontmatter fm
-                with _ -> return emptySettings
+                    return fm
+                with _ -> return null
             }
+        let descriptorSettings = readDescriptorAiFromFrontmatter fm
+        let modelsSettings = readDescriptorModelsFromFrontmatter fm agentId
         return
             mergeNamedSettings (
                 [ readWorkspaceAiSettingsByAgent workspace agentId ]
                 @ readMuxConfigFileDefaults configFile agentId
-                @ [ Some descriptorSettings ])
+                @ [ Some descriptorSettings; Some modelsSettings ])
     }
 
 type ParentRuntimeAiSettings =

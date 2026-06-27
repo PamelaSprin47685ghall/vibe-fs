@@ -14,6 +14,7 @@ open Wanxiangshu.Mux.Wrappers
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Shell.FallbackRuntimeState
 
 let private zodField (f: MethodologyField) : string * obj =
     match f.kind with
@@ -25,7 +26,7 @@ let private zodField (f: MethodologyField) : string * obj =
 let private methodologyArgs (schema: MethodologySchema) : obj =
     createObj (schema.fields |> List.map zodField)
 
-let private executeSchema (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (schema: MethodologySchema) : obj -> obj -> JS.Promise<string> =
+let private executeSchema (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (runtime: FallbackRuntimeState) (schema: MethodologySchema) : obj -> obj -> JS.Promise<string> =
     fun args context ->
         promise {
             match parse schema args with
@@ -39,6 +40,7 @@ let private executeSchema (host: Host) (registry: ChildAgentRegistry) (ctx: obj)
                 let prompt = formatPrompt host (Meditator(intent, [])) |> List.head
                 let! subResult =
                     runSubagent
+                        runtime
                         registry
                         (get ctx "client")
                         "meditator"
@@ -53,9 +55,9 @@ let private executeSchema (host: Host) (registry: ChildAgentRegistry) (ctx: obj)
                 | Error err -> return wireEncodeToolError "meditator" err
         }
 
-let methodologyTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (schema: MethodologySchema) : obj =
-    define schema.toolDescription (methodologyArgs schema) (executeSchema host registry ctx schema)
+let methodologyTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (runtime: FallbackRuntimeState) (schema: MethodologySchema) : obj =
+    define schema.toolDescription (methodologyArgs schema) (executeSchema host registry ctx runtime schema)
 
-let registerMethodologyTools (registry: ChildAgentRegistry) (ctx: obj) (host: Host) (target: obj) : unit =
+let registerMethodologyTools (registry: ChildAgentRegistry) (ctx: obj) (host: Host) (runtime: FallbackRuntimeState) (target: obj) : unit =
     for schema in allSchemas do
-        target?(schema.toolName) <- box (methodologyTool host registry ctx schema)
+        target?(schema.toolName) <- box (methodologyTool host registry ctx runtime schema)

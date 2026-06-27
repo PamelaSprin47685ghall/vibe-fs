@@ -15,19 +15,20 @@ open Wanxiangshu.Methodology.OpencodeTools
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.FuzzyFinderShell
 open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.FallbackRuntimeState
 
-let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (knowledgeGraphRuntime: Wanxiangshu.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphEnabled: bool) (sessionScope: RuntimeScope) : obj =
+let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (knowledgeGraphRuntime: Wanxiangshu.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphEnabled: bool) (sessionScope: RuntimeScope) (fallbackRuntime: FallbackRuntimeState) : obj =
     let iteratorStore = sessionScope.IteratorStore
     let tools =
         createObj [
-            yield "coder", box (coderTool host registry ctx)
-            yield "investigator", box (investigatorTool host registry ctx)
-            yield "meditator", box (meditatorTool host registry ctx)
-            yield "browser", box (browserTool host registry ctx)
-            yield "executor", box (executorTool host registry ctx sessionScope)
+            yield "coder", box (coderTool host registry ctx fallbackRuntime)
+            yield "investigator", box (investigatorTool host registry ctx fallbackRuntime)
+            yield "meditator", box (meditatorTool host registry ctx fallbackRuntime)
+            yield "browser", box (browserTool host registry ctx fallbackRuntime)
+            yield "executor", box (executorTool host registry ctx sessionScope fallbackRuntime)
             yield "fuzzy_find", box (fuzzyFindTool finderCache iteratorStore)
             yield "fuzzy_grep", box (fuzzyGrepTool finderCache iteratorStore)
-            yield "websearch", box (websearchTool host registry ctx)
+            yield "websearch", box (websearchTool host registry ctx fallbackRuntime)
             yield "webfetch", box (webfetchTool ctx)
             if knowledgeGraphEnabled then
                 yield "knowledge_graph_fetch", box (knowledgeGraphFetchTool knowledgeGraphRuntime ctx)
@@ -37,5 +38,16 @@ let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: Finder
             if host = Mimocode then
                 yield todoWriteToolName host, box (mimoTodoTool ctx)
         ]
-    registerMethodologyTools registry ctx host tools
+    registerMethodologyTools registry ctx host fallbackRuntime tools
     tools
+
+// Legacy 8-arg overload for callers/tests that do not need consumed tracking.
+let createToolsLegacy (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (knowledgeGraphRuntime: Wanxiangshu.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphEnabled: bool) (sessionScope: RuntimeScope) : obj =
+    createTools host registry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled sessionScope (FallbackRuntimeState())
+
+// Test helper that supplies an empty fallback runtime.
+let createToolsForTests (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (knowledgeGraphRuntime: Wanxiangshu.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphEnabled: bool) (sessionScope: RuntimeScope) : obj =
+    createTools host registry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled sessionScope (FallbackRuntimeState())
+
+// Marker to prevent unused-value warnings on the legacy helpers in this module.
+let private _keep = (createToolsLegacy, createToolsForTests)

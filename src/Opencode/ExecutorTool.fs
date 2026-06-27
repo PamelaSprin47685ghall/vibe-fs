@@ -23,13 +23,14 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.SubagentToolExecute
+open Wanxiangshu.Shell.FallbackRuntimeState
 
 [<Global("Buffer")>]
 let private nodeBuffer : obj = jsNative
 let private byteLength (s: string) : int = nodeBuffer?byteLength(s, "utf-8")
 let private resolveStr (text: string) : JS.Promise<string> = Promise.lift text
 
-let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (sessionScope: RuntimeScope) : obj =
+let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (sessionScope: RuntimeScope) (fallbackRuntime: FallbackRuntimeState) : obj =
     define executor
         (box {|
             language = enumReq [| "shell"; "python"; "javascript" |] Params.executorLanguage
@@ -65,7 +66,7 @@ let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (session
                                     let prompt = formatPrompt host (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
                                     let! summary =
                                         resolveSubagentPromise "executor"
-                                            (runSubagentWithCleanup registry client "executor" "Executor summary" prompt
+                                            (runSubagentWithCleanup fallbackRuntime registry client "executor" "Executor summary" prompt
                                                 runtime.Execution.Directory sessionID context)
                                     let formatted = formatToolResponse result (Some summary)
                                     return prependSafetyWarningForExecution formatted options
