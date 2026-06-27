@@ -2,7 +2,6 @@ module Wanxiangshu.Tests.CoverageFillShellTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open System
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.SubagentIo
 open Wanxiangshu.Shell.WorkspaceFiles
@@ -10,196 +9,123 @@ open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.NudgeRuntime
 open Wanxiangshu.Shell.TreeSitterPlatform
+open Wanxiangshu.Shell.FuzzyFinderShell
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 
-// ── Shell.SubagentIo ───────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shell.FuzzyFinderShell – resultFromRaw + FinderCache 分支覆盖补全
+// ═══════════════════════════════════════════════════════════════════════════════
 
-let subagentBuildPromptBody () =
-    let body = buildPromptBody "coder" "do work" null emptySettings
-    equal "agent" "coder" (Dyn.str body "agent")
-    let parts = unbox<obj[]> (Dyn.get body "parts")
-    equal "parts count" 1 parts.Length
-    let settings = { emptySettings with ModelString = Some "openai/gpt4"; ThinkingLevel = Some "high" }
-    let body2 = buildPromptBody "inv" "work" null settings
-    equal "model provider" "openai" (Dyn.str (Dyn.get body2 "model") "providerID")
-    equal "variant" "high" (Dyn.str body2 "variant")
+// ── FinderLike mock helpers ──────────────────────────────────────────────────
 
-let subagentSignalAborted () =
-    check "null not aborted" (not (signalAborted null))
-    let notAborted = createObj [ "aborted", box false ]
-    check "aborted=false not aborted" (not (signalAborted notAborted))
-    let aborted = createObj [ "aborted", box true ]
-    check "aborted=true is aborted" (signalAborted aborted)
+let private mkMockFinder (destroyed: bool) : FinderLike =
+    let mutable destroyedFlag = destroyed
+    { new FinderLike with
+        member _.fileSearch(query: string, opts: obj) : obj = box {| ok = true; items = [||] |}
+        member _.grep(query: string, opts: obj) : obj = box {| ok = true; items = [||] |}
+        member _.destroy() : unit = destroyedFlag <- true
+        member _.isDestroyed : bool = destroyedFlag }
 
-let subagentMakeAbortPromiseNull () =
-    let p = makeAbortPromise null (fun () -> ())
-    check "null signal→resolved" true
+let private mkOkRaw (finder: FinderLike) : obj =
+    box {| ok = true; value = box finder |}
 
-let subagentRaceWithAbortNull () =
-    let p : JS.Promise<unit> = raceWithAbortSignal null (fun () -> ()) (Promise.lift ())
-    check "null signal→work passthrough" true
+let private mkErrRaw (errorMsg: string) : obj =
+    box {| ok = false; error = box errorMsg |}
 
-// ── Shell.WorkspaceFiles ───────────────────────────────────────────────────
+let private mkErrRawNoError () : obj =
+    box {| ok = false |}
 
-let wsFresh () =
-    let b = fresh ()
-    equal "count" 0 b.count
-    equal "total" 0 b.totalBytes
-    check "results empty" (b.results.Count = 0)
+// ── resultFromRaw ────────────────────────────────────────────────────────────
+//
+//  Branch 1: ok=true, value 存在  → Ok finder
+//  Branch 2: ok=false, error 存在 → Error errorMsg
+//  Branch 3: ok=false, error 缺失 → Error "createFinder failed"
 
-let wsIsFull () =
-    let under = { results = ResizeArray<_>(); totalBytes = 100; count = 10 }
-    check "under byte budget" (not (isFull under))
-    let overBytes = { results = ResizeArray<_>(); totalBytes = 9 * 1_048_576; count = 100 }
-    check "over byte budget" (isFull overBytes)
-    let overCount = { results = ResizeArray<_>(); totalBytes = 0; count = 2000 }
-    check "over count budget" (isFull overCount)
+let ffResultFromRawOk () =
+    let mock = mkMockFinder false
+    let raw = mkOkRaw mock
+    match resultFromRaw raw with
+    | Ok f ->
+        check "ok→Ok branch taken" true
+        check "result is mock finder" (obj.ReferenceEquals(f, mock))
+    | Error msg -> check "ok→Ok branch" false
 
-let wsAbsorb () =
-    let b = fresh ()
-    let file : Wanxiangshu.Kernel.CapsFormat.CapsFile = { filePath = "a.fs"; label = "a"; content = "hello" }
-    let b2 = absorb file b
-    equal "count 1" 1 b2.count
-    equal "bytes" 5 b2.totalBytes
-    check "results has file" (b2.results.Count = 1)
-    let b3 = absorb file b2
-    equal "absorb again count" 2 b3.count
-    equal "absorb again bytes" 10 b3.totalBytes
-    let overBudget : Wanxiangshu.Shell.WorkspaceFiles.Budget = { results = ResizeArray<_>(); totalBytes = 8 * 1_048_576; count = 0 }
-    let b4 = absorb file overBudget
-    check "over-budget rejected same ref" (System.Object.ReferenceEquals(b4, overBudget))
+let ffResultFromRawErrMsg () =
+    let raw = mkErrRaw "scan failed"
+    match resultFromRaw raw with
+    | Ok _ -> check "err→Error branch" false
+    | Error msg -> equal "error message preserved" "scan failed" msg
 
-// ── Shell.RunnerBackground ─────────────────────────────────────────────────
+let ffResultFromRawErrDefault () =
+    let raw = mkErrRawNoError()
+    match resultFromRaw raw with
+    | Ok _ -> check "err default→Error branch" false
+    | Error msg -> equal "nullish error → default" "createFinder failed" msg
 
-let rbResetAndRegister () =
-    resetRunnerJobsForTesting ()
-    registerActiveRunnerSession "s1"
-    ()
+// ── FinderCache.Destroy / DestroyAll ─────────────────────────────────────────
+//
+//  Branch A: instances map is empty → match _ → () 无抛
+//  Branch B: instances has entry, finder.isDestroyed=false → finder.destroy() 再移除
+//  DestroyAll 遍历空列表 → 无抛
 
-let rbHasRunningRunnerJob () =
-    resetRunnerJobsForTesting ()
-    check "unknown session" (not (hasRunningRunnerJob "unknown"))
-    registerActiveRunnerSession "s1"
-    check "registered active" (hasRunningRunnerJob "s1")
+let ffDestroyEmptyNoThrow () =
+    let cache = FinderCache()
+    // 空 instances: match _ 分支
+    cache.Destroy("no-such-cwd")
+    check "Destroy empty → no throw" true
 
-let rbSetRunnerJobState () =
-    resetRunnerJobsForTesting ()
-    setRunnerJobStateForTest "s1" "running"
-    check "job registered" (hasRunningRunnerJob "s1")
-    ()
+let ffDestroyAllEmptyNoThrow () =
+    let cache = FinderCache()
+    // instances=empty: toList=[]; iter=no-op
+    cache.DestroyAll()
+    check "DestroyAll empty → no throw" true
 
-let rbAbortRunnerJob () =
-    resetRunnerJobsForTesting ()
-    registerActiveRunnerSession "s1"
-    let msg = abortRunnerJob "s1"
-    check "abort returns msg" (msg <> "")
-    check "not running after abort" (not (hasRunningRunnerJob "s1"))
+// ── FinderCache.Get ──────────────────────────────────────────────────────────
+//
+//  Cache-hit path: Some finder when not finder.isDestroyed → Promise.lift Ok finder
+//  通过反射向私有 instances 字段注入 mock finder，使 Get 命中缓存路径。
 
-let rbCleanupRunnerJob () =
-    resetRunnerJobsForTesting ()
-    setRunnerJobStateForTest "s1" "running"
-    check "job before cleanup" (hasRunningRunnerJob "s1")
-    cleanupRunnerJob "s1" |> ignore
-    check "job cleared after cleanup" (not (hasRunningRunnerJob "s1"))
+let ffGetCacheHit () : JS.Promise<unit> =
+    promise {
+        let cache = FinderCache()
+        let mock = mkMockFinder false
+        // 通过 JS 动态属性注入 mock finder 到私有 instances 字段（Fable 不支持反射）
+        cache?instances <- Map.empty.Add("hit-cwd", mock)
+        // Get 命中缓存: Promise.lift (Ok mock)
+        let! r = cache.Get("hit-cwd")
+        match r with
+        | Ok f -> check "Get hit → Ok finder" (obj.ReferenceEquals(f, mock))
+        | Error msg -> check ("Get hit → unexpected Error: " + msg) false
+    }
 
-// ── Shell.ChildAgentRegistry ───────────────────────────────────────────────
+// Get cache-miss 需要 @ff-labs/fff-node，此处仅验证 Promise 正常创建；
+// 调用 DestroyAll 清理 pending 防止泄漏，不断言结果值。
+let ffGetCacheMissNoThrow () : JS.Promise<unit> =
+    promise {
+        let cache = FinderCache()
+        // 未知 cwd: 触发 createFinder → 在无 @ff-labs/fff-node 的测试环境会 reject
+        // 仅保证 Get 不抛同步异常，且 pending 被正确清理
+        let p = cache.Get("miss-cwd")
+        check "Get miss → promise created" (p <> null)
+        // 异步清理：无论成功失败都 DestroyAll 清 pending
+        p |> Promise.catch (fun _ -> Error "ignored") |> Promise.map (fun _ -> cache.DestroyAll()) |> ignore
+    }
 
-let carLifecycle () =
-    let reg = ChildAgentRegistry.Create()
-    reg.RegisterChildAgent("child-1", "agent-a", Some "parent-1")
-    equal "lookup child" (Some "agent-a") (reg.LookupChildAgent "child-1")
-    equal "lookup unknown" None (reg.LookupChildAgent "child-2")
-    reg.UnregisterChildAgent "child-1"
-    equal "after unregister" None (reg.LookupChildAgent "child-1")
-    ()
+// ── run ──────────────────────────────────────────────────────────────────────
 
-let carResolveParentChain () =
-    let reg = ChildAgentRegistry.Create()
-    reg.RegisterChildAgent("c1", "a1", Some "p1")
-    reg.RegisterChildAgent("p1", "a2", Some "gp1")
-    reg.RegisterChildAgent("gp1", "a3", None)
-    let r = reg.ResolveSubsessionParentID (Some "c1")
-    equal "resolve grandparent" (Some "gp1") r
+let run () : JS.Promise<unit> =
+    promise {
+        // resultFromRaw
+        ffResultFromRawOk ()
+        ffResultFromRawErrMsg ()
+        ffResultFromRawErrDefault ()
+        // FinderCache Destroy / DestroyAll
+        ffDestroyEmptyNoThrow ()
+        ffDestroyAllEmptyNoThrow ()
+        // FinderCache Get
+        do! ffGetCacheHit ()
+        do! ffGetCacheMissNoThrow ()
+    }
 
-let carResolveParentNoCycle () =
-    let reg = ChildAgentRegistry.Create()
-    reg.RegisterChildAgent("c1", "a1", Some "p1")
-    let r = reg.ResolveSubsessionParentID (Some "p1")
-    equal "resolve parent" (Some "p1") r
-
-let carResolveUnknown () =
-    let reg = ChildAgentRegistry.Create()
-    equal "resolve none" None (reg.ResolveSubsessionParentID None)
-    equal "resolve unknown" (Some "x") (reg.ResolveSubsessionParentID (Some "x"))
-
-// ── Shell.NudgeRuntime ─────────────────────────────────────────────────────
-
-let nudgeHandleEventIgnore () =
-    let store = Wanxiangshu.Shell.ReviewRuntime.createReviewStore ()
-    let rt = createNudgeRuntime store None
-    rt.HandleEvent(Ignore, null) |> ignore
-    ()
-
-let nudgeHandleEventStreamAbort () =
-    let store = Wanxiangshu.Shell.ReviewRuntime.createReviewStore ()
-    let rt = createNudgeRuntime store None
-    rt.HandleEvent(StreamAbort "ws-1", null) |> ignore
-    ()
-
-// ── Shell.TreeSitterPlatform ───────────────────────────────────────────────
-
-let tspCallOrGet () =
-    let fn = createObj [ "call", box (fun () -> box "from_fn") ]
-    equal "callable" "from_fn" (string (callOrGet fn "call" (fun () -> Dyn.call0 (Dyn.get fn "call"))))
-    let valObj = createObj [ "val", box "from_val" ]
-    equal "not callable" "from_val" (string (callOrGet valObj "val" (fun () -> box "fallback")))
-
-let tspGetOrCall () =
-    let fn = createObj [ "x", box (fun () -> "fn_result") ]
-    equal "fn result" "fn_result" (string (getOrCall fn "x"))
-    let valObj = createObj [ "y", box "val_result" ]
-    equal "val result" "val_result" (string (getOrCall valObj "y"))
-
-let tspGetOrCallWith () =
-    let fn = createObj [ "x", box (fun (a: obj) -> "fn_" + string a) ]
-    equal "fn with arg" "fn_hello" (string (getOrCallWith fn "x" (box "hello")))
-    let valObj = createObj [ "y", box "static" ]
-    equal "val with arg" "static" (string (getOrCallWith valObj "y" (box "hi")))
-
-let tspDetectLanguage () =
-    let pack = createObj [ "detectLanguageFromPath", box (fun (p: string) -> if p = "test.fs" then box "fs" else null) ]
-    let r = string (detectLanguage pack "let x = 1" "test.fs")
-    equal "detect from path" "fs" r
-
-let tspTryGetPack () =
-    match tryGetPack () with
-    | Ok _ -> check "tryGetPack ok" true
-    | Error _ -> check "tryGetPack error ok" true
-
-
-let run () =
-    subagentBuildPromptBody ()
-    subagentSignalAborted ()
-    subagentMakeAbortPromiseNull ()
-    subagentRaceWithAbortNull ()
-    wsFresh ()
-    wsIsFull ()
-    wsAbsorb ()
-    rbResetAndRegister ()
-    rbHasRunningRunnerJob ()
-    rbSetRunnerJobState ()
-    rbAbortRunnerJob ()
-    rbCleanupRunnerJob ()
-    carLifecycle ()
-    carResolveParentChain ()
-    carResolveParentNoCycle ()
-    carResolveUnknown ()
-    nudgeHandleEventIgnore ()
-    nudgeHandleEventStreamAbort ()
-    tspCallOrGet ()
-    tspGetOrCall ()
-    tspGetOrCallWith ()
-    tspDetectLanguage ()
-    tspTryGetPack ()

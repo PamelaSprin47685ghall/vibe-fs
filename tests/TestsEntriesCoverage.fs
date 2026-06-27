@@ -19,7 +19,7 @@ let coverageTestEntries () : (string * TestBody) list =
     [
     "CoverageFillKernelTests.run", Sync (sync CoverageFillKernelTests.run)
     "CoverageFillKernel2Tests.run", Sync (sync CoverageFillKernel2Tests.run)
-    "CoverageFillShellTests.run", Sync (sync CoverageFillShellTests.run)
+    "CoverageFillShellTests.run", Async CoverageFillShellTests.run
     "CoverageFillFuzzyTests.run", Sync (sync CoverageFillFuzzyTests.run)
     "CoverageFillMethodologyTests.run", Sync (sync CoverageFillMethodologyTests.run)
     "CoverageFillOpencodeTests.run", Sync (sync CoverageFillOpencodeTests.run)

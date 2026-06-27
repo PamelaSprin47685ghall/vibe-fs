@@ -159,6 +159,70 @@ let sessionIoSubagentExtractSessionText () =
         equal "assistant text" "Hello from assistant" text
     }
 
+open Wanxiangshu.Kernel.WarnTdd
+
+// ── HookSchema.injectWarnTddIntoJsonSchema ─────────────────────────────────────
+
+let hookSchemaInjectWarnTddIntoEmptySchema () =
+    let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
+    injectWarnTddIntoJsonSchema schema |> ignore
+    let props = get schema "properties"
+    check "warn_tdd property injected" (not (Dyn.isNullish (get props "warn_tdd")))
+    let required = get schema "required"
+    check "warn_tdd added to required" (isArray required && (required :?> obj array |> Array.exists (fun x -> string x = "warn_tdd")))
+
+let hookSchemaInjectWarnTddAlreadyPresent () =
+    let schema = createObj [ "type", box "object"; "properties", createObj [ "warn_tdd", box (createObj []) ]; "required", box [| box "warn_tdd" |] ]
+    injectWarnTddIntoJsonSchema schema |> ignore
+    let props = get schema "properties"
+    // Should not throw and should keep the existing warn_tdd (no double write)
+    check "existing warn_tdd still present" (not (Dyn.isNullish (get props "warn_tdd")))
+
+let hookSchemaInjectWarnTddNullSchema () =
+    let result = injectWarnTddIntoJsonSchema null
+    check "null schema returns null" (isNull result)
+
+// ── HookSchema.mergeWorkBacklogReportIntoTaskSchema ─────────────────────────────
+
+let hookSchemaMergeWorkBacklogReportIntoPureSchema () =
+    let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
+    mergeWorkBacklogReportIntoTaskSchema schema |> ignore
+    let props = get schema "properties"
+    check "completedWorkReport added" (not (Dyn.isNullish (get props "completedWorkReport")))
+    check "select_methodology added" (not (Dyn.isNullish (get props "select_methodology")))
+
+let hookSchemaMergeWorkBacklogReportRemoveTaskId () =
+    let schema =
+        createObj [
+            "type", box "object"
+            "properties", createObj [
+                "task_id", box (createObj [ "type", box "string" ])
+                "description", box (createObj [ "type", box "string" ])
+            ]
+            "required", box [| box "task_id"; box "description" |]
+        ]
+    mergeWorkBacklogReportIntoTaskSchema schema |> ignore
+    let props = get schema "properties"
+    check "task_id removed from properties" (Dyn.isNullish (get props "task_id"))
+    check "completedWorkReport added" (not (Dyn.isNullish (get props "completedWorkReport")))
+    check "select_methodology added" (not (Dyn.isNullish (get props "select_methodology")))
+    let required = get schema "required"
+    check "task_id absent from required" (not (isArray required) || not ((required :?> obj array) |> Array.exists (fun x -> string x = "task_id")))
+
+// ── HookSchema.buildWorkBacklogSchema ──────────────────────────────────────────
+
+let hookSchemaBuildWorkBacklogSchema () =
+    let schema = buildWorkBacklogSchema ()
+    check "schema is non-null" (not (isNull schema))
+    let typeVal = Dyn.str schema "type"
+    check "schema type = object" (typeVal = "object")
+    let props = get schema "properties"
+    check "properties present" (not (Dyn.isNullish props))
+    let todos = Dyn.get props "todos"
+    check "todos field present" (not (Dyn.isNullish todos))
+    let items = Dyn.get (Dyn.get todos "items") "properties"
+    check "todo item properties present" (not (Dyn.isNullish items))
+
 // ── run ───────────────────────────────────────────────────────────────────────
 
 let run () = promise {
@@ -172,6 +236,12 @@ let run () = promise {
     hookSchemaRewriteToolJsonSchemaParameters ()
     hookSchemaRewriteToolJsonSchemaNoSchema ()
     hookSchemaRewriteToolJsonSchemaArgsBranch ()
+    hookSchemaInjectWarnTddIntoEmptySchema ()
+    hookSchemaInjectWarnTddAlreadyPresent ()
+    hookSchemaInjectWarnTddNullSchema ()
+    hookSchemaMergeWorkBacklogReportIntoPureSchema ()
+    hookSchemaMergeWorkBacklogReportRemoveTaskId ()
+    hookSchemaBuildWorkBacklogSchema ()
     searchToolsFuzzyFindTool ()
     searchToolsFuzzyGrepTool ()
     searchToolsWebsearchTool ()

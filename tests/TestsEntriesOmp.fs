@@ -24,6 +24,8 @@ open Wanxiangshu.Tests.OmpToolResultEventTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.OmpSessionCompactingTests
+open Wanxiangshu.Tests.OmpCoverage2Tests
+open Wanxiangshu.Tests.OmpTodoToolTests
 
 let ompTestEntries () : (string * TestBody) list =
     [
@@ -161,4 +163,6 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpPluginTests.sessionCompactingHookCanBeInvoked", Async OmpPluginTests.sessionCompactingHookCanBeInvoked
     "OmpPluginTests.toolCallBlocksChildOnlyInMainSession", Async OmpPluginTests.toolCallBlocksChildOnlyInMainSession
     "OmpPluginTests.turnStartRestoresMainSessionTools", Async OmpPluginTests.turnStartRestoresMainSessionTools
+    "OmpCoverage2Tests.run", Async OmpCoverage2Tests.run
+    "OmpTodoToolTests.run", Async OmpTodoToolTests.run
     ]
