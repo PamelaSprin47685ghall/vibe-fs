@@ -409,6 +409,7 @@
     <Compile Include="tests/FuzzyTestsPaging.fs" />
     <Compile Include="tests/ShellTests.fs" />
     <Compile Include="tests/ShellTestsFormat.fs" />
+    <Compile Include="tests/ShellCoverage2Tests.fs" />
     <Compile Include="tests/DynTests.fs" />
     <Compile Include="tests/DynFieldTests.fs" />
     <Compile Include="tests/DomainTests.fs" />
@@ -462,6 +463,7 @@
     <Compile Include="tests/OmpAgentConfigTests.fs" />
     <Compile Include="tests/OmpHookExecuteTests.fs" />
     <Compile Include="tests/OmpKnowledgeGraphRuntimeTests.fs" />
+    <Compile Include="tests/OmpCodecCoverageTests.fs" />
     <Compile Include="tests/OmpSessionLifecycleTests.fs" />
     <Compile Include="tests/OmpSessionCompactingTests.fs" />
     <Compile Include="tests/MethodologyTests.fs" />
@@ -565,6 +567,18 @@
     <Compile Include="tests/TestsArchitectureRegistry.fs" />
     <Compile Include="tests/TestsEntriesDomain.fs" />
     <Compile Include="tests/TestsEntriesFuzzy.fs" />
+    <Compile Include="tests/CoverageFillKernelTests.fs" />
+    <Compile Include="tests/CoverageFillKernel2Tests.fs" />
+    <Compile Include="tests/KernelDomainCoverageTests.fs" />
+    <Compile Include="tests/KernelReviewCoverageTests.fs" />
+    <Compile Include="tests/CoverageFillShellTests.fs" />
+    <Compile Include="tests/CoverageFillFuzzyTests.fs" />
+    <Compile Include="tests/CoverageFillMethodologyTests.fs" />
+    <Compile Include="tests/CoverageFillOpencodeTests.fs" />
+    <Compile Include="tests/OmpToolsCoverageTests.fs" />
+    <Compile Include="tests/PluginMimoTuiTests.fs" />
+    <Compile Include="tests/MuxCoverageTests.fs" />
+    <Compile Include="tests/TestsEntriesCoverage.fs" />
     <Compile Include="tests/TestsEntriesCore.fs" />
     <Compile Include="tests/TestsEntriesCodec.fs" />
     <Compile Include="tests/TestsEntriesOmp.fs" />

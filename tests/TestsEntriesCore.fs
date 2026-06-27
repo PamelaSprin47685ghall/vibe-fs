@@ -1,5 +1,4 @@
 module Wanxiangshu.Tests.TestsEntriesCore
-
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.ReviewTests
 open Wanxiangshu.Tests.ReviewTestsReplay
@@ -121,9 +120,9 @@ open Wanxiangshu.Tests.ReviewVerdictTests
 open Wanxiangshu.Tests.ToolCopyTests
 open Wanxiangshu.Tests.JsArrayMutateTests
 open Wanxiangshu.Tests.TestsEntriesDomain
+open Wanxiangshu.Tests.TestsEntriesCoverage
 open Wanxiangshu.Tests.TestsEntriesFuzzy
 open Wanxiangshu.Tests.TestsTestBody
-
 let coreTestEntries () : (string * TestBody) list =
     [
     "ReviewTests.transition'", Sync (sync ReviewTests.transition')
@@ -298,3 +297,4 @@ let coreTestEntries () : (string * TestBody) list =
     ]
     @ TestsEntriesFuzzy.fuzzyTestEntries()
     @ TestsEntriesDomain.domainTestEntries()
+    @ TestsEntriesCoverage.coverageTestEntries()

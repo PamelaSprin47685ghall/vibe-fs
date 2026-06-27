@@ -21,6 +21,7 @@ build-kernel/
 build-shell/
 build-tests/
 artifacts/
+coverage/
 
 ## Generated / vendored dumps
 repomix-output.xml
