@@ -32,6 +32,7 @@ type ExecutorArgs = {
     Dependencies: string list
     TimeoutType: ExecutorTimeoutType
     Mode: string
+    Warn: ExecutorWarn
 }
 
 type TodoItem = { Content: string; Status: string; Priority: string }

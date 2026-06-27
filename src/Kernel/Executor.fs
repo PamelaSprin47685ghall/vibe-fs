@@ -15,6 +15,7 @@ let headTail (s: string) (head: int) (tail: int) : string =
 
 type ExecutorLanguage = Shell | Python | Javascript
 type ExecutorTimeoutType = Short | Long | LastResort
+type ExecutorWarn = ItIsNotPossibleToDoThisUsingOtherTools
 
 let languages: ExecutorLanguage list = [ Shell; Python; Javascript ]
 let timeoutMs = function Short -> 1000 | Long -> 10000 | LastResort -> 100_000

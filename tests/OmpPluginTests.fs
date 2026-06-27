@@ -148,7 +148,7 @@ let executorToolSchemaFourFields () = promise {
     let runner = h.tools |> Seq.find (fun t -> Dyn.str t "name" = "executor")
     let parameters = Dyn.get runner "parameters"
     let properties = Dyn.get parameters "properties"
-    for field in [| "language"; "program"; "dependencies"; "timeout_type"; "mode" |] do
+    for field in [| "language"; "program"; "dependencies"; "timeout_type"; "mode"; "warn" |] do
         check ("runner schema has " + field) (Dyn.has properties field)
 }
 

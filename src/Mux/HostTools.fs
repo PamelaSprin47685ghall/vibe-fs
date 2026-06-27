@@ -106,8 +106,9 @@ let executorTool (deps: obj) (toolNames: string array) (_knowledgeGraphRuntime: 
                   "program", box (strProp Params.executorProgram)
                   "dependencies", box (strArrayProp Params.executorDeps)
                   "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |])
-                  "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |]) ])
-            [| "language"; "program"; "timeout_type"; "mode" |]
+                  "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |])
+                  "warn", box (strEnumProp Params.executorWarn [| "it-is-not-possible-to-do-this-using-other-tools" |]) ])
+            [| "language"; "program"; "timeout_type"; "mode"; "warn" |]
       execute = fun config args ->
           match fromMuxConfig config with
           | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)

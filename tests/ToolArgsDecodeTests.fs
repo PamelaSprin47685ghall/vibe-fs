@@ -64,6 +64,7 @@ let decodeExecutorOkShell () =
             "dependencies", box [| "dep-a" |]
             "timeout_type", box "long"
             "mode", box "rw"
+            "warn", box "it-is-not-possible-to-do-this-using-other-tools"
         ]
     match decodeToolInvocation "executor" args with
     | Ok (Typed (Executor ex)) ->
