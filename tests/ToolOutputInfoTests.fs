@@ -38,7 +38,7 @@ let testTryParseNonFrontMatter () =
     equal "tryParse no fm None" None (tryParse "hello")
 
 let testTryParseValid () =
-    // tryParse expects "info:" array format: ---\ninfo:\n- hint: hello\n---
+    // Flat front-matter format: ---\nhint: hello\n---
     let text = render { info = [ hint "hello" ]; body = "world" }
     match tryParse text with
     | Some msg ->
@@ -125,7 +125,7 @@ let testHintsFromOutput () =
     equal "hintsFromOutput no fm" [] (hintsFromOutput "plain")
 
 let testBodyForBookkeeper () =
-    equal "bodyForBookkeeper extracts" "real body" (bodyForBookkeeper "---\ninfo:\n---\nreal body")
+    equal "bodyForBookkeeper extracts" "real body" (bodyForBookkeeper "---\ntool_output: /See Below/\n---\nreal body")
     equal "bodyForBookkeeper raw" "plain" (bodyForBookkeeper "plain")
     equal "bodyForBookkeeper null" null (bodyForBookkeeper null)
 
@@ -172,6 +172,24 @@ let testInfoItemOrderingBodyRefLast () =
     | Some hp, Some tp -> check "BodyRef lines appear after hint lines" (hp < tp)
     | _ -> check "ordering labels found" false
 
+let testRenderProducesFlatFrontMatter () =
+    let r = render { info = [ status "completed"; exitCode 0; bodyRef ToolOutputBodyRef.SeeBelow ]; body = "OUT" }
+    check "flat fm has no info block" (not (r.Contains "info:"))
+    check "flat fm top-level status" (r.Contains "status: completed")
+    check "flat fm top-level exit_code" (r.Contains "exit_code: 0")
+    check "flat fm top-level tool_output" (r.Contains "tool_output: /See Below/")
+    check "flat fm retains body" (r.Contains "OUT")
+
+let testRenderMultiHintAsArray () =
+    let r = render { info = [ hint "a"; hint "b" ]; body = "" }
+    check "multi hint uses array item a" (r.Contains "- a")
+    check "multi hint uses array item b" (r.Contains "- b")
+    match tryParse r with
+    | Some msg ->
+        let hs = msg.info |> List.choose (function InfoItem.Hint h -> Some h | _ -> None)
+        equal "multi hint parsed as two" 2 (List.length hs)
+    | None -> check "multi hint roundtrip parseable" false
+
 let run () =
     testRenderEmpty ()
     testRenderBodyOnly ()
@@ -198,3 +216,5 @@ let run () =
     testEmptyWithBody ()
     testConstants ()
     testInfoItemOrderingBodyRefLast ()
+    testRenderProducesFlatFrontMatter ()
+    testRenderMultiHintAsArray ()

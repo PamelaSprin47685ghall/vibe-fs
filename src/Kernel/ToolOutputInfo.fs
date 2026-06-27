@@ -56,22 +56,48 @@ let private orderInfoForRender (items: InfoItem list) : InfoItem list =
         items |> List.partition (function InfoItem.BodyRef _ -> true | _ -> false)
     rest @ bodyRefs
 
-let private renderInfoItem = function
-    | InfoItem.Hint h -> createObj [ "hint", box h ]
-    | InfoItem.Syntax s -> createObj [ "syntax", box s ]
-    | InfoItem.Iterator i -> createObj [ "iterator", box i ]
-    | InfoItem.Status s -> createObj [ "status", box s ]
-    | InfoItem.ExitCode n -> createObj [ "exit_code", box n ]
-    | InfoItem.Signal s -> createObj [ "signal", box s ]
-    | InfoItem.TimeoutMs n -> createObj [ "timeout_ms", box n ]
-    | InfoItem.BodyRef r -> createObj [ "tool_output", box (bodyRefValue r) ]
+let private itemKey = function
+    | InfoItem.Hint _ -> "hint"
+    | InfoItem.Syntax _ -> "syntax"
+    | InfoItem.Iterator _ -> "iterator"
+    | InfoItem.Status _ -> "status"
+    | InfoItem.ExitCode _ -> "exit_code"
+    | InfoItem.Signal _ -> "signal"
+    | InfoItem.TimeoutMs _ -> "timeout_ms"
+    | InfoItem.BodyRef _ -> "tool_output"
+
+let private itemValue = function
+    | InfoItem.Hint h -> box h
+    | InfoItem.Syntax s -> box s
+    | InfoItem.Iterator i -> box i
+    | InfoItem.Status s -> box s
+    | InfoItem.ExitCode n -> box n
+    | InfoItem.Signal s -> box s
+    | InfoItem.TimeoutMs n -> box n
+    | InfoItem.BodyRef r -> box (bodyRefValue r)
+
+/// Order-preserving group by key: single value as scalar, multiple as array.
+let private flatFields (items: InfoItem list) : FrontMatterField list =
+    let rec loop acc seen items =
+        match items with
+        | [] -> List.rev acc
+        | item :: rest ->
+            let k = itemKey item
+            if List.contains k seen then loop acc seen rest
+            else
+                let grp = items |> List.filter (fun x -> itemKey x = k) |> List.map itemValue
+                let field =
+                    match grp with
+                    | [ v ] -> (k, v)
+                    | vs -> (k, box (vs |> List.toArray))
+                loop (field :: acc) (k :: seen) rest
+    loop [] [] items
 
 let render (msg: ToolOutputMessage) : string =
     if msg.info.IsEmpty && msg.body = "" then ""
     elif msg.info.IsEmpty then msg.body
     else
-        let infoBlock = yamlSeqField "info" (orderInfoForRender msg.info |> List.map renderInfoItem)
-        let fence = frontMatter [ infoBlock ]
+        let fence = frontMatter (flatFields (orderInfoForRender msg.info))
         match msg.body with
         | "" -> fence
         | body -> fence + "\n" + body

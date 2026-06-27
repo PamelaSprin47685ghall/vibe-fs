@@ -719,3 +719,20 @@
 {"id":"823d","entity":["Opopen宿主适配","Shell层"],"fact":"Opopen/PtyTools.fs ref cell 访问标准化：将 !managerRef 解引用运算符改为 managerRef.Value 属性访问，消除 F# 特有语法，Fable 转译路径简化，Shell 层 ref 访问模式对齐。"}
 {"id":"8b8b","entity":["F#语法"],"fact":"ref cell 赋值废弃 := 操作符，改用 .Value <- 语法消除 FSHARP 3370 弃用警告；PtyTools.fs storePtyClient 已修复。"}
 {"id":"9290","entity":["全仓绿测","构建状态"],"fact":"npm run build-and-test 全仓绿测：14556 passed, 0 failed；Fable 编译零失败，589 源文件编译耗时 23456ms；构建产物目录 build/ 自动生成，package.json 同步复制；唯一非零警告为 Opopen/PtyTools.fs 5 处 ref cell 操作符（:= / !）弃用提示（FSHARP 3370），属风格警告非编译错误"}
+{"id":"321b","entity":["OMP宿主适配","测试覆盖补全"],"fact":"OmpExecutorToolsTests.fs创建：覆盖registerExecutorTools工具注册路径与executor_wait/executor_abort无session错误分支及有session正常执行分支；文件体量符合≤300行过渡门禁；注册于TestsEntriesOmp.fs与wanxiangshu.fsproj双点登记惯例。"}
+{"id":"4a27","entity":["模糊搜索","测试覆盖补全"],"fact":"FuzzySearchGrepTests.fs创建：覆盖resolveGrepIteratorState全5分支同步测试；注册于TestsEntriesCoverage.fs与wanxiangshu.fsproj双点登记，文件体量合规。"}
+{"id":"5574","entity":["审查循环","测试覆盖补全"],"fact":"ReviewerLoopTests.fs创建：覆盖runReviewerLoop/createReviewerChild promise路径；假client构造与promptWithAbort Promise模拟为覆盖关键。"}
+{"id":"4f53","entity":["搜索工具","测试覆盖补全"],"fact":"SearchToolsTests.fs创建：覆盖fuzzyFindTool/fuzzyGrepTool execute分支无session会话验证与参数解码失败路径；注册于TestsEntriesCore.fs。"}
+{"id":"f107","entity":["测试注册表","双点登记惯例"],"fact":"TestsEntriesOmp.fs与TestsEntriesCoverage.fs同步更新：新增四测试文件注册条目；wanxiangshu.fsproj新增四<Compile Include>条目按字母序插入；双点登记惯例保持。"}
+{"id":"a453","entity":["F#语法","编译修复"],"fact":"CoverageFillShellTests.fs局部变量sig触发FS0010保留关键字歧义，重命名为signal并更新4处引用；Opopen/PtyTools.fs ref cell赋值:=改为.Value<-消除FSHARP 3370弃用警告。"}
+{"id":"8afd","entity":["断言修复","OMP宿主适配"],"fact":"OmpTodoToolTests.fs断言键修正：ToolResult检测由kind字符串字段改为isError布尔字段，与运行时结构精确对齐；四测试场景断言已更新。"}
+{"id":"f45f","entity":["Opopen宿主适配","编译修复"],"fact":"OpopenCoverageTests.fs第126/133/139行let spec缩进由5格改为4格，F# offside规则合规。"}
+{"id":"5d2a","entity":["工具输出信封","测试覆盖补全"],"fact":"ToolOutputInfoTests 扩展两函数：testRenderProducesFlatFrontMatter 验证扁平 front-matter（无 info 块、status/exit_code/tool_output 顶层字段保留、body 可读）；testRenderMultiHintAsArray 验证多 hint 渲染为 YAML 数组项且往返解析正确。run() 同步追加调用，测试覆盖边界扩展。"}
+{"id":"e806","entity":["工具输出模型","YAML渲染"],"fact":"ToolOutputInfo.render 重构：从 YAML 序列格式改为扁平键值对格式。orderInfoForRender 将 BodyRef 项后置；flatFields 按键分组，同键多值渲染为数组、单值渲染为标量；消除 yamlSeqField 依赖，InfoItem 七类键值映射完整保留（hint/syntax/iterator/status/exit_code/signal/timeout_ms/tool_output）。"}
+{"id":"5ec5","entity":["工具输出信封","YAML前导元数据"],"fact":"bodyForBookkeeper 剥离 ToolOutputInfo 渲染输出的 YAML front-matter：使用 tool_output: /See Below/ 字段而非 info:，测试断言已同步修正验证该格式"}
+{"id":"c667","entity":["工具输出信封","前导元数据","往返解析"],"fact":"ToolOutputInfo.tryParse 期望扁平化前导元数据格式（键值对），与 render 扁平化输出构成往返解析契约；旧 info 数组格式描述已废止"}
+{"id":"a55c","entity":["文件体量铁律","梯度执法","注意力债务"],"fact":"文件体量梯度执法：200行亮黄牌预警，300行亮红牌强制拆分，二者无灰区。299≠合规—— cosmetic reduction 到299仍站在悬崖边。200→300区间优雅度单调递减，每行都是透支的注意力利息。触发红牌须立即结构性动作（新建文件/移走样板/拆分模块），绝不姑息，绝不凑数。"}
+{"id":"946b","entity":["文件体量铁律"],"fact":"文件体量铁律梯度解释：200行亮黄牌、300行亮红牌，二者间无灰区；299行与303行同处悬崖边，删空行删注释凑数属自欺；200→300行注意力利息逐行递增，优雅度单调递减；触发即拆分，绝不微调凑数。"}
+{"id":"ffe7","entity":["文件体量铁律"],"fact":"CapsPrelude 文档修正：文件体量铁律示例文本由「把303删到299是自欺欺人的垃圾做品」改为「把303删到299是自欺欺人的垃圾做派」，'做品'修正为'做派'，文档措辞与铁律语义精确对齐。"}
+{"id":"3756","entity":["文件体量铁律","设计溃烂","重构触发器"],"fact":"文件体量铁律文档修正：CapsPrelude 示例文本将'把303删到299是自欺欺人的垃圾做派'改为'行数门禁是重构触发器不是橡皮筋：删空行删注释把超标压到阈值下方等于对设计溃烂视而不见反把体检报告改成及格，门禁逼你拆文件你选择压行数，设计烂依旧可读性还赔进去了，比超限更可耻'，强调门禁是触发结构性重构的信号而非可通过删空行凑数逃避的阈值。"}
+{"id":"fb41","entity":["文件体量铁律"],"fact":"文档措辞修订：将'把303删到299是自欺欺人的垃圾做派'扩展为'膨胀本身就是设计溃烂的症状。行数门禁是重构触发器不是橡皮筋：删空行删注释把超标压到阈值下方等于对设计溃烂视而不见反把体检报告改成及格，门禁逼你拆文件你选择压行数，设计烂依旧可读性还赔进去了，比超限更可耻'，强化门禁作为设计溃烂检测器而非行数橡皮筋的语义，明确删行凑数比超限更可耻。"}
