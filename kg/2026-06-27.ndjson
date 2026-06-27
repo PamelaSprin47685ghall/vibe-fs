@@ -1166,3 +1166,6 @@
 {"id":"51f0","entity":["知识图谱","单一真源"],"fact":"知识图谱提交SSOT=Shell.KnowledgeGraphSubmit收归buildEntriesFromDrafts/submitEntriesForKind/submitDraftsForKind；三host KnowledgeGraphRuntimeIO降为薄委托；BookkeeperPolicy白名单SSOT模块限定名VibeFs.Kernel.KnowledgeGraph.BookkeeperPolicy；作业标记YAML经PromptFrontMatter，kind append/daily双Some+Trim非空门禁。"}
 {"id":"5155","entity":["测试注册表","双点登记"],"fact":"双点登记强制惯例：fsproj <Compile Include>与TestsEntriesCore/Codec/Omp/Fuzzy/Domain注册表条目同步更新；七入口列表(core/codec/omp/fuzzy/domain/integration/architecture)结构稳定；TestBody DU=Sync|Async；run()为聚合入口。"}
 {"id":"d93a","entity":["全仓绿测"],"fact":"全量绿测验收SSOT=runner.js退出码0联判Fable零Compilation failed；最近批次12462 passed 0 failed，构建管线全绿。"}
+{"id":"1052","entity":["Fable转译","JS互操作"],"fact":"JS.Object.keys 静态调用需改用 JS.Constructors.Object.keys：Fable 类型推导将 JS.Object.keys 返回类型识别为 obj 而非 string[]，unbox 强制转换无法消除编译歧义；显式使用 JS.Constructors.Object.keys 可触发正确的 Fable 静态方法分发路径，确保返回类型与 unbox 目标类型匹配。"}
+{"id":"b63e","entity":["Fable转译约束","回退链配置编解码","测试覆盖补全"],"fact":"回退链配置编解码测试文件 Fable 转译修复：将 JS.Object.keys 替换为 JS.Constructors.Object.keys，消除 Fable.Core 符号遮蔽导致的 FS0039 编译失败，Shell 层边界编解码 SSOT 与测试体量门禁均合规。"}
+{"id":"c251","entity":["Fable转译","构建状态"],"fact":"Fable 5.2.0 编译 609 源文件耗时 25190ms 零失败"}
