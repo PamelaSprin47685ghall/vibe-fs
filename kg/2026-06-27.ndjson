@@ -1,0 +1,6 @@
+{"type":"knowledge_graph_header","version":1,"kind":"day","date":"2026-06-27","rewritten":false}
+{"id":"d7ac","entity":["工具过滤漏洞","mimo","根因定位"],"fact":"mimo 端 plan/memory 泄露根因：二者为 OpenCode 宿主原生能力（plan=primary agent 别名，memory=配置节），本仓库 ToolCatalog 不注册。classifyTool 无法识别二者名称→归为 Other→canUseSemantic 对 Other 默认 true→filterChatToolsForAgent 对所有 agent 放行。disableMimoMemoryAndCheckpoint 仅清零配置节，不触工具过滤链路，形同虚设。"}
+{"id":"2fe7","entity":["工具过滤漏洞","mimo","修复方向"],"fact":"根治需在 classifyTool 为 plan/memory 增加显式语义分类（如 PlanTool/MemoryTool），并在 canUseSemantic 对应分支对所有 Mimo agent 返回 false；或在 filterChatToolsForAgent 调用前增 host-native 工具黑名单前置过滤。"}
+{"id":"9063","entity":["工具注册范围","宿主原生工具"],"fact":"allToolNames Mimocode 不包含 plan/memory；二者通过 OpenCode 宿主接口从外部传入 chat message 的 tools map 进入过滤链路，是本仓库 ToolCatalog 未登记的宿主原生工具名。"}
+{"id":"2f9b","entity":["工具过滤漏洞","路径分析"],"fact":"plan/memory 渗透路径：OpenCode/Mimo 宿主→chat message tools map→ChatHooks.chatMessageFor→filterChatToolsForAgent→canUseForHost→classifyTool→Other→canUseSemantic true→filtered map 保持 enabled=true→LLM 收到含 plan/memory 工具列表。"}
+{"id":"1f5f","entity":["配置门控","缺陷"],"fact":"disableMimoMemoryAndCheckpoint（OpopenAgentConfigWire）仅清零 cfg.checkpoint/memory/dream/distill 配置节，disableMimoWorkflowToolsForAgents 仅禁 workflow 工具权限，二者均不作用于工具过滤链路，无法阻止 plan/memory 从 tools map 渗透。"}
