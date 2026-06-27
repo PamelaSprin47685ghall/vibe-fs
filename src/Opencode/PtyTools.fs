@@ -20,16 +20,16 @@ let private newRegex (pattern: string) (flags: string) : obj = jsNative
 let private ptyClient : obj ref = ref (box null)
 let private managerRef : obj ref = ref (box null)
 
-let storePtyClient (client: obj) : unit = ptyClient := client
+let storePtyClient (client: obj) : unit = ptyClient.Value <- client
 
 let private getManager () : JS.Promise<obj> =
-    if not (Dyn.isNullish !managerRef) then promise { return !managerRef }
+    if not (Dyn.isNullish managerRef.Value) then promise { return managerRef.Value }
     else
         promise {
             let! mod' = dynImport "opencode-pty/plugin/pty/manager"
-            if not (Dyn.isNullish !ptyClient) then
-                try mod'?initManager(!ptyClient) with _ -> ()
-            managerRef := mod'?manager
+            if not (Dyn.isNullish ptyClient.Value) then
+                try mod'?initManager(ptyClient.Value) with _ -> ()
+            managerRef.Value <- mod'?manager
             return mod'?manager
         }
 

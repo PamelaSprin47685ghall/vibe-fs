@@ -22,6 +22,7 @@ open Wanxiangshu.Tests.OmpTitleFetchGuardTests
 open Wanxiangshu.Tests.OmpMagicTodoTests
 open Wanxiangshu.Tests.OmpToolResultEventTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
+open Wanxiangshu.Tests.OmpExecutorToolsTests
 open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.OmpSessionCompactingTests
 open Wanxiangshu.Tests.OmpCoverage2Tests
@@ -165,4 +166,6 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpPluginTests.turnStartRestoresMainSessionTools", Async OmpPluginTests.turnStartRestoresMainSessionTools
     "OmpCoverage2Tests.run", Async OmpCoverage2Tests.run
     "OmpTodoToolTests.run", Async OmpTodoToolTests.run
+    "OmpExecutorToolsTests.registersExecutorTools", Sync (sync OmpExecutorToolsTests.registersExecutorTools)
+    "OmpExecutorToolsTests.run", Async OmpExecutorToolsTests.run
     ]

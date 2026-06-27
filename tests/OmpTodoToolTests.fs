@@ -105,7 +105,6 @@ let execute_validReturnsTextResult () : JS.Promise<unit> =
 
 let run () : JS.Promise<unit> =
     promise {
-        clearFailuresForRun ()
         registerTodoTool_addsTool ()
         do! execute_missingReportReturnsError ()
         do! execute_missingMethodologyReturnsError ()

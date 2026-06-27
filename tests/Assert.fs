@@ -66,7 +66,6 @@ let timed (label: string) (f: unit -> unit) : unit =
         f ()
         timings.Add(label, now () - start)
     with ex ->
-        printfn "ERROR in %s: %A" label ex
         failed <- failed + 1
         failures.Add(label + " [THREW]")
         timings.Add(label, now () - start)
@@ -92,7 +91,6 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
                 failed <- failed + 1
                 failures.Add(label + $" [TIMEOUT>{asyncSpecTimeoutMs}ms]")
             else
-                printfn "ERROR in %s: %A" label ex
                 failed <- failed + 1
                 failures.Add(label + " [THREW]")
             timings.Add(label, now () - start)
@@ -110,7 +108,6 @@ let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<uni
                 failed <- failed + 1
                 failures.Add(label + $" [TIMEOUT>{asyncSuiteTimeoutMs}ms]")
             else
-                printfn "ERROR in %s: %A" label ex
                 failed <- failed + 1
                 failures.Add(label + " [THREW]")
             timings.Add(label, now () - start)

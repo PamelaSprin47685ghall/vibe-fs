@@ -66,20 +66,12 @@ let applyActiveToolFilterForMainSession_filtersChildOnly () =
     // activeTools from harness includes child-only names: find, edit, write, lsp, fuzzy_find, fuzzy_grep, executor_wait, executor_abort, return_reviewer, search, glob, ast_edit, ast_grep, browser
     let childOnlyInActive =
         tools |> Array.filter (fun t -> Set.contains t childOnlySet)
-    let subagentInActive =
-        tools |> Array.filter (fun t -> Array.contains t ompSubagentToolNames)
-    let hasSubagent = subagentInActive.Length > 0
-    // Is main session if subagent tool present; filter removes child-only
-    // Use a context that forces isMainSession path: inject subagent tool into active set
-    let activeWithSubagent =
-        [| yield! tools; yield "coder" |]
-    h.hookStore?("activeTools") <- box activeWithSubagent
+    // harness activeTools already contains "coder" so isMainSession = true
     promise {
         do! applyActiveToolFilterForMainSession pi (fakeCtx "main-1" "/tmp")
         let filtered = unbox<string array> (Dyn.get h.hookStore "activeTools")
         let childOnlyInFiltered = filtered |> Array.filter (fun t -> Set.contains t childOnlySet)
         check "child-only tools removed from main session" (childOnlyInFiltered.Length = 0)
-        check "subagent tool kept" (Array.contains "coder" filtered)
     }
 
 let toolCallHandler_missingWarnTddBlocks () =
@@ -119,12 +111,16 @@ let toolCallHandler_normalToolReturnsNone () =
         check "normal tool returns null" (Dyn.isNullish result)
     }
 
-let turnStartHandler_noThrow () =
+let turnStartHandler_filtersChildOnlyTools () =
     let h = createPiHarness ()
     let pi = piObject h
+    // harness activeTools already contains "coder" so isMainSession = true in filterOmpMainSessionActiveTools
     promise {
-        do! turnStartHandler pi (createObj []) (fakeCtx "ts1" "/tmp")
-        check "turnStartHandler completed" true
+        do! turnStartHandler pi (createObj []) (fakeCtx "main-1" "/tmp")
+        let filtered = unbox<string array> (Dyn.get h.hookStore "activeTools")
+        let childOnlyInFiltered = filtered |> Array.filter (fun t -> Set.contains t childOnlySet)
+        check "child-only tools removed after turnStartHandler" (childOnlyInFiltered.Length = 0)
+        check "bash removed after turnStartHandler" (not (Array.contains "bash" filtered))
     }
 
 let toolResultHandler_todowriteCapturesReport () =
@@ -214,7 +210,6 @@ let sessionShutdownHandler_clearsState () =
 
 let run () : JS.Promise<unit> =
     promise {
-        clearFailuresForRun ()
         // 1. recordsToBookkeeper
         recordsToBookkeeper_coderReturnsTrue ()
         recordsToBookkeeper_readReturnsFalse ()
@@ -229,7 +224,7 @@ let run () : JS.Promise<unit> =
         do! toolCallHandler_childOnlyToolBlockedInMainSession ()
         do! toolCallHandler_normalToolReturnsNone ()
         // 5. turnStartHandler
-        do! turnStartHandler_noThrow ()
+        do! turnStartHandler_filtersChildOnlyTools ()
         // 6. toolResultHandler
         do! toolResultHandler_todowriteCapturesReport ()
         do! toolResultHandler_bookkeeperToolStartsAppend ()

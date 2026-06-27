@@ -11,7 +11,9 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Shell.FuzzyFinderShell
 open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.WebToolsCodec
 open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.ToolCatalog
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -56,7 +58,6 @@ let hookSchemaStripUiFromJsonSchemaNull () =
     let result = stripUiFromJsonSchema null
     check "null returns null" (isNull result)
 
-// ── HookSchema.rewriteToolJsonSchema ─────────────────────────────────────────
 
 let hookSchemaRewriteToolJsonSchemaJsonSchema () =
     let mutable capturedKey = ""
@@ -90,7 +91,6 @@ let hookSchemaRewriteToolJsonSchemaArgsBranch () =
     rewriteToolJsonSchema setKey rewrite outArgs |> ignore
     equal "args rewritten" "rewritten" (string (outArgs?("args")?("tag")))
 
-// ── SearchTools construction ──────────────────────────────────────────────────
 
 let searchToolsFuzzyFindTool () =
     let finderCache = FinderCache()
@@ -114,6 +114,46 @@ let searchToolsWebfetchTool () =
     let ctx = createObj []
     let tool = webfetchTool ctx
     check "webfetch tool non-null" (not (isNull tool))
+
+
+let searchToolsFuzzyFindToolName () =
+    let finderCache = FinderCache()
+    let iteratorStore = createTypedIteratorStore 200
+    let tool = fuzzyFindTool finderCache iteratorStore
+    let spec = specOf "fuzzy_find"
+    equal "fuzzyFind tool name" spec.name "fuzzy_find"
+
+let searchToolsFuzzyGrepToolName () =
+    let finderCache = FinderCache()
+    let iteratorStore = createTypedIteratorStore 200
+    let tool = fuzzyGrepTool finderCache iteratorStore
+    let spec = specOf "fuzzy_grep"
+    equal "fuzzyGrep tool name" spec.name "fuzzy_grep"
+
+let searchToolsWebfetchToolName () =
+    let ctx = createObj []
+    let tool = webfetchTool ctx
+    let spec = specOf "webfetch"
+    equal "webfetch tool name" spec.name "webfetch"
+
+// ── SearchTools webfetch full options decode ──────────────────────────────────
+
+let searchToolsWebfetchToolFullOptionsDecode () =
+    let args = createObj [
+        "url", box "https://example.com"
+        "extract_main", box true
+        "prefer_llms_txt", box "auto"
+        "prompt", box "summarize"
+        "timeout", box 30
+    ]
+    match decodeWebfetchArgs args with
+    | Error e -> check "webfetch decode should succeed" false
+    | Ok wf ->
+        check "url decoded" (wf.Url = "https://example.com")
+        check "extract_main decoded" (wf.ExtractMain = Some true)
+        check "prefer_llms_txt decoded" (wf.PreferLlmsTxt = Some "auto")
+        check "prompt decoded" (wf.Prompt = Some "summarize")
+        check "timeout decoded" (wf.Timeout = Some 30)
 
 // ── SessionIoSubagent ─────────────────────────────────────────────────────────
 
@@ -161,7 +201,6 @@ let sessionIoSubagentExtractSessionText () =
 
 open Wanxiangshu.Kernel.WarnTdd
 
-// ── HookSchema.injectWarnTddIntoJsonSchema ─────────────────────────────────────
 
 let hookSchemaInjectWarnTddIntoEmptySchema () =
     let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
@@ -182,12 +221,11 @@ let hookSchemaInjectWarnTddNullSchema () =
     let result = injectWarnTddIntoJsonSchema null
     check "null schema returns null" (isNull result)
 
-// ── HookSchema.mergeWorkBacklogReportIntoTaskSchema ─────────────────────────────
 
 let hookSchemaMergeWorkBacklogReportIntoPureSchema () =
     let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
-    mergeWorkBacklogReportIntoTaskSchema schema |> ignore
-    let props = get schema "properties"
+    let result = mergeWorkBacklogReportIntoTaskSchema schema
+    let props = get result "properties"
     check "completedWorkReport added" (not (Dyn.isNullish (get props "completedWorkReport")))
     check "select_methodology added" (not (Dyn.isNullish (get props "select_methodology")))
 
@@ -201,12 +239,15 @@ let hookSchemaMergeWorkBacklogReportRemoveTaskId () =
             ]
             "required", box [| box "task_id"; box "description" |]
         ]
-    mergeWorkBacklogReportIntoTaskSchema schema |> ignore
-    let props = get schema "properties"
+    // ── 调用 SUT ──
+    let result = mergeWorkBacklogReportIntoTaskSchema schema
+    let resultProps = get result "properties"
+    let resultRequired = get result "required"
+    let props = resultProps
     check "task_id removed from properties" (Dyn.isNullish (get props "task_id"))
     check "completedWorkReport added" (not (Dyn.isNullish (get props "completedWorkReport")))
     check "select_methodology added" (not (Dyn.isNullish (get props "select_methodology")))
-    let required = get schema "required"
+    let required = resultRequired
     check "task_id absent from required" (not (isArray required) || not ((required :?> obj array) |> Array.exists (fun x -> string x = "task_id")))
 
 // ── HookSchema.buildWorkBacklogSchema ──────────────────────────────────────────
@@ -232,20 +273,24 @@ let run () = promise {
     hookSchemaStripUiFromJsonSchemaWithUi ()
     hookSchemaStripUiFromJsonSchemaNoUi ()
     hookSchemaStripUiFromJsonSchemaNull ()
+    hookSchemaInjectWarnTddIntoEmptySchema ()
+    hookSchemaBuildWorkBacklogSchema ()
     hookSchemaRewriteToolJsonSchemaJsonSchema ()
     hookSchemaRewriteToolJsonSchemaParameters ()
     hookSchemaRewriteToolJsonSchemaNoSchema ()
     hookSchemaRewriteToolJsonSchemaArgsBranch ()
-    hookSchemaInjectWarnTddIntoEmptySchema ()
     hookSchemaInjectWarnTddAlreadyPresent ()
     hookSchemaInjectWarnTddNullSchema ()
     hookSchemaMergeWorkBacklogReportIntoPureSchema ()
     hookSchemaMergeWorkBacklogReportRemoveTaskId ()
-    hookSchemaBuildWorkBacklogSchema ()
     searchToolsFuzzyFindTool ()
     searchToolsFuzzyGrepTool ()
     searchToolsWebsearchTool ()
     searchToolsWebfetchTool ()
+    searchToolsWebfetchToolFullOptionsDecode ()
+    searchToolsFuzzyFindToolName ()
+    searchToolsFuzzyGrepToolName ()
+    searchToolsWebfetchToolName ()
     sessionIoSubagentBuildPromptBodyMinimal ()
     sessionIoSubagentBuildPromptBodyTools ()
     sessionIoSubagentBuildPromptBodyModel ()

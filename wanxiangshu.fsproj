@@ -467,6 +467,7 @@
     <Compile Include="tests/OmpCodecCoverageTests.fs" />
     <Compile Include="tests/OmpCoverage2Tests.fs" />
     <Compile Include="tests/OmpTodoToolTests.fs" />
+    <Compile Include="tests/OmpExecutorToolsTests.fs" />
     <Compile Include="tests/OpencodeCoverageTests.fs" />
     <Compile Include="tests/OmpSessionLifecycleTests.fs" />
     <Compile Include="tests/OmpSessionCompactingTests.fs" />
@@ -582,6 +583,9 @@
     <Compile Include="tests/OmpToolsCoverageTests.fs" />
     <Compile Include="tests/PluginMimoTuiTests.fs" />
     <Compile Include="tests/MuxCoverageTests.fs" />
+    <Compile Include="tests/FuzzySearchGrepTests.fs" />
+    <Compile Include="tests/SearchToolsTests.fs" />
+    <Compile Include="tests/ReviewerLoopTests.fs" />
     <Compile Include="tests/TestsEntriesCoverage.fs" />
     <Compile Include="tests/TestsEntriesCore.fs" />
     <Compile Include="tests/TestsEntriesCodec.fs" />

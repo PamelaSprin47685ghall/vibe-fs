@@ -160,7 +160,8 @@ let runAll (args: string array) : JS.Promise<int> =
             return 1
         else
             let isIntegrationSuiteRun (label: string) =
-                label.StartsWith "Integration" && label.EndsWith ".run"
+                (label.StartsWith "Integration" && label.EndsWith ".run")
+                || (label = "OmpExecutorToolsTests.run")
 
             for (label, body) in runnableTests do
                 match body with

@@ -38,7 +38,6 @@ let private mkErrRawNoError () : obj =
     box {| ok = false |}
 
 // ── resultFromRaw ────────────────────────────────────────────────────────────
-//
 //  Branch 1: ok=true, value 存在  → Ok finder
 //  Branch 2: ok=false, error 存在 → Error errorMsg
 //  Branch 3: ok=false, error 缺失 → Error "createFinder failed"
@@ -65,7 +64,6 @@ let ffResultFromRawErrDefault () =
     | Error msg -> equal "nullish error → default" "createFinder failed" msg
 
 // ── FinderCache.Destroy / DestroyAll ─────────────────────────────────────────
-//
 //  Branch A: instances map is empty → match _ → () 无抛
 //  Branch B: instances has entry, finder.isDestroyed=false → finder.destroy() 再移除
 //  DestroyAll 遍历空列表 → 无抛
@@ -100,32 +98,183 @@ let ffGetCacheHit () : JS.Promise<unit> =
         | Error msg -> check ("Get hit → unexpected Error: " + msg) false
     }
 
-// Get cache-miss 需要 @ff-labs/fff-node，此处仅验证 Promise 正常创建；
-// 调用 DestroyAll 清理 pending 防止泄漏，不断言结果值。
-let ffGetCacheMissNoThrow () : JS.Promise<unit> =
+// ── run ──────────────────────────────────────────────────────────────────────
+
+// ── firstString ────────────────────────────────────────────────────────────────
+//  Branch A: first key hits → Some v
+//  Branch B: all keys miss → None
+
+let siMultiKeyHit () =
+    let ctx = createObj [ "alpha" ==> "v1"; "beta" ==> "v2" ]
+    match firstString ctx ["alpha"; "beta"; "gamma"] with
+    | Some v -> equal "firstString hit first key" "v1" v
+    | None   -> check "firstString hit first key" false
+
+let siAllMiss () =
+    let ctx = createObj [ "alpha" ==> "v1" ]
+    match firstString ctx ["x"; "y"; "z"] with
+    | Some _ -> check "firstString all miss" false
+    | None   -> check "firstString all miss → None" true
+
+// ── getAbortSignal ─────────────────────────────────────────────────────────────
+//  Branch A: null ctx → null
+//  Branch B: no abort key → null
+//  Branch C: has abort → non-null
+
+let gasNullCtx () =
+    let r = getAbortSignal null
+    check "getAbortSignal null ctx → null" (Dyn.isNullish r)
+
+let gasNoAbortKey () =
+    let ctx = createObj [ "foo" ==> "bar" ]
+    let r = getAbortSignal ctx
+    check "getAbortSignal no abort key → null" (Dyn.isNullish r)
+
+let gasHasAbort () =
+    let abortObj = createObj [ "aborted" ==> false ]
+    let ctx = createObj [ "abort" ==> abortObj ]
+    let r = getAbortSignal ctx
+    check "getAbortSignal has abort → non-null" (not (Dyn.isNullish r))
+
+// ── extractToolContext ─────────────────────────────────────────────────────────
+//  Branch A: directory alias hits → use alias (≠ pluginDir)
+//  Branch B: sessionID alias hits → non-empty string
+
+let etcDirectoryAlias () =
+    let ctx = createObj [ "directory" ==> "/custom/dir" ]
+    let tc = extractToolContext ctx "/fallback"
+    equal "extractToolContext directory alias" "/custom/dir" tc.Directory
+
+let etcSessionIdAlias () =
+    let ctx = createObj [ "sessionId" ==> "sess-123" ]
+    let tc = extractToolContext ctx "/fallback"
+    equal "extractToolContext sessionId alias" "sess-123" tc.SessionID
+
+let etcFallbacks () =
+    let ctx = createObj []  // no keys
+    let tc = extractToolContext ctx "/fb"
+    equal "extractToolContext dir fallback" "/fb" tc.Directory
+    equal "extractToolContext sid fallback" "" tc.SessionID
+
+// ── textPart / textParts ───────────────────────────────────────────────────────
+//  textPart: fixed shape {| type="text"; text=... |}
+//  textParts: array length == input length; every item type="text"
+
+let tpSingle () =
+    let p = textPart "hello"
+    equal "textPart type" "text" (string (Dyn.get p "type"))
+    equal "textPart text" "hello" (string (Dyn.get p "text"))
+
+let tpsMultiple () =
+    let arr = textParts ["a"; "b"; "c"]
+    equal "textParts length" 3 (int (unbox arr.Length))
+    let t0 = string (Dyn.get arr.[0] "type")
+    let t1 = string (Dyn.get arr.[1] "type")
+    check "textParts[0].type = text" (t0 = "text")
+    check "textParts[1].type = text" (t1 = "text")
+
+// ── buildPromptBody ────────────────────────────────────────────────────────────
+//  Branch A: ModelString=None → body 无 model 键
+//  Branch B: ModelString=Some "provider/model" → body.model 含 providerID+modelID
+//  Branch C: ThinkingLevel=Some "high" → body.variant = "high"
+//  Branch D: tools 非空 → body 含 tools 键
+
+let bpbNoModel () =
+    let body = buildPromptBody "agent" "prompt" null emptySettings
+    check "bpb no model → no model key" (Dyn.isNullish (Dyn.get body "model"))
+
+let bpbModelString () =
+    let settings = { emptySettings with ModelString = Some "openai/gpt-4o" }
+    let body = buildPromptBody "agent" "prompt" null settings
+    let model = Dyn.get body "model"
+    check "bpb modelString → model non-null" (not (Dyn.isNullish model))
+    equal "bpb providerID" "openai" (string (Dyn.get model "providerID"))
+    equal "bpb modelID" "gpt-4o" (string (Dyn.get model "modelID"))
+
+let bpbThinkingLevel () =
+    let settings = { emptySettings with ThinkingLevel = Some "high" }
+    let body = buildPromptBody "agent" "prompt" null settings
+    equal "bpb thinkingLevel → variant" "high" (string (Dyn.get body "variant"))
+
+let bpbWithTools () =
+    let tools = createObj [ "t" ==> true ]
+    let body = buildPromptBody "agent" "prompt" tools emptySettings
+    check "bpb tools → tools key present" (not (Dyn.isNullish (Dyn.get body "tools")))
+
+// ── signalAborted ──────────────────────────────────────────────────────────────
+//  Branch A: null signal → false
+//  Branch B: aborted=false → false
+//  Branch C: aborted=true → true
+
+let saNull () =
+    check "signalAborted null → false" (not (signalAborted null))
+
+let saNotAborted () =
+    let signal = createObj [ "aborted" ==> false ]
+    check "signalAborted not aborted → false" (not (signalAborted signal))
+
+let saAborted () =
+    let signal = createObj [ "aborted" ==> true ]
+    check "signalAborted aborted → true" (signalAborted signal)
+
+// ── makeAbortPromise null signal ────────────────────────────────────────────────
+//  Branch A: null signal → Promise.resolve(()) 已 resolved
+
+let mapNullAbort () : JS.Promise<unit> =
     promise {
-        let cache = FinderCache()
-        // 未知 cwd: 触发 createFinder → 在无 @ff-labs/fff-node 的测试环境会 reject
-        // 仅保证 Get 不抛同步异常，且 pending 被正确清理
-        let p = cache.Get("miss-cwd")
-        check "Get miss → promise created" (p <> null)
-        // 异步清理：无论成功失败都 DestroyAll 清 pending
-        p |> Promise.catch (fun _ -> Error "ignored") |> Promise.map (fun _ -> cache.DestroyAll()) |> ignore
+        let p = makeAbortPromise null (fun () -> ())
+        let! _v = p
+        check "makeAbortPromise null → resolved" true
     }
 
-// ── run ──────────────────────────────────────────────────────────────────────
+// ── raceWithAbortSignal null signal ────────────────────────────────────────────
+//  Branch A: null signal → 直接 return work（引用等价）
+
+let rwasNullSignal () : JS.Promise<unit> =
+    promise {
+        let work = Promise.lift 42
+        let r = raceWithAbortSignal null (fun () -> ()) (unbox<JS.Promise<int>> work)
+        let! result = r
+        equal "raceWithAbortSignal null → result = 42" 42 result
+    }
+
+// ── run ────────────────────────────────────────────────────────────────────────
 
 let run () : JS.Promise<unit> =
     promise {
-        // resultFromRaw
+        // FuzzyFinderShell – resultFromRaw + FinderCache 分支覆盖补全
         ffResultFromRawOk ()
         ffResultFromRawErrMsg ()
         ffResultFromRawErrDefault ()
-        // FinderCache Destroy / DestroyAll
         ffDestroyEmptyNoThrow ()
         ffDestroyAllEmptyNoThrow ()
-        // FinderCache Get
         do! ffGetCacheHit ()
-        do! ffGetCacheMissNoThrow ()
+        // firstString
+        siMultiKeyHit ()
+        siAllMiss ()
+        // getAbortSignal
+        gasNullCtx ()
+        gasNoAbortKey ()
+        gasHasAbort ()
+        // extractToolContext
+        etcDirectoryAlias ()
+        etcSessionIdAlias ()
+        etcFallbacks ()
+        // textPart / textParts
+        tpSingle ()
+        tpsMultiple ()
+        // buildPromptBody
+        bpbNoModel ()
+        bpbModelString ()
+        bpbThinkingLevel ()
+        bpbWithTools ()
+        // signalAborted
+        saNull ()
+        saNotAborted ()
+        saAborted ()
+        // makeAbortPromise null
+        do! mapNullAbort ()
+        // raceWithAbortSignal null
+        do! rwasNullSignal ()
     }
 

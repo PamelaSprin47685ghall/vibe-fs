@@ -23,7 +23,7 @@ let private nodeBuffer : obj = jsNative
 let private byteLength (s: string) : int = nodeBuffer?byteLength(s, "utf-8")
 
 let executorMaxWaitMs = 60_000
-let executorMinWaitMs = 500
+let mutable executorMinWaitMs = 500  // test seam — OmpExecutorToolsTests sets this to 0 in with-session paths to eliminate real waits
 
 let private ompScope = RuntimeScope()
 let private sessionExecutor = createForScope ompScope
