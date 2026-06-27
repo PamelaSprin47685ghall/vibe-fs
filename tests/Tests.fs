@@ -84,6 +84,11 @@ open Wanxiangshu.Tests.OmpTitleFetchGuardTests
 open Wanxiangshu.Tests.OmpMagicTodoTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.SubagentIoTests
+open Wanxiangshu.Tests.ToolCatalogClassificationTests
+open Wanxiangshu.Tests.ToolOutputInfoTests
+open Wanxiangshu.Tests.KernelHelpersTests
+open Wanxiangshu.Tests.KnowledgeGraphHelpersTests
+open Wanxiangshu.Tests.ReviewPromptsFormatTests
 open Wanxiangshu.Omp.Plugin
 
 [<Import("appendFileSync", "node:fs")>]

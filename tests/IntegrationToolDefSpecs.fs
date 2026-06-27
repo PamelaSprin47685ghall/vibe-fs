@@ -11,6 +11,12 @@ open Wanxiangshu.Shell.Dyn
 
 open Wanxiangshu.Tests.IntegrationToolDefSpecsMimo
 
+[<Import("Schema", "effect")>]
+let private effectSchemaNs : obj = jsNative
+
+let private effectStruct (shape: obj) : obj = effectSchemaNs?("Struct")(shape)
+let private effectString : obj = get effectSchemaNs "String"
+
 let toolDefinitionSpec () = promise {
     let! workspaceDir = mkdtempAsync "tool-definition-"
     let! p = plugin (box {| directory = workspaceDir |})
@@ -23,6 +29,25 @@ let toolDefinitionSpec () = promise {
     let props = get (get coderDef "jsonSchema") "properties"
     check "tool.definition does not strip coder _ui property" (not (isNullish (get props "_ui")))
     check "tool.definition keeps coder intents" (not (isNullish (get props "intents")))
+    let editParameters =
+        effectStruct (createObj [
+            "filePath", effectString
+            "oldString", effectString
+            "newString", effectString
+        ])
+    let editDef = createObj [ "description", box "native"; "parameters", box editParameters ]
+    do! td $ (createObj [ "toolID", box "edit" ], editDef) |> unbox<JS.Promise<unit>>
+    check "tool.definition preserves edit parameters reference" (obj.ReferenceEquals(get editDef "parameters", editParameters))
+    let editJsonSchema = get editDef "jsonSchema"
+    check "tool.definition builds edit jsonSchema from effect parameters" (not (isNullish editJsonSchema))
+    check "tool.definition injects warn_tdd into edit jsonSchema" (not (isNullish (get (get editJsonSchema "properties") "warn_tdd")))
+    let patchParameters = effectStruct (createObj [ "patchText", effectString ])
+    let patchDef = createObj [ "description", box "native"; "parameters", box patchParameters ]
+    do! td $ (createObj [ "toolID", box "apply_patch" ], patchDef) |> unbox<JS.Promise<unit>>
+    check "tool.definition preserves apply_patch parameters reference" (obj.ReferenceEquals(get patchDef "parameters", patchParameters))
+    check "tool.definition injects warn_tdd into apply_patch jsonSchema" (not (isNullish (get (get (get patchDef "jsonSchema") "properties") "warn_tdd")))
+    let patchRequired = unbox<obj[]> (get (get patchDef "jsonSchema") "required") |> Array.map string
+    check "tool.definition requires warn_tdd for apply_patch jsonSchema" (patchRequired |> Array.contains "warn_tdd")
     let todoParams = createObj [ "__effectSchema", box true ]
     let todoDef = createObj [ "description", box "old desc"; "parameters", box todoParams ]
     do! td $ (createObj [ "toolID", box "todowrite" ], todoDef) |> unbox<JS.Promise<unit>>

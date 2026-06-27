@@ -17,6 +17,9 @@ open Wanxiangshu.Shell.WorkBacklogSchema
 
 let selectMethodologyFieldDescription = Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription
 
+[<Import("Schema", "effect")>]
+let private effectSchemaNs : obj = jsNative
+
 /// Write `_ui` directly onto the host's args reference when the tool exposes a
 /// UI label (coder/investigator). The host keeps the same args object it passed
 /// in, so the label survives into the message history the UI reads. Replacing
@@ -60,12 +63,31 @@ let stripUiFromJsonSchema (schema: obj) : obj =
                 |> createObj
             createObj [ for key in Dyn.keys schema do if key = "properties" then yield key, nextProperties elif key = "required" then yield key, requiredWithoutUi (get schema "required") else yield key, get schema key ]
 
+let private tryBuildJsonSchemaFromEffectSchema (parameters: obj) : obj =
+    try
+        let toJsonSchemaDocument = get effectSchemaNs "toJsonSchemaDocument"
+        if isNullish toJsonSchemaDocument || not (Dyn.typeIs toJsonSchemaDocument "function") then null
+        else
+            let document = effectSchemaNs?("toJsonSchemaDocument")(parameters, createObj [ "additionalProperties", box true ])
+            get document "schema"
+    with _ -> null
+
 let rewriteToolJsonSchema (setKey: obj -> string -> obj -> unit) (rewrite: obj -> obj) (output: obj) : unit =
     let jsonSchema = get output "jsonSchema"
-    if not (isNullish jsonSchema) then setKey output "jsonSchema" (rewrite jsonSchema)
+    if not (isNullish jsonSchema) then
+        rewrite jsonSchema |> ignore
     else
         let parameters = get output "parameters"
-        if not (isNullish parameters) then setKey output "parameters" (rewrite parameters)
+        if not (isNullish parameters) then
+            let generated = tryBuildJsonSchemaFromEffectSchema parameters
+            if not (isNullish generated) then
+                setKey output "jsonSchema" (rewrite generated)
+            else
+                rewrite parameters |> ignore
+        else
+            let args = get output "args"
+            if not (isNullish args) then
+                rewrite args |> ignore
 
 let warnTddProperty : obj =
     createObj [
@@ -82,31 +104,35 @@ let inlineJsonWarnTddProperty : obj =
         "description", box Params.warnTddDesc
     ]
 
-/// Inject warn_tdd into a jsonSchema (properties + required).
+let private appendRequiredWarnTddInPlace (schema: obj) : unit =
+    let existingRequired = get schema "required"
+    if isArray existingRequired then
+        let arr = unbox<obj[]> existingRequired
+        if not (arr |> Array.exists (fun x -> string x = "warn_tdd")) then
+            existingRequired?("push")(box "warn_tdd") |> ignore
+    else
+        schema?("required") <- box [| box "warn_tdd" |]
+
+let private injectWarnTddIntoJsonSchemaInPlace (schema: obj) : unit =
+    let props = get schema "properties"
+    if not (isNullish props) && isNullish (get props "warn_tdd") then
+        props?("warn_tdd") <- inlineJsonWarnTddProperty
+        appendRequiredWarnTddInPlace schema
+
+let private injectWarnTddIntoArgsShapeInPlace (shape: obj) : unit =
+    if isNullish (get shape "warn_tdd") then
+        shape?("warn_tdd") <- enumReq [| WarnTdd.canonicalValue |] Params.warnTddDesc
+
+/// Inject warn_tdd into an Opencode tool schema in place.
 let injectWarnTddIntoJsonSchema (schema: obj) : obj =
     if isNullish schema then schema
     else
         let props = get schema "properties"
-        if isNullish props then schema
-        elif isNullish (get props "warn_tdd") then
-            let existingRequired = get schema "required"
-            let nextRequired =
-                if isArray existingRequired then
-                    let arr = unbox<obj[]> existingRequired
-                    if arr |> Array.exists (fun x -> string x = "warn_tdd") then existingRequired
-                    else Array.append arr [| box "warn_tdd" |] |> box
-                else box [| box "warn_tdd" |]
-            createObj [
-                for key in Dyn.keys schema do
-                    if key = "properties" then
-                        yield key, createObj (
-                            [ for pkey in Dyn.keys props do yield pkey, get props pkey
-                              yield "warn_tdd", inlineJsonWarnTddProperty ]
-                        )
-                    elif key = "required" then yield key, nextRequired
-                    else yield key, get schema key
-            ]
-        else schema
+        if not (isNullish props) then
+            injectWarnTddIntoJsonSchemaInPlace schema
+        else
+            injectWarnTddIntoArgsShapeInPlace schema
+        schema
 
 let private stringZodProperty (description: string) : obj =
     createObj [

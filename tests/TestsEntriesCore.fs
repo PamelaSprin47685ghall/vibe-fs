@@ -4,11 +4,13 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.ReviewTests
 open Wanxiangshu.Tests.ReviewTestsReplay
 open Wanxiangshu.Tests.ReviewTestsPrompts
+open Wanxiangshu.Tests.ReviewSessionEffectsTests
 open Wanxiangshu.Tests.AgentTests
 open Wanxiangshu.Tests.AgentNudgeSpecs
 open Wanxiangshu.Tests.AgentNudgeSpecsWip
 open Wanxiangshu.Tests.AgentNudgeSpecsDecode
 open Wanxiangshu.Tests.KernelTests
+open Wanxiangshu.Tests.DynFieldTests
 open Wanxiangshu.Tests.KernelPromptSpecs
 open Wanxiangshu.Tests.FuzzyTests
 open Wanxiangshu.Tests.FuzzyTestsPaging
@@ -30,23 +32,32 @@ open Wanxiangshu.Tests.MethodologyTests
 open Wanxiangshu.Tests.KnowledgeGraphTests
 open Wanxiangshu.Tests.KnowledgeGraphFileTests
 open Wanxiangshu.Tests.KnowledgeGraphKernelTests
+open Wanxiangshu.Tests.LoopMessagesTests
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.ReviewReplaySyncTests
 open Wanxiangshu.Tests.CapsSynthCommonTests
 open Wanxiangshu.Tests.CapsFileCacheTests
+open Wanxiangshu.Tests.DedupTests
+open Wanxiangshu.Tests.MessagingTests
 open Wanxiangshu.Tests.SubagentPromptBuildTests
 open Wanxiangshu.Tests.SubagentSpawnTests
 open Wanxiangshu.Tests.WebToolsCodecTests
 open Wanxiangshu.Tests.ReviewToolsCodecTests
 open Wanxiangshu.Tests.KnowledgeGraphToolsCodecTests
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
+open Wanxiangshu.Tests.ToolExecuteTests
 open Wanxiangshu.Tests.ToolArgsDecodeTests
 open Wanxiangshu.Tests.ToolResultWireTests
+open Wanxiangshu.Tests.KernelHelpersTests
+open Wanxiangshu.Tests.KnowledgeGraphHelpersTests
+open Wanxiangshu.Tests.ReviewPromptsFormatTests
 open Wanxiangshu.Tests.SubagentToolExecuteTests
 open Wanxiangshu.Tests.FileToolsCodecTests
 open Wanxiangshu.Tests.FuzzyToolsCodecTests
+open Wanxiangshu.Tests.ReviewSessionRegistryTests
 open Wanxiangshu.Tests.WorkBacklogToolsCodecTests
 open Wanxiangshu.Tests.PatchToolsCodecTests
+open Wanxiangshu.Tests.PatchParserTests
 open Wanxiangshu.Tests.HostMessagePartCodecTests
 open Wanxiangshu.Tests.MessagingPartCodecTests
 open Wanxiangshu.Tests.ToolContextCodecTests
@@ -56,6 +67,7 @@ open Wanxiangshu.Tests.OpencodeSessionSpawnCodecTests
 open Wanxiangshu.Tests.SessionIoPromptBodyTests
 open Wanxiangshu.Tests.OpencodeAgentConfigCodecTests
 open Wanxiangshu.Tests.OpencodeSessionEventCodecTests
+open Wanxiangshu.Tests.OpencodeSessionEventCodecCommonTests
 open Wanxiangshu.Tests.MuxAiSettingsCodecTests
 open Wanxiangshu.Tests.MuxAiSettingsIntegrationTests
 open Wanxiangshu.Tests.AgentConfigApplyTests
@@ -84,6 +96,29 @@ open Wanxiangshu.Tests.OmpTitleFetchGuardTests
 open Wanxiangshu.Tests.OmpMagicTodoTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.SubagentIoTests
+open Wanxiangshu.Tests.MessageTransformPolicyTests
+open Wanxiangshu.Tests.ToolCatalogClassificationTests
+open Wanxiangshu.Tests.ToolOutputInfoTests
+open Wanxiangshu.Tests.ExecutorKernelTests
+open Wanxiangshu.Tests.NudgeTransitionsTests
+open Wanxiangshu.Tests.NudgeRetryProgressTests
+open Wanxiangshu.Tests.NudgeTodoStatusTests
+open Wanxiangshu.Tests.NudgeCoordinatorTests
+open Wanxiangshu.Tests.ReviewSessionStateMachineTests
+open Wanxiangshu.Tests.HostToolsTests
+open Wanxiangshu.Tests.ToolPermissionTests
+open Wanxiangshu.Tests.SubagentPromptsTests
+open Wanxiangshu.Tests.SubagentIntentsTests
+open Wanxiangshu.Tests.MethodologyRegistryTests
+open Wanxiangshu.Tests.NudgeEventHandlerTests
+open Wanxiangshu.Tests.ToolCatalogRegistryTests
+open Wanxiangshu.Tests.TreeSitterKernelTests
+open Wanxiangshu.Tests.ConfigTests
+open Wanxiangshu.Tests.JsonSchemaBuildersTests
+open Wanxiangshu.Tests.ExecutorStripTests
+open Wanxiangshu.Tests.WebFetchGuardTests
+open Wanxiangshu.Tests.TestsEntriesDomain
+open Wanxiangshu.Tests.TestsEntriesFuzzy
 open Wanxiangshu.Tests.TestsTestBody
 
 let coreTestEntries () : (string * TestBody) list =
@@ -95,6 +130,14 @@ let coreTestEntries () : (string * TestBody) list =
     "ReviewTests.runtime", Sync (sync ReviewTests.runtime)
     "ReviewTests.promptPartsBranches", Sync (sync ReviewTests.promptPartsBranches)
     "ReviewTests.resolvePendingClearsSuppressor", Sync (sync ReviewTests.resolvePendingClearsSuppressor)
+    "ReviewSessionEffectsTests.emptyEffectsHasEmptyMaps", Sync (sync ReviewSessionEffectsTests.emptyEffectsHasEmptyMaps)
+    "ReviewSessionEffectsTests.setPendingAddsEntry", Sync (sync ReviewSessionEffectsTests.setPendingAddsEntry)
+    "ReviewSessionEffectsTests.resolvePendingFiresCallback", Sync (sync ReviewSessionEffectsTests.resolvePendingFiresCallback)
+    "ReviewSessionEffectsTests.resolvePendingUnknownIdReturnsFalse", Sync (sync ReviewSessionEffectsTests.resolvePendingUnknownIdReturnsFalse)
+    "ReviewSessionEffectsTests.disposeSessionTreeTerminatesAll", Sync (sync ReviewSessionEffectsTests.disposeSessionTreeTerminatesAll)
+    "ReviewSessionRegistryTests.run", Sync (sync ReviewSessionRegistryTests.run)
+    "ReviewSessionQueryTests.run", Sync (sync ReviewSessionQueryTests.run)
+    "ReviewPromptsFormatTests.run", Sync (sync ReviewPromptsFormatTests.run)
     "ReviewTests.disposeSessionTreeTerminatesAll", Sync (sync ReviewTestsReplay.disposeSessionTreeTerminatesAll)
     "ReviewTests.inferReviewTaskFromTexts'", Sync (sync ReviewTestsReplay.inferReviewTaskFromTexts')
     "ReviewTests.parseFrontMatterScalars'", Sync (sync ReviewTestsReplay.parseFrontMatterScalars')
@@ -118,12 +161,41 @@ let coreTestEntries () : (string * TestBody) list =
     "AgentNudgeSpecs.decodeTodosOpenItems", Sync (sync AgentNudgeSpecsDecode.decodeTodosOpenItems)
     "AgentNudgeSpecsWip.submitReviewWipNudgeDedup", Sync (sync AgentNudgeSpecsWip.submitReviewWipNudgeDedup)
     "AgentNudgeSpecsDecode.decodeTodosOpenItems", Sync (sync AgentNudgeSpecsDecode.decodeTodosOpenItems)
+    "NudgeTransitionsTests.run", Sync (sync NudgeTransitionsTests.run)
+    "NudgeRetryProgressTests.run", Sync (sync NudgeRetryProgressTests.run)
+    "NudgeTodoStatusTests.run", Sync (sync NudgeTodoStatusTests.run)
+    "NudgeCoordinatorTests.freshSession", Sync (sync NudgeCoordinatorTests.freshSessionTest)
+    "NudgeCoordinatorTests.freshCoordinator", Sync (sync NudgeCoordinatorTests.freshCoordinatorTest)
+    "NudgeCoordinatorTests.freshCoordinatorRuntime", Sync (sync NudgeCoordinatorTests.freshCoordinatorRuntimeTest)
+    "NudgeCoordinatorTests.updateNudgeNone", Sync (sync NudgeCoordinatorTests.updateNudgeNoneTest)
+    "NudgeCoordinatorTests.updateSameDedup", Sync (sync NudgeCoordinatorTests.updateSameDedupTest)
+    "NudgeCoordinatorTests.updateDifferent", Sync (sync NudgeCoordinatorTests.updateDifferentTest)
+    "NudgeCoordinatorTests.updateNewSession", Sync (sync NudgeCoordinatorTests.updateNewSessionTest)
+    "NudgeCoordinatorTests.shouldSuppressNudgeQuestion", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgeQuestionTest)
+    "NudgeCoordinatorTests.shouldSuppressNudgeSkipTodo", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgeSkipTodoTest)
+    "NudgeCoordinatorTests.shouldSuppressNudgeSkipLoop", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgeSkipLoopTest)
+    "NudgeCoordinatorTests.shouldSuppressNudgePreviousSame", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgePreviousSameTest)
+    "NudgeCoordinatorTests.shouldSuppressNudgePreviousDifferent", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgePreviousDifferentTest)
+    "NudgeCoordinatorTests.shouldSuppressNudgeNoPrevious", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgeNoPreviousTest)
+    "NudgeCoordinatorTests.consumeSuppressionPresent", Sync (sync NudgeCoordinatorTests.consumeSuppressionPresentTest)
+    "NudgeCoordinatorTests.consumeSuppressionAbsent", Sync (sync NudgeCoordinatorTests.consumeSuppressionAbsentTest)
+    "NudgeCoordinatorTests.suppressSession", Sync (sync NudgeCoordinatorTests.suppressSessionTest)
+    "NudgeCoordinatorTests.clearRuntimeSession", Sync (sync NudgeCoordinatorTests.clearRuntimeSessionTest)
+    "NudgeCoordinatorTests.decideRuntimeActionSuppressed", Sync (sync NudgeCoordinatorTests.decideRuntimeActionSuppressedTest)
+    "NudgeCoordinatorTests.decideRuntimeActionNormal", Sync (sync NudgeCoordinatorTests.decideRuntimeActionNormalTest)
+    "KernelHelpersTests.run", Sync (sync KernelHelpersTests.run)
+    "ReviewSessionStateMachineTests.run", Sync (sync ReviewSessionStateMachineTests.run)
+    "HostToolsTests.run", Sync (sync HostToolsTests.run)
+    "ToolPermissionTests.run", Sync (sync ToolPermissionTests.run)
+    "SubagentPromptsTests.run", Sync (sync SubagentPromptsTests.run)
+    "SubagentIntentsTests.run", Sync (sync SubagentIntentsTests.run)
     "KernelTests.headTail'", Sync (sync KernelTests.headTail')
     "KernelTests.stripLexer'", Sync (sync KernelTests.stripLexer')
     "KernelTests.dedup'", Sync (sync KernelTests.dedup')
     "KernelTests.jsBoundary'", Sync (sync KernelTests.jsBoundary')
     "KernelPromptSpecs.hostKernel'", Sync (sync KernelPromptSpecs.hostKernel')
     "KernelTests.knowledgeGraphFetchAnswer", Sync (sync KernelTests.knowledgeGraphFetchAnswer)
+    "DynFieldTests.run", Sync (sync DynFieldTests.run)
     "KernelPromptSpecs.toolCatalogCentralized", Sync (sync KernelPromptSpecs.toolCatalogCentralized)
     "KernelPromptSpecs.hostToolsKnowledgeGraphNames", Sync (sync KernelPromptSpecs.hostToolsKnowledgeGraphNames)
     "KernelPromptSpecs.subagentDispatch", Sync (sync KernelPromptSpecs.subagentDispatch)
@@ -167,14 +239,21 @@ let coreTestEntries () : (string * TestBody) list =
     "ShellTestsFormat.summarizerInputCap", Sync (sync ShellTestsFormat.summarizerInputCap)
     "ShellTestsFormat.executorToolResponseFormatting", Sync (sync ShellTestsFormat.executorToolResponseFormatting)
     "ShellTestsFormat.summarizerPromptOmitsReturnValue", Sync (sync ShellTestsFormat.summarizerPromptOmitsReturnValue)
+    "ShellTestsFormat.formatFetchResponseAllFields", Sync (sync ShellTestsFormat.formatFetchResponseAllFields)
+    "ShellTestsFormat.formatFetchResponseOnlyTitle", Sync (sync ShellTestsFormat.formatFetchResponseOnlyTitle)
+    "ShellTestsFormat.formatFetchResponseOnlyContent", Sync (sync ShellTestsFormat.formatFetchResponseOnlyContent)
+    "ShellTestsFormat.formatFetchResponseAllNone", Sync (sync ShellTestsFormat.formatFetchResponseAllNone)
+    "ShellTestsFormat.formatFetchResponseEmptyTitleOmitted", Sync (sync ShellTestsFormat.formatFetchResponseEmptyTitleOmitted)
     "ShellTests.readDirectoryListing", Async ShellTests.readDirectoryListing
     "ShellTests.ensureJavascriptProjectRepairsModuleType", Async ShellTests.ensureJavascriptProjectRepairsModuleType
     "ShellTests.rewriteJavascriptRelativeImports", Async ShellTests.rewriteJavascriptRelativeImports
     "ShellTests.knowledgeGraphPortRangeSpec", Async ShellTests.knowledgeGraphPortRangeSpec
     "ShellTests.knowledgeGraphPortSerialSpec", Async ShellTests.knowledgeGraphPortSerialSpec
     "DynTests.nullish", Sync (sync DynTests.nullish)
+    "DedupTests.run", Sync (sync DedupTests.run)
     "DelegateTests.run", Sync (sync DelegateTests.run)
     "DelegateToolsCodecTests.run", Sync (sync DelegateToolsCodecTests.run)
+    "PatchParserTests.run", Sync (sync PatchParserTests.run)
     "ResolveAiSettingsTests.run", Sync (sync ResolveAiSettingsTests.run)
     "IntegrationPluginTests.run", Async IntegrationPluginTests.run
     "IntegrationEventTests.run", Async IntegrationEventTests.run
@@ -185,8 +264,14 @@ let coreTestEntries () : (string * TestBody) list =
     "KnowledgeGraphTests.run", Async KnowledgeGraphTests.run
     "KnowledgeGraphFileTests.run", Async KnowledgeGraphFileTests.run
     "KnowledgeGraphKernelTests.run", Async KnowledgeGraphKernelTests.run
+    "KnowledgeGraphHelpersTests.run", Sync (sync KnowledgeGraphHelpersTests.run)
+    "LoopMessagesTests.run", Sync (sync LoopMessagesTests.run)
+    "MessagingTests.run", Sync (sync MessagingTests.run)
     "WorkBacklogTests.run", Sync (sync WorkBacklogTests.run)
     "MethodologyTests.run", Sync (sync MethodologyTests.run)
+    "MethodologyRegistryTests.run", Sync (sync MethodologyRegistryTests.run)
+    "NudgeEventHandlerTests.run", Sync (sync NudgeEventHandlerTests.run)
+    "ToolCatalogRegistryTests.run", Sync (sync ToolCatalogRegistryTests.run)
     "TitleFetchGuardTests.signature", Sync (sync TitleFetchGuardTests.signature)
     "TitleFetchGuardTests.wrap", Sync (sync TitleFetchGuardTests.wrap)
     "TitleFetchGuardTests.detect", Sync (sync TitleFetchGuardTests.detect)
@@ -194,4 +279,16 @@ let coreTestEntries () : (string * TestBody) list =
     "TitleFetchGuardTests.rewriteStringContent", Sync (sync TitleFetchGuardTests.rewriteStringContent)
     "TitleFetchGuardTests.rewriteArrayContent", Sync (sync TitleFetchGuardTests.rewriteArrayContent)
     "TitleFetchGuardTests.skipProbeMessage", Sync (sync TitleFetchGuardTests.skipProbeMessage)
+    "ToolCatalogClassificationTests.run", Sync (sync ToolCatalogClassificationTests.run)
+    "ToolOutputInfoTests.run", Sync (sync ToolOutputInfoTests.run)
+    "MessageTransformPolicyTests.run", Sync (sync MessageTransformPolicyTests.run)
+    "ExecutorKernelTests.run", Sync (sync ExecutorKernelTests.run)
+    "ToolExecuteTests.run", Sync (sync ToolExecuteTests.run)
+    "TreeSitterKernelTests.run", Sync (sync TreeSitterKernelTests.run)
+    "ConfigTests.run", Sync (sync ConfigTests.run)
+    "JsonSchemaBuildersTests.run", Sync (sync JsonSchemaBuildersTests.run)
+    "ExecutorStripTests.run", Sync (sync ExecutorStripTests.run)
+    "WebFetchGuardTests.run", Sync (sync WebFetchGuardTests.run)
     ]
+    @ TestsEntriesFuzzy.fuzzyTestEntries()
+    @ TestsEntriesDomain.domainTestEntries()

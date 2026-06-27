@@ -28,6 +28,7 @@ open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.ReviewReplaySyncTests
 open Wanxiangshu.Tests.CapsSynthCommonTests
 open Wanxiangshu.Tests.CapsFileCacheTests
+open Wanxiangshu.Tests.CapsFormatTests
 open Wanxiangshu.Tests.SubagentPromptBuildTests
 open Wanxiangshu.Tests.SubagentSpawnTests
 open Wanxiangshu.Tests.WebToolsCodecTests
@@ -50,6 +51,7 @@ open Wanxiangshu.Tests.OpencodeSessionSpawnCodecTests
 open Wanxiangshu.Tests.SessionIoPromptBodyTests
 open Wanxiangshu.Tests.OpencodeAgentConfigCodecTests
 open Wanxiangshu.Tests.OpencodeSessionEventCodecTests
+open Wanxiangshu.Tests.OpencodeSessionEventCodecCommonTests
 open Wanxiangshu.Tests.MuxAiSettingsCodecTests
 open Wanxiangshu.Tests.MuxAiSettingsIntegrationTests
 open Wanxiangshu.Tests.AgentConfigApplyTests
@@ -105,6 +107,7 @@ let codecTestEntries () : (string * TestBody) list =
     "SessionIoPromptBodyTests.run", Sync (sync SessionIoPromptBodyTests.run)
     "OpencodeAgentConfigCodecTests.run", Sync (sync OpencodeAgentConfigCodecTests.run)
     "OpencodeSessionEventCodecTests.run", Sync (sync OpencodeSessionEventCodecTests.run)
+    "OpencodeSessionEventCodecCommonTests.run", Sync (sync OpencodeSessionEventCodecCommonTests.run)
     "MuxAiSettingsCodecTests.run", Sync (sync MuxAiSettingsCodecTests.run)
     "MuxAiSettingsIntegrationTests.run", Async MuxAiSettingsIntegrationTests.run
     "AgentConfigApplyTests.run", Sync (sync AgentConfigApplyTests.run)
@@ -114,5 +117,6 @@ let codecTestEntries () : (string * TestBody) list =
     "SessionExecutorScopeTests.run", Async SessionExecutorScopeTests.run
     "CapsSynthCommonTests.run", Sync (sync CapsSynthCommonTests.run)
     "CapsFileCacheTests.run", Async CapsFileCacheTests.run
+    "CapsFormatTests.run", Sync (sync CapsFormatTests.run)
     "ReviewReplaySyncTests.run", Sync (sync ReviewReplaySyncTests.run)
     ]

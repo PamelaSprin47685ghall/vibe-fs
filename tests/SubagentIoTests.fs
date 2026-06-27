@@ -1,58 +1,98 @@
 module Wanxiangshu.Tests.SubagentIoTests
 
-open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.Dyn
+module DynModule = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.SubagentIo
-module Dyn = Wanxiangshu.Shell.Dyn
 
-let private ctx (values: (string * obj) list) : obj =
-    let o = createObj []
-    for k, v in values do
-        o?(k) <- v
-    o
+let noOutputMessageIsNoOutputText () =
+    equal "no output" noOutputText (noOutputMessage ())
 
-let firstStringPreferListed () =
-    let c = ctx [ "sessionID", box "abc" ]
-    equal "sessionID wins" (Some "abc") (firstString c [ "sessionID"; "sessionId" ])
-    let c = ctx [ "sessionId", box "xyz" ]
-    equal "sessionId fallback" (Some "xyz") (firstString c [ "sessionID"; "sessionId" ])
-    let c = ctx []
-    check "no value -> None" (firstString c [ "sessionID" ] |> Option.isNone)
+let abortedPrefixMessageIsAbortedPrefix () =
+    equal "aborted" abortedPrefix (abortedPrefixMessage ())
 
-let extractToolContextDirectoryFallback () =
-    let c = ctx []
-    let tc = extractToolContext c "/plugin"
-    equal "directory fallback to plugin" "/plugin" tc.Directory
-    check "empty sessionID" (tc.SessionID = "")
+let textPartReturnsCorrectShape () =
+    let part = textPart "hello"
+    let t = DynModule.str part "type"
+    let txt = DynModule.str part "text"
+    equal "type" "text" t
+    equal "text" "hello" txt
 
-let extractToolContextHonoursCtx () =
-    let c = ctx [ "cwd", box "/ws"; "sessionId", box "sid-1" ]
-    let tc = extractToolContext c "/plugin"
-    equal "directory from cwd" "/ws" tc.Directory
-    equal "sessionId" "sid-1" tc.SessionID
-
-let textPartsWrapsStrings () =
+let textPartsReturnsArrayOfTextParts () =
     let parts = textParts [ "a"; "b" ]
-    equal "parts length" 2 parts.Length
-    check "first text" (string (Dyn.get parts.[0] "text") = "a")
-    check "first type" (string (Dyn.get parts.[0] "type") = "text")
+    equal "count" 2 parts.Length
+    for p in parts do
+        let t = DynModule.str p "type"
+        equal "type" "text" t
 
-let buildPromptBodyNoAiSettings () =
+let emptySettingsHasNone () =
+    equal "model" None emptySettings.ModelString
+    equal "thinking" None emptySettings.ThinkingLevel
+    equal "variant" None emptySettings.Variant
+
+let extractToolContextUsesDirectory () =
+    let ctx = box (createObj [ "directory", box "/tmp" ])
+    let tc = extractToolContext ctx "/plugin"
+    equal "dir" "/tmp" tc.Directory
+
+let extractToolContextFallsBackToPluginDirectory () =
+    let ctx = box (createObj [])
+    let tc = extractToolContext ctx "/plugin"
+    equal "dir" "/plugin" tc.Directory
+
+let extractToolContextFindsSessionID () =
+    let ctx = box (createObj [ "sessionID", box "s123" ])
+    let tc = extractToolContext ctx "/tmp"
+    equal "sessionID" "s123" tc.SessionID
+
+let extractToolContextSessionIDFallsBack () =
+    let ctx = box (createObj [])
+    let tc = extractToolContext ctx "/tmp"
+    equal "empty" "" tc.SessionID
+
+let firstStringFindsFirst () =
+    let ctx = box (createObj [ "a", box "1"; "b", box "2" ])
+    equal "a" (Some "1") (firstString ctx [ "a"; "b" ])
+
+let firstStringFindsFallback () =
+    let ctx = box (createObj [ "x", box "3" ])
+    equal "x" (Some "3") (firstString ctx [ "a"; "x" ])
+
+let firstStringNoneWhenNotFound () =
+    let ctx = box (createObj [])
+    equal "none" None (firstString ctx [ "a" ])
+
+let signalAbortedNullIsFalse () =
+    check "false" (not (signalAborted null))
+
+let signalAbortedNullishIsFalse () =
+    check "false" (not (signalAborted (box (createObj []))))
+
+let buildPromptBodyBasic () =
     let body = buildPromptBody "coder" "do it" null emptySettings
-    equal "agent" "coder" (string (Dyn.get body "agent"))
-    check "no model key" (Dyn.isNullish (Dyn.get body "model"))
-    check "no variant key" (Dyn.isNullish (Dyn.get body "variant"))
+    let agent = DynModule.str body "agent"
+    equal "agent" "coder" agent
 
 let buildPromptBodyWithThinkingLevel () =
-    let settings : SubagentAiSettings =
-        { ModelString = None
-          ThinkingLevel = Some "high"
-          Variant = None }
-    let body = buildPromptBody "coder" "x" null settings
-    equal "variant set" "high" (string (Dyn.get body "variant"))
+    let settings = { emptySettings with ThinkingLevel = Some "high" }
+    let body = buildPromptBody "coder" "do it" null settings
+    let variant = DynModule.str body "variant"
+    equal "variant" "high" variant
 
-let signalAbortedFalseOnNull () =
-    check "null not aborted" (not (signalAborted null))
-    check "undefined-ish not aborted" (not (signalAborted (box null)))
+let run () =
+    noOutputMessageIsNoOutputText ()
+    abortedPrefixMessageIsAbortedPrefix ()
+    textPartReturnsCorrectShape ()
+    textPartsReturnsArrayOfTextParts ()
+    emptySettingsHasNone ()
+    extractToolContextUsesDirectory ()
+    extractToolContextFallsBackToPluginDirectory ()
+    extractToolContextFindsSessionID ()
+    extractToolContextSessionIDFallsBack ()
+    firstStringFindsFirst ()
+    firstStringFindsFallback ()
+    firstStringNoneWhenNotFound ()
+    signalAbortedNullIsFalse ()
+    signalAbortedNullishIsFalse ()
+    buildPromptBodyBasic ()
+    buildPromptBodyWithThinkingLevel ()

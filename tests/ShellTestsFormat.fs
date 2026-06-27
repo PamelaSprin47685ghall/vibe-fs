@@ -96,3 +96,64 @@ let summarizerPromptOmitsReturnValue () =
         executorSummarizerPrompt "" "line1\nline2" "shell" "echo hi\necho bye" [ "dep1" ] "long" "ro"
     check "summarizer multiline program uses block field" (multiline.Contains "program: |")
     check "summarizer multiline raw_output uses block field" (multiline.Contains "raw_output: |")
+
+// --- formatFetchResponse ---
+
+let formatFetchResponseAllFields () =
+    let data =
+        { title = Some "The Title"
+          byline = Some "By Author"
+          length = Some 500
+          content = Some "body text" }
+    let out = formatFetchResponse data
+    check "front matter contains title" (out.Contains "title: The Title")
+    check "front matter contains byline" (out.Contains "byline: By Author")
+    check "front matter contains length" (out.Contains "length: 500")
+    check "front matter contains content" (out.Contains "body text")
+
+let formatFetchResponseOnlyTitle () =
+    let data =
+        { title = Some "Only Title"
+          byline = None
+          length = None
+          content = None }
+    let out = formatFetchResponse data
+    check "front matter contains title" (out.Contains "title: Only Title")
+    check "front matter omits byline" (not (out.Contains "byline:"))
+    check "front matter omits length" (not (out.Contains "length:"))
+    check "front matter omits content" (not (out.Contains "content:"))
+
+let formatFetchResponseOnlyContent () =
+    let data =
+        { title = None
+          byline = None
+          length = None
+          content = Some "just body" }
+    let out = formatFetchResponse data
+    check "front matter contains content" (out.Contains "just body")
+    check "front matter omits title" (not (out.Contains "title:"))
+    check "front matter omits byline" (not (out.Contains "byline:"))
+    check "front matter omits length" (not (out.Contains "length:"))
+
+let formatFetchResponseAllNone () =
+    let data =
+        { title = None
+          byline = None
+          length = None
+          content = None }
+    let out = formatFetchResponse data
+    check "starts with front matter fence" (out.StartsWith "---")
+    check "front matter has no title" (not (out.Contains "title:"))
+    check "front matter has no byline" (not (out.Contains "byline:"))
+    check "front matter has no length" (not (out.Contains "length:"))
+    check "front matter has no content" (not (out.Contains "content:"))
+
+let formatFetchResponseEmptyTitleOmitted () =
+    let data =
+        { title = Some ""
+          byline = None
+          length = None
+          content = Some "body" }
+    let out = formatFetchResponse data
+    check "empty title omitted" (not (out.Contains "title:"))
+    check "content still present" (out.Contains "body")
