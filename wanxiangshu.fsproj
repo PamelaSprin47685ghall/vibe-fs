@@ -533,6 +533,9 @@
     <Compile Include="tests/FuzzyFormatTests.fs" />
     <Compile Include="tests/ExecutorStripTests.fs" />
     <Compile Include="tests/WebFetchGuardTests.fs" />
+    <Compile Include="tests/ReviewVerdictTests.fs" />
+    <Compile Include="tests/ToolCopyTests.fs" />
+    <Compile Include="tests/JsArrayMutateTests.fs" />
     <Compile Include="tests/ArchitectureTestsSupport.fs" />
     <Compile Include="tests/ArchitectureTestsFoundation.fs" />
     <Compile Include="tests/ArchitectureTestsMessageTransform.fs" />

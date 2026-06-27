@@ -117,6 +117,9 @@ open Wanxiangshu.Tests.ConfigTests
 open Wanxiangshu.Tests.JsonSchemaBuildersTests
 open Wanxiangshu.Tests.ExecutorStripTests
 open Wanxiangshu.Tests.WebFetchGuardTests
+open Wanxiangshu.Tests.ReviewVerdictTests
+open Wanxiangshu.Tests.ToolCopyTests
+open Wanxiangshu.Tests.JsArrayMutateTests
 open Wanxiangshu.Tests.TestsEntriesDomain
 open Wanxiangshu.Tests.TestsEntriesFuzzy
 open Wanxiangshu.Tests.TestsTestBody
@@ -289,6 +292,9 @@ let coreTestEntries () : (string * TestBody) list =
     "JsonSchemaBuildersTests.run", Sync (sync JsonSchemaBuildersTests.run)
     "ExecutorStripTests.run", Sync (sync ExecutorStripTests.run)
     "WebFetchGuardTests.run", Sync (sync WebFetchGuardTests.run)
+    "ReviewVerdictTests.run", Sync (sync ReviewVerdictTests.run)
+    "ToolCopyTests.run", Sync (sync ToolCopyTests.run)
+    "JsArrayMutateTests.run", Sync (sync JsArrayMutateTests.run)
     ]
     @ TestsEntriesFuzzy.fuzzyTestEntries()
     @ TestsEntriesDomain.domainTestEntries()
