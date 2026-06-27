@@ -7,7 +7,7 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
 
 let private dateNow () : float =
-    float (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+    float (getTimestampMs())
 
 let private relTime (updated: float) : string =
     let diff = dateNow () - updated

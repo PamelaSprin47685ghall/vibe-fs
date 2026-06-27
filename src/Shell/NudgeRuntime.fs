@@ -8,125 +8,13 @@ open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 open Wanxiangshu.Kernel.NudgeState
 open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Shell.SerialStateHolder
 
 type NudgeRuntimeEvent =
     | Ignore
     | StreamEnd of workspaceId: string * stopReason: string * lastAssistantMessage: string
     | StreamAbort of workspaceId: string
     | AbortedError of workspaceId: string
-
-type private StateHolder<'state>(initialState: 'state) =
-    let mutable state = initialState
-
-    member _.Mutate<'result>(transition: 'state -> 'state * 'result) : 'result =
-        let nextState, result = transition state
-        state <- nextState
-        result
-
-let private tryGetTodos (helpers: obj) (workspaceId: string) : JS.Promise<string list> =
-    promise {
-        try
-            let getTodosFn = Dyn.get helpers "getTodos"
-            let! result = unbox<JS.Promise<obj>> (Dyn.call1 getTodosFn workspaceId)
-            if Dyn.isArray result then
-                return (result :?> obj array) |> Array.map string |> List.ofArray
-            else
-                return []
-        with ex ->
-            return []
-    }
-
-let private tryGetChatHistory
-    (getChatHistory: (string -> JS.Promise<obj array>) option)
-    (workspaceId: string)
-    : JS.Promise<obj array> =
-    promise {
-        match getChatHistory with
-        | None -> return [||]
-        | Some getHistory ->
-            try
-                return! getHistory workspaceId
-            with ex ->
-                return [||]
-    }
-
-let private getPartsText (parts: obj) : string =
-    if not (Dyn.isArray parts) then ""
-    else
-        (parts :?> obj array)
-        |> Array.choose (fun part ->
-            if Dyn.str part "type" = "text" then
-                let text = Dyn.get part "text"
-                if Dyn.isNullish text then None else Some (string text)
-            else None)
-        |> String.concat "\n"
-
-let private messageHasSubmitReviewWipProgress (message: obj) : bool =
-    let parts = Dyn.get message "parts"
-    if not (Dyn.isArray parts) then false
-    else
-        (parts :?> obj array)
-        |> Array.exists (fun part ->
-            Dyn.str part "type" = "dynamic-tool"
-            && isSubmitReviewToolName (Dyn.str part "toolName")
-            && (let direct = Dyn.get part "output"
-                if not (Dyn.isNullish direct) then string direct
-                else
-                    let state = Dyn.get part "state"
-                    if Dyn.isNullish state || Dyn.typeIs state "string" then ""
-                    else string (Dyn.get state "output"))
-               |> isSubmitReviewWipProgressOutput)
-
-let private messageIsUserNudgePrompt (message: obj) : bool =
-    Dyn.str message "role" = "user" && isNudgePrompt (getPartsText (Dyn.get message "parts"))
-
-let private alreadyNudgedAfterIndex (messages: obj array) (index: int) : bool =
-    messages.[index + 1 ..]
-    |> Array.fold
-        (fun nudged message ->
-            if messageHasSubmitReviewWipProgress message then false
-            elif messageIsUserNudgePrompt message then true
-            else nudged)
-        false
-
-let private decodeLastAssistant (messages: obj array) : string * bool =
-    let lastAssistantIndex =
-        messages
-        |> Array.tryFindIndexBack (fun message ->
-            Dyn.str message "role" = "assistant"
-            && not (isSyntheticAssistantAgent (Dyn.str message "agent")))
-
-    match lastAssistantIndex with
-    | None -> "", false
-    | Some index ->
-        let text = getPartsText (Dyn.get messages.[index] "parts")
-        let alreadyNudged = alreadyNudgedAfterIndex messages index
-        text, alreadyNudged
-
-let private collectSnapshot
-    (getChatHistory: (string -> JS.Promise<obj array>) option)
-    (helpers: obj)
-    (workspaceId: string)
-    (eventLastAssistantMessage: string)
-    : JS.Promise<SessionSnapshot> =
-    promise {
-        let! todos = tryGetTodos helpers workspaceId
-        let! history = tryGetChatHistory getChatHistory workspaceId
-        let historyLastAssistantMessage, historyAlreadyNudged = decodeLastAssistant history
-        let effectiveLastAssistantMessage, alreadyNudged =
-            if historyLastAssistantMessage = "" then
-                eventLastAssistantMessage, false
-            elif eventLastAssistantMessage <> "" && eventLastAssistantMessage <> historyLastAssistantMessage then
-                eventLastAssistantMessage, false
-            else
-                historyLastAssistantMessage, historyAlreadyNudged
-
-        return
-            { todos = todos
-              lastAssistantMessage = effectiveLastAssistantMessage
-              alreadyNudged = alreadyNudged
-              agentFromMessage = None }
-    }
 
 let private runNudgeFlow
     (holder: StateHolder<NudgeShellState>)
@@ -136,43 +24,102 @@ let private runNudgeFlow
     (workspaceId: string)
     (lastAssistantMessage: string)
     : JS.Promise<unit> =
-    promise {
-        try
-            let! snapshot = collectSnapshot getChatHistory helpers workspaceId lastAssistantMessage
-            match holder.Mutate(fun state -> decideNudge reviewStore.isReviewActive (fun _ -> None) state workspaceId snapshot) with
-            | StandDown -> ()
-            | Send(promptText, _) ->
-                let! delivered =
+    let getSnapshot () : JS.Promise<SessionSnapshot option> =
+        promise {
+            let! todos =
+                promise {
+                    try
+                        let getTodosFn = Dyn.get helpers "getTodos"
+                        let! result = unbox<JS.Promise<obj>> (Dyn.call1 getTodosFn workspaceId)
+                        if Dyn.isArray result then
+                            return (result :?> obj array) |> Array.map string |> List.ofArray
+                        else
+                            return []
+                    with _ ->
+                        return []
+                }
+            let! history =
+                match getChatHistory with
+                | None -> return [||]
+                | Some getHistory ->
                     promise {
                         try
-                            let nudgeFn = Dyn.get helpers "nudge"
-                            return! unbox<JS.Promise<bool>> (Dyn.call2 nudgeFn workspaceId promptText)
-                        with ex ->
-                            return false
+                            return! getHistory workspaceId
+                        with _ ->
+                            return [||]
                     }
+            let lastAssistantIndex =
+                history
+                |> Array.tryFindIndexBack (fun message ->
+                    Dyn.str message "role" = "assistant"
+                    && not (isSyntheticAssistantAgent (Dyn.str message "agent")))
+            let historyLastAssistantMessage, historyAlreadyNudged =
+                match lastAssistantIndex with
+                | None -> "", false
+                | Some idx ->
+                    let parts = Dyn.get history.[idx] "parts"
+                    let text =
+                        if not (Dyn.isArray parts) then ""
+                        else
+                            (parts :?> obj array)
+                            |> Array.choose (fun part ->
+                                if Dyn.str part "type" = "text" then
+                                    let t = Dyn.get part "text"
+                                    if Dyn.isNullish t then None else Some (string t)
+                                else None)
+                            |> String.concat "\n"
+                    let already =
+                        history.[idx + 1 ..]
+                        |> Array.fold (fun nudged msg ->
+                            if Dyn.str msg "role" = "user" && isNudgePrompt text then true
+                            else nudged) false
+                    text, already
+            let effectiveMsg, alreadyNudged =
+                if historyLastAssistantMessage = "" then lastAssistantMessage, false
+                elif lastAssistantMessage <> "" && lastAssistantMessage <> historyLastAssistantMessage then lastAssistantMessage, false
+                else historyLastAssistantMessage, historyAlreadyNudged
+            return Some { todos = todos; lastAssistantMessage = effectiveMsg; alreadyNudged = alreadyNudged; agentFromMessage = None }
+        }
+    let attemptSend (promptText: string) (_agentOpt: string option) : JS.Promise<SendOutcome> =
+        promise {
+            try
+                let nudgeFn = Dyn.get helpers "nudge"
+                let! delivered = unbox<JS.Promise<bool>> (Dyn.call2 nudgeFn workspaceId promptText)
+                return if delivered then Delivered else Busy
+            with _ ->
+                return Busy
+        }
+    runNudgeFlowCore holder reviewStore (fun _ -> None) getSnapshot attemptSend workspaceId
 
-                let outcome = if delivered then Delivered else Busy
-                holder.Mutate(fun state ->
-                    match tryRecordSend state workspaceId outcome with
-                    | Some nextState -> nextState, ()
-                    | None -> state, ())
-        with ex ->
+let runNudgeFlowCore
+    (holder: StateHolder<NudgeShellState>)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
+    (lookupChildAgent: string -> string option)
+    (getSnapshot: unit -> JS.Promise<SessionSnapshot option>)
+    (attemptSend: string -> string option -> JS.Promise<SendOutcome>)
+    (workspaceId: string)
+    : JS.Promise<unit> =
+    promise {
+        try
+            let! snapshotOpt = getSnapshot ()
+            match snapshotOpt with
+            | None -> holder.Mutate(fun state -> clearSession state workspaceId, ())
+            | Some snapshot ->
+                match holder.Mutate(fun state -> decideNudge reviewStore.isReviewActive lookupChildAgent state workspaceId snapshot) with
+                | StandDown -> ()
+                | Send(promptText, agentOpt) ->
+                    let! outcome = attemptSend promptText agentOpt
+                    holder.Mutate(fun state ->
+                        match tryRecordSend state workspaceId outcome with
+                        | Some nextState -> nextState, ()
+                        | None -> state, ())
+        with _ ->
             holder.Mutate(fun state -> clearSession state workspaceId, ())
     }
 
-let private startNudgeFlow
-    (holder: StateHolder<NudgeShellState>)
-    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
-    (getChatHistory: (string -> JS.Promise<obj array>) option)
-    (helpers: obj)
-    (workspaceId: string)
-    (lastAssistantMessage: string)
-    : unit =
-    runNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage |> Promise.start
-
 type NudgeRuntime
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore,
-     getChatHistory: (string -> JS.Promise<obj array>) option) =
+      getChatHistory: (string -> JS.Promise<obj array>) option) =
 
     let holder = StateHolder<NudgeShellState>(emptyState)
 
@@ -184,7 +131,7 @@ type NudgeRuntime
                 if Dyn.isNullish helpers || stopReason = "queued-message" then
                     return ()
                 else
-                    startNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage
+                    runNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage |> ignore
                     return ()
             | StreamAbort workspaceId
             | AbortedError workspaceId ->

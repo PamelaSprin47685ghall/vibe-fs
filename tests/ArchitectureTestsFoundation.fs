@@ -11,12 +11,16 @@ open Wanxiangshu.Tests.ArchitectureTestsSupport
 /// Kernel must stay free of host-specific dynamic access (Dyn) and Shell imports.
 /// Fable interop (createObj/box/obj) is permitted for pure value construction
 /// with portable libraries such as the yaml package (no IO, no host objects).
+/// Kernel must not read the wall clock directly; time values are injected from Shell.
 let kernelBoundary () =
     for f in fsFilesRelative "src/Kernel" do
         let path = "src/Kernel/" + f
         let content = requireFile path
         check ("arch: " + f + " Dyn-free") (not (content.Contains "Dyn."))
         check ("arch: " + f + " no open Shell") (not (content.Contains "open Wanxiangshu.Shell"))
+        check ("arch: " + f + " no UtcNow (clock side-effect)") (not (content.Contains "UtcNow"))
+        check ("arch: " + f + " no DateTimeOffset (clock side-effect)") (not (content.Contains "DateTimeOffset"))
+        check ("arch: " + f + " no Date.now (clock side-effect)") (not (content.Contains "Date.now"))
 
 let kernelNoEmptyDefault () =
     for f in fsFilesRelative "src/Kernel" do
@@ -55,6 +59,36 @@ let fileBodyUnder300 () =
             let lineCount = content.Length - content.Replace("\n", "").Length
             check ("arch: " + path + " <=300 lines") (lineCount <= 300)
 
+let noDuplicateStateHolder () =
+    for dir in [| "src/Opencode"; "src/Mux"; "src/Omp" |] do
+        for f in fsFilesRelative dir do
+            let content = requireFile (dir + "/" + f)
+            check ("arch: " + dir + "/" + f + " no type StateHolder def") (not (content.Contains "type StateHolder"))
+
+/// NudgeFlow skeleton (decideNudge + attemptSend + tryRecordSend) must live
+/// only in Shell/NudgeRuntime.fs (runNudgeFlowCore).  Host adapters may define
+/// getSnapshot / attemptSend closures and call Shell.runNudgeFlowCore, but must
+/// not inline the skeleton body (decideNudge + tryRecordSend).
+let noDuplicateNudgeSkeleton () =
+    let skeletonMarkers = [| "decideNudge"; "tryRecordSend" |]
+    for dir in [| "src/Opencode"; "src/Mux"; "src/Omp" |] do
+        for f in fsFilesRelative dir do
+            let content = requireFile (dir + "/" + f)
+            let hasAllMarkers =
+                skeletonMarkers |> Array.forall (fun m -> content.Contains m)
+            check ("arch: " + dir + "/" + f + " no inline NudgeFlow skeleton")
+                (not hasAllMarkers)
+
+/// KG TestHooks type must live only in Shell; host adapters use extension-method wrappers.
+let noDuplicateKgTestHooks () =
+    for dir in [| "src/Opencode"; "src/Mux"; "src/Omp" |] do
+        for f in fsFilesRelative dir do
+            let content = requireFile (dir + "/" + f)
+            check ("arch: " + dir + "/" + f + " no type KnowledgeGraphTestHooks def")
+                (not (content.Contains "type KnowledgeGraphTestHooks"))
+            check ("arch: " + dir + "/" + f + " no type MuxKnowledgeGraphTestHooks def")
+                (not (content.Contains "type MuxKnowledgeGraphTestHooks"))
+
 let returnReviewerCatalogAndHostRegistration () =
     let catalog = requireFile "src/Kernel/ToolCatalog/Review.fs"
     check "arch: ToolCatalog lists return_reviewer spec" (catalog.Contains "return_reviewer")
@@ -78,9 +112,10 @@ let opencodeHookSchemaNoDirectZodImport () =
     check "arch: HookSchema no direct zod import" (not (content.Contains "import \"z\" \"zod\""))
 
 let hookSchemaNoDuplicateMethodologySchema () =
-    let code = requireFile "src/Opencode/HookSchema.fs" |> nonCommentCode
-    check "arch: HookSchema no local selectMethodologyProperty def"
-        (not (code.Contains "let selectMethodologyProperty"))
+    // Core holds the implementation; check Core, not the Facade re-export shim.
+    let coreCode = requireFile "src/Opencode/HookSchemaCore.fs" |> nonCommentCode
+    check "arch: HookSchemaCore no local selectMethodologyProperty def"
+        (not (coreCode.Contains "let selectMethodologyProperty"))
 
 let private legacyInjectedOutputMarkers = [|
     "[executor]"
@@ -100,11 +135,12 @@ let opencodeHookSchemaUsesIntentsRawFromArgs () =
     let codec = requireFile "src/Shell/SubagentIntentsCodec.fs" |> nonCommentCode
     check "arch: SubagentIntentsCodec defines intentsRawFromArgs"
         (codec.Contains "let intentsRawFromArgs")
-    let code = requireFile "src/Opencode/HookSchema.fs" |> nonCommentCode
-    check "arch: HookSchema uses intentsRawFromArgs"
-        (code.Contains "intentsRawFromArgs")
+    // Core holds the implementation; Facade re-exports via open
+    let coreCode = requireFile "src/Opencode/HookSchemaCore.fs" |> nonCommentCode
+    check "arch: HookSchemaCore uses intentsRawFromArgs"
+        (coreCode.Contains "intentsRawFromArgs")
     check "arch: HookSchema must not Dyn.get args intents"
-        (not (code.Contains "Dyn.get args \"intents\""))
+        (not (coreCode.Contains "Dyn.get args \"intents\""))
 
 let private forbiddenMuxOpencodeProjectionPatterns =
     [| System.Text.RegularExpressions.Regex(@"captureReport\s+opencode")

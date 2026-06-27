@@ -8,8 +8,9 @@ open Wanxiangshu.Kernel.Messaging
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ToolContextCodec
 open Wanxiangshu.Shell.OpencodeClientCodec
-open Wanxiangshu.Opencode.MessagingCodec
-open Wanxiangshu.Opencode.SessionIoSubagent
+open Wanxiangshu.Opopen.MessagingCodec
+open Wanxiangshu.Opopen.SubagentSpawn
+open Wanxiangshu.Opopen.SubagentIo
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.FallbackRuntimeState
 
@@ -21,7 +22,7 @@ let extractToolContext (context: obj) (pluginDirectory: string) : obj =
             let s = Id.sessionIdValue execution.SessionId
             if s = "" then box null
             else box s
-        abortSignal = SessionIoSubagent.getAbortSignal context
+        abortSignal = SubagentSpawn.getAbortSignal context
     |}
 
 let invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
@@ -58,16 +59,16 @@ let readSessionTexts (client: obj) (sessionId: string) (directory: string) : JS.
         with _ -> return []
     }
 
-let extractSessionText = SessionIoSubagent.extractSessionText
-let startSubagentSession = SessionIoSubagent.startSubagentSession
+let extractSessionText = SubagentIo.extractSessionText
+let startSubagentSession = SubagentSpawn.startSubagentSession
 
-let promptWithAbort = SessionIoSubagent.promptWithAbort
+let promptWithAbort = SubagentIo.promptWithAbort
 
-let runSubagentCoreResult = SessionIoSubagent.runSubagentCoreResult
+let runSubagentCoreResult = SubagentSpawn.runSubagentCoreResult
 
-let runSubagentWithCleanup = SessionIoSubagent.runSubagentWithCleanup
+let runSubagentWithCleanup = SubagentSpawn.runSubagentWithCleanup
 
 let runSubagent (runtime: FallbackRuntimeState) (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
                 (directory: string) (sessionID: string) (context: obj)
                 (tools: obj) : JS.Promise<Result<string, DomainError>> =
-    SessionIoSubagent.runSubagentCoreResult runtime registry client agent title prompt directory sessionID context tools false
+    SubagentSpawn.runSubagentCoreResult runtime registry client agent title prompt directory sessionID context tools false

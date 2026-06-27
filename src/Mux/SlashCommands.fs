@@ -65,7 +65,7 @@ let createLoopOnlyCommand (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewSt
                     elif reviewStore.isReviewActive (Id.workspaceIdValue wid) then
                         Promise.lift "With-Review Mode is already active. Submit your work via submit_review."
                     else
-                        reviewStore.activateReview(Id.workspaceIdValue wid, task, Domain.nowMs ())
+                         reviewStore.activateReview(Id.workspaceIdValue wid, task, getTimestampMs())
                         Promise.lift (buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ])) |}
 
 let private precheckReview
@@ -86,7 +86,7 @@ let private precheckReview
 let private activateReview
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (workspaceIdStr: string) (task: string)
     (isPass: bool) (feedback: string) : string =
-    reviewStore.activateReview(workspaceIdStr, task, Domain.nowMs ())
+    reviewStore.activateReview(workspaceIdStr, task, getTimestampMs())
     if isPass then
         buildLoopMessage task [ "With-Review Mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
     else

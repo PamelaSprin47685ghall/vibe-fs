@@ -8,6 +8,7 @@ open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.ReviewLoop
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.Clock
 
 let loopCommand = "loop"
 
@@ -29,7 +30,7 @@ let handleLoopReviewCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: 
                 | Accepted _ -> notifyInfo $"Pre-review passed. Task \"{task}\" already meets criteria — no loop needed."
                 | Terminated -> notifyInfo "Pre-review could not complete."
                 | Rejected feedback ->
-                    store.activateReview(sessionId, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                    store.activateReview(sessionId, task, getTimestampMs())
                     pi?sendMessage(
                         createObj [
                             "customType", box "wanxiangshu-loop-precheck"
@@ -60,7 +61,7 @@ let handleLoopCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: obj) :
                 notifyInfo "loop mode cancelled."
             elif store.isReviewActive sessionId then notifyInfo "loop mode is already active."
             else
-                store.activateReview(sessionId, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                store.activateReview(sessionId, task, getTimestampMs())
                 pi?sendMessage(
                     createObj [
                         "customType", box "wanxiangshu-loop-activate"

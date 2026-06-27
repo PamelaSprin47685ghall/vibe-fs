@@ -8,7 +8,8 @@ open Wanxiangshu.Opencode.ToolSchema
 open Wanxiangshu.Opencode.KnowledgeGraphTools
 open Wanxiangshu.Opencode.SubagentTools
 open Wanxiangshu.Opencode.ExecutorTool
-open Wanxiangshu.Opencode.PtyTools
+open Wanxiangshu.Opencode.PtySpawn
+open Wanxiangshu.Opencode.PtyIo
 open Wanxiangshu.Opencode.SearchTools
 open Wanxiangshu.Opencode.ReviewTools
 open Wanxiangshu.Opencode.MimoTodoTool

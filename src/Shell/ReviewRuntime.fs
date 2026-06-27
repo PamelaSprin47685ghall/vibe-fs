@@ -75,7 +75,7 @@ let syncReviewProjection (store: ReviewStore) (sessionID: string) (task: string 
             if store.getReviewTask sessionID <> Some nextTask || not (store.isReviewActive sessionID) then
                 if store.getReviewState sessionID |> Option.isSome then
                     store.deactivateReview sessionID
-                store.activateReview(sessionID, nextTask, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                store.activateReview(sessionID, nextTask, getTimestampMs())
         | None ->
             if store.getReviewState sessionID |> Option.isSome then
                 store.deactivateReview sessionID

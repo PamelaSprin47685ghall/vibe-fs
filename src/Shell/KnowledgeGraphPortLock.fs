@@ -37,7 +37,7 @@ let rec private acquireLoopUntil (port: int) (deadlineMs: int64) (retryDelayMs: 
             let! server = listenServer port
             return Ok server
         with _ ->
-            if instantFail || System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() >= deadlineMs then
+            if instantFail || getTimestampMs() >= deadlineMs then
                 return Error $"Timed out acquiring knowledge graph port lock on 127.0.0.1:{port}"
             else
                 if retryDelayMs > 0 then do! Promise.sleep retryDelayMs
@@ -48,7 +48,7 @@ let withKnowledgeGraphPortLock (timeoutMs: int64) (retryDelayMs: int) (workspace
     promise {
         let port = lockPortForPath workspaceRoot
         let instantFail = timeoutMs <= 0L
-        let deadlineMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + max timeoutMs 0L
+        let deadlineMs = getTimestampMs() + max timeoutMs 0L
         let! acquired = acquireLoopUntil port deadlineMs retryDelayMs instantFail
         match acquired with
         | Error e -> return Error e

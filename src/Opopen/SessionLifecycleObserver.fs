@@ -1,4 +1,4 @@
-module Wanxiangshu.Opencode.SessionLifecycleObserver
+module Wanxiangshu.Opopen.SessionLifecycleObserver
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -15,15 +15,15 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.OpencodeClientCodec
-open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Shell.OpopenClientCodec
+open Wanxiangshu.Shell.OpopenSessionEventCodec
 open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.OpencodeHookInputCodec
+open Wanxiangshu.Shell.OpopenHookInputCodec
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.SerialStateHolder
-open Wanxiangshu.Opencode.NudgeEffect
-open Wanxiangshu.Opencode.BacklogSession
+open Wanxiangshu.Opopen.NudgeEffect
+open Wanxiangshu.Opopen.BacklogSession
 
 type SessionLifecycleObserver
     ( host              : Host

@@ -15,7 +15,7 @@ open Wanxiangshu.Opencode.ToolDefinitionHooks
 open Wanxiangshu.Opencode.EventHooks
 open Wanxiangshu.Opencode.Tools
 open Wanxiangshu.Opencode.HookExecute
-open Wanxiangshu.Opencode.PtyTools
+open Wanxiangshu.Opencode.PtySpawn
 open Wanxiangshu.Shell.TitleFetchGuardCommon
 open Wanxiangshu.Opencode.SessionLifecycleObserver
 open Wanxiangshu.Opencode.KnowledgeGraphRuntime

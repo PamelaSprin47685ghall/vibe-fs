@@ -97,8 +97,6 @@ let classifyErrorLeaf (name: string) (tag: string) (message: string) : DomainErr
     | _ ->
         if containsAbortText message then MessageAborted else UnknownJsError(message)
 
-let nowMs () : int64 = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-
 type ChildSessionMeta =
     { agent: string
       parentSessionId: SessionId option }

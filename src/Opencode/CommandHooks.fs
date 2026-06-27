@@ -43,7 +43,7 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
             elif reviewStore.isReviewActive sessionID then
                 parts.Add(box {| ``type`` = "text"; text = reviewAlreadyActiveMessage |})
             elif command = "loop" then
-                reviewStore.activateReview(sessionID, task, Domain.nowMs ())
+                    reviewStore.activateReview(sessionID, task, getTimestampMs())
                 let msg = buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
                 parts.Add(box {| ``type`` = "text"; text = msg |})
             else
@@ -58,7 +58,7 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
                 | Terminated ->
                     parts.Add(box {| ``type`` = "text"; text = preReviewCouldNotComplete |})
                 | Rejected feedback ->
-                    reviewStore.activateReview(sessionID, task, Domain.nowMs ())
+                    reviewStore.activateReview(sessionID, task, getTimestampMs())
                     let msg = buildLoopMessage task [ withReviewPreReviewFeedbackHeader; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]
                     parts.Add(box {| ``type`` = "text"; text = msg |})
             setHookParts output (box parts)
