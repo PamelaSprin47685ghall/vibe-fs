@@ -52,7 +52,7 @@ let canUseSemanticReturnRoleDenied () =
 let canUseSemanticBookkeeper () =
     check "bookkeeper denied all" (not (canUseSemantic "bookkeeper" Read "read"))
 let canUseSemanticMeditator () =
-    check "meditator denied all" (not (canUseSemantic "meditator" Read "read"))
+    check "meditator can read" (canUseSemantic "meditator" Read "read")
 let canUseSemanticExecutor () =
     check "executor denied all" (not (canUseSemantic "executor" Read "read"))
 let canUseSemanticReadReviewer () =
@@ -106,7 +106,7 @@ let canUseSemanticFuzzyGrepCoder () =
 let canUseSemanticBookkeeperAll () =
     check "bookkeeper denied all" (not (canUseSemantic "bookkeeper" Read "read"))
 let canUseSemanticMeditatorAll () =
-    check "meditator denied all" (not (canUseSemantic "meditator" Read "read"))
+    check "meditator can read" (canUseSemantic "meditator" Read "read")
 let canUseSemanticExecutorAll () =
     check "executor denied all" (not (canUseSemantic "executor" Read "read"))
 

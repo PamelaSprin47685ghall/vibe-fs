@@ -736,3 +736,9 @@
 {"id":"ffe7","entity":["文件体量铁律"],"fact":"CapsPrelude 文档修正：文件体量铁律示例文本由「把303删到299是自欺欺人的垃圾做品」改为「把303删到299是自欺欺人的垃圾做派」，'做品'修正为'做派'，文档措辞与铁律语义精确对齐。"}
 {"id":"3756","entity":["文件体量铁律","设计溃烂","重构触发器"],"fact":"文件体量铁律文档修正：CapsPrelude 示例文本将'把303删到299是自欺欺人的垃圾做派'改为'行数门禁是重构触发器不是橡皮筋：删空行删注释把超标压到阈值下方等于对设计溃烂视而不见反把体检报告改成及格，门禁逼你拆文件你选择压行数，设计烂依旧可读性还赔进去了，比超限更可耻'，强调门禁是触发结构性重构的信号而非可通过删空行凑数逃避的阈值。"}
 {"id":"fb41","entity":["文件体量铁律"],"fact":"文档措辞修订：将'把303删到299是自欺欺人的垃圾做派'扩展为'膨胀本身就是设计溃烂的症状。行数门禁是重构触发器不是橡皮筋：删空行删注释把超标压到阈值下方等于对设计溃烂视而不见反把体检报告改成及格，门禁逼你拆文件你选择压行数，设计烂依旧可读性还赔进去了，比超限更可耻'，强化门禁作为设计溃烂检测器而非行数橡皮筋的语义，明确删行凑数比超限更可耻。"}
+{"id":"a18c","entity":["权限矩阵","工具过滤","语义分类"],"fact":"meditator在canUseSemantic匹配中被| \"meditator\", _ -> false全局拦截，四宿主（Opencode/Mimocode/Mux/Omp）read权限均被deny，阻断发生在| _, Read -> true分支之前；修复需将Read分支上移至meditator拦截前，使meditator对Read语义放行而其余语义仍拦截，修改点唯一：src/Kernel/ToolPermission.fs第70-74行match分支顺序"}
+{"id":"e668","entity":["测试覆盖补全","权限矩阵"],"fact":"meditator read权限解封后测试断言须同步更新：tests/ToolPermissionTests.fs第55/109行断言由denied改为allowed；tests/AgentTests.fs第17行断言及第108行矩阵meditator列read项由false改为true"}
+{"id":"728f","entity":["权限矩阵","测试覆盖补全"],"fact":"权限矩阵测试断言解封：meditator read权限由denied改为allowed，与canUseSemantic运行时解封精确对齐"}
+{"id":"c622","entity":["权限矩阵","测试断言"],"fact":"AgentTests.fs 权限断言更新：meditator read 权限由 denied 改为 can read，与 canUseSemantic Read 通用放行门控精确对齐，消除测试断言与运行时权限矩阵分歧。"}
+{"id":"2992","entity":["权限矩阵","测试断言","代理角色"],"fact":"ToolPermissionTests.fs meditator read权限断言由denied改为allowed：canUseSemantic \"meditator\" Read \"read\" 测试由否定断言修正为肯定断言，与运行时权限矩阵解封后行为精确对齐"}
+{"id":"375b","entity":["权限矩阵","工具过滤"],"fact":"权限矩阵细化：meditator代理Read语义在canUseSemantic匹配中由全局拦截改为显式放行（Read → true），其余语义保持拒绝；与bookkeeper/mediator/executor三类代理Read全拒绝边界对齐，消除身份隐性排斥。"}

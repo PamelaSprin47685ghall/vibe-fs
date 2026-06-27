@@ -14,7 +14,7 @@ let canUse' () =
     check "submit_review denied for coder" (not (canUse "coder" "submit_review"))
     check "submit_review denied for investigator" (not (canUse "investigator" "submit_review"))
 
-    check "meditator denied read" (not (canUse "meditator" "read"))
+    check "meditator can read" (canUse "meditator" "read")
     check "executor denied read" (not (canUse "executor" "read"))
     check "meditator agent_report ok" (canUse "meditator" "agent_report")
 
@@ -105,7 +105,7 @@ let canUseMatrix () =
         "fuzzy_grep",                    [ false; true;  true;  false; false; false; false; false ]
         "fuzzy_find",                    [ true;  true;  true;  false; false; false; false; false ]
         "glob",                          [ true;  true;  true;  false; false; false; false; false ]
-        "read",                          [ true;  true;  true;  true;  true;  false; false; false ]
+        "read",                          [ true;  true;  true;  true;  true;  true;  false; false ]
         "write",                         [ false; false; true;  false; false; false; false; false ]
         "edit",                          [ false; false; true;  false; false; false; false; false ]
         "patch",                         [ false; false; true;  false; false; false; false; false ]
