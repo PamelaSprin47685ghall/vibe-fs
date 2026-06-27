@@ -9,6 +9,7 @@ open Wanxiangshu.Shell.FuzzySearchHelpers
 open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Kernel.FuzzyPath
+module Livelock = Wanxiangshu.Shell.LivelockGuard
 module Dyn = Wanxiangshu.Shell.Dyn
 
 // ── FuzzyFinderShell.resultFromRaw ──────────────────────────────────────────
@@ -42,12 +43,12 @@ let resultFromRawErrMissing () =
 
 let finderCacheDestroyMissing () =
     let cache = FinderCache()
-    cache.Destroy "/no/such/path"  // must not throw
+    cache.Destroy "/no/such/path"
     check "destroy missing path no throw" true
 
 let finderCacheDestroyAll () =
     let cache = FinderCache()
-    cache.DestroyAll()  // must not throw
+    cache.DestroyAll()
     check "destroyAll no throw" true
 
 // ── resolveGrepIteratorState ─────────────────────────────────────────────────
@@ -153,6 +154,25 @@ let resolveStoreNone () =
     let opts : SearchOptions = { cwd = "/"; scopeId = "g"; store = None; finderCache = FinderCache() }
     match resolveStore opts with Error _ -> check "resolveStore None → Error" true | Ok _ -> check "resolveStore None → Error" false
 
+// ── LivelockGuard ─────────────────────────────────────────────────────────────
+
+let livelockGuardFirstCall () =
+    check "first call not blocked" (not (Livelock.check "s1" "c" "a" "o"))
+
+let livelockGuardSameIncrement () =
+    check "same tool" (not (Livelock.check "s9" "c" "a" "o"))
+    check "repeat counts" (not (Livelock.check "s9" "c" "a" "o"))
+
+let livelockGuardBreach () =
+    check "1st" (not (Livelock.check "s2" "c" "a" "o"))
+    check "2nd" (not (Livelock.check "s2" "c" "a" "o"))
+    check "3rd breach" (Livelock.check "s2" "c" "a" "o")
+
+let livelockGuardDifferentResets () =
+    check "s3 baseline" (not (Livelock.check "s3" "c" "a" "o"))
+    check "s3 repeat" (not (Livelock.check "s3" "c" "a" "o"))
+    check "s3 different output breaks" (not (Livelock.check "s3" "c" "a" "x"))
+
 let run () =
     resultFromRawOk ()
     resultFromRawErrMsg ()
@@ -177,3 +197,7 @@ let run () =
     errorMsgNoError ()
     resolveStoreSome ()
     resolveStoreNone ()
+    livelockGuardFirstCall ()
+    livelockGuardSameIncrement ()
+    livelockGuardBreach ()
+    livelockGuardDifferentResets ()

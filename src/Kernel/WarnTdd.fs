@@ -18,3 +18,18 @@ let modificationTools: Set<string> =
 
 let isModificationTool (tool: string) : bool =
     Set.contains (tool.ToLowerInvariant()) modificationTools
+
+// ── warn hook (acknowledgement for tools with side effects beyond code modification) ──
+
+let warnCanonicalValue = "it-is-not-possible-to-do-it-using-other-tools"
+
+let parseWarn (s: string) : bool =
+    s = warnCanonicalValue
+
+let warnRequiredTools: Set<string> =
+    Set.ofList [ "executor"; "pty_spawn"; "pty_write"; "pty_read"; "pty_list"; "pty_kill" ]
+
+let isWarnRequiredTool (tool: string) : bool =
+    Set.contains (tool.ToLowerInvariant()) warnRequiredTools
+
+let warnDescription = "Warning acknowledgement: '" + warnCanonicalValue + "' — acknowledge that this task cannot be done with other tools."

@@ -38,7 +38,6 @@ let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (session
             dependencies = strArrayOpt Params.executorDeps
             timeout_type = enumReq [| "short"; "long"; "last-resort" |] Params.executorTimeout
             mode = enumReq [| "ro"; "rw" |] Params.executorMode
-            warn = enumReq [| "it-is-not-possible-to-do-it-using-other-tools" |] Params.executorWarn
             warn_tdd = enumReq [| WarnTdd.canonicalValue |] Params.warnTddDesc
         |})
         (fun args context ->

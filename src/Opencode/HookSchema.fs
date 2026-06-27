@@ -104,6 +104,13 @@ let inlineJsonWarnTddProperty : obj =
         "description", box Params.warnTddDesc
     ]
 
+let private inlineJsonWarnProperty : obj =
+    createObj [
+        "type", box "string"
+        "enum", [| WarnTdd.warnCanonicalValue |] |> box
+        "description", box WarnTdd.warnDescription
+    ]
+
 let private appendRequiredWarnTddInPlace (schema: obj) : unit =
     let existingRequired = get schema "required"
     if isArray existingRequired then
@@ -132,6 +139,36 @@ let injectWarnTddIntoJsonSchema (schema: obj) : obj =
             injectWarnTddIntoJsonSchemaInPlace schema
         else
             injectWarnTddIntoArgsShapeInPlace schema
+        schema
+
+let private appendRequiredWarnInPlace (schema: obj) : unit =
+    let existingRequired = get schema "required"
+    if isArray existingRequired then
+        let arr = unbox<obj[]> existingRequired
+        if not (arr |> Array.exists (fun x -> string x = "warn")) then
+            existingRequired?("push")(box "warn") |> ignore
+    else
+        schema?("required") <- box [| box "warn" |]
+
+let private injectWarnIntoJsonSchemaInPlace (schema: obj) : unit =
+    let props = get schema "properties"
+    if not (isNullish props) && isNullish (get props "warn") then
+        props?("warn") <- inlineJsonWarnProperty
+        appendRequiredWarnInPlace schema
+
+let private injectWarnIntoArgsShapeInPlace (shape: obj) : unit =
+    if isNullish (get shape "warn") then
+        shape?("warn") <- enumReq [| WarnTdd.warnCanonicalValue |] WarnTdd.warnDescription
+
+/// Inject warn into an Opencode tool schema in place.
+let injectWarnIntoJsonSchema (schema: obj) : obj =
+    if isNullish schema then schema
+    else
+        let props = get schema "properties"
+        if not (isNullish props) then
+            injectWarnIntoJsonSchemaInPlace schema
+        else
+            injectWarnIntoArgsShapeInPlace schema
         schema
 
 let private stringZodProperty (description: string) : obj =

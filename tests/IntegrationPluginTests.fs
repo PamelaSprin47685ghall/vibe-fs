@@ -83,8 +83,8 @@ let systemTransformSpec (p: obj) = promise {
     let systemArray = [| "baseline system prompt"; "extra prompt" |]
     let output = createObj [ "system", box systemArray ]
     do! tf $ (createObj [], output) |> unbox<JS.Promise<unit>>
-    let transformedSystem = unbox<obj[]> (get output "system")
-    check "system transform empties system prompt array" (transformedSystem.Length = 0)
+    let system = string (get output "system")
+    check "system transform sets directory" (system <> "" && not (system.Contains "baseline"))
 }
 
 let run () : JS.Promise<unit> =

@@ -23,8 +23,8 @@ let compactingHandlerFor (host: Host) (backlogSession: Wanxiangshu.Opencode.Back
 let compactingHandler (backlogSession: Wanxiangshu.Opencode.BacklogSession.BacklogSession) (input: obj) (output: obj) : JS.Promise<unit> =
     MessageTransform.compactingHandler backlogSession input output
 
-let systemTransform (input: obj) (output: obj) : JS.Promise<unit> =
-    MessageTransform.systemTransform input output
+let systemTransform (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
+    MessageTransform.systemTransform directory input output
 
 let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     ToolDefinitionHooks.toolDefinitionFor host input output

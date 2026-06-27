@@ -101,6 +101,10 @@ let handleEvent
                     let! msgs = executor.FetchMessages sessionID
                     if allTodosCompleted msgs then
                         runtime.UpdateState sessionID { ns with TaskComplete = true }
+                    elif hasNetworkErrorText msgs then
+                        match List.tryItem ns.CurrentIndex chain with
+                        | Some model -> do! executor.SendContinue (sessionID, model)
+                        | None -> ()
                     elif hasToolCallAsText msgs then
                         match List.tryItem ns.CurrentIndex chain with
                         | Some model -> do! executor.SendContinue (sessionID, model)

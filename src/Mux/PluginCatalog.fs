@@ -25,6 +25,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MuxHookInputCodec
 open Wanxiangshu.Kernel.KnowledgeGraph.BookkeeperPolicy
 open Wanxiangshu.Shell.ChatTransformOutputCodec
+open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.ToolExecute
 
 let muxToolNames =
@@ -91,11 +92,15 @@ let toolExecuteAfter
     : JS.Promise<unit> =
     promise {
         let decoded = decodeMuxToolExecuteAfterInput input deps
-        let succeeded = hookOutputErrorMux output = ""
         let originalOutput = hookOutputTextMux output
-        if succeeded
-           && Wanxiangshu.Kernel.KnowledgeGraph.BookkeeperPolicy.recordsToBookkeeper decoded.Tool
-           && not (isReadOnlyExecutorMux decoded.Tool decoded.Args) && not (isChildWorkspace deps decoded.SessionID) then
+        if Wanxiangshu.Shell.FallbackMessageCodec.isNetworkErrorText originalOutput then
+            setHookErrorMux output "network connection lost"
+        let succeeded = hookOutputErrorMux output = ""
+        if check decoded.SessionID decoded.Tool (JS.JSON.stringify decoded.Args) originalOutput then
+            setHookErrorMux output "livelock guard: repeated identical tool call with identical result"
+        elif succeeded
+            && Wanxiangshu.Kernel.KnowledgeGraph.BookkeeperPolicy.recordsToBookkeeper decoded.Tool
+            && not (isReadOnlyExecutorMux decoded.Tool decoded.Args) && not (isChildWorkspace deps decoded.SessionID) then
             knowledgeGraphRuntime.StartBookkeeperAppend(
                 bookkeeperInput decoded.Args,
                 Wanxiangshu.Kernel.ToolOutputInfo.bodyForBookkeeper originalOutput,
@@ -116,12 +121,22 @@ let private requireWarnTddMux (tool: string) (args: obj) (output: obj) : unit =
         | Some _ -> Dyn.deleteKey args "warn_tdd"
         | None -> setHookErrorMux output (wireDomainFailure tool (InvalidIntent(tool, "warn_tdd", "required — acknowledge TDD + Kolmolgorov discipline")))
 
+let private requireWarnMux (tool: string) (args: obj) (output: obj) : unit =
+    if not (Wanxiangshu.Kernel.WarnTdd.isWarnRequiredTool tool) then ()
+    else
+        let raw = Dyn.str args "warn"
+        if Wanxiangshu.Kernel.WarnTdd.parseWarn raw then
+            Dyn.deleteKey args "warn"
+        else
+            setHookErrorMux output (wireDomainFailure tool (InvalidIntent(tool, "warn", "required — acknowledge this task cannot be done with other tools")))
+
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let tool = toolNameFromHookInputMux input
         let args = Dyn.get input "args"
         if not (Dyn.isNullish args) then
             requireWarnTddMux tool args output
+            requireWarnMux tool args output
             let raw = Dyn.get args "intents"
             let labelResult =
                 match tool with
@@ -133,5 +148,5 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
             | _ -> ()
     }
 
-let systemTransform (_input: obj) (output: obj) : JS.Promise<unit> =
-    promise { clearSystemOutputLength output }
+let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
+    promise { setSystemOutputToDirectory directory output }

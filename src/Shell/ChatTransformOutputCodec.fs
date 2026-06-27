@@ -14,3 +14,6 @@ let clearSystemOutputLength (output: obj) : unit =
     let systemObj = Dyn.get output "system"
     if not (Dyn.isNullish systemObj) then
         systemObj?length <- 0
+
+let setSystemOutputToDirectory (directory: string) (output: obj) : unit =
+    if directory <> "" then output?system <- directory

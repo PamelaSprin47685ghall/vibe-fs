@@ -20,7 +20,7 @@ let internal executorSpec: ToolSpec =
               "Warning acknowledgement: 'it-is-not-possible-to-do-it-using-other-tools' — acknowledge that this task cannot be done with other tools."
               "warn_tdd",
               "TDD discipline acknowledgement: '" + Wanxiangshu.Kernel.WarnTdd.canonicalValue + "' — I confirm I have followed TDD and Kolmolgorov principles, never skipping red phase." ]
-      requiredFields = [ "language"; "program"; "timeout_type"; "mode"; "warn"; "warn_tdd" ] }
+      requiredFields = [ "language"; "program"; "timeout_type"; "mode"; "warn_tdd" ] }
 
 let internal executorWaitSpec: ToolSpec =
     { name = "executor_wait"

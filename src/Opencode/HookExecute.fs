@@ -19,6 +19,7 @@ open Wanxiangshu.Shell.TreeSitterShell
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.PatchToolsCodec
 open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Shell.Dyn
@@ -38,6 +39,15 @@ let private requireWarnTdd (tool: string) (args: obj) (output: obj) : unit =
         | Some _ -> Dyn.deleteKey args "warn_tdd"
         | None -> setHookError output (wireDomainFailure tool (Domain.InvalidIntent(tool, "warn_tdd", "required — acknowledge TDD + Kolmolgorov discipline")))
 
+let private requireWarn (tool: string) (args: obj) (output: obj) : unit =
+    if not (WarnTdd.isWarnRequiredTool tool) then ()
+    else
+        let raw = Dyn.str args "warn"
+        if WarnTdd.parseWarn raw then
+            Dyn.deleteKey args "warn"
+        else
+            setHookError output (wireDomainFailure tool (Domain.InvalidIntent(tool, "warn", "required — acknowledge this task cannot be done with other tools")))
+
 let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let args = argsFromHookOutput output
@@ -45,6 +55,7 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
         else
             let tool = toolNameFromHookInput input
             requireWarnTdd tool args output
+            requireWarn tool args output
             setUiLabel args tool
             if host = Mimocode then
                 rewriteMimocodeApplyPatchArgsForExecute output input args
@@ -87,9 +98,13 @@ let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserve
         do! appendSyntaxDiagnostics pluginDirectory input output
         let tool = toolNameFromHookInput input
         let sessionID = Wanxiangshu.Kernel.Domain.Id.sessionIdValue (fromOpencode input pluginDirectory).Execution.SessionId
-        let succeeded = hookOutputError output = ""
         let originalOutput = hookOutputText output
-        if succeeded && recordsToBookkeeper tool && not (isReadOnlyExecutor tool input) && (registry.LookupChildAgent sessionID).IsNone then
+        if Wanxiangshu.Shell.FallbackMessageCodec.isNetworkErrorText originalOutput then
+            setHookError output "network connection lost"
+        let succeeded = hookOutputError output = ""
+        if check sessionID tool (JS.JSON.stringify (argsFromHookInput input)) originalOutput then
+            setHookError output "livelock guard: repeated identical tool call with identical result"
+        elif succeeded && recordsToBookkeeper tool && not (isReadOnlyExecutor tool input) && (registry.LookupChildAgent sessionID).IsNone then
             knowledgeGraphRuntime.StartBookkeeperAppend(bookkeeperInput input, bodyForBookkeeper originalOutput, tool, parentSessionID = sessionID)
             setHookOutputString output (withBookkeepingHints originalOutput)
         do! lifecycleObserver.handleToolExecuteAfter input output

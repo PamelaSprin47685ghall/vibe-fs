@@ -11,6 +11,7 @@ open Wanxiangshu.Mux.BacklogSession
 open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.FuzzyFinderShell
+open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Mux.WrappersReview
 
 let private createScope (deps: obj) =
@@ -34,7 +35,8 @@ let private registerTestHooks
     setKey registration "tool.execute.before" (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
         toolExecuteBefore input output)))
     setKey registration "systemTransform" (box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
-        systemTransform input output)))
+        let directory = if Dyn.isNullish deps then "" else Dyn.str deps "directory"
+        systemTransform directory input output)))
 
 let createRegistration (deps: obj) : obj =
     let (scope, backlogSession, reviewStore, hostReadExec, _, knowledgeGraphRuntime, tools, toolsObj) =

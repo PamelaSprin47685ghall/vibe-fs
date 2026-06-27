@@ -106,5 +106,5 @@ let compactingHandlerFor (_host: Host) (backlogSession: BacklogSession) (input: 
 let compactingHandler (backlogSession: BacklogSession) (input: obj) (output: obj) : JS.Promise<unit> =
     compactingHandlerFor opencode backlogSession input output
 
-let systemTransform (_input: obj) (output: obj) : JS.Promise<unit> =
-    promise { clearSystemOutputLength output }
+let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
+    promise { setSystemOutputToDirectory directory output }

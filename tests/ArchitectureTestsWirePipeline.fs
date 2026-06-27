@@ -31,8 +31,8 @@ let messageTransformUsesChatTransformOutputCodec () =
         check ("arch: " + path + " must not Dyn.get output messages")
             (not (code.Contains "Dyn.get output \"messages\""))
     let opencode = requireFile "src/Opencode/MessageTransform.fs" |> nonCommentCode
-    check "arch: Opencode MessageTransform uses clearSystemOutputLength"
-        (opencode.Contains "clearSystemOutputLength")
+    check "arch: Opencode MessageTransform uses setSystemOutputToDirectory"
+        (opencode.Contains "setSystemOutputToDirectory")
 
 let messageTransformUsesMessageTransformCore () =
     for path in [| "src/Opencode/MessageTransform.fs"; "src/Mux/MessageTransform.fs" |] do

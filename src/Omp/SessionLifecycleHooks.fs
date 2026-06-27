@@ -21,6 +21,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FuzzyIteratorStore
@@ -109,33 +110,38 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (kgRuntime: OmpKnow
     promise {
         let toolName = Dyn.str event "toolName"
         let args = getToolInput event
-        applyToolResultHook toolName args
-        do! appendToolResultSyntax (Dyn.str ctx "cwd") event
-        if toolName = todoWriteToolName omp then
-            let callId = getToolCallId event
-            let input = getToolInput event
-            let raw = if Dyn.isNullish input then "" else string (Dyn.get input "completedWorkReport")
-            let report = raw.Trim()
-            if report <> "" && callId <> "" then
-                backlogSession.CaptureReport(callId, report)
-            let methodologies =
-                let raw = if Dyn.isNullish args then null else Dyn.get args "select_methodology"
-                if Dyn.isNullish raw || not (Dyn.isArray raw) then []
-                else
-                    let rawArr = unbox<obj array> raw
-                    rawArr |> Seq.map string |> List.ofSeq
-            let content = getToolResultText event
-            if content <> "" then
-                setToolResultText event (todoWriteOutput methodologies true)
-        elif recordsToBookkeeper toolName && not (isReadOnlyExecutor toolName args) then
-            let parentId = getSessionIdFromContext ctx |> Option.defaultValue ""
-            if not (isChildSession parentId) then
-                let cwd = Dyn.str ctx "cwd"
+        let content = getToolResultText event
+        let sessionId = getSessionIdFromContext ctx |> Option.defaultValue ""
+        if sessionId <> "" && check sessionId toolName (JS.JSON.stringify args) content then
+            setToolResultText event "livelock guard: repeated identical tool call with identical result"
+        else
+            applyToolResultHook toolName args
+            do! appendToolResultSyntax (Dyn.str ctx "cwd") event
+            if toolName = todoWriteToolName omp then
+                let callId = getToolCallId event
+                let input = getToolInput event
+                let raw = if Dyn.isNullish input then "" else string (Dyn.get input "completedWorkReport")
+                let report = raw.Trim()
+                if report <> "" && callId <> "" then
+                    backlogSession.CaptureReport(callId, report)
+                let methodologies =
+                    let raw = if Dyn.isNullish args then null else Dyn.get args "select_methodology"
+                    if Dyn.isNullish raw || not (Dyn.isArray raw) then []
+                    else
+                        let rawArr = unbox<obj array> raw
+                        rawArr |> Seq.map string |> List.ofSeq
                 let content = getToolResultText event
-                if cwd <> "" && content <> "" then
-                    let input = if Dyn.isNullish args then "" else Fable.Core.JS.JSON.stringify args
-                    kgRuntime.StartBookkeeperAppend(input, bodyForBookkeeper content, toolName, cwd)
-                    setToolResultText event (withBookkeepingHints content)
+                if content <> "" then
+                    setToolResultText event (todoWriteOutput methodologies true)
+            elif recordsToBookkeeper toolName && not (isReadOnlyExecutor toolName args) then
+                let parentId = getSessionIdFromContext ctx |> Option.defaultValue ""
+                if not (isChildSession parentId) then
+                    let cwd = Dyn.str ctx "cwd"
+                    let content = getToolResultText event
+                    if cwd <> "" && content <> "" then
+                        let input = if Dyn.isNullish args then "" else Fable.Core.JS.JSON.stringify args
+                        kgRuntime.StartBookkeeperAppend(input, bodyForBookkeeper content, toolName, cwd)
+                        setToolResultText event (withBookkeepingHints content)
     }
 
 let agentEndHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : unit =

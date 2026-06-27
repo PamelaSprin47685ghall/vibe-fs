@@ -125,7 +125,7 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
             do! services.SessionLifecycleObserver.handleEvent input
         }))
     setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host services.BacklogSession input output))
-    setKey result "experimental.chat.system.transform" (twoArgHook (fun input output -> HookTransform.systemTransform input output))
+    setKey result "experimental.chat.system.transform" (twoArgHook (fun input output -> HookTransform.systemTransform services.Directory input output))
 
 let private applyFallbackModelOverrides (cfg: obj) (fbCfgOpt: FallbackConfig option) : unit =
     match fbCfgOpt with

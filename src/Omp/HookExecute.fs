@@ -53,10 +53,21 @@ let private requireWarnTddOmp (toolName: string) (args: obj) : string option =
             None
         | None -> Some (sprintf "Tool '%s': warn_tdd required — acknowledge TDD + Kolmolgorov discipline" toolName)
 
+let private requireWarnOmp (toolName: string) (args: obj) : string option =
+    if not (Wanxiangshu.Kernel.WarnTdd.isWarnRequiredTool toolName) then None
+    else
+        let raw = Dyn.str args "warn"
+        if Wanxiangshu.Kernel.WarnTdd.parseWarn raw then
+            Dyn.deleteKey args "warn"
+            None
+        else Some (sprintf "Tool '%s': warn required — acknowledge this task cannot be done with other tools" toolName)
+
 let applyPreExecuteHook (toolName: string) (args: obj) : string option =
     normalizePatchArgs toolName args
     setUiLabel args toolName
-    requireWarnTddOmp toolName args
+    match requireWarnTddOmp toolName args with
+    | Some err -> Some err
+    | None -> requireWarnOmp toolName args
 
 /// Apply the Omp pre-tool argument normalisations that must run before any
 /// downstream consumer reads the args reference. pi exposes a `tool_call`

@@ -1,18 +1,18 @@
 {"type":"knowledge_graph_header","version":1,"kind":"day","date":"2026-06-26","rewritten":true}
 {"id":"008e","entity":["消息投影","探针剥离"],"fact":"消息投影重构：stripSyntheticBySource作用于decodeMessages原始输出typedMessages，构建backlog前完成全部合成事件剥离；投影层移除withProbe条件追加分支，统一replaceArrayInPlace messagesArr final，消除探针残留与backlog重建间状态分歧；appendToolResultSyntax同步替换Dyn裸访问为ToolResultEvent.getToolInput/getToolResultText/setToolResultText。"}
 {"id":"1cd7","entity":["文件体量铁律","架构门禁"],"fact":"fileBodyUnder200为主门禁遍历五层生产源码递归.fs；fileBodyUnder300为过渡门禁；tests/全树纳入扫描；架构体量门禁扩至递归子目录时相对路径标签须与requireFile完整路径同链对齐，禁止仅扫单层目录。"}
-{"id":"8118","entity":["架构测试","测试注册表"],"fact":"ArchitectureTests十二子切片封顶；切片探针用fsFilesRelative递归相对路径枚举覆盖子目录化拆分；ompBoundary探针禁OMP引用engine/Opopen/Mux；Foundation层双向宿主隔离探针同步递归扫描；Support辅助提供递归相对路径枚举供探针与arch标签对齐。"}
+{"id":"8118","entity":["架构测试","测试注册表"],"fact":"ArchitectureTests十二子切片封顶；切片探针用fsFilesRelative递归相对路径枚举覆盖子目录化拆分；ompBoundary探针禁OMP引用engine//Mux；Foundation层双向宿主隔离探针同步递归扫描；Support辅助提供递归相对路径枚举供探针与arch标签对齐。"}
 {"id":"5f84","entity":["测试运行器","可观测性"],"fact":"中央runner支持详细日志：--verbose或VIBE_FS_TEST_VERBOSE=1启用后于tests/logs按时间戳创建.verbose.log，逐条PASS/FAIL含标签追加写入；汇总阶段在verboseLogPath为Some时向该路径追加页脚行含passed/failed/verboseChecksLogged计数，并打印verbose log路径；进程参数兼承载用例选择器与详细日志开关，按标签筛选前须剔除短开关项防误匹配；timedAsync新增1s硬超时，runAll入口clearFailuresForRun。"}
 {"id":"e52b","entity":["OMP能力对照","REQ文档"],"fact":"REQ.md原P0三项重估后仅browser MCP动态注入仍属部分缺失；tool_call等价tool.execute.before已确认存在，system.transform等价before_agent_start已确认存在；优先级调整P1移为browser MCP。"}
 {"id":"f89e","entity":["OMP宿主适配","会话压缩"],"fact":"OMP session.compacting钩子处理器返回非空对象：传入含sessionId与messages数组的事件，emitJsExpr Promise.resolve路径返回有效结果。"}
 {"id":"84c0","entity":["钩子系统","模块边界"],"fact":"HookExecute提取共享applyPreExecuteHook：normalizePatchArgs+setUiLabel合并，tool_call与tool_result双路径调用，消除分支漂移；applyToolResultHook保留公开名作幂等兼容，覆盖tool_call钩子时序边缘情况未触发场景。"}
-{"id":"8d63","entity":["项目文档","方法论工具注册"],"fact":"README Methodology目录行更新：工具计数由53修正为54，注册范围由Opopen/Mux扩展至三宿主，文档口径与当前实现态同步。"}
-{"id":"c13b","entity":["审查回放","消息变换"],"fact":"三宿主审查回放均依赖全量历史：Opopen经getChatHistory委托、Mux经deps.getChatHistory、OMP经context entries全量历史；Defect 1修复后三宿主审查回放全量历史依赖已从缺陷态转为实现态。"}
+{"id":"8d63","entity":["项目文档","方法论工具注册"],"fact":"README Methodology目录行更新：工具计数由53修正为54，注册范围由/Mux扩展至三宿主，文档口径与当前实现态同步。"}
+{"id":"c13b","entity":["审查回放","消息变换"],"fact":"三宿主审查回放均依赖全量历史：经getChatHistory委托、Mux经deps.getChatHistory、OMP经context entries全量历史；Defect 1修复后三宿主审查回放全量历史依赖已从缺陷态转为实现态。"}
 {"id":"8fc5","entity":["分层架构","OMP宿主适配"],"fact":"OMP编译顺序修复：SessionCompacting仅依赖BacklogSession与GetOrRebuildBacklog，不open SessionLifecycleHooks，消除编译循环依赖；ToolResultEvent.fs移至HookExecute.fs前登记，保证在MessageTransform之前完成编译。"}
 {"id":"262d","entity":["测试覆盖","OMP宿主适配"],"fact":"OMP积压投影测试新增replayBacklogOmpFallsBackToCapturedReport：BacklogSession(omp).CaptureReport写入报告后，replayBacklogFor omp在输入缺失时正确回退至捕获报告；OmpSessionCompactingTests与OmpPluginTests生命周期钩子测试全量注册。"}
 {"id":"a16f","entity":["会话标识","子代理"],"fact":"OMP isChildSession通过childSessionIds进程级可变集合判定；markChildSession在createChildSession调用，dispose包装清理；使用点包括toolResultHandler抑制子代理KG写入与MessageTransform投影排除KG权限检查。"}
 {"id":"c4ac","entity":["OMP宿主适配","钩子系统"],"fact":"OMP tool_call钩子处理器可被正常调用：传入含toolName与input的事件对象，emitJsExpr Promise.resolve路径无异常抛出；当前handler返回值从unit扩展为obj，主会话命中child-only工具集时返回{block:true,reason}触发Pi runtime自动取消。"}
 {"id":"102a","entity":["消息内容函数","模块边界"],"fact":"runnerReminderContent/loopReminderContent/todoReminderContent定义在NudgeRuntime，handler只负责dispatch和发送；内容生成与分发逻辑内聚于同一模块。"}
-{"id":"0ba5","entity":["钩子系统","宿主适配"],"fact":"Opopen Hook注册使用setKey机制（tool.definition/tool.execute.before/tool.execute.after/chat.message/event），OMP使用pi.on()机制，两宿主API不同不可混用；Opopen侧阻断协议通过setHookError写output.error字段实现，当前toolExecuteBeforeFor未调用setHookError用于阻断，阻断能力协议就位但实现空缺。"}
+{"id":"0ba5","entity":["钩子系统","宿主适配"],"fact":" Hook注册使用setKey机制（tool.definition/tool.execute.before/tool.execute.after/chat.message/event），OMP使用pi.on()机制，两宿主API不同不可混用；侧阻断协议通过setHookError写output.error字段实现，当前toolExecuteBeforeFor未调用setHookError用于阻断，阻断能力协议就位但实现空缺。"}
 {"id":"0381","entity":["测试注册表","OMP宿主适配"],"fact":"OMP测试注册扩展：TestsEntriesOmp.fs新增ToolResultEvent十三项同步测试条目与Backlog回退测试条目；wanxiangshu.fsproj增补OmpToolResultEventTests.fs编译条目；OmpSessionCompactingTests与OmpPluginTests生命周期钩子测试全量注册。"}
 {"id":"67fe","entity":["测试断言","测试基础设施"],"fact":"测试断言入口SSOT=Wanxiangshu.Tests.Assert.check，Dyn.check不存在且致编译失败；OMP MagicTodo测试依赖收敛：tests/OmpMagicTodoTests.fs须open Wanxiangshu.Tests.BacklogMessageBuilders与Wanxiangshu.Kernel.BacklogProjectionCore，两模块为OMP积压投影测试的显式边界。"}

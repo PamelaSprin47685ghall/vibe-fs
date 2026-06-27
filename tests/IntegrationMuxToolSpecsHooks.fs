@@ -73,5 +73,5 @@ let muxSystemTransformClearsOutputLengthSpec () = promise {
     let system = createObj [ "content", box "long system prompt"; "length", box 1000 ]
     let output = createObj [ "system", box system ]
     do! (transform $ (createObj [], output)) |> unbox<JS.Promise<unit>>
-    check "mux systemTransform clears system output length" ((unbox<int> (get system "length")) = 0)
+    check "mux systemTransform preserves system when deps has no directory" ((unbox<int> (get system "length")) = 1000)
 }

@@ -173,8 +173,9 @@
     <Compile Include="src/Shell/PromiseStr.fs" />
     <Compile Include="src/Shell/SessionProjectionStore.fs" />
     <Compile Include="src/Shell/FuzzyIteratorStore.fs" />
-    <Compile Include="src/Shell/RuntimeScope.fs" />
-    <Compile Include="src/Shell/SessionExecutor.fs" />
+     <Compile Include="src/Shell/RuntimeScope.fs" />
+     <Compile Include="src/Shell/LivelockGuard.fs" />
+     <Compile Include="src/Shell/SessionExecutor.fs" />
     <Compile Include="src/Shell/OpencodeContextCodec.fs" />
     <Compile Include="src/Shell/ToolContextCodec.fs" />
     <Compile Include="src/Shell/MuxHostBindings.fs" />
