@@ -27,9 +27,9 @@ let fshResolveStore () =
 let fshResolveIteratorBranch () =
     let store = createTypedIteratorStore 10
     let freshCalled = ref false
-    let onFresh () = freshCalled := true; Error "fresh-fn-called"
+    let onFresh () = freshCalled.Value <- true; Error "fresh-fn-called"
     match resolveIteratorBranch store None consumeFindIterator "find" onFresh with Error msg -> equal "fresh called" "fresh-fn-called" msg | Ok _ -> check "fresh called" false
-    freshCalled := false
+    freshCalled.Value <- false
     match resolveIteratorBranch store (Some "missing-id") consumeFindIterator "find" onFresh with Error msg -> check "missing id error" (msg.Contains "missing-id") | Ok _ -> check "missing id error" false
     let state : FuzzyFindState = { query = "q"; pageSize = 30; pageIndex = 0; externalBasePath = None }
     let storedId = storeFindIterator store "s" state

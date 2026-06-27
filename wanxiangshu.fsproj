@@ -464,6 +464,7 @@
     <Compile Include="tests/OmpHookExecuteTests.fs" />
     <Compile Include="tests/OmpKnowledgeGraphRuntimeTests.fs" />
     <Compile Include="tests/OmpCodecCoverageTests.fs" />
+    <Compile Include="tests/OpencodeCoverageTests.fs" />
     <Compile Include="tests/OmpSessionLifecycleTests.fs" />
     <Compile Include="tests/OmpSessionCompactingTests.fs" />
     <Compile Include="tests/MethodologyTests.fs" />

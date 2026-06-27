@@ -571,3 +571,11 @@
 {"id":"2427","entity":["测试覆盖补全","断言修复"],"fact":"KernelDomainCoverageTests.fs idRoundTrip 断言逻辑修正：比较目标由 label 文本 value 改为原始输入字符串 input，使 round-trip 测试真正验证解析→提取往返一致性；ParseError 格式化期望字符串字段顺序修正：由 \"parse error in d: ctx\" 改为 \"parse error in ctx: d\"，与 Kernel.Domain.formatDomainError 实际输出对齐。两处修复均属断言语义校正，非编译错误修复。"}
 {"id":"31d1","entity":["方法论使用指导","并行工具调用"],"fact":"methodology_* 工具设计为正交推理切片，面对复杂问题应并行调用多个方法论工具让不同视角同时展开、结果互补，而非串行等一个结论再换下一个。"}
 {"id":"d756","entity":["方法论工具","正交推理切片"],"fact":"methodology_* 工具被设计为正交推理切片：面对复杂问题应并行调用多个工具，让不同视角同时展开、结果互补，而非串行等待单结论。"}
+{"id":"f45f","entity":["测试覆盖补全","双点登记惯例","文件体量铁律"],"fact":"tests/OpencodeCoverageTests.fs 创建，覆盖 Opopen.HookSchema、Opencode.SearchTools、SessionIoSubagent 模块纯函数与工具构造子，注册于 TestsEntriesCoverage 与 wanxiangshu.fsproj 双点登记，171 行符合测试文件体量门禁"}
+{"id":"20e4","entity":["测试注册表"],"fact":"异步测试函数须返回 promise 并在注册表标记为 Async；Sync 条目包装同步测试，禁止将 promise 包装入 Sync"}
+{"id":"b0ac","entity":["Opopen宿主适配","工具Schema编解码"],"fact":"rewriteToolJsonSchema 三路径（jsonSchema/parameters/args）均使用 rewrite 原地修改，不经过 setKey；effect schema 不可用时 parameters 路径回退至手动 rewrite；jsonSchema/parameters 测试须验证 rewrite 写入的 tag 字段而非 capturedKey"}
+{"id":"94ee","entity":["Opopen宿主适配","子代理意图编解码"],"fact":"setUiLabel → joinCoderUiLabel → parseCoderIntents 要求 coder intents targets 数组非空；空 targets 返回 Result.Error，setUiLabel 静默跳过不注入 _ui 标签"}
+{"id":"5ff8","entity":["Opopen宿主适配","会话事件编解码"],"fact":"extractSessionText 使用 let! 异步调用 session.messages；假对象 messages 字段须返回 JS.Promise，同步返回裸对象导致 let! 解析失败"}
+{"id":"fe7c","entity":["编译修复","测试覆盖补全"],"fact":"OmpCodecCoverageTests.fs FS3365 索引语法歧义全量修复：box/createObj 后数组/列表字面量加空格消除歧义；字符串/列表索引歧义替换为 List.item/Array.get 显式访问；共 20 处修复，零语义变更。"}
+{"id":"8b08","entity":["编译修复","测试覆盖补全"],"fact":"CoverageFillFuzzyTests.fs FS3370 废弃 ref 单元运算符修复：:= 替换为 .Value <-，2 处修复（行 30/32），消除已弃用语法警告。"}
+{"id":"229c","entity":["测试覆盖补全","OMP宿主适配","编译修复"],"fact":"OmpCodecCoverageTests.fs 修复 FS3365 警告与 List.item 类型错误：将 2 处 `List.item` (lines 27/50) 替换为 `Array.get`，将 3 处 `p.[0]` (lines 26/48/49) 替换为 `Array.get p 0`，并为 4 处 `box[`/`createObj[` 模式 (lines 91/97/98/114) 补充空格消除 FS3365 警告；验证 lines 111/137 的 `List.item` 操作对象为 string list 类型合法无需修改。全文件零 FS3365/FS3370 残留。"}
