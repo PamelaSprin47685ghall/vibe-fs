@@ -742,3 +742,4 @@
 {"id":"c622","entity":["权限矩阵","测试断言"],"fact":"AgentTests.fs 权限断言更新：meditator read 权限由 denied 改为 can read，与 canUseSemantic Read 通用放行门控精确对齐，消除测试断言与运行时权限矩阵分歧。"}
 {"id":"2992","entity":["权限矩阵","测试断言","代理角色"],"fact":"ToolPermissionTests.fs meditator read权限断言由denied改为allowed：canUseSemantic \"meditator\" Read \"read\" 测试由否定断言修正为肯定断言，与运行时权限矩阵解封后行为精确对齐"}
 {"id":"375b","entity":["权限矩阵","工具过滤"],"fact":"权限矩阵细化：meditator代理Read语义在canUseSemantic匹配中由全局拦截改为显式放行（Read → true），其余语义保持拒绝；与bookkeeper/mediator/executor三类代理Read全拒绝边界对齐，消除身份隐性排斥。"}
+{"id":"fba3","entity":["重构规划"],"fact":"大规模保姆级重构指南已写入工作区，识别三类优先级偏离：P0 Kernel侧效泄漏(Domain.fs时钟直读)、P1三宿主知识重复(StateHolder/KGTestHooks/collectSnapshot/ReviewLoop/KG Runtime五处)、P2黄牌文件(五文件200-300行)。规划六Phase迁移方案，每Phase含手工修改+编译测试验证+回滚策略，验收含架构探针断言扩展与全仓绿测门禁，量化目标净减约70行重复代码并消除全部Kernel纯度缺口。"}
