@@ -1,6 +1,8 @@
 ---
 import: 
   - README.md
+  - ../opencode-auto-fallback
+  - ../opencode-auto-resume
 ---
 
 - 提交仓库时候带上 kg/ 的变化
