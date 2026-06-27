@@ -1,0 +1,62 @@
+module Wanxiangshu.Shell.FallbackRuntimeState
+
+open Wanxiangshu.Kernel.FallbackKernel.Types
+
+let private freshState : SessionFallbackState =
+    { Phase         = FallbackPhase.Idle
+      CurrentIndex  = 0
+      FailureCount  = 0
+      Cancelled     = false
+      TaskComplete  = false
+      ContinueCount = 0 }
+
+type FallbackRuntimeState() =
+    let mutable states = Map.ofList<string, SessionFallbackState> []
+    let mutable chains = Map.ofList<string, FallbackChain> []
+    let mutable agents = Map.ofList<string, string> []
+    let mutable busyCounts = Map.ofList<string, int> []
+    let mutable consumed = Map.ofList<string, bool> []
+
+    member _.GetOrCreateState(sessionID: string) : SessionFallbackState =
+        match Map.tryFind sessionID states with
+        | Some s -> s
+        | None ->
+            states <- Map.add sessionID freshState states
+            freshState
+
+    member _.UpdateState(sessionID: string) (state: SessionFallbackState) : unit =
+        states <- Map.add sessionID state states
+
+    member _.GetChain(sessionID: string) : FallbackChain =
+        Map.tryFind sessionID chains |> Option.defaultValue []
+
+    member _.SetChain(sessionID: string) (chain: FallbackChain) : unit =
+        chains <- Map.add sessionID chain chains
+
+    member _.SetAgentName(sessionID: string) (agentName: string) : unit =
+        agents <- Map.add sessionID agentName agents
+
+    member _.GetAgentName(sessionID: string) : string =
+        Map.tryFind sessionID agents |> Option.defaultValue ""
+
+    member _.GetBusyCount(sessionID: string) : int =
+        Map.tryFind sessionID busyCounts |> Option.defaultValue 0
+
+    member _.SetBusyCount(sessionID: string) (n: int) : unit =
+        busyCounts <- Map.add sessionID n busyCounts
+
+    member _.SetConsumed(sessionID: string) (value: bool) : unit =
+        consumed <- Map.add sessionID value consumed
+
+    member _.GetConsumed(sessionID: string) : bool option =
+        Map.tryFind sessionID consumed
+
+    member _.ClearConsumed(sessionID: string) : unit =
+        consumed <- Map.remove sessionID consumed
+
+    member _.CleanupSession(sessionID: string) : unit =
+        states <- Map.remove sessionID states
+        chains <- Map.remove sessionID chains
+        agents <- Map.remove sessionID agents
+        busyCounts <- Map.remove sessionID busyCounts
+        consumed <- Map.remove sessionID consumed

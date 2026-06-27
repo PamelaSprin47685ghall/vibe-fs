@@ -15,16 +15,21 @@ open Wanxiangshu.Shell.SubagentSpawn
 open Wanxiangshu.Shell.ToolArgsDecode
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.ToolRuntimeContext
+open Wanxiangshu.Shell.FallbackRuntimeState
 
 type OpencodeSubagentSpawn =
     { Host: Host
       Registry: ChildAgentRegistry
       Client: obj
       PluginCtx: obj
-      ToolContext: obj }
+      ToolContext: obj
+      FallbackRuntime: FallbackRuntimeState }
 
-type private RunSubagentCoreResult =
-    ChildAgentRegistry -> obj -> string -> string -> string -> string -> string -> obj -> obj -> bool -> JS.Promise<Result<string, DomainError>>
+type RunSubagentCoreResult =
+    FallbackRuntimeState -> ChildAgentRegistry -> obj -> string -> string -> string -> string -> string -> obj -> obj -> bool -> JS.Promise<Result<string, DomainError>>
+
+let private runCoreWithSpawn (runCore: RunSubagentCoreResult) (spawn: OpencodeSubagentSpawn) (agent: string) (title: string) (prompt: string) (dir: string) (sessionID: string) (ctx: obj) (tools: obj) (noOp: bool) =
+    runCore spawn.FallbackRuntime spawn.Registry spawn.Client agent title prompt dir sessionID ctx tools noOp
 
 let resolveSubagentPromise (context: string) (p: JS.Promise<Result<string, DomainError>>) : JS.Promise<string> =
     promise {
@@ -47,12 +52,10 @@ let executeOpencodeSubagentTool
             let runtime = fromOpencode spawn.ToolContext (pluginDirectoryFromCtx spawn.PluginCtx)
             let dir = runtime.Execution.Directory
             let sessionID = runtime.Execution.SessionId
-            let registry = spawn.Registry
-            let client = spawn.Client
             let ctx = spawn.ToolContext
             let tools = box null
             let spawnOne agent title prompt =
-                resolveSubagentPromise toolName (runCore registry client agent title prompt dir (Id.sessionIdValue sessionID) ctx tools false)
+                resolveSubagentPromise toolName (runCoreWithSpawn runCore spawn agent title prompt dir (Id.sessionIdValue sessionID) ctx tools false)
             match decoded with
             | CoderBatch intents ->
                 let prompts = promptsFromCoderIntents spawn.Host intents

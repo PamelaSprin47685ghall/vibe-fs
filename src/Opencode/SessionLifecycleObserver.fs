@@ -11,16 +11,42 @@ open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
 open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeHookInputCodec
+open Wanxiangshu.Shell.FallbackEventBridge
+open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Opencode.NudgeEffect
 open Wanxiangshu.Opencode.BacklogSession
 
-type SessionLifecycleObserver(host: Host, ctx: obj, reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore, registry: ChildAgentRegistry) =
+type SessionLifecycleObserver
+    ( host              : Host
+    , ctx               : obj
+    , reviewStore       : Wanxiangshu.Shell.ReviewRuntime.ReviewStore
+    , registry          : ChildAgentRegistry
+    , fallbackHandler   : (obj -> JS.Promise<FallbackHookResult>) option
+    , fallbackRuntime   : FallbackRuntimeState
+    ) =
+
+    let abortSession (client: obj) (sid: string) : JS.Promise<unit> =
+        promise {
+            try
+                let arg = box {| path = box {| id = sid |} |}
+                do! client?session?abort(arg) |> Promise.map ignore
+            with _ -> ()
+        }
+
+    let promptSession (client: obj) (sid: string) (text: string) : JS.Promise<unit> =
+        promise {
+            try
+                do! client?session?prompt(sid, box text) |> Promise.map ignore
+            with _ -> ()
+        }
     let holder = StateHolder<NudgeShellState>(emptyState)
 
     member _.handleChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
@@ -30,6 +56,7 @@ type SessionLifecycleObserver(host: Host, ctx: obj, reviewStore: Wanxiangshu.She
             if isNudgePrompt text then state, ()
             else
                 let agentOpt = if agent <> "" then Some agent else None
+                fallbackRuntime.SetAgentName sid agent
                 resumeSession (rememberAgent state sid agentOpt) sid, ())
         resolvedUnitPromise ()
 
@@ -47,6 +74,11 @@ type SessionLifecycleObserver(host: Host, ctx: obj, reviewStore: Wanxiangshu.She
                 match hookOutputString output with
                 | Some _ -> setHookOutputString output (todoWriteOutput methodologies true)
                 | None -> ()
+            elif tool = "task_complete" then
+                let sid = sessionIdFromHookInput input ""
+                if sid <> "" then
+                    let st = fallbackRuntime.GetOrCreateState sid
+                    fallbackRuntime.UpdateState sid { st with TaskComplete = true }
             elif tool = "submit_review" then
                 match hookOutputString output with
                 | Some text when isSubmitReviewWipProgressOutput text ->
@@ -55,28 +87,97 @@ type SessionLifecycleObserver(host: Host, ctx: obj, reviewStore: Wanxiangshu.She
         }
 
     member _.handleEvent(input: obj) : JS.Promise<unit> =
-        let claimed =
-            holder.Mutate(fun state ->
-                try
-                    match decodeHostEventEnvelope input with
-                    | None -> state, None
-                    | Some { EventType = eventType; Props = props } ->
-                        let sessionIDStr = getSessionID eventType props
-                        match Id.trySessionId sessionIDStr with
-                        | None -> state, None
-                        | Some sessionID ->
-                            let nudgeEvent = decodeNudgeHostEvent eventType props
-                            let nextState, wantsNudge = NudgeState.handleEvent state (Id.sessionIdValue sessionID) nudgeEvent
-                            nextState, (if wantsNudge then Some sessionID else None)
-                with _ ->
-                    state, None)
-        match claimed with
-        | Some sessionID ->
-            match getClientFromPluginCtx ctx with
-            | Ok client -> startNudgeFlow holder client reviewStore registry sessionID
-            | Error _ -> ()
-        | None -> ()
-        resolvedUnitPromise ()
+        promise {
+            let eventEnvelope = decodeHostEventEnvelope input
 
-let createSessionLifecycleObserver (host: Host) (ctx: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (registry: ChildAgentRegistry) : SessionLifecycleObserver =
-    SessionLifecycleObserver(host, ctx, reviewStore, registry)
+            // Bind agent name from session.status busy events before fallback
+            match eventEnvelope with
+            | Some { EventType = "session.status"; Props = props } ->
+                let statusObj = Dyn.get props "status"
+                let agentName = Dyn.str statusObj "agent"
+                if agentName <> "" then
+                    let sid = getSessionID "session.status" props
+                    if sid <> "" then
+                        fallbackRuntime.SetAgentName sid agentName
+            | _ -> ()
+
+            // Fallback intercepts first; consumed → skip nudge
+            let! fbConsumed =
+                match fallbackHandler with
+                | Some handler ->
+                    promise {
+                        let! r = handler input
+                        return r.Consumed
+                    }
+                | None -> Promise.lift false
+
+            // Orphan parent: child idle → resume stuck parent (event-driven, zero-timer)
+            match eventEnvelope with
+            | Some { EventType = "session.status"; Props = props } ->
+                let status = Dyn.str (Dyn.get props "status") "status"
+                let sid = getSessionID "session.status" props
+                if sid <> "" && status = "busy" then
+                    fallbackRuntime.SetBusyCount sid 1
+                elif sid <> "" && status = "idle" then
+                    let previousBusyCount = fallbackRuntime.GetBusyCount sid
+                    fallbackRuntime.SetBusyCount sid 0
+                    // Orphan parent: child idle -> parent busyCount still >0 means parent stuck; abort+resume
+                    if (registry.LookupChildAgent sid).IsSome then
+                        match registry.ResolveSubsessionParentID (Some sid) with
+                        | Some parentSid when parentSid <> "" && fallbackRuntime.GetBusyCount parentSid > 0 ->
+                            let pst = fallbackRuntime.GetOrCreateState parentSid
+                            if not pst.Cancelled && not pst.TaskComplete then
+                                match getClientFromPluginCtx ctx with
+                                | Ok client ->
+                                    do! abortSession client parentSid
+                                    do! promptSession client parentSid "continue"
+                                | Error _ -> ()
+                        | _ -> ()
+                    // Track busyCount drop on parent sessions too (for explicit orphan detection via busyCount)
+                    elif previousBusyCount > 1 && fallbackRuntime.GetBusyCount sid = 0 then
+                        let pst = fallbackRuntime.GetOrCreateState sid
+                        if not pst.Cancelled && not pst.TaskComplete then
+                            match getClientFromPluginCtx ctx with
+                            | Ok client ->
+                                do! abortSession client sid
+                                do! promptSession client sid "continue"
+                            | Error _ -> ()
+                elif sid <> "" && status = "busy" then
+                    fallbackRuntime.SetBusyCount sid (fallbackRuntime.GetBusyCount sid + 1)
+            | _ -> ()
+
+            if fbConsumed then
+                return ()
+            else
+                let claimed =
+                    holder.Mutate(fun state ->
+                        try
+                            match eventEnvelope with
+                            | None -> state, None
+                            | Some { EventType = eventType; Props = props } ->
+                                let sessionIDStr = getSessionID eventType props
+                                match Id.trySessionId sessionIDStr with
+                                | None -> state, None
+                                | Some session ->
+                                    let nudgeEvent = decodeNudgeHostEvent eventType props
+                                    let nextState, wantsNudge = NudgeState.handleEvent state (Id.sessionIdValue session) nudgeEvent
+                                    nextState, (if wantsNudge then Some session else None)
+                        with _ ->
+                            state, None)
+                match claimed with
+                | Some sessionID ->
+                    match getClientFromPluginCtx ctx with
+                    | Ok client -> startNudgeFlow holder client reviewStore registry sessionID
+                    | Error _ -> ()
+                | None -> ()
+        }
+
+let createSessionLifecycleObserver
+    ( host               : Host
+    , ctx                : obj
+    , reviewStore        : Wanxiangshu.Shell.ReviewRuntime.ReviewStore
+    , registry           : ChildAgentRegistry
+    , fallbackHandler    : (obj -> JS.Promise<FallbackHookResult>) option
+    , fallbackRuntime    : FallbackRuntimeState
+    ) : SessionLifecycleObserver =
+    SessionLifecycleObserver(host, ctx, reviewStore, registry, fallbackHandler, fallbackRuntime)

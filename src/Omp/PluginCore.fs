@@ -21,22 +21,43 @@ open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.SessionExecutor
 open Wanxiangshu.Shell.TreeSitterShell
+open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.FallbackEventBridge
+open Wanxiangshu.Shell.FallbackConfigCodec
+open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Omp.FallbackHooks
 
 type CoreServices =
     { ReviewStore: ReviewStore
       KnowledgeGraphRuntime: OmpKnowledgeGraphRuntime
       FinderCache: FinderCache
-      Pi: obj }
+      Pi: obj
+      FallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option }
 
 let reviewStore : ReviewStore = createReviewStore ()
 
 let private createCoreServices (pi: obj) : CoreServices =
     let kgRuntime = OmpKnowledgeGraphRuntime(pi)
     let finderCache = FinderCache()
+
+    let directory = Dyn.str pi "directory"
+    let fallbackConfigOpt = loadFallbackConfig directory
+    let fallbackRuntime = FallbackRuntimeState()
+    let configLookup : ConfigLookup =
+        match fallbackConfigOpt with
+        | Some cfg -> (fun _ -> cfg)
+        | None -> (fun _ -> emptyConfig)
+    let sessionApi = Dyn.get pi "session"
+    let fallbackHandler =
+        match fallbackConfigOpt with
+        | Some _ -> Some (createOmpFallbackHandler fallbackRuntime configLookup sessionApi)
+        | None -> None
+
     { ReviewStore = reviewStore
       KnowledgeGraphRuntime = kgRuntime
       FinderCache = finderCache
-      Pi = pi }
+      Pi = pi
+      FallbackHandler = fallbackHandler }
 
 /// Apply AgentConfig to the host's config object if the host exposes both
 /// `getConfig` and `setConfig`. Without `getConfig` we have no base to merge
@@ -61,26 +82,45 @@ let private applyAgentConfigIfSupported (pi: obj) : unit =
 let private sessionEndEventTypes =
     Set [ "session.abort"; "stream.abort"; "session.error"; "session.delete"; "session.close"; "session.remove"; "session.deleted" ]
 
-let registerAbortHandler (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) : unit =
+let registerAbortHandler (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime)
+    (fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option) : unit =
+    let fallbackEventTypes = Set [ "session.busy"; "session.idle"; "message.updated"; "session.updated" ]
     pi?on(
         "event",
         box(fun (event: obj) (ctx: obj) ->
             promise {
                 let evtType = Dyn.str event "type"
-                if sessionEndEventTypes.Contains evtType then
-                    match getSessionIdFromContext ctx with
-                    | Some sid ->
-                        reviewStore.deactivateReview sid
-                        Wanxiangshu.Omp.NudgeRuntime.clearNudgeSession sid
-                        kgRuntime.DeleteJob sid
-                    | None -> ()
+                let sidOpt = getSessionIdFromContext ctx
+                match sidOpt with
+                | None -> ()
+                | Some sid ->
+                    if sessionEndEventTypes.Contains evtType then
+                        match fallbackHandler with
+                        | None ->
+                            reviewStore.deactivateReview sid
+                            Wanxiangshu.Omp.NudgeRuntime.clearNudgeSession sid
+                            kgRuntime.DeleteJob sid
+                        | Some handler ->
+                            let rawEvent = createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
+                            let! r = handler rawEvent
+                            if not r.Consumed then
+                                reviewStore.deactivateReview sid
+                                Wanxiangshu.Omp.NudgeRuntime.clearNudgeSession sid
+                                kgRuntime.DeleteJob sid
+                    elif fallbackEventTypes.Contains evtType then
+                        match fallbackHandler with
+                        | Some handler ->
+                            let rawEvent = createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
+                            let! _ = handler rawEvent
+                            ()
+                        | None -> ()
             }))
 
 let private registerHooks (pi: obj) (services: CoreServices) : unit =
     registerAllTools pi services.ReviewStore services.KnowledgeGraphRuntime
     registerInputHandler pi services.ReviewStore
     registerSessionLifecycle pi services.ReviewStore services.KnowledgeGraphRuntime
-    registerAbortHandler pi services.ReviewStore services.KnowledgeGraphRuntime
+    registerAbortHandler pi services.ReviewStore services.KnowledgeGraphRuntime services.FallbackHandler
 
 let pluginFor (pi: obj) : JS.Promise<unit> =
     promise {

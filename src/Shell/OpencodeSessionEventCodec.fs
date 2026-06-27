@@ -155,3 +155,14 @@ let createPromptBody (agent: string option) (text: string) : obj =
     match agent with
     | Some a -> box {| agent = a; parts = [| box {| ``type`` = "text"; text = text |} |] |}
     | None -> box {| parts = [| box {| ``type`` = "text"; text = text |} |] |}
+
+/// Build prompt body with optional agent and model override.
+/// Build prompt body with optional agent and model override.
+let createPromptBodyWithModel (agent: string option) (model: string option) (text: string) : obj =
+    let textPart = box {| ``type`` = "text"; text = text |}
+    let parts : obj array = [| textPart |]
+    match agent, model with
+    | Some a, Some m -> box {| agent = a; model = m; parts = parts |}
+    | Some a, None -> box {| agent = a; parts = parts |}
+    | None, Some m -> box {| model = m; parts = parts |}
+    | None, None -> box {| parts = parts |}

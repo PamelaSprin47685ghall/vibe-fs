@@ -31,6 +31,7 @@ open Wanxiangshu.Shell.FuzzyToolsCodec
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Shell.FallbackRuntimeState
 module ToolSchemaModule = Wanxiangshu.Opencode.ToolSchema
 module FuzzyCommandsModule = Wanxiangshu.Shell.FuzzySearch
 
@@ -84,7 +85,7 @@ let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.F
         finderCache
         iteratorStore
 
-let websearchTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =
+let websearchTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (fallbackRuntime: FallbackRuntimeState) : obj =
     define websearch
         (box {| query = strReq Params.websearchQuery
                 numResults = numOpt Params.websearchNumResults
@@ -110,7 +111,7 @@ let websearchTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =
                             else
                                 let prompt = formatPrompt host (WebsearchSummary(ws.WhatToSummarize, rawResults)) |> List.head
                                 return! resolveSubagentPromise "executor"
-                                    (runSubagentWithCleanup registry client "executor" "Web search summary" prompt
+                                    (runSubagentWithCleanup fallbackRuntime registry client "executor" "Web search summary" prompt
                                         runtime.Execution.Directory (Id.sessionIdValue runtime.Execution.SessionId) context)
                     })
 
