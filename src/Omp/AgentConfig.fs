@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -38,7 +39,7 @@ let private mergeObj (a: obj) (b: obj) : obj =
     result
 
 let private mapToolNames (f: string -> 'a) : obj =
-    allToolNames omp
+    Array.append (allToolNames omp) methodologyToolNames
     |> Seq.map (fun name -> name, box (f name))
     |> createObj
 

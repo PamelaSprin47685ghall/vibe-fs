@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeAgentConfigCodec
 open Wanxiangshu.Shell.OpencodeAgentConfigWire
@@ -47,11 +48,11 @@ let private tryFindBuiltinAgent name =
     builtinAgentSpecs |> List.tryFind (fun spec -> spec.name = name)
 
 let private toolDefaultsFor (host: Host) (agentName: string) : OpencodeAgentConfigCodec.ToolsOverrides =
-    allToolNames host
+    Array.append (allToolNames host) methodologyToolNames
     |> Seq.fold (fun acc name -> Map.add name (canUseForHost host agentName name) acc) Map.empty
 
 let private permissionDefaultsFor (host: Host) (agentName: string) : OpencodeAgentConfigCodec.PermissionOverrides =
-    allToolNames host
+    Array.append (allToolNames host) methodologyToolNames
     |> Seq.fold
         (fun acc name ->
             let value = if canUseForHost host agentName name then "allow" else "deny"

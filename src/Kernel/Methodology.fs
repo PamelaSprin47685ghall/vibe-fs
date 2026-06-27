@@ -78,6 +78,9 @@ let methodologyEnumValues: string list =
 
 let methodologyCatalog = Wanxiangshu.Kernel.MethodologyCatalog.methodologyCatalog
 
+let methodologyToolNames : string array =
+    methodologyEnumValues |> List.map (fun id -> "methodology_" + id) |> Array.ofList
+
 let selectMethodologyFieldDescription =
     "Required when calling this tool: record `select_methodology` with one or more methodology names that must guide the next work step. Choose by definitions, not by keyword vibes.\n\n"
     + methodologyCatalog

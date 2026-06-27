@@ -12,6 +12,7 @@ type ToolSemantic =
     | StealthBrowser
     | ReturnRoleEcho
     | TodoFamily
+    | MethodologyFamily
     | Read
     | WritePatchFamily
     | FuzzyGrep
@@ -26,6 +27,8 @@ let private blockedShellTaskGrepSet =
 
 let private todoFamilySet =
     Set.ofList [ "todowrite"; "todo_write"; "todo"; "manage_todo_list" ]
+
+let private methodologyPrefix = "methodology_"
 
 let private writePatchFamilySet =
     Set.ofList [ "write"; "edit"; "patch"; "apply_patch"; "ast_edit" ]
@@ -49,6 +52,7 @@ let classifyTool (host: Host) (tool: Tool) : ToolSemantic =
     elif isStealthBrowserTool t then StealthBrowser
     elif t.StartsWith "return_" then ReturnRoleEcho
     elif Set.contains t todoFamilySet then TodoFamily
+    elif t.StartsWith methodologyPrefix then MethodologyFamily
     elif t = "read" then Read
     elif isDispatchOrWebSkillTool t then SubagentWebSkillOrSubmit
     elif Set.contains t writePatchFamilySet then WritePatchFamily
@@ -65,7 +69,8 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
     | "bookkeeper", _ -> false
     | "meditator", _
     | "executor", _ -> false
-    | _, TodoFamily -> not (shouldExcludeAgentFromProjection agent false)
+    | _, TodoFamily
+    | _, MethodologyFamily -> not (shouldExcludeAgentFromProjection agent false)
     | _, Read -> true
     | "reviewer", _
     | "browser", _ -> false
