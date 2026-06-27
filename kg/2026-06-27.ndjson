@@ -569,3 +569,5 @@
 {"id":"1b69","entity":["测试覆盖补全","编译修复"],"fact":"run() 函数调用点须完整传参；部分应用（缺 label 或传参不全）触发 F# 类型推断失败；所有测试条目单元化调用 fn() 形式"}
 {"id":"483b","entity":["编译修复","测试覆盖补全"],"fact":"KernelDomainCoverageTests.fs 编译修复：idRoundTrip 补 label 参数、五个调用站补空串 \"\"、Domain. 前缀移除、run() 调用完整性验证，四类问题全量消除"}
 {"id":"2427","entity":["测试覆盖补全","断言修复"],"fact":"KernelDomainCoverageTests.fs idRoundTrip 断言逻辑修正：比较目标由 label 文本 value 改为原始输入字符串 input，使 round-trip 测试真正验证解析→提取往返一致性；ParseError 格式化期望字符串字段顺序修正：由 \"parse error in d: ctx\" 改为 \"parse error in ctx: d\"，与 Kernel.Domain.formatDomainError 实际输出对齐。两处修复均属断言语义校正，非编译错误修复。"}
+{"id":"31d1","entity":["方法论使用指导","并行工具调用"],"fact":"methodology_* 工具设计为正交推理切片，面对复杂问题应并行调用多个方法论工具让不同视角同时展开、结果互补，而非串行等一个结论再换下一个。"}
+{"id":"d756","entity":["方法论工具","正交推理切片"],"fact":"methodology_* 工具被设计为正交推理切片：面对复杂问题应并行调用多个工具，让不同视角同时展开、结果互补，而非串行等待单结论。"}
