@@ -27,32 +27,6 @@ let decodeExecutorMissingProgram () =
     | Error (InvalidIntent ("executor", "program", "required")) -> check "executor missing program" true
     | _ -> check "executor missing program" false
 
-let decodeExecutorInvalidWarn () =
-    let args =
-        createObj [
-            "language", box "shell"
-            "program", box "echo ok"
-            "timeout_type", box "short"
-            "mode", box "ro"
-            "warn", box "nope"
-        ]
-    match decodeExecutorArgs args with
-    | Error (InvalidIntent ("executor", "warn", "must be 'it-is-not-possible-to-do-it-using-other-tools'")) ->
-        check "executor invalid warn" true
-    | _ -> check "executor invalid warn" false
-
-let decodeExecutorMissingWarn () =
-    let args =
-        createObj [
-            "language", box "shell"
-            "program", box "echo ok"
-            "timeout_type", box "short"
-            "mode", box "ro"
-        ]
-    match decodeExecutorArgs args with
-    | Error (InvalidIntent ("executor", "warn", "required")) -> check "executor missing warn" true
-    | _ -> check "executor missing warn" false
-
 let decodeExecutorOkShell () =
     let args =
         createObj [
@@ -61,7 +35,6 @@ let decodeExecutorOkShell () =
             "dependencies", box [| "dep-a" |]
             "timeout_type", box "long"
             "mode", box "rw"
-            "warn", box "it-is-not-possible-to-do-it-using-other-tools"
         ]
     match decodeExecutorArgs args with
     | Ok ex ->
@@ -70,15 +43,24 @@ let decodeExecutorOkShell () =
         equal "executor ok deps count" 1 ex.Dependencies.Length
         check "executor ok timeout" (ex.TimeoutType = Long)
         check "executor ok mode" (ex.Mode = "rw")
-        check "executor ok warn" (ex.Warn = ItIsNotPossibleToDoThisUsingOtherTools)
         let opts = toExecuteOptions (Some "/tmp/ws") ex
         check "executor ok cwd" (opts.cwd = Some "/tmp/ws")
         check "executor ok opts language" (opts.language = Shell)
     | Error _ -> check "executor ok shell" false
 
+let decodeExecutorMissingMode () =
+    let args =
+        createObj [
+            "language", box "shell"
+            "program", box "echo ok"
+            "timeout_type", box "short"
+        ]
+    match decodeExecutorArgs args with
+    | Error (InvalidIntent ("executor", "mode", "required")) -> check "executor missing mode" true
+    | _ -> check "executor missing mode" false
+
 let run () =
     decodeExecutorInvalidLanguage ()
     decodeExecutorMissingProgram ()
-    decodeExecutorInvalidWarn ()
-    decodeExecutorMissingWarn ()
     decodeExecutorOkShell ()
+    decodeExecutorMissingMode ()

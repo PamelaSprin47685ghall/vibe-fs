@@ -11,7 +11,6 @@ type ExecutorArgs = {
     Dependencies: string list
     TimeoutType: ExecutorTimeoutType
     Mode: string
-    Warn: ExecutorWarn
 }
 
 let private strListField (a: obj) (k: string) : string list =
@@ -31,11 +30,6 @@ let private parseModeField (value: string) : Result<string, DomainError> =
     match value.Trim() with
     | "ro" | "rw" as m -> Ok m
     | _ -> Error (InvalidIntent ("executor", "mode", "must be ro or rw"))
-
-let private parseWarnField (value: string) : Result<ExecutorWarn, DomainError> =
-    match value.Trim() with
-    | "it-is-not-possible-to-do-it-using-other-tools" -> Ok ItIsNotPossibleToDoThisUsingOtherTools
-    | _ -> Error (InvalidIntent ("executor", "warn", "must be 'it-is-not-possible-to-do-it-using-other-tools'"))
 
 let peekExecutorMode (args: obj) : string option =
     strField args "mode" |> Option.map (fun s -> s.Trim())
@@ -58,21 +52,14 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
                     match parseModeField modeStr with
                     | Error e -> Error e
                     | Ok mode ->
-                        match strField args "warn" with
-                        | None -> Error (InvalidIntent ("executor", "warn", "required"))
-                        | Some warnStr ->
-                            match parseWarnField warnStr with
-                            | Error e -> Error e
-                            | Ok warn ->
-                                let timeoutRaw = defaultArg (strField args "timeout_type") ""
-                                Ok {
-                                    Language = language
-                                    Program = program
-                                    Dependencies = strListField args "dependencies"
-                                    TimeoutType = parseTimeout timeoutRaw
-                                    Mode = mode
-                                    Warn = warn
-                                }
+                        let timeoutRaw = defaultArg (strField args "timeout_type") ""
+                        Ok {
+                            Language = language
+                            Program = program
+                            Dependencies = strListField args "dependencies"
+                            TimeoutType = parseTimeout timeoutRaw
+                            Mode = mode
+                        }
 
 let toExecuteOptions (cwd: string option) (decoded: ExecutorArgs) : ExecuteOptions =
     { program = decoded.Program
