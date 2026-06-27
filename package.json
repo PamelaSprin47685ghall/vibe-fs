@@ -33,6 +33,9 @@
     "opencode-pty": "^0.3.4",
     "yaml": "^2.9.0"
   },
+  "overrides": {
+    "bun-pty": "0.4.8"
+  },
   "optionalDependencies": {
     "@ff-labs/fff-node": "^0.9.4",
     "@kreuzberg/tree-sitter-language-pack": "^1.8.1",
