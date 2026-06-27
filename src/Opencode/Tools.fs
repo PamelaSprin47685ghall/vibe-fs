@@ -8,6 +8,7 @@ open Wanxiangshu.Opencode.ToolSchema
 open Wanxiangshu.Opencode.KnowledgeGraphTools
 open Wanxiangshu.Opencode.SubagentTools
 open Wanxiangshu.Opencode.ExecutorTool
+open Wanxiangshu.Opencode.PtyTools
 open Wanxiangshu.Opencode.SearchTools
 open Wanxiangshu.Opencode.ReviewTools
 open Wanxiangshu.Opencode.MimoTodoTool
@@ -25,6 +26,11 @@ let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: Finder
             yield "meditator", box (meditatorTool host registry ctx)
             yield "browser", box (browserTool host registry ctx)
             yield "executor", box (executorTool host registry ctx sessionScope)
+            yield "pty_spawn", box (ptySpawnTool host)
+            yield "pty_write", box (ptyWriteTool host)
+            yield "pty_read", box (ptyReadTool host)
+            yield "pty_list", box (ptyListTool host)
+            yield "pty_kill", box (ptyKillTool host)
             yield "fuzzy_find", box (fuzzyFindTool finderCache iteratorStore)
             yield "fuzzy_grep", box (fuzzyGrepTool finderCache iteratorStore)
             yield "websearch", box (websearchTool host registry ctx)

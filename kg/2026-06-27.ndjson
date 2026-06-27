@@ -647,3 +647,39 @@
 {"id":"ee85","entity":["知识图谱运行时","单一真源"],"fact":"知识图谱提交 SSOT=Shell.KnowledgeGraphSubmit（buildEntriesFromDrafts/submitEntriesForKind/submitDraftsForKind）；三宿主 KnowledgeGraphRuntimeIO 降为薄委托；BookkeeperPolicy 白名单 SSOT=Kernel.KnowledgeGraph.BookkeeperPolicy；作业标记 YAML 经 PromptFrontMatter，kind append/daily 双 Some+Trim 非空门禁。"}
 {"id":"41f7","entity":["方法论工具","编解码闭环"],"fact":"54 个 Methodology/*.fs 加 SchemaCommon.fs 构成工具目录编解码 SSOT；buildSchema 自动注入 intent/background 并生成 toolName（methodology_ 前缀）；enumArrayMinOpt 统一编码器；参数三路径（description/args/execute）与 ToolSchema.define 契约对齐。"}
 {"id":"a278","entity":["子代理","输入编码"],"fact":"work_input intents 字段须原生 JSON 数组非 JSON.stringify 字符串；investigator 解析要求 Array 类型，string 值触发 panic 无回退；formatPrompt(host,…) 单点分流（Mux coder 含 agent_report 尾，Opencode 不含）；子 workspaceId 独立，父 id 不自动进 tool opts。"}
+{"id":"3920","entity":["权限矩阵"],"fact":"权限矩阵终态：Opopen/Omp AgentConfig 追加 methodologyToolNames 至权限评估集合，methodology_* 工具与 todo 工具共享 canUseSemantic 判定规则（TodoFamily | MethodologyFamily 合并），三类代理（bookkeeper/mediator/executor）全拒绝维持不变；ToolPermissionTests 同步覆盖分类/语义/宿主级权限断言，权限边界全链路闭环"}
+{"id":"82ea","entity":["版本控制","工作区布局","分支结构"],"fact":"master 与 wanxiangshu-1 共享最近三个提交：62be12a(hack)、5688fce(hack)、8a1bdb2(docs(prelude): encourage parallel methodology_* tool calls)；wanxiangshu-1 多出一个独占提交 adbb3d1（methodology_* 工具权限与 todowrite 对齐），说明两分支历史在共享提交后发生分叉，该独占提交可能尚未合入 master"}
+{"id":"fb44","entity":["版本控制","权限矩阵"],"fact":"master 分支已通过 git push 接收 adbb3d1 提交（methodology_* 工具权限与 todowrite 对齐），该变更从 wanxiangshu-1 合并至主线，两分支权限矩阵实现态现已同步。"}
+{"id":"59aa","entity":["工具注册"],"fact":"HostTools.fs 工具名常量数组新增 PTY 五件套（pty_spawn/pty_write/pty_read/pty_list/pty_kill），工具注册范围扩展"}
+{"id":"a8a3","entity":["工具目录模块","Opopen宿主适配"],"fact":"Opopen 层新增 PtyTools.fs：五件 PTY 工具（pty_spawn/pty_write/pty_read/pty_list/pty_kill）通过 Import 引入 open-pty 插件（opencode-pty/plugin/pty/manager）；define 声明 schema 使用 strReq/strOpt/numOpt/boolOpt 辅助函数；checkExecPerm 校验 executor 权限，缺失时 failwithf；Dyn.str/Dyn.get 访问上下文；Promise.lift 包装结果，符合 Opopen 执行器契约。"}
+{"id":"86b9","entity":["Opopen PTY工具"],"fact":"Opopen/PtyTools.fs 实现 PTY 五件套工具（pty_spawn/pty_write/pty_read/pty_list/pty_kill），通过 Import 引入 opencode-pty/plugin/pty/manager；工具定义遵循 Opopen define/createObj 模式，执行权限通过 canUseForHost 检查，结果经 Promise.lift 包装，与编解码 SSOT 对齐。"}
+{"id":"6261","entity":["Opopen宿主适配","PTY工具注册","工具目录"],"fact":"Opopen/Tools.fs 工具注册列表新增五件 PTY 工具（pty_spawn/pty_write/pty_read/pty_list/pty_kill），Opopen PTY 工具注册路径闭环，与 HostTools PTY 命名对齐。"}
+{"id":"bbde","entity":["Opopen宿主适配","模块边界","编译依赖"],"fact":"Opopen/PluginCore.fs 新增导入声明：open Wanxiangshu.Opopen.PtyTools 与 open Wanxiangshu.Shell.TitleFetchGuardCommon，显式声明 Opopen 主机层对 PTY 工具模块与标题抓取守卫公共模块的编译依赖，消除隐式依赖隐患，与分层边界纯化同向。"}
+{"id":"330f","entity":["测试覆盖策略"],"fact":"全量单元测试覆盖纯函数路径; Shell层高价值模块(Dyn/编解码/执行路径)优先补齐; 集成测试分域收敛; 架构门禁探针保障分层边界; 覆盖率数字仅参考,全仓绿测为SSOT"}
+{"id":"aa49","entity":["编译约束"],"fact":"Fable转译禁System.Reflection/静态StringComparer; Promise内禁finally/failwith; Dyn.truthy替代强转; unbox<T>替代:?>; open Dyn后须module别名防遮蔽; Promise.reject须emitJsExpr"}
+{"id":"6518","entity":["分层架构"],"fact":"四层Kernel(纯函数)/Shell(边界编解码SSOT)/Mux/Opopen; OMP为第五宿主仅依赖Kernel+Shell禁反向引用; Dyn权威实现仅Shell/Dyn.fs"}
+{"id":"fb5a","entity":["模块边界"],"fact":"Kernel零Dyn; 宿主禁内联Dyn.str/Dyn.get读键; 反射探针须Load Shell ref; 分层依赖显式声明消除隐式依赖"}
+{"id":"233e","entity":["工具目录"],"fact":"54个Methodology/*.fs+SchemaCommon构成编解码SSOT; buildSchema自动注入intent/background生成toolName(methodology_前缀); enumArrayMinOpt统一编码器; 三路径(description/args/execute)与ToolSchema.define对齐"}
+{"id":"68ca","entity":["权限矩阵"],"fact":"ToolSemantic分15个语义族; classifyTool完成host+tool到语义族完整映射; canUseSemantic权限判定; blockedShellTaskGrepSet含plan/memory等十工具; TodoFamily权限受代理投影规则约束"}
+{"id":"7a0e","entity":["钩子系统"],"fact":"三宿主tool.execute.before语义等价API不同(Opopen setKey/Mux setKey/OMP pi.on); 阻断协议通过hook output error字段写入; TDD门控Opopen requireWarnTdd/Mux requireWarnTddMux/OMP requireWarnTddOmp为执行前强制阻断点"}
+{"id":"cd0a","entity":["参数编解码"],"fact":"执行器工具五字段(program/language/mode/timeout_type/warn)四层贯通; warn_tdd双层强制(schema注入+执行前门控); 边界编解码30+ codec驻Shell为双宿主SSOT"}
+{"id":"5301","entity":["消息投影"],"fact":"stripSyntheticBySource在backlog构建前完成全剥离; replaceArrayInPlace统一; appendToolResultSyntax消除Dyn裸访问; 探针不得进入session/UI/导出/SDK"}
+{"id":"130f","entity":["事件溯源"],"fact":"事件落盘优先内存状态更新; NDJSON单行追加; 损坏截断不跳过后续; 快照指纹校验失败则从头重放; 版本号幂等升级函数纯且无外部依赖"}
+{"id":"bc32","entity":["类型系统"],"fact":"类型消灭不可能态; 代数数据类型穷举分支; 密封类型禁止新增状态不编译; 有限状态用有限构造表达; 业务失败不伪装异常用Result分支"}
+{"id":"b8fe","entity":["文件体量约束"],"fact":"生产源码≤200行/测试≤300行硬约束; 超限须拆独立编译单元; TestsEntriesCore超限拆TestsEntriesDomain实例已落地"}
+{"id":"4ec9","entity":["测试注册惯例"],"fact":"双点登记(fsproj编译项与注册表条目同步); 单文件单一直译编译目标; 聚合run入口缩减注册条目数; 七入口列表结构稳定(core/codec/omp/fuzzy/domain/integration/architecture)"}
+{"id":"01e9","entity":["构建标准"],"fact":"npm run build-and-test为全仓绿测SSOT(Fable零失败+runner.js exit 0); 不得以build与build:tests双绿替代全量零失败; 通过规模随套件演进"}
+{"id":"5b2d","entity":["Opopen宿主适配","PTY工具注册"],"fact":"Opopen PluginCore 初始化序列补充：client 非空时执行 initPtyManager，PTY 管理器生命周期与插件上下文 client 可用性绑定，消除空引用异常风险"}
+{"id":"07f1","entity":["Opopen会话清理","PTY生命周期"],"fact":"PluginCore 事件处理管线新增 PTY 清理分支：从 Opopen host event envelope 解析 session ID，对 deleted/remove/close 事件触发 cleanupPtyBySession，在 SessionLifecycleObserver.handleEvent 前执行。"}
+{"id":"e665","entity":["执行器工具","参数编解码","全仓绿测"],"fact":"executor 工具执行 opencode-pty@^0.3.4 安装任务全链路验证通过：language=shell/mode=rw/timeout_type=long/warn=it-is-not-possible-to-do-it-using-other-tools 五参数经编解码门控后实际执行成功；npm install 新增 15 包、审计 53 包、0 漏洞，外壳执行路径实际工作状态确认。"}
+{"id":"bc2f","entity":["Opopen宿主适配","Dyn模块","编译失败","分层边界"],"fact":"Opopen/PtyTools.fs  Dyn：14处Dyn.未限定名调用(行26/33/49/50/72/106-109/113/130/134/190/192)触发FS0039；违反分层规则Dyn权威仅Shell/Dyn.fs；宿主编译单元须module Dyn = Wanxiangshu.Shell.Dyn显式别名或改用Shell编解码SSOT辅助函数；Dyn.truthy替代强转、Dyn.call0/call1替代直接调用"}
+{"id":"149d","entity":["Opopen PTY工具","工具目录"],"fact":"OpenCode PTY 工具模块 src/Opopen/PtyTools.fs 实现完成：引入 opencode-pty/plugin/pty/manager，提供 pty_spawn/pty_write/pty_read/pty_list/pty_kill 五件工具；使用 Shell.Dyn 动态访问上下文，通过 canUseForHost 校验 executor 权限，结果经 Promise.lift 包装，与 Kernel.HostTools PTY 命名集对齐。"}
+{"id":"d665","entity":["Dyn模块","分层边界","Opopen宿主适配"],"fact":"Opopen/PtyTools.fs 存在14处Dyn未定义编译错误：Opopen宿主编译单元未声明Shell.Dyn别名，违反Dyn权威仅Shell/Dyn.fs的分层规则；须module Dyn = Wanxiangshu.Shell.Dyn显式别名或改用Shell编解码SSOT辅助函数"}
+{"id":"b238","entity":["编译门禁","Fable转译"],"fact":"Fable编译失败SSOT判断：grep -E \"(error|warning|finished)\"过滤后含error行即编译失败；零失败标准为无FSHARP error输出，不以warning计数替代"}
+{"id":"1b52","entity":["分层边界","Dyn模块"],"fact":"Opopen/PtyTools.fs 编译依赖修复：将 open Wanxiangshu.Shell.Dyn 改为 module Dyn = Wanxiangshu.Shell.Dyn 显式别名，消除 Fable.Core 注入符号遮蔽导致的 FS0039 编译失败；该模式与 MuxCoverageTests/OmpCodecCoverageTests/PluginMimoTuiTests 等覆盖测试套件修复同向，统一 Dyn 权威实现仅限 Shell/Dyn.fs 的分层规则。"}
+{"id":"fe36","entity":["Opopen PTY工具","模块边界"],"fact":"Opopen/PtyTools.fs 显式声明 module Dyn = Wanxiangshu.Shell.Dyn 模块别名，消除 Fable.Core 注入符号遮蔽导致的 FS0039 编译失败，与 Shell/Dyn.fs 权威实现分层边界对齐"}
+{"id":"481e","entity":["Opopen PTY管理","函数命名调整"],"fact":"PluginCore初始化序列调整：client非空时调用storePtyClient替代initPtyManager，PTY客户端存储职责与初始化职责分离，函数命名更准确反映实际行为"}
+{"id":"befe","entity":["Fable转译","编译约束"],"fact":"Fable 5.2.0 不支持 PromiseConstructor.lift 成员；Shell/Opopen/PtyTools.fs 第26行 Promise.lift 调用触发 FSHARP error 39，须替换为 promise {} 块或 Promise.ofPromise 等兼容原语"}
+{"id":"f50e","entity":["测试覆盖策略","Shell层"],"fact":"Shell 层执行路径零覆盖：Shell/Executor.fs/FileSys.fs/ToolExecute.fs/WebFetch.fs 为实际执行路径，完全无单元测试保障，属高价值覆盖缺口"}
+{"id":"4413","entity":["Fable转译约束","Promise原语","编译修复"],"fact":"Opopen/PtyTools.fs 将 Promise.lift !managerRef 替换为 promise { return !managerRef }，修复 Fable 5.2.0 编译错误，符合 Promise.lift 成员不兼容约束"}
+{"id":"b216","entity":["全仓绿测","构建验证"],"fact":"executor 工具执行构建验证：npm run build-and-test 通过，451 passed, 0 failed，runner.js 退出码 0，构建标准全量满足。"}

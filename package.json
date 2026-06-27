@@ -30,6 +30,7 @@
   "dependencies": {
     "@fable-org/fable-library-js": "^2.1.1",
     "@opencode-ai/plugin": "^1.17.4",
+    "opencode-pty": "^0.3.4",
     "yaml": "^2.9.0"
   },
   "optionalDependencies": {

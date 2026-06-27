@@ -14,6 +14,7 @@ open Wanxiangshu.Opencode.ToolDefinitionHooks
 open Wanxiangshu.Opencode.EventHooks
 open Wanxiangshu.Opencode.Tools
 open Wanxiangshu.Opencode.HookExecute
+open Wanxiangshu.Opencode.PtyTools
 open Wanxiangshu.Shell.TitleFetchGuardCommon
 open Wanxiangshu.Opencode.SessionLifecycleObserver
 open Wanxiangshu.Opencode.KnowledgeGraphRuntime
@@ -61,6 +62,8 @@ let private createCoreServices (host: Host) (ctx: obj) =
     let scope = create ()
     let backlogSession = BacklogSession(host, scope)
     let tools = createTools host childAgentRegistry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled scope
+    let client = match getClientFromPluginCtx ctx with Ok c -> c | Error _ -> box null
+    if not (Dyn.isNullish client) then storePtyClient client
     let mcps = box {| ``type`` = "local"; command = Wanxiangshu.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
     let mcpMap = box {| ``stealth-browser-mcp`` = mcps |}
     {
@@ -91,6 +94,12 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
         promise {
             do! eventHandler services.ReviewStore input
             cleanUpJobContextIfAbortedOrDeleted services.KnowledgeGraphRuntime input
+            let ptyCleanupSessionId =
+                match Wanxiangshu.Shell.OpencodeHookInputCodec.decodeHostEventEnvelope input with
+                | Some e when e.EventType = "session.deleted" || e.EventType = "session.delete" || e.EventType = "session.remove" || e.EventType = "session.close" ->
+                    Wanxiangshu.Shell.OpencodeSessionEventCodec.getSessionID e.EventType e.Props
+                | _ -> ""
+            if ptyCleanupSessionId <> "" then cleanupPtyBySession ptyCleanupSessionId
             do! services.SessionLifecycleObserver.handleEvent input
         }))
     setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host services.BacklogSession input output))

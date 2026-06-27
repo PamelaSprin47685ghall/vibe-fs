@@ -1,6 +1,7 @@
 ---
 import: 
   - README.md
+  - ../opencode-pty/README.md
 ---
 
 - 提交仓库时候带上 kg/ 的变化

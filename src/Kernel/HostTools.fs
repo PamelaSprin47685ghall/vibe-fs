@@ -76,6 +76,7 @@ let muxSpawnToolUniverse =
 let allToolNames (host: Host) : string array =
     [| "coder"; "investigator"; "meditator"; "browser"; "executor"
        "executor_wait"; "executor_abort"
+       "pty_spawn"; "pty_write"; "pty_read"; "pty_list"; "pty_kill"
        "fuzzy_find"; "fuzzy_grep"; "websearch"; "webfetch"
        "knowledge_graph_fetch"; "return_bookkeeper"; "submit_review"; "return_reviewer"; "read"; "write"
        "bash"; taskToolName host; "grep"; "edit"; "patch"; "apply_patch"

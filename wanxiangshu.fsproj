@@ -307,6 +307,7 @@
     <Compile Include="src/Opencode/SubagentTools.fs" />
     <Compile Include="src/Methodology/OpencodeTools.fs" />
     <Compile Include="src/Opencode/ExecutorTool.fs" />
+    <Compile Include="src/Opencode/PtyTools.fs" />
     <Compile Include="src/Opencode/SearchTools.fs" />
     <Compile Include="src/Opencode/ReviewTools.fs" />
     <Compile Include="src/Opencode/Tools.fs" />
