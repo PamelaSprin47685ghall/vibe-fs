@@ -35,7 +35,7 @@ let toolCatalogCentralized () =
     let coderSpec = specOf "coder"
     check "coder spec carries description" (coderSpec.description.Length > 0)
     check "coder description names intents" (coderSpec.description.Contains "intents")
-    check "coder requires intents+tdd" (coderSpec.requiredFields = [ "intents"; "tdd" ])
+    check "coder requires intents+tdd+warn_tdd" (coderSpec.requiredFields = [ "intents"; "tdd"; "warn_tdd" ])
     check "coder param doc for intents" (Map.containsKey "intents" coderSpec.paramDocs)
     check "coder param doc for tdd" (Map.containsKey "tdd" coderSpec.paramDocs)
 

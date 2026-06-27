@@ -9,6 +9,8 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Shell.SubagentIntentsCodec
 open Wanxiangshu.Kernel.WorkBacklog
+open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Opencode.ToolSchema
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.WorkBacklogSchema
@@ -64,6 +66,47 @@ let rewriteToolJsonSchema (setKey: obj -> string -> obj -> unit) (rewrite: obj -
     else
         let parameters = get output "parameters"
         if not (isNullish parameters) then setKey output "parameters" (rewrite parameters)
+
+let warnTddProperty : obj =
+    createObj [
+        "type", box "string"
+        "minLength", box 1
+        "description", box Params.warnTddDesc
+        "enum", [| WarnTdd.canonicalValue |] |> box
+    ]
+
+let inlineJsonWarnTddProperty : obj =
+    createObj [
+        "type", box "string"
+        "enum", [| WarnTdd.canonicalValue |] |> box
+        "description", box Params.warnTddDesc
+    ]
+
+/// Inject warn_tdd into a jsonSchema (properties + required).
+let injectWarnTddIntoJsonSchema (schema: obj) : obj =
+    if isNullish schema then schema
+    else
+        let props = get schema "properties"
+        if isNullish props then schema
+        elif isNullish (get props "warn_tdd") then
+            let existingRequired = get schema "required"
+            let nextRequired =
+                if isArray existingRequired then
+                    let arr = unbox<obj[]> existingRequired
+                    if arr |> Array.exists (fun x -> string x = "warn_tdd") then existingRequired
+                    else Array.append arr [| box "warn_tdd" |] |> box
+                else box [| box "warn_tdd" |]
+            createObj [
+                for key in Dyn.keys schema do
+                    if key = "properties" then
+                        yield key, createObj (
+                            [ for pkey in Dyn.keys props do yield pkey, get props pkey
+                              yield "warn_tdd", inlineJsonWarnTddProperty ]
+                        )
+                    elif key = "required" then yield key, nextRequired
+                    else yield key, get schema key
+            ]
+        else schema
 
 let private stringZodProperty (description: string) : obj =
     createObj [
