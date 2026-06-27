@@ -11,10 +11,12 @@ open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.OmpToolSchema
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
-let private executeSchema (pi: obj) (schema: MethodologySchema) =
+let private executeSchema (pi: obj) (schema: MethodologySchema) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) =
     fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
         promise {
             match parse schema params' with
@@ -24,12 +26,12 @@ let private executeSchema (pi: obj) (schema: MethodologySchema) =
                 let intent = renderMeditatorIntent schema yaml
                 let prompt = formatPrompt omp (Meditator(intent, [])) |> List.head
                 try
-                    let! text = runSubagent pi ctx [||] prompt (Some signal)
+                    let! text = runSubagent pi ctx [||] prompt (Some signal) fallbackRuntime fallbackConfigOpt
                     return textResult text
                 with ex -> return asErrorResult ex
         }
 
-let registerMethodologyTools (pi: obj) : unit =
+let registerMethodologyTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : unit =
     let tb = Dyn.get pi "typebox"
     for schema in allSchemas do
         pi?registerTool(
@@ -38,5 +40,5 @@ let registerMethodologyTools (pi: obj) : unit =
                 "label", box schema.toolName
                 "description", box schema.toolDescription
                 "parameters", methodologyParameters schema tb
-                "execute", box (executeSchema pi schema)
+                "execute", box (executeSchema pi schema fallbackRuntime fallbackConfigOpt)
             ])

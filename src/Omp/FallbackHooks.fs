@@ -83,11 +83,20 @@ let ompActionExecutor (sessionApi: obj) : IActionExecutor =
 let private setConsumedFromResult (runtime: FallbackRuntimeState) (sessionID: string) (result: FallbackHookResult) : unit =
     runtime.SetConsumed sessionID result.Consumed
 
-let private clearConsumedOnLifecycle (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : unit =
+let private clearConsumedOnNewUserMessage (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : unit =
+    if ompEventTranslator.IsNewUserMessage rawEvent then
+        runtime.ClearConsumed sessionID
+
+let private bindAgentName (runtime: FallbackRuntimeState) (rawEvent: obj) : unit =
     let eventObj = Dyn.get rawEvent "event"
     let eventType = Dyn.str eventObj "type"
-    if eventType = "session.busy" || eventType = "session.idle" || eventType = "message.updated" then
-        runtime.ClearConsumed sessionID
+    if eventType = "session.busy" || eventType = "session.updated" then
+        let info = Dyn.get eventObj "info"
+        if not (Dyn.isNullish info) then
+            let agent = Dyn.str info "agent"
+            if agent <> "" then
+                let sid = ompEventTranslator.ExtractSessionID rawEvent
+                if sid <> "" then runtime.SetAgentName sid agent
 
 let createOmpFallbackHandler
     (runtime       : FallbackRuntimeState)
@@ -98,15 +107,11 @@ let createOmpFallbackHandler
     fun (rawEvent: obj) ->
         promise {
             let sessionID = ompEventTranslator.ExtractSessionID rawEvent
+            bindAgentName runtime rawEvent
             let! result = baseHandler rawEvent
             setConsumedFromResult runtime sessionID result
-            clearConsumedOnLifecycle runtime sessionID rawEvent
+            clearConsumedOnNewUserMessage runtime sessionID rawEvent
             return result
         }
 
-let createOmpFallbackHandlerLegacy
-    (runtime       : FallbackRuntimeState)
-    (configLookup  : ConfigLookup)
-    (sessionApi    : obj)
-    : (obj -> JS.Promise<FallbackHookResult>) =
-    createHandler ompEventTranslator runtime configLookup (ompActionExecutor sessionApi)
+

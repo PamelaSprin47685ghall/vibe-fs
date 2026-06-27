@@ -38,7 +38,7 @@ let createChildSessionReviewToolNames () = promise {
     let captured = ref [||]
     let pi = mockPi captured
     let ctx = createObj [ "cwd", box "/tmp/ws" ]
-    let! _ = createChildSession pi ctx ompReviewChildToolNames None [||]
+    let! _ = createChildSession pi ctx ompReviewChildToolNames None [||] None
     equal "review child tool count" ompReviewChildToolNames.Length captured.Value.Length
     for i in 0 .. ompReviewChildToolNames.Length - 1 do
         equal ("review child tool " + string i) ompReviewChildToolNames.[i] captured.Value.[i]
@@ -49,7 +49,7 @@ let createChildSessionRunnerToolNames () = promise {
     let captured = ref [||]
     let pi = mockPi captured
     let ctx = createObj [ "cwd", box "/tmp/ws" ]
-    let! _ = createChildSession pi ctx ompRunnerChildToolNames None [||]
+    let! _ = createChildSession pi ctx ompRunnerChildToolNames None [||] None
     equal "runner child tool count" ompRunnerChildToolNames.Length captured.Value.Length
     for i in 0 .. ompRunnerChildToolNames.Length - 1 do
         equal ("runner child tool " + string i) ompRunnerChildToolNames.[i] captured.Value.[i]

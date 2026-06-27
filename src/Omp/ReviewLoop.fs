@@ -79,7 +79,7 @@ let runReviewLoop (pi: obj) (ctx: obj) (store: ReviewStore) (parentId: string) (
     : JS.Promise<JsReviewResult> =
     promise {
         let resolved = ref None
-        let! child = createChildSession pi ctx ompReviewChildToolNames None [||]
+        let! child = createChildSession pi ctx ompReviewChildToolNames None [||] None
         let childSession = child.session
         let childCtx = createObj [ "sessionManager", Dyn.get childSession "sessionManager" ]
         let childId = getSessionIdFromContext childCtx |> Option.defaultValue ""
@@ -121,7 +121,7 @@ let runPreReviewerSession (pi: obj) (ctx: obj) (store: ReviewStore) (task: strin
             | None -> return Terminated
             | Some parentId ->
                 let resolved = ref None
-                let! child = createChildSession pi ctx ompReviewChildToolNames None [||]
+                let! child = createChildSession pi ctx ompReviewChildToolNames None [||] None
                 let childSession = child.session
                 let childCtx = createObj [ "sessionManager", Dyn.get childSession "sessionManager" ]
                 let childId = getSessionIdFromContext childCtx |> Option.defaultValue ""

@@ -71,7 +71,7 @@ let registerExecutorTools (pi: obj) : unit =
                                 unregisterRunnerChild parentId
                             disposeChild ()
                         try
-                            let! child = createChildSession pi ctx ompRunnerChildToolNames None [||]
+                            let! child = createChildSession pi ctx ompRunnerChildToolNames None [||] None
                             childHolder <- Some child
                             let childSession = child.session
                             let childCtx = createObj [ "sessionManager", Dyn.get childSession "sessionManager" ]

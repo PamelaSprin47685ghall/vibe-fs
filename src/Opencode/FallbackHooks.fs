@@ -106,9 +106,8 @@ let opencodeActionExecutor (client: obj) : IActionExecutor =
 let private setConsumedFromResult (runtime: FallbackRuntimeState) (sessionID: string) (result: FallbackHookResult) : unit =
     runtime.SetConsumed sessionID result.Consumed
 
-let private clearConsumedOnLifecycle (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : unit =
-    let eventType = getEventType rawEvent
-    if eventType = "session.busy" || eventType = "session.idle" || eventType = "message.updated" then
+let private clearConsumedOnNewUserMessage (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : unit =
+    if opencodeEventTranslator.IsNewUserMessage rawEvent then
         runtime.ClearConsumed sessionID
 
 let createOpencodeFallbackHandler
@@ -123,27 +122,6 @@ let createOpencodeFallbackHandler
             let sessionID = opencodeEventTranslator.ExtractSessionID rawEvent
             let! result = baseHandler rawEvent
             setConsumedFromResult runtime sessionID result
-            clearConsumedOnLifecycle runtime sessionID rawEvent
+            clearConsumedOnNewUserMessage runtime sessionID rawEvent
             return result
         }
-
-let createOpencodeFallbackHandlerLegacy
-    (client: obj)
-    (runtime: FallbackRuntimeState)
-    (configLookup: ConfigLookup)
-    : (obj -> JS.Promise<FallbackHookResult>) =
-    createHandler opencodeEventTranslator runtime configLookup (opencodeActionExecutor client)
-
-let createOpencodeFallbackHandlerWithRegistry
-    (client: obj)
-    (runtime: FallbackRuntimeState)
-    (configLookup: ConfigLookup)
-    (registry: ChildAgentRegistry)
-    : (obj -> JS.Promise<FallbackHookResult>) =
-    createOpencodeFallbackHandler client runtime configLookup registry
-
-let trackConsumedFromResult (runtime: FallbackRuntimeState) (sessionID: string) (result: FallbackHookResult) : unit =
-    setConsumedFromResult runtime sessionID result
-
-let clearConsumedOnLifecycleEvent (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : unit =
-    clearConsumedOnLifecycle runtime sessionID rawEvent

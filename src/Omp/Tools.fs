@@ -13,15 +13,17 @@ open Wanxiangshu.Methodology.OmpTools
 open Wanxiangshu.Shell.FuzzyFinderShell
 open Wanxiangshu.Shell.KnowledgeGraphFiles
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
-let registerAllTools (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) : unit =
+let registerAllTools (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : unit =
     let finderCache = FinderCache()
     registerFuzzyTools pi finderCache
-    registerWebTools pi
+    registerWebTools pi fallbackRuntime fallbackConfigOpt
     registerExecutorTools pi
-    registerSubagentTools pi
+    registerSubagentTools pi fallbackRuntime fallbackConfigOpt
     registerTodoTool pi
-    registerMethodologyTools pi
+    registerMethodologyTools pi fallbackRuntime fallbackConfigOpt
     registerLoopFeatures pi reviewStore
     registerContextTransform pi reviewStore kgRuntime
     ensureKnowledgeGraphTools pi kgRuntime (Wanxiangshu.Shell.Dyn.str pi "cwd")

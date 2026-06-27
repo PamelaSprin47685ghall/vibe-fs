@@ -111,39 +111,38 @@ type SessionLifecycleObserver
                     }
                 | None -> Promise.lift false
 
-            // Orphan parent: child idle → resume stuck parent (event-driven, zero-timer)
+            // Orphan parent: busyCount tracking + child-idle → resume stuck parent (event-driven, zero-timer)
             match eventEnvelope with
             | Some { EventType = "session.status"; Props = props } ->
                 let status = Dyn.str (Dyn.get props "status") "status"
                 let sid = getSessionID "session.status" props
-                if sid <> "" && status = "busy" then
-                    fallbackRuntime.SetBusyCount sid 1
-                elif sid <> "" && status = "idle" then
-                    let previousBusyCount = fallbackRuntime.GetBusyCount sid
-                    fallbackRuntime.SetBusyCount sid 0
-                    // Orphan parent: child idle -> parent busyCount still >0 means parent stuck; abort+resume
-                    if (registry.LookupChildAgent sid).IsSome then
-                        match registry.ResolveSubsessionParentID (Some sid) with
-                        | Some parentSid when parentSid <> "" && fallbackRuntime.GetBusyCount parentSid > 0 ->
-                            let pst = fallbackRuntime.GetOrCreateState parentSid
+                if sid <> "" then
+                    if status = "busy" then
+                        fallbackRuntime.SetBusyCount sid (fallbackRuntime.GetBusyCount sid + 1)
+                    elif status = "idle" then
+                        let previousBusyCount = fallbackRuntime.GetBusyCount sid
+                        fallbackRuntime.SetBusyCount sid (max 0 (previousBusyCount - 1))
+                        // Orphan parent: busyCount dropped from >1 to 1 → abort+resume this session
+                        if previousBusyCount > 1 && fallbackRuntime.GetBusyCount sid = 1 then
+                            let pst = fallbackRuntime.GetOrCreateState sid
                             if not pst.Cancelled && not pst.TaskComplete then
                                 match getClientFromPluginCtx ctx with
                                 | Ok client ->
-                                    do! abortSession client parentSid
-                                    do! promptSession client parentSid "continue"
+                                    do! abortSession client sid
+                                    do! promptSession client sid "continue"
                                 | Error _ -> ()
-                        | _ -> ()
-                    // Track busyCount drop on parent sessions too (for explicit orphan detection via busyCount)
-                    elif previousBusyCount > 1 && fallbackRuntime.GetBusyCount sid = 0 then
-                        let pst = fallbackRuntime.GetOrCreateState sid
-                        if not pst.Cancelled && not pst.TaskComplete then
-                            match getClientFromPluginCtx ctx with
-                            | Ok client ->
-                                do! abortSession client sid
-                                do! promptSession client sid "continue"
-                            | Error _ -> ()
-                elif sid <> "" && status = "busy" then
-                    fallbackRuntime.SetBusyCount sid (fallbackRuntime.GetBusyCount sid + 1)
+                        // Child-idle orphan: child session idle → parent still busy → abort+resume parent
+                        if (registry.LookupChildAgent sid).IsSome then
+                            match registry.ResolveSubsessionParentID (Some sid) with
+                            | Some parentSid when parentSid <> "" && fallbackRuntime.GetBusyCount parentSid > 0 ->
+                                let pst = fallbackRuntime.GetOrCreateState parentSid
+                                if not pst.Cancelled && not pst.TaskComplete then
+                                    match getClientFromPluginCtx ctx with
+                                    | Ok client ->
+                                        do! abortSession client parentSid
+                                        do! promptSession client parentSid "continue"
+                                    | Error _ -> ()
+                            | _ -> ()
             | _ -> ()
 
             if fbConsumed then

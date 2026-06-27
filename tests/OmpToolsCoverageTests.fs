@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.FallbackRuntimeState
 module Dyn = Wanxiangshu.Shell.Dyn
 
 let toolNames (h: PiHarness) =
@@ -31,7 +32,7 @@ let run () = promise {
     resetPluginState ()
     let h2 = createPiHarness ()
     let pi2 = piObject h2
-    Wanxiangshu.Omp.WebTools.registerWebTools pi2
+    Wanxiangshu.Omp.WebTools.registerWebTools pi2 (FallbackRuntimeState()) None
     let names2 = toolNames h2 |> Set.ofList
     check "websearch tool registered" (names2.Contains "websearch")
     check "webfetch tool registered" (names2.Contains "webfetch")

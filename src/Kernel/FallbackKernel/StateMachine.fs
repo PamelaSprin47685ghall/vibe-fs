@@ -30,16 +30,14 @@ let transition (state: SessionFallbackState) (evt: FallbackEvent) (cfg: Fallback
                 ns, FallbackAction.DoNothing
 
             | FallbackPhase.Idle, ErrorClass.RetrySame ->
-                let k = state.FailureCount + 1
                 match selectModel chain state.CurrentIndex with
-                | Some m -> sendOrAbort cfg m { state with Phase = FallbackPhase.Retrying 1; FailureCount = k }
-                | None -> { state with Phase = FallbackPhase.Exhausted; FailureCount = k }, FallbackAction.PropagateFailure
+                | Some m -> sendOrAbort cfg m { state with Phase = FallbackPhase.Retrying 1 }
+                | None -> { state with Phase = FallbackPhase.Exhausted }, FallbackAction.PropagateFailure
 
             | FallbackPhase.Retrying count, ErrorClass.RetrySame when count < cfg.MaxRetries ->
-                let k = state.FailureCount + 1
                 match selectModel chain state.CurrentIndex with
-                | Some m -> sendOrAbort cfg m { state with Phase = FallbackPhase.Retrying (count + 1); FailureCount = k }
-                | None -> { state with Phase = FallbackPhase.Exhausted; FailureCount = k }, FallbackAction.PropagateFailure
+                | Some m -> sendOrAbort cfg m { state with Phase = FallbackPhase.Retrying (count + 1) }
+                | None -> { state with Phase = FallbackPhase.Exhausted }, FallbackAction.PropagateFailure
 
             | _, ErrorClass.ImmediateFallback
             | _, ErrorClass.Exhausted

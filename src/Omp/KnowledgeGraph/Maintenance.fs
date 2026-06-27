@@ -74,7 +74,7 @@ let startBookkeeperAppend
         promise {
             try
                 let ctx = createObj [ "cwd", box root ]
-                let! child = createChildSession pi ctx bookkeeperChildTools None [||]
+                let! child = createChildSession pi ctx bookkeeperChildTools None [||] None
                 let sm = Dyn.get child.session "sessionManager"
                 let childId =
                     let sid = Dyn.str child.session "id"
