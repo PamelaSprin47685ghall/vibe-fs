@@ -20,6 +20,7 @@ open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.PatchToolsCodec
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Shell.Dyn
 
 let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (args: obj) : unit =
@@ -29,12 +30,21 @@ let private rewriteMimocodeApplyPatchArgsForExecute (output: obj) (input: obj) (
         | Result.Ok fields -> setHookArgs output (createObj [ "patchText", box fields.PatchText ])
         | Result.Error e -> setHookError output (wireEncodeToolError "apply_patch" e)
 
+let private requireWarnTdd (tool: string) (args: obj) (output: obj) : unit =
+    if not (WarnTdd.isModificationTool tool) then ()
+    else
+        let raw = Dyn.str args "warn_tdd"
+        match WarnTdd.parseWarnTdd raw with
+        | Some _ -> Dyn.deleteKey args "warn_tdd"
+        | None -> setHookError output (wireDomainFailure tool (Domain.InvalidIntent(tool, "warn_tdd", "required — acknowledge TDD + Kolmolgorov discipline")))
+
 let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let args = argsFromHookOutput output
         if Dyn.isNullish args then ()
         else
             let tool = toolNameFromHookInput input
+            requireWarnTdd tool args output
             setUiLabel args tool
             if host = Mimocode then
                 rewriteMimocodeApplyPatchArgsForExecute output input args

@@ -28,7 +28,7 @@ let muxExecutorRwTriggersMaintenanceSpec () = promise {
         check "mux registration exposes executor tool" false
     else
         let ctx = muxToolConfig workspaceDir "mux-executor-maintenance"
-        let args = createObj [ "language", box "shell"; "program", box "printf mux-maintenance"; "timeout_type", box "short"; "mode", box "rw"; "warn", box "it-is-not-possible-to-do-this-using-other-tools" ]
+        let args = createObj [ "language", box "shell"; "program", box "printf mux-maintenance"; "timeout_type", box "short"; "mode", box "rw"; "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
         let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         check "mux rw executor returns output" (result.Contains "mux-maintenance")
         let after = get reg "tool.execute.after"

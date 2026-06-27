@@ -27,7 +27,7 @@ let private executeSubagent (host: Host) (registry: ChildAgentRegistry) (ctx: ob
 let coderTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =
     let coderRequiredKeys = subagentRequiredKeys "coder"
     define coder
-        (subagentZodShape coderRequiredKeys (createObj [ "intents", coderIntentsSchema Params.coderIntents; "tdd", enumReq [| "red"; "green" |] Params.coderTdd; "_ui", uiParam ]))
+        (subagentZodShape coderRequiredKeys (createObj [ "intents", coderIntentsSchema Params.coderIntents; "tdd", enumReq [| "red"; "green" |] Params.coderTdd; "warn_tdd", enumReq [| WarnTdd.canonicalValue |] Params.warnTddDesc; "_ui", uiParam ]))
         (fun args context -> executeSubagent host registry ctx "coder" args context)
 
 let investigatorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) : obj =

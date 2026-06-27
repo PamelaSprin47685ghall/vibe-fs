@@ -6,6 +6,8 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Shell
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Config
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Mux.Wrappers
 open Wanxiangshu.Mux.WrappersReview
 open Wanxiangshu.Mux.KnowledgeGraphToolDefs
@@ -23,6 +25,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MuxHookInputCodec
 open Wanxiangshu.Kernel.KnowledgeGraph.BookkeeperPolicy
 open Wanxiangshu.Shell.ChatTransformOutputCodec
+open Wanxiangshu.Shell.ToolExecute
 
 let muxToolNames =
     Array.append
@@ -105,11 +108,20 @@ let toolExecuteAfter
             setHookOutputStringMux output (Wanxiangshu.Kernel.ToolOutputInfo.withBookkeepingHints originalOutput)
     }
 
-let toolExecuteBefore (input: obj) (_output: obj) : JS.Promise<unit> =
+let private requireWarnTddMux (tool: string) (args: obj) (output: obj) : unit =
+    if not (Wanxiangshu.Kernel.WarnTdd.isModificationTool tool) then ()
+    else
+        let raw = Dyn.str args "warn_tdd"
+        match Wanxiangshu.Kernel.WarnTdd.parseWarnTdd raw with
+        | Some _ -> Dyn.deleteKey args "warn_tdd"
+        | None -> setHookErrorMux output (wireDomainFailure tool (InvalidIntent(tool, "warn_tdd", "required — acknowledge TDD + Kolmolgorov discipline")))
+
+let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let tool = toolNameFromHookInputMux input
         let args = Dyn.get input "args"
         if not (Dyn.isNullish args) then
+            requireWarnTddMux tool args output
             let raw = Dyn.get args "intents"
             let labelResult =
                 match tool with

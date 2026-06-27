@@ -31,6 +31,7 @@
     <Compile Include="src/Kernel/SubagentPrompts.fs" />
     <Compile Include="src/Kernel/OmpPrompts.fs" />
     <Compile Include="src/Kernel/Subagent.fs" />
+    <Compile Include="src/Kernel/WarnTdd.fs" />
     <Compile Include="src/Kernel/ToolCatalog/ToolSpec.fs" />
     <Compile Include="src/Kernel/ToolCatalog/Subagent.fs" />
     <Compile Include="src/Kernel/ToolCatalog/Search.fs" />
@@ -145,6 +146,7 @@
     <Compile Include="src/Kernel/Nudge/EventHandler.fs" />
     <Compile Include="src/Kernel/Nudge/Registry.fs" />
     <Compile Include="src/Kernel/Config.fs" />
+    <Compile Include="src/Kernel/WarnTdd.fs" />
     <Compile Include="src/Kernel/FuzzyPath.fs" />
     <Compile Include="src/Kernel/FuzzyQuery.fs" />
     <Compile Include="src/Kernel/FuzzyFormat.fs" />

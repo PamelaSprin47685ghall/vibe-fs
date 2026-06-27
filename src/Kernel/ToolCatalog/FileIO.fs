@@ -1,6 +1,7 @@
 module Wanxiangshu.Kernel.ToolCatalog.FileIO
 
 open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
+open Wanxiangshu.Kernel
 
 let internal readSpec: ToolSpec =
     { name = "read"
@@ -20,5 +21,7 @@ let internal writeSpec: ToolSpec =
       paramDocs =
         map
             [ "file_path", "The absolute or relative path of the file to write"
-              "content", "The content to write to the file" ]
-      requiredFields = [ "file_path"; "content" ] }
+              "content", "The content to write to the file"
+              "warn_tdd",
+              "TDD discipline acknowledgement: '" + Wanxiangshu.Kernel.WarnTdd.canonicalValue + "' — I confirm I have followed TDD and Kolmolgorov principles, never skipping red phase." ]
+      requiredFields = [ "file_path"; "content"; "warn_tdd" ] }

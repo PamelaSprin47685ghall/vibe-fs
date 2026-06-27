@@ -34,8 +34,8 @@ let private parseModeField (value: string) : Result<string, DomainError> =
 
 let private parseWarnField (value: string) : Result<ExecutorWarn, DomainError> =
     match value.Trim() with
-    | "it-is-not-possible-to-do-this-using-other-tools" -> Ok ItIsNotPossibleToDoThisUsingOtherTools
-    | _ -> Error (InvalidIntent ("executor", "warn", "must be 'it-is-not-possible-to-do-this-using-other-tools'"))
+    | "it-is-not-possible-to-do-it-using-other-tools" -> Ok ItIsNotPossibleToDoThisUsingOtherTools
+    | _ -> Error (InvalidIntent ("executor", "warn", "must be 'it-is-not-possible-to-do-it-using-other-tools'"))
 
 let peekExecutorMode (args: obj) : string option =
     strField args "mode" |> Option.map (fun s -> s.Trim())

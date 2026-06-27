@@ -152,7 +152,7 @@ let muxExecutorFailureDoesNotBookkeepSpec () = promise {
         check "mux registration exposes executor tool" false
     else
         let ctx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-executor-fail"; "workspaceId", box "mux-executor-fail" ]
-        let args = createObj [ "language", box "shell"; "program", box "exit 1"; "timeout_type", box "short"; "mode", box "rw"; "warn", box "it-is-not-possible-to-do-this-using-other-tools" ]
+        let args = createObj [ "language", box "shell"; "program", box "exit 1"; "timeout_type", box "short"; "mode", box "rw"; "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
         let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         check "executor failure reports non-zero exit" (result.Contains "exited with code 1")
         do! waitForBackgroundJobsForTesting reg

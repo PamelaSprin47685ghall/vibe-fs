@@ -20,7 +20,7 @@ let muxExecutorRoCatPrependsWarningSpec () = promise {
         check "mux registration exposes executor tool for ro warning" false
     else
         let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box "mux-executor-ro-warning"; "sessionID", box "mux-executor-ro-warning" ]
-        let args = createObj [ "language", box "shell"; "program", box "cat /etc/passwd"; "timeout_type", box "short"; "mode", box "ro"; "warn", box "it-is-not-possible-to-do-this-using-other-tools" ]
+        let args = createObj [ "language", box "shell"; "program", box "cat /etc/passwd"; "timeout_type", box "short"; "mode", box "ro"; "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
         let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
         check "mux executor ro cat includes misuse hint in envelope" (
             hasExactHint result hintExecutorMisuse)

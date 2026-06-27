@@ -1,6 +1,7 @@
 module Wanxiangshu.Kernel.ToolCatalog.Executor
 
 open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
+open Wanxiangshu.Kernel
 
 let internal executorSpec: ToolSpec =
     { name = "executor"
@@ -16,8 +17,10 @@ let internal executorSpec: ToolSpec =
               "mode",
               "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)."
               "warn",
-              "Warning acknowledgement: 'it-is-not-possible-to-do-this-using-other-tools' — acknowledge that this task cannot be done with other tools." ]
-      requiredFields = [ "language"; "program"; "timeout_type"; "mode"; "warn" ] }
+              "Warning acknowledgement: 'it-is-not-possible-to-do-this-using-other-tools' — acknowledge that this task cannot be done with other tools."
+              "warn_tdd",
+              "TDD discipline acknowledgement: '" + Wanxiangshu.Kernel.WarnTdd.canonicalValue + "' — I confirm I have followed TDD and Kolmolgorov principles, never skipping red phase." ]
+      requiredFields = [ "language"; "program"; "timeout_type"; "mode"; "warn"; "warn_tdd" ] }
 
 let internal executorWaitSpec: ToolSpec =
     { name = "executor_wait"

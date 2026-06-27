@@ -45,6 +45,7 @@ let coderParameters (tb: obj) : obj =
         [|
             ("intents", arrayOf (coderIntentItem tb) Params.coderIntents tb)
             ("tdd", enumOf [| "red"; "green" |] Params.coderTdd tb)
+            ("warn_tdd", enumOf [| Wanxiangshu.Kernel.WarnTdd.canonicalValue |] Params.warnTddDesc tb)
         |]
         tb
 
@@ -80,7 +81,8 @@ let executorParameters (tb: obj) : obj =
             ("dependencies", opt Params.executorDeps tb (fun desc tb -> strArray desc tb))
             ("timeout_type", enumOf [| "short"; "long"; "last-resort" |] Params.executorTimeout tb)
             ("mode", enumOf [| "ro"; "rw" |] Params.executorMode tb)
-            ("warn", enumOf [| "it-is-not-possible-to-do-this-using-other-tools" |] Params.executorWarn tb)
+            ("warn", enumOf [| "it-is-not-possible-to-do-it-using-other-tools" |] Params.executorWarn tb)
+            ("warn_tdd", enumOf [| Wanxiangshu.Kernel.WarnTdd.canonicalValue |] Params.warnTddDesc tb)
             ("what_to_summarize", opt "Optional summary focus for long executor output." tb str)
         |]
         tb

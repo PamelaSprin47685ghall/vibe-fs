@@ -43,18 +43,30 @@ let private normalizePatchArgs (toolName: string) (args: obj) : unit =
 /// and `_ui` label injection for subagent intents. Called by both the
 /// `tool_call` pre-execute hook and the `tool_result` post-execute hook
 /// (the latter via `applyToolCallHook` to keep the logic in one place).
-let applyPreExecuteHook (toolName: string) (args: obj) : unit =
+let private requireWarnTddOmp (toolName: string) (args: obj) : string option =
+    if not (Wanxiangshu.Kernel.WarnTdd.isModificationTool toolName) then None
+    else
+        let raw = Dyn.str args "warn_tdd"
+        match Wanxiangshu.Kernel.WarnTdd.parseWarnTdd raw with
+        | Some _ ->
+            Dyn.deleteKey args "warn_tdd"
+            None
+        | None -> Some (sprintf "Tool '%s': warn_tdd required — acknowledge TDD + Kolmolgorov discipline" toolName)
+
+let applyPreExecuteHook (toolName: string) (args: obj) : string option =
     normalizePatchArgs toolName args
     setUiLabel args toolName
+    requireWarnTddOmp toolName args
 
 /// Apply the Omp pre-tool argument normalisations that must run before any
 /// downstream consumer reads the args reference. pi exposes a `tool_call`
 /// hook that fires pre-execute — this is the right insertion point.
-let applyToolCallHook (toolName: string) (args: obj) : unit =
+/// Returns Some error message if the tool call should be blocked.
+let applyToolCallHook (toolName: string) (args: obj) : string option =
     applyPreExecuteHook toolName args
 
 /// Apply the Omp post-tool argument normalisations. Runs the same normalisation
 /// as a post-execute idempotency guard — the `tool_call` pre-hook might not
 /// fire under race conditions, so `tool_result` is the last safe insertion point.
 let applyToolResultHook (toolName: string) (args: obj) : unit =
-    applyPreExecuteHook toolName args
+    applyPreExecuteHook toolName args |> ignore

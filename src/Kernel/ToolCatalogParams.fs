@@ -18,6 +18,8 @@ let executorDeps = executor "dependencies"
 let executorTimeout = executor "timeout_type"
 let executorMode = executor "mode"
 let executorWarn = executor "warn"
+
+let warnTddDesc = doc "executor" "warn_tdd"
 let fetchKnowledgeGraphEntity = doc "knowledge_graph_fetch" "entity"
 let submitKnowledgeGraphEntries = doc "return_bookkeeper" "entries"
 let kgEntryId = doc "return_bookkeeper" "id"

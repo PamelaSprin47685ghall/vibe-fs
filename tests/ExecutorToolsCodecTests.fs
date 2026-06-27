@@ -14,7 +14,7 @@ let decodeExecutorInvalidLanguage () =
             "program", box "echo hi"
             "timeout_type", box "short"
             "mode", box "ro"
-            "warn", box "it-is-not-possible-to-do-this-using-other-tools"
+            "warn", box "it-is-not-possible-to-do-it-using-other-tools"
         ]
     match decodeExecutorArgs args with
     | Error (InvalidIntent ("executor", "language", "expected shell, python, or javascript")) ->
@@ -22,7 +22,7 @@ let decodeExecutorInvalidLanguage () =
     | _ -> check "executor invalid language" false
 
 let decodeExecutorMissingProgram () =
-    let args = createObj [ "language", box "shell"; "mode", box "ro"; "warn", box "it-is-not-possible-to-do-this-using-other-tools" ]
+    let args = createObj [ "language", box "shell"; "mode", box "ro"; "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
     match decodeExecutorArgs args with
     | Error (InvalidIntent ("executor", "program", "required")) -> check "executor missing program" true
     | _ -> check "executor missing program" false
@@ -37,7 +37,7 @@ let decodeExecutorInvalidWarn () =
             "warn", box "nope"
         ]
     match decodeExecutorArgs args with
-    | Error (InvalidIntent ("executor", "warn", "must be 'it-is-not-possible-to-do-this-using-other-tools'")) ->
+    | Error (InvalidIntent ("executor", "warn", "must be 'it-is-not-possible-to-do-it-using-other-tools'")) ->
         check "executor invalid warn" true
     | _ -> check "executor invalid warn" false
 
@@ -61,7 +61,7 @@ let decodeExecutorOkShell () =
             "dependencies", box [| "dep-a" |]
             "timeout_type", box "long"
             "mode", box "rw"
-            "warn", box "it-is-not-possible-to-do-this-using-other-tools"
+            "warn", box "it-is-not-possible-to-do-it-using-other-tools"
         ]
     match decodeExecutorArgs args with
     | Ok ex ->

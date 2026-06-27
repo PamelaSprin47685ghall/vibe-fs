@@ -84,14 +84,20 @@ let toolCallHandler (_pi: obj) (_reviewStore: ReviewStore) (_kgRuntime: OmpKnowl
     promise {
         let toolName = Dyn.str event "toolName"
         let args = getToolInput event
-        applyToolCallHook toolName args
-        match getSessionIdFromContext ctx with
-        | Some sessionId when not (isChildSession sessionId) && isChildOnlyTool toolName ->
+        match applyToolCallHook toolName args with
+        | Some reason ->
             return createObj [
                 "block", box true
-                "reason", box (sprintf "Tool '%s' is child-session-only; delegate via a subagent." toolName)
+                "reason", box reason
             ]
-        | _ -> return None
+        | None ->
+            match getSessionIdFromContext ctx with
+            | Some sessionId when not (isChildSession sessionId) && isChildOnlyTool toolName ->
+                return createObj [
+                    "block", box true
+                    "reason", box (sprintf "Tool '%s' is child-session-only; delegate via a subagent." toolName)
+                ]
+            | _ -> return None
     }
 
 /// turn_start handler: re-applies active-tool filtering at the start of each
