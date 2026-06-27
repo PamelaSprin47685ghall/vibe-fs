@@ -134,7 +134,7 @@ let applyOverride_matchesSpacedAgentName () =
     match extractFallbackConfig fm with
     | Some cfg ->
         let overrides = buildAgentModelOverrides cfg
-        let keys : string[] = unbox (JS.Object.keys agentObj)
+        let keys : string[] = unbox (JS.Constructors.Object.keys agentObj)
         let matched =
             keys
             |> Array.choose (fun origKey ->

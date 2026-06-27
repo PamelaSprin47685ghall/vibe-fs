@@ -135,7 +135,7 @@ let private applyFallbackModelOverrides (cfg: obj) (fbCfgOpt: FallbackConfig opt
         let agentObj = Dyn.get cfg "agent"
         if Dyn.isNullish agentObj then ()
         else
-            let agentKeys : string[] = unbox (JS.Object.keys agentObj)
+            let agentKeys : string[] = unbox (JS.Constructors.Object.keys agentObj)
             for kv in overrides do
                 for i = 0 to agentKeys.Length - 1 do
                     let origKey = agentKeys.[i]
