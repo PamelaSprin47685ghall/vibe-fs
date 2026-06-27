@@ -55,7 +55,7 @@ let reviewerVerdictPromptsShared () =
     check "loop-review verdict mentions actionable" (preReview.Contains "actionable")
 
 let reviewResultFormattingShared () =
-    let accepted = formatReviewResult ReviewResult.Accepted
+    let accepted = formatReviewResult (ReviewResult.Accepted "")
     check "accepted text mentions passed" (accepted.ToLower().Contains "passed" || accepted.ToLower().Contains "accepted")
     check "accepted text signals with-review ended" (accepted.ToLower().Contains "with-review")
 
@@ -97,18 +97,22 @@ let reviewDecisionPolicy () =
     equal "pass before double-check asks for re-evaluation"
         AskDoubleCheck (decideReviewSubmission Pass "" false)
     equal "pass after double-check finalizes as accepted"
-        (Finalize Accepted) (decideReviewSubmission Pass "" true)
+        (Finalize (Accepted "")) (decideReviewSubmission Pass "" true)
 
 let reviewMarkdownCodec () =
     check "format pass is exactly PASS" (formatReviewVerdictMarkdown Pass "" = "PASS")
+    check "format pass with feedback" ((formatReviewVerdictMarkdown Pass "nice style").Contains "nice style")
+    check "format pass with feedback starts with PASS" ((formatReviewVerdictMarkdown Pass "nice style").StartsWith "PASS")
     check "format reject embeds feedback" ((formatReviewVerdictMarkdown Reject "fix the leak").Contains "fix the leak")
     check "format reject starts with REJECT" ((formatReviewVerdictMarkdown Reject "fix the leak").StartsWith "REJECT")
     check "format reject empty feedback still rejects" ((formatReviewVerdictMarkdown Reject "").StartsWith "REJECT")
-    equal "parse PASS markdown -> Accepted" Accepted (parseReviewReportMarkdown "PASS")
+    equal "parse PASS markdown -> Accepted" (Accepted "") (parseReviewReportMarkdown "PASS")
+    equal "parse PASS with feedback -> Accepted with feedback" (Accepted "nice work") (parseReviewReportMarkdown "PASS: nice work")
     equal "parse REJECT markdown -> Rejected feedback" (Rejected "fix the leak") (parseReviewReportMarkdown "REJECT: fix the leak")
     equal "parse unrecognized markdown -> Terminated" Terminated (parseReviewReportMarkdown "I think it looks fine")
     equal "parse empty markdown -> Terminated" Terminated (parseReviewReportMarkdown "")
-    equal "round-trip pass" Accepted (parseReviewReportMarkdown (formatReviewVerdictMarkdown Pass ""))
+    equal "round-trip pass" (Accepted "") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Pass ""))
+    equal "round-trip pass with feedback" (Accepted "looks good") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Pass "looks good"))
     equal "round-trip reject non-empty" (Rejected "needs work") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Reject "needs work"))
 
 let executorSummarizerNoExitStatus () =

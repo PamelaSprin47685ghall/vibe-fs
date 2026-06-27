@@ -46,7 +46,11 @@ let readSessionTexts (client: obj) (sessionId: string) (directory: string) : JS.
                 let data = Dyn.get result "data"
                 if Dyn.isNullish data then return []
                 else
-                    let messagesList = MessagingCodec.decodeMessages (unbox<obj[]> data)
+                    let rawData = unbox<obj[]> data
+                    let activeData = rawData |> Array.filter (fun msg ->
+                        let info = Dyn.get msg "info"
+                        not (Dyn.truthy (Dyn.get info "reverted")))
+                    let messagesList = MessagingCodec.decodeMessages activeData
                     return
                         messagesList
                         |> Messaging.flatten

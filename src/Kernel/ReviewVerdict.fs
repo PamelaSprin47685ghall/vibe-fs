@@ -31,7 +31,7 @@ type ReviewDecision =
 let decideReviewSubmission (verdict: Verdict) (feedback: string) (doubleCheckDone: bool) : ReviewDecision =
     match verdict with
     | Reject -> Finalize(ReviewResult.Rejected feedback)
-    | Pass when doubleCheckDone -> Finalize ReviewResult.Accepted
+    | Pass when doubleCheckDone -> Finalize(ReviewResult.Accepted feedback)
     | Pass -> AskDoubleCheck
 
 // ── mux reportMarkdown text codec ────────────────────────────────────────────
@@ -44,19 +44,23 @@ let decideReviewSubmission (verdict: Verdict) (feedback: string) (doubleCheckDon
 let private rejectNoFeedback = "No feedback provided."
 
 let formatReviewVerdictMarkdown (verdict: Verdict) (feedback: string) : string =
+    let trimmedFeedback (f: string) = (if isNull f then "" else f).Trim()
     match verdict with
-    | Pass -> "PASS"
+    | Pass ->
+        let f = trimmedFeedback feedback
+        if f = "" then "PASS" else "PASS: " + f
     | Reject ->
-        let trimmed = (if isNull feedback then "" else feedback).Trim()
-        if trimmed = "" then "REJECT: " + rejectNoFeedback else "REJECT: " + trimmed
+        let f = trimmedFeedback feedback
+        if f = "" then "REJECT: " + rejectNoFeedback else "REJECT: " + f
 
 let parseReviewReportMarkdown (markdown: string) : ReviewResult =
     let trimmed = (if isNull markdown then "" else markdown).Trim()
-    if trimmed.ToUpperInvariant() = "PASS" then ReviewResult.Accepted
-    elif trimmed.ToUpperInvariant().StartsWith "REJECT" then
-        let afterColon =
-            match trimmed.IndexOf(':') with
-            | i when i >= 0 -> trimmed.Substring(i + 1).Trim()
-            | _ -> ""
-        ReviewResult.Rejected afterColon
+    let upper = trimmed.ToUpperInvariant()
+    let extractAfterColon () =
+        match trimmed.IndexOf(':') with
+        | i when i >= 0 -> trimmed.Substring(i + 1).Trim()
+        | _ -> ""
+    if upper = "PASS" then ReviewResult.Accepted ""
+    elif upper.StartsWith "PASS" then ReviewResult.Accepted(extractAfterColon ())
+    elif upper.StartsWith "REJECT" then ReviewResult.Rejected(extractAfterColon ())
     else ReviewResult.Terminated

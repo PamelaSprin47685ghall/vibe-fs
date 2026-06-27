@@ -25,7 +25,7 @@ type ReviewEvent =
     | Accepted
     | Rejected of feedback: string
 
-type ReviewResult = Accepted | Rejected of feedback: string | Terminated
+type ReviewResult = Accepted of feedback: string | Rejected of feedback: string | Terminated
 
 type ReviewSession =
     { id: string

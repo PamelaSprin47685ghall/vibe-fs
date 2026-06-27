@@ -22,7 +22,7 @@ let private attachReviewChild (store: ReviewStore) (parentId: string) (childId: 
     store.setPendingReview(childId, fun kr ->
         let js =
             match kr with
-            | Accepted -> { accepted = Some true; feedback = None; terminated = None }
+            | Accepted fb -> { accepted = Some true; feedback = (if fb = "" then None else Some fb); terminated = None }
             | Rejected fb -> { accepted = Some false; feedback = Some fb; terminated = None }
             | Terminated -> terminatedResult "Review session closed."
         onResolve js)
@@ -108,7 +108,7 @@ let runReviewLoop (pi: obj) (ctx: obj) (store: ReviewStore) (parentId: string) (
 
 let private jsToReviewResult (js: JsReviewResult) : ReviewResult =
     if defaultArg js.terminated false then Terminated
-    elif js.accepted = Some true then Accepted
+    elif js.accepted = Some true then Accepted(defaultArg js.feedback "")
     elif js.accepted = Some false then Rejected(defaultArg js.feedback "")
     else Terminated
 

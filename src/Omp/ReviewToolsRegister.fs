@@ -80,7 +80,8 @@ let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
                             match Wanxiangshu.Kernel.ReviewVerdict.parseVerdict (Dyn.str params' "verdict") with
                             | None -> return textResult reviewerNudgePrompt
                             | Some Wanxiangshu.Kernel.ReviewVerdict.Pass ->
-                                if not (store.resolvePendingReview(sessionId, Accepted)) then return errorResult "No pending review to resolve."
+                                let fb = (Dyn.str params' "feedback").Trim()
+                                if not (store.resolvePendingReview(sessionId, Accepted fb)) then return errorResult "No pending review to resolve."
                                 else return { textResult "Review submitted: accepted." with display = Some false }
                             | Some Wanxiangshu.Kernel.ReviewVerdict.Reject ->
                                 let fb = (Dyn.str params' "feedback").Trim()

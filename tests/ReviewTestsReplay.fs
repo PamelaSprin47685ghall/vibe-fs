@@ -35,7 +35,7 @@ let disposeSessionTreeTerminatesAll () =
 let inferReviewTaskFromTexts' () =
     let activate task =
         buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
-    let accept = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult Accepted
+    let accept = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Accepted "")
     let cancel = loopCancelledMessage
     let rejected = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Rejected "fix the tests")
     let terminated = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult Terminated

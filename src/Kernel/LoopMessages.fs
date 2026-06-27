@@ -34,6 +34,7 @@ let loopFooter =
       "- affectedFiles: list of every file you modified or created"
       "- wip (optional, defaults to true): omit or true while the task is not fully complete; false only when the full task is done"
       ""
+      "You must fully complete every item in the task — no shortcuts, no reduced scope, no deferred work."
       "A reviewer will examine your submission. If accepted, you are done. If rejected, you will receive specific feedback to address." ]
 
 let buildLoopMessage (task: string) (bodyLines: string list) : string =

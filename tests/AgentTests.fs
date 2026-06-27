@@ -41,7 +41,7 @@ let canUse' () =
     check "investigator can fuzzy_grep" (canUse "investigator" "fuzzy_grep")
     check "investigator denied write" (not (canUse "investigator" "write"))
     check "investigator denied coder dispatch" (not (canUse "investigator" "coder"))
-    check "investigator allowed todo" (canUse "investigator" "todowrite")
+    check "investigator denied todo" (not (canUse "investigator" "todowrite"))
 
     check "coder can read" (canUse "coder" "read")
     check "coder can write" (canUse "coder" "write")
@@ -99,6 +99,8 @@ let canUseMatrix () =
         "bash_run",                      [ false; false; false; false; false; false; false; false ]
         "task",                          [ false; false; false; false; false; false; false; false ]
         "grep",                          [ false; false; false; false; false; false; false; false ]
+        "plan",                          [ false; false; false; false; false; false; false; false ]
+        "memory",                        [ false; false; false; false; false; false; false; false ]
         "grep_x",                        [ true;  true;  true;  false; false; false; false; false ]
         "fuzzy_grep",                    [ false; true;  true;  false; false; false; false; false ]
         "fuzzy_find",                    [ true;  true;  true;  false; false; false; false; false ]
@@ -112,8 +114,8 @@ let canUseMatrix () =
         "websearch",                     [ true;  false; false; false; false; false; false; false ]
         "webfetch",                      [ true;  false; false; false; false; false; false; false ]
         "submit_review",                 [ true;  false; false; false; false; false; false; false ]
-        "todowrite",                     [ true;  true;  true;  true;  true;  false; false; false ]
-        "todo_write",                    [ true;  true;  true;  true;  true;  false; false; false ]
+        "todowrite",                     [ true;  false; true;  true;  false; false; false; false ]
+        "todo_write",                    [ true;  false; true;  true;  false; false; false; false ]
         "question",                      [ true;  false; false; false; false; false; false; false ]
         "ask_user_question",             [ true;  false; false; false; false; false; false; false ]
         "skill",                         [ true;  false; false; false; false; false; false; false ]
@@ -126,7 +128,7 @@ let canUseMatrix () =
         "stealth-browser-mcp_navigate",  [ false; false; false; false; true;  false; false; false ]
         "return_reviewer",               [ false; false; false; true;  false; false; false; false ]
         "return_coder",                  [ false; false; true;  false; false; false; false; false ]
-        "manage_todo_list",              [ true;  true;  true;  true;  true;  false; false; false ]
+        "manage_todo_list",              [ true;  false; true;  true;  false; false; false; false ]
     ]
     matrix
     |> List.iter (fun (tool, expected) ->

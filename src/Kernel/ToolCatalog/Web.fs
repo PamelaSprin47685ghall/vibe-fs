@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 let internal websearchSpec: ToolSpec =
     { name = "websearch"
       description =
-        "Search the web for any topic; raw results are rewritten by a summarizer subagent focused on what_to_summarize, returning clean, ready-to-use content."
+        "Search the web for any topic; raw results are processed by an automated summarizer focused on what_to_summarize, returning clean, ready-to-use content."
       paramDocs =
         map
             [ "query",

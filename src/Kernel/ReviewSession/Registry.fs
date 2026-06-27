@@ -63,6 +63,6 @@ let reduce (registry: Registry) (action: RegistryAction) : Registry =
 
 let actionFor (id: string) (result: ReviewResult) : RegistryAction =
     match result with
-    | Accepted -> RegistryAction.Accept id
+    | Accepted _ -> RegistryAction.Accept id
     | Rejected feedback -> RegistryAction.Reject(id, feedback)
     | Terminated -> RegistryAction.Deactivate id

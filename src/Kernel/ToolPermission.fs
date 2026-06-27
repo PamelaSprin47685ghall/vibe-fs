@@ -1,6 +1,7 @@
 module Wanxiangshu.Kernel.ToolPermission
 
 open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.MessageTransformPolicy
 
 type Agent = string
 type Tool = string
@@ -21,7 +22,7 @@ let private knownAgentSet =
     Set.ofList [ "manager"; "investigator"; "coder"; "reviewer"; "browser"; "meditator"; "executor"; "bookkeeper" ]
 
 let private blockedShellTaskGrepSet =
-    Set.ofList [ "bash"; "bash_run"; "task"; "grep" ]
+    Set.ofList [ "bash"; "bash_run"; "task"; "grep"; "plan"; "memory"; "propose_plan"; "set_goal"; "get_goal"; "complete_goal" ]
 
 let private todoFamilySet =
     Set.ofList [ "todowrite"; "todo_write"; "todo"; "manage_todo_list" ]
@@ -64,7 +65,7 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
     | "bookkeeper", _ -> false
     | "meditator", _
     | "executor", _ -> false
-    | _, TodoFamily -> true
+    | _, TodoFamily -> not (shouldExcludeAgentFromProjection agent false)
     | _, Read -> true
     | "reviewer", _
     | "browser", _ -> false

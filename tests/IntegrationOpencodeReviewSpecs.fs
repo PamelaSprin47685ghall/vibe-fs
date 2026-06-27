@@ -64,7 +64,7 @@ let secondPassResolvesAcceptedSpec () = promise {
     let returnTool = returnReviewerTool workspaceDir history store
     let! result = execVerdict returnTool (createObj [ "verdict", box "PASS"; "feedback", box null ]) (reviewerContext workspaceDir sessionID)
     check "opencode return_reviewer second PASS reports submitted" (result.Contains "Verdict submitted.")
-    check "opencode return_reviewer second PASS resolves accepted" (resolved.Value = Some Accepted)
+    check "opencode return_reviewer second PASS resolves accepted" (resolved.Value = Some (Accepted ""))
     do! rmAsync workspaceDir
 }
 

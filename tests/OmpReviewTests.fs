@@ -73,7 +73,7 @@ let returnReviewerVerdictPassReject () = promise {
     let ctx1 = createObj [ "sessionManager", box(createObj [ "getSessionId", box(fun () -> box reviewSessionId) ]) ]
     let! passResult =
         executeTool tool "call-1" (createObj [ "verdict", box "PASS" ]) ctx1
-    equal "PASS verdict" (Some Accepted) firstKr
+    equal "PASS verdict" (Some (Accepted "")) firstKr
     equal "PASS result text" "Review submitted: accepted." (toolText passResult)
     let mutable secondKr : ReviewResult option = None
     reviewStore.setPendingReview(reviewSessionId, fun kr -> secondKr <- Some kr)
@@ -134,7 +134,7 @@ let runReviewLoopChildToolNames () = promise {
         ])
     let promptAcceptOnFirst =
         box(fun (_: obj) ->
-            store.resolvePendingReview(childId, Accepted) |> ignore
+            store.resolvePendingReview(childId, Accepted "") |> ignore
             emitJsExpr () "Promise.resolve()"
             |> unbox<JS.Promise<unit>>)
     let createAgentSession =
@@ -166,7 +166,7 @@ let runReviewLoopAcceptsWhenPendingResolved () = promise {
     let store = createReviewStore ()
     let promptResolve =
         box(fun (_: obj) ->
-            store.resolvePendingReview(childId, Accepted) |> ignore
+            store.resolvePendingReview(childId, Accepted "") |> ignore
             emitJsExpr () "Promise.resolve()"
             |> unbox<JS.Promise<unit>>)
     let session =

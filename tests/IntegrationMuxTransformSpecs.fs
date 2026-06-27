@@ -152,7 +152,7 @@ let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () = promise {
     if isNullish tf then
         check "mux messagesTransform exposed for accepted review replay" false
     else
-        let accepted = formatReviewResult Wanxiangshu.Kernel.ReviewSession.ReviewResult.Accepted
+        let accepted = formatReviewResult (Wanxiangshu.Kernel.ReviewSession.ReviewResult.Accepted "")
         let messages =
             [| muxTextMessage "loop-task" "assistant" "---\ntask: Ship feature\n---\nWith-Review Mode is active."
                muxDynamicToolMessage "submit-review" "submit_review" "call-review" (createObj []) (box accepted) |]

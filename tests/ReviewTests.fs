@@ -47,12 +47,12 @@ let registry () =
     check "clear empties" ((reduce accepted RegistryAction.Clear).IsEmpty)
 
 let resultMapping () =
-    equal "Accepted→Accept" (RegistryAction.Accept "s1") (actionFor "s1" Accepted)
+    equal "Accepted→Accept" (RegistryAction.Accept "s1") (actionFor "s1" (Accepted ""))
     equal "Rejected→Reject" (RegistryAction.Reject("s1", "bad")) (actionFor "s1" (Rejected "bad"))
     equal "Terminated→Deactivate" (RegistryAction.Deactivate "s1") (actionFor "s1" Terminated)
 
 let reviewerLoop () =
-    check "resolved finishes" (match decideAfterRound 0 (Resolved Accepted) 3 with Finish _ -> true | _ -> false)
+    check "resolved finishes" (match decideAfterRound 0 (Resolved (Accepted "")) 3 with Finish _ -> true | _ -> false)
     check "prompt-failed terminates" (match decideAfterRound 0 PromptFailed 3 with Finish Terminated -> true | _ -> false)
     check "no-result nudges" (match decideAfterRound 0 NoResult 3 with Nudge 1 -> true | _ -> false)
     check "exhausted nudges finish" (match decideAfterRound 2 NoResult 3 with Finish Terminated -> true | _ -> false)
@@ -66,7 +66,7 @@ let runtime () =
     store.unlockReview "w1"
     let mutable fired = false
     store.setPendingReview ("w1", fun _ -> fired <- true)
-    check "resolve fires" (store.resolvePendingReview ("w1", Accepted))
+    check "resolve fires" (store.resolvePendingReview ("w1", Accepted ""))
     check "callback called" fired
     store.clearReviewSessions ()
     check "cleared" (not (store.isReviewActive "w1"))
@@ -85,13 +85,13 @@ let resolvePendingClearsSuppressor () =
         emptyEffects
         |> fun e -> setPending e "child-1" (fun result -> resolved <- Some result)
         |> fun e -> { e with abortSuppressors = Map.add "child-1" (fun () -> suppressed <- suppressed + 1) e.abortSuppressors }
-    let next, fired = resolvePending effects "child-1" Accepted
+    let next, fired = resolvePending effects "child-1" (Accepted "")
     check "fired flag true" fired
-    equal "resolver received verdict" (Some Accepted) resolved
+    equal "resolver received verdict" (Some (Accepted "")) resolved
     equal "suppressor invoked exactly once" 1 suppressed
     check "pending cleared" (not (Map.containsKey "child-1" next.pendingResolutions))
     check "suppressor cleared" (not (Map.containsKey "child-1" next.abortSuppressors))
-    let next2, fired2 = resolvePending next "nonexistent" Accepted
+    let next2, fired2 = resolvePending next "nonexistent" (Accepted "")
     check "unknown id → fired false" (not fired2)
     equal "pending count untouched on unknown id" next.pendingResolutions.Count next2.pendingResolutions.Count
     equal "suppressor count untouched on unknown id" next.abortSuppressors.Count next2.abortSuppressors.Count

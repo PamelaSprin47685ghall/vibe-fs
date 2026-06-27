@@ -107,10 +107,10 @@ let submitReviewTool (deps: obj) (toolNames: string array) (reviewStore: ReviewS
                                       let! round1 = runReviewRound deps config toolNames (reviewSubmissionVerdictPrompt originalTask report affectedFiles)
                                       let! verdict =
                                           match round1 with
-                                          | Accepted -> runReviewRound deps config toolNames (reviewSubmissionDoubleCheckPrompt originalTask report affectedFiles)
+                                          | Accepted _ -> runReviewRound deps config toolNames (reviewSubmissionDoubleCheckPrompt originalTask report affectedFiles)
                                           | other -> Promise.lift other
                                       match verdict with
-                                      | Accepted | Terminated -> reviewStore.deactivateReview workspaceId
+                                      | Accepted _ | Terminated -> reviewStore.deactivateReview workspaceId
                                       | Rejected _ -> ()
                                       return formatReviewResult verdict
                                   with ex ->

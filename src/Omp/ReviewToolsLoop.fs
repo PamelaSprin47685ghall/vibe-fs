@@ -26,7 +26,7 @@ let handleLoopReviewCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: 
             else
                 let! result = runPreReviewerSession pi ctx store task
                 match result with
-                | Accepted -> notifyInfo $"Pre-review passed. Task \"{task}\" already meets criteria — no loop needed."
+                | Accepted _ -> notifyInfo $"Pre-review passed. Task \"{task}\" already meets criteria — no loop needed."
                 | Terminated -> notifyInfo "Pre-review could not complete."
                 | Rejected feedback ->
                     store.activateReview(sessionId, task, System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())

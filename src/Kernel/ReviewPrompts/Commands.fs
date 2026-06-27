@@ -13,6 +13,8 @@ let withReviewCommandTemplate =
             [ "You are entering With-Review Mode."
               "Complete the task recorded in the front matter."
               ""
+              "CRITICAL: You must fully satisfy every requirement in the task — no shortcuts, no partial implementations, no deferred work. If the task has multiple items, every single one must be addressed. Do not skip, trim, or reduce scope under any circumstance. The reviewer will verify completeness against the original task text."
+              ""
               "The reviewer will judge your eventual submission using these criteria:"
               ""
               reviewCriteria

@@ -111,7 +111,7 @@ let private loopReviewExecute
             | DelegateTimeout.Report markdown ->
                 let isPass, feedback =
                     match parseReviewReportMarkdown markdown with
-                    | Accepted -> true, ""
+                    | Accepted fb -> true, fb
                     | Rejected fb -> false, fb
                     | Terminated -> false, markdown
                 return activateReview reviewStore workspaceIdStr task isPass feedback

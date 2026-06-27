@@ -3,3 +3,4 @@
 3. 把 with-review 模式提示词增加更严厉的要求，要求把用户需求做到不能再做为止，严禁缩水
 4. 目前 opencode 端 revert 对话，被 revert 掉的部分中的 with-review /loop 仍然触发，与历史记录唯一真理的假设矛盾
 5. mimo 端目前泄露了 plan 和 memory 相关工具，这两个对任何 agent 禁用
+6. 收窄 todowrite 权限，恰好和 caps inject 的范围一致，如果 caps 文件有注入的 agent 就能用

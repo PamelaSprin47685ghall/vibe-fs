@@ -53,7 +53,7 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
                     | Error _ -> Promise.lift Terminated
                     | Ok client -> runReviewerSession childAgentRegistry client reviewStore directory sessionID task
                 match result with
-                | Accepted ->
+                | Accepted _ ->
                     parts.Add(box {| ``type`` = "text"; text = preReviewPassedMessage task |})
                 | Terminated ->
                     parts.Add(box {| ``type`` = "text"; text = preReviewCouldNotComplete |})

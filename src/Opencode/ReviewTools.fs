@@ -65,7 +65,7 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangs
                                             task
                                             abort
                                     match result with
-                                    | Accepted
+                                    | Accepted _
                                     | Terminated ->
                                         store.deactivateReview sessionID
                                     | Rejected _ -> ()
