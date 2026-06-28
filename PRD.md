@@ -184,7 +184,32 @@ Inactive | Active(task) | Locked(task, reviewerId) | Accepted | Rejected(feedbac
 
 **Kernel**：`Coordinator.update` 对 `lastAction + lastMessage` 去重；`Transitions` 管理 `nudgedSessions` / `stoppedSessions` / `retryPending`。
 
-**Runtime**：`NudgeRuntime.HandleEvent`；`StreamEnd` 触发 `runNudgeFlow`；并行 snapshot + `decide` → 可选 `nudge` 副作用。
+**Runtime**：`NudgeRuntime.HandleEvent`；`StreamEnd` 触发 `runNudgeFlow`；并行 snapshot + `decide`   → 可选 `nudge` 副作用。
+
+---
+
+### 3.9 Multi-FrontMatter 作为等效事实源
+
+一条消息体内允许存在多个 `---` YAML front-matter 块，块间保留 prose body。`PromptFrontMatter` 解析时：
+
+- 按出现顺序提取每个 block；
+- 同一 key 后出现的 block 覆盖先出现的 block；
+- `bodyAfterFrontMatter` 返回最后一个 block 之后的 prose。
+
+等效性原则：
+
+- 工具输入、工具输出、LLM 输入输出、历史、回放、投影、宿主 wire format 仍然有效；
+- `multi-frontmatter` 只是这些事实源的另一种编码；
+- 消费方（`LoopMessages`、`ToolOutputInfo`、`ReviewReplayPolicy`、`BacklogProjection` 等）必须按块顺序处理，不能假设只有一块 front matter。
+
+Compaction 补锚点：
+
+- 折叠只压缩消息数组，不替代历史；
+- 折叠完成后触发一次真实 `prompt()`，正文固定为 `See above for some messages before compaction.`；
+- 该消息的多块 front-matter 包含 backlog projection 与从被压消息提取的 anchors；
+- 新消息带 `source: compaction-anchor`，下次折叠时过滤自身，避免指数累积。
+
+迁移顺序：先改 `PromptFrontMatter` 解析，再改只读消费者，再改宿主 codec，最后补测试。
 
 ---
 

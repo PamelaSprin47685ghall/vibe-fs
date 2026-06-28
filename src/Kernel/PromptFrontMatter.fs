@@ -116,3 +116,55 @@ let parseFrontMatterScalars (text: string) : Map<string, string> =
                     | _ -> None)
             |> Array.fold (fun acc (k, v) -> Map.add k v acc) Map.empty
         with _ -> Map.empty
+
+let parseFrontMatterScalarBlocks (text: string) : Map<string,string> list =
+    let (blocks, _) = extractFrontMatterBlocksAndBody text
+    blocks
+    |> List.map (fun block -> parseFrontMatterScalars ("---\n" + block + "\n---"))
+
+let compactionAnchorSource = "compaction-anchor"
+
+let compactionAnchorBody = "See above for some messages before compaction."
+
+/// Parse a single block's YAML content (no fence) and check whether its `source`
+/// field equals `compactionAnchorSource`.  Returns false on parse failure.
+let private blockHasSource (blockContent: string) : bool =
+    try
+        let parsed = Yaml.parse blockContent
+        if isNull parsed then false
+        else
+            let src = parsed?source
+            if isNull src then false
+            else
+                try unbox<string> src = compactionAnchorSource
+                with _ -> false
+    with _ -> false
+
+/// Render a single block content (no fence) back into a full fence string via
+/// `Yaml.parse` + `frontMatterRoot` so the output is re-parseable.
+let private blockToFenceString (blockContent: string) : string option =
+    try
+        let parsed = Yaml.parse blockContent
+        if isNull parsed then None else Some (frontMatterRoot parsed)
+    with _ -> None
+
+/// Extract all front-matter fence strings from *text*, excluding any block whose
+/// `source` field equals `compactionAnchorSource`.  Order is preserved.
+let extractFrontMatterFenceStrings (text: string) : string list =
+    if isNull text then []
+    else
+        let (blocks, _) = extractFrontMatterBlocksAndBody text
+        blocks
+        |> List.filter (fun b -> not (blockHasSource b))
+        |> List.choose blockToFenceString
+
+/// Render a compaction-anchor prompt: prepend a marker block, then append all
+/// *fenceStrings* (each already a complete fence), then two newlines and
+/// `compactionAnchorBody`.  When *fenceStrings* is empty the body is returned as-is.
+let renderCompactionAnchorPrompt (fenceStrings: string list) : string =
+    let marker = frontMatter [ yamlField "source" compactionAnchorSource ]
+    if List.isEmpty fenceStrings then
+        compactionAnchorBody
+    else
+        let fences = marker :: fenceStrings |> String.concat "\n\n"
+        fences + "\n\n" + compactionAnchorBody

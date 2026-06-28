@@ -17,6 +17,7 @@ open Wanxiangshu.Shell.ReadDedupOpenCode
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Opencode.AgentConfig
 open Wanxiangshu.Opencode.BacklogSession
 open Wanxiangshu.Opencode.MessagingCodec
@@ -84,7 +85,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                 if not cleaned.IsEmpty then replaceArrayInPlace messagesArr final
     }
 
-let compactingHandlerFor (_host: Host) (backlogSession: BacklogSession) (input: obj) (output: obj) : JS.Promise<unit> =
+let compactingHandlerFor (_host: Host) (backlogSession: BacklogSession) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
@@ -100,11 +101,30 @@ let compactingHandlerFor (_host: Host) (backlogSession: BacklogSession) (input: 
                         backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
                     let afterBacklog = applyBacklogProjection sessionID false backlogOps cleaned
                     let encoded = MessagingCodec.encodeMessages afterBacklog
+                    // Inline backlogEntries for front-matter block (projectionRootValue is private in BacklogProjectionCore)
+                    let backlogEntries =
+                        let entries =
+                            backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
+                            |> List.map (fun be -> box (createObj [ "user_message", box [||]; "completed_work", box (be.report.Trim()) ]))
+                        box (entries |> List.toArray)
+                    let backlogBlock = [ frontMatterRoot backlogEntries ]
+                    let anchorTexts =
+                        cleaned
+                        |> List.collect (fun m -> m.parts)
+                        |> List.choose (function
+                            | TextPart t -> Some t
+                            | ToolPart(_, _, Some s, _) -> Some s.output
+                            | _ -> None)
+                    let anchorBlocks = anchorTexts |> List.collect PromptFrontMatter.extractFrontMatterFenceStrings
+                    let allBlocks = backlogBlock @ anchorBlocks
+                    if not allBlocks.IsEmpty && not (Dyn.isNullish client) && sessionID <> "" then
+                        let promptText = PromptFrontMatter.renderCompactionAnchorPrompt allBlocks
+                        try do! client?session?prompt(sessionID, box promptText) |> Promise.map ignore with _ -> ()
                     replaceArrayInPlace messagesArr encoded
     }
 
-let compactingHandler (backlogSession: BacklogSession) (input: obj) (output: obj) : JS.Promise<unit> =
-    compactingHandlerFor opencode backlogSession input output
+let compactingHandler (backlogSession: BacklogSession) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
+    compactingHandlerFor opencode backlogSession client input output
 
 let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
     promise { setSystemOutputToDirectory directory output }

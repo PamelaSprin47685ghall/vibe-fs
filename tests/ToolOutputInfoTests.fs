@@ -190,6 +190,15 @@ let testRenderMultiHintAsArray () =
         equal "multi hint parsed as two" 2 (List.length hs)
     | None -> check "multi hint roundtrip parseable" false
 
+let testTryParseMergesMultipleFrontMatterBlocks () =
+    let text = "---\nhint: a\n---\n---\nsyntax: json\n---\nbody after"
+    match tryParse text with
+    | Some msg ->
+        equal "multi-block body" "body after" msg.body
+        check "multi-block hint" (List.exists (function InfoItem.Hint "a" -> true | _ -> false) msg.info)
+        check "multi-block syntax" (List.exists (function InfoItem.Syntax "json" -> true | _ -> false) msg.info)
+    | None -> check "multi-block parse should succeed" false
+
 let run () =
     testRenderEmpty ()
     testRenderBodyOnly ()
@@ -198,6 +207,7 @@ let run () =
     testTryParseEmpty ()
     testTryParseNonFrontMatter ()
     testTryParseValid ()
+    testTryParseMergesMultipleFrontMatterBlocks ()
     testHasExactHint ()
     testNoChangeEnvelope ()
     testSeeBelowEnvelope ()

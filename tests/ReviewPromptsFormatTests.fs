@@ -82,6 +82,26 @@ let bodyAfterMultiFrontMatter () =
     check "body starts with expected text" (body.StartsWith "Body text")
     check "body does not contain frontmatter delimiter" (not (body.Contains "---"))
 
+// ── extractFrontMatterFenceStrings / renderCompactionAnchorPrompt ──────────────
+
+let multiFrontMatterExtractionToFenceStrings () =
+    let input =
+        "---\nauthor: Alice\nmode: review\n---\n---\nsource: compaction-anchor\n---\n---\nauthor: Bob\npriority: high\n---\nBody."
+    let fences = extractFrontMatterFenceStrings input
+    equal "extraction count excludes compaction-anchor" 2 (List.length fences)
+    check "first fence contains Alice" (fences.[0].Contains "Alice")
+    check "second fence contains Bob" (fences.[1].Contains "Bob")
+    check "no compaction marker in fences" (not (List.exists (fun (s: string) -> s.Contains "compaction-anchor") fences))
+
+let compactionAnchorPromptRendersMarkerAndBody () =
+    let fence1 = "---\nauthor: Alice\n---"
+    let fence2 = "---\nauthor: Bob\n---"
+    let prompt = renderCompactionAnchorPrompt [ fence1; fence2 ]
+    check "prompt contains source marker" (prompt.Contains "source: compaction-anchor")
+    check "prompt contains body" (prompt.Contains "See above for some messages before compaction.")
+    let fenceCount = prompt.Split([| "---" |], System.StringSplitOptions.None).Length - 1
+    check "prompt has marker + two fences" (fenceCount >= 3)
+
 let run () =
     submitReviewIsWipNoneDefaultsTrue ()
     submitReviewIsWipSomeTrue ()
@@ -94,3 +114,5 @@ let run () =
     parseMultiFrontMatterMerging ()
     parseMultiFrontMatterScalars ()
     bodyAfterMultiFrontMatter ()
+    multiFrontMatterExtractionToFenceStrings ()
+    compactionAnchorPromptRendersMarkerAndBody ()

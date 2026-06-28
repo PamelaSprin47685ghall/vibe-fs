@@ -51,11 +51,22 @@ let loopCancelledMessage : string =
 
 // ── Reconstruction from dialogue history ─────────────────────────────────────
 
+/// Parse *text* into one scalar map per front-matter block (order preserved).
+/// Each block is parsed independently so multi-front-matter blocks do not merge.
+let frontMatterScalarBlocks (text: string) : Map<string,string> list =
+    parseFrontMatterScalarBlocks text
+
 /// After an opencode restart the in-memory review store is gone, but the
 /// dialogue history still carries the loop messages this module and
 /// `Prompts.formatReviewResult` author. This pure fold replays them to recover
 /// the current review task: the history is the single source of truth and the
 /// store is merely a re-buildable projection of it.
+///
+/// Processing is block-ordered within each text fragment: a `task` field
+/// (re)activates the current task; an end-verdict (`accepted`/`cancelled`)
+/// clears it.  Later blocks within the same text can override or cancel
+/// earlier blocks — this is the fix for multi-front-matter where block 1
+/// activates a task and block 2 cancels it.
 ///
 /// Each fragment is matched on its structured front-matter ONLY:
 ///   `task` field         -> (re)activate with that task (worker With-Review only;
@@ -65,13 +76,14 @@ let loopCancelledMessage : string =
 let inferReviewTaskFromTexts (texts: string seq) : string option =
     texts
     |> Seq.fold (fun current text ->
-        let fields = parseFrontMatterScalars text
-        match Map.tryFind taskField fields with
-        | Some task when task <> "" -> Some task
-        | _ ->
-            match Map.tryFind verdictField fields with
-            | Some verdict when isEndVerdict verdict -> None
-            | _ -> current) None
+        frontMatterScalarBlocks text
+        |> List.fold (fun currentBlock fields ->
+            match Map.tryFind taskField fields with
+            | Some task when task <> "" -> Some task
+            | _ ->
+                match Map.tryFind verdictField fields with
+                | Some verdict when isEndVerdict verdict -> None
+                | _ -> currentBlock) current) None
 
 let doubleCheckField = "double-check"
 

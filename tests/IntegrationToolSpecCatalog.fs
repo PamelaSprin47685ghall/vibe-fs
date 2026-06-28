@@ -146,6 +146,7 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
         "muxExecutorFailureDoesNotBookkeep", muxExecutorFailureDoesNotBookkeepSpec
         "muxTodoWriteMethodologySchema", muxTodoWriteMethodologySchemaSpec
         "muxCompactingTransformProjectsBacklog", muxCompactingTransformProjectsBacklogSpec
+        "muxCompactingTransformEmitsAnchorPrompt", muxCompactingTransformEmitsAnchorPromptSpec
         "muxToolExecuteAfterSkipsChildWorkspace", muxToolExecuteAfterSkipsChildWorkspaceSpec
         "muxEventHookAbortDeactivatesReview", muxEventHookAbortDeactivatesReviewSpec
         "muxEventHookAbortCleansUpKnowledgeGraphJob", muxEventHookAbortCleansUpKnowledgeGraphJobSpec

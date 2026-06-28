@@ -498,6 +498,7 @@
     <Compile Include="tests/OpencodeSubagentCoverageTests.fs" />
     <Compile Include="tests/OmpSessionLifecycleTests.fs" />
     <Compile Include="tests/OmpSessionCompactingTests.fs" />
+    <Compile Include="tests/OmpSessionCompactingAnchorTests.fs" />
     <Compile Include="tests/MethodologyTests.fs" />
     <Compile Include="tests/ReviewReplaySyncTests.fs" />
     <Compile Include="tests/ReviewPromptsFormatTests.fs" />
