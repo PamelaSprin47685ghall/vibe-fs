@@ -7,6 +7,7 @@ open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Opencode.Plugin
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
@@ -178,5 +179,78 @@ let opencodeFreshChatMessageRearmsLoopNudgeSpec () = promise {
     do! Promise.sleep 0
     check "new assistant turn in history re-arms loop nudge on next idle"
         (promptCalls.Count = 2 && textOf 1 = loopNudgePrompt)
+    do! rmAsync workspaceDir
+}
+
+let opencodeCompactingDoesNotEmitPromptSpec () = promise {
+    let sessionID = "opencode-compact-session"
+    let promptCalls = ResizeArray<obj>()
+    let mkClient () =
+        createObj [ "session", box (createObj [
+            "todo", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                promise { return box {| data = [||] |} }))
+            "messages", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                promise { return box {| data = [||] |} }))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                promise { promptCalls.Add(arg) }))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "opencode-compact-"
+    let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
+    let compacting = get p "experimental.session.compacting"
+    let messageInfo id role agent = createObj [ "id", box id; "agent", box agent; "sessionID", box sessionID; "role", box role ]
+    let textMessage id role agent text = createObj [ "info", box (messageInfo id role agent); "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
+    let todoState report content status priority =
+        createObj [
+            "status", box "completed"
+            "input", box (createObj [ "completedWorkReport", box report; "todos", box [| createObj [ "content", box content; "status", box status; "priority", box priority ] |] ])
+            "output", box (createObj [ "success", box true; "count", box 1 ])
+            "error", box ""
+        ]
+    let toolMessage id callID report content status priority =
+        createObj [
+            "info", box (messageInfo id "assistant" "manager")
+            "parts", box [| createObj [ "type", box "tool"; "tool", box "todowrite"; "callID", box callID; "state", box (todoState report content status priority) ] |]
+        ]
+    let messages =
+        [| textMessage "compact-user-1" "user" "manager" "plan phase"
+           toolMessage "compact-1" "compact-call-a" "planned compact phase" "Plan change" "in_progress" "high"
+           textMessage "compact-user-2" "user" "manager" "implement phase"
+           toolMessage "compact-2" "compact-call-b" "implemented compact phase" "Implement change" "completed" "high" |]
+    let output = createObj [ "messages", box messages ]
+    do! compacting $ (createObj [ "sessionID", box sessionID ], output) |> unbox<JS.Promise<unit>>
+    check "compacting hook does not emit prompt" (promptCalls.Count = 0)
+    let transformed = unbox<obj[]> (get output "messages")
+    check "compacting hook still projects backlog" (transformed.Length > 0)
+    do! rmAsync workspaceDir
+}
+
+let opencodeNudgeAfterCompactionEmitsAnchorPromptSpec () = promise {
+    let sessionID = "opencode-compaction-nudge"
+    let promptCalls = ResizeArray<obj>()
+    let messages =
+        [| box (createObj [
+            "info", box (createObj [ "role", box "assistant"; "agent", box "compaction"; "finish", box "stop"; "sessionID", box sessionID; "time", box (createObj [ "completed", box 1 ]) ])
+            "parts", box [| createObj [ "type", box "text"; "text", box "Compacted summary of previous work." ] |]
+        ]) |]
+    let mkClient () =
+        createObj [ "session", box (createObj [
+            "todo", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                promise { return box {| data = [||] |} }))
+            "messages", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                promise { return box {| data = messages |} }))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                promise { promptCalls.Add(arg) }))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "opencode-compaction-nudge-"
+    let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
+    let eventHook = get p "event"
+    do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    check "nudge after compaction emits one prompt" (promptCalls.Count = 1)
+    if promptCalls.Count > 0 then
+        let arg = promptCalls.[0]
+        check "nudge prompt path id matches session" (str (get arg "path") "id" = sessionID)
+        let bodyText = getPartsText (get (get arg "body") "parts")
+        check "nudge prompt contains see above text" (bodyText.Contains "See above for some messages before compaction.")
     do! rmAsync workspaceDir
 }

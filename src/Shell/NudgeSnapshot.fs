@@ -73,7 +73,7 @@ let private alreadyNudgedAfterIndex (messages: obj array) (index: int) : bool =
             else nudged)
         false
 
-let private decodeLastAssistant (messages: obj array) : string * bool =
+let private decodeLastAssistant (messages: obj array) : string * bool * string option =
     let lastAssistantIndex =
         messages
         |> Array.tryFindIndexBack (fun message ->
@@ -81,11 +81,14 @@ let private decodeLastAssistant (messages: obj array) : string * bool =
             && not (isSyntheticAssistantAgent (Dyn.str message "agent")))
 
     match lastAssistantIndex with
-    | None -> "", false
+    | None -> "", false, None
     | Some index ->
         let text = getPartsText (Dyn.get messages.[index] "parts")
         let alreadyNudged = alreadyNudgedAfterIndex messages index
-        text, alreadyNudged
+        let info = Dyn.get messages.[index] "info"
+        let agentVal = Dyn.str info "agent"
+        let agent = if agentVal = "" then None else Some agentVal
+        text, alreadyNudged, agent
 
 let collectSnapshot
     (getChatHistory: (string -> JS.Promise<obj array>) option)
@@ -96,7 +99,8 @@ let collectSnapshot
     promise {
         let! todos = tryGetTodos helpers workspaceId
         let! history = tryGetChatHistory getChatHistory workspaceId
-        let historyLastAssistantMessage, historyAlreadyNudged = decodeLastAssistant history
+        let historyLastAssistantMessage, historyAlreadyNudged, historyAgentFromMessage =
+            decodeLastAssistant history
         let effectiveLastAssistantMessage, alreadyNudged =
             if historyLastAssistantMessage = "" then
                 eventLastAssistantMessage, false
@@ -109,5 +113,6 @@ let collectSnapshot
             { todos = todos
               lastAssistantMessage = effectiveLastAssistantMessage
               alreadyNudged = alreadyNudged
-              agentFromMessage = None }
+              agentFromMessage = historyAgentFromMessage
+              anchorPromptIssued = false }
     }

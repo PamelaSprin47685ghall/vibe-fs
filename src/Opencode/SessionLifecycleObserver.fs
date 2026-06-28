@@ -32,6 +32,7 @@ type SessionLifecycleObserver
     , registry          : ChildAgentRegistry
     , fallbackHandler   : (obj -> JS.Promise<FallbackHookResult>) option
     , fallbackRuntime   : FallbackRuntimeState
+    , backlogSession    : Wanxiangshu.Opencode.BacklogSession.BacklogSession
     ) =
 
     let abortSession (client: obj) (sid: string) : JS.Promise<unit> =
@@ -168,7 +169,7 @@ type SessionLifecycleObserver
                 match claimed with
                 | Some sessionID ->
                     match getClientFromPluginCtx ctx with
-                    | Ok client -> startNudgeFlow holder client reviewStore registry sessionID
+                    | Ok client -> startNudgeFlow holder client reviewStore registry backlogSession sessionID
                     | Error _ -> ()
                 | None -> ()
         }
@@ -180,5 +181,6 @@ let createSessionLifecycleObserver
     , registry           : ChildAgentRegistry
     , fallbackHandler    : (obj -> JS.Promise<FallbackHookResult>) option
     , fallbackRuntime    : FallbackRuntimeState
+    , backlogSession     : Wanxiangshu.Opencode.BacklogSession.BacklogSession
     ) : SessionLifecycleObserver =
-    SessionLifecycleObserver(host, ctx, reviewStore, registry, fallbackHandler, fallbackRuntime)
+    SessionLifecycleObserver(host, ctx, reviewStore, registry, fallbackHandler, fallbackRuntime, backlogSession)

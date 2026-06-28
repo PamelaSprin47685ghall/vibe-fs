@@ -16,7 +16,8 @@ type SessionSnapshot =
     { todos: string list
       lastAssistantMessage: string
       alreadyNudged: bool
-      agentFromMessage: string option }
+      agentFromMessage: string option
+      anchorPromptIssued: bool }
 
 type NudgeDecision =
     | StandDown

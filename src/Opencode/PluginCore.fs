@@ -66,9 +66,9 @@ let private createCoreServices (host: Host) (ctx: obj) =
             Some (Wanxiangshu.Opencode.FallbackHooks.createOpencodeFallbackHandler
                     client fallbackRuntime fallbackConfigLookup childAgentRegistry)
         | None -> None
-    let lifecycleObserver = createSessionLifecycleObserver (host, ctx, reviewStore, childAgentRegistry, fallbackHandler, fallbackRuntime)
     let scope = create ()
     let backlogSession = BacklogSession(host, scope)
+    let lifecycleObserver = createSessionLifecycleObserver (host, ctx, reviewStore, childAgentRegistry, fallbackHandler, fallbackRuntime, backlogSession)
     let tools = createTools host childAgentRegistry finderCache ctx reviewStore scope fallbackRuntime
     let client = match getClientFromPluginCtx ctx with Ok c -> c | Error _ -> box null
     if not (Dyn.isNullish client) then storePtyClient client

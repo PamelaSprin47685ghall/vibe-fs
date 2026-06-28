@@ -37,5 +37,7 @@ let run () : JS.Promise<unit> =
         do! repeatedAssistantSpec ()
         do! opencodeLoopNudgeSpec ()
         do! opencodeFreshChatMessageRearmsLoopNudgeSpec ()
+        do! opencodeCompactingDoesNotEmitPromptSpec ()
+        do! opencodeNudgeAfterCompactionEmitsAnchorPromptSpec ()
         do! reusedSessionSpec ()
     }

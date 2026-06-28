@@ -23,6 +23,8 @@ open Wanxiangshu.Opencode.BacklogSession
 open Wanxiangshu.Opencode.MessagingCodec
 open Wanxiangshu.Opencode.CapsCodec
 open Wanxiangshu.Opencode.SessionIo
+open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.ChatTransformOutputCodec
@@ -81,7 +83,17 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                 if not cleaned.IsEmpty then replaceArrayInPlace messagesArr final
     }
 
-let compactingHandlerFor (_host: Host) (backlogSession: BacklogSession) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
+let buildCompactionAnchorPrompt (backlogEntries: BacklogEntry list) (messages: Message<obj> list) : string =
+    let extractAnchorTexts () =
+        messages
+        |> List.collect (fun m -> m.parts)
+        |> List.choose (function
+            | TextPart t -> Some t
+            | ToolPart(_, _, Some s, _) -> Some s.output
+            | _ -> None)
+    BacklogProjectionCore.buildCompactionAnchorPrompt backlogEntries extractAnchorTexts
+
+let compactingHandlerFor (_host: Host) (backlogSession: BacklogSession) (_client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
@@ -97,25 +109,6 @@ let compactingHandlerFor (_host: Host) (backlogSession: BacklogSession) (client:
                         backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
                     let afterBacklog = applyBacklogProjection sessionID false backlogOps cleaned
                     let encoded = MessagingCodec.encodeMessages afterBacklog
-                    // Inline backlogEntries for front-matter block (projectionRootValue is private in BacklogProjectionCore)
-                    let backlogEntries =
-                        let entries =
-                            backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
-                            |> List.map (fun be -> box (createObj [ "user_message", box [||]; "completed_work", box (be.report.Trim()) ]))
-                        box (entries |> List.toArray)
-                    let backlogBlock = [ frontMatterRoot backlogEntries ]
-                    let anchorTexts =
-                        cleaned
-                        |> List.collect (fun m -> m.parts)
-                        |> List.choose (function
-                            | TextPart t -> Some t
-                            | ToolPart(_, _, Some s, _) -> Some s.output
-                            | _ -> None)
-                    let anchorBlocks = anchorTexts |> List.collect PromptFrontMatter.extractFrontMatterFenceStrings
-                    let allBlocks = backlogBlock @ anchorBlocks
-                    if not allBlocks.IsEmpty && not (Dyn.isNullish client) && sessionID <> "" then
-                        let promptText = PromptFrontMatter.renderCompactionAnchorPrompt allBlocks
-                        try do! client?session?prompt(sessionID, box promptText) |> Promise.map ignore with _ -> ()
                     replaceArrayInPlace messagesArr encoded
     }
 

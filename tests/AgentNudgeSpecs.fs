@@ -72,7 +72,7 @@ let shouldSuppress' () =
     check "reopened context re-allows todo nudge" (not (shouldSuppressNudge "s" reopened None))
 
 let private snapshot todos msg alreadyNudged agent : SessionSnapshot =
-    { todos = todos; lastAssistantMessage = msg; alreadyNudged = alreadyNudged; agentFromMessage = agent }
+    { todos = todos; lastAssistantMessage = msg; alreadyNudged = alreadyNudged; agentFromMessage = agent; anchorPromptIssued = false }
 
 let private noReview (_: string) = false
 let private noChild (_: string) = None

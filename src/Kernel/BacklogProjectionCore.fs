@@ -66,3 +66,20 @@ let buildBacklogText (backlog: BacklogEntry list) (userPrompts: string list) : s
 
 let lastTodoErrorText (flat: FlatPart<'raw> list) : string option =
     lastTodoErrorTextFor opencode flat
+
+/// Build the compaction-anchor prompt text from backlog entries and a function
+/// that extracts text candidates (message text + tool output) from the
+/// message stream. Pure: shared by the compaction hook (MessageTransform) and
+/// the post-compaction nudge path (NudgeEffect).
+let buildCompactionAnchorPrompt
+    (backlogEntries: BacklogEntry list)
+    (extractAnchorTexts: unit -> string list)
+    : string =
+    let backlogBlock =
+        let entries =
+            backlogEntries
+            |> List.map (fun be -> createObj [ "user_message", box [||]; "completed_work", box (be.report.Trim()) ])
+            |> List.toArray
+        [ frontMatterRoot (box entries) ]
+    let anchorBlocks = extractAnchorTexts () |> List.collect extractFrontMatterFenceStrings
+    renderCompactionAnchorPrompt (backlogBlock @ anchorBlocks)

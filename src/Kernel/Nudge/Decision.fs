@@ -16,7 +16,7 @@ let private selectNudgePrompt = function
 let decideNudge isReviewActive lookupChildAgent state sessionID snapshot =
     if hasStoppedSession state sessionID then
         state, StandDown
-    elif snapshot.alreadyNudged then
+    elif snapshot.alreadyNudged || snapshot.anchorPromptIssued then
         state, StandDown
     else
         let state = rememberAgent state sessionID snapshot.agentFromMessage
