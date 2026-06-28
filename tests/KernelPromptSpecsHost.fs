@@ -35,7 +35,10 @@ let toolCatalogCentralized () =
     let coderSpec = specOf "coder"
     check "coder spec carries description" (coderSpec.description.Length > 0)
     check "coder description names intents" (coderSpec.description.Contains "intents")
-    check "coder requires intents+tdd+warn_tdd" (coderSpec.requiredFields = [ "intents"; "tdd"; "warn_tdd" ])
+    check "coder requiredFields no warn_tdd" (not (List.contains "warn_tdd" coderSpec.requiredFields))
+    check "coder requiredFields are intents+tdd" (coderSpec.requiredFields = [ "intents"; "tdd" ])
+    check "coder paramDoc no warn_tdd" (not (Map.containsKey "warn_tdd" coderSpec.paramDocs))
+    check "coder paramDoc no warn key" (not (Map.containsKey "warn" coderSpec.paramDocs))
     check "coder param doc for intents" (Map.containsKey "intents" coderSpec.paramDocs)
     check "coder param doc for tdd" (Map.containsKey "tdd" coderSpec.paramDocs)
 
@@ -45,8 +48,19 @@ let toolCatalogCentralized () =
 
     let executorSpec = specOf "executor"
     check "executor describes timeout budgets" (executorSpec.description.Contains "timeout")
+    check "executor requiredFields no warn_tdd" (not (List.contains "warn_tdd" executorSpec.requiredFields))
+    check "executor requiredFields no warn" (not (List.contains "warn" executorSpec.requiredFields))
     check "executor requires mode" (executorSpec.requiredFields |> List.contains "mode")
+    check "executor paramDoc no warn_tdd" (not (Map.containsKey "warn_tdd" executorSpec.paramDocs))
+    check "executor paramDoc no warn" (not (Map.containsKey "warn" executorSpec.paramDocs))
     check "executor param doc for mode" (Map.containsKey "mode" executorSpec.paramDocs)
+
+    let writeSpec = specOf "write"
+    check "write spec carries description" (writeSpec.description.Length > 0)
+    check "write requiredFields no warn_tdd" (not (List.contains "warn_tdd" writeSpec.requiredFields))
+    check "write requiredFields are file_path+content" (writeSpec.requiredFields = [ "file_path"; "content" ])
+    check "write paramDoc no warn_tdd" (not (Map.containsKey "warn_tdd" writeSpec.paramDocs))
+    check "write paramDoc no warn" (not (Map.containsKey "warn" writeSpec.paramDocs))
 
     let ackLower = submitReviewWipAcknowledgment.ToLowerInvariant()
     check "wip acknowledgment does not say No reviewer" (ackLower.IndexOf("no reviewer") < 0)

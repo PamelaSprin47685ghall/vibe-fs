@@ -50,6 +50,32 @@ let setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 let toolsToObject (tools: ToolDefinition array) : obj =
     createObj [ for t in tools -> t.name, box t ]
 
+let private addRequired (schema: obj) (key: string) : unit =
+    let existing = Dyn.get schema "required"
+    if Dyn.isArray existing then
+        existing?("push")(box key) |> ignore
+    else
+        schema?("required") <- box [| box key |]
+
+let private injectWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
+    if Wanxiangshu.Kernel.WarnTdd.isModificationTool tool.name then
+        let props = Dyn.get tool.parameters "properties"
+        if isNullish (Dyn.get props "warn_tdd") then
+            props?("warn_tdd") <- box (createObj [| "type", box "string"; "enum", box [| box Wanxiangshu.Kernel.WarnTdd.canonicalValue |]; "description", box Wanxiangshu.Kernel.WarnTdd.warnDescription |])
+        addRequired tool.parameters "warn_tdd"
+    tool
+
+let private injectWarnIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
+    if Wanxiangshu.Kernel.WarnTdd.isWarnRequiredTool tool.name then
+        let props = Dyn.get tool.parameters "properties"
+        if isNullish (Dyn.get props "warn") then
+            props?("warn") <- box (createObj [| "type", box "string"; "enum", box [| box Wanxiangshu.Kernel.WarnTdd.warnCanonicalValue |]; "description", box Wanxiangshu.Kernel.WarnTdd.warnDescription |])
+        addRequired tool.parameters "warn"
+    tool
+
+let private injectWarnWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
+    injectWarnTddIntoMuxSchema (injectWarnIntoMuxSchema tool)
+
 let createToolCatalog
     (deps: obj)
     (toolNames: string array)
@@ -58,20 +84,20 @@ let createToolCatalog
     (finderCache: FinderCache)
     (sessionScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
     : ToolDefinition array =
-    let iteratorStore = sessionScope.IteratorStore
-    [| yield coderTool deps toolNames
-       yield investigatorTool deps toolNames
-       yield meditatorTool deps toolNames
-       yield browserTool deps toolNames
-       yield executorTool deps toolNames sessionScope
-       yield submitReviewTool deps toolNames reviewStore
-       yield websearchTool deps toolNames
-       yield webfetchTool
-       yield fuzzyGrepTool finderCache iteratorStore
-       yield fuzzyFindTool finderCache iteratorStore
-       yield writeTool deps
-       yield readTool deps hostReadExec
-       yield! allMethodologyTools deps toolNames |]
+     let iteratorStore = sessionScope.IteratorStore
+     [| yield injectWarnWarnTddIntoMuxSchema (coderTool deps toolNames)
+        yield investigatorTool deps toolNames
+        yield meditatorTool deps toolNames
+        yield browserTool deps toolNames
+        yield injectWarnWarnTddIntoMuxSchema (executorTool deps toolNames sessionScope)
+        yield submitReviewTool deps toolNames reviewStore
+        yield websearchTool deps toolNames
+        yield webfetchTool
+        yield fuzzyGrepTool finderCache iteratorStore
+        yield fuzzyFindTool finderCache iteratorStore
+        yield injectWarnWarnTddIntoMuxSchema (writeTool deps)
+        yield readTool deps hostReadExec
+        yield! allMethodologyTools deps toolNames |]
 
 let private requireWarnTddMux (tool: string) (args: obj) (output: obj) : unit =
     if not (Wanxiangshu.Kernel.WarnTdd.isModificationTool tool) then ()

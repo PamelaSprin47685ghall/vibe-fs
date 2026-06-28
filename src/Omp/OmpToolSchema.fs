@@ -1,14 +1,24 @@
 module Wanxiangshu.Omp.OmpToolSchema
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.WarnTdd
 open Wanxiangshu.Omp.Schema
 open Wanxiangshu.Methodology.SchemaCommon
 
 module Params = Wanxiangshu.Kernel.ToolCatalog.Params
+
+let private addRequired (schema: obj) (key: string) : unit =
+    let existing = Dyn.get schema "required"
+    if Dyn.isArray existing then
+        existing?("push")(box key) |> ignore
+    else
+        schema?("required") <- box [| box key |]
 
 let private methodologyField (f: MethodologyField) (tb: obj) : string * obj =
     match f.kind, f.required, f.minArrayItems with
@@ -41,13 +51,19 @@ let private coderIntentItem (tb: obj) : obj =
         tb
 
 let coderParameters (tb: obj) : obj =
-    objectOf
-        [|
-            ("intents", arrayOf (coderIntentItem tb) Params.coderIntents tb)
-            ("tdd", enumOf [| "red"; "green" |] Params.coderTdd tb)
-            ("warn_tdd", enumOf [| Wanxiangshu.Kernel.WarnTdd.canonicalValue |] Params.warnTddDesc tb)
-        |]
-        tb
+    let schema =
+        objectOf
+            [|
+                ("intents", arrayOf (coderIntentItem tb) Params.coderIntents tb)
+                ("tdd", enumOf [| "red"; "green" |] Params.coderTdd tb)
+            |]
+            tb
+    if isModificationTool "coder" then
+        addRequired schema "warn_tdd"
+        let props = Dyn.get schema "properties"
+        if isNullish (Dyn.get props "warn_tdd") then
+            props?("warn_tdd") <- box (createObj [| "type", box "string"; "enum", box [| box canonicalValue |]; "description", box warnDescription |])
+    schema
 
 let private investigatorIntentItem (tb: obj) : obj =
     objectOf
@@ -74,18 +90,28 @@ let browserParameters (tb: obj) : obj =
     objectOf [| ("intent", str Params.browserIntent tb) |] tb
 
 let executorParameters (tb: obj) : obj =
-    objectOf
-        [|
-            ("language", opt Params.executorLanguage tb (fun desc tb -> enumOf [| "shell"; "python"; "javascript" |] desc tb))
-            ("program", str Params.executorProgram tb)
-            ("dependencies", opt Params.executorDeps tb (fun desc tb -> strArray desc tb))
-            ("timeout_type", enumOf [| "short"; "long"; "last-resort" |] Params.executorTimeout tb)
-            ("mode", enumOf [| "ro"; "rw" |] Params.executorMode tb)
-            ("warn", enumOf [| "it-is-not-possible-to-do-it-using-other-tools" |] Params.executorWarn tb)
-            ("warn_tdd", enumOf [| Wanxiangshu.Kernel.WarnTdd.canonicalValue |] Params.warnTddDesc tb)
-            ("what_to_summarize", opt "Optional summary focus for long executor output." tb str)
-        |]
-        tb
+    let schema =
+        objectOf
+            [|
+                ("language", opt Params.executorLanguage tb (fun desc tb -> enumOf [| "shell"; "python"; "javascript" |] desc tb))
+                ("program", str Params.executorProgram tb)
+                ("dependencies", opt Params.executorDeps tb (fun desc tb -> strArray desc tb))
+                ("timeout_type", enumOf [| "short"; "long"; "last-resort" |] Params.executorTimeout tb)
+                ("mode", enumOf [| "ro"; "rw" |] Params.executorMode tb)
+                ("what_to_summarize", opt "Optional summary focus for long executor output." tb str)
+            |]
+            tb
+    if isModificationTool "executor" then
+        addRequired schema "warn_tdd"
+        let props = Dyn.get schema "properties"
+        if isNullish (Dyn.get props "warn_tdd") then
+            props?("warn_tdd") <- box (createObj [| "type", box "string"; "enum", box [| box canonicalValue |]; "description", box warnDescription |])
+    if isWarnRequiredTool "executor" then
+        addRequired schema "warn"
+        let props = Dyn.get schema "properties"
+        if isNullish (Dyn.get props "warn") then
+            props?("warn") <- box (createObj [| "type", box "string"; "enum", box [| box warnCanonicalValue |]; "description", box warnDescription |])
+    schema
 
 let returnReviewerParameters (tb: obj) : obj =
     objectOf

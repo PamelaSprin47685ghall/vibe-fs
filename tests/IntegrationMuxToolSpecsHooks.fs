@@ -8,6 +8,7 @@ open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let muxEventHookAbortDeactivatesReviewSpec () = promise {
     let reg = sharedMuxRegistration ()
@@ -74,4 +75,60 @@ let muxSystemTransformClearsOutputLengthSpec () = promise {
     let output = createObj [ "system", box system ]
     do! (transform $ (createObj [], output)) |> unbox<JS.Promise<unit>>
     check "mux systemTransform preserves system when deps has no directory" ((unbox<int> (get system "length")) = 1000)
+}
+
+let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () = promise {
+    let reg = sharedMuxRegistration ()
+    let tools = unbox<obj[]> (get reg "tools")
+    let findTool (name: string) =
+        tools |> Array.tryFind (fun t -> Dyn.str t "name" = name)
+    let staticRequired (toolDef: obj) : string array =
+        if isNullish toolDef then [||]
+        else
+            let params_ = Dyn.get toolDef "parameters"
+            if isNullish params_ then [||]
+            else
+                let req = Dyn.get params_ "required"
+                if Dyn.isArray req then unbox<string[]> req else [||]
+    let staticProperties (toolDef: obj) : obj =
+        if isNullish toolDef then null
+        else
+            let params_ = Dyn.get toolDef "parameters"
+            if isNullish params_ then null else Dyn.get params_ "properties"
+    // coder: no warn_tdd in raw static BuiltinTools schema
+    let staticCoder = Wanxiangshu.Mux.SubagentTools.coderTool (createObj []) [| "coder" |]
+    let staticCoderProps = staticProperties (box staticCoder)
+    check "coder static BuiltinTools schema has no warn_tdd" (isNullish (Dyn.get staticCoderProps "warn_tdd"))
+    // registered coder: warn_tdd injected into schema properties and required
+    let coder = findTool "coder"
+    check "coder tool exists" (not (isNullish coder))
+    let coderProps = staticProperties coder
+    check "registered coder schema has warn_tdd" (not (isNullish (Dyn.get coderProps "warn_tdd")))
+    check "registered coder required has warn_tdd" (staticRequired coder |> Array.contains "warn_tdd")
+    // executor: no warn or warn_tdd in raw static BuiltinTools schema
+    let staticExec = Wanxiangshu.Mux.BuiltinTools.executorTool (createObj []) [| "executor" |] (Wanxiangshu.Shell.RuntimeScope.create ())
+    let staticExecProps = staticProperties (box staticExec)
+    check "executor static BuiltinTools schema has no warn" (isNullish (Dyn.get staticExecProps "warn"))
+    check "executor static BuiltinTools schema has no warn_tdd" (isNullish (Dyn.get staticExecProps "warn_tdd"))
+    // registered executor: warn and warn_tdd injected
+    let executor = findTool "executor"
+    check "executor tool exists" (not (isNullish executor))
+    let execProps = staticProperties executor
+    check "registered executor schema has warn" (not (isNullish (Dyn.get execProps "warn")))
+    check "registered executor schema has warn_tdd" (not (isNullish (Dyn.get execProps "warn_tdd")))
+    check "registered executor required has warn" (staticRequired executor |> Array.contains "warn")
+    check "registered executor required has warn_tdd" (staticRequired executor |> Array.contains "warn_tdd")
+    // write (staticWrite): no warn_tdd in raw BuiltinTools.writeTool schema
+    let staticWrite = Wanxiangshu.Mux.BuiltinTools.writeTool (createObj [])
+    let staticWriteProps = staticProperties (box staticWrite)
+    check "staticWrite has no warn_tdd" (isNullish (Dyn.get staticWriteProps "warn_tdd"))
+    // registered write: warn_tdd injected into schema properties and required
+    let write = findTool "write"
+    check "write tool exists" (not (isNullish write))
+    let writeProps = staticProperties write
+    check "registered write schema has warn_tdd" (not (isNullish (Dyn.get writeProps "warn_tdd")))
+    check "registered write required has warn_tdd" (staticRequired write |> Array.contains "warn_tdd")
+    // dynamic injection hook must be present
+    let hook = get reg "tool.execute.before"
+    check "tool.execute.before hook is present for dynamic warn/warn_tdd injection" (not (isNullish hook))
 }

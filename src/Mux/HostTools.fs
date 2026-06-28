@@ -106,10 +106,8 @@ let executorTool (deps: obj) (toolNames: string array) (sessionScope: Wanxiangsh
                   "program", box (strProp Params.executorProgram)
                   "dependencies", box (strArrayProp Params.executorDeps)
                   "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |])
-                  "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |])
-                  "warn", box (strEnumProp Params.executorWarn [| "it-is-not-possible-to-do-it-using-other-tools" |])
-                  "warn_tdd", box (strEnumProp Params.warnTddDesc [| WarnTdd.canonicalValue |]) ])
-            [| "language"; "program"; "timeout_type"; "mode"; "warn"; "warn_tdd" |]
+                  "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |]) ])
+            [| "language"; "program"; "timeout_type"; "mode" |]
       execute = fun config args ->
           match fromMuxConfig config with
           | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
@@ -176,9 +174,8 @@ let writeTool (_deps: obj) : ToolDefinition =
         mkSchema
             (createObj
                 [ "file_path", box (strProp Params.writeFilePath)
-                  "content", box (strProp Params.writeContent)
-                  "warn_tdd", box (strEnumProp Params.warnTddDesc [| WarnTdd.canonicalValue |]) ])
-            [| "file_path"; "content"; "warn_tdd" |]
+                  "content", box (strProp Params.writeContent) ])
+            [| "file_path"; "content" |]
       execute =
         fun config args ->
             match fromMuxConfig config with

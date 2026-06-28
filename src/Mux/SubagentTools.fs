@@ -36,7 +36,7 @@ let private execute (deps: obj) (toolNames: string array) (agentId: string) (tit
 let coderTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = "coder"
       description = description "coder"
-      parameters = mkSchema (createObj [ "intents", box (muxCoderIntentsSchema Params.coderIntents); "tdd", box (strEnumProp Params.coderTdd [| "red"; "green" |]); "warn_tdd", box (strEnumProp Params.warnTddDesc [| WarnTdd.canonicalValue |]) ]) (subagentRequiredKeys "coder")
+      parameters = mkSchema (createObj [ "intents", box (muxCoderIntentsSchema Params.coderIntents); "tdd", box (strEnumProp Params.coderTdd [| "red"; "green" |]) ]) (subagentRequiredKeys "coder")
       execute = fun config args -> execute deps toolNames "exec" "Coder" "exec" "coder" config args
       condition = None }
 

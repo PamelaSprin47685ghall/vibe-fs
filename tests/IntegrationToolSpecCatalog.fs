@@ -82,4 +82,5 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
         "muxEventHookAbortDeactivatesReview", muxEventHookAbortDeactivatesReviewSpec
         "muxToolExecuteBeforeSetsUiLabel", muxToolExecuteBeforeSetsUiLabelSpec
         "muxSystemTransformClearsOutputLength", muxSystemTransformClearsOutputLengthSpec
+        "muxToolSchemasAreCleanStaticallyButInjectedDynamically", muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec
     ]

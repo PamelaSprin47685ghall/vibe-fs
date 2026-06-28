@@ -15,12 +15,8 @@ let internal executorSpec: ToolSpec =
               "timeout_type",
               "Execution timeout budget: 'short' (1s), 'long' (10s), or 'last-resort' (100s). Use 'last-resort' only when absolutely necessary."
               "mode",
-              "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)."
-              "warn",
-              "Warning acknowledgement: 'it-is-not-possible-to-do-it-using-other-tools' — acknowledge that this task cannot be done with other tools."
-              "warn_tdd",
-              "TDD discipline acknowledgement: '" + Wanxiangshu.Kernel.WarnTdd.canonicalValue + "' — I confirm I have followed TDD and Kolmolgorov principles, never skipping red phase." ]
-      requiredFields = [ "language"; "program"; "timeout_type"; "mode"; "warn_tdd" ] }
+              "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)." ]
+      requiredFields = [ "language"; "program"; "timeout_type"; "mode" ] }
 
 let internal executorWaitSpec: ToolSpec =
     { name = "executor_wait"

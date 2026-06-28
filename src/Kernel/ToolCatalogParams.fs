@@ -1,6 +1,7 @@
 module Wanxiangshu.Kernel.ToolCatalog.Params
 
 open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.WarnTdd
 
 let private doc tool field = paramDoc tool field
 let private coder = doc "coder"
@@ -17,9 +18,9 @@ let executorProgram = executor "program"
 let executorDeps = executor "dependencies"
 let executorTimeout = executor "timeout_type"
 let executorMode = executor "mode"
-let executorWarn = executor "warn"
+let executorWarn = warnDescription
 
-let warnTddDesc = doc "executor" "warn_tdd"
+let warnTddDesc = warnDescription
 let private fuzzyFind = doc "fuzzy_find"
 let fuzzyFindPattern = fuzzyFind "pattern"
 let fuzzyFindPath = fuzzyFind "path"

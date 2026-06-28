@@ -15,10 +15,8 @@ let internal coderSpec: ToolSpec =
               "tdd",
               "TDD phase for this coder call. red = this edit is the RED phase: write the failing test, or the code that fails it; the result must leave tests failing. green = this edit is the GREEN phase: make the failing tests pass. "
               + "Discipline: for a new requirement the requirement comes first; for a bug fix the regression comes first. Always go red before green for any unit of work. "
-              + "You SHOULD issue a tdd=red coder call before any tdd=green coder call for the same work; a green call with no preceding red in the session is usually a violation and tends to be rejected. Declare the phase truthfully."
-              "warn_tdd",
-              "TDD discipline acknowledgement: '" + Wanxiangshu.Kernel.WarnTdd.canonicalValue + "' — I confirm I have followed TDD and Kolmolgorov principles, never skipping red phase." ]
-      requiredFields = [ "intents"; "tdd"; "warn_tdd" ] }
+              + "You SHOULD issue a tdd=red coder call before any tdd=green coder call for the same work; a green call with no preceding red in the session is usually a violation and tends to be rejected. Declare the phase truthfully." ]
+      requiredFields = [ "intents"; "tdd" ] }
 
 let internal investigatorSpec: ToolSpec =
     { name = "investigator"
