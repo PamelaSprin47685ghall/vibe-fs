@@ -15,7 +15,7 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Kernel.FallbackKernel.Types
 module Dyn = Wanxiangshu.Shell.Dyn
 
-let private coderChildTools = [| "read"; "edit"; "write"; "find"; "fuzzy_find"; "fuzzy_grep"; "lsp" |]
+let private coderChildTools = [| "read"; "edit"; "write"; "find"; "fuzzy_find"; "fuzzy_grep"; "lsp"; "investigator" |]
 let private investigatorChildTools = [| "read"; "find"; "fuzzy_find"; "fuzzy_grep" |]
 
 let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : unit =
