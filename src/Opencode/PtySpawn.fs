@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.ToolPermission
 open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Opencode.ToolSchema
 
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -78,19 +79,18 @@ let ptySpawnTool (host: Host) : obj =
                     "notifyOnExit", args?notifyOnExit
                     "timeoutSeconds", args?timeoutSeconds
                 ])
-                let lines = ResizeArray<string>()
-                lines.Add("<pty_spawned>")
-                lines.Add(sprintf "ID: %s" (string info?``id``))
-                lines.Add(sprintf "Title: %s" (string info?title))
-                lines.Add(sprintf "Command: %s %s" (string info?command) (String.concat " " (unbox<string array> info?args)))
-                lines.Add(sprintf "Workdir: %s" (string info?workdir))
-                lines.Add(sprintf "PID: %d" (unbox<int> info?pid))
-                lines.Add(sprintf "Status: %s" (string info?status))
-                lines.Add(sprintf "NotifyOnExit: %b" (unbox<bool> info?notifyOnExit))
                 let timeoutStr = if Dyn.isNullish info?timeoutSeconds then "none" else string info?timeoutSeconds
-                lines.Add(sprintf "TimeoutSeconds: %s" timeoutStr)
-                lines.Add("</pty_spawned>")
-                return String.concat "\n" lines
+                let fields = [
+                    "id", box (string info?``id``)
+                    "title", box (string info?title)
+                    "command", box (sprintf "%s %s" (string info?command) (String.concat " " (unbox<string array> info?args)))
+                    "workdir", box (string info?workdir)
+                    "pid", box (unbox<int> info?pid)
+                    "status", box (string info?status)
+                    "notify_on_exit", box (unbox<bool> info?notifyOnExit)
+                    "timeout_seconds", box timeoutStr
+                ]
+                return frontMatterPrompt fields "PTY session spawned."
             })
 
 let ptyKillTool (host: Host) : obj =
@@ -110,15 +110,15 @@ let ptyKillTool (host: Host) : obj =
                 let wasRunning = string session?status = "running"
                 let success = unbox<bool> (mgr?kill(id, cleanup))
                 if not success then failwithf "Failed to kill PTY session '%s'" id
-                let action = if wasRunning then "Killed" else "Cleaned up"
-                let cleanupNote = if cleanup then " (session removed)" else " (session retained for log access)"
-                let lines = [|
-                    "<pty_killed>"
-                    sprintf "%s: %s%s" action id cleanupNote
-                    sprintf "Title: %s" (string session?title)
-                    sprintf "Command: %s %s" (string session?command) (String.concat " " (unbox<string array> session?args))
-                    sprintf "Final line count: %d" (unbox<int> session?lineCount)
-                    "</pty_killed>"
-                |]
-                return String.concat "\n" lines
+                let action = if wasRunning then "killed" else "cleaned_up"
+                let retainedNote = if cleanup then "session removed" else "session retained for log access"
+                let fields = [
+                    "id", box id
+                    "action", box action
+                    "cleanup", box cleanup
+                    "title", box (string session?title)
+                    "command", box (sprintf "%s %s" (string session?command) (String.concat " " (unbox<string array> session?args)))
+                    "final_line_count", box (unbox<int> session?lineCount)
+                ]
+                return frontMatterPrompt fields (sprintf "%s %s (%s)." action id retainedNote)
             })

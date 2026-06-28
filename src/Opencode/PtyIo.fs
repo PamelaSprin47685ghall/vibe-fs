@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.ToolPermission
 open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Opencode.ToolSchema
 open Wanxiangshu.Opencode.PtySpawn
 
@@ -28,7 +29,7 @@ let ptyWriteTool (host: Host) : obj =
                 if not success then failwithf "Failed to write to PTY '%s'" id
                 let preview = if data.Length > 50 then data.Substring(0, 50) + "..." else data
                 let display = preview.Replace("\x03", "^C").Replace("\x04", "^D").Replace("\n", "\\n").Replace("\r", "\\r")
-                return sprintf "Sent %d bytes to %s: \"%s\"" data.Length id display
+                return frontMatterPrompt [ "id", box id; "bytes", box data.Length ] (sprintf "Sent: \"%s\"" display)
             })
 
 let ptyReadTool (host: Host) : obj =
@@ -57,8 +58,15 @@ let ptyReadTool (host: Host) : obj =
                     let totalLines = unbox<int> result?totalLines
                     let hasMore = unbox<bool> result?hasMore
                     let resultOffset = unbox<int> result?offset
+                    let fields = [
+                        "id", box id
+                        "status", box (string session?status)
+                        "offset", box resultOffset
+                        "returned", box lines.Length
+                        "total_lines", box totalLines
+                        "has_more", box hasMore
+                    ]
                     let sb = ResizeArray<string>()
-                    sb.Add(sprintf "<pty_output id=\"%s\" status=\"%s\">" id (string session?status))
                     for i in 0 .. lines.Length - 1 do
                         sb.Add(lines.[i])
                     sb.Add("")
@@ -66,8 +74,7 @@ let ptyReadTool (host: Host) : obj =
                         sb.Add(sprintf "(Buffer has more lines. Use offset=%d to read beyond line %d)" (resultOffset + lines.Length) (resultOffset + lines.Length))
                     else
                         sb.Add(sprintf "(End of buffer - total %d lines)" totalLines)
-                    sb.Add("</pty_output>")
-                    return String.concat "\n" sb
+                    return frontMatterPrompt fields (String.concat "\n" sb)
                 else
                     let ignoreCaseBool = if Dyn.isNullish (Dyn.get args "ignoreCase") then false else unbox<bool> args?ignoreCase
                     let flags = if ignoreCaseBool then "i" else ""
@@ -78,8 +85,17 @@ let ptyReadTool (host: Host) : obj =
                     let totalLines = unbox<int> result?totalLines
                     let totalMatches = unbox<int> result?totalMatches
                     let hasMore = unbox<bool> result?hasMore
+                    let fields = [
+                        "id", box id
+                        "status", box (string session?status)
+                        "pattern", box pattern
+                        "offset", box offset'
+                        "returned", box matches.Length
+                        "total_matches", box totalMatches
+                        "total_lines", box totalLines
+                        "has_more", box hasMore
+                    ]
                     let sb = ResizeArray<string>()
-                    sb.Add(sprintf "<pty_output id=\"%s\" status=\"%s\" pattern=\"%s\">" id (string session?status) pattern)
                     if matches.Length = 0 then
                         sb.Add(sprintf "No lines matched the pattern '%s'." pattern)
                         sb.Add(sprintf "Total lines in buffer: %d" totalLines)
@@ -92,8 +108,7 @@ let ptyReadTool (host: Host) : obj =
                             sb.Add(sprintf "(%d of %d matches shown. Use offset=%d to see more.)" matches.Length totalMatches (offset' + matches.Length))
                         else
                             sb.Add(sprintf "(%d match%s from %d total lines)" totalMatches (if totalMatches = 1 then "" else "es") totalLines)
-                    sb.Add("</pty_output>")
-                    return String.concat "\n" sb
+                    return frontMatterPrompt fields (String.concat "\n" sb)
             })
 
 let ptyListTool (host: Host) : obj =
@@ -105,19 +120,16 @@ let ptyListTool (host: Host) : obj =
                 let! mgr = getManager ()
                 let sessions : obj array = unbox (mgr?list())
                 if sessions.Length = 0 then
-                    return "<pty_list>\nNo active PTY sessions.\n</pty_list>"
+                    return frontMatterPrompt [ "session_count", box 0 ] "No active PTY sessions."
                 else
                     let sb = ResizeArray<string>()
-                    sb.Add("<pty_list>")
                     for s in sessions do
-                        sb.Add(sprintf "ID: %s" (string s?``id``))
-                        sb.Add(sprintf "  Title: %s" (string s?title))
-                        sb.Add(sprintf "  Command: %s %s" (string s?command) (String.concat " " (unbox<string array> s?args)))
-                        sb.Add(sprintf "  Status: %s" (string s?status))
-                        sb.Add(sprintf "  PID: %d" (unbox<int> s?pid))
-                        sb.Add(sprintf "  Lines: %d" (unbox<int> s?lineCount))
+                        sb.Add(sprintf "### %s" (string s?``id``))
+                        sb.Add(sprintf "title: %s" (string s?title))
+                        sb.Add(sprintf "command: %s %s" (string s?command) (String.concat " " (unbox<string array> s?args)))
+                        sb.Add(sprintf "status: %s" (string s?status))
+                        sb.Add(sprintf "pid: %d" (unbox<int> s?pid))
+                        sb.Add(sprintf "lines: %d" (unbox<int> s?lineCount))
                         sb.Add("")
-                    sb.Add(sprintf "Total: %d session(s)" sessions.Length)
-                    sb.Add("</pty_list>")
-                    return String.concat "\n" sb
+                    return frontMatterPrompt [ "session_count", box sessions.Length ] (String.concat "\n" sb)
             })
