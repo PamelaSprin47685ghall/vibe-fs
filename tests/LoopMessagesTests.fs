@@ -72,6 +72,18 @@ let inferReviewTaskFromTextsTaskThenCancelled () =
     equal "task, cancelled, prose → None"
         None (inferReviewTaskFromTexts [ taskText "feature-x"; verdictText "cancelled"; "after cancellation" ])
 
+let inferReviewTaskFromTextsTaskInSecondBlock () =
+    let first = "---\nmode: chat\n---"
+    let second = "---\ntask: second-task\n---"
+    equal "task in second block activates"
+        (Some "second-task") (inferReviewTaskFromTexts [ first + "\n" + second + "\nbody" ])
+
+let inferReviewTaskFromTextsVerdictInSecondBlockClears () =
+    let first = "---\ntask: old-task\n---"
+    let second = "---\nverdict: accepted\n---"
+    equal "verdict in second block clears task"
+        None (inferReviewTaskFromTexts [ first + "\n" + second + "\nbody" ])
+
 // ── hasDoubleCheckAnchor ──────────────────────────────────────────────────────
 
 let hasDoubleCheckAnchorTrue () =
@@ -98,5 +110,7 @@ let run () =
     inferReviewTaskFromTextsRejectKeeps ()
     inferReviewTaskFromTextsNonFrontMatterKeeps ()
     inferReviewTaskFromTextsTaskThenCancelled ()
+    inferReviewTaskFromTextsTaskInSecondBlock ()
+    inferReviewTaskFromTextsVerdictInSecondBlockClears ()
     hasDoubleCheckAnchorTrue ()
     hasDoubleCheckAnchorFalse ()

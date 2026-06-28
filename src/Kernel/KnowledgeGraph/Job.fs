@@ -1,7 +1,6 @@
 module Wanxiangshu.Kernel.KnowledgeGraph.Job
 
 open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Kernel.Yaml
 open Wanxiangshu.Kernel.KnowledgeGraph.Types
@@ -10,18 +9,6 @@ let private jobKindTag (kind: KnowledgeGraphJobKind) : string * string option =
     match kind with
     | AppendAfterWork -> "append", None
     | DailyRewrite date -> "daily", Some date
-
-[<Emit("Object.assign({}, $0, $1)")>]
-let private assignObjects (baseObj: obj) (overrideObj: obj) : obj = jsNative
-
-let private markerObject (ctx: KnowledgeGraphJobContext) : obj =
-    let kind, value = jobKindTag ctx.kind
-    let fields =
-        [ "type", box "vibe_knowledge_graph_job"
-          "workspaceRoot", box ctx.workspaceRoot
-          "kind", box kind ]
-        @ (match value with Some date when kind = "daily" -> [ "date", box date ] | _ -> [])
-    createObj fields
 
 let private jobMarkerFields (ctx: KnowledgeGraphJobContext) : FrontMatterField list =
     let kind, value = jobKindTag ctx.kind
@@ -38,17 +25,13 @@ let renderJobMarker (ctx: KnowledgeGraphJobContext) : string =
 let prependJobMarker (ctx: KnowledgeGraphJobContext) (text: string) : string =
     let normalized = if isNull text then "" else text.Replace("\r\n", "\n").Replace("\r", "\n")
     if normalized = "" then
-        frontMatter (jobMarkerFields ctx)
+        renderJobMarker ctx
     else
-        let parsed = parseFrontMatter normalized
-        if isNull parsed then
-            frontMatterPrompt (jobMarkerFields ctx) normalized
+        let marker = renderJobMarker ctx
+        if normalized.StartsWith("---") then
+            marker + "\n" + normalized
         else
-            let body = bodyAfterFrontMatter normalized
-            let merged = assignObjects parsed (markerObject ctx)
-            let yamlStr = stringify merged
-            let fm = "---\n" + yamlStr.TrimEnd('\n') + "\n---"
-            match body with "" -> fm | _ -> fm + "\n" + body
+            marker + "\n\n" + normalized
 
 let tryParseJobMarker (text: string) : KnowledgeGraphJobContext option =
     let fields = parseFrontMatterScalars text

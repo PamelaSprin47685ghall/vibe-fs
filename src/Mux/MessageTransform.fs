@@ -17,6 +17,7 @@ open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Kernel.MessageTransformPolicy
+open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
 open Wanxiangshu.Mux.KnowledgeGraphRuntimeMuxQuery
 open Wanxiangshu.Mux.MessagingCodec
@@ -29,6 +30,7 @@ open Wanxiangshu.Shell.MessageTransformCommon
 open Wanxiangshu.Shell.MuxHookInputCodec
 open Wanxiangshu.Shell.MuxWorkspaceCodec
 open Wanxiangshu.Shell.ChatTransformOutputCodec
+open Wanxiangshu.Shell.Dyn
 
 let messagesTransform
     (deps: obj)
@@ -100,5 +102,26 @@ let compactingTransform (deps: obj) (backlogSession: BacklogSession) (input: obj
                     backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
                 let afterBacklog = applyBacklogProjection sessionID false backlogOps cleaned
                 let encoded = encodeMessages afterBacklog
+                let backlogEntries =
+                    backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
+                    |> List.map (fun be -> box (createObj [ "user_message", box [||]; "completed_work", box (be.report.Trim()) ]))
+                    |> List.toArray
+                let backlogBlock = [ frontMatterRoot (box backlogEntries) ]
+                let anchorTexts =
+                    cleaned
+                    |> List.collect (fun m -> m.parts)
+                    |> List.choose (function
+                        | TextPart t -> Some t
+                        | ToolPart(_, _, Some s, _) -> Some s.output
+                        | _ -> None)
+                let anchorBlocks = anchorTexts |> List.collect extractFrontMatterFenceStrings
+                let allBlocks = backlogBlock @ anchorBlocks
+                if not allBlocks.IsEmpty && sessionID <> "" then
+                    let session = Dyn.get deps "session"
+                    if not (Dyn.isNullish session) then
+                        let promptFn = Dyn.get session "prompt"
+                        if not (Dyn.isNullish promptFn) then
+                            let promptText = renderCompactionAnchorPrompt allBlocks
+                            try do! unbox<JS.Promise<unit>> (Dyn.call2 promptFn sessionID (box promptText)) with _ -> ()
                 replaceArrayInPlace messagesArr encoded
     }

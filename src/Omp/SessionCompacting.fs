@@ -7,6 +7,7 @@ module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Omp.MagicTodo
 open Wanxiangshu.Omp.MessagingCodec
 
@@ -24,10 +25,17 @@ let sessionCompactingHandler (_pi: obj) (event: obj) (_ctx: obj) : JS.Promise<ob
         let cleaned = stripSyntheticBySource messagesList
         if cleaned.IsEmpty then return createObj []
         else
-            let backlogEntries = backlogSession.GetOrRebuildBacklog(sessionId, cleaned)
-            if backlogEntries.IsEmpty then return createObj []
+            let backlogEntries =
+                backlogSession.GetOrRebuildBacklog(sessionId, cleaned)
+                |> List.map (fun be -> box (createObj [ "user_message", box [||]; "completed_work", box (be.report.Trim()) ]))
+                |> List.toArray
+            let backlogBlock = [ frontMatterRoot (box backlogEntries) ]
+            let anchorTexts = extractHistoryTexts cleaned
+            let anchorBlocks = anchorTexts |> List.collect extractFrontMatterFenceStrings
+            let allBlocks = backlogBlock @ anchorBlocks
+            if allBlocks.IsEmpty then return createObj []
             else
-                let contextText = buildBacklogText backlogEntries []
+                let contextText = renderCompactionAnchorPrompt allBlocks
                 let contextLines = contextText.Split('\n')
                 return createObj [ "context", box contextLines ]
     }

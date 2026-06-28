@@ -17,11 +17,11 @@ let chatMessage (registry: ChildAgentRegistry) (lifecycleObserver: Wanxiangshu.O
 let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: Wanxiangshu.Opencode.BacklogSession.BacklogSession) (knowledgeGraphRuntime: Wanxiangshu.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     MessageTransform.messagesTransform registry directory runtimeScope backlogSession knowledgeGraphRuntime reviewStore client input output
 
-let compactingHandlerFor (host: Host) (backlogSession: Wanxiangshu.Opencode.BacklogSession.BacklogSession) (input: obj) (output: obj) : JS.Promise<unit> =
-    MessageTransform.compactingHandlerFor host backlogSession input output
+let compactingHandlerFor (host: Host) (backlogSession: Wanxiangshu.Opencode.BacklogSession.BacklogSession) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
+    MessageTransform.compactingHandlerFor host backlogSession client input output
 
-let compactingHandler (backlogSession: Wanxiangshu.Opencode.BacklogSession.BacklogSession) (input: obj) (output: obj) : JS.Promise<unit> =
-    MessageTransform.compactingHandler backlogSession input output
+let compactingHandler (backlogSession: Wanxiangshu.Opencode.BacklogSession.BacklogSession) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
+    MessageTransform.compactingHandler backlogSession client input output
 
 let systemTransform (directory: string) (input: obj) (output: obj) : JS.Promise<unit> =
     MessageTransform.systemTransform directory input output

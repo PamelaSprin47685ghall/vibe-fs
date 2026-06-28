@@ -199,3 +199,49 @@ let muxCompactingTransformProjectsBacklogSpec () = promise {
                 text.Contains("Completed work from folded turns. File changes are already on disk.")
                 && text.Contains("planned compact phase")))
 }
+
+let muxCompactingTransformEmitsAnchorPromptSpec () = promise {
+    let promptsCaptured = ResizeArray<string>()
+    let mockSession =
+        createObj
+            [ "prompt",
+              box (System.Func<string, obj, JS.Promise<unit>>(fun sessionID promptText ->
+                  promise {
+                      let text = string promptText
+                      if text <> "" then promptsCaptured.Add(text)
+                      return ()
+                  })) ]
+    let deps =
+        createObj
+            [ "loadConfigOrDefault", box (fun () -> createObj [])
+              "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
+              "resolveAgentFrontmatter",
+              box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
+              "nowUtc", box (System.Func<unit, System.DateTime>(fun () -> System.DateTime(2026, 6, 25)))
+              "session", box mockSession ]
+    let reg = Wanxiangshu.Mux.Plugin.createRegistration deps
+    let compactingTransform = get reg "compactingTransform"
+    if isNullish compactingTransform then
+        check "mux registration exposes compactingTransform" false
+    else
+        let todoInput report content status priority =
+            createObj
+                [ "completedWorkReport", box report
+                  "todos", box [| createObj [ "content", box content; "status", box status; "priority", box priority ] |] ]
+        let todoOutput count = createObj [ "success", box true; "count", box count ]
+        let messages =
+            [| muxTextMessage "anchor-user-1" "user" "plan phase"
+               muxDynamicToolMessage "anchor-1" "todo_write" "anchor-call-a" (todoInput "anchor planned phase" "Anchor Plan" "in_progress" "high") (todoOutput 1)
+               muxTextMessage "anchor-user-2" "user" "implement phase"
+               muxDynamicToolMessage "anchor-2" "todo_write" "anchor-call-b" (todoInput "anchor implemented phase" "Anchor Implement" "completed" "high") (todoOutput 1) |]
+        let out = createObj [ "messages", box messages ]
+        let input = createObj [ "agent", box "manager"; "sessionID", box "mux-anchor-session" ]
+        do! (compactingTransform $ (input, out)) |> unbox<JS.Promise<unit>>
+        check "mux compacting transform emits exactly one anchor prompt" (promptsCaptured.Count = 1)
+        if promptsCaptured.Count > 0 then
+            let promptText = promptsCaptured.[0]
+            check "anchor prompt contains See above body" (promptText.Contains "See above for some messages before compaction.")
+            check "anchor prompt contains compaction-anchor source marker" (promptText.Contains "source: compaction-anchor")
+            check "anchor prompt contains backlog report text (planned phase)" (promptText.Contains "anchor planned phase")
+            check "anchor prompt contains backlog report text (implemented phase)" (promptText.Contains "anchor implemented phase")
+}

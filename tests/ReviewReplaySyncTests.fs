@@ -49,6 +49,15 @@ let syncReviewFromTextsDeactivatesOnEndVerdict () =
     syncReviewFromTexts store "s3" [ accept ]
     check "end verdict deactivates review" (not (store.isReviewActive "s3"))
 
+let syncReviewFromTextsRecoversTaskFromSecondBlock () =
+    let store = createReviewStore ()
+    let activate =
+        "---\nmode: chat\n---\n---\ntask: from-second-block\n---\nWith-Review Mode is active."
+    syncReviewFromTexts store "s5" [ activate ]
+    equal "replay recovers task from second block"
+        (Some "from-second-block") (store.getReviewTask "s5")
+    check "replay marks session active from second block" (store.isReviewActive "s5")
+
 let syncReviewFromTextsPreservesActiveOnReject () =
     let store = createReviewStore ()
     let activate = buildLoopMessage "active-task" [ "With-Review Mode is active." ]
@@ -73,6 +82,7 @@ let fullTextsRecoverAnchor () =
 let run () =
     textsFromFlatPartsIncludesToolOutput ()
     syncReviewFromTextsActivatesFromTexts ()
+    syncReviewFromTextsRecoversTaskFromSecondBlock ()
     syncReviewFromTextsDeactivatesOnEndVerdict ()
     syncReviewFromTextsPreservesActiveOnReject ()
     truncatedTextsLoseAnchor ()

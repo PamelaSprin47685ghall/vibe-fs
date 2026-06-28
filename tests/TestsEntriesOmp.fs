@@ -25,6 +25,7 @@ open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.OmpExecutorToolsTests
 open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.OmpSessionCompactingTests
+open Wanxiangshu.Tests.OmpSessionCompactingAnchorTests
 open Wanxiangshu.Tests.OmpCoverage2Tests
 open Wanxiangshu.Tests.OmpTodoToolTests
 
@@ -159,6 +160,8 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpSessionCompactingTests.sessionCompactingHandlerWithMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerWithMessages
     "OmpSessionCompactingTests.sessionCompactingPreservesCompletedWorkReport", Async OmpSessionCompactingTests.sessionCompactingPreservesCompletedWorkReport
     "OmpSessionCompactingTests.sessionCompactingStripsSynthetic", Async OmpSessionCompactingTests.sessionCompactingStripsSynthetic
+    "OmpSessionCompactingAnchorTests.sessionCompactingContextContainsSeeAbove", Async OmpSessionCompactingAnchorTests.sessionCompactingContextContainsSeeAbove
+    "OmpSessionCompactingAnchorTests.sessionCompactingContextHasMultipleFrontMatterBlocks", Async OmpSessionCompactingAnchorTests.sessionCompactingContextHasMultipleFrontMatterBlocks
     "OmpPluginTests.extensionRegistersLifecycleHooks", Async OmpPluginTests.extensionRegistersLifecycleHooks
     "OmpPluginTests.toolCallHookCanBeInvoked", Async OmpPluginTests.toolCallHookCanBeInvoked
     "OmpPluginTests.sessionCompactingHookCanBeInvoked", Async OmpPluginTests.sessionCompactingHookCanBeInvoked
