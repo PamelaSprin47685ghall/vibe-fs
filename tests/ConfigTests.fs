@@ -42,7 +42,7 @@ let getStealthBrowserMcpLocalConfigCommandElements () =
     check "command has server" (Array.contains "server" cmd)
 
 let sembleMcpRefEmptyReturnsMaster () =
-    equal "empty env -> master" "master" (sembleMcpRef "")
+    equal "empty env -> main" "main" (sembleMcpRef "")
 
 let sembleMcpRefNonEmptyPassthrough () =
     equal "non-empty env passthrough" "feature-x" (sembleMcpRef "feature-x")
@@ -51,13 +51,13 @@ let getSembleMcpCommandElements () =
     let cmd = getSembleMcpCommand ""
     equal "command is uvx" "uvx" cmd.command
     check "args has --from" (Array.contains "--from" cmd.args)
-    check "args has git+ repo" (cmd.args |> Array.exists (fun a -> a.Contains "https://github.com/MinishLab/semble.git"))
-    check "args has master" (cmd.args |> Array.exists (fun a -> a.Contains "master"))
-    check "args has --extra" (Array.contains "--extra" cmd.args)
-    check "args has mcp" (Array.contains "mcp" cmd.args)
-    check "args has python" (Array.contains "python" cmd.args)
-    check "args has -m" (Array.contains "-m" cmd.args)
-    check "args has semble" (Array.contains "semble" cmd.args)
+    let reqArg = cmd.args |> Array.find (fun a -> a.Contains "semble[mcp]")
+    check "requirement carries mcp extra" (reqArg.Contains "[mcp]")
+    check "requirement carries git url" (reqArg.Contains "https://github.com/MinishLab/semble.git")
+    check "requirement carries main" (reqArg.Contains "main")
+    check "args has no python" (not (Array.contains "python" cmd.args))
+    check "args has semble entrypoint" (Array.contains "semble" cmd.args)
+    check "args has no --extra" (not (Array.contains "--extra" cmd.args))
 
 let getSembleMcpCommandCustomRef () =
     let cmd = getSembleMcpCommand "dev-branch"

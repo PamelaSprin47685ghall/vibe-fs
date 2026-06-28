@@ -43,20 +43,31 @@ let private injectSembleResults
     (sessionID: string)
     : JS.Promise<obj array> =
     promise {
-        if not (SembleSearch.isBreakpoint final) then
+        let messages = MessagingCodec.decodeMessages final
+        match SembleSearch.breakpointStart sessionID with
+        | None ->
+            SembleSearch.trace "DECIDE" $"reseed: no prior breakpoint, skip this turn (agent={agent}, len={final.Length})"
+            SembleSearch.markBreakpoint sessionID final.Length
             return final
-        else
-            let messages = MessagingCodec.decodeMessages final
-            let context = SembleSearch.extractContextFromMessages messages
+        | Some stored when stored > List.length messages ->
+            SembleSearch.trace "DECIDE" $"reseed: breakpoint {stored} > len {List.length messages}, compaction reset"
+            SembleSearch.markBreakpoint sessionID final.Length
+            return final
+        | Some startIndex ->
+            let context = SembleSearch.extractContextFromMessages startIndex messages
             if context.Length < 50 then
+                SembleSearch.trace "DECIDE" $"skip: context too short ({context.Length}, start={startIndex}, len={final.Length})"
                 return final
             else
                 let! results = SembleSearch.search context directory 3
                 if results.IsEmpty then
+                    SembleSearch.trace "DECIDE" $"skip: no results (start={startIndex}, len={final.Length})"
                     return final
                 else
                     let pairs = results |> List.collect (SembleSearch.buildReadPair sessionID agent)
                     let encoded = MessagingCodec.encodeMessages pairs
+                    SembleSearch.markBreakpoint sessionID final.Length
+                    SembleSearch.dumpInjection sessionID agent context results pairs.Length
                     return Array.append final encoded
     }
 
@@ -109,7 +120,9 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                     let! injected =
                         if agent = "investigator" then
                             injectSembleResults directory final agent sessionID
-                        else Promise.lift final
+                        else
+                            Wanxiangshu.Shell.SembleSearch.trace "DECIDE" $"skip: agent={agent} (not investigator)"
+                            Promise.lift final
                     replaceArrayInPlace messagesArr injected
     }
 

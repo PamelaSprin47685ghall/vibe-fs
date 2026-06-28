@@ -1,10 +1,14 @@
 module Wanxiangshu.Tests.SembleInjectionTests
 
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.SembleSearch
+
+[<Global("process")>]
+let private procEnv : obj = jsNative
 
 let private sampleResult : SembleResult =
     { filePath = "src/auth.py"
@@ -88,10 +92,15 @@ let isBreakpointFalseForAssistantFinal () =
 let isBreakpointFalseForEmpty () =
     check "breakpoint empty false" (not (isBreakpoint [||]))
 
-let extractContextCollectsTextAndOutput () =
+let extractContextCollectsUserAndAssistantText () =
+    let userMsg =
+        { info = emptyInfo "msg-0" User
+          parts = [ TextPart "Find the auth function" ]
+          source = Native
+          raw = null }
     let assistantText =
         { info = emptyInfo "msg-1" Assistant
-          parts = [ TextPart "Investigate authentication" ]
+          parts = [ TextPart "Investigating authentication" ]
           source = Native
           raw = null }
     let toolResult =
@@ -99,23 +108,51 @@ let extractContextCollectsTextAndOutput () =
           parts = [ ToolPart("read", "call-1", Some { status = "completed"; output = "file content"; error = ""; input = null; operationAction = "" }, null) ]
           source = Native
           raw = null }
-    let ctx = extractContextFromMessages [ assistantText; toolResult ]
-    check "context contains assistant text" (ctx.Contains "Investigate authentication")
-    check "context contains tool output" (ctx.Contains "file content")
+    let ctx = extractContextFromMessages 0 [ userMsg; assistantText; toolResult ]
+    check "context contains user text" (ctx.Contains "Find the auth function")
+    check "context contains assistant text" (ctx.Contains "Investigating authentication")
+    check "context excludes tool output" (not (ctx.Contains "file content"))
 
-let extractContextStopsAtToolCallBoundary () =
-    let assistantCall =
-        { info = emptyInfo "msg-1" Assistant
-          parts = [ ToolPart("read", "call-1", None, null) ]
+let extractContextRespectsStartIndex () =
+    let m0 =
+        { info = emptyInfo "m0" Assistant
+          parts = [ TextPart "first turn already injected" ]
           source = Native
           raw = null }
-    let toolResult =
-        { info = emptyInfo "msg-2" ToolResult
-          parts = [ ToolPart("read", "call-1", Some { status = "completed"; output = "result A"; error = ""; input = null; operationAction = "" }, null) ]
+    let m1 =
+        { info = emptyInfo "m1" User
+          parts = [ TextPart "new request since breakpoint" ]
           source = Native
           raw = null }
-    let ctx = extractContextFromMessages [ assistantCall; toolResult ]
-    check "context only result A" (ctx = "result A")
+    let ctx = extractContextFromMessages 1 [ m0; m1 ]
+    check "context excludes pre-start" (not (ctx.Contains "first turn"))
+    check "context includes post-start" (ctx.Contains "new request")
+
+let extractContextExcludesAssistantToolParts () =
+    let assistantWithTool =
+        { info = emptyInfo "m0" Assistant
+          parts = [ TextPart "thinking"; ToolPart("read", "c1", None, null) ]
+          source = Native
+          raw = null }
+    let ctx = extractContextFromMessages 0 [ assistantWithTool ]
+    check "context keeps assistant text" (ctx.Contains "thinking")
+
+let debugDisabledByDefault () =
+    check "debug disabled by default" (not (debugEnabled ()))
+
+let debugEnabledViaEnv () =
+    let prev = if isNull (procEnv?env?SEMBLE_INJECT_DEBUG) then "" else string procEnv?env?SEMBLE_INJECT_DEBUG
+    try
+        procEnv?env?SEMBLE_INJECT_DEBUG <- "1"
+        check "debug enabled via env" (debugEnabled ())
+        procEnv?env?SEMBLE_INJECT_DEBUG <- "0"
+        check "debug disabled when env=0" (not (debugEnabled ()))
+    finally
+        procEnv?env?SEMBLE_INJECT_DEBUG <- prev
+
+let dumpInjectionNoThrowWhenDisabled () =
+    dumpInjection "s" "investigator" "ctx" [ sampleResult ] 2
+    check "dumpInjection disabled no throw" true
 
 let run () =
     formatReadOutputPrefixesLines ()
@@ -126,5 +163,9 @@ let run () =
     isBreakpointDetectsToolResultFinal ()
     isBreakpointFalseForAssistantFinal ()
     isBreakpointFalseForEmpty ()
-    extractContextCollectsTextAndOutput ()
-    extractContextStopsAtToolCallBoundary ()
+    extractContextCollectsUserAndAssistantText ()
+    extractContextRespectsStartIndex ()
+    extractContextExcludesAssistantToolParts ()
+    debugDisabledByDefault ()
+    debugEnabledViaEnv ()
+    dumpInjectionNoThrowWhenDisabled ()

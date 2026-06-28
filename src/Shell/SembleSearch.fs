@@ -23,12 +23,43 @@ let private envVar (name: string) : string =
     let v = nodeProcess?env?(name)
     if isNull v then "" else string v
 
+[<Import("appendFileSync", "node:fs")>]
+let private appendFileSync (path: string) (content: string) (encoding: string) : unit = jsNative
+
 type SembleResult =
     { filePath: string
       startLine: int
       endLine: int
       content: string
       score: float }
+
+let private debugLogPath () : string =
+    let dir = envVar "SEMBLE_INJECT_DEBUG_DIR"
+    if dir = "" then "/tmp/wanxiangshu-semble-inject.log" else $"{dir}/wanxiangshu-semble-inject.log"
+
+let debugEnabled () : bool = envVar "SEMBLE_INJECT_DEBUG" = "1"
+
+let trace (tag: string) (detail: string) : unit =
+    if not (debugEnabled ()) then ()
+    else
+        let ts = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
+        let line = $"[semble {ts}] {tag}: {detail}\n"
+        try appendFileSync (debugLogPath ()) line "utf8" with _ -> ()
+
+let dumpInjection (sessionID: string) (agent: string) (context: string) (results: SembleResult list) (pairCount: int) : unit =
+    if not (debugEnabled ()) then ()
+    else
+        let resultLines =
+            results
+            |> List.mapi (fun i r ->
+                $"  [{i}] {r.filePath}:{r.startLine}-{r.endLine} score={r.score}")
+            |> String.concat "\n"
+        let ctxHead = context.[.. min 199 (context.Length - 1)]
+        let detail =
+            $"session={sessionID} agent={agent} pairs={pairCount} ctxLen={context.Length}\n"
+            + $"  ctx: {ctxHead}\n"
+            + resultLines
+        trace "INJECT" detail
 
 let formatReadOutput (content: string) (startLine: int) : string =
     content.Split('\n')
@@ -84,21 +115,24 @@ let isBreakpoint (final: obj array) : bool =
         let info = Dyn.get last "info"
         Dyn.str info "role" = "toolResult"
 
-let extractContextFromMessages (messages: Message<obj> list) : string =
-    let rec loop (msgs: Message<obj> list) (acc: string list) =
-        match msgs with
-        | [] -> acc
-        | m :: rest ->
-            match m.info.role with
-            | Assistant when m.parts |> List.exists (function ToolPart(_, _, None, _) -> true | _ -> false) -> acc
-            | Assistant ->
-                let texts = m.parts |> List.choose (function TextPart t when t <> "" -> Some t | _ -> None)
-                loop rest (texts @ acc)
-            | ToolResult ->
-                let outputs = m.parts |> List.choose (function ToolPart(_, _, Some s, _) when s.output <> "" -> Some s.output | _ -> None)
-                loop rest (outputs @ acc)
-            | _ -> loop rest acc
-    loop (List.rev messages) []
+let mutable private lastBreakpoint: Map<string, int> = Map.empty
+
+let breakpointStart (sessionID: string) : int option = Map.tryFind sessionID lastBreakpoint
+
+let markBreakpoint (sessionID: string) (index: int) : unit =
+    lastBreakpoint <- Map.add sessionID index lastBreakpoint
+
+/// Context = user/assistant text in [startIndex, end). Tool I/O excluded.
+let extractContextFromMessages (startIndex: int) (messages: Message<'raw> list) : string =
+    let rec safeSkip n xs =
+        if n <= 0 then xs
+        else match xs with [] -> [] | _ :: t -> safeSkip (n - 1) t
+    safeSkip startIndex messages
+    |> List.collect (fun m ->
+        match m.info.role with
+        | User | Assistant ->
+            m.parts |> List.choose (function TextPart t when t <> "" -> Some t | _ -> None)
+        | _ -> [])
     |> String.concat "\n"
     |> fun s -> s.Trim()
 
@@ -118,6 +152,8 @@ let private getClient () : JS.Promise<Client option> =
                         box {| name = "wanxiangshu-semble"; version = "0.1.0" |},
                         box {| capabilities = {| tools = box [||] |} |})
                     let cmd = getSembleMcpCommand (envVar "SEMBLE_MCP_REF")
+                    let argsStr = String.concat " " (Array.toList cmd.args)
+                    trace "CONNECT" $"spawning {cmd.command} {argsStr}"
                     let transport = StdioClientTransport(box {|
                         command = cmd.command
                         args = cmd.args
@@ -125,9 +161,11 @@ let private getClient () : JS.Promise<Client option> =
                     do! c.connect(transport)
                     _client <- Some c
                     _connecting <- None
+                    trace "CONNECT" "ok"
                     return Some c
-                with _ ->
+                with ex ->
                     _connecting <- None
+                    trace "CONNECT" $"failed: {ex.Message}"
                     return None
             }
             _connecting <- Some p
@@ -174,7 +212,9 @@ let private parseResults (result: obj) : SembleResult list =
 let search (query: string) (repoPath: string) (topK: int) : JS.Promise<SembleResult list> =
     promise {
         match! getClient () with
-        | None -> return []
+        | None ->
+            trace "SEARCH" "skip: client not ready"
+            return []
         | Some client ->
             try
                 let! result = client.callTool(box {|
@@ -186,6 +226,10 @@ let search (query: string) (repoPath: string) (topK: int) : JS.Promise<SembleRes
                         max_snippet_lines = 20
                     |}
                 |})
-                return parseResults result
-            with _ -> return []
+                let parsed = parseResults result
+                trace "SEARCH" $"query='{query}' repo={repoPath} results={List.length parsed}"
+                return parsed
+            with ex ->
+                trace "SEARCH" $"callTool failed: {ex.Message}"
+                return []
     }
