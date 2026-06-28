@@ -24,6 +24,7 @@ open Wanxiangshu.Shell.PromiseQueue
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.ToolContextCodec
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.Clock
 open Wanxiangshu.Mux.KnowledgeGraphRuntimeIO
 
 type MuxKnowledgeGraphRuntime(?deps: obj) as this =
@@ -42,8 +43,8 @@ type MuxKnowledgeGraphRuntime(?deps: obj) as this =
             let getNow = Dyn.get d "nowUtc"
             if not (Dyn.isNullish getNow) && Dyn.typeIs getNow "function" then
                 fun () -> unbox<System.DateTime> (getNow $ null)
-            else fun () -> System.DateTime.UtcNow
-        | _ -> fun () -> System.DateTime.UtcNow
+            else fun () -> Clock.nowUtc ()
+        | _ -> fun () -> Clock.nowUtc ()
 
     let testPorts =
         createFromStateQueueSink

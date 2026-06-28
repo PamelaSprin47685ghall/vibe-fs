@@ -11,6 +11,8 @@ open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.KnowledgeGraphFiles
 open Wanxiangshu.Shell.PromiseQueue
+open Wanxiangshu.Shell.Clock
+open Wanxiangshu.Shell
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -32,7 +34,7 @@ let startMaintenanceIfDue
             promise {
                 let! files = readKnowledgeGraphFiles root
                 let projection = projectLatestWins files
-                let dailyDue = dueMaintenance files System.DateTime.UtcNow
+                let dailyDue = dueMaintenance files (Clock.nowUtc ())
                 let launchIfDue due kind title resultPrefix promptInfix buildPrompt =
                     due
                     |> List.iter (fun value ->

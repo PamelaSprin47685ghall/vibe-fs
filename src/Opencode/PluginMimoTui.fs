@@ -5,9 +5,10 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.Clock
 
 let private dateNow () : float =
-    float (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+    float (getTimestampMs())
 
 let private relTime (updated: float) : string =
     let diff = dateNow () - updated

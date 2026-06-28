@@ -43,6 +43,9 @@ let sessionIoUsesToolContextCodec () =
 let private sessionIoSubagentCode () =
     (requireFile "src/Opencode/SessionIo.fs" |> nonCommentCode)
     + (requireFile "src/Opencode/SessionIoSubagent.fs" |> nonCommentCode)
+    + (requireFile "src/Opencode/SubagentSpawn.fs" |> nonCommentCode)
+    + (requireFile "src/Opencode/SubagentIo.fs" |> nonCommentCode)
+    + (requireFile "src/Opencode/SubagentTypes.fs" |> nonCommentCode)
 
 let sessionIoUsesOpencodeContextCodec () =
     let code = sessionIoSubagentCode ()
@@ -68,7 +71,7 @@ let sessionIoUsesOpencodeSessionSpawnCodec () =
         (not (code.Contains "Dyn.str (Dyn.get createResult \"data\") \"id\""))
     check "arch: SessionIo must not Dyn.get createResult data"
         (not (code.Contains "Dyn.get createResult \"data\""))
-    let subagentOnly = requireFile "src/Opencode/SessionIoSubagent.fs" |> nonCommentCode
+    let subagentOnly = requireFile "src/Opencode/SubagentSpawn.fs" |> nonCommentCode
     let startIdx = subagentOnly.IndexOf "let startSubagentSession"
     check "arch: SessionIo startSubagentSession exists" (startIdx >= 0)
     let startWindow =

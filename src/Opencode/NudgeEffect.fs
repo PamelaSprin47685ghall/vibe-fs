@@ -12,20 +12,12 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
 open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Shell.SerialStateHolder
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
     unbox (target?(method)(arg))
 
 let resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
-
-type StateHolder<'state>(initialState: 'state) =
-    let mutable state = initialState
-
-    member _.Mutate<'result>(transition: 'state -> 'state * 'result) : 'result =
-        let nextState, result = transition state
-        state <- nextState
-        result
 
 let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<SessionSnapshot option> =
     promise {
@@ -60,36 +52,27 @@ let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string opt
         | Ok session -> do! invoke1 promptArg "prompt" session |> Promise.map ignore
     }
 
+let private sendNudgeOutcome (client: obj) (sessionID: SessionId) (promptText: string) (agentOpt: string option) : JS.Promise<SendOutcome> =
+    promise {
+        let! caught = sendNudge client sessionID agentOpt promptText |> Promise.result
+        return
+            match caught with
+            | Ok () -> Delivered
+            | Error error ->
+                match ErrorClassify.translateJsError error with
+                | MessageAborted -> Aborted
+                | SessionBusy -> Busy
+                | _ -> Failed
+    }
+
 let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
                           (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
                           (registry: ChildAgentRegistry)
                           (sessionID: SessionId) : JS.Promise<unit> =
-    promise {
-        try
-            let! snapshotOpt = collectSnapshot client sessionID
-            match snapshotOpt with
-            | None -> holder.Mutate(fun (state: NudgeShellState) -> clearSession state (Id.sessionIdValue sessionID), ())
-            | Some snapshot ->
-                let sid = Id.sessionIdValue sessionID
-                match holder.Mutate(fun (state: NudgeShellState) -> decideNudge reviewStore.isReviewActive registry.LookupChildAgent state sid snapshot) with
-                | StandDown -> ()
-                | Send(promptText, agentOpt) ->
-                    let! caught = sendNudge client sessionID agentOpt promptText |> Promise.result
-                    let outcome =
-                        match caught with
-                        | Ok () -> Delivered
-                        | Error error ->
-                            match translateJsError error with
-                            | MessageAborted -> Aborted
-                            | SessionBusy -> Busy
-                            | _ -> Failed
-                    holder.Mutate(fun (state: NudgeShellState) ->
-                        match tryRecordSend state sid outcome with
-                        | Some nextState -> nextState, ()
-                        | None -> state, ())
-        with _ ->
-            holder.Mutate(fun (state: NudgeShellState) -> clearSession state (Id.sessionIdValue sessionID), ())
-    }
+    let sid = Id.sessionIdValue sessionID
+    let takeSnapshot () = collectSnapshot client sessionID
+    let sendNudgeFn promptText agentOpt = sendNudgeOutcome client sessionID promptText agentOpt
+    NudgeRuntime.runNudgeFlowCore holder reviewStore.isReviewActive registry.LookupChildAgent sid takeSnapshot sendNudgeFn
 
 let startNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
                     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)

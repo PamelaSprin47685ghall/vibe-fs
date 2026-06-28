@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Mux.PluginCatalog
 open Wanxiangshu.Mux.ReadDedup
 open Wanxiangshu.Shell.WorkspaceFiles
+open Wanxiangshu.Shell.Clock
 
 let muxToolNames = PluginCatalog.muxToolNames
 
@@ -31,7 +32,7 @@ let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]
         let! files = findCapsFiles projectRoot
         if List.isEmpty files then return [||]
         else
-            let timestamp = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            let timestamp = getTimestampMs()
             let token = string timestamp
             let modified = System.DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime.ToString("O")
             return
