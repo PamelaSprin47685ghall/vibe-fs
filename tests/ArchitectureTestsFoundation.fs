@@ -104,10 +104,12 @@ let opencodeHookSchemaNoDirectZodImport () =
     check "arch: HookSchema no direct zod import" (not (content.Contains "import \"z\" \"zod\""))
 
 let hookSchemaNoDuplicateMethodologySchema () =
-    // HookSchema is the unified file; check it directly, not a split shim.
-    let code = requireFile "src/Opencode/HookSchema.fs" |> nonCommentCode
-    check "arch: HookSchema no local selectMethodologyProperty def"
-        (not (code.Contains "let selectMethodologyProperty"))
+    let core = requireFile "src/Opencode/HookSchemaCore.fs" |> nonCommentCode
+    let decode = requireFile "src/Opencode/HookSchemaDecode.fs" |> nonCommentCode
+    check "arch: HookSchemaCore no local selectMethodologyProperty def"
+        (not (core.Contains "let selectMethodologyProperty"))
+    check "arch: HookSchemaDecode no local selectMethodologyProperty def"
+        (not (decode.Contains "let selectMethodologyProperty"))
 
 let private legacyInjectedOutputMarkers = [|
     "[executor]"
@@ -127,12 +129,15 @@ let opencodeHookSchemaUsesIntentsRawFromArgs () =
     let codec = requireFile "src/Shell/SubagentIntentsCodec.fs" |> nonCommentCode
     check "arch: SubagentIntentsCodec defines intentsRawFromArgs"
         (codec.Contains "let intentsRawFromArgs")
-    // HookSchema is the unified file after Core+Decode merge.
-    let code = requireFile "src/Opencode/HookSchema.fs" |> nonCommentCode
-    check "arch: HookSchema uses intentsRawFromArgs"
-        (code.Contains "intentsRawFromArgs")
-    check "arch: HookSchema must not Dyn.get args intents"
-        (not (code.Contains "Dyn.get args \"intents\""))
+    let core = requireFile "src/Opencode/HookSchemaCore.fs" |> nonCommentCode
+    check "arch: HookSchemaCore uses intentsRawFromArgs"
+        (core.Contains "intentsRawFromArgs")
+    let coreFile = requireFile "src/Opencode/HookSchemaCore.fs"
+    let decodeFile = requireFile "src/Opencode/HookSchemaDecode.fs"
+    check "arch: HookSchemaCore must not Dyn.get args intents"
+        (not (coreFile.Contains "Dyn.get args \"intents\""))
+    check "arch: HookSchemaDecode must not Dyn.get args intents"
+        (not (decodeFile.Contains "Dyn.get args \"intents\""))
 
 let private forbiddenMuxOpencodeProjectionPatterns =
     [| System.Text.RegularExpressions.Regex(@"captureReport\s+opencode")

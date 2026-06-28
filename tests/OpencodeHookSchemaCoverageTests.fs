@@ -1,24 +1,17 @@
-module Wanxiangshu.Tests.OpencodeCoverageTests
+module Wanxiangshu.Tests.OpencodeHookSchemaCoverageTests
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Opencode.HookSchema
-open Wanxiangshu.Opencode.SearchTools
-open Wanxiangshu.Opencode.MessagingCodec
+open Wanxiangshu.Shell.WorkBacklogSchema
+open Wanxiangshu.Kernel.WarnTdd
 open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.FuzzyIteratorStore
-open Wanxiangshu.Shell.FuzzyFinderShell
-open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.WebToolsCodec
-open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.ToolCatalog
-
 module Dyn = Wanxiangshu.Shell.Dyn
 
-// ── HookSchema.setUiLabel ─────────────────────────────────────────────────────
+// ── setUiLabel ────────────────────────────────────────────────────────────────
 
-let hookSchemaSetUiLabelCoder () =
+let opencodeHookSchemaSetUiLabelCoder () =
     let args = createObj [ "intents", box [| box (createObj [
         "objective", box "Fix bug"
         "background", box "reason"
@@ -28,37 +21,38 @@ let hookSchemaSetUiLabelCoder () =
     setUiLabel args "coder"
     check "coder _ui set" (not (Dyn.isNullish (Dyn.get args "_ui")))
 
-let hookSchemaSetUiLabelInvestigator () =
+let opencodeHookSchemaSetUiLabelInvestigator () =
     let args = createObj [ "intents", box [| box {| objective = "Investigate"; background = "reason"; questions = [| "Q1" |]; entries = [||] |} |] ]
     setUiLabel args "investigator"
     check "investigator _ui set" (not (Dyn.isNullish (Dyn.get args "_ui")))
 
-let hookSchemaSetUiLabelOther () =
+let opencodeHookSchemaSetUiLabelOther () =
     let args = createObj [ "intents", box [| box {| objective = "Fix bug"; background = "reason"; targets = [||]; do_not_touch = [||] |} |] ]
     setUiLabel args "other"
     check "other _ui not set" (Dyn.isNullish (Dyn.get args "_ui"))
 
-// ── HookSchema.stripUiFromJsonSchema ─────────────────────────────────────────
+// ── stripUiFromJsonSchema ─────────────────────────────────────────────────────
 
-let hookSchemaStripUiFromJsonSchemaWithUi () =
+let opencodeHookSchemaStripUiFromJsonSchemaWithUi () =
     let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []); "_ui", box (createObj []) ] ]
     let result = stripUiFromJsonSchema schema
     check "type preserved" (Dyn.str result "type" = "object")
     check "_ui removed" (Dyn.isNullish (Dyn.get (Dyn.get result "properties") "_ui"))
     check "name kept" (not (Dyn.isNullish (Dyn.get (Dyn.get result "properties") "name")))
 
-let hookSchemaStripUiFromJsonSchemaNoUi () =
+let opencodeHookSchemaStripUiFromJsonSchemaNoUi () =
     let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
     let result = stripUiFromJsonSchema schema
     check "type preserved no _ui" (Dyn.str result "type" = "object")
     check "name still present" (not (Dyn.isNullish (Dyn.get (Dyn.get result "properties") "name")))
 
-let hookSchemaStripUiFromJsonSchemaNull () =
+let opencodeHookSchemaStripUiFromJsonSchemaNull () =
     let result = stripUiFromJsonSchema null
     check "null returns null" (isNull result)
 
+// ── rewriteToolJsonSchema ─────────────────────────────────────────────────────
 
-let hookSchemaRewriteToolJsonSchemaJsonSchema () =
+let opencodeHookSchemaRewriteToolJsonSchemaJsonSchema () =
     let mutable capturedKey = ""
     let setKey (o: obj) (k: string) (v: obj) = capturedKey <- k; o?(k) <- v
     let rewrite (o: obj) = o?("tag") <- "rewritten"; o
@@ -66,7 +60,7 @@ let hookSchemaRewriteToolJsonSchemaJsonSchema () =
     rewriteToolJsonSchema setKey rewrite outJson |> ignore
     equal "jsonSchema rewritten" "rewritten" (string (outJson?("jsonSchema")?("tag")))
 
-let hookSchemaRewriteToolJsonSchemaParameters () =
+let opencodeHookSchemaRewriteToolJsonSchemaParameters () =
     let mutable capturedKey = ""
     let setKey (o: obj) (k: string) (v: obj) = capturedKey <- k; o?(k) <- v
     let rewrite (o: obj) = o?("tag") <- "rewritten"; o
@@ -74,7 +68,7 @@ let hookSchemaRewriteToolJsonSchemaParameters () =
     rewriteToolJsonSchema setKey rewrite outParams |> ignore
     equal "parameters rewritten" "rewritten" (string (outParams?("parameters")?("tag")))
 
-let hookSchemaRewriteToolJsonSchemaNoSchema () =
+let opencodeHookSchemaRewriteToolJsonSchemaNoSchema () =
     let mutable capturedKey = ""
     let setKey (o: obj) (k: string) (v: obj) = capturedKey <- k; o?(k) <- v
     let rewrite (o: obj) = o?("tag") <- "rewritten"; o
@@ -82,7 +76,7 @@ let hookSchemaRewriteToolJsonSchemaNoSchema () =
     rewriteToolJsonSchema setKey rewrite outNone |> ignore
     equal "no crash key empty" "" capturedKey
 
-let hookSchemaRewriteToolJsonSchemaArgsBranch () =
+let opencodeHookSchemaRewriteToolJsonSchemaArgsBranch () =
     let mutable capturedKey = ""
     let setKey (o: obj) (k: string) (v: obj) = capturedKey <- k; o?(k) <- v
     let rewrite (o: obj) = o?("tag") <- "rewritten"; o
@@ -90,74 +84,9 @@ let hookSchemaRewriteToolJsonSchemaArgsBranch () =
     rewriteToolJsonSchema setKey rewrite outArgs |> ignore
     equal "args rewritten" "rewritten" (string (outArgs?("args")?("tag")))
 
+// ── injectWarnTddIntoJsonSchema ───────────────────────────────────────────────
 
-let searchToolsFuzzyFindTool () =
-    let finderCache = FinderCache()
-    let iteratorStore = createTypedIteratorStore 200
-    let tool = fuzzyFindTool finderCache iteratorStore
-    check "fuzzyFind tool non-null" (not (isNull tool))
-
-let searchToolsFuzzyGrepTool () =
-    let finderCache = FinderCache()
-    let iteratorStore = createTypedIteratorStore 200
-    let tool = fuzzyGrepTool finderCache iteratorStore
-    check "fuzzyGrep tool non-null" (not (isNull tool))
-
-let searchToolsWebsearchTool () =
-    let registry = ChildAgentRegistry.Create()
-    let ctx = createObj []
-    let tool = websearchTool Opencode registry ctx (Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState())
-    check "websearch tool non-null" (not (isNull tool))
-
-let searchToolsWebfetchTool () =
-    let ctx = createObj []
-    let tool = webfetchTool ctx
-    check "webfetch tool non-null" (not (isNull tool))
-
-
-let searchToolsFuzzyFindToolName () =
-    let finderCache = FinderCache()
-    let iteratorStore = createTypedIteratorStore 200
-    let tool = fuzzyFindTool finderCache iteratorStore
-    let spec = specOf "fuzzy_find"
-    equal "fuzzyFind tool name" spec.name "fuzzy_find"
-
-let searchToolsFuzzyGrepToolName () =
-    let finderCache = FinderCache()
-    let iteratorStore = createTypedIteratorStore 200
-    let tool = fuzzyGrepTool finderCache iteratorStore
-    let spec = specOf "fuzzy_grep"
-    equal "fuzzyGrep tool name" spec.name "fuzzy_grep"
-
-let searchToolsWebfetchToolName () =
-    let ctx = createObj []
-    let tool = webfetchTool ctx
-    let spec = specOf "webfetch"
-    equal "webfetch tool name" spec.name "webfetch"
-
-// ── SearchTools webfetch full options decode ──────────────────────────────────
-
-let searchToolsWebfetchToolFullOptionsDecode () =
-    let args = createObj [
-        "url", box "https://example.com"
-        "extract_main", box true
-        "prefer_llms_txt", box "auto"
-        "prompt", box "summarize"
-        "timeout", box 30
-    ]
-    match decodeWebfetchArgs args with
-    | Error e -> check "webfetch decode should succeed" false
-    | Ok wf ->
-        check "url decoded" (wf.Url = "https://example.com")
-        check "extract_main decoded" (wf.ExtractMain = Some true)
-        check "prefer_llms_txt decoded" (wf.PreferLlmsTxt = Some "auto")
-        check "prompt decoded" (wf.Prompt = Some "summarize")
-        check "timeout decoded" (wf.Timeout = Some 30)
-
-open Wanxiangshu.Kernel.WarnTdd
-
-
-let hookSchemaInjectWarnTddIntoEmptySchema () =
+let opencodeHookSchemaInjectWarnTddIntoEmptySchema () =
     let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
     injectWarnTddIntoJsonSchema schema |> ignore
     let props = get schema "properties"
@@ -165,26 +94,26 @@ let hookSchemaInjectWarnTddIntoEmptySchema () =
     let required = get schema "required"
     check "warn_tdd added to required" (isArray required && (required :?> obj array |> Array.exists (fun x -> string x = "warn_tdd")))
 
-let hookSchemaInjectWarnTddAlreadyPresent () =
+let opencodeHookSchemaInjectWarnTddAlreadyPresent () =
     let schema = createObj [ "type", box "object"; "properties", createObj [ "warn_tdd", box (createObj []) ]; "required", box [| box "warn_tdd" |] ]
     injectWarnTddIntoJsonSchema schema |> ignore
     let props = get schema "properties"
-    // Should not throw and should keep the existing warn_tdd (no double write)
     check "existing warn_tdd still present" (not (Dyn.isNullish (get props "warn_tdd")))
 
-let hookSchemaInjectWarnTddNullSchema () =
+let opencodeHookSchemaInjectWarnTddNullSchema () =
     let result = injectWarnTddIntoJsonSchema null
     check "null schema returns null" (isNull result)
 
+// ── mergeWorkBacklogReportIntoTaskSchema ─────────────────────────────────────
 
-let hookSchemaMergeWorkBacklogReportIntoPureSchema () =
+let opencodeHookSchemaMergeWorkBacklogReportIntoPureSchema () =
     let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
     let result = mergeWorkBacklogReportIntoTaskSchema schema
     let props = get result "properties"
     check "completedWorkReport added" (not (Dyn.isNullish (get props "completedWorkReport")))
     check "select_methodology added" (not (Dyn.isNullish (get props "select_methodology")))
 
-let hookSchemaMergeWorkBacklogReportRemoveTaskId () =
+let opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId () =
     let schema =
         createObj [
             "type", box "object"
@@ -194,7 +123,6 @@ let hookSchemaMergeWorkBacklogReportRemoveTaskId () =
             ]
             "required", box [| box "task_id"; box "description" |]
         ]
-    // ── 调用 SUT ──
     let result = mergeWorkBacklogReportIntoTaskSchema schema
     let resultProps = get result "properties"
     let resultRequired = get result "required"
@@ -205,9 +133,9 @@ let hookSchemaMergeWorkBacklogReportRemoveTaskId () =
     let required = resultRequired
     check "task_id absent from required" (not (isArray required) || not ((required :?> obj array) |> Array.exists (fun x -> string x = "task_id")))
 
-// ── HookSchema.buildWorkBacklogSchema ──────────────────────────────────────────
+// ── buildWorkBacklogSchema ────────────────────────────────────────────────────
 
-let hookSchemaBuildWorkBacklogSchema () =
+let opencodeHookSchemaBuildWorkBacklogSchema () =
     let schema = buildWorkBacklogSchema ()
     check "schema is non-null" (not (isNull schema))
     let typeVal = Dyn.str schema "type"
@@ -222,28 +150,20 @@ let hookSchemaBuildWorkBacklogSchema () =
 // ── run ───────────────────────────────────────────────────────────────────────
 
 let run () = promise {
-    hookSchemaSetUiLabelCoder ()
-    hookSchemaSetUiLabelInvestigator ()
-    hookSchemaSetUiLabelOther ()
-    hookSchemaStripUiFromJsonSchemaWithUi ()
-    hookSchemaStripUiFromJsonSchemaNoUi ()
-    hookSchemaStripUiFromJsonSchemaNull ()
-    hookSchemaInjectWarnTddIntoEmptySchema ()
-    hookSchemaBuildWorkBacklogSchema ()
-    hookSchemaRewriteToolJsonSchemaJsonSchema ()
-    hookSchemaRewriteToolJsonSchemaParameters ()
-    hookSchemaRewriteToolJsonSchemaNoSchema ()
-    hookSchemaRewriteToolJsonSchemaArgsBranch ()
-    hookSchemaInjectWarnTddAlreadyPresent ()
-    hookSchemaInjectWarnTddNullSchema ()
-    hookSchemaMergeWorkBacklogReportIntoPureSchema ()
-    hookSchemaMergeWorkBacklogReportRemoveTaskId ()
-    searchToolsFuzzyFindTool ()
-    searchToolsFuzzyGrepTool ()
-    searchToolsWebsearchTool ()
-    searchToolsWebfetchTool ()
-    searchToolsWebfetchToolFullOptionsDecode ()
-    searchToolsFuzzyFindToolName ()
-    searchToolsFuzzyGrepToolName ()
-    searchToolsWebfetchToolName ()
+    opencodeHookSchemaSetUiLabelCoder ()
+    opencodeHookSchemaSetUiLabelInvestigator ()
+    opencodeHookSchemaSetUiLabelOther ()
+    opencodeHookSchemaStripUiFromJsonSchemaWithUi ()
+    opencodeHookSchemaStripUiFromJsonSchemaNoUi ()
+    opencodeHookSchemaStripUiFromJsonSchemaNull ()
+    opencodeHookSchemaInjectWarnTddIntoEmptySchema ()
+    opencodeHookSchemaBuildWorkBacklogSchema ()
+    opencodeHookSchemaRewriteToolJsonSchemaJsonSchema ()
+    opencodeHookSchemaRewriteToolJsonSchemaParameters ()
+    opencodeHookSchemaRewriteToolJsonSchemaNoSchema ()
+    opencodeHookSchemaRewriteToolJsonSchemaArgsBranch ()
+    opencodeHookSchemaInjectWarnTddAlreadyPresent ()
+    opencodeHookSchemaInjectWarnTddNullSchema ()
+    opencodeHookSchemaMergeWorkBacklogReportIntoPureSchema ()
+    opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId ()
 }
