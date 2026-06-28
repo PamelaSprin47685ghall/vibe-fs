@@ -162,6 +162,7 @@
     <Compile Include="src/Methodology/Args.fs" />
     <Compile Include="src/Shell/DynField.fs" />
     <Compile Include="src/Shell/ErrorClassify.fs" />
+    <Compile Include="src/Shell/Clock.fs" />
     <Compile Include="src/Shell/ReviewRuntime.fs" />
     <Compile Include="src/Shell/CapsSynthCommon.fs" />
     <Compile Include="src/Shell/ReviewReplaySync.fs" />
@@ -209,6 +210,7 @@
     <Compile Include="src/Shell/KnowledgeGraphSubmit.fs" />
     <Compile Include="src/Shell/KnowledgeGraphRuntimeTestPorts.fs" />
     <Compile Include="src/Shell/KnowledgeGraphTestHooks.fs" />
+
     <Compile Include="src/Shell/KnowledgeGraphMaintenanceRun.fs" />
     <Compile Include="src/Shell/WorkspaceFiles.fs" />
     <Compile Include="src/Shell/HostMessagePartCodec.fs" />
@@ -242,9 +244,8 @@
     <Compile Include="src/Shell/FuzzySearchGrep.fs" />
     <Compile Include="src/Shell/FuzzySearch.fs" />
     <Compile Include="src/Shell/FuzzyToolsCodec.fs" />
-    <Compile Include="src/Shell/ChildAgentRegistry.fs" />
-    <Compile Include="src/Shell/Clock.fs" />
-    <Compile Include="src/Shell/ReviewToolsCodec.fs" />
+     <Compile Include="src/Shell/ChildAgentRegistry.fs" />
+     <Compile Include="src/Shell/ReviewToolsCodec.fs" />
     <Compile Include="src/Shell/KnowledgeGraphToolsCodec.fs" />
     <Compile Include="src/Shell/SubagentSimpleArgsCodec.fs" />
     <Compile Include="src/Shell/ExecutorToolsCodec.fs" />
@@ -263,6 +264,7 @@
     <Compile Include="src/Shell/OpencodeHookInputCodec.fs" />
     <Compile Include="src/Shell/KnowledgeGraphBookkeeperLaunch.fs" />
     <Compile Include="src/Shell/SerialStateHolder.fs" />
+    <Compile Include="src/Shell/NudgeSnapshot.fs" />
     <Compile Include="src/Shell/NudgeRuntime.fs" />
     <Compile Include="src/Mux/AiSettings.fs" />
     <Compile Include="src/Opencode/MessagingCodec.fs" />
@@ -270,9 +272,9 @@
     <Compile Include="src/Opencode/CapsCodec.fs" />
     <Compile Include="src/Opencode/BacklogSession.fs" />
      <Compile Include="src/Opencode/ToolSchema.fs" />
-     <Compile Include="src/Opencode/HookSchemaCore.fs" />
-     <Compile Include="src/Opencode/HookSchemaDecode.fs" />
-     <Compile Include="src/Opencode/HookSchema.fs" />
+      <Compile Include="src/Opencode/HookSchemaCore.fs" />
+      <Compile Include="src/Opencode/HookSchemaDecode.fs" />
+      <Compile Include="src/Opencode/HookSchema.fs" />
     <Compile Include="src/Mux/WrappersReview.fs" />
     <Compile Include="src/Mux/Wrappers.fs" />
     <Compile Include="src/Mux/DelegateTimeout.fs" />
@@ -301,12 +303,13 @@
     <Compile Include="src/Mux/PluginRegistrationParts.fs" />
     <Compile Include="src/Mux/PluginRegistration.fs" />
     <Compile Include="src/Mux/Plugin.fs" />
-     <Compile Include="src/Opencode/NudgeEffect.fs" />
-     <Compile Include="src/Opopen/SessionLifecycleObserver.fs" />
-     <Compile Include="src/Opencode/FallbackHooks.fs" />
-     <Compile Include="src/Opencode/SubagentSpawn.fs" />
-     <Compile Include="src/Opencode/SubagentIo.fs" />
-     <Compile Include="src/Opencode/SessionIoSubagent.fs" />
+      <Compile Include="src/Opencode/NudgeEffect.fs" />
+      <Compile Include="src/Opencode/SessionLifecycleObserver.fs" />
+      <Compile Include="src/Opencode/FallbackHooks.fs" />
+      <Compile Include="src/Opencode/SubagentTypes.fs" />
+      <Compile Include="src/Opencode/SubagentSpawn.fs" />
+      <Compile Include="src/Opencode/SubagentIo.fs" />
+      <Compile Include="src/Opencode/SessionIoSubagent.fs" />
     <Compile Include="src/Opencode/SessionIo.fs" />
     <Compile Include="src/Opencode/ReviewerLoop.fs" />
     <Compile Include="src/Opencode/KnowledgeGraphSessionMessages.fs" />
@@ -372,11 +375,11 @@
     <Compile Include="src/Omp/HookExecute.fs" />
     <Compile Include="src/Omp/AgentConfig.fs" />
      <Compile Include="src/Omp/OmpTestHooks.fs" />
-     <Compile Include="src/Omp/SessionCompacting.fs" />
-     <Compile Include="src/Omp/NudgeHooks.fs" />
-     <Compile Include="src/Omp/TodoHooks.fs" />
-     <Compile Include="src/Omp/SessionLifecycleHooks.fs" />
-    <Compile Include="src/Omp/SessionLifecycle.fs" />
+      <Compile Include="src/Omp/NudgeHooks.fs" />
+      <Compile Include="src/Omp/TodoHooks.fs" />
+       <Compile Include="src/Omp/SessionCompacting.fs" />
+       <Compile Include="src/Omp/SessionLifecycleHooks.fs" />
+     <Compile Include="src/Omp/SessionLifecycle.fs" />
 
     <Compile Include="src/Omp/Tools.fs" />
     <Compile Include="src/Omp/FallbackHooks.fs" />
@@ -492,6 +495,7 @@
     <Compile Include="tests/OmpTodoToolTests.fs" />
     <Compile Include="tests/OmpExecutorToolsTests.fs" />
     <Compile Include="tests/OpencodeCoverageTests.fs" />
+    <Compile Include="tests/OpencodeSubagentCoverageTests.fs" />
     <Compile Include="tests/OmpSessionLifecycleTests.fs" />
     <Compile Include="tests/OmpSessionCompactingTests.fs" />
     <Compile Include="tests/MethodologyTests.fs" />

@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.Clock
 
 let private dateNow () : float =
     float (getTimestampMs())

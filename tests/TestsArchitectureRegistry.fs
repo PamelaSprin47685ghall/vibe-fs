@@ -41,7 +41,7 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
     "ArchitectureTests.ompNoEngineRef", Sync (sync ArchitectureTestsFoundation.ompNoEngineRef)
     "ArchitectureTests.noDuplicateStateHolder", Sync (sync ArchitectureTestsFoundation.noDuplicateStateHolder)
     "ArchitectureTests.noDuplicateKgTestHooks", Sync (sync ArchitectureTestsFoundation.noDuplicateKgTestHooks)
-    "ArchitectureTests.noDuplicateNudgeSkeleton", Sync (sync ArchitectureTestsFoundation.noDuplicateNudgeSkeleton)
+    "ArchitectureTests.noDuplicateRunNudgeFlowCore", Sync (sync ArchitectureTestsFoundation.noDuplicateRunNudgeFlowCore)
     "ArchitectureTests.ompMessageTransformUsesProjectionPolicy", Sync (sync ArchitectureTestsOmp.ompMessageTransformUsesProjectionPolicy)
     "ArchitectureTests.ompMessageTransformUsesShellCaps", Sync (sync ArchitectureTestsOmp.ompMessageTransformUsesShellCaps)
     "ArchitectureTests.ompMessageTransformUsesMessagingCodec", Sync (sync ArchitectureTestsOmp.ompMessageTransformUsesMessagingCodec)

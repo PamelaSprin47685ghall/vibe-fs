@@ -16,6 +16,7 @@ open Wanxiangshu.Tests.OmpCodecCoverageTests
 open Wanxiangshu.Tests.PluginMimoTuiTests
 open Wanxiangshu.Tests.ShellCoverage2Tests
 open Wanxiangshu.Tests.OpencodeCoverageTests
+open Wanxiangshu.Tests.OpencodeSubagentCoverageTests
 open Wanxiangshu.Tests.ReviewerLoopTests
 
 let coverageTestEntries () : (string * TestBody) list =
@@ -35,5 +36,6 @@ let coverageTestEntries () : (string * TestBody) list =
     "PluginMimoTuiTests.run", Sync (sync PluginMimoTuiTests.run)
     "MuxCoverageTests.run", Sync (sync MuxCoverageTests.run)
     "OpencodeCoverageTests.run", Async OpencodeCoverageTests.run
+    "OpencodeSubagentCoverageTests.run", Async OpencodeSubagentCoverageTests.run
     "ReviewerLoopTests.run", Async ReviewerLoopTests.run
     ]

@@ -65,29 +65,21 @@ let noDuplicateStateHolder () =
             let content = requireFile (dir + "/" + f)
             check ("arch: " + dir + "/" + f + " no type StateHolder def") (not (content.Contains "type StateHolder"))
 
-/// NudgeFlow skeleton (decideNudge + attemptSend + tryRecordSend) must live
-/// only in Shell/NudgeRuntime.fs (runNudgeFlowCore).  Host adapters may define
-/// getSnapshot / attemptSend closures and call Shell.runNudgeFlowCore, but must
-/// not inline the skeleton body (decideNudge + tryRecordSend).
-let noDuplicateNudgeSkeleton () =
-    let skeletonMarkers = [| "decideNudge"; "tryRecordSend" |]
-    for dir in [| "src/Opencode"; "src/Mux"; "src/Omp" |] do
-        for f in fsFilesRelative dir do
-            let content = requireFile (dir + "/" + f)
-            let hasAllMarkers =
-                skeletonMarkers |> Array.forall (fun m -> content.Contains m)
-            check ("arch: " + dir + "/" + f + " no inline NudgeFlow skeleton")
-                (not hasAllMarkers)
-
-/// KG TestHooks type must live only in Shell; host adapters use extension-method wrappers.
 let noDuplicateKgTestHooks () =
     for dir in [| "src/Opencode"; "src/Mux"; "src/Omp" |] do
         for f in fsFilesRelative dir do
             let content = requireFile (dir + "/" + f)
-            check ("arch: " + dir + "/" + f + " no type KnowledgeGraphTestHooks def")
-                (not (content.Contains "type KnowledgeGraphTestHooks"))
-            check ("arch: " + dir + "/" + f + " no type MuxKnowledgeGraphTestHooks def")
-                (not (content.Contains "type MuxKnowledgeGraphTestHooks"))
+            check ("arch: " + dir + "/" + f + " no inline takeLaunchesFromPorts")
+                (not (content.Contains "takeLaunchesFromPorts"))
+            check ("arch: " + dir + "/" + f + " no inline waitJobsOnPorts")
+                (not (content.Contains "waitJobsOnPorts"))
+
+let noDuplicateRunNudgeFlowCore () =
+    for dir in [| "src/Opencode"; "src/Mux"; "src/Omp" |] do
+        for f in fsFilesRelative dir do
+            let content = requireFile (dir + "/" + f)
+            check ("arch: " + dir + "/" + f + " no inline tryRecordSend")
+                (not (content.Contains "tryRecordSend"))
 
 let returnReviewerCatalogAndHostRegistration () =
     let catalog = requireFile "src/Kernel/ToolCatalog/Review.fs"
@@ -112,10 +104,10 @@ let opencodeHookSchemaNoDirectZodImport () =
     check "arch: HookSchema no direct zod import" (not (content.Contains "import \"z\" \"zod\""))
 
 let hookSchemaNoDuplicateMethodologySchema () =
-    // Core holds the implementation; check Core, not the Facade re-export shim.
-    let coreCode = requireFile "src/Opencode/HookSchemaCore.fs" |> nonCommentCode
-    check "arch: HookSchemaCore no local selectMethodologyProperty def"
-        (not (coreCode.Contains "let selectMethodologyProperty"))
+    // HookSchema is the unified file; check it directly, not a split shim.
+    let code = requireFile "src/Opencode/HookSchema.fs" |> nonCommentCode
+    check "arch: HookSchema no local selectMethodologyProperty def"
+        (not (code.Contains "let selectMethodologyProperty"))
 
 let private legacyInjectedOutputMarkers = [|
     "[executor]"
@@ -135,12 +127,12 @@ let opencodeHookSchemaUsesIntentsRawFromArgs () =
     let codec = requireFile "src/Shell/SubagentIntentsCodec.fs" |> nonCommentCode
     check "arch: SubagentIntentsCodec defines intentsRawFromArgs"
         (codec.Contains "let intentsRawFromArgs")
-    // Core holds the implementation; Facade re-exports via open
-    let coreCode = requireFile "src/Opencode/HookSchemaCore.fs" |> nonCommentCode
-    check "arch: HookSchemaCore uses intentsRawFromArgs"
-        (coreCode.Contains "intentsRawFromArgs")
+    // HookSchema is the unified file after Core+Decode merge.
+    let code = requireFile "src/Opencode/HookSchema.fs" |> nonCommentCode
+    check "arch: HookSchema uses intentsRawFromArgs"
+        (code.Contains "intentsRawFromArgs")
     check "arch: HookSchema must not Dyn.get args intents"
-        (not (coreCode.Contains "Dyn.get args \"intents\""))
+        (not (code.Contains "Dyn.get args \"intents\""))
 
 let private forbiddenMuxOpencodeProjectionPatterns =
     [| System.Text.RegularExpressions.Regex(@"captureReport\s+opencode")

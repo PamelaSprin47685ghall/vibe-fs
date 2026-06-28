@@ -7,6 +7,9 @@ let sessionIoRunSubagentReturnsResult () =
     let sessionIo =
         (requireFile "src/Opencode/SessionIo.fs" |> nonCommentCode)
         + (requireFile "src/Opencode/SessionIoSubagent.fs" |> nonCommentCode)
+        + (requireFile "src/Opencode/SubagentSpawn.fs" |> nonCommentCode)
+        + (requireFile "src/Opencode/SubagentIo.fs" |> nonCommentCode)
+        + (requireFile "src/Opencode/SubagentTypes.fs" |> nonCommentCode)
     check "arch: SessionIo runSubagent returns Promise Result"
         (sessionIo.Contains "let runSubagent" && sessionIo.Contains "JS.Promise<Result<string, DomainError>>")
     check "arch: SessionIo runSubagentWithCleanup returns Promise Result"

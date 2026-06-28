@@ -2,88 +2,80 @@ module Wanxiangshu.Opencode.SubagentIo
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Opencode.MessagingCodec
+open Wanxiangshu.Kernel
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.ToolResult
+open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.DelegatedAiSettings
+open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Shell.SessionIoSpawn
+open Wanxiangshu.Opencode.SubagentSpawn
+module Dyn = Wanxiangshu.Shell.Dyn
 
-let noOutputText = "(no output)"
+open Wanxiangshu.Opencode.SubagentTypes
 
-let extractSessionText (client: obj) (sessionId: string) (directory: string) : JS.Promise<string> =
+let runSubagentCoreResult (runtime: FallbackRuntimeState) (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
+                          (directory: string) (sessionID: string) (context: obj)
+                          (tools: obj) (cleanup: bool) : JS.Promise<Result<string, DomainError>> =
     promise {
+        let signal = getAbortSignal context
+        let options =
+            { agent = agent
+              title = title
+              prompt = prompt
+              directory = directory
+              sessionID = sessionID
+              tools = tools
+              aiSettings = { modelString = None; thinkingLevel = None } }
         try
-            match getSessionApiFromClient client with
-            | Error _ -> return noOutputText
-            | Ok session ->
-                let arg =
-                    if directory = "" then
-                        box {| path = box {| id = sessionId |} |}
-                    else
-                        box {| path = box {| id = sessionId |}; query = box {| directory = directory |} |}
-                let! result = (session?messages)(arg)
-                let data = Dyn.get result "data"
-                if Dyn.isNullish data then return noOutputText
-                else
-                    let messagesList = MessagingCodec.decodeMessages (unbox<obj[]> data)
-                    match Messaging.readAssistantText messagesList 0 "\n\n" with
-                    | Some text -> return text
-                    | None -> return noOutputText
-        with _ -> return noOutputText
-    }
-
-let buildPromptBody (options: {| agent: string; prompt: string; directory: string; sessionID: string; tools: obj; aiSettings: {| modelString: string option; thinkingLevel: string option |} |}) childID : obj =
-    let body = box {| agent = options.agent; parts = [| box {| ``type`` = "text"; text = options.prompt |} |] |}
-    let body = if Dyn.isNullish options.tools then body else Dyn.withKey body "tools" options.tools
-    let body =
-        match options.aiSettings.modelString with
-        | None -> body
-        | Some modelString ->
-            let payload = createObj [ "modelString", box modelString ]
-            match tryDecodePromptModelFromPayload payload with
-            | Some model -> Dyn.withKey body "model" model
-            | None -> body
-    let body =
-        match options.aiSettings.thinkingLevel with
-        | Some level when level.Trim() <> "" -> Dyn.withKey body "variant" (box level)
-        | _ -> body
-    createObj [ "path", box {| id = childID |}; "body", body ]
-
-let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
-    promise {
-        match getSessionApiFromClient client with
-        | Error err -> return! Promise.reject (exn (wireEncodeToolError "OpencodeClient" err))
-        | Ok session ->
-            if Dyn.isNullish signal then
-                do! session?prompt(args)
-            elif Dyn.truthy (Dyn.get signal "aborted") then
-                return! Promise.reject (DOMException("Aborted", "AbortError"))
-            else
-                let settled = ref false
-                let handlerRef = ref None
-                let abortAsync : JS.Promise<string> =
-                    Promise.create (fun resolve _reject ->
-                        let handler = fun () ->
-                            if not settled.Value then
-                                settled.Value <- true
-                                match handlerRef.Value with
-                                | Some h -> signal?removeEventListener("abort", h) |> ignore
-                                | None -> ()
-                                resolve "aborted"
-                        handlerRef.Value <- Some handler
-                        signal?addEventListener("abort", handler) |> ignore)
-                let promptAsync : JS.Promise<string> =
-                    promise {
-                        do! session?prompt(args)
-                        if not settled.Value then
-                            settled.Value <- true
-                            match handlerRef.Value with
-                            | Some h -> signal?removeEventListener("abort", h) |> ignore
-                            | None -> ()
-                        return "ok"
-                    }
+            let! childResult = startSubagentSession registry client options
+            match childResult with
+            | Error err -> return Error err
+            | Ok childID ->
+                let abortAndUnregister () =
+                    match getSessionApiFromClient client with
+                    | Ok session ->
+                        let abortPromise : JS.Promise<obj> = invoke1 (box {| path = box {| id = childID |} |}) "abort" session
+                        abortPromise |> ignore
+                    | Error _ -> ()
+                    registry.UnregisterChildAgent(childID)
+                let cleanupChildIfRequested () = if cleanup then abortAndUnregister ()
                 try
-                    let! winner = Promise.race [ promptAsync; abortAsync ]
-                    if winner = "aborted" then return! Promise.reject (DOMException("Aborted", "AbortError"))
+                    do! promptWithAbort client (buildPromptBody options childID) signal
+                    try
+                        let! text = extractSessionText client childID directory
+                        return Ok (formatSubagentReport noOutputText abortedPrefix text false)
+                    finally
+                        cleanupChildIfRequested ()
                 with err ->
                     match translateJsError err with
-                    | MessageAborted -> return! Promise.reject (DOMException("Aborted", "AbortError"))
-                    | _ -> return! Promise.reject err
+                    | MessageAborted ->
+                        abortAndUnregister ()
+                        if not (Dyn.isNullish signal) && Dyn.truthy (Dyn.get signal "aborted") then
+                            return Ok abortedPrefix
+                        else
+                            let! text = extractSessionText client childID directory
+                            return Ok (formatSubagentReport noOutputText abortedPrefix text true)
+                    | other ->
+                        // Fallback closed-loop recovery: if model error was consumed by fallback,
+                        // do not reject; instead extract whatever text exists and return success.
+                        do! Promise.lift ()
+                        match runtime.GetConsumed childID with
+                        | Some true ->
+                            let! text = extractSessionText client childID directory
+                            return Ok (formatSubagentReport noOutputText abortedPrefix text false)
+                        | _ -> return Error other
+        with err ->
+            return Error (translateJsError err)
     }
+
+let runSubagentWithCleanup (runtime: FallbackRuntimeState) (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
+                           (directory: string) (sessionID: string) (context: obj) : JS.Promise<Result<string, DomainError>> =
+    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context (box null) true
+
+let runSubagent (runtime: FallbackRuntimeState) (registry: ChildAgentRegistry) (client: obj) (agent: string) (title: string) (prompt: string)
+                (directory: string) (sessionID: string) (context: obj)
+                (tools: obj) : JS.Promise<Result<string, DomainError>> =
+    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context tools false

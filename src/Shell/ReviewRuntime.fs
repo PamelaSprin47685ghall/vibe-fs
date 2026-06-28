@@ -2,6 +2,7 @@ module Wanxiangshu.Shell.ReviewRuntime
 
 open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
+open Wanxiangshu.Shell.Clock
 
 /// The full host-facing review store: pure registry kernel plus effect side-table.
 type ReviewStore =

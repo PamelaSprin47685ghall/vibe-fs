@@ -8,6 +8,8 @@ open Wanxiangshu.Kernel.KnowledgeGraph.Maintenance
 open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
 open Wanxiangshu.Omp.KnowledgeGraphRuntimeIO
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.Clock
+open Wanxiangshu.Shell
 open Wanxiangshu.Shell.KnowledgeGraphFiles
 open Wanxiangshu.Shell.PromiseQueue
 
@@ -21,7 +23,7 @@ type OmpKnowledgeGraphRuntime(pi: obj) =
     let mutable registeredJobs = Map.empty<string, KnowledgeGraphJobContext>
     let magicGetEntries = ref None
 
-    let today () = System.DateTime.UtcNow.ToString("yyyy-MM-dd")
+    let today () = (Clock.nowUtc ()).ToString("yyyy-MM-dd")
 
     let applyCmd (cmd: KnowledgeGraphCommand) = state <- reducer state cmd
 

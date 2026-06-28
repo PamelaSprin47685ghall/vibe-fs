@@ -2,6 +2,7 @@ module Wanxiangshu.Shell.KnowledgeGraphPortLock
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Shell.Clock
 
 [<Import("createServer", "node:net")>]
 let private createServer () : obj = jsNative

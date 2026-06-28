@@ -26,6 +26,7 @@ open Wanxiangshu.Shell.FuzzyFinderShell
 open Wanxiangshu.Shell.KnowledgeGraphFiles
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Clock
 open Wanxiangshu.Shell.FallbackConfigCodec
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.Dyn
@@ -72,7 +73,7 @@ let private createCoreServices (host: Host) (ctx: obj) =
     let lifecycleObserver = createSessionLifecycleObserver (host, ctx, reviewStore, childAgentRegistry, fallbackHandler, fallbackRuntime)
     let nowUtc () =
         let nowMs = Dyn.get ctx "nowMs"
-        if Dyn.isNullish nowMs then System.DateTime.UtcNow
+        if Dyn.isNullish nowMs then Clock.nowUtc ()
         else System.DateTimeOffset.FromUnixTimeMilliseconds(int64 (unbox<float> nowMs)).UtcDateTime
     let knowledgeGraphEnabled = knowledgeGraphDirExists directory
     let knowledgeGraphClient =

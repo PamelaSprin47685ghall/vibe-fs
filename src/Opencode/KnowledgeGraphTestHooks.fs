@@ -1,25 +1,27 @@
 module Wanxiangshu.Opencode.KnowledgeGraphTestHooks
 
 open Fable.Core
+open Wanxiangshu.Opencode.KnowledgeGraphRuntime
 open Wanxiangshu.Shell.KnowledgeGraphTestHooks
-open Wanxiangshu.Shell.KnowledgeGraphRuntimeTestPorts
-open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
 
 type KnowledgeGraphRuntime with
-    member this.TestHooks : KgTestOps =
-        { createTestPorts = fun () -> this.CreateTestPorts()
-          registerJob = fun (sessionID, ctx) -> this.RegisterJob(sessionID, ctx)
-          takeLaunches =
-              fun (ports: KnowledgeGraphRuntimeTestPorts) ->
-                  unbox<BookkeeperLaunch list>
-                      (ports.SwapState(fun s ->
-                          let launches, next = drainLaunches s
-                          next, box launches))
-          waitJobs =
-              fun (ports: KnowledgeGraphRuntimeTestPorts) ->
-                  promise {
-                      do! ports.RunOnCommandQueue(fun () -> Promise.lift ())
-                      do! ports.AwaitBackgroundSinkJobs()
-                  }
+    member this.KgTestOps : KgTestOps =
+        { createTestPorts = this.CreateTestPorts
+          registerJob = this.RegisterJob
           hasJob = fun _ -> false
           mapLaunch = box }
+
+type KnowledgeGraphTestHooks(runtime: KnowledgeGraphRuntime) =
+    let ops = runtime.KgTestOps
+
+    member _.RegisterJob(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =
+        registerTestJob ops sessionID workspaceRoot kindTag payload
+
+    member _.TakeLaunches() : obj array =
+        takeTestLaunches ops
+
+    member _.WaitJobs() : JS.Promise<unit> =
+        waitTestJobs ops
+
+type KnowledgeGraphRuntime with
+    member this.TestHooks : KnowledgeGraphTestHooks = KnowledgeGraphTestHooks(this)

@@ -3,6 +3,7 @@ module Wanxiangshu.Omp.SessionLifecycle
 open Fable.Core.JsInterop
 open Wanxiangshu.Omp.KnowledgeGraph.Runtime
 open Wanxiangshu.Omp.SessionLifecycleHooks
+open Wanxiangshu.Omp.NudgeHooks
 open Wanxiangshu.Omp.SessionCompacting
 open Wanxiangshu.Shell.ReviewRuntime
 

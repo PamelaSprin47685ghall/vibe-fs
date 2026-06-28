@@ -1,32 +1,42 @@
 module Wanxiangshu.Mux.KnowledgeGraphTestHooks
 
+open System
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Shell.KnowledgeGraphTestHooks
-open Wanxiangshu.Shell.KnowledgeGraphRuntimeTestPorts
 open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
+open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
+open Wanxiangshu.Shell.KnowledgeGraphTestHooks
 
 type MuxKnowledgeGraphRuntime with
-    member this.TestHooks : KgTestOps =
-        { createTestPorts = fun () -> this.CreateTestPorts()
-          registerJob = fun (sessionID, ctx) -> this.RegisterJob(sessionID, ctx)
-          takeLaunches =
-              fun (ports: KnowledgeGraphRuntimeTestPorts) ->
-                  unbox<BookkeeperLaunch list>
-                      (ports.SwapState(fun s ->
-                          let launches, next = drainLaunches s
-                          next, box launches))
-          waitJobs =
-              fun (ports: KnowledgeGraphRuntimeTestPorts) ->
-                  promise {
-                      do! ports.RunOnCommandQueue(fun () -> Promise.lift ())
-                      do! ports.AwaitBackgroundSinkJobs()
-                  }
+    member this.KgTestOps : KgTestOps =
+        { createTestPorts = this.CreateTestPorts
+          registerJob = this.RegisterJob
           hasJob = this.HasJobForTest
-          mapLaunch =
-              fun (l: BookkeeperLaunch) ->
-                  createObj [
-                      "agent",  box l.agent
-                      "title",  box l.title
-                      "prompt", box l.prompt
-                      "result", box l.result ] }
+          mapLaunch = fun l ->
+              box (createObj [
+                  "agent", box l.agent
+                  "title", box l.title
+                  "prompt", box l.prompt
+                  "result", box l.result
+              ]) }
+
+type MuxKnowledgeGraphTestHooks(runtime: MuxKnowledgeGraphRuntime) =
+    let ops = runtime.KgTestOps
+
+    member _.RegisterJob(sessionID: string, workspaceRoot: string, kindTag: string, payload: obj) : unit =
+        if String.IsNullOrWhiteSpace workspaceRoot then
+            failwith "Knowledge graph job workspaceRoot must be a non-empty directory path."
+
+        registerTestJob ops sessionID workspaceRoot kindTag payload
+
+    member _.TakeLaunches() : obj array =
+        takeTestLaunches ops
+
+    member _.WaitJobs() : JS.Promise<unit> =
+        waitTestJobs ops
+
+    member _.HasJob(sessionID: string) : bool =
+        hasTestJob ops sessionID
+
+type MuxKnowledgeGraphRuntime with
+    member this.TestHooks : MuxKnowledgeGraphTestHooks = MuxKnowledgeGraphTestHooks(this)

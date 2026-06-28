@@ -9,12 +9,43 @@ open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 open Wanxiangshu.Kernel.NudgeState
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Shell.SerialStateHolder
+open Wanxiangshu.Shell.NudgeSnapshot
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Shell.ErrorClassify
 
 type NudgeRuntimeEvent =
     | Ignore
     | StreamEnd of workspaceId: string * stopReason: string * lastAssistantMessage: string
     | StreamAbort of workspaceId: string
     | AbortedError of workspaceId: string
+
+let runNudgeFlowCore
+    (holder: StateHolder<NudgeShellState>)
+    (isReviewActive: string -> bool)
+    (lookupChildAgent: string -> string option)
+    (sessionKey: string)
+    (takeSnapshot: unit -> JS.Promise<SessionSnapshot option>)
+    (sendNudge: string -> string option -> JS.Promise<SendOutcome>)
+    : JS.Promise<unit> =
+    promise {
+        try
+            let! snapshotOpt = takeSnapshot ()
+            match snapshotOpt with
+            | None -> holder.Mutate(fun state -> clearSession state sessionKey, ())
+            | Some snapshot ->
+                match holder.Mutate(fun state -> decideNudge isReviewActive lookupChildAgent state sessionKey snapshot) with
+                | StandDown -> ()
+                | Send(promptText, agentOpt) ->
+                    let! outcome = sendNudge promptText agentOpt
+                    holder.Mutate(fun state ->
+                        match tryRecordSend state sessionKey outcome with
+                        | Some nextState -> nextState, ()
+                        | None -> state, ())
+        with ex ->
+            match translateJsError ex with
+            | MessageAborted | SessionBusy | TaskWaitBackgrounded -> ()
+            | _ -> holder.Mutate(fun state -> clearSession state sessionKey, ())
+    }
 
 let private runNudgeFlow
     (holder: StateHolder<NudgeShellState>)
@@ -24,102 +55,35 @@ let private runNudgeFlow
     (workspaceId: string)
     (lastAssistantMessage: string)
     : JS.Promise<unit> =
-    let getSnapshot () : JS.Promise<SessionSnapshot option> =
-        promise {
-            let! todos =
-                promise {
-                    try
-                        let getTodosFn = Dyn.get helpers "getTodos"
-                        let! result = unbox<JS.Promise<obj>> (Dyn.call1 getTodosFn workspaceId)
-                        if Dyn.isArray result then
-                            return (result :?> obj array) |> Array.map string |> List.ofArray
-                        else
-                            return []
-                    with _ ->
-                        return []
-                }
-            let! history =
-                match getChatHistory with
-                | None -> return [||]
-                | Some getHistory ->
-                    promise {
-                        try
-                            return! getHistory workspaceId
-                        with _ ->
-                            return [||]
-                    }
-            let lastAssistantIndex =
-                history
-                |> Array.tryFindIndexBack (fun message ->
-                    Dyn.str message "role" = "assistant"
-                    && not (isSyntheticAssistantAgent (Dyn.str message "agent")))
-            let historyLastAssistantMessage, historyAlreadyNudged =
-                match lastAssistantIndex with
-                | None -> "", false
-                | Some idx ->
-                    let parts = Dyn.get history.[idx] "parts"
-                    let text =
-                        if not (Dyn.isArray parts) then ""
-                        else
-                            (parts :?> obj array)
-                            |> Array.choose (fun part ->
-                                if Dyn.str part "type" = "text" then
-                                    let t = Dyn.get part "text"
-                                    if Dyn.isNullish t then None else Some (string t)
-                                else None)
-                            |> String.concat "\n"
-                    let already =
-                        history.[idx + 1 ..]
-                        |> Array.fold (fun nudged msg ->
-                            if Dyn.str msg "role" = "user" && isNudgePrompt text then true
-                            else nudged) false
-                    text, already
-            let effectiveMsg, alreadyNudged =
-                if historyLastAssistantMessage = "" then lastAssistantMessage, false
-                elif lastAssistantMessage <> "" && lastAssistantMessage <> historyLastAssistantMessage then lastAssistantMessage, false
-                else historyLastAssistantMessage, historyAlreadyNudged
-            return Some { todos = todos; lastAssistantMessage = effectiveMsg; alreadyNudged = alreadyNudged; agentFromMessage = None }
-        }
-    let attemptSend (promptText: string) (_agentOpt: string option) : JS.Promise<SendOutcome> =
-        promise {
-            try
-                let nudgeFn = Dyn.get helpers "nudge"
-                let! delivered = unbox<JS.Promise<bool>> (Dyn.call2 nudgeFn workspaceId promptText)
-                return if delivered then Delivered else Busy
-            with _ ->
-                return Busy
-        }
-    runNudgeFlowCore holder reviewStore (fun _ -> None) getSnapshot attemptSend workspaceId
+    runNudgeFlowCore
+        holder
+        reviewStore.isReviewActive
+        (fun _ -> None)
+        workspaceId
+        (fun () -> collectSnapshot getChatHistory helpers workspaceId lastAssistantMessage |> Promise.map Some)
+        (fun promptText _ ->
+            promise {
+                try
+                    let nudgeFn = Dyn.get helpers "nudge"
+                    let! delivered = unbox<JS.Promise<bool>> (Dyn.call2 nudgeFn workspaceId promptText)
+                    return if delivered then Delivered else Busy
+                with _ ->
+                    return Busy
+            })
 
-let runNudgeFlowCore
+let private startNudgeFlow
     (holder: StateHolder<NudgeShellState>)
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
-    (lookupChildAgent: string -> string option)
-    (getSnapshot: unit -> JS.Promise<SessionSnapshot option>)
-    (attemptSend: string -> string option -> JS.Promise<SendOutcome>)
+    (getChatHistory: (string -> JS.Promise<obj array>) option)
+    (helpers: obj)
     (workspaceId: string)
-    : JS.Promise<unit> =
-    promise {
-        try
-            let! snapshotOpt = getSnapshot ()
-            match snapshotOpt with
-            | None -> holder.Mutate(fun state -> clearSession state workspaceId, ())
-            | Some snapshot ->
-                match holder.Mutate(fun state -> decideNudge reviewStore.isReviewActive lookupChildAgent state workspaceId snapshot) with
-                | StandDown -> ()
-                | Send(promptText, agentOpt) ->
-                    let! outcome = attemptSend promptText agentOpt
-                    holder.Mutate(fun state ->
-                        match tryRecordSend state workspaceId outcome with
-                        | Some nextState -> nextState, ()
-                        | None -> state, ())
-        with _ ->
-            holder.Mutate(fun state -> clearSession state workspaceId, ())
-    }
+    (lastAssistantMessage: string)
+    : unit =
+    runNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage |> Promise.start
 
 type NudgeRuntime
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore,
-      getChatHistory: (string -> JS.Promise<obj array>) option) =
+     getChatHistory: (string -> JS.Promise<obj array>) option) =
 
     let holder = StateHolder<NudgeShellState>(emptyState)
 
@@ -131,7 +95,7 @@ type NudgeRuntime
                 if Dyn.isNullish helpers || stopReason = "queued-message" then
                     return ()
                 else
-                    runNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage |> ignore
+                    startNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage
                     return ()
             | StreamAbort workspaceId
             | AbortedError workspaceId ->
@@ -144,5 +108,3 @@ let createNudgeRuntime
     (getChatHistory: (string -> JS.Promise<obj array>) option)
     : NudgeRuntime =
     NudgeRuntime(reviewStore, getChatHistory)
-
-

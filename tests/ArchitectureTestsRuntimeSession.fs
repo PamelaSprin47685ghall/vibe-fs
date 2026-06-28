@@ -8,6 +8,9 @@ open Wanxiangshu.Tests.ArchitectureTestsSupport
 let private sessionIoSubagentCode () =
     (requireFile "src/Opencode/SessionIo.fs" |> nonCommentCode)
     + (requireFile "src/Opencode/SessionIoSubagent.fs" |> nonCommentCode)
+    + (requireFile "src/Opencode/SubagentSpawn.fs" |> nonCommentCode)
+    + (requireFile "src/Opencode/SubagentIo.fs" |> nonCommentCode)
+    + (requireFile "src/Opencode/SubagentTypes.fs" |> nonCommentCode)
 
 let sessionIoUsesOpencodeClientCodec () =
     let code = sessionIoSubagentCode ()

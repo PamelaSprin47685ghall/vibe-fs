@@ -12,6 +12,7 @@ open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Opencode.AgentConfig
 open Wanxiangshu.Opencode.ReviewerLoop
 open Wanxiangshu.Opencode.KnowledgeGraphRuntime
+open Wanxiangshu.Shell.Clock
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.OpencodeHookInputCodec
@@ -43,10 +44,10 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
             elif reviewStore.isReviewActive sessionID then
                 parts.Add(box {| ``type`` = "text"; text = reviewAlreadyActiveMessage |})
             elif command = "loop" then
-                    reviewStore.activateReview(sessionID, task, getTimestampMs())
-                let msg = buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
-                parts.Add(box {| ``type`` = "text"; text = msg |})
-            else
+                 reviewStore.activateReview(sessionID, task, getTimestampMs())
+                 let msg = buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
+                 parts.Add(box {| ``type`` = "text"; text = msg |})
+             else
                 let directory = pluginDirectoryFromCtx ctx
                 let! result =
                     match getClientFromPluginCtx ctx with

@@ -6,9 +6,14 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Shell
 
+open Wanxiangshu.Kernel.SubagentIntents
+open Wanxiangshu.Shell.SubagentIntentsCodec
 open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Opencode.ToolSchema
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.WorkBacklogSchema
 
 let selectMethodologyFieldDescription = Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription
 
@@ -30,15 +35,15 @@ let setUiLabel (args: obj) (tool: string) : unit =
     | Result.Ok label when label <> "" -> args?("_ui") <- box label
     | _ -> ()
 
-let private filterRequired (excludeKey: string) (required: obj) : obj =
+let filterRequired (excludeKey: string) (required: obj) : obj =
     if not (isArray required) then required
     else required :?> obj array |> Array.choose (fun item -> let key = string item in if key = excludeKey then None else Some(box key)) |> box
 
-let private requiredWithoutUi (required: obj) : obj = filterRequired "_ui" required
+let requiredWithoutUi (required: obj) : obj = filterRequired "_ui" required
 
-let private requiredWithoutTaskId (required: obj) : obj = filterRequired "task_id" required
+let requiredWithoutTaskId (required: obj) : obj = filterRequired "task_id" required
 
-let private appendRequiredKey (requiredKey: string) (required: obj) : obj =
+let appendRequiredKey (requiredKey: string) (required: obj) : obj =
     if not (isArray required) then box [| box requiredKey |]
     else
         let arr = unbox<obj[]> required
@@ -58,7 +63,7 @@ let stripUiFromJsonSchema (schema: obj) : obj =
                 |> createObj
             createObj [ for key in Dyn.keys schema do if key = "properties" then yield key, nextProperties elif key = "required" then yield key, requiredWithoutUi (get schema "required") else yield key, get schema key ]
 
-let private tryBuildJsonSchemaFromEffectSchema (parameters: obj) : obj =
+let tryBuildJsonSchemaFromEffectSchema (parameters: obj) : obj =
     try
         let toJsonSchemaDocument = get effectSchemaNs "toJsonSchemaDocument"
         if isNullish toJsonSchemaDocument || not (Dyn.typeIs toJsonSchemaDocument "function") then null
@@ -99,32 +104,13 @@ let inlineJsonWarnTddProperty : obj =
         "description", box Params.warnTddDesc
     ]
 
-let private appendRequiredWarnTddInPlace (schema: obj) : unit =
-    let existingRequired = get schema "required"
-    if isArray existingRequired then
-        let arr = unbox<obj[]> existingRequired
-        if not (arr |> Array.exists (fun x -> string x = "warn_tdd")) then
-            existingRequired?("push")(box "warn_tdd") |> ignore
-    else
-        schema?("required") <- box [| box "warn_tdd" |]
+let inlineJsonWarnProperty : obj =
+    createObj [
+        "type", box "string"
+        "enum", [| WarnTdd.warnCanonicalValue |] |> box
+        "description", box WarnTdd.warnDescription
+    ]
 
-let private injectWarnTddIntoJsonSchemaInPlace (schema: obj) : unit =
-    let props = get schema "properties"
-    if not (isNullish props) && isNullish (get props "warn_tdd") then
-        props?("warn_tdd") <- inlineJsonWarnTddProperty
-        appendRequiredWarnTddInPlace schema
+let buildWorkBacklogSchema () : obj = WorkBacklogSchema.buildWorkBacklogSchema ()
 
-let private injectWarnTddIntoArgsShapeInPlace (shape: obj) : unit =
-    if isNullish (get shape "warn_tdd") then
-        shape?("warn_tdd") <- enumReq [| WarnTdd.canonicalValue |] Params.warnTddDesc
-
-/// Inject warn_tdd into an Opencode tool schema in place.
-let injectWarnTddIntoJsonSchema (schema: obj) : obj =
-    if isNullish schema then schema
-    else
-        let props = get schema "properties"
-        if not (isNullish props) then
-            injectWarnTddIntoJsonSchemaInPlace schema
-        else
-            injectWarnTddIntoArgsShapeInPlace schema
-        schema
+let fusedTaskToolDescription = toolDescriptionFor Mimocode
