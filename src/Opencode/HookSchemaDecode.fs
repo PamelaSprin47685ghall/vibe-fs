@@ -30,8 +30,9 @@ let private appendRequiredWarnTddInPlace (schema: obj) : unit =
 
 let private injectWarnTddIntoJsonSchemaInPlace (schema: obj) : unit =
     let props = get schema "properties"
-    if not (isNullish props) && isNullish (get props "warn_tdd") then
-        props?("warn_tdd") <- inlineJsonWarnTddProperty
+    if not (isNullish props) then
+        if isNullish (get props "warn_tdd") then
+            props?("warn_tdd") <- inlineJsonWarnTddProperty
         appendRequiredWarnTddInPlace schema
 
 let private injectWarnTddIntoArgsShapeInPlace (shape: obj) : unit =
@@ -60,8 +61,9 @@ let private appendRequiredWarnInPlace (schema: obj) : unit =
 
 let private injectWarnIntoJsonSchemaInPlace (schema: obj) : unit =
     let props = get schema "properties"
-    if not (isNullish props) && isNullish (get props "warn") then
-        props?("warn") <- inlineJsonWarnProperty
+    if not (isNullish props) then
+        if isNullish (get props "warn") then
+            props?("warn") <- inlineJsonWarnProperty
         appendRequiredWarnInPlace schema
 
 let private injectWarnIntoArgsShapeInPlace (shape: obj) : unit =

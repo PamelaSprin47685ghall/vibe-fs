@@ -87,7 +87,13 @@ let rewriteToolJsonSchema (setKey: obj -> string -> obj -> unit) (rewrite: obj -
         else
             let args = get output "args"
             if not (isNullish args) then
-                rewrite args |> ignore
+                let generated = tryBuildJsonSchemaFromEffectSchema args
+                if not (isNullish generated) then
+                    setKey output "jsonSchema" (rewrite generated)
+                else
+                    rewrite args |> ignore
+            else
+                ()
 
 let warnTddProperty : obj =
     createObj [

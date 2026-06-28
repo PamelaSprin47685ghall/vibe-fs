@@ -14,7 +14,8 @@ let parseWarnTdd (s: string) : WarnTdd option =
 let modificationTools: Set<string> =
     Set.ofList
         [ "coder"; "executor"; "write"; "edit"; "apply_patch"; "patch"
-          "ast_edit"; "ast_grep_replace"; "file_edit_replace_string"; "file_edit_insert" ]
+          "ast_edit"; "ast_grep_replace"; "file_edit_replace_string"; "file_edit_insert"
+          "pty_spawn"; "pty_write"; "pty_read"; "pty_list"; "pty_kill" ]
 
 let isModificationTool (tool: string) : bool =
     Set.contains (tool.ToLowerInvariant()) modificationTools

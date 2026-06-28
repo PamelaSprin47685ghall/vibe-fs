@@ -40,7 +40,7 @@ let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit>
             | Omp -> ()
         elif WarnTdd.isModificationTool toolID then
             rewriteToolJsonSchema setKey (injectWarnTddIntoJsonSchema) output
-        elif WarnTdd.isWarnRequiredTool toolID then
+        if WarnTdd.isWarnRequiredTool toolID then
             rewriteToolJsonSchema setKey (injectWarnIntoJsonSchema) output
     }
 
