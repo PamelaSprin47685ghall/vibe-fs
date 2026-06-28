@@ -38,7 +38,7 @@ let canUse' () =
     check "coder can edit" (canUse "coder" "edit")
     check "coder can fuzzy_find" (canUse "coder" "fuzzy_find")
     check "coder can fuzzy_grep" (canUse "coder" "fuzzy_grep")
-    check "coder denied investigator dispatch" (not (canUse "coder" "investigator"))
+    check "coder allowed investigator dispatch" (canUse "coder" "investigator")
     check "coder allowed todo" (canUse "coder" "todowrite")
 
     check "meditator denied todo" (not (canUse "meditator" "todowrite"))
@@ -107,7 +107,7 @@ let canUseMatrix () =
         "ask_user_question",             [ true;  false; false; false; false; false; false ]
         "skill",                         [ true;  false; false; false; false; false; false ]
         "coder",                         [ true;  false; false; false; false; false; false ]
-        "investigator",                  [ true;  false; false; false; false; false; false ]
+        "investigator",                  [ true;  false; true;  false; false; false; false ]
         "meditator",                     [ true;  false; false; false; false; false; false ]
         "browser",                       [ true;  false; false; false; false; false; false ]
         "manager",                       [ true;  false; false; false; false; false; false ]

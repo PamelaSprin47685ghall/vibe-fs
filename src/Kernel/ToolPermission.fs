@@ -75,6 +75,7 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
     | "reviewer", _
     | "browser", _ -> false
     | "investigator", SubagentWebSkillOrSubmit when tool = "executor" -> true
+    | "coder", SubagentWebSkillOrSubmit when tool = "investigator" -> true
     | _, SubagentWebSkillOrSubmit -> agent <> "investigator" && agent <> "coder"
     | _, WritePatchFamily -> agent <> "investigator" && agent <> "manager"
     | "manager", FuzzyGrep -> false
