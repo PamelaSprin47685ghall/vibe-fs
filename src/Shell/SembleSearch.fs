@@ -157,7 +157,14 @@ let private getClient () : JS.Promise<Client option> =
                     let transport = StdioClientTransport(box {|
                         command = cmd.command
                         args = cmd.args
+                        stderr = "pipe"
                     |})
+                    let stderrStream = Dyn.get transport "stderr"
+                    if not (isNull stderrStream) then
+                        let onData = System.Func<obj, unit>(fun chunk ->
+                            let t = (string chunk).TrimEnd('\r', '\n')
+                            if t <> "" then trace "STDERR" (t.[.. min 199 (t.Length - 1)]))
+                        stderrStream?on("data", box onData) |> ignore
                     do! c.connect(transport)
                     _client <- Some c
                     _connecting <- None
