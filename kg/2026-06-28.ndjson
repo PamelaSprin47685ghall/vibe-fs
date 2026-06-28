@@ -138,3 +138,10 @@
 {"id":"2a49","entity":["已知缺陷","消息投影","compaction锚点"],"fact":"Mux/MessageTransform.fs 锚点渲染疑似缺陷：`renderCompactionAnchorPrompt` 输出仅含正文不含 front-matter backlog block；三条 printfn 追踪链路覆盖 backlogEntries 数量→backlogBlock 内容→promptText 实际值→最终 session.prompt 内容；根因待运行时日志确认。"}
 {"id":"2d42","entity":["消息投影","Mux宿主","缩进修复"],"fact":"Mux/MessageTransform.fs 缩进修复：第 125 行 try do! 前补 4 空格，缩进对齐 let promptText（同属 if not (Dyn.isNullish promptFn) then 分支体），修复 promptText 引用未定义作用域错误。"}
 {"id":"4d5f","entity":["消息投影","死代码清理"],"fact":"Opencode/MessageTransform.fs 冗余 null 检查清理：backlogEntries 由 `box (entries |> List.toArray)` 构造永不为 null，`if backlogEntries = null then [] else ...` 死分支简化为 `[ frontMatterRoot backlogEntries ]`；Omp 侧同模式已先期清理，双宿主对齐。"}
+{"id":"9df6","entity":["知识图谱提交","版本控制","跨仓库合并"],"fact":"executor 尝试执行 git merge --continue 合并 kg/2026-06-28.ndjson，因 nano 编辑器不可用（error: there was a problem with the editor '/usr/bin/nano'）导致命令失败，合并未完成；知识图谱入库状态维持待处理，需提供 -m/-F 参数或配置 GIT_EDITOR 后重试。"}
+{"id":"3b87","entity":["工作流","知识图谱"],"fact":"worktree-0 完成 multi-frontmatter 等效事实源从 origin/master 合并，提交 43a297a；多块前言元数据特性已同步至 worktree-0 工作区。"}
+{"id":"74e1","entity":["版本控制","工作区布局"],"fact":"wanxiangshu-0 远程分支推送到 GitHub origin，PR 入口 https://github.com/PamelaSprin47685ghall/vibe-fs/pull/new/wanxiangshu-0，操作路径 cd ../wanxiangshu-0 && git push origin wanxiangshu-0:wanxiangshu-0。"}
+{"id":"f775","entity":["版本控制","工作区布局"],"fact":"wanxiangshu-0 工作区 HEAD 已重置至 8d21ca6（hack）；最近三提交：8d21ca6 hack → 9bc1fb7 fix(opencode): enforce warn/warn_tdd via tool-definition hook → f0cef98 hack。"}
+{"id":"ca3d","entity":["知识图谱","合并冲突","同步状态"],"fact":"kg/2026-06-28.ndjson 在 wanxiangshu-0 合并 origin/master 时发生内容冲突（Auto-merging CONFLICT），知识图谱入库状态维持待处理，需人工解决冲突后完成合并。"}
+{"id":"0108","entity":["等效事实源","测试覆盖"],"fact":"wanxiangshu-0 完成 multi-frontmatter 等效事实源从 origin/master 合并，本地提交已创建；全量测试 16974 passed / 0 failed 验证通过，代码库健康状态达标。"}
+{"id":"1077","entity":["工作区布局","版本控制"],"fact":"worktree-0 已彻底清理：本地 worktree（../wanxiangshu-0）删除、本地分支 wanxiangshu-0 删除、远程分支 wanxiangshu-0 删除；当前仅剩主工作树与 master 分支。"}
