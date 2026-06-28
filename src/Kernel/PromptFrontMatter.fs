@@ -122,8 +122,6 @@ let parseFrontMatterScalarBlocks (text: string) : Map<string,string> list =
     blocks
     |> List.map (fun block -> parseFrontMatterScalars ("---\n" + block + "\n---"))
 
-let compactionAnchorSource = "compaction-anchor"
-
 let compactionAnchorBody = "See above for some messages before compaction."
 
 /// Whitelist of YAML keys whose front-matter blocks must survive compaction.
@@ -162,13 +160,12 @@ let extractFrontMatterFenceStrings (text: string) : string list =
         |> List.filter blockHasWhitelistKey
         |> List.choose blockToFenceString
 
-/// Render a compaction-anchor prompt: prepend a marker block, then append all
-/// *fenceStrings* (each already a complete fence), then two newlines and
-/// `compactionAnchorBody`.  When *fenceStrings* is empty the body is returned as-is.
+/// Render a compaction-anchor prompt: append all *fenceStrings* (each already
+/// a complete fence), then two newlines and `compactionAnchorBody`.  When
+/// *fenceStrings* is empty the body is returned as-is.
 let renderCompactionAnchorPrompt (fenceStrings: string list) : string =
-    let marker = frontMatter [ yamlField "source" compactionAnchorSource ]
     if List.isEmpty fenceStrings then
         compactionAnchorBody
     else
-        let fences = marker :: fenceStrings |> String.concat "\n\n"
+        let fences = fenceStrings |> String.concat "\n\n"
         fences + "\n\n" + compactionAnchorBody

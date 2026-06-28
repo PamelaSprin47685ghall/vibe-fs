@@ -9,7 +9,7 @@ open Wanxiangshu.Omp.SessionCompacting
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 
-/// Context includes the fixed compaction-anchor body and source marker.
+/// Context includes the fixed compaction-anchor body.
 let sessionCompactingContextContainsSeeAbove () = promise {
     resetPluginState ()
     let h = createPiHarness ()
@@ -47,7 +47,6 @@ let sessionCompactingContextContainsSeeAbove () = promise {
         let arr = unbox<string array> context
         let joined = System.String.Join("\n", arr)
         check "context contains See above body" (joined.Contains "See above for some messages before compaction.")
-        check "context contains compaction source marker" (joined.Contains "source: compaction-anchor")
 }
 
 /// Context contains both the backlog block and extracted front-matter fence strings.
@@ -95,6 +94,6 @@ let sessionCompactingContextHasMultipleFrontMatterBlocks () = promise {
         let arr = unbox<string array> context
         let joined = System.String.Join("\n", arr)
         let fenceCount = joined.Split([| "---" |], System.StringSplitOptions.None).Length - 1
-        check "context has marker + backlog + extracted task block" (fenceCount >= 3)
+        check "context has backlog + extracted task block" (fenceCount >= 2)
         check "context contains extracted task" (joined.Contains "review-login")
 }

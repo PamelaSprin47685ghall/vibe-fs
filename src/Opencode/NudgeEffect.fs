@@ -110,6 +110,8 @@ let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
                                     | _ -> None)
                             Wanxiangshu.Kernel.BacklogProjectionCore.buildCompactionAnchorPrompt backlogEntries extractAnchorTexts
                         do! sendNudge client sessionID None promptText
+                        holder.Mutate(fun state ->
+                            { state with compactionAnchorsIssued = Set.add sid state.compactionAnchorsIssued }, ())
                     | None -> ()
                     return Some { snapshot with anchorPromptIssued = true }
                 | _ -> return Some snapshot

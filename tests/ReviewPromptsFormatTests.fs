@@ -99,10 +99,9 @@ let compactionAnchorPromptRendersMarkerAndBody () =
     let fence1 = "---\nauthor: Alice\n---"
     let fence2 = "---\nauthor: Bob\n---"
     let prompt = renderCompactionAnchorPrompt [ fence1; fence2 ]
-    check "prompt contains source marker" (prompt.Contains "source: compaction-anchor")
     check "prompt contains body" (prompt.Contains "See above for some messages before compaction.")
     let fenceCount = prompt.Split([| "---" |], System.StringSplitOptions.None).Length - 1
-    check "prompt has marker + two fences" (fenceCount >= 3)
+    check "prompt has two fences" (fenceCount >= 2)
 
 let run () =
     submitReviewIsWipNoneDefaultsTrue ()

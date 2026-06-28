@@ -240,7 +240,6 @@ let muxCompactingTransformEmitsAnchorPromptSpec () = promise {
         if promptsCaptured.Count > 0 then
             let promptText = promptsCaptured.[0]
             check "anchor prompt contains See above body" (promptText.Contains "See above for some messages before compaction.")
-            check "anchor prompt contains compaction-anchor source marker" (promptText.Contains "source: compaction-anchor")
             check "anchor prompt contains backlog report text (planned phase)" (promptText.Contains "anchor planned phase")
             check "anchor prompt contains backlog report text (implemented phase)" (promptText.Contains "anchor implemented phase")
 }
