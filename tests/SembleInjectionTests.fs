@@ -129,6 +129,20 @@ let extractContextExcludesAssistantToolParts () =
     let ctx = extractContextFromMessages 0 [ assistantWithTool ]
     check "context keeps assistant text" (ctx.Contains "thinking")
 
+let extractContextCollectsReasoningParts () =
+    let reasoningPart = RawPart (box (createObj [
+        "type", box "reasoning"
+        "text", box "I should check the auth module first"
+        "id", box "prt-1"
+    ]))
+    let assistantWithReasoning =
+        { info = emptyInfo "m0" Assistant
+          parts = [ reasoningPart; ToolPart("read", "c1", None, null) ]
+          source = Native
+          raw = null }
+    let ctx = extractContextFromMessages 0 [ assistantWithReasoning ]
+    check "context includes reasoning text" (ctx.Contains "I should check the auth module")
+
 let debugDisabledByDefault () =
     check "debug disabled by default" (not (debugEnabled ()))
 
@@ -157,6 +171,7 @@ let run () =
     extractContextCollectsUserAndAssistantText ()
     extractContextRespectsStartIndex ()
     extractContextExcludesAssistantToolParts ()
+    extractContextCollectsReasoningParts ()
     debugDisabledByDefault ()
     debugEnabledViaEnv ()
     dumpInjectionNoThrowWhenDisabled ()

@@ -115,7 +115,16 @@ let extractContextFromMessages (startIndex: int) (messages: Message<'raw> list) 
     |> List.collect (fun m ->
         match m.info.role with
         | User | Assistant ->
-            m.parts |> List.choose (function TextPart t when t <> "" -> Some t | _ -> None)
+            m.parts |> List.collect (fun part ->
+                match part with
+                | TextPart t when t <> "" -> [t]
+                | RawPart raw ->
+                    let r = box raw
+                    if Dyn.str r "type" = "reasoning" then
+                        let txt = Dyn.str r "text"
+                        if txt <> "" then [txt] else []
+                    else []
+                | _ -> [])
         | _ -> [])
     |> String.concat "\n"
     |> fun s -> s.Trim()
