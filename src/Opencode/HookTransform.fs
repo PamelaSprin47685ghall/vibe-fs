@@ -14,8 +14,8 @@ let chatMessageFor (host: Host) (registry: ChildAgentRegistry) (lifecycleObserve
 let chatMessage (registry: ChildAgentRegistry) (lifecycleObserver: Wanxiangshu.Opencode.SessionLifecycleObserver.SessionLifecycleObserver) (input: obj) (output: obj) : JS.Promise<unit> =
     ChatHooks.chatMessage registry lifecycleObserver input output
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: Wanxiangshu.Opencode.BacklogSession.BacklogSession) (knowledgeGraphRuntime: Wanxiangshu.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
-    MessageTransform.messagesTransform registry directory runtimeScope backlogSession knowledgeGraphRuntime reviewStore client input output
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: Wanxiangshu.Opencode.BacklogSession.BacklogSession) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
+    MessageTransform.messagesTransform registry directory runtimeScope backlogSession reviewStore client input output
 
 let compactingHandlerFor (host: Host) (backlogSession: Wanxiangshu.Opencode.BacklogSession.BacklogSession) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     MessageTransform.compactingHandlerFor host backlogSession client input output

@@ -1,7 +1,7 @@
 module Wanxiangshu.Kernel.MessageTransformPolicy
 
 let defaultExcludedAgents =
-    set [ "browser"; "investigator"; "executor"; "title"; "compaction"; "bookkeeper" ]
+    set [ "browser"; "investigator"; "executor"; "title"; "compaction" ]
 
 let childWorkspaceExcludedAgents = set [ "exec"; "explore" ]
 

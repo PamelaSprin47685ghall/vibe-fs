@@ -144,19 +144,4 @@ let muxSubmitReviewWipSkipsReviewerSpec () = promise {
     do! rmAsync workspaceDir
 }
 
-let muxExecutorFailureDoesNotBookkeepSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-executor-fail-"
-    let reg = sharedMuxRegistration ()
-    let executor = muxToolByName reg "executor"
-    if isNullish executor then
-        check "mux registration exposes executor tool" false
-    else
-        let ctx = createObj [ "directory", box workspaceDir; "sessionID", box "mux-executor-fail"; "workspaceId", box "mux-executor-fail" ]
-        let args = createObj [ "language", box "shell"; "program", box "exit 1"; "timeout_type", box "short"; "mode", box "rw"; "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
-        let! result = ((get executor "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-        check "executor failure reports non-zero exit" (result.Contains "exited with code 1")
-        do! waitForBackgroundJobsForTesting reg
-        let launches = takeBookkeeperLaunchesForTesting reg
-        check "executor failure does not trigger bookkeeper" (launches.Length = 0)
-    do! rmAsync workspaceDir
-}
+

@@ -10,20 +10,16 @@ open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Mux.Wrappers
 open Wanxiangshu.Mux.WrappersReview
-open Wanxiangshu.Mux.KnowledgeGraphToolDefs
 open Wanxiangshu.Shell.FuzzyFinderShell
 open Wanxiangshu.Shell.MuxWorkspaceCodec
 open Wanxiangshu.Mux.SubagentTools
 open Wanxiangshu.Mux.ReviewToolsMux
 open Wanxiangshu.Mux.BuiltinTools
 open Wanxiangshu.Mux.WebTools
-open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
-open Wanxiangshu.Mux.KnowledgeGraphRuntimeMuxSubmit
 open Wanxiangshu.Methodology.MuxTools
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MuxHookInputCodec
-open Wanxiangshu.Kernel.KnowledgeGraph.BookkeeperPolicy
 open Wanxiangshu.Shell.ChatTransformOutputCodec
 open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.ToolExecute
@@ -31,8 +27,7 @@ open Wanxiangshu.Shell.ToolExecute
 let muxToolNames =
     Array.append
         [| "coder"; "investigator"; "meditator"; "browser"; "executor"
-           "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
-           "knowledge_graph_fetch"; "return_bookkeeper" |]
+           "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read" |]
         methodologyToolNames
 
 let private canUseMuxTopLevel (agent: string) (toolName: string) : bool =
@@ -61,7 +56,6 @@ let createToolCatalog
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (hostReadExec: HostFunctionCapture)
     (finderCache: FinderCache)
-    (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
     (sessionScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
     : ToolDefinition array =
     let iteratorStore = sessionScope.IteratorStore
@@ -69,7 +63,7 @@ let createToolCatalog
        yield investigatorTool deps toolNames
        yield meditatorTool deps toolNames
        yield browserTool deps toolNames
-       yield executorTool deps toolNames null sessionScope
+       yield executorTool deps toolNames sessionScope
        yield submitReviewTool deps toolNames reviewStore
        yield websearchTool deps toolNames
        yield webfetchTool
@@ -77,41 +71,7 @@ let createToolCatalog
        yield fuzzyFindTool finderCache iteratorStore
        yield writeTool deps
        yield readTool deps hostReadExec
-       yield knowledgeGraphFetchTool knowledgeGraphRuntime
-       yield returnBookkeeperTool knowledgeGraphRuntime
        yield! allMethodologyTools deps toolNames |]
-
-let bookkeeperInput (args: obj) : string =
-    if Dyn.isNullish args then "" else JS.JSON.stringify args
-
-let toolExecuteAfter
-    (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
-    (deps: obj)
-    (input: obj)
-    (output: obj)
-    : JS.Promise<unit> =
-    promise {
-        let decoded = decodeMuxToolExecuteAfterInput input deps
-        let originalOutput = hookOutputTextMux output
-        if Wanxiangshu.Shell.FallbackMessageCodec.isNetworkErrorText originalOutput then
-            setHookErrorMux output "network connection lost"
-        let succeeded = hookOutputErrorMux output = ""
-        if check decoded.SessionID decoded.Tool (JS.JSON.stringify decoded.Args) originalOutput then
-            setHookErrorMux output "livelock guard: repeated identical tool call with identical result"
-        elif succeeded
-            && Wanxiangshu.Kernel.KnowledgeGraph.BookkeeperPolicy.recordsToBookkeeper decoded.Tool
-            && not (isReadOnlyExecutorMux decoded.Tool decoded.Args) && not (isChildWorkspace deps decoded.SessionID) then
-            knowledgeGraphRuntime.StartBookkeeperAppend(
-                bookkeeperInput decoded.Args,
-                Wanxiangshu.Kernel.ToolOutputInfo.bodyForBookkeeper originalOutput,
-                decoded.Tool,
-                config = createObj
-                    [ "sessionID", box decoded.SessionID
-                      "directory", box decoded.Directory
-                      "workspaceId", box decoded.WorkspaceId
-                      "taskService", box (Dyn.get deps "taskService") ])
-            setHookOutputStringMux output (Wanxiangshu.Kernel.ToolOutputInfo.withBookkeepingHints originalOutput)
-    }
 
 let private requireWarnTddMux (tool: string) (args: obj) (output: obj) : unit =
     if not (Wanxiangshu.Kernel.WarnTdd.isModificationTool tool) then ()
@@ -147,6 +107,8 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
             | Result.Ok label when label <> "" -> args?("_ui") <- box label
             | _ -> ()
     }
+
+let toolExecuteAfter (input: obj) (output: obj) : JS.Promise<unit> = Promise.lift ()
 
 let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
     promise { setSystemOutputToDirectory directory output }

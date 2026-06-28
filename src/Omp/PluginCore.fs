@@ -9,7 +9,6 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FuzzyFinderShell
 open Wanxiangshu.Omp.AgentConfig
 open Wanxiangshu.Omp.Codec
-open Wanxiangshu.Omp.KnowledgeGraph.Runtime
 open Wanxiangshu.Omp.Tools
 open Wanxiangshu.Omp.PruneGuard
 open Wanxiangshu.Omp.ReviewTools
@@ -29,7 +28,6 @@ open Wanxiangshu.Omp.FallbackHooks
 
 type CoreServices =
     { ReviewStore: ReviewStore
-      KnowledgeGraphRuntime: OmpKnowledgeGraphRuntime
       FinderCache: FinderCache
       Pi: obj
       FallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option
@@ -39,7 +37,6 @@ type CoreServices =
 let reviewStore : ReviewStore = createReviewStore ()
 
 let private createCoreServices (pi: obj) : CoreServices =
-    let kgRuntime = OmpKnowledgeGraphRuntime(pi)
     let finderCache = FinderCache()
 
     let directory = Dyn.str pi "directory"
@@ -56,7 +53,6 @@ let private createCoreServices (pi: obj) : CoreServices =
         | None -> None
 
     { ReviewStore = reviewStore
-      KnowledgeGraphRuntime = kgRuntime
       FinderCache = finderCache
       Pi = pi
       FallbackHandler = fallbackHandler
@@ -86,7 +82,7 @@ let private applyAgentConfigIfSupported (pi: obj) : unit =
 let private sessionEndEventTypes =
     Set [ "session.abort"; "stream.abort"; "session.error"; "session.delete"; "session.close"; "session.remove"; "session.deleted" ]
 
-let registerAbortHandler (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime)
+let registerAbortHandler (pi: obj) (reviewStore: ReviewStore)
     (fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option) : unit =
     let fallbackEventTypes = Set [ "session.busy"; "session.idle"; "message.updated"; "session.updated" ]
     pi?on(
@@ -103,14 +99,12 @@ let registerAbortHandler (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKno
                         | None ->
                             reviewStore.deactivateReview sid
                             Wanxiangshu.Omp.NudgeRuntime.clearNudgeSession sid
-                            kgRuntime.DeleteJob sid
                         | Some handler ->
                             let rawEvent = createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
                             let! r = handler rawEvent
                             if not r.Consumed then
                                 reviewStore.deactivateReview sid
                                 Wanxiangshu.Omp.NudgeRuntime.clearNudgeSession sid
-                                kgRuntime.DeleteJob sid
                     elif fallbackEventTypes.Contains evtType then
                         match fallbackHandler with
                         | Some handler ->
@@ -121,10 +115,10 @@ let registerAbortHandler (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKno
             }))
 
 let private registerHooks (pi: obj) (services: CoreServices) : unit =
-    registerAllTools pi services.ReviewStore services.KnowledgeGraphRuntime services.FallbackRuntime services.FallbackConfig
+    registerAllTools pi services.ReviewStore services.FallbackRuntime services.FallbackConfig
     registerInputHandler pi services.ReviewStore
-    registerSessionLifecycle pi services.ReviewStore services.KnowledgeGraphRuntime
-    registerAbortHandler pi services.ReviewStore services.KnowledgeGraphRuntime services.FallbackHandler
+    registerSessionLifecycle pi services.ReviewStore
+    registerAbortHandler pi services.ReviewStore services.FallbackHandler
 
 let pluginFor (pi: obj) : JS.Promise<unit> =
     promise {

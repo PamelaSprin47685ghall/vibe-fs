@@ -59,8 +59,7 @@ let muxSummarizationSpec () =
 let muxSummarizationToolPolicySpec () =
     let toolNames =
         [| "coder"; "investigator"; "meditator"; "browser"; "executor"
-           "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read"
-           "knowledge_graph_fetch"; "return_bookkeeper" |]
+           "submit_review"; "return_reviewer"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read" |]
     let opts = toolOptions toolNames summarizationRole summarizationAiSettingsAgentId
     check "toolOptions is provided" (Option.isSome opts)
     let payload = Option.get opts
@@ -71,7 +70,7 @@ let muxSummarizationToolPolicySpec () =
     let disabled = unbox<string[]> (get policy "disabledTools") |> Set.ofArray
     for removed in [ "coder"; "investigator"; "meditator"; "browser"; "executor"
                      "submit_review"; "return_reviewer"; "websearch"; "webfetch"
-                     "fuzzy_grep"; "fuzzy_find"; "write"; "knowledge_graph_fetch"; "return_bookkeeper" ] do
+                     "fuzzy_grep"; "fuzzy_find"; "write"; "read" ] do
         check $"summary child strips {removed}" (Set.contains removed disabled)
 
 let muxMessagesTransformDedupsRepeatedReadSpec () = promise {

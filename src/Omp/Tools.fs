@@ -1,8 +1,6 @@
 module Wanxiangshu.Omp.Tools
 
 open Wanxiangshu.Omp.FuzzyTools
-open Wanxiangshu.Omp.KnowledgeGraph.Runtime
-open Wanxiangshu.Omp.KnowledgeGraphTools
 open Wanxiangshu.Omp.MessageTransform
 open Wanxiangshu.Omp.ReviewTools
 open Wanxiangshu.Omp.ExecutorTools
@@ -11,12 +9,11 @@ open Wanxiangshu.Omp.TodoTool
 open Wanxiangshu.Omp.WebTools
 open Wanxiangshu.Methodology.OmpTools
 open Wanxiangshu.Shell.FuzzyFinderShell
-open Wanxiangshu.Shell.KnowledgeGraphFiles
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
-let registerAllTools (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : unit =
+let registerAllTools (pi: obj) (reviewStore: ReviewStore) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : unit =
     let finderCache = FinderCache()
     registerFuzzyTools pi finderCache
     registerWebTools pi fallbackRuntime fallbackConfigOpt
@@ -25,7 +22,4 @@ let registerAllTools (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowled
     registerTodoTool pi
     registerMethodologyTools pi fallbackRuntime fallbackConfigOpt
     registerLoopFeatures pi reviewStore
-    registerContextTransform pi reviewStore kgRuntime
-    ensureKnowledgeGraphTools pi kgRuntime (Wanxiangshu.Shell.Dyn.str pi "cwd")
-
-let resetOmpToolsTestState () = resetOmpKgToolsTestState ()
+    registerContextTransform pi reviewStore

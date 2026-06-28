@@ -119,7 +119,7 @@ let builtinToolsExecutorTool () =
     let deps = createObj []
     let toolNames = [| "executor" |]
     let scope = RuntimeScope()
-    let defn = executorTool deps toolNames null scope
+    let defn = executorTool deps toolNames scope
     equal "executorTool name" "executor" defn.name
     check "executorTool description non-empty" (defn.description.Length > 0)
 

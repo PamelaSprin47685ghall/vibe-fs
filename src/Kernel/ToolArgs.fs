@@ -1,8 +1,6 @@
 module Wanxiangshu.Kernel.ToolArgs
 
 open Wanxiangshu.Kernel.Executor
-open Wanxiangshu.Kernel.KnowledgeGraph
-open Wanxiangshu.Kernel.KnowledgeGraph.Types
 
 type ReadArgs = { Path: string; Offset: int option; Limit: int option }
 
@@ -42,8 +40,6 @@ type TodoWriteArgs = {
     SelectMethodology: string list
 }
 
-type KnowledgeGraphFetchArgs = { Entity: string }
-
 type ApplyPatchArgs = { PatchText: string }
 
 type SubmitReviewArgs = { Report: string; AffectedFiles: string list }
@@ -57,7 +53,5 @@ type ToolArgs =
     | Webfetch of WebfetchArgs
     | Executor of ExecutorArgs
     | TodoWrite of TodoWriteArgs
-    | KnowledgeGraphFetch of KnowledgeGraphFetchArgs
-    | ReturnBookkeeper of KnowledgeGraphDraft list
     | ApplyPatch of ApplyPatchArgs
     | SubmitReview of SubmitReviewArgs

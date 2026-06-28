@@ -51,8 +51,6 @@ let sessionLifecycleObserverUsesCodecDecoders () =
 
 let commandHooksUsesCodecSessionID () =
     let hooks = requireFile "src/Opencode/CommandHooks.fs" |> nonCommentCode
-    check "arch: CommandHooks calls getSessionID"
-        (hooks.Contains "getSessionID ")
     check "arch: CommandHooks must not Dyn.str info sessionID locally"
         (not (hooks.Contains "Dyn.str info \"sessionID\""))
 

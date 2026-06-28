@@ -96,7 +96,7 @@ let private hostReadResultIsDirectoryError (result: obj) : bool =
         && not (Dyn.truthy success)
         && error.StartsWith "Path is a directory, not a file:"
 
-let executorTool (deps: obj) (toolNames: string array) (_knowledgeGraphRuntime: obj) (sessionScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) : ToolDefinition =
+let executorTool (deps: obj) (toolNames: string array) (sessionScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) : ToolDefinition =
     { name = "executor"
       description = description "executor"
       parameters =

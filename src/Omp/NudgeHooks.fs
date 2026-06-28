@@ -14,9 +14,7 @@ open Wanxiangshu.Omp.OmpTestHooks
 open Wanxiangshu.Omp.ToolResultEvent
 open Wanxiangshu.Omp.MagicTodo
 open Wanxiangshu.Omp.MessagingCodec
-open Wanxiangshu.Omp.KnowledgeGraph.Runtime
 open Wanxiangshu.Omp.NudgeRuntime
-open Wanxiangshu.Omp.KnowledgeGraphTools
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Kernel.ToolOutputInfo
@@ -60,7 +58,7 @@ let beforeAgentStartHandler (pi: obj) (event: obj) (ctx: obj) : JS.Promise<obj> 
 /// tool_call handler: pre-execute hook on Pi. Normalises the tool arguments
 /// (patch unification + `_ui` label injection) before the tool runs.
 /// Also blocks child-session-only tools when invoked from the main session.
-let toolCallHandler (_pi: obj) (_reviewStore: ReviewStore) (_kgRuntime: OmpKnowledgeGraphRuntime) (event: obj) (ctx: obj) : JS.Promise<obj> =
+let toolCallHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: obj) : JS.Promise<obj> =
     promise {
         let toolName = Dyn.str event "toolName"
         let args = getToolInput event

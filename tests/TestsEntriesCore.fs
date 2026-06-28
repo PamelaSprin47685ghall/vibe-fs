@@ -30,9 +30,7 @@ open Wanxiangshu.Tests.IntegrationChatTests
 open Wanxiangshu.Tests.IntegrationChatTestsSubagent
 open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
-open Wanxiangshu.Tests.KnowledgeGraphTests
-open Wanxiangshu.Tests.KnowledgeGraphFileTests
-open Wanxiangshu.Tests.KnowledgeGraphKernelTests
+
 open Wanxiangshu.Tests.LoopMessagesTests
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.ReviewReplaySyncTests
@@ -44,13 +42,12 @@ open Wanxiangshu.Tests.SubagentPromptBuildTests
 open Wanxiangshu.Tests.SubagentSpawnTests
 open Wanxiangshu.Tests.WebToolsCodecTests
 open Wanxiangshu.Tests.ReviewToolsCodecTests
-open Wanxiangshu.Tests.KnowledgeGraphToolsCodecTests
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Wanxiangshu.Tests.ToolExecuteTests
 open Wanxiangshu.Tests.ToolArgsDecodeTests
 open Wanxiangshu.Tests.ToolResultWireTests
 open Wanxiangshu.Tests.KernelHelpersTests
-open Wanxiangshu.Tests.KnowledgeGraphHelpersTests
+
 open Wanxiangshu.Tests.ReviewPromptsFormatTests
 open Wanxiangshu.Tests.SubagentToolExecuteTests
 open Wanxiangshu.Tests.FileToolsCodecTests
@@ -72,9 +69,6 @@ open Wanxiangshu.Tests.OpencodeSessionEventCodecCommonTests
 open Wanxiangshu.Tests.MuxAiSettingsCodecTests
 open Wanxiangshu.Tests.MuxAiSettingsIntegrationTests
 open Wanxiangshu.Tests.AgentConfigApplyTests
-open Wanxiangshu.Tests.KnowledgeGraphWorkflowTests
-open Wanxiangshu.Tests.KnowledgeGraphBookkeeperLaunchTests
-open Wanxiangshu.Tests.KnowledgeGraphMaintenanceRunTests
 open Wanxiangshu.Tests.SessionExecutorScopeTests
 open Wanxiangshu.Tests.OmpKernelTests
 open Wanxiangshu.Tests.OmpSessionToolsTests
@@ -90,7 +84,6 @@ open Wanxiangshu.Tests.OmpContextTransformTests
 open Wanxiangshu.Tests.OmpChildSessionTests
 open Wanxiangshu.Tests.OmpAgentConfigTests
 open Wanxiangshu.Tests.OmpHookExecuteTests
-open Wanxiangshu.Tests.OmpKnowledgeGraphRuntimeTests
 open Wanxiangshu.Tests.OmpSessionLifecycleTests
 open Wanxiangshu.Tests.OmpPluginCoreTests
 open Wanxiangshu.Tests.OmpTitleFetchGuardTests
@@ -198,7 +191,6 @@ let coreTestEntries () : (string * TestBody) list =
     "KernelTests.dedup'", Sync (sync KernelTests.dedup')
     "KernelTests.jsBoundary'", Sync (sync KernelTests.jsBoundary')
     "KernelPromptSpecs.hostKernel'", Sync (sync KernelPromptSpecs.hostKernel')
-    "KernelTests.knowledgeGraphFetchAnswer", Sync (sync KernelTests.knowledgeGraphFetchAnswer)
     "DynFieldTests.run", Sync (sync DynFieldTests.run)
     "KernelPromptSpecs.toolCatalogCentralized", Sync (sync KernelPromptSpecs.toolCatalogCentralized)
     "KernelPromptSpecs.hostToolsKnowledgeGraphNames", Sync (sync KernelPromptSpecs.hostToolsKnowledgeGraphNames)
@@ -251,8 +243,6 @@ let coreTestEntries () : (string * TestBody) list =
     "ShellTests.readDirectoryListing", Async ShellTests.readDirectoryListing
     "ShellTests.ensureJavascriptProjectRepairsModuleType", Async ShellTests.ensureJavascriptProjectRepairsModuleType
     "ShellTests.rewriteJavascriptRelativeImports", Async ShellTests.rewriteJavascriptRelativeImports
-    "ShellTests.knowledgeGraphPortRangeSpec", Async ShellTests.knowledgeGraphPortRangeSpec
-    "ShellTests.knowledgeGraphPortSerialSpec", Async ShellTests.knowledgeGraphPortSerialSpec
     "DynTests.nullish", Sync (sync DynTests.nullish)
     "DedupTests.run", Sync (sync DedupTests.run)
     "DelegateTests.run", Sync (sync DelegateTests.run)
@@ -265,10 +255,6 @@ let coreTestEntries () : (string * TestBody) list =
     "IntegrationOpencodeReviewSpecs.run", Async IntegrationOpencodeReviewSpecs.run
     "IntegrationChatTests.run", Async IntegrationChatTests.run
     "IntegrationChatTestsSubagent.run", Async IntegrationChatTestsSubagent.run
-    "KnowledgeGraphTests.run", Async KnowledgeGraphTests.run
-    "KnowledgeGraphFileTests.run", Async KnowledgeGraphFileTests.run
-    "KnowledgeGraphKernelTests.run", Async KnowledgeGraphKernelTests.run
-    "KnowledgeGraphHelpersTests.run", Sync (sync KnowledgeGraphHelpersTests.run)
     "LoopMessagesTests.run", Sync (sync LoopMessagesTests.run)
     "MessagingTests.run", Sync (sync MessagingTests.run)
     "WorkBacklogTests.run", Sync (sync WorkBacklogTests.run)

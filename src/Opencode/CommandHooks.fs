@@ -11,23 +11,12 @@ open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Opencode.AgentConfig
 open Wanxiangshu.Opencode.ReviewerLoop
-open Wanxiangshu.Opencode.KnowledgeGraphRuntime
 open Wanxiangshu.Shell.Clock
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
-
-let private abortOrDeleteEvents =
-    set [ "stream-abort"; "session.delete"; "session.close"; "session.remove"; "session.deleted" ]
-
-let cleanUpJobContextIfAbortedOrDeleted (knowledgeGraphRuntime: KnowledgeGraphRuntime) (input: obj) : unit =
-    match decodeHostEventEnvelope input with
-    | Some { EventType = eventType; Props = props } when Set.contains eventType abortOrDeleteEvents ->
-        let sessionID = getSessionID eventType props
-        if sessionID <> "" then knowledgeGraphRuntime.DeleteJob(sessionID)
-    | _ -> ()
 
 /// Handle /loop and /loop-review slash commands.
 let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)

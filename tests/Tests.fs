@@ -22,9 +22,9 @@ open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
 open Wanxiangshu.Tests.IntegrationChatTests
 open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
-open Wanxiangshu.Tests.KnowledgeGraphTests
-open Wanxiangshu.Tests.KnowledgeGraphFileTests
-open Wanxiangshu.Tests.KnowledgeGraphKernelTests
+
+
+
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.TestsArchitectureRegistry
@@ -38,7 +38,7 @@ open Wanxiangshu.Tests.SubagentPromptBuildTests
 open Wanxiangshu.Tests.SubagentSpawnTests
 open Wanxiangshu.Tests.WebToolsCodecTests
 open Wanxiangshu.Tests.ReviewToolsCodecTests
-open Wanxiangshu.Tests.KnowledgeGraphToolsCodecTests
+
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Wanxiangshu.Tests.ToolArgsDecodeTests
 open Wanxiangshu.Tests.ToolResultWireTests
@@ -59,9 +59,9 @@ open Wanxiangshu.Tests.OpencodeSessionEventCodecTests
 open Wanxiangshu.Tests.MuxAiSettingsCodecTests
 open Wanxiangshu.Tests.MuxAiSettingsIntegrationTests
 open Wanxiangshu.Tests.AgentConfigApplyTests
-open Wanxiangshu.Tests.KnowledgeGraphWorkflowTests
-open Wanxiangshu.Tests.KnowledgeGraphBookkeeperLaunchTests
-open Wanxiangshu.Tests.KnowledgeGraphMaintenanceRunTests
+
+
+
 open Wanxiangshu.Tests.SessionExecutorScopeTests
 open Wanxiangshu.Tests.OmpKernelTests
 open Wanxiangshu.Tests.OmpSessionToolsTests
@@ -77,7 +77,7 @@ open Wanxiangshu.Tests.OmpContextTransformTests
 open Wanxiangshu.Tests.OmpChildSessionTests
 open Wanxiangshu.Tests.OmpAgentConfigTests
 open Wanxiangshu.Tests.OmpHookExecuteTests
-open Wanxiangshu.Tests.OmpKnowledgeGraphRuntimeTests
+
 open Wanxiangshu.Tests.OmpSessionLifecycleTests
 open Wanxiangshu.Tests.OmpPluginCoreTests
 open Wanxiangshu.Tests.OmpTitleFetchGuardTests
@@ -87,7 +87,7 @@ open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.ToolCatalogClassificationTests
 open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.KernelHelpersTests
-open Wanxiangshu.Tests.KnowledgeGraphHelpersTests
+
 open Wanxiangshu.Tests.ReviewPromptsFormatTests
 open Wanxiangshu.Omp.Plugin
 

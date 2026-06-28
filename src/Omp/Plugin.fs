@@ -8,7 +8,6 @@ open Wanxiangshu.Omp.MessagingCodec
 open Wanxiangshu.Omp.PruneGuard
 open Wanxiangshu.Omp.ReviewTools
 open Wanxiangshu.Omp.PiResolve
-open Wanxiangshu.Omp.KnowledgeGraph.Runtime
 open Wanxiangshu.Omp.MessageTransform
 open Wanxiangshu.Omp.OmpTestHooks
 open Wanxiangshu.Omp.PluginCore
@@ -32,7 +31,6 @@ let resetOmpPluginTestState () : unit =
     resetRunnerJobsForTesting ()
     resetFuzzyState ()
     resetSessionExecutorForTesting ()
-    resetOmpToolsTestState ()
 
 /// Public test-visible `reviewStore` handle. Backed by the same singleton
 /// `PluginCore.reviewStore` cell that the registered tools use, so tests
@@ -68,6 +66,5 @@ let _test =
         "reset", box resetOmpPluginTestState
         "transformEntries",
             box(fun (entries: obj array) (cwd: string) (sessionId: string) ->
-                let kgRuntime = OmpKnowledgeGraphRuntime(createObj [])
-                transformEntriesAsync reviewStore kgRuntime cwd sessionId (box entries))
+                transformEntriesAsync reviewStore cwd sessionId (box entries))
     ]

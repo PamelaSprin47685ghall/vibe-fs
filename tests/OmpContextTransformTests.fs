@@ -5,7 +5,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
-open Wanxiangshu.Omp.KnowledgeGraph.Runtime
 open Wanxiangshu.Omp.MessageTransform
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ReviewRuntime
@@ -27,13 +26,12 @@ let private firstEntryTextFromOut (entries: obj array) : string = jsNative
 
 let capsSynthUserPrepended () = promise {
     let reviewStore = createReviewStore ()
-    let kgRuntime = OmpKnowledgeGraphRuntime(createObj [])
     let entries =
         [| createObj [
                "info", box(createObj [ "id", box "user-1"; "role", box "user" ])
                "parts", box [| createObj [ "type", box "text"; "text", box "hello" ] |]
            ] |]
-    let! out = transformEntriesAsync reviewStore kgRuntime "/tmp/ws" "sess-1" (box entries)
+    let! out = transformEntriesAsync reviewStore "/tmp/ws" "sess-1" (box entries)
     check "prepends at least caps synth user" (out.Length >= entries.Length + 1)
     let firstInfo = Dyn.get out.[0] "info"
     check "caps user id prefix" ((Dyn.str firstInfo "id").StartsWith "caps-synth-user-")
@@ -45,13 +43,12 @@ let capsReadToolsInContextTransform () = promise {
     let! root = mkdtempAsync "omp-caps-ctx-"
     do! writeFileAsync (join root "ARCH.md") "arch-in-context"
     let reviewStore = createReviewStore ()
-    let kgRuntime = OmpKnowledgeGraphRuntime(createObj [])
     let entries =
         [| createObj [
                "info", box(createObj [ "id", box "user-1"; "role", box "user" ])
                "parts", box [| createObj [ "type", box "text"; "text", box "hello" ] |]
            ] |]
-    let! out = transformEntriesAsync reviewStore kgRuntime root "caps-sess" (box entries)
+    let! out = transformEntriesAsync reviewStore root "caps-sess" (box entries)
     try
         check "prepends user and assistant for caps" (out.Length >= entries.Length + 2)
         let mutable foundRead = false
@@ -99,9 +96,8 @@ let knowledgeGraphPreludeWhenKgPresent () = promise {
 {"id":"abcd","entity":["Test"],"fact":"fact one"}
 """
     let reviewStore = createReviewStore ()
-    let kgRuntime = OmpKnowledgeGraphRuntime(createObj [])
     let entries = [| createObj [ "id", box "u"; "info", box(createObj [ "role", box "user" ]); "parts", box [||] ] |]
-    let! out = transformEntriesAsync reviewStore kgRuntime root "kg-sess" (box entries)
+    let! out = transformEntriesAsync reviewStore root "kg-sess" (box entries)
     let text = firstEntryTextFromOut out
     check "kg front matter" (text.Contains "knowledge_graph:")
     do! rmAsync root
@@ -109,7 +105,6 @@ let knowledgeGraphPreludeWhenKgPresent () = promise {
 
 let reviewReplayIfStoreEmptyOnTransform () = promise {
     let reviewStore = createReviewStore ()
-    let kgRuntime = OmpKnowledgeGraphRuntime(createObj [])
     let sessionId = "omp-review-if-empty"
     reviewStore.activateReview(sessionId, "task A", 1L)
     let historyTaskB =
@@ -119,6 +114,6 @@ let reviewReplayIfStoreEmptyOnTransform () = promise {
                "info", box(createObj [ "id", box "user-hist"; "role", box "user" ])
                "parts", box [| createObj [ "type", box "text"; "text", box historyTaskB ] |]
            ] |]
-    let! _ = transformEntriesAsync reviewStore kgRuntime "/tmp/ws" sessionId (box entries)
+    let! _ = transformEntriesAsync reviewStore "/tmp/ws" sessionId (box entries)
     equal "review replay IfStoreEmpty: store task unchanged when already active" (Some "task A") (reviewStore.getReviewTask sessionId)
 }

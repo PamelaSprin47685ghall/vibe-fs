@@ -7,8 +7,6 @@ open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Omp.MessagingCodec
 open Wanxiangshu.Omp.MessagingCodecEncode
-open Wanxiangshu.Omp.KnowledgeGraphTools
-open Wanxiangshu.Omp.KnowledgeGraph.Runtime
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -136,44 +134,8 @@ let eht () =
     check "has to" (ts |> List.contains "to")
     equal "raw→empty" "" (List.item 2 ts)
 
-// parseDraftArray
-
-let pdaNull () = check "null→Err" (Result.isError (parseDraftArray null))
-let pdaNotArr () = check "str→Err" (Result.isError (parseDraftArray (box"x")))
-let pdaValid () =
-    match parseDraftArray (box [| createObj ["entity", box [| "e1" |]; "fact", box"f1"] |]) with
-    | Error _ -> check "valid→Ok" false
-    | Ok l -> equal "count" 1 l.Length
-let pdaBadItem () = check "bad item→Err" (Result.isError (parseDraftArray (box [| box"nope" |])))
-
-// registerKnowledgeGraphTools
-
-let regTools () =
-    let h = createPiHarness()
-    let pi = piObject h
-    registerKnowledgeGraphTools pi (new OmpKnowledgeGraphRuntime(pi))
-    let n = toolNames h
-    check "fetch reg" (n.Contains "knowledge_graph_fetch")
-    check "bk reg" (n.Contains "return_bookkeeper")
-
-let regFetchSchema () =
-    let h = createPiHarness()
-    registerKnowledgeGraphTools (piObject h) (new OmpKnowledgeGraphRuntime(piObject h))
-    let t = h.tools |> Seq.find (fun t -> Dyn.str t "name" = "knowledge_graph_fetch")
-    check "fetch params" (Dyn.has t "parameters")
-    check "fetch exec" (Dyn.has t "execute")
-
-let regBkSchema () =
-    let h = createPiHarness()
-    registerKnowledgeGraphTools (piObject h) (new OmpKnowledgeGraphRuntime(piObject h))
-    let t = h.tools |> Seq.find (fun t -> Dyn.str t "name" = "return_bookkeeper")
-    check "bk params" (Dyn.has t "parameters")
-    check "bk exec" (Dyn.has t "execute")
-
 let run () = promise {
     encText(); encToolStateMatch(); encToolStateMismatch(); encToolNoState(); encRawPart(); encRawSet(); encMsgs()
     decUser(); decAsst(); decInfoFallback(); decNull(); decEmptyRole(); decArr()
     entSM(); entEmpty(); rasst(); otodo(); otodoEmpty(); dtsFull(); dtsNull(); eht()
-    pdaNull(); pdaNotArr(); pdaValid(); pdaBadItem()
-    regTools(); regFetchSchema(); regBkSchema()
 }

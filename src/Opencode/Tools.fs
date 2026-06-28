@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Opencode.ToolSchema
-open Wanxiangshu.Opencode.KnowledgeGraphTools
 open Wanxiangshu.Opencode.SubagentTools
 open Wanxiangshu.Opencode.ExecutorTool
 open Wanxiangshu.Opencode.PtySpawn
@@ -19,7 +18,7 @@ open Wanxiangshu.Shell.FuzzyFinderShell
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.FallbackRuntimeState
 
-let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (knowledgeGraphRuntime: Wanxiangshu.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphEnabled: bool) (sessionScope: RuntimeScope) (fallbackRuntime: FallbackRuntimeState) : obj =
+let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (sessionScope: RuntimeScope) (fallbackRuntime: FallbackRuntimeState) : obj =
     let iteratorStore = sessionScope.IteratorStore
     let tools =
         createObj [
@@ -37,9 +36,6 @@ let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: Finder
             yield "fuzzy_grep", box (fuzzyGrepTool finderCache iteratorStore)
             yield "websearch", box (websearchTool host registry ctx fallbackRuntime)
             yield "webfetch", box (webfetchTool ctx)
-            if knowledgeGraphEnabled then
-                yield "knowledge_graph_fetch", box (knowledgeGraphFetchTool knowledgeGraphRuntime ctx)
-                yield "return_bookkeeper", box (returnBookkeeperTool knowledgeGraphRuntime ctx)
             yield "submit_review", box (submitReviewTool registry ctx reviewStore)
             yield "return_reviewer", box (submitReviewResultTool ctx reviewStore)
             if host = Mimocode then
@@ -49,5 +45,5 @@ let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: Finder
     tools
 
 // Test helper that supplies an empty fallback runtime.
-let createToolsForTests (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (knowledgeGraphRuntime: Wanxiangshu.Opencode.KnowledgeGraphRuntime.KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphEnabled: bool) (sessionScope: RuntimeScope) : obj =
-    createTools host registry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled sessionScope (FallbackRuntimeState())
+let createToolsForTests (host: Host) (registry: ChildAgentRegistry) (finderCache: FinderCache) (ctx: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (sessionScope: RuntimeScope) : obj =
+    createTools host registry finderCache ctx reviewStore sessionScope (FallbackRuntimeState())

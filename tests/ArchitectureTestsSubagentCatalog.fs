@@ -85,20 +85,12 @@ let toolArgsDecodeCoversMajorTools () =
         (code.Contains "decodeExecutorArgs")
     check "arch: ToolArgsDecode mentions todowrite"
         (code.Contains "todowrite")
-    check "arch: ToolArgsDecode mentions knowledge_graph_fetch"
-        (code.Contains "knowledge_graph_fetch")
-    check "arch: ToolArgsDecode mentions return_bookkeeper"
-        (code.Contains "return_bookkeeper")
     check "arch: ToolArgsDecode mentions apply_patch"
         (code.Contains "apply_patch")
     check "arch: ToolArgsDecode mentions submit_review"
         (code.Contains "submit_review")
     check "arch: ToolArgsDecode uses decodeTodoWriteArgs"
         (code.Contains "decodeTodoWriteArgs")
-    check "arch: ToolArgsDecode uses decodeFetchEntity"
-        (code.Contains "decodeFetchEntity")
-    check "arch: ToolArgsDecode uses decodeReturnBookkeeperArgs"
-        (code.Contains "decodeReturnBookkeeperArgs")
     check "arch: ToolArgsDecode uses decodeApplyPatchFields"
         (code.Contains "decodeApplyPatchFields")
     check "arch: ToolArgsDecode uses decodeSubmitReviewArgs"

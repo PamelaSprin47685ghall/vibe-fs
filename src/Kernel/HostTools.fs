@@ -78,7 +78,7 @@ let allToolNames (host: Host) : string array =
        "executor_wait"; "executor_abort"
        "pty_spawn"; "pty_write"; "pty_read"; "pty_list"; "pty_kill"
        "fuzzy_find"; "fuzzy_grep"; "websearch"; "webfetch"
-       "knowledge_graph_fetch"; "return_bookkeeper"; "submit_review"; "return_reviewer"; "read"; "write"
+       "submit_review"; "return_reviewer"; "read"; "write"
        "bash"; taskToolName host; "grep"; "edit"; "patch"; "apply_patch"
        todoWriteToolName host; todoWritePromptName host; "stealth-browser-mcp_*"
        "question"; "ask_user_question"; "agent_report"

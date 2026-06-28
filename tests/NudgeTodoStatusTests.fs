@@ -38,8 +38,8 @@ let run () =
 
     // --- isSyntheticAssistantAgent ---
     check "isSyntheticAssistantAgent compaction" (isSyntheticAssistantAgent "compaction")
-    check "isSyntheticAssistantAgent bookkeeper" (isSyntheticAssistantAgent "bookkeeper")
     check "isSyntheticAssistantAgent title" (isSyntheticAssistantAgent "title")
+    check "not isSyntheticAssistantAgent bookkeeper" (not (isSyntheticAssistantAgent "bookkeeper"))
     check "not isSyntheticAssistantAgent orchestrator" (not (isSyntheticAssistantAgent "orchestrator"))
 
     // --- isNudgePrompt ---

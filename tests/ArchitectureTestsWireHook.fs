@@ -11,7 +11,7 @@ let opencodeHookExecuteUsesFromOpencode () =
         (code.Contains "ToolRuntimeContext")
     check "arch: Opencode HookExecute opens OpencodeHookInputCodec"
         (code.Contains "OpencodeHookInputCodec")
-    check "arch: Opencode HookExecute uses fromOpencode for bookkeeper session"
+    check "arch: Opencode HookExecute uses fromOpencode"
         (code.Contains "fromOpencode input pluginDirectory")
     check "arch: Opencode HookExecute uses Execution.SessionId"
         (code.Contains "Execution.SessionId")
@@ -19,8 +19,6 @@ let opencodeHookExecuteUsesFromOpencode () =
         (code.Contains "toolNameFromHookInput")
     check "arch: Opencode HookExecute uses argsFromHookInput"
         (code.Contains "argsFromHookInput")
-    check "arch: Opencode HookExecute uses executorModeFromHookInput"
-        (code.Contains "executorModeFromHookInput")
     check "arch: Opencode HookExecute uses hookOutputError and hookOutputText"
         ((code.Contains "hookOutputError") && (code.Contains "hookOutputText"))
     check "arch: Opencode HookExecute uses setHookOutputString"
@@ -80,8 +78,6 @@ let opencodeCommandHooksUsesFromOpencode () =
         (code.Contains "commandArgumentsFromHookInput")
     check "arch: Opencode CommandHooks loop-review uses pluginDirectoryFromCtx"
         (code.Contains "pluginDirectoryFromCtx")
-    check "arch: Opencode CommandHooks uses decodeHostEventEnvelope for KG cleanup"
-        (code.Contains "decodeHostEventEnvelope")
     check "arch: Opencode CommandHooks must not Dyn.str ctx directory"
         (not (code.Contains "Dyn.str ctx \"directory\""))
     check "arch: Opencode CommandHooks must not Dyn.str input sessionID"

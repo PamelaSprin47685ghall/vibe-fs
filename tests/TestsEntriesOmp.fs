@@ -15,7 +15,6 @@ open Wanxiangshu.Tests.OmpContextTransformTests
 open Wanxiangshu.Tests.OmpChildSessionTests
 open Wanxiangshu.Tests.OmpAgentConfigTests
 open Wanxiangshu.Tests.OmpHookExecuteTests
-open Wanxiangshu.Tests.OmpKnowledgeGraphRuntimeTests
 open Wanxiangshu.Tests.OmpSessionLifecycleTests
 open Wanxiangshu.Tests.OmpPluginCoreTests
 open Wanxiangshu.Tests.OmpTitleFetchGuardTests
@@ -54,7 +53,6 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpContextTransformTests.capsSynthUserPrepended", Async OmpContextTransformTests.capsSynthUserPrepended
     "OmpContextTransformTests.capsReadToolsInContextTransform", Async OmpContextTransformTests.capsReadToolsInContextTransform
     "OmpContextTransformTests.beforeAgentStartOmitsCapsXml", Async OmpContextTransformTests.beforeAgentStartOmitsCapsXml
-    "OmpContextTransformTests.knowledgeGraphPreludeWhenKgPresent", Async OmpContextTransformTests.knowledgeGraphPreludeWhenKgPresent
     "OmpContextTransformTests.reviewReplayIfStoreEmptyOnTransform", Async OmpContextTransformTests.reviewReplayIfStoreEmptyOnTransform
     "OmpPluginTests.readAssistantTextFromEntries", Sync (sync OmpPluginTests.readAssistantTextFromEntries)
     "OmpPluginTests.subagentPromptsContainKernelFragments", Sync (sync OmpPluginTests.subagentPromptsContainKernelFragments)
@@ -146,15 +144,7 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpHookExecuteTests.hookApplyPatchStringArgsIsNoOp", Sync (sync OmpHookExecuteTests.hookApplyPatchStringArgsIsNoOp)
     "OmpHookExecuteTests.hookPatchNameNormalisesToPatchText", Sync (sync OmpHookExecuteTests.hookPatchNameNormalisesToPatchText)
     "OmpHookExecuteTests.hookApplyPatchLeavesExistingPatchTextUntouched", Sync (sync OmpHookExecuteTests.hookApplyPatchLeavesExistingPatchTextUntouched)
-    "OmpSessionLifecycleTests.recordsToBookkeeperIncludesApplyPatch", Sync (sync OmpSessionLifecycleTests.recordsToBookkeeperIncludesApplyPatch)
-    "OmpSessionLifecycleTests.isReadOnlyExecutorTrueForRoMode", Sync (sync OmpSessionLifecycleTests.isReadOnlyExecutorTrueForRoMode)
-    "OmpSessionLifecycleTests.isReadOnlyExecutorFalseForRwMode", Sync (sync OmpSessionLifecycleTests.isReadOnlyExecutorFalseForRwMode)
-    "OmpSessionLifecycleTests.isChildSessionGuardSkipsBookkeeper", Sync (sync OmpSessionLifecycleTests.isChildSessionGuardSkipsBookkeeper)
-    "OmpKnowledgeGraphRuntimeTests.submitRejectsWhenKgDirMissing", Async OmpKnowledgeGraphRuntimeTests.submitRejectsWhenKgDirMissing
-    "OmpKnowledgeGraphRuntimeTests.submitRoutesByWorkspaceRoot", Sync (sync OmpKnowledgeGraphRuntimeTests.submitRoutesByWorkspaceRoot)
-    "OmpKnowledgeGraphRuntimeTests.submitKeepsTwoSessionsPerRootDistinct", Sync (sync OmpKnowledgeGraphRuntimeTests.submitKeepsTwoSessionsPerRootDistinct)
-    "OmpKnowledgeGraphRuntimeTests.takeBookkeeperLaunchesForTestingStartsEmpty", Sync (sync OmpKnowledgeGraphRuntimeTests.takeBookkeeperLaunchesForTestingStartsEmpty)
-    "OmpKnowledgeGraphRuntimeTests.startMaintenanceIfDueNoopsForBlankRoot", Async OmpKnowledgeGraphRuntimeTests.startMaintenanceIfDueNoopsForBlankRoot
+    "OmpSessionLifecycleTests.isChildSessionGuard", Sync (sync OmpSessionLifecycleTests.isChildSessionGuard)
     "OmpSessionCompactingTests.sessionCompactingHandlerEmptyMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerEmptyMessages
     "OmpSessionCompactingTests.sessionCompactingHandlerNullMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerNullMessages
     "OmpSessionCompactingTests.sessionCompactingHandlerWithMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerWithMessages

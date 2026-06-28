@@ -4,23 +4,12 @@ module Wanxiangshu.Tests.IntegrationToolSpecCatalog
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.IntegrationCapsSpecs
-open Wanxiangshu.Tests.IntegrationKnowledgeGraphPreludeSpecs
-open Wanxiangshu.Tests.IntegrationAfterHookSpecs
-open Wanxiangshu.Tests.IntegrationMaintenanceSpecs
-open Wanxiangshu.Tests.IntegrationSubmitKnowledgeGraphSpecs
-open Wanxiangshu.Tests.IntegrationSubmitKnowledgeGraphSpecsAppend
-open Wanxiangshu.Tests.IntegrationBookkeeperSpecs
-open Wanxiangshu.Tests.IntegrationBookkeeperSpecsMux
-open Wanxiangshu.Tests.IntegrationBookkeeperSpecsHint
 open Wanxiangshu.Tests.IntegrationToolDefSpecs
 open Wanxiangshu.Tests.IntegrationToolDefSpecsMimo
 open Wanxiangshu.Tests.IntegrationSubagentSpecs
 open Wanxiangshu.Tests.IntegrationMiscSpecs
 open Wanxiangshu.Tests.IntegrationMiscSpecsAgent
-open Wanxiangshu.Tests.IntegrationMiscSpecsExecutorKg
 open Wanxiangshu.Tests.IntegrationMuxPreludeSpecs
-open Wanxiangshu.Tests.IntegrationMuxKnowledgeGraphSpecsBookkeeper
-open Wanxiangshu.Tests.IntegrationMuxKnowledgeGraphSpecs
 open Wanxiangshu.Tests.IntegrationMuxTransformSpecs
 open Wanxiangshu.Tests.IntegrationMuxToolSpecs
 open Wanxiangshu.Tests.IntegrationMuxToolSpecsTodo
@@ -41,43 +30,6 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
         "capsTransformInPlace", capsTransformInPlaceSpec
         "defaultPreludeWithoutCaps", defaultPreludeWithoutCapsSpec
         "capsAndBacklogOrder", capsAndBacklogOrderSpec
-        "bookkeeperDoesNotReceiveCaps", bookkeeperDoesNotReceiveCapsSpec
-        "compactionDoesNotReceiveCaps", compactionDoesNotReceiveCapsSpec
-        "knowledgeGraphPreludeWithoutCaps", knowledgeGraphPreludeWithoutCapsSpec
-        "coderReceivesKnowledgeGraphPrelude", coderReceivesKnowledgeGraphPreludeSpec
-        "browserDoesNotReceiveKnowledgeGraphPrelude", browserDoesNotReceiveKnowledgeGraphPreludeSpec
-        "executorChildSessionWithoutInputAgentDoesNotReceiveKnowledgeGraphPrelude", executorChildSessionWithoutInputAgentDoesNotReceiveKnowledgeGraphPreludeSpec
-        "fetchKnowledgeGraphSnapshot", fetchKnowledgeGraphSnapshotSpec
-        "afterHookRecordsDirectWrite", afterHookRecordsDirectWriteSpec
-        "afterHookSkipsChildSession", afterHookSkipsChildSessionSpec
-        "afterHookSkipsFailedTool", afterHookSkipsFailedToolSpec
-        "afterHookRecordsCoder", afterHookRecordsCoderSpec
-        "afterHookRecordsExecutor", afterHookRecordsExecutorSpec
-        "dailyMaintenanceLaunch", dailyMaintenanceLaunchSpec
-        "heartbeatTriggersMaintenance", heartbeatTriggersMaintenanceSpec
-        "heartbeatMaintenanceUsesParentSession", heartbeatMaintenanceUsesParentSessionSpec
-        "heartbeatSchedulesOnlyEarliestDailyWhileAppendRuns", heartbeatSchedulesOnlyEarliestDailyWhileAppendRunsSpec
-        "dailyRewriteTriggersNextDaily", dailyRewriteTriggersNextDailySpec
-        "submitKnowledgeGraphAppend", submitKnowledgeGraphAppendSpec
-        "submitKnowledgeGraphAppendEmpty", submitKnowledgeGraphAppendEmptySpec
-        "submitKnowledgeGraphAppendDoesNotTriggerMaintenance", submitKnowledgeGraphAppendDoesNotTriggerMaintenanceSpec
-        "submitKnowledgeGraphSchemaAllowsEmpty", submitKnowledgeGraphSchemaAllowsEmptySpec
-        "submitKnowledgeGraphDailyRewrite", submitKnowledgeGraphDailyRewriteSpec
-        "submitKnowledgeGraphReconstructsJobFromHistory", submitKnowledgeGraphReconstructsJobFromHistorySpec
-        "submitKnowledgeGraphRejectsSecondCall", submitKnowledgeGraphRejectsSecondCallSpec
-        "bookkeeperLaunchCarriesAiSettings", bookkeeperLaunchCarriesAiSettingsSpec
-        "bookkeeperFireAndForget", bookkeeperFireAndForgetSpec
-        "websearchTriggersBookkeeper", websearchTriggersBookkeeperSpec
-        "webfetchTriggersBookkeeper", webfetchTriggersBookkeeperSpec
-        "bookkeeperSessionRegisteredInChildAgentRegistry", bookkeeperSessionRegisteredInChildAgentRegistrySpec
-        "bookkeeperAfterHookAddsHintToOutput", bookkeeperAfterHookAddsHintToOutputSpec
-        "bookkeeperAfterHookSkipsHintOnNonBookkeepingTool", bookkeeperAfterHookSkipsHintOnNonBookkeepingToolSpec
-        "bookkeeperAfterHookSkipsHintOnFailure", bookkeeperAfterHookSkipsHintOnFailureSpec
-        "muxBookkeeperAfterHookAddsHintToOutput", muxBookkeeperAfterHookAddsHintToOutputSpec
-        "muxToolExecuteAfterTriggersBookkeeper", muxToolExecuteAfterTriggersBookkeeperSpec
-        "muxToolExecuteAfterSkipsReadOnlyExecutor", muxToolExecuteAfterSkipsReadOnlyExecutorSpec
-        "muxDailyMaintenanceLaunch", muxDailyMaintenanceLaunchSpec
-        "muxDailyRewriteTriggersNext", muxDailyRewriteTriggersNextSpec
         "toolDefinition", toolDefinitionSpec
         "toolExecuteBefore", toolExecuteBeforeSpec
         "mimoApplyPatchExecuteBefore", mimoApplyPatchExecuteBeforeSpec
@@ -93,32 +45,13 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
         "writeTool", fun () -> writeToolSpec reg
         "loopCommand", fun () -> loopCommandSpec reg
         "agentConfig", agentConfigSpec
-        "bookkeeperAgentConfig", bookkeeperAgentConfigSpec
         "disableMimoMemoryAndCheckpoint", disableMimoMemoryAndCheckpointSpec
         "disableMimoMemoryAndCheckpointPreservesUserAgent", disableMimoMemoryAndCheckpointPreservesUserAgentSpec
         "applyAgentConfigForMimoDisablesWorkflow", applyAgentConfigForMimoDisablesWorkflowSpec
         "pluginConfigHookDisablesMimoMemoryAndCheckpoint", pluginConfigHookDisablesMimoMemoryAndCheckpointSpec
-        "executorModeSchema", executorModeSchemaSpec
-        "executorRejectsInvalidLanguage", executorRejectsInvalidLanguageSpec
-        "executorActor", executorActorSpec
-        "knowledgeGraphWorkspaceSerialization", knowledgeGraphWorkspaceSerializationSpec
-        "knowledgeGraphPortLockTimeout", knowledgeGraphPortLockTimeoutSpec
-        "muxFetchKnowledgeGraphSnapshot", muxFetchKnowledgeGraphSnapshotSpec
-        "muxReturnBookkeeperAppend", muxReturnBookkeeperAppendSpec
-        "muxReturnBookkeeperNoActiveJob", muxReturnBookkeeperNoActiveJobSpec
-        "muxReturnBookkeeperReconstructsJobFromHistory", muxReturnBookkeeperReconstructsJobFromHistorySpec
-        "muxReturnBookkeeperAppendDoesNotTriggerMaintenance", muxReturnBookkeeperAppendDoesNotTriggerMaintenanceSpec
-        "muxReturnBookkeeperRejectsSecondCall", muxReturnBookkeeperRejectsSecondCallSpec
-        "muxDailyRewriteTriggersNext", muxDailyRewriteTriggersNextSpec
-        "muxExecutorRwTriggersMaintenance", muxExecutorRwTriggersMaintenanceSpec
-        "muxExecutorModeSchema", muxExecutorModeSchemaSpec
         "muxReadToolReturnsContent", muxReadToolReturnsContentSpec
         "muxReadToolListsDirectories", muxReadToolListsDirectoriesSpec
         "muxMessageTransformRegistered", muxMessageTransformRegisteredSpec
-        "muxKnowledgeGraphPreludeForManager", muxKnowledgeGraphPreludeForManagerSpec
-        "muxKnowledgeGraphPreludeForCoder", muxKnowledgeGraphPreludeForCoderSpec
-        "muxNoKnowledgeGraphPreludeForExcludedAgents", muxNoKnowledgeGraphPreludeForExcludedAgentsSpec
-        "muxCapsAndKnowledgeGraphPreludeOrder", muxCapsAndKnowledgeGraphPreludeOrderSpec
         "muxSummarization", fun () -> promise { muxSummarizationSpec () }
         "muxSummarizationToolPolicy", fun () -> promise { muxSummarizationToolPolicySpec () }
         "muxTopLevelPolicy", muxTopLevelPolicySpec
@@ -143,13 +76,10 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
         "muxSubmitReviewTerminatedCleansReviewState", muxSubmitReviewTerminatedCleansReviewStateSpec
         "muxSubmitReviewWipSkipsReviewer", muxSubmitReviewWipSkipsReviewerSpec
         "muxSubmitReviewOmittedWipSkipsReviewer", muxSubmitReviewOmittedWipSkipsReviewerSpec
-        "muxExecutorFailureDoesNotBookkeep", muxExecutorFailureDoesNotBookkeepSpec
         "muxTodoWriteMethodologySchema", muxTodoWriteMethodologySchemaSpec
         "muxCompactingTransformProjectsBacklog", muxCompactingTransformProjectsBacklogSpec
         "muxCompactingTransformEmitsAnchorPrompt", muxCompactingTransformEmitsAnchorPromptSpec
-        "muxToolExecuteAfterSkipsChildWorkspace", muxToolExecuteAfterSkipsChildWorkspaceSpec
         "muxEventHookAbortDeactivatesReview", muxEventHookAbortDeactivatesReviewSpec
-        "muxEventHookAbortCleansUpKnowledgeGraphJob", muxEventHookAbortCleansUpKnowledgeGraphJobSpec
         "muxToolExecuteBeforeSetsUiLabel", muxToolExecuteBeforeSetsUiLabelSpec
         "muxSystemTransformClearsOutputLength", muxSystemTransformClearsOutputLengthSpec
     ]

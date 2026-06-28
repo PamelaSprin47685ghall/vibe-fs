@@ -28,7 +28,7 @@ let wireEncodeToolErrorFormat () =
 // ── MessageTransformPolicy ──────────────────────────────────────────────────
 
 let defaultExcludedAgentsTrue () =
-    let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction"; "bookkeeper" ]
+    let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction" ]
     agents |> List.iter (fun a -> check (sprintf "default excluded: %s" a) (shouldExcludeAgentFromProjection a false))
 
 let defaultExcludedAgentsFalse () =
@@ -40,7 +40,7 @@ let childWorkspaceExtraExcluded () =
     agents |> List.iter (fun a -> check (sprintf "child excluded: %s" a) (shouldExcludeAgentFromProjection a true))
 
 let childWorkspaceDefaultStillExcluded () =
-    let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction"; "bookkeeper" ]
+    let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction" ]
     agents |> List.iter (fun a -> check (sprintf "child still excluded: %s" a) (shouldExcludeAgentFromProjection a true))
     check "main not excluded in child workspace" (not (shouldExcludeAgentFromProjection "main" true))
     check "agent not excluded in child workspace" (not (shouldExcludeAgentFromProjection "agent" true))

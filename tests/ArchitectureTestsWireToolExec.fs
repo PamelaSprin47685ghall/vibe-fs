@@ -78,8 +78,7 @@ let shellCodecFilesNoLocalStrField () =
            "src/Shell/ExecutorToolsCodec.fs"
            "src/Shell/DelegateToolsCodec.fs"
            "src/Shell/WebToolsCodec.fs"
-           "src/Shell/ReviewToolsCodec.fs"
-           "src/Shell/KnowledgeGraphToolsCodec.fs" |]
+           "src/Shell/ReviewToolsCodec.fs" |]
     for path in paths do
         let code = requireFile path |> nonCommentCode
         check ("arch: " + path + " must not locally define let strField")

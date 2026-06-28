@@ -19,7 +19,6 @@ let runMessageTransformPipeline
     (encodeMessages: Message<obj> list -> obj array)
     (dedupFn: bool -> obj array -> obj array)
     (loadCaps: unit -> JS.Promise<CapsFile list>)
-    (loadKgPrelude: unit -> JS.Promise<string option>)
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
     : JS.Promise<obj array> =
     promise {
@@ -30,6 +29,5 @@ let runMessageTransformPipeline
             let encoded = encodeMessages afterBacklog
             let deduped = dedupFn plan.Excluded encoded
             let! capsFiles = loadCaps ()
-            let! knowledgeGraphPrelude = loadKgPrelude ()
-            return buildCaps deduped capsFiles knowledgeGraphPrelude
+            return buildCaps deduped capsFiles None
     }

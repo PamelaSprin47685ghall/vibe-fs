@@ -13,7 +13,7 @@ let hookCoderInjectUiLabel () =
         createObj [
             "intents", box [|
                 box {| objective = "Add submit_review wip field"; background = "Reviewers must record progress separately from final review."; targets = [| box {| file = "submitReview.ts"; guide = "Add wip field plus canonical acknowledgment." |} |] |}
-                box {| objective = "Wire HookExecute in SessionLifecycle"; background = "OmpSessionLifecycle.toolResult must apply labels on every tool call."; targets = [| box {| file = "SessionLifecycle.fs"; guide = "Call applyToolResultHook before bookkeeper append." |} |] |}
+                box {| objective = "Wire HookExecute in SessionLifecycle"; background = "OmpSessionLifecycle.toolResult must apply labels on every tool call."; targets = [| box {| file = "SessionLifecycle.fs"; guide = "Call applyToolResultHook before backlog append." |} |] |}
             |]
         ]
     applyToolResultHook "coder" args

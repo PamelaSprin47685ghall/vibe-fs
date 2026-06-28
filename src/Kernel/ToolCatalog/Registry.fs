@@ -5,7 +5,6 @@ open Wanxiangshu.Kernel.ToolCatalog.Subagent
 open Wanxiangshu.Kernel.ToolCatalog.Search
 open Wanxiangshu.Kernel.ToolCatalog.Web
 open Wanxiangshu.Kernel.ToolCatalog.Executor
-open Wanxiangshu.Kernel.ToolCatalog.KnowledgeGraph
 open Wanxiangshu.Kernel.ToolCatalog.Review
 open Wanxiangshu.Kernel.ToolCatalog.FileIO
 
@@ -19,8 +18,6 @@ let all: ToolSpec list =
       meditatorSpec
       browserSpec
       executorSpec
-      fetchKnowledgeGraphSpec
-      submitKnowledgeGraphSpec
       fuzzyFindSpec
       fuzzyGrepSpec
       websearchSpec

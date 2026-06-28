@@ -186,13 +186,6 @@ let taTodoWrite () =
     let a = TodoWrite { CompletedWorkReport = "r"; Todos = [||]; SelectMethodology = [] }
     match a with TodoWrite t -> equal "TodoWrite.Report" "r" t.CompletedWorkReport | _ -> check "TodoWrite case" false
 
-let taKnowledgeGraphFetch () =
-    let a = KnowledgeGraphFetch { Entity = "kg1" }
-    match a with KnowledgeGraphFetch k -> equal "KG.Entity" "kg1" k.Entity | _ -> check "KG case" false
-
-let taReturnBookkeeper () =
-    let a = ReturnBookkeeper []
-    match a with ReturnBookkeeper _ -> check "ReturnBookkeeper case" true | _ -> check "ReturnBookkeeper case" false
 
 let taApplyPatch () =
     let a = ApplyPatch { PatchText = "diff" }
@@ -293,7 +286,7 @@ let run () =
     methEnumCount (); methSelectFieldDesc ()
     ompEditorPrompt (); ompGreperPrompt (); ompBrowserPrompt ()
     taRead (); taWrite (); taMeditator (); taBrowser (); taWebsearch (); taWebfetch ()
-    taExecutor (); taTodoWrite (); taKnowledgeGraphFetch (); taReturnBookkeeper (); taApplyPatch (); taSubmitReview ()
+    taExecutor (); taTodoWrite (); taApplyPatch (); taSubmitReview ()
     trWireEncodeResultOk (); trWireEncodeResultError ()
     rrpTextsFromFlatPartsTool (); rrpTextsFromFlatPartsText (); rrpTextsFromFlatPartsOther ()
     rstEmpty (); rstWithTask (); rstWithFeedback (); rstAddChild ()

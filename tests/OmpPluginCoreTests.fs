@@ -71,7 +71,7 @@ let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool
     let ctx = createObj [ "sessionManager", box sessionMgr ]
     let event = createObj [ "type", box evtType ]
     let pi, getHandlers = capturePi ()
-    registerAbortHandler pi reviewStore (Wanxiangshu.Omp.KnowledgeGraph.Runtime.OmpKnowledgeGraphRuntime(createObj [])) None
+    registerAbortHandler pi reviewStore None
     let handlers = getHandlers ()
     check $"{evtType} captured exactly one handler" (handlers.Length = 1)
     let handler = handlers.[0]
@@ -120,12 +120,12 @@ let ompErrorEventRoutesToFallback () =
         "error", box(createObj [ "name", box "APIError"; "message", box "rate limit"; "statusCode", box "429"; "isRetryable", box "true" ])
     ]
     let pi, getHandlers = capturePi ()
-    let runtime = makeFakeRuntime ()
     let mutable handlerCalled = false
+    let runtime = makeFakeRuntime ()
     let fakeHandler (rawEvent: obj) : JS.Promise<FallbackHookResult> =
         handlerCalled <- true
         Promise.lift { Consumed = false; State = runtime.GetOrCreateState "omp-fb-error-sid" }
-    registerAbortHandler pi reviewStore (Wanxiangshu.Omp.KnowledgeGraph.Runtime.OmpKnowledgeGraphRuntime(createObj [])) (Some fakeHandler)
+    registerAbortHandler pi reviewStore (Some fakeHandler)
     let handlers : obj array = getHandlers ()
     check "exactly one handler registered" (handlers.Length = 1)
     invokeFallbackHandler handlers.[0] event ctx
@@ -138,12 +138,12 @@ let ompIdleEventRoutesToFallback () =
     let ctx = createObj [ "sessionManager", box sessionMgr ]
     let event = createObj [ "type", box "session.idle" ]
     let pi, getHandlers = capturePi ()
-    let runtime = makeFakeRuntime ()
     let mutable handlerCalled = false
+    let runtime = makeFakeRuntime ()
     let fakeHandler (rawEvent: obj) : JS.Promise<FallbackHookResult> =
         handlerCalled <- true
         Promise.lift { Consumed = false; State = runtime.GetOrCreateState "omp-fb-idle-sid" }
-    registerAbortHandler pi reviewStore (Wanxiangshu.Omp.KnowledgeGraph.Runtime.OmpKnowledgeGraphRuntime(createObj [])) (Some fakeHandler)
+    registerAbortHandler pi reviewStore (Some fakeHandler)
     let handlers : obj array = getHandlers ()
     invokeFallbackHandler handlers.[0] event ctx
     check "fallback handler saw session.idle" handlerCalled

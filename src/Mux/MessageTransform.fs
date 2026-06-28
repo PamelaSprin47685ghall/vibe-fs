@@ -11,15 +11,10 @@ open Wanxiangshu.Shell.MessageTransformHostEntry
 open Wanxiangshu.Shell.MessageTransformHostHooks
 open Wanxiangshu.Shell.MessageTransformPipeline
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Kernel.KnowledgeGraph
-open Wanxiangshu.Kernel.KnowledgeGraph.Types
-open Wanxiangshu.Kernel.KnowledgeGraph.RuntimeState
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Kernel.PromptFrontMatter
-open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
-open Wanxiangshu.Mux.KnowledgeGraphRuntimeMuxQuery
 open Wanxiangshu.Mux.MessagingCodec
 open Wanxiangshu.Shell.ReadDedupMuxPlugin
 open Wanxiangshu.Mux.BacklogSession
@@ -36,7 +31,6 @@ let messagesTransform
     (deps: obj)
     (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
     (backlogSession: BacklogSession)
-    (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime)
     (reviewStore: ReviewStore)
     (input: obj)
     (output: obj)
@@ -68,8 +62,6 @@ let messagesTransform
                     if excluded then encoded else deduplicateReadOutputsWithSeenByPath Map.empty encoded
                 let loadCaps () =
                     loadCapsForScope runtimeScope RequireDirectory plan
-                let loadKgPrelude () =
-                    loadKgPreludeForAgent true agent plan (fun sid dir -> knowledgeGraphRuntime.BuildPreludeForSession(sid, dir))
                 let buildCaps encoded capsFiles prelude = buildCapsMessages encoded capsFiles prelude
                 let! final =
                     runHostMessagesTransform
@@ -82,7 +74,6 @@ let messagesTransform
                         encodeMessages
                         dedupFn
                         loadCaps
-                        loadKgPrelude
                         buildCaps
                 if not cleanedMessages.IsEmpty then replaceArrayInPlace messagesArr final
     }

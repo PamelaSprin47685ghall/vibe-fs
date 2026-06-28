@@ -39,10 +39,9 @@ let countsSpec (reg: obj) =
     let tools = unbox<obj[]> (get reg "tools")
     let names = tools |> Array.map (fun t -> str t "name")
     check "wrapper count" (wrappers.Length = 5)
-    check "tool count" (tools.Length = 68)
+    check "tool count" (tools.Length = 66)
     check "mux has methodology_first_principles tool" (names |> Array.contains "methodology_first_principles")
-    check "mux has knowledge_graph_fetch tool" (names |> Array.contains "knowledge_graph_fetch")
-    check "mux has return_bookkeeper tool" (names |> Array.contains "return_bookkeeper")
+    check "mux does not have knowledge_graph_fetch tool" (not (names |> Array.contains "knowledge_graph_fetch"))
     check "mux has submit_review tool" (names |> Array.contains "submit_review")
     check "mux does not expose return_reviewer tool" (not (names |> Array.contains "return_reviewer"))
 

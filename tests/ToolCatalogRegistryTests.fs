@@ -4,7 +4,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ToolCatalog
 
 let allCountIs17 () =
-    equal "17 tools" 17 all.Length
+    equal "15 tools" 15 all.Length
 
 let allNamesAreNonEmpty () =
     for spec in all do

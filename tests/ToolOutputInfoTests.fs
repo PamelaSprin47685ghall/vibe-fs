@@ -90,11 +90,6 @@ let testBodyRefValue () =
     equal "SeeBelowTruncated" "/See Below, Truncated/" (bodyRefValue ToolOutputBodyRef.SeeBelowTruncated)
     equal "NoChange" "/No Change Since Previous Read/Write/" (bodyRefValue ToolOutputBodyRef.NoChangeSincePreviousReadWrite)
 
-let testWithBookkeepingHints () =
-    let r = withBookkeepingHints "some output"
-    check "withBookkeepingHints has hint" (r.Contains "hint")
-    check "withBookkeepingHints has SeeBelow" (r.Contains "/See Below/")
-
 let testAddSyntax () =
     let r = addSyntax "code block" "fsharp"
     check "addSyntax has syntax" (r.Contains "syntax")
@@ -123,11 +118,6 @@ let testHintsFromOutput () =
     let noHints = hintsFromOutput (render { info = [ syntax "py" ]; body = "" })
     equal "hintsFromOutput no hints" 0 (List.length noHints)
     equal "hintsFromOutput no fm" [] (hintsFromOutput "plain")
-
-let testBodyForBookkeeper () =
-    equal "bodyForBookkeeper extracts" "real body" (bodyForBookkeeper "---\ntool_output: /See Below/\n---\nreal body")
-    equal "bodyForBookkeeper raw" "plain" (bodyForBookkeeper "plain")
-    equal "bodyForBookkeeper null" null (bodyForBookkeeper null)
 
 let testHintForMethodologies () =
     equal "hintForMethodologies empty" "Todos updated." (hintForMethodologies [])
@@ -215,12 +205,10 @@ let run () =
     testAppendInfo ()
     testSetBodyRefReplacesBodyRef ()
     testBodyRefValue ()
-    testWithBookkeepingHints ()
     testAddSyntax ()
     testWithIterator ()
     testTodoWriteOutput ()
     testHintsFromOutput ()
-    testBodyForBookkeeper ()
     testHintForMethodologies ()
     testAppendMultiple ()
     testEmptyWithBody ()

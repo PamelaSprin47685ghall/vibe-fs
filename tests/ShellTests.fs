@@ -129,36 +129,3 @@ let rewriteJavascriptRelativeImports () = promise {
         check "non-relative body preserved" (rewritten.Contains "console.log(x)")
 }
 
-let knowledgeGraphPortRangeSpec () = promise {
-    let portA = Wanxiangshu.Shell.KnowledgeGraphPortLock.lockPortForPath "/tmp/kg-a"
-    let portB = Wanxiangshu.Shell.KnowledgeGraphPortLock.lockPortForPath "/tmp/kg-a"
-    check "knowledge graph lock deterministic" (portA = portB)
-    check "knowledge graph lock in high range" (portA >= 49152 && portA < 65536)
-}
-
-let knowledgeGraphPortSerialSpec () = promise {
-    let seen = System.Collections.Generic.List<string>()
-    let firstAcquiredResolve = ref (fun () -> ())
-    let firstAcquired : JS.Promise<unit> = Promise.create (fun resolve _ -> firstAcquiredResolve.Value <- resolve)
-    let releaseFirst = ref (fun () -> ())
-    let firstGate : JS.Promise<unit> = Promise.create (fun resolve _ -> releaseFirst.Value <- resolve)
-    let first =
-        Wanxiangshu.Shell.KnowledgeGraphPortLock.withKnowledgeGraphPortLock 30000L 0 "/tmp/kg-lock-test" (fun () -> promise {
-            seen.Add "first-start"
-            firstAcquiredResolve.Value ()
-            do! firstGate
-            seen.Add "first-end"
-            return "one"
-        })
-    do! firstAcquired
-    let second =
-        Wanxiangshu.Shell.KnowledgeGraphPortLock.withKnowledgeGraphPortLock 30000L 0 "/tmp/kg-lock-test" (fun () -> promise {
-            seen.Add "second-start"
-            seen.Add "second-end"
-            return "two"
-        })
-    releaseFirst.Value ()
-    let! _ = first
-    let! _ = second
-    check "knowledge graph lock serializes same workspace" (seen |> Seq.toArray = [| "first-start"; "first-end"; "second-start"; "second-end" |])
-}

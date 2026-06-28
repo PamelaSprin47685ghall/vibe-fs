@@ -8,11 +8,9 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolCatalog
-open Wanxiangshu.Kernel.KnowledgeGraph.BookkeeperPolicy
 open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Opencode.AgentConfig
 open Wanxiangshu.Opencode.HookSchema
-open Wanxiangshu.Opencode.KnowledgeGraphRuntime
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.TreeSitterShell
@@ -86,14 +84,7 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
                     if formatted <> "" then setHookOutputString output (addSyntax s formatted)
     }
 
-let private isReadOnlyExecutor (tool: string) (input: obj) : bool =
-    tool = "executor" && executorModeFromHookInput input = "ro"
-
-let private bookkeeperInput (input: obj) : string =
-    let args = argsFromHookInput input
-    if Dyn.isNullish args then "" else JS.JSON.stringify args
-
-let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserver: Wanxiangshu.Opencode.SessionLifecycleObserver.SessionLifecycleObserver) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (registry: ChildAgentRegistry) (input: obj) (output: obj) : JS.Promise<unit> =
+let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserver: Wanxiangshu.Opencode.SessionLifecycleObserver.SessionLifecycleObserver) (registry: ChildAgentRegistry) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         do! appendSyntaxDiagnostics pluginDirectory input output
         let tool = toolNameFromHookInput input
@@ -104,8 +95,5 @@ let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserve
         let succeeded = hookOutputError output = ""
         if check sessionID tool (JS.JSON.stringify (argsFromHookInput input)) originalOutput then
             setHookError output "livelock guard: repeated identical tool call with identical result"
-        elif succeeded && recordsToBookkeeper tool && not (isReadOnlyExecutor tool input) && (registry.LookupChildAgent sessionID).IsNone then
-            knowledgeGraphRuntime.StartBookkeeperAppend(bookkeeperInput input, bodyForBookkeeper originalOutput, tool, parentSessionID = sessionID)
-            setHookOutputString output (withBookkeepingHints originalOutput)
         do! lifecycleObserver.handleToolExecuteAfter input output
     }

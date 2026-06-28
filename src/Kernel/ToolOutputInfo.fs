@@ -117,11 +117,6 @@ let tryParse (text: string) : ToolOutputMessage option =
                 let info = parseInfoItems parsed
                 Some { info = info; body = body }
 
-let bodyForBookkeeper (text: string) : string =
-    match tryParse text with
-    | Some msg -> msg.body
-    | None -> text
-
 let hintsFromOutput (text: string) : string list =
     match tryParse text with
     | Some msg ->
@@ -146,12 +141,6 @@ let parseOrBody (raw: string) : ToolOutputMessage =
     match tryParse raw with
     | Some msg -> msg
     | None -> { empty with body = normalizedBody raw }
-
-let withBookkeepingHints (raw: string) : string =
-    parseOrBody raw
-    |> appendInfo (InfoItem.Hint hintTodoRefresh)
-    |> setBodyRef ToolOutputBodyRef.SeeBelow
-    |> render
 
 let addSyntax (raw: string) (syntax: string) : string =
     if syntax = "" then raw

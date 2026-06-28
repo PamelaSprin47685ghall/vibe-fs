@@ -84,14 +84,12 @@ let childExecutorChatWithoutInputAgentSpec () = promise {
     let chat = createObj [ "message", box (createObj [
         "info", box (createObj [ "agent", box "executor"; "sessionID", box "child-executor-session" ])
         "tools", box (createObj [
-            "knowledge_graph_fetch", box true
             "read", box true
         ])
     ]) ]
     do! chatMsg $ (createObj [], chat) |> unbox<JS.Promise<unit>>
     let tools = get (get chat "message") "tools"
-    check "executor child chat hides knowledge_graph_fetch without input agent" (not (unbox<bool> (get tools "knowledge_graph_fetch")))
-    check "executor child chat also hides read" (not (unbox<bool> (get tools "read")))
+    check "executor child chat hides read (executor in defaultExcludedAgents)" (not (unbox<bool> (get tools "read")))
     do! rmAsync workspaceDir
 }
 

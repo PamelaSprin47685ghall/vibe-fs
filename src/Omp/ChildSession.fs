@@ -14,7 +14,7 @@ module Dyn = Wanxiangshu.Shell.Dyn
 type ChildSession = { session: obj; dispose: (unit -> unit) option }
 
 /// Process-scoped registry of child session ids whose tool calls must not feed
-/// the bookkeeper. Mirrors `Shell.ChildAgentRegistry` semantics but kept local
+/// back into parent context. Simplest possible approach specific
 /// to Omp: `tool_result` only sees the host ctx, and matching the parent
 /// session id against this set is enough to suppress child-agent noise without
 /// requiring a full Kernel.Domain state machine on the hot path.

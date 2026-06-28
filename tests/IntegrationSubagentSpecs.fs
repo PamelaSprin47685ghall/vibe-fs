@@ -11,7 +11,6 @@ open Wanxiangshu.Opencode.Plugin
 open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Mux.AiSettings
 open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.KnowledgeGraphFiles
 open Wanxiangshu.Shell.Dyn
 
 

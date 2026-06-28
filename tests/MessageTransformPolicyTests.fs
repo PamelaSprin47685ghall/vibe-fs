@@ -5,7 +5,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.MessageTransformPolicy
 
 let defaultExcludedTrue () =
-    let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction"; "bookkeeper" ]
+    let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction" ]
     agents
     |> List.iter (fun a ->
         check (sprintf "default excluded: %s" a) (shouldExcludeAgentFromProjection a false))
@@ -23,7 +23,7 @@ let childWorkspaceExtraExcluded () =
         check (sprintf "child excluded: %s" a) (shouldExcludeAgentFromProjection a true))
 
 let childWorkspaceNotExcluded () =
-    let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction"; "bookkeeper" ]
+    let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction" ]
     agents
     |> List.iter (fun a ->
         check (sprintf "child still excluded: %s" a) (shouldExcludeAgentFromProjection a true))

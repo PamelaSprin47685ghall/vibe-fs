@@ -11,7 +11,6 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Omp.CapsCodec
 open Wanxiangshu.Omp.ChildSession
-open Wanxiangshu.Omp.KnowledgeGraph.Runtime
 open Wanxiangshu.Omp.MagicTodo
 open Wanxiangshu.Omp.MessagingCodec
 open Wanxiangshu.Omp.ReadDedup
@@ -36,7 +35,7 @@ let private resolveAgent (ctx: obj) : string =
         let name = Dyn.str sm "agentName"
         if name <> "" then name else "manager"
 
-let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) (cwd: string) (sessionId: string)
+let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (sessionId: string)
     (entriesObj: obj) (agent: string) : JS.Promise<obj array> =
     promise {
         if Dyn.isNullish entriesObj || not (Dyn.isArray entriesObj) then return unbox<obj array> entriesObj
@@ -44,7 +43,6 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (kgRuntime: OmpKno
             let entriesArr = unbox<obj array> entriesObj
             if entriesArr.Length = 0 then return entriesArr
             else
-                kgRuntime.BindGetEntries(fun () -> entriesArr)
                 let messagesList = decodeEntries sessionId entriesArr
                 let excluded = shouldExcludeAgentFromProjection agent (isChildSession sessionId)
                 let cleaned = stripSyntheticBySource messagesList
@@ -76,10 +74,6 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (kgRuntime: OmpKno
                                       label = f.label
                                       content = f.content } : CapsFile)
                     }
-                let loadKgPrelude () =
-                    if plan.Excluded then Promise.lift None
-                    elif not (canUse agent "knowledge_graph_fetch") then Promise.lift None
-                    else kgRuntime.BuildPreludeForSession(sessionId, cwd)
                 let buildCaps encoded (capsFiles: CapsFile list) prelude =
                     let ompCaps =
                         capsFiles
@@ -96,13 +90,12 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (kgRuntime: OmpKno
                         encodeMessages
                         dedupFn
                         loadCaps
-                        loadKgPrelude
                         buildCaps
     }
 
-let transformEntriesAsync (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) (cwd: string) (sessionId: string)
+let transformEntriesAsync (reviewStore: ReviewStore) (cwd: string) (sessionId: string)
     (entriesObj: obj) : JS.Promise<obj array> =
-    transformEntriesAsyncWithAgent reviewStore kgRuntime cwd sessionId entriesObj "manager"
+    transformEntriesAsyncWithAgent reviewStore cwd sessionId entriesObj "manager"
 
 let beforeAgentStart (_cwd: string) (systemPrompt: obj) : JS.Promise<obj> =
     promise {
@@ -127,7 +120,7 @@ let appendToolResultSyntax (cwd: string) (event: obj) : JS.Promise<unit> =
                 setToolResultText event (content + "\n" + diag)
     }
 
-let registerContextTransform (pi: obj) (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) : unit =
+let registerContextTransform (pi: obj) (reviewStore: ReviewStore) : unit =
     let run (event: obj) (ctx: obj) =
         promise {
             let cwd = Dyn.str ctx "cwd"
@@ -136,7 +129,7 @@ let registerContextTransform (pi: obj) (reviewStore: ReviewStore) (kgRuntime: Om
             let entries = Dyn.get event "entries"
             if Dyn.isNullish entries then return event
             else
-                let! transformed = transformEntriesAsyncWithAgent reviewStore kgRuntime cwd sessionId entries agent
+                let! transformed = transformEntriesAsyncWithAgent reviewStore cwd sessionId entries agent
                 event?entries <- transformed
                 return event
         }

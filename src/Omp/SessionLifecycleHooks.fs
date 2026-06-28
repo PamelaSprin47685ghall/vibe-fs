@@ -9,9 +9,6 @@ let toolCallHandler = NudgeHooks.toolCallHandler
 let turnStartHandler = NudgeHooks.turnStartHandler
 let agentEndHandler = NudgeHooks.agentEndHandler
 
-let bookkeepingSubagentTools = TodoHooks.bookkeepingSubagentTools
-let recordsToBookkeeper = TodoHooks.recordsToBookkeeper
-let isReadOnlyExecutor = TodoHooks.isReadOnlyExecutor
 let toolResultHandler = TodoHooks.toolResultHandler
 let sessionStartHandler = TodoHooks.sessionStartHandler
 let sessionShutdownHandler = TodoHooks.sessionShutdownHandler

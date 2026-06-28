@@ -20,9 +20,6 @@ open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
 open Wanxiangshu.Tests.IntegrationChatTests
 open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
-open Wanxiangshu.Tests.KnowledgeGraphTests
-open Wanxiangshu.Tests.KnowledgeGraphFileTests
-open Wanxiangshu.Tests.KnowledgeGraphKernelTests
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.ReviewReplaySyncTests
@@ -33,7 +30,6 @@ open Wanxiangshu.Tests.SubagentPromptBuildTests
 open Wanxiangshu.Tests.SubagentSpawnTests
 open Wanxiangshu.Tests.WebToolsCodecTests
 open Wanxiangshu.Tests.ReviewToolsCodecTests
-open Wanxiangshu.Tests.KnowledgeGraphToolsCodecTests
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Wanxiangshu.Tests.ToolArgsDecodeTests
 open Wanxiangshu.Tests.ToolResultWireTests
@@ -55,9 +51,6 @@ open Wanxiangshu.Tests.OpencodeSessionEventCodecCommonTests
 open Wanxiangshu.Tests.MuxAiSettingsCodecTests
 open Wanxiangshu.Tests.MuxAiSettingsIntegrationTests
 open Wanxiangshu.Tests.AgentConfigApplyTests
-open Wanxiangshu.Tests.KnowledgeGraphWorkflowTests
-open Wanxiangshu.Tests.KnowledgeGraphBookkeeperLaunchTests
-open Wanxiangshu.Tests.KnowledgeGraphMaintenanceRunTests
 open Wanxiangshu.Tests.SessionExecutorScopeTests
 open Wanxiangshu.Tests.OmpKernelTests
 open Wanxiangshu.Tests.OmpSessionToolsTests
@@ -73,7 +66,6 @@ open Wanxiangshu.Tests.OmpContextTransformTests
 open Wanxiangshu.Tests.OmpChildSessionTests
 open Wanxiangshu.Tests.OmpAgentConfigTests
 open Wanxiangshu.Tests.OmpHookExecuteTests
-open Wanxiangshu.Tests.OmpKnowledgeGraphRuntimeTests
 open Wanxiangshu.Tests.OmpSessionLifecycleTests
 open Wanxiangshu.Tests.OmpPluginCoreTests
 open Wanxiangshu.Tests.OmpTitleFetchGuardTests
@@ -92,7 +84,6 @@ let codecTestEntries () : (string * TestBody) list =
     "SubagentToolExecuteTests.run", Async SubagentToolExecuteTests.run
     "WebToolsCodecTests.run", Sync (sync WebToolsCodecTests.run)
     "ReviewToolsCodecTests.run", Sync (sync ReviewToolsCodecTests.run)
-    "KnowledgeGraphToolsCodecTests.run", Sync (sync KnowledgeGraphToolsCodecTests.run)
     "FileToolsCodecTests.run", Sync (sync FileToolsCodecTests.run)
     "FuzzyToolsCodecTests.run", Sync (sync FuzzyToolsCodecTests.run)
     "WorkBacklogToolsCodecTests.run", Sync (sync WorkBacklogToolsCodecTests.run)
@@ -111,9 +102,6 @@ let codecTestEntries () : (string * TestBody) list =
     "MuxAiSettingsCodecTests.run", Sync (sync MuxAiSettingsCodecTests.run)
     "MuxAiSettingsIntegrationTests.run", Async MuxAiSettingsIntegrationTests.run
     "AgentConfigApplyTests.run", Sync (sync AgentConfigApplyTests.run)
-    "KnowledgeGraphWorkflowTests.run", Async KnowledgeGraphWorkflowTests.run
-    "KnowledgeGraphBookkeeperLaunchTests.run", Async KnowledgeGraphBookkeeperLaunchTests.run
-    "KnowledgeGraphMaintenanceRunTests.run", Async KnowledgeGraphMaintenanceRunTests.run
     "SessionExecutorScopeTests.run", Async SessionExecutorScopeTests.run
     "CapsSynthCommonTests.run", Sync (sync CapsSynthCommonTests.run)
     "CapsFileCacheTests.run", Async CapsFileCacheTests.run

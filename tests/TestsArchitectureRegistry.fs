@@ -9,14 +9,12 @@ open Wanxiangshu.Tests.ArchitectureTestsSubagent
 open Wanxiangshu.Tests.ArchitectureTestsSubagentToolExec
 open Wanxiangshu.Tests.ArchitectureTestsRuntime
 open Wanxiangshu.Tests.ArchitectureTestsRuntimeSession
-open Wanxiangshu.Tests.ArchitectureTestsRuntimeKg
 open Wanxiangshu.Tests.ArchitectureTestsWireToolExec
 open Wanxiangshu.Tests.ArchitectureTestsWireHook
 open Wanxiangshu.Tests.ArchitectureTestsWirePipeline
 open Wanxiangshu.Tests.ArchitectureTestsWirePayload
 open Wanxiangshu.Tests.ArchitectureTestsMuxToolCore
 open Wanxiangshu.Tests.ArchitectureTestsMuxToolAux
-open Wanxiangshu.Tests.ArchitectureTestsMuxToolAuxKg
 open Wanxiangshu.Tests.ArchitectureTestsOpencodeTools
 open Wanxiangshu.Tests.ArchitectureTestsOmp
 open Wanxiangshu.Tests.TestsTestBody
@@ -40,7 +38,6 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
     "ArchitectureTests.ompBoundary", Sync (sync ArchitectureTestsFoundation.ompBoundary)
     "ArchitectureTests.ompNoEngineRef", Sync (sync ArchitectureTestsFoundation.ompNoEngineRef)
     "ArchitectureTests.noDuplicateStateHolder", Sync (sync ArchitectureTestsFoundation.noDuplicateStateHolder)
-    "ArchitectureTests.noDuplicateKgTestHooks", Sync (sync ArchitectureTestsFoundation.noDuplicateKgTestHooks)
     "ArchitectureTests.noDuplicateRunNudgeFlowCore", Sync (sync ArchitectureTestsFoundation.noDuplicateRunNudgeFlowCore)
     "ArchitectureTests.ompMessageTransformUsesProjectionPolicy", Sync (sync ArchitectureTestsOmp.ompMessageTransformUsesProjectionPolicy)
     "ArchitectureTests.ompMessageTransformUsesShellCaps", Sync (sync ArchitectureTestsOmp.ompMessageTransformUsesShellCaps)
@@ -53,7 +50,6 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
     "ArchitectureTests.ompPluginNoOpencodeMuxRefs", Sync (sync ArchitectureTestsOmp.ompPluginNoOpencodeMuxRefs)
     "ArchitectureTests.ompUsesOmpToolSchema", Sync (sync ArchitectureTestsOmp.ompUsesOmpToolSchema)
     "ArchitectureTests.ompReviewUsesReviewRuntime", Sync (sync ArchitectureTestsOmp.ompReviewUsesReviewRuntime)
-    "ArchitectureTests.ompKnowledgeGraphRuntimeSplit", Sync (sync ArchitectureTestsOmp.ompKnowledgeGraphRuntimeSplit)
     "ArchitectureTests.ompCapsCodecExists", Sync (sync ArchitectureTestsOmp.ompCapsCodecExists)
     "ArchitectureTests.ompChildSessionExists", Sync (sync ArchitectureTestsOmp.ompChildSessionExists)
     "ArchitectureTests.ompTestFilesUnder300", Sync (sync ArchitectureTestsOmp.ompTestFilesUnder300)

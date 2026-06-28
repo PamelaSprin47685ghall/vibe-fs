@@ -18,12 +18,9 @@ open Wanxiangshu.Opencode.HookExecute
 open Wanxiangshu.Opencode.PtySpawn
 open Wanxiangshu.Shell.TitleFetchGuardCommon
 open Wanxiangshu.Opencode.SessionLifecycleObserver
-open Wanxiangshu.Opencode.KnowledgeGraphRuntime
-open Wanxiangshu.Opencode.KnowledgeGraphTestHooks
 open Wanxiangshu.Opencode.BacklogSession
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.FuzzyFinderShell
-open Wanxiangshu.Shell.KnowledgeGraphFiles
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Clock
@@ -40,7 +37,6 @@ type private CoreServices = {
     SessionLifecycleObserver: SessionLifecycleObserver
     Directory: string
     RuntimeScope: RuntimeScope
-    KnowledgeGraphRuntime: KnowledgeGraphRuntime
     BacklogSession: BacklogSession
     Tools: obj
     McpMap: obj
@@ -71,19 +67,9 @@ let private createCoreServices (host: Host) (ctx: obj) =
                     client fallbackRuntime fallbackConfigLookup childAgentRegistry)
         | None -> None
     let lifecycleObserver = createSessionLifecycleObserver (host, ctx, reviewStore, childAgentRegistry, fallbackHandler, fallbackRuntime)
-    let nowUtc () =
-        let nowMs = Dyn.get ctx "nowMs"
-        if Dyn.isNullish nowMs then Clock.nowUtc ()
-        else System.DateTimeOffset.FromUnixTimeMilliseconds(int64 (unbox<float> nowMs)).UtcDateTime
-    let knowledgeGraphEnabled = knowledgeGraphDirExists directory
-    let knowledgeGraphClient =
-        match getClientFromPluginCtx ctx with
-        | Ok client -> client
-        | Error _ -> box null
-    let knowledgeGraphRuntime = KnowledgeGraphRuntime(knowledgeGraphClient, directory, nowUtc, childAgentRegistry, 30000L, 1000)
     let scope = create ()
     let backlogSession = BacklogSession(host, scope)
-    let tools = createTools host childAgentRegistry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled scope fallbackRuntime
+    let tools = createTools host childAgentRegistry finderCache ctx reviewStore scope fallbackRuntime
     let client = match getClientFromPluginCtx ctx with Ok c -> c | Error _ -> box null
     if not (Dyn.isNullish client) then storePtyClient client
     let mcps = box {| ``type`` = "local"; command = Wanxiangshu.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
@@ -94,7 +80,6 @@ let private createCoreServices (host: Host) (ctx: obj) =
         SessionLifecycleObserver = lifecycleObserver
         Directory = directory
         RuntimeScope = scope
-        KnowledgeGraphRuntime = knowledgeGraphRuntime
         BacklogSession = backlogSession
         Tools = tools
         McpMap = mcpMap
@@ -105,9 +90,9 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
     setKey result "chat.message" (twoArgHook (fun input output -> chatMessageFor host services.ChildAgentRegistry services.SessionLifecycleObserver input output))
     setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
     setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBeforeFor host input output))
-    setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host services.Directory services.SessionLifecycleObserver services.KnowledgeGraphRuntime services.ChildAgentRegistry input output))
+    setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host services.Directory services.SessionLifecycleObserver services.ChildAgentRegistry input output))
     let client = match getClientFromPluginCtx ctx with Ok c -> c | Error _ -> box null
-    setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform services.ChildAgentRegistry services.Directory services.RuntimeScope services.BacklogSession services.KnowledgeGraphRuntime services.ReviewStore client input output))
+    setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform services.ChildAgentRegistry services.Directory services.RuntimeScope services.BacklogSession services.ReviewStore client input output))
     setKey result "command.execute.before" (twoArgHook (fun input output ->
         promise {
             do! services.SessionLifecycleObserver.handleCommandExecuteBefore input output
@@ -116,7 +101,6 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
     setKey result "event" (box (fun (input: obj) ->
         promise {
             do! eventHandler services.ReviewStore input
-            cleanUpJobContextIfAbortedOrDeleted services.KnowledgeGraphRuntime input
             let ptyCleanupSessionId =
                 match Wanxiangshu.Shell.OpencodeHookInputCodec.decodeHostEventEnvelope input with
                 | Some e when e.EventType = "session.deleted" || e.EventType = "session.delete" || e.EventType = "session.remove" || e.EventType = "session.close" ->
@@ -163,21 +147,6 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         setKey result "name" (box "wanxiangshu")
         setKey result "mcp" services.McpMap
         setKey result "tool" services.Tools
-        setKey
-            result
-            "__knowledgeGraphRuntime"
-            (box (
-                let hooks = services.KnowledgeGraphRuntime.TestHooks
-                createObj [
-                    "rawInstance", box services.KnowledgeGraphRuntime
-                    "registerJobForTesting",
-                    box (System.Func<string, string, string, obj, unit>(fun sessionID workspaceRoot kindTag payload ->
-                        hooks.RegisterJob(sessionID, workspaceRoot, kindTag, payload)))
-                    "takeBookkeeperLaunchesForTesting",
-                    box (System.Func<obj array>(fun () -> hooks.TakeLaunches()))
-                    "waitForBackgroundJobsForTesting",
-                    box (System.Func<JS.Promise<unit>>(fun () -> hooks.WaitJobs()))
-                ]))
         setKey result "config" (box (fun (cfg: obj) ->
             promise {
                 let next = applyAgentConfigFor host cfg services.McpMap

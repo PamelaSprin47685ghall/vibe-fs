@@ -25,7 +25,7 @@ let isTerminalAssistantFinish (finish: string) : bool =
     not (normalized.Contains("tool")) && not (normalized.Contains("abort"))
 
 let syntheticAssistantAgents: Set<string> =
-    Set.ofList [ "compaction"; "bookkeeper"; "title" ]
+    Set.ofList [ "compaction"; "title" ]
 
 let isSyntheticAssistantAgent (agent: string) : bool =
     Set.contains (agent.Trim().ToLowerInvariant()) syntheticAssistantAgents

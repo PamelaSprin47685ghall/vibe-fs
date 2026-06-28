@@ -49,8 +49,6 @@ let canUseSemanticReturnRoleOk () =
     check "coder can use return_coder" (canUseSemantic "coder" ReturnRoleEcho "return_coder")
 let canUseSemanticReturnRoleDenied () =
     check "coder cannot use return_browser" (not (canUseSemantic "coder" ReturnRoleEcho "return_browser"))
-let canUseSemanticBookkeeper () =
-    check "bookkeeper denied all" (not (canUseSemantic "bookkeeper" Read "read"))
 let canUseSemanticMeditator () =
     check "meditator can read" (canUseSemantic "meditator" Read "read")
 let canUseSemanticExecutor () =
@@ -75,8 +73,6 @@ let canUseSemanticMethodologyInvestigator () =
     check "investigator denied methodology" (not (canUseSemantic "investigator" MethodologyFamily "methodology_abduction"))
 let canUseSemanticMethodologyExecutor () =
     check "executor denied methodology" (not (canUseSemantic "executor" MethodologyFamily "methodology_deduction"))
-let canUseSemanticMethodologyBookkeeper () =
-    check "bookkeeper denied methodology" (not (canUseSemantic "bookkeeper" MethodologyFamily "methodology_induction"))
 let canUseSemanticMethodologyMeditator () =
     check "meditator denied methodology" (not (canUseSemantic "meditator" MethodologyFamily "methodology_analogy"))
 let canUseSemanticMethodologyReviewer () =
@@ -103,8 +99,6 @@ let canUseSemanticFuzzyGrepManager () =
     check "manager denied fuzzy_grep" (not (canUseSemantic "manager" FuzzyGrep "fuzzy_grep"))
 let canUseSemanticFuzzyGrepCoder () =
     check "coder can fuzzy_grep" (canUseSemantic "coder" FuzzyGrep "fuzzy_grep")
-let canUseSemanticBookkeeperAll () =
-    check "bookkeeper denied all" (not (canUseSemantic "bookkeeper" Read "read"))
 let canUseSemanticMeditatorAll () =
     check "meditator can read" (canUseSemantic "meditator" Read "read")
 let canUseSemanticExecutorAll () =
@@ -131,7 +125,6 @@ let canUseForHostMethodologyDenied () =
     check "browser denied methodology via host" (not (canUseForHost Opencode "browser" "methodology_first_principles"))
     check "investigator denied methodology via host" (not (canUseForHost Opencode "investigator" "methodology_abduction"))
     check "executor denied methodology via host" (not (canUseForHost Omp "executor" "methodology_deduction"))
-    check "bookkeeper denied methodology via host" (not (canUseForHost Mux "bookkeeper" "methodology_induction"))
     check "meditator denied methodology via host" (not (canUseForHost Opencode "meditator" "methodology_analogy"))
 
 let canUseForHostMethodologyAllowed () =
@@ -177,7 +170,6 @@ let run () =
     canUseSemanticMethodologyBrowser ()
     canUseSemanticMethodologyInvestigator ()
     canUseSemanticMethodologyExecutor ()
-    canUseSemanticMethodologyBookkeeper ()
     canUseSemanticMethodologyMeditator ()
     canUseSemanticMethodologyReviewer ()
     canUseSemanticMethodologyCoder ()
@@ -191,7 +183,6 @@ let run () =
     canUseSemanticSubagentManager ()
     canUseSemanticFuzzyGrepManager ()
     canUseSemanticFuzzyGrepCoder ()
-    canUseSemanticBookkeeperAll ()
     canUseSemanticMeditatorAll ()
     canUseSemanticExecutorAll ()
     canUseForHostOpenCode ()

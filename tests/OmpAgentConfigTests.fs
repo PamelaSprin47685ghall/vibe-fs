@@ -6,7 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Omp.AgentConfig
 
-/// applyAgentConfigFor must hand back a config with the canonical 10 Omp agents
+/// applyAgentConfigFor must hand back a config with the canonical 9 Omp agents
 /// registered, each carrying the right `mode` (primary for manager/build/plan,
 /// subagent for everything else) and a non-null `permission` / `tools` object
 /// derived from Kernel.HostTools.canUseForHost.
@@ -14,7 +14,7 @@ let applyAgentConfigForRegistersBuiltinAgents () =
     let cfg = applyAgentConfigFor (createObj [])
     let agents = get cfg "agent"
     let primaryNames = [| "manager"; "build"; "plan" |]
-    let subagentNames = [| "coder"; "investigator"; "meditator"; "bookkeeper"; "reviewer"; "browser"; "executor" |]
+    let subagentNames = [| "coder"; "investigator"; "meditator"; "reviewer"; "browser"; "executor" |]
     for name in primaryNames do
         let a = get agents name
         check $"primary mode {name}" (str a "mode" = "primary")

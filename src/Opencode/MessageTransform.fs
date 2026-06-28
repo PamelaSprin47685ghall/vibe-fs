@@ -22,7 +22,6 @@ open Wanxiangshu.Opencode.AgentConfig
 open Wanxiangshu.Opencode.BacklogSession
 open Wanxiangshu.Opencode.MessagingCodec
 open Wanxiangshu.Opencode.CapsCodec
-open Wanxiangshu.Opencode.KnowledgeGraphRuntime
 open Wanxiangshu.Opencode.SessionIo
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeHookInputCodec
@@ -34,7 +33,7 @@ let private extractSessionID (messages: Message<obj> list) : string =
     |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
     |> Option.defaultValue ""
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (knowledgeGraphRuntime: KnowledgeGraphRuntime) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
@@ -65,8 +64,6 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                         encoded
                 let loadCaps () =
                     loadCapsForScope runtimeScope AllowEmptyDirectory plan
-                let loadKgPrelude () =
-                    loadKgPreludeForAgent false agent plan (fun sid dir -> knowledgeGraphRuntime.BuildPreludeForSession(sid, dir))
                 let buildCaps encoded capsFiles prelude =
                     buildCapsMessages Wanxiangshu.Shell.FileSys.sha256HexTruncated encoded directory capsFiles prelude
                 let! final =
@@ -80,7 +77,6 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                         MessagingCodec.encodeMessages
                         dedupFn
                         loadCaps
-                        loadKgPrelude
                         buildCaps
                 if not cleaned.IsEmpty then replaceArrayInPlace messagesArr final
     }

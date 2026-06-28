@@ -90,16 +90,6 @@ let uiParam : obj = call1 (call0 (str ()) "optional") "describe" (box "Internal 
 let strArrayReq (desc: string) : obj = call1 (arr (strMin 1 "")) "describe" (box desc)
 let strArrayOpt (desc: string) : obj = call1 (call0 (arr (strMin 1 "")) "optional") "describe" (box desc)
 
-let knowledgeGraphDraftEntriesReq (desc: string) : obj =
-    let entryShape =
-        strictObject (
-            createObj [
-                "id", strOpt Params.kgEntryId
-                "entity", strArrayReq Params.kgEntryEntity
-                "fact", strReq Params.kgEntryFact
-            ])
-    call1 (arr entryShape) "describe" (box desc)
-
 let numOpt (desc: string) : obj =
     let n = call0 schema "number"
     let n = call0 n "int"
@@ -141,10 +131,6 @@ let fuzzyGrep = toolDescription "fuzzy_grep"
 let websearch = toolDescription "websearch"
 
 let webfetch = toolDescription "webfetch"
-
-let fetchKnowledgeGraph = toolDescription "knowledge_graph_fetch"
-
-let submitKnowledgeGraph = toolDescription "return_bookkeeper"
 
 let submitReview = toolDescription "submit_review"
 

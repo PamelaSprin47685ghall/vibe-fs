@@ -8,7 +8,6 @@ open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Omp.SessionLifecycleHooks
-open Wanxiangshu.Omp.KnowledgeGraph.Runtime
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools
@@ -25,9 +24,6 @@ let fakeCtx (sessionId: string) (cwd: string) : obj =
 [<Emit("process.cwd()")>]
 let processCwd () : string = jsNative
 
-let fakeKGR (pi: obj) : OmpKnowledgeGraphRuntime =
-    new OmpKnowledgeGraphRuntime(pi)
-
 let childOnlySet = Set.ofArray ompChildOnlyToolNames
 
 let fakeEvent (toolName: string) (input: obj) : obj =
@@ -40,24 +36,6 @@ let fakeResultEvent (toolName: string) (content: string) : obj =
         "toolName", box toolName
         "input", box null
         "content", box [| createObj [ "type", box "text"; "text", box content ] |] ]
-
-let recordsToBookkeeper_coderReturnsTrue () =
-    check "coder returns true" (recordsToBookkeeper "coder")
-
-let recordsToBookkeeper_readReturnsFalse () =
-    check "read returns false" (not (recordsToBookkeeper "read"))
-
-let isReadOnlyExecutor_roModeReturnsTrue () =
-    let args = createObj [ "mode", box "ro" ]
-    check "executor ro true" (isReadOnlyExecutor "executor" args)
-
-let isReadOnlyExecutor_rwModeReturnsFalse () =
-    let args = createObj [ "mode", box "rw" ]
-    check "executor rw false" (not (isReadOnlyExecutor "executor" args))
-
-let isReadOnlyExecutor_otherToolReturnsFalse () =
-    let args = createObj [ "mode", box "ro" ]
-    check "coder ro false" (not (isReadOnlyExecutor "coder" args))
 
 let applyActiveToolFilterForMainSession_filtersChildOnly () =
     let h = createPiHarness ()
@@ -78,10 +56,9 @@ let toolCallHandler_missingWarnTddBlocks () =
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
-    let kgr = fakeKGR pi
     let event = fakeEvent "coder" (createObj [])
     promise {
-        let! result = toolCallHandler pi store kgr event (fakeCtx "s1" "/tmp")
+        let! result = toolCallHandler pi store event (fakeCtx "s1" "/tmp")
         let block = Dyn.getValue<bool> result "block"
         check "block is true for missing warn_tdd" block
     }
@@ -90,11 +67,10 @@ let toolCallHandler_childOnlyToolBlockedInMainSession () =
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
-    let kgr = fakeKGR pi
     // "find" is child-only; main session context has no child session id
     let event = fakeEvent "find" (createObj [])
     promise {
-        let! result = toolCallHandler pi store kgr event (fakeCtx "main-session" "/tmp")
+        let! result = toolCallHandler pi store event (fakeCtx "main-session" "/tmp")
         let block = Dyn.getValue<bool> result "block"
         check "child-only tool blocked in main session" block
     }
@@ -103,11 +79,10 @@ let toolCallHandler_normalToolReturnsNone () =
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
-    let kgr = fakeKGR pi
     // "coder" is NOT child-only
     let event = fakeEvent "coder" (createObj [ "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles" ])
     promise {
-        let! result = toolCallHandler pi store kgr event (fakeCtx "s1" "/tmp")
+        let! result = toolCallHandler pi store event (fakeCtx "s1" "/tmp")
         check "normal tool returns null" (Dyn.isNullish result)
     }
 
@@ -127,7 +102,6 @@ let toolResultHandler_todowriteCapturesReport () =
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
-    let kgr = fakeKGR pi
     let report = "## Completed Work\n- fixed bug"
     let event =
         createObj [
@@ -136,7 +110,7 @@ let toolResultHandler_todowriteCapturesReport () =
             "callId", box "call-1"
             "content", box [| createObj [ "type", box "text"; "text", box "" ] |] ]
     promise {
-        do! toolResultHandler pi store kgr event (fakeCtx "s1" "/tmp")
+        do! toolResultHandler pi store event (fakeCtx "s1" "/tmp")
         // CaptureReport must have stored the report in the BacklogSession.
         let captured = BacklogSession(omp).TakeReport("call-1")
         check "report captured in BacklogSession" (captured = report.Trim())
@@ -145,92 +119,29 @@ let toolResultHandler_todowriteCapturesReport () =
         check "report consumed after take" (again = "")
     }
 
-let toolResultHandler_bookkeeperToolStartsAppend () =
-    let h = createPiHarness ()
-    let pi = piObject h
-    let store = createReviewStore ()
-    let kgr = fakeKGR pi
-    let event = fakeResultEvent "coder" "coded something"
-    promise {
-        do! toolResultHandler pi store kgr event (fakeCtx "bk1" (processCwd ()))
-        check "bookkeeper toolResultHandler completed" true
-        // Verify the bookkeeper was triggered via kgRuntime test hook
-        let launches = kgr.TakeBookkeeperLaunchesForTesting()
-        check "bookkeeper launch recorded" (launches.Length >= 1)
-    }
-
-let toolResultHandler_readOnlyExecutorNotRecorded () =
-    let h = createPiHarness ()
-    let pi = piObject h
-    let store = createReviewStore ()
-    let kgr = fakeKGR pi
-    let event = fakeResultEvent "executor" "read file"
-    // executor args with mode=ro
-    let args = createObj [ "mode", box "ro" ]
-    event?input <- box args
-    promise {
-        do! toolResultHandler pi store kgr event (fakeCtx "ro1" "/tmp")
-        let launches = kgr.TakeBookkeeperLaunchesForTesting()
-        check "read-only executor not recorded in bookkeeper" (launches.Length = 0)
-    }
-
-let sessionStartHandler_appliesFilterAndKgTools () =
-    let h = createPiHarness ()
-    let pi = piObject h
-    let kgr = fakeKGR pi
-    // Reset kg tools registered state
-    Wanxiangshu.Omp.KnowledgeGraphTools.resetOmpKgToolsTestState ()
-    promise {
-        do! sessionStartHandler pi kgr (fakeCtx "ss1" "/tmp")
-        // applyActiveToolFilterForMainSession must strip child-only tools
-        // from the main session's active-tool list (harness starts with all
-        // tools including child-only entries; after filter none should remain).
-        let filtered = unbox<string array> (Dyn.get h.hookStore "activeTools")
-        let childOnlyInFiltered = filtered |> Array.filter (fun t -> Set.contains t childOnlySet)
-        check "child-only tools removed from main session" (childOnlyInFiltered.Length = 0)
-    }
-
 let sessionShutdownHandler_clearsState () =
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
-    let kgr = fakeKGR pi
-    // Register a job so DeleteJob has something to clear
-    kgr.RegisterJobForTesting("sh1", "/tmp", "append", createObj [])
     let ctx = fakeCtx "sh1" "/tmp"
     promise {
-        do! sessionShutdownHandler store kgr ctx
-        // Verify nudge cleared
+        do! sessionShutdownHandler store ctx
+        // nudge state cleared
         Wanxiangshu.Omp.NudgeRuntime.clearNudgeSession "sh1" |> ignore
-        // kgRuntime.DeleteJob must have removed sh1 from registered jobs.
-        let snapshot = kgr.SnapshotRegisteredJobsForTesting()
-        let sh1StillThere = snapshot |> Array.exists (fun (sid, _) -> sid = "sh1")
-        check "sh1 job deleted from kgRuntime" (not sh1StillThere)
     }
 
 let run () : JS.Promise<unit> =
     promise {
-        // 1. recordsToBookkeeper
-        recordsToBookkeeper_coderReturnsTrue ()
-        recordsToBookkeeper_readReturnsFalse ()
-        // 2. isReadOnlyExecutor
-        isReadOnlyExecutor_roModeReturnsTrue ()
-        isReadOnlyExecutor_rwModeReturnsFalse ()
-        isReadOnlyExecutor_otherToolReturnsFalse ()
-        // 3. applyActiveToolFilterForMainSession
+        // 1. applyActiveToolFilterForMainSession
         do! applyActiveToolFilterForMainSession_filtersChildOnly ()
-        // 4. toolCallHandler
+        // 2. toolCallHandler
         do! toolCallHandler_missingWarnTddBlocks ()
         do! toolCallHandler_childOnlyToolBlockedInMainSession ()
         do! toolCallHandler_normalToolReturnsNone ()
-        // 5. turnStartHandler
+        // 3. turnStartHandler
         do! turnStartHandler_filtersChildOnlyTools ()
-        // 6. toolResultHandler
+        // 4. toolResultHandler
         do! toolResultHandler_todowriteCapturesReport ()
-        do! toolResultHandler_bookkeeperToolStartsAppend ()
-        do! toolResultHandler_readOnlyExecutorNotRecorded ()
-        // 7. sessionStartHandler
-        do! sessionStartHandler_appliesFilterAndKgTools ()
-        // 8. sessionShutdownHandler
+        // 5. sessionShutdownHandler
         do! sessionShutdownHandler_clearsState ()
     }

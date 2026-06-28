@@ -20,7 +20,7 @@ type ToolSemantic =
     | Other
 
 let private knownAgentSet =
-    Set.ofList [ "manager"; "investigator"; "coder"; "reviewer"; "browser"; "meditator"; "executor"; "bookkeeper" ]
+    Set.ofList [ "manager"; "investigator"; "coder"; "reviewer"; "browser"; "meditator"; "executor" ]
 
 let private blockedShellTaskGrepSet =
     Set.ofList [ "bash"; "bash_run"; "task"; "grep"; "plan"; "memory"; "propose_plan"; "set_goal"; "get_goal"; "complete_goal" ]
@@ -66,7 +66,6 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
     | _, BlockedShellTaskGrep -> false
     | _, StealthBrowser -> agent = "browser"
     | _, ReturnRoleEcho -> tool = sprintf "return_%s" agent
-    | "bookkeeper", _ -> false
     | "meditator", Read -> true
     | "meditator", _
     | "executor", _ -> false

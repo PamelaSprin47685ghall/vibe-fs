@@ -1,6 +1,0 @@
-{"type":"knowledge_graph_header","version":1,"kind":"day","date":"2026-06-21","rewritten":true}
-{"id":"744e","entity":["子代理","输入编码","JSON 结构","类型错配","崩溃风险"],"fact":"work_input JSON 的 intents 字段值是 JSON 字符串字面量（以 [ 开头），而非真正的 JSON 数组。investigator 解析 intents 时要求 Array 类型但拿到 string → panic。构造 work_input 时须确保 intents 是原生数组，而非 JSON.stringify 后的字符串。investigator 无 intents=string 的回退或重解析逻辑。"}
-{"id":"2059","entity":["端到端测试"],"fact":"无。现有测试仅覆盖文本存在（KernelTests.fs:288-335/ReviewTests.fs:154）、注册表名存在（IntegrationToolTests.fs:37）、权限（AgentTests.fs:25-27）、工具配置存在（IntegrationPluginTests.fs:84）。无工具执行/子代理委托/verdict 解析的端到端测试。"}
-{"id":"abdc","entity":["宿主适配","工具名错配"],"fact":"src/Mux/Wrappers.fs:201 的 createAllWrappers 调 createAllWrappersFor opencode。mkTodoNudgeWrapper 依 host 选择 todoWritePromptName/openagent 工具名。Mux 容器用了 opencode 版 → todo nudge 发不存在/名字错配工具。应依容器类型传入对应 host。"}
-{"id":"9bff","entity":["工具返回值","异步返回"],"fact":"executor 工具 execute 函数内 `let! output = summarizeWhenNeeded ...` 后缺 `return output`，promise 块返回 unit 而非执行结果字符串。补 `return output` 修复。文件：src/Mux/HostTools.fs。"}
-{"id":"33df","entity":["编译告警","死代码"],"fact":"删 capsThinkingPrefix/capsContextPrefix 常量后，两前缀零引用，warning 对应 missing field 真实编译问题。此前误判为缓存残留，实为删除后未同步清理 buildCapsMessages 内引用致诊断器报错。"}

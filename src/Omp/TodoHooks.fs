@@ -14,9 +14,7 @@ open Wanxiangshu.Omp.OmpTestHooks
 open Wanxiangshu.Omp.ToolResultEvent
 open Wanxiangshu.Omp.MagicTodo
 open Wanxiangshu.Omp.MessagingCodec
-open Wanxiangshu.Omp.KnowledgeGraph.Runtime
 open Wanxiangshu.Omp.NudgeRuntime
-open Wanxiangshu.Omp.KnowledgeGraphTools
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Kernel.ToolOutputInfo
@@ -31,24 +29,11 @@ open Wanxiangshu.Shell.ReviewRuntime
 let private backlogSession = BacklogSession omp
 
 /// Tools whose every user-facing invocation is durable enough to feed the
-/// knowledge graph bookkeeper as an input/output black box. Direct write
+/// backlog as an input/output black box. Direct write
 /// tools join the set via `isFileEditTool`; subagent and IO tools are listed
 /// explicitly. Pure lookups (fuzzy_find/fuzzy_grep), the knowledge graph /
 /// review tools themselves, and host read tools never record.
-let bookkeepingSubagentTools =
-    Set [ "coder"; "investigator"; "meditator"; "browser"; "executor"; "websearch"; "webfetch"; "write"; "apply_patch"; "patch" ]
-
-let recordsToBookkeeper (toolName: string) : bool =
-    isFileEditTool toolName || Set.contains toolName bookkeepingSubagentTools
-
-/// Read-only executor runs (file reads, greps) are durable enough to surface
-/// in the conversation but not stable enough to feed the long-term bookkeeper.
-/// Only `mode = "ro"` qualifies; "rw" must record so executor work survives
-/// knowledge graph compaction.
-let isReadOnlyExecutor (toolName: string) (args: obj) : bool =
-    toolName = "executor" && Dyn.str args "mode" = "ro"
-
-let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) (event: obj) (ctx: obj) : JS.Promise<unit> =
+let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: obj) : JS.Promise<unit> =
     promise {
         let toolName = Dyn.str event "toolName"
         let args = getToolInput event
@@ -75,25 +60,14 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (kgRuntime: OmpKnow
                 let content = getToolResultText event
                 if content <> "" then
                     setToolResultText event (todoWriteOutput methodologies true)
-            elif recordsToBookkeeper toolName && not (isReadOnlyExecutor toolName args) then
-                let parentId = getSessionIdFromContext ctx |> Option.defaultValue ""
-                if not (isChildSession parentId) then
-                    let cwd = Dyn.str ctx "cwd"
-                    let content = getToolResultText event
-                    if cwd <> "" && content <> "" then
-                        let input = if Dyn.isNullish args then "" else Fable.Core.JS.JSON.stringify args
-                        kgRuntime.StartBookkeeperAppend(input, bodyForBookkeeper content, toolName, cwd)
-                        setToolResultText event (withBookkeepingHints content)
     }
 
-let sessionStartHandler (pi: obj) (kgRuntime: OmpKnowledgeGraphRuntime) (ctx: obj) : JS.Promise<unit> =
+let sessionStartHandler (pi: obj) (ctx: obj) : JS.Promise<unit> =
     promise {
         do! NudgeHooks.applyActiveToolFilterForMainSession pi ctx
-        let cwd = Dyn.str ctx "cwd"
-        ensureKnowledgeGraphTools pi kgRuntime cwd
     }
 
-let sessionShutdownHandler (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGraphRuntime) (ctx: obj) : JS.Promise<unit> =
+let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =
     promise {
         match getSessionIdFromContext ctx with
         | None -> ()
@@ -101,6 +75,5 @@ let sessionShutdownHandler (reviewStore: ReviewStore) (kgRuntime: OmpKnowledgeGr
             clearNudgeSession sessionId
             clearTypedIteratorScope globalIteratorStore sessionId
             reviewStore.deactivateReview sessionId
-            kgRuntime.DeleteJob sessionId
             do! cleanupRunnerJob sessionId
     }

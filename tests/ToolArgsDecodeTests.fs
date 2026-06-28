@@ -96,34 +96,6 @@ let decodeTodowriteOk () =
         check "todowrite ok methodology" (tw.SelectMethodology = [ "deduction" ])
     | _ -> check "todowrite ok" false
 
-let decodeKnowledgeGraphFetchMissingEntity () =
-    let args = createObj []
-    match decodeToolInvocation "knowledge_graph_fetch" args with
-    | Error (InvalidIntent ("knowledge_graph_fetch", "entity", _)) ->
-        check "kg fetch missing entity" true
-    | _ -> check "kg fetch missing entity" false
-
-let decodeKnowledgeGraphFetchOk () =
-    let args = createObj [ "entity", box "VibeFS" ]
-    match decodeToolInvocation "knowledge_graph_fetch" args with
-    | Ok (Typed (KnowledgeGraphFetch { Entity = e })) -> check "kg fetch ok entity" (e = "VibeFS")
-    | _ -> check "kg fetch ok" false
-
-let decodeReturnBookkeeperMissingEntries () =
-    let args = createObj []
-    match decodeToolInvocation "return_bookkeeper" args with
-    | Error (InvalidIntent ("return_bookkeeper", "entries", _)) ->
-        check "return bookkeeper missing entries" true
-    | _ -> check "return bookkeeper missing entries" false
-
-let decodeReturnBookkeeperOk () =
-    let entry = createObj [ "entity", box [| "e1" |]; "fact", box "fact via invocation" ]
-    let args = createObj [ "entries", box [| entry |] ]
-    match decodeToolInvocation "return_bookkeeper" args with
-    | Ok (Typed (ReturnBookkeeper drafts)) ->
-        check "return bookkeeper ok fact" (drafts.Head.fact = "fact via invocation")
-    | _ -> check "return bookkeeper ok" false
-
 let decodeApplyPatchMissingPatchText () =
     let args = createObj []
     match decodeToolInvocation "apply_patch" args with
@@ -163,10 +135,6 @@ let run () =
     decodeExecutorOkShell ()
     decodeTodowriteMissingCompletedWorkReport ()
     decodeTodowriteOk ()
-    decodeKnowledgeGraphFetchMissingEntity ()
-    decodeKnowledgeGraphFetchOk ()
-    decodeReturnBookkeeperMissingEntries ()
-    decodeReturnBookkeeperOk ()
     decodeApplyPatchMissingPatchText ()
     decodeApplyPatchOk ()
     decodeSubmitReviewMissingReport ()

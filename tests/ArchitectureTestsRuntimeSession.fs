@@ -62,14 +62,14 @@ let pluginInjectsSessionScopeForExecutor () =
     let muxCatalog = requireFile "src/Mux/PluginCatalog.fs" |> nonCommentCode
     let muxHost = requireFile "src/Mux/HostTools.fs" |> nonCommentCode
     check "arch: Mux Plugin createToolCatalog passes sessionScope to executorTool"
-        (muxCatalog.Contains "executorTool deps toolNames null sessionScope")
+        (muxCatalog.Contains "executorTool deps toolNames sessionScope")
     check "arch: Mux HostTools executor uses sessionScope.EnqueuePerSession"
         (muxHost.Contains "sessionScope.EnqueuePerSession")
     let pluginCore = requireFile "src/Opencode/PluginCore.fs" |> nonCommentCode
     let tools = requireFile "src/Opencode/Tools.fs" |> nonCommentCode
     let executor = requireFile "src/Opencode/ExecutorTool.fs" |> nonCommentCode
     check "arch: Opencode PluginCore createTools passes scope"
-        (pluginCore.Contains "createTools host childAgentRegistry finderCache ctx knowledgeGraphRuntime reviewStore knowledgeGraphEnabled scope")
+        (pluginCore.Contains "createTools host childAgentRegistry finderCache ctx reviewStore scope fallbackRuntime")
     check "arch: Opencode Tools passes host and sessionScope to executorTool"
         (tools.Contains "executorTool host registry ctx sessionScope")
     check "arch: Opencode ExecutorTool uses sessionScope.EnqueuePerSession"

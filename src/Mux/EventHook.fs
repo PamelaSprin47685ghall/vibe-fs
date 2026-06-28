@@ -8,7 +8,6 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackConfigCodec
-open Wanxiangshu.Mux.KnowledgeGraphRuntimeMux
 open Wanxiangshu.Mux.FallbackHooks
 
 type private DecodedHookEvent =
@@ -49,7 +48,7 @@ let private parseHookEvent (event: obj) : NudgeRuntimeEvent =
         | "error" when decoded.errorType = "aborted" -> AbortedError decoded.workspaceId
         | _ -> Ignore
 
-let createEventHook (deps: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (knowledgeGraphRuntime: MuxKnowledgeGraphRuntime) : obj =
+let createEventHook (deps: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     let getChatHistory =
         if Dyn.isNullish deps then None
         else
@@ -62,7 +61,6 @@ let createEventHook (deps: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.Re
         | NudgeRuntime.StreamAbort workspaceId
         | NudgeRuntime.AbortedError workspaceId when workspaceId <> "" ->
             reviewStore.deactivateReview workspaceId
-            knowledgeGraphRuntime.DeleteJob workspaceId
         | _ -> ()
 
     let runtime = createNudgeRuntime reviewStore getChatHistory

@@ -35,12 +35,11 @@ let agentConfigSpec () = promise {
 }
 
 let bookkeeperAgentConfigSpec () = promise {
-    let! workspaceDir = mkdtempAsync "bookkeeper-agent-config-"
+    let! workspaceDir = mkdtempAsync "no-bookkeeper-agent-config-"
     let! p = plugin (box {| directory = workspaceDir |})
     let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>>
     let agents = get cfg "agent"
-    check "bookkeeper agent exists" (not (isNullish (get agents "bookkeeper")))
-    check "bookkeeper agent mode subagent" (str (get agents "bookkeeper") "mode" = "subagent")
+    check "bookkeeper agent removed" (isNullish (get agents "bookkeeper"))
     do! rmAsync workspaceDir
 }
 
@@ -91,7 +90,7 @@ let applyAgentConfigForMimoDisablesWorkflowSpec () = promise {
     let cfg = createObj []
     let next = applyAgentConfigFor Wanxiangshu.Kernel.HostTools.mimocode cfg (createObj [])
     let agents = get next "agent"
-    for name in [| "manager"; "build"; "plan"; "coder"; "investigator"; "meditator"; "bookkeeper"; "reviewer"; "browser"; "executor" |] do
+    for name in [| "manager"; "build"; "plan"; "coder"; "investigator"; "meditator"; "reviewer"; "browser"; "executor" |] do
         let agent = get agents name
         let permissions = get agent "permission"
         let tools = get agent "tools"

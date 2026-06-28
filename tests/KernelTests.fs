@@ -120,16 +120,6 @@ let jsBoundary' () =
     let text = readAssistantText msgs 0 "\n\n"
     check "assistant text read" (text = Some "hello")
 
-let knowledgeGraphFetchAnswer () =
-    let kgId = match Wanxiangshu.Kernel.KnowledgeGraph.tryParseId "0a3f" with Some value -> value | None -> failwith "0a3f should parse"
-    let projection =
-        Map.ofList [
-            kgId, ({ id = kgId; entity = ["project entry"]; fact = "Fact text" } : Wanxiangshu.Kernel.KnowledgeGraph.KnowledgeGraphEntry)
-        ]
-    check "knowledge graph fetch existing" (Wanxiangshu.Kernel.KnowledgeGraph.fetchAnswer projection "project entry" = Ok "Fact text")
-    check "knowledge graph fetch invalid entity" (Wanxiangshu.Kernel.KnowledgeGraph.fetchAnswer projection "" = Error "Invalid knowledge graph entity: ")
-    check "knowledge graph fetch missing entity" (Wanxiangshu.Kernel.KnowledgeGraph.fetchAnswer projection "missing entity" = Error "Knowledge graph entity not found in this session snapshot: missing entity")
-
 /// `Dyn.deleteKey` is the primitive HookExecute leans on to clear Mimocode
 /// task extras off the original args reference.
 let dynDeleteKey () =

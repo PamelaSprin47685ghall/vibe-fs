@@ -22,7 +22,6 @@ let runHostMessagesTransform
     (encodeMessages: Message<obj> list -> obj array)
     (dedupFn: bool -> obj array -> obj array)
     (loadCaps: unit -> JS.Promise<CapsFile list>)
-    (loadKgPrelude: unit -> JS.Promise<string option>)
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
     : JS.Promise<obj array> =
     promise {
@@ -37,5 +36,5 @@ let runHostMessagesTransform
         return!
             if plan.Cleaned.IsEmpty then Promise.lift [||]
             else
-                runMessageTransformPipeline plan backlogOps encodeMessages dedupFn loadCaps loadKgPrelude buildCaps
+                runMessageTransformPipeline plan backlogOps encodeMessages dedupFn loadCaps buildCaps
     }

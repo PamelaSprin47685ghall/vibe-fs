@@ -39,7 +39,6 @@ let private builtinAgentSpecs =
       { name = "coder"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "investigator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "meditator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "bookkeeper"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
       { name = "reviewer"; defaultMode = "subagent"; systemPrompt = reviewInstructions; defaultMcps = [||] }
       { name = "browser"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [| "stealth-browser-mcp" |] }
       { name = "executor"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] } ]

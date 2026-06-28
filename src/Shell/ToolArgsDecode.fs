@@ -9,7 +9,6 @@ open Wanxiangshu.Shell.SubagentSimpleArgsCodec
 open Wanxiangshu.Shell.WebToolsCodec
 open Wanxiangshu.Shell.ExecutorToolsCodec
 open Wanxiangshu.Shell.WorkBacklogToolsCodec
-open Wanxiangshu.Shell.KnowledgeGraphToolsCodec
 open Wanxiangshu.Shell.PatchToolsCodec
 open Wanxiangshu.Shell.ReviewToolsCodec
 
@@ -98,12 +97,6 @@ let decodeToolInvocation (toolName: string) (args: obj) : Result<DecodedToolInvo
     | "todowrite" ->
         decodeTodoWriteArgs args
         |> Result.map (fun tw -> Typed (ToolArgs.TodoWrite (mapTodoWrite tw)))
-    | "knowledge_graph_fetch" ->
-        decodeFetchEntity args
-        |> Result.map (fun entity -> Typed (ToolArgs.KnowledgeGraphFetch { Entity = entity }))
-    | "return_bookkeeper" ->
-        decodeReturnBookkeeperArgs args
-        |> Result.map (fun drafts -> Typed (ToolArgs.ReturnBookkeeper drafts))
     | "apply_patch" ->
         decodeApplyPatchFields args
         |> Result.map (fun f -> Typed (ToolArgs.ApplyPatch { PatchText = f.PatchText }))
