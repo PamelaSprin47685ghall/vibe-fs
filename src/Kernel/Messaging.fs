@@ -56,7 +56,7 @@ let private synthPrefixes =
     [ "caps-synth-user-"; "caps-synth-assistant-"
       "backlog-projection-"; "backlog-prefix-"
       "magic-todo-projection-"; "magic-todo-prefix-"
-      "methodology-probe-" ]
+      "methodology-probe-"; "semble-synth-" ]
 
 let classifySource (id: string) : Source =
     if id = "" then Native

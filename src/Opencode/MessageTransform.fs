@@ -29,11 +29,36 @@ open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.ChatTransformOutputCodec
 open Wanxiangshu.Shell.JsArrayMutate
+open Wanxiangshu.Shell.SembleSearch
 
 let private extractSessionID (messages: Message<obj> list) : string =
     messages
     |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
     |> Option.defaultValue ""
+
+let private injectSembleResults
+    (directory: string)
+    (final: obj array)
+    (agent: string)
+    (sessionID: string)
+    : JS.Promise<obj array> =
+    promise {
+        if not (SembleSearch.isBreakpoint final) then
+            return final
+        else
+            let messages = MessagingCodec.decodeMessages final
+            let context = SembleSearch.extractContextFromMessages messages
+            if context.Length < 50 then
+                return final
+            else
+                let! results = SembleSearch.search context directory 3
+                if results.IsEmpty then
+                    return final
+                else
+                    let pairs = results |> List.collect (SembleSearch.buildReadPair sessionID agent)
+                    let encoded = MessagingCodec.encodeMessages pairs
+                    return Array.append final encoded
+    }
 
 let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
@@ -80,7 +105,12 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                         dedupFn
                         loadCaps
                         buildCaps
-                if not cleaned.IsEmpty then replaceArrayInPlace messagesArr final
+                if not cleaned.IsEmpty then
+                    let! injected =
+                        if agent = "investigator" then
+                            injectSembleResults directory final agent sessionID
+                        else Promise.lift final
+                    replaceArrayInPlace messagesArr injected
     }
 
 let buildCompactionAnchorPrompt (backlogEntries: BacklogEntry list) (messages: Message<obj> list) : string =

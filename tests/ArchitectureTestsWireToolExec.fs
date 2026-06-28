@@ -114,6 +114,7 @@ let private shellBareDynAllowlist =
           "OpencodeAgentConfigWire.fs"
           "ReadDedupMuxPlugin.fs"
           "ReadDedupOpenCode.fs"
+          "SembleSearch.fs"
           "SubagentIo.fs"
           "ToolRuntimeContext.fs"
           "TreeSitterPlatform.fs"

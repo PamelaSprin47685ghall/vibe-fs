@@ -4,12 +4,28 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.ToolPermission
 
 let private repo = "https://github.com/vibheksoni/stealth-browser-mcp.git"
+let private sembleRepo = "https://github.com/MinishLab/semble.git"
 
 let stealthBrowserMcpRef (envValue: string) : string =
     if envValue = "" then "master" else envValue
 
+let sembleMcpRef (envValue: string) : string =
+    if envValue = "" then "master" else envValue
+
 let getStealthBrowserMcpCommand (envValue: string) : string =
     $"uvx --python 3.13 --from git+{repo}@{stealthBrowserMcpRef envValue} python -m server"
+
+let getSembleMcpCommand (envValue: string) : {| command: string; args: string array |} =
+    {| command = "uvx"
+       args = [|
+           "--from"
+           $"git+{sembleRepo}@{sembleMcpRef envValue}"
+           "--extra"
+           "mcp"
+           "python"
+           "-m"
+           "semble"
+       |] |}
 
 let getStealthBrowserMcpLocalConfig
     (envValue: string)

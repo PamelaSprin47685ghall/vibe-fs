@@ -91,6 +91,7 @@ open Wanxiangshu.Tests.OmpMagicTodoTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.MessageTransformPolicyTests
+open Wanxiangshu.Tests.SembleInjectionTests
 open Wanxiangshu.Tests.ToolCatalogClassificationTests
 open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.ExecutorKernelTests
@@ -272,6 +273,16 @@ let coreTestEntries () : (string * TestBody) list =
     "ToolCatalogClassificationTests.run", Sync (sync ToolCatalogClassificationTests.run)
     "ToolOutputInfoTests.run", Sync (sync ToolOutputInfoTests.run)
     "MessageTransformPolicyTests.run", Sync (sync MessageTransformPolicyTests.run)
+    "SembleInjectionTests.formatReadOutputPrefixesLines", Sync (sync SembleInjectionTests.formatReadOutputPrefixesLines)
+    "SembleInjectionTests.buildReadPairProducesTwoMessages", Sync (sync SembleInjectionTests.buildReadPairProducesTwoMessages)
+    "SembleInjectionTests.buildReadPairStateInputIsCorrect", Sync (sync SembleInjectionTests.buildReadPairStateInputIsCorrect)
+    "SembleInjectionTests.buildReadPairCallIDsMatch", Sync (sync SembleInjectionTests.buildReadPairCallIDsMatch)
+    "SembleInjectionTests.stripSyntheticBySourceRemovesSembleSynth", Sync (sync SembleInjectionTests.stripSyntheticBySourceRemovesSembleSynth)
+    "SembleInjectionTests.isBreakpointDetectsToolResultFinal", Sync (sync SembleInjectionTests.isBreakpointDetectsToolResultFinal)
+    "SembleInjectionTests.isBreakpointFalseForAssistantFinal", Sync (sync SembleInjectionTests.isBreakpointFalseForAssistantFinal)
+    "SembleInjectionTests.isBreakpointFalseForEmpty", Sync (sync SembleInjectionTests.isBreakpointFalseForEmpty)
+    "SembleInjectionTests.extractContextCollectsTextAndOutput", Sync (sync SembleInjectionTests.extractContextCollectsTextAndOutput)
+    "SembleInjectionTests.extractContextStopsAtToolCallBoundary", Sync (sync SembleInjectionTests.extractContextStopsAtToolCallBoundary)
     "ExecutorKernelTests.run", Sync (sync ExecutorKernelTests.run)
     "ToolExecuteTests.run", Sync (sync ToolExecuteTests.run)
     "TreeSitterKernelTests.run", Sync (sync TreeSitterKernelTests.run)

@@ -39,6 +39,11 @@ let classifySourceMethodologyProbe () =
     | Synthetic _ -> ()
     | _ -> failwith "expected synthetic"
 
+let classifySourceSembleSynth () =
+    match classifySource "semble-synth-abc123" with
+    | Synthetic kind -> equal "kind" "semble-synth-" kind
+    | _ -> failwith "expected synthetic"
+
 let decodeRoleUser () =
     equal "user" User (decodeRole "user")
 
@@ -106,6 +111,7 @@ let run () =
     classifySourceBacklogPrefix ()
     classifySourceMagicTodo ()
     classifySourceMethodologyProbe ()
+    classifySourceSembleSynth ()
     decodeRoleUser ()
     decodeRoleAssistant ()
     decodeRoleToolResult ()

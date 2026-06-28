@@ -41,6 +41,28 @@ let getStealthBrowserMcpLocalConfigCommandElements () =
     check "command has -m" (Array.contains "-m" cmd)
     check "command has server" (Array.contains "server" cmd)
 
+let sembleMcpRefEmptyReturnsMaster () =
+    equal "empty env -> master" "master" (sembleMcpRef "")
+
+let sembleMcpRefNonEmptyPassthrough () =
+    equal "non-empty env passthrough" "feature-x" (sembleMcpRef "feature-x")
+
+let getSembleMcpCommandElements () =
+    let cmd = getSembleMcpCommand ""
+    equal "command is uvx" "uvx" cmd.command
+    check "args has --from" (Array.contains "--from" cmd.args)
+    check "args has git+ repo" (cmd.args |> Array.exists (fun a -> a.Contains "https://github.com/MinishLab/semble.git"))
+    check "args has master" (cmd.args |> Array.exists (fun a -> a.Contains "master"))
+    check "args has --extra" (Array.contains "--extra" cmd.args)
+    check "args has mcp" (Array.contains "mcp" cmd.args)
+    check "args has python" (Array.contains "python" cmd.args)
+    check "args has -m" (Array.contains "-m" cmd.args)
+    check "args has semble" (Array.contains "semble" cmd.args)
+
+let getSembleMcpCommandCustomRef () =
+    let cmd = getSembleMcpCommand "dev-branch"
+    check "args contains custom ref" (cmd.args |> Array.exists (fun a -> a.Contains "dev-branch"))
+
 let run () =
     stealthBrowserMcpRefEmptyReturnsMaster ()
     stealthBrowserMcpRefNonEmptyPassthrough ()
@@ -48,3 +70,7 @@ let run () =
     getStealthBrowserMcpCommandContainsAllPartsCustomRef ()
     getStealthBrowserMcpLocalConfigTypeLocal ()
     getStealthBrowserMcpLocalConfigCommandElements ()
+    sembleMcpRefEmptyReturnsMaster ()
+    sembleMcpRefNonEmptyPassthrough ()
+    getSembleMcpCommandElements ()
+    getSembleMcpCommandCustomRef ()
