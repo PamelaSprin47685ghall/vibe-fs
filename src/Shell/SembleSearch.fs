@@ -70,43 +70,27 @@ let private shortGuid () =
     let g = System.Guid.NewGuid().ToString("N")
     g.[..7]
 
-let private synthId () = $"semble-synth-{shortGuid ()}"
-
-let buildReadPair (sessionID: string) (agent: string) (result: SembleResult) : Message<obj> list =
-    let callID = $"semble-{shortGuid ()}"
-    let assistantId = synthId ()
-    let resultId = synthId ()
-    let baseInfo id role =
-        { id = id
-          sessionID = sessionID
-          role = role
-          agent = agent
-          isError = false
-          toolName = "read"
-          details = null
-          time = null }
-    let assistantMsg : Message<obj> =
-        { info = baseInfo assistantId Assistant
-          parts = [ ToolPart("read", callID, None, null) ]
-          source = classifySource assistantId
-          raw = null }
-    let toolResultMsg : Message<obj> =
-        let output = formatReadOutput result.content result.startLine
-        let state =
-            { status = "completed"
-              output = output
-              error = ""
-              input = box (createObj [
-                  "path", box result.filePath
-                  "offset", box result.startLine
-                  "limit", box (result.endLine - result.startLine + 1)
-              ])
-              operationAction = "" }
-        { info = baseInfo resultId ToolResult
-          parts = [ ToolPart("read", callID, Some state, null) ]
-          source = classifySource resultId
-          raw = null }
-    [ assistantMsg; toolResultMsg ]
+let buildReadToolParts (assistantId: string) (sessionID: string) (results: SembleResult list) : obj array =
+    results
+    |> List.mapi (fun i r ->
+        let g = shortGuid ()
+        box (createObj [
+            "type", box "tool"
+            "tool", box "read"
+            "callID", box $"semble-call-{g}"
+            "id", box $"semble-tool-{assistantId}-{i}"
+            "sessionID", box sessionID
+            "messageID", box assistantId
+            "state", box (createObj [
+                "status", box "completed"
+                "input", box (createObj [ "filePath", box r.filePath ])
+                "output", box (formatReadOutput r.content r.startLine)
+                "title", box $"Read {r.filePath}"
+                "metadata", box (createObj [])
+                "time", box (createObj [ "start", box 0; "end", box 1 ])
+            ])
+        ]))
+    |> Array.ofList
 
 let isBreakpoint (final: obj array) : bool =
     if final.Length = 0 then false

@@ -42,36 +42,28 @@ let formatReadOutputPrefixesLines () =
     check "line 2 prefix" (lines.[1].StartsWith "   128|")
     check "line 3 prefix" (lines.[2].StartsWith "   129|")
 
-let buildReadPairProducesTwoMessages () =
-    let pair = buildReadPair "session-1" "investigator" sampleResult
-    equal "pair length" 2 pair.Length
-    equal "first role" Assistant pair.[0].info.role
-    equal "second role" ToolResult pair.[1].info.role
-    equal "ids synthetic" true (pair.[0].source <> Native)
-    equal "ids synthetic 2" true (pair.[1].source <> Native)
+let buildReadToolPartsProducesOnePartPerResult () =
+    let parts = buildReadToolParts "msg-1" "session-1" [ sampleResult; sampleResult2 ]
+    equal "part count" 2 parts.Length
 
-let buildReadPairStateInputIsCorrect () =
-    let pair = buildReadPair "session-1" "investigator" sampleResult
-    match pair.[1].parts with
-    | [ ToolPart(_, _, Some state, _) ] ->
-        equal "state status" "completed" state.status
-        let input = state.input
-        equal "path" "src/auth.py" (str input "path")
-        equal "offset" 127 (unbox<int> (get input "offset"))
-        equal "limit" 3 (unbox<int> (get input "limit"))
-        check "output starts with line prefix" (state.output.Contains "   127|")
-    | _ -> failwith "expected single tool result part"
+let buildReadToolPartsStructureMatchesCaps () =
+    let parts = buildReadToolParts "msg-1" "session-1" [ sampleResult ]
+    let p = parts.[0]
+    equal "type" "tool" (str p "type")
+    equal "tool" "read" (str p "tool")
+    check "callID semble prefix" ((str p "callID").StartsWith "semble-call-")
+    equal "messageID" "msg-1" (str p "messageID")
+    let state = get p "state"
+    equal "state status" "completed" (str state "status")
+    let input = get state "input"
+    equal "input filePath" "src/auth.py" (str input "filePath")
+    check "output line prefix" ((str state "output").Contains "   127|")
+    equal "title" "Read src/auth.py" (str state "title")
 
-let buildReadPairCallIDsMatch () =
-    let pair = buildReadPair "session-1" "investigator" sampleResult
-    match pair.[0].parts, pair.[1].parts with
-    | [ ToolPart(_, id1, None, _) ], [ ToolPart(_, id2, Some _, _) ] -> equal "callID" id1 id2
-    | _ -> failwith "expected matching callIDs"
-
-let stripSyntheticBySourceRemovesSembleSynth () =
-    let pair = buildReadPair "session-1" "investigator" sampleResult
-    let stripped = stripSyntheticBySource pair
-    equal "stripped empty" 0 stripped.Length
+let buildReadToolPartsCallIDsUnique () =
+    let parts = buildReadToolParts "msg-1" "session-1" [ sampleResult; sampleResult2 ]
+    let ids = parts |> Array.map (fun p -> str p "callID") |> Set.ofArray
+    equal "unique callIDs" 2 ids.Count
 
 let isBreakpointDetectsToolResultFinal () =
     let toolResultMsg =
@@ -156,10 +148,9 @@ let dumpInjectionNoThrowWhenDisabled () =
 
 let run () =
     formatReadOutputPrefixesLines ()
-    buildReadPairProducesTwoMessages ()
-    buildReadPairStateInputIsCorrect ()
-    buildReadPairCallIDsMatch ()
-    stripSyntheticBySourceRemovesSembleSynth ()
+    buildReadToolPartsProducesOnePartPerResult ()
+    buildReadToolPartsStructureMatchesCaps ()
+    buildReadToolPartsCallIDsUnique ()
     isBreakpointDetectsToolResultFinal ()
     isBreakpointFalseForAssistantFinal ()
     isBreakpointFalseForEmpty ()

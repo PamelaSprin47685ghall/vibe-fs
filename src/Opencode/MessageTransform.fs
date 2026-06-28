@@ -64,15 +64,32 @@ let private injectSembleResults
                     SembleSearch.trace "DECIDE" $"skip: no results (start={startIndex}, len={final.Length})"
                     return final
                 else
-                    let pairs = results |> List.collect (SembleSearch.buildReadPair sessionID agent)
-                    let encoded = MessagingCodec.encodeMessages pairs
-                    if Array.isEmpty encoded then
-                        SembleSearch.trace "DECIDE" "skip: encoded empty"
+                    let rec findLastAssistant i =
+                        if i < 0 then None
+                        else
+                            let m = final.[i]
+                            let role = Wanxiangshu.Shell.Dyn.str (Wanxiangshu.Shell.Dyn.get m "info") "role"
+                            if role = "assistant" then Some m else findLastAssistant (i - 1)
+                    match findLastAssistant (final.Length - 1) with
+                    | None ->
+                        SembleSearch.trace "DECIDE" "skip: no assistant to attach reads"
                         return final
-                    else
-                        SembleSearch.markBreakpoint sessionID final.Length
-                        SembleSearch.dumpInjection sessionID agent context results pairs.Length
-                        return Array.append final encoded
+                    | Some lastAssistant ->
+                        let assistantId = Wanxiangshu.Shell.Dyn.str (Wanxiangshu.Shell.Dyn.get lastAssistant "info") "id"
+                        let newToolParts = SembleSearch.buildReadToolParts assistantId sessionID results
+                        if Array.isEmpty newToolParts then
+                            SembleSearch.trace "DECIDE" "skip: no tool parts"
+                            return final
+                        else
+                            let originalParts = Wanxiangshu.Shell.Dyn.get lastAssistant "parts"
+                            let cleaned =
+                                if Wanxiangshu.Shell.Dyn.isNullish originalParts || not (Wanxiangshu.Shell.Dyn.isArray originalParts) then [||]
+                                else (originalParts :?> obj array) |> Array.filter (fun p -> not ((Wanxiangshu.Shell.Dyn.str p "callID").StartsWith("semble-call-")))
+                            let combined = Array.append cleaned newToolParts
+                            lastAssistant?parts <- box combined
+                            SembleSearch.markBreakpoint sessionID final.Length
+                            SembleSearch.dumpInjection sessionID agent context results newToolParts.Length
+                            return final
     }
 
 let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
