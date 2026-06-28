@@ -55,8 +55,8 @@ let private injectSembleResults
             return final
         | Some startIndex ->
             let context = SembleSearch.extractContextFromMessages startIndex messages
-            if context.Length < 50 then
-                SembleSearch.trace "DECIDE" $"skip: context too short ({context.Length}, start={startIndex}, len={final.Length})"
+            if context.Length = 0 then
+                SembleSearch.trace "DECIDE" $"skip: empty context (start={startIndex}, len={final.Length})"
                 return final
             else
                 let! results = SembleSearch.search context directory 3
@@ -66,9 +66,13 @@ let private injectSembleResults
                 else
                     let pairs = results |> List.collect (SembleSearch.buildReadPair sessionID agent)
                     let encoded = MessagingCodec.encodeMessages pairs
-                    SembleSearch.markBreakpoint sessionID final.Length
-                    SembleSearch.dumpInjection sessionID agent context results pairs.Length
-                    return Array.append final encoded
+                    if Array.isEmpty encoded then
+                        SembleSearch.trace "DECIDE" "skip: encoded empty"
+                        return final
+                    else
+                        SembleSearch.markBreakpoint sessionID final.Length
+                        SembleSearch.dumpInjection sessionID agent context results pairs.Length
+                        return Array.append final encoded
     }
 
 let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
