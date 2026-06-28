@@ -46,7 +46,7 @@ let reviewerPromptFormat () =
 let muxReviewerVerdictPromptFormat () =
     let prompt = Wanxiangshu.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
     check "mux prompt starts with front-matter" (prompt.StartsWith "---")
-    check "mux prompt carries reviewer role" (prompt.Contains "role: reviewer")
+    check "mux prompt has no role field" (not (prompt.Contains "role:"))
     check "mux prompt has no call_id field" (not (prompt.Contains "call_id:"))
     check "mux prompt carries original_task" (prompt.Contains "original_task:" && prompt.Contains "ship S1")
     check "mux prompt carries affected_files" (prompt.Contains "affected_files:")
@@ -59,7 +59,7 @@ let muxReviewerVerdictPromptFormat () =
 let muxPreReviewVerdictPromptFormat () =
     let prompt = Wanxiangshu.Kernel.ReviewPrompts.preReviewVerdictPrompt "clarify rollout"
     check "pre-review prompt starts with front-matter" (prompt.StartsWith "---")
-    check "pre-review prompt carries reviewer role" (prompt.Contains "role: reviewer")
+    check "pre-review prompt has no role field" (not (prompt.Contains "role:"))
     check "pre-review prompt has no call_id field" (not (prompt.Contains "call_id:"))
     check "pre-review prompt carries original_task" (prompt.Contains "original_task:" && prompt.Contains "clarify rollout")
     check "pre-review prompt reuses review criteria" (prompt.Contains "# Evaluation Criteria")
@@ -68,7 +68,6 @@ let muxPreReviewVerdictPromptFormat () =
 
 let reviewInstructionsFrontMatter () =
     let instr = Wanxiangshu.Kernel.ReviewPrompts.reviewInstructions
-    check "instructions wrapped in front-matter" (instr.StartsWith "---")
-    check "instructions carry role" (instr.Contains "role: reviewer")
+    check "instructions are review prose" (instr.Contains "You are a code reviewer performing")
     check "instructions carry review criteria" (instr.Contains "# Evaluation Criteria")
     check "instructions mention return_reviewer" (instr.Contains "return_reviewer")

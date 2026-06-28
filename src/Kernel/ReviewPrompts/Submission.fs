@@ -15,9 +15,6 @@ let doubleCheckPrompt (task: string) : string =
          @ taskLine)
         "If you insist on PASS, otherwise please REJECT with detailed feedback."
 
-let private reviewerPromptFrontMatter (fields: FrontMatterField list) : FrontMatterField list =
-    [ yamlField "role" "reviewer" ] @ fields
-
 let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) : string =
     let taskLine = if task <> "" then [ yamlField originalTaskField task ] else []
 
@@ -57,7 +54,7 @@ let reviewSubmissionVerdictPrompt
     (report: string)
     (affectedFiles: string list)
     : string =
-    frontMatterPrompt (reviewerPromptFrontMatter (reviewSubmissionFields task report affectedFiles)) reviewSubmissionVerdictBody
+    frontMatterPrompt (reviewSubmissionFields task report affectedFiles) reviewSubmissionVerdictBody
 
 let reviewSubmissionDoubleCheckPrompt
     (task: string)
@@ -65,7 +62,7 @@ let reviewSubmissionDoubleCheckPrompt
     (affectedFiles: string list)
     : string =
     let fields =
-        [ yamlField "role" "reviewer"; yamlField doubleCheckField doubleCheckChallenge ]
+        [ yamlField doubleCheckField doubleCheckChallenge ]
         @ reviewSubmissionFields task report affectedFiles
 
     frontMatterPrompt fields reviewSubmissionVerdictBody
@@ -73,4 +70,4 @@ let reviewSubmissionDoubleCheckPrompt
 let preReviewVerdictPrompt (task: string) : string =
     let taskLine = if task <> "" then [ yamlField originalTaskField task ] else []
 
-    frontMatterPrompt (reviewerPromptFrontMatter taskLine) preReviewVerdictBody
+    frontMatterPrompt taskLine preReviewVerdictBody

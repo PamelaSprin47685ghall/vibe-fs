@@ -10,8 +10,7 @@ let reviewInstructionsProse =
     + reviewCriteria
     + "\n\nBased on the original task, change report, and affected files above, read and inspect the actual file contents before making your judgment. The original task is the authoritative requirement — verify that the implementation satisfies it, not just that it matches the self-reported change report.\n\n# Submitting Your Verdict\n\nreturn_reviewer({ \"verdict\": \"PASS\" })                          // Accept — no feedback needed\nreturn_reviewer({ \"verdict\": \"PASS\", \"feedback\": \"minor suggestions...\" }) // Accept with optional suggestions\nreturn_reviewer({ \"verdict\": \"REJECT\", \"feedback\": \"specific...\" }) // Reject — provide detailed, actionable feedback\n\nIMPORTANT: verdict MUST be exactly \"PASS\" or \"REJECT\". When passing, feedback is optional and may include minor suggestions. When rejecting, feedback MUST be detailed and actionable.\n\nYou MUST call return_reviewer before finishing. Do not end the conversation without submitting your verdict."
 
-let reviewInstructions =
-    frontMatterPrompt [ yamlField "role" "reviewer" ] reviewInstructionsProse
+let reviewInstructions = reviewInstructionsProse
 
 let reviewerVerdictPrologue (subject: string) =
     $"You are a reviewer evaluating {subject}.\n\n"

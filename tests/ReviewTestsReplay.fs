@@ -58,7 +58,7 @@ let inferReviewTaskFromTexts' () =
         (inferReviewTaskFromTexts [ reviewerChildPrompt ])
     let reviewerVerdictPrompt =
         Wanxiangshu.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "worker task" "report body" [ "b.fs" ]
-    equal "front matter role: reviewer + task must not activate worker loop" None
+    equal "front matter task: original_task must not activate worker loop" None
         (inferReviewTaskFromTexts [ reviewerVerdictPrompt ])
 
 let parseFrontMatterScalars' () =
