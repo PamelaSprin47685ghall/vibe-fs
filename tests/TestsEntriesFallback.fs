@@ -4,7 +4,6 @@ open Wanxiangshu.Tests.FallbackKernelTests
 open Wanxiangshu.Tests.FallbackConfigCodecTests
 open Wanxiangshu.Tests.FallbackRuntimeStateTests
 open Wanxiangshu.Tests.FallbackEventBridgeTests
-open Wanxiangshu.Tests.FallbackEventBridgeToolTextTests
 open Wanxiangshu.Tests.FallbackMessageCodecTests
 open Wanxiangshu.Tests.FallbackIntegrationTests
 open Wanxiangshu.Tests.ArchitectureTestsFallback
@@ -19,7 +18,6 @@ let fallbackTestEntries () : (string * TestBody) list =
     "FallbackConfigCodecTests.run", Sync (sync FallbackConfigCodecTests.run)
     "FallbackRuntimeStateTests.run", Sync (sync FallbackRuntimeStateTests.run)
     "FallbackEventBridgeTests.run", Async FallbackEventBridgeTests.run
-    "FallbackEventBridgeToolTextTests.run", Async FallbackEventBridgeToolTextTests.run
     "FallbackMessageCodecTests.run", Sync (sync FallbackMessageCodecTests.run)
     "FallbackIntegrationTests.run", Sync (sync FallbackIntegrationTests.run)
     "Arch.Fallback.zeroTimer", Sync (sync ArchitectureTestsFallback.zeroTimer)

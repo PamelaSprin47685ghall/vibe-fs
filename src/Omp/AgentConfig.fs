@@ -38,7 +38,7 @@ let private mergeObj (a: obj) (b: obj) : obj =
     result
 
 let private mapToolNames (f: string -> 'a) : obj =
-    Array.append (allToolNames omp) methodologyToolNames
+    Array.append (allToolNames omp) Wanxiangshu.Methodology.Registry.toolNames
     |> Seq.map (fun name -> name, box (f name))
     |> createObj
 

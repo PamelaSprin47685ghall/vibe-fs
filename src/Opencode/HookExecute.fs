@@ -18,6 +18,14 @@ open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.PatchToolsCodec
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.LivelockGuard
+
+// ponytail: heuristic network-error detection in tool output; proper fix = tools return structured errors
+let private isNetworkErrorText (text: string) : bool =
+    if System.String.IsNullOrWhiteSpace text then false
+    elif text.Contains("\n") then false
+    else
+        let lower = text.ToLowerInvariant()
+        lower.Contains("error") && lower.Contains("network")
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Shell.Dyn
@@ -90,7 +98,7 @@ let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserve
         let tool = toolNameFromHookInput input
         let sessionID = Wanxiangshu.Kernel.Domain.Id.sessionIdValue (fromOpencode input pluginDirectory).Execution.SessionId
         let originalOutput = hookOutputText output
-        if Wanxiangshu.Shell.FallbackMessageCodec.isNetworkErrorText originalOutput then
+        if isNetworkErrorText originalOutput then
             setHookError output "network connection lost"
         let succeeded = hookOutputError output = ""
         if check sessionID tool (JS.JSON.stringify (argsFromHookInput input)) originalOutput then

@@ -4,11 +4,12 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
-[<Emit("Object.keys($0)")>]
-let private objectKeys (o: obj) : string array = jsNative
+[<Global("Object")>]
+let private JSObject: obj = jsNative
 
-[<Emit("Array.isArray($0)")>]
-let private isArray (o: obj) : bool = jsNative
+let private objectKeys (o: obj) : string array = JSObject?keys(o) |> unbox
+
+let private isArray (o: obj) : bool = not (isNull o) && (o :? obj array)
 
 let private parseInfoItem (key: string) (value: obj) : InfoItem option =
     if isNull value then None

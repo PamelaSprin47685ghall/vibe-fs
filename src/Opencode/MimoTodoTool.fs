@@ -61,7 +61,7 @@ let mimoTodoTool (_pluginCtx: obj) : obj =
             "status", strReq todoStatusDesc
             "priority", strReq todoPriorityDesc
         ])
-    let enumVals = List.toArray Wanxiangshu.Kernel.Methodology.methodologyEnumValues
+    let enumVals = List.toArray Wanxiangshu.Methodology.Registry.enumValues
 
     define
         (toolDescriptionFor Mimocode)

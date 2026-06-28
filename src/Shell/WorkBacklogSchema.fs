@@ -14,7 +14,7 @@ let selectMethodologyProperty =
         "description", box selectMethodologyFieldDescription
         "items", createObj [
             "type", box "string"
-            "enum", box (List.toArray methodologyEnumValues)
+            "enum", box (List.toArray Wanxiangshu.Methodology.Registry.enumValues)
         ]
         "minItems", box 1
     ]

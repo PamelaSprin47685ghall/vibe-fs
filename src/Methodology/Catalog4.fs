@@ -1,0 +1,232 @@
+module Wanxiangshu.Methodology.Catalog4
+
+open Wanxiangshu.Methodology.SchemaCommon
+
+let schemas: MethodologySchema list = [
+    buildSchema
+        "conceptual_analysis"
+        "Clarify meanings, category boundaries, scope; remove category mistakes."
+        "When terms collide (tool vs wrapper vs agent vs session vs task)."
+        [ reqStr "confused_concept" "Term or phrase causing wrong edits."
+          reqArr "senses_disambiguated" 3 "Distinct senses with repo examples each."
+          reqArr "category_boundaries" 2 "What is not a member (process vs object, relation vs entity)."
+          reqStr "scope_fix" "Correct scope for the task after disambiguation."
+          reqArr "category_mistakes_found" 1 "Mistakes in prior reasoning or docs."
+          optStr "recommended_vocabulary" "Terms parent should use in todos and reports."
+          optArr "glossary_entries" 2 "Short definitions for KG or comments if allowed." ]
+        "Disambiguate vocabulary before structural changes."
+        [ "Disambiguation table"
+          "Category boundaries"
+          "Scope fix"
+          "Vocabulary"
+          "Next actions" ]
+    buildSchema
+        "dialectical_analysis"
+        "Thesis, antithesis, tension, dependency, resolution—not one-sided causality."
+        "When opposing forces shape design (DRY vs 54 files, kernel purity vs host Dyn)."
+        [ reqStr "thesis" "One force or design pole with advocates and benefits."
+          reqStr "antithesis" "Opposing force with legitimate benefits."
+          reqArr "tensions" 2 "Concrete conflicts between poles in this task."
+          reqArr "dependencies" 1 "How each pole needs the other (cannot eliminate entirely)."
+          reqStr "synthesis_path" "Resolution trajectory: layered compromise, phased plan."
+          optStr "frozen_decision" "What leadership already decided—synthesis must respect."
+          optArr "tradeoffs_accepted" 1 "Costs each side accepts in synthesis." ]
+        "Mediate real opposing design forces instead of picking a slogan."
+        [ "Thesis vs antithesis"
+          "Tensions"
+          "Synthesis"
+          "Accepted tradeoffs"
+          "Next actions" ]
+    buildSchema
+        "hermeneutic_circle"
+        "Iterate part and whole until local and global meaning stabilize."
+        "Understanding large codepaths, README+implementation together, PRD+tests."
+        [ reqStr "whole_artifact" "Global text/system (README architecture, full Plugin.fs)."
+          reqStr "part_focus" "Local fragment under study (one hook, one schema file)."
+          reqArr "part_to_whole_updates" 2 "How part revised understanding of whole."
+          reqArr "whole_to_part_updates" 2 "How whole revised reading of part."
+          reqStr "stabilized_reading" "Mutually consistent interpretation after iterations."
+          optArr "remaining_tension" 1 "Parts still inconsistent—need more reads."
+          optStr "reading_order" "Suggested file order for parent reads." ]
+        "Alternate local detail and global architecture until coherent."
+        [ "Iteration log"
+          "Stabilized reading"
+          "Remaining tension"
+          "Reading order"
+          "Next actions" ]
+    buildSchema
+        "deconstruction"
+        "Inspect hidden binaries, excluded voices, unstable centers in framing."
+        "When PRD, AGENTS, or design docs assume hierarchy that hides alternatives."
+        [ reqStr "text_or_design" "Document or architecture being deconstructed."
+          reqArr "binary_oppositions" 2 "Either/or frames (kernel vs hack, speed vs safety) and what they suppress."
+          reqArr "excluded_middle" 1 "Third options ruled out by rhetoric."
+          reqStr "unstable_center" "Claimed SSOT or center that depends on what it excludes."
+          reqArr "internal_contradictions" 2 "Tensions within the framing itself."
+          optStr "reframe" "Fairer framing for deciding next engineering work."
+          optArr "actionable_extractions" 1 "Still-valid requirements after deconstruction." ]
+        "Expose rhetorical structure so decisions are not captive to false binaries."
+        [ "Binaries and exclusions"
+          "Contradictions"
+          "Reframe"
+          "Actionable requirements"
+          "Next actions" ]
+    buildSchema
+        "renormalization"
+        "Coarse-grain micro-detail; keep scale-relevant variables; find stable macro structure."
+        "When micro implementation noise obscures macro behavior (54 files, hook spaghetti)."
+        [ reqStr "micro_level" "Fine detail drowning analysis (every Dyn call, every test line)."
+          reqStr "macro_question" "What behavior matters at session/plugin scale."
+          reqArr "coarse_graining_map" 2 "What you average, sum, or ignore at macro level."
+          reqArr "relevant_variables" 3 "Variables still predictive after coarse-graining (tool count, queue depth)."
+          reqStr "universal_pattern" "Structure stable across scales (layering, event truth)."
+          optArr "micro_corrections" 1 "When macro view fails—return to micro."
+          optStr "documentation_level" "What belongs in README vs per-file schema." ]
+        "Summarize micro complexity into macro laws for decision-making."
+        [ "Coarse-graining"
+          "Macro variables"
+          "Stable pattern"
+          "When to re-zoom"
+          "Next actions" ]
+    buildSchema
+        "simplification"
+        "Remove accidental complexity until only essential problem remains."
+        "When solution path is cluttered with frameworks, flags, duplicate adapters."
+        [ reqStr "overcomplicated_surface" "What feels heavier than the problem (duplicate MessageTransform, long Dyn chains)."
+          reqArr "accidental_parts" 3 "Pieces not required by user goal or invariants—candidate removal."
+          reqStr "essential_core" "What must remain for correctness."
+          reqArr "simplification_moves" 3 "Concrete removals or merges with risk note each."
+          reqArr "invariants_preserved" 2 "What simplification must not break."
+          optStr "simplification_metric" "How you will know it is simpler (lines, tool count, modules)."
+          optArr "deferred_complexity" 1 "Complexity postponed with explicit trigger to revisit." ]
+        "Peel accidental layers without violating essential invariants."
+        [ "Accidental inventory"
+          "Essential core"
+          "Simplification moves"
+          "Preserved invariants"
+          "Next actions" ]
+    buildSchema
+        "tradeoff_analysis"
+        "Compare options across explicit constraints and costs."
+        "When choosing between registration strategies, schema layout, host parity approaches."
+        [ reqStr "decision" "Choice to make (54 notebook tools vs generated, per-methodology fields vs one generic note field)."
+          reqArr "options" 2 "Named options with one-line summary each."
+          reqArr "constraints" 3 "Hard limits: AGENTS.md, test time, context window, dual host."
+          reqArr "cost_dimensions" 2 "Dimensions: dev time, token cost, maintenance, UX for LLM."
+          reqStr "comparison_matrix" "Narrative or table comparing options on constraints and costs."
+          reqStr "recommendation" "Preferred option with explicit accepted costs."
+          optArr "reversible_parts" 1 "What you can undo cheaply if wrong."
+          optStr "decision_deadline" "What happens if you defer deciding." ]
+        "Compare options honestly on named constraints—not vibes."
+        [ "Options"
+          "Constraint table"
+          "Recommendation"
+          "Reversibility"
+          "Next actions" ]
+    buildSchema
+        "risk_analysis"
+        "Identify failure modes, blast radius, irreversible decisions."
+        "Before large registration change, KG writes, or permission matrix edits."
+        [ reqStr "proposed_change" "What you might ship."
+          reqArr "failure_modes" 3 "Ways it fails (context overflow, oversized notebook backgrounds, test flake)."
+          reqArr "blast_radius" 2 "Who/what breaks: Mux only, all hosts, user sessions."
+          reqArr "irreversible_steps" 1 "Hard-to-rollback actions (published npm, migrated history)."
+          reqStr "risk_ranking" "Ordered risks by severity × likelihood qualitative."
+          reqArr "mitigations" 2 "Per top risk: guard, feature flag, gate, phased rollout."
+          optStr "residual_risk" "Risk accepted after mitigations."
+          optArr "monitoring" 1 "Signals to watch post-change." ]
+        "Map failure modes and mitigations before irreversible edits."
+        [ "Failure modes"
+          "Blast radius"
+          "Mitigations"
+          "Residual risk"
+          "Next actions" ]
+    buildSchema
+        "test_driven_reasoning"
+        "Make expected behavior executable before or during implementation."
+        "When behavior can be pinned by tests (schema registry, Args.parse required fields, architecture gates)."
+        [ reqStr "behavior_claim" "What should hold (54 schemas, required intent/background, tool names)."
+          reqArr "executable_oracles" 3 "Tests or checks: file path + assertion sketch."
+          reqStr "red_phase_plan" "What failing test or gate to add first."
+          reqStr "green_phase_plan" "Minimal implementation to satisfy oracles."
+          reqArr "refactor_safeties" 1 "Oracles that survive internal refactor."
+          optStr "non_testable_residual" "Behavior still needing human review."
+          optArr "tdd_sequence" 2 "Ordered red-green units of work." ]
+        "Bind reasoning to executable oracles in tests/ArchitectureTests.fs style."
+        [ "Behavior claim"
+          "Oracles"
+          "Red-green plan"
+          "TDD sequence"
+          "Next actions" ]
+    buildSchema
+        "debugging_trace"
+        "Reproduce, isolate, instrument, verify the fault chain."
+        "When a failure needs systematic narrowing (Fable build, hook, integration test)."
+        [ reqStr "failure_signature" "Exact error, stack, or assertion text."
+          reqStr "reproduction_steps" "Minimal steps to reproduce (command, env)."
+          reqArr "isolation_experiments" 3 "What you removed or swapped to narrow cause."
+          reqArr "instrumentation_points" 2 "Logs, temporary asserts, read-only traces (no permanent log spam)."
+          reqStr "fault_chain" "Ordered chain from trigger to symptom."
+          reqStr "verified_fix_hypothesis" "Smallest change predicted to break the chain."
+          optArr "ruled_out_causes" 2 "Causes eliminated with evidence."
+          optStr "regression_guard" "Test to add after fix." ]
+        "Document reproduce→isolate→instrument→verify without guessing."
+        [ "Reproduction"
+          "Isolation log"
+          "Fault chain"
+          "Fix hypothesis"
+          "Next actions" ]
+    buildSchema
+        "security_review"
+        "Reason adversarially about trust boundaries and abuse paths."
+        "When tools execute code, read files, spawn subagents, or accept huge backgrounds."
+        [ reqStr "trust_boundary" "Boundary under review (LLM→tool args, plugin→shell, methodology tool backgrounds→files)."
+          reqArr "assets" 2 "What must be protected (repo, secrets, user data, session history)."
+          reqArr "threat_actors" 1 "Malicious or careless LLM, compromised dependency, hostile workspace."
+          reqArr "abuse_paths" 3 "Concrete abuse: path traversal, prompt injection via background, executor rw."
+          reqArr "existing_controls" 2 "Permission matrix, mode ro/rw, validation already present."
+          reqStr "gap_summary" "Missing controls ranked."
+          optArr "hardening_actions" 2 "Specific mitigations without over-engineering logging."
+          optStr "out_of_scope" "Threats explicitly not covered this turn." ]
+        "Adversarial pass on tool and subagent boundaries."
+        [ "Boundary map"
+          "Abuse paths"
+          "Control gaps"
+          "Hardening"
+          "Next actions" ]
+    buildSchema
+        "performance_analysis"
+        "Locate bottlenecks, asymptotics, and resource constraints."
+        "When many methodology notebook tools, large backgrounds, Fable compile, or session history size matters."
+        [ reqStr "performance_question" "Latency, memory, context tokens, or build time concern."
+          reqStr "workload_model" "Who does work how often (per tool call, per session transform)."
+          reqArr "hot_paths" 2 "Suspected bottlenecks with file or pipeline reference."
+          reqArr "complexity_notes" 2 "Asymptotic or scaling behavior (O(tools×schema), history length)."
+          reqStr "measurement_plan" "What to measure (build time, output bytes) without fancy APM."
+          reqArr "optimization_candidates" 2 "Changes with expected impact; avoid premature micro-opt."
+          optStr "budget" "Acceptable limits (tool result size, compile seconds)."
+          optArr "anti_optimizations" 1 "Opts that hurt clarity and should wait." ]
+        "Tie performance claims to workload and measurement."
+        [ "Workload"
+          "Hot paths"
+          "Measurement"
+          "Candidates"
+          "Next actions" ]
+    buildSchema
+        "user_intent_clarification"
+        "Resolve ambiguous goals before optimizing the wrong target."
+        "When user request could mean schema-only, full wiring, or design discussion."
+        [ reqStr "user_request_quote" "Paraphrase or quote of what user asked."
+          reqArr "interpretations" 3 "Plausible readings with different deliverables."
+          reqArr "disambiguating_questions" 2 "Questions to ask user if still blocked—prefer concrete either/or."
+          reqStr "assumed_intent" "Intent you will proceed under if user silent, with risk stated."
+          reqArr "success_criteria_per_interpretation" 2 "How you would know each interpretation is satisfied."
+          optStr "misinterpretation_cost" "What goes wrong if wrong interpretation."
+          optArr "clarified_out_of_scope" 1 "What user did not ask for but might be assumed." ]
+        "Make interpretations explicit before large automated work."
+        [ "Interpretations"
+          "Questions"
+          "Working assumption"
+          "Success criteria"
+          "Next actions" ]
+]

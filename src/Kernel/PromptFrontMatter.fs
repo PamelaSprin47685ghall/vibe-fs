@@ -6,14 +6,21 @@ open Wanxiangshu.Kernel.Yaml
 
 type FrontMatterField = string * obj
 
-[<Emit("Object.keys($0)")>]
-let private objectKeys (o: obj) : string array = jsNative
+[<Global("Object")>]
+let private JSObject: obj = jsNative
 
-[<Emit("typeof $0")>]
-let private jsTypeof (o: obj) : string = jsNative
+let private objectKeys (o: obj) : string array = JSObject?keys(o) |> unbox
 
-[<Emit("Object.assign($0, $1)")>]
-let private objectAssign (target: obj) (source: obj) : obj = jsNative
+let private jsTypeof (o: obj) : string =
+    if isNull o then "object"
+    else
+        match o with
+        | :? string -> "string"
+        | :? bool -> "boolean"
+        | :? int | :? float -> "number"
+        | _ -> "object"
+
+let private objectAssign (target: obj) (source: obj) : obj = JSObject?assign(target, source)
 
 let private extractFrontMatterBlocksAndBody (text: string) : string list * string =
     if isNull text then ([], text)

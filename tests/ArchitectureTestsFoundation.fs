@@ -11,6 +11,7 @@ open Wanxiangshu.Tests.ArchitectureTestsSupport
 /// Kernel must stay free of host-specific dynamic access (Dyn) and Shell imports.
 /// Fable interop (createObj/box/obj) is permitted for pure value construction
 /// with portable libraries such as the yaml package (no IO, no host objects).
+/// [<Emit>] (arbitrary JS injection) is banned; use [<Global>] typed bindings instead.
 /// Kernel must not read the wall clock directly; time values are injected from Shell.
 let kernelBoundary () =
     for f in fsFilesRelative "src/Kernel" do
@@ -18,6 +19,7 @@ let kernelBoundary () =
         let content = requireFile path
         check ("arch: " + f + " Dyn-free") (not (content.Contains "Dyn."))
         check ("arch: " + f + " no open Shell") (not (content.Contains "open Wanxiangshu.Shell"))
+        check ("arch: " + f + " no [<Emit>] (arbitrary JS injection)") (not (content.Contains "[<Emit"))
         check ("arch: " + f + " no UtcNow (clock side-effect)") (not (content.Contains "UtcNow"))
         check ("arch: " + f + " no DateTimeOffset (clock side-effect)") (not (content.Contains "DateTimeOffset"))
         check ("arch: " + f + " no Date.now (clock side-effect)") (not (content.Contains "Date.now"))

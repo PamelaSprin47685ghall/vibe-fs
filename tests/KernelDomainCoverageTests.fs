@@ -7,6 +7,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.Domain.Id
 open Wanxiangshu.Kernel.Methodology
+open Wanxiangshu.Methodology.Registry
 open Wanxiangshu.Kernel.OmpPrompts
 open Wanxiangshu.Kernel.ToolArgs
 open Wanxiangshu.Kernel.ToolResult
@@ -135,7 +136,7 @@ let methTodoResultTextOne () =
     check "todo contains x" (r.Contains "x")
 
 let methEnumCount () =
-    check "enum count > 50" (methodologyEnumValues.Length > 50)
+    check "enum count > 50" (enumValues.Length > 50)
 
 let methSelectFieldDesc () =
     check "selectMethodologyFieldDescription contains select_methodology"

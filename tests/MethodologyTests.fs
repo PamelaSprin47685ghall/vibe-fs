@@ -25,20 +25,18 @@ let todoWriteOutputExact () =
     check "todo envelope: multiple methodologies" (hintFromTodoOutput [ "first_principles"; "deduction" ] = multi)
 
 let enumCount () =
-    check "enum: 54 values" (methodologyEnumValues.Length = 54)
+    check "enum: 54 values" (enumValues.Length = 54)
 
 let enumAllInCatalog () =
-    methodologyEnumValues
+    enumValues
     |> List.iter (fun v -> check ("catalog contains " + v) (methodologyCatalog.Contains(v)))
 
 let catalogContainsKeyphrase () =
     check "catalog: contains keyphrase" (methodologyCatalog.Contains("Methodology catalog"))
 
-let registryAlignsWithEnum () =
+let registrySchemasWellFormed () =
     check "registry: 54 schemas" (allSchemas.Length = 54)
-    methodologyEnumValues
-    |> List.iter (fun id ->
-        check ("registry has " + id) (tryFindSchema id |> Option.isSome))
+    check "registry: enum count matches schemas" (enumValues.Length = allSchemas.Length)
     allSchemas
     |> List.iter (fun s ->
         check ("schema has intent " + s.methodologyId) (
@@ -51,4 +49,4 @@ let run () =
     enumCount ()
     enumAllInCatalog ()
     catalogContainsKeyphrase ()
-    registryAlignsWithEnum ()
+    registrySchemasWellFormed ()

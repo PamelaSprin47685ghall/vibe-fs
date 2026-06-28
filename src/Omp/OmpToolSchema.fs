@@ -134,6 +134,6 @@ let todowriteParameters (tb: obj) : obj =
         [|
             ("todos", arrayOf todoItem todosDesc tb)
             ("completedWorkReport", str reportDesc tb)
-            ("select_methodology", arrayOf (enumOf (methodologyEnumValues |> List.toArray) "Methodology name" tb) selectMethodologyFieldDescription tb)
+            ("select_methodology", arrayOf (enumOf (Wanxiangshu.Methodology.Registry.enumValues |> List.toArray) "Methodology name" tb) selectMethodologyFieldDescription tb)
         |]
         tb

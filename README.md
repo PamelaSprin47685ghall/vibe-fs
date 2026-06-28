@@ -128,9 +128,9 @@ JS/Node 无线程级并发，但有大量异步交错。策略不是到处加锁
 
 共享同一个 Kernel；差异留在各层：schema 生成、tool execute 签名、消息对象形态、子代理启动（OpenCode `ChildAgentRegistry` / Mux delegate / OMP `taskService`+子 workspace）、`task`/`todowrite` 命名（`HostTools` 按 `Opencode|Mimocode|Mux|Omp` 分支）。`src/Omp/` 仅依赖 Kernel+Shell，禁止 `open` / 引用 `Wanxiangshu.Opencode`、`Wanxiangshu.Mux`。
 
-### Methodology：每法一 schema，注册为工具
+### Methodology：数据驱动 schema，注册为工具
 
-`src/Methodology/`：每种推理法一个 `*.fs`（`SchemaCommon` + `Args` + `Registry.allSchemas`），经 `Methodology.OpencodeTools` / `Methodology.MuxTools` / `Methodology.OmpTools` 注册为 `methodology_<id>` 工具（共 54 个）。`Kernel.Methodology` 维护 `select_methodology` 枚举与 `todowrite`/`task` 必填字段文案；OMP 经 `Methodology.OmpTools.registerMethodologyTools`（TypeBox schema，经 `OmpToolSchema.methodologyParameters`）注册同一批 `methodology_<id>` 工具，并在 `todowrite` schema 与 `tool_result` 后处理侧消费同一 `select_methodology` 枚举。
+`src/Methodology/`：`SchemaCommon` + `Args` + `Catalog1`-`Catalog4`（`buildSchema` 数据）+ `Catalog`（聚合）+ `Registry.allSchemas`，经 `Methodology.OpencodeTools` / `Methodology.MuxTools` / `Methodology.OmpTools` 注册为 `methodology_<id>` 工具（共 54 个）。`Kernel.Methodology` 维护 `select_methodology` 枚举与 `todowrite`/`task` 必填字段文案；`Registry.enumValues` 从 `allSchemas` 单一派生消除三重数据复制；OMP 经 `Methodology.OmpTools.registerMethodologyTools`（TypeBox schema，经 `OmpToolSchema.methodologyParameters`）注册同一批 `methodology_<id>` 工具，并在 `todowrite` schema 与 `tool_result` 后处理侧消费同一 `select_methodology` 枚举。
 
 ### knowledge graph 不是全局常开，是目录门控
 
@@ -236,7 +236,7 @@ npm 包主导出入口：`build/src/Mux/Plugin.js`（`"."`）；OMP：`build/src
 src/
   Kernel/       纯领域规则、状态机、格式协议、共享提示词（92 .fs，含 KnowledgeGraph/ Nudge/ ReviewPrompts/ ReviewSession/ ToolCatalog/ 子目录）
   Shell/        Node/文件系统/网络/第三方库/串行队列 + 全部宿主 obj 边界 codec（97 .fs）
-  Methodology/  54 个方法论 schema + Registry + Opencode/Mux/Omp 工具注册（60 .fs）
+  Methodology/  54 个方法论 schema + Registry + Opencode/Mux/Omp 工具注册（10 .fs，数据驱动 Catalog1-4）
   Opencode/     OpenCode / Mimocode 插件适配层与 TUI 扩展（35 .fs）
   Mux/          Mux 注册与 wrapper 适配层（27 .fs）
   Omp/          oh-my-pi 扩展适配层（仅 Kernel+Shell，39 .fs，含 KnowledgeGraph/ 子目录）
