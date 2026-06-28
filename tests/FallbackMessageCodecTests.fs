@@ -39,6 +39,14 @@ let hasToolCallAsText_functionSpace () =
     let m = mkTextMsg "assistant" "<function name=\"edit\">...</function>"
     check "<function → true" (hasToolCallAsText [| m |])
 
+let hasToolCallAsText_toolCallTag () =
+    let m = mkTextMsg "assistant" "<tool_call>{\"name\":\"edit\",\"arguments\":{}}</tool_call>"
+    check "<tool_call> wrapper → true" (hasToolCallAsText [| m |])
+
+let hasToolCallAsText_toolCallTagWithNestedFunction () =
+    let m = mkTextMsg "assistant" "<tool_call>\n<function=Task>...</function>\n</tool_call>"
+    check "<tool_call>+<function= → true" (hasToolCallAsText [| m |])
+
 let hasToolCallAsText_userMessage () =
     let m = mkTextMsg "user" "<function=edit>...</function>"
     check "user role → false" (not (hasToolCallAsText [| m |]))
@@ -67,6 +75,8 @@ let run () =
     hasToolCallAsText_noToolCall ()
     hasToolCallAsText_functionEquals ()
     hasToolCallAsText_functionSpace ()
+    hasToolCallAsText_toolCallTag ()
+    hasToolCallAsText_toolCallTagWithNestedFunction ()
     hasToolCallAsText_userMessage ()
     allTodosCompleted_emptyArray ()
     allTodosCompleted_allCompleted ()

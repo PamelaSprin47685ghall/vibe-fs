@@ -4,7 +4,6 @@ import:
   - 大规模保姆级重构指南.md
 ---
 
-- 提交仓库时候带上 kg/ 的变化
 - Mux 端允许改动 ../mux 代码，但最好只改 binding，对其他核心的修改要最小化。真正实现最好在本仓库，其次在 binding，最差在 mux 本体
 - Omp 端不允许改动 ../oh-my-pi 代码，但可以参考
 - Opencode 端参见 ../opencode 代码，不允许改上游

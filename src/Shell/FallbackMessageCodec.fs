@@ -19,7 +19,8 @@ let hasToolCallAsText (msgs: obj array) : bool =
                     (parts :?> obj array)
                     |> Array.exists (fun part ->
                         Dyn.str part "type" = "text"
-                        && (let t = Dyn.str part "text" in t.Contains("<function=") || t.Contains("<function "))))
+                        && (let t = Dyn.str part "text"
+                            in t.Contains("<function=") || t.Contains("<function ") || t.Contains("<tool_call>"))))
 
 let isNetworkErrorText (text: string) : bool =
     if System.String.IsNullOrWhiteSpace text then false

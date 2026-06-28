@@ -552,6 +552,7 @@
     <Compile Include="tests/FallbackConfigCodecTests.fs" />
     <Compile Include="tests/FallbackRuntimeStateTests.fs" />
     <Compile Include="tests/FallbackEventBridgeTests.fs" />
+    <Compile Include="tests/FallbackEventBridgeToolTextTests.fs" />
     <Compile Include="tests/FallbackMessageCodecTests.fs" />
     <Compile Include="tests/FallbackIntegrationTests.fs" />
     <Compile Include="tests/ArchitectureTestsFallback.fs" />

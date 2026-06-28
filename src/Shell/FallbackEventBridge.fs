@@ -96,21 +96,34 @@ let handleEvent
                 | FallbackAction.PropagateFailure ->
                     do! executor.PropagateFailure sessionID
 
-                // SessionIdle in Idle phase: tool-text recovery + todo-aware skip
+                let mutable finalState = ns
+                // SessionIdle in Idle phase: tool-text / network-error recovery + todo-aware skip
                 if evt = FallbackEvent.SessionIdle && ns.Phase = FallbackPhase.Idle && not ns.TaskComplete && not ns.Cancelled then
                     let! msgs = executor.FetchMessages sessionID
                     if allTodosCompleted msgs then
-                        runtime.UpdateState sessionID { ns with TaskComplete = true }
-                    elif hasNetworkErrorText msgs then
-                        match List.tryItem ns.CurrentIndex chain with
-                        | Some model -> do! executor.SendContinue (sessionID, model)
-                        | None -> ()
-                    elif hasToolCallAsText msgs then
-                        match List.tryItem ns.CurrentIndex chain with
-                        | Some model -> do! executor.SendContinue (sessionID, model)
-                        | None -> ()
+                        finalState <- { ns with TaskComplete = true }
+                        runtime.UpdateState sessionID finalState
+                    elif hasNetworkErrorText msgs || hasToolCallAsText msgs then
+                        // ponytail: tool-text = model breaks host tool protocol; same-model retry futile past LoopMaxContinues, switch model
+                        if ns.ContinueCount + 1 >= cfg.LoopMaxContinues then
+                            match List.tryItem (ns.CurrentIndex + 1) chain with
+                            | Some nextModel ->
+                                finalState <- { ns with CurrentIndex = ns.CurrentIndex + 1; ContinueCount = 0 }
+                                runtime.UpdateState sessionID finalState
+                                do! executor.AbortSession sessionID
+                                do! executor.SendContinue (sessionID, nextModel)
+                            | None ->
+                                finalState <- { ns with Phase = FallbackPhase.Exhausted }
+                                runtime.UpdateState sessionID finalState
+                                do! executor.PropagateFailure sessionID
+                        else
+                            finalState <- { ns with ContinueCount = ns.ContinueCount + 1 }
+                            runtime.UpdateState sessionID finalState
+                            match List.tryItem ns.CurrentIndex chain with
+                            | Some model -> do! executor.SendContinue (sessionID, model)
+                            | None -> ()
 
-                return { Consumed = consumed; State = ns }
+                return { Consumed = consumed; State = finalState }
     }
 
 // ---------------------------------------------------------------------------

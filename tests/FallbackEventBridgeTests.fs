@@ -11,10 +11,11 @@ open Wanxiangshu.Shell.FallbackEventBridge
 // Fake implementations
 // ---------------------------------------------------------------------------
 
-type FakeExecutor() =
+type FakeExecutor(?messages: obj array) =
     let mutable continueCalls  : ResizeArray<string * FallbackModel> = ResizeArray()
     let mutable abortCalls     : ResizeArray<string> = ResizeArray()
     let mutable propagateCalls : ResizeArray<string> = ResizeArray()
+    let msgs = defaultArg messages [||]
 
     interface IActionExecutor with
         member _.SendContinue (sessionID, model) : JS.Promise<unit> =
@@ -24,7 +25,7 @@ type FakeExecutor() =
             abortCalls.Add sessionID
             Promise.lift ()
         member _.FetchMessages (_sessionID: string) : JS.Promise<obj array> =
-            Promise.lift [||]
+            Promise.lift msgs
         member _.PropagateFailure (sessionID: string) : JS.Promise<unit> =
             propagateCalls.Add(sessionID)
             Promise.lift ()
@@ -35,15 +36,30 @@ type FakeExecutor() =
 
 type FakeTranslator(sessionID: string, evt: FallbackEvent) =
     let _sid = sessionID
-    let _ev  = Some evt
+    let _ev  = evt
 
     interface IEventTranslator with
-        member _.TranslateError (_raw: obj) : FallbackEvent option = _ev
+        member _.TranslateError (_raw: obj) : FallbackEvent option =
+            match _ev with
+            | FallbackEvent.SessionError _ -> Some _ev
+            | _ -> None
         member _.ExtractSessionID (_raw: obj) : string = _sid
-        member _.IsSessionError (_raw: obj) : bool  = true
-        member _.IsSessionIdle  (_raw: obj) : bool  = false
-        member _.IsSessionBusy  (_raw: obj) : bool  = false
-        member _.IsNewUserMessage (_raw: obj) : bool = false
+        member _.IsSessionError (_raw: obj) : bool =
+            match _ev with
+            | FallbackEvent.SessionError _ -> true
+            | _ -> false
+        member _.IsSessionIdle (_raw: obj) : bool =
+            match _ev with
+            | FallbackEvent.SessionIdle -> true
+            | _ -> false
+        member _.IsSessionBusy (_raw: obj) : bool =
+            match _ev with
+            | FallbackEvent.SessionBusy -> true
+            | _ -> false
+        member _.IsNewUserMessage (_raw: obj) : bool =
+            match _ev with
+            | FallbackEvent.NewUserMessage -> true
+            | _ -> false
 
 // ---------------------------------------------------------------------------
 // Helpers
