@@ -86,12 +86,14 @@ let bodyAfterMultiFrontMatter () =
 
 let multiFrontMatterExtractionToFenceStrings () =
     let input =
-        "---\nauthor: Alice\nmode: review\n---\n---\nsource: compaction-anchor\n---\n---\nauthor: Bob\npriority: high\n---\nBody."
+        "---\ntask: Ship feature\n---\n---\nauthor: Alice\nmode: review\n---\n---\nsource: compaction-anchor\n---\n---\nsquad_event: tasks_created\nsession_id: s1\n---\n---\nverdict: accepted\n---\nBody."
     let fences = extractFrontMatterFenceStrings input
-    equal "extraction count excludes compaction-anchor" 2 (List.length fences)
-    check "first fence contains Alice" (fences.[0].Contains "Alice")
-    check "second fence contains Bob" (fences.[1].Contains "Bob")
+    equal "whitelist keeps task, squad_event, verdict" 3 (List.length fences)
+    check "first fence has task" (fences.[0].Contains "task")
+    check "second fence has squad_event" (fences.[1].Contains "squad_event")
+    check "third fence has verdict" (fences.[2].Contains "verdict")
     check "no compaction marker in fences" (not (List.exists (fun (s: string) -> s.Contains "compaction-anchor") fences))
+    check "no non-whitelist blocks" (not (List.exists (fun (s: string) -> s.Contains "Alice") fences))
 
 let compactionAnchorPromptRendersMarkerAndBody () =
     let fence1 = "---\nauthor: Alice\n---"

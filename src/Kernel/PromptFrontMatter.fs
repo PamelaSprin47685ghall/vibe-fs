@@ -126,18 +126,20 @@ let compactionAnchorSource = "compaction-anchor"
 
 let compactionAnchorBody = "See above for some messages before compaction."
 
-/// Parse a single block's YAML content (no fence) and check whether its `source`
-/// field equals `compactionAnchorSource`.  Returns false on parse failure.
-let private blockHasSource (blockContent: string) : bool =
+/// Whitelist of YAML keys whose front-matter blocks must survive compaction.
+/// Only blocks containing at least one of these keys are carried into the
+/// compaction anchor prompt; everything else is dropped to save tokens.
+let compactionAnchorWhitelist =
+    Set.ofList ["task"; "verdict"; "double-check"; "squad_event"]
+
+/// Check whether a block's YAML content contains at least one whitelist key.
+let private blockHasWhitelistKey (blockContent: string) : bool =
     try
         let parsed = Yaml.parse blockContent
         if isNull parsed then false
         else
-            let src = parsed?source
-            if isNull src then false
-            else
-                try unbox<string> src = compactionAnchorSource
-                with _ -> false
+            objectKeys parsed
+            |> Array.exists (fun k -> Set.contains k compactionAnchorWhitelist)
     with _ -> false
 
 /// Render a single block content (no fence) back into a full fence string via
@@ -148,14 +150,16 @@ let private blockToFenceString (blockContent: string) : string option =
         if isNull parsed then None else Some (frontMatterRoot parsed)
     with _ -> None
 
-/// Extract all front-matter fence strings from *text*, excluding any block whose
-/// `source` field equals `compactionAnchorSource`.  Order is preserved.
+/// Extract front-matter fence strings from *text*, keeping only blocks that
+/// contain a whitelisted key (task / verdict / double-check / squad_event).
+/// This drops ephemeral context blocks (caps, results, hints, subagent
+/// prompts, etc.) to save tokens in the compaction anchor prompt.
 let extractFrontMatterFenceStrings (text: string) : string list =
     if isNull text then []
     else
         let (blocks, _) = extractFrontMatterBlocksAndBody text
         blocks
-        |> List.filter (fun b -> not (blockHasSource b))
+        |> List.filter blockHasWhitelistKey
         |> List.choose blockToFenceString
 
 /// Render a compaction-anchor prompt: prepend a marker block, then append all
