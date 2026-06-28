@@ -492,6 +492,10 @@
     <Compile Include="tests/CoverageFillFuzzyTests.fs" />
     <Compile Include="tests/CoverageFillMethodologyTests.fs" />
     <Compile Include="tests/CoverageFillOpencodeTests.fs" />
+    <Compile Include="tests/WarnTddKernelFactsTests.fs" />
+    <Compile Include="tests/WarnTddOpencodeEnforcementTests.fs" />
+    <Compile Include="tests/WarnTddMuxEnforcementTests.fs" />
+    <Compile Include="tests/WarnTddOmpEnforcementTests.fs" />
     <Compile Include="tests/OmpToolsCoverageTests.fs" />
     <Compile Include="tests/PluginMimoTuiTests.fs" />
     <Compile Include="tests/MuxCoverageTests.fs" />

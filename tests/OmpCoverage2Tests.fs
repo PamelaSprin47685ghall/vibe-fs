@@ -8,6 +8,7 @@ open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Omp.SessionLifecycleHooks
+open Wanxiangshu.Omp.NudgeHooks
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools
@@ -86,6 +87,50 @@ let toolCallHandler_normalToolReturnsNone () =
         check "normal tool returns null" (Dyn.isNullish result)
     }
 
+let toolCallHandler_childSessionCoderMissingWarnTddBlocked () =
+    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest ()
+    let childId = "child-coder-1"
+    Wanxiangshu.Omp.ChildSession.markChildSession childId
+    let h = createPiHarness ()
+    let pi = piObject h
+    let store = createReviewStore ()
+    let event = fakeEvent "coder" (createObj [])
+    promise {
+        let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
+        let block = Dyn.getValue<bool> result "block"
+        check "child session coder without warn_tdd blocked" block
+        Wanxiangshu.Omp.ChildSession.unmarkChildSession childId
+    }
+
+let toolCallHandler_childSessionExecutorMissingWarnBlocked () =
+    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest ()
+    let childId = "child-exec-1"
+    Wanxiangshu.Omp.ChildSession.markChildSession childId
+    let h = createPiHarness ()
+    let pi = piObject h
+    let store = createReviewStore ()
+    let event = fakeEvent "executor" (createObj [])
+    promise {
+        let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
+        let block = Dyn.getValue<bool> result "block"
+        check "child session executor without warn blocked" block
+        Wanxiangshu.Omp.ChildSession.unmarkChildSession childId
+    }
+
+let toolCallHandler_childSessionReadPasses () =
+    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest ()
+    let childId = "child-read-1"
+    Wanxiangshu.Omp.ChildSession.markChildSession childId
+    let h = createPiHarness ()
+    let pi = piObject h
+    let store = createReviewStore ()
+    let event = fakeEvent "read" (createObj [ "filePath", box "/tmp/foo" ])
+    promise {
+        let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
+        check "child session read (non-modification) passes" (Dyn.isNullish result)
+        Wanxiangshu.Omp.ChildSession.unmarkChildSession childId
+    }
+
 let turnStartHandler_filtersChildOnlyTools () =
     let h = createPiHarness ()
     let pi = piObject h
@@ -138,6 +183,9 @@ let run () : JS.Promise<unit> =
         do! toolCallHandler_missingWarnTddBlocks ()
         do! toolCallHandler_childOnlyToolBlockedInMainSession ()
         do! toolCallHandler_normalToolReturnsNone ()
+        do! toolCallHandler_childSessionCoderMissingWarnTddBlocked ()
+        do! toolCallHandler_childSessionExecutorMissingWarnBlocked ()
+        do! toolCallHandler_childSessionReadPasses ()
         // 3. turnStartHandler
         do! turnStartHandler_filtersChildOnlyTools ()
         // 4. toolResultHandler

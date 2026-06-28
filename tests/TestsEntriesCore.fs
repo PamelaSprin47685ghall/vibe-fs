@@ -119,6 +119,10 @@ open Wanxiangshu.Tests.TestsEntriesDomain
 open Wanxiangshu.Tests.TestsEntriesCoverage
 open Wanxiangshu.Tests.TestsEntriesFuzzy
 open Wanxiangshu.Tests.TestsTestBody
+open Wanxiangshu.Tests.WarnTddKernelFactsTests
+open Wanxiangshu.Tests.WarnTddOpencodeEnforcementTests
+open Wanxiangshu.Tests.WarnTddMuxEnforcementTests
+open Wanxiangshu.Tests.WarnTddOmpEnforcementTests
 let coreTestEntries () : (string * TestBody) list =
     [
     "ReviewTests.transition'", Sync (sync ReviewTests.transition')
@@ -280,6 +284,10 @@ let coreTestEntries () : (string * TestBody) list =
     "ConfigTests.run", Sync (sync ConfigTests.run)
     "JsonSchemaBuildersTests.run", Sync (sync JsonSchemaBuildersTests.run)
     "ExecutorStripTests.run", Sync (sync ExecutorStripTests.run)
+    "WarnTddKernelFactsTests.run", Sync (sync WarnTddKernelFactsTests.run)
+    "WarnTddOpencodeEnforcementTests.run", Async WarnTddOpencodeEnforcementTests.run
+    "WarnTddMuxEnforcementTests.run", Async WarnTddMuxEnforcementTests.run
+    "WarnTddOmpEnforcementTests.run", Sync (sync WarnTddOmpEnforcementTests.run)
     ]
     @ TestsEntriesFallback.tailTestEntries ()
     @ fallbackTestEntries()
