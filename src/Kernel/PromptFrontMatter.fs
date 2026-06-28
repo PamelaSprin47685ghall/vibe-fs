@@ -12,17 +12,63 @@ let private objectKeys (o: obj) : string array = jsNative
 [<Emit("typeof $0")>]
 let private jsTypeof (o: obj) : string = jsNative
 
-let private extractFrontMatterBlock (text: string) : string =
-    if isNull text then ""
+[<Emit("Object.assign($0, $1)")>]
+let private objectAssign (target: obj) (source: obj) : obj = jsNative
+
+let private extractFrontMatterBlocksAndBody (text: string) : string list * string =
+    if isNull text then ([], text)
     else
         let lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
-        if lines.Length < 2 || lines.[0] <> "---" then ""
-        else
-            let rec findClose i =
-                if i >= lines.Length then ""
-                elif lines.[i] = "---" then String.concat "\n" lines.[1 .. i - 1]
-                else findClose (i + 1)
-            findClose 1
+        let rec extractBlocks idx acc =
+            let rec skipEmpty k =
+                if k < lines.Length && System.String.IsNullOrWhiteSpace(lines.[k]) then
+                    skipEmpty (k + 1)
+                else k
+            let startIdx = skipEmpty idx
+            if startIdx < lines.Length && lines.[startIdx] = "---" then
+                let rec findClose k =
+                    if k >= lines.Length then -1
+                    elif lines.[k] = "---" then k
+                    else findClose (k + 1)
+                let closeIdx = findClose (startIdx + 1)
+                if closeIdx <> -1 then
+                    let blockContent = String.concat "\n" lines.[startIdx + 1 .. closeIdx - 1]
+                    extractBlocks (closeIdx + 1) (blockContent :: acc)
+                else
+                    List.rev acc, String.concat "\n" lines.[idx..]
+            else
+                List.rev acc, String.concat "\n" lines.[idx..]
+        extractBlocks 0 []
+
+let extractFrontMatterBlock (text: string) : string =
+    let (blocks, _) = extractFrontMatterBlocksAndBody text
+    match blocks with
+    | [] -> ""
+    | h :: _ -> h
+
+let bodyAfterFrontMatter (text: string) : string =
+    if isNull text then text
+    else snd (extractFrontMatterBlocksAndBody text)
+
+let private mergeObjs (acc: obj) (next: obj) : obj =
+    if isNull acc then next
+    elif isNull next then acc
+    else objectAssign acc next
+
+let parseFrontMatter (text: string) : obj =
+    let (blocks, _) = extractFrontMatterBlocksAndBody text
+    match blocks with
+    | [] -> null
+    | _ ->
+        try
+            blocks
+            |> List.choose (fun b -> try Yaml.parse b |> Some with _ -> None)
+            |> List.fold mergeObjs null
+        with _ -> null
+
+let parseFrontMatterBlocks (text: string) : obj list =
+    let (blocks, _) = extractFrontMatterBlocksAndBody text
+    blocks |> List.choose (fun b -> try Yaml.parse b |> Some with _ -> None)
 
 let yamlField (key: string) (value: string) : FrontMatterField = (key, box value)
 
@@ -50,25 +96,6 @@ let frontMatterPromptRoot (value: obj) (prose: string) : string =
 let stringifyFields (fields: FrontMatterField list) : string =
     let obj = createObj fields
     Yaml.stringify obj |> fun s -> s.TrimEnd('\n')
-
-let parseFrontMatter (text: string) : obj =
-    let fm = extractFrontMatterBlock text
-    if fm = "" then null
-    else try Yaml.parse fm with _ -> null
-
-let bodyAfterFrontMatter (text: string) : string =
-    if isNull text then text
-    else
-        let lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
-        if lines.Length < 2 || lines.[0] <> "---" then text
-        else
-            let rec findClose i =
-                if i >= lines.Length then text
-                elif lines.[i] = "---" then
-                    if i + 1 >= lines.Length then ""
-                    else String.concat "\n" lines.[i + 1 ..]
-                else findClose (i + 1)
-            findClose 1
 
 let parseFrontMatterScalars (text: string) : Map<string, string> =
     let parsed = parseFrontMatter text
