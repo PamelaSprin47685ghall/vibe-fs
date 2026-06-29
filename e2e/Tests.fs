@@ -57,12 +57,22 @@ let executorScenario = runToolScenario "e2e.executor-tool-roundtrip" "executor" 
 
 let fuzzyFindScenario = runToolScenario "e2e.fuzzy-find-roundtrip" "fuzzy_find" (box {| pattern = "README" |}) "find README files"
 
+let fuzzyGrepScenario = runToolScenario "e2e.fuzzy-grep-roundtrip" "fuzzy_grep" (box {| pattern = "test" |}) "grep for test"
+
+let investigatorScenario = runToolScenario "e2e.investigator-roundtrip" "investigator" (box {| objective = "find README"; background = "looking for readme"; questions = ResizeArray(["where is README?"]) |}) "investigate README location"
+
+let coderScenario = runToolScenario "e2e.coder-roundtrip" "coder" (box {| intents = ResizeArray([]); tdd = "green" |}) "run coder"
+
+let meditatorScenario = runToolScenario "e2e.meditator-roundtrip" "meditator" (box {| intent = "analyze"; files = ResizeArray([]) |}) "run meditator"
+
+let browserScenario = runToolScenario "e2e.browser-roundtrip" "browser" (box {| intent = "open page" |}) "open browser"
+
 let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
         let selectors = args |> Array.filter (fun a -> a <> "--verbose" && a <> "-v")
-        let scenarios = [| readScenario; writeScenario; executorScenario; fuzzyFindScenario |]
-        let labels = [| "e2e.read-tool-roundtrip"; "e2e.write-tool-roundtrip"; "e2e.executor-tool-roundtrip"; "e2e.fuzzy-find-roundtrip" |]
+        let scenarios = [| readScenario; writeScenario; executorScenario; fuzzyFindScenario; fuzzyGrepScenario; investigatorScenario; coderScenario; meditatorScenario; browserScenario |]
+        let labels = [| "e2e.read-tool-roundtrip"; "e2e.write-tool-roundtrip"; "e2e.executor-tool-roundtrip"; "e2e.fuzzy-find-roundtrip"; "e2e.fuzzy-grep-roundtrip"; "e2e.investigator-roundtrip"; "e2e.coder-roundtrip"; "e2e.meditator-roundtrip"; "e2e.browser-roundtrip" |]
         for i in 0 .. scenarios.Length - 1 do
             let selected =
                 selectors.Length = 0
