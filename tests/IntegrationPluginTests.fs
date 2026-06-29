@@ -82,8 +82,12 @@ let systemTransformSpec (p: obj) = promise {
     let output = createObj [ "system", box systemArray ]
     do! tf $ (createObj [], output) |> unbox<JS.Promise<unit>>
     let systemAfter = get output "system" |> unbox<obj array>
+    check "system transform mutates array in-place (same reference)" (obj.ReferenceEquals(systemArray, box systemAfter))
+    check "system transform replaces with single-element array" (systemAfter.Length = 1)
     let head = systemAfter.[0] :?> string
-    check "system transform replaces array with single-element array" (systemAfter.Length = 1 && head <> "baseline system prompt" && head <> "extra prompt")
+    check "system transform first element is not baseline" (head <> "baseline system prompt")
+    check "system transform first element is not extra" (head <> "extra prompt")
+    check "system transform first element is not empty" (head <> "")
 }
 
 let run () : JS.Promise<unit> =
