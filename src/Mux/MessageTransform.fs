@@ -60,6 +60,7 @@ let messagesTransform
                     Promise.lift (extractTextsFromEncodedMessages messagesArr)
                 let dedupFn excluded encoded =
                     if excluded then encoded else deduplicateReadOutputsWithSeenByPath Map.empty encoded
+                let injectFn _ encoded = Promise.lift encoded
                 let loadCaps () =
                     loadCapsForScope runtimeScope RequireDirectory plan
                 let buildCaps encoded capsFiles prelude = buildCapsMessages encoded capsFiles prelude
@@ -72,6 +73,7 @@ let messagesTransform
                         plan
                         backlogOps
                         encodeMessages
+                        injectFn
                         dedupFn
                         loadCaps
                         buildCaps

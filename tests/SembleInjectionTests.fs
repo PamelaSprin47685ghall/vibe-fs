@@ -4,9 +4,11 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.Dedup
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Shell.SembleSearch
+open Wanxiangshu.Shell.ReadDedupOpenCode
 
 [<Global("process")>]
 let private procEnv : obj = jsNative
@@ -174,6 +176,76 @@ let dumpInjectionNoThrowWhenDisabled () =
     dumpInjection "s" "investigator" "ctx" [ sampleResult ] 2
     check "dumpInjection disabled no throw" true
 
+let private makeRealReadPart (output: string) (path: string) =
+    box (createObj [
+        "type", box "tool"
+        "tool", box "read"
+        "callID", box "real-call-1"
+        "state", box (createObj [
+            "status", box "completed"
+            "input", box (createObj [ "filePath", box path ])
+            "output", box output
+        ])
+    ])
+
+let private makeSembleReadPart (output: string) (path: string) =
+    box (createObj [
+        "type", box "tool"
+        "tool", box "read"
+        "callID", box "semble-call-abc"
+        "state", box (createObj [
+            "status", box "completed"
+            "input", box (createObj [ "filePath", box path ])
+            "output", box output
+        ])
+    ])
+
+let private assistantWithParts (parts: obj array) =
+    box (createObj [
+        "info", box (createObj [ "id", box "msg-1"; "role", box "assistant" ])
+        "parts", box parts
+    ])
+
+let dedupCollapsesSembleReadAfterRealRead () =
+    let sharedOutput =
+        formatReadOutput "src/auth.py" sampleResult.content sampleResult.startLine
+    let realPart = makeRealReadPart sharedOutput "src/auth.py"
+    let semblePart = makeSembleReadPart sharedOutput "src/auth.py"
+    let messages =
+        [| assistantWithParts [| realPart; semblePart |] |]
+    deduplicateOpencodeReadPartsInPlace messages
+    let parts = get messages.[0] "parts" :?> obj array
+    let finalState = get parts.[1] "state"
+    check "semble read collapsed to no-change envelope"
+        (isNoChangeOutput (string (get finalState "output")))
+
+let dedupCollapsesRealReadAfterSembleRead () =
+    let sharedOutput =
+        formatReadOutput "src/auth.py" sampleResult.content sampleResult.startLine
+    let semblePart = makeSembleReadPart sharedOutput "src/auth.py"
+    let realPart = makeRealReadPart sharedOutput "src/auth.py"
+    let messages =
+        [| assistantWithParts [| semblePart; realPart |] |]
+    deduplicateOpencodeReadPartsInPlace messages
+    let parts = get messages.[0] "parts" :?> obj array
+    let finalState = get parts.[1] "state"
+    check "real read after semble collapsed"
+        (isNoChangeOutput (string (get finalState "output")))
+
+let dedupKeepsSembleReadForDifferentOffset () =
+    let offsetOne =
+        formatReadOutput "src/auth.py" sampleResult.content 127
+    let offsetTwo =
+        formatReadOutput "src/auth.py" "totally different content" 250
+    let p1 = makeSembleReadPart offsetOne "src/auth.py"
+    let p2 = makeSembleReadPart offsetTwo "src/auth.py"
+    let messages =
+        [| assistantWithParts [| p1; p2 |] |]
+    deduplicateOpencodeReadPartsInPlace messages
+    let parts = get messages.[0] "parts" :?> obj array
+    check "first offset preserved" (not (isNoChangeOutput (string (get (get parts.[0] "state") "output"))))
+    check "second offset preserved" (not (isNoChangeOutput (string (get (get parts.[1] "state") "output"))))
+
 let run () =
     formatReadOutputPrefixesLines ()
     buildReadToolPartsProducesOnePartPerResult ()
@@ -189,3 +261,6 @@ let run () =
     debugDisabledByDefault ()
     debugEnabledViaEnv ()
     dumpInjectionNoThrowWhenDisabled ()
+    dedupCollapsesSembleReadAfterRealRead ()
+    dedupCollapsesRealReadAfterSembleRead ()
+    dedupKeepsSembleReadForDifferentOffset ()

@@ -35,3 +35,54 @@ let formatReadOutput (filePath: string) (content: string) (startLine: int) : str
         $"(End of file - total {lines.Length} lines)"
         "</content>"
     ]
+
+/// Stable fingerprint over a read tool's output body. Recognizes both
+///   `<line>: <content>` (CapsFormat/Semble injected) and
+///   `     <line>|<content>` (Shell.FileSys native).
+/// Returns `None` when fewer than two numbered lines are found (directory
+/// listings, errors, plain prose) so the caller can fall back to substring
+/// matching without losing existing semantics.
+let private skipWs (s: string) (start: int) : int =
+    let rec loop i =
+        if i >= s.Length then i
+        elif s.[i] = ' ' || s.[i] = '\t' then loop (i + 1)
+        else i
+    loop start
+
+let private skipDigits (s: string) (start: int) : int =
+    let rec loop i =
+        if i >= s.Length then i
+        elif s.[i] >= '0' && s.[i] <= '9' then loop (i + 1)
+        else i
+    loop start
+
+let private skipOneSpace (s: string) (start: int) : int =
+    if start < s.Length && s.[start] = ' ' then start + 1 else start
+
+let private parseLine (raw: string) : (int * string) option =
+    let s = raw.TrimEnd('\r')
+    let lineStart = skipWs s 0
+    let numEnd = skipDigits s lineStart
+    if numEnd = lineStart || numEnd >= s.Length then None
+    else
+        let lineNo = int (s.Substring(lineStart, numEnd - lineStart))
+        let sep = s.[numEnd]
+        if sep <> ':' && sep <> '|' then None
+        else
+            let bodyStart = skipOneSpace s (numEnd + 1)
+            Some (lineNo, s.Substring(bodyStart))
+
+let readFingerprint (output: string) : string option =
+    if String.length output = 0 then None
+    else
+        let pairs =
+            output.Split('\n')
+            |> Array.choose parseLine
+        if pairs.Length < 2 then None
+        else
+            pairs
+            |> Array.distinctBy fst
+            |> Array.sortBy fst
+            |> Array.map snd
+            |> String.concat "\n"
+            |> Some

@@ -1,6 +1,7 @@
 module Wanxiangshu.Tests.DedupTests
 
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.Dedup
 open Wanxiangshu.Kernel.MessageDedup
 open Wanxiangshu.Kernel.ToolOutputInfo
@@ -29,8 +30,9 @@ let deduplicateSubstringOfSeen () =
 
 let deduplicateEmptyOutput () =
     let r = deduplicate [] ""
-    // empty output has .Length=0 so else branch fires: seenOutputs = [] @ [""]
-    check "empty output recorded" (r.seenOutputs = [ "" ])
+    // empty output short-circuits: not appended to seen, output stays empty
+    check "empty output not appended" (r.seenOutputs = [])
+    check "empty output returned verbatim" (r.output = "")
 
 let processDedupFirstCall () =
     let state = createDedupState ()
@@ -94,6 +96,73 @@ let collectReadOutputsExtractsContents () =
     equal "contents length" 2 contents.Length
     equal "contents[0]" "line1" contents.[0]
 
+let readFingerprintMatchesAcrossFormats () =
+    let caps = formatReadOutput "src/A.fs" "alpha\nbeta\ngamma" 1
+    let native =
+        // Mirror Shell.FileSys.readFileWithLineNumbers: 6-wide pipe, no wrapper.
+        ["     1|alpha"; "     2|beta"; "     3|gamma"] |> String.concat "\n"
+    let fpCaps = readFingerprint caps
+    let fpNative = readFingerprint native
+    match fpCaps, fpNative with
+    | Some a, Some b -> equal "caps vs native fingerprint equal" a b
+    | _ -> failwith "expected both fingerprints Some"
+
+let readFingerprintIgnoresFooterAndWrapper () =
+    let caps = formatReadOutput "src/A.fs" "alpha\nbeta" 1
+    // Synthesize a FileSys-shape output with different footer wrapper.
+    let opencodeStyle =
+        "<file>\n     1|alpha\n     2|beta\n</file>\n<status>Showing lines 1-2 of 2</status>"
+    let fpCaps = readFingerprint caps
+    let fpNative = readFingerprint opencodeStyle
+    match fpCaps, fpNative with
+    | Some a, Some b -> equal "caps vs wrapped native fingerprint equal" a b
+    | _ -> failwith "expected both fingerprints Some"
+
+let readFingerprintRejectsDirectoryOutput () =
+    let dirListing =
+        String.concat "\n" [
+            "drwxr-xr-x  4096 Mar 01 src/"
+            "-rw-r--r--  1024 Mar 01 README.md"
+            ""
+            "(2 entries)"
+        ]
+    check "directory listing yields no fingerprint" (readFingerprint dirListing).IsNone
+
+let readFingerprintSubstringNoFalsePositive () =
+    // Two reads with overlapping but distinct line ranges → different fingerprints.
+    let caps1 = formatReadOutput "src/A.fs" "alpha\nbeta\ngamma\ndelta" 1
+    let caps2 = formatReadOutput "src/A.fs" "beta\ngamma\ndelta\nepsilon" 2
+    match readFingerprint caps1, readFingerprint caps2 with
+    | Some a, Some b -> check "different content yields different fingerprints" (a <> b)
+    | _ -> failwith "expected both fingerprints Some"
+
+let deduplicateFingerprintMatchAcrossFormats () =
+    let caps = formatReadOutput "src/A.fs" "alpha\nbeta\ngamma" 1
+    let native = ["     1|alpha"; "     2|beta"; "     3|gamma"] |> String.concat "\n"
+    let r1 = deduplicate [] caps
+    equal "first-seen output unchanged" caps r1.output
+    let r2 = deduplicate r1.seenOutputs native
+    equal "native repeat returns noChangeEnvelope" (noChangeEnvelope ()) r2.output
+
+let deduplicateFingerprintMatchAcrossLimits () =
+    // Same file, different limits → overlapping content → different fingerprints,
+    // so smaller window is NOT considered a duplicate of larger (different lines).
+    let small = formatReadOutput "src/A.fs" "alpha\nbeta" 1
+    let large = formatReadOutput "src/A.fs" "alpha\nbeta\ngamma" 1
+    let r1 = deduplicate [] large
+    let r2 = deduplicate r1.seenOutputs small
+    // Different fingerprints → r2 must NOT collapse small into noChange.
+    check "smaller overlapping window treated as new" (not (isNoChangeOutput r2.output))
+
+let deduplicateFingerprintMatchAcrossFooterVariants () =
+    let caps = formatReadOutput "src/A.fs" "alpha\nbeta" 1
+    // Different footer wrapper, same line content.
+    let altFooter =
+        "<output>\n     1|alpha\n     2|beta\n</output>\n<status>Output capped at 2 lines</status>"
+    let r1 = deduplicate [] caps
+    let r2 = deduplicate r1.seenOutputs altFooter
+    equal "alt-footer repeat returns noChangeEnvelope" (noChangeEnvelope ()) r2.output
+
 let run () =
     isNoChangeOutputTrue ()
     isNoChangeOutputFalse ()
@@ -107,3 +176,10 @@ let run () =
     foldDedupBasic ()
     collectReadOutputsByPathGroups ()
     collectReadOutputsExtractsContents ()
+    readFingerprintMatchesAcrossFormats ()
+    readFingerprintIgnoresFooterAndWrapper ()
+    readFingerprintRejectsDirectoryOutput ()
+    readFingerprintSubstringNoFalsePositive ()
+    deduplicateFingerprintMatchAcrossFormats ()
+    deduplicateFingerprintMatchAcrossLimits ()
+    deduplicateFingerprintMatchAcrossFooterVariants ()

@@ -20,6 +20,7 @@ let runHostMessagesTransform
     (plan: MessageTransformPlan)
     (backlogOps: BacklogSessionOps)
     (encodeMessages: Message<obj> list -> obj array)
+    (injectFn: bool -> obj array -> JS.Promise<obj array>)
     (dedupFn: bool -> obj array -> obj array)
     (loadCaps: unit -> JS.Promise<CapsFile list>)
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
@@ -36,5 +37,5 @@ let runHostMessagesTransform
         return!
             if plan.Cleaned.IsEmpty then Promise.lift [||]
             else
-                runMessageTransformPipeline plan backlogOps encodeMessages dedupFn loadCaps buildCaps
+                runMessageTransformPipeline plan backlogOps encodeMessages injectFn dedupFn loadCaps buildCaps
     }

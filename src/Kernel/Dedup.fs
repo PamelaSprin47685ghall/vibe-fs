@@ -1,5 +1,6 @@
 module Wanxiangshu.Kernel.Dedup
 
+open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
@@ -14,10 +15,23 @@ let isNoChangeOutput (output: string) : bool =
             | _ -> false)
     | None -> false
 
-/// If `output` was already seen verbatim or is a substring of a previously-seen
-/// output, replace with the no-change envelope; otherwise record it.
+/// If `output` matches a previously-seen entry (verbatim / substring, or
+/// shares the same `readFingerprint`) replace with the no-change envelope;
+/// otherwise record it. Fingerprinting lets Semble-injected reads
+/// (`CapsFormat.formatReadOutput`) dedup against real `Shell.FileSys.read`
+/// outputs even though their wrappers/footers differ.
 let deduplicate (seenOutputs: string list) (output: string) : DedupedOutput =
-    if output.Length > 0 && List.exists (fun (seen: string) -> seen.Contains output) seenOutputs then
-        { output = noChangeEnvelope (); seenOutputs = seenOutputs }
+    if output.Length = 0 then
+        { output = output; seenOutputs = seenOutputs }
     else
-        { output = output; seenOutputs = seenOutputs @ [ output ] }
+        let fpOut = readFingerprint output
+        let matches seen =
+            match fpOut with
+            | Some fp -> fp = seen || seen.Contains output
+            | None -> seen.Contains output
+        if List.exists matches seenOutputs then
+            { output = noChangeEnvelope (); seenOutputs = seenOutputs }
+        elif fpOut.IsSome then
+            { output = output; seenOutputs = seenOutputs @ [ fpOut.Value ] }
+        else
+            { output = output; seenOutputs = seenOutputs @ [ output ] }

@@ -37,60 +37,64 @@ let private extractSessionID (messages: Message<obj> list) : string =
     |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
     |> Option.defaultValue ""
 
-let private injectSembleResults
+let private injectSembleIntoEncoded
     (directory: string)
-    (final: obj array)
     (agent: string)
     (sessionID: string)
+    (encoded: obj array)
     : JS.Promise<obj array> =
     promise {
-        let messages = MessagingCodec.decodeMessages final
-        match SembleSearch.breakpointStart sessionID with
-        | None ->
-            trace "DECIDE" $"reseed: no prior breakpoint, skip this turn (agent={agent}, len={final.Length})"
-            SembleSearch.markBreakpoint sessionID final.Length
-            return final
-        | Some stored when stored > List.length messages ->
-            trace "DECIDE" $"reseed: breakpoint {stored} > len {List.length messages}, compaction reset"
-            SembleSearch.markBreakpoint sessionID final.Length
-            return final
-        | Some startIndex ->
-            let context = SembleSearch.extractContextFromMessages startIndex messages
-            if context.Length = 0 then
-                trace "DECIDE" $"skip: empty context (start={startIndex}, len={final.Length})"
-                return final
-            else
-                let! results = search context directory 3
-                if results.IsEmpty then
-                    trace "DECIDE" $"skip: no results (start={startIndex}, len={final.Length})"
-                    return final
+        if agent <> "investigator" then
+            SembleSearch.markBreakpoint sessionID encoded.Length
+            return encoded
+        else
+            let messages = MessagingCodec.decodeMessages encoded
+            match SembleSearch.breakpointStart sessionID with
+            | None ->
+                SembleSearch.markBreakpoint sessionID encoded.Length
+                SembleMcp.trace "DECIDE" $"reseed: no prior breakpoint, skip this turn (agent={agent}, len={encoded.Length})"
+                return encoded
+            | Some stored when stored > List.length messages ->
+                SembleSearch.markBreakpoint sessionID encoded.Length
+                SembleMcp.trace "DECIDE" $"reseed: breakpoint {stored} > len {List.length messages}, compaction reset"
+                return encoded
+            | Some startIndex ->
+                let context = SembleSearch.extractContextFromMessages startIndex messages
+                if context.Length = 0 then
+                    SembleMcp.trace "DECIDE" $"skip: empty context (start={startIndex}, len={encoded.Length})"
+                    return encoded
                 else
-                    let rec findLastAssistant i =
-                        if i < 0 then None
-                        else
-                            let m = final.[i]
-                            let role = Wanxiangshu.Shell.Dyn.str (Wanxiangshu.Shell.Dyn.get m "info") "role"
-                            if role = "assistant" then Some m else findLastAssistant (i - 1)
-                    match findLastAssistant (final.Length - 1) with
-                    | None ->
-                        trace "DECIDE" "skip: no assistant to attach reads"
-                        return final
-                    | Some lastAssistant ->
-                        let assistantId = Wanxiangshu.Shell.Dyn.str (Wanxiangshu.Shell.Dyn.get lastAssistant "info") "id"
-                        let newToolParts = SembleSearch.buildReadToolParts assistantId sessionID results
-                        if Array.isEmpty newToolParts then
-                            trace "DECIDE" "skip: no tool parts"
-                            return final
-                        else
-                            let originalParts = Wanxiangshu.Shell.Dyn.get lastAssistant "parts"
-                            let cleaned =
-                                if Wanxiangshu.Shell.Dyn.isNullish originalParts || not (Wanxiangshu.Shell.Dyn.isArray originalParts) then [||]
-                                else (originalParts :?> obj array) |> Array.filter (fun p -> not ((Wanxiangshu.Shell.Dyn.str p "callID").StartsWith("semble-call-")))
-                            let combined = Array.append cleaned newToolParts
-                            lastAssistant?parts <- box combined
-                            SembleSearch.markBreakpoint sessionID final.Length
-                            SembleSearch.dumpInjection sessionID agent context results newToolParts.Length
-                            return final
+                    let! results = SembleSearch.search context directory 3
+                    if results.IsEmpty then
+                        SembleMcp.trace "DECIDE" $"skip: no results (start={startIndex}, len={encoded.Length})"
+                        return encoded
+                    else
+                        let rec findLastAssistant i =
+                            if i < 0 then None
+                            else
+                                let m = encoded.[i]
+                                let role = Wanxiangshu.Shell.Dyn.str (Wanxiangshu.Shell.Dyn.get m "info") "role"
+                                if role = "assistant" then Some m else findLastAssistant (i - 1)
+                        match findLastAssistant (encoded.Length - 1) with
+                        | None ->
+                            SembleMcp.trace "DECIDE" "skip: no assistant to attach reads"
+                            return encoded
+                        | Some lastAssistant ->
+                            let assistantId = Wanxiangshu.Shell.Dyn.str (Wanxiangshu.Shell.Dyn.get lastAssistant "info") "id"
+                            let newToolParts = SembleSearch.buildReadToolParts assistantId sessionID results
+                            if Array.isEmpty newToolParts then
+                                SembleMcp.trace "DECIDE" "skip: no tool parts"
+                                return encoded
+                            else
+                                let originalParts = Wanxiangshu.Shell.Dyn.get lastAssistant "parts"
+                                let cleaned =
+                                    if Wanxiangshu.Shell.Dyn.isNullish originalParts || not (Wanxiangshu.Shell.Dyn.isArray originalParts) then [||]
+                                    else (originalParts :?> obj array) |> Array.filter (fun p -> not ((Wanxiangshu.Shell.Dyn.str p "callID").StartsWith("semble-call-")))
+                                let combined = Array.append cleaned newToolParts
+                                lastAssistant?parts <- box combined
+                                SembleSearch.markBreakpoint sessionID encoded.Length
+                                SembleSearch.dumpInjection sessionID agent context results newToolParts.Length
+                                return encoded
     }
 
 let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
@@ -122,6 +126,9 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                     else
                         deduplicateOpencodeReadPartsInPlace encoded
                         encoded
+                let injectFn excluded encoded =
+                    if excluded then Promise.lift encoded
+                    else injectSembleIntoEncoded directory agent sessionID encoded
                 let loadCaps () =
                     loadCapsForScope runtimeScope AllowEmptyDirectory plan
                 let buildCaps encoded capsFiles prelude =
@@ -135,17 +142,11 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                         plan
                         backlogOps
                         MessagingCodec.encodeMessages
+                        injectFn
                         dedupFn
                         loadCaps
                         buildCaps
-                if not cleaned.IsEmpty then
-                    let! injected =
-                        if agent = "investigator" then
-                            injectSembleResults directory final agent sessionID
-                        else
-                            Wanxiangshu.Shell.SembleMcp.trace "DECIDE" $"skip: agent={agent} (not investigator)"
-                            Promise.lift final
-                    replaceArrayInPlace messagesArr injected
+                replaceArrayInPlace messagesArr final
     }
 
 let buildCompactionAnchorPrompt (backlogEntries: BacklogEntry list) (messages: Message<obj> list) : string =

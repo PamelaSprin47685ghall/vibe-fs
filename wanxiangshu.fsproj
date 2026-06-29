@@ -51,11 +51,11 @@
     <Compile Include="src/Kernel/Nudge/TodoStatus.fs" />
     <Compile Include="src/Kernel/Nudge/RetryProgress.fs" />
     <Compile Include="src/Kernel/Nudge/SubmitReviewHooks.fs" />
+    <Compile Include="src/Kernel/CapsFormat.fs" />
     <Compile Include="src/Kernel/Dedup.fs" />
     <Compile Include="src/Kernel/Messaging.fs" />
     <Compile Include="src/Kernel/ReviewReplayPolicy.fs" />
     <Compile Include="src/Kernel/Message.fs" />
-    <Compile Include="src/Kernel/CapsFormat.fs" />
     <Compile Include="src/Kernel/CapsSynthPolicy.fs" />
     <Compile Include="src/Kernel/CapsPrelude.fs" />
     <Compile Include="src/Kernel/PatchParser.fs" />

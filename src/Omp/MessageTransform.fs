@@ -62,6 +62,7 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
                     else
                         applyReadDedup encoded
                         encoded
+                let injectFn _ encoded = Promise.lift encoded
                 let loadCaps () : JS.Promise<CapsFile list> =
                     promise {
                         if plan.Excluded || cwd = "" then return ([] : CapsFile list)
@@ -88,6 +89,7 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
                         plan
                         backlogOps
                         encodeMessages
+                        injectFn
                         dedupFn
                         loadCaps
                         buildCaps
