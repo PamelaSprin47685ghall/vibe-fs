@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Shell.SembleSearch
 
 [<Global("process")>]
@@ -35,12 +36,13 @@ let private emptyInfo id role =
       time = null }
 
 let formatReadOutputPrefixesLines () =
-    let out = formatReadOutput sampleResult.content sampleResult.startLine
-    let lines = out.Split('\n')
-    equal "line count" 3 lines.Length
-    check "line 1 prefix" (lines.[0].StartsWith "   127|")
-    check "line 2 prefix" (lines.[1].StartsWith "   128|")
-    check "line 3 prefix" (lines.[2].StartsWith "   129|")
+    let out = formatReadOutput sampleResult.filePath sampleResult.content sampleResult.startLine
+    check "has path tag" (out.Contains "<path>src/auth.py</path>")
+    check "has type tag" (out.Contains "<type>file</type>")
+    check "has content tag" (out.Contains "<content>")
+    check "has 127 line" (out.Contains "127: def save_pretrained")
+    check "has EOF footer" (out.Contains "(End of file - total 3 lines)")
+    check "has closing content tag" (out.Contains "</content>")
 
 let buildReadToolPartsProducesOnePartPerResult () =
     let parts = buildReadToolParts "msg-1" "session-1" [ sampleResult; sampleResult2 ]
@@ -53,11 +55,23 @@ let buildReadToolPartsStructureMatchesCaps () =
     equal "tool" "read" (str p "tool")
     check "callID semble prefix" ((str p "callID").StartsWith "semble-call-")
     equal "messageID" "msg-1" (str p "messageID")
+    check "id starts with prt_" ((str p "id").StartsWith "prt_")
     let state = get p "state"
     equal "state status" "completed" (str state "status")
     let input = get state "input"
     equal "input filePath" "src/auth.py" (str input "filePath")
-    check "output line prefix" ((str state "output").Contains "   127|")
+    equal "input offset" 127 (getValue<int> input "offset")
+    equal "input limit" 2000 (getValue<int> input "limit")
+    check "output has path" ((str state "output").Contains "<path>src/auth.py</path>")
+    check "output has 127:" ((str state "output").Contains "127:")
+    let metadata = get state "metadata"
+    check "metadata has preview" (has metadata "preview")
+    check "metadata has truncated" (has metadata "truncated")
+    check "metadata has loaded" (has metadata "loaded")
+    check "metadata has display" (has metadata "display")
+    let time = get state "time"
+    check "time start > 0" ((getValue<int> time "start") > 0)
+    check "time end >= start" ((getValue<int> time "end") >= (getValue<int> time "start"))
     equal "title" "Read src/auth.py" (str state "title")
 
 let buildReadToolPartsCallIDsUnique () =
