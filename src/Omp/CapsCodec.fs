@@ -57,7 +57,7 @@ let private buildReadToolPart (cap: CapsFile) (fp: string) (index: int) : obj =
                 createObj [
                     "status", box "completed"
                     "input", box(createObj [ "filePath", box cap.filePath ])
-                    "output", box(formatReadOutput cap.filePath cap.content)
+                    "output", box(formatReadOutput cap.filePath cap.content 1)
                     "error", box ""
                 ])
     ]

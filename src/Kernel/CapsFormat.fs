@@ -23,9 +23,9 @@ let buildCapitalsContext (files: CapsFile list) : string =
             createObj [ "label", box f.label; "content", box f.content ])
     frontMatter [ yamlSeqField "caps" items ]
 
-let formatReadOutput (filePath: string) (content: string) : string =
+let formatReadOutput (filePath: string) (content: string) (startLine: int) : string =
     let lines = content.Split('\n')
-    let numbered = lines |> Array.mapi (fun i line -> $"{i + 1}: {line}") |> String.concat "\n"
+    let numbered = lines |> Array.mapi (fun i line -> $"{startLine + i}: {line}") |> String.concat "\n"
     String.concat "\n" [
         $"<path>{filePath}</path>"
         "<type>file</type>"

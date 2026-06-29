@@ -2,6 +2,7 @@ module Wanxiangshu.Shell.SembleSearch
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.Dyn
@@ -61,11 +62,6 @@ let dumpInjection (sessionID: string) (agent: string) (context: string) (results
             + resultLines
         trace "INJECT" detail
 
-let formatReadOutput (content: string) (startLine: int) : string =
-    content.Split('\n')
-    |> Array.mapi (fun i line -> sprintf "%6d|%s" (startLine + i) (line.TrimEnd('\r')))
-    |> String.concat "\n"
-
 let private shortGuid () =
     let g = System.Guid.NewGuid().ToString("N")
     g.[..7]
@@ -78,16 +74,21 @@ let buildReadToolParts (assistantId: string) (sessionID: string) (results: Sembl
             "type", box "tool"
             "tool", box "read"
             "callID", box $"semble-call-{g}"
-            "id", box $"semble-tool-{assistantId}-{i}"
+            "id", box $"prt_{g}"
             "sessionID", box sessionID
             "messageID", box assistantId
             "state", box (createObj [
                 "status", box "completed"
-                "input", box (createObj [ "filePath", box r.filePath ])
-                "output", box (formatReadOutput r.content r.startLine)
+                "input", box (createObj [ "filePath", box r.filePath; "offset", box r.startLine; "limit", box 2000 ])
+                "output", box (formatReadOutput r.filePath r.content r.startLine)
                 "title", box $"Read {r.filePath}"
-                "metadata", box (createObj [])
-                "time", box (createObj [ "start", box 0; "end", box 1 ])
+                "metadata", box (createObj [
+                    "preview", box true
+                    "truncated", box false
+                    "loaded", box true
+                    "display", box true
+                ])
+                "time", box (let t = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() in createObj [ "start", box t; "end", box (t + 1L) ])
             ])
         ]))
     |> Array.ofList

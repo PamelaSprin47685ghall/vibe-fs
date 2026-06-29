@@ -36,7 +36,7 @@ let private buildCapsAssistantMessage (id: string) (parentId: string) (capsFiles
                             "file_size", box cap.content.Length
                             "modifiedTime", box "1970-01-01T00:00:00.000Z"
                             "lines_read", box (cap.content.Split('\n').Length)
-                            "content", box (formatReadOutput cap.filePath cap.content) ]) ])
+                            "content", box (formatReadOutput cap.filePath cap.content 1) ]) ])
         |> Array.ofList
     buildMuxMessage id "assistant" parts
 

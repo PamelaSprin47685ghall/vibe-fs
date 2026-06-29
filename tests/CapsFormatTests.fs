@@ -71,7 +71,7 @@ let buildCapitalsContextLabelAndContentDistinct () =
     check "content present in output" (result.Contains "my-content")
 
 let formatReadOutputSingleLine () =
-    let result = formatReadOutput "/path/to/file.txt" "hello"
+    let result = formatReadOutput "/path/to/file.txt" "hello" 1
     check "single line output starts with path tag" (result.StartsWith "<path>/path/to/file.txt</path>")
     check "single line output contains type tag" (result.Contains "<type>file</type>")
     check "single line output contains content tag" (result.Contains "<content>")
@@ -80,19 +80,19 @@ let formatReadOutputSingleLine () =
 
 let formatReadOutputMultiLine () =
     let content = "line1\nline2\nline3"
-    let result = formatReadOutput "/f" content
+    let result = formatReadOutput "/f" content 1
     check "multi line has 1: line1" (result.Contains "1: line1")
     check "multi line has 2: line2" (result.Contains "2: line2")
     check "multi line has 3: line3" (result.Contains "3: line3")
     check "multi line footer shows 3 lines" (result.Contains "(End of file - total 3 lines)")
 
 let formatReadOutputEmptyContent () =
-    let result = formatReadOutput "/f" ""
+    let result = formatReadOutput "/f" "" 1
     check "empty content still has content tag" (result.Contains "<content>")
     check "empty content footer shows 1 line (empty string splits to 1 element)" (result.Contains "(End of file - total 1 lines)")
 
 let formatReadOutputClosingTags () =
-    let result = formatReadOutput "/f" "x"
+    let result = formatReadOutput "/f" "x" 1
     check "closing content tag" (result.Contains "</content>")
 
 let run () =
