@@ -131,6 +131,12 @@ let parseFrontMatterScalarBlocks (text: string) : Map<string,string> list =
 
 let compactionAnchorBody = "See above for some messages before compaction."
 
+/// True when *text* already contains the compaction anchor body.  Used by
+/// host adapters to detect that the anchor prompt has been persisted in chat
+/// history and must not be re-sent.
+let hasCompactionAnchorPrompt (text: string) : bool =
+    not (isNull text) && text.Contains(compactionAnchorBody)
+
 /// Whitelist of YAML keys whose front-matter blocks must survive compaction.
 /// Only blocks containing at least one of these keys are carried into the
 /// compaction anchor prompt; everything else is dropped to save tokens.

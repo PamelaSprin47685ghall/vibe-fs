@@ -312,6 +312,7 @@
     <Compile Include="tests/IntegrationMiscSpecs.fs" />
     <Compile Include="tests/IntegrationMuxPreludeSpecs.fs" />
     <Compile Include="tests/IntegrationMuxTransformSpecs.fs" />
+    <Compile Include="tests/IntegrationMuxCompactionResendSpecs.fs" />
     <Compile Include="tests/IntegrationMuxToolSpecsTodo.fs" />
     <Compile Include="tests/IntegrationMuxToolSpecsRead.fs" />
     <Compile Include="tests/IntegrationMuxToolSpecsHooks.fs" />

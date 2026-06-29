@@ -3,15 +3,13 @@ module Wanxiangshu.Tests.IntegrationMuxTransformSpecs
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
-
-open Wanxiangshu.Kernel.Methodology
-open Wanxiangshu.Kernel.ReviewPrompts
+open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Mux.BuiltinTools
 open Wanxiangshu.Mux.SubagentTools
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Kernel.ReviewPrompts.Format
 
 
 let muxTopLevelPolicySpec () =
