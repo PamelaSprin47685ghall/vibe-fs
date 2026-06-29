@@ -9,18 +9,27 @@ open Wanxiangshu.Shell.WorkBacklogToolsCodec
 let decodeTodoMissingCompletedWorkReport () =
     let args =
         createObj [
+            "ahaMoments", box ""
+            "changesAndReasons", box ""
+            "gotchas", box ""
+            "lessonsAndConventions", box ""
+            "plan", box ""
             "todos", box [| createObj [ "content", box "x"; "status", box "pending"; "priority", box "high" ] |]
             "select_methodology", box [| "first_principles" |]
         ]
     match decodeTodoWriteArgs args with
-    | Error (InvalidIntent ("todowrite", "completedWorkReport", _)) ->
-        check "todo missing completedWorkReport" true
-    | _ -> check "todo missing completedWorkReport" false
+    | Error (InvalidIntent ("todowrite", "ahaMoments", _)) ->
+        check "todo missing ahaMoments" true
+    | _ -> check "todo missing ahaMoments" false
 
 let decodeTodoOk () =
     let args =
         createObj [
-            "completedWorkReport", box "本轮完成 codec 测试骨架"
+            "ahaMoments", box ("x".PadRight(1024, 'a'))
+            "changesAndReasons", box ("x".PadRight(1024, 'b'))
+            "gotchas", box ("x".PadRight(1024, 'c'))
+            "lessonsAndConventions", box ("x".PadRight(1024, 'd'))
+            "plan", box ("x".PadRight(1024, 'e'))
             "select_methodology", box [| "test_driven_reasoning"; "deduction" |]
             "todos", box [|
                 createObj [ "content", box "实现 codec"; "status", box "in_progress"; "priority", box "high" ]
@@ -29,7 +38,7 @@ let decodeTodoOk () =
         ]
     match decodeTodoWriteArgs args with
     | Ok tw ->
-        check "todo ok report" (tw.CompletedWorkReport = "本轮完成 codec 测试骨架")
+        check "todo ok ahaMoments" (tw.AhaMoments = "x".PadRight(1024, 'a'))
         equal "todo ok todos count" 2 tw.Todos.Length
         check "todo ok first content" (tw.Todos.[0].Content = "实现 codec")
         check "todo ok first status" (tw.Todos.[0].Status = "in_progress")
@@ -50,20 +59,24 @@ let decodeTodoToolOptsMissingToolCallId () =
         check "todo opts missing toolCallId" true
     | _ -> check "todo opts missing toolCallId" false
 
-let decodeTodoItemMissingContent () =
+let decodeTodoItemMissingAhaMoments () =
     let args =
         createObj [
-            "completedWorkReport", box "report"
+            "ahaMoments", box ""
+            "changesAndReasons", box ""
+            "gotchas", box ""
+            "lessonsAndConventions", box ""
+            "plan", box ""
             "todos", box [| createObj [ "status", box "pending"; "priority", box "high" ] |]
         ]
     match decodeTodoWriteArgs args with
-    | Error (InvalidIntent ("todowrite", "todos", msg)) ->
-        check "todo item missing content" (msg.Contains "content")
-    | _ -> check "todo item missing content" false
+    | Error (InvalidIntent ("todowrite", "ahaMoments", _)) ->
+        check "todo item missing ahaMoments" true
+    | _ -> check "todo item missing ahaMoments" false
 
 let run () =
     decodeTodoMissingCompletedWorkReport ()
     decodeTodoOk ()
     decodeTodoToolOptsExtractsToolCallId ()
     decodeTodoToolOptsMissingToolCallId ()
-    decodeTodoItemMissingContent ()
+    decodeTodoItemMissingAhaMoments ()

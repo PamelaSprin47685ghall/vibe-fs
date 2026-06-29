@@ -35,7 +35,11 @@ type ExecutorArgs = {
 type TodoItem = { Content: string; Status: string; Priority: string }
 
 type TodoWriteArgs = {
-    CompletedWorkReport: string
+    AhaMoments: string
+    ChangesAndReasons: string
+    Gotchas: string
+    LessonsAndConventions: string
+    Plan: string
     Todos: TodoItem array
     SelectMethodology: string list
 }

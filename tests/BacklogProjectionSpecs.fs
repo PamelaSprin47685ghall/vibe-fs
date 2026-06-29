@@ -78,7 +78,7 @@ let projectBacklogDropsFoldedUserMessages () =
     check "backlog fold: uses front matter projection summary" (
         text.StartsWith("---\n")
         && text.Contains("- user_message")
-        && text.Contains("completed_work:"))
+        && text.Contains("aha_moments:"))
     check "backlog fold: keeps folded user content in projection" (text.Contains("please fix this bug"))
 
 let projectBacklogKeepsReviewInFold () =
@@ -145,7 +145,7 @@ let buildBacklogTextTest () =
     check "backlog text: has front matter" (text.StartsWith("---\n"))
     check "backlog text: stores reports in front matter" (
         text.Contains("user_message")
-        && text.Contains("completed_work")
+        && text.Contains("aha_moments")
         && text.Contains("Completed work from folded turns. File changes are already on disk.")
         && text.Contains("Did work"))
     let empty: string = buildBacklogText [] []

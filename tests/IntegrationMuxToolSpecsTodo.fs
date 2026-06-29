@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
+open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Mux.Plugin
@@ -31,7 +32,7 @@ let muxTodoWriteWrapperSchemaSpec () = promise {
         let todoProps = get todoItem "properties"
         let required = unbox<string[]> (get schema "required")
         let todoRequired = unbox<string[]> (get todoItem "required")
-        check "mux todo_write wrapper requires completedWorkReport" (required |> Array.contains "completedWorkReport")
+        check "mux todo_write wrapper requires ahaMoments" (required |> Array.contains "ahaMoments")
         check "mux todo_write wrapper exposes priority" (not (isNullish (get todoProps "priority")))
         check "mux todo_write wrapper requires priority" (todoRequired |> Array.contains "priority")
 }
@@ -54,16 +55,21 @@ let muxTodoWriteCapturesCompletedWorkReportSpec () = promise {
         let execute = get wrapped "execute"
         let args =
             createObj
-                [ "completedWorkReport", box "finished wrapper capture"
+                [ "ahaMoments", box (System.String('a', 1024))
+                  "changesAndReasons", box (System.String('b', 1024))
+                  "gotchas", box (System.String('c', 1024))
+                  "lessonsAndConventions", box (System.String('d', 1024))
+                  "plan", box (System.String('e', 1024))
                   "todos",
                   box
                       [| createObj [ "content", box "Inspect wrapper"; "status", box "in_progress"; "priority", box "high" ] |] ]
         let! result = (execute $ (args, createObj [ "toolCallId", box "todo-call-1" ])) |> unbox<JS.Promise<obj>>
         let nativeTodos = unbox<obj[]> (get nativeArgs "todos")
-        check "mux todo_write wrapper strips completedWorkReport before native execute" (isNullish (get nativeArgs "completedWorkReport"))
+        check "mux todo_write wrapper strips ahaMoments before native execute" (isNullish (get nativeArgs "ahaMoments"))
         check "mux todo_write wrapper strips priority before native execute" (isNullish (get nativeTodos.[0] "priority"))
         let scope = unbox<RuntimeScope> (get reg "__runtimeScope")
-        check "mux todo_write wrapper captures completedWorkReport" (scope.Projection.TryGetReport(mux, "todo-call-1") = Some "finished wrapper capture")
+        let captured = scope.Projection.TryGetBacklogEntry(mux, "todo-call-1")
+        check "mux todo_write wrapper captures ahaMoments" (captured = Some { ahaMoments = System.String('a', 1024); changesAndReasons = System.String('b', 1024); gotchas = System.String('c', 1024); lessonsAndConventions = System.String('d', 1024); plan = System.String('e', 1024) })
         check "mux todo_write wrapper keeps nudge behavior" (hasExactHint (str result "output") hintMeditator)
 }
 
@@ -73,9 +79,13 @@ let muxBacklogProjectionSpec () = promise {
     if isNullish tf then
         check "mux messagesTransform exposed for magic todo projection" false
     else
-        let todoInput report content status priority =
+        let todoInput (report: string) content status priority =
             createObj
-                [ "completedWorkReport", box report
+                [ "ahaMoments", box report
+                  "changesAndReasons", box (report + "_changes")
+                  "gotchas", box (report + "_gotchas")
+                  "lessonsAndConventions", box (report + "_lessons")
+                  "plan", box (report + "_plan")
                   "todos", box [| createObj [ "content", box content; "status", box status; "priority", box priority ] |] ]
         let todoOutput count = createObj [ "success", box true; "count", box count ]
         let messages =

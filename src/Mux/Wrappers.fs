@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Kernel.ToolOutputInfo
@@ -127,8 +128,14 @@ let private todoArrayForNativeWrite (decoded: TodoWriteArgs) : obj =
     decoded.Todos |> Array.map todoItemForNativeWrite |> box
 
 let private captureTodoReportFromDecoded (host: Host) (projection: ProjectionStore) (tw: TodoWriteArgs) (o: TodoToolOpts) : unit =
-    if tw.CompletedWorkReport <> "" && o.ToolCallId <> "" then
-        projection.CaptureReport(host, o.ToolCallId, tw.CompletedWorkReport)
+    if o.ToolCallId <> "" && (tw.AhaMoments <> "" || tw.ChangesAndReasons <> "" || tw.Gotchas <> "" || tw.LessonsAndConventions <> "" || tw.Plan <> "") then
+        let entry : BacklogEntry =
+            { ahaMoments = tw.AhaMoments
+              changesAndReasons = tw.ChangesAndReasons
+              gotchas = tw.Gotchas
+              lessonsAndConventions = tw.LessonsAndConventions
+              plan = tw.Plan }
+        projection.CaptureBacklogEntry(host, o.ToolCallId, entry)
 
 let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj =
     let wrapperFn =

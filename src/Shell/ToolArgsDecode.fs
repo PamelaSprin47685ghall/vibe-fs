@@ -44,7 +44,11 @@ let private mapTodoItem (t: WorkBacklogToolsCodec.TodoItem) : Wanxiangshu.Kernel
 
 let private mapTodoWrite (tw: WorkBacklogToolsCodec.TodoWriteArgs) : Wanxiangshu.Kernel.ToolArgs.TodoWriteArgs =
     {
-        CompletedWorkReport = tw.CompletedWorkReport
+        AhaMoments = tw.AhaMoments
+        ChangesAndReasons = tw.ChangesAndReasons
+        Gotchas = tw.Gotchas
+        LessonsAndConventions = tw.LessonsAndConventions
+        Plan = tw.Plan
         Todos = tw.Todos |> Array.map mapTodoItem
         SelectMethodology = tw.SelectMethodology
     }

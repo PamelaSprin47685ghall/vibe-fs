@@ -172,7 +172,11 @@ let muxCompactingTransformProjectsBacklogSpec () = promise {
     else
         let todoInput report content status priority =
             createObj
-                [ "completedWorkReport", box report
+                [ "ahaMoments", box report
+                  "changesAndReasons", box ""
+                  "gotchas", box ""
+                  "lessonsAndConventions", box ""
+                  "plan", box ""
                   "todos", box [| createObj [ "content", box content; "status", box status; "priority", box priority ] |] ]
         let todoOutput count = createObj [ "success", box true; "count", box count ]
         let messages =
@@ -225,7 +229,11 @@ let muxCompactingTransformEmitsAnchorPromptSpec () = promise {
     else
         let todoInput report content status priority =
             createObj
-                [ "completedWorkReport", box report
+                [ "ahaMoments", box report
+                  "changesAndReasons", box ""
+                  "gotchas", box ""
+                  "lessonsAndConventions", box ""
+                  "plan", box ""
                   "todos", box [| createObj [ "content", box content; "status", box status; "priority", box priority ] |] ]
         let todoOutput count = createObj [ "success", box true; "count", box count ]
         let messages =

@@ -34,7 +34,7 @@ let private todoToolPart (report: string) : obj =
         "tool", box todoWriteToolNameDefault
         "state", box (createObj [
             "status", box "completed"
-            "input", box (createObj [ "completedWorkReport", box report; "todos", box [||] ])
+            "input", box (createObj [ "ahaMoments", box report; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box ""; "todos", box [||] ])
             "output", box "Todos updated."
         ])
     ]

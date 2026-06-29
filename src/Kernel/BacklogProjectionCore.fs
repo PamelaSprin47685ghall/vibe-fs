@@ -11,7 +11,13 @@ let todoWriteToolNameDefault = todoWriteToolNameFor opencode
 let reviewToolName = "submit_review"
 
 type BacklogEntry =
-    { report: string }
+    { ahaMoments: string
+      changesAndReasons: string
+      gotchas: string
+      lessonsAndConventions: string
+      plan: string }
+
+let trunc (s: string) : string = if s = null then "" else s.Trim()
 
 let isTodoResultFor (host: Host) (part: Part<'raw>) : bool =
     match part with
@@ -46,14 +52,20 @@ let private completedWorkItem (userPrompts: string list) (entry: BacklogEntry) :
     let userMsgField =
         if userPrompts.IsEmpty then box [||]
         else box (userPrompts |> List.map (fun text -> box (text.Trim())) |> List.toArray)
-    createObj [ "user_message", userMsgField; "completed_work", box (entry.report.Trim()) ]
+    let fields =
+        [ "user_message", userMsgField
+          "aha_moments", box (trunc entry.ahaMoments)
+          "changes_and_reasons", box (trunc entry.changesAndReasons)
+          "gotchas", box (trunc entry.gotchas)
+          "lessons_and_conventions", box (trunc entry.lessonsAndConventions)
+          "plan", box (trunc entry.plan) ]
+    createObj fields
 
 let private projectionRootValue (backlog: BacklogEntry list) (userPrompts: string list) : obj =
     box (backlog |> List.map (completedWorkItem userPrompts) |> List.toArray)
 
 let private projectionBody (errorNotice: string option) : string =
     let baseText = "Completed work from folded turns. File changes are already on disk."
-
     match errorNotice with
     | Some err when err.Trim() <> "" -> baseText + "\n\nLast todo write error: " + err.Trim()
     | _ -> baseText
@@ -67,10 +79,6 @@ let buildBacklogText (backlog: BacklogEntry list) (userPrompts: string list) : s
 let lastTodoErrorText (flat: FlatPart<'raw> list) : string option =
     lastTodoErrorTextFor opencode flat
 
-/// Build the compaction-anchor prompt text from backlog entries and a function
-/// that extracts text candidates (message text + tool output) from the
-/// message stream. Pure: shared by the compaction hook (MessageTransform) and
-/// the post-compaction nudge path (NudgeEffect).
 let buildCompactionAnchorPrompt
     (backlogEntries: BacklogEntry list)
     (extractAnchorTexts: unit -> string list)
@@ -78,7 +86,15 @@ let buildCompactionAnchorPrompt
     let backlogBlock =
         let entries =
             backlogEntries
-            |> List.map (fun be -> createObj [ "user_message", box [||]; "completed_work", box (be.report.Trim()) ])
+            |> List.map (fun be ->
+                let fields =
+                    [ "user_message", box [||]
+                      "aha_moments", box (trunc be.ahaMoments)
+                      "changes_and_reasons", box (trunc be.changesAndReasons)
+                      "gotchas", box (trunc be.gotchas)
+                      "lessons_and_conventions", box (trunc be.lessonsAndConventions)
+                      "plan", box (trunc be.plan) ]
+                createObj fields)
             |> List.toArray
         [ frontMatterRoot (box entries) ]
     let anchorBlocks = extractAnchorTexts () |> List.collect extractFrontMatterFenceStrings

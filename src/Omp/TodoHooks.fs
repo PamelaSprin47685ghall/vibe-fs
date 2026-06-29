@@ -21,6 +21,7 @@ open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.BacklogProjectionCore
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Shell.ReviewRuntime
@@ -47,10 +48,19 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
             if toolName = todoWriteToolName omp then
                 let callId = getToolCallId event
                 let input = getToolInput event
-                let raw = if Dyn.isNullish input then "" else string (Dyn.get input "completedWorkReport")
-                let report = raw.Trim()
-                if report <> "" && callId <> "" then
-                    backlogSession.CaptureReport(callId, report)
+                let ahaMoments = if Dyn.isNullish input then "" else (Dyn.str input "ahaMoments").Trim()
+                let changesAndReasons = if Dyn.isNullish input then "" else (Dyn.str input "changesAndReasons").Trim()
+                let gotchas = if Dyn.isNullish input then "" else (Dyn.str input "gotchas").Trim()
+                let lessonsAndConventions = if Dyn.isNullish input then "" else (Dyn.str input "lessonsAndConventions").Trim()
+                let plan = if Dyn.isNullish input then "" else (Dyn.str input "plan").Trim()
+                if (ahaMoments <> "" || changesAndReasons <> "" || gotchas <> "" || lessonsAndConventions <> "" || plan <> "") && callId <> "" then
+                    let entry : BacklogEntry =
+                        { ahaMoments = ahaMoments
+                          changesAndReasons = changesAndReasons
+                          gotchas = gotchas
+                          lessonsAndConventions = lessonsAndConventions
+                          plan = plan }
+                    backlogSession.CaptureReport(callId, entry.plan)
                 let methodologies =
                     let raw = if Dyn.isNullish args then null else Dyn.get args "select_methodology"
                     if Dyn.isNullish raw || not (Dyn.isArray raw) then []

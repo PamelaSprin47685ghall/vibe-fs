@@ -27,8 +27,8 @@ let muxMessageTransformUsesMuxHookInputCodec () =
 
 let muxWrappersCaptureUsesProjectionNotModuleCapture () =
     let code = requireFile "src/Mux/Wrappers.fs" |> nonCommentCode
-    check "arch: Mux Wrappers uses projection.CaptureReport"
-        (code.Contains "projection.CaptureReport")
+    check "arch: Mux Wrappers uses projection.CaptureBacklogEntry"
+        (code.Contains "projection.CaptureBacklogEntry")
     check "arch: Mux Wrappers must not module captureReport"
         (not (code.Contains "captureReport host"))
     check "arch: Mux createAllWrappers passes RuntimeScope"

@@ -75,7 +75,7 @@ let blpLastTodoErrorText () =
     equal "text part no error" None (lastTodoErrorTextFor Opencode flatText)
 
 let blpBuildBacklogText () =
-    let backlog : BacklogEntry list = [ { report = "fix bug" }; { report = "add feat" } ]
+    let backlog : BacklogEntry list = [ { ahaMoments = "fix bug"; changesAndReasons = ""; gotchas = ""; lessonsAndConventions = ""; plan = "" }; { ahaMoments = "add feat"; changesAndReasons = ""; gotchas = ""; lessonsAndConventions = ""; plan = "" } ]
     let text = buildBacklogText backlog ["q1"]
     check "text non-empty" (text <> "")
     check "text has report" (text.Contains "fix bug")

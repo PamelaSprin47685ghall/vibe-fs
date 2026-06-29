@@ -8,6 +8,9 @@ open Wanxiangshu.Shell.Dyn
 let jsonStringProperty (description: string) : obj =
     createObj [ "type", box "string"; "description", box description ]
 
+let jsonStringMinLengthProperty (minLength: int) (description: string) : obj =
+    createObj [ "type", box "string"; "minLength", box minLength; "description", box description ]
+
 let selectMethodologyProperty =
     createObj [
         "type", box "array"
@@ -18,6 +21,8 @@ let selectMethodologyProperty =
         ]
         "minItems", box 1
     ]
+
+let reportMinLength = 1024
 
 let buildWorkBacklogSchema () : obj =
     let todoItem =
@@ -30,8 +35,12 @@ let buildWorkBacklogSchema () : obj =
         "type", box "object"
         "properties", createObj [
             "todos", createObj [ "type", box "array"; "description", box todosDesc; "items", todoItem ]
-            "completedWorkReport", jsonStringProperty reportDesc
+            "ahaMoments", jsonStringMinLengthProperty reportMinLength ahaMomentsDesc
+            "changesAndReasons", jsonStringMinLengthProperty reportMinLength changesAndReasonsDesc
+            "gotchas", jsonStringMinLengthProperty reportMinLength gotchasDesc
+            "lessonsAndConventions", jsonStringMinLengthProperty reportMinLength lessonsAndConventionsDesc
+            "plan", jsonStringMinLengthProperty reportMinLength planDesc
             "select_methodology", selectMethodologyProperty
         ]
-        "required", box [| box "todos"; box "completedWorkReport"; box "select_methodology" |]
+        "required", box [| box "todos"; box "ahaMoments"; box "changesAndReasons"; box "gotchas"; box "lessonsAndConventions"; box "plan"; box "select_methodology" |]
     ]

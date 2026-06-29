@@ -111,7 +111,7 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpPluginCoreTests.unrelatedEventLeavesReviewActive", Sync (sync OmpPluginCoreTests.unrelatedEventLeavesReviewActive)
     "OmpMagicTodoTests.sharedSessionStoreByHost", Sync (sync OmpMagicTodoTests.sharedSessionStoreByHost)
     "OmpMagicTodoTests.hostPartitionedReports", Sync (sync OmpMagicTodoTests.hostPartitionedReports)
-    "OmpMagicTodoTests.backlogReportFromTodoInputHostAgnostic", Sync (sync OmpMagicTodoTests.backlogReportFromTodoInputHostAgnostic)
+    "OmpMagicTodoTests.backlogEntryFromTodoInputHostAgnostic", Sync (sync OmpMagicTodoTests.backlogEntryFromTodoInputHostAgnostic)
     "OmpMagicTodoTests.inputOfPartNonTool", Sync (sync OmpMagicTodoTests.inputOfPartNonTool)
     "OmpMagicTodoTests.replayBacklogOmpFallsBackToCapturedReport", Sync (sync OmpMagicTodoTests.replayBacklogOmpFallsBackToCapturedReport)
     "OmpToolResultEventTests.getToolInputPrefersInputOverArgs", Sync (sync OmpToolResultEventTests.getToolInputPrefersInputOverArgs)
@@ -148,7 +148,7 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpSessionCompactingTests.sessionCompactingHandlerEmptyMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerEmptyMessages
     "OmpSessionCompactingTests.sessionCompactingHandlerNullMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerNullMessages
     "OmpSessionCompactingTests.sessionCompactingHandlerWithMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerWithMessages
-    "OmpSessionCompactingTests.sessionCompactingPreservesCompletedWorkReport", Async OmpSessionCompactingTests.sessionCompactingPreservesCompletedWorkReport
+    "OmpSessionCompactingTests.sessionCompactingPreservesBacklogReport", Async OmpSessionCompactingTests.sessionCompactingPreservesBacklogReport
     "OmpSessionCompactingTests.sessionCompactingStripsSynthetic", Async OmpSessionCompactingTests.sessionCompactingStripsSynthetic
     "OmpSessionCompactingAnchorTests.sessionCompactingContextContainsSeeAbove", Async OmpSessionCompactingAnchorTests.sessionCompactingContextContainsSeeAbove
     "OmpSessionCompactingAnchorTests.sessionCompactingContextHasMultipleFrontMatterBlocks", Async OmpSessionCompactingAnchorTests.sessionCompactingContextHasMultipleFrontMatterBlocks

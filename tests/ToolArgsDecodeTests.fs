@@ -76,22 +76,26 @@ let decodeExecutorOkShell () =
     | _ -> check "executor ok shell via decodeToolInvocation" false
 
 let decodeTodowriteMissingCompletedWorkReport () =
-    let args = createObj [ "todos", box [||] ]
+    let args = createObj [ "ahaMoments", box ""; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box ""; "todos", box [||] ]
     match decodeToolInvocation "todowrite" args with
-    | Error (InvalidIntent ("todowrite", "completedWorkReport", _)) ->
-        check "todowrite missing completedWorkReport" true
-    | _ -> check "todowrite missing completedWorkReport" false
+    | Error (InvalidIntent ("todowrite", "ahaMoments", _)) ->
+        check "todowrite missing ahaMoments" true
+    | _ -> check "todowrite missing ahaMoments" false
 
 let decodeTodowriteOk () =
     let args =
         createObj [
-            "completedWorkReport", box "done slice"
+            "ahaMoments", box (System.String('a', 1024))
+            "changesAndReasons", box (System.String('b', 1024))
+            "gotchas", box (System.String('c', 1024))
+            "lessonsAndConventions", box (System.String('d', 1024))
+            "plan", box (System.String('e', 1024))
             "select_methodology", box [| "deduction" |]
             "todos", box [| createObj [ "content", box "a"; "status", box "pending"; "priority", box "high" ] |]
         ]
     match decodeToolInvocation "todowrite" args with
     | Ok (Typed (TodoWrite tw)) ->
-        check "todowrite ok report" (tw.CompletedWorkReport = "done slice")
+        check "todowrite ok ahaMoments" (tw.AhaMoments = System.String('a', 1024))
         equal "todowrite ok todos" 1 tw.Todos.Length
         check "todowrite ok methodology" (tw.SelectMethodology = [ "deduction" ])
     | _ -> check "todowrite ok" false

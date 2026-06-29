@@ -33,26 +33,26 @@ let hostPartitionedReports () =
     check "omp session drained" (sOmp.TakeReport callID = "")
     check "oc session drained" (sOc.TakeReport callID = "")
 
-let backlogReportFromTodoInputHostAgnostic () =
-    let input1 = createObj [ "completedWorkReport", box "from-input" ]
-    let input2 = createObj [ "completedWorkReport", box "" ]
+let backlogEntryFromTodoInputHostAgnostic () =
+    let input1 = createObj [ "ahaMoments", box "from-input"; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box "" ]
+    let input2 = createObj [ "ahaMoments", box ""; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box "" ]
     let input3 = createObj []
-    equal "host-agnostic 1" "from-input" (backlogReportFromTodoInput omp input1)
-    equal "host-agnostic 2" "" (backlogReportFromTodoInput omp input2)
-    equal "host-agnostic 3" "" (backlogReportFromTodoInput omp input3)
-    equal "host-agnostic opencode same" "from-input" (backlogReportFromTodoInput Opencode input1)
+    equal "host-agnostic 1" "from-input" (backlogEntryFromTodoInput input1).ahaMoments
+    equal "host-agnostic 2" "" (backlogEntryFromTodoInput input2).ahaMoments
+    equal "host-agnostic 3" "" (backlogEntryFromTodoInput input3).ahaMoments
+    equal "host-agnostic opencode same" "from-input" (backlogEntryFromTodoInput input1).ahaMoments
 
 let inputOfPartNonTool () =
     let p : Part<obj> = TextPart "hi"
     equal "non-tool returns null" null (Wanxiangshu.Shell.BacklogSessionCodec.inputOfPart p)
 
 /// Mirror BacklogReplaySpecs.opencode: CaptureReport on BacklogSession(omp), replay
-/// with empty completedWorkReport in input, captured report is returned.
+/// with empty ahaMoments in input, captured report is returned.
 let replayBacklogOmpFallsBackToCapturedReport () =
     let session = Wanxiangshu.Omp.MagicTodo.BacklogSession omp
     let callID = "omp-fallback-c1"
     session.CaptureReport(callID, "captured omp report")
-    let input = box (createObj [ "completedWorkReport", box "" ])
+    let input = box (createObj [ "ahaMoments", box ""; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box "" ])
     let msgs =
         [ { info = { mkInfo "m1" Assistant with sessionID = "test" }
             parts =
@@ -65,4 +65,4 @@ let replayBacklogOmpFallsBackToCapturedReport () =
             raw = null } ]
     let backlog = Wanxiangshu.Omp.MagicTodo.replayBacklogFor omp msgs
     check "omp replay: one entry" (backlog.Length = 1)
-    equal "omp replay: captured report preserved" "captured omp report" backlog.[0].report
+    equal "omp replay: captured report preserved" "captured omp report" backlog.[0].ahaMoments

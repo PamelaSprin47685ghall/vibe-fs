@@ -9,7 +9,7 @@ open Wanxiangshu.Shell.SessionProjectionStore
 
 let private projection = ProjectionStore()
 
-let backlogReportFromTodoInput = Wanxiangshu.Shell.BacklogSessionCodec.backlogReportFromTodoInput
+let backlogEntryFromTodoInput = Wanxiangshu.Shell.BacklogSessionCodec.backlogEntryFromTodoInput
 
 type BacklogSession(host: Host) =
     member _.Host = host

@@ -63,7 +63,13 @@ let sessionCompactingHandlerWithMessages () = promise {
                             "status", box "completed"
                             "output", box "Todos updated."
                             "error", box ""
-                            "input", box(createObj [ "completedWorkReport", box "Completed task A" ])
+                            "input", box(createObj [
+                                "ahaMoments", box "Completed task A"
+                                "changesAndReasons", box ""
+                                "gotchas", box ""
+                                "lessonsAndConventions", box ""
+                                "plan", box ""
+                            ])
                         ])
                     ]
                 |]
@@ -84,8 +90,8 @@ let sessionCompactingHandlerWithMessages () = promise {
         check "with messages: backlog contains report text" (joined.Contains "Completed task A")
 }
 
-/// completedWorkReport in todowrite is preserved in backlog projection.
-let sessionCompactingPreservesCompletedWorkReport () = promise {
+/// Backlog projection includes ahaMoments in compaction output.
+let sessionCompactingPreservesBacklogReport () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
@@ -110,7 +116,13 @@ let sessionCompactingPreservesCompletedWorkReport () = promise {
                             "status", box "completed"
                             "output", box "Todos updated."
                             "error", box ""
-                            "input", box(createObj [ "completedWorkReport", box "Added module A with tests" ])
+                            "input", box(createObj [
+                                "ahaMoments", box "Added module A with tests"
+                                "changesAndReasons", box ""
+                                "gotchas", box ""
+                                "lessonsAndConventions", box ""
+                                "plan", box ""
+                            ])
                         ])
                     ]
                 |]
@@ -129,7 +141,13 @@ let sessionCompactingPreservesCompletedWorkReport () = promise {
                             "status", box "completed"
                             "output", box "Todos updated."
                             "error", box ""
-                            "input", box(createObj [ "completedWorkReport", box "Refactored module B for clarity" ])
+                            "input", box(createObj [
+                                "ahaMoments", box "Refactored module B for clarity"
+                                "changesAndReasons", box ""
+                                "gotchas", box ""
+                                "lessonsAndConventions", box ""
+                                "plan", box ""
+                            ])
                         ])
                     ]
                 |]
@@ -181,7 +199,13 @@ let sessionCompactingStripsSynthetic () = promise {
                             "status", box "completed"
                             "output", box "Todos updated."
                             "error", box ""
-                            "input", box(createObj [ "completedWorkReport", box "Work done" ])
+                            "input", box(createObj [
+                                "ahaMoments", box "Work done"
+                                "changesAndReasons", box ""
+                                "gotchas", box ""
+                                "lessonsAndConventions", box ""
+                                "plan", box ""
+                            ])
                         ])
                     ]
                 |]

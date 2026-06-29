@@ -110,7 +110,7 @@ let opencodeHookSchemaMergeWorkBacklogReportIntoPureSchema () =
     let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
     let result = mergeWorkBacklogReportIntoTaskSchema schema
     let props = get result "properties"
-    check "completedWorkReport added" (not (Dyn.isNullish (get props "completedWorkReport")))
+    check "ahaMoments added" (not (Dyn.isNullish (get props "ahaMoments")))
     check "select_methodology added" (not (Dyn.isNullish (get props "select_methodology")))
 
 let opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId () =
@@ -128,7 +128,7 @@ let opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId () =
     let resultRequired = get result "required"
     let props = resultProps
     check "task_id removed from properties" (Dyn.isNullish (get props "task_id"))
-    check "completedWorkReport added" (not (Dyn.isNullish (get props "completedWorkReport")))
+    check "ahaMoments added" (not (Dyn.isNullish (get props "ahaMoments")))
     check "select_methodology added" (not (Dyn.isNullish (get props "select_methodology")))
     let required = resultRequired
     check "task_id absent from required" (not (isArray required) || not ((required :?> obj array) |> Array.exists (fun x -> string x = "task_id")))

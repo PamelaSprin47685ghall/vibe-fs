@@ -32,7 +32,7 @@ let replayBacklogOpencodeFallsBackToCapturedReportWhenInputMissing () =
             raw = null } ]
     let backlog = replayBacklogFor Opencode s msgs
     check "opencode replay: tryGetReport fallback when input has no report" (backlog.Length = 1)
-    check "opencode replay: captured report preserved" (backlog.[0].report = "captured report")
+    check "opencode replay: captured report preserved" (backlog.[0].ahaMoments = "captured report")
 
 let replayBacklogMuxFallsBackToCapturedReportWhenInputMissing () =
     let s = scope ()
@@ -50,22 +50,22 @@ let replayBacklogMuxFallsBackToCapturedReportWhenInputMissing () =
             raw = null } ]
     let backlog = replayBacklogFor Mux s msgs
     check "mux replay: tryGetReport fallback when input has no report" (backlog.Length = 1)
-    check "mux replay: captured report preserved" (backlog.[0].report = "captured mux report")
+    check "mux replay: captured report preserved" (backlog.[0].ahaMoments = "captured mux report")
 
 let replayBacklogOpencodeDoesNotMergeConsecutiveTodoWrite () =
     let s = scope ()
     let msgs = [ todoWriteMsg "m1" "c1" "W1"; todoWriteMsg "m2" "c2" "W2"; todoWriteMsg "m3" "c3" "W3" ]
     let backlog = replayBacklogFor Opencode s msgs
     check "opencode: each todowrite is one backlog entry" (backlog.Length = 3)
-    check "opencode: reports not merged" (backlog.[0].report = "W1" && backlog.[1].report = "W2" && backlog.[2].report = "W3")
+    check "opencode: reports not merged" (backlog.[0].ahaMoments = "W1" && backlog.[1].ahaMoments = "W2" && backlog.[2].ahaMoments = "W3")
 
 let replayBacklogTest () =
     let s = scope ()
     let msgs = [ todoWriteMsg "m1" "c1" "Implemented parser"; todoWriteMsg "m2" "c2" "Fixed critical bug" ]
     let backlog = replayBacklog s msgs
     check "replay: backlog count" (backlog.Length = 2)
-    check "replay: entry 1 report" (backlog.[0].report = "Implemented parser")
-    check "replay: entry 2 report" (backlog.[1].report = "Fixed critical bug")
+    check "replay: entry 1 report" (backlog.[0].ahaMoments = "Implemented parser")
+    check "replay: entry 2 report" (backlog.[1].ahaMoments = "Fixed critical bug")
 
 let replayEmpty () =
     let s = scope ()
