@@ -103,6 +103,9 @@ let compactionAnchorPromptRendersMarkerAndBody () =
     let fenceCount = prompt.Split([| "---" |], System.StringSplitOptions.None).Length - 1
     check "prompt has two fences" (fenceCount >= 2)
 
+let compactionAnchorPromptEmptyFencesReturnsEmpty () =
+    equal "empty fences returns empty string" "" (renderCompactionAnchorPrompt [])
+
 let run () =
     submitReviewIsWipNoneDefaultsTrue ()
     submitReviewIsWipSomeTrue ()
@@ -117,3 +120,4 @@ let run () =
     bodyAfterMultiFrontMatter ()
     multiFrontMatterExtractionToFenceStrings ()
     compactionAnchorPromptRendersMarkerAndBody ()
+    compactionAnchorPromptEmptyFencesReturnsEmpty ()

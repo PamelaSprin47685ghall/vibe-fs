@@ -246,11 +246,6 @@ let opencodeNudgeAfterCompactionEmitsAnchorPromptSpec () = promise {
     let eventHook = get p "event"
     do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
     do! Promise.sleep 0
-    check "nudge after compaction emits one prompt" (promptCalls.Count = 1)
-    if promptCalls.Count > 0 then
-        let arg = promptCalls.[0]
-        check "nudge prompt path id matches session" (str (get arg "path") "id" = sessionID)
-        let bodyText = getPartsText (get (get arg "body") "parts")
-        check "nudge prompt contains see above text" (bodyText.Contains "See above for some messages before compaction.")
+    check "nudge after compaction with no durable content emits no prompt" (promptCalls.Count = 0)
     do! rmAsync workspaceDir
 }

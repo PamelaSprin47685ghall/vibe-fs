@@ -42,3 +42,4 @@ let run () =
     backlogSessionRefreshesBacklogForMimocode ()
     buildBacklogTextTest ()
     buildBacklogTextWithErrorTest ()
+    buildCompactionAnchorPromptEmptyReturnsEmpty ()

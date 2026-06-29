@@ -169,10 +169,11 @@ let extractFrontMatterFenceStrings (text: string) : string list =
 
 /// Render a compaction-anchor prompt: append all *fenceStrings* (each already
 /// a complete fence), then two newlines and `compactionAnchorBody`.  When
-/// *fenceStrings* is empty the body is returned as-is.
+/// *fenceStrings* is empty the empty string is returned (caller decides
+/// whether to skip emitting the anchor entirely).
 let renderCompactionAnchorPrompt (fenceStrings: string list) : string =
     if List.isEmpty fenceStrings then
-        compactionAnchorBody
+        ""
     else
         let fences = fenceStrings |> String.concat "\n\n"
         fences + "\n\n" + compactionAnchorBody

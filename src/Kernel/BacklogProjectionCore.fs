@@ -83,19 +83,21 @@ let buildCompactionAnchorPrompt
     (backlogEntries: BacklogEntry list)
     (extractAnchorTexts: unit -> string list)
     : string =
-    let backlogBlock =
-        let entries =
-            backlogEntries
-            |> List.map (fun be ->
-                let fields =
-                    [ "user_message", box [||]
-                      "aha_moments", box (trunc be.ahaMoments)
-                      "changes_and_reasons", box (trunc be.changesAndReasons)
-                      "gotchas", box (trunc be.gotchas)
-                      "lessons_and_conventions", box (trunc be.lessonsAndConventions)
-                      "plan", box (trunc be.plan) ]
-                createObj fields)
-            |> List.toArray
-        [ frontMatterRoot (box entries) ]
     let anchorBlocks = extractAnchorTexts () |> List.collect extractFrontMatterFenceStrings
-    renderCompactionAnchorPrompt (backlogBlock @ anchorBlocks)
+    if List.isEmpty backlogEntries && List.isEmpty anchorBlocks then ""
+    else
+        let backlogBlock =
+            let entries =
+                backlogEntries
+                |> List.map (fun be ->
+                    let fields =
+                        [ "user_message", box [||]
+                          "aha_moments", box (trunc be.ahaMoments)
+                          "changes_and_reasons", box (trunc be.changesAndReasons)
+                          "gotchas", box (trunc be.gotchas)
+                          "lessons_and_conventions", box (trunc be.lessonsAndConventions)
+                          "plan", box (trunc be.plan) ]
+                    createObj fields)
+                |> List.toArray
+            [ frontMatterRoot (box entries) ]
+        renderCompactionAnchorPrompt (backlogBlock @ anchorBlocks)

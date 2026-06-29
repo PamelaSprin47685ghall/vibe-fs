@@ -158,3 +158,6 @@ let buildBacklogTextWithErrorTest () =
     check "backlog text with error: error moves to body" (
         text.Contains("Last todo write error: bad todo state")
         && not (text.Contains("last_todo_write_error:")))
+
+let buildCompactionAnchorPromptEmptyReturnsEmpty () =
+    equal "empty backlog + empty anchors returns empty" "" (buildCompactionAnchorPrompt [] (fun () -> []))
