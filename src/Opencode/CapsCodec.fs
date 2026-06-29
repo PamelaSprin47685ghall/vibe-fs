@@ -47,7 +47,7 @@ let private buildToolParts (capsFiles: CapsFile list) (fp: string) (sessionID: s
             "state", box (createObj [
                 "status", box "completed"
                 "input", box (createObj [ "filePath", box cap.filePath ])
-                "output", box (formatReadOutput cap.filePath cap.content 1)
+                "output", box (formatReadOutput cap.filePath (sliceFromContent cap.content))
                 "title", box $"Read {cap.filePath}"
                 "metadata", box (createObj [])
                 "time", box (createObj [ "start", box 0; "end", box 1 ])

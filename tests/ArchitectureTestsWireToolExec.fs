@@ -113,6 +113,7 @@ let private shellBareDynAllowlist =
           "OpencodeAgentConfigWire.fs"
           "ReadDedupMuxPlugin.fs"
           "ReadDedupOpenCode.fs"
+          "SembleMcp.fs"
           "SembleSearch.fs"
           "SubagentIo.fs"
           "ToolRuntimeContext.fs"

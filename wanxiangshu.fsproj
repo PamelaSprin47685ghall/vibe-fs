@@ -137,6 +137,7 @@
     <Compile Include="src/Shell/DelegatedAiSettings.fs" />
     <Compile Include="src/Shell/MuxAiSettingsCodec.fs" />
     <Compile Include="src/Shell/FileSys.fs" />
+    <Compile Include="src/Shell/SembleMcp.fs" />
     <Compile Include="src/Shell/SembleSearch.fs" />
     <Compile Include="src/Shell/WorkspaceFiles.fs" />
     <Compile Include="src/Shell/HostMessagePartCodec.fs" />
@@ -511,6 +512,7 @@
     <Compile Include="tests/ArchitectureTestsFallback.fs" />
     <Compile Include="tests/TestsEntriesFallback.fs" />
     <Compile Include="tests/SembleInjectionTests.fs" />
+    <Compile Include="tests/SembleReadInjectionTests.fs" />
     <Compile Include="tests/TestsEntriesCore.fs" />
     <Compile Include="tests/TestsEntriesCodec.fs" />
     <Compile Include="tests/TestsEntriesOmp.fs" />

@@ -3,57 +3,31 @@ module Wanxiangshu.Shell.SembleSearch
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.CapsFormat
-open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.SembleMcp
 
-[<Import("Client", "@modelcontextprotocol/sdk/client/index.js")>]
-type Client(info: obj, capabilities: obj) =
-    member _.connect(transport: obj) : JS.Promise<unit> = jsNative
-    member _.callTool(req: obj) : JS.Promise<obj> = jsNative
-    member _.close() : JS.Promise<unit> = jsNative
+[<Import("readFileSync", "node:fs")>]
+let private readFileSync (path: string) (encoding: string) : string = jsNative
 
-[<Import("StdioClientTransport", "@modelcontextprotocol/sdk/client/stdio.js")>]
-type StdioClientTransport(opts: obj) =
-    class end
+let private readFileAsync (path: string) : JS.Promise<string> =
+    promise { return readFileSync path "utf-8" }
 
-[<Global("process")>]
-let private nodeProcess : obj = jsNative
+[<Global("Buffer")>]
+let private nodeBuffer : obj = jsNative
 
-let private envVar (name: string) : string =
-    let v = nodeProcess?env?(name)
-    if isNull v then "" else string v
+let private byteLength (str: string) (encoding: string) : int = unbox<int> (nodeBuffer?byteLength(str, encoding))
 
-[<Import("appendFileSync", "node:fs")>]
-let private appendFileSync (path: string) (content: string) (encoding: string) : unit = jsNative
-
-type SembleResult =
-    { filePath: string
-      startLine: int
-      endLine: int
-      content: string
-      score: float }
-
-let private debugLogPath () : string =
-    let dir = envVar "SEMBLE_INJECT_DEBUG_DIR"
-    if dir = "" then "/tmp/wanxiangshu-semble-inject.log" else $"{dir}/wanxiangshu-semble-inject.log"
-
-let debugEnabled () : bool = envVar "SEMBLE_INJECT_DEBUG" = "1"
-
-let trace (tag: string) (detail: string) : unit =
-    if not (debugEnabled ()) then ()
-    else
-        let ts = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
-        let line = $"[semble {ts}] {tag}: {detail}\n"
-        try appendFileSync (debugLogPath ()) line "utf8" with _ -> ()
+let private maxLineLength = 2000
+let private maxBytes = 50 * 1024
+let private defaultReadLimit = 2000
 
 let dumpInjection (sessionID: string) (agent: string) (context: string) (results: SembleResult list) (pairCount: int) : unit =
     if not (debugEnabled ()) then ()
     else
         let resultLines =
             results
-            |> List.mapi (fun i r ->
-                $"  [{i}] {r.filePath}:{r.startLine}-{r.endLine} score={r.score}")
+            |> List.mapi (fun i r -> $"  [{i}] {r.filePath}:{r.startLine}-{r.endLine} score={r.score}")
             |> String.concat "\n"
         let ctxHead = context.[.. min 199 (context.Length - 1)]
         let detail =
@@ -66,32 +40,79 @@ let private shortGuid () =
     let g = System.Guid.NewGuid().ToString("N")
     g.[..7]
 
-let buildReadToolParts (assistantId: string) (sessionID: string) (results: SembleResult list) : obj array =
-    results
-    |> List.mapi (fun i r ->
-        let g = shortGuid ()
-        box (createObj [
-            "type", box "tool"
-            "tool", box "read"
-            "callID", box $"semble-call-{g}"
-            "id", box $"prt_{g}"
-            "sessionID", box sessionID
-            "messageID", box assistantId
-            "state", box (createObj [
-                "status", box "completed"
-                "input", box (createObj [ "filePath", box r.filePath; "offset", box r.startLine; "limit", box 2000 ])
-                "output", box (formatReadOutput r.filePath r.content r.startLine)
-                "title", box $"Read {r.filePath}"
-                "metadata", box (createObj [
-                    "preview", box true
-                    "truncated", box false
-                    "loaded", box true
-                    "display", box true
-                ])
-                "time", box (let t = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() in createObj [ "start", box t; "end", box (t + 1L) ])
-            ])
-        ]))
-    |> Array.ofList
+let readLinesForInjection (filePath: string) (offset: int) : JS.Promise<ReadSlice> =
+    promise {
+        let! raw = readFileAsync filePath
+        let lines = raw.Split('\n')
+        let startIdx = max 0 (offset - 1)
+        let mutable bytes = 0
+        let mutable count = 0
+        let mutable more = false
+        let mutable cut = false
+        let acc = ResizeArray<string>()
+        for i in 0 .. lines.Length - 1 do
+            count <- count + 1
+            if count <= startIdx then ()
+            elif acc.Count >= defaultReadLimit then more <- true
+            else
+                let line =
+                    if lines.[i].Length > maxLineLength
+                    then lines.[i].Substring(0, maxLineLength) + $"... (line truncated to {maxLineLength} chars)"
+                    else lines.[i]
+                let size = byteLength line "utf-8" + (if acc.Count > 0 then 1 else 0)
+                if bytes + size <= maxBytes then
+                    acc.Add(line)
+                    bytes <- bytes + size
+                else
+                    cut <- true
+                    more <- true
+        return { raw = acc.ToArray(); offset = offset; totalLines = lines.Length; more = more; cut = cut }
+    }
+
+let buildReadToolParts (assistantId: string) (sessionID: string) (results: SembleResult list) : JS.Promise<obj array> =
+    promise {
+        let resultsArr = results |> List.toArray
+        let! slices =
+            resultsArr
+            |> Array.map (fun r -> readLinesForInjection r.filePath r.startLine)
+            |> Promise.all
+        return
+            (resultsArr, slices)
+            ||> Array.mapi2 (fun i r slice ->
+                let g = shortGuid ()
+                let truncated = slice.more || slice.cut
+                let lineStart = slice.offset
+                let lineEnd = slice.offset + slice.raw.Length - 1
+                box (createObj [
+                    "type", box "tool"
+                    "tool", box "read"
+                    "callID", box $"semble-call-{g}"
+                    "id", box $"prt_{g}"
+                    "sessionID", box sessionID
+                    "messageID", box assistantId
+                    "state", box (createObj [
+                        "status", box "completed"
+                        "input", box (createObj [ "filePath", box r.filePath; "offset", box r.startLine; "limit", box 2000 ])
+                        "output", box (formatReadOutput r.filePath slice)
+                        "title", box $"Read {r.filePath}"
+                        "metadata", box (createObj [
+                            "preview", box (if slice.raw.Length > 20 then slice.raw.[..19] |> String.concat "\n" else slice.raw |> String.concat "\n")
+                            "truncated", box truncated
+                            "loaded", box true
+                            "display", box (createObj [
+                                "type", box "file"
+                                "path", box r.filePath
+                                "text", box (slice.raw |> String.concat "\n")
+                                "lineStart", box lineStart
+                                "lineEnd", box lineEnd
+                                "totalLines", box slice.totalLines
+                                "truncated", box truncated
+                            ])
+                        ])
+                        "time", box (let t = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() in createObj [ "start", box t; "end", box (t + 1L) ])
+                    ])
+                ]))
+    }
 
 let isBreakpoint (final: obj array) : bool =
     if final.Length = 0 then false
@@ -129,108 +150,3 @@ let extractContextFromMessages (startIndex: int) (messages: Message<'raw> list) 
         | _ -> [])
     |> String.concat "\n"
     |> fun s -> s.Trim()
-
-let mutable private _client: Client option = None
-let mutable private _connecting: JS.Promise<Client option> option = None
-
-let private getClient () : JS.Promise<Client option> =
-    match _client with
-    | Some c -> Promise.lift (Some c)
-    | None ->
-        match _connecting with
-        | Some p -> p
-        | None ->
-            let p = promise {
-                try
-                    let c = Client(
-                        box {| name = "wanxiangshu-semble"; version = "0.1.0" |},
-                        box {| capabilities = {| tools = box [||] |} |})
-                    let cmd = getSembleMcpCommand (envVar "SEMBLE_MCP_REF")
-                    let argsStr = String.concat " " (Array.toList cmd.args)
-                    trace "CONNECT" $"spawning {cmd.command} {argsStr}"
-                    let transport = StdioClientTransport(box {|
-                        command = cmd.command
-                        args = cmd.args
-                        stderr = "pipe"
-                    |})
-                    let stderrStream = Dyn.get transport "stderr"
-                    if not (isNull stderrStream) then
-                        let onData = System.Func<obj, unit>(fun chunk ->
-                            let t = (string chunk).TrimEnd('\r', '\n')
-                            if t <> "" then trace "STDERR" (t.[.. min 199 (t.Length - 1)]))
-                        stderrStream?on("data", box onData) |> ignore
-                    do! c.connect(transport)
-                    _client <- Some c
-                    _connecting <- None
-                    trace "CONNECT" "ok"
-                    return Some c
-                with ex ->
-                    _connecting <- None
-                    trace "CONNECT" $"failed: {ex.Message}"
-                    return None
-            }
-            _connecting <- Some p
-            p
-
-let private parseResults (result: obj) : SembleResult list =
-    let content = Dyn.get result "content"
-    if Dyn.isNullish content || not (Dyn.isArray content) then []
-    else
-        let arr = content :?> obj array
-        if arr.Length = 0 then []
-        else
-            let first = arr.[0]
-            if Dyn.isNullish first then []
-            else
-                let text = Dyn.str first "text"
-                if text = "" then []
-                else
-                    try
-                        let parsed = JS.JSON.parse text
-                        let results = Dyn.get parsed "results"
-                        if Dyn.isNullish results || not (Dyn.isArray results) then []
-                        else
-                            results :?> obj array
-                            |> Array.toList
-                            |> List.choose (fun r ->
-                                let filePath = Dyn.str r "file_path"
-                                if filePath = "" then None
-                                else
-                                    let line (key: string) : int =
-                                        let v = Dyn.get r key
-                                        if Dyn.isNullish v then 1 else unbox<int> v
-                                    let scoreVal =
-                                        let s = Dyn.get r "score"
-                                        if Dyn.isNullish s then 0.0 else unbox<float> s
-                                    Some
-                                        { filePath = filePath
-                                          startLine = line "start_line"
-                                          endLine = line "end_line"
-                                          content = Dyn.str r "content"
-                                          score = scoreVal })
-                    with _ -> []
-
-let search (query: string) (repoPath: string) (topK: int) : JS.Promise<SembleResult list> =
-    promise {
-        match! getClient () with
-        | None ->
-            trace "SEARCH" "skip: client not ready"
-            return []
-        | Some client ->
-            try
-                let! result = client.callTool(box {|
-                    name = "search"
-                    arguments = box {|
-                        query = query
-                        repo = repoPath
-                        top_k = topK
-                        max_snippet_lines = 20
-                    |}
-                |})
-                let parsed = parseResults result
-                trace "SEARCH" $"query='{query}' repo={repoPath} results={List.length parsed}"
-                return parsed
-            with ex ->
-                trace "SEARCH" $"callTool failed: {ex.Message}"
-                return []
-    }

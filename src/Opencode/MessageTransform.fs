@@ -29,6 +29,7 @@ open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.ChatTransformOutputCodec
 open Wanxiangshu.Shell.JsArrayMutate
+open Wanxiangshu.Shell.SembleMcp
 open Wanxiangshu.Shell.SembleSearch
 
 let private extractSessionID (messages: Message<obj> list) : string =
@@ -46,22 +47,22 @@ let private injectSembleResults
         let messages = MessagingCodec.decodeMessages final
         match SembleSearch.breakpointStart sessionID with
         | None ->
-            SembleSearch.trace "DECIDE" $"reseed: no prior breakpoint, skip this turn (agent={agent}, len={final.Length})"
+            trace "DECIDE" $"reseed: no prior breakpoint, skip this turn (agent={agent}, len={final.Length})"
             SembleSearch.markBreakpoint sessionID final.Length
             return final
         | Some stored when stored > List.length messages ->
-            SembleSearch.trace "DECIDE" $"reseed: breakpoint {stored} > len {List.length messages}, compaction reset"
+            trace "DECIDE" $"reseed: breakpoint {stored} > len {List.length messages}, compaction reset"
             SembleSearch.markBreakpoint sessionID final.Length
             return final
         | Some startIndex ->
             let context = SembleSearch.extractContextFromMessages startIndex messages
             if context.Length = 0 then
-                SembleSearch.trace "DECIDE" $"skip: empty context (start={startIndex}, len={final.Length})"
+                trace "DECIDE" $"skip: empty context (start={startIndex}, len={final.Length})"
                 return final
             else
-                let! results = SembleSearch.search context directory 3
+                let! results = search context directory 3
                 if results.IsEmpty then
-                    SembleSearch.trace "DECIDE" $"skip: no results (start={startIndex}, len={final.Length})"
+                    trace "DECIDE" $"skip: no results (start={startIndex}, len={final.Length})"
                     return final
                 else
                     let rec findLastAssistant i =
@@ -72,13 +73,13 @@ let private injectSembleResults
                             if role = "assistant" then Some m else findLastAssistant (i - 1)
                     match findLastAssistant (final.Length - 1) with
                     | None ->
-                        SembleSearch.trace "DECIDE" "skip: no assistant to attach reads"
+                        trace "DECIDE" "skip: no assistant to attach reads"
                         return final
                     | Some lastAssistant ->
                         let assistantId = Wanxiangshu.Shell.Dyn.str (Wanxiangshu.Shell.Dyn.get lastAssistant "info") "id"
-                        let newToolParts = SembleSearch.buildReadToolParts assistantId sessionID results
+                        let! newToolParts = SembleSearch.buildReadToolParts assistantId sessionID results
                         if Array.isEmpty newToolParts then
-                            SembleSearch.trace "DECIDE" "skip: no tool parts"
+                            trace "DECIDE" "skip: no tool parts"
                             return final
                         else
                             let originalParts = Wanxiangshu.Shell.Dyn.get lastAssistant "parts"
@@ -142,7 +143,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                         if agent = "investigator" then
                             injectSembleResults directory final agent sessionID
                         else
-                            Wanxiangshu.Shell.SembleSearch.trace "DECIDE" $"skip: agent={agent} (not investigator)"
+                            Wanxiangshu.Shell.SembleMcp.trace "DECIDE" $"skip: agent={agent} (not investigator)"
                             Promise.lift final
                     replaceArrayInPlace messagesArr injected
     }
