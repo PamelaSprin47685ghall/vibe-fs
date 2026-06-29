@@ -21,7 +21,7 @@ let executorMode = executor "mode"
 let executorWhatToSummarize = executor "what_to_summarize"
 let executorWarn = warnDescription
 
-let warnTddDesc = warnDescription
+let warnTddDesc = warnTddDescription
 let private fuzzyFind = doc "fuzzy_find"
 let fuzzyFindPattern = fuzzyFind "pattern"
 let fuzzyFindPath = fuzzyFind "path"

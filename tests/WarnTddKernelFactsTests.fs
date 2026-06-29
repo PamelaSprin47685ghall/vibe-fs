@@ -107,6 +107,12 @@ let kernelCanonicalValuesAreNonEmpty () =
     check "warn canonicalValue non-empty" (warnCanonicalValue <> "")
     check "warnDescription non-empty" (warnDescription <> "")
 
+let kernelWarnDescriptionsDiffer () =
+    check "warnTddDescription non-empty" (warnTddDescription <> "")
+    check "warnDescription and warnTddDescription differ" (warnDescription <> warnTddDescription)
+    check "warnTddDescription contains 'TDD' or 'tdd'" (warnTddDescription.Contains("TDD") || warnTddDescription.Contains("tdd"))
+    check "warnTddDescription contains 'Kolmolgorov'" (warnTddDescription.Contains("Kolmolgorov"))
+
 let run () =
     kernelWarnTddSet ()
     kernelWarnRequiredSet ()
@@ -117,3 +123,4 @@ let run () =
     kernelParseWarnCanonical ()
     kernelParseWarnRejectsVariants ()
     kernelCanonicalValuesAreNonEmpty ()
+    kernelWarnDescriptionsDiffer ()

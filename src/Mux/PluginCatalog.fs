@@ -61,7 +61,7 @@ let private injectWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
     if Wanxiangshu.Kernel.WarnTdd.isModificationTool tool.name then
         let props = Dyn.get tool.parameters "properties"
         if isNullish (Dyn.get props "warn_tdd") then
-            props?("warn_tdd") <- box (createObj [| "type", box "string"; "enum", box [| box Wanxiangshu.Kernel.WarnTdd.canonicalValue |]; "description", box Wanxiangshu.Kernel.WarnTdd.warnDescription |])
+            props?("warn_tdd") <- box (createObj [| "type", box "string"; "enum", box [| box Wanxiangshu.Kernel.WarnTdd.canonicalValue |]; "description", box Wanxiangshu.Kernel.WarnTdd.warnTddDescription |])
         addRequired tool.parameters "warn_tdd"
     tool
 

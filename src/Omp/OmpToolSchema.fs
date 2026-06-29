@@ -62,7 +62,7 @@ let coderParameters (tb: obj) : obj =
         addRequired schema "warn_tdd"
         let props = Dyn.get schema "properties"
         if isNullish (Dyn.get props "warn_tdd") then
-            props?("warn_tdd") <- box (createObj [| "type", box "string"; "enum", box [| box canonicalValue |]; "description", box warnDescription |])
+            props?("warn_tdd") <- box (createObj [| "type", box "string"; "enum", box [| box canonicalValue |]; "description", box warnTddDescription |])
     schema
 
 let private investigatorIntentItem (tb: obj) : obj =
@@ -105,7 +105,7 @@ let executorParameters (tb: obj) : obj =
         addRequired schema "warn_tdd"
         let props = Dyn.get schema "properties"
         if isNullish (Dyn.get props "warn_tdd") then
-            props?("warn_tdd") <- box (createObj [| "type", box "string"; "enum", box [| box canonicalValue |]; "description", box warnDescription |])
+            props?("warn_tdd") <- box (createObj [| "type", box "string"; "enum", box [| box canonicalValue |]; "description", box warnTddDescription |])
     if isWarnRequiredTool "executor" then
         addRequired schema "warn"
         let props = Dyn.get schema "properties"

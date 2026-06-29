@@ -34,3 +34,5 @@ let isWarnRequiredTool (tool: string) : bool =
     Set.contains (tool.ToLowerInvariant()) warnRequiredTools
 
 let warnDescription = "Warning acknowledgement: '" + warnCanonicalValue + "' — acknowledge that this task cannot be done with other tools."
+
+let warnTddDescription = "Warning acknowledgement: '" + canonicalValue + "' — acknowledge that tests are written first (TDD) and Kolmolgorov discipline is followed."
