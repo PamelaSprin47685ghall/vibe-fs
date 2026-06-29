@@ -30,8 +30,7 @@ let mapOutcome (options: ExecuteOptions) (timeout: int) (output: string) (outcom
         let body = if output = "" then "(no output)" else output
         Completed(body, 0)
     | Exited(code, _, _) ->
-        let body = if output = "" then $"exited with code {code}" else output
-        Failed(body, Some code, None)
+        Failed(output, Some code, None)
     | SpawnFailed(ExecutorExecutableMissing exe) ->
         MissingExecutable(exe,
                           $"Error: '{exe}' executable not found. Please ensure '{exe}' is installed and available on your PATH.")

@@ -38,6 +38,7 @@ let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (session
             dependencies = strArrayOpt Params.executorDeps
             timeout_type = enumReq [| "short"; "long"; "last-resort" |] Params.executorTimeout
             mode = enumReq [| "ro"; "rw" |] Params.executorMode
+            what_to_summarize = strOpt Params.executorWhatToSummarize
         |})
         (fun args context ->
             match decodeExecutorArgs args with
@@ -61,7 +62,7 @@ let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (session
                                 else
                                     let langStr = languageToString options.language
                                     let timeoutStr = timeoutToString options.timeoutType
-                                    let prompt = formatPrompt host (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
+                                    let prompt = formatPrompt host (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode, options.whatToSummarize)) |> List.head
                                     let! summary =
                                         resolveSubagentPromise "executor"
                                             (runSubagentWithCleanup fallbackRuntime registry client "executor" "Executor summary" prompt

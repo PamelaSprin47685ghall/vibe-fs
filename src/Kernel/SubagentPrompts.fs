@@ -75,16 +75,18 @@ let executorSummarizerPrompt
     (timeoutType: string)
     (mode: string)
     : string =
+    let taskBody =
+        let directive = "You are a filter for executor output. Preserve errors, stack traces, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output.\nDo NOT lose any information."
+        let trimmed = whatToSummarize.Trim()
+        if trimmed = "" then directive
+        else directive + "\n\n" + trimmed
     agentPrompt
-        [ yamlField "what_to_summarize" whatToSummarize
-          yamlField "language" language
+        [ yamlField "language" language
           yamlField "program" program
           yamlStringSeqField "dependencies" dependencies
           yamlField "timeout_type" timeoutType
-          yamlField "mode" mode
-          yamlField "raw_output" output ]
-        [ "You are a filter for executor output. Preserve errors, stack traces, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output."
-          "Do NOT lose any information." ]
+          yamlField "mode" mode ]
+        [ output; "# Task\n" + taskBody ]
 
 let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =
     agentPrompt

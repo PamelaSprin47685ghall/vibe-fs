@@ -89,5 +89,5 @@ let formatWriteSyntaxResult (filePath: string) (result: SyntaxCheckResult) : str
             $"Syntax check failed for {filePath} ({lang}): {reason}"
     let successBody = $"Successfully wrote to {filePath}"
     match result with
-    | Ok (_, [||]) -> seeBelowEnvelope successBody
+    | Ok (_, [||]) -> render { empty with body = successBody }
     | _ -> addSyntax successBody syntaxText

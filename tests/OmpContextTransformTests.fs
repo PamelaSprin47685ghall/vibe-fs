@@ -83,26 +83,6 @@ let beforeAgentStartOmitsCapsXml () = promise {
     do! rmAsync root
 }
 
-let knowledgeGraphPreludeWhenKgPresent () = promise {
-    let! root = mkdtempAsync "omp-kg-ctx-"
-    let kgDir = join root "kg"
-    let fsAsync : obj = requireFn "fs"
-    let promises = unbox<obj> (fsAsync?promises)
-    do! unbox<JS.Promise<unit>> (promises?mkdir(kgDir))
-    do!
-        writeFileAsync
-            (join kgDir "2026-06-25.ndjson")
-            """{"type":"knowledge_graph_header","version":1,"kind":"day","date":"2026-06-25","rewritten":false}
-{"id":"abcd","entity":["Test"],"fact":"fact one"}
-"""
-    let reviewStore = createReviewStore ()
-    let entries = [| createObj [ "id", box "u"; "info", box(createObj [ "role", box "user" ]); "parts", box [||] ] |]
-    let! out = transformEntriesAsync reviewStore root "kg-sess" (box entries)
-    let text = firstEntryTextFromOut out
-    check "kg front matter" (text.Contains "knowledge_graph:")
-    do! rmAsync root
-}
-
 let reviewReplayIfStoreEmptyOnTransform () = promise {
     let reviewStore = createReviewStore ()
     let sessionId = "omp-review-if-empty"

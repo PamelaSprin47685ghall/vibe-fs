@@ -18,6 +18,7 @@ let executorProgram = executor "program"
 let executorDeps = executor "dependencies"
 let executorTimeout = executor "timeout_type"
 let executorMode = executor "mode"
+let executorWhatToSummarize = executor "what_to_summarize"
 let executorWarn = warnDescription
 
 let warnTddDesc = warnDescription

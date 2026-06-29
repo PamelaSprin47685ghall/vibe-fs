@@ -104,7 +104,6 @@ let private shellBareDynAllowlist =
           "FuzzySearchHelpers.fs"
           "FuzzySearchFind.fs"
           "FuzzySearchGrep.fs"
-          "KnowledgeGraphTestHooks.fs"
           "OpencodeSessionEventCodecCommon.fs"
           "OpencodeSessionEventNudge.fs"
           "MuxHostBindings.fs"

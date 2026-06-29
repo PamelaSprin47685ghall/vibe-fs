@@ -50,5 +50,5 @@ let executorSummarizerPromptCarriesWhatToSummarize () =
     let marker = "summarize exit codes and stderr only"
     let prompt =
         executorSummarizerPrompt marker "raw" "shell" "echo 1" [] "omp-runner" "rw"
-    check "prompt has what_to_summarize field" (prompt.Contains "what_to_summarize:")
+    check "prompt has task directive" (prompt.Contains "# Task")
     check "prompt embeds summarize intent" (prompt.Contains marker)

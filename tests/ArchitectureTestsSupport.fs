@@ -49,7 +49,7 @@ let rec fsFilesRecursive (dir: string) : string list =
 
 /// Relative `.fs` paths under `dir`, recursive. Use when arch scans must include
 /// modules that have been split into subdirectories (e.g.
-/// `src/Kernel/KnowledgeGraph/Prompts.fs`); labels are forward-slash relative
+/// `src/Kernel/ReviewPrompts/Instructions.fs`); labels are forward-slash relative
 /// paths so they match how callers build `dir + "/" + name` paths.
 let rec fsFilesRelative (dir: string) : string list =
     if not (existsSync dir) then []

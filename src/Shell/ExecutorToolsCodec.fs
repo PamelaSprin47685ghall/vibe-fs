@@ -11,6 +11,7 @@ type ExecutorArgs = {
     Dependencies: string list
     TimeoutType: ExecutorTimeoutType
     Mode: string
+    WhatToSummarize: string
 }
 
 let private strListField (a: obj) (k: string) : string list =
@@ -59,6 +60,7 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
                             Dependencies = strListField args "dependencies"
                             TimeoutType = parseTimeout timeoutRaw
                             Mode = mode
+                            WhatToSummarize = defaultArg (strField args "what_to_summarize") ""
                         }
 
 let toExecuteOptions (cwd: string option) (decoded: ExecutorArgs) : ExecuteOptions =
@@ -68,4 +70,4 @@ let toExecuteOptions (cwd: string option) (decoded: ExecutorArgs) : ExecuteOptio
       timeoutType = decoded.TimeoutType
       mode = decoded.Mode
       cwd = cwd
-      whatToSummarize = "" }
+      whatToSummarize = decoded.WhatToSummarize }

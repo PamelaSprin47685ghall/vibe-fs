@@ -45,7 +45,7 @@ let private summarizeWhenNeeded (deps: obj) (config: obj) (toolNames: string arr
         else
             let langStr = languageToString options.language
             let timeoutStr = timeoutToString options.timeoutType
-            let prompt = formatPrompt mimocode (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode)) |> List.head
+            let prompt = formatPrompt mimocode (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode, options.whatToSummarize)) |> List.head
             let opts = toolOptions toolNames summarizationRole summarizationAiSettingsAgentId
             let! report = runMuxSubagent deps config summarizationAgentId prompt "Executor summary" opts
             let formatted = formatToolResponse result (Some report)

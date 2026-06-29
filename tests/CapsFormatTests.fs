@@ -40,36 +40,6 @@ let stableFingerprintFilePathChangeAltersResult () =
     let f2 = { filePath = "/b"; label = "X"; content = "v" }
     check "file path change alters fingerprint" ((stableFingerprint h [f1]) <> (stableFingerprint h [f2]))
 
-let buildCapitalsContextEmpty () =
-    let result = buildCapitalsContext []
-    check "empty caps still wrapped in front-matter fences" (result.StartsWith "---\n")
-    check "empty caps has closing fence" (result.Contains "\n---")
-
-let buildCapitalsContextSingleFile () =
-    let files = [ { filePath = "/p.fs"; label = "Plugin"; content = "let x = 1" } ]
-    let result = buildCapitalsContext files
-    check "single caps has front-matter opening" (result.StartsWith "---\n")
-    check "single caps contains caps field" (result.Contains "caps:")
-    check "single caps contains label" (result.Contains "Plugin")
-    check "single caps contains content" (result.Contains "let x = 1")
-    check "single caps has closing fence" (result.Contains "\n---")
-
-let buildCapitalsContextMultipleFilesPreservesOrder () =
-    let files = [
-        { filePath = "/a"; label = "A"; content = "ca" }
-        { filePath = "/b"; label = "B"; content = "cb" }
-    ]
-    let result = buildCapitalsContext files
-    let aIdx = result.IndexOf "A"
-    let bIdx = result.IndexOf "B"
-    check "caps preserve list order" (aIdx >= 0 && bIdx >= 0 && aIdx < bIdx)
-
-let buildCapitalsContextLabelAndContentDistinct () =
-    let files = [ { filePath = "/p"; label = "my-label"; content = "my-content" } ]
-    let result = buildCapitalsContext files
-    check "label present in output" (result.Contains "my-label")
-    check "content present in output" (result.Contains "my-content")
-
 let formatReadOutputSingleLine () =
     let result = formatReadOutput "/path/to/file.txt" "hello"
     check "single line output starts with path tag" (result.StartsWith "<path>/path/to/file.txt</path>")
@@ -102,10 +72,6 @@ let run () =
     stableFingerprintDeterministicAcrossCalls ()
     stableFingerprintContentChangeAltersResult ()
     stableFingerprintFilePathChangeAltersResult ()
-    buildCapitalsContextEmpty ()
-    buildCapitalsContextSingleFile ()
-    buildCapitalsContextMultipleFilesPreservesOrder ()
-    buildCapitalsContextLabelAndContentDistinct ()
     formatReadOutputSingleLine ()
     formatReadOutputMultiLine ()
     formatReadOutputEmptyContent ()
