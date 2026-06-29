@@ -53,7 +53,7 @@ type FlatPart<'raw> =
       part: Part<'raw> }
 
 let private synthPrefixes =
-    [ "caps-synth-user-"; "caps-synth-assistant-"
+    [ "caps-synth-user-"; "caps-synth-assistant-"; "caps-synth-ack-"
       "backlog-projection-"; "backlog-prefix-"
       "magic-todo-projection-"; "magic-todo-prefix-"
       "methodology-probe-"; "semble-synth-" ]

@@ -94,12 +94,17 @@ let private buildAssistantMessage (assistantId: string) (parentID: string) (sess
         "parts", box parts
     ])
 
+let private buildAckMessage (ackId: string) (parentID: string) (sessionID: string option) (projectRoot: string) : obj =
+    buildAssistantMessage ackId parentID sessionID projectRoot
+        [| box (createObj [ "type", box "reasoning"; "text", box acknowledgeText ]) |]
+
 /// Build the synthetic caps prefix: a single user message whose text wraps
-/// thinkText + llmText in <think></think>, followed by optional caps-file
-/// tool reads. The caller decides suppression by passing an empty `capsFiles`
-/// (no file reads) and/or `None` prelude; this keeps a single decision point
-/// in `MessageTransform`. The only guard here is structural: nothing to
-/// anchor onto when there is no real message.
+/// thinkText + llmText in <think></think>, then an assistant reasoning ack
+/// ("好的，我将遵守规则。"), followed by optional caps-file tool reads. The
+/// caller decides suppression by passing an empty `capsFiles` (no file reads)
+/// and/or `None` prelude; this keeps a single decision point in
+/// `MessageTransform`. The only guard here is structural: nothing to anchor
+/// onto when there is no real message.
 let buildCapsMessages
     (hashFn: string -> string)
     (messages: obj array)
@@ -119,7 +124,12 @@ let buildCapsMessages
             let fp = stableFingerprint hashFn capsFiles
             let userId = $"{capsUserPrefix}{fp}"
             let assistantId = $"{capsAssistantPrefix}{fp}"
+            let ackId = $"{capsAcknowledgePrefix}{fp}"
             let toolParts = if capsFiles.IsEmpty then [||] else buildToolParts capsFiles fp sessionOpt assistantId
             let userMsg = buildUserMessage userId sessionOpt preludeText
-            let assistantMessages = if capsFiles.IsEmpty then [||] else [| buildAssistantMessage assistantId userId sessionOpt projectRoot toolParts |]
+            let ackMsg = buildAckMessage ackId userId sessionOpt projectRoot
+            let assistantMessages =
+                if capsFiles.IsEmpty
+                then [| ackMsg |]
+                else [| ackMsg; buildAssistantMessage assistantId userId sessionOpt projectRoot toolParts |]
             Array.concat [| [| userMsg |]; assistantMessages; existingStripped |]

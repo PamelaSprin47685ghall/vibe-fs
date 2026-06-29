@@ -6,6 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
 
+open Wanxiangshu.Kernel.CapsSynthPolicy
 open Wanxiangshu.Kernel.Message
 open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Opencode.Plugin
@@ -37,8 +38,8 @@ let capsTransformSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "manager" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "caps transform injects messages" (msgs.Length = 3)
-    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[2], originalMsg))
+    check "caps transform injects messages" (msgs.Length = 4)
+    check "caps transform preserves original" (obj.ReferenceEquals(msgs.[3], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -64,10 +65,10 @@ let defaultPreludeWithoutCapsSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "manager" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "default prelude injects synthetic messages without caps" (msgs.Length = 2)
+    check "default prelude injects synthetic messages without caps" (msgs.Length = 3)
     let userParts = unbox<obj[]> (get msgs.[0] "parts")
     check "default prelude injects Kolmolgorov prelude content" ((str userParts.[0] "text").StartsWith "# Kolmolgorov 宝典")
-    check "default prelude preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))
+    check "default prelude preserves original message" (obj.ReferenceEquals(msgs.[2], originalMsg))
     do! rmAsync workspaceDir
 }
 
@@ -99,12 +100,14 @@ let capsAndBacklogOrderSpec () = promise {
     do! tf $ (createObj [], messages) |> unbox<JS.Promise<unit>>
     let result = unbox<obj[]> (get messages "messages")
     let userParts = unbox<obj[]> (get result.[0] "parts")
-    let capsAssistantInfo = get result.[1] "info"
-    let magicInfo = get result.[2] "info"
+    let ackInfo = get result.[1] "info"
+    let capsAssistantInfo = get result.[2] "info"
+    let magicInfo = get result.[3] "info"
     let magicId : string = str magicInfo "id"
     check "caps/backlog order: caps user first" ((str userParts.[0] "text").StartsWith "# Kolmolgorov 宝典")
-    check "caps/backlog order: caps read assistant second" ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
-    check "caps/backlog order: backlog prefix third" (magicId.StartsWith(backlogPrefixIdPrefix : string))
+    check "caps/backlog order: caps ack assistant second" ((str ackInfo "id").StartsWith(capsAcknowledgePrefix : string))
+    check "caps/backlog order: caps read assistant third" ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix : string))
+    check "caps/backlog order: backlog prefix fourth" (magicId.StartsWith(backlogPrefixIdPrefix : string))
     do! rmAsync workspaceDir
 }
 

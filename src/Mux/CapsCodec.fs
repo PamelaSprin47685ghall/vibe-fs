@@ -3,6 +3,7 @@ module Wanxiangshu.Mux.CapsCodec
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Kernel.CapsPrelude
 open Wanxiangshu.Kernel.CapsSynthPolicy
 open Wanxiangshu.Shell.CapsSynthCommon
 open Wanxiangshu.Shell.Dyn
@@ -40,6 +41,10 @@ let private buildCapsAssistantMessage (id: string) (parentId: string) (capsFiles
         |> Array.ofList
     buildMuxMessage id "assistant" parts
 
+let private buildAckMessage (ackId: string) : obj =
+    buildMuxMessage ackId "assistant"
+        [| createObj [ "type", box "reasoning"; "text", box acknowledgeText ] |]
+
 let buildCapsMessages
     (messages: obj array)
     (capsFiles: CapsFile list)
@@ -54,8 +59,11 @@ let buildCapsMessages
             let fp = stableFingerprint sha256HexTruncated capsFiles
             let userId = $"{capsUserPrefix}{fp}"
             let assistantId = $"{capsAssistantPrefix}{fp}"
+            let ackId = $"{capsAcknowledgePrefix}{fp}"
             let userMsg = buildUserMessage userId preludeText
+            let ackMsg = buildAckMessage ackId
             let assistantMsgs =
-                if capsFiles.IsEmpty then [||]
-                else [| buildCapsAssistantMessage assistantId userId capsFiles fp |]
+                if capsFiles.IsEmpty
+                then [| ackMsg |]
+                else [| ackMsg; buildCapsAssistantMessage assistantId userId capsFiles fp |]
             Array.concat [| [| userMsg |]; assistantMsgs; existingStripped |]

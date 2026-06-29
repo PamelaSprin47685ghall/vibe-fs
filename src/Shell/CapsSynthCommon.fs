@@ -17,7 +17,7 @@ let findFirstNonSynthMessage (messageId: obj -> string) (messages: obj array) : 
     messages
     |> Array.tryFind (fun msg ->
         let id = messageId msg
-        id <> "" && not (id.StartsWith capsUserPrefix) && not (id.StartsWith capsAssistantPrefix))
+        id <> "" && not (id.StartsWith capsUserPrefix) && not (id.StartsWith capsAssistantPrefix) && not (id.StartsWith capsAcknowledgePrefix))
 
 let userCapsText (preludeText: string option) : string =
     match preludeText with

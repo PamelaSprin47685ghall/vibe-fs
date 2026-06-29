@@ -3,12 +3,10 @@ module Wanxiangshu.Omp.CapsCodec
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Kernel.CapsSynthPolicy
 open Wanxiangshu.Shell.CapsPrelude
 open Wanxiangshu.Shell.OmpCaps
 module Dyn = Wanxiangshu.Shell.Dyn
-
-let capsUserPrefix = "caps-synth-user-"
-let capsAssistantPrefix = "caps-synth-assistant-"
 
 let private entryId (entry: obj) : string =
     let info = Dyn.get entry "info"
@@ -69,11 +67,19 @@ let private buildAssistantEntry (assistantId: string) (parentUserId: string) (se
     if projectRoot <> "" then info?path <- box(createObj [ "cwd", box projectRoot; "root", box projectRoot ])
     createObj [ "info", box info; "parts", box parts ]
 
+let private buildAckEntry (ackId: string) (parentUserId: string) (sessionId: string) : obj =
+    let info = createObj [ "id", box ackId; "role", box "assistant"; "parentID", box parentUserId ]
+    if sessionId <> "" then info?sessionID <- box sessionId
+    createObj [
+        "info", box info
+        "parts", box [| createObj [ "type", box "reasoning"; "text", box acknowledgeText ] |]
+    ]
+
 let private findFirstRealEntry (entries: obj array) : obj option =
     entries
     |> Array.tryFind (fun entry ->
         let id = entryId entry
-        id <> "" && not (id.StartsWith capsUserPrefix) && not (id.StartsWith capsAssistantPrefix))
+        id <> "" && not (id.StartsWith capsUserPrefix) && not (id.StartsWith capsAssistantPrefix) && not (id.StartsWith capsAcknowledgePrefix))
 
 let buildCapsEntries (hashFn: string -> string) (entries: obj array) (projectRoot: string) (ompCaps: OmpCapsFile list) (preludeText: string option) : obj array =
     match findFirstRealEntry entries with
@@ -87,8 +93,13 @@ let buildCapsEntries (hashFn: string -> string) (entries: obj array) (projectRoo
             let fp = stableFingerprint hashFn capsFiles
             let userId = $"{capsUserPrefix}{fp}"
             let assistantId = $"{capsAssistantPrefix}{fp}"
+            let ackId = $"{capsAcknowledgePrefix}{fp}"
             let userEntry = buildUserEntry userId sessionId preludeText
+            let ackEntry = buildAckEntry ackId userId sessionId
             let assistantEntries =
-                if capsFiles.IsEmpty then [||]
-                else [| buildAssistantEntry assistantId userId sessionId projectRoot capsFiles fp |]
+                if capsFiles.IsEmpty
+                then [| ackEntry |]
+                else
+                    [| ackEntry
+                       buildAssistantEntry assistantId userId sessionId projectRoot capsFiles fp |]
             Array.concat [| [| userEntry |]; assistantEntries; stripped |]
