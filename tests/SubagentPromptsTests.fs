@@ -61,6 +61,13 @@ let executorSummarizerPromptContainsFields () =
     check "contains language" (p.Contains "python")
     check "contains program" (p.Contains "print(1)")
     check "contains mode" (p.Contains "ro")
+    check "contains task section" (p.Contains "# Task")
+    check "contains preserve directive" (p.Contains "Preserve errors")
+
+let executorSummarizerPromptEmbedsWhatToSummarize () =
+    let p = executorSummarizerPrompt "summarize exit codes and stderr only" "stdout" "python" "print(1)" [] "short" "ro"
+    check "what_to_summarize embedded" (p.Contains "summarize exit codes and stderr only")
+    check "contains task section" (p.Contains "# Task")
 
 let websearchSummarizerPromptContains () =
     let p = websearchSummarizerPrompt "Q?" "results..."
@@ -80,4 +87,5 @@ let run () =
     meditatorPromptContainsFiles ()
     meditatorPromptSkippedSection ()
     executorSummarizerPromptContainsFields ()
+    executorSummarizerPromptEmbedsWhatToSummarize ()
     websearchSummarizerPromptContains ()

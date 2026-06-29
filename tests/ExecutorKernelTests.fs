@@ -52,17 +52,15 @@ let formatCompletedWithSummary () =
 
 let formatTruncatedBodyRef () =
     let resp = formatToolResponse (Truncated("x", Short)) None
-    check "uses truncated body ref" (resp.Contains "/See Below, Truncated/")
+    check "uses truncated body ref" (resp.Contains "(Output Truncated)")
 
 let formatCompletedBodyRef () =
     let resp = formatToolResponse (Completed("x", 0)) None
-    check "uses normal body ref" (resp.Contains "/See Below/")
+    check "no tool_output field" (not (resp.Contains "tool_output:"))
 
 let formatToolResponseFailedSignal () =
     let resp = formatToolResponse (Failed("partial", None, Some "SIGTERM")) None
-    check "signal status" (resp.Contains "status: killed_signal")
-    check "signal value" (resp.Contains "signal: SIGTERM")
-    check "signal hint" (resp.Contains "Killed by signal SIGTERM")
+    check "signal status" (resp.Contains "status: SIGTERM")
 
 let formatToolResponseFailedExitCode () =
     let resp = formatToolResponse (Failed("err", Some 2, None)) None

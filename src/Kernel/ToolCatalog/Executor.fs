@@ -15,7 +15,9 @@ let internal executorSpec: ToolSpec =
               "timeout_type",
               "Execution timeout budget: 'short' (1s), 'long' (10s), or 'last-resort' (100s). Use 'last-resort' only when absolutely necessary."
               "mode",
-              "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)." ]
+              "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)."
+              "what_to_summarize",
+              "What the summary should focus on. Becomes the executor subagent's task description, so phrase it as a directive (e.g. 'only keep stack traces and exit codes')." ]
       requiredFields = [ "language"; "program"; "timeout_type"; "mode" ] }
 
 let internal executorWaitSpec: ToolSpec =

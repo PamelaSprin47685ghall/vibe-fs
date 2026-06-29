@@ -43,8 +43,7 @@ let createRegistration (deps: obj) : obj =
     let eventHook, slashCommands, getToolPolicy =
         createEventHooksSlashAndPolicy deps reviewStore
     let registration =
-        assembleRegistrationObject scope tools wrappers mcpServers (createContextInjector ())
-            eventHook slashCommands messagesTransform compactingTransform getToolPolicy
+        assembleRegistrationObject scope tools wrappers mcpServers eventHook slashCommands messagesTransform compactingTransform getToolPolicy
             (createReviewTestSurface reviewStore)
     registerTestHooks registration deps
     box registration

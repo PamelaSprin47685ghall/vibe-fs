@@ -1,6 +1,7 @@
 module Wanxiangshu.Kernel.Dedup
 
 open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
 type DedupedOutput = { output: string; seenOutputs: string list }
 
@@ -9,7 +10,7 @@ let isNoChangeOutput (output: string) : bool =
     | Some msg ->
         msg.info
         |> List.exists (function
-            | InfoItem.BodyRef ToolOutputBodyRef.NoChangeSincePreviousReadWrite -> true
+            | InfoItem.Status s when s = noChangeStatus -> true
             | _ -> false)
     | None -> false
 

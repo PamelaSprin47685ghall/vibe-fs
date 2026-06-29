@@ -67,17 +67,15 @@ let executorToolResponseFormatting () =
     check "failed response includes exit_code 2" (failedResp.Contains "exit_code: 2")
     check "failed response includes status exit_error" (failedResp.Contains "status: exit_error")
     let truncatedResp = formatToolResponse truncatedResult None
-    check "truncated response includes status killed_timeout" (truncatedResp.Contains "status: killed_timeout")
-    check "truncated response uses truncated body ref" (truncatedResp.Contains seeBelowTruncated)
-    check "truncated response includes timeout_ms" (truncatedResp.Contains "timeout_ms:")
-    check "truncated response omits timeout_type" (not (truncatedResp.Contains "timeout_type:"))
-    check "truncated response includes killed hint in info" (hintTextContains truncatedResp "Killed after")
+    check "truncated response includes killed_timeout status" (truncatedResp.Contains "killed_timeout")
+    check "truncated response includes Output Truncated suffix" (truncatedResp.Contains "(Output Truncated)")
+    check "truncated response omits timeout_ms field" (not (truncatedResp.Contains "timeout_ms:"))
+    check "truncated response omits timeout hints" (not (truncatedResp.Contains "Killed after"))
     check "truncated body excludes legacy executor suffix" (not (truncatedResp.Contains "[executor]"))
     let signaledResult = Failed("partial out", None, Some "SIGTERM")
     let signaledResp = formatToolResponse signaledResult None
-    check "signaled response includes status killed_signal" (signaledResp.Contains "status: killed_signal")
-    check "signaled response includes signal" (signaledResp.Contains "signal: SIGTERM")
-    check "signaled response includes killed hint" (hintTextContains signaledResp "Killed by signal")
+    check "signaled response includes signal as status" (signaledResp.Contains "status: SIGTERM")
+    check "signaled response omits legacy signal field" (not (signaledResp.Contains "signal: SIGTERM"))
     check "signaled body has no legacy suffix" (not (signaledResp.Contains "[executor]"))
     let missingResp = formatToolResponse missingResult None
     check "missing response includes status missing_executable" (missingResp.Contains "status: missing_executable")
@@ -95,7 +93,7 @@ let summarizerPromptOmitsReturnValue () =
     let multiline =
         executorSummarizerPrompt "" "line1\nline2" "shell" "echo hi\necho bye" [ "dep1" ] "long" "ro"
     check "summarizer multiline program uses block field" (multiline.Contains "program: |")
-    check "summarizer multiline raw_output uses block field" (multiline.Contains "raw_output: |")
+    check "summarizer multiline raw output in body" (multiline.Contains "line1" && multiline.Contains "line2")
 
 // --- formatFetchResponse ---
 

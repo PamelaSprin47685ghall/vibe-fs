@@ -11,6 +11,7 @@ open Wanxiangshu.Kernel.SubagentPrompts
 open Wanxiangshu.Kernel.SearchPrompts
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 [<Import("createRequire", "node:module")>]
 let private createRequire' : string -> (string -> obj) = jsNative
@@ -69,13 +70,6 @@ let capsFileShape () =
     let f : Wanxiangshu.Kernel.CapsFormat.CapsFile = { filePath = "/abs/HERE.md"; label = "HERE.md"; content = "x" }
     equal "capsFile filePath" "/abs/HERE.md" f.filePath
     equal "capsFile label" "HERE.md" f.label
-
-let capsContextFormat () =
-    let ctx = Wanxiangshu.Kernel.CapsFormat.buildCapitalsContext
-                [ { filePath = "/abs/A & B.md"; label = "A & B.md"; content = "body text" } ]
-    check "caps context is front matter" (ctx.StartsWith "---\ncaps:")
-    check "caps label present" (ctx.Contains "A & B.md")
-    check "caps content raw" (ctx.Contains "body text")
 
 let capsFileSizeLimit () =
     equal "caps file size limit 4MB" (4 * 1_048_576) Wanxiangshu.Shell.WorkspaceFiles.maxFileSize

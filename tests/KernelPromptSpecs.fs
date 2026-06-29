@@ -6,7 +6,6 @@ open Wanxiangshu.Tests.KernelPromptSpecsReview
 
 let hostKernel' () = KernelPromptSpecsHost.hostKernel' ()
 let toolCatalogCentralized () = KernelPromptSpecsHost.toolCatalogCentralized ()
-let hostToolsKnowledgeGraphNames () = KernelPromptSpecsHost.hostToolsKnowledgeGraphNames ()
 let subagentDispatch () = KernelPromptSpecsSubagent.subagentDispatch ()
 let subagentJoinReports () = KernelPromptSpecsSubagent.subagentJoinReports ()
 let mimocodeFormatPromptAppendsAgentReportTail () = KernelPromptSpecsSubagent.mimocodeFormatPromptAppendsAgentReportTail ()

@@ -37,13 +37,6 @@ let muxExecutorModeSchema (reg: obj) : obj =
         let props = get schema "properties"
         if isNullish props then null else get props "mode"
 
-let muxKnowledgeGraphRuntime (reg: obj) : obj =
-    let direct = get reg "__knowledgeGraphRuntime"
-    if not (isNullish direct) then direct
-    else
-        let rt = get reg "knowledgeGraphRuntime"
-        if isNullish rt then null else rt
-
 let muxReviewStore (reg: obj) : obj = get reg "__reviewStore"
 
 let muxActivateReviewForTest (reg: obj) (sessionID: string) (task: string) : unit =
@@ -116,11 +109,6 @@ let mockMuxTaskServiceReturningVerdicts (prompts: ResizeArray<string>) (verdicts
                   let report = if queue.Count > 0 then let v = queue.[0] in queue.RemoveAt(0); v else ""
                   return box {| reportMarkdown = report |}
               })) ]
-
-let registerMuxKnowledgeGraphJobForTest (reg: obj) (sessionID: string) (workspaceRoot: string) (kindTag: string) (payload: obj) : unit =
-    let runtime = muxKnowledgeGraphRuntime reg
-    let registrar = get runtime "registerJobForTesting" |> unbox<System.Func<string, string, string, obj, unit>>
-    registrar.Invoke(sessionID, workspaceRoot, kindTag, payload)
 
 let muxMessageTransform (reg: obj) : obj =
     get reg "messagesTransform"

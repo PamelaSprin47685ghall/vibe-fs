@@ -3,7 +3,6 @@ module Wanxiangshu.Mux.PluginRegistrationParts
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
-open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Shell
 open Wanxiangshu.Mux.Wrappers
 open Wanxiangshu.Mux.WrappersReview
@@ -13,7 +12,6 @@ open Wanxiangshu.Mux.MessageTransform
 open Wanxiangshu.Mux.PluginCatalog
 open Wanxiangshu.Mux.BacklogSession
 open Wanxiangshu.Shell.RuntimeScope
-open Wanxiangshu.Shell.WorkspaceFiles
 
 let createWrapperExecution (toolsObj: obj) (hostReadExec: HostFunctionCapture) (scope: RuntimeScope) : obj =
     createAllWrappers toolsObj hostReadExec scope
@@ -41,13 +39,6 @@ let createEventHooksSlashAndPolicy
     let getToolPolicy = System.Func<string, obj, obj>(fun (_agentId: string) (role: obj) -> buildToolPolicy muxToolNames role)
     (box eventHook, box slashCommands, box getToolPolicy)
 
-let createContextInjector () : obj =
-    box {| inject = (fun (projectPath: string) ->
-        promise {
-            let! files = findCapsFiles projectPath
-            return if List.isEmpty files then box null else box (Wanxiangshu.Kernel.CapsFormat.buildCapitalsContext files)
-        } :> obj) |}
-
 let createReviewTestSurface (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     createObj
         [ "activateReview",
@@ -64,7 +55,6 @@ let assembleRegistrationObject
     (tools: ToolDefinition array)
     (wrappers: obj)
     (mcpServers: obj)
-    (contextInjector: obj)
     (eventHook: obj)
     (slashCommands: obj)
     (messagesTransform: obj)
@@ -78,7 +68,6 @@ let assembleRegistrationObject
         "tools", box tools
         "wrappers", box wrappers
         "mcpServers", box mcpServers
-        "contextInjector", box contextInjector
         "eventHook", box eventHook
         "slashCommands", box slashCommands
         "messagesTransform", box messagesTransform

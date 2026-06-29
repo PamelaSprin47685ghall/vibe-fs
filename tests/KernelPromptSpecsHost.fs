@@ -74,9 +74,4 @@ let toolCatalogCentralized () =
     check "catalog covers meditator" (Set.contains "meditator" names)
     check "catalog covers browser" (Set.contains "browser" names)
     check "catalog covers executor" (Set.contains "executor" names)
-    check "catalog does not cover knowledge_graph_fetch" (not (Set.contains "knowledge_graph_fetch" names))
     check "catalog covers submit_review" (Set.contains "submit_review" names)
-
-let hostToolsKnowledgeGraphNames () =
-    let opencodeNames = allToolNames Opencode |> Set.ofArray
-    check "host tools do not include knowledge_graph_fetch" (not (Set.contains "knowledge_graph_fetch" opencodeNames))

@@ -96,15 +96,6 @@ let ompReviewUsesReviewRuntime () =
     check "arch: Omp ReviewTools uses ReviewRuntime"
         (tools.Contains "ReviewRuntime")
 
-let ompKnowledgeGraphRuntimeSplit () =
-    check "arch: Omp KnowledgeGraph Runtime.fs exists"
-        (existsSync "src/Omp/KnowledgeGraph/Runtime.fs")
-    check "arch: Omp KnowledgeGraphRuntime.fs is consumed via KnowledgeGraph.Runtime"
-        (existsSync "src/Omp/KnowledgeGraph/Runtime.fs")
-    let runtime = requireFile "src/Omp/KnowledgeGraph/Runtime.fs" |> nonCommentCode
-    check "arch: Omp KnowledgeGraph Runtime.fs is sole runtime home"
-        (runtime.Length > 0 && runtime.Contains "OmpKnowledgeGraphRuntime")
-
 let ompCapsCodecExists () =
     let code = requireFile "src/Omp/CapsCodec.fs" |> nonCommentCode
     check "arch: Omp CapsCodec non-empty" (code.Contains "module")

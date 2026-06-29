@@ -64,7 +64,7 @@ let defaultPreludeWithoutCapsSpec () = promise {
     let out = createObj [ "messages", box [| originalMsg |] ]
     do! tf $ (createObj [ "agent", box "manager" ], out) |> unbox<JS.Promise<unit>>
     let msgs = unbox<obj[]> (get out "messages")
-    check "default prelude injects synthetic messages without caps or knowledge graph" (msgs.Length = 2)
+    check "default prelude injects synthetic messages without caps" (msgs.Length = 2)
     let userParts = unbox<obj[]> (get msgs.[0] "parts")
     check "default prelude injects Kolmolgorov prelude content" ((str userParts.[0] "text").StartsWith "# Kolmolgorov 宝典")
     check "default prelude preserves original message" (obj.ReferenceEquals(msgs.[1], originalMsg))

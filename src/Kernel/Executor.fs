@@ -42,48 +42,31 @@ let outputFromResult (result: ExecuteResult) : string =
     | Failed(o, _, _)
     | MissingExecutable(_, o) -> o
 
-let executorKilledAfterTimeoutHint (timeoutMs: int) =
-    $"Killed after {timeoutMs}ms. Partial output below."
-
-let executorKilledBySignalHint (signal: string) =
-    $"Killed by signal {signal}. Partial output below."
-
 let private isSpawnFailedMessage (output: string) =
     output.StartsWith "spawn failed:"
 
-let private executorInfoItems (result: ExecuteResult) : InfoItem list =
+let executorInfoItems (result: ExecuteResult) : InfoItem list =
     match result with
     | Completed(_, code) ->
         [ InfoItem.Status "completed"; InfoItem.ExitCode code ]
     | Truncated(_, timeoutType) ->
-        let ms = timeoutMs timeoutType
-        [ InfoItem.Status "killed_timeout"
-          InfoItem.TimeoutMs ms
-          InfoItem.Hint (executorKilledAfterTimeoutHint ms) ]
-    | Failed(output, code, sig') ->
-        match sig', code with
-        | Some s, _ when s <> "" ->
-            [ InfoItem.Status "killed_signal"
-              InfoItem.Signal s
-              InfoItem.Hint (executorKilledBySignalHint s) ]
-        | _, Some c ->
-            [ InfoItem.Status "exit_error"; InfoItem.ExitCode c ]
-        | _, None when isSpawnFailedMessage output ->
-            [ InfoItem.Status "spawn_failed" ]
-        | _, None ->
-            [ InfoItem.Status "exit_error" ]
+        [ InfoItem.Status "killed_timeout (Output Truncated)" ]
+    | Failed(_, Some c, _) ->
+        [ InfoItem.Status "exit_error"; InfoItem.ExitCode c ]
+    | Failed(_, None, Some sig') when sig' <> "" ->
+        [ InfoItem.Status sig' ]
+    | Failed(output, _, _) when isSpawnFailedMessage output ->
+        [ InfoItem.Status "spawn_failed" ]
+    | Failed(_, None, _) ->
+        [ InfoItem.Status "exit_error" ]
     | MissingExecutable _ ->
         [ InfoItem.Status "missing_executable" ]
 
 let formatToolResponse (result: ExecuteResult) (summaryOption: string option) : string =
     let body = Option.defaultValue (outputFromResult result) summaryOption
-    let truncated = match result with Truncated _ -> true | _ -> false
-    let ref' =
-        if truncated || summaryOption.IsSome then ToolOutputBodyRef.SeeBelowTruncated
-        else ToolOutputBodyRef.SeeBelow
     render
         { empty with
-            info = executorInfoItems result @ [ InfoItem.BodyRef ref' ]
+            info = executorInfoItems result
             body = body }
 
 let readOnlyReadCommands: Set<string> =
@@ -107,13 +90,7 @@ let prependSafetyWarning (output: string) (program: string) (language: ExecutorL
     else
         match tryParse output with
         | Some msg -> render (appendInfo (InfoItem.Hint hintExecutorMisuse) msg)
-        | None ->
-            render
-                { empty with
-                    info =
-                        [ InfoItem.Hint hintExecutorMisuse
-                          InfoItem.BodyRef ToolOutputBodyRef.SeeBelow ]
-                    body = output }
+        | None -> render { empty with info = [ InfoItem.Hint hintExecutorMisuse ]; body = output }
 
 let shouldSummarize (byteLength: string -> int) (output: string) : bool =
     byteLength output > summaryThresholdBytes

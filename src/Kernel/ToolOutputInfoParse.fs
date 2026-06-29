@@ -24,18 +24,6 @@ let private parseInfoItem (key: string) (value: obj) : InfoItem option =
             match System.Int32.TryParse strValue with
             | true, n -> Some (InfoItem.ExitCode n)
             | false, _ -> None
-        | "signal" -> Some (InfoItem.Signal strValue)
-        | "timeout_ms" ->
-            match System.Int32.TryParse strValue with
-            | true, n -> Some (InfoItem.TimeoutMs n)
-            | false, _ -> None
-        | "tool_output" ->
-            let ref' =
-                if strValue = seeBelow then ToolOutputBodyRef.SeeBelow
-                elif strValue = seeBelowTruncated then ToolOutputBodyRef.SeeBelowTruncated
-                elif strValue = noChangeSincePreviousReadWrite then ToolOutputBodyRef.NoChangeSincePreviousReadWrite
-                else ToolOutputBodyRef.SeeBelow
-            Some (InfoItem.BodyRef ref')
         | _ -> None
 
 let parseInfoItems (parsed: obj) : InfoItem list =
