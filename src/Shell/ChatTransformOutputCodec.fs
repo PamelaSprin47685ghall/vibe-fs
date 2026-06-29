@@ -16,4 +16,5 @@ let clearSystemOutputLength (output: obj) : unit =
         systemObj?length <- 0
 
 let setSystemOutputToDirectory (directory: string) (output: obj) : unit =
-    if directory <> "" then output?system <- directory
+    if directory <> "" then
+        output?system <- [| box directory |]
