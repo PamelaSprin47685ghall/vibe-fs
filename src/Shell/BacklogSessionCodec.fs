@@ -12,16 +12,22 @@ let inputOfPart (part: Part<obj>) : obj =
     | ToolPart(_, _, Some state, _) -> state.input
     | _ -> null
 
-let backlogReportFromTodoInput (_host: Host) (input: obj) : string =
-    let raw = Dyn.get input "completedWorkReport"
-    if Dyn.isNullish raw then "" else string raw
+let backlogEntryFromTodoInput (input: obj) : BacklogEntry =
+    { ahaMoments = Dyn.str input "ahaMoments" |> fun s -> s.Trim()
+      changesAndReasons = Dyn.str input "changesAndReasons" |> fun s -> s.Trim()
+      gotchas = Dyn.str input "gotchas" |> fun s -> s.Trim()
+      lessonsAndConventions = Dyn.str input "lessonsAndConventions" |> fun s -> s.Trim()
+      plan = Dyn.str input "plan" |> fun s -> s.Trim() }
 
-let reportFromFlatPartWithProjection (host: Host) (projection: ProjectionStore) (fp: FlatPart<obj>) : string =
+let reportFromFlatPartWithProjection (host: Host) (projection: ProjectionStore) (fp: FlatPart<obj>) : BacklogEntry option =
     match fp.part with
     | ToolPart(_, callID, Some state, _) ->
-        let explicit = backlogReportFromTodoInput host state.input
-        if explicit <> "" then explicit
+        let entry = backlogEntryFromTodoInput state.input
+        let hasAny =
+            entry.ahaMoments <> "" || entry.changesAndReasons <> "" || entry.gotchas <> "" || entry.lessonsAndConventions <> "" || entry.plan <> ""
+        if hasAny then Some entry
         elif host = Opencode || host = Mux || host = Omp then
-            projection.TryGetReport(host, callID) |> Option.defaultValue ""
-        else ""
-    | _ -> ""
+            projection.TryGetReport(host, callID)
+            |> Option.map (fun r -> { entry with ahaMoments = r })
+        else None
+    | _ -> None

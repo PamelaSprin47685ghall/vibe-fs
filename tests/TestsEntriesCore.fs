@@ -92,7 +92,6 @@ open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.MessageTransformPolicyTests
 open Wanxiangshu.Tests.SembleInjectionTests
-open Wanxiangshu.Tests.SembleReadInjectionTests
 open Wanxiangshu.Tests.ToolCatalogClassificationTests
 open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.ExecutorKernelTests
@@ -277,7 +276,6 @@ let coreTestEntries () : (string * TestBody) list =
     "ToolOutputInfoTests.run", Sync (sync ToolOutputInfoTests.run)
     "MessageTransformPolicyTests.run", Sync (sync MessageTransformPolicyTests.run)
     "SembleInjectionTests.run", Sync (sync SembleInjectionTests.run)
-    "SembleReadInjectionTests.run", Async SembleReadInjectionTests.run
     "ExecutorKernelTests.run", Sync (sync ExecutorKernelTests.run)
     "ToolExecuteTests.run", Sync (sync ToolExecuteTests.run)
     "TreeSitterKernelTests.run", Sync (sync TreeSitterKernelTests.run)

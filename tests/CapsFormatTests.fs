@@ -40,8 +40,38 @@ let stableFingerprintFilePathChangeAltersResult () =
     let f2 = { filePath = "/b"; label = "X"; content = "v" }
     check "file path change alters fingerprint" ((stableFingerprint h [f1]) <> (stableFingerprint h [f2]))
 
+let buildCapitalsContextEmpty () =
+    let result = buildCapitalsContext []
+    check "empty caps still wrapped in front-matter fences" (result.StartsWith "---\n")
+    check "empty caps has closing fence" (result.Contains "\n---")
+
+let buildCapitalsContextSingleFile () =
+    let files = [ { filePath = "/p.fs"; label = "Plugin"; content = "let x = 1" } ]
+    let result = buildCapitalsContext files
+    check "single caps has front-matter opening" (result.StartsWith "---\n")
+    check "single caps contains caps field" (result.Contains "caps:")
+    check "single caps contains label" (result.Contains "Plugin")
+    check "single caps contains content" (result.Contains "let x = 1")
+    check "single caps has closing fence" (result.Contains "\n---")
+
+let buildCapitalsContextMultipleFilesPreservesOrder () =
+    let files = [
+        { filePath = "/a"; label = "A"; content = "ca" }
+        { filePath = "/b"; label = "B"; content = "cb" }
+    ]
+    let result = buildCapitalsContext files
+    let aIdx = result.IndexOf "A"
+    let bIdx = result.IndexOf "B"
+    check "caps preserve list order" (aIdx >= 0 && bIdx >= 0 && aIdx < bIdx)
+
+let buildCapitalsContextLabelAndContentDistinct () =
+    let files = [ { filePath = "/p"; label = "my-label"; content = "my-content" } ]
+    let result = buildCapitalsContext files
+    check "label present in output" (result.Contains "my-label")
+    check "content present in output" (result.Contains "my-content")
+
 let formatReadOutputSingleLine () =
-    let result = formatReadOutput "/path/to/file.txt" (sliceFromContent "hello")
+    let result = formatReadOutput "/path/to/file.txt" "hello" 1
     check "single line output starts with path tag" (result.StartsWith "<path>/path/to/file.txt</path>")
     check "single line output contains type tag" (result.Contains "<type>file</type>")
     check "single line output contains content tag" (result.Contains "<content>")
@@ -49,36 +79,21 @@ let formatReadOutputSingleLine () =
     check "single line output has end-of-file footer" (result.Contains "(End of file - total 1 lines)")
 
 let formatReadOutputMultiLine () =
-    let result = formatReadOutput "/f" (sliceFromContent "line1\nline2\nline3")
+    let content = "line1\nline2\nline3"
+    let result = formatReadOutput "/f" content 1
     check "multi line has 1: line1" (result.Contains "1: line1")
     check "multi line has 2: line2" (result.Contains "2: line2")
     check "multi line has 3: line3" (result.Contains "3: line3")
     check "multi line footer shows 3 lines" (result.Contains "(End of file - total 3 lines)")
 
 let formatReadOutputEmptyContent () =
-    let result = formatReadOutput "/f" (sliceFromContent "")
+    let result = formatReadOutput "/f" "" 1
     check "empty content still has content tag" (result.Contains "<content>")
-    check "empty content footer shows 0 lines" (result.Contains "(End of file - total 0 lines)")
+    check "empty content footer shows 1 line (empty string splits to 1 element)" (result.Contains "(End of file - total 1 lines)")
 
 let formatReadOutputClosingTags () =
-    let result = formatReadOutput "/f" (sliceFromContent "x")
+    let result = formatReadOutput "/f" "x" 1
     check "closing content tag" (result.Contains "</content>")
-
-let formatReadFooterEndOfFileWhenNotTruncated () =
-    let s = { raw = [| "a"; "b" |]; offset = 1; totalLines = 2; more = false; cut = false }
-    equal "end of file footer" "(End of file - total 2 lines)" (formatReadFooter s)
-
-let formatReadFooterShowingWhenMoreAndNotCut () =
-    let s = { raw = [| "a"; "b" |]; offset = 1; totalLines = 5; more = true; cut = false }
-    equal "showing footer" "(Showing lines 1-2 of 5. Use offset=3 to continue.)" (formatReadFooter s)
-
-let formatReadFooterCappedWhenCut () =
-    let s = { raw = [| "a"; "b" |]; offset = 10; totalLines = 100; more = true; cut = true }
-    equal "capped footer" "(Output capped at 50 KB. Showing lines 10-11. Use offset=12 to continue.)" (formatReadFooter s)
-
-let formatReadFooterOffsetAware () =
-    let s = { raw = [| "x" |]; offset = 127; totalLines = 200; more = true; cut = false }
-    equal "offset-aware showing footer" "(Showing lines 127-127 of 200. Use offset=128 to continue.)" (formatReadFooter s)
 
 let run () =
     stableFingerprintEmptyList ()
@@ -87,11 +102,11 @@ let run () =
     stableFingerprintDeterministicAcrossCalls ()
     stableFingerprintContentChangeAltersResult ()
     stableFingerprintFilePathChangeAltersResult ()
+    buildCapitalsContextEmpty ()
+    buildCapitalsContextSingleFile ()
+    buildCapitalsContextMultipleFilesPreservesOrder ()
+    buildCapitalsContextLabelAndContentDistinct ()
     formatReadOutputSingleLine ()
     formatReadOutputMultiLine ()
     formatReadOutputEmptyContent ()
     formatReadOutputClosingTags ()
-    formatReadFooterEndOfFileWhenNotTruncated ()
-    formatReadFooterShowingWhenMoreAndNotCut ()
-    formatReadFooterCappedWhenCut ()
-    formatReadFooterOffsetAware ()

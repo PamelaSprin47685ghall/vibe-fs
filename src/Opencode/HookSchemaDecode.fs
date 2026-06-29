@@ -88,6 +88,17 @@ let private stringZodProperty (description: string) : obj =
         "description", box description
     ]
 
+let private jsonStringMinLengthProperty (minLength: int) (description: string) : obj =
+    createObj [ "type", box "string"; "minLength", box minLength; "description", box description ]
+
+let private reportFieldDescs =
+    [| "ahaMoments", ahaMomentsDesc
+       "changesAndReasons", changesAndReasonsDesc
+       "gotchas", gotchasDesc
+       "lessonsAndConventions", lessonsAndConventionsDesc
+       "plan", planDesc |]
+    |> Map.ofArray
+
 let private hasCallable (o: obj) (key: string) : bool =
     let value = get o key
     not (isNullish value) && jsType value = "function"
@@ -132,11 +143,11 @@ let private extendZodTaskSchema (schema: obj) : obj =
         else
             let keys = Dyn.keys shape
             let mutable templateStr = null
-            let mutable existingReport = null
+            let mutable existingReportFields : Set<string> = Set.empty
             let mutable existingMethodology = null
             for k in keys do
                 let prop = get shape k
-                if k = "completedWorkReport" then existingReport <- prop
+                if Wanxiangshu.Kernel.WorkBacklog.reportFieldNames |> List.contains k then existingReportFields <- Set.add k existingReportFields
                 if k = "select_methodology" then existingMethodology <- prop
                 let typeName = get (get prop "_def") "typeName"
                 if typeName = "ZodString" then
@@ -152,9 +163,18 @@ let private extendZodTaskSchema (schema: obj) : obj =
             if isNullish templateStr then schema
             else
                 let mutable extProps : (string * obj) list = []
-                if isNullish existingReport then
-                    match callSchemaMethod templateStr "describe" (box reportDesc) with
-                    | Some describedStr -> extProps <- ("completedWorkReport", describedStr) :: extProps
+                let missingReportFields = Wanxiangshu.Kernel.WorkBacklog.reportFieldNames |> List.filter (fun f -> not (Set.contains f existingReportFields))
+                for field in missingReportFields do
+                    let desc =
+                        match field with
+                        | "ahaMoments" -> ahaMomentsDesc
+                        | "changesAndReasons" -> changesAndReasonsDesc
+                        | "gotchas" -> gotchasDesc
+                        | "lessonsAndConventions" -> lessonsAndConventionsDesc
+                        | "plan" -> planDesc
+                        | _ -> ""
+                    match callSchemaMethod templateStr "describe" (box desc) with
+                    | Some describedStr -> extProps <- (field, describedStr) :: extProps
                     | None -> ()
                 if isNullish existingMethodology then
                     match callSchemaMethod0 templateStr "array" with
@@ -185,8 +205,10 @@ let mergeWorkBacklogReportIntoTaskSchema (schema: obj) : obj =
         let properties = get schema "properties"
         if isNullish properties then schema
         else
-            if isNullish (get properties "completedWorkReport") then
-                properties?("completedWorkReport") <- jsonStringProperty reportDesc
+            [| "ahaMoments"; "changesAndReasons"; "gotchas"; "lessonsAndConventions"; "plan" |]
+            |> Array.iter (fun field ->
+                if isNullish (get properties field) then
+                    properties?(field) <- jsonStringMinLengthProperty 1024 (reportFieldDescs.[field]))
             if isNullish (get properties "select_methodology") then
                 properties?("select_methodology") <- selectMethodologyProperty
             if not (isNullish (get properties "task_id")) then

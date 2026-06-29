@@ -39,9 +39,17 @@ let registerTodoTool (pi: obj) : unit =
             "execute",
                 box(fun (_id: string) (params': obj) (_s: obj) (_u: obj) (_ctx: obj) ->
                     promise {
-                        let report = (Dyn.str params' "completedWorkReport").Trim()
+                        let ahaMoments = (Dyn.str params' "ahaMoments").Trim()
+                        let changesAndReasons = (Dyn.str params' "changesAndReasons").Trim()
+                        let gotchas = (Dyn.str params' "gotchas").Trim()
+                        let lessonsAndConventions = (Dyn.str params' "lessonsAndConventions").Trim()
+                        let plan = (Dyn.str params' "plan").Trim()
                         let methodologies = decodeMethodologies params'
-                        if report = "" then return errorResult "todowrite requires completedWorkReport"
+                        if ahaMoments.Length < 1024 then return errorResult "todowrite requires ahaMoments (min 1024 chars)"
+                        elif changesAndReasons.Length < 1024 then return errorResult "todowrite requires changesAndReasons (min 1024 chars)"
+                        elif gotchas.Length < 1024 then return errorResult "todowrite requires gotchas (min 1024 chars)"
+                        elif lessonsAndConventions.Length < 1024 then return errorResult "todowrite requires lessonsAndConventions (min 1024 chars)"
+                        elif plan.Length < 1024 then return errorResult "todowrite requires plan (min 1024 chars)"
                         elif methodologies.IsEmpty then return errorResult "todowrite requires select_methodology"
                         else
                             match validateTodos params' with

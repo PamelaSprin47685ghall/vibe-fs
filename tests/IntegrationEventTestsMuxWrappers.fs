@@ -30,7 +30,11 @@ let todoWriteWrapperSpec (reg: obj) = promise {
     let wrapped = (get tw "wrapper") $ (mockTodo, createObj [])
     let args =
         createObj
-            [ "completedWorkReport", box "integration todo_write wrapper spec handover"
+            [ "ahaMoments", box (System.String('a', 1024))
+              "changesAndReasons", box (System.String('b', 1024))
+              "gotchas", box (System.String('c', 1024))
+              "lessonsAndConventions", box (System.String('d', 1024))
+              "plan", box (System.String('e', 1024))
               "select_methodology", box [| "test_driven_reasoning" |]
               "todos",
               box
@@ -65,13 +69,17 @@ let todoWriteWrapperDecodeFailureSpec (reg: obj) = promise {
             [ "select_methodology", box [| "test_driven_reasoning" |]
               "todos", validTodos ]
     let! r1 = execute $ (missingReportArgs, createObj [ "toolCallId", box "integration-todo-decode-1" ]) |> unbox<JS.Promise<obj>>
-    check "todo_write missing completedWorkReport success false" (not (truthy (get r1 "success")))
+    check "todo_write missing ahaMoments success false" (not (truthy (get r1 "success")))
     let out1 = str r1 "output"
-    check "todo_write missing completedWorkReport output invalid" (out1.Contains "invalid")
-    check "todo_write missing completedWorkReport names todowrite" (out1.Contains "todowrite")
+    check "todo_write missing ahaMoments output invalid" (out1.Contains "invalid")
+    check "todo_write missing ahaMoments names todowrite" (out1.Contains "todowrite")
     let validArgs =
         createObj
-            [ "completedWorkReport", box "decode failure spec handover"
+            [ "ahaMoments", box (System.String('a', 1024))
+              "changesAndReasons", box (System.String('b', 1024))
+              "gotchas", box (System.String('c', 1024))
+              "lessonsAndConventions", box (System.String('d', 1024))
+              "plan", box (System.String('e', 1024))
               "select_methodology", box [| "test_driven_reasoning" |]
               "todos", validTodos ]
     let! r2 = execute $ (validArgs, createObj []) |> unbox<JS.Promise<obj>>

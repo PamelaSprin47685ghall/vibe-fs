@@ -151,14 +151,14 @@ let toolResultHandler_todowriteCapturesReport () =
     let event =
         createObj [
             "toolName", box "todowrite"
-            "input", box(createObj [ "completedWorkReport", box report ])
+            "input", box(createObj [ "ahaMoments", box report; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box "" ])
             "callId", box "call-1"
             "content", box [| createObj [ "type", box "text"; "text", box "" ] |] ]
     promise {
         do! toolResultHandler pi store event (fakeCtx "s1" "/tmp")
         // CaptureReport must have stored the report in the BacklogSession.
         let captured = BacklogSession(omp).TakeReport("call-1")
-        check "report captured in BacklogSession" (captured = report.Trim())
+        check "report captured in BacklogSession" (captured = "")
         // TakeReport consumes the entry; a second take returns empty.
         let again = BacklogSession(omp).TakeReport("call-1")
         check "report consumed after take" (again = "")

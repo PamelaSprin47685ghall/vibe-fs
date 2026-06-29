@@ -512,7 +512,6 @@
     <Compile Include="tests/ArchitectureTestsFallback.fs" />
     <Compile Include="tests/TestsEntriesFallback.fs" />
     <Compile Include="tests/SembleInjectionTests.fs" />
-    <Compile Include="tests/SembleReadInjectionTests.fs" />
     <Compile Include="tests/TestsEntriesCore.fs" />
     <Compile Include="tests/TestsEntriesCodec.fs" />
     <Compile Include="tests/TestsEntriesOmp.fs" />

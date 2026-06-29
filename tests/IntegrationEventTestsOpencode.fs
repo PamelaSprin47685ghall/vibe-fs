@@ -202,7 +202,7 @@ let opencodeCompactingDoesNotEmitPromptSpec () = promise {
     let todoState report content status priority =
         createObj [
             "status", box "completed"
-            "input", box (createObj [ "completedWorkReport", box report; "todos", box [| createObj [ "content", box content; "status", box status; "priority", box priority ] |] ])
+            "input", box (createObj [ "ahaMoments", box report; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box ""; "todos", box [| createObj [ "content", box content; "status", box status; "priority", box priority ] |] ])
             "output", box (createObj [ "success", box true; "count", box 1 ])
             "error", box ""
         ]

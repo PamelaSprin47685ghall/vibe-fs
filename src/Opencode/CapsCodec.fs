@@ -12,7 +12,7 @@ open Wanxiangshu.Shell.Dyn
 
 /// The obj-boundary layer for caps message synthesis: reads info fields off
 /// host message objects and constructs the synthetic user/assistant prefix
-/// objects. Pure helpers (stableFingerprint, formatReadOutput) live in
+/// objects. Pure formatting (buildCapitalsContext/etc.) stays in
 /// Kernel.CapsFormat; this module is the only site that touches host objects.
 
 let private messageInfoField (field: obj -> string) (msg: obj) : string =
@@ -47,7 +47,7 @@ let private buildToolParts (capsFiles: CapsFile list) (fp: string) (sessionID: s
             "state", box (createObj [
                 "status", box "completed"
                 "input", box (createObj [ "filePath", box cap.filePath ])
-                "output", box (formatReadOutput cap.filePath (sliceFromContent cap.content))
+                "output", box (formatReadOutput cap.filePath cap.content 1)
                 "title", box $"Read {cap.filePath}"
                 "metadata", box (createObj [])
                 "time", box (createObj [ "start", box 0; "end", box 1 ])

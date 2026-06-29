@@ -35,7 +35,7 @@ let sessionCompactingContextContainsSeeAbove () = promise {
                             "status", box "completed"
                             "output", box "Todos updated."
                             "error", box ""
-                            "input", box(createObj [ "completedWorkReport", box "Completed task A" ])
+                            "input", box(createObj [ "ahaMoments", box "Completed task A"; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box "" ])
                         ])
                     ]
                 |]
@@ -82,7 +82,7 @@ let sessionCompactingContextHasMultipleFrontMatterBlocks () = promise {
                             "status", box "completed"
                             "output", box "Todos updated."
                             "error", box ""
-                            "input", box(createObj [ "completedWorkReport", box "Completed task A" ])
+                            "input", box(createObj [ "ahaMoments", box "Completed task A"; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box "" ])
                         ])
                     ]
                 |]

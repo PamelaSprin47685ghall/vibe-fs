@@ -71,6 +71,16 @@ let defaultPreludeWithoutCapsSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let private todoInput (report: string) : obj =
+    createObj [ "ahaMoments", box report; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box ""; "todos", box [||] ]
+
+let private todoState (report: string) : obj =
+    createObj [ "status", box "completed"; "input", box (todoInput report); "output", box "Todos updated." ]
+
+let private todoMsg (id: string) (callID: string) (report: string) (created: int) (completed: int) : obj =
+    box {| info = createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test"; "time", box (createObj [ "created", box created; "completed", box completed ]) ]
+           parts = [| createObj [ "type", box "tool"; "tool", box "todowrite"; "callID", box callID; "state", box (todoState report) ] |] |}
+
 let capsAndBacklogOrderSpec () = promise {
     let! workspaceDir = mkdtempAsync "caps-magic-order-"
     do! writeFileAsync (unbox<string> (pathModule?join(workspaceDir, "CAPS.md"))) "# Capabilities\nTest content"
@@ -80,41 +90,11 @@ let capsAndBacklogOrderSpec () = promise {
     let messages = createObj [ "messages", box [|
         box {| info = createObj [ "id", box "u1"; "role", box "user"; "sessionID", box "test" ]
                parts = [| box {| ``type`` = "text"; text = "start" |} |] |}
-        box {| info = createObj [ "id", box "m1"; "role", box "assistant"; "sessionID", box "test"; "time", box (createObj [ "created", box 123; "completed", box 456 ]) ]
-               parts = [| createObj [
-                   "type", box "tool"
-                   "tool", box "todowrite"
-                   "callID", box "c1"
-                   "state", box (createObj [
-                       "status", box "completed"
-                       "input", box (createObj [ "completedWorkReport", box "R1"; "todos", box [||] ])
-                       "output", box "Todos updated."
-                   ])
-               ] |] |}
+        todoMsg "m1" "c1" "R1" 123 456
         box {| info = createObj [ "id", box "u2"; "role", box "user"; "sessionID", box "test" ]
                parts = [| box {| ``type`` = "text"; text = "please fix this bug" |} |] |}
-        box {| info = createObj [ "id", box "m2"; "role", box "assistant"; "sessionID", box "test"; "time", box (createObj [ "created", box 789; "completed", box 790 ]) ]
-               parts = [| createObj [
-                   "type", box "tool"
-                   "tool", box "todowrite"
-                   "callID", box "c2"
-                   "state", box (createObj [
-                       "status", box "completed"
-                       "input", box (createObj [ "completedWorkReport", box "R2"; "todos", box [||] ])
-                       "output", box "Todos updated."
-                   ])
-               ] |] |}
-        box {| info = createObj [ "id", box "m3"; "role", box "assistant"; "sessionID", box "test"; "time", box (createObj [ "created", box 791; "completed", box 792 ]) ]
-               parts = [| createObj [
-                   "type", box "tool"
-                   "tool", box "todowrite"
-                   "callID", box "c3"
-                   "state", box (createObj [
-                       "status", box "completed"
-                       "input", box (createObj [ "completedWorkReport", box "R3"; "todos", box [||] ])
-                       "output", box "Todos updated."
-                   ])
-               ] |] |}
+        todoMsg "m2" "c2" "R2" 789 790
+        todoMsg "m3" "c3" "R3" 791 792
     |] ]
     do! tf $ (createObj [], messages) |> unbox<JS.Promise<unit>>
     let result = unbox<obj[]> (get messages "messages")

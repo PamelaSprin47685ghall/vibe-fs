@@ -9,7 +9,7 @@ open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Shell.BacklogSessionCodec
 open Wanxiangshu.Shell.RuntimeScope
 
-let backlogReportFromTodoInput = BacklogSessionCodec.backlogReportFromTodoInput
+let backlogEntryFromTodoInput = BacklogSessionCodec.backlogEntryFromTodoInput
 
 type BacklogSession(host: Host, scope: RuntimeScope) =
     let projection = scope.Projection

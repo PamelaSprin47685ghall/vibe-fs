@@ -182,8 +182,8 @@ let taExecutor () =
     match a with Executor e -> equal "Executor.Program" "p" e.Program | _ -> check "Executor case" false
 
 let taTodoWrite () =
-    let a = TodoWrite { CompletedWorkReport = "r"; Todos = [||]; SelectMethodology = [] }
-    match a with TodoWrite t -> equal "TodoWrite.Report" "r" t.CompletedWorkReport | _ -> check "TodoWrite case" false
+    let a = TodoWrite { AhaMoments = "r"; ChangesAndReasons = ""; Gotchas = ""; LessonsAndConventions = ""; Plan = ""; Todos = [||]; SelectMethodology = [] }
+    match a with TodoWrite t -> equal "TodoWrite.AhaMoments" "r" t.AhaMoments | _ -> check "TodoWrite case" false
 
 let taApplyPatch () =
     let a = ApplyPatch { PatchText = "diff" }

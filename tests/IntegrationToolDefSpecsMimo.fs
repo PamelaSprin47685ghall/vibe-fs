@@ -40,11 +40,16 @@ let mimoTaskExecuteRoundTripSpec () = promise {
     let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let taskTool = get (get p "tool") "task"
     let args = createObj [
-        "completedWorkReport", box "Detailed backlog report"
+        "ahaMoments", box (System.String('a', 1024))
+        "changesAndReasons", box (System.String('b', 1024))
+        "gotchas", box (System.String('c', 1024))
+        "lessonsAndConventions", box (System.String('d', 1024))
+        "plan", box (System.String('e', 1024))
+        "select_methodology", box [| "first_principles" |]
         "todos", box [| createObj [ "content", box "Ship parser fix"; "status", box "completed"; "priority", box "high" ] |]
     ]
     let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ]) |> unbox<JS.Promise<string>>
-    check "mimo task execute returns todo envelope" (result.StartsWith "---" && result.Contains hintTodosUpdated)
+    check "mimo task execute returns todo envelope" (result.Contains hintMeditator)
     do! rmAsync workspaceDir
 }
 
@@ -53,11 +58,16 @@ let mimoTaskExecuteNestedReportSpec () = promise {
     let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let taskTool = get (get p "tool") "task"
     let args = createObj [
-        "completedWorkReport", box "Nested report is no longer supported"
+        "ahaMoments", box (System.String('a', 1024))
+        "changesAndReasons", box (System.String('b', 1024))
+        "gotchas", box (System.String('c', 1024))
+        "lessonsAndConventions", box (System.String('d', 1024))
+        "plan", box (System.String('e', 1024))
+        "select_methodology", box [| "first_principles" |]
         "todos", box [| createObj [ "content", box "Build feature"; "status", box "in_progress"; "priority", box "high" ] |]
     ]
     let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ]) |> unbox<JS.Promise<string>>
-    check "mimo task execute still succeeds with explicit top-level report" (result.Contains hintTodosUpdated)
+    check "mimo task execute with methodology returns success" (result.Contains hintMeditator)
     do! rmAsync workspaceDir
 }
 
@@ -65,7 +75,7 @@ let mimoTaskExecuteInPlaceStripSpec () = promise {
     let! workspaceDir = mkdtempAsync "mimo-task-inplace-"
     let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let teb = get p "tool.execute.before"
-    let originalArgs = createObj [ "completedWorkReport", box "top-level report text"; "todos", box [||] ]
+    let originalArgs = createObj [ "ahaMoments", box (System.String('a', 1024)); "changesAndReasons", box (System.String('b', 1024)); "gotchas", box (System.String('c', 1024)); "lessonsAndConventions", box (System.String('d', 1024)); "plan", box (System.String('e', 1024)); "todos", box [||] ]
     let beforeOut = createObj [ "args", box originalArgs ]
     do! teb $ (createObj [ "tool", box "task"; "sessionID", box "s1"; "callID", box "ci1" ], beforeOut) |> unbox<JS.Promise<unit>>
     check "mimo task execute.before leaves todo args untouched" (obj.ReferenceEquals(get beforeOut "args", originalArgs))
@@ -77,12 +87,17 @@ let mimoTaskExecuteStripsTaskIdSpec () = promise {
     let! p = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let taskTool = get (get p "tool") "task"
     let args = createObj [
-        "completedWorkReport", box "noop report"
+        "ahaMoments", box (System.String('a', 1024))
+        "changesAndReasons", box (System.String('b', 1024))
+        "gotchas", box (System.String('c', 1024))
+        "lessonsAndConventions", box (System.String('d', 1024))
+        "plan", box (System.String('e', 1024))
+        "select_methodology", box [| "first_principles" |]
         "todos", box [| createObj [ "content", box "List current work"; "status", box "pending"; "priority", box "low" ] |]
         "task_id", box "T4"
     ]
     let! result = (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ]) |> unbox<JS.Promise<string>>
-    check "mimo task execute ignores stray task_id" (result.Contains hintTodosUpdated)
+    check "mimo task execute ignores stray task_id" (result.Contains hintMeditator)
     do! rmAsync workspaceDir
 }
 
@@ -126,12 +141,12 @@ let mimoTaskDefinitionHandlesZodLikeParametersSpec () = promise {
         "safeExtend", box (System.Func<obj, obj>(fun arg ->
             extendCalls.Add(arg)
             createObj [ "kind", box "extended" ]))
-        "shape", box (createObj [ "completedWorkReport", box existingReportField ])
+        "shape", box (createObj [ "ahaMoments", box existingReportField ])
     ]
     let taskDef = createObj [ "description", box "native"; "parameters", box zodLikeParams ]
     do! td $ (createObj [ "toolID", box "task" ], taskDef) |> unbox<JS.Promise<unit>>
     check "mimo task.definition rewrites zod-like parameters" (string (get (get taskDef "parameters") "kind") = "extended")
-    check "mimo task.definition does not overwrite existing report field on zod schema" (isNullish (get extendCalls.[0] "completedWorkReport"))
+    check "mimo task.definition does not overwrite existing ahaMoments field on zod schema" (isNullish (get extendCalls.[0] "ahaMoments"))
     check "mimo task.definition builds methodology from zod string template" (obj.ReferenceEquals(get extendCalls.[0] "select_methodology", describedMethodology))
     check "mimo task.definition calls zod array for methodology" (arrayCalls.Count = 1)
     check "mimo task.definition calls zod min 1 for methodology" (minCalls.Count = 1 && minCalls.[0] = 1)

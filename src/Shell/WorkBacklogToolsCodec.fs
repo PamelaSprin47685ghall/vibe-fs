@@ -1,6 +1,7 @@
 module Wanxiangshu.Shell.WorkBacklogToolsCodec
 
 open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.DynField
 
@@ -11,12 +12,18 @@ type TodoItem = {
 }
 
 type TodoWriteArgs = {
-    CompletedWorkReport: string
+    AhaMoments: string
+    ChangesAndReasons: string
+    Gotchas: string
+    LessonsAndConventions: string
+    Plan: string
     Todos: TodoItem array
     SelectMethodology: string list
 }
 
 type TodoToolOpts = { ToolCallId: string }
+
+let reportMinLength = 1024
 
 let private requireNonBlank (tool: string) (field: string) (index: int) (label: string) (value: string option) : Result<string, DomainError> =
     match value with
@@ -52,20 +59,45 @@ let private decodeSelectMethodology (args: obj) : string list =
     if Dyn.isNullish raw || not (Dyn.isArray raw) then []
     else raw :?> obj array |> Array.map string |> Array.toList
 
+let private requireReportField (args: obj) (field: string) : Result<string, DomainError> =
+    match strField args field with
+    | None -> Error (InvalidIntent ("todowrite", field, "required"))
+    | Some v when System.String.IsNullOrWhiteSpace v ->
+        Error (InvalidIntent ("todowrite", field, "required"))
+    | Some v ->
+        let trimmed = v.Trim()
+        if trimmed.Length < reportMinLength then
+            Error (InvalidIntent ("todowrite", field, sprintf "must be at least %d characters" reportMinLength))
+        else Ok trimmed
+
 let decodeTodoWriteArgs (args: obj) : Result<TodoWriteArgs, DomainError> =
-    match strField args "completedWorkReport" with
-    | None -> Error (InvalidIntent ("todowrite", "completedWorkReport", "required"))
-    | Some report when System.String.IsNullOrWhiteSpace report ->
-        Error (InvalidIntent ("todowrite", "completedWorkReport", "required"))
-    | Some report ->
-        match decodeTodos args with
+    match requireReportField args "ahaMoments" with
+    | Error e -> Error e
+    | Ok ahaMoments ->
+        match requireReportField args "changesAndReasons" with
         | Error e -> Error e
-        | Ok todos ->
-            Ok {
-                CompletedWorkReport = report.Trim()
-                Todos = todos
-                SelectMethodology = decodeSelectMethodology args
-            }
+        | Ok changesAndReasons ->
+            match requireReportField args "gotchas" with
+            | Error e -> Error e
+            | Ok gotchas ->
+                match requireReportField args "lessonsAndConventions" with
+                | Error e -> Error e
+                | Ok lessonsAndConventions ->
+                    match requireReportField args "plan" with
+                    | Error e -> Error e
+                    | Ok plan ->
+                        match decodeTodos args with
+                        | Error e -> Error e
+                        | Ok todos ->
+                            Ok {
+                                AhaMoments = ahaMoments
+                                ChangesAndReasons = changesAndReasons
+                                Gotchas = gotchas
+                                LessonsAndConventions = lessonsAndConventions
+                                Plan = plan
+                                Todos = todos
+                                SelectMethodology = decodeSelectMethodology args
+                            }
 
 let decodeTodoToolOpts (opts: obj) : Result<TodoToolOpts, DomainError> =
     match strField opts "toolCallId" with

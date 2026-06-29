@@ -41,14 +41,17 @@ let execute_missingReportReturnsError () : JS.Promise<unit> =
     let tool = findTodoTool h
     let params' =
         createObj [
-            "completedWorkReport", box ""
+            "changesAndReasons", box (System.String('b', 1024))
+            "gotchas", box (System.String('c', 1024))
+            "lessonsAndConventions", box (System.String('d', 1024))
+            "plan", box (System.String('e', 1024))
             "select_methodology", box [| "first_principles" |]
             "todos", box [| createObj [ "content", box "x"; "status", box "pending" ] |]
         ]
     promise {
         let! result = invokeExecute tool params'
         check "error when report missing" (Dyn.truthy (Dyn.get result "isError"))
-        check "error mentions completedWorkReport" (hasText result "completedWorkReport")
+        check "error mentions ahaMoments" (hasText result "ahaMoments")
     }
 
 let execute_missingMethodologyReturnsError () : JS.Promise<unit> =
@@ -58,8 +61,11 @@ let execute_missingMethodologyReturnsError () : JS.Promise<unit> =
     let tool = findTodoTool h
     let params' =
         createObj [
-            "completedWorkReport", box "done"
-            "select_methodology", box [||]
+            "ahaMoments", box (System.String('a', 1024))
+            "changesAndReasons", box (System.String('b', 1024))
+            "gotchas", box (System.String('c', 1024))
+            "lessonsAndConventions", box (System.String('d', 1024))
+            "plan", box (System.String('e', 1024))
             "todos", box [| createObj [ "content", box "x"; "status", box "pending" ] |]
         ]
     promise {
@@ -75,7 +81,11 @@ let execute_invalidTodoReturnsError () : JS.Promise<unit> =
     let tool = findTodoTool h
     let params' =
         createObj [
-            "completedWorkReport", box "done"
+            "ahaMoments", box (System.String('a', 1024))
+            "changesAndReasons", box (System.String('b', 1024))
+            "gotchas", box (System.String('c', 1024))
+            "lessonsAndConventions", box (System.String('d', 1024))
+            "plan", box (System.String('e', 1024))
             "select_methodology", box [| "first_principles" |]
             "todos", box [| createObj [ "content", box ""; "status", box "pending" ] |]
         ]
@@ -92,7 +102,11 @@ let execute_validReturnsTextResult () : JS.Promise<unit> =
     let tool = findTodoTool h
     let params' =
         createObj [
-            "completedWorkReport", box "## Done\n- fixed"
+            "ahaMoments", box (System.String('a', 1024))
+            "changesAndReasons", box (System.String('b', 1024))
+            "gotchas", box (System.String('c', 1024))
+            "lessonsAndConventions", box (System.String('d', 1024))
+            "plan", box (System.String('e', 1024))
             "select_methodology", box [| "first_principles" |]
             "todos", box [| createObj [ "content", box "x"; "status", box "pending" ] |]
         ]

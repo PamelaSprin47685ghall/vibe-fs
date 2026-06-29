@@ -95,7 +95,7 @@ let compactingTransform (deps: obj) (backlogSession: BacklogSession) (input: obj
                 let encoded = encodeMessages afterBacklog
                 let backlogEntries =
                     backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
-                    |> List.map (fun be -> box (createObj [ "user_message", box [||]; "completed_work", box (be.report.Trim()) ]))
+                    |> List.map (fun be -> box (createObj [ "user_message", box [||]; "aha_moments", box (be.ahaMoments.Trim()); "changes_and_reasons", box (be.changesAndReasons.Trim()); "gotchas", box (be.gotchas.Trim()); "lessons_and_conventions", box (be.lessonsAndConventions.Trim()); "plan", box (be.plan.Trim()) ]))
                     |> List.toArray
                 let backlogBlock = [ frontMatterRoot (box backlogEntries) ]
                 let anchorTexts =

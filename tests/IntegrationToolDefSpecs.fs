@@ -55,11 +55,11 @@ let toolDefinitionSpec () = promise {
     check "tool.definition leaves todo parameters untouched" (obj.ReferenceEquals(get todoDef "parameters", todoParams))
     let todoSchema = get todoDef "jsonSchema"
     let todoProps = get todoSchema "properties"
-    let reportSchema = get todoProps "completedWorkReport"
+    let reportSchema = get todoProps "ahaMoments"
     let required = unbox<obj[]> (get todoSchema "required") |> Array.map string
     check "tool.definition builds todo report field" (str reportSchema "type" = "string")
-    check "tool.definition builds todo report description" (str reportSchema "description" = Wanxiangshu.Kernel.WorkBacklog.reportDesc)
-    check "tool.definition requires todo report" (required |> Array.contains "completedWorkReport")
+    check "tool.definition builds todo report description" (str reportSchema "description" = Wanxiangshu.Kernel.WorkBacklog.ahaMomentsDesc)
+    check "tool.definition requires todo report" (required |> Array.contains "ahaMoments")
     check "tool.definition requires todos" (required |> Array.contains "todos")
     check "tool.definition builds todos description" (str (get todoProps "todos") "description" = Wanxiangshu.Kernel.WorkBacklog.todosDesc)
     let todoItemProps = get (get (get todoProps "todos") "items") "properties"
@@ -77,7 +77,7 @@ let toolDefinitionSpec () = promise {
     let taskDef = createObj [ "description", box "native"; "parameters", box taskParams ]
     do! mimoTd $ (createObj [ "toolID", box "task" ], taskDef) |> unbox<JS.Promise<unit>>
     check "mimo task.definition keeps parameters not jsonSchema" (isNullish (get taskDef "jsonSchema"))
-    check "mimo task.definition fuses report into parameters" (not (isNullish (get (get (get taskDef "parameters") "properties") "completedWorkReport")))
+    check "mimo task.definition fuses report into parameters" (not (isNullish (get (get (get taskDef "parameters") "properties") "ahaMoments")))
     check "mimo task.definition preserves todos" (not (isNullish (get (get (get taskDef "parameters") "properties") "todos")))
     let taskJsonSchema = createObj [
         "type", box "object"
@@ -86,7 +86,7 @@ let toolDefinitionSpec () = promise {
     ]
     let taskJsonDef = createObj [ "description", box "native"; "jsonSchema", box taskJsonSchema ]
     do! mimoTd $ (createObj [ "toolID", box "task" ], taskJsonDef) |> unbox<JS.Promise<unit>>
-    check "mimo task.definition rewrites jsonSchema when that is the exposed path" (not (isNullish (get (get (get taskJsonDef "jsonSchema") "properties") "completedWorkReport")))
+    check "mimo task.definition rewrites jsonSchema when that is the exposed path" (not (isNullish (get (get (get taskJsonDef "jsonSchema") "properties") "ahaMoments")))
     check "mimo task.definition strips task_id from jsonSchema" (isNullish (get (get (get taskJsonDef "jsonSchema") "properties") "task_id"))
     let jsonRequired = unbox<obj[]> (get (get taskJsonDef "jsonSchema") "required") |> Array.map string
     check "mimo task.definition keeps todos required in jsonSchema" (jsonRequired |> Array.contains "todos")

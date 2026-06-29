@@ -77,7 +77,7 @@ let private injectSembleResults
                         return final
                     | Some lastAssistant ->
                         let assistantId = Wanxiangshu.Shell.Dyn.str (Wanxiangshu.Shell.Dyn.get lastAssistant "info") "id"
-                        let! newToolParts = SembleSearch.buildReadToolParts assistantId sessionID results
+                        let newToolParts = SembleSearch.buildReadToolParts assistantId sessionID results
                         if Array.isEmpty newToolParts then
                             trace "DECIDE" "skip: no tool parts"
                             return final

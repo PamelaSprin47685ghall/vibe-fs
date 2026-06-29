@@ -27,7 +27,7 @@ let sessionCompactingHandler (_pi: obj) (event: obj) (_ctx: obj) : JS.Promise<ob
         else
             let backlogEntries =
                 backlogSession.GetOrRebuildBacklog(sessionId, cleaned)
-                |> List.map (fun be -> box (createObj [ "user_message", box [||]; "completed_work", box (be.report.Trim()) ]))
+                |> List.map (fun be -> box (createObj [ "user_message", box [||]; "aha_moments", box (be.ahaMoments.Trim()); "changes_and_reasons", box (be.changesAndReasons.Trim()); "gotchas", box (be.gotchas.Trim()); "lessons_and_conventions", box (be.lessonsAndConventions.Trim()); "plan", box (be.plan.Trim()) ]))
                 |> List.toArray
             let backlogBlock = [ frontMatterRoot (box backlogEntries) ]
             let anchorTexts = extractHistoryTexts cleaned

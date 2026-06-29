@@ -42,10 +42,10 @@ let mimoConfigSpec () = promise {
     let todoDef = createObj [ "description", box "old desc"; "parameters", box taskParams ]
     do! (get p "tool.definition") $ (createObj [ "toolID", box "task" ], todoDef) |> unbox<JS.Promise<unit>>
     check "mimo tool.definition rewrites task description" (str todoDef "description" |> fun text -> text.Contains("append-only work backlog") && text.Contains("full todos list"))
-    check "mimo tool.definition merges completedWorkReport into parameters" (not (isNullish (get (get (get todoDef "parameters") "properties") "completedWorkReport")))
+    check "mimo tool.definition merges ahaMoments into parameters" (not (isNullish (get (get (get todoDef "parameters") "properties") "ahaMoments")))
     check "mimo tool.definition keeps todos schema" (not (isNullish (get (get (get todoDef "parameters") "properties") "todos")))
     let sessionID = "mimo-session-1"
-    let makeTaskMessage id report =
+    let makeTaskMessage id ahaMomentsVal changesAndReasonsVal gotchasVal lessonsAndConventionsVal planVal =
         box (createObj [
             "info", box (createObj [
                 "id", box id; "sessionID", box sessionID; "role", box "toolResult"
@@ -58,10 +58,14 @@ let mimoConfigSpec () = promise {
                     "state", box (createObj [
                         "status", box "completed"
                         "input", box (createObj [
-                            "todos", box [| createObj [ "content", box report; "status", box "completed"; "priority", box "high" ] |]
-                            "completedWorkReport", box report
+                            "todos", box [| createObj [ "content", box ahaMomentsVal; "status", box "completed"; "priority", box "high" ] |]
+                            "ahaMoments", box ahaMomentsVal
+                            "changesAndReasons", box changesAndReasonsVal
+                            "gotchas", box gotchasVal
+                            "lessonsAndConventions", box lessonsAndConventionsVal
+                            "plan", box planVal
                         ])
-                        "output", box report
+                        "output", box ahaMomentsVal
                     ])
                 ])
             |]
@@ -76,11 +80,11 @@ let mimoConfigSpec () = promise {
             "parts", box [| box (createObj [ "type", box "text"; "text", box text ]) |]
         ])
     let messages = [|
-        makeTaskMessage "mimo-msg-1" "First report from the first task."
+        makeTaskMessage "mimo-msg-1" "First report from the first task." "" "" "" ""
         makeUserMessage "mimo-user-1" "Fold this user note into the summary."
-        makeTaskMessage "mimo-msg-2" "Second report from the second task."
+        makeTaskMessage "mimo-msg-2" "Second report from the second task." "" "" "" ""
         makeUserMessage "mimo-user-2" "Keep this user detail in the projection."
-        makeTaskMessage "mimo-msg-3" "Third report from the final task."
+        makeTaskMessage "mimo-msg-3" "Third report from the final task." "" "" "" ""
     |]
     let output = createObj [ "messages", box messages ]
     do! (get p "experimental.chat.messages.transform") $ (createObj [ "agent", box "manager" ], output) |> unbox<JS.Promise<unit>>

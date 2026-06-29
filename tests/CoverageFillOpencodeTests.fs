@@ -43,7 +43,7 @@ let hookSchemaBuildWorkBacklogSchema () =
     equal "schema type" "object" (Dyn.str s "type")
     let props = Dyn.get s "properties"
     check "has todos" (not (Dyn.isNullish (Dyn.get props "todos")))
-    check "has completedWorkReport" (not (Dyn.isNullish (Dyn.get props "completedWorkReport")))
+    check "has ahaMoments" (not (Dyn.isNullish (Dyn.get props "ahaMoments")))
     check "has select_methodology" (not (Dyn.isNullish (Dyn.get props "select_methodology")))
     let req = unbox<obj[]> (Dyn.get s "required")
     check "required non-empty" (req.Length > 0)

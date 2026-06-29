@@ -107,7 +107,7 @@ let hookSchemaMergeWorkBacklogReport () =
     let jsonSchema = createObj [ "type", box "object"; "properties", createObj [ "task_id", box (createObj [ "type", box "string" ]) ]; "required", box [| box "task_id" |] ]
     let r = mergeWorkBacklogReportIntoTaskSchema jsonSchema
     let props = get r "properties"
-    check "completedWorkReport added" (not (isNullish (get props "completedWorkReport")))
+    check "ahaMoments added" (not (isNullish (get props "ahaMoments")))
     check "select_methodology added" (not (isNullish (get props "select_methodology")))
     check "task_id removed from properties" (isNullish (get props "task_id"))
     let req = unbox<obj[]> (get r "required")
