@@ -85,7 +85,6 @@
     <Compile Include="src/Kernel/Nudge/EventHandler.fs" />
     <Compile Include="src/Kernel/Nudge/Registry.fs" />
     <Compile Include="src/Kernel/Config.fs" />
-    <Compile Include="src/Kernel/WarnTdd.fs" />
     <Compile Include="src/Kernel/FuzzyPath.fs" />
     <Compile Include="src/Kernel/FuzzyQuery.fs" />
     <Compile Include="src/Kernel/FuzzyFormat.fs" />
