@@ -114,5 +114,6 @@ let collectSnapshot
               lastAssistantMessage = effectiveLastAssistantMessage
               alreadyNudged = alreadyNudged
               agentFromMessage = historyAgentFromMessage
+              lastAssistantIsCompaction = false
               anchorPromptIssued = false }
     }

@@ -18,6 +18,7 @@ type SessionSnapshot =
       lastAssistantMessage: string
       alreadyNudged: bool
       agentFromMessage: string option
+      lastAssistantIsCompaction: bool
       anchorPromptIssued: bool }
 
 type NudgeDecision =

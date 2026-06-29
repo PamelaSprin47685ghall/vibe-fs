@@ -39,7 +39,7 @@ let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<Se
                     else recoverOpenTodosFromMessages messagesData
                 let lastAssistantMessage, agentFromMessage, alreadyNudged =
                     decodeLastAssistant messagesData
-                let lastAssistantAgentIsCompaction =
+                let lastAssistantIsCompaction =
                     if Dyn.isArray messagesData then
                         (messagesData :?> obj array)
                         |> Array.tryFindBack (fun msg ->
@@ -52,7 +52,8 @@ let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<Se
                     { todos = openTodos
                       lastAssistantMessage = lastAssistantMessage
                       alreadyNudged = alreadyNudged
-                      agentFromMessage = if lastAssistantAgentIsCompaction then Some "compaction" else agentFromMessage
+                      agentFromMessage = agentFromMessage
+                      lastAssistantIsCompaction = lastAssistantIsCompaction
                       anchorPromptIssued = false }
                 return Some snapshot, Some (if Dyn.isArray messagesData then messagesData :?> obj array else [||])
         with _ ->
@@ -93,8 +94,8 @@ let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
             match snapshotOpt with
             | None -> return None
             | Some snapshot ->
-                match snapshot.agentFromMessage with
-                | Some "compaction" ->
+                match snapshot.lastAssistantIsCompaction with
+                | true ->
                     match messagesOpt with
                     | Some messagesArr ->
                         let messagesList = MessagingCodec.decodeMessages messagesArr
@@ -109,7 +110,7 @@ let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
                                     | ToolPart(_, _, Some s, _) -> Some s.output
                                     | _ -> None)
                             Wanxiangshu.Kernel.BacklogProjectionCore.buildCompactionAnchorPrompt backlogEntries extractAnchorTexts
-                        if promptText <> "" then do! sendNudge client sessionID None promptText
+                        if promptText <> "" then do! sendNudge client sessionID snapshot.agentFromMessage promptText
                         holder.Mutate(fun state ->
                             { state with compactionAnchorsIssued = Set.add sid state.compactionAnchorsIssued }, ())
                     | None -> ()

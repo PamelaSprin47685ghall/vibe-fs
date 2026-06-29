@@ -11,7 +11,7 @@ open Wanxiangshu.Kernel.ReviewPrompts
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
 
 let private snapshot todos msg alreadyNudged agent : SessionSnapshot =
-    { todos = todos; lastAssistantMessage = msg; alreadyNudged = alreadyNudged; agentFromMessage = agent; anchorPromptIssued = false }
+    { todos = todos; lastAssistantMessage = msg; alreadyNudged = alreadyNudged; agentFromMessage = agent; lastAssistantIsCompaction = false; anchorPromptIssued = false }
 
 let private noReview (_: string) = false
 let private noChild (_: string) = None

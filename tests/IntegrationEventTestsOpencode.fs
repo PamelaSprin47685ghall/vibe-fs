@@ -249,3 +249,37 @@ let opencodeNudgeAfterCompactionEmitsAnchorPromptSpec () = promise {
     check "nudge after compaction with no durable content emits no prompt" (promptCalls.Count = 0)
     do! rmAsync workspaceDir
 }
+
+let opencodeCompactionAnchorUsesPriorAgentSpec () = promise {
+    let sessionID = "opencode-compaction-anchor-agent"
+    let promptCalls = ResizeArray<obj>()
+    let mkClient () =
+        createObj [ "session", box (createObj [
+            "todo", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                promise { return box {| data = [||] |} }))
+            "messages", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                let managerMsg =
+                    let anchorBlock = "---\ntask: implemented-feature\n---\nWork completed."
+                    box (createObj [
+                        "info", box (createObj [ "role", box "assistant"; "agent", box "manager"; "finish", box "stop"; "sessionID", box sessionID; "time", box (createObj [ "completed", box 1 ]) ])
+                        "parts", box [| box {| ``type`` = "text"; text = anchorBlock |} |]
+                    ])
+                let compactionMsg =
+                    box (createObj [
+                        "info", box (createObj [ "role", box "assistant"; "agent", box "compaction"; "finish", box "stop"; "sessionID", box sessionID; "time", box (createObj [ "completed", box 2 ]) ])
+                        "parts", box [| box {| ``type`` = "text"; text = "Compacted summary of previous work." |} |]
+                    ])
+                promise { return box {| data = [| managerMsg; compactionMsg |] |} }))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                promise { promptCalls.Add(arg) }))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "opencode-compaction-anchor-agent-"
+    let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
+    let eventHook = get p "event"
+    do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    check "compaction anchor prompt is emitted" (promptCalls.Count = 1)
+    let body = get promptCalls.[0] "body"
+    check "anchor prompt carries prior real agent" (str body "agent" = "manager")
+    do! rmAsync workspaceDir
+}
