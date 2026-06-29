@@ -67,12 +67,16 @@ let meditatorScenario = runToolScenario "e2e.meditator-roundtrip" "meditator" (b
 
 let browserScenario = runToolScenario "e2e.browser-roundtrip" "browser" (box {| intent = "open page" |}) "open browser"
 
+let submitReviewScenario = runToolScenario "e2e.submit-review-roundtrip" "submit_review" (box {| report = "test report"; wip = false; affectedFiles = ResizeArray([]) |}) "submit review"
+
+let todowriteScenario = runToolScenario "e2e.todowrite-roundtrip" "todowrite" (box {| todos = ResizeArray([]); completedWorkReport = "test"; select_methodology = ResizeArray(["first_principles"]) |}) "write todo"
+
 let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
         let selectors = args |> Array.filter (fun a -> a <> "--verbose" && a <> "-v")
-        let scenarios = [| readScenario; writeScenario; executorScenario; fuzzyFindScenario; fuzzyGrepScenario; investigatorScenario; coderScenario; meditatorScenario; browserScenario |]
-        let labels = [| "e2e.read-tool-roundtrip"; "e2e.write-tool-roundtrip"; "e2e.executor-tool-roundtrip"; "e2e.fuzzy-find-roundtrip"; "e2e.fuzzy-grep-roundtrip"; "e2e.investigator-roundtrip"; "e2e.coder-roundtrip"; "e2e.meditator-roundtrip"; "e2e.browser-roundtrip" |]
+        let scenarios = [| readScenario; writeScenario; executorScenario; fuzzyFindScenario; fuzzyGrepScenario; investigatorScenario; coderScenario; meditatorScenario; browserScenario; submitReviewScenario; todowriteScenario |]
+        let labels = [| "e2e.read-tool-roundtrip"; "e2e.write-tool-roundtrip"; "e2e.executor-tool-roundtrip"; "e2e.fuzzy-find-roundtrip"; "e2e.fuzzy-grep-roundtrip"; "e2e.investigator-roundtrip"; "e2e.coder-roundtrip"; "e2e.meditator-roundtrip"; "e2e.browser-roundtrip"; "e2e.submit-review-roundtrip"; "e2e.todowrite-roundtrip" |]
         for i in 0 .. scenarios.Length - 1 do
             let selected =
                 selectors.Length = 0
