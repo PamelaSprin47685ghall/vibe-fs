@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.TestsEntriesCore
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.EventDrivenHarnessDemo
 open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.TestsEntriesFallback
 open Wanxiangshu.Tests.ReviewTests
@@ -286,6 +287,7 @@ let coreTestEntries () : (string * TestBody) list =
     "WarnTddOpencodeEnforcementTests.run", Async WarnTddOpencodeEnforcementTests.run
     "WarnTddMuxEnforcementTests.run", Async WarnTddMuxEnforcementTests.run
     "WarnTddOmpEnforcementTests.run", Sync (sync WarnTddOmpEnforcementTests.run)
+    "EventDrivenHarnessDemo.run", Async (fun () -> EventDrivenHarnessDemo.run ())
     ]
     @ TestsEntriesFallback.tailTestEntries ()
     @ fallbackTestEntries()
