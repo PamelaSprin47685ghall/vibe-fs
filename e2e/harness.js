@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EventSource } from 'eventsource';
 import { createMockLLM } from './mock-llm.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -16,7 +15,8 @@ function createPluginStub(targetDir) {
   fs.mkdirSync(pluginDir, { recursive: true });
   fs.writeFileSync(
     path.join(pluginDir, 'wanxiangshu.js'),
-    `export { plugin } from '${PLUGIN_JS.replace(/\\/g, '\\\\')}';\n`,
+    `export { plugin } from '${PLUGIN_JS.replace(/\\/g, '\\\\')}';
+`,
     'utf-8',
   );
 }
@@ -40,11 +40,32 @@ function isolatedEnv(home, llmUrl) {
     XDG_CONFIG_HOME: xdg,
     XDG_STATE_HOME: xdg,
     OPENCODE_CONFIG_CONTENT: JSON.stringify({
-      provider: 'test',
-      model: 'test-model',
-      npm: '@ai-sdk/openai-compatible',
-      baseURL: llmUrl,
-      apiKey: 'test-key',
+      formatter: false,
+      lsp: false,
+      model: 'test/test-model',
+      provider: {
+        test: {
+          name: 'Test',
+          id: 'test',
+          env: [],
+          npm: '@ai-sdk/openai-compatible',
+          models: {
+            'test-model': {
+              id: 'test-model',
+              name: 'Test Model',
+              attachment: false,
+              reasoning: false,
+              temperature: false,
+              tool_call: true,
+              release_date: '2025-01-01',
+              limit: { context: 100000, output: 10000 },
+              cost: { input: 0, output: 0 },
+              options: {},
+            },
+          },
+          options: { apiKey: 'test-key', baseURL: llmUrl },
+        },
+      },
     }),
     OPENCODE_DISABLE_PROJECT_CONFIG: '1',
     OPENCODE_PURE: '1',
@@ -52,12 +73,13 @@ function isolatedEnv(home, llmUrl) {
     OPENCODE_DISABLE_AUTOCOMPACT: '1',
     OPENCODE_DISABLE_MODELS_FETCH: '1',
     OPENCODE_AUTH_CONTENT: '{}',
+    OPENCODE_EXPERIMENTAL_EVENT_SYSTEM: 'true',
   };
 }
 
 async function waitForListening(stdout, timeoutMs = 30000) {
   let buf = '';
-  await new Promise((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
     const check = () => {
       if (buf.includes('opencode server listening on http://')) {
@@ -97,7 +119,7 @@ export async function start(_opencodeIndex) {
   createPluginStub(workDir);
 
   // 3. env
-  const env = isolatedEnv(home, `http://127.0.0.1:${llmHandle.port}`);
+  const env = isolatedEnv(home, `${llmHandle.url}/v1`);
 
   // 4. spawn opencode serve
   const child = spawn('opencode', ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
@@ -112,41 +134,22 @@ export async function start(_opencodeIndex) {
     listenLine = await waitForListening(child.stdout);
   } catch (err) {
     child.kill('SIGKILL');
-    const stderr = await new Promise(r => child.stderr.once('data', c => r(c.toString())));
+    const stderr = await new Promise((resolve) => {
+      const t = setTimeout(() => resolve(''), 2000);
+      child.stderr.once('data', (c) => { clearTimeout(t); resolve(c.toString()); });
+    });
     throw new Error('opencode serve failed: ' + err.message + '\nstderr: ' + stderr);
   }
 
+  if (!listenLine) {
+    child.kill('SIGKILL');
+    throw new Error('waitForListening returned empty/undefined');
+  }
   const m = listenLine.match(/http:\/\/[^:]+:(\d+)/);
   const port = m ? Number(m[1]) : 0;
   const baseUrl = `http://127.0.0.1:${port}`;
 
-  // 5.5 event helpers — event-based wait replaces sleep poll
-  function subscribeEvent(predicate, timeoutMs) {
-    return new Promise((resolve, reject) => {
-      const es = new EventSource(`${baseUrl}/api/event?directory=${encodeURIComponent(workDir)}`);
-      const timer = setTimeout(() => { es.close(); reject(new Error('subscribeEvent timed out')); }, timeoutMs);
-      es.onmessage = (raw) => {
-        let evt;
-        try { evt = JSON.parse(raw.data); } catch { return; }
-        if (predicate(evt)) {
-          clearTimeout(timer);
-          es.close();
-          resolve(evt);
-        }
-      };
-      es.onerror = () => { es.close(); reject(new Error('EventSource error')); };
-    });
-  }
-
-  async function waitForToolSuccess(sessionID, timeoutMs = 60000) {
-    const evt = await subscribeEvent(
-      (evt) => evt.type === 'tool.success' && evt.data?.sessionID === sessionID,
-      timeoutMs,
-    );
-    return evt.data;
-  }
-
-  // 6. HTTP helpers
+  // 5. HTTP helpers
   async function request(method, urlPath, { query, body, headers } = {}) {
     const qs = query ? '?' + new URLSearchParams(query).toString() : '';
     const url = baseUrl + urlPath + qs;
@@ -173,17 +176,14 @@ export async function start(_opencodeIndex) {
     workDir,
     home,
 
-    subscribeEvent,
-    waitForToolSuccess,
-
-    async createSession(body = { agent: 'build', model: { providerID: 'test', modelID: 'test-model' } }, query = {}) {
+    async createSession(body = { model: { id: 'test-model', providerID: 'test' } }, query = {}) {
       return request('POST', '/api/session', { query, body });
     },
 
     async sendPrompt(sessionID, text, query = {}) {
-      return request('POST', `/api/session/${sessionID}/prompt`, {
+      return request('POST', `/session/${sessionID}/message`, {
         query,
-        body: { prompt: { text } },
+        body: { parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } },
       });
     },
 
@@ -204,4 +204,13 @@ export async function start(_opencodeIndex) {
   };
 
   return api;
+}
+
+export function containsReadTool(msgsRes) {
+  if (!msgsRes.ok) return false;
+  return msgsRes.data.some((m) =>
+    m.type === 'assistant' &&
+    Array.isArray(m.content) &&
+    m.content.some((p) => p.type === 'tool' && p.name === 'read')
+  );
 }

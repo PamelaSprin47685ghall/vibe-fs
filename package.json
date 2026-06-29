@@ -38,6 +38,9 @@
   "overrides": {
     "bun-pty": "0.4.8"
   },
+  "devDependencies": {
+    "eventsource": "^3.0.7"
+  },
   "optionalDependencies": {
     "@ff-labs/fff-node": "^0.9.4",
     "@kreuzberg/tree-sitter-language-pack": "^1.8.1",
