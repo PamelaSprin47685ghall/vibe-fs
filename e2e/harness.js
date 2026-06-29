@@ -3,43 +3,28 @@ import { execSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createMockLLM } from './mock-llm.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WANXIANG_ROOT = path.resolve(__dirname, '..');
 const PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Opencode/Plugin.js');
-
-function createPluginStub(targetDir) {
-  const pluginDir = path.join(targetDir, '.opencode', 'plugin');
-  fs.mkdirSync(pluginDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(pluginDir, 'wanxiangshu.js'),
-    `export { plugin } from '${PLUGIN_JS.replace(/\\/g, '\\\\')}';
-`,
-    'utf-8',
-  );
-}
+const PLUGIN_URL = pathToFileURL(PLUGIN_JS).href;
 
 function gitInit(dir) {
   execSync('git init', { cwd: dir, stdio: 'ignore' });
   execSync('git config user.email test@example.com', { cwd: dir, stdio: 'ignore' });
   execSync('git config user.name test', { cwd: dir, stdio: 'ignore' });
   fs.writeFileSync(path.join(dir, 'README.md'), '# test\n');
-  execSync('git add README.md', { cwd: dir, stdio: 'ignore' });
+  fs.writeFileSync(path.join(dir, 'AGENTS.md'), '- e2e test workspace\n');
+  execSync('git add README.md AGENTS.md', { cwd: dir, stdio: 'ignore' });
   execSync('git commit -m init', { cwd: dir, stdio: 'ignore' });
 }
 
-function isolatedEnv(home, llmUrl) {
+function isolatedEnv(home, llmUrl, opts = {}) {
+  const { plugin } = opts || {};
   const xdg = path.join(home, 'xdg');
-  return {
-    OPENCODE_TEST_HOME: home,
-    HOME: home,
-    XDG_DATA_HOME: xdg,
-    XDG_CACHE_HOME: xdg,
-    XDG_CONFIG_HOME: xdg,
-    XDG_STATE_HOME: xdg,
-    OPENCODE_CONFIG_CONTENT: JSON.stringify({
+  const config = {
       formatter: false,
       lsp: false,
       model: 'test/test-model',
@@ -66,9 +51,16 @@ function isolatedEnv(home, llmUrl) {
           options: { apiKey: 'test-key', baseURL: llmUrl },
         },
       },
-    }),
-    OPENCODE_DISABLE_PROJECT_CONFIG: '1',
-    OPENCODE_PURE: '1',
+  };
+  if (plugin) config.plugin = [PLUGIN_URL];
+  return {
+    OPENCODE_TEST_HOME: home,
+    HOME: home,
+    XDG_DATA_HOME: xdg,
+    XDG_CACHE_HOME: xdg,
+    XDG_CONFIG_HOME: xdg,
+    XDG_STATE_HOME: xdg,
+    OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
     OPENCODE_DISABLE_AUTOUPDATE: '1',
     OPENCODE_DISABLE_AUTOCOMPACT: '1',
     OPENCODE_DISABLE_MODELS_FETCH: '1',
@@ -106,7 +98,7 @@ async function waitForListening(stdout, timeoutMs = 30000) {
   });
 }
 
-export async function start(_opencodeIndex) {
+export async function start(opts = {}) {
   // 1. mock LLM
   const llm = createMockLLM();
   const llmHandle = await llm.start();
@@ -116,10 +108,9 @@ export async function start(_opencodeIndex) {
   const workDir = path.join(home, 'workspace');
   fs.mkdirSync(workDir, { recursive: true });
   gitInit(workDir);
-  createPluginStub(workDir);
 
   // 3. env
-  const env = isolatedEnv(home, `${llmHandle.url}/v1`);
+  const env = isolatedEnv(home, `${llmHandle.url}/v1`, opts);
 
   // 4. spawn opencode serve
   const child = spawn('opencode', ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
