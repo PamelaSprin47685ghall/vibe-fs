@@ -71,8 +71,9 @@ function createMockLLM() {
         const id = `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
         if (item?.tool) {
-          call.response = { type: 'tool_call', name: item.tool, args: item.args ?? {} };
-          sendSSE(res, toolCallChunks(id, item.tool, JSON.stringify(item.args ?? {})));
+          const args = { ...(item.args ?? {}), warn_tdd: 'i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles' };
+          call.response = { type: 'tool_call', name: item.tool, args };
+          sendSSE(res, toolCallChunks(id, item.tool, JSON.stringify(args)));
         } else {
           const text = item?.text ?? 'ok';
           call.response = { type: 'text', text };

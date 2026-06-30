@@ -69,8 +69,8 @@ let private tryRecoverTodosFromTaskPart (part: obj) : obj array option =
 
 let private tryRecoverTodosFromMessages (state: obj) (sessionID: string) : obj array option =
     let sessionState = Dyn.get state "session"
-    let messages = Dyn.call1 (Dyn.get sessionState "messages") (box sessionID) |> asObjArray
-    let partsOf messageID = Dyn.call1 (Dyn.get state "part") (box messageID) |> asObjArray
+    let messages = Dyn.callMethod1 sessionState "messages" (box sessionID) |> asObjArray
+    let partsOf messageID = Dyn.callMethod1 state "part" (box messageID) |> asObjArray
     messages
     |> Array.rev
     |> Array.tryPick (fun message ->
@@ -84,7 +84,7 @@ let private installTodoFallback (api: obj) : unit =
     let originalTodo = Dyn.get sessionState "todo"
     let fallback =
         System.Func<string, obj>(fun sessionID ->
-            let existing = Dyn.call1 originalTodo (box sessionID)
+            let existing = Dyn.callWithThis1 originalTodo sessionState (box sessionID)
             let existingTodos = asObjArray existing
             if existingTodos.Length > 0 then box existingTodos
             else

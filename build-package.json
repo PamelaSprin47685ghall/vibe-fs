@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "highlight.js": "*",
-    "@kreuzberg/tree-sitter-language-pack": "*"
+    "@kreuzberg/tree-sitter-language-pack": "*",
+    "yaml": "^2.9.0"
   }
 }

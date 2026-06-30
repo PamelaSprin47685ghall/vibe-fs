@@ -48,6 +48,18 @@ let call1 (f: obj) (a: obj) : obj = f $ a
 
 let call2 (f: obj) (a: obj) (b: obj) : obj = f $ (a, b)
 
+let callMethod0 (o: obj) (method_: string) : obj =
+    emitJsExpr (o, method_) "$0[$1]()"
+
+let callMethod1 (o: obj) (method_: string) (a: obj) : obj =
+    emitJsExpr (o, method_, a) "$0[$1]($2)"
+
+let callMethod2 (o: obj) (method_: string) (a: obj) (b: obj) : obj =
+    emitJsExpr (o, method_, a, b) "$0[$1]($2, $3)"
+
+let callWithThis1 (f: obj) (thisObj: obj) (a: obj) : obj =
+    emitJsExpr (f, thisObj, a) "$0.call($1, $2)"
+
 let withKey (o: obj) (key: string) (v: obj) : obj =
     let copy = cloneShallow o
     copy?(key) <- v

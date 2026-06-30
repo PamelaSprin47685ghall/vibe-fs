@@ -40,7 +40,7 @@ let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise
             let api : obj = Dyn.get session method_
             if Dyn.isNullish api then Promise.lift (unbox null)
             else
-                unbox<JS.Promise<obj>> (Dyn.call1 api arg)
+                unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
 
 let private tryReadLatestAssistantInfo (client: obj) (sessionID: string) : JS.Promise<obj option> =
     promise {

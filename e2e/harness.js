@@ -22,37 +22,36 @@ function gitInit(dir) {
 }
 
 function isolatedEnv(home, llmUrl, opts = {}) {
-  const { plugin } = opts || {};
   const xdg = path.join(home, 'xdg');
   const config = {
-      formatter: false,
-      lsp: false,
-      model: 'test/test-model',
-      provider: {
-        test: {
-          name: 'Test',
-          id: 'test',
-          env: [],
-          npm: '@ai-sdk/openai-compatible',
-          models: {
-            'test-model': {
-              id: 'test-model',
-              name: 'Test Model',
-              attachment: false,
-              reasoning: false,
-              temperature: false,
-              tool_call: true,
-              release_date: '2025-01-01',
-              limit: { context: 100000, output: 10000 },
-              cost: { input: 0, output: 0 },
-              options: {},
-            },
+    formatter: false,
+    lsp: false,
+    model: 'test/test-model',
+    provider: {
+      test: {
+        name: 'Test',
+        id: 'test',
+        env: [],
+        npm: '@ai-sdk/openai-compatible',
+        models: {
+          'test-model': {
+            id: 'test-model',
+            name: 'Test Model',
+            attachment: false,
+            reasoning: false,
+            temperature: false,
+            tool_call: true,
+            release_date: '2025-01-01',
+            limit: { context: 100000, output: 10000 },
+            cost: { input: 0, output: 0 },
+            options: {},
           },
-          options: { apiKey: 'test-key', baseURL: llmUrl },
         },
+        options: { apiKey: 'test-key', baseURL: llmUrl },
       },
+    },
+    plugin: opts.plugin ? [PLUGIN_URL] : [],
   };
-  if (plugin) config.plugin = [PLUGIN_URL];
   return {
     OPENCODE_TEST_HOME: home,
     HOME: home,
@@ -60,19 +59,24 @@ function isolatedEnv(home, llmUrl, opts = {}) {
     XDG_CACHE_HOME: xdg,
     XDG_CONFIG_HOME: xdg,
     XDG_STATE_HOME: xdg,
-    OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
     OPENCODE_DISABLE_AUTOUPDATE: '1',
     OPENCODE_DISABLE_AUTOCOMPACT: '1',
     OPENCODE_DISABLE_MODELS_FETCH: '1',
     OPENCODE_AUTH_CONTENT: '{}',
     OPENCODE_EXPERIMENTAL_EVENT_SYSTEM: 'true',
+    OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
   };
 }
 
-async function waitForListening(stdout, timeoutMs = 30000) {
+async function waitForListening(stdout, child, timeoutMs = 30000) {
   let buf = '';
+  let exitHandler;
   return await new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
+    exitHandler = (code, signal) => {
+      reject(new Error(`opencode serve exited with code=${code} signal=${signal}`));
+    };
+    child.on('exit', exitHandler);
     const check = () => {
       if (buf.includes('opencode server listening on http://')) {
         resolve(buf);
@@ -85,7 +89,8 @@ async function waitForListening(stdout, timeoutMs = 30000) {
       setTimeout(check, 50);
     };
     stdout.on('data', (chunk) => {
-      buf += chunk.toString();
+      const chunkStr = chunk.toString();
+      buf += chunkStr;
       const idx = buf.indexOf('\n');
       if (idx !== -1) {
         const line = buf.slice(0, idx).trim();
@@ -95,24 +100,23 @@ async function waitForListening(stdout, timeoutMs = 30000) {
         }
       }
     });
+    check();
+  }).finally(() => {
+    child.removeListener('exit', exitHandler);
   });
 }
 
 export async function start(opts = {}) {
-  // 1. mock LLM
   const llm = createMockLLM();
   const llmHandle = await llm.start();
 
-  // 2. workspace
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiang-e2e-'));
   const workDir = path.join(home, 'workspace');
   fs.mkdirSync(workDir, { recursive: true });
   gitInit(workDir);
 
-  // 3. env
   const env = isolatedEnv(home, `${llmHandle.url}/v1`, opts);
 
-  // 4. spawn opencode serve
   const child = spawn('opencode', ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
     cwd: workDir,
     env: { ...process.env, ...env },
@@ -122,7 +126,7 @@ export async function start(opts = {}) {
 
   let listenLine;
   try {
-    listenLine = await waitForListening(child.stdout);
+    listenLine = await waitForListening(child.stdout, child);
   } catch (err) {
     child.kill('SIGKILL');
     const stderr = await new Promise((resolve) => {
@@ -136,7 +140,8 @@ export async function start(opts = {}) {
     child.kill('SIGKILL');
     throw new Error('waitForListening returned empty/undefined');
   }
-  const m = listenLine.match(/http:\/\/[^:]+:(\d+)/);
+
+  const m = listenLine.match(/http:\/\/[?1h =[^:]+:(\d+)/) || listenLine.match(/http:\/\/127.0.0.1:(\d+)/) || listenLine.match(/http:\/\/localhost:(\d+)/) || listenLine.match(/:(\d+)/);
   const port = m ? Number(m[1]) : 0;
   const baseUrl = `http://127.0.0.1:${port}`;
 
@@ -172,10 +177,33 @@ export async function start(opts = {}) {
     },
 
     async sendPrompt(sessionID, text, query = {}) {
-      return request('POST', `/session/${sessionID}/message`, {
-        query,
-        body: { parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } },
-      });
+      const qs = query ? '?' + new URLSearchParams(query).toString() : '';
+      const url = baseUrl + `/session/${sessionID}/message` + qs;
+      const body = { parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } };
+      const ac = new AbortController();
+      const timeout = setTimeout(() => ac.abort(), 15000);
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-opencode-directory': workDir },
+          body: JSON.stringify(body),
+          signal: ac.signal,
+        });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          if (buffer.includes('data: [DONE]')) break;
+        }
+        return { status: res.status, ok: res.ok, data: buffer };
+      } catch (e) {
+        return { status: 0, ok: false, data: e.message };
+      } finally {
+        clearTimeout(timeout);
+      }
     },
 
     async getMessages(sessionID, query = {}) {
@@ -184,6 +212,35 @@ export async function start(opts = {}) {
 
     async getSessions(query = {}) {
       return request('GET', '/api/session', { query });
+    },
+
+    async waitForCalls(count, timeoutMs = 15000) {
+      const deadline = Date.now() + timeoutMs;
+      while (llmHandle.calls.length < count) {
+        if (Date.now() > deadline) {
+          throw new Error(`timed out waiting for ${count} llm calls; saw ${llmHandle.calls.length}`);
+        }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return llmHandle.calls.length;
+    },
+
+    async readFile(relPath) {
+      return fs.readFileSync(path.join(workDir, relPath), 'utf8');
+    },
+
+    async fileExists(relPath) {
+      return fs.existsSync(path.join(workDir, relPath));
+    },
+
+    async waitForFile(relPath, timeoutMs = 10000) {
+      const deadline = Date.now() + timeoutMs;
+      const absPath = path.join(workDir, relPath);
+      while (Date.now() < deadline) {
+        if (fs.existsSync(absPath)) return true;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      return false;
     },
 
     async dispose() {
