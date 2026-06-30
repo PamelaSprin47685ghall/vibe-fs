@@ -124,7 +124,7 @@ let languageToString (value: ExecutorLanguage) : string =
     | Javascript -> "javascript"
     | Shell -> "shell"
 
-let private summaryInputMaxBytes = 1_048_576
+let private summaryInputMaxBytes = 200_000
 
 let buildSummaryPrompt
     (byteLength: string -> int)
@@ -136,7 +136,7 @@ let buildSummaryPrompt
     let capped =
         if byteLength raw > summaryInputMaxBytes then
             truncateToBytes raw summaryInputMaxBytes
-            + "\n\n[Output truncated to 1MB for summarization]"
+            + "\n\n[Output truncated to 200000 bytes for summarization]"
         else
             raw
     let langStr = languageToString options.language

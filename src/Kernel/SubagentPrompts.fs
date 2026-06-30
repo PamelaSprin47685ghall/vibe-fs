@@ -1,5 +1,6 @@
 module Wanxiangshu.Kernel.SubagentPrompts
 
+open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.SubagentIntents
@@ -7,6 +8,47 @@ open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Kernel.PromptFragments
 
 let meditatorSkippedSection = "(skipped)"
+let executorSummaryMaxBytes = 200_000
+
+let private utf8CharWidth (text: string) (index: int) : int * int =
+    let current = text[index]
+    if Char.IsHighSurrogate current && index + 1 < text.Length && Char.IsLowSurrogate text[index + 1] then
+        4, 2
+    else
+        let code = int current
+        if code <= 0x7F then 1, 1
+        elif code <= 0x7FF then 2, 1
+        else 3, 1
+
+let truncateUtf8ByBytes (text: string) (maxBytes: int) : string =
+    if String.IsNullOrEmpty text || maxBytes <= 0 then
+        ""
+    else
+        let mutable index = 0
+        let mutable used = 0
+        let mutable endIndex = 0
+        while index < text.Length do
+            let width, step = utf8CharWidth text index
+            if used + width > maxBytes then
+                index <- text.Length
+            else
+                used <- used + width
+                index <- index + step
+                endIndex <- index
+        text.Substring(0, endIndex)
+
+let capExecutorSummaryOutput (output: string) : string =
+    let mutable index = 0
+    let mutable total = 0
+    while index < output.Length do
+        let width, step = utf8CharWidth output index
+        total <- total + width
+        index <- index + step
+    if total <= executorSummaryMaxBytes then
+        output
+    else
+        truncateUtf8ByBytes output executorSummaryMaxBytes
+        + "\n\n[Output truncated to 200000 bytes for summarization]"
 
 type MeditatorFileSection =
     { file: string; content: string option }
@@ -75,6 +117,7 @@ let executorSummarizerPrompt
     (timeoutType: string)
     (mode: string)
     : string =
+    let capped = capExecutorSummaryOutput output
     let taskBody =
         let directive = "You are a filter for executor output. Preserve errors, stack traces, and key paths or values. Omit noise, repeated lines, and progress banners. Do not invent details that are not in the output.\nDo NOT lose any information."
         let trimmed = whatToSummarize.Trim()
@@ -86,7 +129,7 @@ let executorSummarizerPrompt
           yamlStringSeqField "dependencies" dependencies
           yamlField "timeout_type" timeoutType
           yamlField "mode" mode ]
-        [ output; "# Task\n" + taskBody ]
+        [ capped; "# Task\n" + taskBody ]
 
 let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =
     agentPrompt

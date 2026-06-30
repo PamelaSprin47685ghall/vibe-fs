@@ -25,12 +25,12 @@ let summarizerInputCap () =
     let small = String.replicate 100 "x"
     let smallPrompt = buildSummaryPrompt bl trunc opts (Completed(small, 0))
     check "small output kept whole" (smallPrompt.Contains small)
-    check "small output not truncated" (not (smallPrompt.Contains "[Output truncated to 1MB for summarization]"))
+    check "small output not truncated" (not (smallPrompt.Contains "[Output truncated to 200000 bytes for summarization]"))
     let marker = "END_OF_OUTPUT_TAIL"
-    let large = String.replicate (1_048_576 + 100 - marker.Length) "x" + marker
+    let large = String.replicate (200_000 + 100 - marker.Length) "x" + marker
     let tail = marker
     let largePrompt = buildSummaryPrompt bl trunc opts (Completed(large, 0))
-    check "large output truncated message" (largePrompt.Contains "[Output truncated to 1MB for summarization]")
+    check "large output truncated message" (largePrompt.Contains "[Output truncated to 200000 bytes for summarization]")
     check "large output tail absent" (not (largePrompt.Contains tail))
 
 let safetyWarning () =
