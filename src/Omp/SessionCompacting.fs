@@ -25,17 +25,11 @@ let sessionCompactingHandler (_pi: obj) (event: obj) (_ctx: obj) : JS.Promise<ob
         let cleaned = stripSyntheticBySource messagesList
         if cleaned.IsEmpty then return createObj []
         else
-            let backlogEntries =
-                backlogSession.GetOrRebuildBacklog(sessionId, cleaned)
-                |> List.map (fun be -> box (createObj [ "user_message", box [||]; "aha_moments", box (be.ahaMoments.Trim()); "changes_and_reasons", box (be.changesAndReasons.Trim()); "gotchas", box (be.gotchas.Trim()); "lessons_and_conventions", box (be.lessonsAndConventions.Trim()); "plan", box (be.plan.Trim()) ]))
-                |> List.toArray
-            let backlogBlock = [ frontMatterRoot (box backlogEntries) ]
+            let backlogEntries = backlogSession.GetOrRebuildBacklog(sessionId, cleaned)
             let anchorTexts = extractHistoryTexts cleaned
-            let anchorBlocks = anchorTexts |> List.collect extractFrontMatterFenceStrings
-            let allBlocks = backlogBlock @ anchorBlocks
-            if allBlocks.IsEmpty then return createObj []
+            let contextText = buildCompactionAnchorPrompt backlogEntries (fun () -> anchorTexts)
+            if System.String.IsNullOrEmpty contextText then return createObj []
             else
-                let contextText = renderCompactionAnchorPrompt allBlocks
                 let contextLines = contextText.Split('\n')
                 return createObj [ "context", box contextLines ]
     }

@@ -97,3 +97,30 @@ let sessionCompactingContextHasMultipleFrontMatterBlocks () = promise {
         check "context has backlog + extracted task block" (fenceCount >= 2)
         check "context contains extracted task" (joined.Contains "review-login")
 }
+
+let sessionCompactingContextWithoutBacklogDoesNotEmitEmptyArrayBlock () = promise {
+    resetPluginState ()
+    let h = createPiHarness ()
+    let pi = piObject h
+    do! wanxiangshuExtension pi
+    let userEntry =
+        createObj [
+            "id", box "msg-user-1"
+            "info", box(createObj [ "role", box "user" ])
+            "parts",
+                box [|
+                    createObj [
+                        "type", box "text"
+                        "text", box "---\ntask: review-login\n---\nStart reviewing login."
+                    ]
+                |]
+        ]
+    let event = createObj [ "sessionId", box "test-no-backlog-array-block"; "messages", box [| userEntry |] ]
+    let! result = sessionCompactingHandler pi event (createObj [ "cwd", box "/tmp" ])
+    let context = Dyn.get result "context"
+    if Dyn.isArray context then
+        let arr = unbox<string array> context
+        let joined = System.String.Join("\n", arr)
+        check "context keeps task anchor" (joined.Contains "task: review-login")
+        check "context does not emit empty backlog array block" (not (joined.Contains "---\n[]\n---"))
+}
