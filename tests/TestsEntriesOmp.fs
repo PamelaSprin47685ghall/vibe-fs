@@ -9,6 +9,7 @@ open Wanxiangshu.Tests.OmpFuzzyTests
 open Wanxiangshu.Tests.OmpPluginTests
 open Wanxiangshu.Tests.OmpPluginTestsAgentEnd
 open Wanxiangshu.Tests.OmpReviewTests
+open Wanxiangshu.Tests.OmpReviewLoopAsyncTests
 open Wanxiangshu.Tests.OmpHelpersTests
 open Wanxiangshu.Tests.OmpRunnerTests
 open Wanxiangshu.Tests.OmpContextTransformTests
@@ -65,6 +66,8 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpReviewTests.returnReviewerViaSetPendingStateForTest", Async OmpReviewTests.returnReviewerViaSetPendingStateForTest
     "OmpReviewTests.runReviewLoopChildToolNames", Async OmpReviewTests.runReviewLoopChildToolNames
     "OmpReviewTests.runReviewLoopAcceptsWhenPendingResolved", Async OmpReviewTests.runReviewLoopAcceptsWhenPendingResolved
+    "OmpReviewLoopAsyncTests.runReviewLoopResolvesViaAsyncCallbackNotPolling", Async OmpReviewLoopAsyncTests.runReviewLoopResolvesViaAsyncCallbackNotPolling
+    "OmpReviewLoopAsyncTests.runReviewLoopSendsNudgeOnTimeoutThenStopsOnResolve", Async OmpReviewLoopAsyncTests.runReviewLoopSendsNudgeOnTimeoutThenStopsOnResolve
     "OmpChildSessionTests.createChildSessionReviewToolNames", Async OmpChildSessionTests.createChildSessionReviewToolNames
     "OmpChildSessionTests.createChildSessionRunnerToolNames", Async OmpChildSessionTests.createChildSessionRunnerToolNames
     "OmpRunnerTests.waitRunnerJobAfterAppendLog", Async OmpRunnerTests.waitRunnerJobAfterAppendLog

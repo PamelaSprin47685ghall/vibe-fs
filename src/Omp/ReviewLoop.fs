@@ -17,6 +17,10 @@ type JsReviewResult = { accepted: bool option; feedback: string option; terminat
 let private terminatedResult fb =
     { accepted = Some false; feedback = Some fb; terminated = Some true }
 
+let private createDeferred () : JS.Promise<JsReviewResult> * (JsReviewResult -> unit) =
+    let d = emitJsExpr () "Promise.withResolvers()"
+    unbox (Dyn.get d "promise"), unbox (Dyn.get d "resolve")
+
 let private attachReviewChild (store: ReviewStore) (parentId: string) (childId: string) (onResolve: JsReviewResult -> unit) =
     store.addChild(parentId, childId)
     store.setPendingReview(childId, fun kr ->
@@ -31,54 +35,61 @@ let private detachReviewChild (store: ReviewStore) (_parentId: string) (childId:
     store.resolvePendingReview(childId, Terminated) |> ignore
     store.unlockReview childId
 
-let private waitUntilResolved (resolved: JsReviewResult option ref) : JS.Promise<JsReviewResult> =
-    let rec loop () =
-        promise {
-            if resolved.Value.IsSome then return resolved.Value.Value
-            else
-                do! Promise.sleep 50
-                return! loop ()
-        }
-    loop ()
-
-let private raceResolvedOr (resolved: JsReviewResult option ref) (other: JS.Promise<unit>) : JS.Promise<JsReviewResult option> =
-    promise {
-        let! winner =
-            Promise.race [
-                waitUntilResolved resolved |> Promise.map Some
-                other |> Promise.map (fun () -> None)
-            ]
-        return winner
-    }
-
 let private maxNudges = 3
-let private initialGraceMs = 6000
-let private subsequentGraceMs = 10000
+let mutable initialGraceMs = 6000
+let mutable subsequentGraceMs = 10000
 
-let private runNudgeLoop (childSession: obj) (resolved: JsReviewResult option ref) (onMaxNudges: unit -> JsReviewResult)
+let resetReviewLoopGracePeriods () =
+    initialGraceMs <- 6000
+    subsequentGraceMs <- 10000
+
+let private scheduleTimeout (fn: unit -> unit) (ms: int) : int =
+    emitJsExpr (fn, ms) "setTimeout($0, $1)"
+
+let private cancelScheduledTimeout (id: int) : unit =
+    emitJsExpr (id) "clearTimeout($0)"
+
+let private runNudgeLoop (childSession: obj) (resolvedPromise: JS.Promise<JsReviewResult>) (onMaxNudges: unit -> JsReviewResult)
     : JS.Promise<JsReviewResult> =
-    let rec nudgeLoop n =
-        promise {
-            if n >= maxNudges then return onMaxNudges ()
+    promise {
+        let deferred, resolveDeferred = createDeferred ()
+        let cancelled = ref false
+        let timeoutHandle = ref 0
+
+        // When resolvedPromise resolves, cancel pending timeout and resolve deferred
+        resolvedPromise |> Promise.map (fun r ->
+            if not cancelled.Value then
+                cancelled.Value <- true
+                cancelScheduledTimeout timeoutHandle.Value
+                resolveDeferred r
+            r
+        ) |> ignore
+
+        let rec scheduleNext n =
+            if n >= maxNudges then
+                if not cancelled.Value then
+                    cancelled.Value <- true
+                    resolveDeferred (onMaxNudges ())
             else
-                let! first = raceResolvedOr resolved (childSession?waitForIdle() |> unbox<JS.Promise<unit>>)
-                match first with
-                | Some r -> return r
-                | None ->
-                    let grace = if n = 0 then initialGraceMs else subsequentGraceMs
-                    let! second = raceResolvedOr resolved (Promise.sleep grace)
-                    match second with
-                    | Some r -> return r
-                    | None ->
-                        do! childSession?prompt(reviewerNudgePrompt) |> unbox<JS.Promise<unit>>
-                        return! nudgeLoop (n + 1)
-        }
-    nudgeLoop 0
+                let grace = if n = 0 then initialGraceMs else subsequentGraceMs
+                timeoutHandle.Value <-
+                    scheduleTimeout (fun () ->
+                        if not cancelled.Value then
+                            childSession?prompt(reviewerNudgePrompt) |> unbox<JS.Promise<unit>>
+                            |> Promise.map (fun () ->
+                                if not cancelled.Value then
+                                    scheduleNext (n + 1)
+                            ) |> ignore
+                    ) grace
+
+        scheduleNext 0
+        return! deferred
+    }
 
 let runReviewLoop (pi: obj) (ctx: obj) (store: ReviewStore) (parentId: string) (report: string) (files: string array) (task: string option)
     : JS.Promise<JsReviewResult> =
     promise {
-        let resolved = ref None
+        let resolvedPromise, resolveReview = createDeferred ()
         let! child = createChildSession pi ctx ompReviewChildToolNames None [||] None
         let childSession = child.session
         let childCtx = createObj [ "sessionManager", Dyn.get childSession "sessionManager" ]
@@ -94,14 +105,14 @@ let runReviewLoop (pi: obj) (ctx: obj) (store: ReviewStore) (parentId: string) (
             child.dispose |> Option.iter (fun dispose -> dispose ())
             return terminatedResult "Review child session unavailable"
         else
-            attachReviewChild store parentId childId (fun r -> resolved.Value <- Some r)
+            attachReviewChild store parentId childId (fun r -> resolveReview r)
             let initial = buildOmpReviewInitialPrompt report (files |> Array.toList) task
             do! childSession?prompt(initial) |> unbox<JS.Promise<unit>>
             let onMax () =
                 let sm = Dyn.get childSession "sessionManager"
                 let fb = readAssistantText sm 0 "\n\n" |> Option.defaultValue "Reviewer failed to finish."
                 terminatedResult fb
-            let! outcome = runNudgeLoop childSession resolved onMax
+            let! outcome = runNudgeLoop childSession resolvedPromise onMax
             cleanupChild ()
             return outcome
     }
@@ -120,7 +131,7 @@ let runPreReviewerSession (pi: obj) (ctx: obj) (store: ReviewStore) (task: strin
             match getSessionIdFromContext ctx with
             | None -> return Terminated
             | Some parentId ->
-                let resolved = ref None
+                let resolvedPromise, resolveReview = createDeferred ()
                 let! child = createChildSession pi ctx ompReviewChildToolNames None [||] None
                 let childSession = child.session
                 let childCtx = createObj [ "sessionManager", Dyn.get childSession "sessionManager" ]
@@ -134,10 +145,10 @@ let runPreReviewerSession (pi: obj) (ctx: obj) (store: ReviewStore) (task: strin
                     cleanupChild ()
                     return Terminated
                 else
-                    attachReviewChild store parentId childId (fun r -> resolved.Value <- Some r)
+                    attachReviewChild store parentId childId (fun r -> resolveReview r)
                     let initial = reviewerPrompt taskTrim "" []
                     do! childSession?prompt(initial) |> unbox<JS.Promise<unit>>
-                    let! jsOutcome = runNudgeLoop childSession resolved (fun () -> terminatedResult "Pre-review timed out.")
+                    let! jsOutcome = runNudgeLoop childSession resolvedPromise (fun () -> terminatedResult "Pre-review timed out.")
                     cleanupChild ()
                     return jsToReviewResult jsOutcome
     }
