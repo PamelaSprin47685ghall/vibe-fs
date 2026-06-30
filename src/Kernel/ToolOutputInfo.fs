@@ -19,7 +19,7 @@ let hintMeditator =
 let hintTodosUpdated = "Todos updated."
 
 let hintMethodologyFollowup (methodologyId: string) =
-    $"Great! Now apply {methodologyId} to actual work NOW and you MUST think over and then call methodology_{methodologyId} tool asap!"
+    $"Great! Now apply {methodologyId} to actual work NOW and you MUST think over and then call methodology tool with {methodologyId} selected asap!"
 
 let hintForMethodologies (methodologies: string list) : string =
     match methodologies with

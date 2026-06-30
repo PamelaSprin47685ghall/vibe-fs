@@ -19,9 +19,9 @@ let classifyToolTodoFamily () =
 let classifyToolTodoFamilyTask () =
     equal "mimo task" TodoFamily (classifyTool Mimocode "task")
 let classifyToolMethodologyFamily () =
-    equal "methodology_first_principles" MethodologyFamily (classifyTool Opencode "methodology_first_principles")
+    equal "methodology" MethodologyFamily (classifyTool Opencode "methodology")
 let classifyToolMethodologyFamilyOmp () =
-    equal "omp methodology" MethodologyFamily (classifyTool Omp "methodology_abduction")
+    equal "omp methodology" MethodologyFamily (classifyTool Omp "methodology")
 let classifyToolRead () =
     equal "read" Read (classifyTool Opencode "read")
 let classifyToolWrite () =
@@ -68,19 +68,19 @@ let canUseSemanticTodoBrowser () =
 let canUseSemanticTodoCoder () =
     check "coder can todo" (canUseSemantic "coder" TodoFamily "todowrite")
 let canUseSemanticMethodologyBrowser () =
-    check "browser denied methodology" (not (canUseSemantic "browser" MethodologyFamily "methodology_first_principles"))
+    check "browser denied methodology" (not (canUseSemantic "browser" MethodologyFamily "methodology"))
 let canUseSemanticMethodologyInvestigator () =
-    check "investigator denied methodology" (not (canUseSemantic "investigator" MethodologyFamily "methodology_abduction"))
+    check "investigator denied methodology" (not (canUseSemantic "investigator" MethodologyFamily "methodology"))
 let canUseSemanticMethodologyExecutor () =
-    check "executor denied methodology" (not (canUseSemantic "executor" MethodologyFamily "methodology_deduction"))
+    check "executor denied methodology" (not (canUseSemantic "executor" MethodologyFamily "methodology"))
 let canUseSemanticMethodologyMeditator () =
-    check "meditator denied methodology" (not (canUseSemantic "meditator" MethodologyFamily "methodology_analogy"))
+    check "meditator denied methodology" (not (canUseSemantic "meditator" MethodologyFamily "methodology"))
 let canUseSemanticMethodologyReviewer () =
-    check "reviewer can methodology (same as todo)" (canUseSemantic "reviewer" MethodologyFamily "methodology_specialization")
+    check "reviewer can methodology (same as todo)" (canUseSemantic "reviewer" MethodologyFamily "methodology")
 let canUseSemanticMethodologyCoder () =
-    check "coder can methodology" (canUseSemantic "coder" MethodologyFamily "methodology_generalization")
+    check "coder can methodology" (canUseSemantic "coder" MethodologyFamily "methodology")
 let canUseSemanticMethodologyManager () =
-    check "manager can methodology" (canUseSemantic "manager" MethodologyFamily "methodology_working_backwards")
+    check "manager can methodology" (canUseSemantic "manager" MethodologyFamily "methodology")
 let canUseSemanticWriteInvestigator () =
     check "investigator denied write" (not (canUseSemantic "investigator" WritePatchFamily "write"))
 let canUseSemanticWriteManager () =
@@ -122,19 +122,19 @@ let deniedToolsFilters () =
     check "coder allowed write" (not (List.contains "write" denied))
 
 let canUseForHostMethodologyDenied () =
-    check "browser denied methodology via host" (not (canUseForHost Opencode "browser" "methodology_first_principles"))
-    check "investigator denied methodology via host" (not (canUseForHost Opencode "investigator" "methodology_abduction"))
-    check "executor denied methodology via host" (not (canUseForHost Omp "executor" "methodology_deduction"))
-    check "meditator denied methodology via host" (not (canUseForHost Opencode "meditator" "methodology_analogy"))
+    check "browser denied methodology via host" (not (canUseForHost Opencode "browser" "methodology"))
+    check "investigator denied methodology via host" (not (canUseForHost Opencode "investigator" "methodology"))
+    check "executor denied methodology via host" (not (canUseForHost Omp "executor" "methodology"))
+    check "meditator denied methodology via host" (not (canUseForHost Opencode "meditator" "methodology"))
 
 let canUseForHostMethodologyAllowed () =
-    check "coder allowed methodology via host" (canUseForHost Opencode "coder" "methodology_generalization")
-    check "manager allowed methodology via host" (canUseForHost Mux "manager" "methodology_working_backwards")
-    check "reviewer allowed methodology via host" (canUseForHost Opencode "reviewer" "methodology_specialization")
+    check "coder allowed methodology via host" (canUseForHost Opencode "coder" "methodology")
+    check "manager allowed methodology via host" (canUseForHost Mux "manager" "methodology")
+    check "reviewer allowed methodology via host" (canUseForHost Opencode "reviewer" "methodology")
 
 let deniedToolsForHostMethodology () =
-    let denied = deniedToolsForHost Opencode "browser" [ "read"; "methodology_first_principles"; "todowrite" ]
-    check "browser denied methodology" (List.contains "methodology_first_principles" denied)
+    let denied = deniedToolsForHost Opencode "browser" [ "read"; "methodology"; "todowrite" ]
+    check "browser denied methodology" (List.contains "methodology" denied)
     check "browser denied todowrite" (List.contains "todowrite" denied)
     check "browser allowed read" (not (List.contains "read" denied))
 

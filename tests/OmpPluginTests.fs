@@ -27,29 +27,25 @@ let registersCoreToolsIdempotent () = promise {
         [ "fuzzy_find"; "fuzzy_grep"; "coder"; "investigator"; "meditator"; "browser"; "websearch"; "webfetch"; "executor"
           "submit_review"; "return_reviewer"; "todowrite" ] do
         check ("has tool " + expected) (names.Contains expected)
-    let methodologyCount = names |> Set.filter (fun n -> n.StartsWith "methodology_") |> Set.count
-    check "OMP parity: registers methodology_first_principles" (names.Contains "methodology_first_principles")
-    check "OMP parity: registers at least 53 methodology_* tools" (methodologyCount >= 53)
+    check "OMP parity: registers methodology tool" (names.Contains "methodology")
     check "has loop command" (h1.commands |> Seq.exists (fun c -> Dyn.str c "name" = "loop"))
 }
 
-let methodologySchemaCarriesMinItems () = promise {
+let methodologySchemaUnifiedNote () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
     do! wanxiangshuExtension pi
-    let abduction =
-        h.tools |> Seq.tryFind (fun t -> Dyn.str t "name" = "methodology_abduction")
-    check "methodology_abduction tool registered" (abduction.IsSome)
-    match abduction with
+    let methodology =
+        h.tools |> Seq.tryFind (fun t -> Dyn.str t "name" = "methodology")
+    check "methodology tool registered" (methodology.IsSome)
+    match methodology with
     | None -> ()
     | Some tool ->
         let props = Dyn.get (Dyn.get tool "parameters") "properties"
-        let dt = Dyn.get props "discriminating_tests"
-        check "discriminating_tests present" (not (Dyn.isNullish dt))
-        let mi = Dyn.get dt "minItems"
-        check "discriminating_tests has minItems" (not (Dyn.isNullish mi))
-        check "discriminating_tests minItems >= 2" (unbox<int> mi >= 2)
+        // The unified methodology tool has a single note: string parameter.
+        let note = Dyn.get props "note"
+        check "note field present" (not (Dyn.isNullish note))
 }
 
 let sessionStartStripsMainSessionTools () = promise {

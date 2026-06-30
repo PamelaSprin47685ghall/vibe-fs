@@ -82,9 +82,9 @@ let testWithIterator () =
     equal "withIterator empty returns body" "body" (withIterator "body" "")
 
 let testTodoWriteOutput () =
-    let r = todoWriteOutput [ "methodology_a" ] false
-    check "todoWriteOutput has methodology" (r.Contains "methodology_a")
-    let rMeta = todoWriteOutput [ "methodology_a" ] true
+    let r = todoWriteOutput [ "methodology" ] false
+    check "todoWriteOutput has methodology" (r.Contains "methodology")
+    let rMeta = todoWriteOutput [ "methodology" ] true
     check "todoWriteOutput with meditator" (rMeta.Contains "Think thrice")
     let rEmpty = todoWriteOutput [] false
     check "todoWriteOutput empty" (rEmpty.Contains "Todos updated.")
@@ -117,8 +117,8 @@ let testConstants () =
     check "hintExecutorMisuse nonempty" (hintExecutorMisuse.Length > 0)
     check "hintTodoRefresh nonempty" (hintTodoRefresh.Length > 0)
     check "hintMeditator nonempty" (hintMeditator.Length > 0)
-    let r = hintMethodologyFollowup "methodology_axiomatization"
-    check "hintMethodologyFollowup contains id" (r.Contains "methodology_axiomatization")
+    let r = hintMethodologyFollowup "methodology"
+    check "hintMethodologyFollowup contains id" (r.Contains "methodology")
 
 let testInfoItemOrdering () =
     let r =

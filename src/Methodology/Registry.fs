@@ -3,19 +3,16 @@ module Wanxiangshu.Methodology.Registry
 open Wanxiangshu.Methodology.SchemaCommon
 open Wanxiangshu.Methodology.Catalog
 
-let allSchemas: MethodologySchema list = Catalog.all
-
-let allToolSpecs: Wanxiangshu.Kernel.ToolCatalog.ToolSpec list =
-    allSchemas |> List.map toToolCatalogSpec
+let allEntries: MethodologyEntry list = Catalog.all
 
 let enumValues: string list =
-    allSchemas |> List.map (fun s -> s.methodologyId)
+    allEntries |> List.map (fun e -> e.methodologyId)
 
-let toolNames: string array =
-    allSchemas |> List.map (fun s -> s.toolName) |> Array.ofList
+let enumValuesArray: string array =
+    enumValues |> Array.ofList
 
-let tryFindSchema methodologyId =
-    allSchemas |> List.tryFind (fun s -> s.methodologyId = methodologyId)
+let unifiedNoteDescription: string =
+    buildUnifiedNoteDescription allEntries
 
-let tryFindToolSpec methodologyId =
-    tryFindSchema methodologyId |> Option.map toToolCatalogSpec
+let tryFindEntry methodologyId =
+    allEntries |> List.tryFind (fun e -> e.methodologyId = methodologyId)

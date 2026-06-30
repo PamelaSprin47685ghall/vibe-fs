@@ -144,8 +144,8 @@ let hookSchemaPtySpawnWarnSets () =
 
 let hookSchemaMethodologyNotInWarnSets () =
     // (5) A methodology tool name is in neither set.
-    // methodology_first_principles is a representative methodology tool name (methodology_<id>).
-    let methodologyTool = "methodology_first_principles"
+    // methodology is the representative methodology tool name.
+    let methodologyTool = "methodology"
     check "methodology tool NOT isModificationTool" (not (Wanxiangshu.Kernel.WarnTdd.isModificationTool methodologyTool))
     check "methodology tool NOT isWarnRequiredTool" (not (Wanxiangshu.Kernel.WarnTdd.isWarnRequiredTool methodologyTool))
 

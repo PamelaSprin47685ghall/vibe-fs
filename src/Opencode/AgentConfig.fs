@@ -47,11 +47,11 @@ let private tryFindBuiltinAgent name =
     builtinAgentSpecs |> List.tryFind (fun spec -> spec.name = name)
 
 let private toolDefaultsFor (host: Host) (agentName: string) : OpencodeAgentConfigCodec.ToolsOverrides =
-    Array.append (allToolNames host) Wanxiangshu.Methodology.Registry.toolNames
+    Array.append (allToolNames host) [| "methodology" |]
     |> Seq.fold (fun acc name -> Map.add name (canUseForHost host agentName name) acc) Map.empty
 
 let private permissionDefaultsFor (host: Host) (agentName: string) : OpencodeAgentConfigCodec.PermissionOverrides =
-    Array.append (allToolNames host) Wanxiangshu.Methodology.Registry.toolNames
+    Array.append (allToolNames host) [| "methodology" |]
     |> Seq.fold
         (fun acc name ->
             let value = if canUseForHost host agentName name then "allow" else "deny"

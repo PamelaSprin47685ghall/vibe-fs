@@ -1,40 +1,25 @@
 module Wanxiangshu.Methodology.Args
 
 open System
-open Wanxiangshu.Methodology.SchemaCommon
 open Wanxiangshu.Shell.Dyn
 
-let parse (schema: MethodologySchema) (args: obj) : Result<Map<string, string> * Map<string, string list>, string> =
+type MethodologyArgs =
+    { methodology: string
+      intent: string
+      background: string
+      note: string }
+
+let parse (args: obj) : Result<MethodologyArgs, string> =
     if isNullish args then Error "missing tool arguments"
     else
-        let values = ResizeArray()
-        let arrays = ResizeArray()
         let errors = ResizeArray()
-
-        for f in schema.fields do
-            let raw = get args f.name
-            match f.kind with
-            | FieldKind.String ->
-                let text =
-                    if isNullish raw then ""
-                    else string raw |> fun s -> s.Trim()
-                if f.required && text = "" then errors.Add($"{f.name} is required")
-                elif text <> "" || f.required then values.Add(f.name, text)
-            | FieldKind.StringArray ->
-                let items =
-                    if isNullish raw || not (isArray raw) then []
-                    else
-                        unbox<obj array> raw
-                        |> Array.map (fun x -> string x |> fun s -> s.Trim())
-                        |> Array.filter ((<>) "")
-                        |> Array.toList
-                if f.required && items.Length < f.minArrayItems then
-                    errors.Add($"{f.name} requires at least {f.minArrayItems} non-empty items")
-                elif not f.required && items.IsEmpty then ()
-                else arrays.Add(f.name, items)
-
-        if errors.Count > 0 then Error (String.concat "; " (errors |> Seq.toList))
-        else
-            Ok(
-                values |> Seq.map (fun (k, v) -> k, v) |> Map.ofSeq,
-                arrays |> Seq.map (fun (k, v) -> k, v) |> Map.ofSeq)
+        let methodology = if isNullish (get args "methodology") then "" else string (get args "methodology") |> fun s -> s.Trim()
+        let intent = if isNullish (get args "intent") then "" else string (get args "intent") |> fun s -> s.Trim()
+        let background = if isNullish (get args "background") then "" else string (get args "background") |> fun s -> s.Trim()
+        let note = if isNullish (get args "note") then "" else string (get args "note") |> fun s -> s.Trim()
+        if methodology = "" then errors.Add("methodology is required")
+        if intent = "" then errors.Add("intent is required")
+        if background = "" then errors.Add("background is required")
+        if note = "" then errors.Add("note is required")
+        if errors.Count > 0 then Error(String.concat "; " (errors |> Seq.toList))
+        else Ok { methodology = methodology; intent = intent; background = background; note = note }

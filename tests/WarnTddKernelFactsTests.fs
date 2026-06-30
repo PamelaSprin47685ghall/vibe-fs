@@ -48,7 +48,7 @@ let kernelIsModificationToolMatrix () =
           "browser", false
           "submit_review", false
           "todowrite", false
-          "methodology_first_principles", false ]
+          "methodology", false ]
     for (tool, expected) in cases do
         equal ("isModificationTool " + tool) expected (isModificationTool tool)
 

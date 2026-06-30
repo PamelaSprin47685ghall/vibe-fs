@@ -113,7 +113,7 @@ let execute_validReturnsTextResult () : JS.Promise<unit> =
     promise {
         let! result = invokeExecute tool params'
         check "not error when valid" (not (Dyn.truthy (Dyn.get result "isError")))
-        check "result mentions methodology hint" (hasText result "methodology_first_principles")
+        check "result mentions methodology hint" (hasText result "methodology")
         check "result mentions apply" (hasText result "apply")
     }
 

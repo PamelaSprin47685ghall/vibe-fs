@@ -2,8 +2,8 @@ module Wanxiangshu.Methodology.Catalog
 
 open Wanxiangshu.Methodology.SchemaCommon
 
-let all: MethodologySchema list =
-    Catalog1.schemas
-    @ Catalog2.schemas
-    @ Catalog3.schemas
-    @ Catalog4.schemas
+let all: MethodologyEntry list =
+    Catalog1.entries
+    @ Catalog2.entries
+    @ Catalog3.entries
+    @ Catalog4.entries

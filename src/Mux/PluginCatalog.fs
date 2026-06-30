@@ -97,7 +97,7 @@ let createToolCatalog
         yield fuzzyFindTool finderCache iteratorStore
         yield injectWarnWarnTddIntoMuxSchema (writeTool deps)
         yield readTool deps hostReadExec
-        yield! allMethodologyTools deps toolNames |]
+        yield methodologyTool deps toolNames |]
 
 let private requireWarnTddMux (tool: string) (args: obj) (output: obj) : unit =
     if not (Wanxiangshu.Kernel.WarnTdd.isModificationTool tool) then ()

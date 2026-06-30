@@ -34,19 +34,23 @@ let enumAllInCatalog () =
 let catalogContainsKeyphrase () =
     check "catalog: contains keyphrase" (methodologyCatalog.Contains("Methodology catalog"))
 
-let registrySchemasWellFormed () =
-    check "registry: 54 schemas" (allSchemas.Length = 54)
-    check "registry: enum count matches schemas" (enumValues.Length = allSchemas.Length)
-    allSchemas
-    |> List.iter (fun s ->
-        check ("schema has intent " + s.methodologyId) (
-            s.fields |> List.exists (fun f -> f.name = intentFieldName && f.required))
-        check ("schema has background " + s.methodologyId) (
-            s.fields |> List.exists (fun f -> f.name = backgroundFieldName && f.required)))
+let registryEntriesWellFormed () =
+    check "registry: 54 entries" (allEntries.Length = 54)
+    check "registry: enum count matches entries" (enumValues.Length = allEntries.Length)
+    allEntries
+    |> List.iter (fun e ->
+        check ("entry has shortDefinition " + e.methodologyId) (e.shortDefinition <> "")
+        check ("entry has noteDescription " + e.methodologyId) (e.noteDescription <> ""))
+
+let unifiedNoteDescriptionContainsAll () =
+    check "unified note description non-empty" (unifiedNoteDescription.Length > 0)
+    for e in allEntries do
+        check ("unified note contains " + e.methodologyId) (unifiedNoteDescription.Contains(e.methodologyId))
 
 let run () =
     todoWriteOutputExact ()
     enumCount ()
     enumAllInCatalog ()
     catalogContainsKeyphrase ()
-    registrySchemasWellFormed ()
+    registryEntriesWellFormed ()
+    unifiedNoteDescriptionContainsAll ()

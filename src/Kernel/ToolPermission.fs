@@ -52,7 +52,7 @@ let classifyTool (host: Host) (tool: Tool) : ToolSemantic =
     elif isStealthBrowserTool t then StealthBrowser
     elif t.StartsWith "return_" then ReturnRoleEcho
     elif Set.contains t todoFamilySet then TodoFamily
-    elif t.StartsWith methodologyPrefix then MethodologyFamily
+    elif t.StartsWith methodologyPrefix || t = "methodology" then MethodologyFamily
     elif t = "read" then Read
     elif isDispatchOrWebSkillTool t then SubagentWebSkillOrSubmit
     elif Set.contains t writePatchFamilySet then WritePatchFamily

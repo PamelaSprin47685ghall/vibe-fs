@@ -10,6 +10,7 @@ open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.WarnTdd
 open Wanxiangshu.Omp.Schema
 open Wanxiangshu.Methodology.SchemaCommon
+open Wanxiangshu.Methodology.Registry
 
 module Params = Wanxiangshu.Kernel.ToolCatalog.Params
 
@@ -20,17 +21,15 @@ let private addRequired (schema: obj) (key: string) : unit =
     else
         schema?("required") <- box [| box key |]
 
-let private methodologyField (f: MethodologyField) (tb: obj) : string * obj =
-    match f.kind, f.required, f.minArrayItems with
-    | FieldKind.String, _, _ -> f.name, str f.description tb
-    | FieldKind.StringArray, true, n when n > 0 ->
-        f.name, arrayMin (str "" tb) n f.description tb
-    | FieldKind.StringArray, true, _ ->
-        f.name, strArray f.description tb
-    | FieldKind.StringArray, _, _ -> f.name, opt f.description tb (fun desc t -> strArray desc t)
-
-let methodologyParameters (schema: MethodologySchema) (tb: obj) : obj =
-    objectOf (schema.fields |> List.map (fun f -> methodologyField f tb) |> Array.ofList) tb
+let methodologyParameters (tb: obj) : obj =
+    objectOf
+        [|
+            ("methodology", enumOf (Wanxiangshu.Methodology.Registry.enumValuesArray) "Select which methodology to apply." tb)
+            ("intent", str intentFieldDescription tb)
+            ("background", str backgroundFieldDescription tb)
+            ("note", str unifiedNoteDescription tb)
+        |]
+        tb
 
 let private coderIntentItem (tb: obj) : obj =
     let targetShape =
@@ -138,6 +137,6 @@ let todowriteParameters (tb: obj) : obj =
             ("gotchas", str gotchasDesc tb)
             ("lessonsAndConventions", str lessonsAndConventionsDesc tb)
             ("plan", str planDesc tb)
-            ("select_methodology", arrayOf (enumOf (Wanxiangshu.Methodology.Registry.enumValues |> List.toArray) "Methodology name" tb) selectMethodologyFieldDescription tb)
+            ("select_methodology", arrayOf (enumOf Wanxiangshu.Methodology.Registry.enumValuesArray "Methodology name" tb) selectMethodologyFieldDescription tb)
         |]
         tb

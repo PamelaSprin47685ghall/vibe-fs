@@ -12,60 +12,56 @@ open Wanxiangshu.Shell.Dyn
 // ── Methodology.Args ───────────────────────────────────────────────────────
 
 let methArgs () =
-    let schema =
-        { methodologyId = "test"
-          toolName = "methodology_test"
-          shortDefinition = "d"
-          triggerWhen = "t"
-          toolDescription = "desc"
-          fields =
-            [ { name = "intent"; description = "i"; required = true; kind = FieldKind.String; minArrayItems = 0 }
-              { name = "background"; description = "b"; required = true; kind = FieldKind.String; minArrayItems = 0 }
-              { name = "tags"; description = "t"; required = false; kind = FieldKind.StringArray; minArrayItems = 0 } ]
-          meditatorRole = "r"
-          outputSections = [] }
-    match parse schema null with Error msg -> check "null args error" (msg.Contains "missing") | Ok _ -> check "null args error" false
-    let reqSchema = { schema with fields = [ { name = "x"; description = ""; required = true; kind = FieldKind.String; minArrayItems = 0 } ] }
-    match parse reqSchema (createObj []) with Error msg -> check "required missing" (msg.Contains "x") | Ok _ -> check "required missing" false
-    let arrSchema = { schema with fields = [ { name = "arr"; description = ""; required = true; kind = FieldKind.StringArray; minArrayItems = 2 } ] }
-    match parse arrSchema (createObj [ "arr", box [| box "a" |] ]) with Error msg -> check "array too short" (msg.Contains "arr") | Ok _ -> check "array too short" false
-    let okArgs = createObj [ "intent", box "do stuff"; "background", box "ctx"; "tags", box [| box "a"; box "b" |] ]
-    match parse schema okArgs with
-    | Ok (vs, ar) ->
-        check "ok values map" (Map.containsKey "intent" vs)
-        check "ok array map" (Map.containsKey "tags" ar)
-        equal "intent value" "do stuff" (Map.find "intent" vs)
-        equal "tags values" ["a"; "b"] (Map.find "tags" ar)
+    // null → error
+    match parse null with
+    | Error msg -> check "null args error" (msg.Contains "missing")
+    | Ok _ -> check "null args error" false
+    // empty obj → all required fields missing
+    match parse (createObj []) with
+    | Error msg ->
+        check "empty missing methodology" (msg.Contains "methodology")
+        check "empty missing intent" (msg.Contains "intent")
+        check "empty missing background" (msg.Contains "background")
+        check "empty missing note" (msg.Contains "note")
+    | Ok _ -> check "empty args error unexpected" false
+    // partial obj → only missing fields reported
+    match parse (createObj [ "methodology", box "m"; "intent", box "i" ]) with
+    | Error msg ->
+        check "partial missing background" (msg.Contains "background")
+        check "partial missing note" (msg.Contains "note")
+        check "partial not missing methodology" (not (msg.Contains "methodology"))
+        check "partial not missing intent" (not (msg.Contains "intent"))
+    | Ok _ -> check "partial args error unexpected" false
+    // valid args → Ok record
+    let okArgs = createObj [ "methodology", box "test"; "intent", box "do stuff"; "background", box "ctx"; "note", box "my note" ]
+    match parse okArgs with
+    | Ok vs ->
+        equal "methodology value" "test" vs.methodology
+        equal "intent value" "do stuff" vs.intent
+        equal "background value" "ctx" vs.background
+        equal "note value" "my note" vs.note
     | Error msg -> check "ok parse error unexpected" false
 
 // ── Methodology.SchemaCommon ───────────────────────────────────────────────
 
 let methSchemaCommon () =
-    let multi = "line1\nline2\nline3"
-    let schema =
+    let entry =
         { methodologyId = "first_principles"
-          toolName = "methodology_first_principles"
           shortDefinition = "rebuild from facts"
           triggerWhen = "hard"
-          toolDescription = "desc"
-          fields =
-            [ { name = "intent"; description = "i"; required = true; kind = FieldKind.String; minArrayItems = 0 }
-              { name = "tags"; description = "t"; required = false; kind = FieldKind.StringArray; minArrayItems = 0 } ]
+          noteDescription = "problem_statement, assumptions_to_strip, atomic_facts, rebuild_steps"
           meditatorRole = "analyst"
           outputSections = ["Findings"; "Plan"] }
-    let values = Map.ofList [ "intent", "test"; "tags", "" ]
-    let arrays = Map.ofList [ "tags", ["a"; "b"] ]
-    let yaml = renderInputYaml schema values arrays
-    check "yaml has methodology" (yaml.Contains "methodology: first_principles")
-    check "yaml has intent" (yaml.Contains "intent: test")
-    check "yaml array items" (yaml.Contains "- a")
-    let prompt = renderMeditatorIntent schema "inputs:\n  intent: hi\n"
+    let prompt = renderMeditatorIntent entry "hi" "my note"
+    check "prompt has methodology id" (prompt.Contains "first_principles")
     check "prompt has def" (prompt.Contains "rebuild from facts")
+    check "prompt has trigger" (prompt.Contains "hard")
     check "prompt has role" (prompt.Contains "analyst")
     check "prompt has sections" (prompt.Contains "Findings")
-    let spec = toToolCatalogSpec schema
-    equal "spec name" "methodology_first_principles" spec.name
-    check "spec has required" (List.contains "intent" spec.requiredFields)
+    check "prompt has section order" (prompt.Contains "1. Findings")
+    check "prompt has section 2" (prompt.Contains "2. Plan")
+    check "prompt has intent" (prompt.Contains "hi")
+    check "prompt has note" (prompt.Contains "my note")
 
 // ── Opencode.HookSchema ────────────────────────────────────────────────────
 
