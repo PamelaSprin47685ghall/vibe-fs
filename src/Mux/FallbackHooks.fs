@@ -77,7 +77,9 @@ let muxActionExecutor (helpers: obj) : IActionExecutor =
 
         member _.FetchMessages sessionID = getChatHistory sessionID
 
-        member _.PropagateFailure (_sessionID: string) = Promise.lift () }
+        member _.PropagateFailure (_sessionID: string) = Promise.lift ()
+
+        member _.CaptureCurrentModel (_sessionID: string) = Promise.lift None }
 
 let createMuxFallbackHandler
     (runtime       : FallbackRuntimeState)

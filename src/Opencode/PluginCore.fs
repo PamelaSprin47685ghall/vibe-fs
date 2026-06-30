@@ -61,11 +61,8 @@ let private createCoreServices (host: Host) (ctx: obj) =
         | Some cfg -> (fun _ -> cfg)
         | None -> (fun _ -> Wanxiangshu.Shell.FallbackConfigCodec.emptyConfig)
     let fallbackHandler =
-        match fallbackConfigOpt with
-        | Some _ ->
-            Some (Wanxiangshu.Opencode.FallbackHooks.createOpencodeFallbackHandler
-                    client fallbackRuntime fallbackConfigLookup childAgentRegistry)
-        | None -> None
+        Some (Wanxiangshu.Opencode.FallbackHooks.createOpencodeFallbackHandler
+                client fallbackRuntime fallbackConfigLookup childAgentRegistry)
     let scope = create ()
     let backlogSession = BacklogSession(host, scope)
     let lifecycleObserver = createSessionLifecycleObserver (host, ctx, reviewStore, childAgentRegistry, fallbackHandler, fallbackRuntime, backlogSession)

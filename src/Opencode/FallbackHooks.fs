@@ -37,9 +37,53 @@ let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise
         match getSessionApiFromClient client with
         | Error _ -> Promise.lift (unbox null)
         | Ok session ->
-            let api : obj = session?(method_)
+            let api : obj = Dyn.get session method_
             if Dyn.isNullish api then Promise.lift (unbox null)
-            else unbox<JS.Promise<obj>> (api?(arg))
+            else
+                unbox<JS.Promise<obj>> (Dyn.call1 api arg)
+
+let private tryReadLatestAssistantInfo (client: obj) (sessionID: string) : JS.Promise<obj option> =
+    promise {
+        let arg = box {| path = box {| id = sessionID |} |}
+        let! resp = invokeClient client "messages" arg
+        let data = Dyn.get resp "data"
+        if not (Dyn.isArray data) then return None
+        else
+            let messages = data :?> obj array
+            return
+                messages
+                |> Array.tryFindBack (fun msg ->
+                    let info = Dyn.get msg "info"
+                    not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
+                |> Option.map (fun msg -> Dyn.get msg "info")
+    }
+
+let private tryReadCurrentModel (client: obj) (sessionID: string) : JS.Promise<FallbackModel option> =
+    promise {
+        if Dyn.isNullish client then return None
+        else
+            let! infoOpt = tryReadLatestAssistantInfo client sessionID
+            match infoOpt with
+            | None -> return None
+            | Some info ->
+                let model = Dyn.get info "model"
+                if Dyn.isNullish model then return None
+                else
+                    let provider = Dyn.str model "providerID"
+                    let modelId = Dyn.str model "modelID"
+                    if provider = "" || modelId = "" then return None
+                    else
+                        return Some {
+                            ProviderID = provider
+                            ModelID = modelId
+                            Variant = None
+                            Temperature = None
+                            TopP = None
+                            MaxTokens = None
+                            ReasoningEffort = None
+                            Thinking = false
+                        }
+    }
 
 let opencodeEventTranslator : IEventTranslator =
     { new IEventTranslator with
@@ -81,7 +125,15 @@ let opencodeActionExecutor (client: obj) : IActionExecutor =
                     match model.Variant with
                     | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
                     | None -> sprintf "%s/%s" model.ProviderID model.ModelID
-                let body = createPromptBodyWithModel None (Some modelStr) "continue"
+                let! infoOpt = tryReadLatestAssistantInfo client sessionID
+                let agent =
+                    infoOpt
+                    |> Option.map (fun info -> Dyn.str info "agent")
+                    |> Option.filter (fun value -> value <> "")
+                let body =
+                    match agent with
+                    | Some value -> createPromptBodyWithModel (Some value) (Some modelStr) "continue"
+                    | None -> createPromptBodyWithModel None (Some modelStr) "continue"
                 let arg = box {| path = box {| id = sessionID |}; body = body |}
                 do! invokeClient client "prompt" arg |> Promise.map ignore
             }
@@ -101,7 +153,10 @@ let opencodeActionExecutor (client: obj) : IActionExecutor =
                 else return [||]
             }
 
-        member _.PropagateFailure _sessionID = Promise.lift () }
+        member _.PropagateFailure _sessionID = Promise.lift ()
+
+        member _.CaptureCurrentModel sessionID =
+            tryReadCurrentModel client sessionID }
 
 let private setConsumedFromResult (runtime: FallbackRuntimeState) (sessionID: string) (result: FallbackHookResult) : unit =
     runtime.SetConsumed sessionID result.Consumed

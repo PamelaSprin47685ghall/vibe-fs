@@ -7,6 +7,7 @@ open Wanxiangshu.Tests.IntegrationEventTestsMux
 open Wanxiangshu.Tests.IntegrationEventTestsMuxWrappers
 open Wanxiangshu.Tests.IntegrationEventTestsOpencode
 open Wanxiangshu.Tests.IntegrationEventTestsOpencodeLoop
+open Wanxiangshu.Tests.IntegrationEventTestsOpencodeFallback
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Opencode.Plugin
@@ -35,6 +36,7 @@ let run () : JS.Promise<unit> =
         do! toolExecuteAfterSpec p
         do! rmAsync workspaceDir
         do! abortedRetrySpec ()
+        do! fallbackRetryWithoutFrontmatterSpec ()
         do! repeatedAssistantSpec ()
         do! opencodeLoopNudgeSpec ()
         do! opencodeBrowserSubsessionHistoryDoesNotLoopNudgeSpec ()

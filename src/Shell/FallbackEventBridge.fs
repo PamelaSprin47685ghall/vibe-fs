@@ -25,6 +25,7 @@ type IActionExecutor =
     abstract AbortSession    : sessionID:string -> JS.Promise<unit>
     abstract FetchMessages   : sessionID:string -> JS.Promise<obj array>
     abstract PropagateFailure: sessionID:string -> JS.Promise<unit>
+    abstract CaptureCurrentModel : sessionID:string -> JS.Promise<FallbackModel option>
 
 type ConfigLookup = (string -> FallbackConfig)
 
@@ -60,15 +61,27 @@ let handleEvent
             let agentName = runtime.GetAgentName sessionID
             let cfg = configLookup agentName
 
-            let chain =
-                let existing = runtime.GetChain sessionID
-                if not (List.isEmpty existing) then existing
-                else
-                    let resolved =
-                        Map.tryFind (normalizeAgentName agentName) cfg.AgentChains
-                        |> Option.defaultValue cfg.DefaultChain
-                    if not (List.isEmpty resolved) then runtime.SetChain sessionID resolved
-                    resolved
+            let! chain =
+                promise {
+                    let existing = runtime.GetChain sessionID
+                    if not (List.isEmpty existing) then
+                        return existing
+                    else
+                        let resolved =
+                            Map.tryFind (normalizeAgentName agentName) cfg.AgentChains
+                            |> Option.defaultValue cfg.DefaultChain
+                        if not (List.isEmpty resolved) then
+                            runtime.SetChain sessionID resolved
+                            return resolved
+                        else
+                            let! currentModel = executor.CaptureCurrentModel sessionID
+                            match currentModel with
+                            | Some current ->
+                                let single = [ current ]
+                                runtime.SetChain sessionID single
+                                return single
+                            | None -> return []
+                }
 
             if List.isEmpty chain then
                 return { Consumed = false; State = state }

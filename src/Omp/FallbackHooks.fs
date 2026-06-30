@@ -78,7 +78,9 @@ let ompActionExecutor (sessionApi: obj) : IActionExecutor =
                 else return [||]
             }
 
-        member _.PropagateFailure (_sessionID: string) = Promise.lift () }
+        member _.PropagateFailure (_sessionID: string) = Promise.lift ()
+
+        member _.CaptureCurrentModel (_sessionID: string) = Promise.lift None }
 
 let private setConsumedFromResult (runtime: FallbackRuntimeState) (sessionID: string) (result: FallbackHookResult) : unit =
     runtime.SetConsumed sessionID result.Consumed
@@ -113,3 +115,4 @@ let createOmpFallbackHandler
             clearConsumedOnNewUserMessage runtime sessionID rawEvent
             return result
         }
+
