@@ -33,6 +33,7 @@ let architectureTestEntriesPartB () : (string * TestBody) list =
     "ArchitectureTests.opencodeReviewUsesToolCopy", Sync (sync ArchitectureTestsOpencodeToolsReview.opencodeReviewUsesToolCopy)
     "ArchitectureTests.opencodeReviewUsesFromOpencode", Sync (sync ArchitectureTestsOpencodeToolsReview.opencodeReviewUsesFromOpencode)
     "ArchitectureTests.opencodeReviewUsesReviewToolsCodec", Sync (sync ArchitectureTestsOpencodeToolsReview.opencodeReviewUsesReviewToolsCodec)
+    "ArchitectureTests.opencodeNudgeDoesNotReadReviewStoreForLoopState", Sync (sync ArchitectureTestsOpencodeToolsReview.opencodeNudgeDoesNotReadReviewStoreForLoopState)
     "ArchitectureTests.opencodeSubagentToolsUsesToolArgsDecode", Sync (sync ArchitectureTestsSubagentToolExec.opencodeSubagentToolsUsesToolArgsDecode)
     "ArchitectureTests.muxSubagentToolsUsesSimpleArgsCodec", Sync (sync ArchitectureTestsMuxToolAux.muxSubagentToolsUsesSimpleArgsCodec)
     "ArchitectureTests.subagentToolsUseDecodeIntentsField", Sync (sync ArchitectureTestsSubagent.subagentToolsUseDecodeIntentsField)

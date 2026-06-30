@@ -11,9 +11,8 @@ open Wanxiangshu.Kernel.ReviewPrompts
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
 
 let private snapshot todos msg alreadyNudged agent : SessionSnapshot =
-    { todos = todos; lastAssistantMessage = msg; alreadyNudged = alreadyNudged; agentFromMessage = agent; lastAssistantIsCompaction = false; anchorPromptIssued = false }
+    { todos = todos; lastAssistantMessage = msg; isLoopActive = false; alreadyNudged = alreadyNudged; agentFromMessage = agent; lastAssistantIsCompaction = false; anchorPromptIssued = false }
 
-let private noReview (_: string) = false
 let private noChild (_: string) = None
 
 let alreadyNudgedFromTailTexts' () =
@@ -36,12 +35,12 @@ let decideNudgeWipNeutralAlreadyNudged' () =
     let snap =
         snapshot [] "still implementing" false None
         |> fun s -> { s with alreadyNudged = false }
-    match snd (decideNudge loopReview noChild claimed "s" snap) with
+    match snd (decideNudge noChild claimed "s" { snap with isLoopActive = true }) with
     | Send(text, _) -> check "wip-neutral snapshot allows loop nudge" (text = loopNudgePrompt)
     | StandDown -> check "wip-neutral snapshot allows loop nudge" false
 
     let snapStillNudged = snapshot [] "still implementing" true None
-    let _, d = decideNudge loopReview noChild claimed "s" snapStillNudged
+    let _, d = decideNudge noChild claimed "s" { snapStillNudged with isLoopActive = true }
     equal "history still nudged → StandDown" StandDown d
 
 let submitReviewWipNudgeDedup () =

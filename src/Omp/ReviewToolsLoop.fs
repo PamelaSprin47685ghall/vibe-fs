@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.ReviewPrompts
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.ReviewLoop
+open Wanxiangshu.Omp.MessagingCodec
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.Clock
@@ -19,11 +20,12 @@ let handleLoopReviewCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: 
         | None -> ()
         | Some sessionId ->
             let notify = Dyn.get (Dyn.get ctx "ui") "notify"
+            let sm = Dyn.get ctx "sessionManager"
             let notifyInfo (msg: string) =
                 if Dyn.typeIs notify "function" then
                     emitJsExpr (notify, box msg, box "info") "if (typeof $0 === 'function') $0($1, $2)" |> ignore
             if task = "" then notifyInfo "loop-review needs a task. Try /loop-review <task>."
-            elif store.isReviewActive sessionId then notifyInfo "loop mode is already active."
+            elif not (Dyn.isNullish sm) && hasActiveLoopFromHistory sm then notifyInfo "loop mode is already active."
             else
                 let! result = runPreReviewerSession pi ctx store task
                 match result with
@@ -53,13 +55,14 @@ let handleLoopCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: obj) :
         | None -> ()
         | Some sessionId ->
             let notify = Dyn.get (Dyn.get ctx "ui") "notify"
+            let sm = Dyn.get ctx "sessionManager"
             let notifyInfo (msg: string) =
                 if Dyn.typeIs notify "function" then
                     emitJsExpr (notify, box msg, box "info") "if (typeof $0 === 'function') $0($1, $2)" |> ignore
             if task = "" then
                 store.deactivateReview sessionId
                 notifyInfo "loop mode cancelled."
-            elif store.isReviewActive sessionId then notifyInfo "loop mode is already active."
+            elif not (Dyn.isNullish sm) && hasActiveLoopFromHistory sm then notifyInfo "loop mode is already active."
             else
                 store.activateReview(sessionId, task, getTimestampMs())
                 pi?sendMessage(

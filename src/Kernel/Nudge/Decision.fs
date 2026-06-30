@@ -13,7 +13,7 @@ let private selectNudgePrompt = function
     | NudgeLoop -> Some loopNudgePrompt
     | _ -> None
 
-let decideNudge isReviewActive lookupChildAgent state sessionID snapshot =
+let decideNudge lookupChildAgent state sessionID snapshot =
     if hasStoppedSession state sessionID then
         state, StandDown
     elif snapshot.alreadyNudged || snapshot.anchorPromptIssued then
@@ -25,7 +25,7 @@ let decideNudge isReviewActive lookupChildAgent state sessionID snapshot =
         let isWorkerLoopActive =
             match lookupChildAgent sessionID with
             | Some "reviewer" -> false
-            | _ -> isReviewActive sessionID
+            | _ -> snapshot.isLoopActive
         let context =
             { todos = snapshot.todos
               lastAssistantMessage = snapshot.lastAssistantMessage

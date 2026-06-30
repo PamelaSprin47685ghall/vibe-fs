@@ -44,10 +44,18 @@ let muxActivateReviewForTest (reg: obj) (sessionID: string) (task: string) : uni
     let activate = get store "activateReview" |> unbox<System.Func<string, string, int64, unit>>
     activate.Invoke(sessionID, task, 0L)
 
+let muxReplayReviewTaskForTest (reg: obj) (sessionID: string) (task: string option) : unit =
+    let store = muxReviewStore reg
+    let activate = get store "activateReview" |> unbox<System.Func<string, string, int64, unit>>
+    let deactivate = get store "deactivateReview" |> unbox<System.Func<string, unit>>
+    match task with
+    | Some value -> activate.Invoke(sessionID, value, 0L)
+    | None -> deactivate.Invoke(sessionID)
+
 let muxIsReviewActiveForTest (reg: obj) (sessionID: string) : bool =
     let store = muxReviewStore reg
-    let fn = get store "isReviewActive" |> unbox<System.Func<string, bool>>
-    fn.Invoke(sessionID)
+    let fn = get store "getReviewTask" |> unbox<System.Func<string, string option>>
+    fn.Invoke(sessionID).IsSome
 
 let minimalMuxDeps () : obj =
     createObj

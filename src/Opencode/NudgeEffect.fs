@@ -10,6 +10,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.ReviewReplayPolicy
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
@@ -37,6 +38,14 @@ let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<Se
                 let openTodos =
                     if not (List.isEmpty openTodosFromApi) then openTodosFromApi
                     else recoverOpenTodosFromMessages messagesData
+                let historyTexts =
+                    if Dyn.isArray messagesData then
+                        MessagingCodec.decodeMessages (messagesData :?> obj array)
+                        |> Messaging.flatten
+                        |> textsFromFlatParts
+                        |> Seq.toList
+                    else
+                        []
                 let lastAssistantMessage, agentFromMessage, alreadyNudged =
                     decodeLastAssistant messagesData
                 let lastAssistantIsCompaction =
@@ -51,6 +60,7 @@ let private collectSnapshot (client: obj) (sessionID: SessionId) : JS.Promise<Se
                 let snapshot =
                     { todos = openTodos
                       lastAssistantMessage = lastAssistantMessage
+                      isLoopActive = historyTexts |> reviewTaskFromTexts |> Option.isSome
                       alreadyNudged = alreadyNudged
                       agentFromMessage = agentFromMessage
                       lastAssistantIsCompaction = lastAssistantIsCompaction
@@ -118,7 +128,7 @@ let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
                 | _ -> return Some snapshot
         }
     let sendNudgeFn promptText agentOpt = sendNudgeOutcome client sessionID promptText agentOpt
-    NudgeRuntime.runNudgeFlowCore holder reviewStore.isReviewActive registry.LookupChildAgent sid takeSnapshot sendNudgeFn
+    NudgeRuntime.runNudgeFlowCore holder registry.LookupChildAgent sid takeSnapshot sendNudgeFn
 
 let startNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
                     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)

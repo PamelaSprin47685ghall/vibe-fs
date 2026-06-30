@@ -16,7 +16,6 @@ type ReviewStore =
     abstract member resolvePendingReview: sessionID: string * result: ReviewResult -> bool
     abstract member getReviewTask: sessionID: string -> string option
     abstract member getReviewState: sessionID: string -> ReviewState option
-    abstract member isReviewActive: sessionID: string -> bool
     abstract member addChild: parentID: string * childID: string -> unit
 
 /// Single atomic state cell: the pure registry projection plus the effect
@@ -64,7 +63,6 @@ let createReviewStore () : ReviewStore =
             fired
         member _.getReviewTask(sessionID) = taskOf state.Registry sessionID
         member _.getReviewState(sessionID) = stateOf state.Registry sessionID
-        member _.isReviewActive(sessionID) = sessionIsActive state.Registry sessionID
         member _.addChild(parentID, childID) =
             state <- { state with Registry = reduce state.Registry (RegistryAction.AddChild(parentID, childID)) } }
 
@@ -73,7 +71,7 @@ let syncReviewProjection (store: ReviewStore) (sessionID: string) (task: string 
     else
         match task with
         | Some nextTask ->
-            if store.getReviewTask sessionID <> Some nextTask || not (store.isReviewActive sessionID) then
+            if store.getReviewTask sessionID <> Some nextTask || store.getReviewState sessionID |> Option.isNone then
                 if store.getReviewState sessionID |> Option.isSome then
                     store.deactivateReview sessionID
                 store.activateReview(sessionID, nextTask, getTimestampMs())

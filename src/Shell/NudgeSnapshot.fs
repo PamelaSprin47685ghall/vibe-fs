@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Kernel.ReviewReplayPolicy
 
 let private tryGetTodos (helpers: obj) (workspaceId: string) : JS.Promise<string list> =
     promise {
@@ -64,6 +65,28 @@ let private messageHasSubmitReviewWipProgress (message: obj) : bool =
 let private messageIsUserNudgePrompt (message: obj) : bool =
     Dyn.str message "role" = "user" && isNudgePrompt (getPartsText (Dyn.get message "parts"))
 
+let private historyText (message: obj) : string list =
+    let parts = Dyn.get message "parts"
+    if not (Dyn.isArray parts) then []
+    else
+        (parts :?> obj array)
+        |> Array.choose (fun part ->
+            match Dyn.str part "type" with
+            | "text" ->
+                let text = Dyn.get part "text"
+                if Dyn.isNullish text then None else Some (string text)
+            | "tool"
+            | "dynamic-tool" ->
+                let output =
+                    let direct = Dyn.get part "output"
+                    if not (Dyn.isNullish direct) then string direct
+                    else
+                        let state = Dyn.get part "state"
+                        if Dyn.isNullish state then "" else string (Dyn.get state "output")
+                if output = "" then None else Some output
+            | _ -> None)
+        |> Array.toList
+
 let private alreadyNudgedAfterIndex (messages: obj array) (index: int) : bool =
     messages.[index + 1 ..]
     |> Array.fold
@@ -101,6 +124,12 @@ let collectSnapshot
         let! history = tryGetChatHistory getChatHistory workspaceId
         let historyLastAssistantMessage, historyAlreadyNudged, historyAgentFromMessage =
             decodeLastAssistant history
+        let historyLoopActive =
+            history
+            |> Array.toList
+            |> List.collect historyText
+            |> reviewTaskFromTexts
+            |> Option.isSome
         let effectiveLastAssistantMessage, alreadyNudged =
             if historyLastAssistantMessage = "" then
                 eventLastAssistantMessage, false
@@ -112,6 +141,7 @@ let collectSnapshot
         return
             { todos = todos
               lastAssistantMessage = effectiveLastAssistantMessage
+              isLoopActive = historyLoopActive
               alreadyNudged = alreadyNudged
               agentFromMessage = historyAgentFromMessage
               lastAssistantIsCompaction = false

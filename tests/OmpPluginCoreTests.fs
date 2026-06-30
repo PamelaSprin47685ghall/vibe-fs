@@ -20,16 +20,16 @@ let reviewStoreIsSharedSingleton () =
     check "reviewStore singleton reference equality" (System.Object.ReferenceEquals(s1, s2))
     let sessionId = "core-services-1"
     s1.activateReview(sessionId, "task", 0L)
-    check "shared store sees activation" (s1.isReviewActive sessionId)
-    check "shared store sees activation via second reference" (s2.isReviewActive sessionId)
+    check "shared store sees activation" (s1.getReviewTask sessionId = Some "task")
+    check "shared store sees activation via second reference" (s2.getReviewTask sessionId = Some "task")
     s1.deactivateReview sessionId
-    check "deactivation observed by second reference" (not (s2.isReviewActive sessionId))
+    check "deactivation observed by second reference" (s2.getReviewState sessionId |> Option.isNone)
 
 let clearReviewStatesNoError () =
     let s = reviewStore
     s.activateReview("core-svc-2", "x", 0L)
     s.clearReviewSessions ()
-    check "clearReviewSessions clears" (not (s.isReviewActive "core-svc-2"))
+    check "clearReviewSessions clears" (s.getReviewState "core-svc-2" |> Option.isNone)
 
 /// Minimal `pi` harness capturing `pi.on(event, handler)` registrations so a
 /// test can invoke the captured closure and observe its side effects.
@@ -76,7 +76,7 @@ let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool
     check $"{evtType} captured exactly one handler" (handlers.Length = 1)
     let handler = handlers.[0]
     emitJsExpr (handler, event, ctx) "(($0)($1, $2))" |> ignore
-    let actual = reviewStore.isReviewActive sessionId
+    let actual = reviewStore.getReviewState sessionId |> Option.isSome
     check $"{evtType} leaves review inactive for {sessionId}" (actual = expectActive)
 
 /// `session.abort` must deactivate the active review for the host-reported
@@ -85,28 +85,28 @@ let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool
 let abortHookDeactivatesReview () =
     let sid = "abort-hook-sid-1"
     reviewStore.activateReview(sid, "task", 0L)
-    check "precondition: review active" (reviewStore.isReviewActive sid)
+    check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
     driveAbort "session.abort" sid false
 
 /// `stream.abort` must mirror the session.abort path: review state clears.
 let streamAbortHookDeactivatesReview () =
     let sid = "stream-abort-hook-sid-1"
     reviewStore.activateReview(sid, "task", 0L)
-    check "precondition: review active" (reviewStore.isReviewActive sid)
+    check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
     driveAbort "stream.abort" sid false
 
 /// `session.error` collapses to the same outcome as aborts.
 let sessionErrorHookDeactivatesReview () =
     let sid = "session-error-hook-sid-1"
     reviewStore.activateReview(sid, "task", 0L)
-    check "precondition: review active" (reviewStore.isReviewActive sid)
+    check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
     driveAbort "session.error" sid false
 
 /// Events outside the abort/error set must be ignored: review state stays put.
 let unrelatedEventLeavesReviewActive () =
     let sid = "unrelated-event-sid-1"
     reviewStore.activateReview(sid, "task", 0L)
-    check "precondition: review active" (reviewStore.isReviewActive sid)
+    check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
     driveAbort "session.idle" sid true
 
 /// OMP session.error must be routed through the fallback handler before

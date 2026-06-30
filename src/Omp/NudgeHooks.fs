@@ -83,7 +83,7 @@ let toolCallHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: ob
 let turnStartHandler (pi: obj) (_event: obj) (ctx: obj) : JS.Promise<unit> =
     applyActiveToolFilterForMainSession pi ctx
 
-let agentEndHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : unit =
+let agentEndHandler (pi: obj) (_reviewStore: ReviewStore) (ctx: obj) : unit =
     match getSessionIdFromContext ctx with
     | None -> ()
     | Some sessionId ->
@@ -91,7 +91,7 @@ let agentEndHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : unit =
         let hasPending =
             let fn = Dyn.get ctx "hasPendingMessages"
             Dyn.typeIs fn "function" && Dyn.truthy (Dyn.call0 fn)
-        if reviewStore.isReviewActive sessionId && not (Dyn.isNullish sm) && not hasPending then
+        if hasActiveLoopFromHistory sm && not (Dyn.isNullish sm) && not hasPending then
             let last = lastAssistantMessage sm
             match tryLoopNudge sessionId last with
             | Some NudgeRunner ->

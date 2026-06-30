@@ -36,7 +36,6 @@ let muxSubmitReviewTwoRoundPassAcceptsSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-two-pass-"
     let sessionID = "mux-submit-review-two-pass"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
-    muxActivateReviewForTest reg sessionID "Implement feature X"
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "PASS" ]
     let submitTool = muxToolByName reg "submit_review"
@@ -56,7 +55,6 @@ let muxSubmitReviewRejectKeepsReviewActiveSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-reject-"
     let sessionID = "mux-submit-review-reject"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
-    muxActivateReviewForTest reg sessionID "Implement feature X"
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "REJECT: missing tests" ]
     let submitTool = muxToolByName reg "submit_review"
@@ -76,7 +74,6 @@ let muxSubmitReviewDoubleCheckRejectSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-double-reject-"
     let sessionID = "mux-submit-review-double-reject"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
-    muxActivateReviewForTest reg sessionID "Implement feature X"
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "REJECT: cut corners on edge cases" ]
     let submitTool = muxToolByName reg "submit_review"
@@ -96,7 +93,6 @@ let muxSubmitReviewTerminatedCleansReviewStateSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-terminated-"
     let sessionID = "mux-submit-review-terminated"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
-    muxActivateReviewForTest reg sessionID "Implement feature X"
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "I think it looks fine" ]
     let submitTool = muxToolByName reg "submit_review"
@@ -113,7 +109,6 @@ let muxSubmitReviewOmittedWipSkipsReviewerSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-omitted-wip-"
     let sessionID = "mux-submit-review-omitted-wip"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
-    muxActivateReviewForTest reg sessionID "Implement feature X"
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts []
     let submitTool = muxToolByName reg "submit_review"
@@ -131,7 +126,6 @@ let muxSubmitReviewWipSkipsReviewerSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-wip-"
     let sessionID = "mux-submit-review-wip"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
-    muxActivateReviewForTest reg sessionID "Implement feature X"
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts []
     let submitTool = muxToolByName reg "submit_review"
@@ -143,5 +137,4 @@ let muxSubmitReviewWipSkipsReviewerSpec () = promise {
     check "submit_review wip keeps review session active" (muxIsReviewActiveForTest reg sessionID)
     do! rmAsync workspaceDir
 }
-
 

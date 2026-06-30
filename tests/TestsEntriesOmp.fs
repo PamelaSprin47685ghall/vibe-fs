@@ -60,11 +60,7 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpPluginTests.browserErrorsWithoutBrowserHost", Async OmpPluginTests.browserErrorsWithoutBrowserHost
     "OmpPluginTests.reviewChildInitialPromptUsesReturnReviewer", Sync (sync OmpPluginTests.reviewChildInitialPromptUsesReturnReviewer)
     "OmpPluginTests.fuzzyGrepExcludeAnyOfLength2", Async OmpPluginTests.fuzzyGrepExcludeAnyOfLength2
-    "OmpPluginTestsAgentEnd.agentEndRunnerNudgeBeforeLoop", Async OmpPluginTestsAgentEnd.agentEndRunnerNudgeBeforeLoop
-    "OmpPluginTestsAgentEnd.agentEndLoopNudgeWhenActive", Async OmpPluginTestsAgentEnd.agentEndLoopNudgeWhenActive
-    "OmpPluginTestsAgentEnd.agentEndSkipsLoopNudgeWhenPendingMessages", Async OmpPluginTestsAgentEnd.agentEndSkipsLoopNudgeWhenPendingMessages
-    "OmpPluginTestsAgentEnd.agentEndTodoNudgeWhenOpenPhases", Async OmpPluginTestsAgentEnd.agentEndTodoNudgeWhenOpenPhases
-    "OmpPluginTestsAgentEnd.runnerNudgePromptUsesExecutorToolNames", Sync (sync OmpPluginTestsAgentEnd.runnerNudgePromptUsesExecutorToolNames)
+    "OmpPluginTestsAgentEnd.run", Async OmpPluginTestsAgentEnd.run
     "OmpReviewTests.returnReviewerVerdictPassReject", Async OmpReviewTests.returnReviewerVerdictPassReject
     "OmpReviewTests.returnReviewerViaSetPendingStateForTest", Async OmpReviewTests.returnReviewerViaSetPendingStateForTest
     "OmpReviewTests.runReviewLoopChildToolNames", Async OmpReviewTests.runReviewLoopChildToolNames

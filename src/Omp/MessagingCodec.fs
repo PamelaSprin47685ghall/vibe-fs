@@ -3,6 +3,7 @@ module Wanxiangshu.Omp.MessagingCodec
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.ReviewReplayPolicy
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -152,6 +153,19 @@ let extractHistoryTexts (messages: Message<obj> list) : string list =
         | TextPart text -> text
         | ToolPart(_, _, Some state, _) -> state.output
         | _ -> "")
+
+let hasActiveLoopFromHistory (sessionManager: obj) : bool =
+    entries sessionManager
+    |> decodeEntries ""
+    |> extractHistoryTexts
+    |> reviewTaskFromTexts
+    |> Option.isSome
+
+let activeLoopTaskFromHistory (sessionManager: obj) : string option =
+    entries sessionManager
+    |> decodeEntries ""
+    |> extractHistoryTexts
+    |> reviewTaskFromTexts
 
 open Wanxiangshu.Omp.MessagingCodecEncode
 

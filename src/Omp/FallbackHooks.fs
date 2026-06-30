@@ -113,5 +113,3 @@ let createOmpFallbackHandler
             clearConsumedOnNewUserMessage runtime sessionID rawEvent
             return result
         }
-
-

@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.MessagingCodec
 open Wanxiangshu.Omp.OmpToolSchema
 open Wanxiangshu.Omp.ReviewLoop
 open Wanxiangshu.Omp.ReviewToolsLoop
@@ -33,8 +34,14 @@ let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
                         match getSessionIdFromContext ctx with
                         | None -> return errorResult "Loop review is not active for this session."
                         | Some sessionId ->
-                            if not (store.isReviewActive sessionId) then return errorResult "Loop review is not active for this session."
-                            else
+                            let sm = Dyn.get ctx "sessionManager"
+                            let activeTask =
+                                if Dyn.isNullish sm then None
+                                else activeLoopTaskFromHistory sm
+                            syncReviewProjection store sessionId activeTask
+                            match activeTask with
+                            | None -> return errorResult "Loop review is not active for this session."
+                            | Some activeTask ->
                                 let wip = submitReviewIsWip (optBool params' "wip")
                                 if wip then return textResult submitReviewWipAcknowledgment
                                 elif not (store.tryLockReview sessionId) then return errorResult "A review is already in progress."
@@ -47,7 +54,7 @@ let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
                                     let mutable loopError : exn option = None
                                     let mutable result : JsReviewResult option = None
                                     try
-                                        let! r = runReviewLoop pi ctx store sessionId report files (store.getReviewTask sessionId)
+                                        let! r = runReviewLoop pi ctx store sessionId report files (Some activeTask)
                                         result <- Some r
                                     with ex -> loopError <- Some ex
                                     store.unlockReview sessionId

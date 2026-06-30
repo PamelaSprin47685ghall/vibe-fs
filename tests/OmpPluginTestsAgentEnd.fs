@@ -7,6 +7,8 @@ open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Omp.Plugin
 open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.PromptFrontMatter
 module Dyn = Wanxiangshu.Shell.Dyn
 
 let agentEndRunnerNudgeBeforeLoop () = promise {
@@ -49,12 +51,32 @@ let agentEndLoopNudgeWhenActive () = promise {
                 box(
                     createObj [
                         "getSessionId", box(fun () -> box "session-2")
-                        "getEntries", box(fun () -> box [||])
+                        "getEntries", box(fun () -> box [| createObj [ "message", box (createObj [ "role", box "assistant"; "content", box [| createObj [ "type", box "text"; "text", box (frontMatterPrompt [ yamlField taskField "do task" ] "With-Review Mode is active.") ] |] ]) ] |])
                     ])
             "hasPendingMessages", box(fun () -> box false)
         ]
     do! invokeHandler h "agent_end" (createObj []) ctxEnd
     equal "loop reminder type" "wanxiangshu-loop-reminder" (lastMessageCustomType h)
+}
+
+let agentEndSkipsLoopNudgeWithoutWorkerTaskAnchor () = promise {
+    resetPluginState ()
+    let h = createPiHarness ()
+    let pi = piObject h
+    do! wanxiangshuExtension pi
+    let reviewerOnly = Wanxiangshu.Kernel.ReviewPrompts.Submission.reviewerPrompt "do task" "" []
+    let ctxEnd =
+        createObj [
+            "sessionManager",
+                box(
+                    createObj [
+                        "getSessionId", box(fun () -> box "session-2b")
+                        "getEntries", box(fun () -> box [| createObj [ "message", box (createObj [ "role", box "assistant"; "content", box [| createObj [ "type", box "text"; "text", box reviewerOnly ] |] ]) ] |])
+                    ])
+            "hasPendingMessages", box(fun () -> box false)
+        ]
+    do! invokeHandler h "agent_end" (createObj []) ctxEnd
+    check "reviewer-only history does not emit loop reminder" (h.messages.Count = 0)
 }
 
 let agentEndSkipsLoopNudgeWhenPendingMessages () = promise {
@@ -110,3 +132,12 @@ let runnerNudgePromptUsesExecutorToolNames () =
     check "runner nudge names executor_wait" (text.Contains "executor_wait")
     check "runner nudge names executor_abort" (text.Contains "executor_abort")
     check "runner nudge avoids legacy runner_wait" (not (text.Contains "runner_wait"))
+
+let run () = promise {
+    do! agentEndRunnerNudgeBeforeLoop ()
+    do! agentEndLoopNudgeWhenActive ()
+    do! agentEndSkipsLoopNudgeWithoutWorkerTaskAnchor ()
+    do! agentEndSkipsLoopNudgeWhenPendingMessages ()
+    do! agentEndTodoNudgeWhenOpenPhases ()
+    runnerNudgePromptUsesExecutorToolNames ()
+}

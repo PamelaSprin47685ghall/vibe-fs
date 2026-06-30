@@ -45,7 +45,6 @@ let createReviewTestSurface (reviewStore: Wanxiangshu.Shell.ReviewRuntime.Review
           box (System.Func<string, string, int64, unit>(fun sessionID task createdAt ->
               reviewStore.activateReview(sessionID, task, createdAt)))
           "deactivateReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.deactivateReview sessionID))
-          "isReviewActive", box (System.Func<string, bool>(fun sessionID -> reviewStore.isReviewActive sessionID))
           "getReviewTask", box (System.Func<string, string option>(fun sessionID -> reviewStore.getReviewTask sessionID))
           "tryLockReview", box (System.Func<string, bool>(fun sessionID -> reviewStore.tryLockReview sessionID))
           "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ]

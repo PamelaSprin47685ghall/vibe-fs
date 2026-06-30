@@ -116,7 +116,10 @@ type SessionLifecycleObserver
             // Orphan parent: child idle → resume stuck parent (event-driven, zero-timer)
             match eventEnvelope with
             | Some { EventType = "session.status"; Props = props } ->
-                let status = Dyn.str (Dyn.get props "status") "status"
+                let statusObj = Dyn.get props "status"
+                let status =
+                    let fromStatus = Dyn.str statusObj "status"
+                    if fromStatus <> "" then fromStatus else Dyn.str statusObj "type"
                 let sid = getSessionID "session.status" props
                 if sid <> "" && status = "busy" then
                     fallbackRuntime.SetBusyCount sid 1

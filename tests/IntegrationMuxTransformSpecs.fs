@@ -145,7 +145,6 @@ let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () = promise {
     let reg = sharedMuxRegistration ()
     let tf = muxMessageTransform reg
     let sessionID = "mux-review-accepted-history"
-    muxActivateReviewForTest reg sessionID "Ship feature"
     if isNullish tf then
         check "mux messagesTransform exposed for accepted review replay" false
     else
@@ -153,6 +152,7 @@ let muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec () = promise {
         let messages =
             [| muxTextMessage "loop-task" "assistant" "---\ntask: Ship feature\n---\nWith-Review Mode is active."
                muxDynamicToolMessage "submit-review" "submit_review" "call-review" (createObj []) (box accepted) |]
+        muxReplayReviewTaskForTest reg sessionID (Some "Ship feature")
         let out = createObj [ "messages", box messages ]
         let input = createObj [ "agent", box "manager"; "sessionID", box sessionID ]
         do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>

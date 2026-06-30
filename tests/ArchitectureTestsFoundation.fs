@@ -83,6 +83,19 @@ let noDuplicateRunNudgeFlowCore () =
             check ("arch: " + dir + "/" + f + " no inline tryRecordSend")
                 (not (content.Contains "tryRecordSend"))
 
+let nudgeLoopStateMustReplayHistory () =
+    let opencode = requireFile "src/Opencode/NudgeEffect.fs" |> nonCommentCode
+    let shell = requireFile "src/Shell/NudgeSnapshot.fs" |> nonCommentCode
+    let omp = requireFile "src/Omp/NudgeHooks.fs" |> nonCommentCode
+    check "arch: Opencode NudgeEffect must not read live review-state query" (not (opencode.Contains "isReviewActive"))
+    check "arch: Shell NudgeSnapshot rebuilds loop state from history"
+        (shell.Contains "reviewTaskFromTexts")
+    check "arch: Opencode NudgeEffect rebuilds loop state from history"
+        (opencode.Contains "reviewTaskFromTexts" || opencode.Contains "textsFromFlatParts")
+    check "arch: Omp NudgeHooks must not read live review-state query" (not (omp.Contains "isReviewActive"))
+    check "arch: Omp NudgeHooks rebuilds loop state from history"
+        (omp.Contains "hasActiveLoopFromHistory")
+
 let returnReviewerCatalogAndHostRegistration () =
     let catalog = requireFile "src/Kernel/ToolCatalog/Review.fs"
     check "arch: ToolCatalog lists return_reviewer spec" (catalog.Contains "return_reviewer")

@@ -91,32 +91,32 @@ let submitReviewTool (deps: obj) (toolNames: string array) (reviewStore: ReviewS
                   | Error e -> return wireDecodeFailure "submit_review" e
                   | Ok decoded ->
                       let! resolvedTask = syncReviewTaskFromHistory deps reviewStore workspaceId
-                      if not (reviewStore.tryLockReview workspaceId) then
-                          return
-                              if reviewStore.isReviewActive workspaceId then submitReviewInProgress
-                              else submitReviewNotNeeded
-                      else
-                          try
-                              if submitReviewIsWip decoded.Wip then
-                                  return submitReviewWipAcknowledgment
-                              else
-                                  let originalTask = defaultArg resolvedTask ""
-                                  let report = decoded.Report
-                                  let affectedFiles = decoded.AffectedFiles
-                                  try
-                                      let! round1 = runReviewRound deps config toolNames (reviewSubmissionVerdictPrompt originalTask report affectedFiles)
-                                      let! verdict =
-                                          match round1 with
-                                          | Accepted _ -> runReviewRound deps config toolNames (reviewSubmissionDoubleCheckPrompt originalTask report affectedFiles)
-                                          | other -> Promise.lift other
-                                      match verdict with
-                                      | Accepted _ | Terminated -> reviewStore.deactivateReview workspaceId
-                                      | Rejected _ -> ()
-                                      return formatReviewResult verdict
-                                  with ex ->
-                                      reviewStore.deactivateReview workspaceId
-                                      return! Promise.reject ex
-                          finally
-                              reviewStore.unlockReview workspaceId
+                      match resolvedTask with
+                      | None -> return submitReviewNotNeeded
+                      | Some originalTask ->
+                          if not (reviewStore.tryLockReview workspaceId) then
+                              return submitReviewInProgress
+                          else
+                              try
+                                  if submitReviewIsWip decoded.Wip then
+                                      return submitReviewWipAcknowledgment
+                                  else
+                                      let report = decoded.Report
+                                      let affectedFiles = decoded.AffectedFiles
+                                      try
+                                          let! round1 = runReviewRound deps config toolNames (reviewSubmissionVerdictPrompt originalTask report affectedFiles)
+                                          let! verdict =
+                                              match round1 with
+                                              | Accepted _ -> runReviewRound deps config toolNames (reviewSubmissionDoubleCheckPrompt originalTask report affectedFiles)
+                                              | other -> Promise.lift other
+                                          match verdict with
+                                          | Accepted _ | Terminated -> reviewStore.deactivateReview workspaceId
+                                          | Rejected _ -> ()
+                                          return formatReviewResult verdict
+                                      with ex ->
+                                          reviewStore.deactivateReview workspaceId
+                                          return! Promise.reject ex
+                              finally
+                                  reviewStore.unlockReview workspaceId
               }
       condition = None }

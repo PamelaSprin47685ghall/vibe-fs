@@ -21,7 +21,6 @@ type NudgeRuntimeEvent =
 
 let runNudgeFlowCore
     (holder: StateHolder<NudgeShellState>)
-    (isReviewActive: string -> bool)
     (lookupChildAgent: string -> string option)
     (sessionKey: string)
     (takeSnapshot: unit -> JS.Promise<SessionSnapshot option>)
@@ -33,7 +32,7 @@ let runNudgeFlowCore
             match snapshotOpt with
             | None -> holder.Mutate(fun state -> clearSession state sessionKey, ())
             | Some snapshot ->
-                match holder.Mutate(fun state -> decideNudge isReviewActive lookupChildAgent state sessionKey snapshot) with
+                match holder.Mutate(fun state -> decideNudge lookupChildAgent state sessionKey snapshot) with
                 | StandDown -> ()
                 | Send(promptText, agentOpt) ->
                     let! outcome = sendNudge promptText agentOpt
@@ -57,7 +56,6 @@ let private runNudgeFlow
     : JS.Promise<unit> =
     runNudgeFlowCore
         holder
-        reviewStore.isReviewActive
         (fun _ -> None)
         workspaceId
         (fun () -> collectSnapshot getChatHistory helpers workspaceId lastAssistantMessage |> Promise.map Some)

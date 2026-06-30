@@ -95,6 +95,8 @@ let ompReviewUsesReviewRuntime () =
         (loop.Contains "ReviewSession")
     check "arch: Omp ReviewTools uses ReviewRuntime"
         (tools.Contains "ReviewRuntime")
+    check "arch: Omp ReviewTools register replays active task from history"
+        (tools.Contains "activeLoopTaskFromHistory")
 
 let ompCapsCodecExists () =
     let code = requireFile "src/Omp/CapsCodec.fs" |> nonCommentCode
@@ -135,6 +137,12 @@ let ompReadDedupModule () =
 let ompNudgeRuntimeModule () =
     let code = requireFile "src/Omp/NudgeRuntime.fs" |> nonCommentCode
     check "arch: Omp NudgeRuntime non-empty" (code.Contains "module")
+
+let ompNudgeHooksDoNotReadReviewStoreForLoopState () =
+    let code = requireFile "src/Omp/NudgeHooks.fs" |> nonCommentCode
+    check "arch: Omp NudgeHooks must not read live review-state query" (not (code.Contains "isReviewActive"))
+    check "arch: Omp NudgeHooks rebuild loop state from history"
+        (code.Contains "hasActiveLoopFromHistory")
 
 let ompSessionLifecycleHooks () =
     let code = requireFile "src/Omp/SessionLifecycleHooks.fs" |> nonCommentCode

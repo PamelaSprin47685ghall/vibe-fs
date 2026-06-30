@@ -8,6 +8,7 @@ let opencodeReviewUsesToolCopy () =
     check "arch: Opencode ReviewTools opens ToolCopy" (code.Contains "ToolCopy")
     check "arch: Opencode ReviewTools uses submitReviewNotNeeded" (code.Contains "submitReviewNotNeeded")
     check "arch: Opencode ReviewTools uses opencodeSubmitReviewInProgress" (code.Contains "opencodeSubmitReviewInProgress")
+    check "arch: Opencode ReviewTools replays task from session texts" (code.Contains "inferReviewTaskFromTexts")
     check "arch: Opencode ReviewTools must not inline you do not need review"
         (not (code.Contains "You do not need review. Just continue with your work."))
 
@@ -48,3 +49,9 @@ let opencodeReviewUsesReviewToolsCodec () =
         (not (code.Contains "formatDomainError \"submit_review\""))
     check "arch: Opencode ReviewTools must not ToolHelpers.formatDomainError return_reviewer"
         (not (code.Contains "formatDomainError \"return_reviewer\""))
+
+let opencodeNudgeDoesNotReadReviewStoreForLoopState () =
+    let code = requireFile "src/Opencode/NudgeEffect.fs" |> nonCommentCode
+    check "arch: Opencode NudgeEffect must not read live review-state query" (not (code.Contains "isReviewActive"))
+    check "arch: Opencode NudgeEffect rebuilds review state from history"
+        (code.Contains "reviewTaskFromTexts")

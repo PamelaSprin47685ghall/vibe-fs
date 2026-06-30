@@ -16,6 +16,7 @@ type NudgeShellState =
 type SessionSnapshot =
     { todos: string list
       lastAssistantMessage: string
+      isLoopActive: bool
       alreadyNudged: bool
       agentFromMessage: string option
       lastAssistantIsCompaction: bool

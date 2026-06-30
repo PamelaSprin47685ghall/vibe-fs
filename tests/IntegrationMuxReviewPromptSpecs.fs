@@ -7,19 +7,19 @@ open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
 
+open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Shell.Dyn
 
 
 let muxSubmitReviewPromptFormatSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-prompt-"
-    let reg = sharedMuxRegistration ()
+    let sessionID = "mux-review-prompt"
+    let reg = createRegistration (muxDepsWithChatHistory sessionID [| box (buildLoopMessage "Implement feature X" [ "With-Review Mode is active." ]) |])
     let submitTool = muxToolByName reg "submit_review"
     if isNullish submitTool then
         check "mux registration exposes submit_review tool" false
     else
-        let sessionID = "mux-review-prompt"
-        muxActivateReviewForTest reg sessionID "Implement feature X"
         let prompts = ResizeArray<string>()
         let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "PASS" ]
         let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
@@ -89,7 +89,6 @@ let muxSubmitReviewUsesRolledBackHistoryTaskSpec () = promise {
     if isNullish submitTool then
         check "mux registration exposes submit_review tool" false
     else
-        muxActivateReviewForTest reg sessionID "Second task"
         let prompts = ResizeArray<string>()
         let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "REJECT: not done" ]
         let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]

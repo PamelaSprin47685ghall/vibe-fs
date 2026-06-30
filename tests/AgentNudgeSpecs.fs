@@ -72,7 +72,7 @@ let shouldSuppress' () =
     check "reopened context re-allows todo nudge" (not (shouldSuppressNudge "s" reopened None))
 
 let private snapshot todos msg alreadyNudged agent : SessionSnapshot =
-    { todos = todos; lastAssistantMessage = msg; alreadyNudged = alreadyNudged; agentFromMessage = agent; lastAssistantIsCompaction = false; anchorPromptIssued = false }
+    { todos = todos; lastAssistantMessage = msg; isLoopActive = false; alreadyNudged = alreadyNudged; agentFromMessage = agent; lastAssistantIsCompaction = false; anchorPromptIssued = false }
 
 let private noReview (_: string) = false
 let private noChild (_: string) = None
@@ -81,35 +81,35 @@ let private noChild (_: string) = None
 /// `alreadyNudged`, read from the dialogue history, NOT an in-memory counter —
 /// so a restart that wipes the counter can never resurrect a duplicate nudge.
 let decideNudge' () =
-    match snd (decideNudge noReview noChild emptyState "s" (snapshot [ "a" ] "working" false None)) with
+    match snd (decideNudge noChild emptyState "s" (snapshot [ "a" ] "working" false None)) with
     | Send(text, _) -> check "unclaimed fresh history nudges todo" (text = Wanxiangshu.Kernel.PromptFragments.todoNudgePrompt)
     | StandDown -> check "unclaimed fresh history nudges todo" false
 
     let claimed, _ = tryClaimNudge emptyState "s"
-    match snd (decideNudge noReview noChild claimed "s" (snapshot [ "a" ] "working" false None)) with
+    match snd (decideNudge noChild claimed "s" (snapshot [ "a" ] "working" false None)) with
     | Send(text, _) -> check "claimed fresh stop nudges todo" (text = Wanxiangshu.Kernel.PromptFragments.todoNudgePrompt)
     | StandDown -> check "claimed fresh stop nudges todo" false
 
-    let _, dDup = decideNudge noReview noChild claimed "s" (snapshot [ "a" ] "working" true None)
+    let _, dDup = decideNudge noChild claimed "s" (snapshot [ "a" ] "working" true None)
     equal "already-nudged stop → StandDown" StandDown dDup
 
-    let _, dNone = decideNudge noReview noChild claimed "s" (snapshot [] "done" false None)
+    let _, dNone = decideNudge noChild claimed "s" (snapshot [] "done" false None)
     equal "no work → StandDown" StandDown dNone
 
-    let loopReview (_: string) = true
-    match snd (decideNudge loopReview noChild claimed "s" (snapshot [] "ok" false None)) with
+    let loopSnap = { snapshot [] "ok" false None with isLoopActive = true }
+    match snd (decideNudge noChild claimed "s" loopSnap) with
     | Send(text, _) -> check "loop active nudges loop" (text = Wanxiangshu.Kernel.PromptFragments.loopNudgePrompt)
     | StandDown -> check "loop active nudges loop" false
 
     let lookupReviewer (_: string) = Some "reviewer"
     let claimedReviewer, _ = tryClaimNudge emptyState "reviewer-child-sess"
-    match snd (decideNudge loopReview lookupReviewer claimedReviewer "reviewer-child-sess" (snapshot [] "ok" false None)) with
+    match snd (decideNudge lookupReviewer claimedReviewer "reviewer-child-sess" { loopSnap with isLoopActive = true }) with
     | Send(text, _) ->
         check "reviewer child session must not get worker loopNudgePrompt" (text <> Wanxiangshu.Kernel.PromptFragments.loopNudgePrompt)
     | StandDown -> ()
 
     let stopped = stopSession claimed "s"
-    let _, dStop = decideNudge noReview noChild stopped "s" (snapshot [ "a" ] "working" false None)
+    let _, dStop = decideNudge noChild stopped "s" (snapshot [ "a" ] "working" false None)
     equal "stopped → StandDown" StandDown dStop
 
 /// decodeLastAssistant reads (text, agent, alreadyNudged) from the host message

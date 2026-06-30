@@ -7,8 +7,11 @@ open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Kernel.ReviewPrompts
 open Wanxiangshu.Kernel.PromptFragments
+open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Shell.Dyn
+
+let private loopAnchor task = frontMatterPrompt [ yamlField taskField task ] "With-Review Mode is active."
 
 let repeatedTodoNudgeSpec () = promise {
     let mutable history = [| muxTextMessage "repeat-assistant-1" "assistant" "first" |]
@@ -52,7 +55,8 @@ let repeatedTodoNudgeSpec () = promise {
 
 let reviewerRejectRenudgesLoopSpec () = promise {
     let sessionID = "review-reject-ws"
-    let mutable history = [| muxTextMessage "review-assistant-1" "assistant" "implemented first pass" |]
+    let mutable history = [| muxTextMessage "review-loop-anchor" "assistant" (loopAnchor "Implement feature X")
+                             muxTextMessage "review-assistant-1" "assistant" "implemented first pass" |]
     let reg =
         createRegistration
             (createObj [
@@ -61,7 +65,6 @@ let reviewerRejectRenudgesLoopSpec () = promise {
                 "resolveAgentFrontmatter", box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
                 "getChatHistory", box (System.Func<string, JS.Promise<obj array>>(fun workspaceId -> promise { return if workspaceId = sessionID then history else [||] }))
             ])
-    muxActivateReviewForTest reg sessionID "Implement feature X"
     let nudges = ResizeArray<string>()
     let mutable nudgeCount = 0
     let helpers =
@@ -90,7 +93,8 @@ let reviewerRejectRenudgesLoopSpec () = promise {
 
 let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () = promise {
     let sessionID = "review-wip-nudge-ws"
-    let mutable history = [| muxTextMessage "review-wip-assistant-1" "assistant" "implemented first pass" |]
+    let mutable history = [| muxTextMessage "review-wip-loop-anchor" "assistant" (loopAnchor "Implement feature X")
+                             muxTextMessage "review-wip-assistant-1" "assistant" "implemented first pass" |]
     let reg =
         createRegistration
             (createObj [
@@ -99,7 +103,6 @@ let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () = promise {
                 "resolveAgentFrontmatter", box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
                 "getChatHistory", box (System.Func<string, JS.Promise<obj array>>(fun workspaceId -> promise { return if workspaceId = sessionID then history else [||] }))
             ])
-    muxActivateReviewForTest reg sessionID "Implement feature X"
     let nudges = ResizeArray<string>()
     let mutable nudgeCount = 0
     let helpers =

@@ -13,29 +13,29 @@ let private mkReviewSession id st ver =
 let private regFromList sessions =
     sessions |> List.fold (fun r (s: ReviewSession) -> Map.add s.id s r) emptyRegistry
 
-// sessionIsActive
-let sessionIsActiveActive () =
-    check "Active is active" (Wanxiangshu.Kernel.ReviewSession.Query.sessionIsActive
-        (regFromList [ mkReviewSession "s" (ReviewState.Active "t") 0 ]) "s")
+// hasActiveReviewState
+let hasActiveReviewStateActive () =
+    check "Active is active" (Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState
+    (regFromList [ mkReviewSession "s" (ReviewState.Active "t") 0 ]) "s")
 
-let sessionIsActiveLocked () =
-    check "Locked is active" (Wanxiangshu.Kernel.ReviewSession.Query.sessionIsActive
-        (regFromList [ mkReviewSession "s" (ReviewState.Locked("t", "r")) 0 ]) "s")
+let hasActiveReviewStateLocked () =
+    check "Locked is active" (Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState
+    (regFromList [ mkReviewSession "s" (ReviewState.Locked("t", "r")) 0 ]) "s")
 
-let sessionIsActiveInactive () =
-    check "Inactive not active" (not (Wanxiangshu.Kernel.ReviewSession.Query.sessionIsActive
-        (regFromList [ mkReviewSession "s" ReviewState.Inactive 0 ]) "s"))
+let hasActiveReviewStateInactive () =
+    check "Inactive not active" (not (Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState
+    (regFromList [ mkReviewSession "s" ReviewState.Inactive 0 ]) "s"))
 
-let sessionIsActiveAccepted () =
-    check "Accepted not active" (not (Wanxiangshu.Kernel.ReviewSession.Query.sessionIsActive
-        (regFromList [ mkReviewSession "s" ReviewState.Accepted 0 ]) "s"))
+let hasActiveReviewStateAccepted () =
+    check "Accepted not active" (not (Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState
+    (regFromList [ mkReviewSession "s" ReviewState.Accepted 0 ]) "s"))
 
-let sessionIsActiveRejected () =
-    check "Rejected is active" (Wanxiangshu.Kernel.ReviewSession.Query.sessionIsActive
-        (regFromList [ mkReviewSession "s" (ReviewState.Rejected "bad") 0 ]) "s")
+let hasActiveReviewStateRejected () =
+    check "Rejected is active" (Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState
+    (regFromList [ mkReviewSession "s" (ReviewState.Rejected "bad") 0 ]) "s")
 
-let sessionIsActiveMissing () =
-    check "missing not active" (not (Wanxiangshu.Kernel.ReviewSession.Query.sessionIsActive emptyRegistry "nope"))
+let hasActiveReviewStateMissing () =
+    check "missing not active" (not (Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState emptyRegistry "nope"))
 
 // taskOf
 let taskOfPresent () =
@@ -100,12 +100,12 @@ let reduceIfVersionMissingSessionReturnsNone () =
     | None -> check "missing None" true
 
 let run () =
-    sessionIsActiveActive ()
-    sessionIsActiveLocked ()
-    sessionIsActiveInactive ()
-    sessionIsActiveAccepted ()
-    sessionIsActiveRejected ()
-    sessionIsActiveMissing ()
+    hasActiveReviewStateActive ()
+    hasActiveReviewStateLocked ()
+    hasActiveReviewStateInactive ()
+    hasActiveReviewStateAccepted ()
+    hasActiveReviewStateRejected ()
+    hasActiveReviewStateMissing ()
     taskOfPresent ()
     taskOfMissing ()
     stateOfPresent ()

@@ -40,14 +40,14 @@ let syncReviewFromTextsActivatesFromTexts () =
         frontMatterPrompt [ yamlField taskField "from-replay" ] "body"
     syncReviewFromTexts store "s2" [ activate ]
     equal "replay activates task" (Some "from-replay") (store.getReviewTask "s2")
-    check "replay marks session active" (store.isReviewActive "s2")
+    check "replay marks session active" (store.getReviewState "s2" |> Option.isSome)
 
 let syncReviewFromTextsDeactivatesOnEndVerdict () =
     let store = createReviewStore ()
     store.activateReview ("s3", "active-task", 1L)
     let accept = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Accepted "")
     syncReviewFromTexts store "s3" [ accept ]
-    check "end verdict deactivates review" (not (store.isReviewActive "s3"))
+    check "end verdict deactivates review" (store.getReviewState "s3" |> Option.isNone)
 
 let syncReviewFromTextsRecoversTaskFromSecondBlock () =
     let store = createReviewStore ()
@@ -56,7 +56,7 @@ let syncReviewFromTextsRecoversTaskFromSecondBlock () =
     syncReviewFromTexts store "s5" [ activate ]
     equal "replay recovers task from second block"
         (Some "from-second-block") (store.getReviewTask "s5")
-    check "replay marks session active from second block" (store.isReviewActive "s5")
+    check "replay marks session active from second block" (store.getReviewState "s5" |> Option.isSome)
 
 let syncReviewFromTextsPreservesActiveOnReject () =
     let store = createReviewStore ()
@@ -64,7 +64,7 @@ let syncReviewFromTextsPreservesActiveOnReject () =
     let rejected = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Rejected "fix tests")
     syncReviewFromTexts store "s4" [ activate; rejected ]
     equal "reject keeps task active" (Some "active-task") (store.getReviewTask "s4")
-    check "reject keeps session active" (store.isReviewActive "s4")
+    check "reject keeps session active" (store.getReviewState "s4" |> Option.isSome)
 
 /// Regression: when the task: anchor is missing from replay texts (e.g. truncated
 /// by compaction), inferReviewTaskFromTexts correctly returns None — proving the
@@ -79,6 +79,10 @@ let fullTextsRecoverAnchor () =
     let texts = [ activate; "working on it" ]
     equal "full texts with anchor → Some" (Some "ship feature") (inferReviewTaskFromTexts texts)
 
+let reviewerOnlyHistoryDoesNotActivateLoop () =
+    let texts = [ Wanxiangshu.Kernel.ReviewPrompts.Submission.reviewerPrompt "ship feature" "" [] ]
+    equal "reviewer original_task only must not activate worker loop" None (inferReviewTaskFromTexts texts)
+
 let run () =
     textsFromFlatPartsIncludesToolOutput ()
     syncReviewFromTextsActivatesFromTexts ()
@@ -87,3 +91,4 @@ let run () =
     syncReviewFromTextsPreservesActiveOnReject ()
     truncatedTextsLoseAnchor ()
     fullTextsRecoverAnchor ()
+    reviewerOnlyHistoryDoesNotActivateLoop ()

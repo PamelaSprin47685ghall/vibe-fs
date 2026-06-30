@@ -6,6 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.IntegrationEventTestsMux
 open Wanxiangshu.Tests.IntegrationEventTestsMuxWrappers
 open Wanxiangshu.Tests.IntegrationEventTestsOpencode
+open Wanxiangshu.Tests.IntegrationEventTestsOpencodeLoop
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Opencode.Plugin
@@ -36,6 +37,7 @@ let run () : JS.Promise<unit> =
         do! abortedRetrySpec ()
         do! repeatedAssistantSpec ()
         do! opencodeLoopNudgeSpec ()
+        do! opencodeBrowserSubsessionHistoryDoesNotLoopNudgeSpec ()
         do! opencodeFreshChatMessageRearmsLoopNudgeSpec ()
         do! opencodeCompactingDoesNotEmitPromptSpec ()
         do! opencodeCompactionAnchorUsesPriorAgentSpec ()

@@ -4,7 +4,7 @@ open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.ReviewSession.StateMachine
 open Wanxiangshu.Kernel.ReviewSession.Registry
 
-let sessionIsActive registry id =
+let hasActiveReviewState registry id =
     Map.tryFind id registry |> Option.map (fun s -> isActive s.state) |> Option.defaultValue false
 
 let taskOf registry id = Map.tryFind id registry |> Option.bind (fun s -> s.originalTask)

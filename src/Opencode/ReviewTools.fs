@@ -19,6 +19,7 @@ open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Opencode.ReviewerLoop
 open Wanxiangshu.Shell.PromiseStr
 open Wanxiangshu.Shell.ReviewToolsCodec
+open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.Dyn
@@ -38,41 +39,34 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangs
                 | Ok client ->
                     let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
                     let sessionID = Wanxiangshu.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId
-                    if sessionID = "" || not (store.isReviewActive sessionID) then
-                        resolveStr submitReviewNotNeeded
-                    elif not (store.tryLockReview sessionID) then
-                        resolveStr opencodeSubmitReviewInProgress
-                    else
-                        let abort =
-                            match runtime.AbortSignal with
-                            | Some s -> s
-                            | None -> null
-                        promise {
-                            try
-                                if submitReviewIsWip decoded.Wip then
-                                    return submitReviewWipAcknowledgment
-                                else
-                                    let task = defaultArg (store.getReviewTask sessionID) ""
-                                    let! result =
-                                        runSubmitReview
-                                            registry
-                                            client
-                                            store
-                                            runtime.Execution.Directory
-                                            sessionID
-                                            decoded.Report
-                                            decoded.AffectedFiles
-                                            task
-                                            abort
-                                    match result with
-                                    | Accepted _
-                                    | Terminated ->
-                                        store.deactivateReview sessionID
-                                    | Rejected _ -> ()
-                                    return formatReviewResult result
-                            finally
-                                store.unlockReview sessionID
-                        })
+                    promise {
+                        if sessionID = "" then return submitReviewNotNeeded
+                        else
+                            let! texts = Wanxiangshu.Opencode.SessionIo.readSessionTexts client sessionID runtime.Execution.Directory
+                            let activeTask = inferReviewTaskFromTexts texts
+                            syncReviewProjection store sessionID activeTask
+                            match activeTask with
+                            | None -> return submitReviewNotNeeded
+                            | Some task when not (store.tryLockReview sessionID) -> return opencodeSubmitReviewInProgress
+                            | Some task ->
+                                let abort =
+                                    match runtime.AbortSignal with
+                                    | Some s -> s
+                                    | None -> null
+                                try
+                                    if submitReviewIsWip decoded.Wip then
+                                        return submitReviewWipAcknowledgment
+                                    else
+                                        let! result =
+                                            runSubmitReview registry client store runtime.Execution.Directory sessionID decoded.Report decoded.AffectedFiles task abort
+                                        match result with
+                                        | Accepted _
+                                        | Terminated -> store.deactivateReview sessionID
+                                        | Rejected _ -> ()
+                                        return formatReviewResult result
+                                finally
+                                    store.unlockReview sessionID
+                    })
 
 let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     define submitReviewResult

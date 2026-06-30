@@ -105,7 +105,7 @@ let reviewStoreSharedWithTools () = promise {
     do! wanxiangshuExtension pi
     let sessionId = "shared-store-1"
     reviewStore.activateReview(sessionId, "t", 0L)
-    check "plugin pre-activation visible" (reviewStore.isReviewActive sessionId)
+    check "plugin pre-activation visible" (reviewStore.getReviewTask sessionId = Some "t")
     reviewStore.deactivateReview sessionId
-    check "deactivation observed" (not (reviewStore.isReviewActive sessionId))
+    check "deactivation observed" (reviewStore.getReviewState sessionId |> Option.isNone)
 }

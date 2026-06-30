@@ -36,14 +36,14 @@ let transition' () =
 let registry () =
     let activated = reduce emptyRegistry (RegistryAction.Activate("s1", "do thing", 100))
     check "activate creates session" (Map.containsKey "s1" activated)
-    check "active session is active" (sessionIsActive activated "s1")
+    check "active review state is active" (hasActiveReviewState activated "s1")
     equal "task recorded" (Some "do thing") (taskOf activated "s1")
     let locked = reduce activated (RegistryAction.Lock("s1", "rev1"))
-    check "locked active" (sessionIsActive locked "s1")
+    check "locked state remains active" (hasActiveReviewState locked "s1")
     let accepted = reduce locked (RegistryAction.Accept "s1")
-    check "accepted not active" (not (sessionIsActive accepted "s1"))
+    check "accepted state is inactive" (not (hasActiveReviewState accepted "s1"))
     let rejected = reduce locked (RegistryAction.Reject("s1", "fix it"))
-    check "rejected still active for With-Review nudge" (sessionIsActive rejected "s1")
+    check "rejected state remains active for With-Review nudge" (hasActiveReviewState rejected "s1")
     check "clear empties" ((reduce accepted RegistryAction.Clear).IsEmpty)
 
 let resultMapping () =
@@ -60,7 +60,7 @@ let reviewerLoop () =
 let runtime () =
     let store = createReviewStore ()
     store.activateReview ("w1", "task A", 100)
-    check "store active" (store.isReviewActive "w1")
+    check "store active" (store.getReviewState "w1" |> Option.isSome)
     equal "store task" (Some "task A") (store.getReviewTask "w1")
     check "store lock" (store.tryLockReview "w1")
     store.unlockReview "w1"
@@ -69,7 +69,7 @@ let runtime () =
     check "resolve fires" (store.resolvePendingReview ("w1", Accepted ""))
     check "callback called" fired
     store.clearReviewSessions ()
-    check "cleared" (not (store.isReviewActive "w1"))
+    check "cleared" (store.getReviewState "w1" |> Option.isNone)
 
 let promptPartsBranches () =
     let initial = [ "task body"; "extra detail" ]
