@@ -48,7 +48,6 @@ let runNudgeFlowCore
 
 let private runNudgeFlow
     (holder: StateHolder<NudgeShellState>)
-    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (getChatHistory: (string -> JS.Promise<obj array>) option)
     (helpers: obj)
     (workspaceId: string)
@@ -71,17 +70,15 @@ let private runNudgeFlow
 
 let private startNudgeFlow
     (holder: StateHolder<NudgeShellState>)
-    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (getChatHistory: (string -> JS.Promise<obj array>) option)
     (helpers: obj)
     (workspaceId: string)
     (lastAssistantMessage: string)
     : unit =
-    runNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage |> Promise.start
+    runNudgeFlow holder getChatHistory helpers workspaceId lastAssistantMessage |> Promise.start
 
 type NudgeRuntime
-    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore,
-     getChatHistory: (string -> JS.Promise<obj array>) option) =
+    (getChatHistory: (string -> JS.Promise<obj array>) option) =
 
     let holder = StateHolder<NudgeShellState>(emptyState)
 
@@ -93,7 +90,7 @@ type NudgeRuntime
                 if Dyn.isNullish helpers || stopReason = "queued-message" then
                     return ()
                 else
-                    startNudgeFlow holder reviewStore getChatHistory helpers workspaceId lastAssistantMessage
+                    startNudgeFlow holder getChatHistory helpers workspaceId lastAssistantMessage
                     return ()
             | StreamAbort workspaceId
             | AbortedError workspaceId ->
@@ -102,7 +99,6 @@ type NudgeRuntime
         }
 
 let createNudgeRuntime
-    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (getChatHistory: (string -> JS.Promise<obj array>) option)
     : NudgeRuntime =
-    NudgeRuntime(reviewStore, getChatHistory)
+    NudgeRuntime(getChatHistory)

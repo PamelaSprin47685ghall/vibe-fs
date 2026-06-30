@@ -63,7 +63,7 @@ let createEventHook (deps: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.Re
             reviewStore.deactivateReview workspaceId
         | _ -> ()
 
-    let runtime = createNudgeRuntime reviewStore getChatHistory
+    let runtime = createNudgeRuntime getChatHistory
 
     let fallbackRuntime = FallbackRuntimeState()
     let directory =
