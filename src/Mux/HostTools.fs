@@ -107,7 +107,7 @@ let executorTool (deps: obj) (toolNames: string array) (sessionScope: Wanxiangsh
                   "dependencies", box (strArrayProp Params.executorDeps)
                   "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |])
                   "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |]) ])
-            [| "language"; "program"; "timeout_type"; "mode" |]
+            [| "program"; "timeout_type"; "mode" |]
       execute = fun config args ->
           match fromMuxConfig config with
           | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)

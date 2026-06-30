@@ -36,32 +36,33 @@ let peekExecutorMode (args: obj) : string option =
     strField args "mode" |> Option.map (fun s -> s.Trim())
 
 let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
-    match strField args "language" with
-    | None -> Error (InvalidIntent ("executor", "language", "required"))
-    | Some langStr ->
-        match parseLanguageField langStr with
-        | Error e -> Error e
-        | Ok language ->
-            match strField args "program" with
-            | None -> Error (InvalidIntent ("executor", "program", "required"))
-            | Some program when System.String.IsNullOrWhiteSpace program ->
-                Error (InvalidIntent ("executor", "program", "required"))
-            | Some program ->
-                match strField args "mode" with
-                | None -> Error (InvalidIntent ("executor", "mode", "required"))
-                | Some modeStr ->
-                    match parseModeField modeStr with
-                    | Error e -> Error e
-                    | Ok mode ->
-                        let timeoutRaw = defaultArg (strField args "timeout_type") ""
-                        Ok {
-                            Language = language
-                            Program = program
-                            Dependencies = strListField args "dependencies"
-                            TimeoutType = parseTimeout timeoutRaw
-                            Mode = mode
-                            WhatToSummarize = defaultArg (strField args "what_to_summarize") ""
-                        }
+    let languageResult =
+        match strField args "language" with
+        | None -> Ok Shell
+        | Some langStr -> parseLanguageField langStr
+    match languageResult with
+    | Error e -> Error e
+    | Ok language ->
+        match strField args "program" with
+        | None -> Error (InvalidIntent ("executor", "program", "required"))
+        | Some program when System.String.IsNullOrWhiteSpace program ->
+            Error (InvalidIntent ("executor", "program", "required"))
+        | Some program ->
+            match strField args "mode" with
+            | None -> Error (InvalidIntent ("executor", "mode", "required"))
+            | Some modeStr ->
+                match parseModeField modeStr with
+                | Error e -> Error e
+                | Ok mode ->
+                    let timeoutRaw = defaultArg (strField args "timeout_type") ""
+                    Ok {
+                        Language = language
+                        Program = program
+                        Dependencies = strListField args "dependencies"
+                        TimeoutType = parseTimeout timeoutRaw
+                        Mode = mode
+                        WhatToSummarize = defaultArg (strField args "what_to_summarize") ""
+                    }
 
 let toExecuteOptions (cwd: string option) (decoded: ExecutorArgs) : ExecuteOptions =
     { program = decoded.Program
