@@ -125,10 +125,10 @@ let private runNudgeFlow (holder: StateHolder<NudgeShellState>) (client: obj)
                                 | ToolPart(_, _, Some s, _) -> Some s.output
                                 | _ -> None)
                             |> List.exists hasCompactionAnchorPrompt
-                        if not anchorAlreadyInHistory then
-                            let backlogEntries = backlogSession.GetOrRebuildBacklog(sid, cleaned)
-                            let promptText = Wanxiangshu.Kernel.BacklogProjectionCore.buildCompactionAnchorPrompt backlogEntries extractAnchorTexts
-                            if promptText <> "" then do! sendNudge client sessionID snapshot.agentFromMessage promptText
+                        let backlogEntries = backlogSession.GetOrRebuildBacklog(sid, cleaned)
+                        let promptText = BacklogProjectionCore.buildCompactionAnchorPrompt backlogEntries extractAnchorTexts
+                        if not anchorAlreadyInHistory && promptText <> "" then
+                            do! sendNudge client sessionID snapshot.agentFromMessage promptText
                     | None -> ()
                     return Some { snapshot with anchorPromptIssued = true }
                 | _ -> return Some snapshot

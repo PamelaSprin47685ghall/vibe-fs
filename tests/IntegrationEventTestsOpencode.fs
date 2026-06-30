@@ -211,5 +211,8 @@ let opencodeCompactionAnchorUsesPriorAgentSpec () = promise {
     check "compaction anchor prompt is emitted" (promptCalls.Count = 1)
     let body = get promptCalls.[0] "body"
     check "anchor prompt carries prior real agent" (str body "agent" = "manager")
+    do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    check "compaction anchor prompt is emitted once" (promptCalls.Count = 1)
     do! rmAsync workspaceDir
 }

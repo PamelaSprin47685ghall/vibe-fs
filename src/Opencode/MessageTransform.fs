@@ -22,12 +22,12 @@ open Wanxiangshu.Opencode.AgentConfig
 open Wanxiangshu.Opencode.BacklogSession
 open Wanxiangshu.Opencode.MessagingCodec
 open Wanxiangshu.Opencode.CapsCodec
-open Wanxiangshu.Opencode.SessionIo
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.ChatTransformOutputCodec
+open Wanxiangshu.Shell.MessageTransformCommon
 open Wanxiangshu.Shell.JsArrayMutate
 open Wanxiangshu.Shell.SembleMcp
 open Wanxiangshu.Shell.SembleSearch
@@ -97,7 +97,7 @@ let private injectSembleIntoEncoded
                                 return encoded
     }
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
+let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (_client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
@@ -117,10 +117,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                     Cleaned = cleaned
                 }
                 let replayTexts () : JS.Promise<string seq> =
-                    promise {
-                        let! texts = readSessionTexts client sessionID directory
-                        return texts :> string seq
-                    }
+                    Promise.lift (extractTextsFromEncodedMessages messagesArr)
                 let dedupFn excluded encoded =
                     if excluded then encoded
                     else
@@ -148,16 +145,6 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                         buildCaps
                 replaceArrayInPlace messagesArr final
     }
-
-let buildCompactionAnchorPrompt (backlogEntries: BacklogEntry list) (messages: Message<obj> list) : string =
-    let extractAnchorTexts () =
-        messages
-        |> List.collect (fun m -> m.parts)
-        |> List.choose (function
-            | TextPart t -> Some t
-            | ToolPart(_, _, Some s, _) -> Some s.output
-            | _ -> None)
-    BacklogProjectionCore.buildCompactionAnchorPrompt backlogEntries extractAnchorTexts
 
 let compactingHandlerFor (_host: Host) (backlogSession: BacklogSession) (_client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
