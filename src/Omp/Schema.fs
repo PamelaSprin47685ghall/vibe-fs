@@ -15,6 +15,11 @@ let optional (schema: obj) (typebox: obj) = typebox?Type?Optional(schema)
 
 let opt (desc: string) (typebox: obj) (build: string -> obj -> obj) = optional (build desc typebox) typebox
 
+let optWithDefault (desc: string) (typebox: obj) (defaultValue: string) (build: string -> obj -> obj) : obj =
+    let inner = build desc typebox
+    inner?("default") <- box defaultValue
+    optional inner typebox
+
 let union (schemas: obj array) (typebox: obj) = typebox?Type?Union(schemas)
 
 let null_ (description: string) (typebox: obj) = typebox?Type?Null(createObj [ "description", box description ])

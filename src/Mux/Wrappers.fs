@@ -58,6 +58,7 @@ let strProp = jsonStrProp
 let numProp = jsonNumProp
 let boolProp = jsonBoolProp
 let strEnumProp = jsonStrEnumProp
+let strEnumPropWithDefault = jsonStrEnumPropWithDefault
 let strArrayProp = jsonStrArrayProp
 
 let requireWorkspaceId (config: obj) (toolName: string) : Result<string, DomainError> =

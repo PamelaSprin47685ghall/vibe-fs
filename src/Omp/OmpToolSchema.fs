@@ -92,7 +92,7 @@ let executorParameters (tb: obj) : obj =
     let schema =
         objectOf
             [|
-                ("language", opt Params.executorLanguage tb (fun desc tb -> enumOf [| "shell"; "python"; "javascript" |] desc tb))
+                ("language", optWithDefault Params.executorLanguage tb "shell" (fun desc tb -> enumOf [| "shell"; "python"; "javascript" |] desc tb))
                 ("program", str Params.executorProgram tb)
                 ("dependencies", opt Params.executorDeps tb (fun desc tb -> strArray desc tb))
                 ("timeout_type", enumOf [| "short"; "long"; "last-resort" |] Params.executorTimeout tb)

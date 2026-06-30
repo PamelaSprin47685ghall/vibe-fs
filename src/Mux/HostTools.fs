@@ -102,7 +102,7 @@ let executorTool (deps: obj) (toolNames: string array) (sessionScope: Wanxiangsh
       parameters =
         mkSchema
             (createObj
-                [ "language", box (strEnumProp Params.executorLanguage [| "shell"; "python"; "javascript" |])
+                [ "language", box (strEnumPropWithDefault Params.executorLanguage [| "shell"; "python"; "javascript" |] "shell")
                   "program", box (strProp Params.executorProgram)
                   "dependencies", box (strArrayProp Params.executorDeps)
                   "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |])

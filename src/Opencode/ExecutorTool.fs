@@ -33,7 +33,7 @@ let private resolveStr (text: string) : JS.Promise<string> = Promise.lift text
 let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (sessionScope: RuntimeScope) (fallbackRuntime: FallbackRuntimeState) : obj =
     define executor
         (box {|
-            language = enumOpt [| "shell"; "python"; "javascript" |] Params.executorLanguage
+            language = enumOptWithDefault [| "shell"; "python"; "javascript" |] "shell" Params.executorLanguage
             program = strReq Params.executorProgram
             dependencies = strArrayOpt Params.executorDeps
             timeout_type = enumReq [| "short"; "long"; "last-resort" |] Params.executorTimeout

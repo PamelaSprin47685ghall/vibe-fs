@@ -17,6 +17,9 @@ let jsonBoolProp (desc: string) : obj =
 let jsonStrEnumProp (desc: string) (values: string array) : obj =
     createObj [ "type", box "string"; "enum", box values; "description", box desc ]
 
+let jsonStrEnumPropWithDefault (desc: string) (values: string array) (defaultValue: string) : obj =
+    createObj [ "type", box "string"; "enum", box values; "default", box defaultValue; "description", box desc ]
+
 let private jsonStrItem : obj = createObj [ "type", box "string" ]
 
 let private jsonStrItemReq : obj = createObj [ "type", box "string"; "minLength", box 1 ]

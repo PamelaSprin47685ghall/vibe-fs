@@ -104,6 +104,11 @@ let enumOpt (values: string array) (desc: string) : obj =
     let e = call1 schema "enum" values
     call1 (call0 e "optional") "describe" (box desc)
 
+let enumOptWithDefault (values: string array) (defaultValue: string) (desc: string) : obj =
+    let e = call1 schema "enum" values
+    let e = call1 e "default" (box defaultValue)
+    call1 e "describe" (box desc)
+
 let enumArrayMin (values: string array) (minCount: int) (desc: string) : obj =
     arrayMin (call1 schema "enum" values) minCount desc
 
