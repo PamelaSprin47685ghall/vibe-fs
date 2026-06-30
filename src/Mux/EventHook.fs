@@ -48,7 +48,7 @@ let private parseHookEvent (event: obj) : NudgeRuntimeEvent =
         | "error" when decoded.errorType = "aborted" -> AbortedError decoded.workspaceId
         | _ -> Ignore
 
-let createEventHook (deps: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
+let createEventHook (deps: obj) (deactivateReview: string -> unit) : obj =
     let getChatHistory =
         if Dyn.isNullish deps then None
         else
@@ -60,7 +60,7 @@ let createEventHook (deps: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.Re
         match parseHookEvent event with
         | NudgeRuntime.StreamAbort workspaceId
         | NudgeRuntime.AbortedError workspaceId when workspaceId <> "" ->
-            reviewStore.deactivateReview workspaceId
+            deactivateReview workspaceId
         | _ -> ()
 
     let runtime = createNudgeRuntime getChatHistory

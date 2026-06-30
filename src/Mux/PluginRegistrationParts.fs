@@ -34,7 +34,7 @@ let createEventHooksSlashAndPolicy
     (deps: obj)
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     : obj * obj * obj =
-    let eventHook = createEventHook deps reviewStore
+    let eventHook = createEventHook deps (fun sid -> reviewStore.deactivateReview sid)
     let slashCommands = createSlashCommands deps muxToolNames reviewStore
     let getToolPolicy = System.Func<string, obj, obj>(fun (_agentId: string) (role: obj) -> buildToolPolicy muxToolNames role)
     (box eventHook, box slashCommands, box getToolPolicy)
