@@ -29,6 +29,7 @@ open Wanxiangshu.Tests.IntegrationToolSpecCatalog
 open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
 open Wanxiangshu.Tests.IntegrationChatTests
 open Wanxiangshu.Tests.IntegrationChatTestsSubagent
+open Wanxiangshu.Tests.OpencodeSessionLifecycleTests
 open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
 
@@ -259,6 +260,7 @@ let coreTestEntries () : (string * TestBody) list =
     "IntegrationOpencodeReviewSpecs.run", Async IntegrationOpencodeReviewSpecs.run
     "IntegrationChatTests.run", Async IntegrationChatTests.run
     "IntegrationChatTestsSubagent.run", Async IntegrationChatTestsSubagent.run
+    "OpencodeSessionLifecycleTests.childIdleDoesNotAbortParent", Async OpencodeSessionLifecycleTests.childIdleDoesNotAbortParent
     "LoopMessagesTests.run", Sync (sync LoopMessagesTests.run)
     "MessagingTests.run", Sync (sync MessagingTests.run)
     "WorkBacklogTests.run", Sync (sync WorkBacklogTests.run)

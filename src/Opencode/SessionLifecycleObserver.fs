@@ -113,7 +113,7 @@ type SessionLifecycleObserver
                     }
                 | None -> Promise.lift false
 
-            // Orphan parent: child idle → resume stuck parent (event-driven, zero-timer)
+            // Track local session busyCount: busy→1, idle→0
             match eventEnvelope with
             | Some { EventType = "session.status"; Props = props } ->
                 let statusObj = Dyn.get props "status"
@@ -124,29 +124,7 @@ type SessionLifecycleObserver
                 if sid <> "" && status = "busy" then
                     fallbackRuntime.SetBusyCount sid 1
                 elif sid <> "" && status = "idle" then
-                    let previousBusyCount = fallbackRuntime.GetBusyCount sid
                     fallbackRuntime.SetBusyCount sid 0
-                    // Orphan parent: child idle -> parent busyCount still >0 means parent stuck; abort+resume
-                    if (registry.LookupChildAgent sid).IsSome then
-                        match registry.ResolveSubsessionParentID (Some sid) with
-                        | Some parentSid when parentSid <> "" && fallbackRuntime.GetBusyCount parentSid > 0 ->
-                            let pst = fallbackRuntime.GetOrCreateState parentSid
-                            if not pst.Cancelled && not pst.TaskComplete then
-                                match getClientFromPluginCtx ctx with
-                                | Ok client ->
-                                    do! abortSession client parentSid
-                                    do! promptSession client parentSid "continue"
-                                | Error _ -> ()
-                        | _ -> ()
-                    // Track busyCount drop on parent sessions too (for explicit orphan detection via busyCount)
-                    elif previousBusyCount > 1 && fallbackRuntime.GetBusyCount sid = 0 then
-                        let pst = fallbackRuntime.GetOrCreateState sid
-                        if not pst.Cancelled && not pst.TaskComplete then
-                            match getClientFromPluginCtx ctx with
-                            | Ok client ->
-                                do! abortSession client sid
-                                do! promptSession client sid "continue"
-                            | Error _ -> ()
                 elif sid <> "" && status = "busy" then
                     fallbackRuntime.SetBusyCount sid (fallbackRuntime.GetBusyCount sid + 1)
             | _ -> ()

@@ -486,7 +486,7 @@ if not fallbackResult.Consumed then
 |---|---|---|---|
 | 工具文本检测 | session.idle | fetch messages → 正则扫描 XML 工具调用 → 发恢复 prompt | 立即执行，无延迟 |
 | 幻觉循环检测 | 每次 send continue | continueCount++ → ≥ 阈值 → abort+resume | 纯计数，无时间窗 |
-| 孤儿父检测 | session.status (busy→idle) | busyCount 降 → 立即 abort+resume | 事件驱动，无等待 |
+| 本 session busy/idle 跟踪 | session.status (busy→idle) | busyCount 归零，仅本 session 本地状态 | 事件驱动，无等待 |
 | task_complete | tool 调用 | 标记 TaskComplete=true → 停止恢复 | 经 ToolCatalog 注册 |
 | todo 感知续推 | session.idle | 检查 todos → 全 completed → 跳过 continue | 事件驱动 |
 | ESC 取消 | session.error (MessageAborted) | 标记 Cancelled=true → 停止恢复 | 同 |
@@ -588,7 +588,7 @@ AGENTS.md models: 存在 → 覆盖 opencode.json agent model
 | 完全平方数扫描 | k=1 从 0 扫，k=2 从 N 扫，k=4 从 0 扫 |
 | 工具文本检测 | session.idle → 扫描消息 → XML 工具调用 → 发恢复 prompt |
 | 幻觉循环 | 连续 N 次 continue → abort+resume |
-| 孤儿父检测 | busyCount 降 → abort+resume |
+| 本 session busy/idle 跟踪 | busyCount 归零，仅本 session 本地状态 |
 | task_complete | tool 调用 → 停止恢复 |
 | todo 感知续推 | 全 completed → 跳过 continue |
 | ESC 取消 | MessageAborted → 停止恢复 |
@@ -612,7 +612,7 @@ AGENTS.md models: 存在 → 覆盖 opencode.json agent model
 | Slice 3 | Shell: FallbackEventBridge 公共接口 | Slice 1 |
 | Slice 4 | Opencode: FallbackHooks + consumed 机制 + createPromptBody 扩展 | Slice 2+3 |
 | Slice 5 | 内循环自闭环（SessionLifecycleObserver 注入 + Subagent 拦截） | Slice 4 |
-| Slice 6 | auto-resume 能力事件驱动版（工具文本/幻觉循环/孤儿/task_complete/todo/ESC） | Slice 4+5 |
+| Slice 6 | auto-resume 能力事件驱动版（工具文本/幻觉循环/task_complete/todo/ESC） | Slice 4+5 |
 | Slice 7 | Mux: FallbackHooks | Slice 2+3 |
 | Slice 8 | Omp: FallbackHooks | Slice 2+3 |
 | Slice 9 | 配置覆盖（AGENTS.md models: → opencode.json 覆盖） | Slice 4+7 |
@@ -629,7 +629,7 @@ Slice 1-3 可顺序执行。Slice 4 后，5+6/7/8 可并行。Slice 9 依赖 4+7
 - 错误分类（isRetryable + HTTP 状态码）
 - 工具文本检测（事件驱动）
 - 幻觉循环检测（纯计数）
-- 孤儿父检测（事件驱动）
+- 本 session busy/idle 跟踪（事件驱动）
 - task_complete 工具
 - todo 感知续推
 - ESC 取消
