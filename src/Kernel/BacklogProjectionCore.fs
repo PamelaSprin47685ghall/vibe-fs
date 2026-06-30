@@ -102,4 +102,4 @@ let buildCompactionAnchorPrompt
                         createObj fields)
                     |> List.toArray
                 [ frontMatterRoot (box entries) ]
-        renderCompactionAnchorPrompt (backlogBlock @ anchorBlocks)
+        renderCompactionAnchorPrompt (anchorBlocks @ backlogBlock)

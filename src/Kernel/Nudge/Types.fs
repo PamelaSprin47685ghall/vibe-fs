@@ -10,8 +10,7 @@ type NudgeShellState =
       retryPendingSessions: Set<string>
       sessionAgents: Map<string, string>
       freshAssistantSnapshots: Map<string, FreshAssistantSnapshot>
-      lastNudgedSession: string option
-      compactionAnchorsIssued: Set<string> }
+      lastNudgedSession: string option }
 
 type SessionSnapshot =
     { todos: string list
@@ -71,5 +70,4 @@ let emptyState =
       retryPendingSessions = Set.empty
       sessionAgents = Map.empty
       freshAssistantSnapshots = Map.empty
-      lastNudgedSession = None
-      compactionAnchorsIssued = Set.empty }
+      lastNudgedSession = None }

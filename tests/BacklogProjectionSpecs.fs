@@ -167,3 +167,13 @@ let buildCompactionAnchorPromptWithoutBacklogSkipsEmptyArrayBlock () =
         buildCompactionAnchorPrompt [] (fun () -> [ "---\ntask: investigate-loop\n---" ])
     check "anchor-only prompt starts with real anchor block" (prompt.StartsWith "---\ntask: investigate-loop")
     check "anchor-only prompt does not prepend empty array block" (not (prompt.Contains "---\n[]\n---"))
+
+let buildCompactionAnchorPromptOrdersHistoryAnchorsBeforeBacklog () =
+    let prompt =
+        buildCompactionAnchorPrompt
+            [ backlogEntry 1 "progress so far" ]
+            (fun () -> [ "---\ncommand: with-review\ntask: ship feature\n---" ])
+    let anchorIdx = prompt.IndexOf "command: with-review"
+    let backlogIdx = prompt.IndexOf "aha_moments"
+    check "history task/command anchor precedes backlog projection" (anchorIdx >= 0 && backlogIdx >= 0 && anchorIdx < backlogIdx)
+    check "anchor prompt starts with the earliest history block" (prompt.StartsWith "---\ncommand: with-review")

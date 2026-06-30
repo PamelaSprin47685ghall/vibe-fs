@@ -40,8 +40,7 @@ let clearSession state sessionID =
     let next = resumeSession state sessionID
     { next with
         sessionAgents = Map.remove sessionID next.sessionAgents
-        freshAssistantSnapshots = Map.remove sessionID next.freshAssistantSnapshots
-        compactionAnchorsIssued = Set.remove sessionID next.compactionAnchorsIssued }
+        freshAssistantSnapshots = Map.remove sessionID next.freshAssistantSnapshots }
 
 let addRetryPendingSession state sessionID =
     { state with retryPendingSessions = Set.add sessionID state.retryPendingSessions }

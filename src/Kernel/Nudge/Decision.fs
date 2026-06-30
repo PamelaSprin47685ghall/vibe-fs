@@ -18,8 +18,6 @@ let decideNudge lookupChildAgent state sessionID snapshot =
         state, StandDown
     elif snapshot.alreadyNudged || snapshot.anchorPromptIssued then
         state, StandDown
-    elif Set.contains sessionID state.compactionAnchorsIssued then
-        state, StandDown
     else
         let state = rememberAgent state sessionID snapshot.agentFromMessage
         let isWorkerLoopActive =

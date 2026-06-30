@@ -44,3 +44,5 @@ let run () =
     buildBacklogTextWithErrorTest ()
     buildCompactionAnchorPromptEmptyReturnsEmpty ()
     buildCompactionAnchorPromptWithoutBacklogSkipsEmptyArrayBlock ()
+    buildCompactionAnchorPromptOrdersHistoryAnchorsBeforeBacklog ()
+    buildCompactionAnchorPromptOrdersHistoryAnchorsBeforeBacklog ()
