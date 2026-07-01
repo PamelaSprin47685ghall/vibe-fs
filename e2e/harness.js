@@ -10,6 +10,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WANXIANG_ROOT = path.resolve(__dirname, '..');
 const PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Opencode/Plugin.js');
 const PLUGIN_URL = pathToFileURL(PLUGIN_JS).href;
+const FIXTURE_MCP = path.resolve(__dirname, 'stealth-mcp-fixture.js');
+
+function createFixtureUvx(home) {
+  const dir = path.join(home, 'mcp-bin');
+  fs.mkdirSync(dir, { recursive: true });
+  const shim = path.join(dir, process.platform === 'win32' ? 'uvx.cmd' : 'uvx');
+  const body = process.platform === 'win32'
+    ? `@echo off\r\nnode "%STEALTH_BROWSER_MCP_FIXTURE%"\r\n`
+    : `#!/usr/bin/env bash\nset -euo pipefail\nexec node "$STEALTH_BROWSER_MCP_FIXTURE"\n`;
+  fs.writeFileSync(shim, body, 'utf8');
+  if (process.platform !== 'win32') fs.chmodSync(shim, 0o755);
+  return dir;
+}
 
 function gitInit(dir) {
   execSync('git init', { cwd: dir, stdio: 'ignore' });
@@ -23,6 +36,7 @@ function gitInit(dir) {
 
 function isolatedEnv(home, llmUrl, opts = {}) {
   const xdg = path.join(home, 'xdg');
+  const fixtureUvxDir = createFixtureUvx(home);
   const config = {
     formatter: false,
     lsp: false,
@@ -65,6 +79,8 @@ function isolatedEnv(home, llmUrl, opts = {}) {
     OPENCODE_AUTH_CONTENT: '{}',
     OPENCODE_EXPERIMENTAL_EVENT_SYSTEM: 'true',
     OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
+    PATH: `${fixtureUvxDir}${path.delimiter}${process.env.PATH ?? ''}`,
+    STEALTH_BROWSER_MCP_FIXTURE: FIXTURE_MCP,
   };
 }
 
@@ -176,12 +192,12 @@ export async function start(opts = {}) {
       return request('POST', '/api/session', { query, body });
     },
 
-    async sendPrompt(sessionID, text, query = {}) {
+    async sendPrompt(sessionID, text, query = {}, timeoutMs = 15000) {
       const qs = query ? '?' + new URLSearchParams(query).toString() : '';
       const url = baseUrl + `/session/${sessionID}/message` + qs;
       const body = { parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } };
       const ac = new AbortController();
-      const timeout = setTimeout(() => ac.abort(), 15000);
+      const timeout = setTimeout(() => ac.abort(), timeoutMs);
       try {
         const res = await fetch(url, {
           method: 'POST',
@@ -250,6 +266,18 @@ export async function start(opts = {}) {
       try { fs.rmSync(home, { recursive: true, force: true }); } catch {}
     },
   };
+
+  // opencode >=1.17 blocks the first prompt on a one-time `@opencode-ai/plugin`
+  // dependency install (arborist reify) during plugin bootstrap. Pre-pay that
+  // cost here with a generous timeout so per-test prompts can keep a tight one.
+  if (opts.plugin) {
+    const warmSession = await api.createSession().then((r) => r.data?.data?.id);
+    if (warmSession) {
+      llmHandle.expectText('warmup');
+      await api.sendPrompt(warmSession, 'warmup', {}, 90000);
+      llmHandle.reset();
+    }
+  }
 
   return api;
 }

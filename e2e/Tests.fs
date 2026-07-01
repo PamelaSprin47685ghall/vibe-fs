@@ -55,6 +55,17 @@ let private toolRoundWithCalls (harness: Harness) (sessionID: string) (toolName:
 let private toolRound (harness: Harness) (sessionID: string) (toolName: string) (toolArgs: obj) (promptText: string) : JS.Promise<unit> =
     toolRoundWithCalls harness sessionID toolName toolArgs promptText 1
 
+let private browserMcpRound (harness: Harness) (sessionID: string) : JS.Promise<unit> =
+    promise {
+        harness.mockLLM.reset()
+        harness.mockLLM.expectTool "browser" (box {| intent = "open page" |})
+        harness.mockLLM.expectTool "stealth-browser-mcp_get_debug_view" (createObj [])
+        harness.mockLLM.expectText "browser mcp done"
+        let! _ = harness.sendPrompt sessionID "open browser" emptyObj
+        let! _ = harness.waitForCalls 3 20000
+        return ()
+    }
+
 let private textRoundWithCalls (harness: Harness) (sessionID: string) (promptText: string) (expectedCalls: int) : JS.Promise<unit> =
     promise {
         harness.mockLLM.reset()
@@ -83,7 +94,7 @@ let runAll (args: string array) : JS.Promise<int> =
                 return string (createData?data?data?id)
             }
 
-        let expected = 37
+        let expected = 39
         let mutable ok = 0
         let chk l c =
             check l c
@@ -128,8 +139,10 @@ let runAll (args: string array) : JS.Promise<int> =
         chk "e2e.meditator.tool-called" (containsTool harness "meditator")
 
         // 10. browser
-        do! toolRound harness sessionID "browser" (box {| intent = "open page" |}) "open browser"
+        do! browserMcpRound harness sessionID
         chk "e2e.browser.tool-called" (containsTool harness "browser")
+        chk "e2e.browser.mcp-tool-called" (containsTool harness "stealth-browser-mcp_get_debug_view")
+        chk "e2e.browser.mcp-tool-result-fed-back" ((bodies harness).Contains "e2e stealth mcp debug view")
 
         // 11. submit_review
         do! toolRound harness sessionID "submit_review" (box {| report = "test report"; wip = false; affectedFiles = ResizeArray([]) |}) "submit review"

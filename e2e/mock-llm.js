@@ -34,6 +34,37 @@ function createMockLLM() {
     ];
   }
 
+  function toolNames(body) {
+    const tools = body?.tools;
+    if (Array.isArray(tools)) {
+      return tools.flatMap((tool) => {
+        const name = tool?.function?.name ?? tool?.name;
+        return typeof name === 'string' ? [name] : [];
+      });
+    }
+    if (tools && typeof tools === 'object') return Object.keys(tools);
+    return [];
+  }
+
+  function hasToolResult(body) {
+    return (body?.messages ?? []).some((message) => {
+      if (message?.role === 'tool') return true;
+      if (!Array.isArray(message?.content)) return false;
+      return message.content.some((part) => part?.type === 'tool-result' || part?.type === 'tool');
+    });
+  }
+
+  function nextItemFor(body) {
+    const names = new Set(toolNames(body));
+    if (names.size === 0 && !hasToolResult(body)) return undefined;
+    if (_queue[0]?.tool && names.size > 0 && !names.has(_queue[0].tool)) {
+      const toolIndex = _queue.findIndex((item) => item?.tool && names.has(item.tool));
+      if (toolIndex >= 0) return _queue.splice(toolIndex, 1)[0];
+    }
+    if (_queue.length > 0) return _queue.shift();
+    return undefined;
+  }
+
   const handler = (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -57,17 +88,18 @@ function createMockLLM() {
       let body = '';
       req.on('data', chunk => body += chunk);
       req.on('end', () => {
-        let messages = [];
-        try { messages = JSON.parse(body).messages || []; } catch { /* keep [] */ }
+        let parsed = {};
+        try { parsed = JSON.parse(body); } catch { /* keep {} */ }
+        const messages = parsed.messages || [];
         const lastUser = [...messages].reverse().find(m => m.role === 'user');
 
         const call = {
           path: url.pathname,
-          body: JSON.parse(body),
+          body: parsed,
           lastUserMessage: lastUser?.content ?? null,
         };
 
-        const item = _queue.shift();
+        const item = nextItemFor(parsed);
         const id = `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
         if (item?.tool) {
