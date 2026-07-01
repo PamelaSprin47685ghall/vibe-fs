@@ -61,7 +61,7 @@ let tryClaimNudge state sessionID =
 
 let recordSend state sessionID outcome =
     match outcome with
-    | Delivered -> deleteNudgedSession state sessionID
+    | Delivered -> stopSession state sessionID
     | Aborted -> stopSession state sessionID
     | Busy -> deleteNudgedSession state sessionID
     | Failed -> addRetryPendingSession (deleteNudgedSession state sessionID) sessionID

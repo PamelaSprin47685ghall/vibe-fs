@@ -53,7 +53,9 @@ let tryClaimNudgeTest () =
 
 let recordSendTest () =
     let state = { emptyState with nudgedSessions = set [ "s" ] }
-    check "Delivered removes nudged" (not (Set.contains "s" (recordSend state "s" Delivered).nudgedSessions))
+    let delivered = recordSend state "s" Delivered
+    check "Delivered keeps nudged" (Set.contains "s" delivered.nudgedSessions)
+    check "Delivered stops session" (Set.contains "s" delivered.stoppedSessions)
     let a = recordSend state "s" Aborted
     check "Aborted adds stopped" (Set.contains "s" a.stoppedSessions)
     check "Aborted keeps nudged (stopSession adds)" (Set.contains "s" a.nudgedSessions)

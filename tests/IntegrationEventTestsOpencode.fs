@@ -80,6 +80,33 @@ let repeatedAssistantSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let repeatedIdleBeforeHistoryPersistsNudgeSpec () = promise {
+    let messages = [|
+        box {| info = box {| role = "assistant"; agent = "manager"; finish = "stop"; time = box {| completed = 1 |} |}
+               parts = [| box {| ``type`` = "text"; text = "still working" |} |] |}
+    |]
+    let promptCalls = ResizeArray<obj>()
+    let mkClient () =
+        createObj [ "session", box (createObj [
+            "todo", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                promise { return box {| data = [| box {| id = "todo-1"; content = "task"; status = "in_progress" |} |] |} }))
+            "messages", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                promise { return box {| data = messages |} }))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                promise { promptCalls.Add(arg) }))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "repeated-idle-before-history-"
+    let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
+    let eventHook = get p "event"
+    let idle = box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = "history-race-ws" |} |} |}
+    do! eventHook $ idle |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    do! eventHook $ idle |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    check "repeated idle before nudge reaches history sends once" (promptCalls.Count = 1)
+    do! rmAsync workspaceDir
+}
+
 let reusedSessionSpec () = promise {
     let mutable messages = [|
         box {| info = box {| role = "assistant"; agent = "manager"; finish = "stop"; time = box {| completed = 1 |} |}

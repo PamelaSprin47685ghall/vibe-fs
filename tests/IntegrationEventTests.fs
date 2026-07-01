@@ -38,6 +38,7 @@ let run () : JS.Promise<unit> =
         do! abortedRetrySpec ()
         do! fallbackRetryWithoutFrontmatterSpec ()
         do! repeatedAssistantSpec ()
+        do! repeatedIdleBeforeHistoryPersistsNudgeSpec ()
         do! opencodeLoopNudgeSpec ()
         do! opencodeBrowserSubsessionHistoryDoesNotLoopNudgeSpec ()
         do! opencodeFreshChatMessageRearmsLoopNudgeSpec ()

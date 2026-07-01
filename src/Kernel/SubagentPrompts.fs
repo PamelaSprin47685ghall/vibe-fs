@@ -128,7 +128,8 @@ let executorSummarizerPrompt
           yamlField "program" program
           yamlStringSeqField "dependencies" dependencies
           yamlField "timeout_type" timeoutType
-          yamlField "mode" mode ]
+          yamlField "mode" mode
+          yamlField "what_to_summarize" whatToSummarize ]
         [ capped; "# Task\n" + taskBody ]
 
 let websearchSummarizerPrompt (whatToSummarize: string) (rawResults: string) : string =
