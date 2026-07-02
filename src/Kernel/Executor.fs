@@ -14,10 +14,10 @@ let headTail (s: string) (head: int) (tail: int) : string =
     else s.Substring(0, head) + "..." + s.Substring(s.Length - tail)
 
 type ExecutorLanguage = Shell | Python | Javascript
-type ExecutorTimeoutType = Short | Long | LastResort
+type ExecutorTimeoutType = Short | Long
 
 let languages: ExecutorLanguage list = [ Shell; Python; Javascript ]
-let timeoutMs = function Short -> 1000 | Long -> 10000 | LastResort -> 100_000
+let timeoutMs = function Short -> 10_000 | Long -> 100_000
 let summaryThresholdBytes = 8192
 
 type ExecuteOptions =
@@ -110,7 +110,6 @@ let timeoutToString (value: ExecutorTimeoutType) : string =
     match value with
     | Short -> "short"
     | Long -> "long"
-    | LastResort -> "last-resort"
 
 let parseLanguage (value: string) : ExecutorLanguage =
     match value.ToLowerInvariant() with
@@ -146,5 +145,4 @@ let buildSummaryPrompt
 let parseTimeout (value: string) : ExecutorTimeoutType =
     match value.Replace("-", "").ToLowerInvariant() with
     | "long" -> Long
-    | "lastresort" -> LastResort
     | _ -> Short

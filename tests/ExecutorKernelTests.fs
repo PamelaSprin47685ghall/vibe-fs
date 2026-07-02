@@ -32,9 +32,8 @@ let headTailLongerThanSum () =
 // ── timeoutMs ─────────────────────────────────────────────────────────
 
 let timeoutMsValues () =
-    equal "Short" 1000 (timeoutMs Short)
-    equal "Long" 10000 (timeoutMs Long)
-    equal "LastResort" 100_000 (timeoutMs LastResort)
+    equal "Short" 10_000 (timeoutMs Short)
+    equal "Long" 100_000 (timeoutMs Long)
 
 // ── outputFromResult ──────────────────────────────────────────────────
 
@@ -145,15 +144,12 @@ let languageToStringRoundtrip () =
 
 let parseTimeoutRoundtrip () =
     equal "long" Long (parseTimeout "long")
-    equal "last-resort" LastResort (parseTimeout "last-resort")
-    equal "LastResort" LastResort (parseTimeout "LastResort")
     equal "default short" Short (parseTimeout "short")
     equal "unknown falls back short" Short (parseTimeout "tiny")
 
 let timeoutToStringRoundtrip () =
     equal "Short" "short" (timeoutToString Short)
     equal "Long" "long" (timeoutToString Long)
-    equal "LastResort" "last-resort" (timeoutToString LastResort)
 
 // ── prepareShellProgram ───────────────────────────────────────────────
 

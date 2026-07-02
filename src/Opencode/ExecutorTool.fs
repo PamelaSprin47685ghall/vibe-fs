@@ -36,7 +36,7 @@ let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (session
             language = enumOptWithDefault [| "shell"; "python"; "javascript" |] "shell" Params.executorLanguage
             program = strReq Params.executorProgram
             dependencies = strArrayOpt Params.executorDeps
-            timeout_type = enumReq [| "short"; "long"; "last-resort" |] Params.executorTimeout
+            timeout_type = enumReq [| "short"; "long" |] Params.executorTimeout
             mode = enumReq [| "ro"; "rw" |] Params.executorMode
             what_to_summarize = strReq Params.executorWhatToSummarize
         |})

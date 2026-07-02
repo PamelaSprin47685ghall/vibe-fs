@@ -105,7 +105,7 @@ let executorTool (deps: obj) (toolNames: string array) (sessionScope: Wanxiangsh
                 [ "language", box (strEnumPropWithDefault Params.executorLanguage [| "shell"; "python"; "javascript" |] "shell")
                   "program", box (strProp Params.executorProgram)
                   "dependencies", box (strArrayProp Params.executorDeps)
-                  "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |])
+                  "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long" |])
                   "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |])
                   "what_to_summarize", box (strProp Params.executorWhatToSummarize) ])
             [| "program"; "timeout_type"; "mode"; "what_to_summarize" |]
