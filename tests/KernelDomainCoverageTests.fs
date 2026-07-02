@@ -178,7 +178,7 @@ let taWebfetch () =
     match a with Webfetch w -> equal "Webfetch.Url" "http://x" w.Url | _ -> check "Webfetch case" false
 
 let taExecutor () =
-    let a = Executor { Language = Shell; Program = "p"; Dependencies = []; TimeoutType = Short; Mode = "rw" }
+    let a = Executor { Language = Shell; Program = "p"; Dependencies = []; TimeoutType = Short; Mode = "rw"; WhatToSummarize = "s" }
     match a with Executor e -> equal "Executor.Program" "p" e.Program | _ -> check "Executor case" false
 
 let taTodoWrite () =

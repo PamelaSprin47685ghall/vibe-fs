@@ -29,12 +29,13 @@ let decodeExecutorMissingProgram () =
 
 let decodeExecutorOkShell () =
     let args =
-        createObj [
+         createObj [
             "language", box "shell"
             "program", box "echo ok"
             "dependencies", box [| "dep-a" |]
             "timeout_type", box "long"
             "mode", box "rw"
+            "what_to_summarize", box "summarize exit codes and stderr only"
         ]
     match decodeExecutorArgs args with
     | Ok ex ->
@@ -43,10 +44,23 @@ let decodeExecutorOkShell () =
         equal "executor ok deps count" 1 ex.Dependencies.Length
         check "executor ok timeout" (ex.TimeoutType = Long)
         check "executor ok mode" (ex.Mode = "rw")
+        check "executor ok what_to_summarize" (ex.WhatToSummarize = "summarize exit codes and stderr only")
         let opts = toExecuteOptions (Some "/tmp/ws") ex
         check "executor ok cwd" (opts.cwd = Some "/tmp/ws")
         check "executor ok opts language" (opts.language = Shell)
     | Error _ -> check "executor ok shell" false
+
+let decodeExecutorMissingWhatToSummarize () =
+    let args =
+        createObj [
+            "language", box "shell"
+            "program", box "echo ok"
+            "timeout_type", box "long"
+            "mode", box "rw"
+        ]
+    match decodeExecutorArgs args with
+    | Error (InvalidIntent ("executor", "what_to_summarize", "required")) -> check "executor missing what_to_summarize" true
+    | _ -> check "executor missing what_to_summarize" false
 
 let decodeExecutorMissingMode () =
     let args =
@@ -64,3 +78,4 @@ let run () =
     decodeExecutorMissingProgram ()
     decodeExecutorOkShell ()
     decodeExecutorMissingMode ()
+    decodeExecutorMissingWhatToSummarize ()

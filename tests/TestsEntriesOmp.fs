@@ -61,6 +61,7 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpPluginTests.browserErrorsWithoutBrowserHost", Async OmpPluginTests.browserErrorsWithoutBrowserHost
     "OmpPluginTests.reviewChildInitialPromptUsesReturnReviewer", Sync (sync OmpPluginTests.reviewChildInitialPromptUsesReturnReviewer)
     "OmpPluginTests.fuzzyGrepExcludeAnyOfLength2", Async OmpPluginTests.fuzzyGrepExcludeAnyOfLength2
+    "OmpPluginTests.websearchSchemaRequiresQueryAndWhatToSummarize", Async OmpPluginTests.websearchSchemaRequiresQueryAndWhatToSummarize
     "OmpPluginTestsAgentEnd.run", Async OmpPluginTestsAgentEnd.run
     "OmpReviewTests.returnReviewerVerdictPassReject", Async OmpReviewTests.returnReviewerVerdictPassReject
     "OmpReviewTests.returnReviewerViaSetPendingStateForTest", Async OmpReviewTests.returnReviewerViaSetPendingStateForTest

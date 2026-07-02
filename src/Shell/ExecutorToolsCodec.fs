@@ -55,14 +55,19 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
                 | Error e -> Error e
                 | Ok mode ->
                     let timeoutRaw = defaultArg (strField args "timeout_type") ""
-                    Ok {
-                        Language = language
-                        Program = program
-                        Dependencies = strListField args "dependencies"
-                        TimeoutType = parseTimeout timeoutRaw
-                        Mode = mode
-                        WhatToSummarize = defaultArg (strField args "what_to_summarize") ""
-                    }
+                    match strField args "what_to_summarize" with
+                    | None -> Error (InvalidIntent ("executor", "what_to_summarize", "required"))
+                    | Some whatToSummarize when System.String.IsNullOrWhiteSpace whatToSummarize ->
+                        Error (InvalidIntent ("executor", "what_to_summarize", "required"))
+                    | Some whatToSummarize ->
+                        Ok {
+                            Language = language
+                            Program = program
+                            Dependencies = strListField args "dependencies"
+                            TimeoutType = parseTimeout timeoutRaw
+                            Mode = mode
+                            WhatToSummarize = whatToSummarize
+                        }
 
 let toExecuteOptions (cwd: string option) (decoded: ExecutorArgs) : ExecuteOptions =
     { program = decoded.Program

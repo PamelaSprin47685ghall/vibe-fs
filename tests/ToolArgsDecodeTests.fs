@@ -64,6 +64,7 @@ let decodeExecutorOkShell () =
             "dependencies", box [| "dep-a" |]
             "timeout_type", box "long"
             "mode", box "rw"
+            "what_to_summarize", box "focus on exit codes and stderr"
             "warn", box "it-is-not-possible-to-do-it-using-other-tools"
         ]
     match decodeToolInvocation "executor" args with
@@ -73,7 +74,22 @@ let decodeExecutorOkShell () =
         equal "executor ok deps count" 1 ex.Dependencies.Length
         check "executor ok timeout" (ex.TimeoutType = Long)
         check "executor ok mode" (ex.Mode = "rw")
+        check "executor ok what_to_summarize" (ex.WhatToSummarize = "focus on exit codes and stderr")
     | _ -> check "executor ok shell via decodeToolInvocation" false
+
+let decodeExecutorMissingWhatToSummarize () =
+    let args =
+        createObj [
+            "language", box "shell"
+            "program", box "echo ok"
+            "timeout_type", box "long"
+            "mode", box "rw"
+            "warn", box "it-is-not-possible-to-do-it-using-other-tools"
+        ]
+    match decodeToolInvocation "executor" args with
+    | Error (InvalidIntent ("executor", "what_to_summarize", "required")) ->
+        check "executor missing what_to_summarize via decodeToolInvocation" true
+    | _ -> check "executor missing what_to_summarize via decodeToolInvocation" false
 
 let decodeTodowriteMissingCompletedWorkReport () =
     let args = createObj [ "ahaMoments", box ""; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box ""; "todos", box [||] ]
@@ -137,6 +153,7 @@ let run () =
     decodeToolArgsRejectsCoderBatch ()
     decodeWebsearchMissingWhatToSummarize ()
     decodeExecutorOkShell ()
+    decodeExecutorMissingWhatToSummarize ()
     decodeTodowriteMissingCompletedWorkReport ()
     decodeTodowriteOk ()
     decodeApplyPatchMissingPatchText ()

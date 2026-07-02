@@ -18,18 +18,31 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
+let private addRequired (schema: obj) (key: string) : unit =
+    let existing = Dyn.get schema "required"
+    if Dyn.isArray existing then
+        existing?("push")(box key) |> ignore
+    else
+        schema?("required") <- box [| box key |]
+
+let private websearchParameters (tb: obj) : obj =
+    let schema =
+        objectOf
+            [| ("query", str Params.websearchQuery tb)
+               ("numResults", opt Params.websearchNumResults tb num)
+               ("what_to_summarize", str Params.websearchWhatToSummarize tb) |]
+            tb
+    addRequired schema "query"
+    addRequired schema "what_to_summarize"
+    schema
+
 let private buildWebsearch (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : obj =
     let tb = Dyn.get pi "typebox"
     createObj [
         "name", box "websearch"
         "label", box "Web Search"
         "description", box (description "websearch")
-        "parameters",
-            objectOf
-                [| ("query", str Params.websearchQuery tb)
-                   ("numResults", opt Params.websearchNumResults tb num)
-                   ("what_to_summarize", str Params.websearchWhatToSummarize tb) |]
-                tb
+        "parameters", websearchParameters tb
         "execute",
             box(fun (_id: string) (params': obj) (signal: obj) ->
                 promise {

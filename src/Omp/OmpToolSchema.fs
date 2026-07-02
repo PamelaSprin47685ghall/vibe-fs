@@ -97,7 +97,7 @@ let executorParameters (tb: obj) : obj =
                 ("dependencies", opt Params.executorDeps tb (fun desc tb -> strArray desc tb))
                 ("timeout_type", enumOf [| "short"; "long"; "last-resort" |] Params.executorTimeout tb)
                 ("mode", enumOf [| "ro"; "rw" |] Params.executorMode tb)
-                ("what_to_summarize", opt "Optional summary focus for long executor output." tb str)
+                ("what_to_summarize", str Params.executorWhatToSummarize tb)
             |]
             tb
     if isModificationTool "executor" then
@@ -110,6 +110,7 @@ let executorParameters (tb: obj) : obj =
         let props = Dyn.get schema "properties"
         if isNullish (Dyn.get props "warn") then
             props?("warn") <- box (createObj [| "type", box "string"; "enum", box [| box warnCanonicalValue |]; "description", box warnDescription |])
+    addRequired schema "what_to_summarize"
     schema
 
 let returnReviewerParameters (tb: obj) : obj =

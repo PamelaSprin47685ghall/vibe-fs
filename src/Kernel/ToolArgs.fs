@@ -30,6 +30,7 @@ type ExecutorArgs = {
     Dependencies: string list
     TimeoutType: ExecutorTimeoutType
     Mode: string
+    WhatToSummarize: string
 }
 
 type TodoItem = { Content: string; Status: string; Priority: string }

@@ -18,7 +18,7 @@ let internal executorSpec: ToolSpec =
               "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)."
               "what_to_summarize",
               "What the summary should focus on. Becomes the executor subagent's task description, so phrase it as a directive (e.g. 'only keep stack traces and exit codes')." ]
-      requiredFields = [ "program"; "timeout_type"; "mode" ] }
+      requiredFields = [ "program"; "timeout_type"; "mode"; "what_to_summarize" ] }
 
 let internal executorWaitSpec: ToolSpec =
     { name = "executor_wait"

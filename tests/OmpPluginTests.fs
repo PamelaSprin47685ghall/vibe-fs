@@ -144,8 +144,14 @@ let executorToolSchemaFourFields () = promise {
     let runner = h.tools |> Seq.find (fun t -> Dyn.str t "name" = "executor")
     let parameters = Dyn.get runner "parameters"
     let properties = Dyn.get parameters "properties"
-    for field in [| "language"; "program"; "dependencies"; "timeout_type"; "mode"; "warn" |] do
+    for field in [| "language"; "program"; "dependencies"; "timeout_type"; "mode"; "what_to_summarize"; "warn" |] do
         check ("runner schema has " + field) (Dyn.has properties field)
+    match Dyn.get parameters "required" with
+    | null -> check "executor schema has required array" false
+    | req when Dyn.isArray req ->
+        let reqArr = unbox<string array> req
+        check "executor schema requires what_to_summarize" (Array.contains "what_to_summarize" reqArr)
+    | _ -> check "executor schema has required array" false
 }
 
 let browserErrorsWithoutBrowserHost () = promise {
@@ -256,4 +262,27 @@ let sessionCompactingHookCanBeInvoked () = promise {
             "Promise.resolve($0($1, $2))"
         |> unbox<JS.Promise<obj>>
     check "session.compacting handler returns object" (not (Dyn.isNullish result))
+}
+
+let websearchSchemaRequiresQueryAndWhatToSummarize () = promise {
+    resetPluginState ()
+    let h = createPiHarness ()
+    let pi = piObject h
+    do! wanxiangshuExtension pi
+    let websearch =
+        h.tools
+        |> Seq.tryFind (fun t -> Dyn.str t "name" = "websearch")
+    check "websearch tool registered" (websearch.IsSome)
+    match websearch with
+    | None -> ()
+    | Some tool ->
+        let parameters = Dyn.get tool "parameters"
+        let req = Dyn.get parameters "required"
+        let reqArr =
+            if Dyn.isArray req then
+                req :?> obj array |> Array.map string
+            else [||]
+        check "required contains query" (reqArr |> Array.exists ((=) "query"))
+        check "required contains what_to_summarize" (reqArr |> Array.exists ((=) "what_to_summarize"))
+        check "required length is 2" (reqArr.Length = 2)
 }

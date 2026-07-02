@@ -100,14 +100,15 @@ let executorTool (deps: obj) (toolNames: string array) (sessionScope: Wanxiangsh
     { name = "executor"
       description = description "executor"
       parameters =
-        mkSchema
+         mkSchema
             (createObj
                 [ "language", box (strEnumPropWithDefault Params.executorLanguage [| "shell"; "python"; "javascript" |] "shell")
                   "program", box (strProp Params.executorProgram)
                   "dependencies", box (strArrayProp Params.executorDeps)
                   "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long"; "last-resort" |])
-                  "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |]) ])
-            [| "program"; "timeout_type"; "mode" |]
+                  "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |])
+                  "what_to_summarize", box (strProp Params.executorWhatToSummarize) ])
+            [| "program"; "timeout_type"; "mode"; "what_to_summarize" |]
       execute = fun config args ->
           match fromMuxConfig config with
           | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)

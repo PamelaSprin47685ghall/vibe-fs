@@ -70,59 +70,62 @@ let registerExecutorTools (pi: obj) : unit =
                                 unregisterActiveRunnerSession parentId
                                 unregisterRunnerChild parentId
                             disposeChild ()
-                        try
-                            let! child = createChildSession pi ctx ompRunnerChildToolNames None [||] None
-                            childHolder <- Some child
-                            let childSession = child.session
-                            let childCtx = createObj [ "sessionManager", Dyn.get childSession "sessionManager" ]
-                            let childId = getSessionIdFromContext childCtx |> Option.defaultValue ""
-                            if childId = "" then
-                                finishJob ()
-                                return errorResult "Executor child session unavailable"
-                            else
-                                if parentId <> "" then
-                                    registerActiveRunnerSession parentId
-                                    registerRunnerChild parentId childId disposeChild
-                                let options =
-                                    { program = program
-                                      language = parseLanguage lang
-                                      dependencies = deps
-                                      timeoutType = timeoutType
-                                      mode = mode
-                                      cwd = Some (Dyn.str ctx "cwd")
-                                      whatToSummarize = what }
-                                let runWork =
-                                    sessionExecutor.EnqueuePerSession(
-                                        childId,
-                                        fun () ->
-                                            promise {
-                                                let! r = executeWith defaultExecuteDeps options childId None
-                                                let output = outputFromResult r
-                                                appendRunnerLog childId output
-                                                if parentId <> "" then appendRunnerLog parentId output
-                                                return r
-                                            })
-                                let onSignalAbort () =
-                                    if parentId <> "" then abortRunnerJob parentId |> ignore
-                                    if childId <> "" then abortExecutorRun childId
-                                let! result = raceWithAbortSignal signal onSignalAbort runWork
-                                let output = outputFromResult result
-                                if not (shouldSummarize byteLength output) then
+                        if System.String.IsNullOrWhiteSpace what then
+                            return errorResult "Executor: what_to_summarize is required."
+                        else
+                            try
+                                let! child = createChildSession pi ctx ompRunnerChildToolNames None [||] None
+                                childHolder <- Some child
+                                let childSession = child.session
+                                let childCtx = createObj [ "sessionManager", Dyn.get childSession "sessionManager" ]
+                                let childId = getSessionIdFromContext childCtx |> Option.defaultValue ""
+                                if childId = "" then
                                     finishJob ()
-                                    return textResult output
+                                    return errorResult "Executor child session unavailable"
                                 else
-                                    let summaryPrompt =
-                                        executorSummarizerPrompt what output lang program deps "executor" mode
-                                    do! childSession?prompt(summaryPrompt) |> unbox<JS.Promise<unit>>
-                                    do! childSession?waitForIdle() |> unbox<JS.Promise<unit>>
-                                    let sm = Dyn.get childSession "sessionManager"
-                                    let text = readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
-                                    finishJob ()
-                                    return textResult text
-                        with ex ->
-                            finishJob ()
-                            if hasErrorName ex "AbortError" then return textResult "Executor aborted."
-                            else return asErrorResult ex
+                                    if parentId <> "" then
+                                        registerActiveRunnerSession parentId
+                                        registerRunnerChild parentId childId disposeChild
+                                    let options =
+                                        { program = program
+                                          language = parseLanguage lang
+                                          dependencies = deps
+                                          timeoutType = timeoutType
+                                          mode = mode
+                                          cwd = Some (Dyn.str ctx "cwd")
+                                          whatToSummarize = what }
+                                    let runWork =
+                                        sessionExecutor.EnqueuePerSession(
+                                            childId,
+                                            fun () ->
+                                                promise {
+                                                    let! r = executeWith defaultExecuteDeps options childId None
+                                                    let output = outputFromResult r
+                                                    appendRunnerLog childId output
+                                                    if parentId <> "" then appendRunnerLog parentId output
+                                                    return r
+                                                })
+                                    let onSignalAbort () =
+                                        if parentId <> "" then abortRunnerJob parentId |> ignore
+                                        if childId <> "" then abortExecutorRun childId
+                                    let! result = raceWithAbortSignal signal onSignalAbort runWork
+                                    let output = outputFromResult result
+                                    if not (shouldSummarize byteLength output) then
+                                        finishJob ()
+                                        return textResult output
+                                    else
+                                        let summaryPrompt =
+                                            executorSummarizerPrompt what output lang program deps "executor" mode
+                                        do! childSession?prompt(summaryPrompt) |> unbox<JS.Promise<unit>>
+                                        do! childSession?waitForIdle() |> unbox<JS.Promise<unit>>
+                                        let sm = Dyn.get childSession "sessionManager"
+                                        let text = readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
+                                        finishJob ()
+                                        return textResult text
+                            with ex ->
+                                finishJob ()
+                                if hasErrorName ex "AbortError" then return textResult "Executor aborted."
+                                else return asErrorResult ex
                     })
         ])
 

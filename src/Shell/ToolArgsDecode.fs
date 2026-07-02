@@ -37,6 +37,7 @@ let private mapExecutor (e: ExecutorToolsCodec.ExecutorArgs) : Wanxiangshu.Kerne
         Dependencies = e.Dependencies
         TimeoutType = e.TimeoutType
         Mode = e.Mode
+        WhatToSummarize = e.WhatToSummarize
     }
 
 let private mapTodoItem (t: WorkBacklogToolsCodec.TodoItem) : Wanxiangshu.Kernel.ToolArgs.TodoItem =
