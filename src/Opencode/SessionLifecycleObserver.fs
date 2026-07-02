@@ -48,9 +48,17 @@ type SessionLifecycleObserver
                 do! client?session?prompt(sid, box text) |> Promise.map ignore
             with _ -> ()
         }
-    let mutable runtimeState = emptyRuntimeState
-    let mutable retryPendingSessions = Set.empty<string>
     let resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
+
+    let isNaturalStop (eventType: string) (props: obj) : bool =
+        if eventType = "session.idle" then true
+        elif eventType = "session.status" then
+            let statusObj = Dyn.get props "status"
+            let status =
+                let fromStatus = Dyn.str statusObj "status"
+                if fromStatus <> "" then fromStatus else Dyn.str statusObj "type"
+            status = "idle"
+        else false
 
     member _.handleChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
         let text = getPartsText parts
@@ -129,26 +137,14 @@ type SessionLifecycleObserver
                 | Some envelope ->
                     let eventType = envelope.EventType
                     let props = envelope.Props
-                    match eventType with
-                    | "session.next.step.failed" ->
-                        let errorObj = Dyn.get props "error"
-                        let errorType = if Dyn.isNullish errorObj then "" else Dyn.str errorObj "type"
-                        if errorType = "unknown" || errorType = "aborted" then
-                            let sid = getSessionID eventType props
-                            if sid <> "" then retryPendingSessions <- Set.add sid retryPendingSessions
-                    | "session.next.prompted" ->
-                        let sid = getSessionID eventType props
-                        if sid <> "" then retryPendingSessions <- Set.remove sid retryPendingSessions
-                    | _ -> ()
                     let sessionIDStr = getSessionID eventType props
                     match Id.trySessionId sessionIDStr with
                     | None -> ()
                     | Some sessionID ->
-                        if not (Set.contains sessionIDStr retryPendingSessions) then
+                        if isNaturalStop eventType props then
                             match getClientFromPluginCtx ctx with
                             | Ok client ->
-                                let! newState = startNudgeFlow runtimeState client sessionID
-                                runtimeState <- newState
+                                do! dispatchPostStopFromHistory client sessionID
                             | Error _ -> ()
         }
 

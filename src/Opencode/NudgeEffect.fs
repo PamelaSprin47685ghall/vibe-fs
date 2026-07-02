@@ -165,3 +165,9 @@ let startNudgeFlow (runtimeState: NudgeRuntimeState) (client: obj) (sessionID: S
         sid
         (fun () -> collectSnapshot client sessionID)
         (fun promptText agentOpt -> sendNudgeOutcome client sessionID promptText agentOpt)
+
+let dispatchPostStopFromHistory (client: obj) (sessionID: SessionId) : JS.Promise<unit> =
+    promise {
+        let! _ = startNudgeFlow emptyRuntimeState client sessionID
+        return ()
+    }

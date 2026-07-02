@@ -13,10 +13,9 @@ let submitReviewWipToolClearsNudgeDedup = Wanxiangshu.Kernel.Nudge.SubmitReviewH
 
 let deriveAlreadyNudged (tailTexts: string list) : bool =
     tailTexts
-    |> List.fold (fun nudged text ->
-        if isSubmitReviewWipProgressOutput text then false
-        elif isNudgePrompt text then true
-        else nudged) false
+    |> List.filter (fun text -> text.Trim() <> "")
+    |> List.tryLast
+    |> Option.exists isNudgePrompt
 
 type SnapshotInput =
     { tailTexts: string list
@@ -48,11 +47,12 @@ let deriveAction
     elif snapshot.todos.IsEmpty && not snapshot.isLoopActive && not snapshot.hasActiveRunner then NudgeNone
     else
         let text = snapshot.lastAssistantMessage.Trim()
-        if isQuestion text then NudgeNone
+        if text = "" || isQuestion text then NudgeNone
         elif skipsTodo text || skipsLoop text then NudgeNone
         else
             let desired =
-                if snapshot.hasActiveRunner && snapshot.todos.IsEmpty && not snapshot.isLoopActive then NudgeRunner
+                if snapshot.hasActiveRunner && not snapshot.todos.IsEmpty then NudgeNone
+                elif snapshot.hasActiveRunner && snapshot.todos.IsEmpty && not snapshot.isLoopActive then NudgeRunner
                 elif not snapshot.todos.IsEmpty then NudgeTodo
                 elif snapshot.isLoopActive then NudgeLoop
                 else NudgeNone

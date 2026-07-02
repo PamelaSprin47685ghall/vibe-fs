@@ -6,6 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.IntegrationEventTestsMux
 open Wanxiangshu.Tests.IntegrationEventTestsMuxWrappers
 open Wanxiangshu.Tests.IntegrationEventTestsOpencode
+open Wanxiangshu.Tests.IntegrationEventTestsOpencodeCompaction
 open Wanxiangshu.Tests.IntegrationEventTestsOpencodeLoop
 open Wanxiangshu.Tests.IntegrationEventTestsOpencodeFallback
 open Wanxiangshu.Tests.TempWorkspace
@@ -39,6 +40,8 @@ let run () : JS.Promise<unit> =
         do! fallbackRetryWithoutFrontmatterSpec ()
         do! repeatedAssistantSpec ()
         do! repeatedIdleBeforeHistoryPersistsNudgeSpec ()
+        do! sessionStatusIdleAndSessionIdleDedupSpec ()
+        do! sessionStatusBusyDoesNotNudgeSpec ()
         do! opencodeLoopNudgeSpec ()
         do! opencodeBrowserSubsessionHistoryDoesNotLoopNudgeSpec ()
         do! opencodeFreshChatMessageRearmsLoopNudgeSpec ()

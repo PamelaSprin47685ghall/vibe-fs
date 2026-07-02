@@ -347,6 +347,7 @@
     <Compile Include="tests/IntegrationEventTestsMux.fs" />
     <Compile Include="tests/IntegrationEventTestsMuxWrappers.fs" />
     <Compile Include="tests/IntegrationEventTestsOpencode.fs" />
+    <Compile Include="tests/IntegrationEventTestsOpencodeCompaction.fs" />
     <Compile Include="tests/IntegrationEventTestsOpencodeLoop.fs" />
     <Compile Include="tests/IntegrationEventTestsOpencodeFallback.fs" />
     <Compile Include="tests/IntegrationEventTests.fs" />

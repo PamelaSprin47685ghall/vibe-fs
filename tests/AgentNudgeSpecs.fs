@@ -13,6 +13,12 @@ let private snap todos msg alreadyNudged agent isLoop : Wanxiangshu.Kernel.Nudge
       lastAssistantIsCompaction = false; anchorPromptIssued = false
       hasActiveRunner = false }
 
+let private snap' todos msg alreadyNudged agent isLoop hasActiveRunner : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
+    { todos = todos; lastAssistantMessage = msg; isLoopActive = isLoop
+      alreadyNudged = alreadyNudged; agentFromMessage = agent
+      lastAssistantIsCompaction = false; anchorPromptIssued = false
+      hasActiveRunner = hasActiveRunner }
+
 let decision () =
     equal "todos -> NudgeTodo" NudgeTodo (deriveAction (snap [ "a" ] "working" false None false) None None)
     equal "todos+question -> None" NudgeNone (deriveAction (snap [ "a" ] "what now?" false None false) None None)
@@ -20,6 +26,8 @@ let decision () =
     equal "nothing -> None" NudgeNone (deriveAction (snap [] "ok" false None false) None None)
     equal "loop -> NudgeLoop" NudgeLoop (deriveAction (snap [] "ok" false None true) None None)
     equal "loop+skip -> None" NudgeNone (deriveAction (snap [] "done <skip-loop-check />" false None true) None None)
+    equal "todos+activeRunner -> None (regression: agent still working must not nudge todo)"
+        NudgeNone (deriveAction (snap' [ "a" ] "working" false None false true) None None)
 
 let dedup () =
     let s = snap [ "a" ] "working" false None false

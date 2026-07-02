@@ -96,6 +96,14 @@ type NudgeRuntime
                 | "text" ->
                     let t = Dyn.get part "text"
                     if Dyn.isNullish t then None else Some (string t)
+                | "tool" | "dynamic-tool" ->
+                    let output =
+                        let direct = Dyn.get part "output"
+                        if not (Dyn.isNullish direct) then string direct
+                        else
+                            let state = Dyn.get part "state"
+                            if Dyn.isNullish state then "" else string (Dyn.get state "output")
+                    if output = "" then None else Some output
                 | _ -> None)
 
     let collectSnapshotMux (helpers: obj) (workspaceId: string) () : JS.Promise<SessionSnapshot option> =

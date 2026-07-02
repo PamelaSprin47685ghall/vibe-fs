@@ -16,8 +16,10 @@ let private snap todos msg alreadyNudged agent : Wanxiangshu.Kernel.Nudge.Types.
 let alreadyNudgedFromTailTexts' () =
     check "tail loop nudge only -> true" (deriveAlreadyNudged [ loopNudgePrompt ])
     check "tail wip ack only -> false" (not (deriveAlreadyNudged [ submitReviewWipAcknowledgment ]))
-    check "loop nudge then wip ack -> false"
+    check "loop nudge then wip ack -> false when wip ack is last"
         (not (deriveAlreadyNudged [ loopNudgePrompt; submitReviewWipAcknowledgment ]))
+    check "only last tail text counts: nudge buried under user reply -> false"
+        (not (deriveAlreadyNudged [ loopNudgePrompt; "user continued" ]))
     check "todo nudge tail -> true" (deriveAlreadyNudged [ todoNudgePrompt ])
     check "empty tail -> false" (not (deriveAlreadyNudged []))
 

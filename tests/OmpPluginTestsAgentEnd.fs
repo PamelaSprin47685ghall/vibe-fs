@@ -17,13 +17,20 @@ let agentEndRunnerNudgeBeforeLoop () = promise {
     let pi = piObject h
     do! wanxiangshuExtension pi
     setRunnerJobStateForTest "session-1" "running"
+    let assistantEntry =
+        createObj [
+            "message", box (createObj [
+                "role", box "assistant"
+                "content", box [| createObj [ "type", box "text"; "text", box "waiting on background runner" ] |]
+            ])
+        ]
     let ctx =
         createObj [
             "sessionManager",
                 box(
                     createObj [
                         "getSessionId", box(fun () -> box "session-1")
-                        "getEntries", box(fun () -> box [||])
+                        "getEntries", box(fun () -> box [| assistantEntry |])
                     ])
             "hasPendingMessages", box(fun () -> box false)
         ]
@@ -113,10 +120,17 @@ let agentEndTodoNudgeWhenOpenPhases () = promise {
     let h = createPiHarness ()
     let pi = piObject h
     do! wanxiangshuExtension pi
+    let assistantEntry =
+        createObj [
+            "message", box (createObj [
+                "role", box "assistant"
+                "content", box [| createObj [ "type", box "text"; "text", box "paused with open todos" ] |]
+            ])
+        ]
     let sm =
         createObj [
             "getSessionId", box(fun () -> box "session-todo")
-            "getEntries", box(fun () -> box (todoPhaseEntries ()))
+            "getEntries", box(fun () -> Array.append (todoPhaseEntries ()) [| assistantEntry |])
         ]
     let ctxEnd =
         createObj [
