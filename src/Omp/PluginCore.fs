@@ -98,13 +98,13 @@ let registerAbortHandler (pi: obj) (reviewStore: ReviewStore)
                         match fallbackHandler with
                         | None ->
                             reviewStore.deactivateReview sid
-                            Wanxiangshu.Omp.NudgeRuntime.clearNudgeSession sid
+                            Wanxiangshu.Omp.NudgeRuntime.markSessionForceStopped sid
                         | Some handler ->
                             let rawEvent = createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
                             let! r = handler rawEvent
                             if not r.Consumed then
                                 reviewStore.deactivateReview sid
-                                Wanxiangshu.Omp.NudgeRuntime.clearNudgeSession sid
+                                Wanxiangshu.Omp.NudgeRuntime.markSessionForceStopped sid
                     elif fallbackEventTypes.Contains evtType then
                         match fallbackHandler with
                         | Some handler ->

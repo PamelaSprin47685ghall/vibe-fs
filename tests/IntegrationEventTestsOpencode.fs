@@ -211,3 +211,32 @@ let reusedSessionSpec () = promise {
     check "reused session nudges after session.deleted" (promptCalls.Count = 2)
     do! rmAsync workspaceDir
 }
+
+let opencodeForceStopTodoNudgeSpec () = promise {
+    let sessionID = "force-stop-ws"
+    let mutable messages = [|
+        box {| info = box {| role = "assistant"; agent = "manager"; finish = "stop"; time = box {| completed = 1 |} |}
+               parts = [| box {| ``type`` = "text"; text = "working on it" |} |] |}
+    |]
+    let promptCalls = ResizeArray<obj>()
+    let mkClient () =
+        createObj [ "session", box (createObj [
+            "todo", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                promise { return box {| data = [| box {| id = "todo-1"; content = "task"; status = "in_progress" |} |] |} }))
+            "messages", box (System.Func<unit, JS.Promise<obj>>(fun () ->
+                promise { return box {| data = messages |} }))
+            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg ->
+                promise { promptCalls.Add(arg) }))
+        ]) ]
+    let! workspaceDir = mkdtempAsync "force-stop-"
+    let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
+    let eventHook = get p "event"
+    let mkEvent typ props =
+        box {| event = box {| ``type`` = typ; properties = props |} |}
+    do! eventHook $ (mkEvent "stream-abort" (box {| sessionID = sessionID |})) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    do! eventHook $ (mkEvent "session.idle" (box {| sessionID = sessionID |})) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    check "force-stop must not send todo nudge" (promptCalls.Count = 0)
+    do! rmAsync workspaceDir
+}

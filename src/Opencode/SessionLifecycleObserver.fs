@@ -34,6 +34,8 @@ type SessionLifecycleObserver
     , backlogSession    : Wanxiangshu.Opencode.BacklogSession.BacklogSession
     ) =
 
+    let mutable forceStoppedSessions: Set<string> = Set.empty
+
     let abortSession (client: obj) (sid: string) : JS.Promise<unit> =
         promise {
             try
@@ -105,6 +107,29 @@ type SessionLifecycleObserver
                         fallbackRuntime.SetAgentName sid agentName
             | _ -> ()
 
+            // Track force-stopped sessions to block nudge after abort
+            match eventEnvelope with
+            | Some envelope ->
+                let sessionIDStr = getSessionID envelope.EventType envelope.Props
+                if sessionIDStr <> "" then
+                    match envelope.EventType with
+                    | "stream-abort" ->
+                        forceStoppedSessions <- Set.add sessionIDStr forceStoppedSessions
+                    | "session.error" ->
+                        let errorObj = Dyn.get envelope.Props "error"
+                        if not (Dyn.isNullish errorObj) then
+                            let name = Dyn.str errorObj "name"
+                            let tag = Dyn.str errorObj "_tag"
+                            let msg = Dyn.str errorObj "message"
+                            if name = "AbortError" || name = "MessageAbortedError"
+                               || tag = "MessageAborted"
+                               || containsAbortText msg then
+                                forceStoppedSessions <- Set.add sessionIDStr forceStoppedSessions
+                    | "session.next.prompted" ->
+                        forceStoppedSessions <- Set.remove sessionIDStr forceStoppedSessions
+                    | _ -> ()
+            | None -> ()
+
             let! fbConsumed =
                 match fallbackHandler with
                 | Some handler ->
@@ -141,7 +166,8 @@ type SessionLifecycleObserver
                     match Id.trySessionId sessionIDStr with
                     | None -> ()
                     | Some sessionID ->
-                        if isNaturalStop eventType props then
+                        if isNaturalStop eventType props
+                           && not (Set.contains sessionIDStr forceStoppedSessions) then
                             match getClientFromPluginCtx ctx with
                             | Ok client ->
                                 do! dispatchPostStopFromHistory client sessionID

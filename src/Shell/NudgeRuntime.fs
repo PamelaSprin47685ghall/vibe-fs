@@ -18,9 +18,14 @@ open Wanxiangshu.Kernel.ReviewReplayPolicy
 type NudgeRuntimeState =
     { lastSentActions: Map<string, NudgeAction>
       lastSentMessages: Map<string, string>
-      retryPendingSessions: Set<string> }
+      retryPendingSessions: Set<string>
+      forceStoppedSessions: Set<string> }
 
-let emptyRuntimeState = { lastSentActions = Map.empty; lastSentMessages = Map.empty; retryPendingSessions = Set.empty }
+let emptyRuntimeState =
+    { lastSentActions = Map.empty
+      lastSentMessages = Map.empty
+      retryPendingSessions = Set.empty
+      forceStoppedSessions = Set.empty }
 
 let runNudgeFlowCore
     (runtimeState: NudgeRuntimeState)
@@ -183,7 +188,8 @@ type NudgeRuntime
         (takeSnapshot: unit -> JS.Promise<SessionSnapshot option>)
         (sendNudge: string -> string option -> JS.Promise<SendOutcome>)
         : JS.Promise<NudgeRuntimeState> =
-        if Set.contains sessionKey runtimeState.retryPendingSessions then
+        if Set.contains sessionKey runtimeState.retryPendingSessions
+           || Set.contains sessionKey runtimeState.forceStoppedSessions then
             Promise.lift runtimeState
         else
             runNudgeFlowCore runtimeState sessionKey takeSnapshot sendNudge
@@ -213,7 +219,9 @@ type NudgeRuntime
                 let props = envelope.Props
                 let errorObj = Dyn.get props "error"
                 let errorType = if Dyn.isNullish errorObj then "" else Dyn.str errorObj "type"
-                if errorType = "unknown" || errorType = "aborted" then
+                if errorType = "aborted" then
+                    AbortedError (getSessionID envelope.EventType props)
+                elif errorType = "unknown" then
                     StepFailed (getSessionID envelope.EventType props)
                 else Ignore
             | "session.next.prompted" ->
@@ -231,13 +239,20 @@ type NudgeRuntime
                 return ()
             | StreamAbort workspaceId
             | AbortedError workspaceId ->
-                runtimeState <- { runtimeState with lastSentActions = Map.remove workspaceId runtimeState.lastSentActions; lastSentMessages = Map.remove workspaceId runtimeState.lastSentMessages; retryPendingSessions = Set.remove workspaceId runtimeState.retryPendingSessions }
+                runtimeState <-
+                    { runtimeState with
+                        lastSentActions = Map.remove workspaceId runtimeState.lastSentActions
+                        lastSentMessages = Map.remove workspaceId runtimeState.lastSentMessages
+                        forceStoppedSessions = Set.add workspaceId runtimeState.forceStoppedSessions }
                 return ()
             | StepFailed workspaceId ->
                 runtimeState <- { runtimeState with retryPendingSessions = Set.add workspaceId runtimeState.retryPendingSessions }
                 return ()
             | Prompted workspaceId ->
-                runtimeState <- { runtimeState with retryPendingSessions = Set.remove workspaceId runtimeState.retryPendingSessions }
+                runtimeState <-
+                    { runtimeState with
+                        retryPendingSessions = Set.remove workspaceId runtimeState.retryPendingSessions
+                        forceStoppedSessions = Set.remove workspaceId runtimeState.forceStoppedSessions }
                 return ()
         }
 

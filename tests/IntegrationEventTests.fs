@@ -49,4 +49,6 @@ let run () : JS.Promise<unit> =
         do! opencodeCompactionAnchorUsesPriorAgentSpec ()
         do! opencodeNudgeAfterCompactionEmitsAnchorPromptSpec ()
         do! reusedSessionSpec ()
+        do! muxForceStopTodoNudgeSpec ()
+        do! opencodeForceStopTodoNudgeSpec ()
     }

@@ -130,3 +130,40 @@ let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () = promise {
     do! Promise.sleep 0
     check "wip submit_review does not permanently suppress loop nudge" (nudges.Count = 2 && nudges.[1] = loopNudgePrompt)
 }
+
+let muxForceStopTodoNudgeSpec () = promise {
+    let sessionID = "force-stop-ws"
+    let mutable history = [| muxTextMessage "force-assistant-1" "assistant" "working on it" |]
+    let nudges = ResizeArray<string>()
+    let reg =
+        createRegistration
+            (createObj [
+                "loadConfigOrDefault", box (fun () -> createObj [])
+                "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
+                "resolveAgentFrontmatter", box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
+                "getChatHistory", box (System.Func<string, JS.Promise<obj array>>(fun workspaceId -> promise { return if workspaceId = sessionID then history else [||] }))
+            ])
+    let mutable nudgeCount = 0
+    let helpers todoList =
+        createObj [
+            "getTodos", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                (promise { return box (todoList |> List.toArray) })))
+            "nudge", box (System.Func<obj, obj, JS.Promise<bool>>(fun _ws msg ->
+                promise {
+                    nudges.Add(string msg)
+                    nudgeCount <- nudgeCount + 1
+                    return true
+                }))
+        ]
+    let hook = get reg "eventHook"
+    let streamAbort = createObj [ "type", box "stream-abort"; "workspaceId", box sessionID ]
+    let streamEnd ws parts =
+        createObj [ "type", box "stream-end"; "workspaceId", box ws
+                    "properties", box (createObj [ "parts", box parts ]) ]
+    let textPart t = box {| ``type`` = "text"; text = t |}
+    do! hook $ (streamAbort, helpers ["pending"]) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    do! hook $ (streamEnd sessionID [| textPart "working on it" |], helpers ["pending"]) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 0
+    check "force-stop must not send todo nudge" (nudges.Count = 0)
+}
