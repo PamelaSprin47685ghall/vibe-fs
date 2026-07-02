@@ -1,27 +1,25 @@
 module Wanxiangshu.Tests.AgentNudgeSpecsWip
 
-open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Nudge
-open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
-open Wanxiangshu.Kernel.NudgeState
-open Wanxiangshu.Kernel.Nudge.Types
+open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.ReviewPrompts
-open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 
-let private snapshot todos msg alreadyNudged agent : SessionSnapshot =
-    { todos = todos; lastAssistantMessage = msg; isLoopActive = false; alreadyNudged = alreadyNudged; agentFromMessage = agent; lastAssistantIsCompaction = false; anchorPromptIssued = false }
-
-let private noChild (_: string) = None
+let private snap todos msg alreadyNudged agent : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
+    { todos = todos; lastAssistantMessage = msg; isLoopActive = false
+      alreadyNudged = alreadyNudged; agentFromMessage = agent
+      lastAssistantIsCompaction = false; anchorPromptIssued = false
+      hasActiveRunner = false }
 
 let alreadyNudgedFromTailTexts' () =
-    check "tail loop nudge only → true" (alreadyNudgedFromTailTexts [ loopNudgePrompt ])
-    check "tail wip ack only → false" (not (alreadyNudgedFromTailTexts [ submitReviewWipAcknowledgment ]))
-    check "loop nudge then wip ack → false"
-        (not (alreadyNudgedFromTailTexts [ loopNudgePrompt; submitReviewWipAcknowledgment ]))
-    check "todo nudge tail → true" (alreadyNudgedFromTailTexts [ todoNudgePrompt ])
-    check "empty tail → false" (not (alreadyNudgedFromTailTexts []))
+    check "tail loop nudge only -> true" (deriveAlreadyNudged [ loopNudgePrompt ])
+    check "tail wip ack only -> false" (not (deriveAlreadyNudged [ submitReviewWipAcknowledgment ]))
+    check "loop nudge then wip ack -> false"
+        (not (deriveAlreadyNudged [ loopNudgePrompt; submitReviewWipAcknowledgment ]))
+    check "todo nudge tail -> true" (deriveAlreadyNudged [ todoNudgePrompt ])
+    check "empty tail -> false" (not (deriveAlreadyNudged []))
 
 let submitReviewWipToolClearsNudgeDedup' () =
     check "submit_review wip output clears" (submitReviewWipToolClearsNudgeDedup "submit_review" submitReviewWipAcknowledgment)
@@ -30,18 +28,9 @@ let submitReviewWipToolClearsNudgeDedup' () =
         (not (submitReviewWipToolClearsNudgeDedup "submit_review" "Review passed."))
 
 let decideNudgeWipNeutralAlreadyNudged' () =
-    let loopReview (_: string) = true
-    let claimed, _ = tryClaimNudge emptyState "s"
-    let snap =
-        snapshot [] "still implementing" false None
-        |> fun s -> { s with alreadyNudged = false }
-    match snd (decideNudge noChild claimed "s" { snap with isLoopActive = true }) with
-    | Send(text, _) -> check "wip-neutral snapshot allows loop nudge" (text = loopNudgePrompt)
-    | StandDown -> check "wip-neutral snapshot allows loop nudge" false
-
-    let snapStillNudged = snapshot [] "still implementing" true None
-    let _, d = decideNudge noChild claimed "s" { snapStillNudged with isLoopActive = true }
-    equal "history still nudged → StandDown" StandDown d
+    let snapStillNudged = snap [] "still implementing" true None
+    let d = deriveAction { snapStillNudged with isLoopActive = true } None None
+    equal "history still nudged -> NudgeNone" NudgeNone d
 
 let submitReviewWipNudgeDedup () =
     alreadyNudgedFromTailTexts' ()

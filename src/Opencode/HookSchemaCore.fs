@@ -20,6 +20,9 @@ let selectMethodologyFieldDescription = Wanxiangshu.Kernel.Methodology.selectMet
 [<Import("Schema", "effect")>]
 let private effectSchemaNs : obj = jsNative
 
+[<Import("toJSONSchema", "zod/v4")>]
+let private zodToJsonSchema (schema: obj) (opts: obj) : obj = jsNative
+
 /// Write `_ui` directly onto the host's args reference when the tool exposes a
 /// UI label (coder/investigator). The host keeps the same args object it passed
 /// in, so the label survives into the message history the UI reads. Replacing
@@ -72,6 +75,17 @@ let tryBuildJsonSchemaFromEffectSchema (parameters: obj) : obj =
             get document "schema"
     with _ -> null
 
+/// Convert a Zod v4 shape (plain object whose values are Zod schemas) into a
+/// JSON Schema document. Returns null when the input is not a Zod shape.
+let tryBuildJsonSchemaFromZodShape (shape: obj) : obj =
+    try
+        if isNullish shape then null
+        else
+            let wrapped = ToolSchema.call1 ToolSchema.schema "object" shape
+            let generated = zodToJsonSchema wrapped (createObj [ "unrepresentable", box "any"; "target", box "draft-2020-12" ])
+            if isNullish generated then null else generated
+    with _ -> null
+
 let rewriteToolJsonSchema (setKey: obj -> string -> obj -> unit) (rewrite: obj -> obj) (output: obj) : unit =
     let jsonSchema = get output "jsonSchema"
     if not (isNullish jsonSchema) then
@@ -87,7 +101,10 @@ let rewriteToolJsonSchema (setKey: obj -> string -> obj -> unit) (rewrite: obj -
         else
             let args = get output "args"
             if not (isNullish args) then
-                let generated = tryBuildJsonSchemaFromEffectSchema args
+                let fromEffect = tryBuildJsonSchemaFromEffectSchema args
+                let generated =
+                    if not (isNullish fromEffect) then fromEffect
+                    else tryBuildJsonSchemaFromZodShape args
                 if not (isNullish generated) then
                     setKey output "jsonSchema" (rewrite generated)
                 else

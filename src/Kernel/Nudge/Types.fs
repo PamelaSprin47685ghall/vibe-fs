@@ -19,7 +19,8 @@ type SessionSnapshot =
       alreadyNudged: bool
       agentFromMessage: string option
       lastAssistantIsCompaction: bool
-      anchorPromptIssued: bool }
+      anchorPromptIssued: bool
+      hasActiveRunner: bool }
 
 type NudgeDecision =
     | StandDown
@@ -64,7 +65,7 @@ type NudgeHostEvent =
     | RetryProgress
     | Other
 
-let emptyState =
+let emptyState: NudgeShellState =
     { nudgedSessions = Set.empty
       stoppedSessions = Set.empty
       retryPendingSessions = Set.empty

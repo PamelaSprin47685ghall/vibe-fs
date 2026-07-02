@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Omp.Codec
@@ -25,9 +26,6 @@ module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Shell.ReviewRuntime
 
-/// Shared helper: filter the active-tool list for the main (non-child) OMP
-/// session. Used by both `session_start` and `before_agent_start` handlers so
-/// the filtering logic lives in one place.
 let applyActiveToolFilterForMainSession (pi: obj) (ctx: obj) : JS.Promise<unit> =
     promise {
         let getActive = Dyn.get pi "getActiveTools"
@@ -35,7 +33,7 @@ let applyActiveToolFilterForMainSession (pi: obj) (ctx: obj) : JS.Promise<unit> 
             if Dyn.typeIs getActive "function" then
                 let rawActive = Dyn.call0 getActive
                 unbox<obj array> rawActive
-                |> Microsoft.FSharp.Collections.Array.map string
+                |> Array.map string
             else
                 [||]
         let filtered = filterOmpMainSessionActiveTools active
@@ -43,9 +41,6 @@ let applyActiveToolFilterForMainSession (pi: obj) (ctx: obj) : JS.Promise<unit> 
             do! pi?setActiveTools(filtered) |> unbox<JS.Promise<unit>>
     }
 
-/// before_agent_start handler: runs the existing cwd + system-prompt patch,
-/// then applies the same active-tool filtering as session_start so that any
-/// tool-list mutation between session start and a new agent turn is caught.
 let beforeAgentStartHandler (pi: obj) (event: obj) (ctx: obj) : JS.Promise<obj> =
     promise {
         let cwd = Dyn.str ctx "cwd"
@@ -55,9 +50,6 @@ let beforeAgentStartHandler (pi: obj) (event: obj) (ctx: obj) : JS.Promise<obj> 
         return patch
     }
 
-/// tool_call handler: pre-execute hook on Pi. Normalises the tool arguments
-/// (patch unification + `_ui` label injection) before the tool runs.
-/// Also blocks child-session-only tools when invoked from the main session.
 let toolCallHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: obj) : JS.Promise<obj> =
     promise {
         let toolName = Dyn.str event "toolName"
@@ -78,8 +70,6 @@ let toolCallHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: ob
             | _ -> return None
     }
 
-/// turn_start handler: re-applies active-tool filtering at the start of each
-/// turn so that tool visibility changes mid-session are caught immediately.
 let turnStartHandler (pi: obj) (_event: obj) (ctx: obj) : JS.Promise<unit> =
     applyActiveToolFilterForMainSession pi ctx
 
@@ -91,10 +81,26 @@ let agentEndHandler (pi: obj) (_reviewStore: ReviewStore) (ctx: obj) : unit =
         let hasPending =
             let fn = Dyn.get ctx "hasPendingMessages"
             Dyn.typeIs fn "function" && Dyn.truthy (Dyn.call0 fn)
-        if hasActiveLoopFromHistory sm && not (Dyn.isNullish sm) && not hasPending then
+        if Dyn.isNullish sm || hasPending then ()
+        else
+            let historyTexts =
+                entries sm |> decodeEntries "" |> extractHistoryTexts
+            let openTodos = openTodoStatuses sm
             let last = lastAssistantMessage sm
-            match tryLoopNudge sessionId last with
-            | Some NudgeRunner ->
+            let isLoopActive = hasActiveLoopFromHistory sm
+            let hasRunner = hasRunningRunnerJob sessionId
+            let snapshot = deriveSnapshot {
+                tailTexts = historyTexts
+                openTodos = openTodos
+                lastAssistantText = last
+                agentFromMessage = None
+                isLoopActive = isLoopActive
+                lastAssistantIsCompaction = false
+                hasActiveRunner = hasRunner
+            }
+            match deriveAction snapshot None None with
+            | NudgeNone -> ()
+            | NudgeRunner ->
                 pi?sendMessage(
                     createObj [
                         "customType", box "wanxiangshu-runner-reminder"
@@ -102,7 +108,7 @@ let agentEndHandler (pi: obj) (_reviewStore: ReviewStore) (ctx: obj) : unit =
                         "display", box false
                     ],
                     createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
-            | Some NudgeLoop ->
+            | NudgeLoop ->
                 pi?sendMessage(
                     createObj [
                         "customType", box "wanxiangshu-loop-reminder"
@@ -110,19 +116,7 @@ let agentEndHandler (pi: obj) (_reviewStore: ReviewStore) (ctx: obj) : unit =
                         "display", box false
                     ],
                     createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
-            | _ -> ()
-        elif not (Dyn.isNullish sm) && not hasPending then
-            let last = lastAssistantMessage sm
-            match tryTodoNudge sessionId sm last with
-            | Some NudgeRunner ->
-                pi?sendMessage(
-                    createObj [
-                        "customType", box "wanxiangshu-runner-reminder"
-                        "content", box (runnerReminderContent ())
-                        "display", box false
-                    ],
-                    createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
-            | Some NudgeTodo ->
+            | NudgeTodo ->
                 pi?sendMessage(
                     createObj [
                         "customType", box "wanxiangshu-todo-reminder"
@@ -130,4 +124,3 @@ let agentEndHandler (pi: obj) (_reviewStore: ReviewStore) (ctx: obj) : unit =
                         "display", box false
                     ],
                     createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
-            | _ -> ()
