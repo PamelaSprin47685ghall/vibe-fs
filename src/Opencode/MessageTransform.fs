@@ -146,7 +146,10 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                 replaceArrayInPlace messagesArr final
     }
 
-let compactingHandlerFor (_host: Host) (backlogSession: BacklogSession) (_client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
+let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
+    unbox (target?(method)(arg))
+
+let compactingHandlerFor (host: Host) (backlogSession: BacklogSession) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
@@ -162,6 +165,38 @@ let compactingHandlerFor (_host: Host) (backlogSession: BacklogSession) (_client
                         backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
                     let afterBacklog = applyBacklogProjection sessionID false backlogOps cleaned
                     let encoded = MessagingCodec.encodeMessages afterBacklog
+                    // compaction anchor prompt injection (mirrors Mux compactingTransform)
+                    let backlogEntries = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
+                    let anchorTexts =
+                        cleaned
+                        |> List.collect (fun m -> m.parts)
+                        |> List.choose (function
+                            | TextPart t -> Some t
+                            | ToolPart(_, _, Some s, _) -> Some s.output
+                            | _ -> None)
+                    let promptText = BacklogProjectionCore.buildCompactionAnchorPrompt backlogEntries (fun () -> anchorTexts)
+                    if not (System.String.IsNullOrEmpty(promptText)) && sessionID <> "" then
+                        match getSessionApiFromClient client with
+                        | Ok session ->
+                            try
+                                let! messagesResp = invoke1 (box {| path = box {| id = sessionID |} |}) "messages" session
+                                let messagesData = Wanxiangshu.Shell.Dyn.get messagesResp "data"
+                                let historyTexts =
+                                    if Wanxiangshu.Shell.Dyn.isNullish messagesData || not (Wanxiangshu.Shell.Dyn.isArray messagesData) then Seq.empty
+                                    else extractTextsFromEncodedMessages (messagesData :?> obj array)
+                                if Seq.exists hasCompactionAnchorPrompt historyTexts |> not then
+                                    let priorAgent =
+                                        cleaned
+                                        |> List.rev
+                                        |> List.tryPick (fun m ->
+                                            if m.info.role = Assistant && not (Wanxiangshu.Kernel.Nudge.TodoStatus.isSyntheticAssistantAgent m.info.agent) then
+                                                Some m.info.agent
+                                            else None)
+                                    let body = createPromptBody priorAgent promptText
+                                    let promptArg = box {| path = box {| id = sessionID |}; body = body |}
+                                    do! invoke1 promptArg "prompt" session |> Promise.map ignore
+                            with _ -> ()
+                        | Error _ -> ()
                     replaceArrayInPlace messagesArr encoded
     }
 
