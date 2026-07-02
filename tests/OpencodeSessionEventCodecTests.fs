@@ -1,7 +1,6 @@
 module Wanxiangshu.Tests.OpencodeSessionEventCodecTests
 
 open Wanxiangshu.Tests.OpencodeSessionEventCodecTestsSession
-open Wanxiangshu.Tests.OpencodeSessionEventCodecTestsNudge
 
 let run () =
     getSessionIDFromPropsPrefersPropsKey ()
@@ -32,17 +31,3 @@ let run () =
     decodeLastAssistantDetectsAlreadyNudged ()
     createPromptBodyWithoutAgent ()
     createPromptBodyWithAgent ()
-    decodeNudgeHostEventStreamAbort ()
-    decodeNudgeHostEventSessionLifecyclePure ()
-    decodeNudgeHostEventSessionIdle ()
-    decodeNudgeHostEventRetryProgressByName ()
-    decodeNudgeHostEventUnknown ()
-    decodeNudgeHostEventMessageUpdatedCompleted ()
-    decodeNudgeHostEventMessageUpdatedAborted ()
-    decodeNudgeHostEventMessageUpdatedNoChange ()
-    decodeNudgeHostEventMessagePartUpdatedRetry ()
-    decodeNudgeHostEventMessagePartUpdatedAborted ()
-    decodeNudgeHostEventSessionStatusBusy ()
-    decodeNudgeHostEventSessionStatusUnknownFallsToOther ()
-    decodeNudgeHostEventSessionPromptedFromPartsFallback ()
-    decodeNudgeHostEventSessionPromptedFromPromptText ()

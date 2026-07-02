@@ -4,7 +4,7 @@
 
 ## 0. 一句话定义
 
-万象术是一个经 **Fable 编译为 JavaScript** 的多代理插件运行时：同一套 **Kernel（纯领域规则）+ Shell（副作用边界）** 落到 **四套宿主适配面**（OpenCode、Mimocode、Mux、oh-my-pi OMP），向主会话 LLM 暴露子代理委派、文件与模糊搜索、执行器、**With-Review Mode**（`/loop`）、可选 **knowledge graph**（`kg/` 门控）、nudge、以及 **`Registry.allSchemas` 所列全部** `methodology_*` 结构化笔记本工具（当前源码 **54** 个 methodology id）；长会话通过 **backlog 投影 + YAML front-matter 锚点** 在重启后尽量恢复 review / todo / KG 语义。
+万象术是一个经 **Fable 编译为 JavaScript** 的多代理插件运行时：同一套 **Kernel（纯领域规则）+ Shell（副作用边界）** 落到 **四套宿主适配面**（OpenCode、Mimocode、Mux、oh-my-pi OMP），向主会话 LLM 暴露子代理委派、文件与模糊搜索、执行器、**With-Review Mode**（`/loop`）、可选 **knowledge graph**（`kg/` 门控）、nudge、**Fallback 模型降级**（完全平方数启发式 + 实际 continue 探测）、**WarnTdd**（修改类工具必须声明 TDD 纪律）、以及 **`Registry.allSchemas` 所列全部** `methodology_*` 结构化笔记本工具（当前源码 **54** 个 methodology id）；长会话通过 **backlog 投影 + YAML front-matter 锚点** 在重启后尽量恢复 review / todo / KG 语义。
 
 ---
 
@@ -25,7 +25,7 @@
 ### 1.2 解决方案（产品形态）
 
 - **一套内核、四套接线**：`src/Kernel/` + `src/Shell/` + `src/Opencode/` | `src/Mux/` | `src/Omp/` + `src/Methodology/`。
-- **历史优先于内存**：review 任务从对话 front-matter 折叠（`inferReviewTaskFromTexts`）；todo 进度从 `completedWorkReport` 回放为 backlog；KG 从 `kg/*.ndjson` 事件流折叠。
+- **历史优先于内存**：review 任务从对话 front-matter 折叠（`inferReviewTaskFromTexts`）；todo 进度从五份交接报告（`ahaMoments`/`changesAndReasons`/`gotchas`/`lessonsAndConventions`/`plan`）回放为 backlog；KG 从 `kg/*.ndjson` 事件流折叠。
 - **命令可拒、事实宜追加**：工具参数校验失败 → 强类型 `Error` 分支；KG 与 backlog 倾向 append，日维护对历史天文件做 **受控 rewrite**（头行 `rewritten` 标记）。
 - **权限与命名 SSOT**：`ToolCatalog` + `ToolCopy` + `ToolPermission` + `HostTools.normalizeToolName`。
 
@@ -50,8 +50,10 @@
 | With-Review = 有限状态机 + front-matter | `src/Kernel/ReviewSession/*`, `src/Kernel/LoopMessages.fs` |
 | Nudge = 纯决策 + 去重状态机 | `src/Kernel/Nudge/*`, `src/Shell/NudgeRuntime.fs` |
 | Knowledge graph = append + 日维护 rewrite | `src/Kernel/KnowledgeGraph/*`, `src/Shell/KnowledgeGraphFiles.fs` |
-| Todo / backlog = 全量替换 todos + 必填交接报告 | `src/Kernel/WorkBacklog.fs`, `src/Kernel/BacklogProjectionCore.fs` |
+| Todo / backlog = 全量替换 todos + 五份交接报告（ahaMoments 等） | `src/Kernel/WorkBacklog.fs`, `src/Kernel/BacklogProjectionCore.fs` |
 | 工具权限 = 角色 × 语义分类 | `src/Kernel/ToolPermission.fs` |
+| WarnTdd = 修改类工具 TDD 声明 + 副作用确认 | `src/Kernel/WarnTdd.fs` |
+| Fallback = 完全平方数启发式模型降级 | `src/Kernel/FallbackKernel/*` |
 | 方法论笔记本 = 每法一 schema → `methodology_<id>` | `src/Methodology/Registry.fs`, `src/Methodology/SchemaCommon.fs` |
 
 **判定**：去掉 Node / 宿主 `obj` 后仍成立的规则 → Kernel；否则 → Shell 或宿主目录。
@@ -59,7 +61,7 @@
 ### 2.2 历史是事实，内存状态是投影
 
 - Review：`inferReviewTaskFromTexts` 明确声明「历史是 SSOT，store 是可重建投影」（`LoopMessages.fs:53-57`）。
-- Todo：`replayBacklogWith` 从消息流折叠 `completedWorkReport`（`WorkBacklog.fs:49-68`）。
+- Todo：`replayBacklogWith` 从消息流折叠五份交接报告（`BacklogEntry` record，每条含 `ahaMoments`/`changesAndReasons`/`gotchas`/`lessonsAndConventions`/`plan`）；`WorkBacklog.fs` L24-71。
 - KG：NDJSON 日文件 + `projectLatestWins` 折叠；内存 `KnowledgeGraphRuntime` 状态不得替代磁盘事件流。
 - OpenCode **存储**消息：compaction 不删存储（万象阵 PRD 核实口径与万象术重放路径一致）；重放走 `session.messages` 全量路径，而非仅 `experimental.chat.messages.transform` 切片。
 
@@ -156,10 +158,14 @@ Inactive | Active(task) | Locked(task, reviewerId) | Accepted | Rejected(feedbac
 **每次调用必填**（`WorkBacklog.fs` + `WorkBacklogToolsCodec`）：
 
 - `todos[]`：**完整替换**，禁止部分更新。
-- `completedWorkReport`：非空；高密度中文交接（aha、改动原因、坑、约定）。
+- `ahaMoments`：必填；≥1024 字符；高密度中文，记录本工作步骤的关键突破与发现。
+- `changesAndReasons`：必填；≥1024 字符；记录哪些文件或逻辑发生了变更以及每个变更的原因。
+- `gotchas`：必填；≥1024 字符；记录遇到的陷阱、边界情况和意外发现。
+- `lessonsAndConventions`：必填；≥1024 字符；记录后续开发者应遵循的模式、约定或教训。
+- `plan`：必填；≥1024 字符；初次规划时附详细计划并明确说明尚未开始实现；持续工作中描述下一步。
 - `select_methodology[]`：至少一项，枚举 SSOT 在 `Kernel.Methodology.methodologyEnumValues`（与 `MethodologyCatalog` 文案一致）。
 
-**折叠**：`MessageTransformPipeline` → `applyBacklogProjection` 将历史 todo 结果压入 backlog 文本（YAML front-matter + `completed_work[]`）。
+**折叠**：`MessageTransformPipeline` → `applyBacklogProjection` 将历史 todo 结果压入 backlog 文本（YAML front-matter + `completed_work[]`，每项含 `aha_moments`/`changes_and_reasons`/`gotchas`/`lessons_and_conventions`/`plan`）。
 
 ### 3.6 Knowledge Graph（opt-in）
 
@@ -253,6 +259,13 @@ Compaction 补锚点：
 | `experimental.session.compacting` | backlog 与折叠协作 |
 | `experimental.chat.system.transform` | system 侧变换 |
 | `__knowledgeGraphRuntime` | 测试钩子（非生产契约） |
+
+**`tool.definition` 行为**（`ToolDefinitionHooks.fs`）：对每个工具 id，按优先级处理：
+
+1. `todoWriteToolNameFor host` → 设置 `jsonSchema` 为 `buildWorkBacklogSchema()`（Mimocode 额外走 `mergeWorkBacklogReportIntoTaskSchema` 注入 Zod safeExtend）。
+2. `isModificationTool`（coder、executor、write、edit、apply_patch、patch、pty_* 等）→ 设置 `description` + `jsonSchema`，再调用 `injectWarnTddIntoJsonSchema` 注入 `warn_tdd` 必填字段。
+3. 其余非修改工具 → 设置 `description` + `jsonSchema` 为 `buildWorkBacklogSchema()` 基线。
+4. 若 `isWarnRequiredTool`（executor、pty_*）→ 额外调用 `injectWarnIntoJsonSchema` 注入 `warn` 必填字段。
 
 **Client 能力**（实现依赖 `@opencode-ai/plugin`，与万象阵 PRD §4.2 同族）：`session.prompt`、`session.messages`、`session.create`、`session.command`、`event.subscribe` 等；具体封装在 `Shell.OpencodeClientCodec`、`OpencodeSessionEventCodec`。
 
@@ -396,7 +409,7 @@ ReviewReplaySync.syncReviewFromTexts(store, sessionID, texts)
 
 `WorkBacklog.toolDescriptionFor host` 拼接：
 
-- 必填 `completedWorkReport` + 全量 `todos`；
+- 必填五份交接报告字段（`ahaMoments`/`changesAndReasons`/`gotchas`/`lessonsAndConventions`/`plan`，每项 ≥1024 字符）+ 全量 `todos`；
 - `Methodology.selectMethodologyFieldDescription`（长枚举 + 定义附录，与 `todowrite` 工具 schema 一致）。
 
 ### 7.2 select_methodology 与工具结果
@@ -500,6 +513,8 @@ appendDraftsUnderLock / serializedWrite
 | 无 TODO/FIXME/HACK；无 legacy 输出标记 | 卫生 |
 | 工具 args 必经 codec | 禁 inline Dyn 解析 |
 | Opencode HookSchema 禁本地 zod / 禁重复 selectMethodology | SSOT |
+| FallbackKernel 无 Dyn/Shell/Node 引用；Fallback 相关文件无 setTimeout/setInterval/Date.now | 零定时器 + Kernel 纯度 |
+| Omp/Fallback* 无 Opencode/Mux 引用 | Omp 隔离 |
 
 注册表：`tests/TestsArchitectureRegistry.fs` + `TestsArchitectureRegistryB.fs`（约 100 项）。
 
@@ -527,7 +542,7 @@ npm run build-and-test
 用户: /loop 实现 PRD.md 中与万象阵同密度的章节
 → command.execute.before: activateReview, 注入 task front-matter 消息
 → LLM 调用 read/investigator/...
-→ LLM 调用 todowrite(task, completedWorkReport, select_methodology, todos全量)
+→ LLM 调用 todowrite(todos全量, ahaMoments, changesAndReasons, gotchas, lessonsAndConventions, plan, select_methodology)
 → transform: backlog 投影进上下文
 ```
 
@@ -562,7 +577,8 @@ transform 注入 knowledge_graph prelude
 | 场景 | 行为 |
 |------|------|
 | 无 `kg/` | 不注册 KG 工具；transform 不注入 KG prelude |
-| todowrite 缺 `completedWorkReport` | codec `InvalidIntent`；错误可折叠进 backlog 正文（`BacklogProjectionCore`） |
+| todowrite 缺任一交接报告字段 | codec `InvalidIntent`（字段名 + reason）；错误可折叠进 backlog 正文（`BacklogProjectionCore`） |
+| todowrite 交接报告字段 <1024 字符 | codec `InvalidIntent`；拒绝并提示最小长度 |
 | review 已 active 再 `/loop` | `reviewAlreadyActiveMessage` |
 | bookkeeper 重复提交 | 历史幂等门拒绝第二条 `return_bookkeeper` |
 | 端口锁超时 | 写失败；调用方重试；不静默丢事实 |
@@ -771,7 +787,7 @@ Notebook 输入渲染：`renderInputYaml` 写入 methodology 笔记本文件（S
 
 ### 22.3 与 todowrite 的耦合
 
-- `todowrite` / `task`（Mimocode）必填 `select_methodology[]`，枚举与 `Kernel.Methodology.methodologyEnumValues` 一致。
+- `todowrite` / `task`（Mimocode）必填五份交接报告（≥1024 字符/项）+ `select_methodology[]`，枚举与 `Kernel.Methodology.methodologyEnumValues` 一致。
 - 工具描述尾部拼接 `MethodologyCatalog` 长文（`WorkBacklog.toolDescriptionFor`）。
 
 ### 22.4 注册路径
@@ -951,7 +967,7 @@ ToolExecute / SubagentToolExecute / MuxSubagentToolExecute
   → 模型所见上下文
 ```
 
-Compaction：`experimental.session.compacting` 与 `BacklogSession` 保留 durable 交接，不替代 `completedWorkReport` 义务。
+Compaction：`experimental.session.compacting` 与 `BacklogSession` 保留 durable 交接，不替代五份交接报告义务。
 
 ---
 
@@ -959,17 +975,19 @@ Compaction：`experimental.session.compacting` 与 `BacklogSession` 保留 durab
 
 ### 31.1 运行器
 
-`tests/runner.js` → `build/tests/Tests.js` `runAll`；失败 exit code 非 0。
+- `tests/runner.js` → `build/tests/Tests.js` `runAll`；失败 exit code 非 0。
+- `e2e/harness.js` + `e2e/mock-llm.js`：端到端插件测试框架，mock LLM 响应、工具 round-trip、插件热身。测试用例在 `e2e/Tests.fs`。
 
 ### 31.2 测试分层
 
 | 层级 | 示例 |
 |------|------|
-| 纯 Kernel | `KernelTests.fs`, `ReviewTests.fs`, `KnowledgeGraphKernelTests.fs` |
-| Shell codec | `*CodecTests.fs`, `ToolArgsDecodeTests.fs` |
+| 纯 Kernel | `KernelTests.fs`, `ReviewTests.fs`, `KnowledgeGraphKernelTests.fs`, `FallbackKernelTests.fs` |
+| Shell codec | `*CodecTests.fs`, `ToolArgsDecodeTests.fs`, `FallbackConfigCodecTests.fs`, `FallbackEventBridgeTests.fs`, `FallbackRuntimeStateTests.fs` |
 | 架构 | `ArchitectureTests*.fs` + `TestsArchitectureRegistry*.fs` |
-| 集成 | `IntegrationPluginTests.fs`, `IntegrationMux*`, `IntegrationOpencodeReviewSpecs.fs` |
+| 集成 | `IntegrationPluginTests.fs`, `IntegrationMux*`, `IntegrationOpencodeReviewSpecs.fs`, `FallbackIntegrationTests.fs` |
 | OMP | `OmpPluginTests.fs`, `OmpKnowledgeGraphRuntimeTests.fs`, … |
+| E2E | `e2e/Tests.fs`（mock-llm + harness + 插件热身 + 工具 round-trip） |
 
 ### 31.3 集成探针（契约锁定）
 
@@ -1003,6 +1021,9 @@ Compaction：`experimental.session.compacting` 与 `BacklogSession` 保留 durab
 | Review 非法转移 | `transition` 返回 None | StateMachine.fs:18 |
 | submit_review 非 active | ToolCopy 拒绝语 | ToolCopy.fs |
 | 文件 >300 行（产码） | 架构测试失败 | ArchitectureTestsFoundation |
+| Fallback 链全部耗尽 | consumed=false → Nudge 感知失败 → 传播给父代理 | FallbackHooks + NudgeRuntime |
+| Fallback 模型错误（401/429/5xx） | 拦截 + 切换 fallback 链中下一个模型 | FallbackKernel.StateMachine |
+| Modification 工具缺 warn_tdd | tool.execute.before 拒绝并提示 canonical value | WarnTdd.parseWarnTdd |
 
 ---
 
@@ -1030,6 +1051,7 @@ Compaction：`experimental.session.compacting` 与 `BacklogSession` 保留 durab
 ### 35.1 环境变量（示例）
 
 - `STEALTH_BROWSER_MCP_REF`：stealth browser MCP 命令解析
+- `SEMBLE_MCP_REF`：semble MCP server 版本 ref（若启用）
 - 测试钩子：`PluginCore` 可读 `ctx.nowMs` 固定时间
 
 ### 35.2 工作区文件
@@ -1049,7 +1071,7 @@ Compaction：`experimental.session.compacting` 与 `BacklogSession` 保留 durab
 
 ### 36.1 已交付（本 PRD 描述现状）
 
-四宿主、ToolCatalog、methodology 全注册、review+replay、backlog、kg 门控、架构测试、npm 包 exports。
+四宿主、ToolCatalog、methodology 全注册、review+replay、backlog、kg 门控、架构测试、npm 包 exports、**Fallback 模型降级**（完全平方数启发式 + 实际 continue 探测 + 三宿主适配）、**WarnTdd**（修改类工具 TDD 声明 + warn 副作用确认）、e2e 测试基础设施。
 
 ### 36.2 可演进
 
@@ -1069,6 +1091,7 @@ Compaction：`experimental.session.compacting` 与 `BacklogSession` 保留 durab
 | 允许 manager 默认 fuzzy_grep | 权限矩阵显式拒绝 |
 | 在架构测试中放行 >300 行产码文件 | 铁律 |
 | 默认开启 KG | 无 `kg/` 不注册 |
+| Fallback 覆盖上下文溢出 | 由 opencode 自身压缩机制处理，Fallback 不干预 |
 
 ---
 
@@ -1084,6 +1107,8 @@ Compaction：`experimental.session.compacting` 与 `BacklogSession` 保留 durab
 | ToolSemantic | 权限分类中间层 |
 | SerialQueue | Promise 链式串行执行 |
 | Bookkeeper | KG 子代理角色 |
+| Fallback | 模型降级状态机（完全平方数启发式 + 实际 continue 探测） |
+| WarnTdd | 修改类工具 TDD 声明 + 副作用确认机制 |
 
 ## 附录 B：与万象阵 PRD 对照
 
@@ -1212,13 +1237,41 @@ OpenCode / Mimocode 插件 JS 由宿主配置指向 `build/src/Opencode/Plugin.j
 
 见 `FileIO.fs`、`Search.fs`、`Web.fs`：`read` 用 `filePath`；`write` 用 `filePath`+`content`；`fuzzy_find`/`fuzzy_grep` 支持 `iterator` 分页；`websearch` 必填 `query`+`what_to_summarize`；`webfetch` 必填 `url`。
 
+### I.6 TodoWrite（todowrite / task）
+
+**todowrite**（`WorkBacklog.fs` + `WorkBacklogToolsCodec.fs`）
+
+- 必填：`todos[]`（每项含 `content`, `status`, `priority`）
+- 必填（≥1024 字符）：`ahaMoments`, `changesAndReasons`, `gotchas`, `lessonsAndConventions`, `plan`
+- 必填：`select_methodology[]`（≥1 项，枚举 SSOT 在 `Registry.enumValues`）
+
+**Mimocode task**：同上五份报告字段 + `select_methodology`，经 `mergeWorkBacklogReportIntoTaskSchema` 注入 Zod schema。
+
+### I.7 WarnTdd 工具集
+
+`WarnTdd.modificationTools`（必须附带 `warn_tdd` 确认字段）：
+
+```
+coder, executor, write, edit, apply_patch, patch,
+ast_edit, ast_grep_replace, file_edit_replace_string, file_edit_insert,
+pty_spawn, pty_write, pty_read, pty_list, pty_kill
+```
+
+`WarnTdd.warnRequiredTools`（必须附带 `warn` 确认字段）：
+
+```
+executor, pty_spawn, pty_write, pty_read, pty_list, pty_kill
+```
+
+canonical value：`i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles`（`warn_tdd`）；`it-is-not-possible-to-do-it-using-other-tools`（`warn`）。
+
 ---
 
 ## 附录 J：Backlog 投影 YAML 形状
 
 `BacklogProjectionCore.buildBacklogText`（L61-65）：
 
-- front-matter 根：数组项含 `user_message[]`（自上次 todo 以来的 user 文本）与 `completed_work`（`completedWorkReport` 正文）
+- front-matter 根：数组项含 `user_message[]`（自上次 todo 以来的 user 文本）与五份报告字段（`aha_moments`, `changes_and_reasons`, `gotchas`, `lessons_and_conventions`, `plan`）
 - 正文固定句：`Completed work from folded turns. File changes are already on disk.`
 - 若上次 todowrite 为 error 状态，追加 `Last todo write error: ...`（L54-59）
 
@@ -1258,7 +1311,11 @@ wanxiangshu-1/
 ```
 [1] 用户在 Mux 主会话输入需求；manager 调用 todowrite(
       todos=全量列表,
-      completedWorkReport="尚未开工，附计划…",
+      ahaMoments="关键突破：发现…",
+      changesAndReasons="变更…",
+      gotchas="陷阱…",
+      lessonsAndConventions="教训…",
+      plan="详细计划…",
       select_methodology=["working_backwards","test_driven_reasoning"])
 
 [2] transform 将历史 completed todowrite 折叠为 backlog front-matter

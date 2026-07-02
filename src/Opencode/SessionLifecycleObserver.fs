@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.Nudge
-open Wanxiangshu.Kernel.NudgeState
 open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Kernel.HostTools
@@ -16,12 +15,12 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
-open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackRuntimeState
-open Wanxiangshu.Shell.SerialStateHolder
+open Wanxiangshu.Shell.NudgeRuntime
 open Wanxiangshu.Opencode.NudgeEffect
 open Wanxiangshu.Opencode.BacklogSession
 
@@ -49,22 +48,19 @@ type SessionLifecycleObserver
                 do! client?session?prompt(sid, box text) |> Promise.map ignore
             with _ -> ()
         }
-    let holder = StateHolder<NudgeShellState>(emptyState)
+    let mutable runtimeState = emptyRuntimeState
+    let mutable retryPendingSessions = Set.empty<string>
+    let resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
 
     member _.handleChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
-        holder.Mutate(fun state ->
-            let text = getPartsText parts
-            let sid = Id.sessionIdValue sessionID
-            if isNudgePrompt text then state, ()
-            else
-                let agentOpt = if agent <> "" then Some agent else None
-                fallbackRuntime.SetAgentName sid agent
-                resumeSession (rememberAgent state sid agentOpt) sid, ())
+        let text = getPartsText parts
+        let sid = Id.sessionIdValue sessionID
+        if not (isNudgePrompt text) && agent <> "" then
+            fallbackRuntime.SetAgentName sid agent
         resolvedUnitPromise ()
 
     member _.handleCommandExecuteBefore(input: obj) (_output: obj) : JS.Promise<unit> =
-        let sessionIDStr = sessionIdFromHookInput input ""
-        holder.Mutate(fun (state: NudgeShellState) -> resumeSession state sessionIDStr, ())
+        let _sessionIDStr = sessionIdFromHookInput input ""
         resolvedUnitPromise ()
 
     member _.handleToolExecuteAfter(input: obj) (output: obj) : JS.Promise<unit> =
@@ -83,8 +79,7 @@ type SessionLifecycleObserver
                     fallbackRuntime.UpdateState sid { st with TaskComplete = true }
             elif tool = "submit_review" then
                 match hookOutputString output with
-                | Some text when isSubmitReviewWipProgressOutput text ->
-                    holder.Mutate(fun state -> resumeSession state sessionIDStr, ())
+                | Some text when isSubmitReviewWipProgressOutput text -> ()
                 | _ -> ()
         }
 
@@ -92,7 +87,6 @@ type SessionLifecycleObserver
         promise {
             let eventEnvelope = decodeHostEventEnvelope input
 
-            // Bind agent name from session.status busy events before fallback
             match eventEnvelope with
             | Some { EventType = "session.status"; Props = props } ->
                 let statusObj = Dyn.get props "status"
@@ -103,7 +97,6 @@ type SessionLifecycleObserver
                         fallbackRuntime.SetAgentName sid agentName
             | _ -> ()
 
-            // Fallback intercepts first; consumed → skip nudge
             let! fbConsumed =
                 match fallbackHandler with
                 | Some handler ->
@@ -113,7 +106,6 @@ type SessionLifecycleObserver
                     }
                 | None -> Promise.lift false
 
-            // Track local session busyCount: busy→1, idle→0
             match eventEnvelope with
             | Some { EventType = "session.status"; Props = props } ->
                 let statusObj = Dyn.get props "status"
@@ -132,27 +124,32 @@ type SessionLifecycleObserver
             if fbConsumed then
                 return ()
             else
-                let claimed =
-                    holder.Mutate(fun state ->
-                        try
-                            match eventEnvelope with
-                            | None -> state, None
-                            | Some { EventType = eventType; Props = props } ->
-                                let sessionIDStr = getSessionID eventType props
-                                match Id.trySessionId sessionIDStr with
-                                | None -> state, None
-                                | Some session ->
-                                    let nudgeEvent = decodeNudgeHostEvent eventType props
-                                    let nextState, wantsNudge = NudgeState.handleEvent state (Id.sessionIdValue session) nudgeEvent
-                                    nextState, (if wantsNudge then Some session else None)
-                        with _ ->
-                            state, None)
-                match claimed with
-                | Some sessionID ->
-                    match getClientFromPluginCtx ctx with
-                    | Ok client -> startNudgeFlow holder client reviewStore registry backlogSession sessionID
-                    | Error _ -> ()
+                match eventEnvelope with
                 | None -> ()
+                | Some envelope ->
+                    let eventType = envelope.EventType
+                    let props = envelope.Props
+                    match eventType with
+                    | "session.next.step.failed" ->
+                        let errorObj = Dyn.get props "error"
+                        let errorType = if Dyn.isNullish errorObj then "" else Dyn.str errorObj "type"
+                        if errorType = "unknown" || errorType = "aborted" then
+                            let sid = getSessionID eventType props
+                            if sid <> "" then retryPendingSessions <- Set.add sid retryPendingSessions
+                    | "session.next.prompted" ->
+                        let sid = getSessionID eventType props
+                        if sid <> "" then retryPendingSessions <- Set.remove sid retryPendingSessions
+                    | _ -> ()
+                    let sessionIDStr = getSessionID eventType props
+                    match Id.trySessionId sessionIDStr with
+                    | None -> ()
+                    | Some sessionID ->
+                        if not (Set.contains sessionIDStr retryPendingSessions) then
+                            match getClientFromPluginCtx ctx with
+                            | Ok client ->
+                                let! newState = startNudgeFlow runtimeState client sessionID
+                                runtimeState <- newState
+                            | Error _ -> ()
         }
 
 let createSessionLifecycleObserver

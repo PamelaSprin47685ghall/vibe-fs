@@ -97,17 +97,14 @@ open Wanxiangshu.Tests.SembleInjectionTests
 open Wanxiangshu.Tests.ToolCatalogClassificationTests
 open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.ExecutorKernelTests
-open Wanxiangshu.Tests.NudgeTransitionsTests
 open Wanxiangshu.Tests.NudgeRetryProgressTests
 open Wanxiangshu.Tests.NudgeTodoStatusTests
-open Wanxiangshu.Tests.NudgeCoordinatorTests
 open Wanxiangshu.Tests.ReviewSessionStateMachineTests
 open Wanxiangshu.Tests.HostToolsTests
 open Wanxiangshu.Tests.ToolPermissionTests
 open Wanxiangshu.Tests.SubagentPromptsTests
 open Wanxiangshu.Tests.SubagentIntentsTests
 open Wanxiangshu.Tests.MethodologyRegistryTests
-open Wanxiangshu.Tests.NudgeEventHandlerTests
 open Wanxiangshu.Tests.ToolCatalogRegistryTests
 open Wanxiangshu.Tests.TreeSitterKernelTests
 open Wanxiangshu.Tests.ConfigTests
@@ -156,37 +153,14 @@ let coreTestEntries () : (string * TestBody) list =
     "AgentTests.canUseMatrix", Sync (sync AgentTests.canUseMatrix)
     "AgentTests.deniedTools'", Sync (sync AgentTests.deniedTools')
     "AgentNudgeSpecs.decision", Sync (sync AgentNudgeSpecs.decision)
-    "AgentNudgeSpecs.updateState", Sync (sync AgentNudgeSpecs.updateState)
-    "AgentNudgeSpecs.coordinatorRuntime", Sync (sync AgentNudgeSpecs.coordinatorRuntime)
-    "AgentNudgeSpecs.shouldSuppress'", Sync (sync AgentNudgeSpecs.shouldSuppress')
+    "AgentNudgeSpecs.dedup", Sync (sync AgentNudgeSpecs.dedup)
     "AgentNudgeSpecs.decideNudge'", Sync (sync AgentNudgeSpecs.decideNudge')
-    "AgentNudgeSpecs.decodeLastAssistantNudge", Sync (sync AgentNudgeSpecs.decodeLastAssistantNudge)
     "AgentNudgeSpecs.submitReviewWipNudgeDedup", Sync (sync AgentNudgeSpecsWip.submitReviewWipNudgeDedup)
     "AgentNudgeSpecs.decodeTodosOpenItems", Sync (sync AgentNudgeSpecsDecode.decodeTodosOpenItems)
     "AgentNudgeSpecsWip.submitReviewWipNudgeDedup", Sync (sync AgentNudgeSpecsWip.submitReviewWipNudgeDedup)
     "AgentNudgeSpecsDecode.decodeTodosOpenItems", Sync (sync AgentNudgeSpecsDecode.decodeTodosOpenItems)
-    "NudgeTransitionsTests.run", Sync (sync NudgeTransitionsTests.run)
     "NudgeRetryProgressTests.run", Sync (sync NudgeRetryProgressTests.run)
     "NudgeTodoStatusTests.run", Sync (sync NudgeTodoStatusTests.run)
-    "NudgeCoordinatorTests.freshSession", Sync (sync NudgeCoordinatorTests.freshSessionTest)
-    "NudgeCoordinatorTests.freshCoordinator", Sync (sync NudgeCoordinatorTests.freshCoordinatorTest)
-    "NudgeCoordinatorTests.freshCoordinatorRuntime", Sync (sync NudgeCoordinatorTests.freshCoordinatorRuntimeTest)
-    "NudgeCoordinatorTests.updateNudgeNone", Sync (sync NudgeCoordinatorTests.updateNudgeNoneTest)
-    "NudgeCoordinatorTests.updateSameDedup", Sync (sync NudgeCoordinatorTests.updateSameDedupTest)
-    "NudgeCoordinatorTests.updateDifferent", Sync (sync NudgeCoordinatorTests.updateDifferentTest)
-    "NudgeCoordinatorTests.updateNewSession", Sync (sync NudgeCoordinatorTests.updateNewSessionTest)
-    "NudgeCoordinatorTests.shouldSuppressNudgeQuestion", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgeQuestionTest)
-    "NudgeCoordinatorTests.shouldSuppressNudgeSkipTodo", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgeSkipTodoTest)
-    "NudgeCoordinatorTests.shouldSuppressNudgeSkipLoop", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgeSkipLoopTest)
-    "NudgeCoordinatorTests.shouldSuppressNudgePreviousSame", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgePreviousSameTest)
-    "NudgeCoordinatorTests.shouldSuppressNudgePreviousDifferent", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgePreviousDifferentTest)
-    "NudgeCoordinatorTests.shouldSuppressNudgeNoPrevious", Sync (sync NudgeCoordinatorTests.shouldSuppressNudgeNoPreviousTest)
-    "NudgeCoordinatorTests.consumeSuppressionPresent", Sync (sync NudgeCoordinatorTests.consumeSuppressionPresentTest)
-    "NudgeCoordinatorTests.consumeSuppressionAbsent", Sync (sync NudgeCoordinatorTests.consumeSuppressionAbsentTest)
-    "NudgeCoordinatorTests.suppressSession", Sync (sync NudgeCoordinatorTests.suppressSessionTest)
-    "NudgeCoordinatorTests.clearRuntimeSession", Sync (sync NudgeCoordinatorTests.clearRuntimeSessionTest)
-    "NudgeCoordinatorTests.decideRuntimeActionSuppressed", Sync (sync NudgeCoordinatorTests.decideRuntimeActionSuppressedTest)
-    "NudgeCoordinatorTests.decideRuntimeActionNormal", Sync (sync NudgeCoordinatorTests.decideRuntimeActionNormalTest)
     "KernelHelpersTests.run", Sync (sync KernelHelpersTests.run)
     "ReviewSessionStateMachineTests.run", Sync (sync ReviewSessionStateMachineTests.run)
     "HostToolsTests.run", Sync (sync HostToolsTests.run)
@@ -266,7 +240,6 @@ let coreTestEntries () : (string * TestBody) list =
     "WorkBacklogTests.run", Sync (sync WorkBacklogTests.run)
     "MethodologyTests.run", Sync (sync MethodologyTests.run)
     "MethodologyRegistryTests.run", Sync (sync MethodologyRegistryTests.run)
-    "NudgeEventHandlerTests.run", Sync (sync NudgeEventHandlerTests.run)
     "ToolCatalogRegistryTests.run", Sync (sync ToolCatalogRegistryTests.run)
     "TitleFetchGuardTests.signature", Sync (sync TitleFetchGuardTests.signature)
     "TitleFetchGuardTests.wrap", Sync (sync TitleFetchGuardTests.wrap)

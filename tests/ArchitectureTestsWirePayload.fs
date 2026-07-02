@@ -30,8 +30,7 @@ let opencodeSessionEventCodecExists () =
         (codec.Contains "let createPromptBody")
     check "arch: OpencodeSessionEventCodec defines recoverOpenTodosFromMessages"
         (codec.Contains "let recoverOpenTodosFromMessages")
-    check "arch: OpencodeSessionEventCodec defines decodeNudgeHostEvent"
-        (codec.Contains "let decodeNudgeHostEvent")
+
 
 let nudgeEffectRecoversViaCodec () =
     let effect = requireFile "src/Opencode/NudgeEffect.fs" |> nonCommentCode
@@ -44,8 +43,6 @@ let nudgeEffectRecoversViaCodec () =
 
 let sessionLifecycleObserverUsesCodecDecoders () =
     let observer = requireFile "src/Opencode/SessionLifecycleObserver.fs" |> nonCommentCode
-    check "arch: SessionLifecycleObserver uses decodeNudgeHostEvent"
-        (observer.Contains "decodeNudgeHostEvent ")
     check "arch: SessionLifecycleObserver must not Dyn.str props sessionID"
         (not (observer.Contains "Dyn.str props \"sessionID\""))
 

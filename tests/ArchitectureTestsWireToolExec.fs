@@ -108,7 +108,6 @@ let private shellBareDynAllowlist =
           "OpencodeSessionEventNudge.fs"
           "MuxHostBindings.fs"
           "NudgeRuntime.fs"
-          "NudgeSnapshot.fs"
           "OmpHostBindings.fs"
           "OpencodeAgentConfigWire.fs"
           "ReadDedupMuxPlugin.fs"

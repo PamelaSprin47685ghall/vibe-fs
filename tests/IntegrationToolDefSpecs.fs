@@ -66,6 +66,17 @@ let toolDefinitionSpec () = promise {
     check "tool.definition builds todo content description" (str (get todoItemProps "content") "description" = Wanxiangshu.Kernel.WorkBacklog.todoContentDesc)
     check "tool.definition builds todo status description" (str (get todoItemProps "status") "description" = Wanxiangshu.Kernel.WorkBacklog.todoStatusDesc)
     check "tool.definition builds todo priority description" (str (get todoItemProps "priority") "description" = Wanxiangshu.Kernel.WorkBacklog.todoPriorityDesc)
+    let tools = get p "tool"
+    let executorTool = get tools "executor"
+    let executorDef = createObj [ "description", get executorTool "description"; "args", get executorTool "args" ]
+    do! td $ (createObj [ "toolID", box "executor" ], executorDef) |> unbox<JS.Promise<unit>>
+    let executorSchema = get executorDef "jsonSchema"
+    let executorProps = get executorSchema "properties"
+    check "tool.definition keeps executor program schema" (not (isNullish (get executorProps "program")))
+    check "tool.definition keeps executor mode schema" (not (isNullish (get executorProps "mode")))
+    check "tool.definition injects executor warn_tdd schema" (not (isNullish (get executorProps "warn_tdd")))
+    check "tool.definition injects executor warn schema" (not (isNullish (get executorProps "warn")))
+    check "tool.definition does not replace executor with backlog schema" (isNullish (get executorProps "todos"))
     let! mimoP = Wanxiangshu.Opencode.PluginMimo.plugin (box {| directory = workspaceDir |})
     let mimoTd = get mimoP "tool.definition"
     let taskParams =

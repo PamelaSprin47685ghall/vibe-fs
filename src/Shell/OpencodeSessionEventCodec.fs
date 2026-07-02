@@ -7,7 +7,6 @@ open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeSessionPromptCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
-open Wanxiangshu.Shell.OpencodeSessionEventNudge
 
 /// Host wire → typed nudge state transition boundary.
 ///
@@ -26,9 +25,6 @@ open Wanxiangshu.Shell.OpencodeSessionEventNudge
 let getSessionID = OpencodeSessionEventCodecCommon.getSessionID
 let getPartsText = OpencodeSessionEventCodecCommon.getPartsText
 let isCompletedAssistantMessage = OpencodeSessionEventCodecCommon.isCompletedAssistantMessage
-
-/// Re-export nudge event decoder from Nudge module for single-import convenience.
-let decodeNudgeHostEvent = OpencodeSessionEventNudge.decodeNudgeHostEvent
 
 /// Decode a todo list payload into the *open* todo contents, dropping items
 /// with terminal status. The returned strings are the raw `content` strings

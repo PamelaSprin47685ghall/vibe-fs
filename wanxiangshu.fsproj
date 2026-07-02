@@ -1,4 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Thoth.Json" Version="10.4.1" />
   </ItemGroup>
@@ -47,7 +51,6 @@
     <Compile Include="src/Kernel/ToolCatalog/Registry.fs" />
     <Compile Include="src/Kernel/ToolCatalogParams.fs" />
     <Compile Include="src/Kernel/Nudge.fs" />
-    <Compile Include="src/Kernel/Nudge/Coordinator.fs" />
     <Compile Include="src/Kernel/Nudge/TodoStatus.fs" />
     <Compile Include="src/Kernel/Nudge/RetryProgress.fs" />
     <Compile Include="src/Kernel/Nudge/SubmitReviewHooks.fs" />
@@ -80,9 +83,7 @@
     <Compile Include="src/Kernel/ToolCopy.fs" />
     <Compile Include="src/Kernel/ToolContext.fs" />
     <Compile Include="src/Kernel/Nudge/Types.fs" />
-    <Compile Include="src/Kernel/Nudge/Transitions.fs" />
-    <Compile Include="src/Kernel/Nudge/Decision.fs" />
-    <Compile Include="src/Kernel/Nudge/EventHandler.fs" />
+    <Compile Include="src/Kernel/Nudge/NudgeDerivation.fs" />
     <Compile Include="src/Kernel/Nudge/Registry.fs" />
     <Compile Include="src/Kernel/Config.fs" />
     <Compile Include="src/Kernel/FuzzyPath.fs" />
@@ -185,11 +186,9 @@
     <Compile Include="src/Shell/MuxSubagentToolExecute.fs" />
     <Compile Include="src/Shell/DelegateToolsCodec.fs" />
     <Compile Include="src/Shell/OpencodeSessionEventCodecCommon.fs" />
-    <Compile Include="src/Shell/OpencodeSessionEventNudge.fs" />
     <Compile Include="src/Shell/OpencodeSessionEventCodec.fs" />
     <Compile Include="src/Shell/OpencodeHookInputCodec.fs" />
     <Compile Include="src/Shell/SerialStateHolder.fs" />
-    <Compile Include="src/Shell/NudgeSnapshot.fs" />
     <Compile Include="src/Shell/NudgeRuntime.fs" />
     <Compile Include="src/Mux/AiSettings.fs" />
     <Compile Include="src/Opencode/MessagingCodec.fs" />
@@ -424,7 +423,6 @@
     <Compile Include="tests/SessionIoPromptBodyTests.fs" />
     <Compile Include="tests/OpencodeAgentConfigCodecTests.fs" />
     <Compile Include="tests/OpencodeSessionEventCodecTestsSession.fs" />
-    <Compile Include="tests/OpencodeSessionEventCodecTestsNudge.fs" />
     <Compile Include="tests/OpencodeSessionEventCodecTests.fs" />
     <Compile Include="tests/OpencodeSessionEventCodecCommonTests.fs" />
     <Compile Include="tests/MuxAiSettingsCodecTests.fs" />
@@ -432,10 +430,8 @@
     <Compile Include="tests/AgentConfigApplyTests.fs" />
     <Compile Include="tests/SessionExecutorScopeTests.fs" />
     <Compile Include="tests/ToolResultWireTests.fs" />
-    <Compile Include="tests/NudgeTransitionsTests.fs" />
     <Compile Include="tests/NudgeRetryProgressTests.fs" />
     <Compile Include="tests/NudgeTodoStatusTests.fs" />
-    <Compile Include="tests/NudgeCoordinatorTests.fs" />
     <Compile Include="tests/ReviewSessionQueryTests.fs" />
     <Compile Include="tests/ReviewSessionEffectsTests.fs" />
     <Compile Include="tests/ReviewSessionRegistryTests.fs" />
@@ -445,7 +441,6 @@
     <Compile Include="tests/SubagentPromptsTests.fs" />
     <Compile Include="tests/SubagentIntentsTests.fs" />
     <Compile Include="tests/MethodologyRegistryTests.fs" />
-    <Compile Include="tests/NudgeEventHandlerTests.fs" />
     <Compile Include="tests/ToolCatalogRegistryTests.fs" />
     <Compile Include="tests/TreeSitterKernelTests.fs" />
     <Compile Include="tests/PatchParserTests.fs" />
