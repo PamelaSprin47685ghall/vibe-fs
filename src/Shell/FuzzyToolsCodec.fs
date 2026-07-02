@@ -53,6 +53,7 @@ let decodeFuzzyGrepArgs (args: obj) : Result<FuzzyGrepParams, DomainError> =
         { pattern = pattern
           path = strField args "path"
           exclude = parseExcludeField args
+          searchIgnored = optBool args "searchIgnored"
           caseSensitive = optBool args "caseSensitive"
           context = context
           limit = limit

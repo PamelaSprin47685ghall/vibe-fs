@@ -53,6 +53,7 @@ let decodeGrepOkWithExcludeArray () =
         createObj [
             "pattern", box "needle"
             "exclude", box [| "test/"; "*.min.js" |]
+            "searchIgnored", box true
             "caseSensitive", box true
             "context", box 2
             "limit", box 25
@@ -61,6 +62,7 @@ let decodeGrepOkWithExcludeArray () =
     check "grep pattern" (p.pattern = Some "needle")
     check "grep exclude len" (p.exclude.Length = 2)
     check "grep exclude head" (p.exclude.[0] = "test/")
+    check "grep searchIgnored" (p.searchIgnored = Some true)
     check "grep caseSensitive" (p.caseSensitive = Some true)
     check "grep context" (p.context = Some 2)
     check "grep limit" (p.limit = Some 25)

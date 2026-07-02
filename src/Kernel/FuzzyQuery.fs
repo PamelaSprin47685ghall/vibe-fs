@@ -33,6 +33,7 @@ type FuzzyGrepParams =
     { pattern: string option
       path: string option
       exclude: string list
+      searchIgnored: bool option
       caseSensitive: bool option
       context: int option
       limit: int option

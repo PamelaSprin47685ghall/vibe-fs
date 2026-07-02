@@ -70,6 +70,7 @@ let registerFuzzyTools (pi: obj) (finderCache: FinderCache) : unit =
                                     tb)
                                 tb)
                         ("caseSensitive", opt "Case-sensitivity override (smart-case by default)." tb bool_)
+                        ("searchIgnored", opt "Search git-ignored files such as node_modules by adding the fff git:ignored constraint." tb bool_)
                         ("context", opt "Number of context lines before and after each match" tb num)
                         ("limit", opt "Maximum number of matches to return per call." tb num)
                         ("iterator", opt "Opaque single-use iterator from a previous fuzzy_grep result." tb str)
@@ -88,6 +89,7 @@ let registerFuzzyTools (pi: obj) (finderCache: FinderCache) : unit =
                                     { pattern = optStr params' "pattern"
                                       path = optStr params' "path"
                                       exclude = exclude
+                                      searchIgnored = optBool params' "searchIgnored"
                                       caseSensitive = optBool params' "caseSensitive"
                                       context = optInt params' "context"
                                       limit = optInt params' "limit"

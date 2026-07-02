@@ -76,7 +76,8 @@ let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.F
     buildFuzzyTool
         ToolSchemaModule.fuzzyGrep
         (box {| pattern = strMinNullish 1 Params.fuzzyGrepPattern; path = strOpt Params.fuzzyGrepPath
-                exclude = excludeOpt Params.fuzzyGrepExclude; caseSensitive = boolOptional Params.fuzzyGrepCaseSensitive
+                exclude = excludeOpt Params.fuzzyGrepExclude; searchIgnored = boolOptional Params.fuzzyGrepSearchIgnored
+                caseSensitive = boolOptional Params.fuzzyGrepCaseSensitive
                 context = intMinNullish 0 Params.fuzzyGrepContext; limit = intMinNullish 1 Params.fuzzyGrepLimit
                 iterator = strOpt Params.fuzzyGrepIterator |})
         "fuzzy_grep"

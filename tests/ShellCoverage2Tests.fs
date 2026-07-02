@@ -56,7 +56,7 @@ let finderCacheDestroyAll () =
 let grepStateEmptyPattern () =
     let store = createTypedIteratorStore 100
     let opts : SearchOptions = { cwd = "/tmp"; scopeId = "s1"; store = Some store; finderCache = FinderCache() }
-    let params' : FuzzyGrepParams = { pattern = None; path = None; exclude = []; caseSensitive = None; context = None; limit = None; iterator = None }
+    let params' : FuzzyGrepParams = { pattern = None; path = None; exclude = []; searchIgnored = None; caseSensitive = None; context = None; limit = None; iterator = None }
     match resolveGrepIteratorState params' opts with
     | Error msg -> equal "empty pattern error" "pattern is required on the first call" msg
     | Ok _ -> check "empty pattern → Error" false
@@ -64,14 +64,14 @@ let grepStateEmptyPattern () =
 let grepStateWildcardOnly () =
     let store = createTypedIteratorStore 100
     let opts : SearchOptions = { cwd = "/tmp"; scopeId = "s1"; store = Some store; finderCache = FinderCache() }
-    let params' : FuzzyGrepParams = { pattern = Some "*"; path = None; exclude = []; caseSensitive = None; context = None; limit = None; iterator = None }
+    let params' : FuzzyGrepParams = { pattern = Some "*"; path = None; exclude = []; searchIgnored = None; caseSensitive = None; context = None; limit = None; iterator = None }
     match resolveGrepIteratorState params' opts with
     | Error msg -> check "wildcard error mentions matches everything" (msg.Contains "matches everything")
     | Ok _ -> check "wildcard only → Error" false
 
 let grepStateNoStore () =
     let opts : SearchOptions = { cwd = "/tmp"; scopeId = "s1"; store = None; finderCache = FinderCache() }
-    let params' : FuzzyGrepParams = { pattern = Some "foo"; path = None; exclude = []; caseSensitive = None; context = None; limit = None; iterator = None }
+    let params' : FuzzyGrepParams = { pattern = Some "foo"; path = None; exclude = []; searchIgnored = None; caseSensitive = None; context = None; limit = None; iterator = None }
     match resolveGrepIteratorState params' opts with
     | Error msg -> equal "no store error" "FuzzySearch requires SearchOptions.store; inject RuntimeScope.IteratorStore from the tool registration path" msg
     | Ok _ -> check "no store → Error" false
@@ -79,7 +79,7 @@ let grepStateNoStore () =
 let grepStateValid () =
     let store = createTypedIteratorStore 100
     let opts : SearchOptions = { cwd = "/tmp"; scopeId = "s1"; store = Some store; finderCache = FinderCache() }
-    let params' : FuzzyGrepParams = { pattern = Some "let"; path = None; exclude = []; caseSensitive = Some false; context = Some 2; limit = Some 30; iterator = None }
+    let params' : FuzzyGrepParams = { pattern = Some "let"; path = None; exclude = []; searchIgnored = None; caseSensitive = Some false; context = Some 2; limit = Some 30; iterator = None }
     match resolveGrepIteratorState params' opts with
     | Ok state ->
         equal "query present" true (state.core.query <> "")

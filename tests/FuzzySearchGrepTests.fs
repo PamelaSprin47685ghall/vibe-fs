@@ -23,6 +23,7 @@ let noStore_returnsError () =
         { pattern = Some "x"
           path = None
           exclude = []
+          searchIgnored = None
           caseSensitive = None
           context = None
           limit = None
@@ -38,6 +39,7 @@ let missingPattern_returnsError () =
         { pattern = None
           path = None
           exclude = []
+          searchIgnored = None
           caseSensitive = None
           context = None
           limit = None
@@ -53,6 +55,7 @@ let wildcardOnly_returnsError () =
         { pattern = Some ".*"
           path = None
           exclude = []
+          searchIgnored = None
           caseSensitive = None
           context = None
           limit = None
@@ -68,6 +71,7 @@ let invalidIterator_returnsError () =
         { pattern = Some "anything"
           path = None
           exclude = []
+          searchIgnored = None
           caseSensitive = None
           context = None
           limit = None
@@ -83,6 +87,7 @@ let validPattern_returnsOk () =
         { pattern = Some "test"
           path = None
           exclude = []
+          searchIgnored = None
           caseSensitive = None
           context = Some 2
           limit = Some 10
@@ -98,9 +103,28 @@ let validPattern_returnsOk () =
         check "cursor None" (state.cursor = None)
     | Error msg -> check "valid → Ok" false
 
+let searchIgnored_addsGitIgnoredConstraint () =
+    let opts = optsWithStore()
+    let params' : FuzzyGrepParams =
+        { pattern = Some "needle"
+          path = Some "node_modules/pkg"
+          exclude = []
+          searchIgnored = Some true
+          caseSensitive = None
+          context = None
+          limit = None
+          iterator = None }
+    match resolveGrepIteratorState params' opts with
+    | Ok state ->
+        check "query contains ignored constraint" (state.core.query.Contains "git:ignored")
+        check "query keeps pattern" (state.core.query.Contains "needle")
+        check "query keeps path" (state.core.query.Contains "node_modules/pkg/")
+    | Error _ -> check "searchIgnored → Ok" false
+
 let run () =
     noStore_returnsError ()
     missingPattern_returnsError ()
     wildcardOnly_returnsError ()
     invalidIterator_returnsError ()
     validPattern_returnsOk ()
+    searchIgnored_addsGitIgnoredConstraint ()

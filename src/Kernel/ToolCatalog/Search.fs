@@ -23,6 +23,7 @@ let internal fuzzyGrepSpec: ToolSpec =
             [ "pattern", "Initial search pattern. Required on the first call."
               "path", "Initial path constraint."
               "exclude", "Initial exclude paths (e.g. 'test/,*.min.js')"
+              "searchIgnored", "Search git-ignored files such as node_modules by adding the fff git:ignored constraint."
               "caseSensitive", "Case-sensitivity override (smart-case by default)."
               "context", "Number of context lines before and after each match"
               "limit", "Maximum number of matches to return per call"

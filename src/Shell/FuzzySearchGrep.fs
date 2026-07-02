@@ -25,8 +25,10 @@ let resolveGrepIteratorState (params': FuzzyGrepParams) (opts: SearchOptions)
             if checkWildcardOnly pattern mode then
                 Error $"Pattern '{pattern}' matches everything - fuzzy_grep needs a concrete substring or identifier."
             else
+                let query = buildQuery searchPath.pathConstraint pattern params'.exclude searchPath.basePath searchPath.external
+                let query = if defaultArg params'.searchIgnored false then "git:ignored " + query else query
                 Ok { core =
-                        { query = buildQuery searchPath.pathConstraint pattern params'.exclude searchPath.basePath searchPath.external
+                        { query = query
                           mode = mode
                           smartCase = defaultArg params'.caseSensitive false |> not
                           beforeContext = defaultArg params'.context 0

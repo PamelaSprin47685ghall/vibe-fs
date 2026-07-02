@@ -48,7 +48,7 @@ let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.F
 let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : ToolDefinition =
     { name = "fuzzy_grep"
       description = description "fuzzy_grep"
-      parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyGrepPattern); "path", box (strProp Params.fuzzyGrepPath); "exclude", box (strProp Params.fuzzyGrepExclude); "caseSensitive", box (boolProp Params.fuzzyGrepCaseSensitive); "context", box (numProp Params.fuzzyGrepContext); "limit", box (numProp Params.fuzzyGrepLimit); "iterator", box (strProp Params.fuzzyGrepIterator) ]) [||]
+      parameters = mkSchema (createObj [ "pattern", box (strProp Params.fuzzyGrepPattern); "path", box (strProp Params.fuzzyGrepPath); "exclude", box (strProp Params.fuzzyGrepExclude); "searchIgnored", box (boolProp Params.fuzzyGrepSearchIgnored); "caseSensitive", box (boolProp Params.fuzzyGrepCaseSensitive); "context", box (numProp Params.fuzzyGrepContext); "limit", box (numProp Params.fuzzyGrepLimit); "iterator", box (strProp Params.fuzzyGrepIterator) ]) [||]
       execute = fun config args ->
           match fromMuxConfig config with
           | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
