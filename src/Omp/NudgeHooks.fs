@@ -94,20 +94,21 @@ let agentEndHandler (pi: obj) (_reviewStore: ReviewStore) (ctx: obj) : JS.Promis
                     let openTodos = openTodoStatuses sm
                     let last = lastAssistantMessage sm
                     let root = Dyn.str ctx "cwd"
-                    let! isLoopActive = isLoopActiveFromEventLog root sessionId
-                    let hasRunner = hasRunningRunnerJob sessionId
                     let turnId = lastAssistantTurnId sm
-                    let key = nudgeAnchorKey turnId last
-                    let! blocked = nudgeBlockedForTurn root sessionId key
-                    let snapshot = deriveSnapshot {
-                        openTodos = openTodos
-                        lastAssistantText = last
-                        agentFromMessage = None
-                        isLoopActive = isLoopActive
-                        lastAssistantIsCompaction = false
-                        hasActiveRunner = hasRunner
+                    do! appendAssistantCompletedOrFail root sessionId last None turnId openTodos
+                    let! snap = getNudgeSnapshotFromEventLog root sessionId
+                    let hasRunner = hasRunningRunnerJob sessionId
+                    let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
+                    let dedupState = { BlockedAnchor = snap.nudgeDedupAnchor }
+                    let blocked = isNudgeBlockedForAnchor dedupState key
+                    let snapshot : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot = {
+                        todos = snap.openTodos
+                        lastAssistantMessage = snap.lastAssistantText
+                        isLoopActive = snap.isLoopActive
                         nudgeBlockedForTurn = blocked
-                        turnId = turnId
+                        nudgeAnchorKey = key
+                        agentFromMessage = snap.agentFromMessage
+                        hasActiveRunner = hasRunner
                     }
                     match deriveAction snapshot with
                     | NudgeNone -> ()

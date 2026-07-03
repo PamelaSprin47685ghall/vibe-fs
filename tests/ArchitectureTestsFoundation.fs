@@ -95,10 +95,10 @@ let nudgeLoopStateMustReplayHistory () =
     let omp = requireFile "src/Omp/NudgeHooks.fs" |> nonCommentCode
     check "arch: Opencode NudgeEffect must not read live review-state query" (not (opencode.Contains "isReviewActive"))
     check "arch: Opencode NudgeEffect loop state from event log"
-        (opencode.Contains "isLoopActiveFromEventLog")
+        (opencode.Contains "isLoopActiveFromEventLog" || opencode.Contains "getNudgeSnapshotFromEventLog")
     check "arch: Omp NudgeHooks must not read live review-state query" (not (omp.Contains "isReviewActive"))
     check "arch: Omp NudgeHooks loop state from event log"
-        (omp.Contains "isLoopActiveFromEventLog")
+        (omp.Contains "isLoopActiveFromEventLog" || omp.Contains "getNudgeSnapshotFromEventLog")
 
 let returnReviewerCatalogAndHostRegistration () =
     let catalog = requireFile "src/Kernel/ToolCatalog/Review.fs"

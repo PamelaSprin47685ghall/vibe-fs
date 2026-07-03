@@ -451,6 +451,7 @@
     <Compile Include="tests/ToolResultWireTests.fs" />
     <Compile Include="tests/NudgeRetryProgressTests.fs" />
     <Compile Include="tests/NudgeTodoStatusTests.fs" />
+    <Compile Include="tests/NudgeEventSourcingTests.fs" />
     <Compile Include="tests/ReviewSessionQueryTests.fs" />
     <Compile Include="tests/ReviewSessionEffectsTests.fs" />
     <Compile Include="tests/ReviewSessionRegistryTests.fs" />

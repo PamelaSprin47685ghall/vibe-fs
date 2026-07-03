@@ -67,6 +67,14 @@ let nudgeBlockedForTurn (workspaceRoot: string) (sessionID: string) (assistantMe
 let tryClaimNudgeDispatch (workspaceRoot: string) (sessionID: string) (action: NudgeAction) (anchor: string) : JS.Promise<bool> =
     getStore(workspaceRoot).TryClaimNudgeDispatch sessionID action anchor isNudgeBlockedForAnchor
 
+let getNudgeSnapshotFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Promise<NudgeSnapshotState> =
+    promise {
+        if sessionID = "" || workspaceRoot = "" then return emptyNudgeSnapshotState
+        else
+            let! events = getStore(workspaceRoot).ReadAllEvents()
+            return foldNudgeSnapshot sessionID events
+    }
+
 let appendSubmitReviewWipRecorded (workspaceRoot: string) (sessionID: string) : JS.Promise<Result<unit, string>> =
     getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindSubmitReviewWipRecorded Map.empty (getTimestampMs().ToString()))
 
@@ -108,6 +116,22 @@ let appendNudgeDedupClearedOrFail (workspaceRoot: string) (sessionID: string) : 
 let appendWorkBacklogCommittedOrFail (workspaceRoot: string) (sessionID: string) (args: TodoWriteArgs) : JS.Promise<unit> =
     let payload = Map [ "ahaMoments", args.AhaMoments; "changesAndReasons", args.ChangesAndReasons; "gotchas", args.Gotchas; "lessonsAndConventions", args.LessonsAndConventions; "plan", args.Plan; "todosJson", JS.JSON.stringify(args.Todos); "selectMethodologyJson", JS.JSON.stringify(args.SelectMethodology |> List.toArray) ]
     getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindWorkBacklogCommitted payload (getTimestampMs().ToString()))
+
+let appendAssistantCompleted (workspaceRoot: string) (sessionID: string) (assistantMessage: string) (agent: string option) (turnId: string) (openTodos: string list) : JS.Promise<Result<unit, string>> =
+    let baseMap = Map [ "assistantMessage", assistantMessage; "turnId", turnId; "openTodosJson", JS.JSON.stringify(openTodos |> List.toArray) ]
+    let payload =
+        match agent with
+        | Some a when a <> "" -> Map.add "agent" a baseMap
+        | _ -> baseMap
+    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindAssistantCompleted payload (getTimestampMs().ToString()))
+
+let appendAssistantCompletedOrFail (workspaceRoot: string) (sessionID: string) (assistantMessage: string) (agent: string option) (turnId: string) (openTodos: string list) : JS.Promise<unit> =
+    let baseMap = Map [ "assistantMessage", assistantMessage; "turnId", turnId; "openTodosJson", JS.JSON.stringify(openTodos |> List.toArray) ]
+    let payload =
+        match agent with
+        | Some a when a <> "" -> Map.add "agent" a baseMap
+        | _ -> baseMap
+    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindAssistantCompleted payload (getTimestampMs().ToString()))
 
 let verdictStringFromReviewResult (result: Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult) : string * string option =
     match result with

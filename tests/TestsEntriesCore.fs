@@ -103,6 +103,7 @@ open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.ExecutorKernelTests
 open Wanxiangshu.Tests.NudgeRetryProgressTests
 open Wanxiangshu.Tests.NudgeTodoStatusTests
+open Wanxiangshu.Tests.NudgeEventSourcingTests
 open Wanxiangshu.Tests.ReviewSessionStateMachineTests
 open Wanxiangshu.Tests.HostToolsTests
 open Wanxiangshu.Tests.ToolPermissionTests
@@ -168,6 +169,7 @@ let coreTestEntries () : (string * TestBody) list =
     "AgentNudgeSpecsDecode.decodeTodosOpenItems", TestBody.Sync (sync AgentNudgeSpecsDecode.decodeTodosOpenItems)
     "NudgeRetryProgressTests.run", TestBody.Sync (sync NudgeRetryProgressTests.run)
     "NudgeTodoStatusTests.run", TestBody.Sync (sync NudgeTodoStatusTests.run)
+    "NudgeEventSourcingTests.run", TestBody.Sync (sync NudgeEventSourcingTests.run)
     "KernelHelpersTests.run", TestBody.Sync (sync KernelHelpersTests.run)
     "ReviewSessionStateMachineTests.run", TestBody.Sync (sync ReviewSessionStateMachineTests.run)
     "HostToolsTests.run", TestBody.Sync (sync HostToolsTests.run)

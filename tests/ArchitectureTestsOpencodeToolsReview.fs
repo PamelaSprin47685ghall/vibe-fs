@@ -54,4 +54,4 @@ let opencodeNudgeDoesNotReadReviewStoreForLoopState () =
     let code = requireFile "src/Opencode/NudgeEffect.fs" |> nonCommentCode
     check "arch: Opencode NudgeEffect must not read live review-state query" (not (code.Contains "isReviewActive"))
     check "arch: Opencode NudgeEffect loop state from event log"
-        (code.Contains "isLoopActiveFromEventLog")
+        (code.Contains "isLoopActiveFromEventLog" || code.Contains "getNudgeSnapshotFromEventLog")
