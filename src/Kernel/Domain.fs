@@ -38,6 +38,10 @@ module Id =
 
 type DomainError =
     | MessageAborted
+    | ClientCancellation of source: string
+    | FileSystemFault of path: string * errno: string * message: string
+    | NetworkTransportFailure of url: string * statusCode: int option * body: string
+    | HostProtocolMismatch of field: string * expected: string * actual: string
     | SessionBusy
     | TaskWaitBackgrounded
     | ExecutorExecutableMissing of executable: string
@@ -52,6 +56,12 @@ type DomainError =
 let formatDomainError (error: DomainError) : string =
     match error with
     | MessageAborted -> "aborted"
+    | ClientCancellation source -> $"client cancelled: {source}"
+    | FileSystemFault(path, errno, msg) -> $"file system fault: path={path}, errno={errno}: {msg}"
+    | NetworkTransportFailure(url, statusCode, body) ->
+        let status = match statusCode with Some s -> string s | None -> "none"
+        $"network transport failure: url={url}, status={status}, body={body}"
+    | HostProtocolMismatch(field, expected, actual) -> $"host protocol mismatch: field={field}, expected={expected}, actual={actual}"
     | SessionBusy -> "session busy"
     | TaskWaitBackgrounded -> "task wait backgrounded"
     | ExecutorExecutableMissing exe -> $"executable not found: {exe}"
@@ -65,7 +75,10 @@ let formatDomainError (error: DomainError) : string =
 
 let isAbort (error: DomainError) : bool =
     match error with
-    | MessageAborted -> true
+    | MessageAborted | ClientCancellation _ -> true
+    | FileSystemFault _
+    | NetworkTransportFailure _
+    | HostProtocolMismatch _
     | SessionBusy
     | TaskWaitBackgrounded
     | ExecutorExecutableMissing _
@@ -91,11 +104,13 @@ let private (|ForegroundWaitBackgroundedError|_|) (name: string, tag: string) =
 
 let classifyErrorLeaf (name: string) (tag: string) (message: string) : DomainError =
     match name, tag with
-    | AbortError -> MessageAborted
     | SessionBusyError -> SessionBusy
     | ForegroundWaitBackgroundedError -> TaskWaitBackgrounded
-    | _ ->
-        if containsAbortText message then MessageAborted else UnknownJsError(message)
+    | _ when name = "AbortError" -> ClientCancellation "AbortError"
+    | _ when name = "AbortSignal" -> ClientCancellation "AbortSignal"
+    | _ when tag = "MessageAborted" || name = "MessageAbortedError" -> MessageAborted
+    | _ when containsAbortText message -> ClientCancellation "abort-text"
+    | _ -> UnknownJsError(message)
 
 type ChildSessionMeta =
     { agent: string

@@ -3,14 +3,19 @@ module Wanxiangshu.Omp.FallbackHooks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell
+open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackRuntimeState
 
 let ompErrorInput (errorObj: obj) : ErrorInput =
-    { ErrorName   = Dyn.str errorObj "name"
-      Message     = Dyn.str errorObj "message"
+    let errorName = Dyn.str errorObj "name"
+    let message = Dyn.str errorObj "message"
+    { ErrorName   = errorName
+      DomainError = Some (translateJsError errorObj)
+      Message     = message
       StatusCode  =
           let sc = Dyn.str errorObj "statusCode"
           if sc <> "" then Some (int sc) else None

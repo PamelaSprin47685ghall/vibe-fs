@@ -7,6 +7,8 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.SubagentPrompts
 open Wanxiangshu.Kernel.ToolCatalog
+open Wanxiangshu.Kernel.HostAdapter
+open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Opencode.ToolSchema
 open Wanxiangshu.Opencode.SessionIo
 open Wanxiangshu.Kernel.ToolResult
@@ -14,16 +16,38 @@ open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.PromiseStr
 open Wanxiangshu.Shell.SubagentToolExecute
+open Wanxiangshu.Shell.SubagentDispatcher
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.ToolRuntimeContext
 
-let private spawnCtx (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (client: obj) (context: obj) (runtime: FallbackRuntimeState) =
-    { Host = host; Registry = registry; Client = client; PluginCtx = ctx; ToolContext = context; FallbackRuntime = runtime }
+type OpencodeHostAdapter(runCore: RunSubagentCoreResult, registry: ChildAgentRegistry, client: obj, ctx: obj, toolContext: obj, fallbackRuntime: FallbackRuntimeState) =
+    let workspaceRoot = (fromOpencode toolContext (pluginDirectoryFromCtx ctx)).Execution.Directory
+    let sessionId = (fromOpencode toolContext (pluginDirectoryFromCtx ctx)).Execution.SessionId |> Id.sessionIdValue
+
+    interface IHostAdapter with
+        member _.WorkspaceRoot = workspaceRoot
+        member _.SessionId = sessionId
+        member _.SpawnSubagent(request: SubagentRequest) : JS.Promise<SubagentResponse> =
+            let agent =
+                match request.Role with
+                | Coder -> "coder"
+                | Investigator -> "investigator"
+                | Meditator -> "meditator"
+                | Browser -> "browser"
+            promise {
+                let! result = runCore fallbackRuntime registry client agent request.Title request.Prompt workspaceRoot sessionId toolContext (box null) false
+                return
+                    match result with
+                    | Ok text -> Success text
+                    | Error err -> Failure err
+            }
 
 let private executeSubagent (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (toolName: string) (args: obj) (context: obj) (runtime: FallbackRuntimeState) =
     match getClientFromPluginCtx ctx with
     | Error e -> resolveStr (wireEncodeToolError "OpencodeClient" e)
     | Ok client ->
-        executeOpencodeSubagentTool runSubagentCoreResult (spawnCtx host registry ctx client context runtime) toolName args
+        let adapter = OpencodeHostAdapter(runSubagentCoreResult, registry, client, ctx, context, runtime)
+        dispatch host adapter toolName args
 
 let coderTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (runtime: FallbackRuntimeState) : obj =
     let coderRequiredKeys = subagentRequiredKeys "coder"

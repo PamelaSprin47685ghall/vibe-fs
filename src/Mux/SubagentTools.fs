@@ -7,11 +7,14 @@ open Wanxiangshu.Kernel.Subagent
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.SubagentToolPolicy
+open Wanxiangshu.Kernel.HostAdapter
+open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Mux.Delegate
 open Wanxiangshu.Mux.Wrappers
-open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Shell.MuxJsonSchema
 open Wanxiangshu.Shell.MuxSubagentToolExecute
+open Wanxiangshu.Shell.SubagentDispatcher
 
 let private disabledToolsForRole (toolNames: string array) (role: string) : string array =
     SubagentToolPolicy.disabledToolNamesForRole mux toolNames role muxSpawnToolUniverse

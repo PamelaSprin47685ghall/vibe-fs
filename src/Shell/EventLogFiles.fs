@@ -79,7 +79,6 @@ let private withWorkspaceLock (lkPath: string) (action: unit -> JS.Promise<'T>) 
                     | Ok v -> v
                     | Error ex -> raise ex
             else
-                if attempt > 0 && attempt % 64 = 0 then do! releaseLock lkPath
                 if attempt >= 96 then return failwith "EventLog lock timeout"
                 do! yieldMicrotask ()
                 return! waitAndRun (attempt + 1)
@@ -107,6 +106,15 @@ type EventLogStore(workspaceRoot: string) =
                         return Ok ()
                     with ex ->
                         return Error ex.Message
+                }))
+
+    member _.AppendEventOrFail(e: WanEvent) : JS.Promise<unit> =
+        queue.Enqueue(fun () ->
+            withWorkspaceLock lkPath (fun () ->
+                promise {
+                    let path = eventPath root
+                    let line = wanEventToLine e + "\n"
+                    do! appendFileAsync path line
                 }))
 
     member _.TryClaimNudgeDispatch

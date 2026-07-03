@@ -11,8 +11,10 @@
     <Compile Include="src/Kernel/HostTools.fs" />
     <Compile Include="src/Kernel/OmpSessionTools.fs" />
     <Compile Include="src/Kernel/SubagentIntents.fs" />
-     <Compile Include="src/Kernel/Yaml.fs" />
-     <Compile Include="src/Kernel/FallbackKernel/Types.fs" />
+<Compile Include="src/Kernel/Yaml.fs" />
+    <Compile Include="src/Kernel/Domain.fs" />
+    <Compile Include="src/Kernel/HostAdapter.fs" />
+    <Compile Include="src/Kernel/FallbackKernel/Types.fs" />
      <Compile Include="src/Kernel/FallbackKernel/Decision.fs" />
      <Compile Include="src/Kernel/FallbackKernel/Recovery.fs" />
      <Compile Include="src/Kernel/FallbackKernel/StateMachine.fs" />
@@ -80,7 +82,6 @@
     <Compile Include="src/Kernel/EventLog/Fold.fs" />
     <Compile Include="src/Kernel/BacklogProjection.fs" />
     <Compile Include="src/Kernel/WorkBacklog.fs" />
-    <Compile Include="src/Kernel/Domain.fs" />
     <Compile Include="src/Kernel/ToolResult.fs" />
     <Compile Include="src/Kernel/ToolCopy.fs" />
     <Compile Include="src/Kernel/ToolContext.fs" />
@@ -99,6 +100,7 @@
     <Compile Include="src/Methodology/Args.fs" />
     <Compile Include="src/Shell/DynField.fs" />
     <Compile Include="src/Shell/ErrorClassify.fs" />
+    <Compile Include="src/Shell/Contracts.fs" />
     <Compile Include="src/Shell/Clock.fs" />
     <Compile Include="src/Shell/ReviewRuntime.fs" />
     <Compile Include="src/Shell/CapsSynthCommon.fs" />
@@ -189,6 +191,7 @@
     <Compile Include="src/Shell/ToolArgsDecode.fs" />
     <Compile Include="src/Shell/ToolExecute.fs" />
     <Compile Include="src/Shell/SubagentToolExecute.fs" />
+    <Compile Include="src/Shell/SubagentDispatcher.fs" />
     <Compile Include="src/Shell/MuxSubagentToolExecute.fs" />
     <Compile Include="src/Shell/DelegateToolsCodec.fs" />
     <Compile Include="src/Shell/OpencodeSessionEventCodecCommon.fs" />
@@ -228,6 +231,9 @@
     <Compile Include="src/Mux/PluginRegistration.fs" />
     <Compile Include="src/Mux/Plugin.fs" />
       <Compile Include="src/Opencode/NudgeEffect.fs" />
+      <Compile Include="src/Opencode/ProgressObserver.fs" />
+      <Compile Include="src/Opencode/FallbackCoordinator.fs" />
+      <Compile Include="src/Opencode/NudgeTrigger.fs" />
       <Compile Include="src/Opencode/SessionLifecycleObserver.fs" />
       <Compile Include="src/Opencode/FallbackHooks.fs" />
       <Compile Include="src/Opencode/SubagentTypes.fs" />
@@ -349,6 +355,8 @@
     <Compile Include="tests/DynTests.fs" />
     <Compile Include="tests/DynFieldTests.fs" />
     <Compile Include="tests/DomainTests.fs" />
+    <Compile Include="tests/ErrorClassifyTests.fs" />
+    <Compile Include="tests/PromiseQueueTests.fs" />
     <Compile Include="tests/DelegateTests.fs" />
     <Compile Include="tests/DelegateToolsCodecTests.fs" />
     <Compile Include="tests/ResolveAiSettingsTests.fs" />
@@ -452,6 +460,7 @@
     <Compile Include="tests/ToolPermissionTests.fs" />
     <Compile Include="tests/SubagentPromptsTests.fs" />
     <Compile Include="tests/SubagentIntentsTests.fs" />
+    <Compile Include="tests/SubagentDispatcherTests.fs" />
     <Compile Include="tests/MethodologyRegistryTests.fs" />
     <Compile Include="tests/ToolCatalogRegistryTests.fs" />
     <Compile Include="tests/TreeSitterKernelTests.fs" />
@@ -499,9 +508,9 @@
     <Compile Include="tests/TestsEntriesFuzzy.fs" />
     <Compile Include="tests/CoverageFillKernelTests.fs" />
     <Compile Include="tests/CoverageFillKernel2Tests.fs" />
-    <Compile Include="tests/KernelDomainCoverageTests.fs" />
-    <Compile Include="tests/KernelReviewCoverageTests.fs" />
-    <Compile Include="tests/CoverageFillShellTests.fs" />
+     <Compile Include="tests/KernelDomainCoverageTests.fs" />
+      <Compile Include="tests/KernelReviewCoverageTests.fs" />
+      <Compile Include="tests/CoverageFillShellTests.fs" />
     <Compile Include="tests/CoverageFillFuzzyTests.fs" />
     <Compile Include="tests/CoverageFillMethodologyTests.fs" />
     <Compile Include="tests/CoverageFillOpencodeTests.fs" />

@@ -93,11 +93,11 @@ let containsAbortChecks () =
     check "Abort capital" (containsAbortText "Abort")
 
 let classifyErrorLeafChecks () =
-    equal "AbortError name" MessageAborted (classifyErrorLeaf "AbortError" "" "msg")
+    equal "AbortError name" (ClientCancellation "AbortError") (classifyErrorLeaf "AbortError" "" "msg")
     equal "MessageAborted tag" MessageAborted (classifyErrorLeaf "" "MessageAborted" "msg")
     equal "SessionBusyError name" SessionBusy (classifyErrorLeaf "SessionBusyError" "" "msg")
     equal "TaskWaitBackgrounded tag" TaskWaitBackgrounded (classifyErrorLeaf "" "TaskWaitBackgrounded" "msg")
-    equal "Other+abort text" MessageAborted (classifyErrorLeaf "Other" "Other" "abort text")
+    equal "Other+abort text" (ClientCancellation "abort-text") (classifyErrorLeaf "Other" "Other" "abort text")
     equal "Other no abort" (UnknownJsError "normal") (classifyErrorLeaf "Other" "Other" "normal")
 
 // ── Kernel.Domain.WorkspaceState ──────────────────────────────────────────────

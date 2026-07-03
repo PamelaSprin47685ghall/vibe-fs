@@ -42,7 +42,12 @@ let runNudgeFlowCore
                 match selectNudgePrompt action snapshot with
                 | None -> return runtimeState
                 | Some promptText ->
-                    let! claimed = tryClaimNudgeDispatch workspaceRoot sessionKey action snapshot.nudgeAnchorKey
+                    let! claimed =
+                        promise {
+                            try
+                                return! tryClaimNudgeDispatch workspaceRoot sessionKey action snapshot.nudgeAnchorKey
+                            with _ -> return false
+                        }
                     if not claimed then return runtimeState
                     else
                         let! _ = sendNudge promptText snapshot.agentFromMessage

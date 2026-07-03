@@ -74,10 +74,34 @@ let readStopsAtCorruptLine () = promise {
     do! rmAsync dir
 }
 
+let strictAppendLoopActivatedPersistsEvent () = promise {
+    let! dir = mkdtempAsync "eventlog-strict-append-"
+    let store = EventLogStore dir
+    do! appendLoopActivatedOrFail dir "s-strict" "strict task"
+    let! events = store.ReadAllEvents()
+    check "strict append: one event" (events.Length = 1)
+    check "strict append: kind" (events.[0].Kind = eventKindLoopActivated)
+    check "strict append: task" (events.[0].Payload |> Map.tryFind "task" = Some "strict task")
+    do! rmAsync dir
+}
+
+let strictAppendLoopActivatedFailsOnBadPath () = promise {
+    let! dir = mkdtempAsync "eventlog-strict-fail-"
+    let file = dir + "/badfile"
+    do! writeFileAsync file "content"
+    let! result = appendLoopActivatedOrFail file "s-bad" "task" |> Promise.result
+    match result with
+    | Error _ -> check "rejected on bad path" true
+    | Ok _ -> failwith "expected rejection on bad path"
+    do! rmAsync dir
+}
+
 let run () = promise {
     do! appendThenReadAll ()
     do! syncReviewFromEventLogProjectsTask ()
     do! syncClearsAfterAcceptedVerdict ()
     do! parallelAppendsBothPersist ()
     do! readStopsAtCorruptLine ()
+    do! strictAppendLoopActivatedPersistsEvent ()
+    do! strictAppendLoopActivatedFailsOnBadPath ()
 }

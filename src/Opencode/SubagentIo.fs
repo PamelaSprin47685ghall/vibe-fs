@@ -52,7 +52,7 @@ let runSubagentCoreResult (runtime: FallbackRuntimeState) (registry: ChildAgentR
                         cleanupChildIfRequested ()
                 with err ->
                     match translateJsError err with
-                    | MessageAborted ->
+                    | MessageAborted | ClientCancellation _ ->
                         abortAndUnregister ()
                         if not (Dyn.isNullish signal) && Dyn.truthy (Dyn.get signal "aborted") then
                             return Ok abortedPrefix

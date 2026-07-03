@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.FallbackIntegrationTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.StateMachine
 
@@ -18,15 +19,16 @@ let private mkCfg () =
       MaxRetries = 2; LoopMaxContinues = 3 }
 
 let private retryErr =
-    { ErrorName = "err"; Message = "fail"; StatusCode = None; IsRetryable = Some true }
+    { ErrorName = "err"; DomainError = Some (UnknownJsError "fail")
+      Message = "fail"; StatusCode = None; IsRetryable = Some true }
 
 let private abortErr =
-    { ErrorName = "MessageAbortedError"; Message = "abort"
-      StatusCode = None; IsRetryable = None }
+    { ErrorName = "MessageAbortedError"; DomainError = Some MessageAborted
+      Message = "abort"; StatusCode = None; IsRetryable = None }
 
 let private authErr =
-    { ErrorName = "AuthError"; Message = "401"
-      StatusCode = Some 401; IsRetryable = None }
+    { ErrorName = "AuthError"; DomainError = None
+      Message = "401"; StatusCode = Some 401; IsRetryable = None }
 
 let private mkState phase idx fc cc =
     { Phase = phase; CurrentIndex = idx; FailureCount = fc

@@ -1,5 +1,7 @@
 module Wanxiangshu.Kernel.FallbackKernel.Types
 
+open Wanxiangshu.Kernel.Domain
+
 /// Model variant qualifier (e.g. "high", "medium", "low").
 type ModelVariant = string
 
@@ -27,6 +29,7 @@ type FallbackConfig =
 /// Structured error extracted from a session.error or status event.
 type ErrorInput =
     { ErrorName   : string
+      DomainError : DomainError option
       Message     : string
       StatusCode  : int option
       IsRetryable : bool option }

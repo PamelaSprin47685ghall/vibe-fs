@@ -140,10 +140,10 @@ let muxSlashCommandsLoopUsesDepsDirectory () =
 
 let muxSubagentToolsUsesSimpleArgsCodec () =
     let mux = requireFile "src/Mux/SubagentTools.fs" |> nonCommentCode
-    let shell = requireFile "src/Shell/MuxSubagentToolExecute.fs" |> nonCommentCode
+    let dispatcher = requireFile "src/Shell/SubagentDispatcher.fs" |> nonCommentCode
     check "arch: Mux SubagentTools must not open SubagentSimpleArgsCodec"
         (not (mux.Contains "SubagentSimpleArgsCodec"))
-    check "arch: MuxSubagentToolExecute must not decodeMeditatorArgs"
-        (not (shell.Contains "decodeMeditatorArgs"))
-    check "arch: MuxSubagentToolExecute uses decodeToolInvocation"
-        (shell.Contains "decodeToolInvocation")
+    check "arch: SubagentDispatcher must not decodeMeditatorArgs"
+        (not (dispatcher.Contains "decodeMeditatorArgs"))
+    check "arch: SubagentDispatcher uses decodeToolInvocation"
+        (dispatcher.Contains "decodeToolInvocation")

@@ -6,7 +6,10 @@ open Fable.Core
 /// actor pattern with a plain Promise chain: tasks run in the
 /// order they are enqueued, the tail swallows predecessor exceptions so the queue
 /// never jams, and each Enqueue resolves/rejects with its own task's outcome.
-type SerialQueue() =
+type IExceptionObserver =
+    abstract OnException: exn -> unit
+
+type SerialQueue(?observer: IExceptionObserver) =
     let mutable tail : JS.Promise<unit> = Promise.lift ()
 
     member _.Enqueue(work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
@@ -17,11 +20,13 @@ type SerialQueue() =
                         let! result = work ()
                         resolve result
                     with ex ->
+                        observer |> Option.iter (fun o -> o.OnException ex)
                         reject ex
                 }
             tail <-
                 tail
-                |> Promise.catch (fun _ -> ())
+                |> Promise.catch (fun ex ->
+                    observer |> Option.iter (fun o -> o.OnException ex))
                 |> Promise.bind (fun _ -> runNext () |> Promise.map ignore))
 
 /// Race a promise against a timeout. Returns None when the timeout wins, Some

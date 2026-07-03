@@ -87,6 +87,28 @@ let appendWorkBacklogCommitted (workspaceRoot: string) (sessionID: string) (args
               "selectMethodologyJson", methJson ]
     getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindWorkBacklogCommitted payload (getTimestampMs().ToString()))
 
+let appendLoopActivatedOrFail (workspaceRoot: string) (sessionID: string) (task: string) : JS.Promise<unit> =
+    let payload = Map [ "task", task ]
+    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindLoopActivated payload (getTimestampMs().ToString()))
+
+let appendLoopCancelledOrFail (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
+    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindLoopCancelled Map.empty (getTimestampMs().ToString()))
+
+let appendReviewVerdictOrFail (workspaceRoot: string) (sessionID: string) (verdict: string) (feedback: string option) : JS.Promise<unit> =
+    let baseMap = Map [ "verdict", verdict ]
+    let payload = match feedback with Some f when f <> "" -> Map.add "feedback" f baseMap | _ -> baseMap
+    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindReviewVerdict payload (getTimestampMs().ToString()))
+
+let appendSubmitReviewWipRecordedOrFail (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
+    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindSubmitReviewWipRecorded Map.empty (getTimestampMs().ToString()))
+
+let appendNudgeDedupClearedOrFail (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
+    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindNudgeDedupCleared Map.empty (getTimestampMs().ToString()))
+
+let appendWorkBacklogCommittedOrFail (workspaceRoot: string) (sessionID: string) (args: TodoWriteArgs) : JS.Promise<unit> =
+    let payload = Map [ "ahaMoments", args.AhaMoments; "changesAndReasons", args.ChangesAndReasons; "gotchas", args.Gotchas; "lessonsAndConventions", args.LessonsAndConventions; "plan", args.Plan; "todosJson", JS.JSON.stringify(args.Todos); "selectMethodologyJson", JS.JSON.stringify(args.SelectMethodology |> List.toArray) ]
+    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindWorkBacklogCommitted payload (getTimestampMs().ToString()))
+
 let verdictStringFromReviewResult (result: Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult) : string * string option =
     match result with
     | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb ->
