@@ -57,10 +57,9 @@ join(workspaceRoot, ".wanxiangshu.ndjson")
 | `loop_cancelled` | 用户取消 With-Review | — |
 | `review_verdict` | reviewer 结论写回父会话语义成立时 | `verdict`: `accepted` \| `rejected` \| `terminated` \| `cancelled`；`feedback?` |
 | `work_backlog_committed` | `todowrite` / `task`（Mimocode）校验通过并采纳 | `todos`；五份报告字段 + `select_methodology`（与 `WorkBacklog` 一致） |
-| `submit_review_recorded` | `submit_review` 进入审查管线 | `report` 摘要、`affectedFiles`、`wip` |
 | `nudge_dispatched` | nudge 在锁内 claim 成功后落盘（先于或伴随宿主投递） | `action`: `nudge-todo` \| `nudge-loop` \| `nudge-runner`；`anchor`: 当前 assistant 文本 |
 | `submit_review_wip_recorded` | `submit_review` WIP 受理 | — |
-| `nudge_suppressed` | Coordinator 记录会话级抑制（若需跨重启） | `reason` |
+| `nudge_dedup_cleared` | nudge 去重状态清除（新用户消息或 submit_review_wip 后） | — |
 
 后续可增 `fallback_*`、`methodology_note` 等；增 kind 须先改 Kernel 类型 + 本表 + 测试。
 
@@ -78,7 +77,7 @@ Host hook / tool execute
 
 | 层 | 职责 |
 |----|------|
-| `Kernel/EventLog/*` | 事件 DU、按 session fold（`foldReviewTask`、`foldBacklog`、`foldNudgeSnapshot`…）、版本升级纯函数 |
+| `Kernel/EventLog/*` | 事件 DU（`Types.fs`）、按 session fold（`Fold.fs`：`foldReviewTask`/`foldWorkBacklogSnapshot`/`foldNudgeDedup`）、版本升级纯函数 |
 | `Shell/EventLogFiles.fs` | 路径、锁、append、读全文件/按 session 流式读、损坏截断 |
 | `Shell/EventLogRuntime.fs` | 与 `ReviewRuntime`、`ReviewReplaySync` 对接：启动重放、append 与投影同步 |
 | 宿主 `MessageTransform*` | 移除 compaction-anchor 注入；caps/backlog **展示** 可读投影，不从历史 fold SSOT |
@@ -95,20 +94,22 @@ Host hook / tool execute
 | `experimental.session.compacting` 保留 durable backlog 语义 | 缩为「compaction 前无需补锚」；若仍 hook，仅日志/无操作 |
 | PRD/README「历史优先于内存」指 **对话历史** | 改为 **`.wanxiangshu.ndjson` 优先于内存**；对话历史非真相 |
 
-**保留**：`PromptFrontMatter` 解析（工具输出、用户可读锚点）；`LoopMessages` 字段名常量（编码事件 payload / 展示文案）。
+**保留**：`PromptFrontMatter` 解析（工具输出、用户可读锚点）；`LoopMessages` 字段名常量（编码事件 payload / 展示文案）；`inferReviewTaskFromTexts` + `ReviewReplaySync.syncReviewFromTexts` 作为宿主文本 fallback 保留，事件重放（`EventLogRuntime.syncReviewFromEventLog`）为首选路径。
+
+**当前进度**：`Kernel/EventLog/`（`Types.fs` + `Fold.fs`）+ `Shell/EventLogCodec.fs` + `Shell/EventLogFiles.fs` + `Shell/EventLogRuntime.fs` 已建成；`foldReviewTask`/`foldWorkBacklogSnapshot`/`foldNudgeDedup` 纯函数已实现；NDJSON append + 文件锁 + 损坏行截断已实现；`EventLogRuntime.syncReviewFromEventLog` + `isLoopActiveFromEventLog` + `tryClaimNudgeDispatch` 已接入宿主。compaction-anchor 完全删除尚未完成。
 
 ## 7. 实施顺序（任务强制）
 
-1. **文档**：`README.md`、`PRD/PRD.md`、`PRD/EventSourcing.md`（本文件）、`AGENTS.md` 指针。
-2. **测试**：`tests/EventLog*` — fold 纯函数、损坏行截断、append 顺序、锁下串行（可 mock FS）、与 `ReviewTestsReplay` / `BacklogReplaySpecs` 等等价场景 **改断言源为事件流**。
-3. **开发**：Kernel → Shell → 各宿主 tool/hook 接线；删除 compaction-anchor 路径；架构测试更新（禁止 loop 决策读仅历史 texts）。
+1. **文档**：`README.md`、`PRD/PRD.md`、`PRD/EventSourcing.md`（本文件）、`AGENTS.md` 指针。✅
+2. **测试**：`tests/EventLogFoldTests.fs`、`tests/EventLogCodecTests.fs`、`tests/EventLogRuntimeTests.fs` — fold 纯函数、损坏行截断、append 顺序、锁下串行。✅
+3. **开发**：`Kernel/EventLog/` + `Shell/EventLogCodec.fs` + `Shell/EventLogFiles.fs` + `Shell/EventLogRuntime.fs` + 各宿主 append 接线。✅ `inferReviewTaskFromTexts` 仍存在作为宿主文本 fallback（`ReviewReplaySync.syncReviewFromTexts`），事件重放（`EventLogRuntime.syncReviewFromEventLog`）为首选路径。
 
 ## 8. 验收标准
 
-- 重启进程后，仅依赖 `.wanxiangshu.ndjson` 可恢复：当前 `task`（With-Review）、最新 backlog 全量 `todos` + 最近 `work_backlog_committed` 五份报告、nudge 所需快照。
-- OpenCode compaction **后** 不注入 anchor prompt，上述状态仍正确。
-- 架构测试：`Kernel` 无 `Dyn`；事件 fold 在 `Kernel`；append 仅在 `Shell`。
-- `npm run build-and-test` 全绿。
+- ✅ 重启进程后,仅依赖 `.wanxiangshu.ndjson` 可恢复:当前 `task`(With-Review)、最新 backlog 全量 `todos` + 最近 `work_backlog_committed` 五份报告、nudge 所需快照。
+- ⬜ OpenCode compaction **后** 不注入 anchor prompt,上述状态仍正确。(迁移中:`inferReviewTaskFromTexts` 文本 fallback 仍存在)
+- ✅ 架构测试:`Kernel` 无 `Dyn`;事件 fold 在 `Kernel`;append 仅在 `Shell`。
+- ✅ `npm run build-and-test` 全绿。
 
 ## 9. 与附录对照
 

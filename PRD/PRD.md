@@ -47,7 +47,7 @@
 
 | 稳定语义 | 内核落点（示例路径） |
 |----------|----------------------|
-| With-Review = 有限状态机 + 事件 fold | `src/Kernel/ReviewSession/*`, `src/Kernel/EventLog/*`（待建）, `LoopMessages.fs`（字段名/展示） |
+| With-Review = 有限状态机 + 事件 fold | `src/Kernel/ReviewSession/*`, `src/Kernel/EventLog/*`, `LoopMessages.fs`（字段名/展示） |
 | Nudge = 纯决策 + 去重状态机 | `src/Kernel/Nudge/*`, `src/Shell/NudgeRuntime.fs` |
 | Todo / backlog = 全量替换 todos + 五份交接报告（ahaMoments 等） | `src/Kernel/WorkBacklog.fs`, `src/Kernel/BacklogProjectionCore.fs` |
 | 工具权限 = 角色 × 语义分类 | `src/Kernel/ToolPermission.fs` |
@@ -247,7 +247,7 @@ Inactive | Active(task) | Locked(task, reviewerId) | Accepted | Rejected(feedbac
 
 | 类 | 代表模块 |
 |----|----------|
-| 状态机 | `ReviewSession/*`, `Nudge/*`, `EventLog/*`（待建） |
+| 状态机 | `ReviewSession/*`, `Nudge/*`, `EventLog/*`, `FallbackKernel/*` |
 | 协议与提示 | `PromptFrontMatter`, `LoopMessages`, `CapsPrelude`, `ReviewPrompts/*`, `SubagentPrompts` |
 | 工具元数据 | `ToolCatalog/*`, `ToolCopy`, `HostTools`, `Config` |
 | 消息语义 | `Messaging`, `Message`, `MessageDedup`, `BacklogProjectionCore`, `ReviewReplayPolicy` |
@@ -257,11 +257,11 @@ Inactive | Active(task) | Locked(task, reviewerId) | Accepted | Rejected(feedbac
 
 | 类 | 代表模块 |
 |----|----------|
-| IO | `FileSys`, `WorkspaceFiles`, `EventLogFiles`（待建） |
+| IO | `FileSys`, `WorkspaceFiles`, `EventLogFiles` |
 | 搜索 | `FuzzyFinderShell`, `FuzzySearch`, `FuzzyIteratorStore` |
 | 执行 | `Executor`, `ExecutorJavascript`, `SessionExecutor` |
 | 编解码 | `*ToolsCodec`, `OpencodeHookInputCodec`, `MuxHookInputCodec`, `MessagingPartCodec`, `SubagentIntentsCodec` |
-| 编排 | `MessageTransformPipeline`, `ReviewRuntime`, `NudgeRuntime`, `ReviewReplaySync`, `ChildAgentRegistry`, `SubagentSpawn` |
+| 编排 | `MessageTransformPipeline`, `ReviewRuntime`, `NudgeRuntime`, `ReviewReplaySync`, `ChildAgentRegistry`, `SubagentSpawn`, `EventLogRuntime`, `EventLogFiles` |
 
 ### 4.5 消息变换管线（SSOT 顺序）
 
@@ -549,7 +549,7 @@ LLM 调用 submit_review(report, affectedFiles, wip=false)
 
 ## 15. 技术约束
 
-- **语言**：F# → Fable 4.x → ES module（`package.json` `"type": "module"`）。
+- **语言**：F# → Fable 5.2.0 → ES module（`package.json` `"type": "module"`）。
 - **异步**：仅 `promise {}` / `JS.Promise`；禁 Async/Task（宝典）。
 - **依赖**：`yaml`（配置与事件 front matter）、`@opencode-ai/plugin`（Opencode 侧）；可选 tree-sitter、tsx 等见 `optionalDependencies`。
 - **Mux 改动**：允许改 `../mux` binding，核心改动优先本仓库（`AGENTS.md`）。
@@ -577,7 +577,7 @@ LLM 调用 submit_review(report, affectedFiles, wip=false)
 - [x] ToolCatalog SSOT + 三宿主注册 + Registry 全部 methodology
 - [x] `/loop` + submit_review + replay
 - [x] todowrite + backlog 投影 + select_methodology
-- [ ] `.wanxiangshu.ndjson` 事件溯源（见 `EventSourcing.md`）
+- [x] `.wanxiangshu.ndjson` 事件溯源（见 `EventSourcing.md`）
 - [x] ArchitectureTests* 门禁
 
 ### 17.2 可增强（非阻塞）
@@ -870,7 +870,7 @@ Compaction：仅影响宿主 LLM 窗口；durable 交接在 `.wanxiangshu.ndjson
 
 | 层级 | 示例 |
 |------|------|
-| 纯 Kernel | `KernelTests.fs`, `ReviewTests.fs`, `EventLogTests.fs`（待建）, `FallbackKernelTests.fs` |
+| 纯 Kernel | `KernelTests.fs`, `ReviewTests.fs`, `EventLogFoldTests.fs`, `EventLogCodecTests.fs`, `FallbackKernelTests.fs` |
 | Shell codec | `*CodecTests.fs`, `ToolArgsDecodeTests.fs`, `FallbackConfigCodecTests.fs`, `FallbackEventBridgeTests.fs`, `FallbackRuntimeStateTests.fs` |
 | 架构 | `ArchitectureTests*.fs` + `TestsArchitectureRegistry*.fs` |
 | 集成 | `IntegrationPluginTests.fs`, `IntegrationMux*`, `IntegrationOpencodeReviewSpecs.fs`, `FallbackIntegrationTests.fs` |
@@ -901,7 +901,7 @@ Compaction：仅影响宿主 LLM 窗口；durable 交接在 `.wanxiangshu.ndjson
 | `/loop-review` client 错误 | `Terminated` → `preReviewCouldNotComplete` | CommandHooks.fs:52-59 |
 | methodology 工具缺 intent | codec 拒绝 | 各 Methodology schema + tests |
 | fuzzy iterator 过期 | 返回下一页 iterator 或空 | FuzzyIteratorStore |
-| 事件文件锁超时 | 写失败；调用方重试 | EventLogFiles（待建） |
+| 事件文件锁超时 | 写失败；调用方重试 | EventLogFiles |
 | OMP 重复注册 extension | WeakSet 跳过 | Omp/Plugin.fs:45-47 |
 | Review 非法转移 | `transition` 返回 None | StateMachine.fs:18 |
 | submit_review 非 active | ToolCopy 拒绝语 | ToolCopy.fs |
@@ -1002,7 +1002,7 @@ Compaction：仅影响宿主 LLM 窗口；durable 交接在 `.wanxiangshu.ndjson
 | HTTP | 无 coordinator server | slave→coordinator |
 | 串行 | 事件文件锁、git（阵）、队列 | SerialQueue on master |
 
-## 附录 C：Review 重放伪代码（目标：`Kernel/EventLog/Fold.fs`）
+## 附录 C：Review 重放伪代码（实现：`Kernel/EventLog/Fold.fs`）
 
 ```
 foldReviewTask(sessionId, lines):
@@ -1033,8 +1033,8 @@ foldReviewTask(sessionId, lines):
 
 1. `src/Kernel/ReviewSession/Types.fs` + `StateMachine.fs`
 2. `src/Kernel/LoopMessages.fs`
-3. `src/Kernel/Nudge.fs` + `src/Kernel/Nudge/Coordinator.fs`
-4. `PRD/EventSourcing.md` + `src/Kernel/EventLog/*`（待建）
+3. `src/Kernel/Nudge.fs` + `src/Kernel/Nudge/NudgeDerivation.fs`
+4. `PRD/EventSourcing.md` + `src/Kernel/EventLog/*`
 5. `src/Kernel/BacklogProjectionCore.fs` + `WorkBacklog.fs`
 6. `src/Shell/MessageTransformPipeline.fs`
 7. `src/Opencode/PluginCore.fs` + `CommandHooks.fs`
@@ -1158,8 +1158,8 @@ wanxiangshu-1/
   src/
     Kernel/
       ReviewSession/     Types, StateMachine, Registry, Effects, Facade
-      EventLog/          Types, Fold（待建）
-      Nudge/             Coordinator, Decision, TodoStatus, Transitions
+      EventLog/          Types, Fold
+      Nudge/             NudgeDerivation, Registry, RetryProgress, SubmitReviewHooks, TodoStatus
       ToolCatalog/       Registry + 分族 Spec
       CapsPrelude.fs     宝典/铁律 SSOT
     Shell/               codec, IO, runtime, MessageTransform*
@@ -1227,7 +1227,7 @@ wanxiangshu-1/
 | 主题 | README | PRD（源码计数） |
 |------|--------|-----------------|
 | methodology 数量 | 53 | Registry **54** |
-| ToolCatalog 工具数 | 未逐条列 | **17** 规范名（含 executor_wait/abort） |
+| ToolCatalog 工具数 | 未逐条列 | **15** 规范名（含 executor_wait/abort） |
 | 第五宿主 | OMP | 同，且架构测试最严 |
 
 ---

@@ -67,13 +67,15 @@ JS/Node 无线程级并发，但有大量异步交错。策略不是到处加锁
 
 ### Kernel：纯规则层
 
-不是"公共工具箱"，是"真正稳定的系统语义"。92 个 `.fs` 文件，按子目录+顶层分六类：
+不是"公共工具箱"，是"真正稳定的系统语义"。81 个 `.fs` 文件，按子目录+顶层分六类：
 
 1. 领域状态机（子目录）：
    - `ReviewSession/`：`Types`/`StateMachine`/`Registry`/`Query`/`Effects`/`Facade`
-   - `Nudge/`：`Types`/`Transitions`/`Decision`/`Coordinator`/`EventHandler`/`Registry`/`RetryProgress`/`SubmitReviewHooks`/`TodoStatus`
+   - `Nudge/`：`Types`/`NudgeDerivation`/`Registry`/`RetryProgress`/`SubmitReviewHooks`/`TodoStatus`
+   - `EventLog/`：`Types`/`Fold`（事件 DU + 纯 fold：`foldReviewTask`/`foldWorkBacklogSnapshot`/`foldNudgeDedup`）
+   - `FallbackKernel/`：`Types`/`Decision`/`Recovery`/`StateMachine`（完全平方数启发式模型降级纯状态机）
 2. 跨宿主共享格式与协议：`PromptFrontMatter`/`PromptFragments`/`LoopMessages`/`ReviewPrompts/`（`Commands`/`Format`/`Instructions`/`OmpVariant`/`Registry`/`Submission`）/`SearchPrompts`/`SubagentPrompts`/`OmpPrompts`/`CapsFormat`/`Yaml`/`PatchParser`
-3. 工具/权限/意图元数据：`ToolCatalog/`（`ToolSpec`/`Registry`/`Classification`/`FileIO`/`Web`/`Search`/`Review`/`Subagent`/`Executor`）/`ToolCatalogParams`/`Config`/`Subagent`/`SubagentIntents`/`SubagentToolPolicy`/`HostTools`（含 `Omp`）/`OmpSessionTools`/`ToolPermission`/`ToolCopy`/`ToolResult`/`ToolArgs`/`ToolContext`/`ToolOutputInfo`(+`Types`+`Parse`)/`WebFetchGuard`/`ReviewVerdict`
+3. 工具/权限/意图元数据：`ToolCatalog/`（`ToolSpec`/`Registry`/`Classification`/`FileIO`/`Web`/`Search`/`Review`/`Subagent`/`Executor`）/`ToolCatalogParams`/`Config`/`Subagent`/`SubagentIntents`/`SubagentToolPolicy`/`HostTools`（含 `Omp`）/`OmpSessionTools`/`ToolPermission`/`ToolCopy`/`ToolResult`/`ToolArgs`/`ToolContext`/`ToolOutputInfo`(+`Types`+`Parse`)/`WebFetchGuard`/`ReviewVerdict`/`WarnTdd`
 4. 历史折叠与消息语义：`Messaging`/`Message`/`MessageDedup`/`Dedup`/`BacklogProjectionCore`/`BacklogProjection`/`WorkBacklog`/`MessageTransformPolicy`/`ReviewReplayPolicy`
 5. 纯算法或纯解析：`FuzzyQuery`/`FuzzyPath`/`FuzzyFormat`/`Executor`(+`ExecutorStrip`)/`TreeSitterKernel`/`Domain`/`Methodology`(+`MethodologyCatalog`)
 6. 会话前导与宝典：`CapsPrelude`/`CapsFormat`/`CapsSynthPolicy`/`PromptFrontMatter` 等（宝典/铁律文本 SSOT 在 `CapsPrelude`）
@@ -82,19 +84,20 @@ JS/Node 无线程级并发，但有大量异步交错。策略不是到处加锁
 
 ### Shell：现实世界边界
 
-把 Kernel 需要的能力从 Node 取回，97 个 `.fs` 文件按功能分簇：
+把 Kernel 需要的能力从 Node 取回，100 个 `.fs` 文件按功能分簇：
 
 - 文件系统：`FileSys`/`WorkspaceFiles`
 - 搜索后端：`FuzzyFinderShell`/`FuzzySearch`(+`Find`/`Grep`/`Helpers`)/`FuzzyIteratorStore`
+- 语义搜索注入：`SembleMcp`（MCP client v1.x best-effort spawn/connect/callTool）/`SembleSearch`（investigator 断点检测 + context 提取 + read 对注入）
 - 执行器：`Executor`/`ExecutorJavascript`/`ExecutorSpawn`/`ExecutorSpawnRunners`/`SessionExecutor`
 - tree-sitter：`TreeSitterShell`/`TreeSitterPlatform`
 - 远端 API：`WebSearchApi`/`WebFetch`/`TitleFetchGuardCommon`
 - 动态类型与错误分类：`Dyn`/`DynField`/`ErrorClassify`/`JsArrayMutate`/`PromiseStr`
 - OMP 专属边界能力：`OmpCaps`/`RunnerBackground`/`CapsPrelude`（Shell 侧 caps 组装）/`OmpHostBindings`/`MuxHostBindings`
-- 串行与并发：`PromiseQueue`/`RuntimeScope`
+- 基础设施：`PromiseQueue`/`RuntimeScope`/`Clock`/`LivelockGuard`/`SerialStateHolder`/`CoordinatorLifecycle`
 - 子代理与 session：`ChildAgentRegistry`/`SessionProjectionStore`/`SubagentSpawn`/`SubagentIo`/`SubagentToolExecute`/`MuxSubagentToolExecute`/`SessionIoSpawn`
 - 编解码边界（`*Codec`/`*Decode`/`*Encode`/`*Wire`）：
-  - 工具：`ToolArgsDecode`/`ToolExecute`/`ToolRuntimeContext`/`ToolContextCodec`/`FileToolsCodec`/`WebToolsCodec`/`ExecutorToolsCodec`/`FuzzyToolsCodec`/`PatchToolsCodec`/`DelegateToolsCodec`/`WorkBacklogToolsCodec`/`ReviewToolsCodec`/`JsonSchemaBuilders`/`MuxJsonSchema`
+  - 工具：`ToolArgsDecode`/`ToolExecute`/`ToolRuntimeContext`/`ToolContextCodec`/`FileToolsCodec`/`WebToolsCodec`/`WebSearchCodec`/`ExecutorToolsCodec`/`FuzzyToolsCodec`/`PatchToolsCodec`/`DelegateToolsCodec`/`WorkBacklogToolsCodec`/`ReviewToolsCodec`/`JsonSchemaBuilders`/`MuxJsonSchema`
   - 子代理：`SubagentIntentsCodec`/`SubagentSimpleArgsCodec`/`SubagentPromptBuild`
    - 消息变换：`MessageTransformPipeline`/`MessageTransformCore`/`MessageTransformHostEntry`/`MessageTransformHostHooks`/`MessageTransformCommon`/`MessagingEncodeHelpers`/`MessagingPartCodec`/`HostMessagePartCodec`/`ChatHookOutputCodec`/`ChatTransformOutputCodec`
   - Opencode 宿主：`OpencodeHookInputCodec`/`OpencodeSessionPromptCodec`/`OpencodeSessionSpawnCodec`/`OpencodeAgentConfigCodec`/`OpencodeAgentConfigWire`/`OpencodeClientCodec`/`OpencodeContextCodec`/`OpencodeSessionEventCodec`(+`Common`/`Nudge`)
@@ -102,6 +105,8 @@ JS/Node 无线程级并发，但有大量异步交错。策略不是到处加锁
   - 去重：`ReadDedupOpenCode`/`ReadDedupMuxPlugin`
   - caps 缓存：`CapsFileCache`/`CapsSynthCommon`
 - review/nudge runtime：`ReviewRuntime`/`ReviewReplaySync`/`NudgeRuntime`
+- 事件溯源：`EventLogCodec`/`EventLogFiles`/`EventLogRuntime`（NDJSON append/lock/fold + ReviewStore 同步）
+- Fallback：`FallbackConfigCodec`/`FallbackRuntimeState`/`FallbackMessageCodec`/`FallbackEventBridge`
 - backlog：`BacklogSessionCodec`/`WorkBacklogSchema`
 
 每个 Shell 模块只承担一种外部能力，复杂流程留给上层编排。
@@ -132,7 +137,7 @@ JS/Node 无线程级并发，但有大量异步交错。策略不是到处加锁
 
 review 仅少数合法状态 → DU 状态机。`/loop` 与 verdict 等事实 → append `loop_*` / `review_verdict` 事件；跨重启从 `.wanxiangshu.ndjson` fold 当前 `task`，再 `syncReviewProjection`。消息上的 YAML front-matter 仅作 LLM 可读展示，**不是** SSOT。
 
-更硬的纪律：`reviewStore` 等只是事件积分的缓存。loop/nudge 判断一律先由 **事件重放** 得到 `SessionSnapshot`，再进 `Kernel.Nudge`/`Decision`；禁止用 `inferReviewTaskFromTexts(宿主全量文本)` 作真相（该函数迁移为废弃或仅测展示编码）。
+更硬的纪律：`reviewStore` 等只是事件积分的缓存。loop/nudge 判断一律先由 **事件重放** 得到 `SessionSnapshot`，再进 `Kernel.Nudge`/`NudgeDerivation`；`ReviewReplaySync.syncReviewFromTexts`（基于 `inferReviewTaskFromTexts`）仍存在作为宿主文本 fallback，事件重放（`EventLogRuntime.syncReviewFromEventLog`）为首选路径。
 
 ### todo 必须有 `completedWorkReport`
 
@@ -221,13 +226,14 @@ npm 包主导出入口：`build/src/Mux/Plugin.js`（`"."`）；OMP：`build/src
 
 ```text
 src/
-  Kernel/       纯领域规则、状态机、格式协议、共享提示词（92 .fs，含 Nudge/ ReviewPrompts/ ReviewSession/ ToolCatalog/ 子目录）
-  Shell/        Node/文件系统/网络/第三方库/串行队列 + 全部宿主 obj 边界 codec（97 .fs）
-  Methodology/  54 个方法论 schema + Registry + Opencode/Mux/Omp 工具注册（10 .fs，数据驱动 Catalog1-4）
-  Opencode/     OpenCode / Mimocode 插件适配层与 TUI 扩展（35 .fs）
-  Mux/          Mux 注册与 wrapper 适配层（27 .fs）
-  Omp/          oh-my-pi 扩展适配层（仅 Kernel+Shell，39 .fs）
-tests/          纯内核 + Shell + 集成 + 插件契约 + 架构边界探针（150+ .fs，含 27 个 ArchitectureTests*）
+  Kernel/       纯领域规则、状态机、格式协议、共享提示词（81 .fs，含 EventLog/ FallbackKernel/ Nudge/ ReviewPrompts/ ReviewSession/ ToolCatalog/ 子目录）
+  Shell/        Node/文件系统/网络/第三方库/串行队列 + 全部宿主 obj 边界 codec（100 .fs）
+  Methodology/  54 个方法论 schema + Registry + Opencode/Mux/Omp 工具注册（11 .fs，数据驱动 Catalog1-4）
+  Opencode/     OpenCode / Mimocode 插件适配层与 TUI 扩展（39 .fs）
+  Mux/          Mux 注册与 wrapper 适配层（22 .fs）
+  Omp/          oh-my-pi 扩展适配层（仅 Kernel+Shell，35 .fs）
+tests/          纯内核 + Shell + 集成 + 插件契约 + 架构边界探针（232 .fs，含 23 个 ArchitectureTests*）
+e2e/            端到端插件测试（1 .fs + 3 .js：harness/mock-llm/stealth-mcp-fixture）
 build/          Fable 编译后的 JS 产物
 ```
 
