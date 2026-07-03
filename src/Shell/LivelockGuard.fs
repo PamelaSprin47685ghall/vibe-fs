@@ -16,3 +16,6 @@ let check (sessionId: string) (tool: string) (argsJson: string) (outputJson: str
     | _ ->
         stateBySession <- Map.add sessionId { tool = tool; argsJson = argsJson; outputJson = outputJson; count = 1 } stateBySession
         false
+
+let cleanup (sessionId: string) : unit =
+    stateBySession <- Map.remove sessionId stateBySession

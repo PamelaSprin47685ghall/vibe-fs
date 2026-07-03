@@ -217,16 +217,6 @@ let saAborted () =
     let signal = createObj [ "aborted" ==> true ]
     check "signalAborted aborted → true" (signalAborted signal)
 
-// ── makeAbortPromise null signal ────────────────────────────────────────────────
-//  Branch A: null signal → Promise.resolve(()) 已 resolved
-
-let mapNullAbort () : JS.Promise<unit> =
-    promise {
-        let p = makeAbortPromise null (fun () -> ())
-        let! _v = p
-        check "makeAbortPromise null → resolved" true
-    }
-
 // ── raceWithAbortSignal null signal ────────────────────────────────────────────
 //  Branch A: null signal → 直接 return work（引用等价）
 
@@ -272,8 +262,6 @@ let run () : JS.Promise<unit> =
         saNull ()
         saNotAborted ()
         saAborted ()
-        // makeAbortPromise null
-        do! mapNullAbort ()
         // raceWithAbortSignal null
         do! rwasNullSignal ()
     }

@@ -86,4 +86,5 @@ let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<un
             clearTypedIteratorScope globalIteratorStore sessionId
             reviewStore.deactivateReview sessionId
             do! cleanupRunnerJob sessionId
+            Wanxiangshu.Shell.LivelockGuard.cleanup sessionId
     }

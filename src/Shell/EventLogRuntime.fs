@@ -25,41 +25,19 @@ let getStore (workspaceRoot: string) : EventLogStore =
         stores <- Map.add workspaceRoot s stores
         s
 
-let mutable private sessionEvents : Map<string * string, WanEvent list> = Map.empty
-
-let private updateCache (workspaceRoot: string) (e: WanEvent) : unit =
-    match Map.tryFind (workspaceRoot, e.Session) sessionEvents with
-    | Some events ->
-        sessionEvents <- Map.add (workspaceRoot, e.Session) (events @ [e]) sessionEvents
-    | None -> ()
-
 let getSessionEvents (workspaceRoot: string) (sessionID: string) : JS.Promise<WanEvent list> =
     promise {
         if sessionID = "" || workspaceRoot = "" then return []
         else
-            match Map.tryFind (workspaceRoot, sessionID) sessionEvents with
-            | Some events -> return events
-            | None ->
-                let! allEvents = getStore(workspaceRoot).ReadAllEvents()
-                let filtered = allEvents |> List.filter (fun e -> e.Session = sessionID)
-                sessionEvents <- Map.add (workspaceRoot, sessionID) filtered sessionEvents
-                return filtered
+            let! allEvents = getStore(workspaceRoot).ReadAllEvents()
+            return allEvents |> List.filter (fun e -> e.Session = sessionID)
     }
 
 let private appendAndCache (workspaceRoot: string) (e: WanEvent) : JS.Promise<Result<unit, string>> =
-    promise {
-        let! res = getStore(workspaceRoot).AppendEvent e
-        match res with
-        | Ok () -> updateCache workspaceRoot e
-        | _ -> ()
-        return res
-    }
+    getStore(workspaceRoot).AppendEvent e
 
 let private appendAndCacheOrFail (workspaceRoot: string) (e: WanEvent) : JS.Promise<unit> =
-    promise {
-        do! getStore(workspaceRoot).AppendEventOrFail e
-        updateCache workspaceRoot e
-    }
+    getStore(workspaceRoot).AppendEventOrFail e
 
 let isLoopActiveFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Promise<bool> =
     promise {

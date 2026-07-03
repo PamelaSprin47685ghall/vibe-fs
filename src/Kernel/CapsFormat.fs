@@ -75,12 +75,13 @@ let private parseLine (raw: string) : (int * string) option =
 
 let mutable private fingerprintCache : Map<string, string option> = Map.empty
 let private cacheKeys = Queue<string>()
-let private maxCacheSize = 1000
+let private maxCacheSize = 100
 
 let readFingerprint (output: string) : string option =
     if String.length output = 0 then None
     else
-        match Map.tryFind output fingerprintCache with
+        let cacheKey = $"{output.Length}_{hash output}"
+        match Map.tryFind cacheKey fingerprintCache with
         | Some cached -> cached
         | None ->
             let pairs =
@@ -99,6 +100,6 @@ let readFingerprint (output: string) : string option =
                 if cacheKeys.Count > 0 then
                     let oldestKey = cacheKeys.Dequeue()
                     fingerprintCache <- Map.remove oldestKey fingerprintCache
-            fingerprintCache <- Map.add output result fingerprintCache
-            cacheKeys.Enqueue(output)
+            fingerprintCache <- Map.add cacheKey result fingerprintCache
+            cacheKeys.Enqueue(cacheKey)
             result

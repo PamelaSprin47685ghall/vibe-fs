@@ -112,36 +112,49 @@ let buildPromptBody (agent: string) (prompt: string) (tools: obj) (settings: Sub
 let signalAborted (signal: obj) : bool =
     not (Dyn.isNullish signal) && Dyn.truthy (Dyn.get signal "aborted")
 
-/// Wire an abort event on signal so a Promise.race can use it as a
-/// cancellation source. Calls fire() (best-effort cleanup) and rejects.
-let makeAbortPromise (signal: obj) (fire: unit -> unit) : JS.Promise<unit> =
-    if Dyn.isNullish signal then
-        unbox<JS.Promise<unit>> (emitJsExpr () "Promise.resolve()")
+/// Race a work promise against an AbortSignal.  When the signal fires, the
+/// onAbort callback is invoked (caller uses it to clean up child sessions
+/// etc.) and the returned promise rejects with an `AbortError`.
+///
+/// The abort listener is removed on both branches (settled work or fired
+/// signal) to prevent listener accumulation when a host reuses the same
+/// signal across calls.
+let raceWithAbortSignal (signal: obj) (onAbort: unit -> unit) (work: JS.Promise<'T>) : JS.Promise<'T> =
+    if Dyn.isNullish signal then work
     else
         let rejecter =
             emitJsExpr ()
                 "Object.assign(new Error('Aborted'), { name: 'AbortError' })"
-        Promise.create (fun _resolve reject ->
-            let handler () =
-                try
-                    try fire () with _ -> ()
-                    reject rejecter
-                with _ -> ()
-            if signalAborted signal then
-                try fire () with _ -> ()
-                reject rejecter
-            else
-                try signal?addEventListener("abort", box handler)
-                with _ -> ())
 
-/// Race a work promise against an AbortSignal.  When the signal fires, the
-/// onAbort callback is invoked (caller uses it to clean up child sessions
-/// etc.) and the returned promise rejects with an `AbortError`.
-let raceWithAbortSignal (signal: obj) (onAbort: unit -> unit) (work: JS.Promise<'T>) : JS.Promise<'T> =
-    if Dyn.isNullish signal then work
-    else
-        let abortP = makeAbortPromise signal onAbort
-        // The race rejects as soon as abortP rejects; lift to 'T so the list
-        // element type matches work.
-        let abortAsT = unbox<JS.Promise<'T>> (box abortP)
-        Promise.race [ work; abortAsT ]
+        Promise.create (fun resolve reject ->
+            let mutable isDone = false
+            let mutable handler : obj = null
+
+            let removeHandler () =
+                if not (isNull handler) then
+                    try signal?removeEventListener("abort", handler) with _ -> ()
+                    handler <- null
+
+            let settleAbort () =
+                if not isDone then
+                    isDone <- true
+                    removeHandler ()
+                    try onAbort () with _ -> ()
+                    reject rejecter
+
+            let settleWork (continuation: unit -> unit) () =
+                if not isDone then
+                    isDone <- true
+                    removeHandler ()
+                    continuation ()
+
+            if signalAborted signal then
+                settleAbort ()
+            else
+                handler <- box (fun () -> settleAbort ())
+                try signal?addEventListener("abort", handler) with _ -> ()
+                work?``then``(
+                    (fun res -> settleWork (fun () -> resolve res) ()),
+                    (fun err -> settleWork (fun () -> reject err) ())
+                ) |> ignore
+        )

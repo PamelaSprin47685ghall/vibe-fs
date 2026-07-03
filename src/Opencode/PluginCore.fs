@@ -103,7 +103,9 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
                 | Some e when e.EventType = "session.deleted" || e.EventType = "session.delete" || e.EventType = "session.remove" || e.EventType = "session.close" ->
                     Wanxiangshu.Shell.OpencodeSessionEventCodec.getSessionID e.EventType e.Props
                 | _ -> ""
-            if ptyCleanupSessionId <> "" then cleanupPtyBySession ptyCleanupSessionId
+            if ptyCleanupSessionId <> "" then
+                cleanupPtyBySession ptyCleanupSessionId
+                Wanxiangshu.Shell.LivelockGuard.cleanup ptyCleanupSessionId
             do! services.SessionLifecycleObserver.handleEvent input
         }))
     setKey result "experimental.chat.system.transform" (twoArgHook (fun input output -> HookTransform.systemTransform services.Directory input output))
