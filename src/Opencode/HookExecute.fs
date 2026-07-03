@@ -49,15 +49,13 @@ let private requireWarn (tool: string) (args: obj) (output: obj) : unit =
 
 let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
-        let args = argsFromHookOutput output
-        if Dyn.isNullish args then ()
-        else
-            let tool = toolNameFromHookInput input
-            requireWarnTdd tool args output
-            requireWarn tool args output
-            setUiLabel args tool
-            if host = Mimocode then
-                rewriteMimocodeApplyPatchArgsForExecute output input args
+        let args = resolveHookExecuteArgs input output
+        let tool = toolNameFromHookInput input
+        requireWarnTdd tool args output
+        requireWarn tool args output
+        setUiLabel args tool
+        if host = Mimocode then
+            rewriteMimocodeApplyPatchArgsForExecute output input args
     }
 
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =

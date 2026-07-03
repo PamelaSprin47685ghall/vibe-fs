@@ -63,6 +63,38 @@ let opencodeIgnoresNonModificationTool () = promise {
     check "opencode read passes" (err = "")
 }
 
+/// Host may omit `output.args`; enforcement must still read `input.args` (or empty object).
+let opencodeRejectsCoderWhenOutputArgsAbsent () = promise {
+    let args = createObj [ "warn_tdd", box "wrong" ]
+    let input =
+        createObj [
+            "tool", box "coder"
+            "sessionID", box "s-warn-enforce"
+            "callID", box "c-warn-enforce"
+            "args", box args
+        ]
+    let output = createObj []
+    do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
+    let err = str output "error"
+    check "opencode coder missing output.args still rejects bad warn_tdd" (err <> "")
+    check "opencode coder error mentions warn_tdd when output.args absent" (err.Contains "warn_tdd")
+}
+
+let opencodeRejectsCoderMissingWarnWhenOutputArgsAbsent () = promise {
+    let args = createObj []
+    let input =
+        createObj [
+            "tool", box "coder"
+            "sessionID", box "s-warn-enforce"
+            "callID", box "c-warn-enforce"
+            "args", box args
+        ]
+    let output = createObj []
+    do! Wanxiangshu.Opencode.HookExecute.toolExecuteBefore input output
+    let err = str output "error"
+    check "opencode coder missing output.args rejects missing warn_tdd" (err <> "")
+}
+
 let opencodeRejectsExecutorMissingWarn () = promise {
     let! err = runWithWarnTdd "executor"
     check "opencode executor missing warn rejects" (err <> "")
@@ -136,6 +168,8 @@ let run () : JS.Promise<unit> =
         do! opencodeRejectsCoderMalformed ()
         do! opencodeAcceptsCoder ()
         do! opencodeIgnoresNonModificationTool ()
+        do! opencodeRejectsCoderWhenOutputArgsAbsent ()
+        do! opencodeRejectsCoderMissingWarnWhenOutputArgsAbsent ()
         do! opencodeRejectsExecutorMissingWarn ()
         do! opencodeRejectsExecutorMalformedWarn ()
         do! opencodeAcceptsExecutor ()

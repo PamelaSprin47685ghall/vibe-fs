@@ -55,6 +55,17 @@ let argsFromHookOutput (output: obj) : obj = Dyn.get output "args"
 /// Write output.args — host wire SSOT for tool execute args rewriter.
 let setHookArgs (output: obj) (args: obj) : unit = output?("args") <- args
 
+/// Args for `tool.execute.before`: prefer `output.args` (host rewriter slot), else
+/// `input.args`, else empty object written onto `output` so warn/_ui hooks always run.
+let resolveHookExecuteArgs (input: obj) (output: obj) : obj =
+    let fromOutput = argsFromHookOutput output
+    if not (Dyn.isNullish fromOutput) then fromOutput
+    else
+        let fromInput = argsFromHookInput input
+        let args = if Dyn.isNullish fromInput then createObj [] else fromInput
+        setHookArgs output args
+        args
+
 /// Write output.error — host wire SSOT for tool execute error payload.
 let setHookError (output: obj) (error: string) : unit = output?("error") <- box error
 

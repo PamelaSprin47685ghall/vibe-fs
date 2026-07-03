@@ -153,8 +153,10 @@ let opencodeHookExecuteUsesHookArgsHelpers () =
         (codec.Contains "let setHookArgs")
     check "arch: OpencodeHookInputCodec defines setHookError"
         (codec.Contains "let setHookError")
-    check "arch: Opencode HookExecute uses argsFromHookOutput"
-        (code.Contains "argsFromHookOutput")
+    check "arch: OpencodeHookInputCodec defines resolveHookExecuteArgs"
+        (codec.Contains "let resolveHookExecuteArgs")
+    check "arch: Opencode HookExecute uses resolveHookExecuteArgs"
+        (code.Contains "resolveHookExecuteArgs")
     check "arch: Opencode HookExecute uses setHookArgs"
         (code.Contains "setHookArgs")
     check "arch: Opencode HookExecute uses setHookError"
