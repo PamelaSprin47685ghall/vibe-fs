@@ -22,6 +22,8 @@ let writeToolSpec (reg: obj) = promise {
 let loopCommandSpec (reg: obj) = promise {
     let cmds = unbox<obj[]> (get reg "slashCommands")
     let loopCmd = cmds |> Array.find (fun c -> str c "key" = "loop")
-    let! result = (get loopCmd "execute") $ ("test-ws", "some task") |> unbox<JS.Promise<string>>
+    let sid = "mux-loop-command-spec-ws"
+    let! _ = (get loopCmd "execute") $ (sid, "") |> unbox<JS.Promise<string>>
+    let! result = (get loopCmd "execute") $ (sid, "some task") |> unbox<JS.Promise<string>>
     check "loop resolve includes task" (result.Contains "some task")
 }

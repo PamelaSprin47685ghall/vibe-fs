@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.EventLogTestSeed
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
 
@@ -15,6 +16,7 @@ open Wanxiangshu.Shell.Dyn
 let muxSubmitReviewPromptFormatSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-prompt-"
     let sessionID = "mux-review-prompt"
+    do! seedLoopActivated workspaceDir sessionID "Implement feature X"
     let reg = createRegistration (muxDepsWithChatHistory sessionID [| box (buildLoopMessage "Implement feature X" [ "With-Review Mode is active." ]) |])
     let submitTool = muxToolByName reg "submit_review"
     if isNullish submitTool then
@@ -81,6 +83,7 @@ let muxAgentReportWrapperFormatsVerdictSpec () = promise {
 let muxSubmitReviewUsesRolledBackHistoryTaskSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-history-rollback-"
     let sessionID = "mux-submit-review-history-rollback"
+    do! seedLoopActivated workspaceDir sessionID "First task"
     let history = ResizeArray<obj>()
     history.Add(box "---\ntask: First task\n---\nWith-Review Mode is active.")
     let deps = muxMutableDepsWithChatHistory sessionID history

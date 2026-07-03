@@ -238,14 +238,22 @@ let muxCompactingTransformEmitsAnchorPromptSpec () = promise {
             [| muxTextMessage "anchor-user-1" "user" "plan phase"
                muxDynamicToolMessage "anchor-1" "todo_write" "anchor-call-a" (todoInput "anchor planned phase" "Anchor Plan" "in_progress" "high") (todoOutput 1)
                muxTextMessage "anchor-user-2" "user" "implement phase"
-               muxDynamicToolMessage "anchor-2" "todo_write" "anchor-call-b" (todoInput "anchor implemented phase" "Anchor Implement" "completed" "high") (todoOutput 1) |]
+               muxDynamicToolMessage "anchor-2" "todo_write" "anchor-call-b" (todoInput "anchor implemented phase" "Anchor Implement" "completed" "high") (todoOutput 1)
+               muxTextMessage "anchor-user-3" "user" "verify phase"
+               muxDynamicToolMessage "anchor-3" "todo_write" "anchor-call-c" (todoInput "anchor verified phase" "Anchor Verify" "completed" "medium") (todoOutput 1) |]
         let out = createObj [ "messages", box messages ]
         let input = createObj [ "agent", box "manager"; "sessionID", box "mux-anchor-session" ]
         do! (compactingTransform $ (input, out)) |> unbox<JS.Promise<unit>>
-        check "mux compacting transform emits exactly one anchor prompt" (promptsCaptured.Count = 1)
-        if promptsCaptured.Count > 0 then
-            let promptText = promptsCaptured.[0]
-            check "anchor prompt contains See above body" (promptText.Contains "See above for some messages before compaction.")
-            check "anchor prompt contains backlog report text (planned phase)" (promptText.Contains "anchor planned phase")
-            check "anchor prompt contains backlog report text (implemented phase)" (promptText.Contains "anchor implemented phase")
+        check "mux compacting transform does not emit anchor prompt" (promptsCaptured.Count = 0)
+        let transformed = unbox<obj[]> (get out "messages")
+        let texts =
+            transformed
+            |> Array.collect (fun msg ->
+                let parts = unbox<obj[]> (get msg "parts")
+                parts |> Array.choose (fun part -> if str part "type" = "text" then Some (str part "text") else None))
+        check "mux compacting still projects backlog into messages" (
+            texts
+            |> Array.exists (fun text ->
+                text.Contains "Completed work from folded turns. File changes are already on disk."
+                && text.Contains "anchor planned phase"))
 }

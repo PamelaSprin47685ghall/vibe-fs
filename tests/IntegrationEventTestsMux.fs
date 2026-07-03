@@ -4,12 +4,18 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.IntegrationMuxSetup
+open Wanxiangshu.Tests.EventLogTestSeed
+open Wanxiangshu.Tests.AsyncFlush
+
 open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Kernel.ReviewPrompts
 open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Shell.Dyn
+
+[<Emit("process.cwd()")>]
+let private processCwd () : string = jsNative
 
 let private loopAnchor task = frontMatterPrompt [ yamlField taskField task ] "With-Review Mode is active."
 
@@ -43,18 +49,19 @@ let repeatedTodoNudgeSpec () = promise {
                     "properties", box (createObj [ "parts", box parts ]) ]
     let textPart t = box {| ``type`` = "text"; text = t |}
     do! hook $ (streamEnd "repeat-ws" [| textPart "first" |], helpers ["pending"]) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     do! hook $ (streamEnd "repeat-ws" [| textPart "first" |], helpers ["pending"]) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
-    check "todo nudge dedupes from history after synthetic nudge" (nudges.Count = 1)
+    do! yieldMicrotask ()
+    check "todo nudge dedupes from event log integral" (nudges.Count = 1)
     history <- Array.append history [| muxTextMessage "repeat-assistant-2" "assistant" "second" |]
     do! hook $ (streamEnd "repeat-ws" [| textPart "second" |], helpers ["pending"]) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "fresh assistant output re-allows todo nudge" (nudges.Count = 2)
 }
 
 let reviewerRejectRenudgesLoopSpec () = promise {
     let sessionID = "review-reject-ws"
+    do! seedLoopActivated (processCwd ()) sessionID "Implement feature X"
     let mutable history = [| muxTextMessage "review-loop-anchor" "assistant" (loopAnchor "Implement feature X")
                              muxTextMessage "review-assistant-1" "assistant" "implemented first pass" |]
     let reg =
@@ -83,16 +90,17 @@ let reviewerRejectRenudgesLoopSpec () = promise {
         createObj [ "type", box "stream-end"; "workspaceId", box sessionID
                     "properties", box (createObj [ "parts", box [| box {| ``type`` = "text"; text = text |} |] ]) ]
     do! hook $ (streamEnd "implemented first pass", helpers) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "active review emits loop nudge" (nudges.Count = 1 && nudges.[0] = loopNudgePrompt)
     history <- Array.append history [| muxTextMessage "review-assistant-2" "assistant" "verdict: rejected\nfeedback: needs rework" |]
     do! hook $ (streamEnd "verdict: rejected\nfeedback: needs rework", helpers) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "reviewer reject reopens loop nudge on fresh assistant output" (nudges.Count = 2 && nudges.[1] = loopNudgePrompt)
 }
 
 let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () = promise {
     let sessionID = "review-wip-nudge-ws"
+    do! seedLoopActivated (processCwd ()) sessionID "Implement feature X"
     let mutable history = [| muxTextMessage "review-wip-loop-anchor" "assistant" (loopAnchor "Implement feature X")
                              muxTextMessage "review-wip-assistant-1" "assistant" "implemented first pass" |]
     let reg =
@@ -121,13 +129,13 @@ let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () = promise {
         createObj [ "type", box "stream-end"; "workspaceId", box sessionID
                     "properties", box (createObj [ "parts", box [| box {| ``type`` = "text"; text = text |} |] ]) ]
     do! hook $ (streamEnd "implemented first pass", helpers) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "active review emits first loop nudge" (nudges.Count = 1 && nudges.[0] = loopNudgePrompt)
     history <-
         Array.append history
             [| muxDynamicToolMessage "review-wip-tool" "submit_review" "wip-call" (createObj []) (box submitReviewWipAcknowledgment) |]
     do! hook $ (streamEnd "continued after wip report", helpers) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "wip submit_review does not permanently suppress loop nudge" (nudges.Count = 2 && nudges.[1] = loopNudgePrompt)
 }
 
@@ -162,8 +170,8 @@ let muxForceStopTodoNudgeSpec () = promise {
                     "properties", box (createObj [ "parts", box parts ]) ]
     let textPart t = box {| ``type`` = "text"; text = t |}
     do! hook $ (streamAbort, helpers ["pending"]) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     do! hook $ (streamEnd sessionID [| textPart "working on it" |], helpers ["pending"]) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "force-stop must not send todo nudge" (nudges.Count = 0)
 }

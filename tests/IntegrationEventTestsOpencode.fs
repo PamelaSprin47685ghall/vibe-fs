@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.IntegrationEventTestsOpencode
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Kernel.PromptFragments
@@ -46,7 +47,7 @@ let abortedRetrySpec () = promise {
         box {| event = box {| ``type`` = typ; properties = props |} |}
     do! eventHook $ (mkEvent "session.next.step.failed" (box {| sessionID = "resume-ws"; error = box {| ``type`` = "unknown"; message = "Aborted" |} |})) |> unbox<JS.Promise<unit>>
     do! eventHook $ (mkEvent "session.idle" (box {| sessionID = "resume-ws" |})) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "aborted retry with no completed assistant does not nudge" (promptCalls.Count = 0)
     do! eventHook $ (mkEvent "session.next.prompted" (box {| sessionID = "resume-ws"; prompt = box {| text = "continue" |} |})) |> unbox<JS.Promise<unit>>
     messages <- [| box {|
@@ -54,7 +55,7 @@ let abortedRetrySpec () = promise {
         parts = [| box {| ``type`` = "text"; text = "working" |} |]
     |} |]
     do! eventHook $ (mkEvent "session.idle" (box {| sessionID = "resume-ws" |})) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "new completed assistant history resumes todo nudge" (promptCalls.Count = 1)
     do! rmAsync workspaceDir
 }
@@ -78,7 +79,7 @@ let repeatedAssistantSpec () = promise {
     let! workspaceDir = mkdtempAsync "repeated-assistant-"
     let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
     do! (get p "event") $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = "same-text-ws" |} |} |}) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "same text first assistant turn nudges" (promptCalls.Count = 1)
     messages <- Array.append messages [|
         box {| info = box {| role = "assistant"; agent = "manager"; finish = "stop"; time = box {| completed = 2 |} |}
@@ -86,7 +87,7 @@ let repeatedAssistantSpec () = promise {
     |]
     let! p2 = plugin (box {| directory = workspaceDir; client = mkClient () |})
     do! (get p2 "event") $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = "same-text-ws" |} |} |}) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "same text new assistant turn nudges again" (promptCalls.Count = 2)
     do! rmAsync workspaceDir
 }
@@ -115,9 +116,9 @@ let repeatedIdleBeforeHistoryPersistsNudgeSpec () = promise {
     let eventHook = get p "event"
     let idle = box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}
     do! eventHook $ idle |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     do! eventHook $ idle |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "repeated idle before nudge reaches history sends once" (promptCalls.Count = 1)
     do! rmAsync workspaceDir
 }
@@ -147,9 +148,9 @@ let sessionStatusIdleAndSessionIdleDedupSpec () = promise {
     let statusIdle = box {| event = box {| ``type`` = "session.status"; properties = box {| sessionID = sessionID; status = box {| ``type`` = "idle" |} |} |} |}
     let idle = box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}
     do! eventHook $ statusIdle |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     do! eventHook $ idle |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "session.status idle + session.idle for same session sends nudge once" (promptCalls.Count = 1)
     do! rmAsync workspaceDir
 }
@@ -175,7 +176,7 @@ let sessionStatusBusyDoesNotNudgeSpec () = promise {
     let sessionID = "busy-session"
     let statusBusy = box {| event = box {| ``type`` = "session.status"; properties = box {| sessionID = sessionID; status = box {| ``type`` = "busy" |} |} |} |}
     do! eventHook $ statusBusy |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "session.status busy does not nudge while agent is working" (promptCalls.Count = 0)
     do! rmAsync workspaceDir
 }
@@ -199,7 +200,7 @@ let reusedSessionSpec () = promise {
     let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
     let eventHook = get p "event"
     do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = "reused-session" |} |} |}) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     do! eventHook $ (box {| event = box {| ``type`` = "session.deleted"; properties = box {| info = box {| id = "reused-session" |} |} |} |}) |> unbox<JS.Promise<unit>>
     messages <- [|
         box {| info = box {| role = "assistant"; agent = "manager"; finish = "stop"; time = box {| completed = 1 |} |}
@@ -207,7 +208,7 @@ let reusedSessionSpec () = promise {
     |]
     let! p2 = plugin (box {| directory = workspaceDir; client = mkClient () |})
     do! (get p2 "event") $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = "reused-session" |} |} |}) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "reused session nudges after session.deleted" (promptCalls.Count = 2)
     do! rmAsync workspaceDir
 }
@@ -234,9 +235,9 @@ let opencodeForceStopTodoNudgeSpec () = promise {
     let mkEvent typ props =
         box {| event = box {| ``type`` = typ; properties = props |} |}
     do! eventHook $ (mkEvent "stream-abort" (box {| sessionID = sessionID |})) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     do! eventHook $ (mkEvent "session.idle" (box {| sessionID = sessionID |})) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "force-stop must not send todo nudge" (promptCalls.Count = 0)
     do! rmAsync workspaceDir
 }

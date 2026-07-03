@@ -23,6 +23,9 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.NudgeRuntime
 open Wanxiangshu.Opencode.NudgeEffect
 open Wanxiangshu.Opencode.BacklogSession
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.WorkBacklogToolsCodec
+open Wanxiangshu.Shell.ToolRuntimeContext
 
 type SessionLifecycleObserver
     ( host              : Host
@@ -77,10 +80,16 @@ type SessionLifecycleObserver
         promise {
             let sessionIDStr = sessionIdFromHookInput input ""
             let tool = normalizeToolName host (toolNameFromHookInput input)
-            if tool = "todowrite" then
+            if tool = todoWriteToolName host then
                 let methodologies = selectMethodologiesFromHookArgs (argsFromHookInput input)
                 match hookOutputString output with
-                | Some _ -> setHookOutputString output (todoWriteOutput methodologies true)
+                | Some _ ->
+                    setHookOutputString output (todoWriteOutput methodologies true)
+                    let directory = (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
+                    let sid = sessionIdFromHookInput input ""
+                    match decodeTodoWriteArgs (argsFromHookInput input) with
+                    | Ok args when sid <> "" -> do! appendWorkBacklogCommitted directory sid args |> Promise.map ignore
+                    | _ -> ()
                 | None -> ()
             elif tool = "task_complete" then
                 let sid = sessionIdFromHookInput input ""
@@ -127,6 +136,9 @@ type SessionLifecycleObserver
                                 forceStoppedSessions <- Set.add sessionIDStr forceStoppedSessions
                     | "session.next.prompted" ->
                         forceStoppedSessions <- Set.remove sessionIDStr forceStoppedSessions
+                    | "session.deleted" | "session.delete" | "session.remove" | "session.close" ->
+                        let directory = pluginDirectoryFromCtx ctx
+                        do! appendNudgeDedupCleared directory sessionIDStr |> Promise.map ignore
                     | _ -> ()
             | None -> ()
 
@@ -170,7 +182,7 @@ type SessionLifecycleObserver
                            && not (Set.contains sessionIDStr forceStoppedSessions) then
                             match getClientFromPluginCtx ctx with
                             | Ok client ->
-                                do! dispatchPostStopFromHistory client sessionID
+                                do! dispatchPostStopFromHistory client ctx sessionID
                             | Error _ -> ()
         }
 

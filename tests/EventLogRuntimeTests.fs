@@ -1,0 +1,83 @@
+module Wanxiangshu.Tests.EventLogRuntimeTests
+
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Kernel.EventLog.Types
+open Wanxiangshu.Shell.EventLogCodec
+open Wanxiangshu.Shell.EventLogFiles
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.ReviewRuntime
+
+let appendThenReadAll () = promise {
+    let! dir = mkdtempAsync "eventlog-read-"
+    let store = EventLogStore dir
+    let! _ = appendLoopActivated dir "s-read" "task one"
+    let! events = store.ReadAllEvents()
+    check "one event" (events.Length = 1)
+    check "kind" (events.[0].Kind = eventKindLoopActivated)
+    check "task" (events.[0].Payload |> Map.tryFind "task" = Some "task one")
+    do! rmAsync dir
+}
+
+let syncReviewFromEventLogProjectsTask () = promise {
+    let! dir = mkdtempAsync "eventlog-sync-"
+    let sessionID = "s-sync"
+    let review = createReviewStore ()
+    do! appendLoopActivated dir sessionID "ship from ndjson" |> Promise.map ignore
+    do! syncReviewFromEventLog review dir sessionID
+    equal "active task" (Some "ship from ndjson") (review.getReviewTask sessionID)
+    do! rmAsync dir
+}
+
+let syncClearsAfterAcceptedVerdict () = promise {
+    let! dir = mkdtempAsync "eventlog-verdict-"
+    let sessionID = "s-verdict"
+    let review = createReviewStore ()
+    do! appendLoopActivated dir sessionID "task" |> Promise.map ignore
+    do! appendReviewVerdict dir sessionID verdictAccepted None |> Promise.map ignore
+    do! syncReviewFromEventLog review dir sessionID
+    equal "cleared after accept" None (review.getReviewTask sessionID)
+    do! rmAsync dir
+}
+
+let parallelAppendsBothPersist () = promise {
+    let! dir = mkdtempAsync "eventlog-parallel-"
+    let store = EventLogStore dir
+    let! _ =
+        Promise.all [|
+            appendLoopActivated dir "s-p1" "task alpha"
+            appendLoopActivated dir "s-p2" "task beta"
+        |]
+    let! events = store.ReadAllEvents()
+    check "parallel append: length 2" (events.Length = 2)
+    let kinds = events |> List.map (fun e -> e.Session) |> Set.ofList
+    check "parallel append: both sessions" (kinds = Set.ofList ["s-p1"; "s-p2"])
+    do! rmAsync dir
+}
+
+let readStopsAtCorruptLine () = promise {
+    let! dir = mkdtempAsync "eventlog-corrupt-"
+    let good =
+        wanEventToLine
+            { V = 1
+              Session = "s1"
+              Kind = eventKindLoopActivated
+              At = ""
+              Payload = Map [ "task", "ok" ] }
+    let path = eventPath dir
+    do! writeFileAsync path (good + "\n{broken\n" + good + "\n")
+    let store = EventLogStore dir
+    let! events = store.ReadAllEvents()
+    check "stops before third line" (events.Length = 1)
+    do! rmAsync dir
+}
+
+let run () = promise {
+    do! appendThenReadAll ()
+    do! syncReviewFromEventLogProjectsTask ()
+    do! syncClearsAfterAcceptedVerdict ()
+    do! parallelAppendsBothPersist ()
+    do! readStopsAtCorruptLine ()
+}

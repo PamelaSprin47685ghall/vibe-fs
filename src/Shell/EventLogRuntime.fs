@@ -1,0 +1,97 @@
+module Wanxiangshu.Shell.EventLogRuntime
+
+open Fable.Core
+open Wanxiangshu.Kernel.Nudge
+open Wanxiangshu.Kernel.EventLog.Types
+open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.LoopMessages
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Shell.EventLogCodec
+open Wanxiangshu.Shell.EventLogFiles
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.ReviewReplaySync
+open Wanxiangshu.Shell.Clock
+open Wanxiangshu.Shell.WorkBacklogToolsCodec
+
+let mutable private stores: Map<string, EventLogStore> = Map.empty
+
+let getStore (workspaceRoot: string) : EventLogStore =
+    match Map.tryFind workspaceRoot stores with
+    | Some s -> s
+    | None ->
+        let s = EventLogStore workspaceRoot
+        stores <- Map.add workspaceRoot s stores
+        s
+
+let isLoopActiveFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Promise<bool> =
+    promise {
+        if sessionID = "" || workspaceRoot = "" then return false
+        else
+            let! events = getStore(workspaceRoot).ReadAllEvents()
+            return foldReviewTask sessionID events |> Option.isSome
+    }
+
+let syncReviewFromEventLog (store: ReviewStore) (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
+    promise {
+        if sessionID = "" then ()
+        else
+            let! events = getStore(workspaceRoot).ReadAllEvents()
+            let task = foldReviewTask sessionID events
+            syncReviewProjection store sessionID task
+    }
+
+let appendLoopActivated (workspaceRoot: string) (sessionID: string) (task: string) : JS.Promise<Result<unit, string>> =
+    let payload = Map [ "task", task ]
+    let e = buildEvent sessionID eventKindLoopActivated payload (getTimestampMs().ToString())
+    getStore(workspaceRoot).AppendEvent e
+
+let appendLoopCancelled (workspaceRoot: string) (sessionID: string) : JS.Promise<Result<unit, string>> =
+    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindLoopCancelled Map.empty (getTimestampMs().ToString()))
+
+let appendReviewVerdict (workspaceRoot: string) (sessionID: string) (verdict: string) (feedback: string option) : JS.Promise<Result<unit, string>> =
+    let baseMap = Map [ "verdict", verdict ]
+    let payload =
+        match feedback with
+        | Some f when f <> "" -> Map.add "feedback" f baseMap
+        | _ -> baseMap
+    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindReviewVerdict payload (getTimestampMs().ToString()))
+
+let nudgeBlockedForTurn (workspaceRoot: string) (sessionID: string) (assistantMessage: string) : JS.Promise<bool> =
+    promise {
+        if sessionID = "" || workspaceRoot = "" then return false
+        else
+            let! events = getStore(workspaceRoot).ReadAllEvents()
+            return isNudgeBlockedForAnchor (foldNudgeDedup sessionID events) assistantMessage
+    }
+
+let tryClaimNudgeDispatch (workspaceRoot: string) (sessionID: string) (action: NudgeAction) (anchor: string) : JS.Promise<bool> =
+    getStore(workspaceRoot).TryClaimNudgeDispatch sessionID action anchor isNudgeBlockedForAnchor
+
+let appendSubmitReviewWipRecorded (workspaceRoot: string) (sessionID: string) : JS.Promise<Result<unit, string>> =
+    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindSubmitReviewWipRecorded Map.empty (getTimestampMs().ToString()))
+
+let appendNudgeDedupCleared (workspaceRoot: string) (sessionID: string) : JS.Promise<Result<unit, string>> =
+    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindNudgeDedupCleared Map.empty (getTimestampMs().ToString()))
+
+let appendWorkBacklogCommitted (workspaceRoot: string) (sessionID: string) (args: TodoWriteArgs) : JS.Promise<Result<unit, string>> =
+    let todosJson = JS.JSON.stringify(args.Todos)
+    let methJson = JS.JSON.stringify(args.SelectMethodology |> List.toArray)
+    let payload =
+        Map
+            [ "ahaMoments", args.AhaMoments
+              "changesAndReasons", args.ChangesAndReasons
+              "gotchas", args.Gotchas
+              "lessonsAndConventions", args.LessonsAndConventions
+              "plan", args.Plan
+              "todosJson", todosJson
+              "selectMethodologyJson", methJson ]
+    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindWorkBacklogCommitted payload (getTimestampMs().ToString()))
+
+let verdictStringFromReviewResult (result: Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult) : string * string option =
+    match result with
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb ->
+        (verdictAccepted, Some fb)
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Rejected fb ->
+        (verdictRejected, Some fb)
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Terminated ->
+        (verdictTerminated, None)

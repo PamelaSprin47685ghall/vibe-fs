@@ -16,7 +16,8 @@ type SessionSnapshot =
     { todos: string list
       lastAssistantMessage: string
       isLoopActive: bool
-      alreadyNudged: bool
+      nudgeBlockedForTurn: bool
+      nudgeAnchorKey: string
       agentFromMessage: string option
       lastAssistantIsCompaction: bool
       anchorPromptIssued: bool

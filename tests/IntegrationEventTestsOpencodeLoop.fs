@@ -4,6 +4,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.EventLogTestSeed
+open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.PromptFrontMatter
@@ -29,10 +31,11 @@ let opencodeLoopNudgeSpec () = promise {
             "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) }))
         ]) ]
     let! workspaceDir = mkdtempAsync "opencode-loop-nudge-"
+    do! seedLoopActivated workspaceDir sessionID "Ship the fix"
     let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
     let eventHook = get p "event"
     do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     let nudgeText =
         if promptCalls.Count = 0 then ""
         else getPartsText (get (get promptCalls.[0] "body") "parts")
@@ -52,18 +55,19 @@ let opencodeFreshChatMessageRearmsLoopNudgeSpec () = promise {
             "prompt", box (System.Func<obj, JS.Promise<unit>>(fun arg -> promise { promptCalls.Add(arg) }))
         ]) ]
     let! workspaceDir = mkdtempAsync "opencode-fresh-chat-"
+    do! seedLoopActivated workspaceDir sessionID "Ship the fix"
     let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
     let eventHook = get p "event"
     let chatHook = get p "chat.message"
     do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     let textOf i = if promptCalls.Count <= i then "" else getPartsText (get (get promptCalls.[i] "body") "parts")
     check "first with-review idle emits loop nudge" (promptCalls.Count = 1 && textOf 0 = loopNudgePrompt)
     do! chatHook $ (createObj [ "sessionID", box sessionID; "agent", box "manager" ], createObj [ "parts", box [| box {| ``type`` = "text"; text = "still working on it" |} |] ]) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     messages <- Array.append messages [| assistantMessage "manager" "still working on it" 2 |]
     do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "new assistant turn in history re-arms loop nudge on next idle" (promptCalls.Count = 2 && textOf 1 = loopNudgePrompt)
     do! rmAsync workspaceDir
 }
@@ -83,7 +87,7 @@ let opencodeBrowserSubsessionHistoryDoesNotLoopNudgeSpec () = promise {
     let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
     let eventHook = get p "event"
     do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "reviewer-style child history must not trigger loop nudge" (promptCalls.Count = 0)
     do! rmAsync workspaceDir
 }

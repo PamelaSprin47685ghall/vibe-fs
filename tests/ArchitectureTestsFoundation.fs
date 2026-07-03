@@ -83,15 +83,22 @@ let noDuplicateRunNudgeFlowCore () =
             check ("arch: " + dir + "/" + f + " no inline tryRecordSend")
                 (not (content.Contains "tryRecordSend"))
 
+let nudgeDedupMustUseEventLogFold () =
+    for path in [| "src/Opencode/NudgeEffect.fs"; "src/Omp/NudgeHooks.fs"; "src/Shell/NudgeRuntime.fs" |] do
+        let code = requireFile path |> nonCommentCode
+        check ("arch: " + path + " no deriveAlreadyNudged") (not (code.Contains "deriveAlreadyNudged"))
+        check ("arch: " + path + " uses event-log nudge integral")
+            (code.Contains "nudgeBlockedForTurn" || code.Contains "tryClaimNudgeDispatch")
+
 let nudgeLoopStateMustReplayHistory () =
     let opencode = requireFile "src/Opencode/NudgeEffect.fs" |> nonCommentCode
     let omp = requireFile "src/Omp/NudgeHooks.fs" |> nonCommentCode
     check "arch: Opencode NudgeEffect must not read live review-state query" (not (opencode.Contains "isReviewActive"))
-    check "arch: Opencode NudgeEffect rebuilds loop state from history"
-        (opencode.Contains "reviewTaskFromTexts" || opencode.Contains "textsFromFlatParts")
+    check "arch: Opencode NudgeEffect loop state from event log"
+        (opencode.Contains "isLoopActiveFromEventLog")
     check "arch: Omp NudgeHooks must not read live review-state query" (not (omp.Contains "isReviewActive"))
-    check "arch: Omp NudgeHooks rebuilds loop state from history"
-        (omp.Contains "hasActiveLoopFromHistory")
+    check "arch: Omp NudgeHooks loop state from event log"
+        (omp.Contains "isLoopActiveFromEventLog")
 
 let returnReviewerCatalogAndHostRegistration () =
     let catalog = requireFile "src/Kernel/ToolCatalog/Review.fs"
@@ -183,6 +190,12 @@ let ompBoundary () =
         check ("arch: " + label + " no Opencode ref") (not (content.Contains "Wanxiangshu.Opencode"))
         check ("arch: " + label + " no Mux ref") (not (content.Contains "Wanxiangshu.Mux"))
         check ("arch: " + label + " no engine ref") (not (content.Contains "engine/"))
+
+let eventLogUsesAdvisoryFlock () =
+    let content = requireFile "src/Shell/EventLogFiles.fs"
+    check "arch: EventLogFiles uses exclusive lock file" (content.Contains "withWorkspaceLock")
+    check "arch: EventLogFiles references .wanxiangshu.ndjson.lock"
+        (content.Contains ".wanxiangshu.ndjson.lock")
 
 let ompNoEngineRef () =
     for f in fsFilesRelative "src/Omp" do

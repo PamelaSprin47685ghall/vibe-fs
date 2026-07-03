@@ -18,6 +18,10 @@ open Wanxiangshu.Mux.SubagentTools
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Clock
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.EventLogRuntime
+
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
 
 let private extractHistoryTexts (history: obj array) : string list =
     history
@@ -49,15 +53,14 @@ let private syncReviewTaskFromHistory
         else
             try
                 let! history = unbox<JS.Promise<obj array>> (getHistory $ sessionID)
-                let task = inferReviewTaskFromTexts (extractHistoryTexts history)
-                syncReviewProjection reviewStore sessionID task
-                return task
+                let root =
+                    let cwd = Dyn.str deps "cwd"
+                    if cwd <> "" then cwd else unbox<string> (nodeProcess?cwd())
+                do! syncReviewFromEventLog reviewStore root sessionID
+                return reviewStore.getReviewTask sessionID
             with _ ->
                 return reviewStore.getReviewTask sessionID
     }
-
-[<Global("process")>]
-let private nodeProcess : obj = jsNative
 
 let private fallbackSlashConfig (deps: obj) (workspaceId: WorkspaceId) : obj =
     createObj
@@ -96,16 +99,23 @@ let createLoopOnlyCommand (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewSt
                 match Id.tryWorkspaceId workspaceIdStr with
                 | None -> Promise.lift "Invalid workspaceId"
                 | Some wid ->
-                    let task = args.Trim()
-                    let existingTask = reviewStore.getReviewTask (Id.workspaceIdValue wid)
-                    if task = "" then
-                        reviewStore.deactivateReview (Id.workspaceIdValue wid)
-                        Promise.lift loopCancelledMessage
-                    elif existingTask.IsSome then
-                        Promise.lift "With-Review Mode is already active. Submit your work via submit_review."
-                    else
-                        reviewStore.activateReview(Id.workspaceIdValue wid, task, getTimestampMs())
-                        Promise.lift (buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ])) |}
+                    promise {
+                        let sid = Id.workspaceIdValue wid
+                        let root = unbox<string> (nodeProcess?cwd())
+                        let task = args.Trim()
+                        do! syncReviewFromEventLog reviewStore root sid
+                        let existingTask = reviewStore.getReviewTask sid
+                        if task = "" then
+                            do! appendLoopCancelled root sid |> Promise.map ignore
+                            reviewStore.deactivateReview sid
+                            return loopCancelledMessage
+                        elif existingTask.IsSome then
+                            return "With-Review Mode is already active. Submit your work via submit_review."
+                        else
+                            do! appendLoopActivated root sid task |> Promise.map ignore
+                            reviewStore.activateReview(sid, task, getTimestampMs())
+                            return buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
+                    }) |}
 
 let private precheckReview
     (deps: obj) (toolNames: string array) (workspaceId: WorkspaceId) (task: string)
@@ -124,12 +134,16 @@ let private precheckReview
 
 let private activateReview
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (workspaceIdStr: string) (task: string)
-    (isPass: bool) (feedback: string) : string =
-    reviewStore.activateReview(workspaceIdStr, task, getTimestampMs())
-    if isPass then
-        buildLoopMessage task [ "With-Review Mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
-    else
-        buildLoopMessage task [ "Pre-review feedback:"; ""; feedback; ""; "With-Review Mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
+    (isPass: bool) (feedback: string) : JS.Promise<string> =
+    promise {
+        let root = unbox<string> (nodeProcess?cwd())
+        do! appendLoopActivated root workspaceIdStr task |> Promise.map ignore
+        reviewStore.activateReview(workspaceIdStr, task, getTimestampMs())
+        if isPass then
+            return buildLoopMessage task [ "With-Review Mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
+        else
+            return buildLoopMessage task [ "Pre-review feedback:"; ""; feedback; ""; "With-Review Mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
+    }
 
 let private loopReviewExecute
     (deps: obj) (toolNames: string array) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
@@ -137,8 +151,12 @@ let private loopReviewExecute
     let task = args.Trim()
     let workspaceIdStr = Id.workspaceIdValue workspaceId
     if task = "" then
-        reviewStore.deactivateReview workspaceIdStr
-        Promise.lift loopCancelledMessage
+        promise {
+            let root = unbox<string> (nodeProcess?cwd())
+            do! appendLoopCancelled root workspaceIdStr |> Promise.map ignore
+            reviewStore.deactivateReview workspaceIdStr
+            return loopCancelledMessage
+        }
     else
         promise {
             let! existingTask = syncReviewTaskFromHistory deps reviewStore workspaceIdStr
@@ -155,7 +173,7 @@ let private loopReviewExecute
                         | Accepted fb -> true, fb
                         | Rejected fb -> false, fb
                         | Terminated -> false, markdown
-                    return activateReview reviewStore workspaceIdStr task isPass feedback
+                    return! activateReview reviewStore workspaceIdStr task isPass feedback
         }
 
 let createLoopReviewCommand (deps: obj) (toolNames: string array) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =

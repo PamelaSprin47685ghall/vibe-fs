@@ -57,5 +57,5 @@ let muxCompactingTransformDoesNotResendAnchorPromptSpec () = promise {
         do! (compactingTransform $ (input, out)) |> unbox<JS.Promise<unit>>
         // second call: anchor prompt now persisted in history, must NOT resend
         do! (compactingTransform $ (input, out)) |> unbox<JS.Promise<unit>>
-        check "mux compacting transform does not resend anchor prompt on repeated call" (promptsCaptured.Count = 1)
+        check "mux compacting transform does not resend anchor prompt on repeated call" (promptsCaptured.Count = 0)
 }

@@ -25,18 +25,20 @@ let private join (a: string) (b: string) = unbox<string> (pathModule?join(a, b))
 let private firstEntryTextFromOut (entries: obj array) : string = jsNative
 
 let capsSynthUserPrepended () = promise {
+    let! root = mkdtempAsync "omp-caps-synth-"
     let reviewStore = createReviewStore ()
     let entries =
         [| createObj [
                "info", box(createObj [ "id", box "user-1"; "role", box "user" ])
                "parts", box [| createObj [ "type", box "text"; "text", box "hello" ] |]
            ] |]
-    let! out = transformEntriesAsync reviewStore "/tmp/ws" "sess-1" (box entries)
+    let! out = transformEntriesAsync reviewStore root "sess-1" (box entries)
     check "prepends at least caps synth user" (out.Length >= entries.Length + 1)
     let firstInfo = Dyn.get out.[0] "info"
     check "caps user id prefix" ((Dyn.str firstInfo "id").StartsWith "caps-synth-user-")
     let firstText = firstEntryTextFromOut out
     check "has think prelude" (firstText.Contains "铁律")
+    do! rmAsync root
 }
 
 let capsReadToolsInContextTransform () = promise {
@@ -84,6 +86,7 @@ let beforeAgentStartOmitsCapsXml () = promise {
 }
 
 let reviewReplayIfStoreEmptyOnTransform () = promise {
+    let! root = mkdtempAsync "omp-review-replay-"
     let reviewStore = createReviewStore ()
     let sessionId = "omp-review-if-empty"
     reviewStore.activateReview(sessionId, "task A", 1L)
@@ -94,6 +97,7 @@ let reviewReplayIfStoreEmptyOnTransform () = promise {
                "info", box(createObj [ "id", box "user-hist"; "role", box "user" ])
                "parts", box [| createObj [ "type", box "text"; "text", box historyTaskB ] |]
            ] |]
-    let! _ = transformEntriesAsync reviewStore "/tmp/ws" sessionId (box entries)
+    let! _ = transformEntriesAsync reviewStore root sessionId (box entries)
     equal "review replay IfStoreEmpty: store task unchanged when already active" (Some "task A") (reviewStore.getReviewTask sessionId)
+    do! rmAsync root
 }

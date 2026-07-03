@@ -5,8 +5,8 @@ open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.MessageTransformCore
 open Wanxiangshu.Shell.MessageTransformPipeline
-open Wanxiangshu.Shell.ReviewReplaySync
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.EventLogRuntime
 
 type ReviewReplayMode =
     | IfStoreEmpty
@@ -32,8 +32,7 @@ let runHostMessagesTransform
             | Always -> true
             | IfStoreEmpty -> reviewStore.getReviewState sessionID |> Option.isNone
         if shouldReplay then
-            let! texts = replayTexts ()
-            syncReviewFromTexts reviewStore sessionID texts
+            do! syncReviewFromEventLog reviewStore plan.Directory sessionID
         return!
             if plan.Cleaned.IsEmpty then Promise.lift [||]
             else

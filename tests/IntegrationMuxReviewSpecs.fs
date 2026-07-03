@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Tests.EventLogTestSeed
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
 
@@ -35,6 +36,7 @@ let private reviewActivationHistory (task: string) : obj array =
 let muxSubmitReviewTwoRoundPassAcceptsSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-two-pass-"
     let sessionID = "mux-submit-review-two-pass"
+    do! seedLoopActivated workspaceDir sessionID "Implement feature X"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "PASS" ]
@@ -54,6 +56,7 @@ let muxSubmitReviewTwoRoundPassAcceptsSpec () = promise {
 let muxSubmitReviewRejectKeepsReviewActiveSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-reject-"
     let sessionID = "mux-submit-review-reject"
+    do! seedLoopActivated workspaceDir sessionID "Implement feature X"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "REJECT: missing tests" ]
@@ -73,6 +76,7 @@ let muxSubmitReviewRejectKeepsReviewActiveSpec () = promise {
 let muxSubmitReviewDoubleCheckRejectSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-double-reject-"
     let sessionID = "mux-submit-review-double-reject"
+    do! seedLoopActivated workspaceDir sessionID "Implement feature X"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "REJECT: cut corners on edge cases" ]
@@ -92,6 +96,7 @@ let muxSubmitReviewDoubleCheckRejectSpec () = promise {
 let muxSubmitReviewTerminatedCleansReviewStateSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-terminated-"
     let sessionID = "mux-submit-review-terminated"
+    do! seedLoopActivated workspaceDir sessionID "Implement feature X"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "I think it looks fine" ]
@@ -108,6 +113,7 @@ let muxSubmitReviewTerminatedCleansReviewStateSpec () = promise {
 let muxSubmitReviewOmittedWipSkipsReviewerSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-omitted-wip-"
     let sessionID = "mux-submit-review-omitted-wip"
+    do! seedLoopActivated workspaceDir sessionID "Implement feature X"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts []
@@ -125,6 +131,7 @@ let muxSubmitReviewOmittedWipSkipsReviewerSpec () = promise {
 let muxSubmitReviewWipSkipsReviewerSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-wip-"
     let sessionID = "mux-submit-review-wip"
+    do! seedLoopActivated workspaceDir sessionID "Implement feature X"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     let prompts = ResizeArray<string>()
     let taskService = mockMuxTaskServiceReturningVerdicts prompts []

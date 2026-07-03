@@ -56,8 +56,8 @@ let muxReviewUsesReviewToolsCodec () =
         (code.Contains "wireDecodeFailure \"submit_review\"")
     check "arch: Mux ReviewToolsMux submit decode must not return formatDomainError"
         (not (code.Contains "| Error e -> return formatDomainError e"))
-    check "arch: Mux ReviewToolsMux submit replays task from history"
-        (code.Contains "syncReviewTaskFromHistory")
+    check "arch: Mux ReviewToolsMux submit syncs review from event log"
+        (code.Contains "syncReviewFromEventLogDir")
 
 let muxWrappersSyntaxUsesFromMuxConfig () =
     let code = requireFile "src/Mux/Wrappers.fs" |> nonCommentCode

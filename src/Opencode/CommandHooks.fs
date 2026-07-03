@@ -17,22 +17,7 @@ open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
-
-let private historyLoopTask (client: obj) (sessionID: string) : JS.Promise<string option> =
-    promise {
-        match getSessionApiFromClient client with
-        | Error _ -> return None
-        | Ok session ->
-            let! messagesResp = unbox<JS.Promise<obj>> (session?("messages")(box {| path = {| id = sessionID |} |}))
-            let messagesData = Dyn.get messagesResp "data"
-            if Dyn.isNullish messagesData || not (Dyn.isArray messagesData) then return None
-            else
-                return
-                    Wanxiangshu.Opencode.MessagingCodec.decodeMessages (unbox<obj array> messagesData)
-                    |> Wanxiangshu.Kernel.Messaging.flatten
-                    |> Wanxiangshu.Kernel.ReviewReplayPolicy.textsFromFlatParts
-                    |> Wanxiangshu.Kernel.ReviewReplayPolicy.reviewTaskFromTexts
-    }
+open Wanxiangshu.Shell.EventLogRuntime
 
 /// Handle /loop and /loop-review slash commands.
 let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
@@ -43,21 +28,21 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
             let sessionID = sessionIdFromHookInput input ""
             let task = (commandArgumentsFromHookInput input).Trim()
             let parts = ResizeArray<obj>()
-            let! activeTask =
-                match getClientFromPluginCtx ctx with
-                | Ok client when sessionID <> "" -> historyLoopTask client sessionID
-                | _ -> Promise.lift None
+            let directory = pluginDirectoryFromCtx ctx
+            do! syncReviewFromEventLog reviewStore directory sessionID
+            let activeTask = reviewStore.getReviewTask sessionID
             if task = "" then
+                do! appendLoopCancelled directory sessionID |> Promise.map ignore
                 reviewStore.deactivateReview sessionID
                 parts.Add(box {| ``type`` = "text"; text = loopCancelledMessage |})
             elif activeTask.IsSome then
                 parts.Add(box {| ``type`` = "text"; text = reviewAlreadyActiveMessage |})
             elif command = "loop" then
+                do! appendLoopActivated directory sessionID task |> Promise.map ignore
                 reviewStore.activateReview(sessionID, task, getTimestampMs())
                 let msg = buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
                 parts.Add(box {| ``type`` = "text"; text = msg |})
             else
-                let directory = pluginDirectoryFromCtx ctx
                 let! result =
                     match getClientFromPluginCtx ctx with
                     | Error _ -> Promise.lift Terminated
@@ -68,6 +53,7 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
                 | Terminated ->
                     parts.Add(box {| ``type`` = "text"; text = preReviewCouldNotComplete |})
                 | Rejected feedback ->
+                    do! appendLoopActivated directory sessionID task |> Promise.map ignore
                     reviewStore.activateReview(sessionID, task, getTimestampMs())
                     let msg = buildLoopMessage task [ withReviewPreReviewFeedbackHeader; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]
                     parts.Add(box {| ``type`` = "text"; text = msg |})

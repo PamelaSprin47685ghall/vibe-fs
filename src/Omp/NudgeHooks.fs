@@ -25,6 +25,8 @@ open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Shell.EventLogRuntime
 
 let applyActiveToolFilterForMainSession (pi: obj) (ctx: obj) : JS.Promise<unit> =
     promise {
@@ -76,56 +78,67 @@ let turnStartHandler (pi: obj) (_event: obj) (ctx: obj) : JS.Promise<unit> =
     | None -> ()
     applyActiveToolFilterForMainSession pi ctx
 
-let agentEndHandler (pi: obj) (_reviewStore: ReviewStore) (ctx: obj) : unit =
+let agentEndHandler (pi: obj) (_reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =
     match getSessionIdFromContext ctx with
-    | None -> ()
+    | None -> Promise.lift ()
     | Some sessionId ->
-        if isSessionForceStopped sessionId then ()
+        if isSessionForceStopped sessionId then Promise.lift ()
         else
             let sm = Dyn.get ctx "sessionManager"
             let hasPending =
                 let fn = Dyn.get ctx "hasPendingMessages"
                 Dyn.typeIs fn "function" && Dyn.truthy (Dyn.call0 fn)
-            if Dyn.isNullish sm || hasPending then ()
+            if Dyn.isNullish sm || hasPending then Promise.lift ()
             else
-                let historyTexts =
-                    entries sm |> decodeEntries "" |> extractHistoryTexts
-                let openTodos = openTodoStatuses sm
-                let last = lastAssistantMessage sm
-                let isLoopActive = hasActiveLoopFromHistory sm
-                let hasRunner = hasRunningRunnerJob sessionId
-                let snapshot = deriveSnapshot {
-                    tailTexts = historyTexts
-                    openTodos = openTodos
-                    lastAssistantText = last
-                    agentFromMessage = None
-                    isLoopActive = isLoopActive
-                    lastAssistantIsCompaction = false
-                    hasActiveRunner = hasRunner
+                promise {
+                    let openTodos = openTodoStatuses sm
+                    let last = lastAssistantMessage sm
+                    let root = Dyn.str ctx "cwd"
+                    let! isLoopActive = isLoopActiveFromEventLog root sessionId
+                    let hasRunner = hasRunningRunnerJob sessionId
+                    let turnId = lastAssistantTurnId sm
+                    let key = nudgeAnchorKey turnId last
+                    let! blocked = nudgeBlockedForTurn root sessionId key
+                    let snapshot = deriveSnapshot {
+                        openTodos = openTodos
+                        lastAssistantText = last
+                        agentFromMessage = None
+                        isLoopActive = isLoopActive
+                        lastAssistantIsCompaction = false
+                        hasActiveRunner = hasRunner
+                        nudgeBlockedForTurn = blocked
+                        turnId = turnId
+                    }
+                    match deriveAction snapshot with
+                    | NudgeNone -> ()
+                    | action ->
+                        let! claimed = tryClaimNudgeDispatch root sessionId action snapshot.nudgeAnchorKey
+                        if not claimed then ()
+                        else
+                            match action with
+                            | NudgeRunner ->
+                                pi?sendMessage(
+                                    createObj [
+                                        "customType", box "wanxiangshu-runner-reminder"
+                                        "content", box (runnerReminderContent ())
+                                        "display", box false
+                                    ],
+                                    createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
+                            | NudgeLoop ->
+                                pi?sendMessage(
+                                    createObj [
+                                        "customType", box "wanxiangshu-loop-reminder"
+                                        "content", box (loopReminderContent ())
+                                        "display", box false
+                                    ],
+                                    createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
+                            | NudgeTodo ->
+                                pi?sendMessage(
+                                    createObj [
+                                        "customType", box "wanxiangshu-todo-reminder"
+                                        "content", box (todoReminderContent ())
+                                        "display", box false
+                                    ],
+                                    createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
+                            | NudgeNone -> ()
                 }
-                match deriveAction snapshot None None with
-                | NudgeNone -> ()
-                | NudgeRunner ->
-                    pi?sendMessage(
-                        createObj [
-                            "customType", box "wanxiangshu-runner-reminder"
-                            "content", box (runnerReminderContent ())
-                            "display", box false
-                        ],
-                        createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
-                | NudgeLoop ->
-                    pi?sendMessage(
-                        createObj [
-                            "customType", box "wanxiangshu-loop-reminder"
-                            "content", box (loopReminderContent ())
-                            "display", box false
-                        ],
-                        createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
-                | NudgeTodo ->
-                    pi?sendMessage(
-                        createObj [
-                            "customType", box "wanxiangshu-todo-reminder"
-                            "content", box (todoReminderContent ())
-                            "display", box false
-                        ],
-                        createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])

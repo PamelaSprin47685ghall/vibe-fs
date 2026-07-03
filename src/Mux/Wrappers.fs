@@ -20,6 +20,7 @@ open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MuxHostBindings
 open Wanxiangshu.Shell.WorkBacklogToolsCodec
+open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.ToolContextCodec
 open Wanxiangshu.Shell.DynField
@@ -161,6 +162,13 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                                     Dyn.withKey result "output" (box output)
                                 else
                                     createObj [ "success", box true; "output", box output ]
+                            match fromMuxConfig opts with
+                            | Ok runtime ->
+                                let root = runtime.Execution.Directory
+                                let sid = workspaceIdString runtime
+                                if sid <> "" && root <> "" then
+                                    do! appendWorkBacklogCommitted root sid tw |> Promise.map ignore
+                            | _ -> ()
                             return nextResult
                     })
 

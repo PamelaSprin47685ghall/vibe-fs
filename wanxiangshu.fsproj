@@ -76,6 +76,8 @@
     <Compile Include="src/Kernel/ToolPermission.fs" />
     <Compile Include="src/Kernel/SubagentToolPolicy.fs" />
     <Compile Include="src/Kernel/BacklogProjectionCore.fs" />
+    <Compile Include="src/Kernel/EventLog/Types.fs" />
+    <Compile Include="src/Kernel/EventLog/Fold.fs" />
     <Compile Include="src/Kernel/BacklogProjection.fs" />
     <Compile Include="src/Kernel/WorkBacklog.fs" />
     <Compile Include="src/Kernel/Domain.fs" />
@@ -138,6 +140,8 @@
     <Compile Include="src/Shell/DelegatedAiSettings.fs" />
     <Compile Include="src/Shell/MuxAiSettingsCodec.fs" />
     <Compile Include="src/Shell/FileSys.fs" />
+    <Compile Include="src/Shell/EventLogCodec.fs" />
+    <Compile Include="src/Shell/EventLogFiles.fs" />
     <Compile Include="src/Shell/SembleMcp.fs" />
     <Compile Include="src/Shell/SembleSearch.fs" />
     <Compile Include="src/Shell/WorkspaceFiles.fs" />
@@ -158,7 +162,6 @@
     <Compile Include="src/Shell/MuxJsonSchema.fs" />
     <Compile Include="src/Shell/CapsFileCache.fs" />
     <Compile Include="src/Shell/MessageTransformHostHooks.fs" />
-    <Compile Include="src/Shell/MessageTransformHostEntry.fs" />
     <Compile Include="src/Shell/WebFetch.fs" />
     <Compile Include="src/Shell/RunnerBackground.fs" />
     <Compile Include="src/Shell/OmpCaps.fs" />
@@ -179,6 +182,8 @@
     <Compile Include="src/Shell/MuxHookInputCodec.fs" />
     <Compile Include="src/Shell/FileToolsCodec.fs" />
     <Compile Include="src/Shell/WorkBacklogToolsCodec.fs" />
+    <Compile Include="src/Shell/EventLogRuntime.fs" />
+    <Compile Include="src/Shell/MessageTransformHostEntry.fs" />
     <Compile Include="src/Shell/PatchToolsCodec.fs" />
     <Compile Include="src/Shell/ToolArgsDecode.fs" />
     <Compile Include="src/Shell/ToolExecute.fs" />
@@ -295,7 +300,12 @@
 
   <ItemGroup>
     <Compile Include="tests/Assert.fs" />
+    <Compile Include="tests/AsyncFlush.fs" />
+    <Compile Include="tests/EventLogFoldTests.fs" />
+    <Compile Include="tests/EventLogCodecTests.fs" />
+    <Compile Include="tests/EventLogTestSeed.fs" />
     <Compile Include="tests/TempWorkspace.fs" />
+    <Compile Include="tests/EventLogRuntimeTests.fs" />
     <Compile Include="tests/IntegrationToolSetup.fs" />
     <Compile Include="tests/EventDrivenHarness.fs" />
     <Compile Include="tests/EventDrivenHarnessDemo.fs" />

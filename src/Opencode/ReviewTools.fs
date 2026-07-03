@@ -24,6 +24,7 @@ open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Shell.EventLogRuntime
 
 let private formatReviewResult = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult
 
@@ -42,9 +43,8 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangs
                     promise {
                         if sessionID = "" then return submitReviewNotNeeded
                         else
-                            let! texts = Wanxiangshu.Opencode.SessionIo.readSessionTexts client sessionID runtime.Execution.Directory
-                            let activeTask = inferReviewTaskFromTexts texts
-                            syncReviewProjection store sessionID activeTask
+                            do! syncReviewFromEventLog store runtime.Execution.Directory sessionID
+                            let activeTask = store.getReviewTask sessionID
                             match activeTask with
                             | None -> return submitReviewNotNeeded
                             | Some task when not (store.tryLockReview sessionID) -> return opencodeSubmitReviewInProgress
@@ -55,10 +55,13 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangs
                                     | None -> null
                                 try
                                     if submitReviewIsWip decoded.Wip then
+                                        do! appendSubmitReviewWipRecorded runtime.Execution.Directory sessionID |> Promise.map ignore
                                         return submitReviewWipAcknowledgment
                                     else
                                         let! result =
                                             runSubmitReview registry client store runtime.Execution.Directory sessionID decoded.Report decoded.AffectedFiles task abort
+                                        let verdict, fb = verdictStringFromReviewResult result
+                                        do! appendReviewVerdict runtime.Execution.Directory sessionID verdict fb |> Promise.map ignore
                                         match result with
                                         | Accepted _
                                         | Terminated -> store.deactivateReview sessionID
@@ -85,12 +88,15 @@ let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.Re
                     match getClientFromPluginCtx ctx with
                     | Error e -> return wireEncodeToolError "OpencodeClient" e
                     | Ok client ->
+                        do! syncReviewFromEventLog store directory sessionID
                         let! texts = Wanxiangshu.Opencode.SessionIo.readSessionTexts client sessionID directory
                         let doubleCheckDone = hasDoubleCheckAnchor texts
                         match decideReviewSubmission decoded.Verdict decoded.Feedback doubleCheckDone with
                         | AskDoubleCheck ->
-                            let task = defaultArg (inferReviewTaskFromTexts texts) ""
+                            let task = store.getReviewTask sessionID |> Option.defaultValue ""
                             return doubleCheckPrompt task
                         | Finalize result ->
+                            let verdict, fb = verdictStringFromReviewResult result
+                            do! appendReviewVerdict directory sessionID verdict fb |> Promise.map ignore
                             return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve."
             })

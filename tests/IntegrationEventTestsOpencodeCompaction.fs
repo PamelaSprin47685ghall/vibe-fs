@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.IntegrationEventTestsOpencodeCompaction
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Opencode.Plugin
 open Wanxiangshu.Shell.Dyn
@@ -55,12 +56,7 @@ let opencodeCompactingEmitsAnchorPromptSpec () = promise {
     msgStore.AddRange messages
     let output = createObj [ "messages", box messages ]
     do! compacting $ (createObj [ "sessionID", box sessionID ], output) |> unbox<JS.Promise<unit>>
-    check "compacting hook emits exactly one anchor prompt" (promptCalls.Count = 1)
-    if promptCalls.Count > 0 then
-        let promptTextStr = promptText promptCalls.[0]
-        check "anchor prompt contains See above body" (promptTextStr.Contains "See above for some messages before compaction.")
-        check "anchor prompt contains backlog report text (planned phase)" (promptTextStr.Contains "anchor planned phase")
-        check "anchor prompt contains backlog report text (implemented phase)" (promptTextStr.Contains "anchor implemented phase")
+    check "compacting hook does not emit anchor prompt" (promptCalls.Count = 0)
     let transformed = unbox<obj[]> (get output "messages")
     check "compacting hook still projects backlog" (transformed.Length > 0)
     do! rmAsync workspaceDir
@@ -114,12 +110,9 @@ let opencodeCompactingAnchorUsesPriorAgentSpec () = promise {
     msgStore.AddRange messages
     let output = createObj [ "messages", box messages ]
     do! compacting $ (createObj [ "sessionID", box sessionID ], output) |> unbox<JS.Promise<unit>>
-    check "compacting anchor prompt is emitted" (promptCalls.Count = 1)
-    if promptCalls.Count > 0 then
-        let body = get promptCalls.[0] "body"
-        check "anchor prompt carries prior real agent" (str body "agent" = "manager")
+    check "compacting does not emit anchor prompt" (promptCalls.Count = 0)
     do! compacting $ (createObj [ "sessionID", box sessionID ], output) |> unbox<JS.Promise<unit>>
-    check "compacting anchor prompt is emitted once" (promptCalls.Count = 1)
+    check "compacting idempotent without anchor prompt" (promptCalls.Count = 0)
     do! rmAsync workspaceDir
 }
 
@@ -144,7 +137,7 @@ let opencodeNudgeAfterCompactionEmitsAnchorPromptSpec () = promise {
     let! p = plugin (box {| directory = workspaceDir; client = mkClient () |})
     let eventHook = get p "event"
     do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     check "nudge after compaction with no durable content emits no prompt" (promptCalls.Count = 0)
     do! rmAsync workspaceDir
 }

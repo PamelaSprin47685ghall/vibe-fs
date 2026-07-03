@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
+open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Omp.Plugin
 open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.Dyn
@@ -24,6 +25,7 @@ let agentEndRunnerNudgeBeforeLoop () = promise {
                 "content", box [| createObj [ "type", box "text"; "text", box "waiting on background runner" ] |]
             ])
         ]
+    let! workspaceDir = mkdtempAsync "omp-agent-end-runner-"
     let ctx =
         createObj [
             "sessionManager",
@@ -33,9 +35,11 @@ let agentEndRunnerNudgeBeforeLoop () = promise {
                         "getEntries", box(fun () -> box [| assistantEntry |])
                     ])
             "hasPendingMessages", box(fun () -> box false)
+            "cwd", box workspaceDir
         ]
     do! invokeHandler h "agent_end" (createObj []) ctx
     equal "runner reminder type" "wanxiangshu-runner-reminder" (lastMessageCustomType h)
+    do! rmAsync workspaceDir
 }
 
 let agentEndLoopNudgeWhenActive () = promise {
@@ -43,10 +47,12 @@ let agentEndLoopNudgeWhenActive () = promise {
     let h = createPiHarness ()
     let pi = piObject h
     do! wanxiangshuExtension pi
+    let! workspaceDir = mkdtempAsync "omp-agent-end-loop-"
     let ctxLoop =
         createObj [
             "sessionManager", box(createObj [ "getSessionId", box(fun () -> box "session-2") ])
             "ui", box(createObj [ "notify", box(fun (_: obj) (_: obj) -> ()) ])
+            "cwd", box workspaceDir
         ]
     do!
         emitJsExpr (eventHandler h "input", createObj [ "text", box "/loop do task" ], ctxLoop)
@@ -61,9 +67,11 @@ let agentEndLoopNudgeWhenActive () = promise {
                         "getEntries", box(fun () -> box [| createObj [ "message", box (createObj [ "role", box "assistant"; "content", box [| createObj [ "type", box "text"; "text", box (frontMatterPrompt [ yamlField taskField "do task" ] "With-Review Mode is active.") ] |] ]) ] |])
                     ])
             "hasPendingMessages", box(fun () -> box false)
+            "cwd", box workspaceDir
         ]
     do! invokeHandler h "agent_end" (createObj []) ctxEnd
     equal "loop reminder type" "wanxiangshu-loop-reminder" (lastMessageCustomType h)
+    do! rmAsync workspaceDir
 }
 
 let agentEndSkipsLoopNudgeWithoutWorkerTaskAnchor () = promise {
@@ -132,13 +140,16 @@ let agentEndTodoNudgeWhenOpenPhases () = promise {
             "getSessionId", box(fun () -> box "session-todo")
             "getEntries", box(fun () -> Array.append (todoPhaseEntries ()) [| assistantEntry |])
         ]
+    let! workspaceDir = mkdtempAsync "omp-agent-end-todo-"
     let ctxEnd =
         createObj [
             "sessionManager", box sm
             "hasPendingMessages", box(fun () -> box false)
+            "cwd", box workspaceDir
         ]
     do! invokeHandler h "agent_end" (createObj []) ctxEnd
     equal "todo reminder type" "wanxiangshu-todo-reminder" (lastMessageCustomType h)
+    do! rmAsync workspaceDir
 }
 
 let runnerNudgePromptUsesExecutorToolNames () =

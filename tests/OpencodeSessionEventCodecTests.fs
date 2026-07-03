@@ -28,6 +28,5 @@ let run () =
     decodeLastAssistantEmptyWhenNoCompletedAssistant ()
     decodeLastAssistantReturnsLastTextAndAgent ()
     decodeLastAssistantDetectsSyntheticAgent ()
-    decodeLastAssistantDetectsAlreadyNudged ()
     createPromptBodyWithoutAgent ()
     createPromptBodyWithAgent ()

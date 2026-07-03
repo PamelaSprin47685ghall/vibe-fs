@@ -25,11 +25,9 @@ let sessionCompactingHandler (_pi: obj) (event: obj) (_ctx: obj) : JS.Promise<ob
         let cleaned = stripSyntheticBySource messagesList
         if cleaned.IsEmpty then return createObj []
         else
-            let backlogEntries = backlogSession.GetOrRebuildBacklog(sessionId, cleaned)
+            let backlog = backlogSession.GetOrRebuildBacklog(sessionId, cleaned)
             let anchorTexts = extractHistoryTexts cleaned
-            let contextText = buildCompactionAnchorPrompt backlogEntries (fun () -> anchorTexts)
-            if System.String.IsNullOrEmpty contextText then return createObj []
-            else
-                let contextLines = contextText.Split('\n')
-                return createObj [ "context", box contextLines ]
+            let prompt = buildCompactionAnchorPrompt backlog (fun () -> anchorTexts)
+            if prompt = "" then return createObj []
+            else return createObj [ "context", box [| prompt |] ]
     }

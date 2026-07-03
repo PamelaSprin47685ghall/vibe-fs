@@ -3,7 +3,7 @@ module Wanxiangshu.Shell.OpencodeSessionEventCodec
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
-open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
+
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeSessionPromptCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
@@ -80,50 +80,8 @@ let recoverOpenTodosFromMessages (messagesData: obj) : string list =
         |> Option.defaultValue [||]
         |> Array.toList
 
-let private submitReviewPartOutput (part: obj) : string =
-    let direct = Dyn.get part "output"
-    if not (Dyn.isNullish direct) then string direct
-    else
-        let state = Dyn.get part "state"
-        if Dyn.isNullish state then ""
-        else string (Dyn.get state "output")
-
-let private messageHasSubmitReviewWipProgress (message: obj) : bool =
-    let parts = Dyn.get message "parts"
-    if not (Dyn.isArray parts) then false
-    else
-        (parts :?> obj array)
-        |> Array.exists (fun part ->
-            let partType = Dyn.str part "type"
-            let tool =
-                if partType = "tool" then Dyn.str part "tool"
-                elif partType = "dynamic-tool" then Dyn.str part "toolName"
-                else ""
-            (partType = "tool" || partType = "dynamic-tool")
-            && isSubmitReviewToolName tool
-            && submitReviewPartOutput part |> isSubmitReviewWipProgressOutput)
-
-let private messageIsUserNudgePrompt (message: obj) : bool =
-    let info = Dyn.get message "info"
-    let role =
-        let r = Dyn.str info "role"
-        if r <> "" then r else Dyn.str message "role"
-    role = "user" && isNudgePrompt (getPartsText (Dyn.get message "parts"))
-
-let private alreadyNudgedAfterIndex (messages: obj array) (idx: int) : bool =
-    messages.[idx + 1 ..]
-    |> Array.fold
-        (fun nudged message ->
-            if messageHasSubmitReviewWipProgress message then false
-            elif messageIsUserNudgePrompt message then true
-            else nudged)
-        false
-
-/// Locate the last completed assistant message in `messagesData` and report
-/// `(text, agent, alreadyNudged)`. `alreadyNudged` is true iff a nudge prompt
-/// already trails the assistant turn — used to suppress double-nudges that
-/// would otherwise survive a process restart.
-let decodeLastAssistant (messagesData: obj) : string * string option * bool =
+/// Locate the last completed assistant message in `messagesData` → `(text, agent)`.
+let decodeLastAssistant (messagesData: obj) : string * string option =
     if Dyn.isArray messagesData then
         let messagesArr = messagesData :?> obj array
         let lastAssistantIdx =
@@ -139,10 +97,9 @@ let decodeLastAssistant (messagesData: obj) : string * string option * bool =
             let agentVal = Dyn.get info "agent"
             let agent = if Dyn.isNullish agentVal then None else Some (string agentVal)
             let text = getPartsText (Dyn.get msg "parts")
-            let alreadyNudged = alreadyNudgedAfterIndex messagesArr idx
-            text, agent, alreadyNudged
-        | None -> "", None, false
-    else "", None, false
+            text, agent
+        | None -> "", None
+    else "", None
 
 /// Build the host wire prompt body for `session.prompt`. The agent-scoped
 /// variant carries an `agent` field so the host routes to the same assistant

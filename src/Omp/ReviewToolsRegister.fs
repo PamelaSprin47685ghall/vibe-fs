@@ -15,6 +15,7 @@ open Wanxiangshu.Omp.Schema
 open Wanxiangshu.Shell.DynField
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.EventLogRuntime
 
 let private optBool = Wanxiangshu.Shell.DynField.optBool
 
@@ -35,15 +36,16 @@ let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
                         | None -> return errorResult "Loop review is not active for this session."
                         | Some sessionId ->
                             let sm = Dyn.get ctx "sessionManager"
-                            let activeTask =
-                                if Dyn.isNullish sm then None
-                                else activeLoopTaskFromHistory sm
-                            syncReviewProjection store sessionId activeTask
+                            let root = Dyn.str ctx "cwd"
+                            do! syncReviewFromEventLog store root sessionId
+                            let activeTask = store.getReviewTask sessionId
                             match activeTask with
                             | None -> return errorResult "Loop review is not active for this session."
                             | Some activeTask ->
                                 let wip = submitReviewIsWip (optBool params' "wip")
-                                if wip then return textResult submitReviewWipAcknowledgment
+                                if wip then
+                                    do! appendSubmitReviewWipRecorded root sessionId |> Promise.map ignore
+                                    return textResult submitReviewWipAcknowledgment
                                 elif not (store.tryLockReview sessionId) then return errorResult "A review is already in progress."
                                 else
                                     let report = Dyn.str params' "report"

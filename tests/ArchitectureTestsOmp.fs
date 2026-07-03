@@ -95,8 +95,8 @@ let ompReviewUsesReviewRuntime () =
         (loop.Contains "ReviewSession")
     check "arch: Omp ReviewTools uses ReviewRuntime"
         (tools.Contains "ReviewRuntime")
-    check "arch: Omp ReviewTools register replays active task from history"
-        (tools.Contains "activeLoopTaskFromHistory")
+    check "arch: Omp ReviewTools register syncs review from event log"
+        (tools.Contains "syncReviewFromEventLog")
 
 let ompCapsCodecExists () =
     let code = requireFile "src/Omp/CapsCodec.fs" |> nonCommentCode
@@ -141,8 +141,8 @@ let ompNudgeRuntimeModule () =
 let ompNudgeHooksDoNotReadReviewStoreForLoopState () =
     let code = requireFile "src/Omp/NudgeHooks.fs" |> nonCommentCode
     check "arch: Omp NudgeHooks must not read live review-state query" (not (code.Contains "isReviewActive"))
-    check "arch: Omp NudgeHooks rebuild loop state from history"
-        (code.Contains "hasActiveLoopFromHistory")
+    check "arch: Omp NudgeHooks loop state from event log"
+        (code.Contains "isLoopActiveFromEventLog")
 
 let ompSessionLifecycleHooks () =
     let code = requireFile "src/Omp/SessionLifecycleHooks.fs" |> nonCommentCode

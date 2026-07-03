@@ -121,33 +121,23 @@ let recoverOpenTodosFromMessagesDropsTerminal () =
 
 let decodeLastAssistantEmptyWhenNoCompletedAssistant () =
     let msg = messageOf (box {| role = "user" |}) (box [| part "hi" |])
-    let text, agent, nudged = decodeLastAssistant (box [| msg |])
+    let text, agent = decodeLastAssistant (box [| msg |])
     equal "text empty when no assistant" "" text
     equal "agent None when no assistant" true (Option.isNone agent)
-    equal "alreadyNudged false when no assistant" false nudged
 
 let decodeLastAssistantReturnsLastTextAndAgent () =
     let info = box {| role = "assistant"; agent = "coder"; finish = "stop" |}
     let msg1 = messageOf (box {| role = "user" |}) (box [| part "ignored" |])
     let msg2 = messageOf info (box [| part "answer" |])
-    let text, agent, nudged = decodeLastAssistant (box [| msg1; msg2 |])
+    let text, agent = decodeLastAssistant (box [| msg1; msg2 |])
     equal "text from last assistant" "answer" text
     equal "agent captured" (Some "coder") agent
-    equal "no nudge prompt follows" false nudged
 
 let decodeLastAssistantDetectsSyntheticAgent () =
     let info = box {| role = "assistant"; agent = "compaction"; finish = "stop" |}
     let msg = messageOf info (box [| part "should ignore" |])
-    let text, _, _ = decodeLastAssistant (box [| msg |])
+    let text, _ = decodeLastAssistant (box [| msg |])
     equal "synthetic agent skipped" "" text
-
-let decodeLastAssistantDetectsAlreadyNudged () =
-    let info = box {| role = "assistant"; finish = "stop" |}
-    let msgAssistant = messageOf info (box [| part "done" |])
-    let nudgePart = part Wanxiangshu.Kernel.PromptFragments.todoNudgePrompt
-    let msgNudge = messageOf (box {| role = "user" |}) (box [| nudgePart |])
-    let _, _, nudged = decodeLastAssistant (box [| msgAssistant; msgNudge |])
-    check "already-nudged detected" nudged
 
 let createPromptBodyWithoutAgent () =
     let body = createPromptBody None "hello"

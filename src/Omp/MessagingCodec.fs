@@ -51,6 +51,20 @@ let readAssistantText (sessionManager: obj) (startIndex: int) (joiner: string) :
 let lastAssistantMessage (sessionManager: obj) : string =
     readAssistantText sessionManager 0 "\n\n" |> Option.defaultValue ""
 
+let lastAssistantTurnId (sessionManager: obj) : string =
+    let arr = entries sessionManager
+    match
+        arr
+        |> Array.tryFindIndexBack (fun entry ->
+            let role =
+                let m = Dyn.get entry "message"
+                if not (Dyn.isNullish m) then Dyn.str m "role"
+                else Dyn.str (Dyn.get entry "info") "role"
+            role = "assistant")
+    with
+    | None -> ""
+    | Some i -> string i
+
 let private flattenTodoTasks (phases: obj array) : string list =
     phases
     |> Array.collect (fun phase ->

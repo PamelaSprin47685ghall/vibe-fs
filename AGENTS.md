@@ -8,3 +8,4 @@ import:
 - Opencode 端参见 ../opencode 代码，不允许改上游
 - 本项目编译测试需要 20s 请合理设置超时
 - Opencode 的大部分 hook 需要原地修改字段而不是换引用，否则不工作
+- durable 状态（review/todo/nudge）SSOT = 工作区 `.wanxiangshu.ndjson`（见 `PRD/EventSourcing.md`）；实施顺序：文档 → 测试 → 代码；勿用宿主对话历史或 compaction 补锚点作真相

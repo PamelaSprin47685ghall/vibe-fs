@@ -20,10 +20,6 @@ models:
     - openai/gpt-5.5
     - zai-coding-plan/glm-5.1
   agents:
-    bookkeeper:
-      - id: openai/gpt-5.4:high
-        temperature: 1.0
-      - id: anthropic/claude-sonnet-4
     sisyphus:
       - opencode-go/deepseek-v4-pro
       - openai/gpt-5.5

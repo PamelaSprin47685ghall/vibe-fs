@@ -13,21 +13,20 @@ open Wanxiangshu.Shell.SerialStateHolder
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
-open Wanxiangshu.Kernel.ReviewReplayPolicy
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Shell.EventLogRuntime
 
 type NudgeRuntimeState =
-    { lastSentActions: Map<string, NudgeAction>
-      lastSentMessages: Map<string, string>
-      retryPendingSessions: Set<string>
+    { retryPendingSessions: Set<string>
       forceStoppedSessions: Set<string> }
 
 let emptyRuntimeState =
-    { lastSentActions = Map.empty
-      lastSentMessages = Map.empty
-      retryPendingSessions = Set.empty
+    { retryPendingSessions = Set.empty
       forceStoppedSessions = Set.empty }
 
 let runNudgeFlowCore
+    (workspaceRoot: string)
     (runtimeState: NudgeRuntimeState)
     (sessionKey: string)
     (takeSnapshot: unit -> JS.Promise<SessionSnapshot option>)
@@ -37,29 +36,17 @@ let runNudgeFlowCore
         match! takeSnapshot () with
         | None -> return runtimeState
         | Some snapshot ->
-            let lastSent = Map.tryFind sessionKey runtimeState.lastSentActions
-            let lastSentMsg = Map.tryFind sessionKey runtimeState.lastSentMessages
-            match deriveAction snapshot lastSent lastSentMsg with
+            match deriveAction snapshot with
             | NudgeNone -> return runtimeState
             | action ->
                 match selectNudgePrompt action with
                 | None -> return runtimeState
                 | Some promptText ->
-                    let! outcome = sendNudge promptText snapshot.agentFromMessage
-                    let nextLastSent =
-                        match outcome with
-                        | Delivered | Aborted -> Some action
-                        | Busy | Failed -> lastSent
-                    let nextLastMsg =
-                        match outcome with
-                        | Delivered | Aborted -> Some snapshot.lastAssistantMessage
-                        | Busy | Failed -> lastSentMsg
-                    return
-                        { runtimeState with
-                            lastSentActions =
-                                Map.add sessionKey (defaultArg nextLastSent NudgeNone) runtimeState.lastSentActions
-                            lastSentMessages =
-                                Map.add sessionKey (defaultArg nextLastMsg "") runtimeState.lastSentMessages }
+                    let! claimed = tryClaimNudgeDispatch workspaceRoot sessionKey action snapshot.nudgeAnchorKey
+                    if not claimed then return runtimeState
+                    else
+                        let! _ = sendNudge promptText snapshot.agentFromMessage
+                        return runtimeState
     }
 
 type NudgeRuntimeEvent =
@@ -69,6 +56,9 @@ type NudgeRuntimeEvent =
     | AbortedError of workspaceId: string
     | StepFailed of workspaceId: string
     | Prompted of workspaceId: string
+
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
 
 type NudgeRuntime
     (getChatHistory: (string -> JS.Promise<obj array>) option) =
@@ -116,14 +106,18 @@ type NudgeRuntime
             let! todos = tryGetTodos helpers workspaceId
             match getChatHistory with
             | None ->
+                let root = unbox<string> (nodeProcess?cwd())
+                let! isLoopActive = isLoopActiveFromEventLog root workspaceId
+                let! blocked = nudgeBlockedForTurn root workspaceId ""
                 return Some (deriveSnapshot {
-                    tailTexts = []
                     openTodos = todos
                     lastAssistantText = ""
                     agentFromMessage = None
-                    isLoopActive = false
+                    isLoopActive = isLoopActive
                     lastAssistantIsCompaction = false
                     hasActiveRunner = false
+                    nudgeBlockedForTurn = blocked
+                    turnId = ""
                 })
             | Some getHistory ->
                 try
@@ -133,43 +127,45 @@ type NudgeRuntime
                         |> Array.tryFindIndexBack (fun m ->
                             let role = Dyn.str m "role"
                             role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str m "agent")))
-                    let lastAssistantText, tailTexts, agent, isLoopActive =
+                    let lastAssistantText, turnId, agent =
                         match lastAssistantIdx with
-                        | None -> "", [], None, false
+                        | None -> "", "", None
                         | Some idx ->
                             let assistantMsg = messages.[idx]
                             let text = messageTexts assistantMsg |> String.concat "\n"
                             let info = Dyn.get assistantMsg "info"
                             let agentVal = Dyn.str info "agent"
                             let agent = if agentVal = "" then None else Some agentVal
-                            let afterTexts =
-                                messages.[idx + 1 ..]
-                                |> Array.toList
-                                |> List.collect messageTexts
-                            let allTexts =
-                                messages
-                                |> Array.toList
-                                |> List.collect messageTexts
-                            let loopActive = allTexts |> reviewTaskFromTexts |> Option.isSome
-                            text, afterTexts, agent, loopActive
+                            let time = Dyn.get info "time"
+                            let completed = Dyn.str time "completed"
+                            let tid = if completed <> "" then completed else Dyn.str info "id"
+                            text, tid, agent
+                    let root = unbox<string> (nodeProcess?cwd())
+                    let key = nudgeAnchorKey turnId lastAssistantText
+                    let! isLoopActive = isLoopActiveFromEventLog root workspaceId
+                    let! blocked = nudgeBlockedForTurn root workspaceId key
                     return Some (deriveSnapshot {
-                        tailTexts = tailTexts
                         openTodos = todos
                         lastAssistantText = lastAssistantText
                         agentFromMessage = agent
                         isLoopActive = isLoopActive
                         lastAssistantIsCompaction = false
                         hasActiveRunner = false
+                        nudgeBlockedForTurn = blocked
+                        turnId = turnId
                     })
                 with _ ->
+                    let root = unbox<string> (nodeProcess?cwd())
+                    let! blocked = nudgeBlockedForTurn root workspaceId ""
                     return Some (deriveSnapshot {
-                        tailTexts = []
                         openTodos = todos
                         lastAssistantText = ""
                         agentFromMessage = None
                         isLoopActive = false
                         lastAssistantIsCompaction = false
                         hasActiveRunner = false
+                        nudgeBlockedForTurn = blocked
+                        turnId = ""
                     })
         }
 
@@ -192,7 +188,8 @@ type NudgeRuntime
            || Set.contains sessionKey runtimeState.forceStoppedSessions then
             Promise.lift runtimeState
         else
-            runNudgeFlowCore runtimeState sessionKey takeSnapshot sendNudge
+            let root = unbox<string> (nodeProcess?cwd())
+            runNudgeFlowCore root runtimeState sessionKey takeSnapshot sendNudge
 
     let parseEvent (input: obj) : NudgeRuntimeEvent =
         match decodeHostEventEnvelope input with
@@ -241,8 +238,6 @@ type NudgeRuntime
             | AbortedError workspaceId ->
                 runtimeState <-
                     { runtimeState with
-                        lastSentActions = Map.remove workspaceId runtimeState.lastSentActions
-                        lastSentMessages = Map.remove workspaceId runtimeState.lastSentMessages
                         forceStoppedSessions = Set.add workspaceId runtimeState.forceStoppedSessions }
                 return ()
             | StepFailed workspaceId ->

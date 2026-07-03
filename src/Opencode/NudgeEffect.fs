@@ -7,7 +7,9 @@ open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 open Wanxiangshu.Kernel.Nudge.Types
-open Wanxiangshu.Kernel.ReviewReplayPolicy
+open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -59,7 +61,7 @@ let private messageIsUserNudgePrompt (message: obj) : bool =
         if r <> "" then r else Dyn.str message "role"
     role = "user" && isNudgePrompt (getPartsText (Dyn.get message "parts"))
 
-let private collectSnapshot (client: obj) (sessionID: SessionId)
+let private collectSnapshot (client: obj) (pluginCtx: obj) (sessionID: SessionId)
     : JS.Promise<SessionSnapshot option> =
     promise {
         try
@@ -83,54 +85,32 @@ let private collectSnapshot (client: obj) (sessionID: SessionId)
                             let info = Dyn.get msg "info"
                             isCompletedAssistantMessage info
                             && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
-                    let lastAssistantText, agentFromMessage, tailTexts =
+                    let lastAssistantText, turnId, agentFromMessage =
                         match lastAssistantIdx with
-                        | None -> "", None, []
+                        | None -> "", "", None
                         | Some idx ->
                             let msg = messagesArr.[idx]
                             let info = Dyn.get msg "info"
                             let agentVal = Dyn.get info "agent"
                             let agent = if Dyn.isNullish agentVal then None else Some (string agentVal)
                             let text = getPartsText (Dyn.get msg "parts")
-                            let tail =
-                                messagesArr.[idx + 1 ..]
-                                |> Array.toList
-                                |> List.map (fun message ->
-                                    let parts = Dyn.get message "parts"
-                                    if not (Dyn.isArray parts) then ""
-                                    else
-                                        (parts :?> obj array)
-                                        |> Array.choose (fun part ->
-                                            match Dyn.str part "type" with
-                                            | "text" ->
-                                                let t = Dyn.get part "text"
-                                                if Dyn.isNullish t then None else Some (string t)
-                                            | "tool" | "dynamic-tool" ->
-                                                let output =
-                                                    let direct = Dyn.get part "output"
-                                                    if not (Dyn.isNullish direct) then string direct
-                                                    else
-                                                        let state = Dyn.get part "state"
-                                                        if Dyn.isNullish state then "" else string (Dyn.get state "output")
-                                                if output = "" then None else Some output
-                                            | _ -> None)
-                                        |> String.concat "\n")
-                                |> List.filter (fun s -> s <> "")
-                            text, agent, tail
-                    let historyTexts =
-                        Wanxiangshu.Opencode.MessagingCodec.decodeMessages messagesArr
-                        |> Wanxiangshu.Kernel.Messaging.flatten
-                        |> textsFromFlatParts
-                        |> Seq.toList
-                    let isLoopActive = historyTexts |> reviewTaskFromTexts |> Option.isSome
+                            let time = Dyn.get info "time"
+                            let completed = Dyn.str time "completed"
+                            let tid = if completed <> "" then completed else Dyn.str info "id"
+                            text, tid, agent
+                    let directory = pluginDirectoryFromCtx pluginCtx
+                    let key = nudgeAnchorKey turnId lastAssistantText
+                    let! isLoopActive = isLoopActiveFromEventLog directory sessionIDStr
+                    let! blocked = nudgeBlockedForTurn directory sessionIDStr key
                     return Some (deriveSnapshot {
-                        tailTexts = tailTexts
                         openTodos = openTodos
                         lastAssistantText = lastAssistantText
                         agentFromMessage = agentFromMessage
                         isLoopActive = isLoopActive
                         lastAssistantIsCompaction = false
                         hasActiveRunner = false
+                        nudgeBlockedForTurn = blocked
+                        turnId = turnId
                     })
         with _ -> return None
     }
@@ -157,17 +137,19 @@ let private sendNudgeOutcome (client: obj) (sessionID: SessionId) (promptText: s
                 | _ -> Failed
     }
 
-let startNudgeFlow (runtimeState: NudgeRuntimeState) (client: obj) (sessionID: SessionId)
+let startNudgeFlow (runtimeState: NudgeRuntimeState) (client: obj) (pluginCtx: obj) (sessionID: SessionId)
     : JS.Promise<NudgeRuntimeState> =
     let sid = Id.sessionIdValue sessionID
+    let root = pluginDirectoryFromCtx pluginCtx
     runNudgeFlowCore
+        root
         runtimeState
         sid
-        (fun () -> collectSnapshot client sessionID)
+        (fun () -> collectSnapshot client pluginCtx sessionID)
         (fun promptText agentOpt -> sendNudgeOutcome client sessionID promptText agentOpt)
 
-let dispatchPostStopFromHistory (client: obj) (sessionID: SessionId) : JS.Promise<unit> =
+let dispatchPostStopFromHistory (client: obj) (pluginCtx: obj) (sessionID: SessionId) : JS.Promise<unit> =
     promise {
-        let! _ = startNudgeFlow emptyRuntimeState client sessionID
+        let! _ = startNudgeFlow emptyRuntimeState client pluginCtx sessionID
         return ()
     }

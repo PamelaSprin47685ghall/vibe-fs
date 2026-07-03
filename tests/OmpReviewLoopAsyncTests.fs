@@ -2,6 +2,7 @@ module Wanxiangshu.Tests.OmpReviewLoopAsyncTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Omp.PiResolve
 open Wanxiangshu.Omp.ReviewLoop
 open Wanxiangshu.Kernel.ReviewSession.Types

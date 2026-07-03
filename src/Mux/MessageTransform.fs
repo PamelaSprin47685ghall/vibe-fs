@@ -95,27 +95,5 @@ let compactingTransform (deps: obj) (backlogSession: BacklogSession) (input: obj
                     backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
                 let afterBacklog = applyBacklogProjection sessionID false backlogOps cleaned
                 let encoded = encodeMessages afterBacklog
-                let backlogEntries = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
-                let anchorTexts =
-                    cleaned
-                    |> List.collect (fun m -> m.parts)
-                    |> List.choose (function
-                        | TextPart t -> Some t
-                        | ToolPart(_, _, Some s, _) -> Some s.output
-                        | _ -> None)
-                let promptText = BacklogProjectionCore.buildCompactionAnchorPrompt backlogEntries (fun () -> List.ofSeq anchorTexts)
-                if not (System.String.IsNullOrEmpty(promptText)) && sessionID <> "" then
-                    let session = Dyn.get deps "session"
-                    if not (Dyn.isNullish session) then
-                        let promptFn = Dyn.get session "prompt"
-                        if not (Dyn.isNullish promptFn) then
-                            let! chatHistory : obj[] =
-                                promise {
-                                    let getHist = Dyn.get deps "getChatHistory"
-                                    if Dyn.isNullish getHist then return [||] else return! unbox<JS.Promise<obj[]>> (Dyn.call1 getHist sessionID)
-                                }
-                            let historyTexts = extractTextsFromEncodedMessages chatHistory
-                            if Seq.exists hasCompactionAnchorPrompt historyTexts |> not then
-                                try do! unbox<JS.Promise<unit>> (Dyn.call2 promptFn sessionID (box promptText)) with _ -> ()
                 replaceArrayInPlace messagesArr encoded
     }

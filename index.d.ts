@@ -246,7 +246,7 @@ export interface PluginToolExecuteAfterInput {
   workspaceId?: string;
   /** Workspace root; falls back to deps.directory when omitted. */
   directory?: string;
-  /** Tool arguments as executed (JSON-serialized for bookkeeper when recorded). */
+  /** Tool arguments as executed. */
   args?: unknown;
   callID?: string;
 }
@@ -254,7 +254,7 @@ export interface PluginToolExecuteAfterInput {
 /** Mutable tool result envelope; `output` may be rewritten in-place on success. */
 export interface PluginToolExecuteAfterOutput {
   output?: string;
-  /** When non-empty, the hook treats the call as failed and skips bookkeeper append. */
+  /** When non-empty, the hook treats the call as failed. */
   error?: string;
 }
 
@@ -271,7 +271,7 @@ export interface PluginRegistration {
     output: { messages: unknown[] },
   ) => Promise<void>;
   /**
-   * Post-tool hook for bookkeeper bookkeeping and output hints.
+   * Post-tool hook for output hints and side effects.
    * F# `createRegistration` also exposes the same handler under the wire key `tool.execute.after`.
    */
   toolExecuteAfter?: (

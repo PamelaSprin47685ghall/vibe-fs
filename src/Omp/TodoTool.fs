@@ -7,6 +7,8 @@ open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.OmpToolSchema
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.WorkBacklogToolsCodec
 module Dyn = Wanxiangshu.Shell.Dyn
 
 let private decodeMethodologies (params': obj) : string list =
@@ -37,7 +39,7 @@ let registerTodoTool (pi: obj) : unit =
             "description", box (toolDescriptionFor omp)
             "parameters", todowriteParameters tb
             "execute",
-                box(fun (_id: string) (params': obj) (_s: obj) (_u: obj) (_ctx: obj) ->
+                box(fun (_id: string) (params': obj) (_s: obj) (_u: obj) (ctx: obj) ->
                     promise {
                         let ahaMoments = (Dyn.str params' "ahaMoments").Trim()
                         let changesAndReasons = (Dyn.str params' "changesAndReasons").Trim()
@@ -54,6 +56,29 @@ let registerTodoTool (pi: obj) : unit =
                         else
                             match validateTodos params' with
                             | Error msg -> return errorResult msg
-                            | Ok () -> return textResult (todoWriteOutput methodologies false)
+                            | Ok () ->
+                                match getSessionIdFromContext ctx with
+                                | Some sid ->
+                                    let root = Dyn.str ctx "cwd"
+                                    let todos =
+                                        let raw = Dyn.get params' "todos"
+                                        if Dyn.isNullish raw || not (Dyn.isArray raw) then [||]
+                                        else
+                                            unbox<obj array> raw
+                                            |> Array.map (fun item ->
+                                                { Content = Dyn.str item "content"
+                                                  Status = Dyn.str item "status"
+                                                  Priority = Dyn.str item "priority" })
+                                    let args =
+                                        { AhaMoments = ahaMoments
+                                          ChangesAndReasons = changesAndReasons
+                                          Gotchas = gotchas
+                                          LessonsAndConventions = lessonsAndConventions
+                                          Plan = plan
+                                          Todos = todos
+                                          SelectMethodology = methodologies }
+                                    if root <> "" then do! appendWorkBacklogCommitted root sid args |> Promise.map ignore
+                                | None -> ()
+                                return textResult (todoWriteOutput methodologies false)
                     })
         ])

@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.IntegrationEventTestsOpencodeFallback
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Opencode.Plugin
 open Wanxiangshu.Shell.Dyn
@@ -28,7 +29,7 @@ let fallbackRetryWithoutFrontmatterSpec () = promise {
     let sid = "fallback-no-frontmatter-session"
     do! eventHook $ (box {| event = box {| ``type`` = "session.status"; properties = box {| info = box {| sessionID = sid |}; status = box {| ``type`` = "busy"; agent = "reviewer" |} |} |} |}) |> unbox<JS.Promise<unit>>
     do! eventHook $ (box {| event = box {| ``type`` = "session.error"; properties = box {| info = box {| sessionID = sid |}; error = box {| name = "APIError"; message = "boom"; isRetryable = true |} |} |} |}) |> unbox<JS.Promise<unit>>
-    do! Promise.sleep 0
+    do! yieldMicrotask ()
     equal "fallback without frontmatter retries once" 1 promptCalls.Count
     let call = promptCalls.[0]
     equal "retry path targets same session" sid (str (get call "path") "id")

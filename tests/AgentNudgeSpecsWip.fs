@@ -3,38 +3,38 @@ module Wanxiangshu.Tests.AgentNudgeSpecsWip
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
-open Wanxiangshu.Kernel.PromptFragments
-open Wanxiangshu.Kernel.ReviewPrompts
-open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
+open Wanxiangshu.Kernel.EventLog.Types
+open Wanxiangshu.Kernel.EventLog.Fold
 
-let private snap todos msg alreadyNudged agent : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
+let private snap todos msg blocked agent : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos; lastAssistantMessage = msg; isLoopActive = false
-      alreadyNudged = alreadyNudged; agentFromMessage = agent
+      nudgeBlockedForTurn = blocked; nudgeAnchorKey = msg; agentFromMessage = agent
       lastAssistantIsCompaction = false; anchorPromptIssued = false
       hasActiveRunner = false }
 
-let alreadyNudgedFromTailTexts' () =
-    check "tail loop nudge only -> true" (deriveAlreadyNudged [ loopNudgePrompt ])
-    check "tail wip ack only -> false" (not (deriveAlreadyNudged [ submitReviewWipAcknowledgment ]))
-    check "loop nudge then wip ack -> false when wip ack is last"
-        (not (deriveAlreadyNudged [ loopNudgePrompt; submitReviewWipAcknowledgment ]))
-    check "only last tail text counts: nudge buried under user reply -> false"
-        (not (deriveAlreadyNudged [ loopNudgePrompt; "user continued" ]))
-    check "todo nudge tail -> true" (deriveAlreadyNudged [ todoNudgePrompt ])
-    check "empty tail -> false" (not (deriveAlreadyNudged []))
+let private ev session kind payload =
+    { V = 1; Session = session; Kind = kind; At = ""; Payload = payload }
 
-let submitReviewWipToolClearsNudgeDedup' () =
-    check "submit_review wip output clears" (submitReviewWipToolClearsNudgeDedup "submit_review" submitReviewWipAcknowledgment)
-    check "other tool does not clear" (not (submitReviewWipToolClearsNudgeDedup "read" submitReviewWipAcknowledgment))
-    check "submit_review non-wip output does not clear"
-        (not (submitReviewWipToolClearsNudgeDedup "submit_review" "Review passed."))
+let foldNudgeDedupBlocksSameAnchor () =
+    let events =
+        [ ev "s1" eventKindNudgeDispatched (Map [ "action", "nudge-todo"; "anchor", "t1\u001eworking" ]) ]
+    let st = foldNudgeDedup "s1" events
+    check "same anchor blocked" (isNudgeBlockedForAnchor st "t1\u001eworking")
+    check "new anchor open" (not (isNudgeBlockedForAnchor st "t2\u001eworking"))
 
-let decideNudgeWipNeutralAlreadyNudged' () =
+let foldWipClearsBlock () =
+    let events =
+        [ ev "s1" eventKindNudgeDispatched (Map [ "action", "nudge-loop"; "anchor", "a" ])
+          ev "s1" eventKindSubmitReviewWipRecorded Map.empty ]
+    let st = foldNudgeDedup "s1" events
+    check "wip clears dedup" (not (isNudgeBlockedForAnchor st "a"))
+
+let decideNudgeWipAllowsAfterClear () =
     let snapStillNudged = snap [] "still implementing" true None
-    let d = deriveAction { snapStillNudged with isLoopActive = true } None None
-    equal "history still nudged -> NudgeNone" NudgeNone d
+    let d = deriveAction { snapStillNudged with isLoopActive = true }
+    equal "integral blocked -> NudgeNone" NudgeNone d
 
 let submitReviewWipNudgeDedup () =
-    alreadyNudgedFromTailTexts' ()
-    submitReviewWipToolClearsNudgeDedup' ()
-    decideNudgeWipNeutralAlreadyNudged' ()
+    foldNudgeDedupBlocksSameAnchor ()
+    foldWipClearsBlock ()
+    decideNudgeWipAllowsAfterClear ()

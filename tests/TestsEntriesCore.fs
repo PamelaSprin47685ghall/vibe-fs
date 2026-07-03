@@ -36,6 +36,9 @@ open Wanxiangshu.Tests.MethodologyTests
 open Wanxiangshu.Tests.LoopMessagesTests
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.ReviewReplaySyncTests
+open Wanxiangshu.Tests.EventLogFoldTests
+open Wanxiangshu.Tests.EventLogCodecTests
+open Wanxiangshu.Tests.EventLogRuntimeTests
 open Wanxiangshu.Tests.CapsSynthCommonTests
 open Wanxiangshu.Tests.CapsFileCacheTests
 open Wanxiangshu.Tests.DedupTests
@@ -140,6 +143,9 @@ let coreTestEntries () : (string * TestBody) list =
     "ReviewSessionQueryTests.run", Sync (sync ReviewSessionQueryTests.run)
     "ReviewPromptsFormatTests.run", Sync (sync ReviewPromptsFormatTests.run)
     "ReviewTests.disposeSessionTreeTerminatesAll", Sync (sync ReviewTestsReplay.disposeSessionTreeTerminatesAll)
+    "EventLogFoldTests.run", Sync (sync EventLogFoldTests.run)
+    "EventLogCodecTests.run", Sync (sync EventLogCodecTests.run)
+    "EventLogRuntimeTests.run", Async EventLogRuntimeTests.run
     "ReviewTests.inferReviewTaskFromTexts'", Sync (sync ReviewTestsReplay.inferReviewTaskFromTexts')
     "ReviewTests.parseFrontMatterScalars'", Sync (sync ReviewTestsReplay.parseFrontMatterScalars')
     "KernelPromptSpecsReview.yamlFrontMatterRoundTrip", Sync (sync KernelPromptSpecsReview.yamlFrontMatterRoundTrip)
@@ -153,7 +159,7 @@ let coreTestEntries () : (string * TestBody) list =
     "AgentTests.canUseMatrix", Sync (sync AgentTests.canUseMatrix)
     "AgentTests.deniedTools'", Sync (sync AgentTests.deniedTools')
     "AgentNudgeSpecs.decision", Sync (sync AgentNudgeSpecs.decision)
-    "AgentNudgeSpecs.dedup", Sync (sync AgentNudgeSpecs.dedup)
+    "AgentNudgeSpecs.dedupFromIntegral", Sync (sync AgentNudgeSpecs.dedupFromIntegral)
     "AgentNudgeSpecs.decideNudge'", Sync (sync AgentNudgeSpecs.decideNudge')
     "AgentNudgeSpecs.submitReviewWipNudgeDedup", Sync (sync AgentNudgeSpecsWip.submitReviewWipNudgeDedup)
     "AgentNudgeSpecs.decodeTodosOpenItems", Sync (sync AgentNudgeSpecsDecode.decodeTodosOpenItems)

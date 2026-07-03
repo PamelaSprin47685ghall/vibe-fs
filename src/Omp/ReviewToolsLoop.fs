@@ -10,6 +10,8 @@ open Wanxiangshu.Omp.MessagingCodec
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.Clock
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.Dyn
 
 let loopCommand = "loop"
 
@@ -25,13 +27,17 @@ let handleLoopReviewCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: 
                 if Dyn.typeIs notify "function" then
                     emitJsExpr (notify, box msg, box "info") "if (typeof $0 === 'function') $0($1, $2)" |> ignore
             if task = "" then notifyInfo "loop-review needs a task. Try /loop-review <task>."
-            elif not (Dyn.isNullish sm) && hasActiveLoopFromHistory sm then notifyInfo "loop mode is already active."
             else
+                let root = Dyn.str ctx "cwd"
+                do! syncReviewFromEventLog store root sessionId
+                if store.getReviewTask sessionId |> Option.isSome then notifyInfo "loop mode is already active."
+                else
                 let! result = runPreReviewerSession pi ctx store task
                 match result with
                 | Accepted _ -> notifyInfo $"Pre-review passed. Task \"{task}\" already meets criteria — no loop needed."
                 | Terminated -> notifyInfo "Pre-review could not complete."
                 | Rejected feedback ->
+                    do! appendLoopActivated root sessionId task |> Promise.map ignore
                     store.activateReview(sessionId, task, getTimestampMs())
                     pi?sendMessage(
                         createObj [
@@ -59,11 +65,16 @@ let handleLoopCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: obj) :
             let notifyInfo (msg: string) =
                 if Dyn.typeIs notify "function" then
                     emitJsExpr (notify, box msg, box "info") "if (typeof $0 === 'function') $0($1, $2)" |> ignore
+            let root = Dyn.str ctx "cwd"
             if task = "" then
+                do! appendLoopCancelled root sessionId |> Promise.map ignore
                 store.deactivateReview sessionId
                 notifyInfo "loop mode cancelled."
-            elif not (Dyn.isNullish sm) && hasActiveLoopFromHistory sm then notifyInfo "loop mode is already active."
             else
+                do! syncReviewFromEventLog store root sessionId
+                if store.getReviewTask sessionId |> Option.isSome then notifyInfo "loop mode is already active."
+                else
+                do! appendLoopActivated root sessionId task |> Promise.map ignore
                 store.activateReview(sessionId, task, getTimestampMs())
                 pi?sendMessage(
                     createObj [
