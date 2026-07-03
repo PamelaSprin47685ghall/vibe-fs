@@ -39,7 +39,7 @@ let opencodeLoopNudgeSpec () = promise {
     let nudgeText =
         if promptCalls.Count = 0 then ""
         else getPartsText (get (get promptCalls.[0] "body") "parts")
-    check "with-review idle emits loop nudge" (promptCalls.Count = 1 && nudgeText = loopNudgePrompt)
+    check "with-review idle emits loop nudge" (promptCalls.Count = 1 && nudgeText.Contains(loopNudgePromptProse))
     do! rmAsync workspaceDir
 }
 
@@ -62,13 +62,13 @@ let opencodeFreshChatMessageRearmsLoopNudgeSpec () = promise {
     do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
     let textOf i = if promptCalls.Count <= i then "" else getPartsText (get (get promptCalls.[i] "body") "parts")
-    check "first with-review idle emits loop nudge" (promptCalls.Count = 1 && textOf 0 = loopNudgePrompt)
+    check "first with-review idle emits loop nudge" (promptCalls.Count = 1 && (textOf 0).Contains(loopNudgePromptProse))
     do! chatHook $ (createObj [ "sessionID", box sessionID; "agent", box "manager" ], createObj [ "parts", box [| box {| ``type`` = "text"; text = "still working on it" |} |] ]) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
     messages <- Array.append messages [| assistantMessage "manager" "still working on it" 2 |]
     do! eventHook $ (box {| event = box {| ``type`` = "session.idle"; properties = box {| sessionID = sessionID |} |} |}) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
-    check "new assistant turn in history re-arms loop nudge on next idle" (promptCalls.Count = 2 && textOf 1 = loopNudgePrompt)
+    check "new assistant turn in history re-arms loop nudge on next idle" (promptCalls.Count = 2 && (textOf 1).Contains(loopNudgePromptProse))
     do! rmAsync workspaceDir
 }
 

@@ -6,8 +6,10 @@ open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.EventLog.Fold
 
-let todoNudgePrompt = Wanxiangshu.Kernel.PromptFragments.todoNudgePrompt
-let loopNudgePrompt = Wanxiangshu.Kernel.PromptFragments.loopNudgePrompt
+let todoNudgePromptProse = Wanxiangshu.Kernel.PromptFragments.todoNudgePromptProse
+let loopNudgePromptProse = Wanxiangshu.Kernel.PromptFragments.loopNudgePromptProse
+let todoNudgePromptFor = Wanxiangshu.Kernel.PromptFragments.todoNudgePromptFor
+let loopNudgePromptFor = Wanxiangshu.Kernel.PromptFragments.loopNudgePromptFor
 
 type SnapshotInput =
     { openTodos: string list
@@ -46,8 +48,9 @@ let deriveAction (snapshot: Snapshot) : NudgeAction =
             elif snapshot.isLoopActive then NudgeLoop
             else NudgeNone
 
-let selectNudgePrompt = function
-    | NudgeTodo -> Some todoNudgePrompt
-    | NudgeLoop -> Some loopNudgePrompt
+let selectNudgePrompt (action: NudgeAction) (snapshot: Snapshot) : string option =
+    match action with
+    | NudgeTodo -> Some (todoNudgePromptFor snapshot.todos)
+    | NudgeLoop -> Some (loopNudgePromptFor snapshot.todos)
     | NudgeRunner -> Some (runnerNudgePromptFor omp)
     | _ -> None

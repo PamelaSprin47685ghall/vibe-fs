@@ -91,11 +91,11 @@ let reviewerRejectRenudgesLoopSpec () = promise {
                     "properties", box (createObj [ "parts", box [| box {| ``type`` = "text"; text = text |} |] ]) ]
     do! hook $ (streamEnd "implemented first pass", helpers) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
-    check "active review emits loop nudge" (nudges.Count = 1 && nudges.[0] = loopNudgePrompt)
+    check "active review emits loop nudge" (nudges.Count = 1 && nudges.[0].Contains(loopNudgePromptProse))
     history <- Array.append history [| muxTextMessage "review-assistant-2" "assistant" "verdict: rejected\nfeedback: needs rework" |]
     do! hook $ (streamEnd "verdict: rejected\nfeedback: needs rework", helpers) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
-    check "reviewer reject reopens loop nudge on fresh assistant output" (nudges.Count = 2 && nudges.[1] = loopNudgePrompt)
+    check "reviewer reject reopens loop nudge on fresh assistant output" (nudges.Count = 2 && nudges.[1].Contains(loopNudgePromptProse))
 }
 
 let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () = promise {
@@ -130,13 +130,13 @@ let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () = promise {
                     "properties", box (createObj [ "parts", box [| box {| ``type`` = "text"; text = text |} |] ]) ]
     do! hook $ (streamEnd "implemented first pass", helpers) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
-    check "active review emits first loop nudge" (nudges.Count = 1 && nudges.[0] = loopNudgePrompt)
+    check "active review emits first loop nudge" (nudges.Count = 1 && nudges.[0].Contains(loopNudgePromptProse))
     history <-
         Array.append history
             [| muxDynamicToolMessage "review-wip-tool" "submit_review" "wip-call" (createObj []) (box submitReviewWipAcknowledgment) |]
     do! hook $ (streamEnd "continued after wip report", helpers) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
-    check "wip submit_review does not permanently suppress loop nudge" (nudges.Count = 2 && nudges.[1] = loopNudgePrompt)
+    check "wip submit_review does not permanently suppress loop nudge" (nudges.Count = 2 && nudges.[1].Contains(loopNudgePromptProse))
 }
 
 let muxForceStopTodoNudgeSpec () = promise {

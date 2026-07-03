@@ -1,6 +1,7 @@
 module Wanxiangshu.Kernel.PromptFragments
 
 open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Kernel.PromptFrontMatter
 
 let readOnlyRulesFor (host: Host) =
     "READ-ONLY: You must NOT write, edit, patch, or create files. "
@@ -25,15 +26,26 @@ let reviewCriteria =
 7. Is the result natural and intuitive for the user or caller?
 8. Does it fully satisfy the original task without cutting corners?"""
 
-let todoNudgePrompt =
+let todoNudgePromptProse =
     "There are still incomplete todos. Continue working through the remaining items. "
     + "If they are irrelevant, remove them. "
     + "If you want to skip this check, respond with <skip-todo-check />"
 
-let loopNudgePrompt =
+let loopNudgePromptProse =
     "You are in loop mode. You must call the submit_review tool to\n"
     + "submit your detailed report and list of modified files for review\n"
     + "before finishing. Do not end the conversation without calling submit_review."
+
+let todoNudgePromptFor (todos: string list) : string =
+    let fields = [ yamlStringSeqField "todos" todos ]
+    frontMatterPrompt fields todoNudgePromptProse
+
+let loopNudgePromptFor (todos: string list) : string =
+    let fields = if List.isEmpty todos then [] else [ yamlStringSeqField "todos" todos ]
+    frontMatterPrompt fields loopNudgePromptProse
+
+let todoNudgePrompt = todoNudgePromptProse
+let loopNudgePrompt = loopNudgePromptProse
 
 let runnerNudgePromptFor (host: Host) =
     let waitTool, abortTool =

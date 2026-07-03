@@ -39,7 +39,7 @@ let runNudgeFlowCore
             match deriveAction snapshot with
             | NudgeNone -> return runtimeState
             | action ->
-                match selectNudgePrompt action with
+                match selectNudgePrompt action snapshot with
                 | None -> return runtimeState
                 | Some promptText ->
                     let! claimed = tryClaimNudgeDispatch workspaceRoot sessionKey action snapshot.nudgeAnchorKey

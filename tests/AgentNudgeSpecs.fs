@@ -47,7 +47,31 @@ let decideNudge' () =
     | NudgeLoop -> check "loop active nudges loop" true
     | _ -> check "loop active nudges loop" false
 
+let selectPrompt () =
+    let todoSnapshot = snap [ "todo1"; "todo2" ] "working" false None false
+    let loopSnapshot = snap [] "ok" false None true
+    let noneSnapshot = snap [] "done" false None false
+
+    match selectNudgePrompt NudgeTodo todoSnapshot with
+    | Some prompt ->
+        check "selectNudgePrompt NudgeTodo returns prompt" true
+        check "todo prompt contains front matter" (prompt.Contains("---"))
+        check "todo prompt contains todos" (prompt.Contains("todos"))
+        check "todo prompt contains todo content" (prompt.Contains("todo1"))
+    | None -> check "selectNudgePrompt NudgeTodo returns prompt" false
+
+    match selectNudgePrompt NudgeLoop loopSnapshot with
+    | Some prompt ->
+        check "selectNudgePrompt NudgeLoop returns prompt" true
+        check "loop prompt contains front matter" (prompt.Contains("---"))
+    | None -> check "selectNudgePrompt NudgeLoop returns prompt" false
+
+    match selectNudgePrompt NudgeNone noneSnapshot with
+    | None -> check "selectNudgePrompt NudgeNone returns None" true
+    | Some _ -> check "selectNudgePrompt NudgeNone returns None" false
+
 let run () =
     decision ()
     dedupFromIntegral ()
     decideNudge' ()
+    selectPrompt ()

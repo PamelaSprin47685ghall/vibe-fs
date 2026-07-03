@@ -128,7 +128,7 @@ let agentEndHandler (pi: obj) (_reviewStore: ReviewStore) (ctx: obj) : JS.Promis
                                 pi?sendMessage(
                                     createObj [
                                         "customType", box "wanxiangshu-loop-reminder"
-                                        "content", box (loopReminderContent ())
+                                        "content", box (loopReminderContent snapshot.todos)
                                         "display", box false
                                     ],
                                     createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
@@ -136,7 +136,7 @@ let agentEndHandler (pi: obj) (_reviewStore: ReviewStore) (ctx: obj) : JS.Promis
                                 pi?sendMessage(
                                     createObj [
                                         "customType", box "wanxiangshu-todo-reminder"
-                                        "content", box (todoReminderContent ())
+                                        "content", box (todoReminderContent snapshot.todos)
                                         "display", box false
                                     ],
                                     createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])

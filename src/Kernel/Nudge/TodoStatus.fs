@@ -30,4 +30,5 @@ let syntheticAssistantAgents: Set<string> =
 let isSyntheticAssistantAgent (agent: string) : bool =
     Set.contains (agent.Trim().ToLowerInvariant()) syntheticAssistantAgents
 
-let isNudgePrompt (text: string) : bool = text = todoNudgePrompt || text = loopNudgePrompt
+let isNudgePrompt (text: string) : bool = 
+    text.Contains(todoNudgePromptProse) || text.Contains(loopNudgePromptProse)

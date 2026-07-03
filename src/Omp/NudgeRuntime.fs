@@ -16,6 +16,6 @@ let clearNudgeSession (sessionId: string) : unit =
 let isSessionForceStopped (sessionId: string) : bool =
     Set.contains sessionId forceStoppedSessions
 
-let todoReminderContent () = todoNudgePrompt
-let loopReminderContent () = loopNudgePrompt
+let todoReminderContent (todos: string list) = todoNudgePromptFor todos
+let loopReminderContent (todos: string list) = loopNudgePromptFor todos
 let runnerReminderContent () = runnerNudgePromptFor omp
