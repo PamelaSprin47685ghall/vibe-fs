@@ -24,7 +24,9 @@ type Harness =
     abstract registration: obj
     abstract fireEvent: obj -> JS.Promise<obj>
     abstract fireStreamEnd: string -> string[] -> JS.Promise<obj>
+    abstract fireStreamAbort: string -> JS.Promise<obj>
     abstract runMessageTransform: obj -> obj -> JS.Promise<obj>
+    abstract runCompactingTransform: obj -> obj -> JS.Promise<obj>
     abstract runSystemTransform: obj -> obj -> JS.Promise<obj>
     abstract getToolDefinition: string -> obj
     abstract getToolSchema: string -> obj
@@ -217,7 +219,16 @@ let runAll (args: string array) : JS.Promise<int> =
         chk "mux.messageTransform.capsHasKolmolgorov" (firstText.Contains "# Kolmolgorov 宝典")
         chk "mux.messageTransform.capsHasIronLaw" (firstText.Contains "铁律")
 
-        // --- 5b. Message transform: system transform injection ----------------
+        // --- 5b. Message transform: compactingTransform ------------------------
+        let msgTextPart : obj = createObj [ "type", box "text"; "text", box "compact message test" ]
+        let testMsg = createObj [ "id", box "msg-1"; "role", box "user"; "parts", box [| msgTextPart |] ]
+        let compactOutput = createObj [ "messages", box [| testMsg |] ]
+        let compactInput = createObj [ "sessionID", box "mux-e2e-session" ]
+        let! _ = harness.runCompactingTransform compactInput compactOutput
+        let compactMsgsOut : obj[] = unbox<obj[]> (dynGet compactOutput "messages")
+        chk "mux.messageTransform.compactingTransform.runOk" (compactMsgsOut.Length = 1)
+
+        // --- 5c. Message transform: system transform injection ----------------
         let systemObj = createObj [ "content", box "long system prompt"; "length", box 1000 ]
         let systemOutput = createObj [ "system", box systemObj ]
         let! _ = harness.runSystemTransform (createEmpty ()) systemOutput
@@ -238,10 +249,21 @@ let runAll (args: string array) : JS.Promise<int> =
             chk "mux.slash.loop.eventLogContainsLoopActivated" (eventLogContent.Contains "loop_activated")
             chk "mux.slash.loop.eventLogContainsTaskText" (eventLogContent.Contains "implement feature X")
 
-        // --- 6b. Slash command: /loop with empty task returns existing ------
+        // --- 6b. Slash command: /loop with empty task returns cancelled -----
         let! emptyResponse = harness.runSlashCommand "loop" "mux-e2e-session" ""
-        chk "mux.slash.loop.emptyTaskReturnsMessage"
-            (emptyResponse.Contains "loop" || emptyResponse.Contains "With-Review" || emptyResponse.Length > 0)
+        chk "mux.slash.loop.emptyTaskReturnsCancelled" (emptyResponse.Contains "With-Review Mode cancelled")
+
+        // --- 6c. Event hook: stream abort ------------------------------------
+        let! loopResponseAbort = harness.runSlashCommand "loop" "mux-e2e-session" "test stream-abort"
+        chk "mux.eventHook.abort.activateOk" (loopResponseAbort.Contains "With-Review Mode is active")
+        let! _ = harness.fireStreamAbort "mux-e2e-session"
+
+        let reviewStoreSurface = dynGet reg "__reviewStore"
+        let getReviewTask = dynGet reviewStoreSurface "getReviewTask"
+        let taskResult = getReviewTask $ "mux-e2e-session"
+        chk "mux.eventHook.abort.deactivated" (dynIsNull taskResult)
+
+        let! _ = harness.runSlashCommand "loop" "mux-e2e-session" ""
 
         do! harness.dispose ()
 

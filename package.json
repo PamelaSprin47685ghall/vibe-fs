@@ -25,9 +25,10 @@
     "index.d.ts"
   ],
   "scripts": {
-    "build-and-test": "dotnet fable wanxiangshu.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && mkdir -p build/e2e && cp e2e/*.js build/e2e/ && sed -i 's|../../e2e/harness.js|./harness.js|g' build/e2e/Tests.js && node tests/runner.js",
-    "e2e": "dotnet fable wanxiangshu.fsproj --outDir build --noCache && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && mkdir -p build/e2e && cp e2e/*.js build/e2e/ && sed -i 's|../../e2e/harness.js|./harness.js|g' build/e2e/Tests.js && node tests/runner.js --e2e",
-    "e2e:mux": "dotnet fable wanxiangshu.fsproj --outDir build --noCache && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && mkdir -p build/e2e && cp e2e/*.js build/e2e/ && sed -i 's|../../e2e/mux-harness.js|./mux-harness.js|g' build/e2e/MuxTests.js && node tests/runner.js --e2e-mux"
+    "build-and-test": "dotnet fable wanxiangshu.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && mkdir -p build/e2e/omp-driver && cp e2e/*.js e2e/*.ts build/e2e/ && cp e2e/omp-driver/*.ts build/e2e/omp-driver/ && sed -i 's|../../e2e/harness.js|./harness.js|g' build/e2e/Tests.js && sed -i 's|../../e2e/mux-harness.js|./mux-harness.js|g' build/e2e/MuxTests.js 2>/dev/null || true && node tests/runner.js",
+    "e2e": "dotnet fable wanxiangshu.fsproj --outDir build --noCache && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && mkdir -p build/e2e/omp-driver && cp e2e/*.js e2e/*.ts build/e2e/ && cp e2e/omp-driver/*.ts build/e2e/omp-driver/ && sed -i 's|../../e2e/harness.js|./harness.js|g' build/e2e/Tests.js && node tests/runner.js --e2e",
+    "e2e:mux": "dotnet fable wanxiangshu.fsproj --outDir build --noCache && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && mkdir -p build/e2e/omp-driver && cp e2e/*.js e2e/*.ts build/e2e/ && cp e2e/omp-driver/*.ts build/e2e/omp-driver/ && sed -i 's|../../e2e/harness.js|./harness.js|g' build/e2e/Tests.js && sed -i 's|../../e2e/mux-harness.js|./mux-harness.js|g' build/e2e/MuxTests.js && node tests/runner.js --e2e-mux",
+    "e2e-omp": "dotnet fable wanxiangshu.fsproj --outDir build --noCache && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && mkdir -p build/e2e/omp-driver && cp e2e/*.js e2e/*.ts build/e2e/ && cp e2e/omp-driver/*.ts build/e2e/omp-driver/ && node tests/runner.js --e2e-omp"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.1.1",
