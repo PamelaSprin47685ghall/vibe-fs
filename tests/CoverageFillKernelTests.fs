@@ -58,13 +58,13 @@ let domainContainsAbortText () =
     check "hello no" (not (containsAbortText "hello"))
 
 let domainClassifyErrorLeaf () =
-    equal "AbortError name" MessageAborted (classifyErrorLeaf "AbortError" "SomeTag" "nope")
+    equal "AbortError name" (ClientCancellation "AbortError") (classifyErrorLeaf "AbortError" "SomeTag" "nope")
     equal "MessageAborted tag" MessageAborted (classifyErrorLeaf "SomeError" "MessageAborted" "nope")
     equal "SessionBusyError name" SessionBusy (classifyErrorLeaf "SessionBusyError" "SomeTag" "nope")
     equal "SessionBusy tag" SessionBusy (classifyErrorLeaf "SomeError" "SessionBusy" "nope")
     equal "ForegroundWaitBackgroundedError name" TaskWaitBackgrounded (classifyErrorLeaf "ForegroundWaitBackgroundedError" "SomeTag" "nope")
     equal "TaskWaitBackgrounded tag" TaskWaitBackgrounded (classifyErrorLeaf "SomeError" "TaskWaitBackgrounded" "nope")
-    equal "fallback abort text" MessageAborted (classifyErrorLeaf "UnknownError" "SomeTag" "operation aborted")
+    equal "fallback abort text" (ClientCancellation "abort-text") (classifyErrorLeaf "UnknownError" "SomeTag" "operation aborted")
     equal "fallback no abort" (UnknownJsError "plain failure") (classifyErrorLeaf "UnknownError" "SomeTag" "plain failure")
 
 let domainReduce () =

@@ -32,13 +32,13 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
             do! syncReviewFromEventLog reviewStore directory sessionID
             let activeTask = reviewStore.getReviewTask sessionID
             if task = "" then
-                do! appendLoopCancelled directory sessionID |> Promise.map ignore
+                do! appendLoopCancelledOrFail directory sessionID
                 reviewStore.deactivateReview sessionID
                 parts.Add(box {| ``type`` = "text"; text = loopCancelledMessage |})
             elif activeTask.IsSome then
                 parts.Add(box {| ``type`` = "text"; text = reviewAlreadyActiveMessage |})
             elif command = "loop" then
-                do! appendLoopActivated directory sessionID task |> Promise.map ignore
+                do! appendLoopActivatedOrFail directory sessionID task
                 reviewStore.activateReview(sessionID, task, getTimestampMs())
                 let msg = buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
                 parts.Add(box {| ``type`` = "text"; text = msg |})
@@ -53,7 +53,7 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
                 | Terminated ->
                     parts.Add(box {| ``type`` = "text"; text = preReviewCouldNotComplete |})
                 | NeedsRevision feedback ->
-                    do! appendLoopActivated directory sessionID task |> Promise.map ignore
+                    do! appendLoopActivatedOrFail directory sessionID task
                     reviewStore.activateReview(sessionID, task, getTimestampMs())
                     let msg = buildLoopMessage task [ withReviewPreReviewFeedbackHeader; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]
                     parts.Add(box {| ``type`` = "text"; text = msg |})

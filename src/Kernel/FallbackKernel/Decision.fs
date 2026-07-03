@@ -1,9 +1,14 @@
 module Wanxiangshu.Kernel.FallbackKernel.Decision
 
+open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
-let private isAbortErrorName (name: string) : bool =
-    name = "AbortError" || name = "MessageAbortedError"
+let private errorInputIsAbort (err: ErrorInput) : bool =
+    match err.DomainError with
+    | Some MessageAborted -> true
+    | Some (ClientCancellation _) -> true
+    | _ when err.ErrorName = "AbortError" || err.ErrorName = "MessageAbortedError" -> true
+    | _ -> false
 
 let private isImmediateStatusCode (sc: int option) : bool =
     match sc with
@@ -35,7 +40,7 @@ let classifyError (err: ErrorInput) (state: SessionFallbackState) (cfg: Fallback
         | _ -> 0
 
     if state.Cancelled || state.TaskComplete then ErrorClass.Ignore
-    elif isAbortErrorName err.ErrorName then ErrorClass.Ignore
+    elif errorInputIsAbort err then ErrorClass.Ignore
     elif isImmediateStatusCode err.StatusCode then ErrorClass.ImmediateFallback
     elif err.IsRetryable = Some false then ErrorClass.ImmediateFallback
     elif retryCount >= cfg.MaxRetries then ErrorClass.Exhausted

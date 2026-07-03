@@ -4,13 +4,17 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackRuntimeState
 
 let private muxErrorInput (props: obj) : ErrorInput =
-    { ErrorName   = Dyn.str props "errorType"
-      Message     = Dyn.str props "errorMessage"
+    let errorName = Dyn.str props "errorType"
+    let message = Dyn.str props "errorMessage"
+    { ErrorName   = errorName
+      DomainError = Some (classifyErrorLeaf errorName "" message)
+      Message     = message
       StatusCode  =
           let sc = Dyn.str props "statusCode"
           if sc <> "" then Some (int sc) else None
@@ -28,6 +32,7 @@ let muxEventTranslator : IEventTranslator =
                 let errType = Dyn.str props "errorType"
                 if errType = "aborted" then
                     Some (SessionError { ErrorName = "MessageAbortedError"
+                                         DomainError = Some MessageAborted
                                          Message = "aborted"; StatusCode = None; IsRetryable = None })
                 else
                     Some (SessionError (muxErrorInput props))

@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.Nudge.TodoStatus
-open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Kernel.EventLog.Fold
 open Wanxiangshu.Shell.EventLogRuntime
@@ -14,7 +13,6 @@ open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
-open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Shell.NudgeRuntime
@@ -32,34 +30,6 @@ let private getPartsText (parts: obj) : string =
                 if Dyn.isNullish text then None else Some (string text)
             else None)
         |> String.concat "\n"
-
-let private messageHasSubmitReviewWipProgress (message: obj) : bool =
-    let parts = Dyn.get message "parts"
-    if not (Dyn.isArray parts) then false
-    else
-        (parts :?> obj array)
-        |> Array.exists (fun part ->
-            let partType = Dyn.str part "type"
-            let tool =
-                if partType = "tool" then Dyn.str part "tool"
-                elif partType = "dynamic-tool" then Dyn.str part "toolName"
-                else ""
-            (partType = "tool" || partType = "dynamic-tool")
-            && isSubmitReviewToolName tool
-            && (let direct = Dyn.get part "output"
-                if not (Dyn.isNullish direct) then string direct
-                else
-                    let state = Dyn.get part "state"
-                    if Dyn.isNullish state || Dyn.typeIs state "string" then ""
-                    else string (Dyn.get state "output"))
-               |> isSubmitReviewWipProgressOutput)
-
-let private messageIsUserNudgePrompt (message: obj) : bool =
-    let info = Dyn.get message "info"
-    let role =
-        let r = Dyn.str info "role"
-        if r <> "" then r else Dyn.str message "role"
-    role = "user" && isNudgePrompt (getPartsText (Dyn.get message "parts"))
 
 let private collectSnapshot (client: obj) (pluginCtx: obj) (sessionID: SessionId)
     : JS.Promise<SessionSnapshot option> =
@@ -99,19 +69,18 @@ let private collectSnapshot (client: obj) (pluginCtx: obj) (sessionID: SessionId
                             let tid = if completed <> "" then completed else Dyn.str info "id"
                             text, tid, agent
                     let directory = pluginDirectoryFromCtx pluginCtx
-                    let key = nudgeAnchorKey turnId lastAssistantText
-                    let! isLoopActive = isLoopActiveFromEventLog directory sessionIDStr
-                    let! blocked = nudgeBlockedForTurn directory sessionIDStr key
-                    return Some (deriveSnapshot {
-                        openTodos = openTodos
-                        lastAssistantText = lastAssistantText
-                        agentFromMessage = agentFromMessage
-                        isLoopActive = isLoopActive
-                        lastAssistantIsCompaction = false
-                        hasActiveRunner = false
-                        nudgeBlockedForTurn = blocked
-                        turnId = turnId
-                    })
+                    do! appendAssistantCompletedOrFail directory sessionIDStr lastAssistantText agentFromMessage turnId openTodos
+                    let! snap = getNudgeSnapshotFromEventLog directory sessionIDStr
+                    let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
+                    let blocked = isNudgeBlockedForAnchor { BlockedAnchor = snap.nudgeDedupAnchor } key
+                    return Some
+                        { todos = snap.openTodos
+                          lastAssistantMessage = snap.lastAssistantText
+                          isLoopActive = snap.isLoopActive
+                          nudgeBlockedForTurn = blocked
+                          nudgeAnchorKey = key
+                          agentFromMessage = snap.agentFromMessage
+                          hasActiveRunner = false }
         with _ -> return None
     }
 

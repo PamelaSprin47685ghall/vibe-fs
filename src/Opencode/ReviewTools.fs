@@ -55,13 +55,13 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangs
                                     | None -> null
                                 try
                                     if submitReviewIsWip decoded.Wip then
-                                        do! appendSubmitReviewWipRecorded runtime.Execution.Directory sessionID |> Promise.map ignore
+                                        do! appendSubmitReviewWipRecordedOrFail runtime.Execution.Directory sessionID
                                         return submitReviewWipAcknowledgment
                                     else
                                         let! result =
                                             runSubmitReview registry client store runtime.Execution.Directory sessionID decoded.Report decoded.AffectedFiles task abort
                                         let verdict, fb = verdictStringFromReviewResult result
-                                        do! appendReviewVerdict runtime.Execution.Directory sessionID verdict fb |> Promise.map ignore
+                                        do! appendReviewVerdictOrFail runtime.Execution.Directory sessionID verdict fb
                                         match result with
                                         | Accepted _
                                         | Terminated -> store.deactivateReview sessionID
@@ -97,6 +97,6 @@ let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.Re
                             return doubleCheckPrompt task
                         | Finalize result ->
                             let verdict, fb = verdictStringFromReviewResult result
-                            do! appendReviewVerdict directory sessionID verdict fb |> Promise.map ignore
+                            do! appendReviewVerdictOrFail directory sessionID verdict fb
                             return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve."
             })

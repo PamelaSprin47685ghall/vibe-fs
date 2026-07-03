@@ -16,7 +16,6 @@ type SnapshotInput =
       lastAssistantText: string
       agentFromMessage: string option
       isLoopActive: bool
-      lastAssistantIsCompaction: bool
       hasActiveRunner: bool
       nudgeBlockedForTurn: bool
       turnId: string }
@@ -30,8 +29,6 @@ let deriveSnapshot (input: SnapshotInput) : Snapshot =
       nudgeBlockedForTurn = input.nudgeBlockedForTurn
       nudgeAnchorKey = nudgeAnchorKey input.turnId input.lastAssistantText
       agentFromMessage = input.agentFromMessage
-      lastAssistantIsCompaction = input.lastAssistantIsCompaction
-      anchorPromptIssued = false
       hasActiveRunner = input.hasActiveRunner }
 
 let deriveAction (snapshot: Snapshot) : NudgeAction =

@@ -9,6 +9,7 @@ type WanEvent = {
     Payload: Map<string, string>
 }
 
+let eventKindAssistantCompleted = "assistant_completed"
 let eventKindLoopActivated = "loop_activated"
 let eventKindLoopCancelled = "loop_cancelled"
 let eventKindReviewVerdict = "review_verdict"

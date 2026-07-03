@@ -127,24 +127,25 @@ let chatHooksUsesChatHookOutputCodec () =
 
 let opencodeSessionLifecycleObserverUsesHookInputCodec () =
     let code = requireFile "src/Opencode/SessionLifecycleObserver.fs" |> nonCommentCode
+    let progressCode = requireFile "src/Opencode/ProgressObserver.fs" |> nonCommentCode
     check "arch: Opencode SessionLifecycleObserver opens OpencodeHookInputCodec"
         (code.Contains "OpencodeHookInputCodec")
     check "arch: Opencode SessionLifecycleObserver uses sessionIdFromHookInput for command"
         (code.Contains "sessionIdFromHookInput")
-    check "arch: Opencode SessionLifecycleObserver uses toolNameFromHookInput"
-        (code.Contains "toolNameFromHookInput")
-    check "arch: Opencode SessionLifecycleObserver uses selectMethodologiesFromHookArgs"
-        (code.Contains "selectMethodologiesFromHookArgs")
     check "arch: Opencode SessionLifecycleObserver must not Dyn.str input sessionID"
         (not (code.Contains "Dyn.str input \"sessionID\""))
     check "arch: Opencode SessionLifecycleObserver must not Dyn.str input tool"
         (not (code.Contains "Dyn.str input \"tool\""))
     check "arch: Opencode SessionLifecycleObserver uses decodeHostEventEnvelope"
         (code.Contains "decodeHostEventEnvelope")
-    check "arch: Opencode SessionLifecycleObserver uses hookOutputString or setHookOutputString"
-        (code.Contains "hookOutputString" || code.Contains "setHookOutputString")
     check "arch: Opencode SessionLifecycleObserver must not Dyn.get input event"
         (not (code.Contains "Dyn.get input \"event\""))
+    check "arch: Opencode ProgressObserver uses toolNameFromHookInput"
+        (progressCode.Contains "toolNameFromHookInput")
+    check "arch: Opencode ProgressObserver uses selectMethodologiesFromHookArgs"
+        (progressCode.Contains "selectMethodologiesFromHookArgs")
+    check "arch: Opencode ProgressObserver uses hookOutputString or setHookOutputString"
+        (progressCode.Contains "hookOutputString" || progressCode.Contains "setHookOutputString")
 
 let opencodeEventHooksUsesEventEnvelopeCodec () =
     let code = requireFile "src/Opencode/EventHooks.fs" |> nonCommentCode

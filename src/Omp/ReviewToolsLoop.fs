@@ -37,7 +37,7 @@ let handleLoopReviewCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: 
                 | Accepted _ -> notifyInfo $"Pre-review passed. Task \"{task}\" already meets criteria — no loop needed."
                 | Terminated -> notifyInfo "Pre-review could not complete."
                 | NeedsRevision feedback ->
-                    do! appendLoopActivated root sessionId task |> Promise.map ignore
+                    do! appendLoopActivatedOrFail root sessionId task
                     store.activateReview(sessionId, task, getTimestampMs())
                     pi?sendMessage(
                         createObj [
@@ -67,14 +67,14 @@ let handleLoopCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: obj) :
                     emitJsExpr (notify, box msg, box "info") "if (typeof $0 === 'function') $0($1, $2)" |> ignore
             let root = Dyn.str ctx "cwd"
             if task = "" then
-                do! appendLoopCancelled root sessionId |> Promise.map ignore
+                do! appendLoopCancelledOrFail root sessionId
                 store.deactivateReview sessionId
                 notifyInfo "loop mode cancelled."
             else
                 do! syncReviewFromEventLog store root sessionId
                 if store.getReviewTask sessionId |> Option.isSome then notifyInfo "loop mode is already active."
                 else
-                do! appendLoopActivated root sessionId task |> Promise.map ignore
+                do! appendLoopActivatedOrFail root sessionId task
                 store.activateReview(sessionId, task, getTimestampMs())
                 pi?sendMessage(
                     createObj [

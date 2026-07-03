@@ -57,32 +57,32 @@ let submitReviewTool (deps: obj) (toolNames: string array) (reviewStore: ReviewS
                   match decodeSubmitReviewArgs args with
                   | Error e -> return wireDecodeFailure "submit_review" e
                   | Ok decoded ->
-                      let! resolvedTask = syncReviewFromEventLogDir reviewStore root workspaceId
-                      match resolvedTask with
-                      | None -> return submitReviewNotNeeded
-                      | Some originalTask ->
-                           if not (reviewStore.tryLockReview workspaceId) then
-                               return submitReviewInProgress
-                           else
-                               try
-                                   if submitReviewIsWip decoded.Wip then
-                                       do! appendSubmitReviewWipRecorded root workspaceId |> Promise.map ignore
-                                       return submitReviewWipAcknowledgment
-                                   else
-                                       let report = decoded.Report
-                                       let affectedFiles = decoded.AffectedFiles
-                                       let! round1 = runReviewRound deps config toolNames (reviewSubmissionVerdictPrompt originalTask report affectedFiles)
-                                       let! verdict =
-                                           match round1 with
-                                           | Accepted _ -> runReviewRound deps config toolNames (reviewSubmissionDoubleCheckPrompt originalTask report affectedFiles)
-                                           | other -> Promise.lift other
-                                       let vStr, fb = verdictStringFromReviewResult verdict
-                                       do! appendReviewVerdict root workspaceId vStr fb |> Promise.map ignore
-                                       match verdict with
-                                       | Accepted _ | Terminated -> reviewStore.deactivateReview workspaceId
+                        let! resolvedTask = syncReviewFromEventLogDir reviewStore root workspaceId
+                        match resolvedTask with
+                        | None -> return submitReviewNotNeeded
+                        | Some originalTask ->
+                            if not (reviewStore.tryLockReview workspaceId) then
+                                return submitReviewInProgress
+                            else
+                                try
+                                    if submitReviewIsWip decoded.Wip then
+                                        do! appendSubmitReviewWipRecordedOrFail root workspaceId
+                                        return submitReviewWipAcknowledgment
+                                    else
+                                        let report = decoded.Report
+                                        let affectedFiles = decoded.AffectedFiles
+                                        let! round1 = runReviewRound deps config toolNames (reviewSubmissionVerdictPrompt originalTask report affectedFiles)
+                                        let! verdict =
+                                            match round1 with
+                                            | Accepted _ -> runReviewRound deps config toolNames (reviewSubmissionDoubleCheckPrompt originalTask report affectedFiles)
+                                            | other -> Promise.lift other
+                                        let vStr, fb = verdictStringFromReviewResult verdict
+                                        do! appendReviewVerdictOrFail root workspaceId vStr fb
+                                        match verdict with
+                                        | Accepted _ | Terminated -> reviewStore.deactivateReview workspaceId
                                         | NeedsRevision _ -> ()
-                                       return formatReviewResult verdict
-                               finally
-                                   reviewStore.unlockReview workspaceId
+                                        return formatReviewResult verdict
+                                finally
+                                    reviewStore.unlockReview workspaceId
               }
       condition = None }

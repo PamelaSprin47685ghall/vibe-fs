@@ -7,13 +7,11 @@ open Wanxiangshu.Kernel.NudgeDerivation
 let private snap todos msg blocked agent isLoop : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos; lastAssistantMessage = msg; isLoopActive = isLoop
       nudgeBlockedForTurn = blocked; nudgeAnchorKey = msg; agentFromMessage = agent
-      lastAssistantIsCompaction = false; anchorPromptIssued = false
       hasActiveRunner = false }
 
 let private snap' todos msg blocked agent isLoop hasActiveRunner : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos; lastAssistantMessage = msg; isLoopActive = isLoop
       nudgeBlockedForTurn = blocked; nudgeAnchorKey = msg; agentFromMessage = agent
-      lastAssistantIsCompaction = false; anchorPromptIssued = false
       hasActiveRunner = hasActiveRunner }
 
 let decision () =

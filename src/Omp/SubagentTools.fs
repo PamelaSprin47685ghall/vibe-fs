@@ -2,21 +2,41 @@ module Wanxiangshu.Omp.SubagentTools
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.HostAdapter
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.Subagent
-open Wanxiangshu.Kernel.SubagentPrompts
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.OmpToolSchema
-open Wanxiangshu.Shell.SubagentIntentsCodec
-open Wanxiangshu.Shell.WorkspaceFiles
+open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Shell.SubagentDispatcher
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Kernel.FallbackKernel.Types
 module Dyn = Wanxiangshu.Shell.Dyn
 
 let private coderChildTools = [| "read"; "edit"; "write"; "find"; "fuzzy_find"; "fuzzy_grep"; "lsp"; "investigator" |]
 let private investigatorChildTools = [| "read"; "find"; "fuzzy_find"; "fuzzy_grep" |]
+
+type OmpHostAdapter(pi: obj, ctx: obj, signal: obj option, fallbackRuntime: FallbackRuntimeState, fallbackConfigOpt: FallbackConfig option) =
+    interface IHostAdapter with
+        member _.WorkspaceRoot = Dyn.str ctx "cwd"
+        member _.SessionId =
+            let s = Dyn.get ctx "sessionId"
+            if Dyn.isNullish s then "" else string s
+        member _.SpawnSubagent(request: SubagentRequest) =
+            let toolNames =
+                match request.Role with
+                | Coder -> coderChildTools
+                | Investigator -> investigatorChildTools
+                | Meditator -> [||]
+                | Browser -> [| "browser" |]
+            promise {
+                try
+                    let! text = runSubagent pi ctx toolNames request.Prompt signal fallbackRuntime fallbackConfigOpt
+                    return Success text
+                with ex ->
+                    return Failure (translateJsError ex)
+            }
 
 let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : unit =
     let tb = Dyn.get pi "typebox"
@@ -30,17 +50,11 @@ let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fal
             "execute",
                 box(fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
                     promise {
-                        match parseCoderIntents (Dyn.get params' "intents") with
-                        | Error message -> return errorResult message
-                        | Ok intents ->
-                            try
-                                let prompts = formatPrompt omp (Coder intents)
-                                let! reports =
-                                    prompts
-                                    |> List.map (fun prompt -> runSubagent pi ctx coderChildTools prompt (Some signal) fallbackRuntime fallbackConfigOpt)
-                                    |> Promise.all
-                                return textResult (joinReports reports)
-                            with ex -> return asErrorResult ex
+                        try
+                            let adapter = OmpHostAdapter(pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+                            let! text = dispatch omp adapter "coder" params'
+                            return textResult text
+                        with ex -> return asErrorResult ex
                     })
         ])
 
@@ -53,17 +67,11 @@ let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fal
             "execute",
                 box(fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
                     promise {
-                        match parseInvestigatorIntents (Dyn.get params' "intents") with
-                        | Error message -> return errorResult message
-                        | Ok intents ->
-                            try
-                                let prompts = formatPrompt omp (Investigator intents)
-                                let! reports =
-                                    prompts
-                                    |> List.map (fun prompt -> runSubagent pi ctx investigatorChildTools prompt (Some signal) fallbackRuntime fallbackConfigOpt)
-                                    |> Promise.all
-                                return textResult (joinReports reports)
-                            with ex -> return asErrorResult ex
+                        try
+                            let adapter = OmpHostAdapter(pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+                            let! text = dispatch omp adapter "investigator" params'
+                            return textResult text
+                        with ex -> return asErrorResult ex
                     })
         ])
 
@@ -77,21 +85,8 @@ let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fal
                 box(fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
                     promise {
                         try
-                            let cwd = Dyn.str ctx "cwd"
-                            let files =
-                                let f = Dyn.get params' "files"
-                                if Dyn.isNullish f || not (Dyn.isArray f) then [||]
-                                else unbox<obj array> f |> Array.map string
-                            let! readResults = readReverieFiles cwd (List.ofArray files)
-                            let sections =
-                                Array.map2
-                                    (fun file (r: ReverieFileResult) -> { file = file; content = r.content })
-                                    files
-                                    (List.toArray readResults)
-                                |> Array.toList
-                            let intent = Dyn.str params' "intent"
-                            let prompt = formatPrompt omp (Meditator(intent, sections)) |> List.head
-                            let! text = runSubagent pi ctx [||] prompt (Some signal) fallbackRuntime fallbackConfigOpt
+                            let adapter = OmpHostAdapter(pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+                            let! text = dispatch omp adapter "meditator" params'
                             return textResult text
                         with ex -> return asErrorResult ex
                     })
@@ -114,9 +109,8 @@ let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fal
                             if not hasBrowser then
                                 return errorResult "Built-in browser tool is unavailable in this session."
                             else
-                                let intent = Dyn.str params' "intent"
-                                let prompt = formatPrompt omp (Browser intent) |> List.head
-                                let! text = runSubagent pi ctx [| "browser" |] prompt (Some signal) fallbackRuntime fallbackConfigOpt
+                                let adapter = OmpHostAdapter(pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+                                let! text = dispatch omp adapter "browser" params'
                                 return textResult text
                         with ex -> return asErrorResult ex
                     })

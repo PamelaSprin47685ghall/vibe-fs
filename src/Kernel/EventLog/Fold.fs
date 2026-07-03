@@ -82,6 +82,75 @@ let foldNudgeDedup (sessionId: string) (events: WanEvent list) : NudgeDedupState
             | _ -> st)
         emptyNudgeDedupState
 
+type NudgeSnapshotState = {
+    openTodos: string list
+    lastAssistantText: string
+    agentFromMessage: string option
+    turnId: string
+    isLoopActive: bool
+    nudgeDedupAnchor: string option
+}
+
+let private parseTodosJson (json: string) : string list =
+    if json = "" then []
+    else
+        try
+            let parsed = Fable.Core.JS.JSON.parse json
+            if Fable.Core.JS.Constructors.Array.isArray parsed then
+                (parsed :?> obj array) |> Array.map string |> Array.toList
+            else []
+        with _ -> []
+
+let emptyNudgeSnapshotState : NudgeSnapshotState =
+    { openTodos = []
+      lastAssistantText = ""
+      agentFromMessage = None
+      turnId = ""
+      isLoopActive = false
+      nudgeDedupAnchor = None }
+
+let private strOrEmpty (o: string option) : string =
+    match o with Some s -> s | None -> ""
+
+let foldNudgeSnapshot (sessionId: string) (events: WanEvent list) : NudgeSnapshotState =
+    forSession sessionId events
+    |> List.fold
+        (fun st e ->
+            match e.Kind with
+            | k when k = eventKindAssistantCompleted ->
+                let msg = payloadField "assistantMessage" e |> strOrEmpty
+                let agent =
+                    payloadField "agent" e
+                    |> Option.bind (fun a -> if a = "" then None else Some a)
+                let tid = payloadField "turnId" e |> strOrEmpty
+                let todosFromPayload =
+                    payloadField "openTodosJson" e
+                    |> Option.map parseTodosJson
+                { st with
+                    lastAssistantText = msg
+                    agentFromMessage = agent
+                    turnId = tid
+                    openTodos = match todosFromPayload with Some t -> t | None -> st.openTodos }
+            | k when k = eventKindLoopActivated ->
+                { st with isLoopActive = true }
+            | k when k = eventKindLoopCancelled ->
+                { st with isLoopActive = false }
+            | k when k = eventKindReviewVerdict ->
+                match payloadVerdict e with
+                | Some v when isEndVerdict v -> { st with isLoopActive = false }
+                | _ -> st
+            | k when k = eventKindNudgeDispatched ->
+                { st with nudgeDedupAnchor = payloadAnchor e }
+            | k when k = eventKindSubmitReviewWipRecorded || k = eventKindNudgeDedupCleared ->
+                { st with nudgeDedupAnchor = None }
+            | k when k = eventKindWorkBacklogCommitted ->
+                let todosOpt =
+                    payloadField "todosJson" e
+                    |> Option.map parseTodosJson
+                { st with openTodos = todosOpt |> Option.defaultValue st.openTodos }
+            | _ -> st)
+        emptyNudgeSnapshotState
+
 let nudgeAnchorKey (turnId: string) (assistantMessage: string) : string =
     let body = assistantMessage.Trim()
     let tid = turnId.Trim()

@@ -14,7 +14,11 @@ let private readFileSync (path: string) (encoding: string) : string = jsNative
 [<Import("existsSync", "node:fs")>]
 let private fileExists (path: string) : bool = jsNative
 
+type MockLLM =
+    abstract calls: ResizeArray<obj>
+
 type Harness =
+    abstract mockLLM: MockLLM
     abstract workDir: string
     abstract helpers: obj
     abstract registration: obj
@@ -29,6 +33,7 @@ type Harness =
     abstract executeTool: string -> obj -> obj -> JS.Promise<string>
     abstract runSlashCommand: string -> string -> string -> JS.Promise<string>
     abstract getChatHistoryCalled: unit -> bool
+    abstract getLastLlmRequest: unit -> obj
     abstract dispose: unit -> JS.Promise<unit>
 
 let private harnessFromObj (o: obj) : Harness = unbox o
@@ -159,23 +164,27 @@ let runAll (args: string array) : JS.Promise<int> =
         chk "mux.execute.write.warnTddRejected"
             ((jsonStringify writeFailResult).Contains "error")
 
-        // --- 3c. Tool execution: read -----------------------------------------
-        let readArgs = createObj [ "path", box "mux-e2e-test.txt" ]
+        // --- 3c. Tool execution: read success --------------------------------
+        let readArgs =
+            createObj [ "path", box "mux-e2e-test.txt" ]
         let! readResult = harness.executeTool "read" readArgs (createEmpty ())
         chk "mux.execute.read.success" (readResult.Contains "hello from mux e2e")
 
-        // --- 3d. Tool execution: executor -------------------------------------
+        // --- 3d. Tool execution: executor success ----------------------------
         let execArgs =
             createObj [ "program", box "echo hello-executor"
+                        "language", box "shell"
                         "mode", box "ro"
+                        "timeout_type", box "short"
                         "what_to_summarize", box "keep stdout only"
                         "warn_tdd", box warnTddValue
                         "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
         let! execResult = harness.executeTool "executor" execArgs (createEmpty ())
         chk "mux.execute.executor.success" (execResult.Contains "hello-executor")
 
-        // --- 3e. Tool execution: fuzzy_find -----------------------------------
-        let fuzzyArgs = createObj [ "pattern", box "mux-e2e-test" ]
+        // --- 3e. Tool execution: fuzzy_find success --------------------------
+        let fuzzyArgs =
+            createObj [ "pattern", box "mux-e2e" ]
         let! fuzzyResult = harness.executeTool "fuzzy_find" fuzzyArgs (createEmpty ())
         chk "mux.execute.fuzzyFind.success" (fuzzyResult.Contains "mux-e2e-test.txt")
 
@@ -186,7 +195,6 @@ let runAll (args: string array) : JS.Promise<int> =
         let! _ = harness.fireStreamEnd "mux-e2e-session" [| "I have completed some work; let me know if there is anything else to do." |]
         let nudgeAfter = nudgeCount harness
         chk "mux.eventHook.nudgeCalledOnStreamEnd" (nudgeAfter > nudgeBefore)
-
         chk "mux.eventHook.getChatHistoryCalled" (harness.getChatHistoryCalled())
 
         // --- 5. Message transform: caps injection ---------------------------
@@ -220,7 +228,7 @@ let runAll (args: string array) : JS.Promise<int> =
         let compactMsgsOut : obj[] = unbox<obj[]> (dynGet compactOutput "messages")
         chk "mux.messageTransform.compactingTransform.runOk" (compactMsgsOut.Length = 1)
 
-        // --- 5c. Message transform: systemTransform ---------------------------
+        // --- 5c. Message transform: system transform injection ----------------
         let systemObj = createObj [ "content", box "long system prompt"; "length", box 1000 ]
         let systemOutput = createObj [ "system", box systemObj ]
         let! _ = harness.runSystemTransform (createEmpty ()) systemOutput

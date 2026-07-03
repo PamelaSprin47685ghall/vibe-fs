@@ -40,10 +40,10 @@ let muxSubagentToolsUsesSubagentToolPolicy () =
 
 let subagentToolsUseKernelPromptHelpers () =
     let mux = requireFile "src/Mux/SubagentTools.fs" |> nonCommentCode
-    let muxShell = requireFile "src/Shell/MuxSubagentToolExecute.fs" |> nonCommentCode
+    let dispatcher = requireFile "src/Shell/SubagentDispatcher.fs" |> nonCommentCode
     let opencode = requireFile "src/Opencode/SubagentTools.fs" |> nonCommentCode
     let shellExec = requireFile "src/Shell/SubagentToolExecute.fs" |> nonCommentCode
-    for (label, code) in [| "SubagentToolExecute", shellExec; "MuxSubagentToolExecute", muxShell |] do
+    for (label, code) in [| "SubagentToolExecute", shellExec; "SubagentDispatcher", dispatcher |] do
         check ("arch: " + label + " uses promptsFromCoderIntents")
             (code.Contains "promptsFromCoderIntents")
         check ("arch: " + label + " uses meditatorPromptFromFiles")
@@ -81,6 +81,7 @@ let subagentToolsUseKernelPromptHelpers () =
 
 let opencodeSubagentToolExecuteUsesHostNotLiteralOpencode () =
     let shellExec = requireFile "src/Shell/SubagentToolExecute.fs" |> nonCommentCode
+    let opencode = requireFile "src/Opencode/SubagentTools.fs" |> nonCommentCode
     check "arch: SubagentToolExecute must not hardcode promptsFromCoderIntents opencode"
         (not (shellExec.Contains "promptsFromCoderIntents opencode"))
     check "arch: SubagentToolExecute must not hardcode meditatorPromptFromFiles opencode"
@@ -90,7 +91,7 @@ let opencodeSubagentToolExecuteUsesHostNotLiteralOpencode () =
     check "arch: SubagentToolExecute threads Host into prompt helpers (spawn.Host or execute host param)"
         ((shellExec.Contains "spawn.Host")
          || (shellExec.Contains "promptsFromCoderIntents spawn.Host")
-         || (shellExec.Contains "executeOpencodeSubagentToolFor")
+         || (opencode.Contains "SubagentDispatcher.dispatch")
          || (shellExec.Contains "promptsFromCoderIntents host"))
 
 let subagentToolsUseDecodeIntentsField () =

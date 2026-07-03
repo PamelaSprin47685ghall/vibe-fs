@@ -142,7 +142,7 @@ let ompNudgeHooksDoNotReadReviewStoreForLoopState () =
     let code = requireFile "src/Omp/NudgeHooks.fs" |> nonCommentCode
     check "arch: Omp NudgeHooks must not read live review-state query" (not (code.Contains "isReviewActive"))
     check "arch: Omp NudgeHooks loop state from event log"
-        (code.Contains "isLoopActiveFromEventLog")
+        (code.Contains "isLoopActiveFromEventLog" || code.Contains "getNudgeSnapshotFromEventLog")
 
 let ompSessionLifecycleHooks () =
     let code = requireFile "src/Omp/SessionLifecycleHooks.fs" |> nonCommentCode

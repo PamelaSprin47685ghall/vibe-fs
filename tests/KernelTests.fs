@@ -103,11 +103,11 @@ let dedup' () =
     check "dedup substring" (r3.output = noChange)
 
 let jsBoundary' () =
-    check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = Wanxiangshu.Kernel.Domain.MessageAborted)
+    check "abort message classified" (translateJsError (createObj [ "message", box "Aborted" ]) = Wanxiangshu.Kernel.Domain.ClientCancellation "abort-text")
     let nestedCause : obj = createObj [ "name", box "TypeError"; "message", box "terminated"; "cause", box (createObj [ "name", box "AbortError"; "message", box "aborted" ]) ]
-    check "abort nested via cause" (translateJsError nestedCause = Wanxiangshu.Kernel.Domain.MessageAborted)
+    check "abort nested via cause" (translateJsError nestedCause = Wanxiangshu.Kernel.Domain.ClientCancellation "AbortError")
     let nestedError : obj = createObj [ "name", box "TypeError"; "error", box (createObj [ "name", box "AbortError" ]) ]
-    check "abort nested via error" (translateJsError nestedError = Wanxiangshu.Kernel.Domain.MessageAborted)
+    check "abort nested via error" (translateJsError nestedError = Wanxiangshu.Kernel.Domain.ClientCancellation "AbortError")
     let nonAbort : obj = createObj [ "name", box "RangeError"; "message", box "out of range" ]
     check "non-abort stays unknown" (translateJsError nonAbort = Wanxiangshu.Kernel.Domain.UnknownJsError "out of range")
     let msgs : Message<obj> list =

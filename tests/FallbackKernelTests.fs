@@ -1,6 +1,7 @@
 module Wanxiangshu.Tests.FallbackKernelTests
 
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.Decision
 open Wanxiangshu.Kernel.FallbackKernel.Recovery
@@ -45,19 +46,20 @@ let mkConfig (maxRetries: int) (loopMax: int) =
       MaxRetries        = maxRetries
       LoopMaxContinues  = loopMax }
 
-let mkError (name: string) (msg: string) (sc: int option) (ret: bool option) =
+let mkError (name: string) (msg: string) (sc: int option) (ret: bool option) (domainErr: DomainError option) =
     { ErrorName   = name
+      DomainError = domainErr
       Message     = msg
       StatusCode  = sc
       IsRetryable = ret }
 
-let err401  = mkError "err" "401" (Some 401) None
-let err429  = mkError "rate" "429" (Some 429) None
-let err500  = mkError "srv" "500" (Some 500) None
-let errRetry = mkError "retry" "retry" None (Some true)
-let errNonRetry = mkError "nonretry" "nonretry" None (Some false)
-let errAbort = mkError "MessageAbortedError" "abort" None None
-let errAbort2 = mkError "AbortError" "abort2" None None
+let err401  = mkError "err" "401" (Some 401) None None
+let err429  = mkError "rate" "429" (Some 429) None None
+let err500  = mkError "srv" "500" (Some 500) None None
+let errRetry = mkError "retry" "retry" None (Some true) (Some (UnknownJsError "retry"))
+let errNonRetry = mkError "nonretry" "nonretry" None (Some false) (Some (UnknownJsError "nonretry"))
+let errAbort = mkError "MessageAbortedError" "abort" None None (Some MessageAborted)
+let errAbort2 = mkError "AbortError" "abort2" None None (Some (ClientCancellation "abort2"))
 
 
 let isPerfectSquareBoundary () =
@@ -127,7 +129,7 @@ let classifyErrorPriority () =
     equal "retryCount>=max → Exhausted" ErrorClass.Exhausted
         (classifyError errRetry stExh cfg)
 
-    let unknown = mkError "unknown" "?" None None
+    let unknown = mkError "unknown" "?" None None (Some (UnknownJsError "?"))
     equal "unknown default → RetrySame" ErrorClass.RetrySame
         (classifyError unknown baseState cfg)
 
@@ -137,7 +139,7 @@ let transitionIdleErrorToRetrying () =
     let chain  = chain [ model ]
     let cfg    = mkConfig 2 3
     let state  = mkState FallbackPhase.Idle 0 0 false false 0
-    let err    = mkError "err" "fail" None (Some true)
+    let err    = mkError "err" "fail" None (Some true) (Some (UnknownJsError "fail"))
 
     let ns, action = transition state (SessionError err) cfg chain
 
@@ -164,7 +166,7 @@ let transitionScanningErrorAdvances () =
     let chain  = chain models
     let cfg    = mkConfig 2 3
     let state  = mkState (FallbackPhase.Scanning (0, 0)) 0 0 false false 0
-    let err    = mkError "err" "fail" None (Some true)
+    let err    = mkError "err" "fail" None (Some true) (Some (UnknownJsError "fail"))
 
     let ns, action = transition state (SessionError err) cfg chain
 
@@ -247,7 +249,7 @@ let transitionLoopDetectionAbortAndResume () =
     let chain  = chain [ model ]
     let cfg    = mkConfig 2 3
     let state  = mkState FallbackPhase.Idle 0 0 false false 3
-    let err    = mkError "retry" "retry" None (Some true)
+    let err    = mkError "retry" "retry" None (Some true) (Some (UnknownJsError "retry"))
 
     let ns, action = transition state (SessionError err) cfg chain
 

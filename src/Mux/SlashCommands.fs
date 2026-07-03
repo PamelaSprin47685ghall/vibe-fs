@@ -92,13 +92,13 @@ let createLoopOnlyCommand (deps: obj) (reviewStore: Wanxiangshu.Shell.ReviewRunt
                         do! syncReviewFromEventLog reviewStore root sid
                         let existingTask = reviewStore.getReviewTask sid
                         if task = "" then
-                            do! appendLoopCancelled root sid |> Promise.map ignore
+                            do! appendLoopCancelledOrFail root sid
                             reviewStore.deactivateReview sid
                             return loopCancelledMessage
                         elif existingTask.IsSome then
                             return "With-Review Mode is already active. Submit your work via submit_review."
                         else
-                            do! appendLoopActivated root sid task |> Promise.map ignore
+                            do! appendLoopActivatedOrFail root sid task
                             reviewStore.activateReview(sid, task, getTimestampMs())
                             return buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
                     }) |}
@@ -124,7 +124,7 @@ let private activateReview
     (isPass: bool) (feedback: string) : JS.Promise<string> =
     promise {
         let root = eventLogRootFromDeps deps
-        do! appendLoopActivated root workspaceIdStr task |> Promise.map ignore
+        do! appendLoopActivatedOrFail root workspaceIdStr task
         reviewStore.activateReview(workspaceIdStr, task, getTimestampMs())
         if isPass then
             return buildLoopMessage task [ "With-Review Mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
@@ -140,7 +140,7 @@ let private loopReviewExecute
     if task = "" then
         promise {
             let root = eventLogRootFromDeps deps
-            do! appendLoopCancelled root workspaceIdStr |> Promise.map ignore
+            do! appendLoopCancelledOrFail root workspaceIdStr
             reviewStore.deactivateReview workspaceIdStr
             return loopCancelledMessage
         }

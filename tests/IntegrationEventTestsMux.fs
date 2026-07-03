@@ -175,3 +175,33 @@ let muxForceStopTodoNudgeSpec () = promise {
     do! yieldMicrotask ()
     check "force-stop must not send todo nudge" (nudges.Count = 0)
 }
+
+let nudgeWithoutChatHistoryButEventCarriesTextSpec () = promise {
+    let sessionID = "no-chat-history-ws-" + System.Guid.NewGuid().ToString()
+    do! seedLoopActivated (processCwd ()) sessionID "Implement feature X"
+    let nudges = ResizeArray<string>()
+    let reg =
+        createRegistration
+            (createObj [
+                "loadConfigOrDefault", box (fun () -> createObj [])
+                "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
+                "resolveAgentFrontmatter", box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
+            ])
+    let helpers =
+        createObj [
+            "getTodos", box (System.Func<obj, JS.Promise<obj>>(fun _ -> promise { return box [||] }))
+            "nudge", box (System.Func<obj, obj, JS.Promise<bool>>(fun _ws msg ->
+                promise {
+                    nudges.Add(string msg)
+                    return true
+                }))
+        ]
+    let hook = get reg "eventHook"
+    let textPart t = box {| ``type`` = "text"; text = t |}
+    let streamEnd ws parts =
+        createObj [ "type", box "stream-end"; "workspaceId", box ws
+                    "properties", box (createObj [ "parts", box parts ]) ]
+    do! hook $ (streamEnd sessionID [| textPart "finished first step successfully" |], helpers) |> unbox<JS.Promise<unit>>
+    do! yieldMicrotask ()
+    check "loop nudge fires from event-carried text when getChatHistory is absent" (nudges.Count = 1 && nudges.[0].Contains(loopNudgePromptProse))
+}

@@ -6,11 +6,8 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.Nudge.TodoStatus
-open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 open Wanxiangshu.Kernel.NudgeState
 open Wanxiangshu.Kernel.Nudge.Types
-open Wanxiangshu.Shell.SerialStateHolder
-open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 open Fable.Core.JsInterop
@@ -42,7 +39,12 @@ let runNudgeFlowCore
                 match selectNudgePrompt action snapshot with
                 | None -> return runtimeState
                 | Some promptText ->
-                    let! claimed = tryClaimNudgeDispatch workspaceRoot sessionKey action snapshot.nudgeAnchorKey
+                    let! claimed =
+                        promise {
+                            try
+                                return! tryClaimNudgeDispatch workspaceRoot sessionKey action snapshot.nudgeAnchorKey
+                            with _ -> return false
+                        }
                     if not claimed then return runtimeState
                     else
                         let! _ = sendNudge promptText snapshot.agentFromMessage
@@ -102,72 +104,57 @@ type NudgeRuntime
                     if output = "" then None else Some output
                 | _ -> None)
 
-    let collectSnapshotMux (helpers: obj) (workspaceId: string) () : JS.Promise<SessionSnapshot option> =
+    let collectSnapshotMux (helpers: obj) (workspaceId: string) (lastMsgFromEvent: string) () : JS.Promise<SessionSnapshot option> =
         promise {
             let! todos = tryGetTodos helpers workspaceId
-            match getChatHistory with
-            | None ->
-                let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
-                let! isLoopActive = isLoopActiveFromEventLog root workspaceId
-                let! blocked = nudgeBlockedForTurn root workspaceId ""
-                return Some (deriveSnapshot {
-                    openTodos = todos
-                    lastAssistantText = ""
-                    agentFromMessage = None
-                    isLoopActive = isLoopActive
-                    lastAssistantIsCompaction = false
-                    hasActiveRunner = false
-                    nudgeBlockedForTurn = blocked
-                    turnId = ""
-                })
-            | Some getHistory ->
-                try
-                    let! messages = getHistory workspaceId
-                    let lastAssistantIdx =
-                        messages
-                        |> Array.tryFindIndexBack (fun m ->
-                            let role = Dyn.str m "role"
-                            role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str m "agent")))
-                    let lastAssistantText, turnId, agent =
-                        match lastAssistantIdx with
-                        | None -> "", "", None
-                        | Some idx ->
-                            let assistantMsg = messages.[idx]
-                            let text = messageTexts assistantMsg |> String.concat "\n"
-                            let info = Dyn.get assistantMsg "info"
-                            let agentVal = Dyn.str info "agent"
-                            let agent = if agentVal = "" then None else Some agentVal
-                            let time = Dyn.get info "time"
-                            let completed = Dyn.str time "completed"
-                            let tid = if completed <> "" then completed else Dyn.str info "id"
-                            text, tid, agent
-                    let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
-                    let key = nudgeAnchorKey turnId lastAssistantText
-                    let! isLoopActive = isLoopActiveFromEventLog root workspaceId
-                    let! blocked = nudgeBlockedForTurn root workspaceId key
-                    return Some (deriveSnapshot {
-                        openTodos = todos
-                        lastAssistantText = lastAssistantText
-                        agentFromMessage = agent
-                        isLoopActive = isLoopActive
-                        lastAssistantIsCompaction = false
-                        hasActiveRunner = false
-                        nudgeBlockedForTurn = blocked
-                        turnId = turnId
-                    })
-                with _ ->
-                    let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
-                    let! blocked = nudgeBlockedForTurn root workspaceId ""
-                    return Some (deriveSnapshot {
-                        openTodos = todos
-                        lastAssistantText = ""
-                        agentFromMessage = None
-                        isLoopActive = false
-                        lastAssistantIsCompaction = false
-                        hasActiveRunner = false
-                        nudgeBlockedForTurn = blocked
-                        turnId = ""
-                    })
+            let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
+
+            // Capture current assistant turn data from host for event sourcing.
+            let! lastAssistantText, agent, turnId =
+                match getChatHistory with
+                | None -> promise { return lastMsgFromEvent, None, "" }
+                | Some getHistory ->
+                    promise {
+                        try
+                            let! messages = getHistory workspaceId
+                            let lastAssistantIdx =
+                                messages
+                                |> Array.tryFindIndexBack (fun m ->
+                                    let role = Dyn.str m "role"
+                                    role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str m "agent")))
+                            match lastAssistantIdx with
+                            | None -> return lastMsgFromEvent, None, ""
+                            | Some idx ->
+                                let assistantMsg = messages.[idx]
+                                let text = messageTexts assistantMsg |> String.concat "\n"
+                                let info = Dyn.get assistantMsg "info"
+                                let agentVal = Dyn.str info "agent"
+                                let agent = if agentVal = "" then None else Some agentVal
+                                let time = Dyn.get info "time"
+                                let completed = Dyn.str time "completed"
+                                let tid = if completed <> "" then completed else Dyn.str info "id"
+                                let finalText = if text = "" then lastMsgFromEvent else text
+                                return finalText, agent, tid
+                        with _ -> return lastMsgFromEvent, None, ""
+                    }
+
+            // Append assistant turn to event log; all downstream decisioning folds from history.
+            do! appendAssistantCompletedOrFail root workspaceId lastAssistantText agent turnId todos
+
+            let! snapshot = getNudgeSnapshotFromEventLog root workspaceId
+
+            // nudgeBlockedForTurn: compare current anchor against dedup anchor from fold. Single source of truth.
+            let currentAnchor = nudgeAnchorKey snapshot.turnId snapshot.lastAssistantText
+            let blocked = match snapshot.nudgeDedupAnchor with None -> false | Some a -> a = currentAnchor
+
+            return Some
+                { todos = snapshot.openTodos
+                  lastAssistantMessage = snapshot.lastAssistantText
+                  isLoopActive = snapshot.isLoopActive
+                  nudgeBlockedForTurn = blocked
+                  nudgeAnchorKey = currentAnchor
+                  agentFromMessage = snapshot.agentFromMessage
+                  hasActiveRunner = false }
         }
 
     let sendNudgeMux (helpers: obj) (workspaceId: string) (promptText: string) (_agentOpt: string option) : JS.Promise<SendOutcome> =
@@ -230,9 +217,9 @@ type NudgeRuntime
         promise {
             match parsed with
             | Ignore -> return ()
-            | StreamEnd(workspaceId, stopReason, _) ->
+            | StreamEnd(workspaceId, stopReason, lastMsg) ->
                 if not (Dyn.isNullish helpers) && stopReason <> "queued-message" then
-                    let! newState = runNudgeFlowWithRetryCheck runtimeState workspaceId (collectSnapshotMux helpers workspaceId) (sendNudgeMux helpers workspaceId)
+                    let! newState = runNudgeFlowWithRetryCheck runtimeState workspaceId (collectSnapshotMux helpers workspaceId lastMsg) (sendNudgeMux helpers workspaceId)
                     runtimeState <- newState
                 return ()
             | StreamAbort workspaceId

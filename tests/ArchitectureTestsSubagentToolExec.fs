@@ -7,15 +7,15 @@ open Wanxiangshu.Tests.ArchitectureTestsSupport
 
 let muxSubagentToolsUsesToolArgsDecode () =
     let mux = requireFile "src/Mux/SubagentTools.fs" |> nonCommentCode
-    let shell = requireFile "src/Shell/MuxSubagentToolExecute.fs" |> nonCommentCode
+    let dispatcher = requireFile "src/Shell/SubagentDispatcher.fs" |> nonCommentCode
     check "arch: Mux SubagentTools opens MuxSubagentToolExecute"
         (mux.Contains "MuxSubagentToolExecute")
     check "arch: Mux SubagentTools uses executeMuxSubagentTool"
         (mux.Contains "executeMuxSubagentTool")
-    check "arch: MuxSubagentToolExecute uses decodeToolInvocation"
-        (shell.Contains "decodeToolInvocation")
-    check "arch: MuxSubagentToolExecute uses wireDecodeFailure on decode errors"
-        (shell.Contains "wireDecodeFailure")
+    check "arch: SubagentDispatcher uses decodeToolInvocation"
+        (dispatcher.Contains "decodeToolInvocation")
+    check "arch: SubagentDispatcher uses wireDecodeFailure on decode errors"
+        (dispatcher.Contains "wireDecodeFailure")
     check "arch: Mux SubagentTools must not parallelPromptsFromIntents"
         (not (mux.Contains "parallelPromptsFromIntents"))
     check "arch: Mux SubagentTools must not buildPromptsFor"
@@ -24,18 +24,23 @@ let muxSubagentToolsUsesToolArgsDecode () =
 let opencodeSubagentToolsUsesToolArgsDecode () =
     let code = requireFile "src/Opencode/SubagentTools.fs" |> nonCommentCode
     let shell = requireFile "src/Shell/SubagentToolExecute.fs" |> nonCommentCode
+    let dispatcher = requireFile "src/Shell/SubagentDispatcher.fs" |> nonCommentCode
     check "arch: Opencode SubagentTools opens SubagentToolExecute"
         (code.Contains "SubagentToolExecute")
-    check "arch: Opencode SubagentTools uses executeOpencodeSubagentTool"
-        (code.Contains "executeOpencodeSubagentTool")
+    check "arch: Opencode SubagentTools uses dispatch"
+        (code.Contains "dispatch")
+    check "arch: Opencode SubagentTools implements IHostAdapter"
+        (code.Contains "IHostAdapter")
     check "arch: Opencode SubagentTools must not decodeIntentsField"
         (not (code.Contains "decodeIntentsField"))
     check "arch: Opencode SubagentTools must not decodeMeditatorArgs"
         (not (code.Contains "decodeMeditatorArgs"))
     check "arch: SubagentToolExecute uses decodeToolInvocation"
         (shell.Contains "decodeToolInvocation")
-    check "arch: SubagentToolExecute uses wireDecodeFailure on decode errors"
-        (shell.Contains "wireDecodeFailure")
+    check "arch: SubagentDispatcher uses decodeToolInvocation"
+        (dispatcher.Contains "decodeToolInvocation")
+    check "arch: SubagentDispatcher uses wireDecodeFailure on decode errors"
+        (dispatcher.Contains "wireDecodeFailure")
     check "arch: SubagentToolExecute must not use decodeToolArgs"
         (not (shell.Contains "decodeToolArgs"))
 
@@ -47,8 +52,8 @@ let subagentToolsUseSubagentSpawn () =
         (spawn.Contains "let runParallelSpawnsWithAbort")
     let opencode = requireFile "src/Opencode/SubagentTools.fs" |> nonCommentCode
     let shellExec = requireFile "src/Shell/SubagentToolExecute.fs" |> nonCommentCode
-    check "arch: Opencode SubagentTools uses executeOpencodeSubagentTool"
-        (opencode.Contains "executeOpencodeSubagentTool")
+    check "arch: Opencode SubagentTools uses dispatch"
+        (opencode.Contains "dispatch")
     check "arch: SubagentToolExecute uses runParallelSpawns"
         (shellExec.Contains "runParallelSpawns")
     check "arch: Opencode SubagentTools must not inline parallel Promise.all joinReports"
@@ -56,17 +61,17 @@ let subagentToolsUseSubagentSpawn () =
     check "arch: Opencode SubagentTools must not call joinReports for parallel coder/investigator"
         (not (opencode.Contains "joinReports"))
     let mux = requireFile "src/Mux/SubagentTools.fs" |> nonCommentCode
-    let muxShell = requireFile "src/Shell/MuxSubagentToolExecute.fs" |> nonCommentCode
-    check "arch: MuxSubagentToolExecute uses runParallelSpawnsWithAbort"
-        (muxShell.Contains "runParallelSpawnsWithAbort")
+    let dispatcher = requireFile "src/Shell/SubagentDispatcher.fs" |> nonCommentCode
+    check "arch: SubagentDispatcher uses runParallelSpawns"
+        (dispatcher.Contains "runParallelSpawns")
     check "arch: Mux SubagentTools must not inline AbortController parallel spawn"
         (not (mux.Contains "AbortController"))
     check "arch: Mux SubagentTools must not inline parallel Promise.all joinReports"
         (not (mux.Contains "|> Promise.all"))
     check "arch: Mux SubagentTools must not call joinReports in bindParallel"
         (not (mux.Contains "joinReports"))
-    check "arch: MuxSubagentToolExecute must not inline AbortController parallel spawn"
-        (not (muxShell.Contains "AbortController"))
+    check "arch: SubagentDispatcher must not inline AbortController parallel spawn"
+        (not (dispatcher.Contains "AbortController"))
 
 let executeMuxSubagentToolUsesSpawnRoleOnly () =
     let shell = requireFile "src/Shell/MuxSubagentToolExecute.fs" |> nonCommentCode
@@ -82,11 +87,11 @@ let executeMuxSubagentToolUsesSpawnRoleOnly () =
 
 let subagentToolExecuteEmptyBatchGuard () =
     let shell = requireFile "src/Shell/SubagentToolExecute.fs" |> nonCommentCode
-    let muxShell = requireFile "src/Shell/MuxSubagentToolExecute.fs" |> nonCommentCode
+    let dispatcher = requireFile "src/Shell/SubagentDispatcher.fs" |> nonCommentCode
     let copy = requireFile "src/Kernel/ToolCopy.fs" |> nonCommentCode
     check "arch: ToolCopy defines subagentIntentsMustBeNonEmpty"
         (copy.Contains "let subagentIntentsMustBeNonEmpty")
     check "arch: SubagentToolExecute calls subagentIntentsMustBeNonEmpty"
         (shell.Contains "subagentIntentsMustBeNonEmpty")
-    check "arch: MuxSubagentToolExecute calls subagentIntentsMustBeNonEmpty"
-        (muxShell.Contains "subagentIntentsMustBeNonEmpty")
+    check "arch: SubagentDispatcher calls subagentIntentsMustBeNonEmpty"
+        (dispatcher.Contains "subagentIntentsMustBeNonEmpty")

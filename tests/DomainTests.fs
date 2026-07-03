@@ -47,10 +47,33 @@ let formatDomainErrorUnknownJsError () =
     equal "UnknownJsError passthrough" "some native error"
         (formatDomainError (UnknownJsError "some native error"))
 
+let formatDomainErrorFileSystemFault () =
+    equal "FileSystemFault" "file system fault: path=/tmp/x, errno=EACCES: permission denied"
+        (formatDomainError (FileSystemFault("/tmp/x", "EACCES", "permission denied")))
+
+let formatDomainErrorNetworkTransportFailure () =
+    equal "NetworkTransportFailure Some status" "network transport failure: url=https://api.example.com, status=500, body=server error"
+        (formatDomainError (NetworkTransportFailure("https://api.example.com", Some 500, "server error")))
+
+let formatDomainErrorNetworkTransportFailureNone () =
+    equal "NetworkTransportFailure None status" "network transport failure: url=https://api.example.com, status=none, body="
+        (formatDomainError (NetworkTransportFailure("https://api.example.com", None, "")))
+
+let formatDomainErrorClientCancellation () =
+    equal "ClientCancellation" "client cancelled: user click"
+        (formatDomainError (ClientCancellation "user click"))
+
+let formatDomainErrorHostProtocolMismatch () =
+    equal "HostProtocolMismatch" "host protocol mismatch: field=sessionId, expected=string, actual=number"
+        (formatDomainError (HostProtocolMismatch("sessionId", "string", "number")))
+
 // --- isAbort ---
 
 let isAbortTrueForMessageAborted () =
     check "MessageAborted is abort" (isAbort MessageAborted)
+
+let isAbortTrueForClientCancellation () =
+    check "ClientCancellation is abort" (isAbort (ClientCancellation "user"))
 
 let isAbortFalseForAllOthers () =
     check "SessionBusy not abort" (not (isAbort SessionBusy))
@@ -72,6 +95,17 @@ let isAbortFalseForAllOthers () =
     check "UnknownJsError not abort"
         (not (isAbort (UnknownJsError "m")))
 
+let isAbortFalseForFileSystemFault () =
+    check "FileSystemFault not abort" (not (isAbort (FileSystemFault("/x", "EIO", "io"))))
+
+let isAbortFalseForNetworkTransportFailure () =
+    check "NetworkTransportFailure not abort"
+        (not (isAbort (NetworkTransportFailure("https://api.example.com", None, ""))))
+
+let isAbortFalseForHostProtocolMismatch () =
+    check "HostProtocolMismatch not abort"
+        (not (isAbort (HostProtocolMismatch("f", "string", "number"))))
+
 // --- containsAbortText ---
 
 let containsAbortTextLower () =
@@ -92,8 +126,12 @@ let containsAbortTextNormal () =
 // --- classifyErrorLeaf ---
 
 let classifyErrorLeafAbortByName () =
-    equal "AbortError name → MessageAborted" MessageAborted
+    equal "AbortError name → ClientCancellation" (ClientCancellation "AbortError")
         (classifyErrorLeaf "AbortError" "SomeTag" "nope")
+
+let classifyErrorLeafAbortSignalByName () =
+    equal "AbortSignal name → ClientCancellation" (ClientCancellation "AbortSignal")
+        (classifyErrorLeaf "AbortSignal" "SomeTag" "nope")
 
 let classifyErrorLeafAbortByTag () =
     equal "MessageAborted tag → MessageAborted" MessageAborted
@@ -116,8 +154,14 @@ let classifyErrorLeafBackgroundedByTag () =
         (classifyErrorLeaf "SomeError" "TaskWaitBackgrounded" "nope")
 
 let classifyErrorLeafFallbackAbortText () =
-    equal "fallback abort text → MessageAborted" MessageAborted
+    equal "fallback abort text → ClientCancellation" (ClientCancellation "abort-text")
         (classifyErrorLeaf "UnknownError" "SomeTag" "operation aborted")
+
+let classifyErrorLeafHostProtocolMismatchByTag () =
+    let msg = "field sessionId type mismatch"
+    equal "HostProtocolMismatch tag → UnknownJsError fallback"
+        (UnknownJsError msg)
+        (classifyErrorLeaf "UnknownError" "HostProtocolMismatch" msg)
 
 let classifyErrorLeafFallbackNoAbort () =
     let msg = "plain failure"

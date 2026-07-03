@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.FallbackEventBridgeTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackEventBridge
@@ -79,12 +80,14 @@ let mkModel (pid: string) (mid: string) : FallbackModel =
 
 let mkRetryableErr () : ErrorInput =
     { ErrorName   = "err"
+      DomainError = Some (UnknownJsError "fail")
       Message     = "fail"
       StatusCode  = None
       IsRetryable = Some true }
 
 let mkAbortErr () : ErrorInput =
     { ErrorName   = "MessageAbortedError"
+      DomainError = Some MessageAborted
       Message     = "abort"
       StatusCode  = None
       IsRetryable = None }

@@ -106,7 +106,7 @@ let promptWithAbort (client: obj) (args: obj) (signal: obj) : JS.Promise<unit> =
                     if winner = "aborted" then return! Promise.reject (DOMException("Aborted", "AbortError"))
                 with err ->
                     match translateJsError err with
-                    | MessageAborted -> return! Promise.reject (DOMException("Aborted", "AbortError"))
+                    | MessageAborted | ClientCancellation _ -> return! Promise.reject (DOMException("Aborted", "AbortError"))
                     | _ -> return! Promise.reject err
     }
 

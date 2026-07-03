@@ -77,7 +77,7 @@ let registerTodoTool (pi: obj) : unit =
                                           Plan = plan
                                           Todos = todos
                                           SelectMethodology = methodologies }
-                                    if root <> "" then do! appendWorkBacklogCommitted root sid args |> Promise.map ignore
+                                    if root <> "" then do! appendWorkBacklogCommittedOrFail root sid args
                                 | None -> ()
                                 return textResult (todoWriteOutput methodologies false)
                     })
