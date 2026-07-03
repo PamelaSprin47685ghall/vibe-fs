@@ -23,7 +23,7 @@ let private retryErr =
       Message = "fail"; StatusCode = None; IsRetryable = Some true }
 
 let private abortErr =
-    { ErrorName = "MessageAbortedError"; DomainError = Some MessageAborted
+    { ErrorName = "AbortError"; DomainError = Some MessageAborted
       Message = "abort"; StatusCode = None; IsRetryable = None }
 
 let private authErr =
@@ -94,9 +94,9 @@ let escCancel_stopsRecovery () =
     let _, action = transition s1 (SessionError retryErr) (mkCfg ()) (mkChain ())
     equal "DoNothing after Cancelled" FallbackAction.DoNothing action
 
-let sessionIdle_idlePhase_returnsDoNothing () =
+let sessionIdle_idlePhase_scanToolCallAsText () =
     let _, action = transition (mkState FallbackPhase.Idle 0 0 0) SessionIdle (mkCfg ()) (mkChain ())
-    equal "DoNothing" FallbackAction.DoNothing action
+    equal "ScanToolCallAsText" FallbackAction.ScanToolCallAsText action
 
 let sessionIdle_taskComplete_doNothing () =
     let s0 = { (mkState FallbackPhase.Idle 0 0 0) with TaskComplete = true }
@@ -110,11 +110,11 @@ let scanning_completesOnIdle () =
     equal "CurrentIndex updated" 1 s1.CurrentIndex
     equal "DoNothing" FallbackAction.DoNothing action
 
-let retrying_recoversOnIdle () =
+let retrying_emitsScanToolCallAsText () =
     let state = mkState (FallbackPhase.Retrying 1) 0 0 0
     let s1, action = transition state SessionIdle (mkCfg ()) (mkChain ())
     equal "Idle after retrying idle" FallbackPhase.Idle s1.Phase
-    equal "DoNothing" FallbackAction.DoNothing action
+    equal "ScanToolCallAsText" FallbackAction.ScanToolCallAsText action
 
 let continueCount_noDoubleIncrement () =
     let state = mkState (FallbackPhase.Retrying 1) 0 0 1
@@ -145,10 +145,10 @@ let run () =
     hallucination_belowThreshold ()
     taskComplete_stopsRecovery ()
     escCancel_stopsRecovery ()
-    sessionIdle_idlePhase_returnsDoNothing ()
+    sessionIdle_idlePhase_scanToolCallAsText ()
     sessionIdle_taskComplete_doNothing ()
     scanning_completesOnIdle ()
-    retrying_recoversOnIdle ()
+    retrying_emitsScanToolCallAsText ()
     continueCount_noDoubleIncrement ()
     exhausted_propagates ()
     newUserMessage_resets ()

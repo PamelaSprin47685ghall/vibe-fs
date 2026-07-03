@@ -68,6 +68,17 @@ let ompActionExecutor (sessionApi: obj) : IActionExecutor =
                 do! invoke "sessionPrompt" arg |> Promise.map ignore
             }
 
+        member _.RecoverWithPrompt (sessionID, model, promptText) =
+            promise {
+                let modelStr =
+                    match model.Variant with
+                    | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
+                    | None -> sprintf "%s/%s" model.ProviderID model.ModelID
+                let body = box {| prompt = box {| text = promptText; model = modelStr |} |}
+                let arg = box {| sessionId = sessionID; body = body |}
+                do! invoke "sessionPrompt" arg |> Promise.map ignore
+            }
+
         member _.AbortSession sessionID =
             promise {
                 let arg = box {| sessionId = sessionID |}
@@ -85,7 +96,9 @@ let ompActionExecutor (sessionApi: obj) : IActionExecutor =
 
         member _.PropagateFailure (_sessionID: string) = Promise.lift ()
 
-        member _.CaptureCurrentModel (_sessionID: string) = Promise.lift None }
+        member _.CaptureCurrentModel (_sessionID: string) = Promise.lift None
+
+    }
 
 let private setConsumedFromResult (runtime: FallbackRuntimeState) (sessionID: string) (result: FallbackHookResult) : unit =
     runtime.SetConsumed sessionID result.Consumed

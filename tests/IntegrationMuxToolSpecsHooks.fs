@@ -191,3 +191,4 @@ let muxToolExecuteAfterMapsNetworkErrorSpec () = promise {
     do! (after $ (input, netOutput)) |> unbox<JS.Promise<unit>>
     check "network error output: error field set" (Dyn.str netOutput "error" = "network connection lost")
 }
+

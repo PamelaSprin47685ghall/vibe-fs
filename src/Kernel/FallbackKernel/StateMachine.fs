@@ -66,7 +66,11 @@ let transition (state: SessionFallbackState) (evt: FallbackEvent) (cfg: Fallback
     | FallbackEvent.SessionIdle ->
         match state.Phase with
         | FallbackPhase.Scanning (scanIdx, origIdx) -> completeScan scanIdx origIdx state
+        | FallbackPhase.Retrying _ when not state.TaskComplete && not state.Cancelled ->
+            { state with Phase = FallbackPhase.Idle }, FallbackAction.ScanToolCallAsText
         | FallbackPhase.Retrying _ -> { state with Phase = FallbackPhase.Idle }, FallbackAction.DoNothing
+        | FallbackPhase.Idle when not state.TaskComplete && not state.Cancelled ->
+            state, FallbackAction.ScanToolCallAsText
         | _ -> state, FallbackAction.DoNothing
 
     | FallbackEvent.NewUserMessage ->
