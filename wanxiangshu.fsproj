@@ -100,7 +100,6 @@
     <Compile Include="src/Methodology/Args.fs" />
     <Compile Include="src/Shell/DynField.fs" />
     <Compile Include="src/Shell/ErrorClassify.fs" />
-    <Compile Include="src/Shell/Contracts.fs" />
     <Compile Include="src/Shell/Clock.fs" />
     <Compile Include="src/Shell/ReviewRuntime.fs" />
     <Compile Include="src/Shell/CapsSynthCommon.fs" />

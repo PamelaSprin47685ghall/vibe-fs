@@ -32,9 +32,7 @@ type FallbackCoordinator
                 if fromStatus <> "" then fromStatus else Dyn.str statusObj "type"
             let sid = getSessionID "session.status" props
             if sid <> "" && status = "busy" then
-                fallbackRuntime.SetBusyCount sid 1
+                fallbackRuntime.SetBusyCount sid (fallbackRuntime.GetBusyCount sid + 1)
             elif sid <> "" && status = "idle" then
                 fallbackRuntime.SetBusyCount sid 0
-            elif sid <> "" && status = "busy" then
-                fallbackRuntime.SetBusyCount sid (fallbackRuntime.GetBusyCount sid + 1)
         | _ -> ()
