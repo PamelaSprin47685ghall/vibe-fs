@@ -177,7 +177,7 @@ let muxForceStopTodoNudgeSpec () = promise {
 }
 
 let nudgeWithoutChatHistoryButEventCarriesTextSpec () = promise {
-    let sessionID = "no-chat-history-ws"
+    let sessionID = "no-chat-history-ws-" + System.Guid.NewGuid().ToString()
     do! seedLoopActivated (processCwd ()) sessionID "Implement feature X"
     let nudges = ResizeArray<string>()
     let reg =

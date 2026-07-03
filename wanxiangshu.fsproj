@@ -542,6 +542,7 @@
     <Compile Include="tests/TestsEntriesOmp.fs" />
     <Compile Include="tests/ArchitectureTests.fs" />
     <Compile Include="e2e/Tests.fs" />
+    <Compile Include="e2e/MuxTests.fs" />
     <Compile Include="tests/Tests.fs" />
   </ItemGroup>
 </Project>

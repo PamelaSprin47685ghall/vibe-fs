@@ -234,28 +234,28 @@ type NudgeRuntime
 
     member _.HandleEvent(parsed: NudgeRuntimeEvent, helpers: obj) : JS.Promise<unit> =
         promise {
-         match parsed with
-             | Ignore -> return ()
-             | StreamEnd(workspaceId, stopReason, lastMsg) ->
-                 if not (Dyn.isNullish helpers) && stopReason <> "queued-message" then
-                     let! newState = runNudgeFlowWithRetryCheck runtimeState workspaceId (collectSnapshotMux helpers workspaceId lastMsg) (sendNudgeMux helpers workspaceId)
-                     runtimeState <- newState
-                 return ()
-             | StreamAbort workspaceId
-             | AbortedError workspaceId ->
-                 runtimeState <-
-                     { runtimeState with
-                         forceStoppedSessions = Set.add workspaceId runtimeState.forceStoppedSessions }
-                 return ()
-             | StepFailed workspaceId ->
-                 runtimeState <- { runtimeState with retryPendingSessions = Set.add workspaceId runtimeState.retryPendingSessions }
-                 return ()
-             | Prompted workspaceId ->
-                 runtimeState <-
-                     { runtimeState with
-                         retryPendingSessions = Set.remove workspaceId runtimeState.retryPendingSessions
-                         forceStoppedSessions = Set.remove workspaceId runtimeState.forceStoppedSessions }
-                 return ()
+            match parsed with
+            | Ignore -> return ()
+            | StreamEnd(workspaceId, stopReason, lastMsg) ->
+                if not (Dyn.isNullish helpers) && stopReason <> "queued-message" then
+                    let! newState = runNudgeFlowWithRetryCheck runtimeState workspaceId (collectSnapshotMux helpers workspaceId lastMsg) (sendNudgeMux helpers workspaceId)
+                    runtimeState <- newState
+                return ()
+            | StreamAbort workspaceId
+            | AbortedError workspaceId ->
+                runtimeState <-
+                    { runtimeState with
+                        forceStoppedSessions = Set.add workspaceId runtimeState.forceStoppedSessions }
+                return ()
+            | StepFailed workspaceId ->
+                runtimeState <- { runtimeState with retryPendingSessions = Set.add workspaceId runtimeState.retryPendingSessions }
+                return ()
+            | Prompted workspaceId ->
+                runtimeState <-
+                    { runtimeState with
+                        retryPendingSessions = Set.remove workspaceId runtimeState.retryPendingSessions
+                        forceStoppedSessions = Set.remove workspaceId runtimeState.forceStoppedSessions }
+                return ()
         }
 
 let createNudgeRuntime
