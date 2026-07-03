@@ -7,6 +7,8 @@ open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
 open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Mux.Plugin
+open Wanxiangshu.Kernel.EventLog.Types
+open Wanxiangshu.Shell.EventLogCodec
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -109,4 +111,83 @@ let muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec () = promise {
     // dynamic injection hook must be present
     let hook = get reg "tool.execute.before"
     check "tool.execute.before hook is present for dynamic warn/warn_tdd injection" (not (isNullish hook))
+}
+
+[<Import("readFile", "node:fs/promises")>]
+let private readFileText (path: string) (encoding: string) : JS.Promise<string> = jsNative
+
+/// `/loop` slash command must write event log (`.wanxiangshu.ndjson`) under
+/// `deps.directory`, not `process.cwd()`.  TDD-red: current implementation in
+/// `SlashCommands.fs:createLoopOnlyCommand` uses `nodeProcess?cwd()`.
+let muxLoopSlashCommandWritesEventLogUnderDepsDirectorySpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-loop-eventlog-"
+    let sessionID = "mux-loop-eventlog-session"
+    let taskText = "Refactor authentication module"
+    let deps =
+        createObj
+            [ "directory", box workspaceDir
+              "loadConfigOrDefault", box (fun () -> createObj [])
+              "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
+              "resolveAgentFrontmatter",
+              box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj []))) ]
+    let reg = createRegistration deps
+    let slashCmds = unbox<obj[]> (get reg "slashCommands")
+    let loopCmd = slashCmds |> Array.find (fun c -> Dyn.str c "key" = "loop")
+    let execute = get loopCmd "execute"
+    let! _result = (execute $ (sessionID, taskText)) |> unbox<JS.Promise<string>>
+    let path = eventPath workspaceDir
+    let! text =
+        promise {
+            try return! readFileText path "utf-8"
+            with _ -> return ""
+        }
+    check "event log under workspaceDir contains loop_activated" (text.Contains eventKindLoopActivated)
+    check "event log under workspaceDir contains task text" (text.Contains taskText)
+    do! rmAsync workspaceDir
+}
+
+/// `tool.execute.after` must detect repeated identical tool+args+output and set
+/// error on the 3rd identical call (`LivelockGuard.defaultMaxRepeats` = 3).
+let muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec () = promise {
+    let reg = sharedMuxRegistration ()
+    let after = get reg "tool.execute.after"
+    check "mux registration exposes tool.execute.after" (not (isNullish after))
+    let sessionID = "mux-livelock-blocks"
+    let args = createObj [ "language", box "shell"; "program", box "echo hi" ]
+    let input =
+        createObj
+            [ "tool", box "executor"
+              "sessionID", box sessionID
+              "args", box args ]
+    let output = createObj [ "output", box "hi" ]
+    do! (after $ (input, output)) |> unbox<JS.Promise<unit>>
+    check "1st identical call: no livelock error" (Dyn.str output "error" = "")
+    do! (after $ (input, output)) |> unbox<JS.Promise<unit>>
+    check "2nd identical call: no livelock error" (Dyn.str output "error" = "")
+    do! (after $ (input, output)) |> unbox<JS.Promise<unit>>
+    let err = Dyn.str output "error"
+    check "3rd identical call: livelock error set" (err <> "")
+    check "3rd identical call: error mentions livelock" (err.Contains "livelock")
+}
+
+/// `tool.execute.after` must map single-line tool output containing both
+/// "error" and "network" (case-insensitive) to `output.error = "network
+/// connection lost"`.  TDD-red: current Mux `toolExecuteAfter` is noop.
+let muxToolExecuteAfterMapsNetworkErrorSpec () = promise {
+    let reg = sharedMuxRegistration ()
+    let after = get reg "tool.execute.after"
+    check "mux registration exposes tool.execute.after for network error" (not (isNullish after))
+    let input =
+        createObj
+            [ "tool", box "webfetch"
+              "sessionID", box "mux-net-session"
+              "args", box (createObj []) ]
+    // Non-network output must not set error
+    let cleanOutput = createObj [ "output", box "success" ]
+    do! (after $ (input, cleanOutput)) |> unbox<JS.Promise<unit>>
+    check "non-network output: error remains empty" (Dyn.str cleanOutput "error" = "")
+    // Single-line output with "error" + "network" -> map to error field
+    let netOutput = createObj [ "output", box "error: network connection refused" ]
+    do! (after $ (input, netOutput)) |> unbox<JS.Promise<unit>>
+    check "network error output: error field set" (Dyn.str netOutput "error" = "network connection lost")
 }

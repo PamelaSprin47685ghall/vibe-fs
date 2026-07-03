@@ -134,7 +134,18 @@ let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
             | _ -> ()
     }
 
-let toolExecuteAfter (input: obj) (output: obj) : JS.Promise<unit> = Promise.lift ()
+let toolExecuteAfter (input: obj) (output: obj) : JS.Promise<unit> =
+    promise {
+        let tool = toolNameFromHookInputMux input
+        let sessionID = Dyn.str input "sessionID"
+        let originalOutput = Dyn.str output "output"
+        if isNetworkErrorText originalOutput then
+            setHookErrorMux output "network connection lost"
+        if LivelockGuard.check sessionID tool
+            (JS.JSON.stringify (argsFromMuxToolExecuteInput input))
+            originalOutput then
+            setHookErrorMux output "livelock guard: repeated identical tool call with identical result"
+    }
 
 let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
     promise { setSystemOutputToDirectory directory output }

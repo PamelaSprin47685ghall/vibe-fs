@@ -37,7 +37,7 @@ let decodeReturnReviewerArgs (args: obj) : Result<ReturnReviewerArgs, DomainErro
     | None -> Error (InvalidIntent ("return_reviewer", "verdict", "must be a string"))
     | Some raw ->
         match parseVerdict raw with
-        | None -> Error (InvalidIntent ("return_reviewer", "verdict", "must be PASS or REJECT"))
+        | None -> Error (InvalidIntent ("return_reviewer", "verdict", "must be PERFECT or REVISE"))
         | Some verdict ->
             Ok {
                 Verdict = verdict

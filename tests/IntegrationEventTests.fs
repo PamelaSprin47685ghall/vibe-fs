@@ -27,7 +27,7 @@ let run () : JS.Promise<unit> =
         let reg = createRegistration (createObj [])
         do! eventHookSpec reg
         do! repeatedTodoNudgeSpec ()
-        do! reviewerRejectRenudgesLoopSpec ()
+        do! reviewerReviseRenudgesLoopSpec ()
         do! muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec ()
         do! syntaxWrapperSpec reg
         do! todoWriteWrapperSpec reg

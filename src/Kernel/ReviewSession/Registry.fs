@@ -11,7 +11,7 @@ type RegistryAction =
     | Lock of id: string * reviewerId: string
     | Unlock of id: string
     | Accept of id: string
-    | Reject of id: string * feedback: string
+    | RequestRevision of id: string * feedback: string
     | AddChild of parentId: string * childId: string
     | Clear
 
@@ -53,8 +53,8 @@ let reduce (registry: Registry) (action: RegistryAction) : Registry =
         transitionSession registry id ReviewCommand.Unlock
     | RegistryAction.Accept id ->
         transitionSession registry id ReviewCommand.Accept
-    | RegistryAction.Reject (id, feedback) ->
-        transitionSessionWithExtra registry id (ReviewCommand.Reject feedback) (fun s -> withFeedback s feedback)
+    | RegistryAction.RequestRevision (id, feedback) ->
+        transitionSessionWithExtra registry id (ReviewCommand.RequestRevision feedback) (fun s -> withFeedback s feedback)
     | RegistryAction.Deactivate id -> Map.remove id registry
     | RegistryAction.Evict cutoff -> evictStale registry cutoff
     | RegistryAction.AddChild (parentId, childId) ->
@@ -64,5 +64,5 @@ let reduce (registry: Registry) (action: RegistryAction) : Registry =
 let actionFor (id: string) (result: ReviewResult) : RegistryAction =
     match result with
     | Accepted _ -> RegistryAction.Accept id
-    | Rejected feedback -> RegistryAction.Reject(id, feedback)
+    | NeedsRevision feedback -> RegistryAction.RequestRevision(id, feedback)
     | Terminated -> RegistryAction.Deactivate id

@@ -37,13 +37,13 @@ let inferReviewTaskFromTexts' () =
         buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
     let accept = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Accepted "")
     let cancel = loopCancelledMessage
-    let rejected = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Rejected "fix the tests")
+    let needsRevisionMsg = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (NeedsRevision "fix the tests")
     let terminated = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult Terminated
     equal "empty -> None" None (inferReviewTaskFromTexts [])
     equal "only activate -> Some task" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1" ])
     equal "activate + accept -> None" None (inferReviewTaskFromTexts [ activate "ship S1"; accept ])
     equal "activate + cancel -> None" None (inferReviewTaskFromTexts [ activate "ship S1"; cancel ])
-    equal "activate + reject -> still active" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1"; rejected ])
+    equal "activate + needs_revision -> still active" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1"; needsRevisionMsg ])
     equal "activate + terminated -> still active" (Some "ship S1") (inferReviewTaskFromTexts [ activate "ship S1"; terminated ])
     equal "two activates no end -> last task" (Some "ship S2") (inferReviewTaskFromTexts [ activate "ship S1"; activate "ship S2" ])
     equal "activate + accept + activate -> second active" (Some "ship S2") (inferReviewTaskFromTexts [ activate "ship S1"; accept; activate "ship S2" ])
@@ -62,8 +62,8 @@ let inferReviewTaskFromTexts' () =
         (inferReviewTaskFromTexts [ reviewerVerdictPrompt ])
 
 let parseFrontMatterScalars' () =
-    let scalars = parseFrontMatterScalars (frontMatterPrompt [ yamlField "verdict" "rejected"; yamlField "feedback" "line one\n---\nline three" ] "Address the feedback above.")
-    equal "scalar verdict parsed" (Some "rejected") (Map.tryFind "verdict" scalars)
+    let scalars = parseFrontMatterScalars (frontMatterPrompt [ yamlField "verdict" "needs_revision"; yamlField "feedback" "line one\n---\nline three" ] "Address the feedback above.")
+    equal "scalar verdict parsed" (Some "needs_revision") (Map.tryFind "verdict" scalars)
     equal "block field parsed" (Some "line one\n---\nline three") (Map.tryFind "feedback" scalars)
     let multi = parseFrontMatterScalars (frontMatter [ yamlField "task" "do thing"; yamlField "verdict" "accepted" ])
     equal "first scalar" (Some "do thing") (Map.tryFind "task" multi)

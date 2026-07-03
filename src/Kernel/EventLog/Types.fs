@@ -19,7 +19,7 @@ let eventKindNudgeDedupCleared = "nudge_dedup_cleared"
 
 let verdictAccepted = "accepted"
 let verdictCancelled = "cancelled"
-let verdictRejected = "rejected"
+let verdictNeedsRevision = "needs_revision"
 let verdictTerminated = "terminated"
 
 let isEndVerdict (verdict: string) : bool =

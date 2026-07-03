@@ -57,7 +57,7 @@ let isTodoWriteToolNameTask () =
 let isTodoWriteToolNameTodoRead () =
     check "todo_read recognized" (isTodoWriteToolName "todo_read")
 let isTodoWriteToolNameFalse () =
-    check "read rejected" (not (isTodoWriteToolName "read"))
+    check "read not todo write" (not (isTodoWriteToolName "read"))
 
 let allToolNames () =
     let names = allToolNames Opencode

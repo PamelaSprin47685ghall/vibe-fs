@@ -88,15 +88,15 @@ let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
                         | Some sessionId ->
                             match Wanxiangshu.Kernel.ReviewVerdict.parseVerdict (Dyn.str params' "verdict") with
                             | None -> return textResult reviewerNudgePrompt
-                            | Some Wanxiangshu.Kernel.ReviewVerdict.Pass ->
+                            | Some Wanxiangshu.Kernel.ReviewVerdict.Perfect ->
                                 let fb = (Dyn.str params' "feedback").Trim()
                                 if not (store.resolvePendingReview(sessionId, Accepted fb)) then return errorResult "No pending review to resolve."
                                 else return { textResult "Review submitted: accepted." with display = Some false }
-                            | Some Wanxiangshu.Kernel.ReviewVerdict.Reject ->
+                            | Some Wanxiangshu.Kernel.ReviewVerdict.Revise ->
                                 let fb = (Dyn.str params' "feedback").Trim()
                                 if fb = "" then return textResult reviewerNudgePrompt
-                                elif not (store.resolvePendingReview(sessionId, Rejected fb)) then return errorResult "No pending review to resolve."
-                                else return { textResult "Review submitted: rejected with feedback." with display = Some false }
+                                elif not (store.resolvePendingReview(sessionId, NeedsRevision fb)) then return errorResult "No pending review to resolve."
+                                else return { textResult "Review submitted: revision requested with feedback." with display = Some false }
                     })
         ])
 

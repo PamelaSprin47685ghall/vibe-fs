@@ -55,7 +55,7 @@ join(workspaceRoot, ".wanxiangshu.ndjson")
 |--------|-------------|--------------|
 | `loop_activated` | worker With-Review 激活（含 `/loop`、等效命令） | `task: string` |
 | `loop_cancelled` | 用户取消 With-Review | — |
-| `review_verdict` | reviewer 结论写回父会话语义成立时 | `verdict`: `accepted` \| `rejected` \| `terminated` \| `cancelled`；`feedback?` |
+| `review_verdict` | reviewer 结论写回父会话语义成立时 | `verdict`: `accepted` \| `needs_revision` \| `terminated` \| `cancelled`；`feedback?` |
 | `work_backlog_committed` | `todowrite` / `task`（Mimocode）校验通过并采纳 | `todos`；五份报告字段 + `select_methodology`（与 `WorkBacklog` 一致） |
 | `nudge_dispatched` | nudge 在锁内 claim 成功后落盘（先于或伴随宿主投递） | `action`: `nudge-todo` \| `nudge-loop` \| `nudge-runner`；`anchor`: 当前 assistant 文本 |
 | `submit_review_wip_recorded` | `submit_review` WIP 受理 | — |

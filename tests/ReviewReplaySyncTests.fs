@@ -58,13 +58,13 @@ let syncReviewFromTextsRecoversTaskFromSecondBlock () =
         (Some "from-second-block") (store.getReviewTask "s5")
     check "replay marks session active from second block" (store.getReviewState "s5" |> Option.isSome)
 
-let syncReviewFromTextsPreservesActiveOnReject () =
+let syncReviewFromTextsPreservesActiveOnNeedsRevision () =
     let store = createReviewStore ()
     let activate = buildLoopMessage "active-task" [ "With-Review Mode is active." ]
-    let rejected = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Rejected "fix tests")
-    syncReviewFromTexts store "s4" [ activate; rejected ]
-    equal "reject keeps task active" (Some "active-task") (store.getReviewTask "s4")
-    check "reject keeps session active" (store.getReviewState "s4" |> Option.isSome)
+    let needsRevisionMsg = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (NeedsRevision "fix tests")
+    syncReviewFromTexts store "s4" [ activate; needsRevisionMsg ]
+    equal "needs_revision keeps task active" (Some "active-task") (store.getReviewTask "s4")
+    check "needs_revision keeps session active" (store.getReviewState "s4" |> Option.isSome)
 
 /// Regression: when the task: anchor is missing from replay texts (e.g. truncated
 /// by compaction), inferReviewTaskFromTexts correctly returns None — proving the
@@ -88,7 +88,7 @@ let run () =
     syncReviewFromTextsActivatesFromTexts ()
     syncReviewFromTextsRecoversTaskFromSecondBlock ()
     syncReviewFromTextsDeactivatesOnEndVerdict ()
-    syncReviewFromTextsPreservesActiveOnReject ()
+    syncReviewFromTextsPreservesActiveOnNeedsRevision ()
     truncatedTextsLoseAnchor ()
     fullTextsRecoverAnchor ()
     reviewerOnlyHistoryDoesNotActivateLoop ()

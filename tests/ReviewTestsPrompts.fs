@@ -16,7 +16,7 @@ let doubleCheckPromptFormat () =
     check "has front-matter fence" (prompt.Contains "---")
     check "has double-check field" (prompt.Contains "double-check:")
     check "embeds task" (prompt.Contains "build the login page")
-    check "asks for re-submission" (prompt.Contains "REJECT with detailed feedback")
+    check "asks for re-submission" (prompt.Contains "REVISE with detailed feedback")
     let multiline = Wanxiangshu.Kernel.ReviewPrompts.doubleCheckPrompt "task with\nnewline and ### markdown"
     check "multiline original_task uses block field" (multiline.Contains "original_task: |")
     let parsed = parseFrontMatterScalars multiline

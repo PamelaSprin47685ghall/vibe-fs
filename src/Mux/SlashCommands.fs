@@ -23,23 +23,11 @@ open Wanxiangshu.Shell.EventLogRuntime
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
 
-let private extractHistoryTexts (history: obj array) : string list =
-    history
-    |> Array.toList
-    |> List.collect (fun item ->
-        if Dyn.typeIs item "string" then [ string item ]
-        else
-            let texts = ResizeArray<string>()
-            let content = Dyn.str item "content"
-            if content <> "" then texts.Add(content)
-            let text = Dyn.str item "text"
-            if text <> "" then texts.Add(text)
-            let parts = Dyn.get item "parts"
-            if not (Dyn.isNullish parts) && Dyn.isArray parts then
-                for p in (parts :?> obj array) do
-                    let partText = Dyn.str p "text"
-                    if partText <> "" then texts.Add(partText)
-            List.ofSeq texts)
+let private eventLogRootFromDeps (deps: obj) : string =
+    if Dyn.isNullish deps then unbox<string> (nodeProcess?cwd())
+    else
+        let d = Dyn.str deps "directory"
+        if d <> "" then d else unbox<string> (nodeProcess?cwd())
 
 let private syncReviewTaskFromHistory
     (deps: obj)
@@ -52,10 +40,8 @@ let private syncReviewTaskFromHistory
             return reviewStore.getReviewTask sessionID
         else
             try
-                let! history = unbox<JS.Promise<obj array>> (getHistory $ sessionID)
-                let root =
-                    let cwd = Dyn.str deps "cwd"
-                    if cwd <> "" then cwd else unbox<string> (nodeProcess?cwd())
+                let! _history = unbox<JS.Promise<obj array>> (getHistory $ sessionID)
+                let root = eventLogRootFromDeps deps
                 do! syncReviewFromEventLog reviewStore root sessionID
                 return reviewStore.getReviewTask sessionID
             with _ ->
@@ -91,7 +77,7 @@ let private pluginConfigForSlash (deps: obj) (workspaceId: WorkspaceId) : JS.Pro
             return slashConfigFromCtx deps workspaceId ctx
     }
 
-let createLoopOnlyCommand (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
+let createLoopOnlyCommand (deps: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     box {| key = "loop"
            description = "Activate With-Review Mode. AI completes task, submits for review."
            inputHint = "<task description>"
@@ -101,7 +87,7 @@ let createLoopOnlyCommand (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewSt
                 | Some wid ->
                     promise {
                         let sid = Id.workspaceIdValue wid
-                        let root = unbox<string> (nodeProcess?cwd())
+                        let root = eventLogRootFromDeps deps
                         let task = args.Trim()
                         do! syncReviewFromEventLog reviewStore root sid
                         let existingTask = reviewStore.getReviewTask sid
@@ -133,10 +119,11 @@ let private precheckReview
     }
 
 let private activateReview
+    (deps: obj)
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (workspaceIdStr: string) (task: string)
     (isPass: bool) (feedback: string) : JS.Promise<string> =
     promise {
-        let root = unbox<string> (nodeProcess?cwd())
+        let root = eventLogRootFromDeps deps
         do! appendLoopActivated root workspaceIdStr task |> Promise.map ignore
         reviewStore.activateReview(workspaceIdStr, task, getTimestampMs())
         if isPass then
@@ -152,7 +139,7 @@ let private loopReviewExecute
     let workspaceIdStr = Id.workspaceIdValue workspaceId
     if task = "" then
         promise {
-            let root = unbox<string> (nodeProcess?cwd())
+            let root = eventLogRootFromDeps deps
             do! appendLoopCancelled root workspaceIdStr |> Promise.map ignore
             reviewStore.deactivateReview workspaceIdStr
             return loopCancelledMessage
@@ -171,9 +158,9 @@ let private loopReviewExecute
                     let isPass, feedback =
                         match parseReviewReportMarkdown markdown with
                         | Accepted fb -> true, fb
-                        | Rejected fb -> false, fb
+                        | NeedsRevision fb -> false, fb
                         | Terminated -> false, markdown
-                    return! activateReview reviewStore workspaceIdStr task isPass feedback
+                    return! activateReview deps reviewStore workspaceIdStr task isPass feedback
         }
 
 let createLoopReviewCommand (deps: obj) (toolNames: string array) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
@@ -188,4 +175,4 @@ let createLoopReviewCommand (deps: obj) (toolNames: string array) (reviewStore: 
                    | Some wid -> loopReviewExecute deps toolNames reviewStore wid args) |}
 
 let createSlashCommands (deps: obj) (toolNames: string array) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj array =
-    [| createLoopOnlyCommand reviewStore; createLoopReviewCommand deps toolNames reviewStore |]
+    [| createLoopOnlyCommand deps reviewStore; createLoopReviewCommand deps toolNames reviewStore |]

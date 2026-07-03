@@ -63,7 +63,7 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpPluginTests.fuzzyGrepExcludeAnyOfLength2", Async OmpPluginTests.fuzzyGrepExcludeAnyOfLength2
     "OmpPluginTests.websearchSchemaRequiresQueryAndWhatToSummarize", Async OmpPluginTests.websearchSchemaRequiresQueryAndWhatToSummarize
     "OmpPluginTestsAgentEnd.run", Async OmpPluginTestsAgentEnd.run
-    "OmpReviewTests.returnReviewerVerdictPassReject", Async OmpReviewTests.returnReviewerVerdictPassReject
+    "OmpReviewTests.returnReviewerVerdictPerfectRevise", Async OmpReviewTests.returnReviewerVerdictPerfectRevise
     "OmpReviewTests.returnReviewerViaSetPendingStateForTest", Async OmpReviewTests.returnReviewerViaSetPendingStateForTest
     "OmpReviewTests.runReviewLoopChildToolNames", Async OmpReviewTests.runReviewLoopChildToolNames
     "OmpReviewTests.runReviewLoopAcceptsWhenPendingResolved", Async OmpReviewTests.runReviewLoopAcceptsWhenPendingResolved

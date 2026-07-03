@@ -7,18 +7,18 @@ open Wanxiangshu.Kernel.ReviewSession.Types
 /// replaces the old nullable-feedback channel: a string "null" can no longer
 /// masquerade as "accept", because the verdict no longer rides inside an
 /// optional feedback field. Feedback is carried separately and is only
-/// meaningful for `Reject`.
+/// meaningful for `Revise`.
 type Verdict =
-    | Pass
-    | Reject
+    | Perfect
+    | Revise
 
 /// Strict decoder for the `verdict` enum field. Anything that is not exactly
-/// PASS/REJECT (case-insensitive, trimmed) is `None` — the caller surfaces that
+/// PERFECT/REVISE (case-insensitive, trimmed) is `None` — the caller surfaces that
 /// as a re-prompt, never silently coercing an unknown token into a verdict.
 let parseVerdict (raw: string) : Verdict option =
     match (if isNull raw then "" else raw).Trim().ToUpperInvariant() with
-    | "PASS" -> Some Pass
-    | "REJECT" -> Some Reject
+    | "PERFECT" -> Some Perfect
+    | "REVISE" -> Some Revise
     | _ -> None
 
 /// The shared, pure review-submission policy. `doubleCheckDone` is the only
@@ -30,28 +30,28 @@ type ReviewDecision =
 
 let decideReviewSubmission (verdict: Verdict) (feedback: string) (doubleCheckDone: bool) : ReviewDecision =
     match verdict with
-    | Reject -> Finalize(ReviewResult.Rejected feedback)
-    | Pass when doubleCheckDone -> Finalize(ReviewResult.Accepted feedback)
-    | Pass -> AskDoubleCheck
+    | Revise -> Finalize(ReviewResult.NeedsRevision feedback)
+    | Perfect when doubleCheckDone -> Finalize(ReviewResult.Accepted feedback)
+    | Perfect -> AskDoubleCheck
 
 // ── mux reportMarkdown text codec ────────────────────────────────────────────
 // mux carries the verdict back to the parent `submit_review` through the
 // reviewer task's `reportMarkdown` (the single, native channel). These two
 // functions are the encode/decode pair across that text boundary. They are not
-// a strict bijection: an empty Reject feedback is normalized to a placeholder,
+// a strict bijection: an empty Revise feedback is normalized to a placeholder,
 // so round-trip preserves the verdict dimension and non-empty feedback only.
 
-let private rejectNoFeedback = "No feedback provided."
+let private reviseNoFeedback = "No feedback provided."
 
 let formatReviewVerdictMarkdown (verdict: Verdict) (feedback: string) : string =
     let trimmedFeedback (f: string) = (if isNull f then "" else f).Trim()
     match verdict with
-    | Pass ->
+    | Perfect ->
         let f = trimmedFeedback feedback
-        if f = "" then "PASS" else "PASS: " + f
-    | Reject ->
+        if f = "" then "PERFECT" else "PERFECT: " + f
+    | Revise ->
         let f = trimmedFeedback feedback
-        if f = "" then "REJECT: " + rejectNoFeedback else "REJECT: " + f
+        if f = "" then "REVISE: " + reviseNoFeedback else "REVISE: " + f
 
 let parseReviewReportMarkdown (markdown: string) : ReviewResult =
     let trimmed = (if isNull markdown then "" else markdown).Trim()
@@ -60,7 +60,7 @@ let parseReviewReportMarkdown (markdown: string) : ReviewResult =
         match trimmed.IndexOf(':') with
         | i when i >= 0 -> trimmed.Substring(i + 1).Trim()
         | _ -> ""
-    if upper = "PASS" then ReviewResult.Accepted ""
-    elif upper.StartsWith "PASS" then ReviewResult.Accepted(extractAfterColon ())
-    elif upper.StartsWith "REJECT" then ReviewResult.Rejected(extractAfterColon ())
+    if upper = "PERFECT" then ReviewResult.Accepted ""
+    elif upper.StartsWith "PERFECT" then ReviewResult.Accepted(extractAfterColon ())
+    elif upper.StartsWith "REVISE" then ReviewResult.NeedsRevision(extractAfterColon ())
     else ReviewResult.Terminated

@@ -84,22 +84,22 @@ let kernelParseWarnTddCanonical () =
           (parseWarnTdd "I-am-sure-i-have-followed-tdd-and-kolmolgorov-principles" = Some IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
 
 let kernelParseWarnTddRejectsVariants () =
-    let rejected =
+    let invalidValues =
         [ ""
           "i-am-sure"
           " i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"
           "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles "
           "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principle"
           "YES" ]
-    for value in rejected do
+    for value in invalidValues do
         check ("parseWarnTdd rejects: " + value) (parseWarnTdd value = None)
 
 let kernelParseWarnCanonical () =
     check "parseWarn accepts canonical" (parseWarn warnCanonicalValue)
 
 let kernelParseWarnRejectsVariants () =
-    let rejected = [ ""; "yes"; "YES"; " y"; "x"; "  it-is-not-possible-to-do-it-using-other-tools" ]
-    for value in rejected do
+    let invalidValues = [ ""; "yes"; "YES"; " y"; "x"; "  it-is-not-possible-to-do-it-using-other-tools" ]
+    for value in invalidValues do
         check ("parseWarn rejects: " + value) (not (parseWarn value))
 
 let kernelCanonicalValuesAreNonEmpty () =

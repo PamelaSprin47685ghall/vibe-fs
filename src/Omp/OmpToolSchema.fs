@@ -116,8 +116,8 @@ let executorParameters (tb: obj) : obj =
 let returnReviewerParameters (tb: obj) : obj =
     objectOf
         [|
-            ("verdict", enumOf [| "PASS"; "REJECT" |] "PASS to accept, REJECT to reject" tb)
-            ("feedback", opt "Detailed, actionable feedback when rejecting; omit when passing." tb str)
+            ("verdict", enumOf [| "PERFECT"; "REVISE" |] "PERFECT to accept, REVISE to request revision" tb)
+            ("feedback", opt "Detailed, actionable feedback when requesting revision; omit when passing." tb str)
         |]
         tb
 

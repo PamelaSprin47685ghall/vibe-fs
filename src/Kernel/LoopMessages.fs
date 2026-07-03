@@ -17,14 +17,14 @@ let taskField = "task"
 let originalTaskField = "original_task"
 let verdictField = "verdict"
 let verdictAccepted = "accepted"
-let verdictRejected = "rejected"
+let verdictNeedsRevision = "needs_revision"
 let verdictTerminated = "terminated"
 let verdictCancelled = "cancelled"
 let commandField = "command"
 let commandWithReview = "with-review"
 let commandWithReviewPrecheck = "with-review-precheck"
 
-/// Verdicts that END With-Review Mode. Reject/terminate keep it active (the work
+/// Verdicts that END With-Review Mode. needs_revision/terminate keep it active (the work
 /// continues), so they are deliberately excluded.
 let isEndVerdict (verdict: string) : bool =
     verdict = verdictAccepted || verdict = verdictCancelled
@@ -35,7 +35,7 @@ let loopFooter =
       "- wip (optional, defaults to true): omit or true while the task is not fully complete; false only when the full task is done"
       ""
       "You must fully complete every item in the task — no shortcuts, no reduced scope, no deferred work."
-      "A reviewer will examine your submission. If accepted, you are done. If rejected, you will receive specific feedback to address." ]
+      "A reviewer will examine your submission. If accepted, you are done. If revision is requested, you will receive specific feedback to address." ]
 
 let buildLoopMessage (task: string) (bodyLines: string list) : string =
     frontMatterPrompt [ yamlField taskField task ] (String.concat "\n" (bodyLines @ loopFooter))
@@ -72,7 +72,7 @@ let frontMatterScalarBlocks (text: string) : Map<string,string> list =
 ///   `task` field         -> (re)activate with that task (worker With-Review only;
 ///                          reviewer prompts use `original_task` instead)
 ///   END verdict          -> accepted / cancelled clear the task
-///   reject/terminate verdict, or any non-front-matter prose -> task untouched
+///   needs_revision/terminate verdict, or any non-front-matter prose -> task untouched
 let inferReviewTaskFromTexts (texts: string seq) : string option =
     texts
     |> Seq.fold (fun current text ->

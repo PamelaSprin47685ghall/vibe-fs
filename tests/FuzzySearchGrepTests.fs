@@ -32,7 +32,7 @@ let noStore_returnsError () =
     | Error msg -> check "noStore error mentions store" (msg.Contains "requires SearchOptions.store")
     | Ok _ -> check "noStore → Error" false
 
-// 2. missingPattern – None or empty string is rejected before wildcard/iterator logic
+// 2. missingPattern – None or empty string is declined before wildcard/iterator logic
 let missingPattern_returnsError () =
     let opts = optsWithStore()
     let paramsNone : FuzzyGrepParams =

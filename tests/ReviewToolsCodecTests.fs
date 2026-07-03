@@ -26,16 +26,16 @@ let decodeReturnReviewerInvalidVerdict () =
     | Error (InvalidIntent ("return_reviewer", "verdict", _)) -> check "return_reviewer invalid verdict" true
     | _ -> check "return_reviewer invalid verdict" false
 
-let decodeReturnReviewerReject () =
-    let args = createObj [ "verdict", box "REJECT"; "feedback", box "fix tests" ]
+let decodeReturnReviewerRevise () =
+    let args = createObj [ "verdict", box "REVISE"; "feedback", box "fix tests" ]
     match decodeReturnReviewerArgs args with
     | Ok rr ->
-        check "return_reviewer reject verdict" (rr.Verdict = Wanxiangshu.Kernel.ReviewVerdict.Reject)
+        check "return_reviewer revise verdict" (rr.Verdict = Wanxiangshu.Kernel.ReviewVerdict.Revise)
         check "return_reviewer feedback" (rr.Feedback = "fix tests")
-    | Error _ -> check "return_reviewer reject" false
+    | Error _ -> check "return_reviewer revise" false
 
 let run () =
     decodeSubmitReviewMissingReport ()
     decodeSubmitReviewOk ()
     decodeReturnReviewerInvalidVerdict ()
-    decodeReturnReviewerReject ()
+    decodeReturnReviewerRevise ()

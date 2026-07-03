@@ -175,7 +175,7 @@ let browserErrorsWithoutBrowserHost () = promise {
 let reviewChildInitialPromptUsesReturnReviewer () =
     let initial = buildOmpReviewInitialPrompt "report" [ "src/x.fs" ] (Some "original task")
     check "review child prompt has return_reviewer" (initial.Contains "return_reviewer")
-    check "review child prompt PASS verdict" (initial.Contains "verdict")
+    check "review child prompt PERFECT verdict" (initial.Contains "PERFECT")
     check "review child prompt no submit_review_result" (not (initial.Contains "submit_review_result"))
 
 let extensionRegistersLifecycleHooks () = promise {

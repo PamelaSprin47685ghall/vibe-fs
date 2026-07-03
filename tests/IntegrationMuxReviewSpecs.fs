@@ -31,63 +31,63 @@ let muxSubmitReviewNoActiveReviewSpec () = promise {
 let private reviewActivationHistory (task: string) : obj array =
     [| box (buildLoopMessage task [ "With-Review Mode is active." ]) |]
 
-/// submit_review only ends With-Review Mode after BOTH rounds pass: round1 PASS
-/// triggers the double-check round, and only a second PASS finalizes Accepted.
+/// submit_review only ends With-Review Mode after BOTH rounds accept: round1 PERFECT
+/// triggers the double-check round, and only a second PERFECT finalizes Accepted.
 let muxSubmitReviewTwoRoundPassAcceptsSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-submit-review-two-pass-"
     let sessionID = "mux-submit-review-two-pass"
     do! seedLoopActivated workspaceDir sessionID "Implement feature X"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     let prompts = ResizeArray<string>()
-    let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "PASS" ]
+    let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PERFECT"; "PERFECT" ]
     let submitTool = muxToolByName reg "submit_review"
     let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
     let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |]; "wip", box false ]
     let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-    check "submit_review two PASS rounds reports accepted" (result.Contains "verdict: accepted")
+    check "submit_review two PERFECT rounds reports accepted" (result.Contains "verdict: accepted")
     check "submit_review runs a double-check round" (prompts.Count = 2)
     check "submit_review double-check round carries anchor" (prompts.[1].Contains "double-check:")
-    check "submit_review two PASS rounds deactivates review" (not (muxIsReviewActiveForTest reg sessionID))
+    check "submit_review two PERFECT rounds deactivates review" (not (muxIsReviewActiveForTest reg sessionID))
     do! rmAsync workspaceDir
 }
 
-/// A round1 REJECT finalizes immediately with feedback and keeps the review
+/// A round1 REVISE finalizes immediately with feedback and keeps the review
 /// active so the worker can address it; no double-check round runs.
-let muxSubmitReviewRejectKeepsReviewActiveSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-submit-review-reject-"
-    let sessionID = "mux-submit-review-reject"
+let muxSubmitReviewReviseKeepsReviewActiveSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-submit-review-revise-"
+    let sessionID = "mux-submit-review-revise"
     do! seedLoopActivated workspaceDir sessionID "Implement feature X"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     let prompts = ResizeArray<string>()
-    let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "REJECT: missing tests" ]
+    let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "REVISE: missing tests" ]
     let submitTool = muxToolByName reg "submit_review"
     let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
     let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |]; "wip", box false ]
     let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-    check "submit_review reject reports rejected verdict" (result.Contains "verdict: rejected")
-    check "submit_review reject surfaces feedback" (result.Contains "missing tests")
-    check "submit_review reject runs only one round" (prompts.Count = 1)
-    check "submit_review reject keeps review session active" (muxIsReviewActiveForTest reg sessionID)
+    check "submit_review revise reports needs_revision verdict" (result.Contains "verdict: needs_revision")
+    check "submit_review revise surfaces feedback" (result.Contains "missing tests")
+    check "submit_review revise runs only one round" (prompts.Count = 1)
+    check "submit_review revise keeps review session active" (muxIsReviewActiveForTest reg sessionID)
     do! rmAsync workspaceDir
 }
 
-/// A round1 PASS followed by a double-check REJECT finalizes rejected and keeps
+/// A round1 PERFECT followed by a double-check REVISE finalizes needs_revision and keeps
 /// the review active — the skeptical second round can still catch corner-cutting.
-let muxSubmitReviewDoubleCheckRejectSpec () = promise {
-    let! workspaceDir = mkdtempAsync "mux-submit-review-double-reject-"
-    let sessionID = "mux-submit-review-double-reject"
+let muxSubmitReviewDoubleCheckReviseSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-submit-review-double-revise-"
+    let sessionID = "mux-submit-review-double-revise"
     do! seedLoopActivated workspaceDir sessionID "Implement feature X"
     let reg = createRegistration (muxDepsWithChatHistory sessionID (reviewActivationHistory "Implement feature X"))
     let prompts = ResizeArray<string>()
-    let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "REJECT: cut corners on edge cases" ]
+    let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PERFECT"; "REVISE: cut corners on edge cases" ]
     let submitTool = muxToolByName reg "submit_review"
     let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
     let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |]; "wip", box false ]
     let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-    check "submit_review double-check reject reports rejected" (result.Contains "verdict: rejected")
-    check "submit_review double-check reject surfaces feedback" (result.Contains "cut corners")
-    check "submit_review double-check reject ran two rounds" (prompts.Count = 2)
-    check "submit_review double-check reject keeps review active" (muxIsReviewActiveForTest reg sessionID)
+    check "submit_review double-check revise reports needs_revision" (result.Contains "verdict: needs_revision")
+    check "submit_review double-check revise surfaces feedback" (result.Contains "cut corners")
+    check "submit_review double-check revise ran two rounds" (prompts.Count = 2)
+    check "submit_review double-check revise keeps review active" (muxIsReviewActiveForTest reg sessionID)
     do! rmAsync workspaceDir
 }
 

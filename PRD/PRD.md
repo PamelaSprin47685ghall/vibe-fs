@@ -135,20 +135,20 @@ type Host = Opencode | Mimocode | Mux | Omp
 |------|------|
 | `task` | Worker 激活 With-Review 的任务文本 |
 | `original_task` | Reviewer 子会话携带父需求，**不**触发 worker 重激活 |
-| `verdict` | `accepted` / `rejected` / `terminated` / `cancelled` |
+| `verdict` | `accepted` / `needs_revision` / `terminated` / `cancelled` |
 | `command` | `with-review` / `with-review-precheck`（模板用） |
 
-**结束 verdict**（`isEndVerdict`）：仅 `accepted`、`cancelled` 清除当前 task；`rejected` / `terminated` **保持** With-Review 活跃。
+**结束 verdict**（`isEndVerdict`）：仅 `accepted`、`cancelled` 清除当前 task；`needs_revision` / `terminated` **保持** With-Review 活跃。
 
 ### 3.4 ReviewSession 状态机
 
 **状态**（`ReviewSession/Types.fs:4-9`）：
 
 ```
-Inactive | Active(task) | Locked(task, reviewerId) | Accepted | Rejected(feedback)
+Inactive | Active(task) | Locked(task, reviewerId) | Accepted | NeedsRevision(feedback)
 ```
 
-**命令 → 事件**（`ReviewSession/StateMachine.fs`）：`Activate`→`Activated`；`Submit`→`Submitted`（状态可仍为 Active）；`Lock`/`Unlock`；`Accept`/`Reject`。
+**命令 → 事件**（`ReviewSession/StateMachine.fs`）：`Activate`→`Activated`；`Submit`→`Submitted`（状态可仍为 Active）；`Lock`/`Unlock`；`Accept`/`RequestRevision`。
 
 **Shell 存储**：`ReviewStore` 将 `Registry` 与 `SessionEffects` 单次 `state <-` 原子更新，避免 registry/effects 交错。
 
@@ -345,10 +345,10 @@ executor_wait, executor_abort
      activateReview(sessionID, task)
      inject buildLoopMessage(task, ...)
 7. else command = "loop-review":
-     runReviewerSession(...) → Accepted | Terminated | Rejected(feedback)
-     Accepted → preReviewPassedMessage
-     Terminated → preReviewCouldNotComplete
-     Rejected → activateReview + buildLoopMessage with feedback block
+      runReviewerSession(...) → Accepted | Terminated | NeedsRevision(feedback)
+      Accepted → preReviewPassedMessage
+      Terminated → preReviewCouldNotComplete
+      NeedsRevision → activateReview + buildLoopMessage with feedback block
 8. setHookParts(output, parts)
 ```
 
@@ -496,7 +496,7 @@ LLM 调用 methodology_working_backwards(intent=..., background=..., target_resu
 LLM 调用 submit_review(report, affectedFiles, wip=false)
 → spawn reviewer → return_reviewer(verdict=...)
 → 父会话注入 verdict front-matter
-→ accepted → inferReviewTaskFromTexts 清除 task；rejected → 保持 Active
+→ accepted → inferReviewTaskFromTexts 清除 task；needs_revision → 保持 Active
 ```
 
 ---
@@ -598,12 +598,12 @@ LLM 调用 submit_review(report, affectedFiles, wip=false)
 | Active task | Submit | Active task | Submitted |
 | Active task | Lock reviewerId | Locked(task, reviewerId) | LockAcquired reviewerId |
 | Active task | Accept | Accepted | Accepted |
-| Active task | Reject feedback | Rejected feedback | Rejected feedback |
+| Active task | RequestRevision feedback | NeedsRevision feedback | NeedsRevision feedback |
 | Locked(task, _) | Unlock | Active task | LockReleased |
 | Locked _ | Accept | Accepted | Accepted |
-| Locked _ | Reject feedback | Rejected feedback | Rejected feedback |
+| Locked _ | RequestRevision feedback | NeedsRevision feedback | NeedsRevision feedback |
 
-**isActive**（L20-26）：`Inactive` / `Accepted` → false；`Active` / `Locked` / `Rejected` → true（Rejected 仍算 active 语义上「审查未通过、工作继续」）。
+**isActive**（L20-26）：`Inactive` / `Accepted` → false；`Active` / `Locked` / `NeedsRevision` → true（NeedsRevision 仍算 active 语义上「需修订、工作继续」）。
 
 **Reviewer 轮次控制**（L36-40）：
 
@@ -625,7 +625,7 @@ decideAfterRound(nudgeCount, outcome, maxNudges):
 | `verdictField` | `"verdict"` | L18 |
 | `verdictAccepted` | 结束 loop | L19 |
 | `verdictCancelled` | 结束 loop | L22 |
-| `verdictRejected` / `verdictTerminated` | **不**结束 loop | L20-21, isEndVerdict L27-30 |
+| `verdictNeedsRevision` / `verdictTerminated` | **不**结束 loop | L20-21, isEndVerdict L27-30 |
 | `commandWithReview` | slash 模板 | L23-24 |
 | `doubleCheckField` | 双检锚点 | L75-78 |
 
@@ -1093,8 +1093,8 @@ OpenCode / Mimocode 插件 JS 由宿主配置指向 `build/src/Opencode/Plugin.j
 
 **return_reviewer**（L17-24）
 
-- 必填：`verdict`（PASS/REJECT 语义见 `ReviewVerdict`）
-- REJECT 时应提供 `feedback`
+- 必填：`verdict`（`PERFECT` / `REVISE`，语义见 `ReviewVerdict`）
+- `REVISE` 时应提供 `feedback`
 
 ### I.3 执行器
 
@@ -1239,7 +1239,7 @@ wanxiangshu-1/
 ```
 万象术 /loop（With-Review Mode）可用。
 完成开发并 commit 后调用 submit_to_squad 之前：
-  若使用 /loop：须 submit_review 至 PASS，再提交 coordinator。
+  若使用 /loop：须 submit_review 至 PERFECT（审查通过），再提交 coordinator。
 ```
 
 字段级协同：loop 消息须含 `task:` front-matter（`LoopMessages.taskField`），与万象术重放一致。
@@ -1262,7 +1262,7 @@ npm run build-and-test
 
 `ReviewSession/Types.fs`：
 
-- `ReviewResult` = `Accepted` | `Rejected of feedback` | `Terminated`
+- `ReviewResult` = `Accepted` | `NeedsRevision of feedback` | `Terminated`
 - `LoopDecision` = `Finish of ReviewResult` | `Nudge of nudgeCount`
 
 `PromptFailed` 与 `NoResult` 为 round outcome（同文件 `RoundOutcome`），驱动 `decideAfterRound`。

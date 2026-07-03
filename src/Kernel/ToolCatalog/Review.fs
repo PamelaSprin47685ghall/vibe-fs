@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.ToolCatalog.ToolSpec
 let internal submitReviewSpec: ToolSpec =
     { name = "submit_review"
       description =
-        "Submit completed work for review. Creates a reviewer that examines the changes against evaluation criteria and returns PASS or actionable feedback. Only works when session is in active With-Review Mode."
+        "Submit completed work for review. Creates a reviewer that examines the changes against evaluation criteria and returns PERFECT or actionable feedback. Only works when session is in active With-Review Mode."
       paramDocs =
         map
             [ "report", "Detailed report of what was done"
@@ -19,6 +19,6 @@ let internal returnReviewerSpec: ToolSpec =
       description = "Submit your review verdict."
       paramDocs =
         map
-            [ "verdict", "PASS to accept, REJECT to reject"
-              "feedback", "Detailed, actionable feedback when rejecting; omit when passing" ]
+            [ "verdict", "PERFECT to accept, REVISE to request revision"
+              "feedback", "Detailed, actionable feedback when requesting revision; omit when passing" ]
       requiredFields = [ "verdict" ] }

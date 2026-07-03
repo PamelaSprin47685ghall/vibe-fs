@@ -14,8 +14,8 @@ let grepDetect () =
     equal "plain sentence" "plain" (detectGrepMode "foo bar")
     equal "dot star regex" "regex" (detectGrepMode "foo.*bar")
     equal "alternation regex" "regex" (detectGrepMode "a|b")
-    check "wildcard .* rejected" (checkWildcardOnly ".*" "regex")
-    check "wildcard . rejected" (checkWildcardOnly "." "regex")
+    check "wildcard .* declined" (checkWildcardOnly ".*" "regex")
+    check "wildcard . declined" (checkWildcardOnly "." "regex")
     check "concrete not wildcard" (not (checkWildcardOnly "getUserById" "plain"))
 
 let iteratorRoundTrip () =

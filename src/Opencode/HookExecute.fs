@@ -19,13 +19,6 @@ open Wanxiangshu.Shell.PatchToolsCodec
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.LivelockGuard
 
-// ponytail: heuristic network-error detection in tool output; proper fix = tools return structured errors
-let private isNetworkErrorText (text: string) : bool =
-    if System.String.IsNullOrWhiteSpace text then false
-    elif text.Contains("\n") then false
-    else
-        let lower = text.ToLowerInvariant()
-        lower.Contains("error") && lower.Contains("network")
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Shell.Dyn

@@ -28,6 +28,8 @@ let architectureTestEntriesPartB () : (string * TestBody) list =
     "ArchitectureTests.muxReviewUsesToolCopy", Sync (sync ArchitectureTestsMuxToolAux.muxReviewUsesToolCopy)
     "ArchitectureTests.muxReviewUsesFromMuxConfig", Sync (sync ArchitectureTestsMuxToolAux.muxReviewUsesFromMuxConfig)
     "ArchitectureTests.muxReviewUsesReviewToolsCodec", Sync (sync ArchitectureTestsMuxToolAux.muxReviewUsesReviewToolsCodec)
+    "ArchitectureTests.muxPluginCatalogToolExecuteAfterUsesLivelockGuard", Sync (sync ArchitectureTestsMuxToolAux.muxPluginCatalogToolExecuteAfterUsesLivelockGuard)
+    "ArchitectureTests.muxSlashCommandsLoopUsesDepsDirectory", Sync (sync ArchitectureTestsMuxToolAux.muxSlashCommandsLoopUsesDepsDirectory)
     "ArchitectureTests.executeMuxSubagentToolUsesSpawnRoleOnly", Sync (sync ArchitectureTestsSubagentToolExec.executeMuxSubagentToolUsesSpawnRoleOnly)
     "ArchitectureTests.subagentToolExecuteEmptyBatchGuard", Sync (sync ArchitectureTestsSubagentToolExec.subagentToolExecuteEmptyBatchGuard)
     "ArchitectureTests.opencodeReviewUsesToolCopy", Sync (sync ArchitectureTestsOpencodeToolsReview.opencodeReviewUsesToolCopy)

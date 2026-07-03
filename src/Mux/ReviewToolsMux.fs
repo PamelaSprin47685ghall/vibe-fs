@@ -24,27 +24,6 @@ open Wanxiangshu.Shell.PromiseStr
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.EventLogRuntime
 
-let private extractHistoryTexts (history: obj array) : string list =
-    history
-    |> Array.toList
-    |> List.collect (fun item ->
-        if Dyn.typeIs item "string" then [ string item ]
-        else
-            let texts = ResizeArray<string>()
-            let content = Dyn.str item "content"
-            if content <> "" then texts.Add(content)
-            let text = Dyn.str item "text"
-            if text <> "" then texts.Add(text)
-            let parts = Dyn.get item "parts"
-            if not (Dyn.isNullish parts) && Dyn.isArray parts then
-                for p in (parts :?> obj array) do
-                    let partText = Dyn.str p "text"
-                    if partText <> "" then texts.Add(partText)
-            List.ofSeq texts)
-
-[<Global("process")>]
-let private nodeProcess : obj = jsNative
-
 let private syncReviewFromEventLogDir (reviewStore: ReviewStore) (root: string) (sessionID: string) : JS.Promise<string option> =
     promise {
         do! syncReviewFromEventLog reviewStore root sessionID
@@ -101,7 +80,7 @@ let submitReviewTool (deps: obj) (toolNames: string array) (reviewStore: ReviewS
                                        do! appendReviewVerdict root workspaceId vStr fb |> Promise.map ignore
                                        match verdict with
                                        | Accepted _ | Terminated -> reviewStore.deactivateReview workspaceId
-                                       | Rejected _ -> ()
+                                        | NeedsRevision _ -> ()
                                        return formatReviewResult verdict
                                finally
                                    reviewStore.unlockReview workspaceId

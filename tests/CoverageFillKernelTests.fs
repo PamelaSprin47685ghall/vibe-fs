@@ -151,10 +151,10 @@ let wfgValidateUrl () =
     match validateFetchUrl "http://example.com" with Ok () -> check "http ok" true | Error _ -> check "http ok" false
     match validateFetchUrl "https://example.com/path" with Ok () -> check "https ok" true | Error _ -> check "https ok" false
     match validateFetchUrl "http://[::1]" with Error msg -> equal "ipv6 literal blocked" "host not allowed" msg | Ok () -> check "ipv6 blocked" false
-    match validateFetchUrl "not a url" with Error msg -> equal "invalid url" "invalid URL" msg | Ok () -> check "invalid rejected" false
-    match validateFetchUrl "ftp://example.com" with Error msg -> equal "ftp unsupported" "unsupported URL scheme: ftp" msg | Ok () -> check "ftp rejected" false
-    match validateFetchUrl "http://localhost" with Error msg -> equal "localhost blocked" "host not allowed" msg | Ok () -> check "localhost rejected" false
-    match validateFetchUrl "http://127.0.0.1" with Error msg -> equal "private ipv4 blocked" "host not allowed" msg | Ok () -> check "loopback rejected" false
+    match validateFetchUrl "not a url" with Error msg -> equal "invalid url" "invalid URL" msg | Ok () -> check "invalid blocked" false
+    match validateFetchUrl "ftp://example.com" with Error msg -> equal "ftp unsupported" "unsupported URL scheme: ftp" msg | Ok () -> check "ftp blocked" false
+    match validateFetchUrl "http://localhost" with Error msg -> equal "localhost blocked" "host not allowed" msg | Ok () -> check "localhost blocked" false
+    match validateFetchUrl "http://127.0.0.1" with Error msg -> equal "private ipv4 blocked" "host not allowed" msg | Ok () -> check "loopback blocked" false
     match validateFetchUrl "http://8.8.8.8" with Ok () -> check "public ip ok" true | Error _ -> check "public ip ok" false
 
 // ── Kernel.ExecutorStrip ───────────────────────────────────────────────────

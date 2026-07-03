@@ -59,8 +59,8 @@ let repeatedTodoNudgeSpec () = promise {
     check "fresh assistant output re-allows todo nudge" (nudges.Count = 2)
 }
 
-let reviewerRejectRenudgesLoopSpec () = promise {
-    let sessionID = "review-reject-ws"
+let reviewerReviseRenudgesLoopSpec () = promise {
+    let sessionID = "review-revise-ws"
     do! seedLoopActivated (processCwd ()) sessionID "Implement feature X"
     let mutable history = [| muxTextMessage "review-loop-anchor" "assistant" (loopAnchor "Implement feature X")
                              muxTextMessage "review-assistant-1" "assistant" "implemented first pass" |]
@@ -92,8 +92,8 @@ let reviewerRejectRenudgesLoopSpec () = promise {
     do! hook $ (streamEnd "implemented first pass", helpers) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
     check "active review emits loop nudge" (nudges.Count = 1 && nudges.[0].Contains(loopNudgePromptProse))
-    history <- Array.append history [| muxTextMessage "review-assistant-2" "assistant" "verdict: rejected\nfeedback: needs rework" |]
-    do! hook $ (streamEnd "verdict: rejected\nfeedback: needs rework", helpers) |> unbox<JS.Promise<unit>>
+    history <- Array.append history [| muxTextMessage "review-assistant-2" "assistant" "verdict: needs_revision\nfeedback: needs rework" |]
+    do! hook $ (streamEnd "verdict: needs_revision\nfeedback: needs rework", helpers) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
     check "reviewer reject reopens loop nudge on fresh assistant output" (nudges.Count = 2 && nudges.[1].Contains(loopNudgePromptProse))
 }

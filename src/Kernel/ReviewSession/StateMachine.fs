@@ -11,10 +11,10 @@ let transition (state: ReviewState) (command: ReviewCommand) : ReviewState * Rev
     | ReviewState.Active task, Lock reviewerId ->
         ReviewState.Locked(task, reviewerId), Some(ReviewEvent.LockAcquired reviewerId)
     | ReviewState.Active _, Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
-    | ReviewState.Active _, Reject feedback -> ReviewState.Rejected feedback, Some(ReviewEvent.Rejected feedback)
+    | ReviewState.Active _, RequestRevision feedback -> ReviewState.NeedsRevision feedback, Some(ReviewEvent.NeedsRevision feedback)
     | ReviewState.Locked(task, _), Unlock -> ReviewState.Active task, Some ReviewEvent.LockReleased
     | ReviewState.Locked _, Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
-    | ReviewState.Locked _, Reject feedback -> ReviewState.Rejected feedback, Some(ReviewEvent.Rejected feedback)
+    | ReviewState.Locked _, RequestRevision feedback -> ReviewState.NeedsRevision feedback, Some(ReviewEvent.NeedsRevision feedback)
     | _ -> state, None
 
 let isActive (state: ReviewState) : bool =
@@ -23,7 +23,7 @@ let isActive (state: ReviewState) : bool =
     | ReviewState.Accepted -> false
     | ReviewState.Active _ -> true
     | ReviewState.Locked _ -> true
-    | ReviewState.Rejected _ -> true
+    | ReviewState.NeedsRevision _ -> true
 
 let initialState = ReviewState.Inactive
 

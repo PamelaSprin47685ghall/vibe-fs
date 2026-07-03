@@ -3,14 +3,14 @@ module Wanxiangshu.Tests.ReviewVerdictTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ReviewVerdict
 
-let parseVerdictPass () =
-    equal "PASS upper" (Some Pass) (parseVerdict "PASS")
+let parseVerdictPerfect () =
+    equal "PERFECT upper" (Some Perfect) (parseVerdict "PERFECT")
 
-let parseVerdictPassLower () =
-    equal "pass lower" (Some Pass) (parseVerdict "pass")
+let parseVerdictPerfectLower () =
+    equal "perfect lower" (Some Perfect) (parseVerdict "perfect")
 
-let parseVerdictRejectPadded () =
-    equal "reject padded" (Some Reject) (parseVerdict "  reject  ")
+let parseVerdictRevisePadded () =
+    equal "revise padded" (Some Revise) (parseVerdict "  revise  ")
 
 let parseVerdictNull () =
     equal "null -> None" None (parseVerdict null)
@@ -18,52 +18,55 @@ let parseVerdictNull () =
 let parseVerdictUnknown () =
     equal "unknown -> None" None (parseVerdict "unknown")
 
-let decideReject () =
-    match decideReviewSubmission Reject "" false with
-    | Finalize(Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Rejected fb) -> equal "reject feedback" "" fb
-    | _ -> check "reject -> Finalize Rejected" false
+let parseVerdictUnknownToken () =
+    equal "unknown token -> None" None (parseVerdict "FOO")
 
-let decidePassDoubleCheckDone () =
-    match decideReviewSubmission Pass "ok" true with
+let decideRevise () =
+    match decideReviewSubmission Revise "" false with
+    | Finalize(Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.NeedsRevision fb) -> equal "revise feedback" "" fb
+    | _ -> check "revise -> Finalize NeedsRevision" false
+
+let decidePerfectDoubleCheckDone () =
+    match decideReviewSubmission Perfect "ok" true with
     | Finalize(Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb) -> equal "accepted feedback" "ok" fb
-    | _ -> check "pass+done -> Finalize Accepted" false
+    | _ -> check "perfect+done -> Finalize Accepted" false
 
-let decidePassNotDoubleCheckDone () =
-    match decideReviewSubmission Pass "" false with
-    | AskDoubleCheck -> check "pass+not done -> AskDoubleCheck" true
-    | _ -> check "pass+not done -> AskDoubleCheck" false
+let decidePerfectNotDoubleCheckDone () =
+    match decideReviewSubmission Perfect "" false with
+    | AskDoubleCheck -> check "perfect+not done -> AskDoubleCheck" true
+    | _ -> check "perfect+not done -> AskDoubleCheck" false
 
-let formatPassEmpty () =
-    equal "PASS empty" "PASS" (formatReviewVerdictMarkdown Pass "")
+let formatPerfectEmpty () =
+    equal "PERFECT empty" "PERFECT" (formatReviewVerdictMarkdown Perfect "")
 
-let formatPassWithFeedback () =
-    equal "PASS feedback" "PASS: good" (formatReviewVerdictMarkdown Pass "good")
+let formatPerfectWithFeedback () =
+    equal "PERFECT feedback" "PERFECT: good" (formatReviewVerdictMarkdown Perfect "good")
 
-let formatRejectEmpty () =
-    equal "REJECT empty" "REJECT: No feedback provided." (formatReviewVerdictMarkdown Reject "")
+let formatReviseEmpty () =
+    equal "REVISE empty" "REVISE: No feedback provided." (formatReviewVerdictMarkdown Revise "")
 
-let formatRejectWithFeedback () =
-    equal "REJECT feedback" "REJECT: bad" (formatReviewVerdictMarkdown Reject "bad")
+let formatReviseWithFeedback () =
+    equal "REVISE feedback" "REVISE: bad" (formatReviewVerdictMarkdown Revise "bad")
 
-let parseReportPass () =
-    match parseReviewReportMarkdown "PASS" with
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> equal "PASS empty fb" "" fb
-    | _ -> check "PASS -> Accepted" false
+let parseReportPerfect () =
+    match parseReviewReportMarkdown "PERFECT" with
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> equal "PERFECT empty fb" "" fb
+    | _ -> check "PERFECT -> Accepted" false
 
-let parseReportPassFeedback () =
-    match parseReviewReportMarkdown "PASS: ok" with
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> equal "PASS ok fb" "ok" fb
-    | _ -> check "PASS: ok -> Accepted ok" false
+let parseReportPerfectFeedback () =
+    match parseReviewReportMarkdown "PERFECT: ok" with
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb -> equal "PERFECT ok fb" "ok" fb
+    | _ -> check "PERFECT: ok -> Accepted ok" false
 
-let parseReportReject () =
-    match parseReviewReportMarkdown "REJECT: bad" with
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Rejected fb -> equal "REJECT bad fb" "bad" fb
-    | _ -> check "REJECT: bad -> Rejected bad" false
+let parseReportRevise () =
+    match parseReviewReportMarkdown "REVISE: bad" with
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.NeedsRevision fb -> equal "REVISE bad fb" "bad" fb
+    | _ -> check "REVISE: bad -> NeedsRevision bad" false
 
-let parseReportRejectEmpty () =
-    match parseReviewReportMarkdown "REJECT" with
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Rejected fb -> equal "REJECT empty fb" "" fb
-    | _ -> check "REJECT -> Rejected empty" false
+let parseReportUnrecognizedMarkdownTerminated () =
+    match parseReviewReportMarkdown "MAYBE: bad" with
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Terminated -> check "unrecognized markdown -> Terminated" true
+    | _ -> check "unrecognized markdown -> Terminated" false
 
 let parseReportUnknown () =
     match parseReviewReportMarkdown "unknown" with
@@ -76,21 +79,22 @@ let parseReportNull () =
     | _ -> check "null -> Terminated" false
 
 let run () : unit =
-    parseVerdictPass ()
-    parseVerdictPassLower ()
-    parseVerdictRejectPadded ()
+    parseVerdictPerfect ()
+    parseVerdictPerfectLower ()
+    parseVerdictRevisePadded ()
+    parseVerdictUnknownToken ()
     parseVerdictNull ()
     parseVerdictUnknown ()
-    decideReject ()
-    decidePassDoubleCheckDone ()
-    decidePassNotDoubleCheckDone ()
-    formatPassEmpty ()
-    formatPassWithFeedback ()
-    formatRejectEmpty ()
-    formatRejectWithFeedback ()
-    parseReportPass ()
-    parseReportPassFeedback ()
-    parseReportReject ()
-    parseReportRejectEmpty ()
+    decideRevise ()
+    decidePerfectDoubleCheckDone ()
+    decidePerfectNotDoubleCheckDone ()
+    formatPerfectEmpty ()
+    formatPerfectWithFeedback ()
+    formatReviseEmpty ()
+    formatReviseWithFeedback ()
+    parseReportPerfect ()
+    parseReportPerfectFeedback ()
+    parseReportRevise ()
+    parseReportUnrecognizedMarkdownTerminated ()
     parseReportUnknown ()
     parseReportNull ()

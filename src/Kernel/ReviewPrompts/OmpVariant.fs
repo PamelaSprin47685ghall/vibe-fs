@@ -4,9 +4,9 @@ open Wanxiangshu.Kernel.ReviewPrompts.Instructions
 
 let reviewerNudgePrompt =
     "Submit your review verdict now via return_reviewer:\n"
-    + "  return_reviewer({ \"verdict\": \"PASS\" })                          // Accept\n"
-    + "  return_reviewer({ \"verdict\": \"REJECT\", \"feedback\": \"details...\" }) // Reject\n\n"
-    + "verdict MUST be exactly \"PASS\" or \"REJECT\". Do not explain what you plan to do — call the tool immediately."
+    + "  return_reviewer({ \"verdict\": \"PERFECT\" })                          // Accept\n"
+    + "  return_reviewer({ \"verdict\": \"REVISE\", \"feedback\": \"details...\" }) // Request revision\n\n"
+    + "verdict MUST be exactly \"PERFECT\" or \"REVISE\". Do not explain what you plan to do — call the tool immediately."
 
 let reviewInstructionsOmp = reviewInstructionsProse
 

@@ -52,7 +52,7 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
                     parts.Add(box {| ``type`` = "text"; text = preReviewPassedMessage task |})
                 | Terminated ->
                     parts.Add(box {| ``type`` = "text"; text = preReviewCouldNotComplete |})
-                | Rejected feedback ->
+                | NeedsRevision feedback ->
                     do! appendLoopActivated directory sessionID task |> Promise.map ignore
                     reviewStore.activateReview(sessionID, task, getTimestampMs())
                     let msg = buildLoopMessage task [ withReviewPreReviewFeedbackHeader; ""; feedback; ""; "Address the feedback above, then call submit_review with:" ]

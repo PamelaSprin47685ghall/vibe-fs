@@ -32,12 +32,12 @@ let run () =
     | None -> check "s1 exists after Accept" false
     check "Accepted not active" (not (isActive r3.["s1"].state))
 
-    // Reject
-    let r4 = reduce r2 (RegistryAction.Reject("s1", "fix it"))
+    // RequestRevision
+    let r4 = reduce r2 (RegistryAction.RequestRevision("s1", "fix it"))
     match Map.tryFind "s1" r4 with
-    | Some s -> equal "Reject->Rejected" (ReviewState.Rejected "fix it") s.state
-    | None -> check "s1 exists after Reject" false
-    check "Rejected still active" (isActive r4.["s1"].state)
+    | Some s -> equal "RequestRevision->NeedsRevision" (ReviewState.NeedsRevision "fix it") s.state
+    | None -> check "s1 exists after RequestRevision" false
+    check "NeedsRevision still active" (isActive r4.["s1"].state)
 
     // Deactivate
     let r5d = reduce r1 (RegistryAction.Deactivate "s1")
@@ -62,5 +62,5 @@ let run () =
 
     // actionFor
     equal "Accepted->Accept" (RegistryAction.Accept "s1") (actionFor "s1" (Accepted ""))
-    equal "Rejected->Reject" (RegistryAction.Reject("s1", "bad")) (actionFor "s1" (Rejected "bad"))
+    equal "NeedsRevision->RequestRevision" (RegistryAction.RequestRevision("s1", "bad")) (actionFor "s1" (NeedsRevision "bad"))
     equal "Terminated->Deactivate" (RegistryAction.Deactivate "s1") (actionFor "s1" Terminated)

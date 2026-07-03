@@ -23,8 +23,8 @@ let isActiveLocked () =
 let isActiveAccepted () =
     check "isActive Accepted = false" (not (isActive ReviewState.Accepted))
 
-let isActiveRejected () =
-    check "isActive Rejected = true" (isActive (ReviewState.Rejected "fb"))
+let isActiveNeedsRevision () =
+    check "isActive NeedsRevision = true" (isActive (ReviewState.NeedsRevision "fb"))
 
 // --- transition (all branches) ---
 
@@ -48,10 +48,10 @@ let transitionActiveAccept () =
     equal "state→Accepted" ReviewState.Accepted s
     equal "event→Accepted" (Some ReviewEvent.Accepted) ev
 
-let transitionActiveReject () =
-    let s, ev = transition (ReviewState.Active "t") (Reject "fb")
-    equal "state→Rejected" (ReviewState.Rejected "fb") s
-    equal "event→Rejected" (Some (ReviewEvent.Rejected "fb")) ev
+let transitionActiveRequestRevision () =
+    let s, ev = transition (ReviewState.Active "t") (RequestRevision "fb")
+    equal "state→NeedsRevision" (ReviewState.NeedsRevision "fb") s
+    equal "event→NeedsRevision" (Some (ReviewEvent.NeedsRevision "fb")) ev
 
 let transitionLockedUnlock () =
     let s, ev = transition (ReviewState.Locked("t", "rid")) Unlock
@@ -63,10 +63,10 @@ let transitionLockedAccept () =
     equal "state→Accepted" ReviewState.Accepted s
     equal "event→Accepted" (Some ReviewEvent.Accepted) ev
 
-let transitionLockedReject () =
-    let s, ev = transition (ReviewState.Locked("t", "rid")) (Reject "fb")
-    equal "state→Rejected" (ReviewState.Rejected "fb") s
-    equal "event→Rejected" (Some (ReviewEvent.Rejected "fb")) ev
+let transitionLockedRequestRevision () =
+    let s, ev = transition (ReviewState.Locked("t", "rid")) (RequestRevision "fb")
+    equal "state→NeedsRevision" (ReviewState.NeedsRevision "fb") s
+    equal "event→NeedsRevision" (Some (ReviewEvent.NeedsRevision "fb")) ev
 
 let transitionNoopInactiveSubmit () =
     let s, ev = transition ReviewState.Inactive Submit
@@ -78,9 +78,9 @@ let transitionNoopAcceptedLock () =
     equal "noop state" ReviewState.Accepted s
     equal "noop event" None ev
 
-let transitionNoopRejectedActivate () =
-    let s, ev = transition (ReviewState.Rejected "x") (Activate "t")
-    equal "noop state" (ReviewState.Rejected "x") s
+let transitionNoopNeedsRevisionActivate () =
+    let s, ev = transition (ReviewState.NeedsRevision "x") (Activate "t")
+    equal "noop state" (ReviewState.NeedsRevision "x") s
     equal "noop event" None ev
 
 // --- applyCommand ---
@@ -104,10 +104,10 @@ let decideAfterRoundResolvedAccepted () =
         (Finish (ReviewResult.Accepted "ok"))
         (decideAfterRound 0 (Resolved (ReviewResult.Accepted "ok")) 3)
 
-let decideAfterRoundResolvedRejected () =
-    equal "Resolved Rejected→Finish Rejected"
-        (Finish (ReviewResult.Rejected "bad"))
-        (decideAfterRound 0 (Resolved (ReviewResult.Rejected "bad")) 3)
+let decideAfterRoundResolvedNeedsRevision () =
+    equal "Resolved NeedsRevision→Finish NeedsRevision"
+        (Finish (ReviewResult.NeedsRevision "bad"))
+        (decideAfterRound 0 (Resolved (ReviewResult.NeedsRevision "bad")) 3)
 
 let decideAfterRoundPromptFailed () =
     equal "PromptFailed→Finish Terminated"
@@ -142,22 +142,22 @@ let run () =
     isActiveActive ()
     isActiveLocked ()
     isActiveAccepted ()
-    isActiveRejected ()
+    isActiveNeedsRevision ()
     transitionInactiveActivate ()
     transitionActiveSubmit ()
     transitionActiveLock ()
     transitionActiveAccept ()
-    transitionActiveReject ()
+    transitionActiveRequestRevision ()
     transitionLockedUnlock ()
     transitionLockedAccept ()
-    transitionLockedReject ()
+    transitionLockedRequestRevision ()
     transitionNoopInactiveSubmit ()
     transitionNoopAcceptedLock ()
-    transitionNoopRejectedActivate ()
+    transitionNoopNeedsRevisionActivate ()
     applyCommandIncrementsVersion ()
     applyCommandNoop ()
     decideAfterRoundResolvedAccepted ()
-    decideAfterRoundResolvedRejected ()
+    decideAfterRoundResolvedNeedsRevision ()
     decideAfterRoundPromptFailed ()
     decideAfterRoundNoResultBelowMax ()
     decideAfterRoundNoResultAtMax ()

@@ -36,7 +36,7 @@ let handleLoopReviewCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: 
                 match result with
                 | Accepted _ -> notifyInfo $"Pre-review passed. Task \"{task}\" already meets criteria — no loop needed."
                 | Terminated -> notifyInfo "Pre-review could not complete."
-                | Rejected feedback ->
+                | NeedsRevision feedback ->
                     do! appendLoopActivated root sessionId task |> Promise.map ignore
                     store.activateReview(sessionId, task, getTimestampMs())
                     pi?sendMessage(

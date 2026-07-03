@@ -65,7 +65,7 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangs
                                         match result with
                                         | Accepted _
                                         | Terminated -> store.deactivateReview sessionID
-                                        | Rejected _ -> ()
+                                        | NeedsRevision _ -> ()
                                         return formatReviewResult result
                                 finally
                                     store.unlockReview sessionID
@@ -73,7 +73,7 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangs
 
 let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     define submitReviewResult
-        (box {| verdict = enumReq [| "PASS"; "REJECT" |] Params.returnReviewerVerdict
+        (box {| verdict = enumReq [| "PERFECT"; "REVISE" |] Params.returnReviewerVerdict
                 feedback = strOpt Params.returnReviewerFeedback |})
         (fun args context ->
             let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)

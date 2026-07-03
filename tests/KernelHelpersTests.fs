@@ -61,8 +61,8 @@ let isCapsSynthIdMatches () =
     check "bare prefix accepted" (isCapsSynthId "caps-synth-")
 
 let isCapsSynthIdRejects () =
-    check "empty string rejected" (not (isCapsSynthId ""))
-    check "no prefix rejected" (not (isCapsSynthId "other-123"))
+    check "empty string invalid caps id" (not (isCapsSynthId ""))
+    check "no prefix invalid caps id" (not (isCapsSynthId "other-123"))
     check "nullish not applicable (value type is string)" true
 
 // ── WarnTdd ─────────────────────────────────────────────────────────────────

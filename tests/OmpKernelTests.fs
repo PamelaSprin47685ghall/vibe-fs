@@ -38,7 +38,7 @@ let validateFetchUrlBlocksPrivate () =
 
 let reviewInstructionsCanonicalVerdictTool () =
     check "reviewInstructions has return_reviewer" (reviewInstructions.Contains "return_reviewer")
-    check "reviewInstructions PASS token" (reviewInstructions.Contains "verdict")
+    check "reviewInstructions PERFECT token" (reviewInstructions.Contains "PERFECT")
     check "reviewInstructions no submit_review_result" (not (reviewInstructions.Contains "submit_review_result"))
     let initial = buildOmpReviewInitialPrompt "report body" [ "src/a.fs" ] (Some "fix login")
     check "initial prompt has return_reviewer" (initial.Contains "return_reviewer")

@@ -20,5 +20,5 @@ let blocksLocalhostAndPrivateRanges () =
 
 let rejectsUnsupportedScheme () =
     match validateFetchUrl "file:///etc/passwd" with
-    | Error msg -> check "file scheme rejected" (msg.Contains "scheme")
+    | Error msg -> check "file scheme blocked" (msg.Contains "scheme")
     | Ok () -> check "file scheme must not pass" false

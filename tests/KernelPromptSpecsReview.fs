@@ -44,14 +44,14 @@ let loopMessagesShared () =
 let reviewerVerdictPromptsShared () =
     let verdict = ReviewerVerdictPrompts.reviewerVerdictInstructions
     check "reviewer verdict mentions agent_report" (verdict.Contains "agent_report")
-    check "reviewer verdict mentions PASS" (verdict.Contains "PASS")
-    check "reviewer verdict mentions REJECT" (verdict.Contains "REJECT")
+    check "reviewer verdict mentions PERFECT" (verdict.Contains "PERFECT")
+    check "reviewer verdict mentions REVISE" (verdict.Contains "REVISE")
     check "reviewer verdict mentions feedback" (verdict.Contains "feedback")
 
     let preReview = ReviewerVerdictPrompts.loopReviewVerdictInstructions
     check "loop-review verdict mentions agent_report" (preReview.Contains "agent_report")
-    check "loop-review verdict mentions PASS" (preReview.Contains "PASS")
-    check "loop-review verdict mentions REJECT" (preReview.Contains "REJECT")
+    check "loop-review verdict mentions PERFECT" (preReview.Contains "PERFECT")
+    check "loop-review verdict mentions REVISE" (preReview.Contains "REVISE")
     check "loop-review verdict mentions actionable" (preReview.Contains "actionable")
 
 let reviewResultFormattingShared () =
@@ -59,9 +59,9 @@ let reviewResultFormattingShared () =
     check "accepted text mentions passed" (accepted.ToLower().Contains "passed" || accepted.ToLower().Contains "accepted")
     check "accepted text signals with-review ended" (accepted.ToLower().Contains "with-review")
 
-    let rejected = formatReviewResult (ReviewResult.Rejected "missing tests")
-    check "rejected text embeds feedback" (rejected.Contains "missing tests")
-    check "rejected text instructs to retry" (rejected.Contains "submit_review")
+    let needsRevision = formatReviewResult (ReviewResult.NeedsRevision "missing tests")
+    check "needs_revision text embeds feedback" (needsRevision.Contains "missing tests")
+    check "needs_revision text instructs to retry" (needsRevision.Contains "submit_review")
 
     let terminated = formatReviewResult ReviewResult.Terminated
     check "terminated text mentions terminated" (terminated.ToLower().Contains "terminat")
@@ -81,39 +81,40 @@ let domainErrorsShared () =
     check "err6 is upstream refused" (match err6 with DomainError.UpstreamRefused "rate limit" -> true | _ -> false)
 
 let reviewVerdictDecode () =
-    equal "PASS decodes to Pass" (Some Pass) (parseVerdict "PASS")
-    equal "REJECT decodes to Reject" (Some Reject) (parseVerdict "REJECT")
-    equal "lowercase pass decodes" (Some Pass) (parseVerdict "pass")
-    equal "mixed-case Reject decodes" (Some Reject) (parseVerdict "  Reject ")
+    equal "PERFECT decodes to Perfect" (Some Perfect) (parseVerdict "PERFECT")
+    equal "REVISE decodes to Revise" (Some Revise) (parseVerdict "REVISE")
+    equal "unknown token is not a verdict" None (parseVerdict "FOO")
+    equal "lowercase perfect decodes" (Some Perfect) (parseVerdict "perfect")
+    equal "mixed-case Revise decodes" (Some Revise) (parseVerdict "  Revise ")
     equal "string null is not a verdict" None (parseVerdict "null")
     equal "empty is not a verdict" None (parseVerdict "")
     equal "garbage is not a verdict" None (parseVerdict "maybe")
 
 let reviewDecisionPolicy () =
-    equal "reject finalizes as rejected with feedback"
-        (Finalize (Rejected "missing tests")) (decideReviewSubmission Reject "missing tests" false)
-    equal "reject with empty feedback still finalizes as rejected"
-        (Finalize (Rejected "")) (decideReviewSubmission Reject "" true)
-    equal "pass before double-check asks for re-evaluation"
-        AskDoubleCheck (decideReviewSubmission Pass "" false)
-    equal "pass after double-check finalizes as accepted"
-        (Finalize (Accepted "")) (decideReviewSubmission Pass "" true)
+    equal "revise finalizes as needs_revision with feedback"
+        (Finalize (NeedsRevision "missing tests")) (decideReviewSubmission Revise "missing tests" false)
+    equal "revise with empty feedback still finalizes as needs_revision"
+        (Finalize (NeedsRevision "")) (decideReviewSubmission Revise "" true)
+    equal "perfect before double-check asks for re-evaluation"
+        AskDoubleCheck (decideReviewSubmission Perfect "" false)
+    equal "perfect after double-check finalizes as accepted"
+        (Finalize (Accepted "")) (decideReviewSubmission Perfect "" true)
 
 let reviewMarkdownCodec () =
-    check "format pass is exactly PASS" (formatReviewVerdictMarkdown Pass "" = "PASS")
-    check "format pass with feedback" ((formatReviewVerdictMarkdown Pass "nice style").Contains "nice style")
-    check "format pass with feedback starts with PASS" ((formatReviewVerdictMarkdown Pass "nice style").StartsWith "PASS")
-    check "format reject embeds feedback" ((formatReviewVerdictMarkdown Reject "fix the leak").Contains "fix the leak")
-    check "format reject starts with REJECT" ((formatReviewVerdictMarkdown Reject "fix the leak").StartsWith "REJECT")
-    check "format reject empty feedback still rejects" ((formatReviewVerdictMarkdown Reject "").StartsWith "REJECT")
-    equal "parse PASS markdown -> Accepted" (Accepted "") (parseReviewReportMarkdown "PASS")
-    equal "parse PASS with feedback -> Accepted with feedback" (Accepted "nice work") (parseReviewReportMarkdown "PASS: nice work")
-    equal "parse REJECT markdown -> Rejected feedback" (Rejected "fix the leak") (parseReviewReportMarkdown "REJECT: fix the leak")
+    check "format perfect is exactly PERFECT" (formatReviewVerdictMarkdown Perfect "" = "PERFECT")
+    check "format perfect with feedback" ((formatReviewVerdictMarkdown Perfect "nice style").Contains "nice style")
+    check "format perfect with feedback starts with PERFECT" ((formatReviewVerdictMarkdown Perfect "nice style").StartsWith "PERFECT")
+    check "format revise embeds feedback" ((formatReviewVerdictMarkdown Revise "fix the leak").Contains "fix the leak")
+    check "format revise starts with REVISE" ((formatReviewVerdictMarkdown Revise "fix the leak").StartsWith "REVISE")
+    check "format revise empty feedback placeholder" ((formatReviewVerdictMarkdown Revise "").StartsWith "REVISE")
+    equal "parse PERFECT markdown -> Accepted" (Accepted "") (parseReviewReportMarkdown "PERFECT")
+    equal "parse PERFECT with feedback -> Accepted with feedback" (Accepted "nice work") (parseReviewReportMarkdown "PERFECT: nice work")
+    equal "parse REVISE markdown -> NeedsRevision feedback" (NeedsRevision "fix the leak") (parseReviewReportMarkdown "REVISE: fix the leak")
     equal "parse unrecognized markdown -> Terminated" Terminated (parseReviewReportMarkdown "I think it looks fine")
     equal "parse empty markdown -> Terminated" Terminated (parseReviewReportMarkdown "")
-    equal "round-trip pass" (Accepted "") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Pass ""))
-    equal "round-trip pass with feedback" (Accepted "looks good") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Pass "looks good"))
-    equal "round-trip reject non-empty" (Rejected "needs work") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Reject "needs work"))
+    equal "round-trip perfect" (Accepted "") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Perfect ""))
+    equal "round-trip perfect with feedback" (Accepted "looks good") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Perfect "looks good"))
+    equal "round-trip revise non-empty" (NeedsRevision "needs work") (parseReviewReportMarkdown (formatReviewVerdictMarkdown Revise "needs work"))
 
 let executorSummarizerNoExitStatus () =
     let prompt = executorSummarizerPrompt "" "raw" "shell" "echo 1" [] "short" "ro"

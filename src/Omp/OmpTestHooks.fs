@@ -104,7 +104,7 @@ let setPendingReviewStateForTest (store: ReviewStore) (sessionId: string) (paren
             match kr with
             | Accepted fb ->
                 createObj [ "accepted", box true; "feedback", (if fb = "" then null else box fb); "terminated", null ]
-            | Rejected fb ->
+            | NeedsRevision fb ->
                 createObj [ "accepted", box false; "feedback", box fb; "terminated", null ]
             | Terminated ->
                 createObj [

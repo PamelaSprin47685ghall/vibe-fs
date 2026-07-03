@@ -46,9 +46,9 @@ let firstPassDoubleChecksSpec () = promise {
     setPending store sessionID resolved
     let history = [| opencodeTextMessage sessionID "activation" (buildLoopMessage "Implement feature X" [ "With-Review Mode is active." ]) |]
     let returnTool = returnReviewerTool workspaceDir history store
-    let! result = execVerdict returnTool (createObj [ "verdict", box "PASS"; "feedback", box null ]) (reviewerContext workspaceDir sessionID)
-    check "opencode return_reviewer first PASS returns double-check prompt" (result.Contains "double-check:")
-    check "opencode return_reviewer first PASS does not resolve pending review" (resolved.Value = None)
+    let! result = execVerdict returnTool (createObj [ "verdict", box "PERFECT"; "feedback", box null ]) (reviewerContext workspaceDir sessionID)
+    check "opencode return_reviewer first PERFECT returns double-check prompt" (result.Contains "double-check:")
+    check "opencode return_reviewer first PERFECT does not resolve pending review" (resolved.Value = None)
     do! rmAsync workspaceDir
 }
 
@@ -62,35 +62,35 @@ let secondPassResolvesAcceptedSpec () = promise {
         [| opencodeTextMessage sessionID "activation" (buildLoopMessage "Implement feature X" [ "With-Review Mode is active." ])
            opencodeTextMessage sessionID "double-check" "---\ndouble-check: confirmed\n---\nok" |]
     let returnTool = returnReviewerTool workspaceDir history store
-    let! result = execVerdict returnTool (createObj [ "verdict", box "PASS"; "feedback", box null ]) (reviewerContext workspaceDir sessionID)
-    check "opencode return_reviewer second PASS reports submitted" (result.Contains "Verdict submitted.")
-    check "opencode return_reviewer second PASS resolves accepted" (resolved.Value = Some (Accepted ""))
+    let! result = execVerdict returnTool (createObj [ "verdict", box "PERFECT"; "feedback", box null ]) (reviewerContext workspaceDir sessionID)
+    check "opencode return_reviewer second PERFECT reports submitted" (result.Contains "Verdict submitted.")
+    check "opencode return_reviewer second PERFECT resolves accepted" (resolved.Value = Some (Accepted ""))
     do! rmAsync workspaceDir
 }
 
-let rejectResolvesRejectedSpec () = promise {
-    let! workspaceDir = mkdtempAsync "opencode-return-reviewer-reject-"
-    let sessionID = "opencode-return-reviewer-reject"
+let reviseResolvesNeedsRevisionSpec () = promise {
+    let! workspaceDir = mkdtempAsync "opencode-return-reviewer-revise-"
+    let sessionID = "opencode-return-reviewer-revise"
     let store = createReviewStore ()
     let resolved = ref None
     setPending store sessionID resolved
     let returnTool = returnReviewerTool workspaceDir [||] store
-    let! result = execVerdict returnTool (createObj [ "verdict", box "REJECT"; "feedback", box "missing tests" ]) (reviewerContext workspaceDir sessionID)
-    check "opencode return_reviewer REJECT reports submitted" (result.Contains "Verdict submitted.")
-    check "opencode return_reviewer REJECT resolves rejected with feedback" (resolved.Value = Some (Rejected "missing tests"))
+    let! result = execVerdict returnTool (createObj [ "verdict", box "REVISE"; "feedback", box "missing tests" ]) (reviewerContext workspaceDir sessionID)
+    check "opencode return_reviewer REVISE reports submitted" (result.Contains "Verdict submitted.")
+    check "opencode return_reviewer REVISE resolves needs_revision with feedback" (resolved.Value = Some (NeedsRevision "missing tests"))
     do! rmAsync workspaceDir
 }
 
-let rejectEmptyFeedbackStillRejectsSpec () = promise {
-    let! workspaceDir = mkdtempAsync "opencode-return-reviewer-reject-empty-"
-    let sessionID = "opencode-return-reviewer-reject-empty"
+let reviseEmptyFeedbackStillNeedsRevisionSpec () = promise {
+    let! workspaceDir = mkdtempAsync "opencode-return-reviewer-revise-empty-"
+    let sessionID = "opencode-return-reviewer-revise-empty"
     let store = createReviewStore ()
     let resolved = ref None
     setPending store sessionID resolved
     let returnTool = returnReviewerTool workspaceDir [||] store
-    let! result = execVerdict returnTool (createObj [ "verdict", box "REJECT"; "feedback", box null ]) (reviewerContext workspaceDir sessionID)
-    check "opencode return_reviewer REJECT empty feedback reports submitted" (result.Contains "Verdict submitted.")
-    check "opencode return_reviewer REJECT empty feedback still rejects" (resolved.Value = Some (Rejected ""))
+    let! result = execVerdict returnTool (createObj [ "verdict", box "REVISE"; "feedback", box null ]) (reviewerContext workspaceDir sessionID)
+    check "opencode return_reviewer REVISE empty feedback reports submitted" (result.Contains "Verdict submitted.")
+    check "opencode return_reviewer REVISE empty feedback still needs_revision" (resolved.Value = Some (NeedsRevision ""))
     do! rmAsync workspaceDir
 }
 
@@ -110,7 +110,7 @@ let invalidVerdictNudgesSpec () = promise {
 let run () : JS.Promise<unit> = promise {
     do! firstPassDoubleChecksSpec ()
     do! secondPassResolvesAcceptedSpec ()
-    do! rejectResolvesRejectedSpec ()
-    do! rejectEmptyFeedbackStillRejectsSpec ()
+    do! reviseResolvesNeedsRevisionSpec ()
+    do! reviseEmptyFeedbackStillNeedsRevisionSpec ()
     do! invalidVerdictNudgesSpec ()
 }

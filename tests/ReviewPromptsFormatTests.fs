@@ -41,13 +41,13 @@ let formatReviewResultAcceptedWithFeedback () =
     check "accepted with feedback contains feedback text" (text.Contains feedback)
     check "accepted with feedback contains Review passed with feedback" (text.Contains "Review passed with the following feedback")
 
-let formatReviewResultRejected () =
+let formatReviewResultNeedsRevision () =
     let feedback = "Fix the boundary checks."
-    let result = Rejected feedback
+    let result = NeedsRevision feedback
     let text = formatReviewResult result
-    check "rejected contains verdict" (text.Contains "rejected")
-    check "rejected contains feedback" (text.Contains feedback)
-    check "rejected keeps With-Review Mode active" (text.Contains "With-Review Mode is still active")
+    check "needs_revision contains verdict" (text.Contains "needs_revision")
+    check "needs_revision contains feedback" (text.Contains feedback)
+    check "needs_revision keeps With-Review Mode active" (text.Contains "With-Review Mode is still active")
 
 let formatReviewResultTerminated () =
     let result = Terminated
@@ -113,7 +113,7 @@ let run () =
     submitReviewWipAcknowledgmentNonEmpty ()
     formatReviewResultAcceptedNoFeedback ()
     formatReviewResultAcceptedWithFeedback ()
-    formatReviewResultRejected ()
+    formatReviewResultNeedsRevision ()
     formatReviewResultTerminated ()
     parseMultiFrontMatterMerging ()
     parseMultiFrontMatterScalars ()

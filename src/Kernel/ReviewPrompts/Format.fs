@@ -28,8 +28,8 @@ let formatReviewResult (result: ReviewResult) : string =
         frontMatterPrompt
             [ yamlField verdictField verdictTerminated ]
             "Review terminated without verdict. With-Review Mode is still active; fix the issues and call submit_review again."
-    | ReviewResult.Rejected feedback ->
+    | ReviewResult.NeedsRevision feedback ->
         frontMatterPrompt
-            [ yamlField verdictField verdictRejected
+            [ yamlField verdictField verdictNeedsRevision
               yamlField "feedback" feedback ]
             "Address the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."

@@ -13,7 +13,7 @@ let doubleCheckPrompt (task: string) : string =
     frontMatterPrompt
         ([ yamlField doubleCheckField doubleCheckChallenge ]
          @ taskLine)
-        "If you insist on PASS, otherwise please REJECT with detailed feedback."
+        "If you insist on PERFECT, otherwise please use REVISE with detailed feedback."
 
 let reviewerPrompt (task: string) (report: string) (affectedFiles: string list) : string =
     let taskLine = if task <> "" then [ yamlField originalTaskField task ] else []

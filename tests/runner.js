@@ -6,6 +6,6 @@ const runAll = isE2e
 runAll(process.argv.slice(2).filter(a => a !== '--e2e'))
     .then(code => process.exit(code))
     .catch(err => {
-        console.error('RUNALL_REJECTED:', err && err.message ? err.message : err);
+        console.error('RUNALL_FAILED:', err && err.message ? err.message : err);
         process.exit(2);
     });

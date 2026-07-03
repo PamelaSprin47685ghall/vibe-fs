@@ -27,7 +27,7 @@ let private attachReviewChild (store: ReviewStore) (parentId: string) (childId: 
         let js =
             match kr with
             | Accepted fb -> { accepted = Some true; feedback = (if fb = "" then None else Some fb); terminated = None }
-            | Rejected fb -> { accepted = Some false; feedback = Some fb; terminated = None }
+            | NeedsRevision fb -> { accepted = Some false; feedback = Some fb; terminated = None }
             | Terminated -> terminatedResult "Review session closed."
         onResolve js)
 
@@ -120,7 +120,7 @@ let runReviewLoop (pi: obj) (ctx: obj) (store: ReviewStore) (parentId: string) (
 let private jsToReviewResult (js: JsReviewResult) : ReviewResult =
     if defaultArg js.terminated false then Terminated
     elif js.accepted = Some true then Accepted(defaultArg js.feedback "")
-    elif js.accepted = Some false then Rejected(defaultArg js.feedback "")
+    elif js.accepted = Some false then NeedsRevision(defaultArg js.feedback "")
     else Terminated
 
 let runPreReviewerSession (pi: obj) (ctx: obj) (store: ReviewStore) (task: string) : JS.Promise<ReviewResult> =

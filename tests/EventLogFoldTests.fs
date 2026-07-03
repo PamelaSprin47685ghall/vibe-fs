@@ -23,11 +23,11 @@ let foldReviewTaskAcceptClears () =
           ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictAccepted ]) ]
     equal "accept clears" None (foldReviewTask "s1" events)
 
-let foldReviewTaskRejectStays () =
+let foldReviewTaskNeedsRevisionStays () =
     let events =
         [ ev "s1" eventKindLoopActivated (Map [ "task", "ship S1" ])
-          ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictRejected ]) ]
-    equal "reject keeps" (Some "ship S1") (foldReviewTask "s1" events)
+          ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictNeedsRevision ]) ]
+    equal "needs_revision keeps" (Some "ship S1") (foldReviewTask "s1" events)
 
 let foldReviewTaskLastActivateWins () =
     let events =
@@ -83,7 +83,7 @@ let run () =
     foldReviewTaskEmpty ()
     foldReviewTaskActivate ()
     foldReviewTaskAcceptClears ()
-    foldReviewTaskRejectStays ()
+    foldReviewTaskNeedsRevisionStays ()
     foldReviewTaskLastActivateWins ()
     foldReviewTaskCancelClears ()
     foldWorkBacklogLatestEntry ()

@@ -108,7 +108,7 @@ let resolveDelegatedAgentAiSettingsFrontmatterRejectSpec () = promise {
             box (System.Func<obj, string, obj>(fun (_cf: obj) (_wid: string) -> createObj [ "workspace", null ]))
             "resolveAgentFrontmatter",
             box (System.Func<obj, obj, string, JS.Promise<obj>>(fun (_rt: obj) (_cwd: obj) (_agentId: string) ->
-                Promise.reject (exn "resolveAgentFrontmatter rejected")))
+                Promise.reject (exn "resolveAgentFrontmatter failed")))
         ]
 
     let config = createObj [ "cwd", box "/tmp"; "runtime", box (createObj []) ]

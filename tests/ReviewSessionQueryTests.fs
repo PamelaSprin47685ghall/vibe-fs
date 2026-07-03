@@ -30,9 +30,9 @@ let hasActiveReviewStateAccepted () =
     check "Accepted not active" (not (Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState
     (regFromList [ mkReviewSession "s" ReviewState.Accepted 0 ]) "s"))
 
-let hasActiveReviewStateRejected () =
-    check "Rejected is active" (Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState
-    (regFromList [ mkReviewSession "s" (ReviewState.Rejected "bad") 0 ]) "s")
+let hasActiveReviewStateNeedsRevision () =
+    check "NeedsRevision is active" (Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState
+    (regFromList [ mkReviewSession "s" (ReviewState.NeedsRevision "bad") 0 ]) "s")
 
 let hasActiveReviewStateMissing () =
     check "missing not active" (not (Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState emptyRegistry "nope"))
@@ -104,7 +104,7 @@ let run () =
     hasActiveReviewStateLocked ()
     hasActiveReviewStateInactive ()
     hasActiveReviewStateAccepted ()
-    hasActiveReviewStateRejected ()
+    hasActiveReviewStateNeedsRevision ()
     hasActiveReviewStateMissing ()
     taskOfPresent ()
     taskOfMissing ()

@@ -58,7 +58,7 @@ let private toolText (result: obj) : string =
     if content.Length = 0 then failwith "tool result content is empty"
     str content.[0] "text"
 
-let returnReviewerVerdictPassReject () = promise {
+let returnReviewerVerdictPerfectRevise () = promise {
     resetPluginState ()
     let h = createPiHarness ()
     let pi = piObject h
@@ -72,15 +72,15 @@ let returnReviewerVerdictPassReject () = promise {
     reviewStore.setPendingReview(reviewSessionId, fun kr -> firstKr <- Some kr)
     let ctx1 = createObj [ "sessionManager", box(createObj [ "getSessionId", box(fun () -> box reviewSessionId) ]) ]
     let! passResult =
-        executeTool tool "call-1" (createObj [ "verdict", box "PASS" ]) ctx1
-    equal "PASS verdict" (Some (Accepted "")) firstKr
-    equal "PASS result text" "Review submitted: accepted." (toolText passResult)
+        executeTool tool "call-1" (createObj [ "verdict", box "PERFECT" ]) ctx1
+    equal "PERFECT verdict" (Some (Accepted "")) firstKr
+    equal "PERFECT result text" "Review submitted: accepted." (toolText passResult)
     let mutable secondKr : ReviewResult option = None
     reviewStore.setPendingReview(reviewSessionId, fun kr -> secondKr <- Some kr)
     let! rejectResult =
-        executeTool tool "call-2" (createObj [ "verdict", box "REJECT"; "feedback", box "Fix it" ]) ctx1
-    equal "REJECT verdict" (Some (Rejected "Fix it")) secondKr
-    equal "reject result text" "Review submitted: rejected with feedback." (toolText rejectResult)
+        executeTool tool "call-2" (createObj [ "verdict", box "REVISE"; "feedback", box "Fix it" ]) ctx1
+    equal "REVISE verdict" (Some (NeedsRevision "Fix it")) secondKr
+    equal "revise result text" "Review submitted: revision requested with feedback." (toolText rejectResult)
 }
 
 let returnReviewerViaSetPendingStateForTest () = promise {
@@ -100,23 +100,23 @@ let returnReviewerViaSetPendingStateForTest () = promise {
         """$0.setPendingReviewStateForTest($1)($2)($3)"""
         |> ignore
     let! passResult =
-        executeTool tool "call-1" (createObj [ "verdict", box "PASS" ]) ctx
+        executeTool tool "call-1" (createObj [ "verdict", box "PERFECT" ]) ctx
     let! firstResolved =
         emitJsExpr firstPending "$0.promise"
         |> unbox<JS.Promise<obj>>
-    equal "setPending PASS feedback absent" true (Dyn.isNullish (Dyn.get firstResolved "feedback"))
-    equal "setPending PASS tool text" "Review submitted: accepted." (toolText passResult)
+    equal "setPending PERFECT feedback absent" true (Dyn.isNullish (Dyn.get firstResolved "feedback"))
+    equal "setPending PERFECT tool text" "Review submitted: accepted." (toolText passResult)
     let secondPending = emitJsExpr () "Promise.withResolvers()" |> unbox<obj>
     emitJsExpr (_test, reviewSessionId, parentSessionId, secondPending)
         """$0.setPendingReviewStateForTest($1)($2)($3)"""
         |> ignore
     let! rejectResult =
-        executeTool tool "call-2" (createObj [ "verdict", box "REJECT"; "feedback", box "Fix it" ]) ctx
+        executeTool tool "call-2" (createObj [ "verdict", box "REVISE"; "feedback", box "Fix it" ]) ctx
     let! secondResolved =
         emitJsExpr secondPending "$0.promise"
         |> unbox<JS.Promise<obj>>
-    equal "setPending REJECT feedback" "Fix it" (str secondResolved "feedback")
-    equal "setPending reject tool text" "Review submitted: rejected with feedback." (toolText rejectResult)
+    equal "setPending REVISE feedback" "Fix it" (str secondResolved "feedback")
+    equal "setPending revise tool text" "Review submitted: revision requested with feedback." (toolText rejectResult)
 }
 
 let runReviewLoopChildToolNames () = promise {

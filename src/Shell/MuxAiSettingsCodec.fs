@@ -108,7 +108,7 @@ let readWorkspaceAiSettingsByAgent (workspace: obj) (agentId: string) : Delegate
     if Dyn.isNullish workspace then None
     else namedSettingsFromRecord (Dyn.get workspace ConfigKeys.aiSettingsByAgent) agentId
 
-// Null `fm` -> `emptySettings`; `AiSettings.resolveDelegatedAgentAiSettings` catches rejected `resolveAgentFrontmatter` promises (try/with) and uses the same fallback.
+    // Null `fm` -> `emptySettings`; `AiSettings.resolveDelegatedAgentAiSettings` catches failed `resolveAgentFrontmatter` promises (try/with) and uses the same fallback.
 let readDescriptorAiFromFrontmatter (fm: obj) : DelegatedAiSettings =
     if Dyn.isNullish fm then emptySettings
     else

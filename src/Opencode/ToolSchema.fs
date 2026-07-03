@@ -42,7 +42,7 @@ let intMinNullish (minVal: int) (desc: string) : obj =
 
 let boolOpt (desc: string) : obj = call1 (call0 (call0 schema "boolean") "nullish") "describe" (box desc)
 
-/// Non-nullish optional boolean: `true | false | undefined`. `null` is rejected at the schema boundary.
+    /// Non-nullish optional boolean: `true | false | undefined`. `null` is invalid at the schema boundary.
 let boolOptional (desc: string) : obj = call1 (call0 (call0 schema "boolean") "optional") "describe" (box desc)
 
 let excludeOpt (desc: string) : obj =

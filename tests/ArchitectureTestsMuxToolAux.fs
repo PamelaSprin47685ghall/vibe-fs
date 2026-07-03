@@ -122,6 +122,22 @@ let muxSubagentToolsUsesMuxSpawnUniverse () =
     check "arch: Mux SubagentTools must not embed mux_agents_read tool-universe literal"
         (not (mux.Contains "mux_agents_read"))
 
+let muxPluginCatalogToolExecuteAfterUsesLivelockGuard () =
+    let code = requireFile "src/Mux/PluginCatalog.fs" |> nonCommentCode
+    check "arch: Mux PluginCatalog toolExecuteAfter uses LivelockGuard.check"
+        (code.Contains "LivelockGuard.check")
+    check "arch: Mux PluginCatalog toolExecuteAfter must not be Promise.lift noop"
+        (not (code.Contains "toolExecuteAfter (input: obj) (output: obj) : JS.Promise<unit> = Promise.lift ()"))
+
+let muxSlashCommandsLoopUsesDepsDirectory () =
+    let code = requireFile "src/Mux/SlashCommands.fs" |> nonCommentCode
+    check "arch: Mux SlashCommands createLoopOnlyCommand takes deps"
+        (code.Contains "let createLoopOnlyCommand (deps: obj)")
+    check "arch: Mux SlashCommands loop path reads deps directory"
+        (code.Contains "eventLogRootFromDeps")
+    check "arch: Mux SlashCommands syncReview must not use deps cwd for event log"
+        (not (code.Contains "Dyn.str deps \"cwd\""))
+
 let muxSubagentToolsUsesSimpleArgsCodec () =
     let mux = requireFile "src/Mux/SubagentTools.fs" |> nonCommentCode
     let shell = requireFile "src/Shell/MuxSubagentToolExecute.fs" |> nonCommentCode

@@ -17,8 +17,8 @@ let isEndVerdictAcceptsAccepted () =
 let isEndVerdictAcceptsCancelled () =
     check "isEndVerdict cancelled → true" (isEndVerdict "cancelled")
 
-let isEndVerdictRejectsRejected () =
-    check "isEndVerdict rejected → false" (not (isEndVerdict "rejected"))
+let isEndVerdictNeedsRevisionNotEnd () =
+    check "isEndVerdict needs_revision → false" (not (isEndVerdict "needs_revision"))
 
 let isEndVerdictRejectsTerminated () =
     check "isEndVerdict terminated → false" (not (isEndVerdict "terminated"))
@@ -60,9 +60,9 @@ let inferReviewTaskFromTextsAcceptedClears () =
     equal "task then accepted → None"
         None (inferReviewTaskFromTexts [ taskText "old task"; verdictText "accepted" ])
 
-let inferReviewTaskFromTextsRejectKeeps () =
-    equal "task then rejected → keeps task"
-        (Some "surviving task") (inferReviewTaskFromTexts [ taskText "surviving task"; verdictText "rejected" ])
+let inferReviewTaskFromTextsNeedsRevisionKeeps () =
+    equal "task then needs_revision → keeps task"
+        (Some "surviving task") (inferReviewTaskFromTexts [ taskText "surviving task"; verdictText "needs_revision" ])
 
 let inferReviewTaskFromTextsNonFrontMatterKeeps () =
     equal "task then prose → keeps task"
@@ -97,7 +97,7 @@ let hasDoubleCheckAnchorFalse () =
 let run () =
     isEndVerdictAcceptsAccepted ()
     isEndVerdictAcceptsCancelled ()
-    isEndVerdictRejectsRejected ()
+    isEndVerdictNeedsRevisionNotEnd ()
     isEndVerdictRejectsTerminated ()
     buildLoopMessageContainsTaskField ()
     buildLoopMessageContainsBody ()
@@ -107,7 +107,7 @@ let run () =
     inferReviewTaskFromTextsFromTask ()
     inferReviewTaskFromTextsCancelledClears ()
     inferReviewTaskFromTextsAcceptedClears ()
-    inferReviewTaskFromTextsRejectKeeps ()
+    inferReviewTaskFromTextsNeedsRevisionKeeps ()
     inferReviewTaskFromTextsNonFrontMatterKeeps ()
     inferReviewTaskFromTextsTaskThenCancelled ()
     inferReviewTaskFromTextsTaskInSecondBlock ()

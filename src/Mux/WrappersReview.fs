@@ -38,7 +38,7 @@ let private reviewerAgentReportDefinition () : obj =
                   [ "type", box "object"
                     "properties",
                         box (createObj
-                            [ "verdict", box (createObj [ "type", box "string"; "enum", box [| "PASS"; "REJECT" |]; "description", box "PASS accepts the work; REJECT sends actionable feedback." ])
+                            [ "verdict", box (createObj [ "type", box "string"; "enum", box [| "PERFECT"; "REVISE" |]; "description", box "PERFECT accepts the work; REVISE requests revision with actionable feedback." ])
                               "feedback", box (createObj [ "type", box "string"; "description", box "Detailed actionable feedback. Optional when passing." ]) ])
                     "required", box [| "verdict"; "feedback" |]
                     "additionalProperties", box false ]) ]
@@ -46,11 +46,11 @@ let private reviewerAgentReportDefinition () : obj =
 let private formatReviewerAgentReportMarkdown (args: obj) : string =
     let verdict = defaultArg (strField args "verdict") "" |> fun value -> value.Trim().ToUpperInvariant()
     let feedback = defaultArg (strField args "feedback") "" |> fun value -> value.Trim()
-    if verdict = "REJECT" then
-        if feedback = "" then "REJECT: No feedback provided."
-        else "REJECT: " + feedback
-    elif feedback <> "" then "PASS: " + feedback
-    else "PASS"
+    if verdict = "REVISE" then
+        if feedback = "" then "REVISE: No feedback provided."
+        else "REVISE: " + feedback
+    elif feedback <> "" then "PERFECT: " + feedback
+    else "PERFECT"
 
 let private reviewerAgentReportPayload (args: obj) : obj =
     createObj [ "reportMarkdown", box (formatReviewerAgentReportMarkdown args) ]

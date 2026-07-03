@@ -7,6 +7,14 @@ open Wanxiangshu.Kernel.ToolArgs
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Shell.ToolArgsDecode
 
+/// Single-line tool output heuristic shared by Opencode/Mux tool.execute.after hooks.
+let isNetworkErrorText (text: string) : bool =
+    if System.String.IsNullOrWhiteSpace text then false
+    elif text.Contains("\n") then false
+    else
+        let lower = text.ToLowerInvariant()
+        lower.Contains("error") && lower.Contains("network")
+
 let wireDecodeFailure (toolName: string) (error: DomainError) : string =
     wireEncodeToolError toolName error
 

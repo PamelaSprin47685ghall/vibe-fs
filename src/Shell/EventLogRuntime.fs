@@ -91,7 +91,7 @@ let verdictStringFromReviewResult (result: Wanxiangshu.Kernel.ReviewSession.Type
     match result with
     | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Accepted fb ->
         (verdictAccepted, Some fb)
-    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Rejected fb ->
-        (verdictRejected, Some fb)
+    | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.NeedsRevision fb ->
+        (verdictNeedsRevision, Some fb)
     | Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult.Terminated ->
         (verdictTerminated, None)

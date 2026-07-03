@@ -72,8 +72,8 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
         "muxSubmitReviewUsesRolledBackHistoryTask", muxSubmitReviewUsesRolledBackHistoryTaskSpec
         "muxLoopReviewPromptUsesFrontMatter", muxLoopReviewPromptUsesFrontMatterSpec
         "muxSubmitReviewTwoRoundPassAccepts", muxSubmitReviewTwoRoundPassAcceptsSpec
-        "muxSubmitReviewRejectKeepsReviewActive", muxSubmitReviewRejectKeepsReviewActiveSpec
-        "muxSubmitReviewDoubleCheckReject", muxSubmitReviewDoubleCheckRejectSpec
+        "muxSubmitReviewReviseKeepsReviewActive", muxSubmitReviewReviseKeepsReviewActiveSpec
+        "muxSubmitReviewDoubleCheckRevise", muxSubmitReviewDoubleCheckReviseSpec
         "muxSubmitReviewTerminatedCleansReviewState", muxSubmitReviewTerminatedCleansReviewStateSpec
         "muxSubmitReviewWipSkipsReviewer", muxSubmitReviewWipSkipsReviewerSpec
         "muxSubmitReviewOmittedWipSkipsReviewer", muxSubmitReviewOmittedWipSkipsReviewerSpec
@@ -85,4 +85,7 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
         "muxToolExecuteBeforeSetsUiLabel", muxToolExecuteBeforeSetsUiLabelSpec
         "muxSystemTransformClearsOutputLength", muxSystemTransformClearsOutputLengthSpec
         "muxToolSchemasAreCleanStaticallyButInjectedDynamically", muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec
+        "muxLoopSlashCommandWritesEventLogUnderDepsDirectory", muxLoopSlashCommandWritesEventLogUnderDepsDirectorySpec
+        "muxToolExecuteAfterBlocksRepeatedIdenticalCall", muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec
+        "muxToolExecuteAfterMapsNetworkError", muxToolExecuteAfterMapsNetworkErrorSpec
     ]

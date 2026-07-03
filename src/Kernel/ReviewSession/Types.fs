@@ -6,7 +6,7 @@ type ReviewState =
     | Active of task: string
     | Locked of task: string * reviewerId: string
     | Accepted
-    | Rejected of feedback: string
+    | NeedsRevision of feedback: string
 
 type ReviewCommand =
     | Activate of task: string
@@ -14,7 +14,7 @@ type ReviewCommand =
     | Lock of reviewerId: string
     | Unlock
     | Accept
-    | Reject of feedback: string
+    | RequestRevision of feedback: string
 
 [<RequireQualifiedAccess>]
 type ReviewEvent =
@@ -23,9 +23,9 @@ type ReviewEvent =
     | LockAcquired of reviewerId: string
     | LockReleased
     | Accepted
-    | Rejected of feedback: string
+    | NeedsRevision of feedback: string
 
-type ReviewResult = Accepted of feedback: string | Rejected of feedback: string | Terminated
+type ReviewResult = Accepted of feedback: string | NeedsRevision of feedback: string | Terminated
 
 type ReviewSession =
     { id: string

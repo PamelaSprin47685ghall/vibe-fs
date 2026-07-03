@@ -23,7 +23,7 @@ let muxSubmitReviewPromptFormatSpec () = promise {
         check "mux registration exposes submit_review tool" false
     else
         let prompts = ResizeArray<string>()
-        let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PASS"; "PASS" ]
+        let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "PERFECT"; "PERFECT" ]
         let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
         let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |]; "wip", box false ]
         let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
@@ -35,7 +35,7 @@ let muxSubmitReviewPromptFormatSpec () = promise {
         check "submit_review prompt reuses review criteria" (promptText.Contains "# Evaluation Criteria")
         check "submit_review prompt uses agent_report protocol" (promptText.Contains "agent_report")
         check "submit_review prompt drops legacy divider" (not (promptText.Contains "==="))
-        check "submit_review accepts two-round PASS verdict" (result.Contains "verdict: accepted")
+        check "submit_review accepts two-round PERFECT verdict" (result.Contains "verdict: accepted")
     do! rmAsync workspaceDir
 }
 
@@ -67,16 +67,16 @@ let muxAgentReportWrapperFormatsVerdictSpec () = promise {
         check "agent_report wrapper schema requires verdict" (required |> Array.contains "verdict")
         check "agent_report wrapper schema requires feedback" (required |> Array.contains "feedback")
 
-        let! passResult = (get wrapped "execute") $ (createObj [ "verdict", box "PASS"; "feedback", box "" ], createObj []) |> unbox<JS.Promise<obj>>
-        check "agent_report wrapper PASS returns success" (truthy (get passResult "success"))
+        let! passResult = (get wrapped "execute") $ (createObj [ "verdict", box "PERFECT"; "feedback", box "" ], createObj []) |> unbox<JS.Promise<obj>>
+        check "agent_report wrapper PERFECT returns success" (truthy (get passResult "success"))
         let passReport = get passResult "report"
-        check "agent_report wrapper PASS attaches PASS markdown" (not (isNullish passReport) && (str passReport "reportMarkdown" = "PASS"))
-        check "agent_report wrapper forwards PASS markdown upstream" (capturedUpstream.Count = 1 && (str capturedUpstream.[0] "reportMarkdown" = "PASS"))
+        check "agent_report wrapper PERFECT attaches PERFECT markdown" (not (isNullish passReport) && (str passReport "reportMarkdown" = "PERFECT"))
+        check "agent_report wrapper forwards PERFECT markdown upstream" (capturedUpstream.Count = 1 && (str capturedUpstream.[0] "reportMarkdown" = "PERFECT"))
 
-        let! rejectResult = (get wrapped "execute") $ (createObj [ "verdict", box "REJECT"; "feedback", box "needs work" ], createObj []) |> unbox<JS.Promise<obj>>
-        let rejectReport = get rejectResult "report"
-        check "agent_report wrapper REJECT embeds feedback in markdown" (not (isNullish rejectReport) && (str rejectReport "reportMarkdown").Contains "needs work")
-        check "agent_report wrapper REJECT markdown starts with REJECT" ((str (capturedUpstream.[1]) "reportMarkdown").StartsWith "REJECT")
+        let! reviseResult = (get wrapped "execute") $ (createObj [ "verdict", box "REVISE"; "feedback", box "needs work" ], createObj []) |> unbox<JS.Promise<obj>>
+        let reviseReport = get reviseResult "report"
+        check "agent_report wrapper REVISE embeds feedback in markdown" (not (isNullish reviseReport) && (str reviseReport "reportMarkdown").Contains "needs work")
+        check "agent_report wrapper REVISE markdown starts with REVISE" ((str (capturedUpstream.[1]) "reportMarkdown").StartsWith "REVISE")
     do! rmAsync workspaceDir
 }
 
@@ -93,7 +93,7 @@ let muxSubmitReviewUsesRolledBackHistoryTaskSpec () = promise {
         check "mux registration exposes submit_review tool" false
     else
         let prompts = ResizeArray<string>()
-        let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "REJECT: not done" ]
+        let taskService = mockMuxTaskServiceReturningVerdicts prompts [ "REVISE: not done" ]
         let ctx = createObj [ "directory", box workspaceDir; "workspaceId", box sessionID; "sessionID", box sessionID; "taskService", box taskService ]
         let args = createObj [ "report", box "Changed a.ts"; "affectedFiles", box [| "a.ts" |]; "wip", box false ]
         let! _ = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
@@ -106,7 +106,7 @@ let muxLoopReviewPromptUsesFrontMatterSpec () = promise {
     let! workspaceDir = mkdtempAsync "mux-loop-review-prompt-"
     let prompts = ResizeArray<string>()
     let deps = minimalMuxDeps ()
-    deps?("taskService") <- mockMuxTaskServiceReturningVerdicts prompts [ "PASS" ]
+    deps?("taskService") <- mockMuxTaskServiceReturningVerdicts prompts [ "PERFECT" ]
     let reg = createRegistration deps
     let commands = unbox<obj[]> (get reg "slashCommands")
     let loopReview = commands |> Array.find (fun command -> str command "key" = "loop-review")

@@ -37,7 +37,7 @@ let verboseCheckCount () : int = verboseChecksLogged
 let private logCheck (kind: string) (label: string) (passedNow: bool) (detail: string option) =
     match verboseLogPath with
     | Some path when verboseEnabled ->
-        let status = if passedNow then "PASS" else "FAIL"
+        let status = if passedNow then "OK" else "FAIL"
         let suffix = detail |> Option.map (sprintf " | %s") |> Option.defaultValue ""
         let line = sprintf "[%s] %s: %s%s\n" status kind label suffix
         appendFile path line "utf8"
@@ -78,7 +78,7 @@ let asyncSpecTimeoutMs = 1000
 let asyncSuiteTimeoutMs = 120_000
 
 /// Time an asynchronous test body with a 1s hard timeout; return a unit promise.
-/// Reject / timeout / throw are all converged into a single failure record.
+/// Promise failure / timeout / throw are all converged into a single failure record.
 let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
     promise {
         let start = now ()
