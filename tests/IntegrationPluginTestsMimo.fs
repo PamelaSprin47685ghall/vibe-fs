@@ -86,6 +86,17 @@ let mimoConfigSpec () = promise {
         makeUserMessage "mimo-user-2" "Keep this user detail in the projection."
         makeTaskMessage "mimo-msg-3" "Third report from the final task." "" "" "" ""
     |]
+    let todoInput report content status priority =
+        { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.AhaMoments = report
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.ChangesAndReasons = report + "_changes"
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Gotchas = report + "_gotchas"
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.LessonsAndConventions = report + "_lessons"
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Plan = report + "_plan"
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Todos = [| { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Content = content; Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Status = status; Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Priority = priority } |]
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
+    do! Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail workspaceDir sessionID (todoInput "First report from the first task." "t1" "completed" "high")
+    do! Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail workspaceDir sessionID (todoInput "Second report from the second task." "t2" "completed" "high")
+    do! Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail workspaceDir sessionID (todoInput "Third report from the final task." "t3" "completed" "high")
     let output = createObj [ "messages", box messages ]
     do! (get p "experimental.chat.messages.transform") $ (createObj [ "agent", box "manager" ], output) |> unbox<JS.Promise<unit>>
     let transformedMessages = unbox<obj[]> (get output "messages")
@@ -102,9 +113,6 @@ let mimoConfigSpec () = promise {
         projectedOutput.Contains("First report from the first task.")
         && projectedOutput.Contains("Second report from the second task.")
         && projectedOutput.Contains("Fold this user note into the summary."))
-    let compactingOutput = createObj [ "context", box [||] ]
-    do! (get p "experimental.session.compacting") $ (createObj [ "sessionID", box sessionID ], compactingOutput) |> unbox<JS.Promise<unit>>
-    check "mimo session.compacting leaves context untouched" ((unbox<obj[]> (get compactingOutput "context")).Length = 0)
     do! rmAsync workspaceDir
 }
 

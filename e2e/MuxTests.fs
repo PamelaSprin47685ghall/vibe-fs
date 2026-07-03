@@ -26,7 +26,6 @@ type Harness =
     abstract fireStreamEnd: string -> string[] -> JS.Promise<obj>
     abstract fireStreamAbort: string -> JS.Promise<obj>
     abstract runMessageTransform: obj -> obj -> JS.Promise<obj>
-    abstract runCompactingTransform: obj -> obj -> JS.Promise<obj>
     abstract runSystemTransform: obj -> obj -> JS.Promise<obj>
     abstract getToolDefinition: string -> obj
     abstract getToolSchema: string -> obj
@@ -218,15 +217,6 @@ let runAll (args: string array) : JS.Promise<int> =
             else ""
         chk "mux.messageTransform.capsHasKolmolgorov" (firstText.Contains "# Kolmolgorov 宝典")
         chk "mux.messageTransform.capsHasIronLaw" (firstText.Contains "铁律")
-
-        // --- 5b. Message transform: compactingTransform ------------------------
-        let msgTextPart : obj = createObj [ "type", box "text"; "text", box "compact message test" ]
-        let testMsg = createObj [ "id", box "msg-1"; "role", box "user"; "parts", box [| msgTextPart |] ]
-        let compactOutput = createObj [ "messages", box [| testMsg |] ]
-        let compactInput = createObj [ "sessionID", box "mux-e2e-session" ]
-        let! _ = harness.runCompactingTransform compactInput compactOutput
-        let compactMsgsOut : obj[] = unbox<obj[]> (dynGet compactOutput "messages")
-        chk "mux.messageTransform.compactingTransform.runOk" (compactMsgsOut.Length = 1)
 
         // --- 5c. Message transform: system transform injection ----------------
         let systemObj = createObj [ "content", box "long system prompt"; "length", box 1000 ]

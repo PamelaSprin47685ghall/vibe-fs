@@ -3,7 +3,6 @@ module Wanxiangshu.Omp.SessionLifecycle
 open Fable.Core.JsInterop
 open Wanxiangshu.Omp.SessionLifecycleHooks
 open Wanxiangshu.Omp.NudgeHooks
-open Wanxiangshu.Omp.SessionCompacting
 open Wanxiangshu.Shell.ReviewRuntime
 
 let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) : unit =
@@ -13,5 +12,4 @@ let registerSessionLifecycle (pi: obj) (reviewStore: ReviewStore) : unit =
     pi?on("agent_end", box (fun (_event: obj) (ctx: obj) -> agentEndHandler pi reviewStore ctx))
     pi?on("session_start", box (fun (_event: obj) (ctx: obj) -> sessionStartHandler pi ctx))
     pi?on("turn_start", box (fun (_event: obj) (ctx: obj) -> turnStartHandler pi ctx))
-    pi?on("session.compacting", box (fun (event: obj) (ctx: obj) -> sessionCompactingHandler pi event ctx))
     pi?on("session_shutdown", box (fun (_event: obj) (ctx: obj) -> sessionShutdownHandler reviewStore ctx))

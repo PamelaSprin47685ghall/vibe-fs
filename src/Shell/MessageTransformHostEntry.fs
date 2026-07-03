@@ -35,6 +35,7 @@ let runHostMessagesTransform
         if shouldReplay then
             reviewStore.markSynced sessionID
             do! syncReviewFromEventLog reviewStore plan.Directory sessionID
+            do! backlogOps.SyncBacklogFromEventLog plan.Directory sessionID
         return!
             if plan.Cleaned.IsEmpty then Promise.lift [||]
             else

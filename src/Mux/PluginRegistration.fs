@@ -38,12 +38,12 @@ let createRegistration (deps: obj) : obj =
         createScope deps
     let wrappers = createWrapperExecution toolsObj hostReadExec scope
     let mcpServers = box {| ``stealth-browser-mcp`` = getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
-    let messagesTransform, compactingTransform =
+    let messagesTransform =
         createMessageTransforms deps scope backlogSession reviewStore
     let eventHook, slashCommands, getToolPolicy =
         createEventHooksSlashAndPolicy deps reviewStore
     let registration =
-        assembleRegistrationObject scope tools wrappers mcpServers eventHook slashCommands messagesTransform compactingTransform getToolPolicy
+        assembleRegistrationObject scope tools wrappers mcpServers eventHook slashCommands messagesTransform getToolPolicy
             (createReviewTestSurface reviewStore)
     registerTestHooks registration deps
     box registration

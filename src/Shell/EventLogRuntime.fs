@@ -12,6 +12,8 @@ open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.ReviewReplaySync
 open Wanxiangshu.Shell.Clock
 open Wanxiangshu.Shell.WorkBacklogToolsCodec
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Shell.SessionProjectionStore
 
 let mutable private stores: Map<string, EventLogStore> = Map.empty
 
@@ -72,6 +74,15 @@ let syncReviewFromEventLog (store: ReviewStore) (workspaceRoot: string) (session
             let! events = getSessionEvents workspaceRoot sessionID
             let task = foldReviewTask sessionID events
             syncReviewProjection store sessionID task
+    }
+
+let syncBacklogFromEventLog (host: Host) (projection: ProjectionStore) (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
+    promise {
+        if sessionID = "" || workspaceRoot = "" then ()
+        else
+            let! events = getSessionEvents workspaceRoot sessionID
+            let backlog = foldBacklogFromEvents sessionID events
+            projection.StoreBacklog(host, sessionID, backlog)
     }
 
 let appendLoopActivated (workspaceRoot: string) (sessionID: string) (task: string) : JS.Promise<Result<unit, string>> =

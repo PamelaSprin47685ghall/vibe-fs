@@ -97,7 +97,18 @@ let capsAndBacklogOrderSpec () = promise {
         todoMsg "m2" "c2" "R2" 789 790
         todoMsg "m3" "c3" "R3" 791 792
     |] ]
-    do! tf $ (createObj [], messages) |> unbox<JS.Promise<unit>>
+    let todoInput report content status priority =
+        { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.AhaMoments = report
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.ChangesAndReasons = report + "_changes"
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Gotchas = report + "_gotchas"
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.LessonsAndConventions = report + "_lessons"
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Plan = report + "_plan"
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Todos = [| { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Content = content; Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Status = status; Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Priority = priority } |]
+          Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
+    do! Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail workspaceDir "test" (todoInput "R1" "t1" "completed" "high")
+    do! Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail workspaceDir "test" (todoInput "R2" "t2" "completed" "high")
+    do! Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail workspaceDir "test" (todoInput "R3" "t3" "completed" "high")
+    do! tf $ (createObj [ "sessionID", box "test"; "directory", box workspaceDir ], messages) |> unbox<JS.Promise<unit>>
     let result = unbox<obj[]> (get messages "messages")
     let userParts = unbox<obj[]> (get result.[0] "parts")
     let ackInfo = get result.[1] "info"

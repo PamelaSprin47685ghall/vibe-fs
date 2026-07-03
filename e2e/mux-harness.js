@@ -130,13 +130,6 @@ export async function start(opts = {}) {
       return output;
     },
 
-    async runCompactingTransform(input, output) {
-      const transform = getRegProp(reg, 'compactingTransform');
-      if (!transform) throw new Error('registration has no compactingTransform');
-      await transform(input, output);
-      return output;
-    },
-
     async runSystemTransform(input, output) {
       const transform = getRegProp(reg, 'systemTransform');
       if (!transform) throw new Error('registration has no systemTransform');

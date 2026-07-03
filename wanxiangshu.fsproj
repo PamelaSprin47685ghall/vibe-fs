@@ -293,7 +293,6 @@
      <Compile Include="src/Omp/OmpTestHooks.fs" />
       <Compile Include="src/Omp/NudgeHooks.fs" />
       <Compile Include="src/Omp/TodoHooks.fs" />
-       <Compile Include="src/Omp/SessionCompacting.fs" />
        <Compile Include="src/Omp/SessionLifecycleHooks.fs" />
      <Compile Include="src/Omp/SessionLifecycle.fs" />
 
@@ -326,7 +325,6 @@
     <Compile Include="tests/IntegrationMiscSpecs.fs" />
     <Compile Include="tests/IntegrationMuxPreludeSpecs.fs" />
     <Compile Include="tests/IntegrationMuxTransformSpecs.fs" />
-    <Compile Include="tests/IntegrationMuxCompactionResendSpecs.fs" />
     <Compile Include="tests/IntegrationMuxToolSpecsTodo.fs" />
     <Compile Include="tests/IntegrationMuxToolSpecsRead.fs" />
     <Compile Include="tests/IntegrationMuxToolSpecsHooks.fs" />
@@ -364,7 +362,6 @@
     <Compile Include="tests/IntegrationEventTestsMux.fs" />
     <Compile Include="tests/IntegrationEventTestsMuxWrappers.fs" />
     <Compile Include="tests/IntegrationEventTestsOpencode.fs" />
-    <Compile Include="tests/IntegrationEventTestsOpencodeCompaction.fs" />
     <Compile Include="tests/IntegrationEventTestsOpencodeLoop.fs" />
     <Compile Include="tests/IntegrationEventTestsOpencodeFallback.fs" />
     <Compile Include="tests/IntegrationEventTests.fs" />
@@ -410,8 +407,6 @@
     <Compile Include="tests/OpencodeSearchToolsCoverageTests.fs" />
     <Compile Include="tests/OpencodeSubagentCoverageTests.fs" />
     <Compile Include="tests/OmpSessionLifecycleTests.fs" />
-    <Compile Include="tests/OmpSessionCompactingTests.fs" />
-    <Compile Include="tests/OmpSessionCompactingAnchorTests.fs" />
     <Compile Include="tests/MethodologyTests.fs" />
     <Compile Include="tests/ReviewReplaySyncTests.fs" />
     <Compile Include="tests/ReviewPromptsFormatTests.fs" />

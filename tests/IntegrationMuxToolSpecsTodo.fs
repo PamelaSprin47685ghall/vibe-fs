@@ -11,6 +11,7 @@ open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Tests.TempWorkspace
 
 let muxTodoWriteWrapperSchemaSpec () = promise {
     let reg = sharedMuxRegistration ()
@@ -74,6 +75,7 @@ let muxTodoWriteCapturesCompletedWorkReportSpec () = promise {
 }
 
 let muxBacklogProjectionSpec () = promise {
+    let! workspaceDir = mkdtempAsync "mux-magic-todo-projection-"
     let reg = sharedMuxRegistration ()
     let tf = muxMessageTransform reg
     if isNullish tf then
@@ -95,8 +97,19 @@ let muxBacklogProjectionSpec () = promise {
                muxDynamicToolMessage "todo-2" "todo_write" "todo-call-b" (todoInput "implemented phase" "Implement change" "completed" "high") (todoOutput 1)
                muxTextMessage "todo-user-3" "user" "verified phase"
                muxDynamicToolMessage "todo-3" "todo_write" "todo-call-c" (todoInput "verified phase" "Verify change" "completed" "medium") (todoOutput 1) |]
+        let todoEvent (report: string) content status priority =
+            { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.AhaMoments = report
+              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.ChangesAndReasons = report + "_changes"
+              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Gotchas = report + "_gotchas"
+              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.LessonsAndConventions = report + "_lessons"
+              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Plan = report + "_plan"
+              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Todos = [| { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Content = content; Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Status = status; Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Priority = priority } |]
+              Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
+        do! Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail workspaceDir "mux-magic-todo-session" (todoEvent "planned phase" "Plan change" "in_progress" "high")
+        do! Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail workspaceDir "mux-magic-todo-session" (todoEvent "implemented phase" "Implement change" "completed" "high")
+        do! Wanxiangshu.Shell.EventLogRuntime.appendWorkBacklogCommittedOrFail workspaceDir "mux-magic-todo-session" (todoEvent "verified phase" "Verify change" "completed" "medium")
         let out = createObj [ "messages", box messages ]
-        let input = createObj [ "agent", box "manager"; "sessionID", box "mux-magic-todo-session" ]
+        let input = createObj [ "agent", box "manager"; "sessionID", box "mux-magic-todo-session"; "directory", box workspaceDir ]
         do! (tf $ (input, out)) |> unbox<JS.Promise<unit>>
         let transformed = unbox<obj[]> (get out "messages")
         let texts =
@@ -111,4 +124,5 @@ let muxBacklogProjectionSpec () = promise {
                 text.Contains("Completed work from folded turns. File changes are already on disk.")
                 && text.Contains("user_message:")
                 && text.Contains("planned phase")))
+        do! rmAsync workspaceDir
 }

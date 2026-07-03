@@ -108,7 +108,9 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                 let cleaned = Messaging.stripSyntheticBySource messagesList
                 let excluded = shouldExcludeAgentFromProjection agent false
                 let backlogOps =
-                    backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
+                    backlogSessionOpsFrom backlogSession.Host
+                        (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
+                        (fun dir sid -> Wanxiangshu.Shell.EventLogRuntime.syncBacklogFromEventLog backlogSession.Host runtimeScope.Projection dir sid)
                 let plan = {
                     SessionID = sessionID
                     Agent = agent
@@ -148,28 +150,6 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
     unbox (target?(method)(arg))
-
-let compactingHandlerFor (host: Host) (backlogSession: BacklogSession) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
-    promise {
-        match tryGetMessagesArrayFromOutput output with
-        | None -> ()
-        | Some messagesArr ->
-                let messagesList = MessagingCodec.decodeMessages messagesArr
-                let sessionID =
-                    let fromInput = sessionIdFromHookInput input ""
-                    if fromInput <> "" then fromInput else extractSessionID messagesList
-                let cleaned = Messaging.stripSyntheticBySource messagesList
-                if cleaned.IsEmpty then ()
-                else
-                    let backlogOps =
-                        backlogSessionOpsFrom backlogSession.Host (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
-                    let afterBacklog = applyBacklogProjection sessionID false backlogOps cleaned
-                    let encoded = MessagingCodec.encodeMessages afterBacklog
-                    replaceArrayInPlace messagesArr encoded
-    }
-
-let compactingHandler (backlogSession: BacklogSession) (client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
-    compactingHandlerFor opencode backlogSession client input output
 
 let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
     promise { setSystemOutputToDirectory directory output }

@@ -24,8 +24,6 @@ open Wanxiangshu.Tests.OmpToolResultEventTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.OmpExecutorToolsTests
 open Wanxiangshu.Tests.SubagentIoTests
-open Wanxiangshu.Tests.OmpSessionCompactingTests
-open Wanxiangshu.Tests.OmpSessionCompactingAnchorTests
 open Wanxiangshu.Tests.OmpCoverage2Tests
 open Wanxiangshu.Tests.OmpTodoToolTests
 
@@ -145,16 +143,8 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpHookExecuteTests.hookPatchNameNormalisesToPatchText", Sync (sync OmpHookExecuteTests.hookPatchNameNormalisesToPatchText)
     "OmpHookExecuteTests.hookApplyPatchLeavesExistingPatchTextUntouched", Sync (sync OmpHookExecuteTests.hookApplyPatchLeavesExistingPatchTextUntouched)
     "OmpSessionLifecycleTests.isChildSessionGuard", Sync (sync OmpSessionLifecycleTests.isChildSessionGuard)
-    "OmpSessionCompactingTests.sessionCompactingHandlerEmptyMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerEmptyMessages
-    "OmpSessionCompactingTests.sessionCompactingHandlerNullMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerNullMessages
-    "OmpSessionCompactingTests.sessionCompactingHandlerWithMessages", Async OmpSessionCompactingTests.sessionCompactingHandlerWithMessages
-    "OmpSessionCompactingTests.sessionCompactingPreservesBacklogReport", Async OmpSessionCompactingTests.sessionCompactingPreservesBacklogReport
-    "OmpSessionCompactingTests.sessionCompactingStripsSynthetic", Async OmpSessionCompactingTests.sessionCompactingStripsSynthetic
-    "OmpSessionCompactingAnchorTests.sessionCompactingContextContainsSeeAbove", Async OmpSessionCompactingAnchorTests.sessionCompactingContextContainsSeeAbove
-    "OmpSessionCompactingAnchorTests.sessionCompactingContextHasMultipleFrontMatterBlocks", Async OmpSessionCompactingAnchorTests.sessionCompactingContextHasMultipleFrontMatterBlocks
     "OmpPluginTests.extensionRegistersLifecycleHooks", Async OmpPluginTests.extensionRegistersLifecycleHooks
     "OmpPluginTests.toolCallHookCanBeInvoked", Async OmpPluginTests.toolCallHookCanBeInvoked
-    "OmpPluginTests.sessionCompactingHookCanBeInvoked", Async OmpPluginTests.sessionCompactingHookCanBeInvoked
     "OmpPluginTests.toolCallBlocksChildOnlyInMainSession", Async OmpPluginTests.toolCallBlocksChildOnlyInMainSession
     "OmpPluginTests.turnStartRestoresMainSessionTools", Async OmpPluginTests.turnStartRestoresMainSessionTools
     "OmpCoverage2Tests.run", Async OmpCoverage2Tests.run

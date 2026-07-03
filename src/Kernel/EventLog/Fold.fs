@@ -62,6 +62,27 @@ let foldWorkBacklogSnapshot (sessionId: string) (events: WanEvent list) : WorkBa
                   LatestEntry = entryOpt |> Option.orElse snap.LatestEntry })
         { TodosJson = None; LatestEntry = None }
 
+let foldBacklogFromEvents (sessionId: string) (events: WanEvent list) : BacklogEntry list =
+    forSession sessionId events
+    |> List.choose (fun e ->
+        if e.Kind <> eventKindWorkBacklogCommitted then None
+        else
+            match
+                payloadField "ahaMoments" e,
+                payloadField "changesAndReasons" e,
+                payloadField "gotchas" e,
+                payloadField "lessonsAndConventions" e,
+                payloadField "plan" e
+            with
+            | Some aha, Some car, Some got, Some les, Some pl ->
+                Some
+                    { ahaMoments = aha
+                      changesAndReasons = car
+                      gotchas = got
+                      lessonsAndConventions = les
+                      plan = pl }
+            | _ -> None)
+
 type NudgeDedupState = { BlockedAnchor: string option }
 
 let emptyNudgeDedupState = { BlockedAnchor = None }

@@ -13,6 +13,7 @@ let backlogEntryFromTodoInput = Wanxiangshu.Shell.BacklogSessionCodec.backlogEnt
 
 type BacklogSession(host: Host) =
     member _.Host = host
+    member _.Projection = projection
 
     member _.CaptureReport(callID: string, report: string) : unit =
         projection.CaptureReport(host, callID, report)

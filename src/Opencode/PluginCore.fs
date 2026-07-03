@@ -106,7 +106,6 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
             if ptyCleanupSessionId <> "" then cleanupPtyBySession ptyCleanupSessionId
             do! services.SessionLifecycleObserver.handleEvent input
         }))
-    setKey result "experimental.session.compacting" (twoArgHook (fun input output -> compactingHandlerFor host services.BacklogSession client input output))
     setKey result "experimental.chat.system.transform" (twoArgHook (fun input output -> HookTransform.systemTransform services.Directory input output))
 
 let private applyFallbackModelOverrides (cfg: obj) (fbCfgOpt: FallbackConfig option) : unit =

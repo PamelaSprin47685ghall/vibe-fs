@@ -11,7 +11,6 @@ open Wanxiangshu.Tests.IntegrationMiscSpecs
 open Wanxiangshu.Tests.IntegrationMiscSpecsAgent
 open Wanxiangshu.Tests.IntegrationMuxPreludeSpecs
 open Wanxiangshu.Tests.IntegrationMuxTransformSpecs
-open Wanxiangshu.Tests.IntegrationMuxCompactionResendSpecs
 open Wanxiangshu.Tests.IntegrationMuxToolSpecs
 open Wanxiangshu.Tests.IntegrationMuxToolSpecsTodo
 open Wanxiangshu.Tests.IntegrationMuxToolSpecsRead
@@ -78,9 +77,6 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
         "muxSubmitReviewWipSkipsReviewer", muxSubmitReviewWipSkipsReviewerSpec
         "muxSubmitReviewOmittedWipSkipsReviewer", muxSubmitReviewOmittedWipSkipsReviewerSpec
         "muxTodoWriteMethodologySchema", muxTodoWriteMethodologySchemaSpec
-        "muxCompactingTransformProjectsBacklog", muxCompactingTransformProjectsBacklogSpec
-        "muxCompactingTransformEmitsAnchorPrompt", muxCompactingTransformEmitsAnchorPromptSpec
-        "muxCompactingTransformDoesNotResendAnchorPrompt", muxCompactingTransformDoesNotResendAnchorPromptSpec
         "muxEventHookAbortDeactivatesReview", muxEventHookAbortDeactivatesReviewSpec
         "muxToolExecuteBeforeSetsUiLabel", muxToolExecuteBeforeSetsUiLabelSpec
         "muxSystemTransformClearsOutputLength", muxSystemTransformClearsOutputLengthSpec

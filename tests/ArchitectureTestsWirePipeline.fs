@@ -41,12 +41,6 @@ let messageTransformUsesMessageTransformCore () =
             (code.Contains "MessageTransformCore")
         check ("arch: " + path + " no direct projectBacklogFor")
             (not (code.Contains "projectBacklogFor"))
-    let opencode = requireFile "src/Opencode/MessageTransform.fs" |> nonCommentCode
-    check "arch: Opencode MessageTransform uses applyBacklogProjection in compacting path"
-        (opencode.Contains "applyBacklogProjection")
-    let mux = requireFile "src/Mux/MessageTransform.fs" |> nonCommentCode
-    check "arch: Mux MessageTransform uses applyBacklogProjection in compacting path"
-        (mux.Contains "applyBacklogProjection")
     let core = requireFile "src/Shell/MessageTransformCore.fs" |> nonCommentCode
     check "arch: MessageTransformCore defines applyBacklogProjection"
         (core.Contains "let applyBacklogProjection")
@@ -111,8 +105,6 @@ let opencodeMessageTransformUsesHookInputCodec () =
     let code = requireFile "src/Opencode/MessageTransform.fs" |> nonCommentCode
     check "arch: Opencode MessageTransform opens OpencodeHookInputCodec"
         (code.Contains "OpencodeHookInputCodec")
-    check "arch: Opencode MessageTransform uses sessionIdFromHookInput"
-        (code.Contains "sessionIdFromHookInput")
     check "arch: Opencode MessageTransform must not Dyn.str input sessionID"
         (not (code.Contains "Dyn.str input \"sessionID\""))
     check "arch: Opencode MessageTransform must not Dyn.str input agent"

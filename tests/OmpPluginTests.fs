@@ -188,7 +188,6 @@ let extensionRegistersLifecycleHooks () = promise {
     check "registers before_agent_start hook" (Dyn.has events "before_agent_start")
     check "registers tool_call hook" (Dyn.has events "tool_call")
     check "registers tool_result hook" (Dyn.has events "tool_result")
-    check "registers session.compacting hook" (Dyn.has events "session.compacting")
     check "registers agent_end hook" (Dyn.has events "agent_end")
     check "registers session_shutdown hook" (Dyn.has events "session_shutdown")
     check "registers turn_start hook" (Dyn.has events "turn_start")
@@ -244,24 +243,6 @@ let turnStartRestoresMainSessionTools () = promise {
     let active = Set.ofArray (activeTools h)
     check "turn_start strips edit from main session" (not (active.Contains "edit"))
     check "turn_start keeps coder" (active.Contains "coder")
-}
-
-let sessionCompactingHookCanBeInvoked () = promise {
-    resetPluginState ()
-    let h = createPiHarness ()
-    let pi = piObject h
-    do! wanxiangshuExtension pi
-    let handler = eventHandler h "session.compacting"
-    let event =
-        createObj [
-            "sessionId", box "test-compact"
-            "messages", box [||]
-        ]
-    let! result =
-        emitJsExpr (handler, event, createObj [ "cwd", box "/tmp" ])
-            "Promise.resolve($0($1, $2))"
-        |> unbox<JS.Promise<obj>>
-    check "session.compacting handler returns object" (not (Dyn.isNullish result))
 }
 
 let websearchSchemaRequiresQueryAndWhatToSummarize () = promise {

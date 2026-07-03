@@ -47,7 +47,9 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
                 let excluded = shouldExcludeAgentFromProjection agent (isChildSession sessionId)
                 let cleaned = stripSyntheticBySource messagesList
                 let backlogOps =
-                    backlogSessionOpsFrom defaultBacklogSession.Host (fun sid msgs -> defaultBacklogSession.GetOrRebuildBacklog(sid, msgs))
+                    backlogSessionOpsFrom defaultBacklogSession.Host
+                        (fun sid msgs -> defaultBacklogSession.GetOrRebuildBacklog(sid, msgs))
+                        (fun dir sid -> Wanxiangshu.Shell.EventLogRuntime.syncBacklogFromEventLog defaultBacklogSession.Host defaultBacklogSession.Projection dir sid)
                 let plan = {
                     SessionID = sessionId
                     Agent = agent
