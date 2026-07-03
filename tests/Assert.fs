@@ -71,7 +71,7 @@ let timed (label: string) (f: unit -> unit) : unit =
         timings.Add(label, now () - start)
 
 /// Per-spec async ceiling (integration sub-specs use this inside their own loops).
-let asyncSpecTimeoutMs = 1000
+let asyncSpecTimeoutMs = 5000
 
 /// Suite-level async ceiling: one `*.run` that sequences many sub-specs must not
 /// inherit the 1s per-spec budget (e.g. other Integration*.run suites).

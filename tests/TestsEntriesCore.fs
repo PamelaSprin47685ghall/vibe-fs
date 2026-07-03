@@ -268,6 +268,7 @@ let coreTestEntries () : (string * TestBody) list =
     "ConfigTests.run", TestBody.Sync (sync ConfigTests.run)
     "JsonSchemaBuildersTests.run", TestBody.Sync (sync JsonSchemaBuildersTests.run)
     "ExecutorStripTests.run", TestBody.Sync (sync ExecutorStripTests.run)
+    "ExecutorTests.run", TestBody.Async (fun () -> ExecutorTests.run ())
     "WarnTddKernelFactsTests.run", TestBody.Sync (sync WarnTddKernelFactsTests.run)
     "WarnTddOpencodeEnforcementTests.run", TestBody.Async WarnTddOpencodeEnforcementTests.run
     "WarnTddMuxEnforcementTests.run", TestBody.Async WarnTddMuxEnforcementTests.run

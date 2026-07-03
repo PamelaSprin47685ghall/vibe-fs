@@ -17,6 +17,8 @@ type ReviewStore =
     abstract member getReviewTask: sessionID: string -> string option
     abstract member getReviewState: sessionID: string -> ReviewState option
     abstract member addChild: parentID: string * childID: string -> unit
+    abstract member hasSynced: sessionID: string -> bool
+    abstract member markSynced: sessionID: string -> unit
 
 /// Single atomic state cell: the pure registry projection plus the effect
 /// side-table fold together so every store method is one `state <- { ... }`
@@ -28,6 +30,7 @@ type private ReviewStoreState =
 
 let createReviewStore () : ReviewStore =
     let mutable state : ReviewStoreState = { Registry = emptyRegistry; Effects = emptyEffects }
+    let mutable syncedSessions = Set.empty<string>
 
     let allDescendantIds sessionId =
         let rec collect id =
@@ -64,7 +67,9 @@ let createReviewStore () : ReviewStore =
         member _.getReviewTask(sessionID) = taskOf state.Registry sessionID
         member _.getReviewState(sessionID) = stateOf state.Registry sessionID
         member _.addChild(parentID, childID) =
-            state <- { state with Registry = reduce state.Registry (RegistryAction.AddChild(parentID, childID)) } }
+            state <- { state with Registry = reduce state.Registry (RegistryAction.AddChild(parentID, childID)) }
+        member _.hasSynced(sessionID) = Set.contains sessionID syncedSessions
+        member _.markSynced(sessionID) = syncedSessions <- Set.add sessionID syncedSessions }
 
 let syncReviewProjection (store: ReviewStore) (sessionID: string) (task: string option) : unit =
     if sessionID = "" then ()

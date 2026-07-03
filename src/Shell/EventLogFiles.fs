@@ -64,8 +64,8 @@ let private releaseLock (lkPath: string) : JS.Promise<unit> =
         try do! unlinkAsync lkPath with _ -> ()
     }
 
-[<Emit("new Promise(function(resolve){ queueMicrotask(resolve); })")>]
-let private yieldMicrotask () : JS.Promise<unit> = jsNative
+[<Emit("new Promise(function(resolve){ if (typeof setImmediate !== 'undefined') { setImmediate(resolve); } else { setTimeout(resolve, 0); } })")>]
+let private yieldMacrotask () : JS.Promise<unit> = jsNative
 
 let private withWorkspaceLock (lkPath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
     let rec waitAndRun (attempt: int) : JS.Promise<'T> =
@@ -80,7 +80,7 @@ let private withWorkspaceLock (lkPath: string) (action: unit -> JS.Promise<'T>) 
                     | Error ex -> raise ex
             else
                 if attempt >= 96 then return failwith "EventLog lock timeout"
-                do! yieldMicrotask ()
+                do! yieldMacrotask ()
                 return! waitAndRun (attempt + 1)
         }
     waitAndRun 0

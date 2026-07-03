@@ -28,10 +28,12 @@ let runHostMessagesTransform
     promise {
         let shouldReplay =
             sessionID <> "" &&
+            not (reviewStore.hasSynced sessionID) &&
             match reviewReplayMode with
             | Always -> true
             | IfStoreEmpty -> reviewStore.getReviewState sessionID |> Option.isNone
         if shouldReplay then
+            reviewStore.markSynced sessionID
             do! syncReviewFromEventLog reviewStore plan.Directory sessionID
         return!
             if plan.Cleaned.IsEmpty then Promise.lift [||]

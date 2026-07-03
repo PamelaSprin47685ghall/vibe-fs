@@ -23,30 +23,63 @@ let getStore (workspaceRoot: string) : EventLogStore =
         stores <- Map.add workspaceRoot s stores
         s
 
+let mutable private sessionEvents : Map<string * string, WanEvent list> = Map.empty
+
+let private updateCache (workspaceRoot: string) (e: WanEvent) : unit =
+    match Map.tryFind (workspaceRoot, e.Session) sessionEvents with
+    | Some events ->
+        sessionEvents <- Map.add (workspaceRoot, e.Session) (events @ [e]) sessionEvents
+    | None -> ()
+
+let getSessionEvents (workspaceRoot: string) (sessionID: string) : JS.Promise<WanEvent list> =
+    promise {
+        if sessionID = "" || workspaceRoot = "" then return []
+        else
+            match Map.tryFind (workspaceRoot, sessionID) sessionEvents with
+            | Some events -> return events
+            | None ->
+                let! allEvents = getStore(workspaceRoot).ReadAllEvents()
+                let filtered = allEvents |> List.filter (fun e -> e.Session = sessionID)
+                sessionEvents <- Map.add (workspaceRoot, sessionID) filtered sessionEvents
+                return filtered
+    }
+
+let private appendAndCache (workspaceRoot: string) (e: WanEvent) : JS.Promise<Result<unit, string>> =
+    promise {
+        let! res = getStore(workspaceRoot).AppendEvent e
+        match res with
+        | Ok () -> updateCache workspaceRoot e
+        | _ -> ()
+        return res
+    }
+
+let private appendAndCacheOrFail (workspaceRoot: string) (e: WanEvent) : JS.Promise<unit> =
+    promise {
+        do! getStore(workspaceRoot).AppendEventOrFail e
+        updateCache workspaceRoot e
+    }
+
 let isLoopActiveFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Promise<bool> =
     promise {
-        if sessionID = "" || workspaceRoot = "" then return false
-        else
-            let! events = getStore(workspaceRoot).ReadAllEvents()
-            return foldReviewTask sessionID events |> Option.isSome
+        let! events = getSessionEvents workspaceRoot sessionID
+        return foldReviewTask sessionID events |> Option.isSome
     }
 
 let syncReviewFromEventLog (store: ReviewStore) (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
     promise {
         if sessionID = "" then ()
         else
-            let! events = getStore(workspaceRoot).ReadAllEvents()
+            let! events = getSessionEvents workspaceRoot sessionID
             let task = foldReviewTask sessionID events
             syncReviewProjection store sessionID task
     }
 
 let appendLoopActivated (workspaceRoot: string) (sessionID: string) (task: string) : JS.Promise<Result<unit, string>> =
     let payload = Map [ "task", task ]
-    let e = buildEvent sessionID eventKindLoopActivated payload (getTimestampMs().ToString())
-    getStore(workspaceRoot).AppendEvent e
+    appendAndCache workspaceRoot (buildEvent sessionID eventKindLoopActivated payload (getTimestampMs().ToString()))
 
 let appendLoopCancelled (workspaceRoot: string) (sessionID: string) : JS.Promise<Result<unit, string>> =
-    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindLoopCancelled Map.empty (getTimestampMs().ToString()))
+    appendAndCache workspaceRoot (buildEvent sessionID eventKindLoopCancelled Map.empty (getTimestampMs().ToString()))
 
 let appendReviewVerdict (workspaceRoot: string) (sessionID: string) (verdict: string) (feedback: string option) : JS.Promise<Result<unit, string>> =
     let baseMap = Map [ "verdict", verdict ]
@@ -54,32 +87,45 @@ let appendReviewVerdict (workspaceRoot: string) (sessionID: string) (verdict: st
         match feedback with
         | Some f when f <> "" -> Map.add "feedback" f baseMap
         | _ -> baseMap
-    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindReviewVerdict payload (getTimestampMs().ToString()))
+    appendAndCache workspaceRoot (buildEvent sessionID eventKindReviewVerdict payload (getTimestampMs().ToString()))
 
 let nudgeBlockedForTurn (workspaceRoot: string) (sessionID: string) (assistantMessage: string) : JS.Promise<bool> =
     promise {
         if sessionID = "" || workspaceRoot = "" then return false
         else
-            let! events = getStore(workspaceRoot).ReadAllEvents()
+            let! events = getSessionEvents workspaceRoot sessionID
             return isNudgeBlockedForAnchor (foldNudgeDedup sessionID events) assistantMessage
     }
 
 let tryClaimNudgeDispatch (workspaceRoot: string) (sessionID: string) (action: NudgeAction) (anchor: string) : JS.Promise<bool> =
-    getStore(workspaceRoot).TryClaimNudgeDispatch sessionID action anchor isNudgeBlockedForAnchor
+    promise {
+        let! events = getSessionEvents workspaceRoot sessionID
+        let trimmedAnchor = anchor.Trim()
+        if isNudgeBlockedForAnchor (foldNudgeDedup sessionID events) trimmedAnchor then return false
+        else
+            let payload =
+                Map [ "action", Wanxiangshu.Kernel.Nudge.toString action; "anchor", trimmedAnchor ]
+            let ev =
+                buildEvent sessionID eventKindNudgeDispatched payload (getTimestampMs().ToString())
+            let! res = appendAndCache workspaceRoot ev
+            match res with
+            | Ok () -> return true
+            | Error _ -> return false
+    }
 
 let getNudgeSnapshotFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Promise<NudgeSnapshotState> =
     promise {
         if sessionID = "" || workspaceRoot = "" then return emptyNudgeSnapshotState
         else
-            let! events = getStore(workspaceRoot).ReadAllEvents()
+            let! events = getSessionEvents workspaceRoot sessionID
             return foldNudgeSnapshot sessionID events
     }
 
 let appendSubmitReviewWipRecorded (workspaceRoot: string) (sessionID: string) : JS.Promise<Result<unit, string>> =
-    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindSubmitReviewWipRecorded Map.empty (getTimestampMs().ToString()))
+    appendAndCache workspaceRoot (buildEvent sessionID eventKindSubmitReviewWipRecorded Map.empty (getTimestampMs().ToString()))
 
 let appendNudgeDedupCleared (workspaceRoot: string) (sessionID: string) : JS.Promise<Result<unit, string>> =
-    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindNudgeDedupCleared Map.empty (getTimestampMs().ToString()))
+    appendAndCache workspaceRoot (buildEvent sessionID eventKindNudgeDedupCleared Map.empty (getTimestampMs().ToString()))
 
 let appendWorkBacklogCommitted (workspaceRoot: string) (sessionID: string) (args: TodoWriteArgs) : JS.Promise<Result<unit, string>> =
     let todosJson = JS.JSON.stringify(args.Todos)
@@ -93,29 +139,29 @@ let appendWorkBacklogCommitted (workspaceRoot: string) (sessionID: string) (args
               "plan", args.Plan
               "todosJson", todosJson
               "selectMethodologyJson", methJson ]
-    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindWorkBacklogCommitted payload (getTimestampMs().ToString()))
+    appendAndCache workspaceRoot (buildEvent sessionID eventKindWorkBacklogCommitted payload (getTimestampMs().ToString()))
 
 let appendLoopActivatedOrFail (workspaceRoot: string) (sessionID: string) (task: string) : JS.Promise<unit> =
     let payload = Map [ "task", task ]
-    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindLoopActivated payload (getTimestampMs().ToString()))
+    appendAndCacheOrFail workspaceRoot (buildEvent sessionID eventKindLoopActivated payload (getTimestampMs().ToString()))
 
 let appendLoopCancelledOrFail (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
-    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindLoopCancelled Map.empty (getTimestampMs().ToString()))
+    appendAndCacheOrFail workspaceRoot (buildEvent sessionID eventKindLoopCancelled Map.empty (getTimestampMs().ToString()))
 
 let appendReviewVerdictOrFail (workspaceRoot: string) (sessionID: string) (verdict: string) (feedback: string option) : JS.Promise<unit> =
     let baseMap = Map [ "verdict", verdict ]
     let payload = match feedback with Some f when f <> "" -> Map.add "feedback" f baseMap | _ -> baseMap
-    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindReviewVerdict payload (getTimestampMs().ToString()))
+    appendAndCacheOrFail workspaceRoot (buildEvent sessionID eventKindReviewVerdict payload (getTimestampMs().ToString()))
 
 let appendSubmitReviewWipRecordedOrFail (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
-    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindSubmitReviewWipRecorded Map.empty (getTimestampMs().ToString()))
+    appendAndCacheOrFail workspaceRoot (buildEvent sessionID eventKindSubmitReviewWipRecorded Map.empty (getTimestampMs().ToString()))
 
 let appendNudgeDedupClearedOrFail (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
-    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindNudgeDedupCleared Map.empty (getTimestampMs().ToString()))
+    appendAndCacheOrFail workspaceRoot (buildEvent sessionID eventKindNudgeDedupCleared Map.empty (getTimestampMs().ToString()))
 
 let appendWorkBacklogCommittedOrFail (workspaceRoot: string) (sessionID: string) (args: TodoWriteArgs) : JS.Promise<unit> =
     let payload = Map [ "ahaMoments", args.AhaMoments; "changesAndReasons", args.ChangesAndReasons; "gotchas", args.Gotchas; "lessonsAndConventions", args.LessonsAndConventions; "plan", args.Plan; "todosJson", JS.JSON.stringify(args.Todos); "selectMethodologyJson", JS.JSON.stringify(args.SelectMethodology |> List.toArray) ]
-    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindWorkBacklogCommitted payload (getTimestampMs().ToString()))
+    appendAndCacheOrFail workspaceRoot (buildEvent sessionID eventKindWorkBacklogCommitted payload (getTimestampMs().ToString()))
 
 let appendAssistantCompleted (workspaceRoot: string) (sessionID: string) (assistantMessage: string) (agent: string option) (turnId: string) (openTodos: string list) : JS.Promise<Result<unit, string>> =
     let baseMap = Map [ "assistantMessage", assistantMessage; "turnId", turnId; "openTodosJson", JS.JSON.stringify(openTodos |> List.toArray) ]
@@ -123,7 +169,7 @@ let appendAssistantCompleted (workspaceRoot: string) (sessionID: string) (assist
         match agent with
         | Some a when a <> "" -> Map.add "agent" a baseMap
         | _ -> baseMap
-    getStore(workspaceRoot).AppendEvent(buildEvent sessionID eventKindAssistantCompleted payload (getTimestampMs().ToString()))
+    appendAndCache workspaceRoot (buildEvent sessionID eventKindAssistantCompleted payload (getTimestampMs().ToString()))
 
 let appendAssistantCompletedOrFail (workspaceRoot: string) (sessionID: string) (assistantMessage: string) (agent: string option) (turnId: string) (openTodos: string list) : JS.Promise<unit> =
     let baseMap = Map [ "assistantMessage", assistantMessage; "turnId", turnId; "openTodosJson", JS.JSON.stringify(openTodos |> List.toArray) ]
@@ -131,7 +177,7 @@ let appendAssistantCompletedOrFail (workspaceRoot: string) (sessionID: string) (
         match agent with
         | Some a when a <> "" -> Map.add "agent" a baseMap
         | _ -> baseMap
-    getStore(workspaceRoot).AppendEventOrFail(buildEvent sessionID eventKindAssistantCompleted payload (getTimestampMs().ToString()))
+    appendAndCacheOrFail workspaceRoot (buildEvent sessionID eventKindAssistantCompleted payload (getTimestampMs().ToString()))
 
 let verdictStringFromReviewResult (result: Wanxiangshu.Kernel.ReviewSession.Types.ReviewResult) : string * string option =
     match result with

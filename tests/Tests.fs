@@ -40,6 +40,7 @@ open Wanxiangshu.Tests.WebToolsCodecTests
 open Wanxiangshu.Tests.ReviewToolsCodecTests
 
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
+open Wanxiangshu.Tests.ExecutorTests
 open Wanxiangshu.Tests.ToolArgsDecodeTests
 open Wanxiangshu.Tests.ToolResultWireTests
 open Wanxiangshu.Tests.SubagentToolExecuteTests
@@ -164,6 +165,7 @@ let runAll (args: string array) : JS.Promise<int> =
             let isIntegrationSuiteRun (label: string) =
                 (label.StartsWith "Integration" && label.EndsWith ".run")
                 || (label = "OmpExecutorToolsTests.run")
+                || (label = "ExecutorTests.run")
 
             for (label, body) in runnableTests do
                 match body with
