@@ -87,7 +87,6 @@
     <Compile Include="src/Kernel/ToolContext.fs" />
     <Compile Include="src/Kernel/Nudge/Types.fs" />
     <Compile Include="src/Kernel/Nudge/NudgeDerivation.fs" />
-    <Compile Include="src/Kernel/Nudge/Registry.fs" />
     <Compile Include="src/Kernel/Config.fs" />
     <Compile Include="src/Kernel/FuzzyPath.fs" />
     <Compile Include="src/Kernel/FuzzyQuery.fs" />

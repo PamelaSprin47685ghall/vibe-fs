@@ -6,7 +6,6 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.Nudge.TodoStatus
-open Wanxiangshu.Kernel.NudgeState
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon

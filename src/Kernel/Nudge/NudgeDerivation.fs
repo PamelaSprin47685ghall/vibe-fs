@@ -6,11 +6,6 @@ open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.EventLog.Fold
 
-let todoNudgePromptProse = Wanxiangshu.Kernel.PromptFragments.todoNudgePromptProse
-let loopNudgePromptProse = Wanxiangshu.Kernel.PromptFragments.loopNudgePromptProse
-let todoNudgePromptFor = Wanxiangshu.Kernel.PromptFragments.todoNudgePromptFor
-let loopNudgePromptFor = Wanxiangshu.Kernel.PromptFragments.loopNudgePromptFor
-
 type SnapshotInput =
     { openTodos: string list
       lastAssistantText: string
