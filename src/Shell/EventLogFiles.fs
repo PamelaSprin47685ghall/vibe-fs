@@ -22,6 +22,14 @@ let private writeFileFlagAsync (path: string) (data: string) (options: obj) : JS
 [<Import("unlink", "node:fs/promises")>]
 let private unlinkAsync (path: string) : JS.Promise<unit> = jsNative
 
+[<Import("stat", "node:fs/promises")>]
+let private statAsync (path: string) : JS.Promise<obj> = jsNative
+
+type private EventLogCache =
+    { mutable Size : float
+      mutable Mtime : float
+      mutable Events : WanEvent list }
+
 let lockFileName = ".wanxiangshu.ndjson.lock"
 
 let lockFilePath (workspaceRoot: string) : string =
@@ -89,11 +97,29 @@ type EventLogStore(workspaceRoot: string) =
     let queue = SerialQueue()
     let root = workspaceRoot
     let lkPath = lockFilePath root
+    let mutable cache : EventLogCache option = None
 
     member _.ReadAllEvents() : JS.Promise<WanEvent list> =
         queue.Enqueue(fun () ->
             withWorkspaceLock lkPath (fun () ->
-                readEventsFile (eventPath root)))
+                promise {
+                    let path = eventPath root
+                    try
+                        let! stats = statAsync path
+                        let size = stats?size |> unbox<float>
+                        let mtime = stats?mtimeMs |> unbox<float>
+                        match cache with
+                        | Some c when c.Size = size && c.Mtime = mtime ->
+                            return c.Events
+                        | _ ->
+                            let! events = readEventsFile path
+                            cache <- Some { Size = size; Mtime = mtime; Events = events }
+                            return events
+                    with _ ->
+                        cache <- None
+                        let! events = readEventsFile path
+                        return events
+                }))
 
     member _.AppendEvent(e: WanEvent) : JS.Promise<Result<unit, string>> =
         queue.Enqueue(fun () ->
@@ -103,6 +129,7 @@ type EventLogStore(workspaceRoot: string) =
                         let path = eventPath root
                         let line = wanEventToLine e + "\n"
                         do! appendFileAsync path line
+                        cache <- None
                         return Ok ()
                     with ex ->
                         return Error ex.Message
@@ -115,6 +142,7 @@ type EventLogStore(workspaceRoot: string) =
                     let path = eventPath root
                     let line = wanEventToLine e + "\n"
                     do! appendFileAsync path line
+                    cache <- None
                 }))
 
     member _.TryClaimNudgeDispatch
@@ -126,7 +154,24 @@ type EventLogStore(workspaceRoot: string) =
         queue.Enqueue(fun () ->
             withWorkspaceLock lkPath (fun () ->
                 promise {
-                    let! events = readEventsFile (eventPath root)
+                    let path = eventPath root
+                    let! events =
+                        promise {
+                            try
+                                let! stats = statAsync path
+                                let size = stats?size |> unbox<float>
+                                let mtime = stats?mtimeMs |> unbox<float>
+                                match cache with
+                                | Some c when c.Size = size && c.Mtime = mtime ->
+                                    return c.Events
+                                | _ ->
+                                    let! evs = readEventsFile path
+                                    cache <- Some { Size = size; Mtime = mtime; Events = evs }
+                                    return evs
+                            with _ ->
+                                cache <- None
+                                return! readEventsFile path
+                        }
                     let trimmedAnchor = anchor.Trim()
                     if isBlocked (foldNudgeDedup sessionId events) trimmedAnchor then return false
                     else
@@ -135,6 +180,7 @@ type EventLogStore(workspaceRoot: string) =
                         let ev =
                             buildEvent sessionId eventKindNudgeDispatched payload (getTimestampMs().ToString())
                         let line = wanEventToLine ev + "\n"
-                        do! appendFileAsync (eventPath root) line
+                        do! appendFileAsync path line
+                        cache <- None
                         return true
                 }))

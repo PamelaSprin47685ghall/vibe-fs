@@ -32,6 +32,6 @@ let deduplicate (seenOutputs: string list) (output: string) : DedupedOutput =
         if List.exists matches seenOutputs then
             { output = noChangeEnvelope (); seenOutputs = seenOutputs }
         elif fpOut.IsSome then
-            { output = output; seenOutputs = seenOutputs @ [ fpOut.Value ] }
+            { output = output; seenOutputs = fpOut.Value :: seenOutputs }
         else
-            { output = output; seenOutputs = seenOutputs @ [ output ] }
+            { output = output; seenOutputs = output :: seenOutputs }

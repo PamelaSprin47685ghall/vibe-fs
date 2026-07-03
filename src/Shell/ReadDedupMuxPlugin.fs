@@ -28,8 +28,10 @@ let private decodeMuxReadPart (part: obj) : ReadPayload option =
         match decodeDynamicToolReadOutput part with
         | None -> None
         | Some content ->
-            let path = tryPath (Dyn.get part "input")
-            Some { path = path; content = content }
+            if isNoChangeOutput content then None
+            else
+                let path = tryPath (Dyn.get part "input")
+                Some { path = path; content = content }
 
 let private collectMuxReadHits (messages: obj array) : ReadHit list =
     messages

@@ -3,6 +3,7 @@ module Wanxiangshu.Kernel.CapsFormat
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.PromptFrontMatter
+open System.Collections.Generic
 
 /// A discovered capability file: its absolute path, display label, and content.
 type CapsFile = { filePath: string; label: string; content: string }
@@ -72,17 +73,32 @@ let private parseLine (raw: string) : (int * string) option =
             let bodyStart = skipOneSpace s (numEnd + 1)
             Some (lineNo, s.Substring(bodyStart))
 
+let mutable private fingerprintCache : Map<string, string option> = Map.empty
+let private cacheKeys = Queue<string>()
+let private maxCacheSize = 1000
+
 let readFingerprint (output: string) : string option =
     if String.length output = 0 then None
     else
-        let pairs =
-            output.Split('\n')
-            |> Array.choose parseLine
-        if pairs.Length < 2 then None
-        else
-            pairs
-            |> Array.distinctBy fst
-            |> Array.sortBy fst
-            |> Array.map snd
-            |> String.concat "\n"
-            |> Some
+        match Map.tryFind output fingerprintCache with
+        | Some cached -> cached
+        | None ->
+            let pairs =
+                output.Split('\n')
+                |> Array.choose parseLine
+            let result =
+                if pairs.Length < 2 then None
+                else
+                    pairs
+                    |> Array.distinctBy fst
+                    |> Array.sortBy fst
+                    |> Array.map snd
+                    |> String.concat "\n"
+                    |> Some
+            if fingerprintCache.Count >= maxCacheSize then
+                if cacheKeys.Count > 0 then
+                    let oldestKey = cacheKeys.Dequeue()
+                    fingerprintCache <- Map.remove oldestKey fingerprintCache
+            fingerprintCache <- Map.add output result fingerprintCache
+            cacheKeys.Enqueue(output)
+            result

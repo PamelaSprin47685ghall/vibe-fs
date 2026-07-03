@@ -1,6 +1,7 @@
 module Wanxiangshu.Omp.ReadDedup
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.Dedup
 open Wanxiangshu.Kernel.MessageDedup
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Shell.Dyn
@@ -28,7 +29,7 @@ let applyReadDedup (entries: obj array) : unit =
                             let state = Dyn.get part "state"
                             if not (Dyn.isNullish state) then
                                 let output = Dyn.get state "output"
-                                if not (Dyn.isNullish output) && Dyn.typeIs output "string" then
+                                if not (Dyn.isNullish output) && Dyn.typeIs output "string" && not (isNoChangeOutput (string output)) then
                                     let currentOutput = string output
                                     let pathKey =
                                         match extractFilePaths (Dyn.get state "input") with

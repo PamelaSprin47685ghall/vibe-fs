@@ -24,6 +24,7 @@ let private objectAssign (target: obj) (source: obj) : obj = JSObject?assign(tar
 
 let private extractFrontMatterBlocksAndBody (text: string) : string list * string =
     if isNull text then ([], text)
+    elif not (text.Contains "---") then ([], text)
     else
         let lines = text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n')
         let rec extractBlocks idx acc =
