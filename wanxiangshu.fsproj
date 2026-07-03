@@ -491,6 +491,7 @@
     <Compile Include="tests/ArchitectureTestsOpencodeToolsExecutor.fs" />
     <Compile Include="tests/ArchitectureTestsOpencodeTools.fs" />
     <Compile Include="tests/TestsTestBody.fs" />
+    <Compile Include="tests/E2eHarnessContractTests.fs" />
     <Compile Include="tests/TestsArchitectureRegistryB.fs" />
     <Compile Include="tests/TestsArchitectureRegistry.fs" />
     <Compile Include="tests/TestsEntriesDomain.fs" />

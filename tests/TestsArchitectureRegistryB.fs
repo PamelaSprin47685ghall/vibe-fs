@@ -21,6 +21,7 @@ open Wanxiangshu.Tests.ArchitectureTestsOpencodeToolsReview
 open Wanxiangshu.Tests.ArchitectureTestsOpencodeToolsSearch
 open Wanxiangshu.Tests.ArchitectureTestsOpencodeToolsExecutor
 open Wanxiangshu.Tests.TestsTestBody
+open Wanxiangshu.Tests.E2eHarnessContractTests
 
 let architectureTestEntriesPartB () : (string * TestBody) list =
     [
@@ -107,4 +108,6 @@ let architectureTestEntriesPartB () : (string * TestBody) list =
     "ArchitectureTests.sessionLifecycleObserverUsesCodecDecoders", Sync (sync ArchitectureTestsWirePayload.sessionLifecycleObserverUsesCodecDecoders)
     "ArchitectureTests.commandHooksUsesCodecSessionID", Sync (sync ArchitectureTestsWirePayload.commandHooksUsesCodecSessionID)
     "ArchitectureTests.eventHooksUsesCodecSessionID", Sync (sync ArchitectureTestsWirePayload.eventHooksUsesCodecSessionID)
+    "ArchitectureTests.e2eHarnessGetMessagesUsesSessionPrefix", Sync (sync E2eHarnessContractTests.getMessagesUsesSessionPrefix)
+    "ArchitectureTests.e2eHarnessPluginJsResolvesWithParentFallback", Sync (sync E2eHarnessContractTests.pluginJsResolvesWithParentFallback)
     ]

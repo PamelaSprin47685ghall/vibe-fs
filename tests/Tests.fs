@@ -85,6 +85,7 @@ open Wanxiangshu.Tests.OmpMagicTodoTests
 open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.EventDrivenHarnessDemo
 open Wanxiangshu.Tests.SubagentIoTests
+open Wanxiangshu.Tests.E2eHarnessContractTests
 open Wanxiangshu.Tests.ToolCatalogClassificationTests
 open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.KernelHelpersTests

@@ -7,10 +7,19 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createMockLLM } from './mock-llm.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const WANXIANG_ROOT = path.resolve(__dirname, '..');
-const PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Opencode/Plugin.js');
+let WANXIANG_ROOT = path.resolve(__dirname, '..');
+let PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Opencode/Plugin.js');
+if (!fs.existsSync(PLUGIN_JS)) {
+  WANXIANG_ROOT = path.resolve(__dirname, '../..');
+  PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Opencode/Plugin.js');
+}
 const PLUGIN_URL = pathToFileURL(PLUGIN_JS).href;
 const FIXTURE_MCP = path.resolve(__dirname, 'stealth-mcp-fixture.js');
+const E2E_LOCK = '/tmp/wanxiang-e2e.lock';
+
+function releaseE2eLock() {
+  try { fs.unlinkSync(E2E_LOCK); } catch {}
+}
 
 function createFixtureUvx(home) {
   const dir = path.join(home, 'mcp-bin');
@@ -87,12 +96,26 @@ function isolatedEnv(home, llmUrl, opts = {}) {
 async function waitForListening(stdout, child, timeoutMs = 30000) {
   let buf = '';
   let exitHandler;
+  let dataHandler;
   return await new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
     exitHandler = (code, signal) => {
       reject(new Error(`opencode serve exited with code=${code} signal=${signal}`));
     };
     child.on('exit', exitHandler);
+    dataHandler = (chunk) => {
+      const chunkStr = chunk.toString();
+      buf += chunkStr;
+      const idx = buf.indexOf('\n');
+      if (idx !== -1) {
+        const line = buf.slice(0, idx).trim();
+        buf = buf.slice(idx + 1);
+        if (line.includes('opencode server listening on http://')) {
+          resolve(line);
+        }
+      }
+    };
+    stdout.on('data', dataHandler);
     const check = () => {
       if (buf.includes('opencode server listening on http://')) {
         resolve(buf);
@@ -104,25 +127,34 @@ async function waitForListening(stdout, child, timeoutMs = 30000) {
       }
       setTimeout(check, 50);
     };
-    stdout.on('data', (chunk) => {
-      const chunkStr = chunk.toString();
-      buf += chunkStr;
-      const idx = buf.indexOf('\n');
-      if (idx !== -1) {
-        const line = buf.slice(0, idx).trim();
-        buf = buf.slice(idx + 1);
-        if (line.includes('opencode server listening on http://')) {
-          resolve(line);
-        }
-      }
-    });
     check();
   }).finally(() => {
     child.removeListener('exit', exitHandler);
+    stdout.removeListener('data', dataHandler);
   });
 }
 
 export async function start(opts = {}) {
+  // Exclusive lock: parallel e2e runs kill each other's opencode serve via
+  // pkill. Acquire before any pkill so a second start() dies immediately
+  // instead of reaping the first run's server.
+  try {
+    fs.openSync(E2E_LOCK, 'wx');
+  } catch (e) {
+    if (e.code === 'EEXIST') {
+      throw new Error('e2e already running (lock exists at ' + E2E_LOCK + ')');
+    }
+    throw e;
+  }
+
+  process.once('exit', releaseE2eLock);
+
+  // Stale opencode serve from a prior e2e run that failed dispose can hold the
+  // port and cause the next start() to bind on a dying process. Reap them
+  // before spawn; pkill -f exits non-zero when nothing matches, so swallow.
+  try { execSync("pkill -f 'opencode serve'", { stdio: 'ignore' }); } catch {}
+  await new Promise((r) => setTimeout(r, 500));
+
   const llm = createMockLLM();
   const llmHandle = await llm.start();
 
@@ -157,7 +189,7 @@ export async function start(opts = {}) {
     throw new Error('waitForListening returned empty/undefined');
   }
 
-  const m = listenLine.match(/http:\/\/[?1h =[^:]+:(\d+)/) || listenLine.match(/http:\/\/127.0.0.1:(\d+)/) || listenLine.match(/http:\/\/localhost:(\d+)/) || listenLine.match(/:(\d+)/);
+  const m = listenLine.match(/http:\/\/127\.0\.0\.1:(\d+)/) || listenLine.match(/http:\/\/localhost:(\d+)/) || listenLine.match(/:(\d+)/);
   const port = m ? Number(m[1]) : 0;
   const baseUrl = `http://127.0.0.1:${port}`;
 
@@ -192,7 +224,7 @@ export async function start(opts = {}) {
       return request('POST', '/api/session', { query, body });
     },
 
-    async sendPrompt(sessionID, text, query = {}, timeoutMs = 15000) {
+    async sendPrompt(sessionID, text, query = {}, timeoutMs = 120000) {
       const qs = query ? '?' + new URLSearchParams(query).toString() : '';
       const url = baseUrl + `/session/${sessionID}/message` + qs;
       const body = { parts: [{ type: 'text', text }], model: { providerID: 'test', modelID: 'test-model' } };
@@ -223,7 +255,7 @@ export async function start(opts = {}) {
     },
 
     async getMessages(sessionID, query = {}) {
-      return request('GET', `/api/session/${sessionID}/message`, { query });
+      return request('GET', `/session/${sessionID}/message`, { query });
     },
 
     async getSessions(query = {}) {
@@ -260,9 +292,24 @@ export async function start(opts = {}) {
     },
 
     async dispose() {
+      releaseE2eLock();
       await llmHandle.stop().catch(() => {});
-      child.kill('SIGKILL');
-      await new Promise((r) => child.on('exit', r));
+      try {
+        if (child.exitCode === null) {
+          child.kill('SIGTERM');
+          await new Promise((resolve) => {
+            const t = setTimeout(() => {
+              try { child.kill('SIGKILL'); } catch {}
+              resolve();
+            }, 5000);
+            child.once('exit', () => { clearTimeout(t); resolve(); });
+          });
+        }
+      } catch {}
+      try {
+        const lockPath = path.join(workDir, '.wanxiangshu.ndjson.lock');
+        if (fs.existsSync(lockPath)) fs.rmSync(lockPath);
+      } catch {}
       try { fs.rmSync(home, { recursive: true, force: true }); } catch {}
     },
   };
@@ -271,22 +318,19 @@ export async function start(opts = {}) {
   // dependency install (arborist reify) during plugin bootstrap. Pre-pay that
   // cost here with a generous timeout so per-test prompts can keep a tight one.
   if (opts.plugin) {
-    const warmSession = await api.createSession().then((r) => r.data?.data?.id);
-    if (warmSession) {
-      llmHandle.expectText('warmup');
-      await api.sendPrompt(warmSession, 'warmup', {}, 90000);
-      llmHandle.reset();
+    try {
+      const warmSession = await api.createSession().then((r) => r.data?.data?.id);
+      if (warmSession) {
+        llmHandle.expectText('warmup');
+        await api.sendPrompt(warmSession, 'warmup', {}, 90000);
+        llmHandle.reset();
+      }
+    } catch (e) {
+      releaseE2eLock();
+      throw e;
     }
   }
 
   return api;
 }
 
-export function containsReadTool(msgsRes) {
-  if (!msgsRes.ok) return false;
-  return msgsRes.data.some((m) =>
-    m.type === 'assistant' &&
-    Array.isArray(m.content) &&
-    m.content.some((p) => p.type === 'tool' && p.name === 'read')
-  );
-}

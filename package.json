@@ -25,8 +25,8 @@
     "index.d.ts"
   ],
   "scripts": {
-    "build-and-test": "dotnet fable wanxiangshu.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && mkdir -p build/e2e && cp e2e/*.js build/e2e/ && node tests/runner.js",
-    "e2e": "dotnet fable wanxiangshu.fsproj --outDir build --noCache && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && mkdir -p build/e2e && cp e2e/*.js build/e2e/ && node tests/runner.js --e2e"
+    "build-and-test": "dotnet fable wanxiangshu.fsproj --outDir build && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && mkdir -p build/e2e && cp e2e/*.js build/e2e/ && sed -i 's|../../e2e/harness.js|./harness.js|g' build/e2e/Tests.js && node tests/runner.js",
+    "e2e": "dotnet fable wanxiangshu.fsproj --outDir build --noCache && rm -f build/fable_modules/.gitignore && cp build-package.json build/package.json && mkdir -p build/e2e && cp e2e/*.js build/e2e/ && sed -i 's|../../e2e/harness.js|./harness.js|g' build/e2e/Tests.js && node tests/runner.js --e2e"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.1.1",
