@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.FallbackRecoveryWait
 open Wanxiangshu.Shell.DelegatedAiSettings
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.SessionIoSpawn
@@ -59,9 +60,7 @@ let runSubagentCoreResult (runtime: FallbackRuntimeState) (registry: ChildAgentR
                             let! text = extractSessionText client childID directory
                             return Ok (formatSubagentReport noOutputText abortedPrefix text true)
                     | other ->
-                        // Fallback closed-loop recovery: if model error was consumed by fallback,
-                        // do not reject; instead extract whatever text exists and return success.
-                        do! Promise.lift ()
+                        do! waitForRecovery runtime childID 48
                         match runtime.GetConsumed childID with
                         | Some true ->
                             let! text = extractSessionText client childID directory

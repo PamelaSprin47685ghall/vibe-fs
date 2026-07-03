@@ -26,6 +26,7 @@ let getSessionID (eventType: string) (props: obj) : string =
         [ Dyn.str props "sessionID"
           Dyn.str part "sessionID"
           Dyn.str info "sessionID"
+          if eventType = "session.error" then Dyn.str props "id" else ""
           if Set.contains eventType sessionEventTypes then
               Dyn.str info "id"
           else "" ]

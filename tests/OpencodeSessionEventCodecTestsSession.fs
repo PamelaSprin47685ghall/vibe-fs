@@ -36,6 +36,10 @@ let getSessionIDLifecycleUsesInfoId () =
     equal "getSessionID uses info.id for lifecycle events" "from-info-id" (getSessionID "session.deleted" props)
     equal "getSessionID uses info.id for session.created" "from-info-id" (getSessionID "session.created" props)
 
+let getSessionIDUsesTopLevelIdForSessionError () =
+    let props = box {| id = "sid-top-level" |}
+    equal "getSessionID session.error uses props.id" "sid-top-level" (getSessionID "session.error" props)
+
 let getSessionIDReturnsEmptyWhenAbsent () =
     let props = box {| unrelated = "x" |}
     equal "getSessionID empty when no carriers" "" (getSessionID "session.idle" props)

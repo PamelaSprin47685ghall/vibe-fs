@@ -22,8 +22,9 @@ let muxEventTranslator : IEventTranslator =
     { new IEventTranslator with
         member _.TranslateError (rawEvent: obj) : FallbackEvent option =
             let eventType = Dyn.str rawEvent "type"
-            if eventType = "error" then
-                let props = Dyn.get rawEvent "properties"
+            let props = Dyn.get rawEvent "properties"
+            let props = if Dyn.isNullish props then rawEvent else props
+            if eventType = "error" || eventType = "session.error" then
                 let errType = Dyn.str props "errorType"
                 if errType = "aborted" then
                     Some (SessionError { ErrorName = "MessageAbortedError"
@@ -33,10 +34,16 @@ let muxEventTranslator : IEventTranslator =
             else None
 
         member _.ExtractSessionID (rawEvent: obj) : string =
-            Dyn.str rawEvent "workspaceId"
+            let ws = Dyn.str rawEvent "workspaceId"
+            if ws <> "" then ws
+            else
+                let props = Dyn.get rawEvent "properties"
+                let props = if Dyn.isNullish props then rawEvent else props
+                Dyn.str props "sessionID"
 
         member _.IsSessionError (rawEvent: obj) : bool =
-            Dyn.str rawEvent "type" = "error"
+            let t = Dyn.str rawEvent "type"
+            t = "error" || t = "session.error"
 
         member _.IsSessionIdle (rawEvent: obj) : bool =
             Dyn.str rawEvent "type" = "stream-end"

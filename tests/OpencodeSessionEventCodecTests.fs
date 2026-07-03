@@ -6,6 +6,7 @@ let run () =
     getSessionIDFromPropsPrefersPropsKey ()
     getSessionIDFallsBackToPart ()
     getSessionIDFallsBackToInfo ()
+    getSessionIDUsesTopLevelIdForSessionError ()
     getSessionIDLifecycleUsesInfoId ()
     getSessionIDReturnsEmptyWhenAbsent ()
     getSessionIDNonLifecycleSkipsInfoId ()

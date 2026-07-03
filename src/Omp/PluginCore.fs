@@ -48,9 +48,7 @@ let private createCoreServices (pi: obj) : CoreServices =
         | None -> (fun _ -> emptyConfig)
     let sessionApi = Dyn.get pi "session"
     let fallbackHandler =
-        match fallbackConfigOpt with
-        | Some _ -> Some (createOmpFallbackHandler fallbackRuntime configLookup sessionApi)
-        | None -> None
+        Some (createOmpFallbackHandler fallbackRuntime configLookup sessionApi)
 
     { ReviewStore = reviewStore
       FinderCache = finderCache

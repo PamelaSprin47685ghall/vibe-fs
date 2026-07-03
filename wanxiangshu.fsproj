@@ -108,6 +108,7 @@
     <Compile Include="src/Shell/FallbackRuntimeState.fs" />
     <Compile Include="src/Shell/FallbackMessageCodec.fs" />
     <Compile Include="src/Shell/FallbackEventBridge.fs" />
+    <Compile Include="src/Shell/FallbackRecoveryWait.fs" />
     <Compile Include="src/Shell/PromiseStr.fs" />
     <Compile Include="src/Shell/SessionProjectionStore.fs" />
     <Compile Include="src/Shell/FuzzyIteratorStore.fs" />
@@ -519,6 +520,8 @@
     <Compile Include="tests/FallbackConfigCodecTests.fs" />
     <Compile Include="tests/FallbackRuntimeStateTests.fs" />
     <Compile Include="tests/FallbackEventBridgeTests.fs" />
+    <Compile Include="tests/FallbackRecoveryWaitTests.fs" />
+    <Compile Include="tests/SubagentIoFallbackRecoveryTests.fs" />
     <Compile Include="tests/FallbackMessageCodecTests.fs" />
     <Compile Include="tests/FallbackIntegrationTests.fs" />
     <Compile Include="tests/ArchitectureTestsFallback.fs" />

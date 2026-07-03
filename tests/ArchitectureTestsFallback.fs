@@ -13,6 +13,7 @@ let fallbackFiles =
         "src/Shell/FallbackRuntimeState.fs"
         "src/Shell/FallbackMessageCodec.fs"
         "src/Shell/FallbackEventBridge.fs"
+        "src/Shell/FallbackRecoveryWait.fs"
         "src/Opencode/FallbackHooks.fs"
         "src/Opencode/FallbackConfigLoader.fs"
         "src/Mux/FallbackHooks.fs"
