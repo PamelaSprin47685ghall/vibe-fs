@@ -38,6 +38,19 @@ let userCapsTextPreludeAndDefault () =
 let acknowledgeTextIsStable () =
     equal "ack text" "好的，我将遵守规则。" acknowledgeText
 
+let capsPreludeRequiresFormalTestsNotAdHoc () =
+    check "think: no ad-hoc tests" (thinkText.Contains "禁止临时测试")
+    check "think: debug becomes tests" (thinkText.Contains "调试过程永久化")
+    check "think: generic pipeline" (thinkText.Contains "标准测试入口")
+    check "think: not one-repo npm" (not (thinkText.Contains "npm run build-and-test"))
+    check "llm: no ad-hoc tests" (llmText.Contains "禁止临时测试")
+    check "llm: debug becomes tests" (llmText.Contains "调试过程永久化")
+    check "llm: generic pipeline" (llmText.Contains "常规测试管线")
+
+let shellCapsPreludeReExportsKernel () =
+    equal "shell thinkWrapped" thinkWrapped Wanxiangshu.Shell.CapsPrelude.thinkWrapped
+    equal "shell llmText" llmText Wanxiangshu.Shell.CapsPrelude.llmText
+
 let classifySourceCoversAck () =
     match classifySource $"{capsAcknowledgePrefix}xyz" with
     | Synthetic kind -> equal "ack kind" capsAcknowledgePrefix kind
@@ -48,4 +61,6 @@ let run () =
     findFirstNonSynthMessageSkipsSynth ()
     userCapsTextPreludeAndDefault ()
     acknowledgeTextIsStable ()
+    capsPreludeRequiresFormalTestsNotAdHoc ()
+    shellCapsPreludeReExportsKernel ()
     classifySourceCoversAck ()
