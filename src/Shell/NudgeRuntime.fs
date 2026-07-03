@@ -107,17 +107,17 @@ type NudgeRuntime
                     if output = "" then None else Some output
                 | _ -> None)
 
-    let collectSnapshotMux (helpers: obj) (workspaceId: string) () : JS.Promise<SessionSnapshot option> =
+    let collectSnapshotMux (helpers: obj) (workspaceId: string) (lastMsgFromEvent: string) () : JS.Promise<SessionSnapshot option> =
         promise {
             let! todos = tryGetTodos helpers workspaceId
             match getChatHistory with
             | None ->
                 let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
                 let! isLoopActive = isLoopActiveFromEventLog root workspaceId
-                let! blocked = nudgeBlockedForTurn root workspaceId ""
+                let! blocked = nudgeBlockedForTurn root workspaceId lastMsgFromEvent
                 return Some (deriveSnapshot {
                     openTodos = todos
-                    lastAssistantText = ""
+                    lastAssistantText = lastMsgFromEvent
                     agentFromMessage = None
                     isLoopActive = isLoopActive
                     lastAssistantIsCompaction = false
@@ -135,7 +135,7 @@ type NudgeRuntime
                             role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str m "agent")))
                     let lastAssistantText, turnId, agent =
                         match lastAssistantIdx with
-                        | None -> "", "", None
+                        | None -> lastMsgFromEvent, "", None
                         | Some idx ->
                             let assistantMsg = messages.[idx]
                             let text = messageTexts assistantMsg |> String.concat "\n"
@@ -145,7 +145,8 @@ type NudgeRuntime
                             let time = Dyn.get info "time"
                             let completed = Dyn.str time "completed"
                             let tid = if completed <> "" then completed else Dyn.str info "id"
-                            text, tid, agent
+                            let finalText = if text = "" then lastMsgFromEvent else text
+                            finalText, tid, agent
                     let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
                     let key = nudgeAnchorKey turnId lastAssistantText
                     let! isLoopActive = isLoopActiveFromEventLog root workspaceId
@@ -162,10 +163,10 @@ type NudgeRuntime
                     })
                 with _ ->
                     let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
-                    let! blocked = nudgeBlockedForTurn root workspaceId ""
+                    let! blocked = nudgeBlockedForTurn root workspaceId lastMsgFromEvent
                     return Some (deriveSnapshot {
                         openTodos = todos
-                        lastAssistantText = ""
+                        lastAssistantText = lastMsgFromEvent
                         agentFromMessage = None
                         isLoopActive = false
                         lastAssistantIsCompaction = false
@@ -233,28 +234,28 @@ type NudgeRuntime
 
     member _.HandleEvent(parsed: NudgeRuntimeEvent, helpers: obj) : JS.Promise<unit> =
         promise {
-            match parsed with
-            | Ignore -> return ()
-            | StreamEnd(workspaceId, stopReason, _) ->
-                if not (Dyn.isNullish helpers) && stopReason <> "queued-message" then
-                    let! newState = runNudgeFlowWithRetryCheck runtimeState workspaceId (collectSnapshotMux helpers workspaceId) (sendNudgeMux helpers workspaceId)
-                    runtimeState <- newState
-                return ()
-            | StreamAbort workspaceId
-            | AbortedError workspaceId ->
-                runtimeState <-
-                    { runtimeState with
-                        forceStoppedSessions = Set.add workspaceId runtimeState.forceStoppedSessions }
-                return ()
-            | StepFailed workspaceId ->
-                runtimeState <- { runtimeState with retryPendingSessions = Set.add workspaceId runtimeState.retryPendingSessions }
-                return ()
-            | Prompted workspaceId ->
-                runtimeState <-
-                    { runtimeState with
-                        retryPendingSessions = Set.remove workspaceId runtimeState.retryPendingSessions
-                        forceStoppedSessions = Set.remove workspaceId runtimeState.forceStoppedSessions }
-                return ()
+         match parsed with
+             | Ignore -> return ()
+             | StreamEnd(workspaceId, stopReason, lastMsg) ->
+                 if not (Dyn.isNullish helpers) && stopReason <> "queued-message" then
+                     let! newState = runNudgeFlowWithRetryCheck runtimeState workspaceId (collectSnapshotMux helpers workspaceId lastMsg) (sendNudgeMux helpers workspaceId)
+                     runtimeState <- newState
+                 return ()
+             | StreamAbort workspaceId
+             | AbortedError workspaceId ->
+                 runtimeState <-
+                     { runtimeState with
+                         forceStoppedSessions = Set.add workspaceId runtimeState.forceStoppedSessions }
+                 return ()
+             | StepFailed workspaceId ->
+                 runtimeState <- { runtimeState with retryPendingSessions = Set.add workspaceId runtimeState.retryPendingSessions }
+                 return ()
+             | Prompted workspaceId ->
+                 runtimeState <-
+                     { runtimeState with
+                         retryPendingSessions = Set.remove workspaceId runtimeState.retryPendingSessions
+                         forceStoppedSessions = Set.remove workspaceId runtimeState.forceStoppedSessions }
+                 return ()
         }
 
 let createNudgeRuntime
