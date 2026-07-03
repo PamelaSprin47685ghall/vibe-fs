@@ -9,10 +9,6 @@ type SessionSnapshot =
       agentFromMessage: string option
       hasActiveRunner: bool }
 
-type NudgeDecision =
-    | StandDown
-    | Send of promptText: string * agentOpt: string option
-
 type SendOutcome =
     | Delivered
     | Aborted
