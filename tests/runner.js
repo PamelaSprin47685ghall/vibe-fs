@@ -1,9 +1,16 @@
+const isMuxE2e = process.argv.includes('--e2e-mux');
 const isE2e = process.argv.includes('--e2e');
-const runAll = isE2e
-    ? (await import('../build/e2e/Tests.js')).runAll
-    : (await import('../build/tests/Tests.js')).runAll;
 
-runAll(process.argv.slice(2).filter(a => a !== '--e2e'))
+let runAll;
+if (isMuxE2e) {
+    runAll = (await import('../build/e2e/MuxTests.js')).runAll;
+} else if (isE2e) {
+    runAll = (await import('../build/e2e/Tests.js')).runAll;
+} else {
+    runAll = (await import('../build/tests/Tests.js')).runAll;
+}
+
+runAll(process.argv.slice(2).filter(a => a !== '--e2e' && a !== '--e2e-mux'))
     .then(code => process.exit(code))
     .catch(err => {
         console.error('RUNALL_FAILED:', err && err.message ? err.message : err);
