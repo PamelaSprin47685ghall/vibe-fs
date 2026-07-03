@@ -61,7 +61,8 @@ type NudgeRuntimeEvent =
 let private nodeProcess : obj = jsNative
 
 type NudgeRuntime
-    (getChatHistory: (string -> JS.Promise<obj array>) option) =
+    (getChatHistory: (string -> JS.Promise<obj array>) option,
+     workspaceDirectory: string) =
 
     let mutable runtimeState = emptyRuntimeState
 
@@ -106,7 +107,7 @@ type NudgeRuntime
             let! todos = tryGetTodos helpers workspaceId
             match getChatHistory with
             | None ->
-                let root = unbox<string> (nodeProcess?cwd())
+                let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
                 let! isLoopActive = isLoopActiveFromEventLog root workspaceId
                 let! blocked = nudgeBlockedForTurn root workspaceId ""
                 return Some (deriveSnapshot {
@@ -140,7 +141,7 @@ type NudgeRuntime
                             let completed = Dyn.str time "completed"
                             let tid = if completed <> "" then completed else Dyn.str info "id"
                             text, tid, agent
-                    let root = unbox<string> (nodeProcess?cwd())
+                    let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
                     let key = nudgeAnchorKey turnId lastAssistantText
                     let! isLoopActive = isLoopActiveFromEventLog root workspaceId
                     let! blocked = nudgeBlockedForTurn root workspaceId key
@@ -155,7 +156,7 @@ type NudgeRuntime
                         turnId = turnId
                     })
                 with _ ->
-                    let root = unbox<string> (nodeProcess?cwd())
+                    let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
                     let! blocked = nudgeBlockedForTurn root workspaceId ""
                     return Some (deriveSnapshot {
                         openTodos = todos
@@ -188,7 +189,7 @@ type NudgeRuntime
            || Set.contains sessionKey runtimeState.forceStoppedSessions then
             Promise.lift runtimeState
         else
-            let root = unbox<string> (nodeProcess?cwd())
+            let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
             runNudgeFlowCore root runtimeState sessionKey takeSnapshot sendNudge
 
     let parseEvent (input: obj) : NudgeRuntimeEvent =
@@ -253,5 +254,6 @@ type NudgeRuntime
 
 let createNudgeRuntime
     (getChatHistory: (string -> JS.Promise<obj array>) option)
+    (workspaceDirectory: string)
     : NudgeRuntime =
-    NudgeRuntime(getChatHistory)
+    NudgeRuntime(getChatHistory, workspaceDirectory)

@@ -49,6 +49,8 @@ let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]
                                   content = f.content.Split('\n') |> Array.mapi (fun i line -> $"{i + 1}\t{line}") |> String.concat "\n" |} })
     }
 
-let createToolCatalog = PluginCatalog.createToolCatalog
+let createToolCatalog deps toolNames reviewStore hostReadExec finderCache sessionScope =
+    PluginCatalog.createToolCatalog deps toolNames reviewStore hostReadExec finderCache sessionScope
 
-let createRegistration = Wanxiangshu.Mux.PluginRegistration.createRegistration
+let createRegistration deps =
+    Wanxiangshu.Mux.PluginRegistration.createRegistration deps
