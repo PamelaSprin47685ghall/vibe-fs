@@ -76,7 +76,7 @@ type NudgeTrigger
                        && not (isForceStopped sessionIDStr) then
                         match getClientFromPluginCtx ctx with
                         | Ok client ->
-                            do! dispatchPostStopFromHistory client ctx sessionID
+                            do! dispatchPostStopFromHistory host client ctx sessionID
                         | Error _ -> ()
         }
 

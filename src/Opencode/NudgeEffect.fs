@@ -15,6 +15,7 @@ module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
 open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Shell.NudgeRuntime
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
@@ -106,19 +107,20 @@ let private sendNudgeOutcome (client: obj) (sessionID: SessionId) (promptText: s
                 | _ -> Failed
     }
 
-let startNudgeFlow (runtimeState: NudgeRuntimeState) (client: obj) (pluginCtx: obj) (sessionID: SessionId)
+let startNudgeFlow (host: Host) (runtimeState: NudgeRuntimeState) (client: obj) (pluginCtx: obj) (sessionID: SessionId)
     : JS.Promise<NudgeRuntimeState> =
     let sid = Id.sessionIdValue sessionID
     let root = pluginDirectoryFromCtx pluginCtx
     runNudgeFlowCore
+        host
         root
         runtimeState
         sid
         (fun () -> collectSnapshot client pluginCtx sessionID)
         (fun promptText agentOpt -> sendNudgeOutcome client sessionID promptText agentOpt)
 
-let dispatchPostStopFromHistory (client: obj) (pluginCtx: obj) (sessionID: SessionId) : JS.Promise<unit> =
+let dispatchPostStopFromHistory (host: Host) (client: obj) (pluginCtx: obj) (sessionID: SessionId) : JS.Promise<unit> =
     promise {
-        let! _ = startNudgeFlow emptyRuntimeState client pluginCtx sessionID
+        let! _ = startNudgeFlow host emptyRuntimeState client pluginCtx sessionID
         return ()
     }

@@ -40,9 +40,9 @@ let deriveAction (snapshot: Snapshot) : NudgeAction =
             elif snapshot.isLoopActive then NudgeLoop
             else NudgeNone
 
-let selectNudgePrompt (action: NudgeAction) (snapshot: Snapshot) : string option =
+let selectNudgePrompt (host: Host) (action: NudgeAction) (snapshot: Snapshot) : string option =
     match action with
     | NudgeTodo -> Some (todoNudgePromptFor snapshot.todos)
     | NudgeLoop -> Some (loopNudgePromptFor snapshot.todos)
-    | NudgeRunner -> Some (runnerNudgePromptFor omp)
+    | NudgeRunner -> Some (runnerNudgePromptFor host)
     | _ -> None

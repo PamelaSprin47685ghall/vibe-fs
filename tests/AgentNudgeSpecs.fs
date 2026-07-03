@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.AgentNudgeSpecs
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
+open Wanxiangshu.Kernel.HostTools
 
 let private snap todos msg blocked agent isLoop : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos; lastAssistantMessage = msg; isLoopActive = isLoop
@@ -50,7 +51,7 @@ let selectPrompt () =
     let loopSnapshot = snap [] "ok" false None true
     let noneSnapshot = snap [] "done" false None false
 
-    match selectNudgePrompt NudgeTodo todoSnapshot with
+    match selectNudgePrompt opencode NudgeTodo todoSnapshot with
     | Some prompt ->
         check "selectNudgePrompt NudgeTodo returns prompt" true
         check "todo prompt contains front matter" (prompt.Contains("---"))
@@ -58,13 +59,13 @@ let selectPrompt () =
         check "todo prompt contains todo content" (prompt.Contains("todo1"))
     | None -> check "selectNudgePrompt NudgeTodo returns prompt" false
 
-    match selectNudgePrompt NudgeLoop loopSnapshot with
+    match selectNudgePrompt opencode NudgeLoop loopSnapshot with
     | Some prompt ->
         check "selectNudgePrompt NudgeLoop returns prompt" true
         check "loop prompt contains front matter" (prompt.Contains("---"))
     | None -> check "selectNudgePrompt NudgeLoop returns prompt" false
 
-    match selectNudgePrompt NudgeNone noneSnapshot with
+    match selectNudgePrompt opencode NudgeNone noneSnapshot with
     | None -> check "selectNudgePrompt NudgeNone returns None" true
     | Some _ -> check "selectNudgePrompt NudgeNone returns None" false
 

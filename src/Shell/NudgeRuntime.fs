@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.Nudge.TodoStatus
+open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Nudge.Types
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
@@ -22,6 +23,7 @@ let emptyRuntimeState =
       forceStoppedSessions = Set.empty }
 
 let runNudgeFlowCore
+    (host: Host)
     (workspaceRoot: string)
     (runtimeState: NudgeRuntimeState)
     (sessionKey: string)
@@ -35,7 +37,7 @@ let runNudgeFlowCore
             match deriveAction snapshot with
             | NudgeNone -> return runtimeState
             | action ->
-                match selectNudgePrompt action snapshot with
+                match selectNudgePrompt host action snapshot with
                 | None -> return runtimeState
                 | Some promptText ->
                     let! claimed =
@@ -176,7 +178,7 @@ type NudgeRuntime
             Promise.lift runtimeState
         else
             let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
-            runNudgeFlowCore root runtimeState sessionKey takeSnapshot sendNudge
+            runNudgeFlowCore Mux root runtimeState sessionKey takeSnapshot sendNudge
 
     let parseEvent (input: obj) : NudgeRuntimeEvent =
         match decodeHostEventEnvelope input with
