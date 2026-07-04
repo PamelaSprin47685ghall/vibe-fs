@@ -13,10 +13,20 @@ type RuntimeScope() =
     let iteratorStore = createTypedIteratorStore 200
     let mutable sessionQueues = Map.empty<string, SerialQueue>
     let mutable extState = Map.empty<string, obj>
+    let mutable tempFilesByPrompt = Map.empty<string, string list>
 
     member _.Projection = projection
 
     member _.IteratorStore = iteratorStore
+
+    member _.RegisterTempFiles(prompt: string, files: string list) : unit =
+        let key = if isNull prompt then "" else prompt.Trim()
+        if key <> "" then
+            tempFilesByPrompt <- Map.add key files tempFilesByPrompt
+
+    member _.TryGetTempFiles(prompt: string) : string list option =
+        let key = if isNull prompt then "" else prompt.Trim()
+        if key = "" then None else Map.tryFind key tempFilesByPrompt
 
     member _.TryGetCapsFiles(key: string) : CapsFile list option =
         Map.tryFind key capsFiles

@@ -17,8 +17,6 @@ open Wanxiangshu.Shell.OpencodeContextCodec
 open Wanxiangshu.Shell.OpencodeSessionPromptCodec
 open Wanxiangshu.Shell.OpencodeSessionSpawnCodec
 open Wanxiangshu.Shell.SessionIoSpawn
-open Wanxiangshu.Shell.SubagentToolExecute
-
 open Wanxiangshu.Opencode.SubagentTypes
 
 let noOutputText = "(no output)"

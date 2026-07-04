@@ -191,7 +191,6 @@
     <Compile Include="src/Shell/PatchToolsCodec.fs" />
     <Compile Include="src/Shell/ToolArgsDecode.fs" />
     <Compile Include="src/Shell/ToolExecute.fs" />
-    <Compile Include="src/Shell/SubagentToolExecute.fs" />
     <Compile Include="src/Shell/SubagentDispatcher.fs" />
     <Compile Include="src/Shell/MuxSubagentToolExecute.fs" />
     <Compile Include="src/Shell/DelegateToolsCodec.fs" />
@@ -318,6 +317,7 @@
     <Compile Include="tests/EventDrivenHarnessDemo.fs" />
     <Compile Include="tests/IntegrationMuxSetup.fs" />
     <Compile Include="tests/IntegrationCapsSpecs.fs" />
+    <Compile Include="tests/IntegrationCapsSpecsSubagent.fs" />
     <Compile Include="tests/IntegrationToolDefSpecsMimo.fs" />
     <Compile Include="tests/IntegrationToolDefSpecs.fs" />
     <Compile Include="tests/IntegrationSubagentSpecs.fs" />

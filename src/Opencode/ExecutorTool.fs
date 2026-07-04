@@ -22,7 +22,7 @@ open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.ToolExecute
-open Wanxiangshu.Shell.SubagentToolExecute
+open Wanxiangshu.Shell.SubagentDispatcher
 open Wanxiangshu.Shell.FallbackRuntimeState
 
 [<Global("Buffer")>]

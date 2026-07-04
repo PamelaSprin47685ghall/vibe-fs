@@ -56,6 +56,7 @@ let messagesTransform
                     Agent = agent
                     Directory = directory
                     Excluded = excluded
+                    IsSubagentSession = isChildWorkspace deps sessionID
                     Cleaned = cleanedMessages
                 }
                 let replayTexts () : JS.Promise<string seq> =
@@ -64,7 +65,12 @@ let messagesTransform
                     if excluded then encoded else deduplicateReadOutputsWithSeenByPath Map.empty encoded
                 let injectFn _ encoded = Promise.lift encoded
                 let loadCaps () =
-                    loadCapsForScope runtimeScope RequireDirectory plan
+                    let parentSessionID =
+                        match tryGetParentWorkspaceId deps sessionID with
+                        | Some parentId -> parentId
+                        | None -> sessionID
+                    let planWithParent = { plan with SessionID = parentSessionID }
+                    loadCapsForScope runtimeScope RequireDirectory planWithParent
                 let buildCaps encoded capsFiles prelude = buildCapsMessages encoded capsFiles prelude
                 let! final =
                     runHostMessagesTransform

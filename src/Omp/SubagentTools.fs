@@ -39,6 +39,18 @@ type OmpHostAdapter(scope: RuntimeScope, pi: obj, ctx: obj, signal: obj option, 
                 with ex ->
                     return Failure (translateJsError ex)
             }
+        member _.RegisterTempFiles(prompt, files) =
+            let sessionId =
+                let s = Dyn.get ctx "sessionId"
+                if Dyn.isNullish s then "" else string s
+            let key = sessionId + "\u0000" + prompt
+            scope.RegisterTempFiles(key, files)
+        member _.TryGetTempFiles(prompt) =
+            let sessionId =
+                let s = Dyn.get ctx "sessionId"
+                if Dyn.isNullish s then "" else string s
+            let key = sessionId + "\u0000" + prompt
+            scope.TryGetTempFiles(key)
 
 let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : unit =
     let tb = Dyn.get pi "typebox"

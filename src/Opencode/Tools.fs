@@ -22,10 +22,10 @@ let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: Finder
     let iteratorStore = sessionScope.IteratorStore
     let tools =
         createObj [
-            yield "coder", box (coderTool host registry ctx fallbackRuntime)
-            yield "investigator", box (investigatorTool host registry ctx fallbackRuntime)
-            yield "meditator", box (meditatorTool host registry ctx fallbackRuntime)
-            yield "browser", box (browserTool host registry ctx fallbackRuntime)
+            yield "coder", box (coderTool host registry ctx fallbackRuntime sessionScope)
+            yield "investigator", box (investigatorTool host registry ctx fallbackRuntime sessionScope)
+            yield "meditator", box (meditatorTool host registry ctx fallbackRuntime sessionScope)
+            yield "browser", box (browserTool host registry ctx fallbackRuntime sessionScope)
             yield "executor", box (executorTool host registry ctx sessionScope fallbackRuntime)
             yield "pty_spawn", box (ptySpawnTool host)
             yield "pty_write", box (ptyWriteTool host)

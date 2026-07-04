@@ -4,6 +4,7 @@ module Wanxiangshu.Tests.IntegrationToolSpecCatalog
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.IntegrationCapsSpecs
+open Wanxiangshu.Tests.IntegrationCapsSpecsSubagent
 open Wanxiangshu.Tests.IntegrationToolDefSpecs
 open Wanxiangshu.Tests.IntegrationToolDefSpecsMimo
 open Wanxiangshu.Tests.IntegrationSubagentSpecs
@@ -27,6 +28,12 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
     [
         "wrapperSpec", fun () -> promise { wrapperSpec reg }
         "computeCountSpec", fun () -> promise { computeCountSpec reg }
+        "subagentCapsInjection", subagentCapsInjectionSpec
+        "crossSessionIsolation", crossSessionIsolationSpec
+        "ompChildSessionObjectiveReRegister", ompChildSessionObjectiveReRegisterSpec
+        "opencodeSubsessionParentID", opencodeSubsessionParentIDSpec
+        "subagentFallbackRawText", subagentFallbackRawTextSpec
+        "muxSubsessionParentID", muxSubsessionParentIDSpec
         "buildCapsFileReadData", buildCapsFileReadDataSpec
         "capsTransform", capsTransformSpec
         "capsTransformInPlace", capsTransformInPlaceSpec

@@ -57,6 +57,7 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
                     Agent = agent
                     Directory = cwd
                     Excluded = excluded
+                    IsSubagentSession = isChildSession ExecutorTools.ompScope sessionId
                     Cleaned = cleaned
                 }
                 let replayTexts () : JS.Promise<string seq> =
@@ -72,12 +73,15 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
                         if plan.Excluded || cwd = "" then return ([] : CapsFile list)
                         else
                             let! ompFiles = findOmpCapsFiles cwd
-                            return
+                            let baseFiles =
                                 ompFiles
                                 |> List.map (fun (f: OmpCapsFile) ->
                                     { filePath = f.filePath
                                       label = f.label
                                       content = f.content } : CapsFile)
+                            return!
+                                Wanxiangshu.Shell.MessageTransformHostHooks.injectSubagentFilesIfAny
+                                    ExecutorTools.ompScope plan baseFiles
                     }
                 let buildCaps encoded (capsFiles: CapsFile list) prelude =
                     let ompCaps =

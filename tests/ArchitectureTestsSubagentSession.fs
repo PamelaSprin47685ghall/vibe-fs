@@ -56,19 +56,9 @@ let opencodeSubagentToolsUsesSimpleArgsCodec () =
 
 let opencodeSubagentToolsUsesFromOpencode () =
     let opencode = requireFile "src/Opencode/SubagentTools.fs" |> nonCommentCode
-    let shellExec = requireFile "src/Shell/SubagentToolExecute.fs" |> nonCommentCode
-    check "arch: SubagentToolExecute opens ToolRuntimeContext"
-        (shellExec.Contains "ToolRuntimeContext")
-    check "arch: SubagentToolExecute uses fromOpencode"
-        (shellExec.Contains "fromOpencode")
-    check "arch: SubagentToolExecute uses runtime.Execution for directory and session"
-        ((shellExec.Contains "runtime.Execution.Directory")
-         && (shellExec.Contains "runtime.Execution.SessionId"))
     check "arch: Opencode SubagentTools must not decodeOpencodeToolContext"
         (not (opencode.Contains "decodeOpencodeToolContext"))
     check "arch: Opencode SubagentTools must not define private ToolExecutionContext"
         (not (opencode.Contains "type private ToolExecutionContext"))
-    check "arch: SubagentToolExecute uses pluginDirectoryFromCtx"
-        (shellExec.Contains "pluginDirectoryFromCtx")
     check "arch: Opencode SubagentTools must not Dyn.str ctx directory"
         (not (opencode.Contains "Dyn.str ctx \"directory\""))

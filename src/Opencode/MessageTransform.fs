@@ -106,6 +106,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                 let agent = resolveMessagesTransformAgent registry input messagesList "build"
                 let sessionID = extractSessionID messagesList
                 let cleaned = Messaging.stripSyntheticBySource messagesList
+                let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
                 let excluded = shouldExcludeAgentFromProjection agent false
                 let backlogOps =
                     backlogSessionOpsFrom backlogSession.Host
@@ -116,6 +117,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                     Agent = agent
                     Directory = directory
                     Excluded = excluded
+                    IsSubagentSession = isSub
                     Cleaned = cleaned
                 }
                 let replayTexts () : JS.Promise<string seq> =
@@ -129,7 +131,11 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                     if excluded then Promise.lift encoded
                     else injectSembleIntoEncoded directory agent sessionID encoded
                 let loadCaps () =
-                    loadCapsForScope runtimeScope AllowEmptyDirectory plan
+                    let parentSessionID =
+                        registry.ResolveSubsessionParentID(Some sessionID)
+                        |> Option.defaultValue sessionID
+                    let planWithParent = { plan with SessionID = parentSessionID }
+                    loadCapsForScope runtimeScope AllowEmptyDirectory planWithParent
                 let buildCaps encoded capsFiles prelude =
                     buildCapsMessages Wanxiangshu.Shell.FileSys.sha256HexTruncated encoded directory capsFiles prelude
                 let! final =

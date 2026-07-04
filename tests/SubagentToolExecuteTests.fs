@@ -6,16 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.MuxSubagentToolExecute
-open Wanxiangshu.Shell.SubagentToolExecute
 open Wanxiangshu.Tests.IntegrationToolSetup
-
-let private stubSpawn () =
-    { Host = Wanxiangshu.Kernel.HostTools.opencode
-      Registry = ChildAgentRegistry.Create()
-      Client = createObj []
-      PluginCtx = createObj [ "directory", box "/proj" ]
-      ToolContext = createObj [ "directory", box "/proj"; "sessionID", box "s-parent" ]
-      FallbackRuntime = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState() }
 
 let private stubMuxSpawn role =
     { ToolNames = [||]
@@ -28,36 +19,13 @@ let private stubMuxSpawn role =
 let private validMuxConfig () =
     createObj [ "workspaceId", box "ws-1"; "directory", box "/proj"; "sessionID", box "s-mux" ]
 
-let executeOpencodeDecodeFailureNeverCallsRunCore () = promise {
-    let mutable runCoreCalls = 0
-    let runCore : RunSubagentCoreResult =
-        fun _ _ _ _ _ _ _ _ _ _ _ ->
-            runCoreCalls <- runCoreCalls + 1
-            Promise.lift (Ok "should not run" : Result<string, DomainError>)
-    let args = createObj [ "intents", box [||] ]
-    let! out = executeOpencodeSubagentTool runCore (stubSpawn ()) "coder" args
-    check "opencode empty intents rejects before runCore" (runCoreCalls = 0)
-    check "opencode decode failure mentions non-empty" (out.Contains "non-empty")
-}
-
-let executeOpencodeMissingIntentsNeverCallsRunCore () = promise {
-    let mutable runCoreCalls = 0
-    let runCore : RunSubagentCoreResult =
-        fun _ _ _ _ _ _ _ _ _ _ _ ->
-            runCoreCalls <- runCoreCalls + 1
-            Promise.lift (Ok "should not run" : Result<string, DomainError>)
-    let! out = executeOpencodeSubagentTool runCore (stubSpawn ()) "coder" (createObj [])
-    check "opencode missing intents rejects before runCore" (runCoreCalls = 0)
-    check "opencode missing intents uses formatDomainError" (out.Contains "coder failed:")
-}
-
 let executeMuxDecodeFailureNeverCallsRunMux () = promise {
     let mutable runMuxCalls = 0
     let runMux _ _ _ _ _ _ =
         runMuxCalls <- runMuxCalls + 1
         Promise.lift "should not run"
     let args = createObj [ "intents", box [||] ]
-    let! out = executeMuxSubagentTool runMux (createObj []) (stubMuxSpawn "coder") args (validMuxConfig ())
+    let! out = executeMuxSubagentTool runMux (createObj []) (stubMuxSpawn "coder") args (validMuxConfig ()) (Wanxiangshu.Shell.RuntimeScope.create ())
     check "mux empty intents rejects before runMux" (runMuxCalls = 0)
     check "mux decode failure mentions non-empty" (out.Contains "non-empty")
 }
@@ -69,21 +37,9 @@ let executeMuxInvalidConfigNeverCallsRunMux () = promise {
         Promise.lift "should not run"
     let args = createObj [ "intents", box [| createObj [ "objective", box "x"; "background", box "b"; "targets", box [||] ] |] ]
     let badConfig = createObj [ "directory", box "/proj" ]
-    let! out = executeMuxSubagentTool runMux (createObj []) (stubMuxSpawn "coder") args badConfig
+    let! out = executeMuxSubagentTool runMux (createObj []) (stubMuxSpawn "coder") args badConfig (Wanxiangshu.Shell.RuntimeScope.create ())
     check "mux missing workspaceId rejects before runMux" (runMuxCalls = 0)
     check "mux config failure mentions workspaceId" (out.Contains "workspaceId")
-}
-
-let executeOpencodeValidIntentCallsRunCore () = promise {
-    let mutable runCoreCalls = 0
-    let runCore : RunSubagentCoreResult =
-        fun _ _ _ _ _ _ _ _ _ _ _ ->
-            runCoreCalls <- runCoreCalls + 1
-            Promise.lift (Ok "child report" : Result<string, DomainError>)
-    let args = createObj [ "intents", box [| sampleCoderIntent "fix" "a.ts" |] ]
-    let! out = executeOpencodeSubagentTool runCore (stubSpawn ()) "coder" args
-    check "opencode valid intent invokes runCore" (runCoreCalls = 1)
-    check "opencode valid intent returns runCore text" (out = "child report")
 }
 
 let executeMuxDecodeInvalidIntentNeverCallsRunMux () = promise {
@@ -92,15 +48,12 @@ let executeMuxDecodeInvalidIntentNeverCallsRunMux () = promise {
         runMuxCalls <- runMuxCalls + 1
         Promise.lift "should not run"
     let args = createObj [ "intents", box [| createObj [ "objective", box ""; "background", box "b"; "targets", box [||] ] |] ]
-    let! out = executeMuxSubagentTool runMux (createObj []) (stubMuxSpawn "coder") args (validMuxConfig ())
+    let! out = executeMuxSubagentTool runMux (createObj []) (stubMuxSpawn "coder") args (validMuxConfig ()) (Wanxiangshu.Shell.RuntimeScope.create ())
     check "mux invalid intent shape rejects before runMux" (runMuxCalls = 0)
     check "mux invalid intent uses subagentToolFailed" (out.Contains "coder failed:")
 }
 
 let run () = promise {
-    do! executeOpencodeDecodeFailureNeverCallsRunCore ()
-    do! executeOpencodeMissingIntentsNeverCallsRunCore ()
-    do! executeOpencodeValidIntentCallsRunCore ()
     do! executeMuxDecodeFailureNeverCallsRunMux ()
     do! executeMuxInvalidConfigNeverCallsRunMux ()
     do! executeMuxDecodeInvalidIntentNeverCallsRunMux ()

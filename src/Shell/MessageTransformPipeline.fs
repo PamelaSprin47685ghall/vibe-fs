@@ -10,6 +10,7 @@ type MessageTransformPlan = {
     Agent: string
     Directory: string
     Excluded: bool
+    IsSubagentSession: bool
     Cleaned: Message<obj> list
 }
 

@@ -17,6 +17,8 @@ open Wanxiangshu.Shell.ToolArgsDecode
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.ToolRuntimeContext
 
+open Wanxiangshu.Shell.RuntimeScope
+
 type MuxSubagentSpawn =
     { ToolNames: string array
       AgentId: string
@@ -28,7 +30,7 @@ type MuxSubagentSpawn =
 type RunMuxSubagent =
     obj -> obj -> string -> string -> string -> obj option -> JS.Promise<string>
 
-type MuxHostAdapter(runMux: RunMuxSubagent, deps: obj, config: obj, spawn: MuxSubagentSpawn, directory: string, sessionId: string) =
+type MuxHostAdapter(runMux: RunMuxSubagent, deps: obj, config: obj, spawn: MuxSubagentSpawn, directory: string, sessionId: string, sessionScope: RuntimeScope) =
     interface IHostAdapter with
         member _.WorkspaceRoot = directory
         member _.SessionId = sessionId
@@ -40,6 +42,12 @@ type MuxHostAdapter(runMux: RunMuxSubagent, deps: obj, config: obj, spawn: MuxSu
                 with ex ->
                     return Failure (translateJsError ex)
             }
+        member _.RegisterTempFiles(prompt, files) =
+            let key = sessionId + "\u0000" + prompt
+            sessionScope.RegisterTempFiles(key, files)
+        member _.TryGetTempFiles(prompt) =
+            let key = sessionId + "\u0000" + prompt
+            sessionScope.TryGetTempFiles(key)
 
 let private muxConfigMessage (title: string) (error: DomainError) : string =
     match error with
@@ -52,12 +60,13 @@ let executeMuxSubagentTool
     (spawn: MuxSubagentSpawn)
     (args: obj)
     (config: obj)
+    (sessionScope: RuntimeScope)
     : JS.Promise<string> =
     promise {
         let toolName = spawn.Role
         match fromMuxConfig config with
         | Error e -> return muxConfigMessage spawn.Title e
         | Ok runtime ->
-            let adapter = MuxHostAdapter(runMux, deps, config, spawn, runtime.Execution.Directory, Id.sessionIdValue runtime.Execution.SessionId)
+            let adapter = MuxHostAdapter(runMux, deps, config, spawn, runtime.Execution.Directory, Id.sessionIdValue runtime.Execution.SessionId, sessionScope)
             return! dispatch mimocode adapter toolName args
     }

@@ -24,7 +24,7 @@ open Wanxiangshu.Opencode.SessionIo
 open Wanxiangshu.Opencode.ToolHelpers
 open Wanxiangshu.Shell.PromiseStr
 open Wanxiangshu.Shell.ChildAgentRegistry
-open Wanxiangshu.Shell.SubagentToolExecute
+open Wanxiangshu.Shell.SubagentDispatcher
 open Wanxiangshu.Shell.FuzzyFinderShell
 open Wanxiangshu.Shell.FuzzySearch
 open Wanxiangshu.Shell.FuzzyToolsCodec

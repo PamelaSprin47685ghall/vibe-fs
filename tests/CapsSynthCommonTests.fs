@@ -45,7 +45,7 @@ let capsPreludeRequiresFormalTestsNotAdHoc () =
     check "think: not one-repo npm" (not (thinkText.Contains "npm run build-and-test"))
     check "llm: no ad-hoc tests" (llmText.Contains "禁止临时测试")
     check "llm: debug becomes tests" (llmText.Contains "调试过程永久化")
-    check "llm: generic pipeline" (llmText.Contains "常规测试管线")
+    check "llm: generic pipeline" (llmText.Contains "正式回归用例")
 
 let shellCapsPreludeReExportsKernel () =
     equal "shell thinkWrapped" thinkWrapped Wanxiangshu.Shell.CapsPrelude.thinkWrapped

@@ -42,14 +42,12 @@ let subagentToolsUseKernelPromptHelpers () =
     let mux = requireFile "src/Mux/SubagentTools.fs" |> nonCommentCode
     let dispatcher = requireFile "src/Shell/SubagentDispatcher.fs" |> nonCommentCode
     let opencode = requireFile "src/Opencode/SubagentTools.fs" |> nonCommentCode
-    let shellExec = requireFile "src/Shell/SubagentToolExecute.fs" |> nonCommentCode
-    for (label, code) in [| "SubagentToolExecute", shellExec; "SubagentDispatcher", dispatcher |] do
-        check ("arch: " + label + " uses promptsFromCoderIntents")
-            (code.Contains "promptsFromCoderIntents")
-        check ("arch: " + label + " uses meditatorPromptFromFiles")
-            (code.Contains "meditatorPromptFromFiles")
-        check ("arch: " + label + " uses browserPromptText")
-            (code.Contains "browserPromptText")
+    check ("arch: SubagentDispatcher uses promptsFromCoderIntents")
+        (dispatcher.Contains "promptsFromCoderIntents")
+    check ("arch: SubagentDispatcher uses meditatorPromptFromFiles")
+        (dispatcher.Contains "meditatorPromptFromFiles")
+    check ("arch: SubagentDispatcher uses browserPromptText")
+        (dispatcher.Contains "browserPromptText")
     check "arch: Opencode SubagentTools must not call promptsForParallelIntents locally"
         (not (opencode.Contains "promptsForParallelIntents"))
     check "arch: Opencode SubagentTools must not call meditatorPromptText locally"
@@ -80,19 +78,9 @@ let subagentToolsUseKernelPromptHelpers () =
         (not (mux.Contains "formatPrompt Host.Mimocode (Browser"))
 
 let opencodeSubagentToolExecuteUsesHostNotLiteralOpencode () =
-    let shellExec = requireFile "src/Shell/SubagentToolExecute.fs" |> nonCommentCode
     let opencode = requireFile "src/Opencode/SubagentTools.fs" |> nonCommentCode
-    check "arch: SubagentToolExecute must not hardcode promptsFromCoderIntents opencode"
-        (not (shellExec.Contains "promptsFromCoderIntents opencode"))
-    check "arch: SubagentToolExecute must not hardcode meditatorPromptFromFiles opencode"
-        (not (shellExec.Contains "meditatorPromptFromFiles opencode"))
-    check "arch: SubagentToolExecute must not hardcode browserPromptText opencode"
-        (not (shellExec.Contains "browserPromptText opencode"))
-    check "arch: SubagentToolExecute threads Host into prompt helpers (spawn.Host or execute host param)"
-        ((shellExec.Contains "spawn.Host")
-         || (shellExec.Contains "promptsFromCoderIntents spawn.Host")
-         || (opencode.Contains "SubagentDispatcher.dispatch")
-         || (shellExec.Contains "promptsFromCoderIntents host"))
+    check "arch: Opencode SubagentTools threads Host into prompt helpers (spawn.Host or execute host param)"
+        (opencode.Contains "dispatch host")
 
 let subagentToolsUseDecodeIntentsField () =
     let codec = requireFile "src/Shell/SubagentSimpleArgsCodec.fs" |> nonCommentCode

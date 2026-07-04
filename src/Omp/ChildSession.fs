@@ -112,12 +112,23 @@ let runSubagent (scope: RuntimeScope) (pi: obj) (ctx: obj) (toolNames: string ar
                     | [] -> None
                 firstModel, Some cfg.DefaultChain
             | None -> None, None
+        let sessionId =
+            let s = Dyn.get ctx "sessionId"
+            if Dyn.isNullish s then "" else string s
         let! child = createChildSession scope pi ctx toolNames None [||] modelOverride
         let session = child.session
         let childId =
             let childCtx = createObj [ "sessionManager", Dyn.get session "sessionManager" ]
             getSessionIdFromContext childCtx |> Option.defaultValue ""
         if childId <> "" then
+            let scalars = Wanxiangshu.Kernel.PromptFrontMatter.parseFrontMatterScalars prompt
+            match Map.tryFind "objective" scalars with
+            | Some objVal when not (System.String.IsNullOrWhiteSpace objVal) ->
+                let parentKey = sessionId + "\u0000" + objVal.Trim()
+                match scope.TryGetTempFiles(parentKey) with
+                | Some files -> scope.RegisterTempFiles(childId + "\u0000" + objVal.Trim(), files)
+                | None -> ()
+            | _ -> ()
             defaultChain |> Option.iter (fun chain -> fallbackRuntime.SetChain childId chain)
         let run =
             promise {

@@ -11,7 +11,9 @@ let fakeAdapter (response: SubagentResponse) : IHostAdapter =
     { new IHostAdapter with
         member _.WorkspaceRoot = "/tmp/test"
         member _.SessionId = "test-session"
-        member _.SpawnSubagent(_) = Promise.lift response }
+        member _.SpawnSubagent(_) = Promise.lift response
+        member _.RegisterTempFiles(_, _) = ()
+        member _.TryGetTempFiles(_) = None }
 
 let sampleCoderArgs =
     box {|

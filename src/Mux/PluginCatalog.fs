@@ -85,10 +85,10 @@ let createToolCatalog
     (sessionScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
     : ToolDefinition array =
      let iteratorStore = sessionScope.IteratorStore
-     [| yield injectWarnWarnTddIntoMuxSchema (coderTool deps toolNames)
-        yield investigatorTool deps toolNames
-        yield meditatorTool deps toolNames
-        yield browserTool deps toolNames
+     [| yield injectWarnWarnTddIntoMuxSchema (coderTool deps toolNames sessionScope)
+        yield investigatorTool deps toolNames sessionScope
+        yield meditatorTool deps toolNames sessionScope
+        yield browserTool deps toolNames sessionScope
         yield injectWarnWarnTddIntoMuxSchema (executorTool deps toolNames sessionScope)
         yield submitReviewTool deps toolNames reviewStore
         yield websearchTool deps toolNames

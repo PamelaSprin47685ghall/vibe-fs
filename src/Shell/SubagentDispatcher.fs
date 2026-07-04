@@ -16,6 +16,14 @@ open Wanxiangshu.Shell.SubagentSpawn
 open Wanxiangshu.Shell.ToolArgsDecode
 open Wanxiangshu.Shell.ToolExecute
 
+let resolveSubagentPromise (context: string) (p: JS.Promise<Result<string, DomainError>>) : JS.Promise<string> =
+    promise {
+        let! result = p
+        match result with
+        | Ok text -> return text
+        | Error err -> return! Promise.reject (System.Exception (wireEncodeToolError context err))
+    }
+
 module HostAdapter = Wanxiangshu.Kernel.HostAdapter
 
 let dispatch (host: Host) (adapter: IHostAdapter) (toolName: string) (args: obj) : JS.Promise<string> =
@@ -41,11 +49,17 @@ let dispatch (host: Host) (adapter: IHostAdapter) (toolName: string) (args: obj)
             | CoderBatch intents ->
                 let prompts = promptsFromCoderIntents host intents
                 if prompts.IsEmpty then return subagentIntentsMustBeNonEmpty
-                else return! runParallelSpawns prompts (spawnOne HostAdapter.Coder "Coder")
+                else
+                    List.zip prompts intents
+                    |> List.iter (fun (prompt, intent) -> adapter.RegisterTempFiles(intent.objective, coderTargetFiles intent))
+                    return! runParallelSpawns prompts (spawnOne HostAdapter.Coder "Coder")
             | InvestigatorBatch intents ->
                 let prompts = promptsFromInvestigatorIntents host intents
                 if prompts.IsEmpty then return subagentIntentsMustBeNonEmpty
-                else return! runParallelSpawns prompts (spawnOne HostAdapter.Investigator "Investigator")
+                else
+                    List.zip prompts intents
+                    |> List.iter (fun (prompt, intent) -> adapter.RegisterTempFiles(intent.objective, Array.toList intent.entries))
+                    return! runParallelSpawns prompts (spawnOne HostAdapter.Investigator "Investigator")
             | Typed (Meditator m) ->
                 let! promptResult = meditatorPromptFromFiles host adapter.WorkspaceRoot m.Intent m.Files
                 match promptResult with

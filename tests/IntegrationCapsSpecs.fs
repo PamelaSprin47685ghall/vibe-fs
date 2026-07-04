@@ -12,7 +12,11 @@ open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Opencode.Plugin
 open Wanxiangshu.Mux.AiSettings
 open Wanxiangshu.Shell.ChildAgentRegistry
+open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Omp
+open Wanxiangshu.Omp.MessageTransform
 
 let buildCapsFileReadDataSpec () = promise {
     let! tmpDir = mkdtempAsync "caps-test-"
@@ -72,6 +76,11 @@ let defaultPreludeWithoutCapsSpec () = promise {
     do! rmAsync workspaceDir
 }
 
+let private mockUserMsg (id: string) (sessionID: string) (prompt: string) : obj =
+    let info = createObj [ "id", box id; "role", box "user"; "sessionID", box sessionID ]
+    let parts = [| createObj [ "type", box "text"; "text", box prompt ] |]
+    createObj [ "info", box info; "parts", box parts ]
+
 let private todoInput (report: string) : obj =
     createObj [ "ahaMoments", box report; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box ""; "todos", box [||] ]
 
@@ -79,8 +88,9 @@ let private todoState (report: string) : obj =
     createObj [ "status", box "completed"; "input", box (todoInput report); "output", box "Todos updated." ]
 
 let private todoMsg (id: string) (callID: string) (report: string) (created: int) (completed: int) : obj =
-    box {| info = createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test"; "time", box (createObj [ "created", box created; "completed", box completed ]) ]
-           parts = [| createObj [ "type", box "tool"; "tool", box "todowrite"; "callID", box callID; "state", box (todoState report) ] |] |}
+    let info = createObj [ "id", box id; "role", box "assistant"; "sessionID", box "test"; "time", box (createObj [ "created", box created; "completed", box completed ]) ]
+    let parts = [| createObj [ "type", box "tool"; "tool", box "todowrite"; "callID", box callID; "state", box (todoState report) ] |]
+    createObj [ "info", box info; "parts", box parts ]
 
 let capsAndBacklogOrderSpec () = promise {
     let! workspaceDir = mkdtempAsync "caps-magic-order-"
@@ -89,11 +99,9 @@ let capsAndBacklogOrderSpec () = promise {
     let! p = plugin (box {| directory = workspaceDir |})
     let tf = get p "experimental.chat.messages.transform"
     let messages = createObj [ "messages", box [|
-        box {| info = createObj [ "id", box "u1"; "role", box "user"; "sessionID", box "test" ]
-               parts = [| box {| ``type`` = "text"; text = "start" |} |] |}
+        mockUserMsg "u1" "test" "start"
         todoMsg "m1" "c1" "R1" 123 456
-        box {| info = createObj [ "id", box "u2"; "role", box "user"; "sessionID", box "test" ]
-               parts = [| box {| ``type`` = "text"; text = "please fix this bug" |} |] |}
+        mockUserMsg "u2" "test" "please fix this bug"
         todoMsg "m2" "c2" "R2" 789 790
         todoMsg "m3" "c3" "R3" 791 792
     |] ]
@@ -121,5 +129,3 @@ let capsAndBacklogOrderSpec () = promise {
     check "caps/backlog order: backlog prefix fourth" (magicId.StartsWith(backlogPrefixIdPrefix : string))
     do! rmAsync workspaceDir
 }
-
-

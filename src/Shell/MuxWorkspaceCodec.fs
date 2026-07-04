@@ -20,3 +20,13 @@ let isChildWorkspace (deps: obj) (workspaceId: string) : bool =
     else
         let workspace = Dyn.get entry "workspace"
         not (Dyn.isNullish workspace) && Dyn.str workspace "parentWorkspaceId" <> ""
+
+let tryGetParentWorkspaceId (deps: obj) (workspaceId: string) : string option =
+    let entry = findWorkspaceEntry deps workspaceId
+    if Dyn.isNullish entry then None
+    else
+        let workspace = Dyn.get entry "workspace"
+        if Dyn.isNullish workspace then None
+        else
+            let parent = Dyn.str workspace "parentWorkspaceId"
+            if parent <> "" then Some parent else None
