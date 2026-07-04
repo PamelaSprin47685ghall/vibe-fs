@@ -85,7 +85,7 @@ let waitRunnerJob (scope: RuntimeScope) (sessionId: string) (ms: int) : JS.Promi
         return if snippet = "" then "(no new output)" else snippet
     }
 
-let private abortRunnerJobCore (scope: RuntimeScope) (sessionId: string) : unit =
+let abortRunnerJobCore (scope: RuntimeScope) (sessionId: string) : unit =
     let childId = Map.tryFind sessionId (getState scope).ChildByParent
     childId |> Option.iter abortExecutorRun
     abortExecutorRun sessionId

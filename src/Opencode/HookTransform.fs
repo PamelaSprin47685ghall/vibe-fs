@@ -26,8 +26,8 @@ let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit>
 let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
     ToolDefinitionHooks.toolDefinition input output
 
-let eventHandler (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
-    EventHooks.eventHandler reviewStore input
+let eventHandler (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (scope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (input: obj) : JS.Promise<unit> =
+    EventHooks.eventHandler reviewStore scope input
 
 let noop (_a: obj) (_b: obj) : JS.Promise<unit> = ChatHooks.noop _a _b
 let noopEvent (_a: obj) : JS.Promise<unit> = ChatHooks.noopEvent _a

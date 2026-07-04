@@ -97,7 +97,7 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
         }))
     setKey result "event" (box (fun (input: obj) ->
         promise {
-            do! eventHandler services.ReviewStore input
+            do! eventHandler services.ReviewStore services.RuntimeScope input
             let ptyCleanupSessionId =
                 match Wanxiangshu.Shell.OpencodeHookInputCodec.decodeHostEventEnvelope input with
                 | Some e when e.EventType = "session.deleted" || e.EventType = "session.delete" || e.EventType = "session.remove" || e.EventType = "session.close" ->

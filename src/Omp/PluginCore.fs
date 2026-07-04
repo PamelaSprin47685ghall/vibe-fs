@@ -97,12 +97,14 @@ let registerAbortHandler (pi: obj) (reviewStore: ReviewStore)
                         | None ->
                             reviewStore.deactivateReview sid
                             Wanxiangshu.Omp.NudgeRuntime.markSessionForceStopped sid
+                            Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore Wanxiangshu.Omp.ExecutorTools.ompScope sid
                         | Some handler ->
                             let rawEvent = createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
                             let! r = handler rawEvent
                             if not r.Consumed then
                                 reviewStore.deactivateReview sid
                                 Wanxiangshu.Omp.NudgeRuntime.markSessionForceStopped sid
+                                Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore Wanxiangshu.Omp.ExecutorTools.ompScope sid
                     elif fallbackEventTypes.Contains evtType then
                         match fallbackHandler with
                         | Some handler ->

@@ -86,14 +86,20 @@ let abortHookDeactivatesReview () =
     let sid = "abort-hook-sid-1"
     reviewStore.activateReview(sid, "task", 0L)
     check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
+    Wanxiangshu.Shell.RunnerBackground.registerActiveRunnerSession Wanxiangshu.Omp.ExecutorTools.ompScope sid
+    check "precondition: has running runner job" (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid)
     driveAbort "session.abort" sid false
+    check "postcondition: runner job was aborted" (not (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid))
 
 /// `stream.abort` must mirror the session.abort path: review state clears.
 let streamAbortHookDeactivatesReview () =
     let sid = "stream-abort-hook-sid-1"
     reviewStore.activateReview(sid, "task", 0L)
     check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
+    Wanxiangshu.Shell.RunnerBackground.registerActiveRunnerSession Wanxiangshu.Omp.ExecutorTools.ompScope sid
+    check "precondition: has running runner job" (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid)
     driveAbort "stream.abort" sid false
+    check "postcondition: runner job was aborted" (not (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid))
 
 /// `session.error` collapses to the same outcome as aborts.
 let sessionErrorHookDeactivatesReview () =

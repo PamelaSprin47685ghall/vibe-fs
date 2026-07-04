@@ -41,7 +41,7 @@ let createRegistration (deps: obj) : obj =
     let messagesTransform =
         createMessageTransforms deps scope backlogSession reviewStore
     let eventHook, slashCommands, getToolPolicy =
-        createEventHooksSlashAndPolicy deps reviewStore
+        createEventHooksSlashAndPolicy deps scope reviewStore
     let registration =
         assembleRegistrationObject scope tools wrappers mcpServers eventHook slashCommands messagesTransform getToolPolicy
             (createReviewTestSurface reviewStore)

@@ -7,7 +7,7 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
 
-let eventHandler (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (input: obj) : JS.Promise<unit> =
+let eventHandler (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (scope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (input: obj) : JS.Promise<unit> =
     promise {
         match decodeHostEventEnvelope input with
         | Some { EventType = "stream-abort"; Props = props } ->
@@ -15,5 +15,6 @@ let eventHandler (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (inp
                 let s = getSessionID "stream-abort" props
                 if s = "" then "loop" else s
             reviewStore.deactivateReview sessionID
+            Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore scope sessionID
         | _ -> ()
     }
