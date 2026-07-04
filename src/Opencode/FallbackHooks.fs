@@ -161,7 +161,28 @@ let opencodeActionExecutor (client: obj) : IActionExecutor =
         member _.PropagateFailure _sessionID = Promise.lift ()
 
         member _.CaptureCurrentModel sessionID =
-            tryReadCurrentModel client sessionID }
+            tryReadCurrentModel client sessionID
+
+        member _.RecoverWithPrompt (sessionID, model, promptText) =
+            promise {
+                let modelStr =
+                    match model.Variant with
+                    | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
+                    | None -> sprintf "%s/%s" model.ProviderID model.ModelID
+                let! infoOpt = tryReadLatestAssistantInfo client sessionID
+                let agent =
+                    infoOpt
+                    |> Option.map (fun info -> Dyn.str info "agent")
+                    |> Option.filter (fun value -> value <> "")
+                let body =
+                    match agent with
+                    | Some value -> createPromptBodyWithModel (Some value) (Some modelStr) promptText
+                    | None -> createPromptBodyWithModel None (Some modelStr) promptText
+                let arg = box {| path = box {| id = sessionID |}; body = body |}
+                do! invokeClient client "prompt" arg |> Promise.map ignore
+            }
+
+}
 
 let private setConsumedFromResult (runtime: FallbackRuntimeState) (sessionID: string) (result: FallbackHookResult) : unit =
     runtime.SetConsumed sessionID result.Consumed

@@ -1,4 +1,4 @@
-module Wanxiangshu.Tests.FallbackEventBridgeTests
+module Wanxiangshu.Tests.FallbackEventBridgeTestsPart2
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -7,7 +7,6 @@ open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackEventBridge
-open Wanxiangshu.Tests.FallbackEventBridgeTestsPart2
 
 
 type FakeExecutor(?messages: obj array) =
@@ -85,13 +84,6 @@ let mkRetryableErr () : ErrorInput =
       StatusCode  = None
       IsRetryable = Some true }
 
-let mkAbortErr () : ErrorInput =
-    { ErrorName   = "MessageAbortedError"
-      DomainError = Some MessageAborted
-      Message     = "abort"
-      StatusCode  = None
-      IsRetryable = None }
-
 let mkConfig () : FallbackConfig =
     { DefaultChain     = []
       AgentChains      = Map.empty
@@ -100,8 +92,7 @@ let mkConfig () : FallbackConfig =
 
 let defaultCfgLookup (_agent: string) : FallbackConfig = mkConfig ()
 
-
-let handleEvent_retrySame_consumedAndSendContinue () = promise {
+let handleEvent_sessionIdle_idle_emitsScanToolCallAsText () = promise {
     let model  = mkModel "oai" "gpt-5"
     let chain  = [ model ]
     let cfg    = mkConfig ()
@@ -110,92 +101,19 @@ let handleEvent_retrySame_consumedAndSendContinue () = promise {
     rt.SetChain sid chain
     rt.SetAgentName sid "reviewer"
 
-    let translator = FakeTranslator(sid, FallbackEvent.SessionError (mkRetryableErr())) :> IEventTranslator
-    let executor   = FakeExecutor()
-
-    let! result = handleEvent translator rt defaultCfgLookup executor (box ())
-
-    equal "consumed" true result.Consumed
-    equal "phase Retrying 1" (FallbackPhase.Retrying 1) result.State.Phase
-    equal "continueCount 1" 1 result.State.ContinueCount
-    equal "executor called once" 1 (executor.ContinueCalls.Length)
-}
-
-let handleEvent_exhausted_notConsumed () = promise {
-    let model  = mkModel "oai" "gpt-5"
-    let chain  = [ model ]
-    let rt     = FallbackRuntimeState()
-    let sid    = "sess-1"
-    rt.SetChain sid chain
-    rt.SetAgentName sid "reviewer"
-
-    let s0 = rt.GetOrCreateState sid
-    rt.UpdateState sid { s0 with Phase = FallbackPhase.Exhausted }
-
-    let translator = FakeTranslator(sid, FallbackEvent.SessionError (mkRetryableErr())) :> IEventTranslator
-    let executor   = FakeExecutor()
-
-    let! result = handleEvent translator rt defaultCfgLookup executor (box ())
-
-    equal "not consumed when exhausted" false result.Consumed
-}
-
-let handleEvent_noChain_notConsumed () = promise {
-    let rt     = FallbackRuntimeState()
-    let sid    = "sess-1"
-    rt.SetAgentName sid "reviewer"
-
-    let translator = FakeTranslator(sid, FallbackEvent.SessionError (mkRetryableErr())) :> IEventTranslator
-    let executor   = FakeExecutor()
-
-    let! result = handleEvent translator rt defaultCfgLookup executor (box ())
-
-    equal "no chain → not consumed" false result.Consumed
-}
-
-let handleEvent_sessionAborted_setsCancelled () = promise {
-    let model  = mkModel "oai" "gpt-5"
-    let chain  = [ model ]
-    let cfg    = mkConfig ()
-    let rt     = FallbackRuntimeState()
-    let sid    = "sess-1"
-    rt.SetChain sid chain
-    rt.SetAgentName sid "reviewer"
-
-    let translator = FakeTranslator(sid, FallbackEvent.SessionError (mkAbortErr())) :> IEventTranslator
-    let executor   = FakeExecutor()
-
-    let! result = handleEvent translator rt defaultCfgLookup executor (box ())
-
-    equal "consumed" true result.Consumed
-    equal "cancelled true" true result.State.Cancelled
-}
-
-let handleEvent_newUserMessage_resetsState () = promise {
-    let model  = mkModel "oai" "gpt-5"
-    let chain  = [ model ]
-    let cfg    = mkConfig ()
-    let rt     = FallbackRuntimeState()
-    let sid    = "sess-1"
-    rt.SetChain sid chain
-    rt.SetAgentName sid "reviewer"
-
-    let s0 = rt.GetOrCreateState sid
-    rt.UpdateState sid { s0 with Phase = FallbackPhase.Retrying 3; ContinueCount = 3; FailureCount = 5 }
-
-    let translator = FakeTranslator(sid, FallbackEvent.NewUserMessage) :> IEventTranslator
+    let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
     let executor   = FakeExecutor()
 
     let! result = handleEvent translator rt defaultCfgLookup executor (box ())
 
     equal "consumed" false result.Consumed
     equal "phase Idle" FallbackPhase.Idle result.State.Phase
-    equal "continueCount 0" 0 result.State.ContinueCount
-    equal "failureCount 0" 0 result.State.FailureCount
-    equal "cancelled false" false result.State.Cancelled
+    equal "taskComplete false" false result.State.TaskComplete
+    equal "no continue calls" 0 (executor.ContinueCalls.Length)
+    equal "no recover calls" 0 (executor.RecoverCalls.Length)
 }
 
-let createHandler_returnsCallable () = promise {
+let handleEvent_sessionIdle_idle_toolText_sendsPrompt () = promise {
     let model  = mkModel "oai" "gpt-5"
     let chain  = [ model ]
     let cfg    = mkConfig ()
@@ -204,49 +122,82 @@ let createHandler_returnsCallable () = promise {
     rt.SetChain sid chain
     rt.SetAgentName sid "reviewer"
 
-    let translator = FakeTranslator(sid, FallbackEvent.SessionError (mkRetryableErr())) :> IEventTranslator
-    let executor   = FakeExecutor()
+    let toolMsg = createObj [
+        "info", box (createObj [ "role", box "assistant" ])
+        "parts", box [| createObj [ "type", box "text"; "text", box "<tool_call>name=\"read\"</tool_call>" ] |]
+    ]
 
-    let handler = createHandler translator rt defaultCfgLookup executor
-    check "handler is non-null" (not (isNull (box handler)))
+    let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
+    let executor   = FakeExecutor(messages = [| toolMsg |])
+
+    let! result = handleEvent translator rt defaultCfgLookup executor (box ())
+
+    equal "phase Idle" FallbackPhase.Idle result.State.Phase
+    equal "recover called once" 1 (executor.RecoverCalls.Length)
+    let (_, _, promptText) = executor.RecoverCalls.[0]
+    equal "prompt contains recovery text" true (promptText.Contains "raw text")
 }
 
-let createHandler_twoSessionsIndependent () = promise {
+let handleEvent_sessionIdle_idle_todosComplete_setsTaskComplete () = promise {
     let model  = mkModel "oai" "gpt-5"
     let chain  = [ model ]
     let cfg    = mkConfig ()
+    let rt     = FallbackRuntimeState()
+    let sid    = "sess-1"
+    rt.SetChain sid chain
+    rt.SetAgentName sid "reviewer"
 
-    let rt1 = FallbackRuntimeState()
-    let rt2 = FallbackRuntimeState()
-    let sid1 = "sess-1"
-    let sid2 = "sess-2"
-    rt1.SetChain sid1 chain; rt1.SetAgentName sid1 "r1"
-    rt2.SetChain sid2 chain; rt2.SetAgentName sid2 "r2"
+    let todoPart = createObj [
+        "type", box "tool"
+        "tool", box "task"
+        "state", box (createObj [
+            "input", box (createObj [
+                "todos", box [| createObj [ "status", box "completed" ] |]
+            ])
+        ])
+    ]
+    let todoMsg = createObj [ "parts", box [| todoPart |] ]
 
-    let tr1 = FakeTranslator(sid1, FallbackEvent.SessionError (mkRetryableErr())) :> IEventTranslator
-    let tr2 = FakeTranslator(sid2, FallbackEvent.SessionError (mkRetryableErr())) :> IEventTranslator
-    let ex1 = FakeExecutor()
-    let ex2 = FakeExecutor()
+    let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
+    let executor   = FakeExecutor(messages = [| todoMsg |])
 
-    let h1 = createHandler tr1 rt1 defaultCfgLookup ex1
-    let h2 = createHandler tr2 rt2 defaultCfgLookup ex2
+    let! result = handleEvent translator rt defaultCfgLookup executor (box ())
 
-    check "handlers non-null" (not (isNull (box h1)) && not (isNull (box h2)))
+    equal "phase Idle" FallbackPhase.Idle result.State.Phase
+    equal "taskComplete true" true result.State.TaskComplete
+    equal "no recover calls" 0 (executor.RecoverCalls.Length)
+}
 
-    let! r1 = h1 (box ())
-    let! r2 = h2 (box ())
-    equal "sess-1 consumed" true r1.Consumed
-    equal "sess-2 consumed" true r2.Consumed
+let handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText () = promise {
+    let model  = mkModel "oai" "gpt-5"
+    let chain  = [ model ]
+    let cfg    = mkConfig ()
+    let rt     = FallbackRuntimeState()
+    let sid    = "sess-1"
+    rt.SetChain sid chain
+    rt.SetAgentName sid "reviewer"
+
+    let s0 = rt.GetOrCreateState sid
+    rt.UpdateState sid { s0 with Phase = FallbackPhase.Retrying 1 }
+
+    let toolMsg = createObj [
+        "info", box (createObj [ "role", box "assistant" ])
+        "parts", box [| createObj [ "type", box "text"; "text", box "<invoke name=\"write\">" ] |]
+    ]
+
+    let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
+    let executor   = FakeExecutor(messages = [| toolMsg |])
+
+    let! result = handleEvent translator rt defaultCfgLookup executor (box ())
+
+    equal "phase Idle" FallbackPhase.Idle result.State.Phase
+    equal "recover called once" 1 (executor.RecoverCalls.Length)
 }
 
 
 let run () = promise {
-    do! handleEvent_retrySame_consumedAndSendContinue ()
-    do! handleEvent_exhausted_notConsumed ()
-    do! handleEvent_noChain_notConsumed ()
-    do! handleEvent_sessionAborted_setsCancelled ()
-    do! handleEvent_newUserMessage_resetsState ()
-    do! createHandler_returnsCallable ()
-    do! createHandler_twoSessionsIndependent ()
-    do! FallbackEventBridgeTestsPart2.run ()
+    do! handleEvent_sessionIdle_idle_emitsScanToolCallAsText ()
+    do! handleEvent_sessionIdle_idle_toolText_sendsPrompt ()
+    do! handleEvent_sessionIdle_idle_todosComplete_setsTaskComplete ()
+    do! handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText ()
 }

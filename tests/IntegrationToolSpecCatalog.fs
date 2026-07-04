@@ -15,9 +15,11 @@ open Wanxiangshu.Tests.IntegrationMuxToolSpecs
 open Wanxiangshu.Tests.IntegrationMuxToolSpecsTodo
 open Wanxiangshu.Tests.IntegrationMuxToolSpecsRead
 open Wanxiangshu.Tests.IntegrationMuxToolSpecsHooks
+open Wanxiangshu.Tests.IntegrationMuxToolSpecsHooksNudge
 open Wanxiangshu.Tests.IntegrationMuxMethodologySpecs
 open Wanxiangshu.Tests.IntegrationMuxReviewSpecs
 open Wanxiangshu.Tests.IntegrationMuxReviewPromptSpecs
+open Wanxiangshu.Tests.IntegrationMuxFallbackSpecs
 open Wanxiangshu.Tests.IntegrationToolSetup
 
 let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
@@ -84,4 +86,7 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
         "muxLoopSlashCommandWritesEventLogUnderDepsDirectory", muxLoopSlashCommandWritesEventLogUnderDepsDirectorySpec
         "muxToolExecuteAfterBlocksRepeatedIdenticalCall", muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec
         "muxToolExecuteAfterMapsNetworkError", muxToolExecuteAfterMapsNetworkErrorSpec
+        "muxStreamEndToolUseErrorTriggersNudge", muxStreamEndToolUseErrorTriggersNudgeSpec
+        "muxSessionErrorTriggersFallbackContinue", muxSessionErrorTriggersFallbackContinueSpec
+        "muxStreamEndToolCallAsTextTriggersFallback", muxStreamEndToolCallAsTextTriggersFallbackSpec
     ]

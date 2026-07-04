@@ -21,11 +21,12 @@ type IEventTranslator =
     abstract IsNewUserMessage: obj -> bool
 
 type IActionExecutor =
-    abstract SendContinue    : sessionID:string * model:FallbackModel -> JS.Promise<unit>
-    abstract AbortSession    : sessionID:string -> JS.Promise<unit>
-    abstract FetchMessages   : sessionID:string -> JS.Promise<obj array>
-    abstract PropagateFailure: sessionID:string -> JS.Promise<unit>
+    abstract SendContinue      : sessionID:string * model:FallbackModel -> JS.Promise<unit>
+    abstract AbortSession      : sessionID:string -> JS.Promise<unit>
+    abstract FetchMessages     : sessionID:string -> JS.Promise<obj array>
+    abstract PropagateFailure  : sessionID:string -> JS.Promise<unit>
     abstract CaptureCurrentModel : sessionID:string -> JS.Promise<FallbackModel option>
+    abstract RecoverWithPrompt : sessionID:string * model:FallbackModel * promptText:string -> JS.Promise<unit>
 
 type ConfigLookup = (string -> FallbackConfig)
 
@@ -99,6 +100,8 @@ let handleEvent
 
                 runtime.SetConsumed sessionID consumed
 
+                let mutable finalState = ns
+
                 match action with
                 | FallbackAction.DoNothing -> ()
                 | FallbackAction.SendContinue model ->
@@ -106,15 +109,24 @@ let handleEvent
                 | FallbackAction.AbortAndResume model ->
                     do! executor.AbortSession sessionID
                     do! executor.SendContinue (sessionID, model)
-                | FallbackAction.PropagateFailure ->
-                    do! executor.PropagateFailure sessionID
-
-                let mutable finalState = ns
-                if evt = FallbackEvent.SessionIdle && ns.Phase = FallbackPhase.Idle && not ns.TaskComplete && not ns.Cancelled then
+                | FallbackAction.RecoverWithPrompt (model, promptText) ->
+                    do! executor.RecoverWithPrompt (sessionID, model, promptText)
+                | FallbackAction.ScanToolCallAsText ->
                     let! msgs = executor.FetchMessages sessionID
                     if allTodosCompleted msgs then
-                        finalState <- { ns with TaskComplete = true }
-                        runtime.UpdateState sessionID finalState
+                        let updated = { ns with TaskComplete = true }
+                        runtime.UpdateState sessionID updated
+                        finalState <- updated
+                    else
+                        match FallbackMessageCodec.scanToolCallAsText msgs with
+                        | Some promptText ->
+                            match List.tryItem ns.CurrentIndex chain with
+                            | Some model ->
+                                do! executor.RecoverWithPrompt (sessionID, model, promptText)
+                            | None -> ()
+                        | None -> ()
+                | FallbackAction.PropagateFailure ->
+                    do! executor.PropagateFailure sessionID
 
                 return { Consumed = consumed; State = finalState }
     }

@@ -55,6 +55,8 @@ type FallbackAction =
     | DoNothing
     | SendContinue of model: FallbackModel
     | AbortAndResume of model: FallbackModel
+    | RecoverWithPrompt of model: FallbackModel * promptText: string
+    | ScanToolCallAsText
     | PropagateFailure
 
 /// Per-session state tracked by the fallback runtime.

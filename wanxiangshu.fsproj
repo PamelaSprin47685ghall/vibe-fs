@@ -331,6 +331,8 @@
     <Compile Include="tests/IntegrationMuxToolSpecsTodo.fs" />
     <Compile Include="tests/IntegrationMuxToolSpecsRead.fs" />
     <Compile Include="tests/IntegrationMuxToolSpecsHooks.fs" />
+    <Compile Include="tests/IntegrationMuxToolSpecsHooksNudge.fs" />
+    <Compile Include="tests/IntegrationMuxFallbackSpecs.fs" />
     <Compile Include="tests/IntegrationMuxToolSpecs.fs" />
     <Compile Include="tests/IntegrationMuxMethodologySpecs.fs" />
     <Compile Include="tests/ReviewTestsReplay.fs" />
@@ -523,10 +525,12 @@
     <Compile Include="tests/SearchToolsTests.fs" />
     <Compile Include="tests/ReviewerLoopTests.fs" />
     <Compile Include="tests/TestsEntriesCoverage.fs" />
-    <Compile Include="tests/FallbackKernelTests.fs" />
+     <Compile Include="tests/FallbackKernelTestsPart2.fs" />
+     <Compile Include="tests/FallbackKernelTests.fs" />
     <Compile Include="tests/FallbackConfigCodecTests.fs" />
     <Compile Include="tests/FallbackRuntimeStateTests.fs" />
-    <Compile Include="tests/FallbackEventBridgeTests.fs" />
+     <Compile Include="tests/FallbackEventBridgeTestsPart2.fs" />
+     <Compile Include="tests/FallbackEventBridgeTests.fs" />
     <Compile Include="tests/FallbackRecoveryWaitTests.fs" />
     <Compile Include="tests/SubagentIoFallbackRecoveryTests.fs" />
     <Compile Include="tests/FallbackMessageCodecTests.fs" />
