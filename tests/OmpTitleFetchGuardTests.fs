@@ -16,6 +16,7 @@ let wrapText () =
         (wrapped.Contains "<do-not-exec>hello world</do-not-exec>")
     check "wrap asks for naming only" (wrapped.Contains "Please name the conversation")
     check "wrap forbids execution" (wrapped.Contains "should not actually execute")
+    check "wrap requests precise style" (wrapped.Contains "precise Chinese")
 
 let detectProbeUserContent () =
     let body = box "{\"messages\":[{\"role\":\"user\",\"content\":\"Generate a title for this conversation\\n\"}]}"

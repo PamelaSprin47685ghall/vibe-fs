@@ -78,8 +78,8 @@ let private applyAgentConfigIfSupported (pi: obj) : unit =
 /// same outcome: in-flight review state must clear. Without this hook,
 /// review state survives host-driven aborts and leaks across sessions.
 let private sessionEndEventTypes =
-    Set [ "session.abort"; "stream.abort"; "session.error"; "session.delete"; "session.close"; "session.remove"; "session.deleted" ]
-
+    Set [ "session.abort"; "stream.abort"; "session.error"; "session.delete"; "session.close"; "session.remove"; "session.deleted"; "session.interrupted" ]
+ 
 let registerAbortHandler (pi: obj) (reviewStore: ReviewStore)
     (fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option) : unit =
     let fallbackEventTypes = Set [ "session.busy"; "session.idle"; "message.updated"; "session.updated" ]

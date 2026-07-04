@@ -37,6 +37,9 @@ let run () : JS.Promise<unit> =
         do! rmAsync workspaceDir
         do! abortedRetrySpec ()
         do! fallbackRetryWithoutFrontmatterSpec ()
+        do! sessionPostErrorSpec ()
+        do! sessionUserQueryPostErrorSpec ()
+        do! sessionInterruptedEventSpec ()
         do! repeatedAssistantSpec ()
         do! repeatedIdleBeforeHistoryPersistsNudgeSpec ()
         do! sessionStatusIdleAndSessionIdleDedupSpec ()

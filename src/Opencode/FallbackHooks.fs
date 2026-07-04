@@ -93,17 +93,35 @@ let private tryReadCurrentModel (client: obj) (sessionID: string) : JS.Promise<F
 let opencodeEventTranslator : IEventTranslator =
     { new IEventTranslator with
         member _.TranslateError rawEvent =
-            if getEventType rawEvent <> "session.error" then None
-            else
+            let eventType = getEventType rawEvent
+            if eventType = "session.error" then
                 let errorObj = Dyn.get (getProps rawEvent) "error"
                 if Dyn.isNullish errorObj then None
                 else Some (FallbackEvent.SessionError (opencodeErrorInput errorObj))
+            elif eventType = "session.interrupted" then
+                Some (FallbackEvent.SessionError { ErrorName = "MessageAbortedError"
+                                                   DomainError = Some MessageAborted
+                                                   Message = "interrupted"
+                                                   StatusCode = None
+                                                   IsRetryable = Some false })
+            elif eventType = "session.status" then
+                let statusObj = Dyn.get (getProps rawEvent) "status"
+                let statusType = Dyn.str statusObj "type"
+                if statusType = "interrupted" then
+                    Some (FallbackEvent.SessionError { ErrorName = "MessageAbortedError"
+                                                       DomainError = Some MessageAborted
+                                                       Message = "interrupted"
+                                                       StatusCode = None
+                                                       IsRetryable = Some false })
+                else None
+            else None
 
         member _.ExtractSessionID rawEvent =
             getSessionID (getEventType rawEvent) (getProps rawEvent)
 
         member _.IsSessionError rawEvent =
-            getEventType rawEvent = "session.error"
+            let t = getEventType rawEvent
+            t = "session.error" || t = "session.interrupted"
 
         member _.IsSessionIdle rawEvent =
             let eventType = getEventType rawEvent

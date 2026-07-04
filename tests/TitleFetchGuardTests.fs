@@ -17,6 +17,7 @@ let wrap () =
         (wrapped.Contains "<do-not-exec>重构用户服务</do-not-exec>")
     check "wrap asks for naming only" (wrapped.Contains "Please name the conversation")
     check "wrap forbids execution" (wrapped.Contains "should not actually execute")
+    check "wrap requests precise style" (wrapped.Contains "precise Chinese")
 
 let detect () =
     let titleBody = box "{\"messages\":[{\"role\":\"user\",\"content\":\"Generate a title for this conversation\\n\"}]}"

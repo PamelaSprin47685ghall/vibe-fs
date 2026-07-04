@@ -32,13 +32,20 @@ let ompEventTranslator : IEventTranslator =
                 let errorObj = Dyn.get eventObj "error"
                 if Dyn.isNullish errorObj then None
                 else Some (SessionError (ompErrorInput errorObj))
+            elif eventType = "session.abort" || eventType = "session.interrupted" then
+                Some (SessionError { ErrorName = "MessageAbortedError"
+                                     DomainError = Some MessageAborted
+                                     Message = "aborted"
+                                     StatusCode = None
+                                     IsRetryable = Some false })
             else None
 
         member _.ExtractSessionID (rawEvent: obj) : string =
             Dyn.str (Dyn.get rawEvent "props") "sessionID"
 
         member _.IsSessionError (rawEvent: obj) : bool =
-            Dyn.str (Dyn.get rawEvent "event") "type" = "session.error"
+            let t = Dyn.str (Dyn.get rawEvent "event") "type"
+            t = "session.error" || t = "session.abort" || t = "session.interrupted"
 
         member _.IsSessionIdle (rawEvent: obj) : bool =
             Dyn.str (Dyn.get rawEvent "event") "type" = "session.idle"

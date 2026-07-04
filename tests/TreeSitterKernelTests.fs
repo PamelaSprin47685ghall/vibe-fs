@@ -74,6 +74,73 @@ let formatWriteSyntaxResultErrors () =
     let result = formatWriteSyntaxResult "test.fs" (Ok ("fsharp", diags))
     check "error detail" (result.Contains "line 1, col 0:")
 
+let testCharWidth () =
+    check "charWidth a" (charWidth 'a' = 1)
+    check "charWidth 你" (charWidth '你' = 2)
+
+let testStringWidth () =
+    equal "stringWidth empty" 0 (stringWidth "")
+    equal "stringWidth ascii" 5 (stringWidth "hello")
+    equal "stringWidth CJK" 4 (stringWidth "你好")
+    equal "stringWidth mixed" 9 (stringWidth "hello你好")
+
+let testCheckLineLengths () =
+    let clean = String.replicate 72 "a"
+    let dirty = String.replicate 73 "a"
+    let cjkClean = String.replicate 36 "你"
+    let cjkDirty = String.replicate 37 "你"
+    
+    let limits = defaultStyleLimits
+    equal "clean line" 0 (checkLineLengths limits clean).Length
+    equal "clean cjk line" 0 (checkLineLengths limits cjkClean).Length
+    
+    let dirtyDiags = checkLineLengths limits dirty
+    equal "dirty line count" 1 dirtyDiags.Length
+    equal "dirty line severity" "warning" dirtyDiags.[0].severity
+    check "dirty line message" (dirtyDiags.[0].message.Contains "exceeds 72")
+    
+    let cjkDirtyDiags = checkLineLengths limits cjkDirty
+    equal "dirty cjk line count" 1 cjkDirtyDiags.Length
+    check "dirty cjk line message" (cjkDirtyDiags.[0].message.Contains "exceeds 72")
+
+let testCheckFileLineCount () =
+    let limits = defaultStyleLimits
+    let lines200 = String.concat "\n" (Array.create 200 "a")
+    let lines201 = String.concat "\n" (Array.create 201 "a")
+    let lines300 = String.concat "\n" (Array.create 300 "a")
+    let lines301 = String.concat "\n" (Array.create 301 "a")
+    
+    equal "200 lines" 0 (checkFileLineCount limits lines200).Length
+    
+    let diags201 = checkFileLineCount limits lines201
+    equal "201 lines count" 1 diags201.Length
+    equal "201 lines severity" "warning" diags201.[0].severity
+    check "201 lines msg" (diags201.[0].message.Contains "200 lines")
+    
+    let diags300 = checkFileLineCount limits lines300
+    equal "300 lines count" 1 diags300.Length
+    equal "300 lines severity" "warning" diags300.[0].severity
+    
+    let diags301 = checkFileLineCount limits lines301
+    equal "301 lines count" 1 diags301.Length
+    equal "301 lines severity" "error" diags301.[0].severity
+    check "301 lines msg" (diags301.[0].message.Contains "300 lines")
+
+let testCheckFunctionLengths () =
+    let limits = defaultStyleLimits
+    let nodes = [|
+        { kind = "function_definition"; startLine = 10; endLine = 60 }
+        { kind = "function_definition"; startLine = 70; endLine = 119 }
+        { kind = "let_binding"; startLine = 130; endLine = 181 }
+        { kind = "other_node"; startLine = 200; endLine = 300 }
+    |]
+    let diags = checkFunctionLengths limits nodes
+    equal "function diags count" 2 diags.Length
+    equal "diag 1 line" 10 diags.[0].line
+    equal "diag 2 line" 130 diags.[1].line
+    check "diag 1 msg" (diags.[0].message.Contains "exceeds 50")
+    check "diag 2 msg" (diags.[1].message.Contains "exceeds 50")
+
 let run () =
     isFileEditToolTrueForEdit ()
     isFileEditToolTrueForWrite ()
@@ -92,3 +159,8 @@ let run () =
     formatWriteSyntaxResultClean ()
     formatWriteSyntaxResultFailed ()
     formatWriteSyntaxResultErrors ()
+    testCharWidth ()
+    testStringWidth ()
+    testCheckLineLengths ()
+    testCheckFileLineCount ()
+    testCheckFunctionLengths ()

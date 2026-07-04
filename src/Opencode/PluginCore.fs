@@ -108,6 +108,40 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
                 Wanxiangshu.Shell.LivelockGuard.cleanup services.RuntimeScope ptyCleanupSessionId
             do! services.SessionLifecycleObserver.handleEvent input
         }))
+    setKey result "session.post" (twoArgHook (fun input output ->
+        promise {
+            let outcome = Dyn.str input "outcome"
+            let errorMsg = Dyn.str input "error"
+            if outcome = "error" || outcome = "cancelled" || errorMsg <> "" then
+                let sessionID = Dyn.str input "sessionID"
+                let isAbort =
+                    outcome = "cancelled"
+                    || errorMsg.ToLowerInvariant().Contains("abort")
+                    || errorMsg.ToLowerInvariant().Contains("cancel")
+                let errName = if isAbort then "MessageAbortedError" else "APIError"
+                let rawEvent =
+                    box {| event = {| ``type`` = "session.error"
+                                      properties = {| sessionID = sessionID
+                                                      info = {| sessionID = sessionID |}
+                                                      error = {| name = errName; message = errorMsg; isRetryable = (not isAbort) |} |} |} |}
+                do! services.SessionLifecycleObserver.handleEvent rawEvent
+        }))
+    setKey result "session.userQuery.post" (twoArgHook (fun input output ->
+        promise {
+            let errorMsg = Dyn.str input "error"
+            if errorMsg <> "" then
+                let sessionID = Dyn.str input "sessionID"
+                let isAbort =
+                    errorMsg.ToLowerInvariant().Contains("abort")
+                    || errorMsg.ToLowerInvariant().Contains("cancel")
+                let errName = if isAbort then "MessageAbortedError" else "APIError"
+                let rawEvent =
+                    box {| event = {| ``type`` = "session.error"
+                                      properties = {| sessionID = sessionID
+                                                      info = {| sessionID = sessionID |}
+                                                      error = {| name = errName; message = errorMsg; isRetryable = (not isAbort) |} |} |} |}
+                do! services.SessionLifecycleObserver.handleEvent rawEvent
+        }))
     setKey result "experimental.chat.system.transform" (twoArgHook (fun input output -> HookTransform.systemTransform services.Directory input output))
 
 let private applyFallbackModelOverrides (cfg: obj) (fbCfgOpt: FallbackConfig option) : unit =

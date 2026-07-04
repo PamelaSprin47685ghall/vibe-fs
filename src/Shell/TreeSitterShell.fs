@@ -76,13 +76,42 @@ let rec private collectDiagnostics (node: obj) (acc: SyntaxDiagnostic list) : Sy
     else
         innerAcc, (isMissing || isError || innerHas)
 
+let rec private collectAstNodes (node: obj) (acc: AstNodeInfo list) : AstNodeInfo list =
+    let startPos = nodePosition node "startPosition"
+    let endPos = nodePosition node "endPosition"
+    let isMissing = nodeBool node "isMissing"
+    let kind = nodeKind node isMissing
+    let info = {
+        kind = kind
+        startLine = startPos.row + 1
+        endLine = endPos.row + 1
+    }
+    let nextAcc = info :: acc
+    let count = nodeChildCount node
+    let rec loop i currentAcc =
+        if i >= count then currentAcc
+        else
+            match nodeChild node i with
+            | None -> loop (i + 1) currentAcc
+            | Some c ->
+                let subAcc = collectAstNodes c currentAcc
+                loop (i + 1) subAcc
+    loop 0 nextAcc
+
+let private runGeneralStyleChecks (content: string) : SyntaxDiagnostic[] =
+    let lineErrors = checkLineLengths defaultStyleLimits content
+    let fileErrors = checkFileLineCount defaultStyleLimits content
+    Array.append lineErrors fileErrors
+
 let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckResult> =
     promise {
         match tryGetPack() with
         | Result.Error reason -> return Failed("", reason)
         | Result.Ok pack ->
             let lang = detectLanguage pack content filePath
-            if lang = "" then return Ok("", Array.empty)
+            if lang = "" then
+                let styleErrors = runGeneralStyleChecks content
+                return Ok("", styleErrors)
             else
                 let parserResult =
                     try
@@ -103,7 +132,15 @@ let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckRes
                     | Result.Ok tree ->
                         let rootNode = getOrCall tree "rootNode"
                         let errors, _ = collectDiagnostics rootNode []
-                        return Ok(lang, errors |> List.rev |> Array.ofList)
+                        let astErrors = errors |> List.rev |> Array.ofList
+                        let astNodes = collectAstNodes rootNode [] |> Array.ofList
+                        let styleErrors =
+                            Array.concat [
+                                checkLineLengths defaultStyleLimits content
+                                checkFileLineCount defaultStyleLimits content
+                                checkFunctionLengths defaultStyleLimits astNodes
+                            ]
+                        return Ok(lang, Array.append astErrors styleErrors)
     }
 
 [<Import("promises", "node:fs")>]

@@ -38,6 +38,16 @@ let checkSyntaxBrokenJsonReports_intentionalWarningFork () = promise {
         check "failed json reason" (reason.Length > 0)
 }
 
+let checkSyntaxStyleChecks () = promise {
+    let content = "const x = \"" + String.replicate 70 "a" + "\";"
+    let! result = checkSyntax content "sample.js"
+    match result with
+    | Ok(lang, errors) ->
+        let styleWarns = errors |> Array.filter (fun e -> e.message.Contains "exceeds 72")
+        check "has exceeds 72 warning" (styleWarns.Length > 0)
+    | Failed(_, reason) -> check "should not fail" (reason = "" && false)
+}
+
 let supportsSyntaxDiagnosticsGrepFalse () =
     check "grep not file-edit tool" (not (isFileEditTool "grep"))
 
