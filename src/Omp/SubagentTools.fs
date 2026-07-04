@@ -7,8 +7,10 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.ExecutorTools
 open Wanxiangshu.Omp.OmpToolSchema
 open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.SubagentDispatcher
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Kernel.FallbackKernel.Types
@@ -17,7 +19,7 @@ module Dyn = Wanxiangshu.Shell.Dyn
 let private coderChildTools = [| "read"; "edit"; "write"; "find"; "fuzzy_find"; "fuzzy_grep"; "lsp"; "investigator" |]
 let private investigatorChildTools = [| "read"; "find"; "fuzzy_find"; "fuzzy_grep" |]
 
-type OmpHostAdapter(pi: obj, ctx: obj, signal: obj option, fallbackRuntime: FallbackRuntimeState, fallbackConfigOpt: FallbackConfig option) =
+type OmpHostAdapter(scope: RuntimeScope, pi: obj, ctx: obj, signal: obj option, fallbackRuntime: FallbackRuntimeState, fallbackConfigOpt: FallbackConfig option) =
     interface IHostAdapter with
         member _.WorkspaceRoot = Dyn.str ctx "cwd"
         member _.SessionId =
@@ -32,7 +34,7 @@ type OmpHostAdapter(pi: obj, ctx: obj, signal: obj option, fallbackRuntime: Fall
                 | Browser -> [| "browser" |]
             promise {
                 try
-                    let! text = runSubagent pi ctx toolNames request.Prompt signal fallbackRuntime fallbackConfigOpt
+                    let! text = runSubagent scope pi ctx toolNames request.Prompt signal fallbackRuntime fallbackConfigOpt
                     return Success text
                 with ex ->
                     return Failure (translateJsError ex)
@@ -49,13 +51,13 @@ let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fal
             "parameters", coderParameters tb
             "execute",
                 box(fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
-                    promise {
-                        try
-                            let adapter = OmpHostAdapter(pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
-                            let! text = dispatch omp adapter "coder" params'
-                            return textResult text
-                        with ex -> return asErrorResult ex
-                    })
+            promise {
+                try
+                    let adapter = OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+                    let! text = dispatch omp adapter "coder" params'
+                    return textResult text
+                with ex -> return asErrorResult ex
+            })
         ])
 
     pi?registerTool(
@@ -68,7 +70,7 @@ let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fal
                 box(fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
                     promise {
                         try
-                            let adapter = OmpHostAdapter(pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+                            let adapter = OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
                             let! text = dispatch omp adapter "investigator" params'
                             return textResult text
                         with ex -> return asErrorResult ex
@@ -85,7 +87,7 @@ let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fal
                 box(fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
                     promise {
                         try
-                            let adapter = OmpHostAdapter(pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+                            let adapter = OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
                             let! text = dispatch omp adapter "meditator" params'
                             return textResult text
                         with ex -> return asErrorResult ex
@@ -109,7 +111,7 @@ let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fal
                             if not hasBrowser then
                                 return errorResult "Built-in browser tool is unavailable in this session."
                             else
-                                let adapter = OmpHostAdapter(pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+                                let adapter = OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
                                 let! text = dispatch omp adapter "browser" params'
                                 return textResult text
                         with ex -> return asErrorResult ex

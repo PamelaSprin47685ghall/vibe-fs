@@ -69,4 +69,4 @@ let assembleRegistrationObject
         "getToolPolicy", box getToolPolicy
         "__reviewStore", box reviewTestSurface
         "tool.execute.after", box (System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
-            Wanxiangshu.Mux.PluginCatalog.toolExecuteAfter input output)) ]
+             Wanxiangshu.Mux.PluginCatalog.toolExecuteAfter scope input output)) ]

@@ -1,17 +1,15 @@
 module Wanxiangshu.Shell.ReadDedupMuxPlugin
 
-open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Dedup
 open Wanxiangshu.Kernel.MessageDedup
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.HostMessagePartCodec
+open Wanxiangshu.Shell.ReadDedupCore
 open Wanxiangshu.Shell.TreeSitterShell
 
 let private readToolNames = Set.ofList [ "read"; "file_read" ]
-
-type private ReadHit = { msgIndex: int; partIndex: int; payload: ReadPayload }
 
 let private tryPath (input: obj) : string =
     if Dyn.isNullish input then ""
@@ -44,12 +42,36 @@ let private collectMuxReadHits (messages: obj array) : ReadHit list =
     |> Array.concat
     |> List.ofArray
 
-let private applyDedupToMessages (messages: obj array) (hits: ReadHit list) (replaced: bool list) : obj array =
-    if List.forall not replaced then messages
+let collectReadOutputs (messages: obj array) : string[] =
+    collectMuxReadHits messages
+    |> List.map (fun hit -> hit.payload.content)
+    |> Array.ofList
+
+let collectReadOutputsByPath (messages: obj array) : Map<string, string list> =
+    collectMuxReadHits messages
+    |> List.map (fun hit -> hit.payload)
+    |> Wanxiangshu.Kernel.MessageDedup.collectReadOutputsByPath
+
+let deduplicateReadOutputsWithSeenByPath
+    (seenByPath: Map<string, string list>)
+    (messages: obj array)
+    : obj[] =
+    let getParts msg = getMessageParts msg
+    let getHit i j part =
+        decodeMuxReadPart part
+        |> Option.map (fun payload -> { msgIndex = i; partIndex = j; payload = payload })
+
+    let verdicts, _ = processDedupHits seenByPath messages getParts getHit
+
+    let replacements =
+        verdicts
+        |> List.choose (fun (hit, verdict) ->
+            match verdict with
+            | AlreadySeen -> Some hit
+            | NewContent _ -> None)
+
+    if List.isEmpty replacements then messages
     else
-        let replacements =
-            List.zip hits replaced
-            |> List.choose (fun (hit, wasReplaced) -> if wasReplaced then Some hit else None)
         let msgGroups = replacements |> List.groupBy (fun hit -> hit.msgIndex)
         messages
         |> Array.mapi (fun i msg ->
@@ -71,25 +93,6 @@ let private applyDedupToMessages (messages: obj array) (hits: ReadHit list) (rep
                                     box (Dyn.withKey originalOutput "content" (box (noChangeEnvelope ())))
                             Dyn.withKey part "output" nextOutput)
                 Dyn.withKey msg "parts" (box newParts))
-
-let collectReadOutputs (messages: obj array) : string[] =
-    collectMuxReadHits messages
-    |> List.map (fun hit -> hit.payload.content)
-    |> Array.ofList
-
-let collectReadOutputsByPath (messages: obj array) : Map<string, string list> =
-    collectMuxReadHits messages
-    |> List.map (fun hit -> hit.payload)
-    |> Wanxiangshu.Kernel.MessageDedup.collectReadOutputsByPath
-
-let deduplicateReadOutputsWithSeenByPath
-    (seenByPath: Map<string, string list>)
-    (messages: obj array)
-    : obj[] =
-    let hits = collectMuxReadHits messages
-    let payloads = hits |> List.map (fun hit -> hit.payload)
-    let _, (_, replaced) = foldDedup seenByPath payloads
-    applyDedupToMessages messages hits replaced
 
 let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : obj[] =
     let seenByPath =

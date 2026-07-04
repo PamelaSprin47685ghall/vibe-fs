@@ -1,5 +1,6 @@
 module Wanxiangshu.Shell.MuxAiSettingsCodec
 
+open Fable.Core
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.ToolContext
 open Wanxiangshu.Shell.DelegatedAiSettings
@@ -7,15 +8,40 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.DynField
 open Wanxiangshu.Shell.ToolContextCodec
 
-module ConfigKeys =
-    let subagentAiDefaults = "subagentAiDefaults"
-    let agentAiDefaults = "agentAiDefaults"
-    let aiSettingsByAgent = "aiSettingsByAgent"
-    let workspace = "workspace"
-    let ai = "ai"
-    let muxEnv = "muxEnv"
-    let runtime = "runtime"
-    let cwd = "cwd"
+[<Erase>]
+type IAgentAiEntryScalars =
+    abstract model: string
+    abstract modelString: string
+    abstract thinkingLevel: string
+
+[<Erase>]
+type IDelegatedAiSettingsRecord =
+    [<Emit("$0[$1]")>]
+    abstract getAgentSettings: agentId: string -> IAgentAiEntryScalars option
+
+[<Erase>]
+type IMuxWorkspace =
+    abstract aiSettingsByAgent: IDelegatedAiSettingsRecord
+
+[<Erase>]
+type IMuxAiConfig =
+    abstract subagentAiDefaults: IDelegatedAiSettingsRecord
+    abstract agentAiDefaults: IDelegatedAiSettingsRecord
+
+[<Erase>]
+type IMuxEnv =
+    abstract MUX_MODEL_STRING: string
+    abstract MUX_THINKING_LEVEL: string
+
+[<Erase>]
+type IMuxAiObj =
+    abstract ai: IAgentAiEntryScalars
+
+[<Erase>]
+type IMuxDelegateConfig =
+    inherit IMuxToolContext
+    abstract runtime: obj
+    abstract muxEnv: IMuxEnv
 
 type MuxDelegateAiConfig = {
     Execution: ToolExecutionContext
@@ -40,6 +66,12 @@ let normalizeTrimmedStr (v: obj) : string option =
         let s = (string v).Trim()
         if s = "" then None else Some s
 
+let normalizeOpt (v: string) : string option =
+    if Dyn.isNullish (box v) then None
+    else
+        let t = v.Trim()
+        if t = "" then None else Some t
+
 let private thinkingLevelMap =
     [ "med", Some "medium"
       "off", Some "off"
@@ -53,74 +85,88 @@ let private thinkingLevelMap =
 let coerceThinkingLevel (value: string) : string option =
     Map.tryFind (value.Trim()) thinkingLevelMap |> Option.defaultValue None
 
-let private delegateRuntimeAndCwd (config: obj) : obj * string =
-    let runtime = Dyn.get config ConfigKeys.runtime
+let private delegateRuntimeAndCwd (config: IMuxDelegateConfig) : obj * string =
+    let runtime = config.runtime
     let runtimeObj = if Dyn.isNullish runtime then null else runtime
-    let cwd = defaultArg (strField config ConfigKeys.cwd) ""
+    let cwd = if Dyn.isNullish (box config.cwd) then "" else config.cwd
     runtimeObj, cwd
 
-let decodeMuxDelegateConfig (config: obj) : Result<MuxDelegateAiConfig, DomainError> =
-    match decodeMuxConfig config with
-    | Error e -> Error e
-    | Ok ctx ->
-        let runtimeObj, cwd = delegateRuntimeAndCwd config
-        Ok { Execution = ctx; Runtime = runtimeObj; Cwd = cwd }
+let decodeMuxDelegateConfig (configObj: obj) : Result<MuxDelegateAiConfig, DomainError> =
+    if Dyn.isNullish configObj then
+        Error (InvalidIntent ("mux-delegate", "config", "nullish"))
+    else
+        let config = unbox<IMuxDelegateConfig> configObj
+        match decodeMuxConfig config with
+        | Error e -> Error e
+        | Ok ctx ->
+            let runtimeObj, cwd = delegateRuntimeAndCwd config
+            Ok { Execution = ctx; Runtime = runtimeObj; Cwd = cwd }
 
-let decodeMuxDelegateConfigLenient (config: obj) : MuxDelegateAiConfig =
+let decodeMuxDelegateConfigLenient (configObj: obj) : MuxDelegateAiConfig =
+    let config = unbox<IMuxDelegateConfig> configObj
     let runtimeObj, cwd = delegateRuntimeAndCwd config
     { Execution = decodeMuxConfigLenient config
       Runtime = runtimeObj
       Cwd = cwd }
 
-let decodeMuxParentRuntimeEnv (muxEnv: obj) : MuxParentRuntimeAiScalars =
-    if Dyn.isNullish muxEnv then
+let decodeMuxParentRuntimeEnv (muxEnv: IMuxEnv) : MuxParentRuntimeAiScalars =
+    if Dyn.isNullish (box muxEnv) then
         { ModelString = None; ThinkingLevel = None }
     else
-        { ModelString = normalizeTrimmedStr (Dyn.get muxEnv "MUX_MODEL_STRING")
-          ThinkingLevel = defaultArg (strField muxEnv "MUX_THINKING_LEVEL") "" |> coerceThinkingLevel }
+        { ModelString = normalizeTrimmedStr (box muxEnv.MUX_MODEL_STRING)
+          ThinkingLevel = normalizeOpt muxEnv.MUX_THINKING_LEVEL |> Option.bind coerceThinkingLevel }
 
-let decodeAgentAiEntryScalars (entry: obj) : AgentAiEntryScalars =
-    if Dyn.isNullish entry then
+let decodeAgentAiEntryScalars (entry: IAgentAiEntryScalars) : AgentAiEntryScalars =
+    if Dyn.isNullish (box entry) then
         { Model = None; ModelString = None; ThinkingLevel = None }
     else
-        { Model = normalizeTrimmedStr (Dyn.get entry "model")
-          ModelString = normalizeTrimmedStr (Dyn.get entry "modelString")
-          ThinkingLevel = normalizeTrimmedStr (Dyn.get entry "thinkingLevel") }
+        { Model = normalizeOpt entry.model
+          ModelString = normalizeOpt entry.modelString
+          ThinkingLevel = normalizeOpt entry.thinkingLevel }
 
-let private namedSettingsFromRecord (source: obj) (agentId: string) : DelegatedAiSettings option =
-    if Dyn.isNullish source then None
+let private namedSettingsFromRecord (source: IDelegatedAiSettingsRecord) (agentId: string) : DelegatedAiSettings option =
+    if Dyn.isNullish (box source) then None
     else
-        let entry = Dyn.get source agentId
-        if Dyn.isNullish entry then None
-        else
+        match source.getAgentSettings agentId with
+        | None -> None
+        | Some entry ->
             let s = decodeAgentAiEntryScalars entry
             Some
                 { modelString = s.Model |> Option.orElse s.ModelString
                   thinkingLevel = s.ThinkingLevel }
 
-let readMuxConfigFileDefaults (configFile: obj) (agentId: string) : DelegatedAiSettings option list =
-    if Dyn.isNullish configFile then [ None; None ]
+let readMuxConfigFileDefaults (configFileObj: obj) (agentId: string) : DelegatedAiSettings option list =
+    if Dyn.isNullish configFileObj then [ None; None ]
     else
-        [ namedSettingsFromRecord (Dyn.get configFile ConfigKeys.subagentAiDefaults) agentId
-          namedSettingsFromRecord (Dyn.get configFile ConfigKeys.agentAiDefaults) agentId ]
+        let configFile = unbox<IMuxAiConfig> configFileObj
+        [ namedSettingsFromRecord configFile.subagentAiDefaults agentId
+          namedSettingsFromRecord configFile.agentAiDefaults agentId ]
 
-let readWorkspaceAiSettingsByAgent (workspace: obj) (agentId: string) : DelegatedAiSettings option =
-    if Dyn.isNullish workspace then None
-    else namedSettingsFromRecord (Dyn.get workspace ConfigKeys.aiSettingsByAgent) agentId
-
-    // Null `fm` -> `emptySettings`; `AiSettings.resolveDelegatedAgentAiSettings` catches failed `resolveAgentFrontmatter` promises (try/with) and uses the same fallback.
-let readDescriptorAiFromFrontmatter (fm: obj) : DelegatedAiSettings =
-    if Dyn.isNullish fm then emptySettings
+let readWorkspaceAiSettingsByAgent (workspaceObj: obj) (agentId: string) : DelegatedAiSettings option =
+    if Dyn.isNullish workspaceObj then None
     else
-        let scalars = decodeAgentAiEntryScalars (Dyn.get fm ConfigKeys.ai)
-        { modelString = scalars.Model |> Option.orElse scalars.ModelString
-          thinkingLevel = scalars.ThinkingLevel }
+        let workspace = unbox<IMuxWorkspace> workspaceObj
+        namedSettingsFromRecord workspace.aiSettingsByAgent agentId
+
+let readDescriptorAiFromFrontmatter (fmObj: obj) : DelegatedAiSettings =
+    if Dyn.isNullish fmObj then emptySettings
+    else
+        let fm = unbox<IMuxAiObj> fmObj
+        let aiScalars = fm.ai
+        if Dyn.isNullish (box aiScalars) then emptySettings
+        else
+            let scalars = decodeAgentAiEntryScalars aiScalars
+            { modelString = scalars.Model |> Option.orElse scalars.ModelString
+              thinkingLevel = scalars.ThinkingLevel }
 
 let readWorkspaceFromFindResult (findResult: obj) : obj =
     if Dyn.isNullish findResult then null
-    else Dyn.get findResult ConfigKeys.workspace
+    else Dyn.get findResult "workspace"
 
-let readParentMuxEnv (config: obj) : MuxParentRuntimeAiScalars =
-    let muxEnv = Dyn.get config ConfigKeys.muxEnv
-    if Dyn.isNullish muxEnv then { ModelString = None; ThinkingLevel = None }
-    else decodeMuxParentRuntimeEnv muxEnv
+let readParentMuxEnv (configObj: obj) : MuxParentRuntimeAiScalars =
+    if Dyn.isNullish configObj then { ModelString = None; ThinkingLevel = None }
+    else
+        let config = unbox<IMuxDelegateConfig> configObj
+        let muxEnv = config.muxEnv
+        if Dyn.isNullish (box muxEnv) then { ModelString = None; ThinkingLevel = None }
+        else decodeMuxParentRuntimeEnv muxEnv

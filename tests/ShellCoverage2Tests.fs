@@ -9,6 +9,7 @@ open Wanxiangshu.Shell.FuzzySearchHelpers
 open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Kernel.FuzzyPath
+open Wanxiangshu.Shell.RuntimeScope
 module Livelock = Wanxiangshu.Shell.LivelockGuard
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -157,21 +158,25 @@ let resolveStoreNone () =
 // ── LivelockGuard ─────────────────────────────────────────────────────────────
 
 let livelockGuardFirstCall () =
-    check "first call not blocked" (not (Livelock.check "s1" "c" "a" "o"))
+    let testScope = RuntimeScope()
+    check "first call not blocked" (not (Livelock.check testScope "s1" "c" "a" "o"))
 
 let livelockGuardSameIncrement () =
-    check "same tool" (not (Livelock.check "s9" "c" "a" "o"))
-    check "repeat counts" (not (Livelock.check "s9" "c" "a" "o"))
+    let testScope = RuntimeScope()
+    check "same tool" (not (Livelock.check testScope "s9" "c" "a" "o"))
+    check "repeat counts" (not (Livelock.check testScope "s9" "c" "a" "o"))
 
 let livelockGuardBreach () =
-    check "1st" (not (Livelock.check "s2" "c" "a" "o"))
-    check "2nd" (not (Livelock.check "s2" "c" "a" "o"))
-    check "3rd breach" (Livelock.check "s2" "c" "a" "o")
+    let testScope = RuntimeScope()
+    check "1st" (not (Livelock.check testScope "s2" "c" "a" "o"))
+    check "2nd" (not (Livelock.check testScope "s2" "c" "a" "o"))
+    check "3rd breach" (Livelock.check testScope "s2" "c" "a" "o")
 
 let livelockGuardDifferentResets () =
-    check "s3 baseline" (not (Livelock.check "s3" "c" "a" "o"))
-    check "s3 repeat" (not (Livelock.check "s3" "c" "a" "o"))
-    check "s3 different output breaks" (not (Livelock.check "s3" "c" "a" "x"))
+    let testScope = RuntimeScope()
+    check "s3 baseline" (not (Livelock.check testScope "s3" "c" "a" "o"))
+    check "s3 repeat" (not (Livelock.check testScope "s3" "c" "a" "o"))
+    check "s3 different output breaks" (not (Livelock.check testScope "s3" "c" "a" "x"))
 
 let run () =
     resultFromRawOk ()

@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.RuntimeScope
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Omp.SessionLifecycleHooks
@@ -13,6 +14,8 @@ open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Omp.MagicTodo
+
+let private testScope = RuntimeScope()
 
 let fakeCtx (sessionId: string) (cwd: string) : obj =
     createObj [
@@ -88,9 +91,9 @@ let toolCallHandler_normalToolReturnsNone () =
     }
 
 let toolCallHandler_childSessionCoderMissingWarnTddBlocked () =
-    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest ()
+    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest testScope ()
     let childId = "child-coder-1"
-    Wanxiangshu.Omp.ChildSession.markChildSession childId
+    Wanxiangshu.Omp.ChildSession.markChildSession testScope childId
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
@@ -99,13 +102,13 @@ let toolCallHandler_childSessionCoderMissingWarnTddBlocked () =
         let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
         let block = Dyn.getValue<bool> result "block"
         check "child session coder without warn_tdd blocked" block
-        Wanxiangshu.Omp.ChildSession.unmarkChildSession childId
+        Wanxiangshu.Omp.ChildSession.unmarkChildSession testScope childId
     }
 
 let toolCallHandler_childSessionExecutorMissingWarnBlocked () =
-    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest ()
+    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest testScope ()
     let childId = "child-exec-1"
-    Wanxiangshu.Omp.ChildSession.markChildSession childId
+    Wanxiangshu.Omp.ChildSession.markChildSession testScope childId
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
@@ -114,13 +117,13 @@ let toolCallHandler_childSessionExecutorMissingWarnBlocked () =
         let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
         let block = Dyn.getValue<bool> result "block"
         check "child session executor without warn blocked" block
-        Wanxiangshu.Omp.ChildSession.unmarkChildSession childId
+        Wanxiangshu.Omp.ChildSession.unmarkChildSession testScope childId
     }
 
 let toolCallHandler_childSessionReadPasses () =
-    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest ()
+    Wanxiangshu.Omp.ChildSession.clearChildSessionsForTest testScope ()
     let childId = "child-read-1"
-    Wanxiangshu.Omp.ChildSession.markChildSession childId
+    Wanxiangshu.Omp.ChildSession.markChildSession testScope childId
     let h = createPiHarness ()
     let pi = piObject h
     let store = createReviewStore ()
@@ -128,7 +131,7 @@ let toolCallHandler_childSessionReadPasses () =
     promise {
         let! result = toolCallHandler pi store event (fakeCtx childId "/tmp")
         check "child session read (non-modification) passes" (Dyn.isNullish result)
-        Wanxiangshu.Omp.ChildSession.unmarkChildSession childId
+        Wanxiangshu.Omp.ChildSession.unmarkChildSession testScope childId
     }
 
 let turnStartHandler_filtersChildOnlyTools () =

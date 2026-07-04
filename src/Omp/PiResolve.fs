@@ -2,6 +2,7 @@ module Wanxiangshu.Omp.PiResolve
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Shell.RuntimeScope
 
 [<Import("homedir", "node:os")>]
 let private homedir () : string = jsNative
@@ -45,20 +46,11 @@ let getPiBase () : string =
             resolvedBase <- Some b
             b
 
-let mutable private testCodingAgentOverride : obj option = None
 let mutable private cachedModule : obj option = None
 
-let setCodingAgentModuleForTest (module': obj) : unit =
-    testCodingAgentOverride <- Some module'
-    cachedModule <- None
-
-let clearCodingAgentModuleForTest () : unit =
-    testCodingAgentOverride <- None
-    cachedModule <- None
-
-let getCodingAgentModule () : JS.Promise<obj> =
+let getCodingAgentModule (scope: RuntimeScope) : JS.Promise<obj> =
     promise {
-        match testCodingAgentOverride with
+        match scope.TryFindKey "omp.coding_agent_module" with
         | Some m -> return m
         | None ->
             match cachedModule with
@@ -70,3 +62,4 @@ let getCodingAgentModule () : JS.Promise<obj> =
                 cachedModule <- Some module'
                 return module'
     }
+

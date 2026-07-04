@@ -5,6 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.MessagingPartCodec
 open Wanxiangshu.Shell.MessagingEncodeHelpers
+open Wanxiangshu.Shell.MessagingDecodeCore
+open Wanxiangshu.Shell.MessagingEncodeCore
 
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.Dyn
@@ -14,78 +16,39 @@ open Wanxiangshu.Shell.Dyn
 
 let decodeToolState (state: obj) : ToolState<obj> option = decodeOpencodeToolStateBox state
 
-let decodePart (part: obj) : Part<obj> =
-    match str part "type" with
-    | "text" -> TextPart (decodeTextPart part)
-    | "tool" -> ToolPart (str part "tool", str part "callID", decodeToolState (get part "state"), part)
-    | _ -> RawPart part
+let opencodeAdapters = {
+    GetParts = fun msg -> decodePartsFromArray (Dyn.get msg "parts")
+    PartType = fun p -> Dyn.str p "type"
+    PartToolName = fun p -> Dyn.str p "tool"
+    PartCallID = fun p -> Dyn.str p "callID"
+    PartState = fun p -> let s = Dyn.get p "state" in if Dyn.isNullish s then None else Some s
+    MessageID = fun m -> let i = Dyn.get m "info" in if Dyn.isNullish i then "" else Dyn.str i "id"
+    MessageRole = fun m -> let i = Dyn.get m "info" in if Dyn.isNullish i then "" else Dyn.str i "role"
+    MessageAgent = fun m -> let i = Dyn.get m "info" in if Dyn.isNullish i then "" else Dyn.str i "agent"
+    MessageToolName = fun m -> let i = Dyn.get m "info" in if Dyn.isNullish i then "" else Dyn.str i "toolName"
+    MessageIsError = fun m ->
+        let i = Dyn.get m "info"
+        if Dyn.isNullish i then false
+        else let v = Dyn.get i "isError" in not (Dyn.isNullish v) && (v :?> bool)
+    MessageDetails = fun m -> let i = Dyn.get m "info" in if Dyn.isNullish i then null else Dyn.get i "details"
+    MessageTime = fun m -> let i = Dyn.get m "info" in if Dyn.isNullish i then null else Dyn.get i "time"
+    MessageSessionID = fun m -> let i = Dyn.get m "info" in if Dyn.isNullish i then "" else Dyn.str i "sessionID"
+    DecodeToolState = decodeToolState
+    DecodeTextPart = decodeTextPart
+    RequireRole = false
+}
 
-let decodeParts (parts: obj) : Part<obj> list =
-    decodePartsFromArray parts |> Array.map decodePart |> List.ofArray
+let decodeMessage msg = Wanxiangshu.Shell.MessagingDecodeCore.decodeMessage opencodeAdapters "" msg
+let decodeMessages msgs = Wanxiangshu.Shell.MessagingDecodeCore.decodeMessages opencodeAdapters "" msgs
 
-let decodeMessage (msg: obj) : Message<obj> option =
-    if isNullish msg then None
-    else
-        let info = get msg "info"
-        if isNullish info then None
-        else
-            let id = str info "id"
-            let isErrorValue = get info "isError"
-            let isError = not (isNullish isErrorValue) && (isErrorValue :?> bool)
-            Some
-                { info =
-                      { id = id
-                        sessionID = str info "sessionID"
-                        role = decodeRole (str info "role")
-                        agent = str info "agent"
-                        isError = isError
-                        toolName = str info "toolName"
-                        details = get info "details"
-                        time = get info "time" }
-                  parts = decodeParts (get msg "parts")
-                  source = classifySource id
-                  raw = msg }
-
-let decodeMessages (messages: obj array) : Message<obj> list =
-    if isNullish messages then []
-    else messages |> Array.choose decodeMessage |> List.ofArray
-
-/// Encode a Part back to a host object. Text parts are rebuilt. Tool parts
-/// return the carried raw reference unchanged when their typed state fields
-/// match the host state (preserving object identity for dedup's "keeps ref"
-/// contract); only parts mutated by a pure typed update (e.g.
-/// setPartOutputTyped) get a shallow state rebuild. Raw parts pass through.
+/// Encode a Part back to a host object. Text parts are rebuilt via
+/// MessagingEncodeCore.encodeTextPartBasic; Tool parts delegate to
+/// encodeOpencodeToolPart which preserves raw reference identity when state
+/// matches and rebuilds state otherwise. Raw parts pass through.
 let encodePart (part: Part<obj>) : obj =
     match part with
-    | TextPart text -> box (createObj [ "type", box "text"; "text", box text ])
-    | ToolPart(toolName, callID, Some state, raw) ->
-        let rawState = if isNull raw then null else get raw "state"
-        if not (isNull raw) && not (isNullish rawState)
-           && str rawState "status" = state.status
-           && str rawState "output" = state.output
-           && str rawState "error" = state.error then
-            raw
-        else
-            let stateObj =
-                if isNullish rawState then
-                    box (createObj [
-                        "status", box state.status
-                        "output", box state.output
-                        "error", box state.error
-                        "input", state.input
-                    ])
-                else
-                    let s1 = withKey rawState "status" (box state.status)
-                    let s2 = withKey s1 "output" (box state.output)
-                    withKey s2 "error" (box state.error)
-            if isNull raw then
-                box (createObj [ "type", box "tool"; "tool", box toolName; "callID", box callID; "state", stateObj ])
-            else
-                withKey raw "state" stateObj
-    | ToolPart(toolName, callID, None, raw) ->
-        if isNull raw then
-            box (createObj [ "type", box "tool"; "tool", box toolName; "callID", box callID ])
-        else raw
+    | TextPart text -> encodeTextPartBasic text
+    | ToolPart(toolName, callID, stateOpt, raw) -> encodeOpencodeToolPart toolName callID stateOpt raw
     | RawPart raw -> raw
 
 let private encodeMessageInfo (info: MessageInfo<obj>) : obj =
@@ -110,7 +73,7 @@ let private encodeMessageInfo (info: MessageInfo<obj>) : obj =
 let encodeMessage (msg: Message<obj>) : obj =
     if isNull msg.raw then
         let partsObj = msg.parts |> List.map encodePart |> List.toArray
-        box (createObj [ "info", box (encodeMessageInfo msg.info); "parts", box partsObj ])
+        box (createObj ["info", box (encodeMessageInfo msg.info); "parts", box partsObj])
     else
         let rawParts = get msg.raw "parts"
         let encodedParts = msg.parts |> List.map encodePart |> List.toArray

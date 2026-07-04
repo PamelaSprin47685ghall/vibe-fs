@@ -11,7 +11,7 @@ open Wanxiangshu.Shell.ToolContextCodec
 type HostEventEnvelope = { EventType: string; Props: obj }
 
 let sessionIdFromHookInput (input: obj) (fallbackDir: string) : string =
-    Id.sessionIdValue (decodeOpencodeToolContext input fallbackDir).SessionId
+    Id.sessionIdValue (decodeOpencodeToolContext (unbox<IOpenCodeToolContext> input) fallbackDir).SessionId
 
 let toolNameFromHookInput (input: obj) : string = Dyn.str input "tool"
 

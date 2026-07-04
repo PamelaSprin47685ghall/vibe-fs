@@ -5,21 +5,23 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Omp.ChildSession
-open Wanxiangshu.Omp.PiResolve
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.RuntimeScope
 module Dyn = Wanxiangshu.Shell.Dyn
 
-let private reset () = clearCodingAgentModuleForTest ()
+let private testScope = RuntimeScope()
+
+let private reset () = testScope.Remove "omp.coding_agent_module"
 
 let private mockPi (captureToolNames: string array ref) : obj =
-    setCodingAgentModuleForTest (
+    testScope.Add("omp.coding_agent_module", box (
         createObj [
             "SessionManager",
                 box(
                     createObj [
                         "create", box(fun (_cwd: string) -> createObj [ "getSessionId", box(fun () -> box "sm-1") ])
                     ])
-        ])
+        ]))
     let createAgentSession =
         box(fun (body: obj) ->
             let names = unbox<string array> (Dyn.get body "toolNames")
@@ -38,7 +40,7 @@ let createChildSessionReviewToolNames () = promise {
     let captured = ref [||]
     let pi = mockPi captured
     let ctx = createObj [ "cwd", box "/tmp/ws" ]
-    let! _ = createChildSession pi ctx ompReviewChildToolNames None [||] None
+    let! _ = createChildSession testScope pi ctx ompReviewChildToolNames None [||] None
     equal "review child tool count" ompReviewChildToolNames.Length captured.Value.Length
     for i in 0 .. ompReviewChildToolNames.Length - 1 do
         equal ("review child tool " + string i) ompReviewChildToolNames.[i] captured.Value.[i]
@@ -49,7 +51,7 @@ let createChildSessionRunnerToolNames () = promise {
     let captured = ref [||]
     let pi = mockPi captured
     let ctx = createObj [ "cwd", box "/tmp/ws" ]
-    let! _ = createChildSession pi ctx ompRunnerChildToolNames None [||] None
+    let! _ = createChildSession testScope pi ctx ompRunnerChildToolNames None [||] None
     equal "runner child tool count" ompRunnerChildToolNames.Length captured.Value.Length
     for i in 0 .. ompRunnerChildToolNames.Length - 1 do
         equal ("runner child tool " + string i) ompRunnerChildToolNames.[i] captured.Value.[i]

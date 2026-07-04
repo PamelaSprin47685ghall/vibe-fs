@@ -6,6 +6,7 @@ open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.MessagingCodec
 open Wanxiangshu.Omp.PiResolve
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.OmpHostBindings
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.SubagentIo
@@ -13,81 +14,93 @@ module Dyn = Wanxiangshu.Shell.Dyn
 
 type ChildSession = { session: obj; dispose: (unit -> unit) option }
 
-/// Process-scoped registry of child session ids whose tool calls must not feed
-/// back into parent context. Simplest possible approach specific
-/// to Omp: `tool_result` only sees the host ctx, and matching the parent
-/// session id against this set is enough to suppress child-agent noise without
-/// requiring a full Kernel.Domain state machine on the hot path.
-let mutable private childSessionIds : Set<string> = Set.empty
 
-let markChildSession (id: string) =
-    if id <> "" then childSessionIds <- Set.add id childSessionIds
+let private getChildIds (scope: RuntimeScope) : Set<string> =
+    match scope.TryFindKey "omp_child_sessions" with
+    | Some v -> unbox<Set<string>> v
+    | None -> Set.empty
 
-let unmarkChildSession (id: string) =
-    if id <> "" then childSessionIds <- Set.remove id childSessionIds
+let private setChildIds (scope: RuntimeScope) (ids: Set<string>) : unit =
+    scope.Add("omp_child_sessions", box ids)
 
-let isChildSession (id: string) : bool =
-    id <> "" && Set.contains id childSessionIds
+let markChildSession (scope: RuntimeScope) (id: string) =
+    if id <> "" then
+        let ids = getChildIds scope
+        setChildIds scope (Set.add id ids)
 
-let clearChildSessionsForTest () : unit =
-    childSessionIds <- Set.empty
+let unmarkChildSession (scope: RuntimeScope) (id: string) =
+    if id <> "" then
+        let ids = getChildIds scope
+        setChildIds scope (Set.remove id ids)
+
+let isChildSession (scope: RuntimeScope) (id: string) : bool =
+    if id = "" then false else
+    let ids = getChildIds scope
+    Set.contains id ids
+
+let clearChildSessionsForTest (scope: RuntimeScope) () : unit =
+    setChildIds scope Set.empty<string>
 
 let private callOpt (ctx: obj) (key: string) : obj =
     let g = Dyn.get ctx key
     if Dyn.typeIs g "function" then Dyn.call0 g else box null
 
-let createChildSession (pi: obj) (ctx: obj) (toolNames: string array) (systemPrompt: obj option) (customTools: obj array) (modelOverride: string option)
+let createChildSession (scope: RuntimeScope) (pi: obj) (ctx: obj) (toolNames: string array) (systemPrompt: obj option) (customTools: obj array) (modelOverride: string option)
     : JS.Promise<ChildSession> =
     promise {
-        let createAgentSession = getCreateAgentSession pi
-        if Dyn.isNullish createAgentSession || not (Dyn.typeIs createAgentSession "function") then
-            return failwith "createAgentSession unavailable"
-        let! codingAgent = getCodingAgentModule ()
-        let sessionManagerType = Dyn.get codingAgent "SessionManager"
-        let cwd = string (Dyn.get ctx "cwd")
-        let sm = createSessionManager sessionManagerType cwd
-        let sp =
-            match systemPrompt with
-            | Some v -> v
-            | None -> callOpt ctx "getSystemPrompt"
-        let model =
-            match modelOverride with
-            | Some m -> box m
-            | None -> Dyn.get ctx "model"
-        let body =
-            createObj [
-                "cwd", box cwd
-                "hasUI", box false
-                "toolNames", box toolNames
-                "modelRegistry", Dyn.get ctx "modelRegistry"
-                "model", model
-                "thinkingLevel", callOpt ctx "getThinkingLevel"
-                "systemPrompt", sp
-                "agentsMdSearch", Dyn.get ctx "agentsMdSearch"
-                "workspaceTree", Dyn.get ctx "workspaceTree"
-                "sessionManager", box sm
-                "customTools", box customTools
-            ]
-        let! wrapper = unbox<JS.Promise<obj>> (Dyn.call1 createAgentSession (box body))
-        let session = Dyn.get wrapper "session"
-        let childId =
-            let childCtx = createObj [ "sessionManager", Dyn.get session "sessionManager" ]
-            getSessionIdFromContext childCtx |> Option.defaultValue ""
-        if childId <> "" then markChildSession childId
-        let dispose =
-            let d = Dyn.get wrapper "dispose"
-            if Dyn.typeIs d "function" then
-                let wrapped () =
-                    try
-                        Dyn.call0 d |> ignore
-                    finally
-                        unmarkChildSession childId
-                Some wrapped
-            else None
-        return { session = session; dispose = dispose }
+        let piTyped = unbox<IPi> pi
+        let createAgentSessionOpt =
+            match piTyped.pi with
+            | Some inner -> inner.createAgentSession
+            | None -> None
+        match createAgentSessionOpt with
+        | None -> return failwith "createAgentSession unavailable"
+        | Some createFn ->
+            let! codingAgent = getCodingAgentModule scope
+            let cwd = string (Dyn.get ctx "cwd")
+            let sessionManagerType = Dyn.get codingAgent "SessionManager"
+            let sm = createSessionManager sessionManagerType cwd
+            let sp =
+                match systemPrompt with
+                | Some v -> v
+                | None -> callOpt ctx "getSystemPrompt"
+            let model =
+                match modelOverride with
+                | Some m -> box m
+                | None -> Dyn.get ctx "model"
+            let body =
+                createObj [
+                    "cwd", box cwd
+                    "hasUI", box false
+                    "toolNames", box toolNames
+                    "modelRegistry", Dyn.get ctx "modelRegistry"
+                    "model", model
+                    "thinkingLevel", callOpt ctx "getThinkingLevel"
+                    "systemPrompt", sp
+                    "agentsMdSearch", Dyn.get ctx "agentsMdSearch"
+                    "workspaceTree", Dyn.get ctx "workspaceTree"
+                    "sessionManager", box sm
+                    "customTools", box customTools
+                ]
+            let! wrapperObj = createFn (box body)
+            let wrapper = unbox<IAgentSessionWrapper> wrapperObj
+            let session = wrapper.session
+            let childId =
+                let childCtx = createObj [ "sessionManager", Dyn.get session "sessionManager" ]
+                getSessionIdFromContext childCtx |> Option.defaultValue ""
+            if childId <> "" then markChildSession scope childId
+            let dispose =
+                match wrapper.dispose with
+                | Some d ->
+                    let wrapped () =
+                        try d ()
+                        finally unmarkChildSession scope childId
+                    Some wrapped
+                | None -> None
+            return { session = session; dispose = dispose }
     }
 
-let runSubagent (pi: obj) (ctx: obj) (toolNames: string array) (prompt: string) (signal: obj option) (fallbackRuntime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState) (fallbackConfigOpt: Wanxiangshu.Kernel.FallbackKernel.Types.FallbackConfig option)
+let runSubagent (scope: RuntimeScope) (pi: obj) (ctx: obj) (toolNames: string array) (prompt: string) (signal: obj option) (fallbackRuntime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState) (fallbackConfigOpt: Wanxiangshu.Kernel.FallbackKernel.Types.FallbackConfig option)
     : JS.Promise<string> =
     promise {
         let modelOverride, defaultChain =
@@ -99,7 +112,7 @@ let runSubagent (pi: obj) (ctx: obj) (toolNames: string array) (prompt: string) 
                     | [] -> None
                 firstModel, Some cfg.DefaultChain
             | None -> None, None
-        let! child = createChildSession pi ctx toolNames None [||] modelOverride
+        let! child = createChildSession scope pi ctx toolNames None [||] modelOverride
         let session = child.session
         let childId =
             let childCtx = createObj [ "sessionManager", Dyn.get session "sessionManager" ]
@@ -110,12 +123,14 @@ let runSubagent (pi: obj) (ctx: obj) (toolNames: string array) (prompt: string) 
             promise {
                 do! sessionPrompt session prompt
                 do! sessionWaitForIdle session
-                let sm = Dyn.get session "sessionManager"
+                let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
                 return readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
             }
         let cleanup () =
-            let abort = sessionAbort session
-            if Dyn.typeIs abort "function" then Dyn.call0 abort |> ignore
+            let childSess = unbox<IChildSession> session
+            match childSess.abort with
+            | Some abort -> try abort () with _ -> ()
+            | None -> ()
             child.dispose |> Option.iter (fun dispose -> dispose ())
         let! text = raceWithAbortSignal (Option.defaultValue (box null) signal) cleanup run
         cleanup ()

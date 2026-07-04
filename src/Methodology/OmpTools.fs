@@ -7,11 +7,14 @@ open Wanxiangshu.Methodology.Args
 open Wanxiangshu.Methodology.Registry
 open Wanxiangshu.Kernel.Subagent
 open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Omp
 open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.ExecutorTools
 open Wanxiangshu.Omp.OmpToolSchema
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -28,7 +31,7 @@ let private executeMethodology (pi: obj) (fallbackRuntime: FallbackRuntimeState)
                     let intent = renderMeditatorIntent entry parsed.intent parsed.note
                     let prompt = formatPrompt omp (Meditator(intent, [])) |> List.head
                     try
-                        let! text = runSubagent pi ctx [||] prompt (Some signal) fallbackRuntime fallbackConfigOpt
+                        let! text = runSubagent ExecutorTools.ompScope pi ctx [||] prompt (Some signal) fallbackRuntime fallbackConfigOpt
                         return textResult text
                     with ex -> return asErrorResult ex
         }

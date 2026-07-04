@@ -4,9 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Omp
 open Wanxiangshu.Omp.Plugin
+open Wanxiangshu.Omp.PluginCore
+open Wanxiangshu.Shell
 module Dyn = Wanxiangshu.Shell.Dyn
+
+let private reviewStore = PluginCore.reviewStore
 
 type private PiHarness =
     { hookStore: obj
@@ -67,12 +71,13 @@ let private piObject (h: PiHarness) : obj =
 
 /// `wanxiangshuExtension` must be idempotent at the tool-registration level.
 let extensionIsIdempotent () = promise {
-    resetOmpPluginTestState ()
+    RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
+    reviewStore.clearReviewSessions ()
     let h = createHarness ()
     let pi = piObject h
-    do! wanxiangshuExtension pi
+    do! Plugin.wanxiangshuExtension pi
     let count1 = h.tools.Count
-    do! wanxiangshuExtension pi
+    do! Plugin.wanxiangshuExtension pi
     check "second registration did not add tools" (h.tools.Count = count1)
 }
 
@@ -80,10 +85,11 @@ let extensionIsIdempotent () = promise {
 /// `tool_result`, `agent_end`, `session_start`, `session_shutdown`, and
 /// `input` — all of these handlers should be present in the harness.
 let extensionRegistersLifecycleHooks () = promise {
-    resetOmpPluginTestState ()
+    RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
+    reviewStore.clearReviewSessions ()
     let h = createHarness ()
     let pi = piObject h
-    do! wanxiangshuExtension pi
+    do! Plugin.wanxiangshuExtension pi
     let events = Dyn.get h.hookStore "events"
     let has name = Dyn.truthy (Dyn.get events name) && (unbox<obj array> (Dyn.get events name)).Length > 0
     check "before_agent_start hook" (has "before_agent_start")
@@ -99,10 +105,11 @@ let extensionRegistersLifecycleHooks () = promise {
 /// After `wanxiangshuExtension`, the shared `reviewStore` is wired such that
 /// pre-activation through the exposed handle is visible to a tool.
 let reviewStoreSharedWithTools () = promise {
-    resetOmpPluginTestState ()
+    RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
+    reviewStore.clearReviewSessions ()
     let h = createHarness ()
     let pi = piObject h
-    do! wanxiangshuExtension pi
+    do! Plugin.wanxiangshuExtension pi
     let sessionId = "shared-store-1"
     reviewStore.activateReview(sessionId, "t", 0L)
     check "plugin pre-activation visible" (reviewStore.getReviewTask sessionId = Some "t")

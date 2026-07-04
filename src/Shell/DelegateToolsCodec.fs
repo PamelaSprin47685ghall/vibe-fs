@@ -26,7 +26,7 @@ let decodeSubagentRole (config: obj) : string =
     defaultArg (strField config "subagentRole") ""
 
 let decodeDelegateConfig (config: obj) : Result<DelegateHostConfig, DomainError> =
-    match decodeMuxConfig config with
+    match decodeMuxConfig (unbox<IMuxToolContext> config) with
     | Error e -> Error e
     | Ok ctx ->
         match ctx.WorkspaceId with

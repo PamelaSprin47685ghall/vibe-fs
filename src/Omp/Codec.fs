@@ -5,6 +5,45 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Omp.Schema
 module Dyn = Wanxiangshu.Shell.Dyn
 
+[<Erase>]
+type ISessionManager =
+    abstract getEntries: (unit -> obj array) option
+    abstract sessionId: string option
+    abstract getSessionId: (unit -> obj) option
+
+[<Erase>]
+type IInnerPi =
+    abstract createAgentSession: (obj -> JS.Promise<obj>) option
+
+[<Erase>]
+type IPi =
+    abstract registerTool: obj -> unit
+    abstract getActiveTools: (unit -> obj) option
+    abstract setActiveTools: (string array -> JS.Promise<unit>) option
+    abstract sendMessage: (obj * obj -> JS.Promise<unit>) option
+    abstract pi: IInnerPi option
+
+[<Erase>]
+type IAgentSessionWrapper =
+    abstract session: obj
+    abstract dispose: (unit -> unit) option
+
+[<Erase>]
+type IChildSession =
+    abstract abort: (unit -> unit) option
+
+[<Erase>]
+type INudgeHooksContext =
+    abstract sessionManager: ISessionManager option
+    abstract hasPendingMessages: (unit -> obj) option
+    abstract workspaceRoot: string option
+    abstract cwd: string option
+    abstract ui: obj option
+
+[<Erase>]
+type IOmpContext =
+    abstract sessionManager: ISessionManager option
+
 type ToolTextResult = { ``type``: string; text: string }
 
 type ToolResult =
@@ -23,28 +62,22 @@ let errorResult (text: string) : ToolResult =
       display = None }
 
 let asErrorResult (error: obj) : ToolResult =
-    let msg =
-        if Dyn.typeIs error "Error" then
-            string (Dyn.get error "message")
-        else
-            string error
-    errorResult msg
+    errorResult (string error)
 
-let getSessionIdFromContext (ctx: obj) : string option =
-    let sm = Dyn.get ctx "sessionManager"
-    if Dyn.isNullish sm then None
+let private normalizeSessionId (sm: ISessionManager) : string option =
+    match sm.getSessionId with
+    | Some getFn ->
+        let id = getFn ()
+        if Dyn.isNullish id then None else Some (string id)
+    | None -> sm.sessionId
+
+let getSessionIdFromContext (ctxObj: obj) : string option =
+    if Dyn.isNullish ctxObj then None
     else
-        let fromFn =
-            let getId = Dyn.get sm "getSessionId"
-            if Dyn.typeIs getId "function" then
-                let id = Dyn.call0 getId
-                if Dyn.isNullish id then None else Some (string id)
-            else None
-        match fromFn with
-        | Some id -> Some id
-        | None ->
-            let sid = Dyn.get sm "sessionId"
-            if Dyn.isNullish sid then None else Some (string sid)
+        let ctx = unbox<IOmpContext> ctxObj
+        match ctx.sessionManager with
+        | None -> None
+        | Some sm -> normalizeSessionId sm
 
 let stringArraySchema (pi: obj) (description: string) : obj =
     let tb = Dyn.get pi "typebox"

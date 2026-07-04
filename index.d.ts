@@ -350,31 +350,7 @@ declare module "wanxiangshu/omp" {
     clearReviewSessions(): void;
   }
 
-  export interface OmpPluginTestExports {
-    reset(): void;
-    setPendingReviewStateForTest(
-      sessionId: string,
-      parentId: string,
-      pending: unknown,
-    ): void;
-    setRunnerJobStateForTest(sessionId: string, state: string): void;
-    stripHeadTailPipes(text: string): string;
-    buildCapsContext(cwd: string): Promise<string | null>;
-    appendCapsContext(cwd: string, context: string): Promise<string>;
-    stripHostAgentsPrompt(systemPrompt: string | string[]): string | string[];
-    checkSyntax(cwd: string, event: Record<string, unknown>): Promise<void>;
-    getOllamaKey(): string | undefined;
-    readAssistantText(
-      sessionManager: unknown,
-      index: number,
-      separator: string,
-    ): string | undefined;
-    supportsSyntaxDiagnosticsTool(toolName: string): Promise<boolean>;
-    fuzzy: Record<string, unknown>;
-  }
-
   export const reviewStore: OmpReviewStore;
-  export const _test: OmpPluginTestExports;
 
   export default function wanxiangshuExtension(pi: unknown): Promise<void>;
 }

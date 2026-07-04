@@ -5,6 +5,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ReviewReplayPolicy
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.MessagingDecodeCore
+open Wanxiangshu.Omp.Codec
 module Dyn = Wanxiangshu.Shell.Dyn
 
 let private toObjArray (value: obj) : obj array =
@@ -23,15 +25,12 @@ let private textFromParts (parts: obj) : string =
                 None)
         |> String.concat "\n\n"
 
-let entries (sessionManager: obj) : obj array =
-    let getEntries = Dyn.get sessionManager "getEntries"
-    if Dyn.typeIs getEntries "function" then
-        let raw = Dyn.call0 getEntries
-        if Dyn.isArray raw then toObjArray raw else [||]
-    else
-        [||]
+let entries (sessionManager: ISessionManager) : obj array =
+    match sessionManager.getEntries with
+    | Some getEntriesFn -> getEntriesFn ()
+    | None -> [||]
 
-let readAssistantText (sessionManager: obj) (startIndex: int) (joiner: string) : string option =
+let readAssistantText (sessionManager: ISessionManager) (startIndex: int) (joiner: string) : string option =
     let chunks = ResizeArray<string>()
     let arr = entries sessionManager
     for index in startIndex .. arr.Length - 1 do
@@ -48,10 +47,10 @@ let readAssistantText (sessionManager: obj) (startIndex: int) (joiner: string) :
             if t <> "" then chunks.Add t
     if chunks.Count = 0 then None else Some (String.concat joiner chunks)
 
-let lastAssistantMessage (sessionManager: obj) : string =
+let lastAssistantMessage (sessionManager: ISessionManager) : string =
     readAssistantText sessionManager 0 "\n\n" |> Option.defaultValue ""
 
-let lastAssistantTurnId (sessionManager: obj) : string =
+let lastAssistantTurnId (sessionManager: ISessionManager) : string =
     let arr = entries sessionManager
     match
         arr
@@ -77,7 +76,7 @@ let private flattenTodoTasks (phases: obj array) : string list =
                 if status = "" then None else Some status))
     |> Array.toList
 
-let openTodoStatuses (sessionManager: obj) : string list =
+let openTodoStatuses (sessionManager: ISessionManager) : string list =
     let arr = entries sessionManager
     let statuses =
         match
@@ -108,16 +107,6 @@ let decodeToolState (state: obj) : ToolState<obj> option =
               input = input
               operationAction = "" }
 
-let private decodePart (part: obj) : Part<obj> =
-    match Dyn.str part "type" with
-    | "text" -> TextPart (Dyn.str part "text")
-    | "tool" -> ToolPart (Dyn.str part "tool", Dyn.str part "callID", decodeToolState (Dyn.get part "state"), part)
-    | _ -> RawPart part
-
-let private decodeParts (parts: obj) : Part<obj> list =
-    if Dyn.isNullish parts || not (Dyn.isArray parts) then []
-    else (parts :?> obj array) |> Array.map decodePart |> List.ofArray
-
 let private roleOfEntry (entry: obj) : string =
     let m = Dyn.get entry "message"
     if not (Dyn.isNullish m) then Dyn.str m "role"
@@ -132,32 +121,30 @@ let private idOfEntry (entry: obj) : string =
         let info = Dyn.get entry "info"
         if not (Dyn.isNullish info) then Dyn.str info "id" else Dyn.str entry "id"
 
-let decodeEntry (sessionID: string) (entry: obj) : Message<obj> option =
-    if Dyn.isNullish entry then None
-    else
-        let role = roleOfEntry entry
-        if role = "" then None
-        else
-            let parts =
-                let m = Dyn.get entry "message"
-                if not (Dyn.isNullish m) then Dyn.get m "content" else Dyn.get entry "parts"
-            Some
-                { info =
-                      { id = idOfEntry entry
-                        sessionID = sessionID
-                        role = decodeRole role
-                        agent = ""
-                        isError = false
-                        toolName = ""
-                        details = null
-                        time = null }
-                  parts = decodeParts parts
-                  source = classifySource (idOfEntry entry)
-                  raw = entry }
+let ompAdapters = {
+    GetParts = fun entry ->
+        let m = Dyn.get entry "message"
+        let p = if not (Dyn.isNullish m) then Dyn.get m "content" else Dyn.get entry "parts"
+        if Dyn.isArray p then unbox p else [||]
+    PartType = fun p -> Dyn.str p "type"
+    PartToolName = fun p -> Dyn.str p "tool"
+    PartCallID = fun p -> Dyn.str p "callID"
+    PartState = fun p -> let s = Dyn.get p "state" in if Dyn.isNullish s then None else Some s
+    MessageID = fun m -> idOfEntry m
+    MessageRole = fun m -> roleOfEntry m
+    MessageAgent = fun _ -> ""
+    MessageToolName = fun _ -> ""
+    MessageIsError = fun _ -> false
+    MessageDetails = fun _ -> null
+    MessageTime = fun _ -> null
+    MessageSessionID = fun _ -> ""
+    DecodeToolState = decodeToolState
+    DecodeTextPart = fun p -> Dyn.str p "text"
+    RequireRole = true
+}
 
-let decodeEntries (sessionID: string) (entriesArr: obj array) : Message<obj> list =
-    if Dyn.isNullish entriesArr then []
-    else entriesArr |> Array.choose (decodeEntry sessionID) |> List.ofArray
+let decodeEntry sessionID msg = Wanxiangshu.Shell.MessagingDecodeCore.decodeMessage ompAdapters sessionID msg
+let decodeEntries sessionID msgs = Wanxiangshu.Shell.MessagingDecodeCore.decodeMessages ompAdapters sessionID msgs
 
 let extractHistoryTexts (messages: Message<obj> list) : string list =
     messages
@@ -168,14 +155,14 @@ let extractHistoryTexts (messages: Message<obj> list) : string list =
         | ToolPart(_, _, Some state, _) -> state.output
         | _ -> "")
 
-let hasActiveLoopFromHistory (sessionManager: obj) : bool =
+let hasActiveLoopFromHistory (sessionManager: ISessionManager) : bool =
     entries sessionManager
     |> decodeEntries ""
     |> extractHistoryTexts
     |> reviewTaskFromTexts
     |> Option.isSome
 
-let activeLoopTaskFromHistory (sessionManager: obj) : string option =
+let activeLoopTaskFromHistory (sessionManager: ISessionManager) : string option =
     entries sessionManager
     |> decodeEntries ""
     |> extractHistoryTexts

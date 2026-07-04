@@ -1,21 +1,34 @@
 module Wanxiangshu.Shell.LivelockGuard
 
+open Wanxiangshu.Shell.RuntimeScope
+
 type LivelockState = { tool: string; argsJson: string; outputJson: string; count: int }
 let defaultMaxRepeats = 3
 
-let mutable private stateBySession = Map.empty<string, LivelockState>
+let private tryGetState (scope: RuntimeScope) (sid: string) =
+    match scope.TryFindKey "livelock_state" with
+    | Some m -> Map.tryFind sid (unbox<Map<string, LivelockState>> m)
+    | None -> None
 
-let check (sessionId: string) (tool: string) (argsJson: string) (outputJson: string) : bool =
+let private putState (scope: RuntimeScope) (sid: string) (s: LivelockState option) =
+    let m =
+        match scope.TryFindKey "livelock_state" with
+        | Some v -> unbox<Map<string, LivelockState>> v
+        | None -> Map.empty
+    let newM = match s with Some x -> Map.add sid x m | None -> Map.remove sid m
+    scope.Add("livelock_state", box newM)
+
+let check (scope: RuntimeScope) (sessionId: string) (tool: string) (argsJson: string) (outputJson: string) : bool =
     let same (s: LivelockState) =
         s.tool = tool && s.argsJson = argsJson && s.outputJson = outputJson
-    match Map.tryFind sessionId stateBySession with
+    match tryGetState scope sessionId with
     | Some prev when same prev ->
         let next = { prev with count = prev.count + 1 }
-        stateBySession <- Map.add sessionId next stateBySession
+        putState scope sessionId (Some next)
         next.count >= defaultMaxRepeats
     | _ ->
-        stateBySession <- Map.add sessionId { tool = tool; argsJson = argsJson; outputJson = outputJson; count = 1 } stateBySession
+        putState scope sessionId (Some { tool = tool; argsJson = argsJson; outputJson = outputJson; count = 1 })
         false
 
-let cleanup (sessionId: string) : unit =
-    stateBySession <- Map.remove sessionId stateBySession
+let cleanup (scope: RuntimeScope) (sessionId: string) : unit =
+    putState scope sessionId None

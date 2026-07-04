@@ -4,7 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Omp
 open Wanxiangshu.Omp.Plugin
+open Wanxiangshu.Omp.PluginCore
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.RuntimeScope
+
+let testScope = RuntimeScope()
 
 type PiHarness =
     { hookStore: obj
@@ -91,7 +97,9 @@ let activeTools (h: PiHarness) : string array =
 let toolNames (h: PiHarness) =
     h.tools |> Seq.map (fun t -> Dyn.str t "name") |> Seq.toList |> List.rev |> Set.ofList
 
-let resetPluginState () = resetOmpPluginTestState ()
+let resetPluginState () =
+    PluginCore.reviewStore.clearReviewSessions ()
+    RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
 
 let lastMessageCustomType (h: PiHarness) : string =
     let entry = h.messages.[h.messages.Count - 1]

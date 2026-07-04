@@ -7,12 +7,14 @@ open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.ExecutorTools
 open Wanxiangshu.Omp.MessagingCodec
 open Wanxiangshu.Omp.OmpToolSchema
 open Wanxiangshu.Omp.ReviewLoop
 open Wanxiangshu.Omp.ReviewToolsLoop
 open Wanxiangshu.Omp.Schema
 open Wanxiangshu.Shell.DynField
+open Wanxiangshu.Shell.RuntimeScope
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.EventLogRuntime
@@ -56,7 +58,7 @@ let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
                                     let mutable loopError : exn option = None
                                     let mutable result : JsReviewResult option = None
                                     try
-                                        let! r = runReviewLoop pi ctx store sessionId report files (Some activeTask)
+                                        let! r = runReviewLoop ompScope pi ctx store sessionId report files (Some activeTask)
                                         result <- Some r
                                     with ex -> loopError <- Some ex
                                     store.unlockReview sessionId

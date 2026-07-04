@@ -49,7 +49,7 @@ let decodeMuxParentRuntimeEnvScalars () =
             "MUX_MODEL_STRING", box " openai:gpt-5 "
             "MUX_THINKING_LEVEL", box "med"
         ]
-    let s = decodeMuxParentRuntimeEnv muxEnv
+    let s = decodeMuxParentRuntimeEnv (unbox muxEnv)
     equal "parent model trim" (Some "openai:gpt-5") s.ModelString
     equal "parent thinking med" (Some "medium") s.ThinkingLevel
 
@@ -85,7 +85,7 @@ let decodeAgentAiEntryScalarsModelPrecedence () =
             "modelString", box "ignored"
             "thinkingLevel", box " high "
         ]
-    let s = decodeAgentAiEntryScalars entry
+    let s = decodeAgentAiEntryScalars (unbox entry)
     equal "entry model" (Some "openai:from-model") s.Model
     equal "entry modelString" (Some "ignored") s.ModelString
     equal "entry thinking trim" (Some "high") s.ThinkingLevel

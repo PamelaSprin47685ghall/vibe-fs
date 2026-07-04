@@ -18,6 +18,7 @@ open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.PatchToolsCodec
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.LivelockGuard
+open Wanxiangshu.Shell.RuntimeScope
 
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Kernel.Domain
@@ -83,7 +84,7 @@ let private appendSyntaxDiagnostics (directory: string) (input: obj) (output: ob
                     if formatted <> "" then setHookOutputString output (addSyntax s formatted)
     }
 
-let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserver: Wanxiangshu.Opencode.SessionLifecycleObserver.SessionLifecycleObserver) (registry: ChildAgentRegistry) (input: obj) (output: obj) : JS.Promise<unit> =
+let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserver: Wanxiangshu.Opencode.SessionLifecycleObserver.SessionLifecycleObserver) (registry: ChildAgentRegistry) (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         do! appendSyntaxDiagnostics pluginDirectory input output
         let tool = toolNameFromHookInput input
@@ -92,7 +93,7 @@ let toolExecuteAfterFor (host: Host) (pluginDirectory: string) (lifecycleObserve
         if isNetworkErrorText originalOutput then
             setHookError output "network connection lost"
         let succeeded = hookOutputError output = ""
-        if check sessionID tool (JS.JSON.stringify (argsFromHookInput input)) originalOutput then
+        if check scope sessionID tool (JS.JSON.stringify (argsFromHookInput input)) originalOutput then
             setHookError output "livelock guard: repeated identical tool call with identical result"
         do! lifecycleObserver.handleToolExecuteAfter input output
     }

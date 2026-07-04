@@ -30,14 +30,14 @@ let mergeSubagentBeforeAgent () =
 
 let modelStringKeyOnConfigDefaults () =
     let fromModelStringScalars =
-        decodeAgentAiEntryScalars (
-            createObj [ "modelString", box "anthropic:from-key"; "thinkingLevel", box "low" ])
+        decodeAgentAiEntryScalars (unbox (
+            createObj [ "modelString", box "anthropic:from-key"; "thinkingLevel", box "low" ]))
 
     equal "modelString key" (Some "anthropic:from-key") (fromModelStringScalars.Model |> Option.orElse fromModelStringScalars.ModelString)
 
     let fromModelScalars =
-        decodeAgentAiEntryScalars (
-            createObj [ "model", box "openai:from-model"; "modelString", box "ignored" ])
+        decodeAgentAiEntryScalars (unbox (
+            createObj [ "model", box "openai:from-model"; "modelString", box "ignored" ]))
 
     equal "model beats modelString" (Some "openai:from-model") (fromModelScalars.Model |> Option.orElse fromModelScalars.ModelString)
 

@@ -12,6 +12,7 @@ type RuntimeScope() =
     let mutable capsInflight = Map.empty<string, JS.Promise<CapsFile list>>
     let iteratorStore = createTypedIteratorStore 200
     let mutable sessionQueues = Map.empty<string, SerialQueue>
+    let mutable extState = Map.empty<string, obj>
 
     member _.Projection = projection
 
@@ -58,5 +59,14 @@ type RuntimeScope() =
                 sessionQueues <- Map.add sessionId q sessionQueues
                 q
         queue.Enqueue(work)
+
+    member _.TryFindKey(key: string) : obj option =
+        Map.tryFind key extState
+
+    member _.Add(key: string, value: obj) : unit =
+        extState <- Map.add key value extState
+
+    member _.Remove(key: string) : unit =
+        extState <- Map.remove key extState
 
 let create () : RuntimeScope = RuntimeScope()

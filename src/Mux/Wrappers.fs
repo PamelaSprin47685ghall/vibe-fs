@@ -63,7 +63,7 @@ let strEnumPropWithDefault = jsonStrEnumPropWithDefault
 let strArrayProp = jsonStrArrayProp
 
 let requireWorkspaceId (config: obj) (toolName: string) : Result<string, DomainError> =
-    decodeMuxConfig config
+    decodeMuxConfig (unbox<IMuxToolContext> config)
     |> Result.map (fun ctx -> ctx.WorkspaceId |> Option.map Id.workspaceIdValue |> Option.defaultValue "")
     |> Result.mapError (function
         | InvalidIntent (_, "workspaceId", _) -> InvalidIntent (toolName, "workspaceId", "required")

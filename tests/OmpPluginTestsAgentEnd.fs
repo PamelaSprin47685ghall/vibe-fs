@@ -5,8 +5,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Tests.TempWorkspace
+open Wanxiangshu.Omp
 open Wanxiangshu.Omp.Plugin
-open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Kernel.PromptFrontMatter
@@ -17,7 +18,7 @@ let agentEndRunnerNudgeBeforeLoop () = promise {
     let h = createPiHarness ()
     let pi = piObject h
     do! wanxiangshuExtension pi
-    setRunnerJobStateForTest "session-1" "running"
+    RunnerBackground.registerActiveRunnerSession ExecutorTools.ompScope "session-1"
     let assistantEntry =
         createObj [
             "message", box (createObj [

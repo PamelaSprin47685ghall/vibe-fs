@@ -4,33 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.MessagingEncodeCore
 module Dyn = Wanxiangshu.Shell.Dyn
 
 let private encodePart (part: Part<obj>) : obj =
     match part with
-    | TextPart text -> box (createObj [ "type", box "text"; "text", box text ])
-    | ToolPart(toolName, callID, Some state, raw) ->
-        let rawState = if isNull raw then null else Dyn.get raw "state"
-        if not (isNull raw) && not (Dyn.isNullish rawState)
-           && Dyn.str rawState "status" = state.status
-           && Dyn.str rawState "output" = state.output
-           && Dyn.str rawState "error" = state.error then
-            raw
-        else
-            let stateObj =
-                if Dyn.isNullish rawState then
-                    box (createObj [ "status", box state.status; "output", box state.output; "error", box state.error; "input", state.input ])
-                else
-                    let s1 = Dyn.withKey rawState "status" (box state.status)
-                    let s2 = Dyn.withKey s1 "output" (box state.output)
-                    Dyn.withKey s2 "error" (box state.error)
-            if isNull raw then
-                box (createObj [ "type", box "tool"; "tool", box toolName; "callID", box callID; "state", stateObj ])
-            else
-                Dyn.withKey raw "state" stateObj
-    | ToolPart(toolName, callID, None, raw) ->
-        if isNull raw then box (createObj [ "type", box "tool"; "tool", box toolName; "callID", box callID ])
-        else raw
+    | TextPart text -> encodeTextPartBasic text
+    | ToolPart(toolName, callID, stateOpt, raw) -> encodeOpencodeToolPart toolName callID stateOpt raw
     | RawPart raw -> raw
 
 let private encodeRole = function

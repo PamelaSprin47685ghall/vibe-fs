@@ -4,24 +4,45 @@ open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.ToolContext
 open Wanxiangshu.Shell.Dyn
 
-let firstTrimmedString (o: obj) (keys: string list) : string option =
-    keys
-    |> List.tryPick (fun k ->
-        let v = Dyn.get o k
-        if Dyn.isNullish v then None
+type IOpenCodeToolContext =
+    abstract directory: string with get
+    abstract cwd: string with get
+    abstract workspaceDir: string with get
+    abstract workspace_dir: string with get
+    abstract workingDirectory: string with get
+    abstract sessionID: string with get
+    abstract sessionId: string with get
+    abstract session_id: string with get
+
+type IMuxToolContext =
+    abstract workspaceId: string with get
+    abstract directory: string with get
+    abstract cwd: string with get
+    abstract workspacePath: string with get
+    abstract sessionID: string with get
+    abstract sessionId: string with get
+    abstract session_id: string with get
+
+let private firstNonEmpty (options: string list) : string option =
+    options
+    |> List.tryPick (fun s ->
+        if Wanxiangshu.Shell.Dyn.isNullish (box s) then None
         else
-            let s = (string v).Trim()
-            if s = "" then None else Some s)
+            let t = s.Trim()
+            if t = "" then None else Some t)
 
-let private firstString (o: obj) (keys: string list) : string option = firstTrimmedString o keys
-
-let decodeOpencodeToolContext (context: obj) (fallbackDir: string) : ToolExecutionContext =
+let decodeOpencodeToolContext (context: IOpenCodeToolContext) (fallbackDir: string) : ToolExecutionContext =
     let directory =
-        match firstString context [ "directory"; "cwd"; "workspaceDir"; "workspace_dir"; "workingDirectory" ] with
+        match firstNonEmpty
+            [ context.directory
+              context.cwd
+              context.workspaceDir
+              context.workspace_dir
+              context.workingDirectory ] with
         | Some s -> s
         | None -> fallbackDir
     let sessionId =
-        match firstString context [ "sessionID"; "sessionId"; "session_id" ] with
+        match firstNonEmpty [ context.sessionID; context.sessionId; context.session_id ] with
         | Some s -> s
         | None -> ""
     {
@@ -30,43 +51,40 @@ let decodeOpencodeToolContext (context: obj) (fallbackDir: string) : ToolExecuti
         WorkspaceId = None
     }
 
-let muxConfigDirectoryFallback (config: obj) : string =
-    match firstString config [ "directory"; "cwd"; "workspacePath" ] with
+let muxConfigDirectoryFallback (config: IMuxToolContext) : string =
+    match firstNonEmpty [ config.directory; config.cwd; config.workspacePath ] with
     | Some s -> s
     | None -> ""
 
-let decodeMuxConfig (config: obj) : Result<ToolExecutionContext, DomainError> =
-    let wid = Dyn.get config "workspaceId"
-    if isNull wid || string wid = "" then
-        Error (InvalidIntent ("mux", "workspaceId", "required"))
-    else
-        let workspaceId = string wid
+let decodeMuxConfig (config: IMuxToolContext) : Result<ToolExecutionContext, DomainError> =
+    let wid = config.workspaceId
+    if not (Wanxiangshu.Shell.Dyn.isNullish (box wid)) && wid <> "" then
         let directory =
-            [ "directory"; "cwd"; "workspacePath" ]
-            |> List.tryPick (fun k -> firstString config [ k ])
-            |> function
-                | Some s -> s
-                | None -> ""
+            match firstNonEmpty [ config.directory; config.cwd; config.workspacePath ] with
+            | Some s -> s
+            | None -> ""
         let sessionId =
-            match firstString config [ "sessionID"; "sessionId"; "session_id" ] with
+            match firstNonEmpty [ config.sessionID; config.sessionId; config.session_id ] with
             | Some s -> s
             | None -> ""
         Ok {
             Directory = directory
             SessionId = Id.sessionIdQuick sessionId
-            WorkspaceId = Some (Id.workspaceIdQuick workspaceId)
+            WorkspaceId = Some (Id.workspaceIdQuick wid)
         }
+    else
+        Error (InvalidIntent ("mux", "workspaceId", "required"))
 
-let decodeMuxConfigLenient (config: obj) : ToolExecutionContext =
+let decodeMuxConfigLenient (config: IMuxToolContext) : ToolExecutionContext =
     match decodeMuxConfig config with
     | Ok ctx -> ctx
     | Error _ ->
-        let workspaceId = firstTrimmedString config [ "workspaceId" ]
+        let workspaceId = firstNonEmpty [ config.workspaceId ]
         let directory =
-            firstTrimmedString config [ "directory"; "cwd"; "workspacePath" ]
+            firstNonEmpty [ config.directory; config.cwd; config.workspacePath ]
             |> Option.defaultValue ""
         let sessionId =
-            firstTrimmedString config [ "sessionID"; "sessionId"; "session_id" ]
+            firstNonEmpty [ config.sessionID; config.sessionId; config.session_id ]
             |> Option.defaultValue ""
         {
             Directory = directory

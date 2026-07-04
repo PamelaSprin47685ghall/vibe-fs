@@ -14,7 +14,7 @@ open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.FallbackRuntimeState
 
 let extractToolContext (context: obj) (pluginDirectory: string) : obj =
-    let execution = decodeOpencodeToolContext context pluginDirectory
+    let execution = decodeOpencodeToolContext (unbox<IOpenCodeToolContext> context) pluginDirectory
     box {|
         directory = execution.Directory
         sessionID =

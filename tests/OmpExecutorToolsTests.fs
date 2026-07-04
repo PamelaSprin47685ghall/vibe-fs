@@ -4,12 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
-open Wanxiangshu.Omp.ExecutorTools
-open Wanxiangshu.Shell.RunnerBackground
+open Wanxiangshu.Omp
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
 
-let private reset () = resetRunnerJobsForTesting ()
+let private reset () = RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
 
 let private jsUndefined : obj = emitJsExpr () "undefined"
 
@@ -17,7 +18,7 @@ let registersExecutorTools () =
     reset ()
     let h = createPiHarness ()
     let pi = piObject h
-    registerExecutorTools pi
+    ExecutorTools.registerExecutorTools pi
     let names = h.tools |> Seq.map (fun t -> Dyn.str t "name") |> Set.ofSeq
     check "executor tool registered" (names.Contains "executor")
     check "executor_wait tool registered" (names.Contains "executor_wait")
@@ -27,7 +28,7 @@ let executorWaitNoSessionReturnsError () = promise {
     reset ()
     let h = createPiHarness ()
     let pi = piObject h
-    registerExecutorTools pi
+    ExecutorTools.registerExecutorTools pi
     let wait =
         h.tools |> Seq.find (fun t -> Dyn.str t "name" = "executor_wait")
     let execute = Dyn.get wait "execute"
@@ -43,13 +44,13 @@ let executorWaitNoSessionReturnsError () = promise {
 
 let executorWaitWithSessionReturnsLogSnippet () = promise {
     reset ()
-    Wanxiangshu.Omp.ExecutorTools.executorMinWaitMs <- 0
+    ExecutorTools.ompScope.Add("omp.executor_min_wait", box 0) |> ignore
     try
         let sessionId = "executor-wait-session-1"
-        appendRunnerLog sessionId "log-line-a\nlog-line-b"
+        RunnerBackground.appendRunnerLog ExecutorTools.ompScope sessionId "log-line-a\nlog-line-b"
         let h = createPiHarness ()
         let pi = piObject h
-        registerExecutorTools pi
+        ExecutorTools.registerExecutorTools pi
         let wait =
             h.tools |> Seq.find (fun t -> Dyn.str t "name" = "executor_wait")
         let execute = Dyn.get wait "execute"
@@ -62,14 +63,14 @@ let executorWaitWithSessionReturnsLogSnippet () = promise {
         let text = Dyn.str content.[0] "text"
         check "executor_wait returns log snippet with session" (text.Contains "log-line-b")
     finally
-        Wanxiangshu.Omp.ExecutorTools.executorMinWaitMs <- 500
+        ExecutorTools.ompScope.Remove("omp.executor_min_wait") |> ignore
 }
 
 let executorAbortNoSessionReturnsError () = promise {
     reset ()
     let h = createPiHarness ()
     let pi = piObject h
-    registerExecutorTools pi
+    ExecutorTools.registerExecutorTools pi
     let abort =
         h.tools |> Seq.find (fun t -> Dyn.str t "name" = "executor_abort")
     let execute = Dyn.get abort "execute"
@@ -86,10 +87,10 @@ let executorAbortNoSessionReturnsError () = promise {
 let executorAbortWithSessionReturnsAbortMessage () = promise {
     reset ()
     let sessionId = "executor-abort-session-1"
-    setRunnerJobStateForTest sessionId "running"
+    RunnerBackground.registerActiveRunnerSession ExecutorTools.ompScope sessionId
     let h = createPiHarness ()
     let pi = piObject h
-    registerExecutorTools pi
+    ExecutorTools.registerExecutorTools pi
     let abort =
         h.tools |> Seq.find (fun t -> Dyn.str t "name" = "executor_abort")
     let execute = Dyn.get abort "execute"
@@ -101,7 +102,7 @@ let executorAbortWithSessionReturnsAbortMessage () = promise {
     let content = unbox<obj array> (Dyn.get result "content")
     let text = Dyn.str content.[0] "text"
     check "executor_abort returns abort message with session" (text = "Runner abort requested.")
-    check "job state cleared after abort" (not (hasRunningRunnerJob sessionId))
+    check "job state cleared after abort" (not (RunnerBackground.hasRunningRunnerJob ExecutorTools.ompScope sessionId))
 }
 
 let run () = promise {

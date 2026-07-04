@@ -9,107 +9,38 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MessagingPartCodec
 open Wanxiangshu.Shell.MessagingEncodeHelpers
+open Wanxiangshu.Shell.MessagingDecodeCore
+open Wanxiangshu.Shell.MessagingEncodeCore
 
-let decodePart (part: obj) : Part<obj> =
-    match Dyn.str part "type" with
-    | "text" -> TextPart (decodeTextPart part)
-    | "dynamic-tool" ->
-        ToolPart(
-            normalizeToolName mux (Dyn.str part "toolName"),
-            Dyn.str part "toolCallId",
-            decodeMuxDynamicToolState part,
-            part
-        )
-    | _ -> RawPart part
+let muxAdapters = {
+    GetParts = fun msg -> decodePartsFromArray (Dyn.get msg "parts")
+    PartType = fun p -> Dyn.str p "type"
+    PartToolName = fun p -> normalizeToolName mux (Dyn.str p "toolName")
+    PartCallID = fun p -> Dyn.str p "toolCallId"
+    PartState = fun p -> Some p
+    MessageID = fun m -> Dyn.str m "id"
+    MessageRole = fun m -> Dyn.str m "role"
+    MessageAgent = fun m -> Dyn.str m "agent"
+    MessageToolName = fun _ -> ""
+    MessageIsError = fun _ -> false
+    MessageDetails = fun _ -> null
+    MessageTime = fun _ -> null
+    MessageSessionID = fun _ -> ""
+    DecodeToolState = decodeMuxDynamicToolState
+    DecodeTextPart = decodeTextPart
+    RequireRole = false
+}
 
-let decodeMessage (sessionID: string) (msg: obj) : Message<obj> option =
-    if Dyn.isNullish msg then
-        None
-    else
-        Some
-            { info =
-                { id = Dyn.str msg "id"
-                  sessionID = sessionID
-                  role = decodeRole (Dyn.str msg "role")
-                  agent = Dyn.str msg "agent"
-                  isError = false
-                  toolName = ""
-                  details = null
-                  time = null }
-              parts = decodePartsFromArray (Dyn.get msg "parts") |> Array.map decodePart |> List.ofArray
-              source = classifySource (Dyn.str msg "id")
-              raw = msg }
+let decodeMessage sessionID msg = Wanxiangshu.Shell.MessagingDecodeCore.decodeMessage muxAdapters sessionID msg
+let decodeMessages sessionID msgs = Wanxiangshu.Shell.MessagingDecodeCore.decodeMessages muxAdapters sessionID msgs
 
-let decodeMessages (sessionID: string) (messages: obj array) : Message<obj> list =
-    messages |> Array.choose (decodeMessage sessionID) |> List.ofArray
-
-let private encodeTextPart (text: string) : obj =
-    createObj [ "type", box "text"; "text", box text; "state", box "done" ]
-
-let private outputsEquivalent (left: obj) (right: obj) : bool =
-    if obj.ReferenceEquals(left, right) then
-        true
-    elif Dyn.isNullish left || Dyn.isNullish right then
-        Dyn.isNullish left && Dyn.isNullish right
-    elif Dyn.typeIs left "string" || Dyn.typeIs right "string" then
-        string left = string right
-    else
-        JS.JSON.stringify(left) = JS.JSON.stringify(right)
-
-let private partsEquivalent (left: obj) (right: obj) : bool =
-    if obj.ReferenceEquals(left, right) then
-        true
-    else
-        match Dyn.str left "type", Dyn.str right "type" with
-        | "text", "text" -> Dyn.str left "text" = Dyn.str right "text" && Dyn.str left "state" = Dyn.str right "state"
-        | "dynamic-tool", "dynamic-tool" ->
-            Dyn.str left "toolName" = Dyn.str right "toolName"
-            && Dyn.str left "toolCallId" = Dyn.str right "toolCallId"
-            && Dyn.str left "state" = Dyn.str right "state"
-            && outputsEquivalent (Dyn.get left "output") (Dyn.get right "output")
-        | _ -> false
-
-let private rawOutputMatchesState (rawPart: obj) (state: ToolState<obj>) : bool =
-    let rawOutput = Dyn.get rawPart "output"
-    if Dyn.isNullish rawOutput then
-        state.output = ""
-    elif Dyn.typeIs rawOutput "string" then
-        string rawOutput = state.output
-    else
-        Dyn.str rawOutput "content" = state.output
-
-let private encodeToolPartState (rawPart: obj) (state: ToolState<obj>) : obj =
-    let rawOutput = Dyn.get rawPart "output"
-    let nextOutput =
-        if Dyn.isNullish rawOutput || Dyn.typeIs rawOutput "string" then
-            box state.output
-        else
-            Dyn.withKey rawOutput "content" (box state.output)
-    let withState = Dyn.withKey rawPart "state" (box "output-available")
-    Dyn.withKey withState "output" nextOutput
-
+/// Encode a Part back to a host object. Text parts carry state="done";
+/// Tool parts delegate to MessagingEncodeCore.encodeMuxToolPart which builds
+/// dynamic-tool objects and preserves raw reference identity when state matches.
 let encodePart (part: Part<obj>) : obj =
     match part with
-    | TextPart text -> box (encodeTextPart text)
-    | ToolPart(toolName, callID, Some state, raw) ->
-        if isNull raw then
-            box
-                (createObj
-                    [ "type", box "dynamic-tool"
-                      "toolName", box toolName
-                      "toolCallId", box callID
-                      "state", box "output-available"
-                      "input", state.input
-                      "output", box state.output ])
-        elif rawOutputMatchesState raw state then
-            raw
-        else
-            encodeToolPartState raw state
-    | ToolPart(toolName, callID, None, raw) ->
-        if isNull raw then
-            box (createObj [ "type", box "dynamic-tool"; "toolName", box toolName; "toolCallId", box callID ])
-        else
-            raw
+    | TextPart text -> encodeTextPartWithState text "done"
+    | ToolPart(toolName, callID, stateOpt, raw) -> encodeMuxToolPart toolName callID stateOpt raw
     | RawPart raw -> raw
 
 let encodeMessage (msg: Message<obj>) : obj =

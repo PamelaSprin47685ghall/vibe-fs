@@ -6,6 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Omp.Plugin
 open Wanxiangshu.Kernel.FuzzyQuery
+open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.MessagingCodec
 open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Kernel.ReviewPrompts
@@ -91,7 +92,7 @@ let readAssistantTextFromEntries () =
                                "parts", box [| createObj [ "type", box "text"; "text", box "done" ] |]
                            ] |])
         ]
-    equal "readAssistantText" (Some "done") (readAssistantText sm 0 "\n\n")
+    equal "readAssistantText" (Some "done") (readAssistantText (unbox<ISessionManager> sm) 0 "\n\n")
 
 let subagentPromptsContainKernelFragments () =
     let coder =

@@ -87,7 +87,7 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
     setKey result "chat.message" (twoArgHook (fun input output -> chatMessageFor host services.ChildAgentRegistry services.SessionLifecycleObserver input output))
     setKey result "tool.definition" (twoArgHook (fun input output -> toolDefinitionFor host input output))
     setKey result "tool.execute.before" (twoArgHook (fun input output -> toolExecuteBeforeFor host input output))
-    setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host services.Directory services.SessionLifecycleObserver services.ChildAgentRegistry input output))
+    setKey result "tool.execute.after" (twoArgHook (fun input output -> toolExecuteAfterFor host services.Directory services.SessionLifecycleObserver services.ChildAgentRegistry services.RuntimeScope input output))
     let client = match getClientFromPluginCtx ctx with Ok c -> c | Error _ -> box null
     setKey result "experimental.chat.messages.transform" (twoArgHook (fun input output -> messagesTransform services.ChildAgentRegistry services.Directory services.RuntimeScope services.BacklogSession services.ReviewStore client input output))
     setKey result "command.execute.before" (twoArgHook (fun input output ->
@@ -105,7 +105,7 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
                 | _ -> ""
             if ptyCleanupSessionId <> "" then
                 cleanupPtyBySession ptyCleanupSessionId
-                Wanxiangshu.Shell.LivelockGuard.cleanup ptyCleanupSessionId
+                Wanxiangshu.Shell.LivelockGuard.cleanup services.RuntimeScope ptyCleanupSessionId
             do! services.SessionLifecycleObserver.handleEvent input
         }))
     setKey result "experimental.chat.system.transform" (twoArgHook (fun input output -> HookTransform.systemTransform services.Directory input output))

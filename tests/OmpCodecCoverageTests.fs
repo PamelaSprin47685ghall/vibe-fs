@@ -6,6 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Omp.MessagingCodec
+open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.MessagingCodecEncode
 open Wanxiangshu.Shell.Dyn
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -87,15 +88,15 @@ let decArr () =
 
 let entSM () =
     let sm = createObj ["getEntries", box (fun () -> [| createObj ["role", box "user"] |] :> obj)]
-    equal "ent len" 1 (unbox<obj array> (entries sm)).Length
+    equal "ent len" 1 (unbox<obj array> (entries (unbox<ISessionManager> sm))).Length
 
-let entEmpty () = equal "ent empty" [||] (entries (createObj []))
+let entEmpty () = equal "ent empty" [||] (entries (unbox<ISessionManager> (createObj [])))
 
 let rasst () =
     let ue = createObj ["message", box (createObj ["role", box "user"; "content", box [| createObj ["type", box "text"; "text", box "u"] |]])]
     let ae = createObj ["message", box (createObj ["role", box "assistant"; "content", box [| createObj ["type", box "text"; "text", box "a1"] |]])]
     let sm = createObj ["getEntries", box (fun () -> [| ue; ae |] :> obj)]
-    equal "rasst" "a1" (Option.defaultValue "" (readAssistantText sm 0 "\n"))
+    equal "rasst" "a1" (Option.defaultValue "" (readAssistantText (unbox<ISessionManager> sm) 0 "\n"))
 
 // openTodoStatuses
 
@@ -104,14 +105,14 @@ let otodo () =
     let phase = createObj ["tasks", box [| task |]]
     let e = createObj ["customType", box"todo-phases"; "content", box [| phase |]]
     let sm = createObj ["getEntries", box (fun () -> [| e |] :> obj)]
-    let s = openTodoStatuses sm
+    let s = openTodoStatuses (unbox<ISessionManager> sm)
     check "todo found" (s.Length > 0)
     equal "pending" "pending" (List.item 0 s)
 
 let otodoEmpty () =
     let e = createObj ["message", box (createObj ["role", box "user"; "content", box [||]])]
     let sm = createObj ["getEntries", box (fun () -> [| e |] :> obj)]
-    equal "no todo" [] (openTodoStatuses sm)
+    equal "no todo" [] (openTodoStatuses (unbox<ISessionManager> sm))
 
 // decodeToolState
 

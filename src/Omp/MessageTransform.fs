@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Omp
 open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Kernel.BacklogProjection
 open Wanxiangshu.Kernel.CapsFormat
@@ -23,6 +24,7 @@ open Wanxiangshu.Shell.MessageTransformPipeline
 open Wanxiangshu.Shell.OmpCaps
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.TreeSitterShell
+open Wanxiangshu.Shell.RuntimeScope
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -44,7 +46,7 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
             if entriesArr.Length = 0 then return entriesArr
             else
                 let messagesList = decodeEntries sessionId entriesArr
-                let excluded = shouldExcludeAgentFromProjection agent (isChildSession sessionId)
+                let excluded = shouldExcludeAgentFromProjection agent (isChildSession ExecutorTools.ompScope sessionId)
                 let cleaned = stripSyntheticBySource messagesList
                 let backlogOps =
                     backlogSessionOpsFrom defaultBacklogSession.Host

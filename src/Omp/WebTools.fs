@@ -6,17 +6,20 @@ open Wanxiangshu.Kernel.SearchPrompts
 open Wanxiangshu.Kernel.Subagent
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.WebFetchGuard
-open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp
 open Wanxiangshu.Omp.ChildSession
+open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.ExecutorTools
 open Wanxiangshu.Omp.Schema
-module Dyn = Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.WebSearchApi
+open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FuzzySearch
+open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.WebSearchApi
 open Wanxiangshu.Shell.WebSearchCodec
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Kernel.FallbackKernel.Types
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let private addRequired (schema: obj) (key: string) : unit =
     let existing = Dyn.get schema "required"
@@ -69,6 +72,7 @@ let private buildWebsearch (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fa
                                     formatPrompt omp (WebsearchSummary(what, rawText)) |> List.head
                                 let! summary =
                                     runSubagent
+                                        ExecutorTools.ompScope
                                         pi
                                         (createObj [ "cwd", box "" ])
                                         [| "read" |]

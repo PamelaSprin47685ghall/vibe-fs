@@ -92,7 +92,10 @@ open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.KernelHelpersTests
 
 open Wanxiangshu.Tests.ReviewPromptsFormatTests
+open Wanxiangshu.Omp
 open Wanxiangshu.Omp.Plugin
+open Wanxiangshu.Omp.PluginCore
+open Wanxiangshu.Shell
 
 [<Import("appendFileSync", "node:fs")>]
 let private appendFile (path: string) (content: string) (encoding: string) : unit = jsNative
@@ -156,7 +159,8 @@ let runAll (args: string array) : JS.Promise<int> =
         let selectors =
             args |> Array.filter (fun a -> a <> "--verbose" && a <> "-v")
         initVerboseLog ()
-        resetOmpPluginTestState ()
+        PluginCore.reviewStore.clearReviewSessions ()
+        RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
         let runnableTests = selectedTests selectors
         if List.isEmpty runnableTests then
             printfn "No tests matched selectors: %A" args

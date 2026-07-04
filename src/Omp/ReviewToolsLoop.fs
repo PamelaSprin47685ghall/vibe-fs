@@ -5,13 +5,15 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.ReviewPrompts
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Omp.Codec
+open Wanxiangshu.Omp.ExecutorTools
 open Wanxiangshu.Omp.ReviewLoop
 open Wanxiangshu.Omp.MessagingCodec
-module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.Clock
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let loopCommand = "loop"
 
@@ -32,7 +34,7 @@ let handleLoopReviewCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: 
                 do! syncReviewFromEventLog store root sessionId
                 if store.getReviewTask sessionId |> Option.isSome then notifyInfo "loop mode is already active."
                 else
-                let! result = runPreReviewerSession pi ctx store task
+                let! result = runPreReviewerSession ompScope pi ctx store task
                 match result with
                 | Accepted _ -> notifyInfo $"Pre-review passed. Task \"{task}\" already meets criteria — no loop needed."
                 | Terminated -> notifyInfo "Pre-review could not complete."

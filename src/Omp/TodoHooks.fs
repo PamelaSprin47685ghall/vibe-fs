@@ -10,7 +10,6 @@ open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Omp.Codec
 open Wanxiangshu.Omp.HookExecute
 open Wanxiangshu.Omp.MessageTransform
-open Wanxiangshu.Omp.OmpTestHooks
 open Wanxiangshu.Omp.ToolResultEvent
 open Wanxiangshu.Omp.MagicTodo
 open Wanxiangshu.Omp.MessagingCodec
@@ -21,9 +20,11 @@ open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Kernel.BacklogProjectionCore
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Omp.ExecutorTools
 open Wanxiangshu.Shell.ReviewRuntime
 
 /// Shared BacklogSession bound to the OMP host.
@@ -40,7 +41,7 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
         let args = getToolInput event
         let content = getToolResultText event
         let sessionId = getSessionIdFromContext ctx |> Option.defaultValue ""
-        if sessionId <> "" && check sessionId toolName (JS.JSON.stringify args) content then
+        if sessionId <> "" && check ExecutorTools.ompScope sessionId toolName (JS.JSON.stringify args) content then
             setToolResultText event "livelock guard: repeated identical tool call with identical result"
         else
             applyToolResultHook toolName args
@@ -83,8 +84,8 @@ let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<un
         | None -> ()
         | Some sessionId ->
             clearNudgeSession sessionId
-            clearTypedIteratorScope globalIteratorStore sessionId
+            clearTypedIteratorScope ompScope.IteratorStore sessionId
             reviewStore.deactivateReview sessionId
-            do! cleanupRunnerJob sessionId
-            Wanxiangshu.Shell.LivelockGuard.cleanup sessionId
+            do! cleanupRunnerJob ExecutorTools.ompScope sessionId
+            Wanxiangshu.Shell.LivelockGuard.cleanup ExecutorTools.ompScope sessionId
     }
