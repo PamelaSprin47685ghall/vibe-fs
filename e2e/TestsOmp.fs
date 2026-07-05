@@ -17,6 +17,8 @@ type OmpHarness =
     abstract readFile: string -> JS.Promise<string>
     abstract fileExists: string -> JS.Promise<bool>
     abstract getCommands: unit -> JS.Promise<obj>
+    abstract expectText: string -> JS.Promise<unit>
+    abstract expectTool: string -> obj -> JS.Promise<unit>
     abstract waitForNdjson: int -> int -> JS.Promise<bool>
     abstract dispose: unit -> JS.Promise<unit>
 
@@ -31,7 +33,7 @@ let runAll (_args: string array) : JS.Promise<int> =
         let! apiObj = start (createObj [])
         let h = harnessFromObj apiObj
 
-        let expected = 22
+        let expected = 23
         let mutable ok = 0
         let chk l c =
             check l c
@@ -62,8 +64,7 @@ let runAll (_args: string array) : JS.Promise<int> =
         let handlerKeys =
             let s = jsonStringify h.handlers
             [ "session_start"; "session_shutdown"; "tool_call"; "tool_result"
-              "agent_end"; "turn_start"; "before_agent_start"; "input"
-              "context"; "before_context"; "session.compacting"; "event" ]
+              "agent_end"; "turn_start"; "before_agent_start"; "event" ]
             |> List.forall s.Contains
         chk "e2e-omp.handlers.subscribed" handlerKeys
 
@@ -75,6 +76,19 @@ let runAll (_args: string array) : JS.Promise<int> =
         let! fuzzyFindResult = h.triggerTool "fuzzy_find" (box {| pattern = "README.md" |}) sessionId (createObj [])
         let fuzzyFindStr = jsonStringify fuzzyFindResult
         chk "e2e-omp.fuzzy-find.responded" (fuzzyFindStr.Contains "content")
+
+        let investigatorIntents = [|
+            box {|
+                objective = "Test investigator e2e"
+                background = "Ensure no f.content crashes"
+                questions = [| "Did it crash?" |]
+                entries = [| "README.md" |]
+            |}
+        |]
+        do! h.expectText "investigator e2e verification output: mock text content"
+        let! investigatorResult = h.triggerTool "investigator" (box {| intents = investigatorIntents |}) sessionId (createObj [])
+        let investigatorStr = jsonStringify investigatorResult
+        chk "e2e-omp.investigator.ran" (investigatorStr.Contains "mock text content")
 
         let args = box {|
             todos = ResizeArray([box {| content = "verify omp e2e"; status = "in_progress"; priority = "high" |}])

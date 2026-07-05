@@ -78,7 +78,7 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
                                 else
                                     ompFiles
                                     |> List.choose (fun (f: OmpCapsFile) ->
-                                        if isNull (box f) then None
+                                        if Dyn.isNullish f || Dyn.isNullish (Dyn.get f "filePath") || Dyn.isNullish (Dyn.get f "content") then None
                                         else
                                             Some ({ filePath = f.filePath
                                                     label = f.label
@@ -93,7 +93,7 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
                         else
                             capsFiles
                             |> List.choose (fun f ->
-                                if isNull (box f) then None
+                                if Dyn.isNullish f || Dyn.isNullish (Dyn.get f "filePath") || Dyn.isNullish (Dyn.get f "content") then None
                                 else Some ({ filePath = f.filePath; label = f.label; content = f.content } : OmpCapsFile))
                     buildCapsEntries sha256HexTruncated encoded cwd ompCaps prelude
                 return!

@@ -1,9 +1,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import readline from 'node:readline';
 import { createOmpHarness } from './omp-harness.js';
+import { createMockLLM } from './mock-llm.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OMP_E2E_LOCK = '/tmp/wanxiang-omp-e2e.lock';
@@ -27,7 +29,35 @@ export async function start(opts = {}) {
         if (e.code === 'EEXIST') throw new Error('omp e2e already running (lock exists at ' + OMP_E2E_LOCK + ')');
         throw e;
     }
-    process.once('exit', releaseLock);
+    const mockLlmInstance = createMockLLM();
+    const mockLlm = await mockLlmInstance.start();
+    const tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'omp-runner-home-'));
+    const agentDir = path.join(tempHome, '.omp', 'agent');
+    fs.mkdirSync(agentDir, { recursive: true });
+    const configContent = `
+model: openai/gpt-4o
+`;
+    const modelsContent = `
+providers:
+  openai:
+    baseUrl: "${mockLlm.url}/v1"
+    apiKey: "test-key"
+    api: "openai-completions"
+    models:
+      - id: "gpt-4o"
+        name: "GPT-4o"
+        api: "openai-completions"
+        contextWindow: 128000
+`;
+    fs.writeFileSync(path.join(agentDir, 'config.yml'), configContent, 'utf8');
+    fs.writeFileSync(path.join(agentDir, 'models.yml'), modelsContent, 'utf8');
+
+    function cleanupAll() {
+        releaseLock();
+        if (mockLlm) { mockLlm.stop().catch(() => {}); }
+        try { fs.rmSync(tempHome, { recursive: true, force: true }); } catch {}
+    }
+    process.once('exit', cleanupAll);
 
     const ompRepo = process.env.WANXIANGSHU_OMP_REPO || path.resolve(__dirname, '..', '..', 'oh-my-pi');
     const driverPath = process.env.WANXIANGSHU_OMP_DRIVER || path.resolve(__dirname, 'omp-driver.ts');
@@ -35,7 +65,13 @@ export async function start(opts = {}) {
 
     const child = spawn(resolveBun(), ['run', driverPath], {
         cwd: ompRepo,
-        env: { ...process.env, WANXIANGSHU_PLUGIN_PATH: pluginPath },
+        env: {
+            ...process.env,
+            WANXIANGSHU_PLUGIN_PATH: pluginPath,
+            MOCK_LLM_URL: mockLlm.url,
+            PI_CODING_AGENT_DIR: agentDir,
+            OPENAI_API_KEY: 'test-key'
+        },
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,
     });
@@ -66,10 +102,11 @@ export async function start(opts = {}) {
     const readyLine = await nextResponse();
     if (readyLine.trim() !== 'ready') {
         child.kill('SIGKILL');
+        cleanupAll();
         throw new Error('Expected ready signal from driver, got: ' + readyLine);
     }
 
-    const harness = createOmpHarness({ sendCommand, child, releaseLock });
+    const harness = createOmpHarness({ sendCommand, child, releaseLock: cleanupAll, mockLlm });
 
     const handlersRes = await sendCommand({ type: 'getHandlers' });
     if (handlersRes.ok) {

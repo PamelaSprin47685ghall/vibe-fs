@@ -55,6 +55,7 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpPluginTests.fuzzyDescriptionsMatchMuxWording", Sync (sync OmpPluginTests.fuzzyDescriptionsMatchMuxWording)
     "OmpContextTransformTests.capsSynthUserPrepended", Async OmpContextTransformTests.capsSynthUserPrepended
     "OmpContextTransformTests.capsReadToolsInContextTransform", Async OmpContextTransformTests.capsReadToolsInContextTransform
+    "OmpContextTransformTests.testInvestigatorCrashWithUndefinedCaps", Async OmpContextTransformTests.testInvestigatorCrashWithUndefinedCaps
     "OmpContextTransformTests.beforeAgentStartOmitsCapsXml", Async OmpContextTransformTests.beforeAgentStartOmitsCapsXml
     "OmpContextTransformTests.reviewReplayIfStoreEmptyOnTransform", Async OmpContextTransformTests.reviewReplayIfStoreEmptyOnTransform
     "OmpPluginTests.readAssistantTextFromEntries", Sync (sync OmpPluginTests.readAssistantTextFromEntries)

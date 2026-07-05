@@ -57,7 +57,8 @@ let getCodingAgentModule (scope: RuntimeScope) : JS.Promise<obj> =
             | Some m -> return m
             | None ->
                 let basePath = getPiBase ()
-                let href = pathToFileURL (pathJoin basePath "pi-coding-agent/src/index.ts")?href
+                let fileUrl = pathToFileURL (pathJoin basePath "pi-coding-agent/src/index.ts")
+                let href = fileUrl?href
                 let! module' = importDynamic<obj> (string href)
                 cachedModule <- Some module'
                 return module'

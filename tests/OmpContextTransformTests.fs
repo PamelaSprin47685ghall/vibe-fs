@@ -101,3 +101,34 @@ let reviewReplayIfStoreEmptyOnTransform () = promise {
     equal "review replay IfStoreEmpty: store task unchanged when already active" (Some "task A") (reviewStore.getReviewTask sessionId)
     do! rmAsync root
 }
+
+let testInvestigatorCrashWithUndefinedCaps () = promise {
+    let validItem : Wanxiangshu.Shell.OmpCaps.OmpCapsFile = { filePath = "file1.md"; label = "file1.md"; content = "file1 content" }
+    let nullItem = emitJsExpr () "null" |> unbox<Wanxiangshu.Shell.OmpCaps.OmpCapsFile>
+    let undefinedItem = emitJsExpr () "undefined" |> unbox<Wanxiangshu.Shell.OmpCaps.OmpCapsFile>
+    let missingContentItem = emitJsExpr () "({ filePath: 'file2.md', label: 'file2.md' })" |> unbox<Wanxiangshu.Shell.OmpCaps.OmpCapsFile>
+    let missingFilePathItem = emitJsExpr () "({ label: 'file3.md', content: 'file3 content' })" |> unbox<Wanxiangshu.Shell.OmpCaps.OmpCapsFile>
+
+    let pollutedOmpCaps = [
+        validItem
+        undefinedItem
+        nullItem
+        missingContentItem
+        missingFilePathItem
+    ]
+
+    let reviewStore = createReviewStore ()
+    let entries =
+        [| createObj [
+               "info", box(createObj [ "id", box "user-1"; "role", box "user" ])
+               "parts", box [| createObj [ "type", box "text"; "text", box "hello" ] |]
+           ] |]
+
+    let hashFn x = x
+    let res = Wanxiangshu.Omp.CapsCodec.buildCapsEntries hashFn entries "" pollutedOmpCaps None
+    check "buildCapsEntries success with polluted caps" (res.Length > 0)
+
+    let formatRes = Wanxiangshu.Shell.OmpCaps.formatOmpCapsContext pollutedOmpCaps
+    check "formatOmpCapsContext successful and filters invalid entries" (formatRes.Contains "file1 content")
+    check "formatOmpCapsContext does not contain partial format for invalid entries" (not (formatRes.Contains "file2.md"))
+}

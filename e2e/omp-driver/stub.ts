@@ -2,6 +2,27 @@ import type { ExtensionRuntime } from '../../packages/coding-agent/src/extensibi
 
 export function createStubExtensionContext(cwd: string, sessionId: string) {
 	const noop = () => undefined as any;
+	const authStorage: any = new Proxy({
+		onCredentialDisabled: () => {},
+		setFallbackResolver: () => {}
+	}, {
+		get(target: any, key: string) {
+			if (key in target) return target[key];
+			if (key === 'hasAuth') return () => true;
+			if (key === 'getApiKey') return () => Promise.resolve('test-key');
+			return () => undefined;
+		}
+	});
+	const ompRepo = process.env.WANXIANGSHU_OMP_REPO || process.cwd();
+	const ModelRegistryClass = require(`${ompRepo}/packages/coding-agent/src/config/model-registry`).ModelRegistry;
+	const modelRegistry = new ModelRegistryClass(authStorage);
+	const mockModel = modelRegistry.find('openai', 'gpt-4o') || {
+		id: 'gpt-4o',
+		name: 'GPT-4o',
+		provider: 'openai',
+		model: 'gpt-4o',
+		api: 'openai-completions'
+	};
 	const ui: any = new Proxy({}, { get(_, key) {
 		if (key === 'theme') return {};
 		if (key === 'getEditorText' || key === 'getToolsExpanded') return () => '';
@@ -12,14 +33,15 @@ export function createStubExtensionContext(cwd: string, sessionId: string) {
 	}});
 	return {
 		ui,
+		authStorage,
 		getContextUsage: () => undefined,
 		compact: async () => {},
 		hasUI: false,
 		cwd,
 		sessionManager: { getSession: () => ({ id: sessionId }), getSessionId: () => sessionId, getCurrentSession: () => ({ id: sessionId }), on: noop },
-		modelRegistry: new Proxy({}, { get: () => undefined as any }),
-		get model() { return undefined; },
-		models: { list: () => [], current: () => undefined, resolve: () => undefined, family: () => '' },
+		modelRegistry,
+		get model() { return mockModel; },
+		models: { list: () => [mockModel], current: () => mockModel, resolve: () => mockModel, family: () => 'openai' },
 		isIdle: () => true, abort: noop, hasPendingMessages: () => false, shutdown: noop, getSystemPrompt: () => [],
 	};
 }

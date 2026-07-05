@@ -55,6 +55,7 @@ async function handleCommand(ex: any, workdir: string, ndjsonPath: string, cmd: 
 
 async function main() {
 	const ompRepo = process.env.WANXIANGSHU_OMP_REPO ?? process.cwd();
+	process.env.OPENAI_API_KEY = 'test-key';
 	const { loadExtensionFromFactory, ExtensionRuntime } = await import(`${ompRepo}/packages/coding-agent/src/extensibility/extensions/loader`);
 	const { EventBus } = await import(`${ompRepo}/packages/coding-agent/src/utils/event-bus`);
 	const pluginPath = process.env.WANXIANGSHU_PLUGIN_PATH;
@@ -63,6 +64,7 @@ async function main() {
 	try { execSync('git init -q && git config user.email test@test && git config user.name test', { cwd: workdir, stdio: 'ignore' }); }
 	catch { fs.mkdirSync(path.join(workdir, '.git'), { recursive: true }); }
 	const ndjsonPath = path.join(workdir, '.wanxiangshu.ndjson');
+
 	const mod = await import(pluginPath);
 	const factory = mod.default ?? mod.wanxiangshuExtension ?? mod.plugin;
 	if (typeof factory !== 'function') { respond(false, null, `Plugin does not export a factory function: got ${typeof factory}`); process.exit(1); }

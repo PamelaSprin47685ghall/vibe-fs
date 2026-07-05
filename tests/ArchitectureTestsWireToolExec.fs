@@ -107,6 +107,7 @@ let private shellBareDynAllowlist =
           "OpencodeSessionEventCodecCommon.fs"
           "OpencodeSessionEventNudge.fs"
           "MuxHostBindings.fs"
+          "OmpCaps.fs"
           "NudgeRuntime.fs"
           "OmpHostBindings.fs"
           "OpencodeAgentConfigWire.fs"

@@ -50,14 +50,14 @@ let injectSubagentFilesIfAny
                     else
                         results
                         |> List.choose (fun r ->
-                            if isNull (box r) then None
+                            if Wanxiangshu.Shell.Dyn.isNullish r then None
                             else
                                 match r.content with
-                                | Some content ->
+                                | Some content when not (Wanxiangshu.Shell.Dyn.isNullish content) ->
                                     Some { filePath = r.filePath
                                            label = pathRelative plan.Directory r.filePath
                                            content = content }
-                                | None -> None)
+                                | _ -> None)
                 let merged = baseFiles @ loaded
                 let deduped =
                     let folder (seen: Set<string>, acc: CapsFile list) (file: CapsFile) =

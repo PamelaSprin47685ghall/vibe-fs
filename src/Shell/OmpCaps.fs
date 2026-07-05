@@ -58,7 +58,7 @@ let formatOmpCapsContext (files: OmpCapsFile list) : string =
     else
         files
         |> List.choose (fun f ->
-            if isNull (box f) then None
+            if Dyn.isNullish f || Dyn.isNullish (Dyn.get f "content") then None
             else Some $"<caps-context file=\"{escapeXmlAttr f.label}\">\n{f.content}\n</caps-context>")
         |> String.concat "\n\n"
 

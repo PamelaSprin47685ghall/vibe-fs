@@ -84,12 +84,14 @@ function createMockLLM() {
       return;
     }
 
-    if (url.pathname === '/v1/chat/completions' && req.method === 'POST') {
+    if ((url.pathname === '/v1/chat/completions' || url.pathname === '/v1/responses') && req.method === 'POST') {
       let body = '';
       req.on('data', chunk => body += chunk);
       req.on('end', () => {
         let parsed = {};
         try { parsed = JSON.parse(body); } catch { /* keep {} */ }
+        console.error("[mock-llm] request body:", JSON.stringify(parsed));
+        console.error("[mock-llm] current queue:", JSON.stringify(_queue));
         const messages = parsed.messages || [];
         const lastUser = [...messages].reverse().find(m => m.role === 'user');
 

@@ -1,7 +1,15 @@
-export function createOmpHarness({ sendCommand, child, releaseLock }) {
+export function createOmpHarness({ sendCommand, child, releaseLock, mockLlm }) {
     return {
         handlers: {},
         tools: [],
+
+        async expectText(text) {
+            if (mockLlm) mockLlm.expectText(text);
+        },
+
+        async expectTool(tool, args) {
+            if (mockLlm) mockLlm.expectTool(tool, args);
+        },
 
         async getToolNames() {
             const res = await sendCommand({ type: 'getToolNames' });

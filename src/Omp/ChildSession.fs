@@ -81,6 +81,8 @@ let createChildSession (scope: RuntimeScope) (pi: obj) (ctx: obj) (toolNames: st
                     "workspaceTree", Dyn.get ctx "workspaceTree"
                     "sessionManager", box sm
                     "customTools", box customTools
+                    "authStorage", Dyn.get ctx "authStorage"
+                    "ui", Dyn.get ctx "ui"
                 ]
             let! wrapperObj = createFn (box body)
             let wrapper = unbox<IAgentSessionWrapper> wrapperObj
@@ -140,7 +142,7 @@ let runSubagent (scope: RuntimeScope) (pi: obj) (ctx: obj) (toolNames: string ar
         let cleanup () =
             let childSess = unbox<IChildSession> session
             match childSess.abort with
-            | Some abort -> try abort () with _ -> ()
+            | Some _ -> try Dyn.callMethod0 session "abort" |> ignore with _ -> ()
             | None -> ()
             child.dispose |> Option.iter (fun dispose -> dispose ())
         let! text = raceWithAbortSignal (Option.defaultValue (box null) signal) cleanup run

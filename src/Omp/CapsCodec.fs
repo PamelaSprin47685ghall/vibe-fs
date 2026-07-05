@@ -35,7 +35,7 @@ let private ompCapsToKernel (files: OmpCapsFile list) : CapsFile list =
     else
         files
         |> List.choose (fun f ->
-            if isNull (box f) then None
+            if Dyn.isNullish f || Dyn.isNullish (Dyn.get f "filePath") || Dyn.isNullish (Dyn.get f "content") then None
             else Some { filePath = f.filePath; label = f.label; content = f.content })
 
 let private buildTextPart (text: string) : obj =
