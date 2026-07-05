@@ -111,18 +111,18 @@ let resolveStoreRequiresInjection () =
 let emptyIteratorTreatedAsAbsent () =
     let store = Wanxiangshu.Shell.FuzzyIteratorStore.createTypedIteratorStore 10
     let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = Some store; finderCache = FinderCache() }
-    let params' : FuzzyFindParams = { pattern = Some "q"; path = None; limit = None; iterator = Some "" }
+    let params' : FuzzyFindParams = { pattern = [ "q" ]; path = None; limit = None; iterator = Some "" }
     match resolveFindSearchState params' opts with
     | Ok _ -> check "empty iterator falls through to fresh search" true
     | Error msg -> check ("empty iterator must not error: " + msg) false
     let storedId =
         Wanxiangshu.Shell.FuzzyIteratorStore.storeFindIterator store "scope"
             { query = "q"; pageSize = 30; pageIndex = 0; externalBasePath = None }
-    let resumed : FuzzyFindParams = { pattern = None; path = None; limit = None; iterator = Some storedId }
+    let resumed : FuzzyFindParams = { pattern = []; path = None; limit = None; iterator = Some storedId }
     match resolveFindSearchState resumed opts with
     | Ok _ -> check "stored iterator resumes" true
     | Error _ -> check "stored iterator resumes" false
-    let bogus : FuzzyFindParams = { pattern = None; path = None; limit = None; iterator = Some "nope" }
+    let bogus : FuzzyFindParams = { pattern = []; path = None; limit = None; iterator = Some "nope" }
     match resolveFindSearchState bogus opts with
     | Error _ -> check "unknown iterator still errors" true
     | Ok _ -> check "unknown iterator still errors" false

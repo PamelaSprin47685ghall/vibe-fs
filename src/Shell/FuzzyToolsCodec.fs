@@ -32,25 +32,44 @@ let private validateFuzzyFirstCall (tool: string) (pattern: string option) (iter
         | Some _ -> requirePositiveOptInt tool "context" context
         | None -> Ok ())
 
+let patternsField (args: obj) : string list =
+    let v = Dyn.get args "pattern"
+    if Dyn.isNullish v then []
+    elif Dyn.isArray v then
+        v :?> obj array
+        |> Array.choose (fun x ->
+            if Dyn.isNullish x then None
+            else Some(string x))
+        |> Array.filter (fun s -> s <> "")
+        |> List.ofArray
+    else
+        let s = string v
+        if s <> "" then [ s ] else []
+
+let private patternHead (patterns: string list) : string option =
+    match patterns with
+    | [] -> None
+    | head :: _ -> Some head
+
 let decodeFuzzyFindArgs (args: obj) : Result<FuzzyFindParams, DomainError> =
-    let pattern = strField args "pattern"
+    let patterns = patternsField args
     let iterator = strField args "iterator"
     let limit = optInt args "limit"
-    validateFuzzyFirstCall "fuzzy_find" pattern iterator limit None
+    validateFuzzyFirstCall "fuzzy_find" (patternHead patterns) iterator limit None
     |> Result.map (fun () ->
-        { pattern = pattern
+        { pattern = patterns
           path = strField args "path"
           limit = limit
           iterator = iterator })
 
 let decodeFuzzyGrepArgs (args: obj) : Result<FuzzyGrepParams, DomainError> =
-    let pattern = strField args "pattern"
+    let patterns = patternsField args
     let iterator = strField args "iterator"
     let limit = optInt args "limit"
     let context = optInt args "context"
-    validateFuzzyFirstCall "fuzzy_grep" pattern iterator limit context
+    validateFuzzyFirstCall "fuzzy_grep" (patternHead patterns) iterator limit context
     |> Result.map (fun () ->
-        { pattern = pattern
+        { pattern = patterns
           path = strField args "path"
           exclude = parseExcludeField args
           searchIgnored = optBool args "searchIgnored"

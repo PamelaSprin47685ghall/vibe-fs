@@ -93,3 +93,21 @@ let formatFindOutput (result: FindResult option) : string =
             let total = defaultArg r.totalMatched r.items.Length
             let plural = if total = 1 then "file" else "files"
             String.concat "\n" ([ $"{total} matching {plural} ({r.totalFiles} total indexed)"; "" ] @ (r.items |> List.map (fun m -> $"{m.relativePath}{fileAnnotation m.annotation}")))
+
+let formatMultiPatternFindOutput (results: (string * FindResult option) list) : string =
+    results
+    |> List.map (fun (pat, result) ->
+        let body = formatFindOutput result
+        $"## pattern: \"{pat}\"\n{body}")
+    |> String.concat "\n\n"
+
+let formatMultiPatternGrepOutput (results: (string * GrepResult option * string option) list) : string =
+    results
+    |> List.map (fun (pat, result, regexErr) ->
+        let body = formatGrepOutput result
+        let body' =
+            match regexErr with
+            | Some e -> body + "\n\nInvalid regex: " + e + ", used literal match"
+            | None -> body
+        $"## pattern: \"{pat}\"\n{body'}")
+    |> String.concat "\n\n"
