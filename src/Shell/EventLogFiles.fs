@@ -79,6 +79,17 @@ let private withWorkspaceLock (filePath: string) (action: unit -> JS.Promise<'T>
         with _ ->
             try do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ]) with _ -> ()
 
+        // If the lock file exists but is NOT a directory (e.g. it is a regular file),
+        // delete it to prevent proper-lockfile from throwing ENOTDIR on rmdir.
+        let lockPath = filePath + ".lock"
+        try
+            let! stats = statAsync lockPath
+            let isDir = unbox<bool> (stats?isDirectory())
+            if not isDir then
+                do! unlinkAsync lockPath
+        with _ ->
+            ()
+
         let! release = lockfileLock filePath (lockfileOptions ())
         let! caught = action () |> Promise.result
         do! release ()

@@ -95,6 +95,20 @@ let strictAppendLoopActivatedFailsOnBadPath () = promise {
     | Ok _ -> failwith "expected rejection on bad path"
     do! rmAsync dir
 }
+let selfHealingLockDeletesFileLock () = promise {
+    let! dir = mkdtempAsync "eventlog-selfhealing-"
+    let lockPath = dir + "/.wanxiangshu.ndjson.lock"
+    do! writeFileAsync lockPath "1"
+    let store = EventLogStore dir
+    do! store.AppendEventOrFail({ V = 1
+                                  Session = "s-heal"
+                                  Kind = eventKindLoopActivated
+                                  At = ""
+                                  Payload = Map [ "task", "healed" ] })
+    let! events = store.ReadAllEvents()
+    check "self healing lock: successfully appended and read" (events.Length = 1)
+    do! rmAsync dir
+}
 
 let run () = promise {
     do! appendThenReadAll ()
@@ -104,4 +118,5 @@ let run () = promise {
     do! readStopsAtCorruptLine ()
     do! strictAppendLoopActivatedPersistsEvent ()
     do! strictAppendLoopActivatedFailsOnBadPath ()
+    do! selfHealingLockDeletesFileLock ()
 }
