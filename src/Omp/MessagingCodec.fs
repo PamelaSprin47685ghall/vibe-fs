@@ -26,9 +26,10 @@ let private textFromParts (parts: obj) : string =
         |> String.concat "\n\n"
 
 let entries (sessionManager: ISessionManager) : obj array =
-    match sessionManager.getEntries with
-    | Some getEntriesFn -> getEntriesFn ()
-    | None -> [||]
+    let smObj = box sessionManager
+    if Dyn.typeIs (Dyn.get smObj "getEntries") "function" then
+        unbox<obj array> (smObj?getEntries())
+    else [||]
 
 let readAssistantText (sessionManager: ISessionManager) (startIndex: int) (joiner: string) : string option =
     let chunks = ResizeArray<string>()

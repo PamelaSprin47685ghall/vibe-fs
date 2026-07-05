@@ -65,11 +65,11 @@ let asErrorResult (error: obj) : ToolResult =
     errorResult (string error)
 
 let private normalizeSessionId (sm: ISessionManager) : string option =
-    match sm.getSessionId with
-    | Some getFn ->
-        let id = getFn ()
+    let smObj = box sm
+    if Dyn.typeIs (Dyn.get smObj "getSessionId") "function" then
+        let id : obj = smObj?getSessionId()
         if Dyn.isNullish id then None else Some (string id)
-    | None -> sm.sessionId
+    else sm.sessionId
 
 let getSessionIdFromContext (ctxObj: obj) : string option =
     if Dyn.isNullish ctxObj then None
