@@ -86,12 +86,6 @@ let ompActionExecutor (sessionApi: obj) : IActionExecutor =
                 do! invoke "sessionPrompt" arg |> Promise.map ignore
             }
 
-        member _.AbortSession sessionID =
-            promise {
-                let arg = box {| sessionId = sessionID |}
-                do! invoke "sessionAbort" arg |> Promise.map ignore
-            }
-
         member _.FetchMessages sessionID =
             promise {
                 let arg = box {| sessionId = sessionID |}

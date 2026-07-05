@@ -4,9 +4,9 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.FallbackKernel.Decision
 open Wanxiangshu.Kernel.FallbackKernel.Recovery
 
-let private sendOrAbort (cfg: FallbackConfig) (model: FallbackModel) (state: SessionFallbackState) =
+let private sendOrContinue (cfg: FallbackConfig) (model: FallbackModel) (state: SessionFallbackState) =
     if state.ContinueCount >= cfg.LoopMaxContinues then
-        { state with ContinueCount = 0 }, FallbackAction.AbortAndResume model
+        { state with ContinueCount = 0 }, FallbackAction.SendContinue model
     else
         { state with ContinueCount = state.ContinueCount + 1 }, FallbackAction.SendContinue model
 
@@ -29,12 +29,12 @@ let handleSessionError (state: SessionFallbackState) (cfg: FallbackConfig) (chai
 
         | FallbackPhase.Idle, ErrorClass.RetrySame ->
             match selectModel chain state.CurrentIndex with
-            | Some m -> sendOrAbort cfg m { state with Phase = FallbackPhase.Retrying 1 }
+            | Some m -> sendOrContinue cfg m { state with Phase = FallbackPhase.Retrying 1 }
             | None -> { state with Phase = FallbackPhase.Exhausted }, FallbackAction.PropagateFailure
 
         | FallbackPhase.Retrying count, ErrorClass.RetrySame when count < cfg.MaxRetries ->
             match selectModel chain state.CurrentIndex with
-            | Some m -> sendOrAbort cfg m { state with Phase = FallbackPhase.Retrying (count + 1) }
+            | Some m -> sendOrContinue cfg m { state with Phase = FallbackPhase.Retrying (count + 1) }
             | None -> { state with Phase = FallbackPhase.Exhausted }, FallbackAction.PropagateFailure
 
         | _, ErrorClass.ImmediateFallback
@@ -43,13 +43,13 @@ let handleSessionError (state: SessionFallbackState) (cfg: FallbackConfig) (chai
             let k = state.FailureCount + 1
             let start = scanStartIndex k state.CurrentIndex
             match selectModel chain start with
-            | Some m -> sendOrAbort cfg m { state with Phase = FallbackPhase.Scanning (start, state.CurrentIndex); FailureCount = k }
+            | Some m -> sendOrContinue cfg m { state with Phase = FallbackPhase.Scanning (start, state.CurrentIndex); FailureCount = k }
             | None -> { state with Phase = FallbackPhase.Exhausted }, FallbackAction.PropagateFailure
 
         | FallbackPhase.Scanning (scanIdx, origIdx), _ ->
             let nextIdx = scanIdx + 1
             match selectModel chain nextIdx with
-            | Some m -> sendOrAbort cfg m { state with Phase = FallbackPhase.Scanning (nextIdx, origIdx) }
+            | Some m -> sendOrContinue cfg m { state with Phase = FallbackPhase.Scanning (nextIdx, origIdx) }
             | None -> { state with Phase = FallbackPhase.Exhausted }, FallbackAction.PropagateFailure
 
         | FallbackPhase.Exhausted, _ ->

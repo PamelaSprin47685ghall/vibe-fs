@@ -22,7 +22,6 @@ type IEventTranslator =
 
 type IActionExecutor =
     abstract SendContinue      : sessionID:string * model:FallbackModel -> JS.Promise<unit>
-    abstract AbortSession      : sessionID:string -> JS.Promise<unit>
     abstract FetchMessages     : sessionID:string -> JS.Promise<obj array>
     abstract PropagateFailure  : sessionID:string -> JS.Promise<unit>
     abstract CaptureCurrentModel : sessionID:string -> JS.Promise<FallbackModel option>
@@ -105,9 +104,6 @@ let handleEvent
                 match action with
                 | FallbackAction.DoNothing -> ()
                 | FallbackAction.SendContinue model ->
-                    do! executor.SendContinue (sessionID, model)
-                | FallbackAction.AbortAndResume model ->
-                    do! executor.AbortSession sessionID
                     do! executor.SendContinue (sessionID, model)
                 | FallbackAction.RecoverWithPrompt (model, promptText) ->
                     do! executor.RecoverWithPrompt (sessionID, model, promptText)

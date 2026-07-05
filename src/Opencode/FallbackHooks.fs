@@ -161,12 +161,6 @@ let opencodeActionExecutor (client: obj) : IActionExecutor =
                 do! invokeClient client "prompt" arg |> Promise.map ignore
             }
 
-        member _.AbortSession sessionID =
-            promise {
-                let arg = box {| path = box {| id = sessionID |} |}
-                do! invokeClient client "abort" arg |> Promise.map ignore
-            }
-
         member _.FetchMessages sessionID =
             promise {
                 let arg = box {| path = box {| id = sessionID |} |}

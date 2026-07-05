@@ -70,10 +70,11 @@ let scanning_busy_resetsFailure () =
 
 let hallucination_exceedsThreshold () =
     let cfg = { (mkCfg ()) with LoopMaxContinues = 3 }
-    let _, action = transition (mkState FallbackPhase.Idle 0 0 3) (SessionError retryErr) cfg (mkChain ())
+    let ns, action = transition (mkState FallbackPhase.Idle 0 0 3) (SessionError retryErr) cfg (mkChain ())
     match action with
-    | FallbackAction.AbortAndResume _ -> ()
-    | _ -> failwith "expected AbortAndResume"
+    | FallbackAction.SendContinue _ -> ()
+    | _ -> failwith "expected SendContinue"
+    check "continueCount resets to 0" (ns.ContinueCount = 0)
 
 let hallucination_belowThreshold () =
     let cfg = { (mkCfg ()) with LoopMaxContinues = 3 }

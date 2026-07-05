@@ -168,7 +168,7 @@ let transitionMessageAbortedCancels () =
     let ns2, _ = transition state (SessionError errAbort2) cfg chain
     equal "AbortError also cancels" true ns2.Cancelled
 
-let transitionLoopDetectionAbortAndResume () =
+let transitionLoopDetectionSendContinue () =
     let model  = mkModel "oai" "gpt-5" None None None None None false
     let chain  = chain [ model ]
     let cfg    = mkConfig 2 3
@@ -179,8 +179,8 @@ let transitionLoopDetectionAbortAndResume () =
 
     equal "continueCount resets to 0" 0 ns.ContinueCount
     match action with
-    | FallbackAction.AbortAndResume m -> equal "action AbortAndResume" model m
-    | _ -> check "action is AbortAndResume" false
+    | FallbackAction.SendContinue m -> equal "action SendContinue" model m
+    | _ -> check "action is SendContinue" false
 
 let transitionSessionIdleIdle_emitsScanToolCallAsText () =
     let model  = mkModel "oai" "gpt-5" None None None None None false
@@ -225,7 +225,7 @@ let run () =
     transitionNewUserMessageResets ()
     transitionTaskCompleteStops ()
     transitionMessageAbortedCancels ()
-    transitionLoopDetectionAbortAndResume ()
+    transitionLoopDetectionSendContinue ()
     transitionSessionIdleIdle_emitsScanToolCallAsText ()
     transitionSessionIdleTaskComplete_noScanToolCallAsText ()
     transitionSessionIdleRetrying_emitsScanToolCallAsText ()

@@ -28,7 +28,7 @@ let runNudgeFlowCore
     (runtimeState: NudgeRuntimeState)
     (sessionKey: string)
     (takeSnapshot: unit -> JS.Promise<SessionSnapshot option>)
-    (sendNudge: string -> string option -> JS.Promise<SendOutcome>)
+    (sendNudge: string -> string option -> string option -> JS.Promise<SendOutcome>)
     : JS.Promise<NudgeRuntimeState> =
     promise {
         match! takeSnapshot () with
@@ -48,7 +48,7 @@ let runNudgeFlowCore
                         }
                     if not claimed then return runtimeState
                     else
-                        let! _ = sendNudge promptText snapshot.agentFromMessage
+                        let! _ = sendNudge promptText snapshot.agentFromMessage snapshot.modelFromMessage
                         return runtimeState
     }
 
@@ -111,9 +111,9 @@ type NudgeRuntime
             let root = if workspaceDirectory <> "" then workspaceDirectory else unbox<string> (nodeProcess?cwd())
 
             // Capture current assistant turn data from host for event sourcing.
-            let! lastAssistantText, agent, turnId =
+            let! lastAssistantText, agent, turnId, model =
                 match getChatHistory with
-                | None -> promise { return lastMsgFromEvent, None, "" }
+                | None -> promise { return lastMsgFromEvent, None, "", None }
                 | Some getHistory ->
                     promise {
                         try
@@ -124,7 +124,7 @@ type NudgeRuntime
                                     let role = Dyn.str m "role"
                                     role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str m "agent")))
                             match lastAssistantIdx with
-                            | None -> return lastMsgFromEvent, None, ""
+                            | None -> return lastMsgFromEvent, None, "", None
                             | Some idx ->
                                 let assistantMsg = messages.[idx]
                                 let text = messageTexts assistantMsg |> String.concat "\n"
@@ -134,9 +134,17 @@ type NudgeRuntime
                                 let time = Dyn.get info "time"
                                 let completed = Dyn.str time "completed"
                                 let tid = if completed <> "" then completed else Dyn.str info "id"
+                                let modelVal = Dyn.get info "model"
+                                let model =
+                                    if Dyn.isNullish modelVal then None
+                                    else
+                                        let providerID = Dyn.str modelVal "providerID"
+                                        let modelID = Dyn.str modelVal "modelID"
+                                        if providerID = "" || modelID = "" then None
+                                        else Some (sprintf "%s/%s" providerID modelID)
                                 let finalText = if text = "" then lastMsgFromEvent else text
-                                return finalText, agent, tid
-                        with _ -> return lastMsgFromEvent, None, ""
+                                return finalText, agent, tid, model
+                        with _ -> return lastMsgFromEvent, None, "", None
                     }
 
             // Append assistant turn to event log; all downstream decisioning folds from history.
@@ -155,10 +163,11 @@ type NudgeRuntime
                   nudgeBlockedForTurn = blocked
                   nudgeAnchorKey = currentAnchor
                   agentFromMessage = snapshot.agentFromMessage
+                  modelFromMessage = model
                   hasActiveRunner = false }
         }
 
-    let sendNudgeMux (helpers: obj) (workspaceId: string) (promptText: string) (_agentOpt: string option) : JS.Promise<SendOutcome> =
+    let sendNudgeMux (helpers: obj) (workspaceId: string) (promptText: string) (_agentOpt: string option) (_modelOpt: string option) : JS.Promise<SendOutcome> =
         promise {
             try
                 let nudgeFn = Dyn.get helpers "nudge"
@@ -171,7 +180,7 @@ type NudgeRuntime
         (runtimeState: NudgeRuntimeState)
         (sessionKey: string)
         (takeSnapshot: unit -> JS.Promise<SessionSnapshot option>)
-        (sendNudge: string -> string option -> JS.Promise<SendOutcome>)
+        (sendNudge: string -> string option -> string option -> JS.Promise<SendOutcome>)
         : JS.Promise<NudgeRuntimeState> =
         if Set.contains sessionKey runtimeState.retryPendingSessions
            || Set.contains sessionKey runtimeState.forceStoppedSessions then

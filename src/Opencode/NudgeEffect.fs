@@ -56,9 +56,9 @@ let private collectSnapshot (client: obj) (pluginCtx: obj) (sessionID: SessionId
                             let info = Dyn.get msg "info"
                             isCompletedAssistantMessage info
                             && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
-                    let lastAssistantText, turnId, agentFromMessage =
+                    let lastAssistantText, turnId, agentFromMessage, modelFromMessage =
                         match lastAssistantIdx with
-                        | None -> "", "", None
+                        | None -> "", "", None, None
                         | Some idx ->
                             let msg = messagesArr.[idx]
                             let info = Dyn.get msg "info"
@@ -68,7 +68,15 @@ let private collectSnapshot (client: obj) (pluginCtx: obj) (sessionID: SessionId
                             let time = Dyn.get info "time"
                             let completed = Dyn.str time "completed"
                             let tid = if completed <> "" then completed else Dyn.str info "id"
-                            text, tid, agent
+                            let modelVal = Dyn.get info "model"
+                            let model =
+                                if Dyn.isNullish modelVal then None
+                                else
+                                    let providerID = Dyn.str modelVal "providerID"
+                                    let modelID = Dyn.str modelVal "modelID"
+                                    if providerID = "" || modelID = "" then None
+                                    else Some (sprintf "%s/%s" providerID modelID)
+                            text, tid, agent, model
                     let directory = pluginDirectoryFromCtx pluginCtx
                     do! appendAssistantCompletedOrFail directory sessionIDStr lastAssistantText agentFromMessage turnId openTodos
                     let! snap = getNudgeSnapshotFromEventLog directory sessionIDStr
@@ -81,22 +89,23 @@ let private collectSnapshot (client: obj) (pluginCtx: obj) (sessionID: SessionId
                           nudgeBlockedForTurn = blocked
                           nudgeAnchorKey = key
                           agentFromMessage = snap.agentFromMessage
+                          modelFromMessage = modelFromMessage
                           hasActiveRunner = false }
         with _ -> return None
     }
 
-let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string option) (promptText: string) : JS.Promise<unit> =
+let private sendNudge (client: obj) (sessionID: SessionId) (agentOpt: string option) (modelOpt: string option) (promptText: string) : JS.Promise<unit> =
     promise {
-        let body = createPromptBody agentOpt promptText
+        let body = createPromptBodyWithModel agentOpt modelOpt promptText
         let promptArg = box {| path = box {| id = Id.sessionIdValue sessionID |}; body = body |}
         match getSessionApiFromClient client with
         | Error _ -> ()
         | Ok session -> do! invoke1 promptArg "prompt" session |> Promise.map ignore
     }
 
-let private sendNudgeOutcome (client: obj) (sessionID: SessionId) (promptText: string) (agentOpt: string option) : JS.Promise<SendOutcome> =
+let private sendNudgeOutcome (client: obj) (sessionID: SessionId) (promptText: string) (agentOpt: string option) (modelOpt: string option) : JS.Promise<SendOutcome> =
     promise {
-        let! caught = sendNudge client sessionID agentOpt promptText |> Promise.result
+        let! caught = sendNudge client sessionID agentOpt modelOpt promptText |> Promise.result
         return
             match caught with
             | Ok () -> Delivered
@@ -117,7 +126,7 @@ let startNudgeFlow (host: Host) (runtimeState: NudgeRuntimeState) (client: obj) 
         runtimeState
         sid
         (fun () -> collectSnapshot client pluginCtx sessionID)
-        (fun promptText agentOpt -> sendNudgeOutcome client sessionID promptText agentOpt)
+        (fun promptText agentOpt modelOpt -> sendNudgeOutcome client sessionID promptText agentOpt modelOpt)
 
 let dispatchPostStopFromHistory (host: Host) (client: obj) (pluginCtx: obj) (sessionID: SessionId) : JS.Promise<unit> =
     promise {

@@ -87,13 +87,6 @@ let muxActionExecutor (helpers: obj) : IActionExecutor =
                 | None -> sprintf "%s/%s" model.ProviderID model.ModelID
             invokeNudge sessionID (promptText + " " + modelStr)
 
-        member _.AbortSession (sessionID) =
-            if Dyn.isNullish helpers then Promise.lift ()
-            else
-                let abort = Dyn.get helpers "abort"
-                if Dyn.isNullish abort then Promise.lift ()
-                else unbox<JS.Promise<unit>> (Dyn.call1 abort sessionID)
-
         member _.FetchMessages sessionID = getChatHistory sessionID
 
         member _.PropagateFailure (_sessionID: string) = Promise.lift ()

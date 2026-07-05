@@ -7,6 +7,7 @@ type SessionSnapshot =
       nudgeBlockedForTurn: bool
       nudgeAnchorKey: string
       agentFromMessage: string option
+      modelFromMessage: string option
       hasActiveRunner: bool }
 
 type SendOutcome =

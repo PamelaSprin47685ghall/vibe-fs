@@ -54,7 +54,6 @@ type FallbackPhase =
 type FallbackAction =
     | DoNothing
     | SendContinue of model: FallbackModel
-    | AbortAndResume of model: FallbackModel
     | RecoverWithPrompt of model: FallbackModel * promptText: string
     | ScanToolCallAsText
     | PropagateFailure

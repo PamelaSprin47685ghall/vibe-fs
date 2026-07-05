@@ -132,6 +132,7 @@ let agentEndHandler (piObj: obj) (_reviewStore: ReviewStore) (ctxObj: obj) : JS.
                             nudgeBlockedForTurn = blocked
                             nudgeAnchorKey = key
                             agentFromMessage = snap.agentFromMessage
+                            modelFromMessage = None
                             hasActiveRunner = hasRunner
                         }
                         match deriveAction snapshot with

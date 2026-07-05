@@ -9,7 +9,7 @@ open Wanxiangshu.Kernel.EventLog.Fold
 let private snap todos msg blocked agent : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos; lastAssistantMessage = msg; isLoopActive = false
       nudgeBlockedForTurn = blocked; nudgeAnchorKey = msg; agentFromMessage = agent
-      hasActiveRunner = false }
+      modelFromMessage = None; hasActiveRunner = false }
 
 let private ev session kind payload =
     { V = 1; Session = session; Kind = kind; At = ""; Payload = payload }

@@ -17,6 +17,7 @@ let private toSessionSnapshot (s: NudgeSnapshotState) : SessionSnapshot =
       nudgeBlockedForTurn = false
       nudgeAnchorKey = nudgeAnchorKey s.turnId s.lastAssistantText
       agentFromMessage = s.agentFromMessage
+      modelFromMessage = None
       hasActiveRunner = false }
 
 /// No events → all fields empty/default.

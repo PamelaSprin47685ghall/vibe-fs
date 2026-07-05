@@ -13,7 +13,6 @@ open Wanxiangshu.Tests.FallbackEventBridgeTestsPart2
 type FakeExecutor(?messages: obj array) =
     let mutable continueCalls  : ResizeArray<string * FallbackModel> = ResizeArray()
     let mutable recoverCalls   : ResizeArray<string * FallbackModel * string> = ResizeArray()
-    let mutable abortCalls     : ResizeArray<string> = ResizeArray()
     let mutable propagateCalls : ResizeArray<string> = ResizeArray()
     let msgs = defaultArg messages [||]
 
@@ -23,9 +22,6 @@ type FakeExecutor(?messages: obj array) =
             Promise.lift ()
         member _.RecoverWithPrompt (sessionID, model, promptText) : JS.Promise<unit> =
             recoverCalls.Add(sessionID, model, promptText)
-            Promise.lift ()
-        member _.AbortSession (sessionID: string) : JS.Promise<unit> =
-            abortCalls.Add sessionID
             Promise.lift ()
         member _.FetchMessages (_sessionID: string) : JS.Promise<obj array> =
             Promise.lift msgs
@@ -37,7 +33,6 @@ type FakeExecutor(?messages: obj array) =
 
     member _.ContinueCalls  = continueCalls |> Seq.toList
     member _.RecoverCalls   = recoverCalls |> Seq.toList
-    member _.AbortCalls     = abortCalls |> Seq.toList
     member _.PropagateCalls = propagateCalls |> Seq.toList
 
 type FakeTranslator(sessionID: string, evt: FallbackEvent) =

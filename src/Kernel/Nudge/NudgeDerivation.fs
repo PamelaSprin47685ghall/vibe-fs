@@ -24,6 +24,7 @@ let deriveSnapshot (input: SnapshotInput) : Snapshot =
       nudgeBlockedForTurn = input.nudgeBlockedForTurn
       nudgeAnchorKey = nudgeAnchorKey input.turnId input.lastAssistantText
       agentFromMessage = input.agentFromMessage
+      modelFromMessage = None
       hasActiveRunner = input.hasActiveRunner }
 
 let deriveAction (snapshot: Snapshot) : NudgeAction =

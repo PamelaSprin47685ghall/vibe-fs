@@ -8,12 +8,12 @@ open Wanxiangshu.Kernel.HostTools
 let private snap todos msg blocked agent isLoop : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos; lastAssistantMessage = msg; isLoopActive = isLoop
       nudgeBlockedForTurn = blocked; nudgeAnchorKey = msg; agentFromMessage = agent
-      hasActiveRunner = false }
+      modelFromMessage = None; hasActiveRunner = false }
 
 let private snap' todos msg blocked agent isLoop hasActiveRunner : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos; lastAssistantMessage = msg; isLoopActive = isLoop
       nudgeBlockedForTurn = blocked; nudgeAnchorKey = msg; agentFromMessage = agent
-      hasActiveRunner = hasActiveRunner }
+      modelFromMessage = None; hasActiveRunner = hasActiveRunner }
 
 let decision () =
     equal "todos -> NudgeTodo" NudgeTodo (deriveAction (snap [ "a" ] "working" false None false))
