@@ -30,10 +30,6 @@ type private EventLogCache =
       mutable Mtime : float
       mutable Events : WanEvent list }
 
-let lockFileName = ".wanxiangshu.ndjson.lock"
-
-let lockFilePath (workspaceRoot: string) : string =
-    resolve workspaceRoot lockFileName
 
 let private readEventsFromText (text: string) : WanEvent list =
     if text = "" then []
@@ -59,51 +55,50 @@ let private readEventsFile (path: string) : JS.Promise<WanEvent list> =
         return readEventsFromText text
     }
 
-let private tryAcquireLock (lkPath: string) : JS.Promise<bool> =
+let lockFileName = ".wanxiangshu.ndjson.lock"
+
+[<Import("lock", "proper-lockfile")>]
+let private lockfileLock (path: string) (options: obj) : JS.Promise<unit -> JS.Promise<unit>> = jsNative
+
+let private lockfileOptions () =
+    createObj [
+        "stale", box 15000
+        "retries", box (createObj [
+            "retries", box 100
+            "factor", box 1
+            "minTimeout", box 50
+            "maxTimeout", box 100
+        ])
+    ]
+
+let private withWorkspaceLock (filePath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
     promise {
         try
-            do! writeFileFlagAsync lkPath "1" (createObj [ "flag", box "wx" ])
-            return true
-        with _ -> return false
+            let! _ = statAsync filePath
+            ()
+        with _ ->
+            try do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ]) with _ -> ()
+
+        let! release = lockfileLock filePath (lockfileOptions ())
+        let! caught = action () |> Promise.result
+        do! release ()
+        return
+            match caught with
+            | Ok v -> v
+            | Error ex -> raise ex
     }
-
-let private releaseLock (lkPath: string) : JS.Promise<unit> =
-    promise {
-        try do! unlinkAsync lkPath with _ -> ()
-    }
-
-[<Emit("new Promise(function(resolve){ if (typeof setImmediate !== 'undefined') { setImmediate(resolve); } else { setTimeout(resolve, 0); } })")>]
-let private yieldMacrotask () : JS.Promise<unit> = jsNative
-
-let private withWorkspaceLock (lkPath: string) (action: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-    let rec waitAndRun (attempt: int) : JS.Promise<'T> =
-        promise {
-            let! acquired = tryAcquireLock lkPath
-            if acquired then
-                let! caught = action () |> Promise.result
-                do! releaseLock lkPath
-                return
-                    match caught with
-                    | Ok v -> v
-                    | Error ex -> raise ex
-            else
-                if attempt >= 96 then return failwith "EventLog lock timeout"
-                do! yieldMacrotask ()
-                return! waitAndRun (attempt + 1)
-        }
-    waitAndRun 0
 
 type EventLogStore(workspaceRoot: string) =
     let queue = SerialQueue()
     let root = workspaceRoot
-    let lkPath = lockFilePath root
+    let eventFilePath = eventPath root
     let mutable cache : EventLogCache option = None
 
     member _.ReadAllEvents() : JS.Promise<WanEvent list> =
         queue.Enqueue(fun () ->
-            withWorkspaceLock lkPath (fun () ->
+            withWorkspaceLock eventFilePath (fun () ->
                 promise {
-                    let path = eventPath root
+                    let path = eventFilePath
                     try
                         let! stats = statAsync path
                         let size = stats?size |> unbox<float>
@@ -123,10 +118,10 @@ type EventLogStore(workspaceRoot: string) =
 
     member _.AppendEvent(e: WanEvent) : JS.Promise<Result<unit, string>> =
         queue.Enqueue(fun () ->
-            withWorkspaceLock lkPath (fun () ->
+            withWorkspaceLock eventFilePath (fun () ->
                 promise {
                     try
-                        let path = eventPath root
+                        let path = eventFilePath
                         let line = wanEventToLine e + "\n"
                         do! appendFileAsync path line
                         cache <- None
@@ -137,9 +132,9 @@ type EventLogStore(workspaceRoot: string) =
 
     member _.AppendEventOrFail(e: WanEvent) : JS.Promise<unit> =
         queue.Enqueue(fun () ->
-            withWorkspaceLock lkPath (fun () ->
+            withWorkspaceLock eventFilePath (fun () ->
                 promise {
-                    let path = eventPath root
+                    let path = eventFilePath
                     let line = wanEventToLine e + "\n"
                     do! appendFileAsync path line
                     cache <- None
@@ -152,9 +147,9 @@ type EventLogStore(workspaceRoot: string) =
         (isBlocked: NudgeDedupState -> string -> bool)
         : JS.Promise<bool> =
         queue.Enqueue(fun () ->
-            withWorkspaceLock lkPath (fun () ->
+            withWorkspaceLock eventFilePath (fun () ->
                 promise {
-                    let path = eventPath root
+                    let path = eventFilePath
                     let! events =
                         promise {
                             try

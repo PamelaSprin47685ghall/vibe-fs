@@ -126,7 +126,7 @@ function createMockLLM() {
     start() {
       _server = http.createServer(handler);
       return new Promise(resolve => {
-        _server.listen(0, () => {
+        _server.listen(0, '127.0.0.1', () => {
           const { port } = _server.address();
           resolve({
             url: `http://127.0.0.1:${port}`,
