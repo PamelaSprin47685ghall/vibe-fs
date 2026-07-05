@@ -24,7 +24,7 @@ let decodeFindOkFull () =
             "iterator", box "it-1"
         ]
     let p = okFind args
-    check "find pattern" (p.pattern = Some "foo")
+    check "find pattern" (p.pattern = [ "foo" ])
     check "find path" (p.path = Some "src/")
     check "find limit" (p.limit = Some 10)
     check "find iterator" (p.iterator = Some "it-1")
@@ -45,7 +45,7 @@ let decodeFindLimitBelowOneErrors () =
 let decodeFindIteratorOnlyResume () =
     let args = createObj [ "iterator", box "resume-id" ]
     let p = okFind args
-    check "find resume pattern absent" (p.pattern = None)
+    check "find resume pattern absent" (p.pattern = [])
     check "find resume iterator" (p.iterator = Some "resume-id")
 
 let decodeGrepOkWithExcludeArray () =
@@ -59,7 +59,7 @@ let decodeGrepOkWithExcludeArray () =
             "limit", box 25
         ]
     let p = okGrep args
-    check "grep pattern" (p.pattern = Some "needle")
+    check "grep pattern" (p.pattern = [ "needle" ])
     check "grep exclude len" (p.exclude.Length = 2)
     check "grep exclude head" (p.exclude.[0] = "test/")
     check "grep searchIgnored" (p.searchIgnored = Some true)
@@ -88,7 +88,7 @@ let decodeGrepLimitBelowOneErrors () =
 let decodeGrepIteratorOnlyResume () =
     let args = createObj [ "iterator", box "g-iter" ]
     let p = okGrep args
-    check "grep missing pattern" (p.pattern = None)
+    check "grep missing pattern" (p.pattern = [])
     check "grep iterator resume" (p.iterator = Some "g-iter")
     check "grep exclude empty" (p.exclude = [])
 

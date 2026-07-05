@@ -64,7 +64,7 @@ let private buildFuzzyTool (description: string) (args: obj) (toolName: string) 
 let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
     buildFuzzyTool
         ToolSchemaModule.fuzzyFind
-        (box {| pattern = strMinNullish 1 Params.fuzzyFindPattern; path = strOpt Params.fuzzyFindPath
+        (box {| pattern = strOrStrArray Params.fuzzyFindPattern; path = strOpt Params.fuzzyFindPath
                 limit = intMinNullish 1 Params.fuzzyFindLimit; iterator = strOpt Params.fuzzyFindIterator |})
         "fuzzy_find"
         decodeFuzzyFindArgs
@@ -75,7 +75,7 @@ let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.F
 let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
     buildFuzzyTool
         ToolSchemaModule.fuzzyGrep
-        (box {| pattern = strMinNullish 1 Params.fuzzyGrepPattern; path = strOpt Params.fuzzyGrepPath
+        (box {| pattern = strOrStrArray Params.fuzzyGrepPattern; path = strOpt Params.fuzzyGrepPath
                 exclude = excludeOpt Params.fuzzyGrepExclude; searchIgnored = boolOptional Params.fuzzyGrepSearchIgnored
                 caseSensitive = boolOptional Params.fuzzyGrepCaseSensitive
                 context = intMinNullish 0 Params.fuzzyGrepContext; limit = intMinNullish 1 Params.fuzzyGrepLimit

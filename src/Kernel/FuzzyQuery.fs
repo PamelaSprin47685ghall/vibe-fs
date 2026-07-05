@@ -24,13 +24,13 @@ let checkWildcardOnly (pattern: string) (mode: string) : bool =
     else Regex.IsMatch(pattern.Trim(), @"^(?:[.^$]*(?:[.][*+?]|\*|\+)[.^$]*|[.^$\s]*|\.\*\??|\.*[+?]?|\.+\??|\.|\*|\?)$")
 
 type FuzzyFindParams =
-    { pattern: string option
+    { pattern: string list
       path: string option
       limit: int option
       iterator: string option }
 
 type FuzzyGrepParams =
-    { pattern: string option
+    { pattern: string list
       path: string option
       exclude: string list
       searchIgnored: bool option
@@ -61,12 +61,12 @@ let fuzzyIteratorDescriptionHint =
     + "\"\"."
 
 let fuzzyFindDescriptionOmpPrefix =
-    "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported.\n\nFirst call: provide pattern and optional path.\nLater calls: provide only iterator.\n"
+    "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported.\n\nFirst call: provide pattern (string or array of strings) and optional path.\nLater calls: provide only iterator.\nWhen pattern is an array, searches run in parallel and results are grouped per pattern.\n"
 
 let fuzzyFindDescriptionOmp = fuzzyFindDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
 
 let fuzzyGrepDescriptionOmpPrefix =
-    "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked.\n\nFirst call: provide pattern and optional filters.\nLater calls: provide only iterator.\n"
+    "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked.\n\nFirst call: provide pattern (string or array of strings) and optional filters.\nLater calls: provide only iterator.\nWhen pattern is an array, searches run in parallel and results are grouped per pattern.\n"
 
 let fuzzyGrepDescriptionOmp = fuzzyGrepDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
 

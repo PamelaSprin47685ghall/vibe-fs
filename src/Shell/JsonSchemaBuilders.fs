@@ -33,5 +33,8 @@ let jsonStrArrayReq (desc: string) : obj =
 let jsonStrArrayOpt (desc: string) : obj =
     createObj [ "type", box "array"; "items", box jsonStrItemReq; "description", box desc ]
 
+let jsonUnionProp (schemas: obj array) (desc: string) : obj =
+    createObj [ "anyOf", box schemas; "description", box desc ]
+
 let jsonObjectSchema (properties: obj) (required: string array) : obj =
     createObj [ "type", box "object"; "properties", properties; "required", box required; "additionalProperties", box false ]

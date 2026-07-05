@@ -113,7 +113,7 @@ let grepMaxMatchesPerFileRespectsPageSize () =
         let store = createTypedIteratorStore 10
         let cache = FinderCache(mockCreate)
         let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = Some store; finderCache = cache }
-        let params' : FuzzyGrepParams = { pattern = Some "q"; path = None; exclude = []; searchIgnored = None; caseSensitive = None; context = None; limit = Some 100; iterator = None }
+        let params' : FuzzyGrepParams = { pattern = [ "q" ]; path = None; exclude = []; searchIgnored = None; caseSensitive = None; context = None; limit = Some 100; iterator = None }
         let! _ = fuzzyGrep params' opts
         match capturedOpts with
         | Some o ->
@@ -139,7 +139,7 @@ let findPagingWhenTotalMatchedIsNone () =
         let store = createTypedIteratorStore 10
         let cache = FinderCache(mockCreate)
         let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = Some store; finderCache = cache }
-        let params' : FuzzyFindParams = { pattern = Some "q"; path = None; limit = Some 30; iterator = None }
+        let params' : FuzzyFindParams = { pattern = [ "q" ]; path = None; limit = Some 30; iterator = None }
         let! outcome = fuzzyFind params' opts
         check "iterator generated when totalMatched=None at page boundary" (outcome.output.Contains "iterator:")
     }
