@@ -206,6 +206,7 @@ let coreTestEntries () : (string * TestBody) list =
     "FuzzyTests.findPagingWhenTotalMatchedIsNone", TestBody.Async FuzzyTests.findPagingWhenTotalMatchedIsNone
     "FuzzyTests.scanTimeoutConfigurable", TestBody.Sync (sync FuzzyTests.scanTimeoutConfigurable)
     "FuzzyTests.iteratorCounterUniqueness", TestBody.Sync (sync FuzzyTests.iteratorCounterUniqueness)
+    "FuzzyTests.grepMultiPropagatesErrorAndSafety", TestBody.Async FuzzyTests.grepMultiPropagatesErrorAndSafety
     "FuzzyTestsPaging.findPagingDefault", TestBody.Sync (sync FuzzyTestsPaging.findPagingDefault)
     "FuzzyTestsPaging.emptyIteratorNotRendered", TestBody.Sync (sync FuzzyTestsPaging.emptyIteratorNotRendered)
     "FuzzyTestsPaging.totalMatchedSemantics", TestBody.Sync (sync FuzzyTestsPaging.totalMatchedSemantics)

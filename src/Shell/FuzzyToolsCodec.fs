@@ -1,5 +1,6 @@
 module Wanxiangshu.Shell.FuzzyToolsCodec
 
+open Fable.Core
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Shell.DynField
@@ -32,9 +33,9 @@ let private validateFuzzyFirstCall (tool: string) (pattern: string option) (iter
         | Some _ -> requirePositiveOptInt tool "context" context
         | None -> Ok ())
 
-let patternsField (args: obj) : string list =
+let private patternsField (tool: string) (args: obj) : Result<string list, DomainError> =
     let v = Dyn.get args "pattern"
-    if Dyn.isNullish v then []
+    if Dyn.isNullish v then Ok []
     elif Dyn.isArray v then
         v :?> obj array
         |> Array.choose (fun x ->
@@ -42,9 +43,9 @@ let patternsField (args: obj) : string list =
             else Some(string x))
         |> Array.filter (fun s -> s <> "")
         |> List.ofArray
+        |> Ok
     else
-        let s = string v
-        if s <> "" then [ s ] else []
+        Error (InvalidIntent (tool, "pattern", "pattern must be an array of strings"))
 
 let private patternHead (patterns: string list) : string option =
     match patterns with
@@ -52,28 +53,30 @@ let private patternHead (patterns: string list) : string option =
     | head :: _ -> Some head
 
 let decodeFuzzyFindArgs (args: obj) : Result<FuzzyFindParams, DomainError> =
-    let patterns = patternsField args
-    let iterator = strField args "iterator"
-    let limit = optInt args "limit"
-    validateFuzzyFirstCall "fuzzy_find" (patternHead patterns) iterator limit None
-    |> Result.map (fun () ->
-        { pattern = patterns
-          path = strField args "path"
-          limit = limit
-          iterator = iterator })
+    patternsField "fuzzy_find" args
+    |> Result.bind (fun patterns ->
+        let iterator = strField args "iterator"
+        let limit = optInt args "limit"
+        validateFuzzyFirstCall "fuzzy_find" (patternHead patterns) iterator limit None
+        |> Result.map (fun () ->
+            { pattern = patterns
+              path = strField args "path"
+              limit = limit
+              iterator = iterator }))
 
 let decodeFuzzyGrepArgs (args: obj) : Result<FuzzyGrepParams, DomainError> =
-    let patterns = patternsField args
-    let iterator = strField args "iterator"
-    let limit = optInt args "limit"
-    let context = optInt args "context"
-    validateFuzzyFirstCall "fuzzy_grep" (patternHead patterns) iterator limit context
-    |> Result.map (fun () ->
-        { pattern = patterns
-          path = strField args "path"
-          exclude = parseExcludeField args
-          searchIgnored = optBool args "searchIgnored"
-          caseSensitive = optBool args "caseSensitive"
-          context = context
-          limit = limit
-          iterator = iterator })
+    patternsField "fuzzy_grep" args
+    |> Result.bind (fun patterns ->
+        let iterator = strField args "iterator"
+        let limit = optInt args "limit"
+        let context = optInt args "context"
+        validateFuzzyFirstCall "fuzzy_grep" (patternHead patterns) iterator limit context
+        |> Result.map (fun () ->
+            { pattern = patterns
+              path = strField args "path"
+              exclude = parseExcludeField args
+              searchIgnored = optBool args "searchIgnored"
+              caseSensitive = optBool args "caseSensitive"
+              context = context
+              limit = limit
+              iterator = iterator }))

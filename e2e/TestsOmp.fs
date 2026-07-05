@@ -73,7 +73,7 @@ let runAll (_args: string array) : JS.Promise<int> =
         let! _ = h.emitEvent "session_start" (createObj [ "reason", box "start" ]) sessionId
         let! _ = h.emitEvent "turn_start" (createObj []) sessionId
 
-        let! fuzzyFindResult = h.triggerTool "fuzzy_find" (box {| pattern = "README.md" |}) sessionId (createObj [])
+        let! fuzzyFindResult = h.triggerTool "fuzzy_find" (box {| pattern = [| "README.md" |] |}) sessionId (createObj [])
         let fuzzyFindStr = jsonStringify fuzzyFindResult
         chk "e2e-omp.fuzzy-find.responded" (fuzzyFindStr.Contains "content")
 

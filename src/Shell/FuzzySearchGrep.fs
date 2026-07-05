@@ -85,35 +85,40 @@ let private fuzzyGrepMulti (patterns: string list) (params': FuzzyGrepParams) (o
     promise {
         let searchPath = resolveFuzzySearchPath params'.path opts.cwd
         let externalBasePath = if searchPath.external then Some searchPath.basePath else None
-        let! finderResult =
-            if searchPath.external then createFinder searchPath.basePath
-            else opts.finderCache.Get opts.cwd
+        let! finderResult = opts.finderCache.Get searchPath.basePath
         match finderResult with
         | Error msg -> return { output = msg; isError = true }
         | Ok finder ->
-            let runOne pat =
-                promise {
-                    match resolveGrepIteratorStateForPattern pat params' opts with
-                    | Error msg -> return (pat, { output = msg; isError = true }, None)
-                    | Ok state ->
-                        let raw = runGrep finder state.core None None
-                        if not (Dyn.truthy (Dyn.get raw "ok")) then
-                            return (pat, { output = errorMsg raw "fuzzy_grep failed"; isError = true }, None)
-                        else
-                            let resolved = resolveResult raw
-                            let body = formatGrepOutput (Some { items = resolved.matches; totalMatched = resolved.total; regexFallbackError = resolved.regexError })
-                            return (pat, { output = buildGrepOutput body resolved.regexError ""; isError = false }, resolved.regexError)
-                }
-            let promises = patterns |> List.map runOne |> List.toArray
-            let! outcomes = Promise.all promises
-            if externalBasePath.IsSome then finder.destroy()
-            let body =
-                outcomes
-                |> Array.map (fun (pat, r, _) ->
-                    $"## pattern: \"{pat}\"\n{r.output}")
-                |> Array.toList
-                |> String.concat "\n\n"
-            return { output = body; isError = false }
+            try
+                let runOne pat =
+                    promise {
+                        try
+                            match resolveGrepIteratorStateForPattern pat params' opts with
+                            | Error msg -> return (pat, { output = msg; isError = true }, None)
+                            | Ok state ->
+                                let raw = runGrep finder state.core None None
+                                if not (Dyn.truthy (Dyn.get raw "ok")) then
+                                    return (pat, { output = errorMsg raw "fuzzy_grep failed"; isError = true }, None)
+                                else
+                                    let resolved = resolveResult raw
+                                    let body = formatGrepOutput (Some { items = resolved.matches; totalMatched = resolved.total; regexFallbackError = resolved.regexError })
+                                    return (pat, { output = buildGrepOutput body resolved.regexError ""; isError = false }, resolved.regexError)
+                        with ex ->
+                            return (pat, { output = ex.Message; isError = true }, None)
+                    }
+                let promises = patterns |> List.map runOne |> List.toArray
+                let! outcomes = Promise.all promises
+                let body =
+                    outcomes
+                    |> Array.map (fun (pat, r, _) ->
+                        $"## pattern: \"{pat}\"\n{r.output}")
+                    |> Array.toList
+                    |> String.concat "\n\n"
+                let anyError = outcomes |> Array.exists (fun (_, r, _) -> r.isError)
+                return { output = body; isError = anyError }
+            finally
+                if externalBasePath.IsSome then
+                    opts.finderCache.Destroy searchPath.basePath |> ignore
     }
 
 let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =

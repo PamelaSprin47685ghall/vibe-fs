@@ -30,7 +30,7 @@ let private searchOptionsFromRuntime (runtime: IToolRuntimeContext) (finderCache
 let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : ToolDefinition =
     { name = "fuzzy_find"
       description = description "fuzzy_find"
-      parameters = mkSchema (createObj [ "pattern", box (Wanxiangshu.Shell.JsonSchemaBuilders.jsonUnionProp [| strProp Params.fuzzyFindPattern; strArrayProp Params.fuzzyFindPattern |] Params.fuzzyFindPattern); "path", box (strProp Params.fuzzyFindPath); "limit", box (numProp Params.fuzzyFindLimit); "iterator", box (strProp Params.fuzzyFindIterator) ]) [||]
+      parameters = mkSchema (createObj [ "pattern", box (strArrayProp Params.fuzzyFindPattern); "path", box (strProp Params.fuzzyFindPath); "limit", box (numProp Params.fuzzyFindLimit); "iterator", box (strProp Params.fuzzyFindIterator) ]) [||]
       execute = fun config args ->
           match fromMuxConfig config with
           | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
@@ -48,7 +48,7 @@ let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.F
 let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : ToolDefinition =
     { name = "fuzzy_grep"
       description = description "fuzzy_grep"
-      parameters = mkSchema (createObj [ "pattern", box (Wanxiangshu.Shell.JsonSchemaBuilders.jsonUnionProp [| strProp Params.fuzzyGrepPattern; strArrayProp Params.fuzzyGrepPattern |] Params.fuzzyGrepPattern); "path", box (strProp Params.fuzzyGrepPath); "exclude", box (strProp Params.fuzzyGrepExclude); "searchIgnored", box (boolProp Params.fuzzyGrepSearchIgnored); "caseSensitive", box (boolProp Params.fuzzyGrepCaseSensitive); "context", box (numProp Params.fuzzyGrepContext); "limit", box (numProp Params.fuzzyGrepLimit); "iterator", box (strProp Params.fuzzyGrepIterator) ]) [||]
+      parameters = mkSchema (createObj [ "pattern", box (strArrayProp Params.fuzzyGrepPattern); "path", box (strProp Params.fuzzyGrepPath); "exclude", box (strProp Params.fuzzyGrepExclude); "searchIgnored", box (boolProp Params.fuzzyGrepSearchIgnored); "caseSensitive", box (boolProp Params.fuzzyGrepCaseSensitive); "context", box (numProp Params.fuzzyGrepContext); "limit", box (numProp Params.fuzzyGrepLimit); "iterator", box (strProp Params.fuzzyGrepIterator) ]) [||]
       execute = fun config args ->
           match fromMuxConfig config with
           | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)

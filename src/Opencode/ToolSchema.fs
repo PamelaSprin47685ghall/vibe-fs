@@ -49,9 +49,9 @@ let excludeOpt (desc: string) : obj =
     let s = str ()
     call1 (call0 (union' [| s; arr s |]) "nullish") "describe" (box desc)
 
-let strOrStrArray (desc: string) : obj =
+let strArrayNullish (desc: string) : obj =
     let s = str ()
-    call1 (call0 (union' [| s; arr s |]) "nullish") "describe" (box desc)
+    call1 (call0 (arr s) "nullish") "describe" (box desc)
 
 let private schemaObject (shape: obj) : obj = call1 schema "object" shape
 

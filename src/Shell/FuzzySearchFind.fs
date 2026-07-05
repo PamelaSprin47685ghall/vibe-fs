@@ -73,38 +73,39 @@ let private fuzzyFindMulti (patterns: string list) (params': FuzzyFindParams) (o
     promise {
         let searchPath = resolveFuzzySearchPath params'.path opts.cwd
         let externalBasePath = if searchPath.external then Some searchPath.basePath else None
-        let! finderResult =
-            if searchPath.external then createFinder searchPath.basePath
-            else opts.finderCache.Get opts.cwd
+        let! finderResult = opts.finderCache.Get searchPath.basePath
         match finderResult with
         | Error msg -> return { output = msg; isError = true }
         | Ok finder ->
-            let runOne pat =
-                promise {
-                    match resolveFindSearchStateForPattern pat params' opts with
-                    | Error msg -> return (pat, { output = msg; isError = true })
-                    | Ok state ->
-                        let raw = finder.fileSearch(state.query, box {| pageIndex = 0; pageSize = state.pageSize |})
-                        if not (Dyn.truthy (Dyn.get raw "ok")) then
-                            return (pat, { output = errorMsg raw "fuzzy_find failed"; isError = true })
-                        else
-                            let value = Dyn.get raw "value"
-                            let matches = itemsOf value |> Array.map toFindMatch |> List.ofArray
-                            let totalOpt = optInt value "totalMatched"
-                            let totalFiles = optInt value "totalFiles" |> Option.defaultValue 0
-                            let result = Some { items = matches; totalMatched = totalOpt; totalFiles = totalFiles }
-                            return (pat, { output = formatFindOutput result; isError = false })
-                }
-            let promises = patterns |> List.map runOne |> List.toArray
-            let! outcomes = Promise.all promises
-            if externalBasePath.IsSome then finder.destroy()
-            let body =
-                outcomes
-                |> Array.map (fun (pat, r) ->
-                    $"## pattern: \"{pat}\"\n{r.output}")
-                |> Array.toList
-                |> String.concat "\n\n"
-            return { output = body; isError = false }
+            try
+                let runOne pat =
+                    promise {
+                        match resolveFindSearchStateForPattern pat params' opts with
+                        | Error msg -> return (pat, { output = msg; isError = true })
+                        | Ok state ->
+                            let raw = finder.fileSearch(state.query, box {| pageIndex = 0; pageSize = state.pageSize |})
+                            if not (Dyn.truthy (Dyn.get raw "ok")) then
+                                return (pat, { output = errorMsg raw "fuzzy_find failed"; isError = true })
+                            else
+                                let value = Dyn.get raw "value"
+                                let matches = itemsOf value |> Array.map toFindMatch |> List.ofArray
+                                let totalOpt = optInt value "totalMatched"
+                                let totalFiles = optInt value "totalFiles" |> Option.defaultValue 0
+                                let result = Some { items = matches; totalMatched = totalOpt; totalFiles = totalFiles }
+                                return (pat, { output = formatFindOutput result; isError = false })
+                    }
+                let promises = patterns |> List.map runOne |> List.toArray
+                let! outcomes = Promise.all promises
+                let body =
+                    outcomes
+                    |> Array.map (fun (pat, r) ->
+                        $"## pattern: \"{pat}\"\n{r.output}")
+                    |> Array.toList
+                    |> String.concat "\n\n"
+                return { output = body; isError = false }
+            finally
+                if externalBasePath.IsSome then
+                    opts.finderCache.Destroy searchPath.basePath |> ignore
     }
 
 let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =

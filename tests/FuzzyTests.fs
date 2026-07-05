@@ -164,3 +164,32 @@ let iteratorCounterUniqueness () =
                 { query = "q"; pageSize = 30; pageIndex = 0; externalBasePath = None } ]
     let distinct = ids |> List.distinct |> List.length
     equal "1000 iterator ids are unique" 1000 distinct
+
+let grepMultiPropagatesErrorAndSafety () =
+    promise {
+        let mutable destroyed = false
+        let mutable callCount = 0
+        let mockCreate (_: string) : JS.Promise<Result<FinderLike, string>> =
+            promise {
+                let finder =
+                    { new FinderLike with
+                        member _.fileSearch(_, _) = box null
+                        member _.grep(query, _) =
+                            callCount <- callCount + 1
+                            if query.Contains "fail" then
+                                failwith "intentional grep failure"
+                            else
+                                box {| ok = true; value = box {| items = [||]; totalMatched = 0 |} |}
+                        member _.destroy() = destroyed <- true
+                        member _.isDestroyed = false }
+                return Ok finder
+            }
+        let store = createTypedIteratorStore 10
+        let cache = FinderCache(mockCreate)
+        let opts : SearchOptions = { cwd = "."; scopeId = "scope"; store = Some store; finderCache = cache }
+        let params' : FuzzyGrepParams = { pattern = [ "success"; "fail" ]; path = Some "/external/path"; exclude = []; searchIgnored = None; caseSensitive = None; context = None; limit = Some 100; iterator = None }
+        let! outcome = fuzzyGrep params' opts
+        check "multi grep isError is true" outcome.isError
+        check "success subpattern was called" (callCount >= 1)
+        check "finder was destroyed on error" destroyed
+    }

@@ -23,13 +23,7 @@ let registerFuzzyTools (pi: obj) (finderCache: FinderCache) : unit =
             "parameters",
                 objectOf
                     [|
-                        ("pattern",
-                            optional(
-                                union
-                                    [| str "Plain fuzzy file path text to search for. Accepts a single string or an array of strings for parallel search." tb
-                                       strArray "Plain fuzzy file path text to search for. Accepts a single string or an array of strings for parallel search." tb |]
-                                    tb)
-                                tb)
+                        ("pattern", optional (strArray """Plain fuzzy file path text to search for. Pass a real JSON array of strings for parallel search; never pass a stringified JSON string. Correct: ["src","build"]. Wrong: "[\"src\",\"build\"]" (a string, not an array).""" tb) tb)
                         ("path", opt "Initial optional path constraint to narrow search scope" tb str)
                         ("limit", opt "Maximum number of results to return per call (default: 30)" tb num)
                         ("iterator", opt "Opaque single-use iterator from a previous fuzzy_find result." tb str)
@@ -43,18 +37,16 @@ let registerFuzzyTools (pi: obj) (finderCache: FinderCache) : unit =
                             if scope = "" then
                                 return errorResult "fuzzy_find requires an active session"
                             else
-                                let p =
-                                    { pattern = Wanxiangshu.Shell.FuzzyToolsCodec.patternsField params'
-                                      path = optStr params' "path"
-                                      limit = optInt params' "limit"
-                                      iterator = optStr params' "iterator" }
-                                let opts : SearchOptions =
-                                    { cwd = Dyn.str ctx "cwd"
-                                      scopeId = scope
-                                      store = None
-                                      finderCache = finderCache }
-                                let! r = fuzzyFind p opts
-                                if r.isError then return errorResult r.output else return textResult r.output
+                                match Wanxiangshu.Shell.FuzzyToolsCodec.decodeFuzzyFindArgs params' with
+                                | Error e -> return errorResult (string e)
+                                | Ok p ->
+                                    let opts : SearchOptions =
+                                        { cwd = Dyn.str ctx "cwd"
+                                          scopeId = scope
+                                          store = None
+                                          finderCache = finderCache }
+                                    let! r = fuzzyFind p opts
+                                    if r.isError then return errorResult r.output else return textResult r.output
                         })
         ])
 
@@ -66,13 +58,7 @@ let registerFuzzyTools (pi: obj) (finderCache: FinderCache) : unit =
             "parameters",
                 objectOf
                     [|
-                        ("pattern",
-                            optional(
-                                union
-                                    [| str "Search pattern. Accepts a single string or an array of strings for parallel search. Required on the first call." tb
-                                       strArray "Search pattern. Accepts a single string or an array of strings for parallel search. Required on the first call." tb |]
-                                    tb)
-                                tb)
+                        ("pattern", optional (strArray """Search pattern. Pass a real JSON array of strings for parallel search; never pass a stringified JSON string. Required on the first call. Correct: ["StateMachine","EventLog"]. Wrong: "[\"StateMachine\",\"EventLog\"]" (a string, not an array).""" tb) tb)
                         ("path", opt "Initial path constraint." tb str)
                         ("exclude",
                             optional(
@@ -96,22 +82,15 @@ let registerFuzzyTools (pi: obj) (finderCache: FinderCache) : unit =
                             if scope = "" then
                                 return errorResult "fuzzy_grep requires an active session"
                             else
-                                let exclude = parseExcludeField params'
-                                let p =
-                                    { pattern = Wanxiangshu.Shell.FuzzyToolsCodec.patternsField params'
-                                      path = optStr params' "path"
-                                      exclude = exclude
-                                      searchIgnored = optBool params' "searchIgnored"
-                                      caseSensitive = optBool params' "caseSensitive"
-                                      context = optInt params' "context"
-                                      limit = optInt params' "limit"
-                                      iterator = optStr params' "iterator" }
-                                let opts : SearchOptions =
-                                    { cwd = Dyn.str ctx "cwd"
-                                      scopeId = scope
-                                      store = None
-                                      finderCache = finderCache }
-                                let! r = fuzzyGrep p opts
-                                if r.isError then return errorResult r.output else return textResult r.output
+                                match Wanxiangshu.Shell.FuzzyToolsCodec.decodeFuzzyGrepArgs params' with
+                                | Error e -> return errorResult (string e)
+                                | Ok p ->
+                                    let opts : SearchOptions =
+                                        { cwd = Dyn.str ctx "cwd"
+                                          scopeId = scope
+                                          store = None
+                                          finderCache = finderCache }
+                                    let! r = fuzzyGrep p opts
+                                    if r.isError then return errorResult r.output else return textResult r.output
                         })
         ])

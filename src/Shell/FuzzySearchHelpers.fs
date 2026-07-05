@@ -37,7 +37,7 @@ let internal resolveIteratorBranch (store: TypedIteratorStore) iterator consume 
 
 let acquireFinderFromOptions externalBasePath (opts: SearchOptions) =
     match externalBasePath with
-    | Some basep -> createFinder basep
+    | Some basep -> opts.finderCache.Get basep
     | None -> opts.finderCache.Get opts.cwd
 
 let releaseFinder (finder: FinderLike) externalBasePath =
@@ -57,7 +57,10 @@ let runWithFinder
     | Error msg -> { output = msg; isError = true }
     | Ok finder ->
         try body finder
-        finally releaseFinder finder externalBasePath
+        finally
+        match externalBasePath with
+        | Some _ -> finder.destroy()
+        | None -> ()
 
 let optStr (o: obj) (key: string) : string option =
     let value = Dyn.get o key

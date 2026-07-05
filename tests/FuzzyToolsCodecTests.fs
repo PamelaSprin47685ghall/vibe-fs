@@ -18,7 +18,7 @@ let private okGrep args =
 let decodeFindOkFull () =
     let args =
         createObj [
-            "pattern", box "foo"
+            "pattern", box [| "foo" |]
             "path", box "src/"
             "limit", box 10
             "iterator", box "it-1"
@@ -37,7 +37,7 @@ let decodeFindMissingPatternErrors () =
     | _ -> check "find missing pattern error" false
 
 let decodeFindLimitBelowOneErrors () =
-    let args = createObj [ "pattern", box "x"; "limit", box 0 ]
+    let args = createObj [ "pattern", box [| "x" |]; "limit", box 0 ]
     match decodeFuzzyFindArgs args with
     | Error (InvalidIntent ("fuzzy_find", "limit", "must be >= 1")) -> check "find limit zero" true
     | _ -> check "find limit zero" false
@@ -51,7 +51,7 @@ let decodeFindIteratorOnlyResume () =
 let decodeGrepOkWithExcludeArray () =
     let args =
         createObj [
-            "pattern", box "needle"
+            "pattern", box [| "needle" |]
             "exclude", box [| "test/"; "*.min.js" |]
             "searchIgnored", box true
             "caseSensitive", box true
@@ -68,7 +68,7 @@ let decodeGrepOkWithExcludeArray () =
     check "grep limit" (p.limit = Some 25)
 
 let decodeGrepExcludeScalar () =
-    let args = createObj [ "pattern", box "x"; "exclude", box "vendor/" ]
+    let args = createObj [ "pattern", box [| "x" |]; "exclude", box "vendor/" ]
     let p = okGrep args
     check "grep scalar exclude" (p.exclude = [ "vendor/" ])
 
@@ -80,7 +80,7 @@ let decodeGrepMissingPatternErrors () =
     | _ -> check "grep missing pattern error" false
 
 let decodeGrepLimitBelowOneErrors () =
-    let args = createObj [ "pattern", box "x"; "limit", box -1 ]
+    let args = createObj [ "pattern", box [| "x" |]; "limit", box -1 ]
     match decodeFuzzyGrepArgs args with
     | Error (InvalidIntent ("fuzzy_grep", "limit", "must be >= 1")) -> check "grep limit negative" true
     | _ -> check "grep limit negative" false
@@ -92,6 +92,41 @@ let decodeGrepIteratorOnlyResume () =
     check "grep iterator resume" (p.iterator = Some "g-iter")
     check "grep exclude empty" (p.exclude = [])
 
+let decodeGrepPatternArray () =
+    let args =
+        createObj [
+            "pattern", box [| "word1"; "word2" |]
+        ]
+    let p = okGrep args
+    check "grep array pattern length" (p.pattern.Length = 2)
+    check "grep array pattern first" (p.pattern.[0] = "word1")
+    check "grep array pattern second" (p.pattern.[1] = "word2")
+
+let decodeFindPatternArray () =
+    let args =
+        createObj [
+            "pattern", box [| "foo"; "bar"; "baz" |]
+        ]
+    let p = okFind args
+    check "find array pattern length" (p.pattern.Length = 3)
+    check "find array pattern first" (p.pattern.[0] = "foo")
+    check "find array pattern second" (p.pattern.[1] = "bar")
+    check "find array pattern third" (p.pattern.[2] = "baz")
+
+let decodeGrepPatternScalarStringFails () =
+    let args = createObj [ "pattern", box "single_string" ]
+    match decodeFuzzyGrepArgs args with
+    | Error (InvalidIntent ("fuzzy_grep", "pattern", "pattern must be an array of strings")) ->
+        check "grep pattern scalar string fails" true
+    | _ -> check "grep pattern scalar string fails" false
+
+let decodeFindPatternScalarStringFails () =
+    let args = createObj [ "pattern", box "single_string" ]
+    match decodeFuzzyFindArgs args with
+    | Error (InvalidIntent ("fuzzy_find", "pattern", "pattern must be an array of strings")) ->
+        check "find pattern scalar string fails" true
+    | _ -> check "find pattern scalar string fails" false
+
 let run () =
     decodeFindOkFull ()
     decodeFindMissingPatternErrors ()
@@ -102,3 +137,7 @@ let run () =
     decodeGrepMissingPatternErrors ()
     decodeGrepLimitBelowOneErrors ()
     decodeGrepIteratorOnlyResume ()
+    decodeGrepPatternArray ()
+    decodeFindPatternArray ()
+    decodeGrepPatternScalarStringFails ()
+    decodeFindPatternScalarStringFails ()

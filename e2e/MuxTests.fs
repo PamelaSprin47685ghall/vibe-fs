@@ -183,7 +183,7 @@ let runAll (args: string array) : JS.Promise<int> =
 
         // --- 3e. Tool execution: fuzzy_find success --------------------------
         let fuzzyArgs =
-            createObj [ "pattern", box "mux-e2e" ]
+            createObj [ "pattern", box [| "mux-e2e" |] ]
         let! fuzzyResult = harness.executeTool "fuzzy_find" fuzzyArgs (createEmpty ())
         chk "mux.execute.fuzzyFind.success" (fuzzyResult.Contains "mux-e2e-test.txt")
 

@@ -86,7 +86,7 @@ let runAll (args: string array) : JS.Promise<int> =
         let! apiObj = start opts
         let harness = harnessFromObj apiObj
 
-        let expected = 40
+        let expected = 42
         let mutable ok = 0
         let chk l c =
             check l c
@@ -121,11 +121,11 @@ let runAll (args: string array) : JS.Promise<int> =
                 chk "e2e.executor.tool-called" (containsTool harness "executor")
 
                 // 5. fuzzy_find
-                do! toolRound harness sessionID "fuzzy_find" (box {| pattern = "README" |}) "find README files"
+                do! toolRound harness sessionID "fuzzy_find" (box {| pattern = [| "README" |] |}) "find README files"
                 chk "e2e.fuzzy-find.tool-called" (containsTool harness "fuzzy_find")
 
                 // 6. fuzzy_grep
-                do! toolRound harness sessionID "fuzzy_grep" (box {| pattern = "test" |}) "grep for test"
+                do! toolRound harness sessionID "fuzzy_grep" (box {| pattern = [| "test" |] |}) "grep for test"
                 chk "e2e.fuzzy-grep.tool-called" (containsTool harness "fuzzy_grep")
 
                 // 7. investigator
@@ -229,7 +229,7 @@ let runAll (args: string array) : JS.Promise<int> =
                 chk "e2e.executor-javascript.tool-called" (containsTool harness "executor")
 
                 // 26. fuzzy-find-no-results
-                do! toolRound harness sessionID "fuzzy_find" (box {| pattern = "xyznonexistent123" |}) "find nonexistent pattern"
+                do! toolRound harness sessionID "fuzzy_find" (box {| pattern = [| "xyznonexistent123" |] |}) "find nonexistent pattern"
                 chk "e2e.fuzzy-find-no-results.tool-called" (containsTool harness "fuzzy_find")
 
                 // 27. write-large-content
@@ -241,6 +241,12 @@ let runAll (args: string array) : JS.Promise<int> =
                 do! toolRound harness sessionID "write" (box {| filePath = "file1.txt"; content = "one" |}) "write file1"
                 do! toolRound harness sessionID "write" (box {| filePath = "file2.txt"; content = "two" |}) "write file2"
                 do! toolRound harness sessionID "write" (box {| filePath = "file3.txt"; content = "three" |}) "write file3"
+
+                // 29. fuzzy-grep-array-pattern
+                do! toolRound harness sessionID "fuzzy_grep" (box {| pattern = [| "fuzzyGrepMulti"; "fuzzyGrepSingle" |] |}) "grep for multiple patterns"
+                chk "e2e.fuzzy-grep-array-pattern.tool-called" (containsTool harness "fuzzy_grep")
+                let bGrep = bodies harness
+                chk "e2e.fuzzy-grep-array-pattern.output-has-blocks" (bGrep.Contains "## pattern: \\\"fuzzyGrepMulti\\\"" || bGrep.Contains "## pattern: \"fuzzyGrepMulti\"")
 
                 printfn "\n✓ %d/%d e2e checks passed" ok expected
                 return summary ()

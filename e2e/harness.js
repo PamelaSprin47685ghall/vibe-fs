@@ -331,6 +331,9 @@ export async function start(opts = {}) {
     }
   }
 
+  child.stdout.on('data', (data) => process.stdout.write(data));
+  child.stderr.on('data', (data) => process.stderr.write(data));
+
   return api;
 }
 

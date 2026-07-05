@@ -61,12 +61,12 @@ let fuzzyIteratorDescriptionHint =
     + "\"\"."
 
 let fuzzyFindDescriptionOmpPrefix =
-    "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported.\n\nFirst call: provide pattern (string or array of strings) and optional path.\nLater calls: provide only iterator.\nWhen pattern is an array, searches run in parallel and results are grouped per pattern.\n"
+    "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported.\n\nFirst call: provide pattern (an array of strings) and optional path.\nLater calls: provide only iterator.\nMultiple patterns run in parallel and results are grouped per pattern.\n"
 
 let fuzzyFindDescriptionOmp = fuzzyFindDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
 
 let fuzzyGrepDescriptionOmpPrefix =
-    "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked.\n\nFirst call: provide pattern (string or array of strings) and optional filters.\nLater calls: provide only iterator.\nWhen pattern is an array, searches run in parallel and results are grouped per pattern.\n"
+    "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked.\n\nFirst call: provide pattern (an array of strings) and optional filters.\nLater calls: provide only iterator.\nMultiple patterns run in parallel and results are grouped per pattern.\n"
 
 let fuzzyGrepDescriptionOmp = fuzzyGrepDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
 
