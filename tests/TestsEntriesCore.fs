@@ -201,6 +201,11 @@ let coreTestEntries () : (string * TestBody) list =
     "FuzzyTests.finderConversion", TestBody.Sync (sync FuzzyTests.finderConversion)
     "FuzzyTests.formatFull", TestBody.Sync (sync FuzzyTests.formatFull)
     "FuzzyTests.fuzzyFallbackNotice", TestBody.Sync (sync FuzzyTests.fuzzyFallbackNotice)
+    "FuzzyTests.finderCacheConcurrencyRace", TestBody.Async FuzzyTests.finderCacheConcurrencyRace
+    "FuzzyTests.grepMaxMatchesPerFileRespectsPageSize", TestBody.Async FuzzyTests.grepMaxMatchesPerFileRespectsPageSize
+    "FuzzyTests.findPagingWhenTotalMatchedIsNone", TestBody.Async FuzzyTests.findPagingWhenTotalMatchedIsNone
+    "FuzzyTests.scanTimeoutConfigurable", TestBody.Sync (sync FuzzyTests.scanTimeoutConfigurable)
+    "FuzzyTests.iteratorCounterUniqueness", TestBody.Sync (sync FuzzyTests.iteratorCounterUniqueness)
     "FuzzyTestsPaging.findPagingDefault", TestBody.Sync (sync FuzzyTestsPaging.findPagingDefault)
     "FuzzyTestsPaging.emptyIteratorNotRendered", TestBody.Sync (sync FuzzyTestsPaging.emptyIteratorNotRendered)
     "FuzzyTestsPaging.totalMatchedSemantics", TestBody.Sync (sync FuzzyTestsPaging.totalMatchedSemantics)

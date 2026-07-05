@@ -11,6 +11,22 @@ type FinderLike =
     abstract member destroy: unit -> unit
     abstract member isDestroyed: bool with get
 
+[<Emit("process.env[$0]")>]
+let private getEnv (key: string) : string = jsNative
+
+let getScanTimeoutEnv () : int option =
+    let v = getEnv "WANXIANGSHU_SCAN_TIMEOUT"
+    if isNull v || v = "" then None
+    else
+        match System.Int32.TryParse(v) with
+        | true, n when n > 0 -> Some n
+        | _ -> None
+
+let getScanTimeout () : int =
+    match getScanTimeoutEnv () with
+    | Some n -> n
+    | None -> 15000
+
 let private createFinderRaw (basePath: string) : JS.Promise<obj> =
     promise {
         let! module' = importDynamic<obj> "@ff-labs/fff-node"
@@ -22,7 +38,7 @@ let private createFinderRaw (basePath: string) : JS.Promise<obj> =
         else
             let finder = Dyn.get result "value"
             try
-                do! finder?waitForScan(15000)
+                do! finder?waitForScan(getScanTimeout())
                 return createObj [ "ok" ==> true; "value" ==> finder; "scanWarn" ==> null ]
             with ex ->
                 return createObj [ "ok" ==> true; "value" ==> finder; "scanWarn" ==> $"waitForScan failed: {ex.Message}" ]
@@ -40,7 +56,8 @@ let createFinder (basePath: string) : JS.Promise<Result<FinderLike, string>> =
         return resultFromRaw raw
     }
 
-type FinderCache() =
+type FinderCache(?createFinderFn: string -> JS.Promise<Result<FinderLike, string>>) =
+    let createFinderImpl = defaultArg createFinderFn createFinder
     let queue = SerialQueue()
     let mutable instances = Map.empty<string, FinderLike>
     let mutable pending = Map.empty<string, JS.Promise<Result<FinderLike, string>>>
@@ -53,7 +70,7 @@ type FinderCache() =
                 match Map.tryFind cwd pending with
                 | Some finderPromise -> finderPromise
                 | None ->
-                    let finderPromise = createFinder cwd
+                    let finderPromise = createFinderImpl cwd
                     pending <- Map.add cwd finderPromise pending
                     finderPromise
                     |> Promise.bind (fun result ->
@@ -63,12 +80,20 @@ type FinderCache() =
                         pending <- Map.remove cwd pending
                         Promise.lift result))
 
-    member _.Destroy(cwd: string) : unit =
-        match Map.tryFind cwd instances with
-        | Some finder when not finder.isDestroyed -> finder.destroy()
-        | _ -> ()
-        instances <- Map.remove cwd instances
-        pending <- Map.remove cwd pending
+    member _.Destroy(cwd: string) : JS.Promise<unit> =
+        queue.Enqueue(fun () ->
+            match Map.tryFind cwd instances with
+            | Some finder when not finder.isDestroyed -> finder.destroy()
+            | _ -> ()
+            instances <- Map.remove cwd instances
+            pending <- Map.remove cwd pending
+            Promise.lift ())
 
-    member this.DestroyAll() : unit =
-        instances |> Map.toList |> List.map fst |> List.iter this.Destroy
+    member _.DestroyAll() : JS.Promise<unit> =
+        queue.Enqueue(fun () ->
+            let allInstances = instances |> Map.toList
+            allInstances |> List.iter (fun (cwd, finder) ->
+                if not finder.isDestroyed then finder.destroy())
+            instances <- Map.empty
+            pending <- Map.empty
+            Promise.lift ())

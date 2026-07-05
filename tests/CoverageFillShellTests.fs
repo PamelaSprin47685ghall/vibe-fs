@@ -71,13 +71,13 @@ let ffResultFromRawErrDefault () =
 let ffDestroyEmptyNoThrow () =
     let cache = FinderCache()
     // 空 instances: match _ 分支
-    cache.Destroy("no-such-cwd")
+    cache.Destroy("no-such-cwd") |> ignore
     check "Destroy empty → no throw" true
 
 let ffDestroyAllEmptyNoThrow () =
     let cache = FinderCache()
     // instances=empty: toList=[]; iter=no-op
-    cache.DestroyAll()
+    cache.DestroyAll() |> ignore
     check "DestroyAll empty → no throw" true
 
 // ── FinderCache.Get ──────────────────────────────────────────────────────────

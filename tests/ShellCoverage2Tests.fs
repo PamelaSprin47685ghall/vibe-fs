@@ -44,12 +44,12 @@ let resultFromRawErrMissing () =
 
 let finderCacheDestroyMissing () =
     let cache = FinderCache()
-    cache.Destroy "/no/such/path"
+    cache.Destroy "/no/such/path" |> ignore
     check "destroy missing path no throw" true
 
 let finderCacheDestroyAll () =
     let cache = FinderCache()
-    cache.DestroyAll()
+    cache.DestroyAll() |> ignore
     check "destroyAll no throw" true
 
 // ── resolveGrepIteratorState ─────────────────────────────────────────────────

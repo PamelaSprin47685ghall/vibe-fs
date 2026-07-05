@@ -39,7 +39,7 @@ let resolveGrepIteratorState (params': FuzzyGrepParams) (opts: SearchOptions)
 
 let private runGrep (finder: FinderLike) (state: FuzzyGrepState) (cursor: obj option) (modeOverride: string option) : obj =
     let mode = defaultArg modeOverride state.mode
-    let opts = box {| mode = mode; smartCase = state.smartCase; maxMatchesPerFile = min state.pageSize 50; pageSize = state.pageSize; cursor = cursor; beforeContext = state.beforeContext; afterContext = state.afterContext; classifyDefinitions = true |}
+    let opts = box {| mode = mode; smartCase = state.smartCase; maxMatchesPerFile = state.pageSize; pageSize = state.pageSize; cursor = cursor; beforeContext = state.beforeContext; afterContext = state.afterContext; classifyDefinitions = true |}
     finder.grep(state.query, opts)
 
 let private typedOf (result: obj) : GrepMatch list * int option * string option * obj =

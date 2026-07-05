@@ -39,8 +39,11 @@ let private runFind (state: FuzzyFindState) (store: TypedIteratorStore) (opts: S
         let value = Dyn.get raw "value"
         let matches = itemsOf value |> Array.map toFindMatch |> List.ofArray
         let totalOpt = optInt value "totalMatched"
-        let totalForPaging = totalOpt |> Option.defaultValue 0
         let totalFiles = optInt value "totalFiles" |> Option.defaultValue 0
+        let totalForPaging =
+            match totalOpt with
+            | Some total -> total
+            | None -> if matches.Length >= state.pageSize then (state.pageIndex + 2) * state.pageSize else 0
         let body = formatFindOutput (Some { items = matches; totalMatched = totalOpt; totalFiles = totalFiles })
         let nextIterator = findNextIterator state store opts totalForPaging
         let output =
