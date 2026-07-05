@@ -32,18 +32,14 @@ open Wanxiangshu.Shell.EventLogRuntime
 
 let applyActiveToolFilterForMainSession (piObj: obj) (ctxObj: obj) : JS.Promise<unit> =
     promise {
-        let pi = unbox<IPi> piObj
-        let ctx = unbox<INudgeHooksContext> ctxObj
         let active =
-            match pi.getActiveTools with
-            | Some getActive ->
-                unbox<obj array> (getActive ()) |> Array.map string
-            | None -> [||]
+            if Dyn.typeIs (Dyn.get piObj "getActiveTools") "function" then
+                unbox<obj array> (piObj?getActiveTools()) |> Array.map string
+            else [||]
         let filtered = filterOmpMainSessionActiveTools active
         if filtered.Length <> active.Length then
-            match pi.setActiveTools with
-            | Some setTools -> do! setTools filtered
-            | None -> ()
+            if Dyn.typeIs (Dyn.get piObj "setActiveTools") "function" then
+                do! piObj?setActiveTools(filtered)
     }
 
 let beforeAgentStartHandler (piObj: obj) (event: obj) (ctxObj: obj) : JS.Promise<obj> =
