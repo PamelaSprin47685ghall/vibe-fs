@@ -36,9 +36,14 @@ let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]
             let token = string timestamp
             let modified = System.DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime.ToString("O")
             return
-                files
-                |> Array.ofList
-                |> Array.mapi (fun index f ->
+                if isNull (box files) then [||]
+                else
+                    files
+                    |> List.choose (fun f ->
+                        if isNull (box f) then None
+                        else Some f)
+                    |> Array.ofList
+                    |> Array.mapi (fun index f ->
                     { path = f.label
                       callId = $"caps-fr-{token}-{index}"
                       input = {| path = f.label |}

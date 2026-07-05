@@ -20,8 +20,12 @@ let stableFingerprint (hashFn: string -> string) (capsFiles: CapsFile list) : st
 /// file discovery lives in the shell; this only formats.
 let buildCapitalsContext (files: CapsFile list) : string =
     let items =
-        files |> List.map (fun f ->
-            createObj [ "label", box f.label; "content", box f.content ])
+        if isNull (box files) then []
+        else
+            files
+            |> List.choose (fun f ->
+                if isNull (box f) then None
+                else Some (createObj [ "label", box f.label; "content", box f.content ]))
     frontMatter [ yamlSeqField "caps" items ]
 
 let formatReadOutput (filePath: string) (content: string) (startLine: int) : string =

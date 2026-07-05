@@ -74,19 +74,27 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
                         else
                             let! ompFiles = findOmpCapsFiles cwd
                             let baseFiles =
-                                ompFiles
-                                |> List.map (fun (f: OmpCapsFile) ->
-                                    { filePath = f.filePath
-                                      label = f.label
-                                      content = f.content } : CapsFile)
+                                if isNull (box ompFiles) then []
+                                else
+                                    ompFiles
+                                    |> List.choose (fun (f: OmpCapsFile) ->
+                                        if isNull (box f) then None
+                                        else
+                                            Some ({ filePath = f.filePath
+                                                    label = f.label
+                                                    content = f.content } : CapsFile))
                             return!
                                 Wanxiangshu.Shell.MessageTransformHostHooks.injectSubagentFilesIfAny
                                     ExecutorTools.ompScope plan baseFiles
                     }
                 let buildCaps encoded (capsFiles: CapsFile list) prelude =
                     let ompCaps =
-                        capsFiles
-                        |> List.map (fun f -> { filePath = f.filePath; label = f.label; content = f.content } : OmpCapsFile)
+                        if isNull (box capsFiles) then []
+                        else
+                            capsFiles
+                            |> List.choose (fun f ->
+                                if isNull (box f) then None
+                                else Some ({ filePath = f.filePath; label = f.label; content = f.content } : OmpCapsFile))
                     buildCapsEntries sha256HexTruncated encoded cwd ompCaps prelude
                 return!
                     runHostMessagesTransform

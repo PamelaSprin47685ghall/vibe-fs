@@ -98,3 +98,12 @@ let capsRespectsFileCountBudget () = promise {
         raise e
     do! rmAsync root
 }
+
+let formatOmpCapsContextHandlesNulls () =
+    let filesWithNulls : OmpCapsFile list =
+        [ unbox null
+          { filePath = "a"; label = "a.md"; content = "hello" }
+          unbox null ]
+    let context = formatOmpCapsContext filesWithNulls
+    check "formatOmpCapsContext does not crash on null/undefined and yields a.md content" (context.Contains "hello")
+    check "formatOmpCapsContext does not contain null or undefined files" (not (context.Contains "undefined") && not (context.Contains "null"))

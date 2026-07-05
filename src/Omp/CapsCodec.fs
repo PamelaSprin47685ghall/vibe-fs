@@ -31,7 +31,12 @@ let private stripExistingCapsMessages (entries: obj array) : obj array =
             id <> "" && id.StartsWith "caps-synth-")
 
 let private ompCapsToKernel (files: OmpCapsFile list) : CapsFile list =
-    files |> List.map (fun f -> { filePath = f.filePath; label = f.label; content = f.content })
+    if isNull (box files) then []
+    else
+        files
+        |> List.choose (fun f ->
+            if isNull (box f) then None
+            else Some { filePath = f.filePath; label = f.label; content = f.content })
 
 let private buildTextPart (text: string) : obj =
     createObj [ "type", box "text"; "text", box text ]
