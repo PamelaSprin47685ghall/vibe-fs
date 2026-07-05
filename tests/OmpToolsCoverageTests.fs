@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.OmpPluginTestsHarness
+open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.FallbackRuntimeState
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -70,11 +71,13 @@ let run () = promise {
     let h5 = createPiHarness ()
     let pi5 = piObject h5
     let store5 = createReviewStore ()
+    let! workspaceDir = mkdtempAsync "omp-cov-session-"
     // ctx with getSessionId returning a valid id and a no-op notify
     let ctx =
         createObj [
             "sessionManager", box(createObj [ "getSessionId", box(fun () -> box "cov-session") ])
             "ui", box(createObj [ "notify", box(fun (_: string) (_: string) -> ()) ])
+            "cwd", box workspaceDir
         ]
     // active review → activates loop, should call sendMessage
     do! Wanxiangshu.Omp.ReviewToolsLoop.handleLoopCommand pi5 store5 "fix login flow" ctx
@@ -87,4 +90,5 @@ let run () = promise {
     // cancel the loop
     do! Wanxiangshu.Omp.ReviewToolsLoop.handleLoopCommand pi5 store5 "" ctx
     check "loop cancelled without error" true
+    do! rmAsync workspaceDir
 }

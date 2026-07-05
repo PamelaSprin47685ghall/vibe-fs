@@ -13,6 +13,15 @@ let private createRequire' : string -> (string -> obj) = jsNative
 [<Global("import.meta")>]
 let private importMeta : obj = jsNative
 
+[<Import("mkdtempSync", "node:fs")>]
+let private mkdtempSync (template: string) : string = jsNative
+
+[<Import("join", "node:path")>]
+let private pathJoin (a: string) (b: string) : string = jsNative
+
+[<Import("tmpdir", "node:os")>]
+let private tmpdir () : string = jsNative
+
 let requireFn : string -> obj = createRequire'(string importMeta?url)
 let fsAsync : obj = requireFn("fs")?promises
 let pathModule : obj = requireFn("path")
@@ -31,7 +40,10 @@ let sharedMuxRegistration () : obj =
     match cachedMuxRegistration with
     | Some reg -> reg
     | None ->
-        let reg = createRegistration (muxDepsWithFixedNow ())
+        let deps = muxDepsWithFixedNow ()
+        let isolatedDir = mkdtempSync (pathJoin (tmpdir ()) "wanxiang-shared-mux-")
+        deps?directory <- isolatedDir
+        let reg = createRegistration deps
         cachedMuxRegistration <- Some reg
         reg
 

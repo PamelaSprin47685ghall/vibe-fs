@@ -6,6 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.IntegrationMuxSetup
 open Wanxiangshu.Tests.EventLogTestSeed
 open Wanxiangshu.Tests.AsyncFlush
+open Wanxiangshu.Tests.TempWorkspace
 
 open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Kernel.ReviewPrompts
@@ -20,11 +21,13 @@ let private processCwd () : string = jsNative
 let private loopAnchor task = frontMatterPrompt [ yamlField taskField task ] "With-Review Mode is active."
 
 let repeatedTodoNudgeSpec () = promise {
+    let! tempDir = mkdtempAsync "mux-todo-nudge-"
     let mutable history = [| muxTextMessage "repeat-assistant-1" "assistant" "first" |]
     let nudges = ResizeArray<string>()
     let reg =
         createRegistration
             (createObj [
+                "directory", box tempDir
                 "loadConfigOrDefault", box (fun () -> createObj [])
                 "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
                 "resolveAgentFrontmatter", box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
@@ -57,16 +60,19 @@ let repeatedTodoNudgeSpec () = promise {
     do! hook $ (streamEnd "repeat-ws" [| textPart "second" |], helpers ["pending"]) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
     check "fresh assistant output re-allows todo nudge" (nudges.Count = 2)
+    do! rmAsync tempDir
 }
 
 let reviewerReviseRenudgesLoopSpec () = promise {
+    let! tempDir = mkdtempAsync "mux-review-revise-"
     let sessionID = "review-revise-ws"
-    do! seedLoopActivated (processCwd ()) sessionID "Implement feature X"
+    do! seedLoopActivated tempDir sessionID "Implement feature X"
     let mutable history = [| muxTextMessage "review-loop-anchor" "assistant" (loopAnchor "Implement feature X")
                              muxTextMessage "review-assistant-1" "assistant" "implemented first pass" |]
     let reg =
         createRegistration
             (createObj [
+                "directory", box tempDir
                 "loadConfigOrDefault", box (fun () -> createObj [])
                 "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
                 "resolveAgentFrontmatter", box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
@@ -96,16 +102,19 @@ let reviewerReviseRenudgesLoopSpec () = promise {
     do! hook $ (streamEnd "verdict: needs_revision\nfeedback: needs rework", helpers) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
     check "reviewer reject reopens loop nudge on fresh assistant output" (nudges.Count = 2 && nudges.[1].Contains(loopNudgePromptProse))
+    do! rmAsync tempDir
 }
 
 let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () = promise {
+    let! tempDir = mkdtempAsync "mux-review-wip-nudge-"
     let sessionID = "review-wip-nudge-ws"
-    do! seedLoopActivated (processCwd ()) sessionID "Implement feature X"
+    do! seedLoopActivated tempDir sessionID "Implement feature X"
     let mutable history = [| muxTextMessage "review-wip-loop-anchor" "assistant" (loopAnchor "Implement feature X")
                              muxTextMessage "review-wip-assistant-1" "assistant" "implemented first pass" |]
     let reg =
         createRegistration
             (createObj [
+                "directory", box tempDir
                 "loadConfigOrDefault", box (fun () -> createObj [])
                 "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
                 "resolveAgentFrontmatter", box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
@@ -137,15 +146,18 @@ let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () = promise {
     do! hook $ (streamEnd "continued after wip report", helpers) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
     check "wip submit_review does not permanently suppress loop nudge" (nudges.Count = 2 && nudges.[1].Contains(loopNudgePromptProse))
+    do! rmAsync tempDir
 }
 
 let muxForceStopTodoNudgeSpec () = promise {
+    let! tempDir = mkdtempAsync "mux-force-stop-"
     let sessionID = "force-stop-ws"
     let mutable history = [| muxTextMessage "force-assistant-1" "assistant" "working on it" |]
     let nudges = ResizeArray<string>()
     let reg =
         createRegistration
             (createObj [
+                "directory", box tempDir
                 "loadConfigOrDefault", box (fun () -> createObj [])
                 "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
                 "resolveAgentFrontmatter", box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
@@ -174,15 +186,18 @@ let muxForceStopTodoNudgeSpec () = promise {
     do! hook $ (streamEnd sessionID [| textPart "working on it" |], helpers ["pending"]) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
     check "force-stop must not send todo nudge" (nudges.Count = 0)
+    do! rmAsync tempDir
 }
 
 let nudgeWithoutChatHistoryButEventCarriesTextSpec () = promise {
+    let! tempDir = mkdtempAsync "mux-no-chat-history-"
     let sessionID = "no-chat-history-ws-" + System.Guid.NewGuid().ToString()
-    do! seedLoopActivated (processCwd ()) sessionID "Implement feature X"
+    do! seedLoopActivated tempDir sessionID "Implement feature X"
     let nudges = ResizeArray<string>()
     let reg =
         createRegistration
             (createObj [
+                "directory", box tempDir
                 "loadConfigOrDefault", box (fun () -> createObj [])
                 "findWorkspaceEntry", box (System.Func<obj, string, obj>(fun _ _ -> createObj [ "workspace", null ]))
                 "resolveAgentFrontmatter", box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
@@ -204,4 +219,5 @@ let nudgeWithoutChatHistoryButEventCarriesTextSpec () = promise {
     do! hook $ (streamEnd sessionID [| textPart "finished first step successfully" |], helpers) |> unbox<JS.Promise<unit>>
     do! yieldMicrotask ()
     check "loop nudge fires from event-carried text when getChatHistory is absent" (nudges.Count = 1 && nudges.[0].Contains(loopNudgePromptProse))
+    do! rmAsync tempDir
 }

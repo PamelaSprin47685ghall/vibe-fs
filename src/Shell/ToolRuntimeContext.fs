@@ -1,10 +1,17 @@
 module Wanxiangshu.Shell.ToolRuntimeContext
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.ToolContext
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeContextCodec
 open Wanxiangshu.Shell.ToolContextCodec
+
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
+
+let private getCwd () : string = unbox<string> (nodeProcess?cwd())
 
 type IToolRuntimeContext = {
     Execution: ToolExecutionContext
@@ -24,7 +31,8 @@ let fromOpencode (context: obj) (fallbackDir: string) : IToolRuntimeContext =
     { Execution = execution; AbortSignal = abortSignalOption (getAbortSignalFromContext context) }
 
 let pluginDirectoryFromCtx (ctx: obj) : string =
-    (fromOpencode ctx "").Execution.Directory
+    let dir = (fromOpencode ctx "").Execution.Directory
+    if System.String.IsNullOrWhiteSpace dir then getCwd () else dir
 
 let sessionId (ctx: IToolRuntimeContext) : SessionId = ctx.Execution.SessionId
 

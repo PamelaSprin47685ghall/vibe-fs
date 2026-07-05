@@ -81,6 +81,7 @@ let agentEndSkipsLoopNudgeWithoutWorkerTaskAnchor () = promise {
     let pi = piObject h
     do! wanxiangshuExtension pi
     let reviewerOnly = Wanxiangshu.Kernel.ReviewPrompts.Submission.reviewerPrompt "do task" "" []
+    let! workspaceDir = mkdtempAsync "omp-agent-end-skips-"
     let ctxEnd =
         createObj [
             "sessionManager",
@@ -90,9 +91,11 @@ let agentEndSkipsLoopNudgeWithoutWorkerTaskAnchor () = promise {
                         "getEntries", box(fun () -> box [| createObj [ "message", box (createObj [ "role", box "assistant"; "content", box [| createObj [ "type", box "text"; "text", box reviewerOnly ] |] ]) ] |])
                     ])
             "hasPendingMessages", box(fun () -> box false)
+            "cwd", box workspaceDir
         ]
     do! invokeHandler h "agent_end" (createObj []) ctxEnd
     check "reviewer-only history does not emit loop reminder" (h.messages.Count = 0)
+    do! rmAsync workspaceDir
 }
 
 let agentEndSkipsLoopNudgeWhenPendingMessages () = promise {
@@ -100,10 +103,12 @@ let agentEndSkipsLoopNudgeWhenPendingMessages () = promise {
     let h = createPiHarness ()
     let pi = piObject h
     do! wanxiangshuExtension pi
+    let! workspaceDir = mkdtempAsync "omp-agent-end-pending-"
     let ctxLoop =
         createObj [
             "sessionManager", box(createObj [ "getSessionId", box(fun () -> box "session-3") ])
             "ui", box(createObj [ "notify", box(fun (_: obj) (_: obj) -> ()) ])
+            "cwd", box workspaceDir
         ]
     do!
         emitJsExpr (eventHandler h "input", createObj [ "text", box "/loop gated" ], ctxLoop)
@@ -119,9 +124,11 @@ let agentEndSkipsLoopNudgeWhenPendingMessages () = promise {
                         "getEntries", box(fun () -> box [||])
                     ])
             "hasPendingMessages", box(fun () -> box true)
+            "cwd", box workspaceDir
         ]
     do! invokeHandler h "agent_end" (createObj []) ctxEnd
     check "no loop reminder when pending" (h.messages.Count = countAfterLoop)
+    do! rmAsync workspaceDir
 }
 
 let agentEndTodoNudgeWhenOpenPhases () = promise {

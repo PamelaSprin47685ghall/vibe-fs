@@ -5,6 +5,12 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeContextCodec
+open Wanxiangshu.Shell.ToolRuntimeContext
+
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
+
+let private getCwd () : string = unbox<string> (nodeProcess?cwd())
 
 let abortNullWhenContextNull () =
     let signal = getAbortSignalFromContext null
@@ -27,8 +33,14 @@ let abortReturnsPresentAbortObject () =
     signal?aborted <- box true
     check "abort present mutates shared object" (unbox<bool> context?abort?aborted)
 
+let pluginDirectoryFallbackToCwd () =
+    let context = createObj []
+    let dir = pluginDirectoryFromCtx context
+    equal "pluginDirectoryFromCtx falls back to CWD" (getCwd ()) dir
+
 let run () =
     abortNullWhenContextNull ()
     abortNullWhenContextUndefined ()
     abortNullWhenAbortMissing ()
     abortReturnsPresentAbortObject ()
+    pluginDirectoryFallbackToCwd ()

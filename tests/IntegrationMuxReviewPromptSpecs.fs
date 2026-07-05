@@ -107,6 +107,7 @@ let muxLoopReviewPromptUsesFrontMatterSpec () = promise {
     let prompts = ResizeArray<string>()
     let deps = minimalMuxDeps ()
     deps?("taskService") <- mockMuxTaskServiceReturningVerdicts prompts [ "PERFECT" ]
+    deps?("directory") <- workspaceDir
     let reg = createRegistration deps
     let commands = unbox<obj[]> (get reg "slashCommands")
     let loopReview = commands |> Array.find (fun command -> str command "key" = "loop-review")
