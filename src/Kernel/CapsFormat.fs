@@ -11,10 +11,14 @@ type CapsFile = { filePath: string; label: string; content: string }
 /// Stable fingerprint over caps files — kernel decides WHAT to hash, the
 /// injected `hashFn` decides HOW (e.g. Shell.Crypto.sha256HexTruncated).
 let stableFingerprint (hashFn: string -> string) (capsFiles: CapsFile list) : string =
-    capsFiles
-    |> List.collect (fun cap -> [ cap.filePath; "\u0000"; cap.content; "\u0000" ])
-    |> String.concat ""
-    |> hashFn
+    if isNull (box capsFiles) then ""
+    else
+        capsFiles
+        |> List.collect (fun cap ->
+            if isNull (box cap) || isNull (box cap.filePath) || isNull (box cap.content) then []
+            else [ cap.filePath; "\u0000"; cap.content; "\u0000" ])
+        |> String.concat ""
+        |> hashFn
 
 /// Wrap already-discovered capability files as a YAML front-matter block. Pure:
 /// file discovery lives in the shell; this only formats.

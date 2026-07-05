@@ -42,6 +42,9 @@ let ompTestEntries () : (string * TestBody) list =
     "OmpCapsTests.capsSkipsExcludedDirs", Async OmpCapsTests.capsSkipsExcludedDirs
     "OmpCapsTests.capsRespectsFileCountBudget", Async OmpCapsTests.capsRespectsFileCountBudget
     "OmpCapsTests.formatOmpCapsContextHandlesNulls", Sync (sync OmpCapsTests.formatOmpCapsContextHandlesNulls)
+    "OmpCapsTests.stableFingerprintHandlesNulls", Sync (sync OmpCapsTests.stableFingerprintHandlesNulls)
+    "OmpCapsTests.buildMeditatorSectionsHandlesNulls", Sync (sync OmpCapsTests.buildMeditatorSectionsHandlesNulls)
+    "OmpCapsTests.workspaceFilesAbsorbHandlesNulls", Sync (sync OmpCapsTests.workspaceFilesAbsorbHandlesNulls)
     "OmpFuzzyTests.fuzzyFindIteratorSingleUse", Sync (sync OmpFuzzyTests.fuzzyFindIteratorSingleUse)
     "OmpFuzzyTests.fuzzyGrepIteratorSingleUse", Sync (sync OmpFuzzyTests.fuzzyGrepIteratorSingleUse)
     "OmpFuzzyTests.registeredFuzzyToolsExposeIteratorParam", Async OmpFuzzyTests.registeredFuzzyToolsExposeIteratorParam

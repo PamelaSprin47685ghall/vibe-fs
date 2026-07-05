@@ -27,8 +27,12 @@ let parallelPromptsFromIntents
     | Ok intents -> Ok (promptsForParallelIntents host constructor intents)
 
 let buildMeditatorSections (files: string array) (results: ReverieFileResult array) : MeditatorFileSection array =
-    Array.zip files results
-    |> Array.map (fun (file, r) -> { file = file; content = r.content })
+    if isNull (box files) || isNull (box results) then [||]
+    else
+        Array.zip files results
+        |> Array.choose (fun (file, r) ->
+            if isNull (box r) then None
+            else Some { file = file; content = r.content })
 
 let meditatorPromptFromFiles (host: Host) (cwd: string) (intent: string) (files: string array) : JS.Promise<Result<string, DomainError>> =
     promise {

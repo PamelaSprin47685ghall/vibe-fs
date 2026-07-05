@@ -14,11 +14,13 @@ let fresh () : Budget = { results = ResizeArray (); totalBytes = 0; count = 0 }
 let isFull (budget: Budget) : bool = budget.count >= 2000 || budget.totalBytes >= (8 * 1_048_576)
 
 let absorb (file: CapsFile) (budget: Budget) : Budget =
-    let nextTotal = budget.totalBytes + file.content.Length
-    if nextTotal > (8 * 1_048_576) then budget
+    if isNull (box file) || isNull (box file.content) then budget
     else
-        budget.results.Add file
-        { results = budget.results; totalBytes = nextTotal; count = budget.count + 1 }
+        let nextTotal = budget.totalBytes + file.content.Length
+        if nextTotal > (8 * 1_048_576) then budget
+        else
+            budget.results.Add file
+            { results = budget.results; totalBytes = nextTotal; count = budget.count + 1 }
 
 [<Import("parse", "yaml")>]
 let private yamlParse (text: string) : obj = jsNative

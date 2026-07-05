@@ -51,22 +51,32 @@ let private buildUserEntry (userId: string) (sessionId: string) (preludeText: st
     createObj [ "info", box info; "parts", box [| buildTextPart text |] ]
 
 let private buildReadToolPart (cap: CapsFile) (fp: string) (index: int) : obj =
-    createObj [
-        "type", box "tool"
-        "tool", box "read"
-        "callID", box $"caps-call-{fp}-{index}"
-        "state",
-            box(
-                createObj [
-                    "status", box "completed"
-                    "input", box(createObj [ "filePath", box cap.filePath ])
-                    "output", box(formatReadOutput cap.filePath cap.content 1)
-                    "error", box ""
-                ])
-    ]
+    if isNull (box cap) || isNull (box cap.filePath) || isNull (box cap.content) then box null
+    else
+        createObj [
+            "type", box "tool"
+            "tool", box "read"
+            "callID", box $"caps-call-{fp}-{index}"
+            "state",
+                box(
+                    createObj [
+                        "status", box "completed"
+                        "input", box(createObj [ "filePath", box cap.filePath ])
+                        "output", box(formatReadOutput cap.filePath cap.content 1)
+                        "error", box ""
+                    ])
+        ]
 
 let private buildAssistantEntry (assistantId: string) (parentUserId: string) (sessionId: string) (projectRoot: string) (capsFiles: CapsFile list) (fp: string) : obj =
-    let parts = capsFiles |> List.mapi (fun i cap -> buildReadToolPart cap fp i) |> List.toArray
+    let parts =
+        if isNull (box capsFiles) then [||]
+        else
+            capsFiles
+            |> List.mapi (fun i cap -> (i, cap))
+            |> List.choose (fun (i, cap) ->
+                let p = buildReadToolPart cap fp i
+                if isNull (box p) then None else Some p)
+            |> List.toArray
     let info = createObj [ "id", box assistantId; "role", box "assistant"; "parentID", box parentUserId ]
     if sessionId <> "" then info?sessionID <- box sessionId
     if projectRoot <> "" then info?path <- box(createObj [ "cwd", box projectRoot; "root", box projectRoot ])
