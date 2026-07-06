@@ -25,14 +25,16 @@
     "index.d.ts"
   ],
   "scripts": {
-    "build": "dotnet fable wanxiangshu.fsproj --outDir build --noCache",
+    "build": "dotnet fable wanxiangshu-core.fsproj --outDir build --noCache",
+    "build:tests": "dotnet fable wanxiangshu-tests.fsproj --outDir build --noCache",
+    "build:e2e": "dotnet fable wanxiangshu-e2e.fsproj --outDir build --noCache",
     "postbuild": "node scripts/postbuild.mjs",
     "test": "node tests/runner.js",
-    "build-and-test": "npm run build && npm run test",
-    "e2e": "npm run build && node build/tests/runner.js --e2e",
-    "e2e:mux": "npm run build && node build/tests/runner.js --e2e-mux",
-    "e2e:opencode-plugin": "npm run build && node build/tests/runner.js --e2e-opencode-plugin",
-    "e2e-omp": "npm run build && node build/tests/runner.js --e2e-omp"
+    "build-and-test": "npm run build:tests && npm run test",
+    "e2e": "npm run build:e2e && node tests/runner.js --e2e",
+    "e2e:mux": "npm run build:e2e && node tests/runner.js --e2e-mux",
+    "e2e:opencode-plugin": "npm run build:e2e && node tests/runner.js --e2e-opencode-plugin",
+    "e2e-omp": "npm run build:e2e && node tests/runner.js --e2e-omp"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.4.0",
