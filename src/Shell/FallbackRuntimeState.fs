@@ -16,6 +16,29 @@ type FallbackRuntimeState() =
     let mutable agents = Map.ofList<string, string> []
     let mutable busyCounts = Map.ofList<string, int> []
     let mutable consumed = Map.ofList<string, bool> []
+    let mutable listeners = Map.empty<string, ResizeArray<unit -> unit>>
+
+    let triggerStateChanged (sessionID: string) : unit =
+        match Map.tryFind sessionID listeners with
+        | Some arr ->
+            let copy = arr.ToArray()
+            arr.Clear()
+            for cb in copy do
+                try cb () with _ -> ()
+        | None -> ()
+
+    member _.OnStateChanged(sessionID: string) (callback: unit -> unit) : unit =
+        let list =
+            match Map.tryFind sessionID listeners with
+            | Some arr -> arr
+            | None ->
+                let arr = ResizeArray<unit -> unit>()
+                listeners <- Map.add sessionID arr listeners
+                arr
+        list.Add(callback)
+
+    member _.HasState(sessionID: string) : bool =
+        Map.containsKey sessionID states
 
     member _.GetOrCreateState(sessionID: string) : SessionFallbackState =
         match Map.tryFind sessionID states with
@@ -26,6 +49,7 @@ type FallbackRuntimeState() =
 
     member _.UpdateState(sessionID: string) (state: SessionFallbackState) : unit =
         states <- Map.add sessionID state states
+        triggerStateChanged sessionID
 
     member _.GetChain(sessionID: string) : FallbackChain =
         Map.tryFind sessionID chains |> Option.defaultValue []
@@ -47,12 +71,14 @@ type FallbackRuntimeState() =
 
     member _.SetConsumed(sessionID: string) (value: bool) : unit =
         consumed <- Map.add sessionID value consumed
+        triggerStateChanged sessionID
 
     member _.GetConsumed(sessionID: string) : bool option =
         Map.tryFind sessionID consumed
 
     member _.ClearConsumed(sessionID: string) : unit =
         consumed <- Map.remove sessionID consumed
+        triggerStateChanged sessionID
 
     member _.CleanupSession(sessionID: string) : unit =
         states <- Map.remove sessionID states
@@ -60,3 +86,4 @@ type FallbackRuntimeState() =
         agents <- Map.remove sessionID agents
         busyCounts <- Map.remove sessionID busyCounts
         consumed <- Map.remove sessionID consumed
+        triggerStateChanged sessionID

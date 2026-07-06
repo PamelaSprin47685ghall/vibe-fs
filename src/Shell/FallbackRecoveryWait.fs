@@ -11,15 +11,21 @@ let isRecoverySettled (runtime: FallbackRuntimeState) (sessionID: string) : bool
         let st = runtime.GetOrCreateState sessionID
         st.Phase = FallbackPhase.Exhausted
 
-[<Emit("new Promise(function(resolve){ queueMicrotask(resolve); })")>]
-let private yieldMicrotask () : JS.Promise<unit> = jsNative
+let waitForRecovery (runtime: FallbackRuntimeState) (sessionID: string) (_maxTurns: int) : JS.Promise<unit> =
+    promise {
+        if sessionID = "" || isRecoverySettled runtime sessionID then
+            return ()
+        else
+            let resolver = ref (fun () -> ())
+            let p = Promise.create (fun resolve reject ->
+                resolver.Value <- resolve
+            )
+            let rec checkSettled () =
+                if isRecoverySettled runtime sessionID then
+                    resolver.Value ()
+                else
+                    runtime.OnStateChanged sessionID checkSettled
 
-let waitForRecovery (runtime: FallbackRuntimeState) (sessionID: string) (maxTurns: int) : JS.Promise<unit> =
-    let rec loop (remaining: int) : JS.Promise<unit> =
-        promise {
-            if sessionID = "" || remaining <= 0 || isRecoverySettled runtime sessionID then ()
-            else
-                do! yieldMicrotask ()
-                do! loop (remaining - 1)
-        }
-    loop maxTurns
+            runtime.OnStateChanged sessionID checkSettled
+            return! p
+    }
