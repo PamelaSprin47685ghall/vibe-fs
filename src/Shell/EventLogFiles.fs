@@ -25,12 +25,6 @@ let private unlinkAsync (path: string) : JS.Promise<unit> = jsNative
 [<Import("stat", "node:fs/promises")>]
 let private statAsync (path: string) : JS.Promise<obj> = jsNative
 
-type private EventLogCache =
-    { mutable Size : float
-      mutable Mtime : float
-      mutable Events : WanEvent list }
-
-
 let private readEventsFromText (text: string) : WanEvent list =
     if text = "" then []
     else
@@ -103,52 +97,89 @@ type EventLogStore(workspaceRoot: string) =
     let queue = SerialQueue()
     let root = workspaceRoot
     let eventFilePath = eventPath root
-    let mutable cache : EventLogCache option = None
+    let mutable sessionStates : Map<string, SessionState> = Map.empty
+    let mutable initDone = false
+    let mutable initPromise : JS.Promise<unit> option = None
+
+    let ensureInitializedInternal () : JS.Promise<unit> =
+        promise {
+            if initDone then return ()
+            else
+                do! withWorkspaceLock eventFilePath (fun () ->
+                    promise {
+                        let! events = readEventsFile eventFilePath
+                        for e in events do
+                            let sId = e.Session
+                            let oldState =
+                                match Map.tryFind sId sessionStates with
+                                | Some st -> st
+                                | None -> emptySessionState ()
+                            let newState = applyEvent oldState e
+                            sessionStates <- Map.add sId newState sessionStates
+                        initDone <- true
+                    })
+        }
+
+    let ensureInitialized () : JS.Promise<unit> =
+        match initPromise with
+        | Some p -> p
+        | None ->
+            let p = ensureInitializedInternal ()
+            initPromise <- Some p
+            p
 
     member _.ReadAllEvents() : JS.Promise<WanEvent list> =
         queue.Enqueue(fun () ->
-            match cache with
-            | Some c -> Promise.lift c.Events
-            | None ->
-                withWorkspaceLock eventFilePath (fun () ->
-                    promise {
-                        let path = eventFilePath
-                        let! events = readEventsFile path
-                        cache <- Some { Size = 0.0; Mtime = 0.0; Events = events }
-                        return events
-                    }))
+            withWorkspaceLock eventFilePath (fun () ->
+                readEventsFile eventFilePath))
+
+    member _.GetSessionState(sessionId: string) : JS.Promise<SessionState> =
+        promise {
+            do! ensureInitialized ()
+            match Map.tryFind sessionId sessionStates with
+            | Some st -> return st
+            | None -> return emptySessionState ()
+        }
 
     member _.AppendEvent(e: WanEvent) : JS.Promise<Result<unit, string>> =
         queue.Enqueue(fun () ->
-            withWorkspaceLock eventFilePath (fun () ->
-                promise {
-                    try
-                        let path = eventFilePath
-                        let line = wanEventToLine e + "\n"
-                        do! appendFileAsync path line
-                        match cache with
-                        | Some c -> c.Events <- c.Events @ [e]
-                        | None ->
-                            let! events = readEventsFile path
-                            cache <- Some { Size = 0.0; Mtime = 0.0; Events = events }
-                        return Ok ()
-                    with ex ->
-                        return Error ex.Message
-                }))
+            promise {
+                do! ensureInitialized ()
+                let sId = e.Session
+                let oldState =
+                    match Map.tryFind sId sessionStates with
+                    | Some st -> st
+                    | None -> emptySessionState ()
+                let newState = applyEvent oldState e
+                sessionStates <- Map.add sId newState sessionStates
+                try
+                    do! withWorkspaceLock eventFilePath (fun () ->
+                        promise {
+                            let line = wanEventToLine e + "\n"
+                            do! appendFileAsync eventFilePath line
+                        })
+                    return Ok ()
+                with ex ->
+                    return Error ex.Message
+            })
 
     member _.AppendEventOrFail(e: WanEvent) : JS.Promise<unit> =
         queue.Enqueue(fun () ->
-            withWorkspaceLock eventFilePath (fun () ->
-                promise {
-                    let path = eventFilePath
-                    let line = wanEventToLine e + "\n"
-                    do! appendFileAsync path line
-                    match cache with
-                    | Some c -> c.Events <- c.Events @ [e]
-                    | None ->
-                        let! events = readEventsFile path
-                        cache <- Some { Size = 0.0; Mtime = 0.0; Events = events }
-                }))
+            promise {
+                do! ensureInitialized ()
+                let sId = e.Session
+                let oldState =
+                    match Map.tryFind sId sessionStates with
+                    | Some st -> st
+                    | None -> emptySessionState ()
+                let newState = applyEvent oldState e
+                sessionStates <- Map.add sId newState sessionStates
+                do! withWorkspaceLock eventFilePath (fun () ->
+                    promise {
+                        let line = wanEventToLine e + "\n"
+                        do! appendFileAsync eventFilePath line
+                    })
+            })
 
     member _.TryClaimNudgeDispatch
         (sessionId: string)
@@ -157,34 +188,28 @@ type EventLogStore(workspaceRoot: string) =
         (isBlocked: NudgeDedupState -> string -> bool)
         : JS.Promise<bool> =
         queue.Enqueue(fun () ->
-            withWorkspaceLock eventFilePath (fun () ->
-                promise {
-                    let path = eventFilePath
-                    let! events =
-                        match cache with
-                        | Some c -> Promise.lift c.Events
-                        | None ->
-                            promise {
-                                let! evs = readEventsFile path
-                                cache <- Some { Size = 0.0; Mtime = 0.0; Events = evs }
-                                return evs
-                            }
-                    let trimmedAnchor = anchor.Trim()
-                    let snap = foldNudgeSnapshot sessionId events
-                    let currentAnchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
-                    if currentAnchor.Trim() <> trimmedAnchor then return false
-                    elif isBlocked (foldNudgeDedup sessionId events) trimmedAnchor then return false
-                    else
-                        let payload =
-                            Map [ "action", Wanxiangshu.Kernel.Nudge.toString action; "anchor", trimmedAnchor ]
-                        let ev =
-                            buildEvent sessionId eventKindNudgeDispatched payload (getTimestampMs().ToString())
-                        let line = wanEventToLine ev + "\n"
-                        do! appendFileAsync path line
-                        match cache with
-                        | Some c -> c.Events <- c.Events @ [ev]
-                        | None ->
-                            let! evs = readEventsFile path
-                            cache <- Some { Size = 0.0; Mtime = 0.0; Events = evs }
-                        return true
-                }))
+            promise {
+                do! ensureInitialized ()
+                let trimmedAnchor = anchor.Trim()
+                let oldState =
+                    match Map.tryFind sessionId sessionStates with
+                    | Some st -> st
+                    | None -> emptySessionState ()
+                let snap = oldState.NudgeSnapshot
+                let currentAnchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
+                if currentAnchor.Trim() <> trimmedAnchor then return false
+                elif isBlocked oldState.NudgeDedup trimmedAnchor then return false
+                else
+                    let payload =
+                        Map [ "action", Wanxiangshu.Kernel.Nudge.toString action; "anchor", trimmedAnchor ]
+                    let ev =
+                        buildEvent sessionId eventKindNudgeDispatched payload (getTimestampMs().ToString())
+                    let newState = applyEvent oldState ev
+                    sessionStates <- Map.add sessionId newState sessionStates
+                    do! withWorkspaceLock eventFilePath (fun () ->
+                        promise {
+                            let line = wanEventToLine ev + "\n"
+                            do! appendFileAsync eventFilePath line
+                        })
+                    return true
+            })

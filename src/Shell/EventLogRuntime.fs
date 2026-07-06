@@ -26,14 +26,6 @@ let getStore (workspaceRoot: string) : EventLogStore =
         stores <- Map.add workspaceRoot s stores
         s
 
-let getSessionEvents (workspaceRoot: string) (sessionID: string) : JS.Promise<WanEvent list> =
-    promise {
-        if sessionID = "" || workspaceRoot = "" then return []
-        else
-            let! allEvents = getStore(workspaceRoot).ReadAllEvents()
-            return allEvents |> List.filter (fun e -> e.Session = sessionID)
-    }
-
 let private appendAndCache (workspaceRoot: string) (e: WanEvent) : JS.Promise<Result<unit, string>> =
     getStore(workspaceRoot).AppendEvent e
 
@@ -42,26 +34,26 @@ let private appendAndCacheOrFail (workspaceRoot: string) (e: WanEvent) : JS.Prom
 
 let isLoopActiveFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Promise<bool> =
     promise {
-        let! events = getSessionEvents workspaceRoot sessionID
-        return foldReviewTask sessionID events |> Option.isSome
+        if sessionID = "" || workspaceRoot = "" then return false
+        else
+            let! state = getStore(workspaceRoot).GetSessionState(sessionID)
+            return state.ReviewTask |> Option.isSome
     }
 
 let syncReviewFromEventLog (store: ReviewStore) (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
     promise {
         if sessionID = "" || workspaceRoot = "" then return ()
         else
-            let! events = getSessionEvents workspaceRoot sessionID
-            let task = foldReviewTask sessionID events
-            syncReviewProjection store sessionID task
+            let! state = getStore(workspaceRoot).GetSessionState(sessionID)
+            syncReviewProjection store sessionID state.ReviewTask
     }
 
 let syncBacklogFromEventLog (host: Host) (projection: ProjectionStore) (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
     promise {
         if sessionID = "" || workspaceRoot = "" then ()
         else
-            let! events = getSessionEvents workspaceRoot sessionID
-            let backlog = foldBacklogFromEvents sessionID events
-            projection.StoreBacklog(host, sessionID, backlog)
+            let! state = getStore(workspaceRoot).GetSessionState(sessionID)
+            projection.StoreBacklog(host, sessionID, state.Backlog)
     }
 
 let appendLoopActivated (workspaceRoot: string) (sessionID: string) (task: string) : JS.Promise<Result<unit, string>> =
@@ -83,8 +75,8 @@ let nudgeBlockedForTurn (workspaceRoot: string) (sessionID: string) (assistantMe
     promise {
         if sessionID = "" || workspaceRoot = "" then return false
         else
-            let! events = getSessionEvents workspaceRoot sessionID
-            return isNudgeBlockedForAnchor (foldNudgeDedup sessionID events) assistantMessage
+            let! state = getStore(workspaceRoot).GetSessionState(sessionID)
+            return isNudgeBlockedForAnchor state.NudgeDedup assistantMessage
     }
 
 let tryClaimNudgeDispatch (workspaceRoot: string) (sessionID: string) (action: NudgeAction) (anchor: string) : JS.Promise<bool> =
@@ -94,8 +86,8 @@ let getNudgeSnapshotFromEventLog (workspaceRoot: string) (sessionID: string) : J
     promise {
         if sessionID = "" || workspaceRoot = "" then return emptyNudgeSnapshotState
         else
-            let! events = getSessionEvents workspaceRoot sessionID
-            return foldNudgeSnapshot sessionID events
+            let! state = getStore(workspaceRoot).GetSessionState(sessionID)
+            return state.NudgeSnapshot
     }
 
 let appendSubmitReviewWipRecorded (workspaceRoot: string) (sessionID: string) : JS.Promise<Result<unit, string>> =

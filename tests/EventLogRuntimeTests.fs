@@ -129,6 +129,16 @@ let tryClaimNudgeDispatchPreventsOutdatedAnchor () = promise {
     do! rmAsync dir
 }
 
+let testGetSessionStateMemoryCache () : JS.Promise<unit> = promise {
+    let! dir = mkdtempAsync "eventlog-memcache-"
+    let sessionID = "s-memcache"
+    let store : EventLogStore = EventLogStore dir
+    do! appendLoopActivated dir sessionID "task-cached" |> Promise.map ignore
+    let! state = store.GetSessionState sessionID
+    equal "memory cache review task" (Some "task-cached") state.ReviewTask
+    do! rmAsync dir
+}
+
 let run () = promise {
     do! appendThenReadAll ()
     do! syncReviewFromEventLogProjectsTask ()
@@ -139,4 +149,5 @@ let run () = promise {
     do! strictAppendLoopActivatedFailsOnBadPath ()
     do! selfHealingLockDeletesFileLock ()
     do! tryClaimNudgeDispatchPreventsOutdatedAnchor ()
+    do! testGetSessionStateMemoryCache ()
 }

@@ -188,3 +188,100 @@ let nudgeAnchorKey (turnId: string) (assistantMessage: string) : string =
 
 let isNudgeBlockedForAnchor (st: NudgeDedupState) (anchorKey: string) : bool =
     Set.contains (anchorKey.Trim()) st.DispatchedAnchors
+
+type SessionState = {
+    ReviewTask: string option
+    Backlog: BacklogEntry list
+    BacklogSnapshot: WorkBacklogSnapshot
+    NudgeDedup: NudgeDedupState
+    NudgeSnapshot: NudgeSnapshotState
+}
+
+let emptySessionState () : SessionState =
+    { ReviewTask = None
+      Backlog = []
+      BacklogSnapshot = { TodosJson = None; LatestEntry = None }
+      NudgeDedup = emptyNudgeDedupState
+      NudgeSnapshot = emptyNudgeSnapshotState }
+
+let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
+    let pTask = payloadField "task" e |> Option.bind (fun t -> if t = "" then None else Some t)
+    let pVerdict = payloadField "verdict" e
+    let pAnchor = payloadField "anchor" e |> Option.bind (fun t -> if t.Trim() = "" then None else Some (t.Trim()))
+
+    let nextReviewTask =
+        match e.Kind with
+        | k when k = eventKindLoopActivated -> pTask |> Option.orElse st.ReviewTask
+        | k when k = eventKindLoopCancelled -> None
+        | k when k = eventKindReviewVerdict ->
+            match pVerdict with
+            | Some v when isEndVerdict v -> None
+            | _ -> st.ReviewTask
+        | _ -> st.ReviewTask
+
+    let backlogEntryFromEvent () =
+        match
+            payloadField "ahaMoments" e,
+            payloadField "changesAndReasons" e,
+            payloadField "gotchas" e,
+            payloadField "lessonsAndConventions" e,
+            payloadField "plan" e
+        with
+        | Some aha, Some car, Some got, Some les, Some pl ->
+            Some { ahaMoments = aha; changesAndReasons = car; gotchas = got; lessonsAndConventions = les; plan = pl }
+        | _ -> None
+
+    let isBacklog = e.Kind = eventKindWorkBacklogCommitted
+    let nextBacklog = if isBacklog then st.Backlog @ (backlogEntryFromEvent () |> Option.toList) else st.Backlog
+    let nextBacklogSnapshot =
+        if not isBacklog then st.BacklogSnapshot
+        else
+            let entryOpt = backlogEntryFromEvent ()
+            { TodosJson = payloadField "todosJson" e |> Option.orElse st.BacklogSnapshot.TodosJson
+              LatestEntry = entryOpt |> Option.orElse st.BacklogSnapshot.LatestEntry }
+
+    let nextNudgeDedup =
+        match e.Kind with
+        | k when k = eventKindNudgeDispatched ->
+            match pAnchor with
+            | Some anchor -> { DispatchedAnchors = Set.add anchor st.NudgeDedup.DispatchedAnchors }
+            | None -> st.NudgeDedup
+        | k when k = eventKindSubmitReviewWipRecorded || k = eventKindNudgeDedupCleared -> emptyNudgeDedupState
+        | _ -> st.NudgeDedup
+
+    let nextNudgeSnapshot =
+        match e.Kind with
+        | k when k = eventKindAssistantCompleted ->
+            let msg = payloadField "assistantMessage" e |> strOrEmpty
+            let agent = payloadField "agent" e |> Option.bind (fun a -> if a = "" then None else Some a)
+            let model = payloadField "model" e |> Option.bind (fun m -> if m = "" then None else Some m)
+            let tid = payloadField "turnId" e |> strOrEmpty
+            let todosFromPayload = payloadField "openTodosJson" e |> Option.map parseTodosJson
+            { st.NudgeSnapshot with
+                lastAssistantText = msg
+                agentFromMessage = agent
+                modelFromMessage = model
+                turnId = tid
+                openTodos = match todosFromPayload with Some t -> t | None -> st.NudgeSnapshot.openTodos }
+        | k when k = eventKindLoopActivated -> { st.NudgeSnapshot with isLoopActive = true }
+        | k when k = eventKindLoopCancelled -> { st.NudgeSnapshot with isLoopActive = false }
+        | k when k = eventKindReviewVerdict ->
+            match pVerdict with
+            | Some v when isEndVerdict v -> { st.NudgeSnapshot with isLoopActive = false }
+            | _ -> st.NudgeSnapshot
+        | k when k = eventKindNudgeDispatched ->
+            match pAnchor with
+            | Some anchor -> { st.NudgeSnapshot with dispatchedAnchors = Set.add anchor st.NudgeSnapshot.dispatchedAnchors }
+            | None -> st.NudgeSnapshot
+        | k when k = eventKindSubmitReviewWipRecorded || k = eventKindNudgeDedupCleared ->
+            { st.NudgeSnapshot with dispatchedAnchors = Set.empty }
+        | k when k = eventKindWorkBacklogCommitted ->
+            let todosOpt = payloadField "todosJson" e |> Option.map parseTodosJson
+            { st.NudgeSnapshot with openTodos = todosOpt |> Option.defaultValue st.NudgeSnapshot.openTodos }
+        | _ -> st.NudgeSnapshot
+
+    { ReviewTask = nextReviewTask
+      Backlog = nextBacklog
+      BacklogSnapshot = nextBacklogSnapshot
+      NudgeDedup = nextNudgeDedup
+      NudgeSnapshot = nextNudgeSnapshot }
