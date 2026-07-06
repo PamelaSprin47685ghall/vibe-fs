@@ -83,12 +83,60 @@ export async function start(opts = {}) {
 
   let getChatHistoryCalled = false;
 
+  const taskReports = new Map();
+
+  async function callMockLLM(prompt) {
+    const res = await fetch(`${llmHandle.url}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'test-model',
+        tools: [{ type: 'function', function: { name: 'dummy_tool' } }]
+      })
+    });
+    if (!res.ok) {
+      throw new Error(`mock-llm fetch failed: ${res.status} ${res.statusText}`);
+    }
+    const text = await res.text();
+    let content = '';
+    for (const line of text.split('\n')) {
+      if (line.startsWith('data: ')) {
+        const dataStr = line.slice(6).trim();
+        if (dataStr === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(dataStr);
+          const delta = parsed.choices?.[0]?.delta;
+          if (delta && typeof delta.content === 'string') {
+            content += delta.content;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+    return content;
+  }
+
   const mockTaskService = {
     create: async (input) => {
-      return { success: true, data: { taskId: 'task-123' } };
+      const taskId = `task-${Math.random().toString(36).slice(2, 8)}`;
+      if (input.title === 'Review' || input.title === 'Pre-review') {
+        taskReports.set(taskId, mockTaskService._reportMarkdown);
+      } else {
+        try {
+          const report = await callMockLLM(input.prompt);
+          taskReports.set(taskId, report);
+        } catch (err) {
+          console.error('Failed to call mock LLM in mockTaskService:', err);
+          taskReports.set(taskId, mockTaskService._reportMarkdown);
+        }
+      }
+      return { success: true, data: { taskId } };
     },
     waitForAgentReport: async (taskId, opts) => {
-      return { reportMarkdown: mockTaskService._reportMarkdown };
+      const report = taskReports.get(taskId) || mockTaskService._reportMarkdown;
+      return { reportMarkdown: report };
     },
     _reportMarkdown: 'Accepted: Pre-review passed.',
   };
