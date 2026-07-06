@@ -35,7 +35,7 @@
     "e2e-omp": "npm run build && node build/tests/runner.js --e2e-omp"
   },
   "dependencies": {
-    "@fable-org/fable-library-js": "^2.1.1",
+    "@fable-org/fable-library-js": "^2.4.0",
     "@modelcontextprotocol/sdk": "^1.10.2",
     "@opencode-ai/plugin": "^1.17.4",
     "opencode-pty": "^0.3.4",
