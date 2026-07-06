@@ -107,25 +107,16 @@ type EventLogStore(workspaceRoot: string) =
 
     member _.ReadAllEvents() : JS.Promise<WanEvent list> =
         queue.Enqueue(fun () ->
-            withWorkspaceLock eventFilePath (fun () ->
-                promise {
-                    let path = eventFilePath
-                    try
-                        let! stats = statAsync path
-                        let size = stats?size |> unbox<float>
-                        let mtime = stats?mtimeMs |> unbox<float>
-                        match cache with
-                        | Some c when c.Size = size && c.Mtime = mtime ->
-                            return c.Events
-                        | _ ->
-                            let! events = readEventsFile path
-                            cache <- Some { Size = size; Mtime = mtime; Events = events }
-                            return events
-                    with _ ->
-                        cache <- None
+            match cache with
+            | Some c -> Promise.lift c.Events
+            | None ->
+                withWorkspaceLock eventFilePath (fun () ->
+                    promise {
+                        let path = eventFilePath
                         let! events = readEventsFile path
+                        cache <- Some { Size = 0.0; Mtime = 0.0; Events = events }
                         return events
-                }))
+                    }))
 
     member _.AppendEvent(e: WanEvent) : JS.Promise<Result<unit, string>> =
         queue.Enqueue(fun () ->
@@ -135,7 +126,11 @@ type EventLogStore(workspaceRoot: string) =
                         let path = eventFilePath
                         let line = wanEventToLine e + "\n"
                         do! appendFileAsync path line
-                        cache <- None
+                        match cache with
+                        | Some c -> c.Events <- c.Events @ [e]
+                        | None ->
+                            let! events = readEventsFile path
+                            cache <- Some { Size = 0.0; Mtime = 0.0; Events = events }
                         return Ok ()
                     with ex ->
                         return Error ex.Message
@@ -148,7 +143,11 @@ type EventLogStore(workspaceRoot: string) =
                     let path = eventFilePath
                     let line = wanEventToLine e + "\n"
                     do! appendFileAsync path line
-                    cache <- None
+                    match cache with
+                    | Some c -> c.Events <- c.Events @ [e]
+                    | None ->
+                        let! events = readEventsFile path
+                        cache <- Some { Size = 0.0; Mtime = 0.0; Events = events }
                 }))
 
     member _.TryClaimNudgeDispatch
@@ -162,22 +161,14 @@ type EventLogStore(workspaceRoot: string) =
                 promise {
                     let path = eventFilePath
                     let! events =
-                        promise {
-                            try
-                                let! stats = statAsync path
-                                let size = stats?size |> unbox<float>
-                                let mtime = stats?mtimeMs |> unbox<float>
-                                match cache with
-                                | Some c when c.Size = size && c.Mtime = mtime ->
-                                    return c.Events
-                                | _ ->
-                                    let! evs = readEventsFile path
-                                    cache <- Some { Size = size; Mtime = mtime; Events = evs }
-                                    return evs
-                            with _ ->
-                                cache <- None
-                                return! readEventsFile path
-                        }
+                        match cache with
+                        | Some c -> Promise.lift c.Events
+                        | None ->
+                            promise {
+                                let! evs = readEventsFile path
+                                cache <- Some { Size = 0.0; Mtime = 0.0; Events = evs }
+                                return evs
+                            }
                     let trimmedAnchor = anchor.Trim()
                     let snap = foldNudgeSnapshot sessionId events
                     let currentAnchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
@@ -190,6 +181,10 @@ type EventLogStore(workspaceRoot: string) =
                             buildEvent sessionId eventKindNudgeDispatched payload (getTimestampMs().ToString())
                         let line = wanEventToLine ev + "\n"
                         do! appendFileAsync path line
-                        cache <- None
+                        match cache with
+                        | Some c -> c.Events <- c.Events @ [ev]
+                        | None ->
+                            let! evs = readEventsFile path
+                            cache <- Some { Size = 0.0; Mtime = 0.0; Events = evs }
                         return true
                 }))
