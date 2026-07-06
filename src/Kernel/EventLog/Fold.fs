@@ -2,6 +2,7 @@ module Wanxiangshu.Kernel.EventLog.Fold
 
 open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.BacklogProjectionCore
+open Thoth.Json
 
 let private payloadTask (e: WanEvent) : string option =
     e.Payload |> Map.tryFind "task" |> Option.bind (fun t -> if t = "" then None else Some t)
@@ -119,12 +120,9 @@ type NudgeSnapshotState = {
 let private parseTodosJson (json: string) : string list =
     if json = "" then []
     else
-        try
-            let parsed = Fable.Core.JS.JSON.parse json
-            if Fable.Core.JS.Constructors.Array.isArray parsed then
-                (parsed :?> obj array) |> Array.map string |> Array.toList
-            else []
-        with _ -> []
+        match Decode.Auto.fromString<string list> json with
+        | Ok list -> list
+        | Error _ -> []
 
 let emptyNudgeSnapshotState : NudgeSnapshotState =
     { openTodos = []

@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.Dyn
+open Thoth.Json
 
 [<Import("Client", "@modelcontextprotocol/sdk/client/index.js")>]
 type Client(info: obj, capabilities: obj) =
@@ -186,28 +187,30 @@ let private parseResults (result: obj) : SembleResult list =
                 if text = "" then []
                 else
                     try
-                        let parsed = JS.JSON.parse text
-                        let results = Dyn.get parsed "results"
-                        if Dyn.isNullish results || not (Dyn.isArray results) then []
-                        else
-                            results :?> obj array
-                            |> Array.toList
-                            |> List.choose (fun r ->
-                                let filePath = Dyn.str r "file_path"
-                                if filePath = "" then None
-                                else
-                                    let line (key: string) : int =
-                                        let v = Dyn.get r key
-                                        if Dyn.isNullish v then 1 else unbox<int> v
-                                    let scoreVal =
-                                        let s = Dyn.get r "score"
-                                        if Dyn.isNullish s then 0.0 else unbox<float> s
-                                    Some
-                                        { filePath = filePath
-                                          startLine = line "start_line"
-                                          endLine = line "end_line"
-                                          content = Dyn.str r "content"
-                                          score = scoreVal })
+                        match Decode.Auto.fromString<obj> text with
+                        | Ok parsed ->
+                            let results = Dyn.get parsed "results"
+                            if Dyn.isNullish results || not (Dyn.isArray results) then []
+                            else
+                                results :?> obj array
+                                |> Array.toList
+                                |> List.choose (fun r ->
+                                    let filePath = Dyn.str r "file_path"
+                                    if filePath = "" then None
+                                    else
+                                        let line (key: string) : int =
+                                            let v = Dyn.get r key
+                                            if Dyn.isNullish v then 1 else unbox<int> v
+                                        let scoreVal =
+                                            let s = Dyn.get r "score"
+                                            if Dyn.isNullish s then 0.0 else unbox<float> s
+                                        Some
+                                            { filePath = filePath
+                                              startLine = line "start_line"
+                                              endLine = line "end_line"
+                                              content = Dyn.str r "content"
+                                              score = scoreVal })
+                        | Error _ -> []
                     with _ -> []
 
 let search (query: string) (repoPath: string) (topK: int) : JS.Promise<SembleResult list> =

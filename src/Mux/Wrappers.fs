@@ -21,6 +21,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MuxHostBindings
 open Wanxiangshu.Shell.WorkBacklogToolsCodec
 open Wanxiangshu.Shell.EventLogRuntime
+open Thoth.Json
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.ToolContextCodec
 open Wanxiangshu.Shell.DynField
@@ -42,7 +43,7 @@ type ToolDefinition =
       execute: obj -> obj -> JS.Promise<string>
       condition: (obj -> bool) option }
 
-let jsonStringify (o: obj) : string = JS.JSON.stringify(o)
+let jsonStringify (o: obj) : string = Encode.Auto.toString(0, o)
 
 let optBool (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<bool> v)
 let optField (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some v

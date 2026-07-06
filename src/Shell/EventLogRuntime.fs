@@ -14,6 +14,7 @@ open Wanxiangshu.Shell.Clock
 open Wanxiangshu.Shell.WorkBacklogToolsCodec
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Shell.SessionProjectionStore
+open Thoth.Json
 
 let mutable private stores: Map<string, EventLogStore> = Map.empty
 
@@ -104,8 +105,8 @@ let appendNudgeDedupCleared (workspaceRoot: string) (sessionID: string) : JS.Pro
     appendAndCache workspaceRoot (buildEvent sessionID eventKindNudgeDedupCleared Map.empty (getTimestampMs().ToString()))
 
 let appendWorkBacklogCommitted (workspaceRoot: string) (sessionID: string) (args: TodoWriteArgs) : JS.Promise<Result<unit, string>> =
-    let todosJson = JS.JSON.stringify(args.Todos)
-    let methJson = JS.JSON.stringify(args.SelectMethodology |> List.toArray)
+    let todosJson = Encode.Auto.toString(0, args.Todos)
+    let methJson = Encode.Auto.toString(0, args.SelectMethodology)
     let payload =
         Map
             [ "ahaMoments", args.AhaMoments
@@ -136,11 +137,11 @@ let appendNudgeDedupClearedOrFail (workspaceRoot: string) (sessionID: string) : 
     appendAndCacheOrFail workspaceRoot (buildEvent sessionID eventKindNudgeDedupCleared Map.empty (getTimestampMs().ToString()))
 
 let appendWorkBacklogCommittedOrFail (workspaceRoot: string) (sessionID: string) (args: TodoWriteArgs) : JS.Promise<unit> =
-    let payload = Map [ "ahaMoments", args.AhaMoments; "changesAndReasons", args.ChangesAndReasons; "gotchas", args.Gotchas; "lessonsAndConventions", args.LessonsAndConventions; "plan", args.Plan; "todosJson", JS.JSON.stringify(args.Todos); "selectMethodologyJson", JS.JSON.stringify(args.SelectMethodology |> List.toArray) ]
+    let payload = Map [ "ahaMoments", args.AhaMoments; "changesAndReasons", args.ChangesAndReasons; "gotchas", args.Gotchas; "lessonsAndConventions", args.LessonsAndConventions; "plan", args.Plan; "todosJson", Encode.Auto.toString(0, args.Todos); "selectMethodologyJson", Encode.Auto.toString(0, args.SelectMethodology) ]
     appendAndCacheOrFail workspaceRoot (buildEvent sessionID eventKindWorkBacklogCommitted payload (getTimestampMs().ToString()))
 
 let appendAssistantCompleted (workspaceRoot: string) (sessionID: string) (assistantMessage: string) (agent: string option) (model: string option) (turnId: string) (openTodos: string list) : JS.Promise<Result<unit, string>> =
-    let baseMap = Map [ "assistantMessage", assistantMessage; "turnId", turnId; "openTodosJson", JS.JSON.stringify(openTodos |> List.toArray) ]
+    let baseMap = Map [ "assistantMessage", assistantMessage; "turnId", turnId; "openTodosJson", Encode.Auto.toString(0, openTodos) ]
     let withAgent =
         match agent with
         | Some a when a <> "" -> Map.add "agent" a baseMap
@@ -152,7 +153,7 @@ let appendAssistantCompleted (workspaceRoot: string) (sessionID: string) (assist
     appendAndCache workspaceRoot (buildEvent sessionID eventKindAssistantCompleted payload (getTimestampMs().ToString()))
 
 let appendAssistantCompletedOrFail (workspaceRoot: string) (sessionID: string) (assistantMessage: string) (agent: string option) (model: string option) (turnId: string) (openTodos: string list) : JS.Promise<unit> =
-    let baseMap = Map [ "assistantMessage", assistantMessage; "turnId", turnId; "openTodosJson", JS.JSON.stringify(openTodos |> List.toArray) ]
+    let baseMap = Map [ "assistantMessage", assistantMessage; "turnId", turnId; "openTodosJson", Encode.Auto.toString(0, openTodos) ]
     let withAgent =
         match agent with
         | Some a when a <> "" -> Map.add "agent" a baseMap

@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
+open Thoth.Json
 
 let titleRequestSignature = "Generate a title for this conversation"
 
@@ -19,17 +20,19 @@ let isTitleRequestBody (body: obj) : bool =
         if not (text.Contains titleRequestSignature) then false
         else
             try
-                let parsed = JS.JSON.parse text
-                let messages = get parsed "messages"
-                if not (isArray messages) then false
-                else
-                    let arr = messages :?> obj array
-                    let firstUser = arr |> Array.tryFind (fun msg -> str msg "role" = "user")
-                    match firstUser with
-                    | None -> false
-                    | Some msg ->
-                        let content = get msg "content"
-                        typeIs content "string" && (string content).StartsWith titleRequestSignature
+                match Decode.Auto.fromString<obj> text with
+                | Ok parsed ->
+                    let messages = get parsed "messages"
+                    if not (isArray messages) then false
+                    else
+                        let arr = messages :?> obj array
+                        let firstUser = arr |> Array.tryFind (fun msg -> str msg "role" = "user")
+                        match firstUser with
+                        | None -> false
+                        | Some msg ->
+                            let content = get msg "content"
+                            typeIs content "string" && (string content).StartsWith titleRequestSignature
+                | Error _ -> false
             with _ -> false
 
 let tryWrapStringContent (content: obj) : string option =
@@ -74,9 +77,12 @@ let installTitleFetchGuard () : unit =
                     if not (isTitleRequestBody body) then
                         return! callNative nativeFetch url init
                     else
-                        let parsed = JS.JSON.parse (string body)
-                        rewriteTitleMessages parsed
-                        init?("body") <- box (JS.JSON.stringify parsed)
-                        return! callNative nativeFetch url init
+                        match Decode.Auto.fromString<obj> (string body) with
+                        | Ok parsed ->
+                            rewriteTitleMessages parsed
+                            init?("body") <- box (Encode.Auto.toString(0, parsed))
+                            return! callNative nativeFetch url init
+                        | Error _ ->
+                            return! callNative nativeFetch url init
                 }
         emitJsExpr (guarded) "globalThis.fetch = $0" |> ignore

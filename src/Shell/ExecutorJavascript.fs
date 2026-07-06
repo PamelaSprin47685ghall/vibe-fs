@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open System.Text.RegularExpressions
 open Wanxiangshu.Kernel
+open Thoth.Json
 
 [<Import("join", "node:path")>]
 let private join (a: string) (b: string) : string = jsNative
@@ -43,10 +44,13 @@ let private parseImports (program: string) : JS.Promise<obj array> =
 /// and ensuring both fields exist (repairs a pre-existing file lacking type:module).
 let private parsePkgJson (json: string) : obj =
     try
-        let p = JS.JSON.parse(json)
-        if Dyn.isNullish (Dyn.get p "dependencies") then p?("dependencies") <- createObj []
-        if Dyn.isNullish (Dyn.get p "type") then p?("type") <- "module"
-        p
+        match Decode.Auto.fromString<obj> json with
+        | Ok p ->
+            if Dyn.isNullish (Dyn.get p "dependencies") then p?("dependencies") <- createObj []
+            if Dyn.isNullish (Dyn.get p "type") then p?("type") <- "module"
+            p
+        | Error _ ->
+            createObj [ "type" ==> "module"; "dependencies" ==> createObj [] ]
     with _ ->
         createObj [ "type" ==> "module"; "dependencies" ==> createObj [] ]
 
@@ -60,7 +64,7 @@ let private jsonStringify (value: obj) : string =
     JSON?stringify(value, Unchecked.defaultof<obj>, 2)
 
 let private jsonEscape (s: string) : string =
-    JS.JSON.stringify(s)
+    Encode.Auto.toString(0, s)
 
 /// Spawn `npx npm install` in the project dir, resolving on a clean exit.
 let private npmInstall (projectDir: string) (packages: string array) : JS.Promise<unit> =

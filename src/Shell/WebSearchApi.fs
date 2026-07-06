@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.WebFetchGuard
+open Thoth.Json
 
 [<Global("process")>]
 let private nodeProcess : obj = jsNative
@@ -55,7 +56,7 @@ let webApiPost (pathname: string) (body: obj) (abortSignal: obj option) : JS.Pro
         | Error e -> return Error e
         | Ok apiKey ->
             let url = $"{webApiBase}{normalizeWebApiPath pathname}"
-            let bodyStr = JS.JSON.stringify(body)
+            let bodyStr = Encode.Auto.toString(0, body)
             let init = postInit apiKey bodyStr abortSignal
             try
                 let! response = fetch url init

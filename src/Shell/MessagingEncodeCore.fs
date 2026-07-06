@@ -4,12 +4,13 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.Dyn
+open Thoth.Json
 
 let outputsEquivalent (left: obj) (right: obj) : bool =
     if obj.ReferenceEquals(left, right) then true
     elif isNullish left || isNullish right then isNullish left && isNullish right
     elif typeIs left "string" || typeIs right "string" then string left = string right
-    else JS.JSON.stringify(left) = JS.JSON.stringify(right)
+    else Encode.Auto.toString(0, left) = Encode.Auto.toString(0, right)
 
 let partsEquivalent (left: obj) (right: obj) : bool =
     if obj.ReferenceEquals(left, right) then true
