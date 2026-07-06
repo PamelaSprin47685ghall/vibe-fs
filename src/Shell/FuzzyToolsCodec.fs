@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Shell.DynField
 open Wanxiangshu.Shell.FuzzySearch
+open Wanxiangshu.Shell.FuzzySearchHelpers
 
 let private patternRequiredOnFirstCall = "pattern is required on the first call"
 
@@ -35,17 +36,7 @@ let private validateFuzzyFirstCall (tool: string) (pattern: string option) (iter
 
 let private patternsField (tool: string) (args: obj) : Result<string list, DomainError> =
     let v = Dyn.get args "pattern"
-    if Dyn.isNullish v then Ok []
-    elif Dyn.isArray v then
-        v :?> obj array
-        |> Array.choose (fun x ->
-            if Dyn.isNullish x then None
-            else Some(string x))
-        |> Array.filter (fun s -> s <> "")
-        |> List.ofArray
-        |> Ok
-    else
-        Error (InvalidIntent (tool, "pattern", "pattern must be an array of strings"))
+    Ok (parseJsonArrayOrString v)
 
 let private patternHead (patterns: string list) : string option =
     match patterns with

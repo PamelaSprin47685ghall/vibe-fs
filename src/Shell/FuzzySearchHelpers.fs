@@ -1,5 +1,6 @@
 module Wanxiangshu.Shell.FuzzySearchHelpers
 
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.FuzzyQuery
@@ -8,11 +9,33 @@ open Wanxiangshu.Kernel.FuzzyFormat
 open Wanxiangshu.Shell.FuzzyFinderShell
 open Wanxiangshu.Shell.FuzzyIteratorStore
 
+let parseJsonArrayOrString (v: obj) : string list =
+    if Dyn.isNullish v then []
+    elif Dyn.isArray v then
+        (unbox<obj array> v)
+        |> Array.choose (fun x -> if Dyn.isNullish x then None else Some(string x))
+        |> Array.filter (fun s -> s <> "")
+        |> List.ofArray
+    else
+        let strVal = string v
+        if strVal.Trim() = "" then []
+        else
+            try
+                let parsed = JS.JSON.parse strVal
+                if Dyn.isArray parsed then
+                    (unbox<obj array> parsed)
+                    |> Array.choose (fun x -> if Dyn.isNullish x then None else Some(string x))
+                    |> Array.filter (fun s -> s <> "")
+                    |> List.ofArray
+                else
+                    let s = string parsed
+                    if s.Trim() = "" then [] else [ s ]
+            with _ ->
+                [ strVal ]
+
 let parseExcludeField (args: obj) : string list =
     let v = Dyn.get args "exclude"
-    if Dyn.isNullish v then []
-    elif Dyn.isArray v then v :?> obj array |> Array.map string |> List.ofArray
-    else [ string v ]
+    parseJsonArrayOrString v
 
 type ResolvedGrep = { matches: GrepMatch list; total: int option; regexError: string option; cursor: obj }
 

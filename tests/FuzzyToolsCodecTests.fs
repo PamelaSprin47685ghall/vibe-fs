@@ -113,19 +113,29 @@ let decodeFindPatternArray () =
     check "find array pattern second" (p.pattern.[1] = "bar")
     check "find array pattern third" (p.pattern.[2] = "baz")
 
-let decodeGrepPatternScalarStringFails () =
+let decodeGrepPatternScalarStringSucceeds () =
     let args = createObj [ "pattern", box "single_string" ]
-    match decodeFuzzyGrepArgs args with
-    | Error (InvalidIntent ("fuzzy_grep", "pattern", "pattern must be an array of strings")) ->
-        check "grep pattern scalar string fails" true
-    | _ -> check "grep pattern scalar string fails" false
+    let p = okGrep args
+    check "grep pattern scalar string succeeds" (p.pattern = [ "single_string" ])
 
-let decodeFindPatternScalarStringFails () =
+let decodeFindPatternScalarStringSucceeds () =
     let args = createObj [ "pattern", box "single_string" ]
-    match decodeFuzzyFindArgs args with
-    | Error (InvalidIntent ("fuzzy_find", "pattern", "pattern must be an array of strings")) ->
-        check "find pattern scalar string fails" true
-    | _ -> check "find pattern scalar string fails" false
+    let p = okFind args
+    check "find pattern scalar string succeeds" (p.pattern = [ "single_string" ])
+
+let decodeGrepPatternJsonArraySucceeds () =
+    let args = createObj [ "pattern", box "[ \"word1\", \"word2\" ]" ]
+    let p = okGrep args
+    check "grep json array pattern length" (p.pattern.Length = 2)
+    check "grep json array pattern first" (p.pattern.[0] = "word1")
+    check "grep json array pattern second" (p.pattern.[1] = "word2")
+
+let decodeFindPatternJsonArraySucceeds () =
+    let args = createObj [ "pattern", box "[ \"foo\", \"bar\" ]" ]
+    let p = okFind args
+    check "find json array pattern length" (p.pattern.Length = 2)
+    check "find json array pattern first" (p.pattern.[0] = "foo")
+    check "find json array pattern second" (p.pattern.[1] = "bar")
 
 let run () =
     decodeFindOkFull ()
@@ -139,5 +149,7 @@ let run () =
     decodeGrepIteratorOnlyResume ()
     decodeGrepPatternArray ()
     decodeFindPatternArray ()
-    decodeGrepPatternScalarStringFails ()
-    decodeFindPatternScalarStringFails ()
+    decodeGrepPatternScalarStringSucceeds ()
+    decodeFindPatternScalarStringSucceeds ()
+    decodeGrepPatternJsonArraySucceeds ()
+    decodeFindPatternJsonArraySucceeds ()
