@@ -6,6 +6,17 @@ This directory contains the authoritative technical specifications, behavioral c
 
 ---
 
+## Architectural Axioms (第一性原理)
+
+The engineering design of Wanxiangshu is governed by five foundational axioms:
+1. **Stable Domain, Volatile Host**: Core rules live in the pure Kernel (`src/Kernel/`); host adapters only map wire formats.
+2. **Event Sourcing as SSOT**: Durable progress is appended as facts to `.wanxiangshu.ndjson`. Memory states are folded from history.
+3. **Strict Side-Effect Isolation**: All physical I/O (files, subprocesses, MCP client) is pushed to the Shell boundary (`src/Shell/`).
+4. **Early Type Constraints**: Untrusted LLM parameters and host message payloads are parsed into static strongly-typed DUs immediately at the boundary.
+5. **Time-Independent Test Reliability**: All E2E and integration tests must be deterministic and must never rely on system clocks, random seeds, or fragile sleeps. Test flow synchronization is managed via dependency injection and adaptive poll state hooks.
+
+---
+
 ## 1. Document Taxonomy & Organization
 
 All documentation files under `PRD/` follow a standardized, numbered, kebab-case naming convention and adhere to industry-standard product requirement document structures:

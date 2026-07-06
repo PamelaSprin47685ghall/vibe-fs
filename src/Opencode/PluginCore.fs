@@ -154,7 +154,7 @@ let private createReviewTestSurface (reviewStore: Wanxiangshu.Shell.ReviewRuntim
           "tryLockReview", box (System.Func<string, bool>(fun sessionID -> reviewStore.tryLockReview sessionID))
           "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ]
 
-let private applyFallbackModelOverrides (cfg: obj) (fbCfgOpt: FallbackConfig option) : unit =
+let applyFallbackModelOverrides (cfg: obj) (fbCfgOpt: FallbackConfig option) : unit =
     match fbCfgOpt with
     | None -> ()
     | Some fbCfg ->
@@ -162,13 +162,18 @@ let private applyFallbackModelOverrides (cfg: obj) (fbCfgOpt: FallbackConfig opt
         let agentObj = Dyn.get cfg "agent"
         if Dyn.isNullish agentObj then ()
         else
+            let setModelAndVariant (a: obj) (modelStr: string) =
+                let parts = modelStr.Split(':')
+                setKey a "model" (box (parts.[0].Trim()))
+                if parts.Length > 1 then setKey a "variant" (box (parts.[1].Trim()))
+                else Dyn.deleteKey a "variant"
             let agentKeys : string[] = unbox (JS.Constructors.Object.keys agentObj)
             for kv in overrides do
                 for i = 0 to agentKeys.Length - 1 do
                     let origKey = agentKeys.[i]
                     if normalizeAgentName origKey = kv.Key then
                         let a = Dyn.get agentObj origKey
-                        if not (Dyn.isNullish a) then setKey a "model" (box kv.Value)
+                        if not (Dyn.isNullish a) then setModelAndVariant a kv.Value
             match Wanxiangshu.Opencode.FallbackConfigLoader.defaultPreferredModel fbCfg with
             | Some dm ->
                 let hasOverride (origKey: string) =
@@ -177,7 +182,7 @@ let private applyFallbackModelOverrides (cfg: obj) (fbCfgOpt: FallbackConfig opt
                     let k = agentKeys.[i]
                     if not (hasOverride k) then
                         let a = Dyn.get agentObj k
-                        if not (Dyn.isNullish a) then setKey a "model" (box dm)
+                        if not (Dyn.isNullish a) then setModelAndVariant a dm
             | None -> ()
 
 let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =

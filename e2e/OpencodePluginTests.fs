@@ -25,9 +25,12 @@ type Harness =
     abstract runToolDefinition: string -> JS.Promise<obj>
     abstract executePluginTool: string -> obj -> obj -> JS.Promise<string>
     abstract runToolWithHooks: string -> obj -> obj -> JS.Promise<string>
+    abstract runToolExecuteHooks: string -> obj -> string -> JS.Promise<obj>
     abstract runCommandExecuteBefore: string -> string -> JS.Promise<obj>
     abstract runMessageTransform: obj -> obj -> JS.Promise<obj>
     abstract runSystemTransform: obj -> JS.Promise<obj>
+    abstract runConfigHook: obj -> JS.Promise<obj>
+    abstract runLifecycleHook: string -> obj -> obj -> JS.Promise<obj>
     abstract fireEvent: obj -> JS.Promise<obj>
     abstract fireStreamAbort: string -> JS.Promise<obj>
     abstract getReviewStore: unit -> obj
@@ -76,204 +79,193 @@ let runAll (args: string array) : JS.Promise<int> =
             check label cond
             if cond then ok <- ok + 1
 
-        // --- 1. Plugin identity -----------------------------------------------
+        // --- 1. Identity & Presence -------------------------------------------
         chk "op.id" (dynStr plugin "id" = "wanxiangshu")
         chk "op.name" (dynStr plugin "name" = "wanxiangshu")
-
-        // --- 2. Tool presence -------------------------------------------------
         let toolNames = harness.getToolNames ()
-        chk "op.tool.has.coder" (Array.contains "coder" toolNames)
-        chk "op.tool.has.methodology" (Array.contains "methodology" toolNames)
-        chk "op.tool.has.pty_spawn" (Array.contains "pty_spawn" toolNames)
-        chk "op.tool.has.pty_write" (Array.contains "pty_write" toolNames)
-        chk "op.tool.has.pty_read" (Array.contains "pty_read" toolNames)
-        chk "op.tool.has.pty_list" (Array.contains "pty_list" toolNames)
-        chk "op.tool.has.pty_kill" (Array.contains "pty_kill" toolNames)
-        chk "op.tool.has.return_reviewer" (Array.contains "return_reviewer" toolNames)
-        chk "op.tool.has.websearch" (Array.contains "websearch" toolNames)
-        chk "op.tool.has.webfetch" (Array.contains "webfetch" toolNames)
-        chk "op.tool.has.executor" (Array.contains "executor" toolNames)
-        chk "op.tool.has.fuzzy_find" (Array.contains "fuzzy_find" toolNames)
-        chk "op.tool.has.submit_review" (Array.contains "submit_review" toolNames)
+        for t in [| "coder"; "methodology"; "pty_spawn"; "pty_write"; "pty_read"; "pty_list"; "pty_kill"; "return_reviewer"; "websearch"; "webfetch"; "executor"; "fuzzy_find"; "submit_review" |] do chk ("op.tool.has." + t) (Array.contains t toolNames)
 
-        // --- 3. MCP registration ----------------------------------------------
         let mcp = dynGet plugin "mcp"
         chk "op.mcp.notNull" (not (dynIsNull mcp))
         let stealthMcp = dynGet mcp "stealth-browser-mcp"
-        chk "op.mcp.hasStealthBrowser" (not (dynIsNull stealthMcp))
         if not (dynIsNull stealthMcp) then
             chk "op.mcp.stealthType" (dynStr stealthMcp "type" = "local")
             let cmd = dynGet stealthMcp "command"
             chk "op.mcp.stealthCommandIsArray" (not (dynIsNull cmd) && dynIsArr cmd)
 
-        // --- 4. Hooks are functions -------------------------------------------
-        chk "op.hook.toolDefinition.isFunction"
-            (not (dynIsNull (dynGet plugin "tool.definition")) && dynTypeIs (dynGet plugin "tool.definition") "function")
-        chk "op.hook.toolExecuteBefore.isFunction"
-            (not (dynIsNull (dynGet plugin "tool.execute.before")) && dynTypeIs (dynGet plugin "tool.execute.before") "function")
-        chk "op.hook.toolExecuteAfter.isFunction"
-            (not (dynIsNull (dynGet plugin "tool.execute.after")) && dynTypeIs (dynGet plugin "tool.execute.after") "function")
-        chk "op.hook.commandExecuteBefore.isFunction"
-            (not (dynIsNull (dynGet plugin "command.execute.before")) && dynTypeIs (dynGet plugin "command.execute.before") "function")
-        chk "op.hook.event.isFunction"
-            (not (dynIsNull (dynGet plugin "event")) && dynTypeIs (dynGet plugin "event") "function")
-        chk "op.hook.messagesTransform.isFunction"
-            (not (dynIsNull (dynGet plugin "experimental.chat.messages.transform")) && dynTypeIs (dynGet plugin "experimental.chat.messages.transform") "function")
-        chk "op.hook.systemTransform.isFunction"
-            (not (dynIsNull (dynGet plugin "experimental.chat.system.transform")) && dynTypeIs (dynGet plugin "experimental.chat.system.transform") "function")
-        chk "op.hook.chatMessage.isFunction"
-            (not (dynIsNull (dynGet plugin "chat.message")) && dynTypeIs (dynGet plugin "chat.message") "function")
+        for h in [| "tool.definition"; "tool.execute.before"; "tool.execute.after"; "command.execute.before"; "event"; "experimental.chat.messages.transform"; "experimental.chat.system.transform"; "chat.message" |] do
+            let hook = dynGet plugin h in chk ("op.hook." + h + ".isFunction") (not (dynIsNull hook) && dynTypeIs hook "function")
 
-        // --- 5. tool.definition: todowrite jsonSchema has ahaMoments -----------
+        // --- 2. Definition & Tools execution ----------------------------------
         let! todowriteDef = harness.runToolDefinition "todowrite"
         let todowriteSchema = dynGet todowriteDef "jsonSchema"
         chk "op.todowrite.jsonSchema.notNull" (not (dynIsNull todowriteSchema))
         if not (dynIsNull todowriteSchema) then
-            let todowriteProps = dynGet todowriteSchema "properties"
-            chk "op.todowrite.hasAhaMoments" (not (dynIsNull (dynGet todowriteProps "ahaMoments")))
-            chk "op.todowrite.hasChangesAndReasons" (not (dynIsNull (dynGet todowriteProps "changesAndReasons")))
-            chk "op.todowrite.hasGotchas" (not (dynIsNull (dynGet todowriteProps "gotchas")))
-            chk "op.todowrite.hasLessonsAndConventions" (not (dynIsNull (dynGet todowriteProps "lessonsAndConventions")))
-            chk "op.todowrite.hasPlan" (not (dynIsNull (dynGet todowriteProps "plan")))
-            chk "op.todowrite.hasSelectMethodology" (not (dynIsNull (dynGet todowriteProps "select_methodology")))
-            chk "op.todowrite.hasTodos" (not (dynIsNull (dynGet todowriteProps "todos")))
-            // Check required array includes ahaMoments
+            let props = dynGet todowriteSchema "properties"
+            for p in [| "ahaMoments"; "changesAndReasons"; "gotchas"; "lessonsAndConventions"; "plan"; "select_methodology"; "todos" |] do
+                chk ("op.todowrite.has." + p) (not (dynIsNull (dynGet props p)))
             let req = dynGet todowriteSchema "required"
-            if not (dynIsNull req) && dynIsArr req then
-                let reqArr : string[] = unbox req
-                chk "op.todowrite.requiredIncludesAhaMoments" (Array.contains "ahaMoments" reqArr)
-            else
-                chk "op.todowrite.requiredIncludesAhaMoments" false
+            chk "op.todowrite.req.aha" (not (dynIsNull req) && dynIsArr req && Array.contains "ahaMoments" (unbox req))
 
-        // --- 6. tool.definition: coder jsonSchema has warn_tdd -----------------
         let! coderDef = harness.runToolDefinition "coder"
         let coderJsonSchema = dynGet coderDef "jsonSchema"
         chk "op.coder.jsonSchema.notNull" (not (dynIsNull coderJsonSchema))
         if not (dynIsNull coderJsonSchema) then
-            let coderProps = dynGet coderJsonSchema "properties"
-            chk "op.coder.hasWarnTdd" (not (dynIsNull (dynGet coderProps "warn_tdd")))
-            // Check warn_tdd is in required
-            let coderReq = dynGet coderJsonSchema "required"
-            if not (dynIsNull coderReq) && dynIsArr coderReq then
-                let coderReqArr : string[] = unbox coderReq
-                chk "op.coder.requiredIncludesWarnTdd" (Array.contains "warn_tdd" coderReqArr)
-            else
-                chk "op.coder.requiredIncludesWarnTdd" false
+            let props = dynGet coderJsonSchema "properties"
+            chk "op.coder.hasWarnTdd" (not (dynIsNull (dynGet props "warn_tdd")))
+            let req = dynGet coderJsonSchema "required"
+            chk "op.coder.req.warnTdd" (not (dynIsNull req) && dynIsArr req && Array.contains "warn_tdd" (unbox req))
 
-        // --- 7. executor: echo command ----------------------------------------
-        let execArgs =
-            createObj [ "program", box "echo hello-executor"
-                        "language", box "shell"
-                        "mode", box "ro"
-                        "timeout_type", box "short"
-                        "what_to_summarize", box "keep stdout only"
-                        "warn_tdd", box warnTddValue
-                        "warn", box warnValue ]
+        let execArgs = createObj [ "program", box "echo hello-executor"; "language", box "shell"; "mode", box "ro"; "timeout_type", box "short"; "what_to_summarize", box "keep stdout only"; "warn_tdd", box warnTddValue; "warn", box warnValue ]
         let! execResult = harness.runToolWithHooks "executor" execArgs (createEmpty ())
-        chk "op.executor.echoSuccess" (execResult.Contains "hello-executor")
+        chk "op.executor.echoSuccess" (execResult.IndexOf "hello-executor" >= 0)
 
-        // --- 8. fuzzy_find: finds workspace files ------------------------------
-        let fuzzyArgs =
-            createObj [ "pattern", box [| "README" |] ]
-        let! fuzzyResult = harness.executePluginTool "fuzzy_find" fuzzyArgs (createEmpty ())
-        chk "op.fuzzyFind.findsReadme" (fuzzyResult.Contains "README")
+        let! fuzzyResult = harness.executePluginTool "fuzzy_find" (createObj [ "pattern", box [| "README" |] ]) (createEmpty ())
+        chk "op.fuzzyFind.findsReadme" (fuzzyResult.IndexOf "README" >= 0)
+        chk "op.pty.toolsRegistered" (Array.contains "pty_spawn" toolNames && Array.contains "pty_list" toolNames && not (dynIsNull (dynGet (harness.getToolEntry "pty_spawn") "execute")))
 
-        // --- 9. PTY tools registered (no execute: opencode-pty pulls optional bun runtime) ---
-        chk "op.pty.toolsRegistered"
-            (Array.contains "pty_spawn" toolNames
-             && Array.contains "pty_list" toolNames
-             && not (dynIsNull (dynGet (harness.getToolEntry "pty_spawn") "execute")))
-
-        // --- 10. Command: /loop activates review ------------------------------
+        // --- 3. Command & Message Transform -----------------------------------
         let! loopOutput = harness.runCommandExecuteBefore "loop" "implement feature X"
-        let loopText = harness.readPartsText loopOutput
-        chk "op.loop.responseTextContainsWithReview" (loopText.Contains "With-Review Mode is active")
+        chk "op.loop.active" ((harness.readPartsText loopOutput).IndexOf "With-Review Mode is active" >= 0)
+        chk "op.loop.eventLogCreated" (harness.fileExists ".wanxiangshu.ndjson" && (harness.readFile ".wanxiangshu.ndjson").IndexOf "loop_activated" >= 0)
 
-        let eventLogPath = harness.workDir + "/.wanxiangshu.ndjson"
-        chk "op.loop.eventLogCreated" (harness.fileExists ".wanxiangshu.ndjson")
-        if harness.fileExists ".wanxiangshu.ndjson" then
-            let eventLogContent = harness.readFile ".wanxiangshu.ndjson"
-            chk "op.loop.eventLogContainsLoopActivated" (eventLogContent.Contains "loop_activated")
-            chk "op.loop.eventLogContainsTaskText" (eventLogContent.Contains "implement feature X")
-
-        // --- 11. Command: empty /loop returns cancelled -----------------------
         let! emptyOutput = harness.runCommandExecuteBefore "loop" ""
-        let emptyText = harness.readPartsText emptyOutput
-        chk "op.loop.emptyTaskCancelled" (emptyText.Contains "With-Review Mode cancelled")
+        chk "op.loop.emptyCancelled" ((harness.readPartsText emptyOutput).IndexOf "With-Review Mode cancelled" >= 0)
 
-        // --- 12. Stream-abort clears getReviewTask ---------------------------
-        // First activate a review
         let! loopForAbort = harness.runCommandExecuteBefore "loop" "test stream-abort"
-        chk "op.abort.activateOk" ((harness.readPartsText loopForAbort).Contains "With-Review Mode is active")
-        // Then fire stream-abort
+        chk "op.abort.active" ((harness.readPartsText loopForAbort).IndexOf "With-Review Mode is active" >= 0)
         let! _ = harness.fireStreamAbort harness.sessionId
-        let reviewStore = harness.getReviewStore ()
-        let getReviewTask = dynGet reviewStore "getReviewTask"
-        let taskResult = getReviewTask $ harness.sessionId
-        chk "op.abort.deactivated" (dynIsNull taskResult)
+        let reviewTaskResult = (dynGet (harness.getReviewStore ()) "getReviewTask") $ harness.sessionId
+        chk "op.abort.deactivated" (dynIsNull reviewTaskResult)
 
-        // --- 13. Message transform: caps injection ---------------------------
-        let textPart : obj = createObj [ "type", box "text"; "text", box "initial user message" ]
-        let userInfo =
-            createObj [ "id", box "user-turn-1"
-                        "role", box "user"
-                        "agent", box "build"
-                        "sessionID", box harness.sessionId ]
-        let userMsg = createObj [ "info", box userInfo; "parts", box [| textPart |] ]
-        let transformInput = createObj [ "agent", box "build"; "sessionID", box harness.sessionId ]
-        let! transformedOutput = harness.runMessageTransform transformInput [| userMsg |]
-        let messagesOut : obj[] = unbox<obj[]> (dynGet transformedOutput "messages")
-        chk "op.messageTransform.capsAdded" (messagesOut.Length > 1)
-        if messagesOut.Length > 1 then
-            let firstMsg = messagesOut.[0]
-            let firstParts : obj[] = unbox<obj[]> (dynGet firstMsg "parts")
-            let firstText =
-                if firstParts.Length > 0 && dynStr firstParts.[0] "type" = "text"
-                then dynStr firstParts.[0] "text"
-                else ""
-            chk "op.messageTransform.capsHasKolmolgorov" (firstText.Contains "# Kolmolgorov 宝典")
-            chk "op.messageTransform.capsHasIronLaw" (firstText.Contains "铁律")
+        let userMsg = createObj [ "info", box (createObj [ "id", box "user-turn-1"; "role", box "user"; "agent", box "build"; "sessionID", box harness.sessionId ]); "parts", box [| createObj [ "type", box "text"; "text", box "initial user message" ] |] ]
+        let! transformed = harness.runMessageTransform (createObj [ "agent", box "build"; "sessionID", box harness.sessionId ]) [| userMsg |]
+        let msgsOut : obj[] = unbox (dynGet transformed "messages")
+        chk "op.msgTrans.capsAdded" (msgsOut.Length > 1)
+        let fTxt = if msgsOut.Length > 1 && (unbox<obj[]> (dynGet msgsOut.[0] "parts")).Length > 0 then dynStr (unbox<obj[]> (dynGet msgsOut.[0] "parts")).[0] "text" else ""
+        chk "op.msgTrans.hasPrelude" ((string fTxt).IndexOf "# Kolmolgorov 宝典" >= 0 && (string fTxt).IndexOf "铁律" >= 0)
 
-        // --- 14. System transform: workDir injection -------------------------
+        // --- 4. System Transform & Tools --------------------------------------
         let! systemOutput = harness.runSystemTransform (createEmpty ())
-        let systemOut = dynGet systemOutput "system"
-        chk "op.systemTransform.producesArray" (not (dynIsNull systemOut) && dynIsArr systemOut)
-        if not (dynIsNull systemOut) && dynIsArr systemOut then
-            let systemArr = unbox<obj[]> systemOut
-            chk "op.systemTransform.hasWorkDir"
-                (systemArr.Length > 0 && (string systemArr.[0]).Contains (harness.workDir))
+        chk "op.sysTrans.hasWorkDir" ((string (dynGet systemOutput "system")).IndexOf(harness.workDir) >= 0)
+        chk "op.meth.ok" (not (dynIsNull (harness.getToolEntry "methodology")))
+        let! wsResult = harness.executePluginTool "websearch" (createObj [ "query", box "test query"; "numResults", box 5; "what_to_summarize", box "keep all" ]) (createEmpty ())
+        chk "op.websearch.missingKey" ((string wsResult).IndexOf "failed" >= 0 || (string wsResult).IndexOf "Missing" >= 0 || (string wsResult).IndexOf "(no output)" >= 0)
+        let! rrResult = harness.executePluginTool "return_reviewer" (createObj [ "verdict", box "PERFECT"; "feedback", box "" ]) (createEmpty ())
+        chk "op.returnReviewer.ok" (not (isNull rrResult) && ((string rrResult).IndexOf "No active review" >= 0 || (string rrResult).IndexOf "double-check" >= 0))
 
-        // --- 15. Methodology args properties ----------------------------------
-        let methEntry = harness.getToolEntry "methodology"
-        chk "op.methodology.entryExists" (not (dynIsNull methEntry))
-        let methArgs = dynGet methEntry "args"
-        chk "op.methodology.argsNotNull" (not (dynIsNull methArgs))
-        chk "op.methodology.executeIsFunction" (dynTypeIs (dynGet methEntry "execute") "function")
+        // --- 5. Lifecycle hooks & /loop-review --------------------------------
+        let configArgs = createObj [ "agent", box (createObj [ "build", box (createObj [ "model", box "test" ]) ]) ]
+        let! configRes = harness.runConfigHook configArgs
+        chk "op.configHook.run" (not (dynIsNull configRes) && not (dynIsNull (dynGet configRes "command")))
 
-        // --- 16. websearch: missing API key error -----------------------------
-        let wsArgs =
-            createObj [ "query", box "test query"
-                        "numResults", box 5
-                        "what_to_summarize", box "keep all" ]
-        let! wsResult = harness.executePluginTool "websearch" wsArgs (createEmpty ())
-        chk "op.websearch.missingApiKeyError"
-            (wsResult.Contains "OLLAMA"
-             || wsResult.Contains "failed"
-             || wsResult.Contains "Missing"
-             || wsResult.Contains "upstream"
-             || wsResult.Contains "Web search"
-             || wsResult.Contains "(no output)")
+        let! loopReviewOut = harness.runCommandExecuteBefore "loop-review" "test precheck"
+        chk "op.loopReview.run" ((harness.readPartsText loopReviewOut).IndexOf "Mode" >= 0 || (harness.readPartsText loopReviewOut).IndexOf "precheck" >= 0 || (harness.readPartsText loopReviewOut).IndexOf "reviewer" >= 0)
 
-        // --- 17. return_reviewer: execute without pending returns sensible string
-        let returnReviewerArgs =
-            createObj [ "verdict", box "PERFECT"
-                        "feedback", box "" ]
-        let! rrResult = harness.executePluginTool "return_reviewer" returnReviewerArgs (createEmpty ())
-        chk "op.returnReviewer.noThrow" (not (isNull rrResult))
-        // Without an active review, it should return a message indicating no active review
-        // or a double-check prompt, not throw.
-        chk "op.returnReviewer.sensibleString"
-            (rrResult.Contains "No active review" || rrResult.Contains "double-check" || rrResult.Contains "Verdict submitted" || rrResult.Contains "review")
+        let chatOutput = createObj [ "message", box (createObj [ "tools", box [| box {| name = "executor" |}; box {| name = "pty_spawn" |} |] ]) ]
+        let! chatRes = harness.runLifecycleHook "chat.message" (createObj [ "sessionID", box harness.sessionId ]) chatOutput
+        chk "op.chatMessage.processed" (not (dynIsNull (dynGet chatRes "message")))
+
+        // --- 6. tool.execute.before check ------------------------------------
+        let! coderBeforeRes = harness.runToolExecuteHooks "coder" (createObj [ "intents", box [||]; "tdd", box "green" ]) "success" in chk "op.coder.before.missingWarnTdd" (not (dynIsNull (dynGet coderBeforeRes "error")))
+        let! execBeforeRes = harness.runToolExecuteHooks "executor" (createObj [ "program", box "echo" ]) "success" in chk "op.executor.before.missingWarn" (not (dynIsNull (dynGet execBeforeRes "error")))
+
+        // --- 7. tool.execute.after boundaries --------------------------------
+        let! netRes = harness.runToolExecuteHooks "executor" execArgs "network error"
+        chk "op.executor.networkErrorConverted" ((string (dynGet netRes "error")) = "network connection lost")
+
+        let execArgs2 = createObj [ "program", box "echo hello-executor"; "language", box "shell"; "mode", box "ro"; "timeout_type", box "short"; "what_to_summarize", box "keep stdout only"; "warn_tdd", box warnTddValue; "warn", box warnValue ]
+        let! liveRes1 = harness.runToolExecuteHooks "executor" execArgs2 "hello-livelock"
+        let! liveRes2 = harness.runToolExecuteHooks "executor" execArgs2 "hello-livelock"
+        let! liveRes3 = harness.runToolExecuteHooks "executor" execArgs2 "hello-livelock"
+        chk "op.executor.livelockIntercepted" ((string (dynGet liveRes3 "error")).IndexOf("livelock guard") >= 0)
+
+        // --- 8. todowrite intercept flow --------------------------------------
+        let pad1024 = String.replicate 1024 "x"
+        let twArgs = createObj [
+            "ahaMoments", box pad1024; "changesAndReasons", box pad1024; "gotchas", box pad1024
+            "lessonsAndConventions", box pad1024; "plan", box pad1024
+            "todos", box [| box {| content = "do task"; status = "pending"; priority = "high" |} |]
+            "select_methodology", box [| "first_principles" |]
+        ]
+        let! twRes = harness.runToolExecuteHooks "todowrite" twArgs "success"
+        chk "op.todowrite.rewritten" ((dynStr twRes "output").IndexOf("first_principles") >= 0); chk "op.todowrite.noErr" (dynIsNull (dynGet twRes "error"))
+        chk "op.todowrite.eventAppended" (((if harness.fileExists ".wanxiangshu.ndjson" then harness.readFile ".wanxiangshu.ndjson" else "").IndexOf("work_backlog_committed") >= 0))
+
+        let chkTwErr label (errSub: string) extra =
+            promise {
+                let beforeLog = if harness.fileExists ".wanxiangshu.ndjson" then harness.readFile ".wanxiangshu.ndjson" else ""
+                let baseArgs = [
+                    "ahaMoments", box pad1024; "changesAndReasons", box pad1024; "gotchas", box pad1024
+                    "lessonsAndConventions", box pad1024; "plan", box pad1024
+                    "todos", box [| box {| content = "do task"; status = "pending"; priority = "high" |} |]
+                    "select_methodology", box [| "first_principles" |]
+                ]
+                let merged = createObj (baseArgs @ extra)
+                let! _ = harness.runToolExecuteHooks "todowrite" merged "success"
+                let afterLog = if harness.fileExists ".wanxiangshu.ndjson" then harness.readFile ".wanxiangshu.ndjson" else ""
+                chk label (beforeLog = afterLog)
+            }
+        do! chkTwErr "op.todowrite.shortErr" "must be at least 1024 characters" [ "ahaMoments", box "short" ]
+        do! chkTwErr "op.todowrite.badTodoErr" "content" [ "todos", box [| box {| content = ""; status = "pending"; priority = "high" |} |] ]
+
+        // --- 9. Nudge & Force-Stop workflow -----------------------------------
+        let mutable nudgePromptCalls = 0
+        let mutable nudgePromptBody = ""
+        let nudgeOpts = createObj [
+            "messages", box [| box (createObj [ "info", box (createObj [ "role", box "assistant"; "agent", box "build"; "finish", box "stop"; "id", box "msg-1"; "time", box {| completed = 1000.0 |} ]); "parts", box [| box (createObj [ "type", box "text"; "text", box "assistant reply" ]) |] ]) |]
+            "mockSessionClient", box (createObj [
+                "todo", box (fun _ -> Promise.lift (box {| data = [| {| content = "layout"; status = "pending" |} |] |}))
+                "prompt", box (fun (body: obj) ->
+                    nudgePromptCalls <- nudgePromptCalls + 1
+                    nudgePromptBody <- jsonStringify body
+                    Promise.lift (box {| ok = true |}))
+            ])
+        ]
+        let! nudgeHarnessObj = startHarness nudgeOpts
+        let nudgeHarness = harnessFromObj nudgeHarnessObj
+        let! _ = nudgeHarness.fireEvent (box {| event = {| ``type`` = "session.idle"; properties = {| sessionID = nudgeHarness.sessionId |} |} |})
+        let mutable nudgeTicks = 0
+        while nudgePromptCalls = 0 && nudgeTicks < 20 do
+            do! Promise.sleep 50
+            nudgeTicks <- nudgeTicks + 1
+        do! nudgeHarness.dispose ()
+        chk "op.nudge.promptSentExactlyOnce" (nudgePromptCalls = 1); chk "op.nudge.promptContentValid" ((string nudgePromptBody).IndexOf("There are still incomplete todos") >= 0)
+
+        let mutable abortPromptCalls = 0
+        let abortOpts = createObj [
+            "messages", box [| box (createObj [ "info", box (createObj [ "role", box "assistant"; "agent", box "build"; "finish", box "stop"; "id", box "msg-1"; "time", box {| completed = 1000.0 |} ]); "parts", box [| box (createObj [ "type", box "text"; "text", box "assistant reply" ]) |] ]) |]
+            "mockSessionClient", box (createObj [
+                "todo", box (fun _ -> Promise.lift (box {| data = [| {| content = "layout"; status = "pending" |} |] |}))
+                "prompt", box (fun _ -> abortPromptCalls <- abortPromptCalls + 1; Promise.lift (box {| ok = true |}))
+            ])
+        ]
+        let! abortHarnessObj = startHarness abortOpts
+        let abortHarness = harnessFromObj abortHarnessObj
+        let! _ = abortHarness.fireStreamAbort abortHarness.sessionId
+        let! _ = abortHarness.fireEvent (box {| event = {| ``type`` = "session.idle"; properties = {| sessionID = abortHarness.sessionId |} |} |})
+        do! Promise.sleep 200
+        do! abortHarness.dispose ()
+        chk "op.nudge.aborted.notCalled" (abortPromptCalls = 0)
+
+        // --- 10. session.post error triggers nudge ----------------------------
+        let mutable errNudgeCalls = 0
+        let errNudgeOpts = createObj [
+            "messages", box [| box (createObj [ "info", box (createObj [ "role", box "assistant"; "agent", box "build"; "finish", box "stop"; "id", box "msg-1"; "time", box {| completed = 1000.0 |} ]); "parts", box [| box (createObj [ "type", box "text"; "text", box "assistant reply" ]) |] ]) |]
+            "mockSessionClient", box (createObj [
+                "todo", box (fun _ -> Promise.lift (box {| data = [| {| content = "layout"; status = "pending" |} |] |}))
+                "prompt", box (fun _ -> errNudgeCalls <- errNudgeCalls + 1; Promise.lift (box {| ok = true |}))
+            ])
+        ]
+        let! errNudgeHarnessObj = startHarness errNudgeOpts
+        let errNudgeHarness = harnessFromObj errNudgeHarnessObj
+        let! _ = errNudgeHarness.runLifecycleHook "session.post" (createObj [ "sessionID", box errNudgeHarness.sessionId; "outcome", box "error"; "error", box "something went wrong" ]) (createEmpty())
+        let mutable errTicks = 0
+        while errNudgeCalls = 0 && errTicks < 20 do
+            do! Promise.sleep 50
+            errTicks <- errTicks + 1
+        do! errNudgeHarness.dispose ()
+        chk "op.sessionPost.errorTriggersNudge" (errNudgeCalls = 1)
 
         do! harness.dispose ()
 

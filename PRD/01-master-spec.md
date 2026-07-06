@@ -23,6 +23,7 @@ Single-host, single-session AI coding agents face five core engineering constrai
 - **Axiom 3: Command Rejection, Fact Append**: Invalid commands fail fast with typed errors. Verified facts append to the event log.
 - **Axiom 4: Strict Side-Effect Isolation**: Kernel functions never invoke Node I/O or `Dyn.*`. All I/O is pushed to `src/Shell/`.
 - **Axiom 5: Type-Driven State Safety**: Discriminated unions (DUs) eliminate illegal states at compile time.
+- **Axiom 6: Time-Independent Test Reliability**: E2E and integration tests must never rely on system clocks, random seeds, or fragile thread sleeps. Test flow synchronization must be managed via dependency injection and adaptive poll state hooks.
 
 ---
 

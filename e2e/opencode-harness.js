@@ -80,23 +80,9 @@ export async function start(opts = {}) {
     sessionId,
     plugin: result,
 
-    // Plugin accessors -----------------------------------------------------
-    getPlugin() {
-      return result;
-    },
-
-    getToolNames() {
-      const tool = result.tool;
-      if (!tool || typeof tool !== 'object') return [];
-      return Object.keys(tool);
-    },
-
-    getToolEntry(name) {
-      const tool = result.tool;
-      if (!tool) return null;
-      const entry = tool[name];
-      return entry || null;
-    },
+    getPlugin() { return result; },
+    getToolNames() { return result.tool ? Object.keys(result.tool) : []; },
+    getToolEntry(name) { return result.tool ? (result.tool[name] || null) : null; },
 
     async runToolDefinition(toolID) {
       const hook = result['tool.definition'];
@@ -141,6 +127,23 @@ export async function start(opts = {}) {
       return typeof raw === 'string' ? raw : JSON.stringify(raw);
     },
 
+    /** Bypasses tool execution body; runs before/after hooks directly for testing hook validation and output rewriting. */
+    async runToolExecuteHooks(name, args = {}, rawOutput = "") {
+      const before = result['tool.execute.before'];
+      const after = result['tool.execute.after'];
+      const outputHolder = { args: { ...args } };
+      if (before) {
+        await before({ tool: name, args: outputHolder.args, sessionID: sessionId }, outputHolder);
+        if (outputHolder.error) return { error: outputHolder.error };
+      }
+      if (after) {
+        const finalOutput = { output: rawOutput };
+        await after({ tool: name, sessionID: sessionId, args: outputHolder.args }, finalOutput);
+        return { output: finalOutput.output, error: finalOutput.error, args: outputHolder.args };
+      }
+      return { output: rawOutput };
+    },
+
     async runCommandExecuteBefore(command, args = '') {
       const hook = result['command.execute.before'];
       if (!hook) throw new Error('plugin has no command.execute.before hook');
@@ -162,6 +165,13 @@ export async function start(opts = {}) {
       const hook = result['experimental.chat.system.transform'];
       if (!hook) throw new Error('plugin has no experimental.chat.system.transform hook');
       const output = {};
+      await hook(input, output);
+      return output;
+    },
+
+    async runLifecycleHook(name, input, output = {}) {
+      const hook = result[name];
+      if (!hook) throw new Error(`plugin has no ${name} hook`);
       await hook(input, output);
       return output;
     },
@@ -213,9 +223,7 @@ export async function start(opts = {}) {
       });
     },
 
-    getReviewStore() {
-      return result.__reviewStore || null;
-    },
+    getReviewStore() { return result.__reviewStore || null; },
 
     // Parts text extraction from output.parts ------------------------------
     readPartsText(output) {
@@ -252,14 +260,8 @@ export async function start(opts = {}) {
     expectText: llmHandle.expectText,
     resetMock: llmHandle.reset,
 
-    // File helpers ---------------------------------------------------------
-    readFile(relPath) {
-      return fs.readFileSync(path.join(workDir, relPath), 'utf8');
-    },
-
-    fileExists(relPath) {
-      return fs.existsSync(path.join(workDir, relPath));
-    },
+    readFile(relPath) { return fs.readFileSync(path.join(workDir, relPath), 'utf8'); },
+    fileExists(relPath) { return fs.existsSync(path.join(workDir, relPath)); },
 
     async waitForFile(relPath, timeoutMs = 10000) {
       const deadline = Date.now() + timeoutMs;
