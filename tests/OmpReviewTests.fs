@@ -73,7 +73,7 @@ let loopInputHandledMessageAndNotify () = promise {
 let private executeTool (tool: obj) (toolCallId: string) (params': obj) (ctx: obj) =
     let execute = Dyn.get tool "execute"
     emitJsExpr (execute, toolCallId, params', jsUndefined, jsUndefined, ctx)
-        "Promise.resolve($0($1)($2)($3)($4)($5))"
+        "Promise.resolve($0($1, $2, $3, $4, $5))"
     |> unbox<JS.Promise<obj>>
 
 let private toolText (result: obj) : string =

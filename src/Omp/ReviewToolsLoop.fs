@@ -13,7 +13,6 @@ open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.Clock
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.Dyn
-module Dyn = Wanxiangshu.Shell.Dyn
 
 let loopCommand = "loop"
 
@@ -23,18 +22,18 @@ let handleLoopReviewCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: 
         match getSessionIdFromContext ctx with
         | None -> ()
         | Some sessionId ->
-            let notify = Dyn.get (Dyn.get ctx "ui") "notify"
-            let sm = Dyn.get ctx "sessionManager"
+            let notify = get (get ctx "ui") "notify"
+            let sm = get ctx "sessionManager"
             let notifyInfo (msg: string) =
-                if Dyn.typeIs notify "function" then
+                if typeIs notify "function" then
                     emitJsExpr (notify, box msg, box "info") "if (typeof $0 === 'function') $0($1, $2)" |> ignore
             if task = "" then notifyInfo "loop-review needs a task. Try /loop-review <task>."
             else
-                let root = Dyn.str ctx "cwd"
+                let root = str ctx "cwd"
                 do! syncReviewFromEventLog store root sessionId
                 if store.getReviewTask sessionId |> Option.isSome then notifyInfo "loop mode is already active."
                 else
-                let! result = runPreReviewerSession ompScope pi ctx store task
+                let! (result: ReviewResult) = runPreReviewerSession ompScope pi ctx store task
                 match result with
                 | Accepted _ -> notifyInfo $"Pre-review passed. Task \"{task}\" already meets criteria — no loop needed."
                 | Terminated -> notifyInfo "Pre-review could not complete."
@@ -62,12 +61,12 @@ let handleLoopCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: obj) :
         match getSessionIdFromContext ctx with
         | None -> ()
         | Some sessionId ->
-            let notify = Dyn.get (Dyn.get ctx "ui") "notify"
-            let sm = Dyn.get ctx "sessionManager"
+            let notify = get (get ctx "ui") "notify"
+            let sm = get ctx "sessionManager"
             let notifyInfo (msg: string) =
-                if Dyn.typeIs notify "function" then
+                if typeIs notify "function" then
                     emitJsExpr (notify, box msg, box "info") "if (typeof $0 === 'function') $0($1, $2)" |> ignore
-            let root = Dyn.str ctx "cwd"
+            let root = str ctx "cwd"
             if task = "" then
                 do! appendLoopCancelledOrFail root sessionId
                 store.deactivateReview sessionId

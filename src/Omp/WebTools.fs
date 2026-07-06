@@ -47,7 +47,7 @@ let private buildWebsearch (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fa
         "description", box (description "websearch")
         "parameters", websearchParameters tb
         "execute",
-            box(fun (_id: string) (params': obj) (signal: obj) ->
+            box(fun (_id: string) (params': obj) (signal: obj) (_onUpdate: obj) (ctx: obj) ->
                 promise {
                     let query = Dyn.str params' "query"
                     let what = Dyn.str params' "what_to_summarize"
@@ -74,7 +74,7 @@ let private buildWebsearch (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fa
                                     runSubagent
                                         ExecutorTools.ompScope
                                         pi
-                                        (createObj [ "cwd", box "" ])
+                                        ctx
                                         [| "read" |]
                                         prompt
                                         abort
@@ -99,7 +99,7 @@ let private buildWebfetch (pi: obj) : obj =
                    ("timeout", opt Params.webfetchTimeout tb num) |]
                 tb
         "execute",
-            box(fun (_id: string) (params': obj) (signal: obj) ->
+            box(fun (_id: string) (params': obj) (signal: obj) (_onUpdate: obj) (ctx: obj) ->
                 promise {
                     let url = Dyn.str params' "url"
                     match validateFetchUrl url with

@@ -20,7 +20,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 module Dyn = Wanxiangshu.Shell.Dyn
 
 let private executeMethodology (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) =
-    fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
+    System.Func<string, obj, obj, obj, obj, JS.Promise<ToolResult>>(fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
         promise {
             match parse params' with
             | Error message -> return errorResult ("Error: " + message)
@@ -34,7 +34,7 @@ let private executeMethodology (pi: obj) (fallbackRuntime: FallbackRuntimeState)
                         let! text = runSubagent ExecutorTools.ompScope pi ctx [||] prompt (Some signal) fallbackRuntime fallbackConfigOpt
                         return textResult text
                     with ex -> return asErrorResult ex
-        }
+        })
 
 let registerMethodologyTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : unit =
     let tb = Dyn.get pi "typebox"

@@ -7,13 +7,14 @@ open Wanxiangshu.Omp.Schema
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FuzzyFinderShell
 open Wanxiangshu.Shell.FuzzySearch
+open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Kernel.FuzzyQuery
 
 let private scopeId (ctx: obj) =
     let sid = Dyn.str ctx "sessionId"
     if sid <> "" then sid else Dyn.str ctx "workspaceId"
 
-let registerFuzzyTools (pi: obj) (finderCache: FinderCache) : unit =
+let registerFuzzyTools (pi: obj) (finderCache: FinderCache) (iteratorStore: TypedIteratorStore) : unit =
     let tb = Dyn.get pi "typebox"
     pi?registerTool(
         createObj [
@@ -43,7 +44,7 @@ let registerFuzzyTools (pi: obj) (finderCache: FinderCache) : unit =
                                     let opts : SearchOptions =
                                         { cwd = Dyn.str ctx "cwd"
                                           scopeId = scope
-                                          store = None
+                                          store = Some iteratorStore
                                           finderCache = finderCache }
                                     let! r = fuzzyFind p opts
                                     if r.isError then return errorResult r.output else return textResult r.output
@@ -88,7 +89,7 @@ let registerFuzzyTools (pi: obj) (finderCache: FinderCache) : unit =
                                     let opts : SearchOptions =
                                         { cwd = Dyn.str ctx "cwd"
                                           scopeId = scope
-                                          store = None
+                                          store = Some iteratorStore
                                           finderCache = finderCache }
                                     let! r = fuzzyGrep p opts
                                     if r.isError then return errorResult r.output else return textResult r.output

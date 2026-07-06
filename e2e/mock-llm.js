@@ -90,10 +90,8 @@ function createMockLLM() {
       req.on('end', () => {
         let parsed = {};
         try { parsed = JSON.parse(body); } catch { /* keep {} */ }
-        if (process.env.WANXIANG_E2E_VERBOSE === '1') {
-          console.error('[mock-llm] request body:', JSON.stringify(parsed));
-          console.error('[mock-llm] current queue:', JSON.stringify(_queue));
-        }
+        console.error('[mock-llm] req model:', parsed.model, 'tools:', parsed.tools ? parsed.tools.map(t => t.function?.name ?? t.name ?? t.function?.name) : 'none');
+        console.error('[mock-llm] current queue:', JSON.stringify(_queue));
         const messages = parsed.messages || [];
         const lastUser = [...messages].reverse().find(m => m.role === 'user');
 
@@ -135,6 +133,7 @@ function createMockLLM() {
             expectTool: (tool, args) => _queue.push({ tool, args: args ?? {} }),
             expectText: (text) => _queue.push({ text }),
             reset: () => { _queue.length = 0; _calls.length = 0; },
+            getRemainingExpectations: () => _queue.length,
             calls: _calls,
             stop: () => new Promise(fulfil => _server.close(fulfil)),
           });

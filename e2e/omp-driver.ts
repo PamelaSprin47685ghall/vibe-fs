@@ -11,6 +11,28 @@ import { execSync } from 'node:child_process';
 import { respond, readStdinJson } from './omp-driver/ipc';
 import { createStubExtensionContext, patchRuntime } from './omp-driver/stub';
 
+const originalFetch = global.fetch;
+global.fetch = async (url, options) => {
+  if (typeof url === 'string' && url.startsWith('https://ollama.com/api')) {
+    const json = () => url.includes('web_search') ? ({ results: [{ title: 'Test Search Title', url: 'http://example.com', content: 'Test search content for E2E.' }] }) : ({ title: 'Example Domain', byline: 'IANA', length: 500, content: 'Example Domain\n\nThis domain is for use in documentation examples.' });
+    return { ok: true, status: 200, json: async () => json() };
+  }
+  return typeof originalFetch === 'function' ? originalFetch(url, options) : Promise.reject(new Error(`fetch not stubbed: ${url}`));
+};
+
+async function callCurried(fn: any, args: any[]) {
+	if (typeof fn !== 'function') return fn;
+	if (fn.length > 1) {
+		return fn(...args);
+	}
+	let current = fn;
+	for (const arg of args) {
+		if (typeof current !== 'function') break;
+		current = await current(arg);
+	}
+	return current;
+}
+
 async function handleCommand(ex: any, workdir: string, ndjsonPath: string, cmd: Record<string, any>): Promise<boolean | void> {
 	switch (cmd.type) {
 		case 'emit': {
@@ -31,7 +53,17 @@ async function handleCommand(ex: any, workdir: string, ndjsonPath: string, cmd: 
 			const toolCallId = cmd.toolCallId ?? 'call-' + Date.now();
 			const toolCtx = createStubExtensionContext(workdir, cmd.sessionId ?? '');
 			let result: unknown, threw = true;
-			try { let f: any = def.execute; f = await f(toolCallId); f = await f(cmd.params); f = await f(undefined); f = await f(onUpdate); f = await f(toolCtx); result = f; threw = false; }
+			try {
+				const callArgs = [
+					toolCallId,
+					cmd.params,
+					undefined,
+					onUpdate,
+					toolCtx
+				];
+				result = await callCurried(def.execute, callArgs);
+				threw = false;
+			}
 			catch (e) { result = { thrown: e instanceof Error ? e.message : String(e) }; }
 			process.stderr.write(`[callTool] ${cmd.name} ok=${!threw} result=${JSON.stringify(result)}\n`);
 			respond(true, result); break;
@@ -47,6 +79,32 @@ async function handleCommand(ex: any, workdir: string, ndjsonPath: string, cmd: 
 		}
 		case 'getToolNames': { respond(true, { toolNames: Array.from(ex.tools.keys()) }); break; }
 		case 'getCommands': { respond(true, { commandNames: Array.from(ex.commands.keys()) }); break; }
+		case 'runCommand': {
+			const entry = ex.commands.get(cmd.name);
+			if (!entry) { respond(false, null, `Unknown command: ${cmd.name}`); break; }
+			const toolCtx = createStubExtensionContext(workdir, cmd.sessionId ?? '');
+			let result: unknown, threw = true;
+			try {
+				let f = entry.handler;
+				process.stderr.write(`[omp-driver] runCommand handler type: ${typeof f}\n`);
+				if (typeof f === 'function') {
+					let r = f;
+					if (typeof r === 'function') r = await r(cmd.args ?? '');
+					if (typeof r === 'function') r = await r(toolCtx);
+					result = r;
+				} else if (entry.execute && typeof entry.execute === 'function') {
+					let r = entry.execute;
+					if (typeof r === 'function') r = await r(cmd.args ?? '');
+					if (typeof r === 'function') r = await r(toolCtx);
+					result = r;
+				} else {
+					result = "handler is not a function";
+				}
+				threw = false;
+			}
+			catch (e) { result = { thrown: e instanceof Error ? e.message : String(e) }; }
+			respond(true, { success: !threw, result }); break;
+		}
 		case 'getHandlers': { respond(true, { handlerKeys: Array.from(ex.handlers.keys()) }); break; }
 		case 'dispose': { try { fs.rmSync(workdir, { recursive: true, force: true }); } catch {} respond(true, { disposed: true }); return true; }
 		default: respond(false, null, `Unknown command: ${cmd.type}`);

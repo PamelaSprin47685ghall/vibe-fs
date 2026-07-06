@@ -70,7 +70,11 @@ providers:
             WANXIANGSHU_PLUGIN_PATH: pluginPath,
             MOCK_LLM_URL: mockLlm.url,
             PI_CODING_AGENT_DIR: agentDir,
-            OPENAI_API_KEY: 'test-key'
+            OPENAI_API_KEY: 'test-key',
+            OLLAMA_API_KEY: 'test-key',
+            OMP_REVIEW_GRACE_INITIAL_MS: '600000',
+            OMP_REVIEW_GRACE_SUBSEQUENT_MS: '600000',
+            OMP_EXECUTOR_MIN_WAIT: '5'
         },
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,

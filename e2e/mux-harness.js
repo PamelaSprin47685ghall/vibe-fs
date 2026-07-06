@@ -5,6 +5,15 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createMockLLM } from './mock-llm.js';
 
+const originalFetch = global.fetch;
+global.fetch = async (url, options) => {
+  if (typeof url === 'string' && url.startsWith('https://ollama.com/api')) {
+    const json = () => url.includes('web_search') ? ({ results: [{ title: 'Test Search Title', url: 'http://example.com', content: 'Test search content for E2E.' }] }) : ({ title: 'Example Domain', byline: 'IANA', length: 500, content: 'Example Domain\n\nThis domain is for use in documentation examples.' });
+    return { ok: true, status: 200, json: async () => json() };
+  }
+  return typeof originalFetch === 'function' ? originalFetch(url, options) : Promise.reject(new Error(`fetch not stubbed: ${url}`));
+};
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // In build/ the plugin lives at ../build/src/Mux/Plugin.js; in source layout the
@@ -74,6 +83,16 @@ export async function start(opts = {}) {
 
   let getChatHistoryCalled = false;
 
+  const mockTaskService = {
+    create: async (input) => {
+      return { success: true, data: { taskId: 'task-123' } };
+    },
+    waitForAgentReport: async (taskId, opts) => {
+      return { reportMarkdown: mockTaskService._reportMarkdown };
+    },
+    _reportMarkdown: 'Accepted: Pre-review passed.',
+  };
+
   const plugin = await loadPlugin();
   const deps = {
     loadConfigOrDefault: () => ({}),
@@ -85,6 +104,7 @@ export async function start(opts = {}) {
       return Promise.resolve(workspaceId === (opts.workspaceId || 'mux-e2e-session') ? messages : []);
     },
     directory: workDir,
+    taskService: mockTaskService,
   };
   const reg = plugin.createRegistration(deps);
 
@@ -99,6 +119,7 @@ export async function start(opts = {}) {
     registration: reg,
     helpers,
     getChatHistoryCalled: () => getChatHistoryCalled,
+    setMockReportMarkdown: (markdown) => { mockTaskService._reportMarkdown = markdown; },
 
     // Event hook -----------------------------------------------------------
     async fireEvent(event) {
@@ -162,6 +183,7 @@ export async function start(opts = {}) {
         directory: workDir,
         sessionID: opts.workspaceId || 'mux-e2e-session',
         workspaceId: opts.workspaceId || 'mux-e2e-session',
+        taskService: mockTaskService,
         ...config,
       };
       // If tool.execute.before exists, run it first.

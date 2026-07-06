@@ -64,20 +64,19 @@ let errorResult (text: string) : ToolResult =
 let asErrorResult (error: obj) : ToolResult =
     errorResult (string error)
 
-let private normalizeSessionId (sm: ISessionManager) : string option =
-    let smObj = box sm
-    if Dyn.typeIs (Dyn.get smObj "getSessionId") "function" then
-        let id : obj = smObj?getSessionId()
-        if Dyn.isNullish id then None else Some (string id)
-    else sm.sessionId
-
 let getSessionIdFromContext (ctxObj: obj) : string option =
     if Dyn.isNullish ctxObj then None
     else
-        let ctx = unbox<IOmpContext> ctxObj
-        match ctx.sessionManager with
-        | None -> None
-        | Some sm -> normalizeSessionId sm
+        let sm = Dyn.get ctxObj "sessionManager"
+        if Dyn.isNullish sm then None
+        else
+            let smObj = box sm
+            if Dyn.typeIs (Dyn.get smObj "getSessionId") "function" then
+                let id : obj = smObj?getSessionId()
+                if Dyn.isNullish id then None else Some (string id)
+            else
+                let sid = Dyn.str smObj "sessionId"
+                if sid = "" then None else Some sid
 
 let stringArraySchema (pi: obj) (description: string) : obj =
     let tb = Dyn.get pi "typebox"

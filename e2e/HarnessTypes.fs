@@ -7,6 +7,7 @@ type MockLLM =
     abstract expectTool: string -> obj -> unit
     abstract expectText: string -> unit
     abstract reset: unit -> unit
+    abstract getRemainingExpectations: unit -> int
     abstract calls: ResizeArray<obj>
 
 type Harness =
@@ -27,4 +28,20 @@ type Harness =
     abstract readFile: string -> JS.Promise<string>
     abstract fileExists: string -> JS.Promise<bool>
     abstract waitForFile: string -> int -> JS.Promise<bool>
+    abstract dispose: unit -> JS.Promise<unit>
+
+type OmpHarness =
+    abstract tools: ResizeArray<obj>
+    abstract handlers: obj
+    abstract getToolNames: unit -> JS.Promise<ResizeArray<string>>
+    abstract runCommand: string -> string -> string -> JS.Promise<obj>
+    abstract triggerTool: string -> obj -> string -> obj -> JS.Promise<obj>
+    abstract emitEvent: string -> obj -> string -> JS.Promise<obj>
+    abstract readNdjson: unit -> JS.Promise<string>
+    abstract readFile: string -> JS.Promise<string>
+    abstract fileExists: string -> JS.Promise<bool>
+    abstract getCommands: unit -> JS.Promise<obj>
+    abstract expectText: string -> JS.Promise<unit>
+    abstract expectTool: string -> obj -> JS.Promise<unit>
+    abstract waitForNdjson: int -> int -> JS.Promise<bool>
     abstract dispose: unit -> JS.Promise<unit>

@@ -116,10 +116,9 @@ let registerSubagentTools (pi: obj) (fallbackRuntime: FallbackRuntimeState) (fal
                 box(fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
                     promise {
                         try
-                            let getAll = Dyn.get pi "getAllTools"
                             let hasBrowser =
-                                Dyn.typeIs getAll "function"
-                                && (unbox<obj array> (Dyn.call0 getAll) |> Array.exists (fun t -> string t = "browser"))
+                                not (Dyn.isNullish (Dyn.get pi "getAllTools"))
+                                && (unbox<obj array> (Dyn.callMethod0 pi "getAllTools") |> Array.exists (fun t -> string t = "browser"))
                             if not hasBrowser then
                                 return errorResult "Built-in browser tool is unavailable in this session."
                             else

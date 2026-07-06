@@ -88,9 +88,15 @@ let private tryReadPromptModel (payload: obj) : obj option =
         let modelString = Dyn.str payload "modelString"
         if modelString = "" then None
         else
-            let slash = modelString.IndexOf('/')
-            if slash <= 0 || slash >= modelString.Length - 1 then None
-            else Some (box {| providerID = modelString.[0..slash-1]; modelID = modelString.[slash+1..] |})
+            let basePart =
+                match modelString.IndexOf(':') with
+                | -1 -> modelString
+                | colon -> modelString.[0..colon - 1].Trim()
+            if basePart = "" then None
+            else
+                let slash = basePart.IndexOf('/')
+                if slash <= 0 || slash >= basePart.Length - 1 then None
+                else Some (box {| providerID = basePart.[0..slash-1]; modelID = basePart.[slash+1..] |})
 
 let buildPromptBody (agent: string) (prompt: string) (tools: obj) (settings: SubagentAiSettings) : obj =
     let body = box {| agent = agent; parts = [| box {| ``type`` = "text"; text = prompt |} |] |}

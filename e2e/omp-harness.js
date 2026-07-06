@@ -23,6 +23,17 @@ export function createOmpHarness({ sendCommand, child, releaseLock, mockLlm }) {
             return res.data;
         },
 
+        getRemainingExpectations() {
+            if (mockLlm) return mockLlm.getRemainingExpectations();
+            return 0;
+        },
+
+        async runCommand(name, args, sessionId) {
+            const res = await sendCommand({ type: 'runCommand', name, args, sessionId });
+            if (!res.ok) throw new Error(res.error || 'runCommand failed');
+            return res.data;
+        },
+
         async triggerTool(name, params, sessionId, extraCtx) {
             const res = await sendCommand({ type: 'callTool', toolCallId: sessionId, name, params, sessionId });
             if (!res.ok) throw new Error(res.error || 'callTool failed');

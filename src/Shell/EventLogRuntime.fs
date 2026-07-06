@@ -47,7 +47,7 @@ let isLoopActiveFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Pr
 
 let syncReviewFromEventLog (store: ReviewStore) (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
     promise {
-        if sessionID = "" then ()
+        if sessionID = "" || workspaceRoot = "" then return ()
         else
             let! events = getSessionEvents workspaceRoot sessionID
             let task = foldReviewTask sessionID events

@@ -13,6 +13,8 @@ type ReviewStore =
     abstract member unlockReview: sessionID: string -> unit
     abstract member setPendingReview: sessionID: string * resolve: (ReviewResult -> unit) -> unit
     abstract member setAbortSuppressor: sessionID: string * suppress: (unit -> unit) -> unit
+    abstract member getPendingReviewIds: unit -> string list
+    abstract member getActiveSessionIds: unit -> string list
     abstract member resolvePendingReview: sessionID: string * result: ReviewResult -> bool
     abstract member getReviewTask: sessionID: string -> string option
     abstract member getReviewState: sessionID: string -> ReviewState option
@@ -60,14 +62,27 @@ let createReviewStore () : ReviewStore =
         member _.setAbortSuppressor(sessionID, suppress) =
             state <- { state with Effects = { state.Effects with abortSuppressors = Map.add sessionID suppress state.Effects.abortSuppressors } }
         member _.resolvePendingReview(sessionID, result) =
-            let nextRegistry = reduce state.Registry (actionFor sessionID result)
-            let nextEffects, fired = resolvePending state.Effects sessionID result
+            let targetID =
+                if Map.containsKey sessionID state.Effects.pendingResolutions then sessionID
+                else
+                    let descendants = allDescendantIds sessionID
+                    descendants
+                    |> List.tryFind (fun id -> Map.containsKey id state.Effects.pendingResolutions)
+                    |> Option.defaultValue sessionID
+            let nextRegistry = reduce state.Registry (actionFor targetID result)
+            let nextEffects, fired = resolvePending state.Effects targetID result
             state <- { state with Registry = nextRegistry; Effects = nextEffects }
             fired
         member _.getReviewTask(sessionID) = taskOf state.Registry sessionID
         member _.getReviewState(sessionID) = stateOf state.Registry sessionID
         member _.addChild(parentID, childID) =
             state <- { state with Registry = reduce state.Registry (RegistryAction.AddChild(parentID, childID)) }
+        member _.getPendingReviewIds() = Map.keys state.Effects.pendingResolutions |> List.ofSeq
+        member _.getActiveSessionIds() =
+            state.Registry
+            |> Map.filter (fun _ s -> Wanxiangshu.Kernel.ReviewSession.StateMachine.isActive s.state)
+            |> Map.keys
+            |> List.ofSeq
         member _.hasSynced(sessionID) = Set.contains sessionID syncedSessions
         member _.markSynced(sessionID) = syncedSessions <- Set.add sessionID syncedSessions }
 

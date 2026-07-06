@@ -34,6 +34,8 @@ export function createStubExtensionContext(cwd: string, sessionId: string) {
 	return {
 		ui,
 		authStorage,
+		sessionId,
+		workspaceId: sessionId,
 		getContextUsage: () => undefined,
 		compact: async () => {},
 		hasUI: false,
@@ -53,7 +55,8 @@ export function patchRuntime(runtime: ExtensionRuntime) {
 		['appendEntry', () => {}],
 		['setLabel', () => {}],
 		['getActiveTools', () => []],
-		['getAllTools', () => []],
+		['getAllTools', () => ['browser']],
+		['getAllRegisteredTools', () => []],
 		['setActiveTools', async () => {}],
 		['getCommands', () => []],
 		['setModel', async () => false],

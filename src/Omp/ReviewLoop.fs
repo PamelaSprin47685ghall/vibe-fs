@@ -22,9 +22,10 @@ let private createDeferred () : JS.Promise<JsReviewResult> * (JsReviewResult -> 
     let d = emitJsExpr () "Promise.withResolvers()"
     unbox (Dyn.get d "promise"), unbox (Dyn.get d "resolve")
 
-let private attachReviewChild (store: ReviewStore) (parentId: string) (childId: string) (onResolve: JsReviewResult -> unit) =
+let private attachReviewChild (store: ReviewStore) (parentId: string) (childId: string) (onResolve: JsReviewResult -> unit) (childSession: obj) =
     store.addChild(parentId, childId)
     store.setPendingReview(childId, fun kr ->
+        try Dyn.callMethod0 childSession "abort" |> ignore with _ -> ()
         let js =
             match kr with
             | Accepted fb -> { accepted = Some true; feedback = (if fb = "" then None else Some fb); terminated = None }
@@ -114,20 +115,16 @@ let runReviewLoop (scope: RuntimeScope) (pi: obj) (ctx: obj) (store: ReviewStore
         let childId = getSessionIdFromContext childCtx |> Option.defaultValue ""
         let cleanupChild () =
             detachReviewChild store parentId childId
-            let childSessionTyped = unbox<IChildSession> childSession
-            match childSessionTyped.abort with
-            | Some abort -> try abort () with _ -> ()
-            | None -> ()
+            if not (Dyn.isNullish (Dyn.get childSession "abort")) then
+                try Dyn.callMethod0 childSession "abort" |> ignore with _ -> ()
             child.dispose |> Option.iter (fun dispose -> dispose ())
         if childId = "" then
-            let childSessionTyped = unbox<IChildSession> childSession
-            match childSessionTyped.abort with
-            | Some abort -> try abort () with _ -> ()
-            | None -> ()
+            if not (Dyn.isNullish (Dyn.get childSession "abort")) then
+                try Dyn.callMethod0 childSession "abort" |> ignore with _ -> ()
             child.dispose |> Option.iter (fun dispose -> dispose ())
             return terminatedResult "Review child session unavailable"
         else
-            attachReviewChild store parentId childId (fun r -> resolveReview r)
+            attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
             let initial = buildOmpReviewInitialPrompt report (files |> Array.toList) task
             do! childSession?prompt(initial) |> unbox<JS.Promise<unit>>
             let onMax () =
@@ -160,16 +157,14 @@ let runPreReviewerSession (scope: RuntimeScope) (pi: obj) (ctx: obj) (store: Rev
                 let childId = getSessionIdFromContext childCtx |> Option.defaultValue ""
                 let cleanupChild () =
                     detachReviewChild store parentId childId
-                    let childSessionTyped = unbox<IChildSession> childSession
-                    match childSessionTyped.abort with
-                    | Some abort -> try abort () with _ -> ()
-                    | None -> ()
+                    if not (Dyn.isNullish (Dyn.get childSession "abort")) then
+                        try Dyn.callMethod0 childSession "abort" |> ignore with _ -> ()
                     child.dispose |> Option.iter (fun dispose -> dispose ())
                 if childId = "" then
                     cleanupChild ()
                     return Terminated
                 else
-                    attachReviewChild store parentId childId (fun r -> resolveReview r)
+                    attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
                     let initial = reviewerPrompt taskTrim "" []
                     do! childSession?prompt(initial) |> unbox<JS.Promise<unit>>
                     let! jsOutcome = runNudgeLoop scope childSession resolvedPromise (fun () -> terminatedResult "Pre-review timed out.")

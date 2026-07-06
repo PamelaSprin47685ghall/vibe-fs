@@ -47,6 +47,37 @@ let modelKeyWinsOverModelString () =
     | None -> check "model key wins" false
     | Some m -> check "model key not parsed from modelString" (obj.ReferenceEquals(m, hostModel))
 
+let nestedSlashPreservesMiddlePath () =
+    match tryDecodePromptModelFromModelString "a/b/c" with
+    | None -> check "nested slash preserves middle path" false
+    | Some m ->
+        check "nested providerID" (providerId m = "a")
+        check "nested modelID keeps middle path" (modelId m = "b/c")
+
+let variantSuffixStrippedSingle () =
+    match tryDecodePromptModelFromModelString "provider/model:variant" with
+    | None -> check "variant suffix stripped single" false
+    | Some m ->
+        check "variant providerID" (providerId m = "provider")
+        check "variant modelID stripped" (modelId m = "model")
+
+let variantSuffixStrippedNested () =
+    match tryDecodePromptModelFromModelString "provider/nested/model:variant" with
+    | None -> check "variant suffix stripped nested" false
+    | Some m ->
+        check "nested variant providerID" (providerId m = "provider")
+        check "nested variant modelID stripped" (modelId m = "nested/model")
+
+let variantOnlyModelIdEmpty () =
+    check "variant only modelId empty" (tryDecodePromptModelFromModelString "provider/:variant" = None)
+
+let variantWithSpecialChars () =
+    match tryDecodePromptModelFromModelString "anthropic/claude-3.5-sonnet:fast-2024" with
+    | None -> check "variant with special chars" false
+    | Some m ->
+        check "special providerID" (providerId m = "anthropic")
+        check "special modelID stripped" (modelId m = "claude-3.5-sonnet")
+
 let run () =
     modelObjectPassthroughFromPayload ()
     modelStringSlashDecodes ()
@@ -54,3 +85,8 @@ let run () =
     emptyModelStringNone ()
     invalidSlashNone ()
     modelKeyWinsOverModelString ()
+    nestedSlashPreservesMiddlePath ()
+    variantSuffixStrippedSingle ()
+    variantSuffixStrippedNested ()
+    variantOnlyModelIdEmpty ()
+    variantWithSpecialChars ()

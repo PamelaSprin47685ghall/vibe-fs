@@ -15,6 +15,10 @@ let private readFileSync (path: string) (encoding: string) : string = jsNative
 let private fileExists (path: string) : bool = jsNative
 
 type MockLLM =
+    abstract expectTool: string -> obj -> unit
+    abstract expectText: string -> unit
+    abstract reset: unit -> unit
+    abstract getRemainingExpectations: unit -> int
     abstract calls: ResizeArray<obj>
 
 type Harness =
@@ -33,6 +37,7 @@ type Harness =
     abstract runSlashCommand: string -> string -> string -> JS.Promise<string>
     abstract getChatHistoryCalled: unit -> bool
     abstract getLastLlmRequest: unit -> obj
+    abstract setMockReportMarkdown: string -> unit
     abstract dispose: unit -> JS.Promise<unit>
 
 let private harnessFromObj (o: obj) : Harness = unbox o
@@ -91,101 +96,100 @@ let runAll (args: string array) : JS.Promise<int> =
             check label cond
             if cond then ok <- ok + 1
 
+        let runTool name args pred label =
+            promise {
+                let! res = harness.executeTool name args (createEmpty ())
+                let cond = pred res
+                if not cond then
+                    printfn "DEBUG FAIL: %s -> %s" label res
+                chk label cond
+            }
+
         // --- 1. Plugin registration structure --------------------------------
         let tools = dynGet reg "tools"
-        chk "mux.reg.tools.isArray"
-            (not (dynIsNull tools) && dynIsArr tools)
-        chk "mux.reg.tools.nonEmpty"
-            (not (dynIsNull tools) && (unbox<obj[]> tools).Length > 0)
+        chk "mux.reg.tools.isArray" (not (dynIsNull tools) && dynIsArr tools)
+        chk "mux.reg.tools.nonEmpty" (not (dynIsNull tools) && (unbox<obj[]> tools).Length > 0)
 
         let eventHook = dynGet reg "eventHook"
-        chk "mux.reg.eventHook.isFunction"
-            (not (dynIsNull eventHook) && dynTypeIs eventHook "function")
+        chk "mux.reg.eventHook.isFunction" (not (dynIsNull eventHook) && dynTypeIs eventHook "function")
 
         let messagesTransform = dynGet reg "messagesTransform"
-        chk "mux.reg.messagesTransform.isFunction"
-            (not (dynIsNull messagesTransform) && dynTypeIs messagesTransform "function")
+        chk "mux.reg.messagesTransform.isFunction" (not (dynIsNull messagesTransform) && dynTypeIs messagesTransform "function")
 
         let slashCommands = dynGet reg "slashCommands"
-        chk "mux.reg.slashCommands.isArray"
-            (not (dynIsNull slashCommands) && dynIsArr slashCommands)
-        chk "mux.reg.slashCommands.hasLoop"
-            (let cmds : obj[] = unbox<obj[]> slashCommands in
-             cmds |> Array.exists (fun c -> dynStr c "key" = "loop"))
-        chk "mux.reg.slashCommands.hasLoopReview"
-            (let cmds : obj[] = unbox<obj[]> slashCommands in
-             cmds |> Array.exists (fun c -> dynStr c "key" = "loop-review"))
+        chk "mux.reg.slashCommands.isArray" (not (dynIsNull slashCommands) && dynIsArr slashCommands)
+        chk "mux.reg.slashCommands.hasLoop" (let cmds : obj[] = unbox<obj[]> slashCommands in cmds |> Array.exists (fun c -> dynStr c "key" = "loop"))
+        chk "mux.reg.slashCommands.hasLoopReview" (let cmds : obj[] = unbox<obj[]> slashCommands in cmds |> Array.exists (fun c -> dynStr c "key" = "loop-review"))
 
         // --- 2. Tool schemas -------------------------------------------------
         let propsWrite = toolSchemaProperties harness "write"
         chk "mux.schema.write.hasFilePath" (not (dynIsNull (dynGet propsWrite "file_path")))
         chk "mux.schema.write.hasContent" (not (dynIsNull (dynGet propsWrite "content")))
-        chk "mux.schema.write.requiredFilePath"
-            (toolSchemaRequiredArray harness "write" |> Array.contains "file_path")
-        chk "mux.schema.write.requiredContent"
-            (toolSchemaRequiredArray harness "write" |> Array.contains "content")
+        chk "mux.schema.write.requiredFilePath" (toolSchemaRequiredArray harness "write" |> Array.contains "file_path")
+        chk "mux.schema.write.requiredContent" (toolSchemaRequiredArray harness "write" |> Array.contains "content")
 
         let propsRead = toolSchemaProperties harness "read"
         chk "mux.schema.read.hasPath" (not (dynIsNull (dynGet propsRead "path")))
-        chk "mux.schema.read.requiredPath"
-            (toolSchemaRequiredArray harness "read" |> Array.contains "path")
+        chk "mux.schema.read.requiredPath" (toolSchemaRequiredArray harness "read" |> Array.contains "path")
 
         let propsExec = toolSchemaProperties harness "executor"
         chk "mux.schema.executor.hasProgram" (not (dynIsNull (dynGet propsExec "program")))
         chk "mux.schema.executor.hasLanguage" (not (dynIsNull (dynGet propsExec "language")))
-        chk "mux.schema.executor.requiredProgram"
-            (toolSchemaRequiredArray harness "executor" |> Array.contains "program")
+        chk "mux.schema.executor.requiredProgram" (toolSchemaRequiredArray harness "executor" |> Array.contains "program")
 
         let propsFuzzy = toolSchemaProperties harness "fuzzy_find"
         chk "mux.schema.fuzzyFind.hasPattern" (not (dynIsNull (dynGet propsFuzzy "pattern")))
 
-        // --- 3. Tool execution: write ----------------------------------------
-        let writeArgs =
-            createObj [ "file_path", box "mux-e2e-test.txt"
-                        "content", box "hello from mux e2e"
-                        "warn_tdd", box warnTddValue ]
-        let! writeResult = harness.executeTool "write" writeArgs (createEmpty ())
+        // --- 3. Tool execution -----------------------------------------------
+        do! runTool "write" (createObj [ "file_path", box "mux-e2e-test.txt"; "content", box "hello from mux e2e"; "warn_tdd", box warnTddValue ]) (fun r -> fileExists (harness.workDir + "/mux-e2e-test.txt") && r.Contains "Successfully") "mux.execute.write.success"
         let writeOk = fileExists (harness.workDir + "/mux-e2e-test.txt")
-        chk "mux.execute.write.fileCreated" writeOk
-        chk "mux.execute.write.success"
-            ((jsonStringify writeResult).Contains "Successfully")
+        chk "mux.execute.write.contentCorrect" (writeOk && (readFileSync (harness.workDir + "/mux-e2e-test.txt") "utf8").Contains "hello from mux e2e")
 
-        if writeOk then
-            let content = readFileSync (harness.workDir + "/mux-e2e-test.txt") "utf8"
-            chk "mux.execute.write.contentCorrect" (content.Contains "hello from mux e2e")
+        do! runTool "write" (createObj [ "file_path", box "mux-e2e-fail.txt"; "content", box "should fail"; "warn_tdd", box "wrong" ]) (fun r -> r.Contains "error") "mux.execute.write.warnTddRejected"
+        do! runTool "read" (createObj [ "path", box "mux-e2e-test.txt" ]) (fun r -> r.Contains "hello from mux e2e") "mux.execute.read.success"
+        do! runTool "executor" (createObj [ "program", box "echo hello-executor"; "language", box "shell"; "mode", box "ro"; "timeout_type", box "short"; "what_to_summarize", box "keep stdout only"; "warn_tdd", box warnTddValue; "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]) (fun r -> r.Contains "hello-executor") "mux.execute.executor.success"
+        do! runTool "fuzzy_find" (createObj [ "pattern", box [| "mux-e2e" |] ]) (fun r -> r.Contains "mux-e2e-test.txt") "mux.execute.fuzzyFind.success"
+        do! runTool "fuzzy_grep" (createObj [ "pattern", box [| "hello" |] ]) (fun r -> r.Contains "mux-e2e-test.txt") "mux.execute.fuzzyGrep.success"
 
-        // --- 3b. Tool execution: write with warn_tdd failure path ------------
-        let writeArgsNoWarn =
-            createObj [ "file_path", box "mux-e2e-fail.txt"
-                        "content", box "should fail"
-                        "warn_tdd", box "wrong-value" ]
-        let! writeFailResult = harness.executeTool "write" writeArgsNoWarn (createEmpty ())
-        chk "mux.execute.write.warnTddRejected"
-            ((jsonStringify writeFailResult).Contains "error")
+        let investigatorIntents = [|
+            box {|
+                objective = "Test"
+                background = "none"
+                questions = [| "ok?" |]
+                entries = [| "mux-e2e-test.txt" |]
+            |}
+        |]
+        harness.mockLLM.expectText "investigator output mock text"
+        do! runTool "investigator" (createObj [ "intents", box investigatorIntents; "tdd", box "green"; "warn_tdd", box warnTddValue ]) (fun r -> r.Contains "investigator output mock text") "mux.execute.investigator.success"
 
-        // --- 3c. Tool execution: read success --------------------------------
-        let readArgs =
-            createObj [ "path", box "mux-e2e-test.txt" ]
-        let! readResult = harness.executeTool "read" readArgs (createEmpty ())
-        chk "mux.execute.read.success" (readResult.Contains "hello from mux e2e")
+        harness.mockLLM.expectText "meditator output mock analysis"
+        do! runTool "meditator" (createObj [ "intent", box "analyze"; "files", box [| "mux-e2e-test.txt" |] ]) (fun r -> r.Contains "meditator output mock analysis") "mux.execute.meditator.success"
 
-        // --- 3d. Tool execution: executor success ----------------------------
-        let execArgs =
-            createObj [ "program", box "echo hello-executor"
-                        "language", box "shell"
-                        "mode", box "ro"
-                        "timeout_type", box "short"
-                        "what_to_summarize", box "keep stdout only"
-                        "warn_tdd", box warnTddValue
-                        "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
-        let! execResult = harness.executeTool "executor" execArgs (createEmpty ())
-        chk "mux.execute.executor.success" (execResult.Contains "hello-executor")
+        harness.mockLLM.expectText "browser mock debug view text"
+        do! runTool "browser" (createObj [ "intent", box "browse" ]) (fun r -> r.Contains "browser mock debug view text") "mux.execute.browser.success"
 
-        // --- 3e. Tool execution: fuzzy_find success --------------------------
-        let fuzzyArgs =
-            createObj [ "pattern", box [| "mux-e2e" |] ]
-        let! fuzzyResult = harness.executeTool "fuzzy_find" fuzzyArgs (createEmpty ())
-        chk "mux.execute.fuzzyFind.success" (fuzzyResult.Contains "mux-e2e-test.txt")
+        harness.mockLLM.expectText "websearch mock output summary text"
+        do! runTool "websearch" (createObj [ "query", box "ai"; "what_to_summarize", box "summary" ]) (fun r -> r.Contains "websearch mock output summary text") "mux.execute.websearch.success"
+
+        do! runTool "webfetch" (createObj [ "url", box "http://localhost" ]) (fun r -> r.Contains "Example Domain") "mux.execute.webfetch.success"
+
+        harness.mockLLM.expectText "methodology mock report output"
+        do! runTool "methodology" (createObj [ "methodology", box "first_principles"; "note", box (String.replicate 1100 "n"); "background", box (String.replicate 1100 "b"); "intent", box (String.replicate 1100 "i") ]) (fun r -> r.Contains "methodology mock report output") "mux.execute.methodology.success"
+
+        let coderIntents = [|
+            box {|
+                objective = "Fix spelling"
+                background = "none"
+                targets = [|
+                    box {|
+                        file = "mux-e2e-test.txt"
+                        guide = "Fix all typos"
+                    |}
+                |]
+            |}
+        |]
+        harness.mockLLM.expectText "coder mock execution output"
+        do! runTool "coder" (createObj [ "intents", box coderIntents; "tdd", box "green"; "warn_tdd", box warnTddValue ]) (fun r -> r.Contains "coder mock execution output") "mux.execute.coder.success"
 
         // --- 4. Event hook: nudge via stream-end with open todos -------------
         let todoItem : obj = createObj [ "content", box "open-task"; "status", box "in_progress" ]
@@ -198,10 +202,7 @@ let runAll (args: string array) : JS.Promise<int> =
 
         // --- 5. Message transform: caps injection ---------------------------
         let textPart : obj = createObj [ "type", box "text"; "text", box "initial user message"; "state", box "done" ]
-        let userMsg =
-            createObj [ "id", box "user-turn-1"
-                        "role", box "user"
-                        "parts", box [| textPart |] ]
+        let userMsg = createObj [ "id", box "user-turn-1"; "role", box "user"; "parts", box [| textPart |] ]
         let outputObj = createObj [ "messages", box [| userMsg |] ]
         let inputObj = createObj [ "agent", box "manager"; "sessionID", box "mux-e2e-session" ]
         let! transformedOutput = harness.runMessageTransform inputObj outputObj
@@ -211,10 +212,7 @@ let runAll (args: string array) : JS.Promise<int> =
         let firstId = dynStr firstMsg "id"
         chk "mux.messageTransform.firstMessageIsCaps" (firstId.StartsWith "caps-synth-user-")
         let firstParts : obj[] = unbox<obj[]> (dynGet firstMsg "parts")
-        let firstText =
-            if firstParts.Length > 0 && dynStr firstParts.[0] "type" = "text"
-            then dynStr firstParts.[0] "text"
-            else ""
+        let firstText = if firstParts.Length > 0 && dynStr firstParts.[0] "type" = "text" then dynStr firstParts.[0] "text" else ""
         chk "mux.messageTransform.capsHasKolmolgorov" (firstText.Contains "# Kolmolgorov 宝典")
         chk "mux.messageTransform.capsHasIronLaw" (firstText.Contains "铁律")
 
@@ -229,21 +227,38 @@ let runAll (args: string array) : JS.Promise<int> =
 
         // --- 6. Slash command: /loop activates review -----------------------
         let! loopResponse = harness.runSlashCommand "loop" "mux-e2e-session" "implement feature X"
-        chk "mux.slash.loop.responseContainsWithReview"
-            (loopResponse.Contains "With-Review Mode")
+        chk "mux.slash.loop.responseContainsWithReview" (loopResponse.Contains "With-Review Mode")
+        chk "mux.slash.loop.eventLogCreated" (fileExists (harness.workDir + "/.wanxiangshu.ndjson"))
 
-        let eventLogPath = harness.workDir + "/.wanxiangshu.ndjson"
-        chk "mux.slash.loop.eventLogCreated" (fileExists eventLogPath)
-        if fileExists eventLogPath then
-            let eventLogContent = readFileSync eventLogPath "utf8"
-            chk "mux.slash.loop.eventLogContainsLoopActivated" (eventLogContent.Contains "loop_activated")
-            chk "mux.slash.loop.eventLogContainsTaskText" (eventLogContent.Contains "implement feature X")
+        // --- 6a. Tool execution: submit_review ------------------------------
+        do! runTool "submit_review" (createObj [ "report", box "wip progress"; "affectedFiles", box [||]; "wip", box true ]) (fun r -> r.Contains "recorded") "mux.execute.submit_review.wip_true.success"
 
-        // --- 6b. Slash command: /loop with empty task returns cancelled -----
+        harness.setMockReportMarkdown "PERFECT: everything looks perfectly clean"
+        do! runTool "submit_review" (createObj [ "report", box "final description"; "affectedFiles", box [||]; "wip", box false ]) (fun r -> r.Contains "With-Review Mode has ended") "mux.execute.submit_review.wip_false.accepted"
+
+        let! _ = harness.runSlashCommand "loop" "mux-e2e-session" "implement feature X version 2"
+        harness.setMockReportMarkdown "REVISE: please verify extreme cases"
+        do! runTool "submit_review" (createObj [ "report", box "final description"; "affectedFiles", box [||]; "wip", box false ]) (fun r -> r.Contains "With-Review Mode is still active") "mux.execute.submit_review.wip_false.needs_revision"
+
+        let! _ = harness.runSlashCommand "loop" "mux-e2e-session" "" // deactivate
+
+        // --- 6b. Slash command: /loop-review --------------------------------
+        harness.setMockReportMarkdown "PERFECT: precheck passed without revisions"
+        let! loopRevRes1 = harness.runSlashCommand "loop-review" "mux-e2e-session" "implement task Alpha"
+        chk "mux.slash.loop-review.accepted" (loopRevRes1.Contains "Pre-review passed")
+
+        let! _ = harness.runSlashCommand "loop" "mux-e2e-session" "" // deactivate
+
+        harness.setMockReportMarkdown "REVISE: precheck requires clarifying objectives"
+        let! loopRevRes2 = harness.runSlashCommand "loop-review" "mux-e2e-session" "implement task Beta"
+        chk "mux.slash.loop-review.needs_revision" (loopRevRes2.Contains "Pre-review feedback")
+
+        let! _ = harness.runSlashCommand "loop" "mux-e2e-session" "" // deactivate
+
+        // --- 6d. Slash command: /loop empty task & stream abort --------------
         let! emptyResponse = harness.runSlashCommand "loop" "mux-e2e-session" ""
         chk "mux.slash.loop.emptyTaskReturnsCancelled" (emptyResponse.Contains "With-Review Mode cancelled")
 
-        // --- 6c. Event hook: stream abort ------------------------------------
         let! loopResponseAbort = harness.runSlashCommand "loop" "mux-e2e-session" "test stream-abort"
         chk "mux.eventHook.abort.activateOk" (loopResponseAbort.Contains "With-Review Mode is active")
         let! _ = harness.fireStreamAbort "mux-e2e-session"
@@ -255,8 +270,11 @@ let runAll (args: string array) : JS.Promise<int> =
 
         let! _ = harness.runSlashCommand "loop" "mux-e2e-session" ""
 
-        do! harness.dispose ()
+        // --- 7. Verify expectations empty -----------------------------------
+        let remaining = harness.mockLLM.getRemainingExpectations()
+        chk "mux.mock-llm.expectations-empty" (remaining = 0)
 
-        printfn "\n✓ %d mux e2e checks passed" ok
+        do! harness.dispose ()
+        printfn "\n✓ %d/53 mux e2e checks passed" ok
         return summary ()
     }

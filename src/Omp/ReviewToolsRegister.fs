@@ -19,61 +19,103 @@ module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.EventLogRuntime
 
-let private optBool = Wanxiangshu.Shell.DynField.optBool
+let private optBool (o: obj) (key: string) : bool option =
+    let v = Dyn.get o key
+    if Dyn.isNullish v then None else Some(unbox<bool> v)
+
+let executeSubmitReview (store: ReviewStore, pi: obj, ctx: obj, id: string, params': obj, signal: obj, onUpdate: obj) : JS.Promise<ToolResult> =
+    promise {
+        let sessionIdOpt =
+            if not (Dyn.isNullish ctx) then
+                getSessionIdFromContext ctx
+            else
+                store.getActiveSessionIds () |> List.tryHead
+        match sessionIdOpt with
+        | None -> return errorResult "Loop review is not active for this session."
+        | Some sessionId ->
+            let sm = Dyn.get ctx "sessionManager"
+            let root = Dyn.str ctx "cwd"
+            do! syncReviewFromEventLog store root sessionId
+            let activeTask = store.getReviewTask sessionId
+            match activeTask with
+            | None -> return errorResult "Loop review is not active for this session."
+            | Some activeTask ->
+                let isWip =
+                    let v = Dyn.get params' "wip"
+                    if Dyn.isNullish v then true else Dyn.truthy v
+                if isWip then
+                    do! appendSubmitReviewWipRecorded root sessionId |> Promise.map ignore
+                    return textResult submitReviewWipAcknowledgment
+                elif not (store.tryLockReview sessionId) then return errorResult "A review is already in progress."
+                else
+                    let report = Dyn.str params' "report"
+                    let files =
+                        let a = Dyn.get params' "affectedFiles"
+                        if Dyn.isNullish a || not (Dyn.isArray a) then [||]
+                        else unbox<obj array> a |> Array.map string
+                    let mutable loopError : exn option = None
+                    let mutable result : JsReviewResult option = None
+                    try
+                        let! r = runReviewLoop ompScope pi ctx store sessionId report files (Some activeTask)
+                        result <- Some r
+                    with ex -> loopError <- Some ex
+                    store.unlockReview sessionId
+                    match loopError, result with
+                    | Some ex, _ -> return asErrorResult ex
+                    | None, None -> return errorResult "Review loop returned no result."
+                    | None, Some r ->
+                        let verdict =
+                            if defaultArg r.terminated false then Wanxiangshu.Kernel.EventLog.Types.verdictTerminated
+                            elif r.accepted = Some true then Wanxiangshu.Kernel.EventLog.Types.verdictAccepted
+                            else Wanxiangshu.Kernel.EventLog.Types.verdictNeedsRevision
+                        do! appendReviewVerdictOrFail root sessionId verdict r.feedback
+                        if r.feedback.IsNone && not (defaultArg r.terminated false) then
+                            store.deactivateReview sessionId
+                            return textResult "Review passed. Loop mode ended."
+                        elif defaultArg r.terminated false then
+                            store.deactivateReview sessionId
+                            return errorResult ("Review terminated: " + defaultArg r.feedback "")
+                        else return errorResult ("Review feedback:\n\n" + r.feedback.Value)
+    }
+
+let executeReturnReviewer (store: ReviewStore, ctx: obj, id: string, params': obj, signal: obj, onUpdate: obj) : JS.Promise<ToolResult> =
+    promise {
+        let sessionIdOpt =
+            match getSessionIdFromContext ctx with
+            | Some sid -> Some sid
+            | None -> store.getPendingReviewIds () |> List.tryHead
+        match sessionIdOpt with
+        | None -> return errorResult "No pending review to resolve."
+        | Some sessionId ->
+            let vStr = Dyn.str params' "verdict"
+            match Wanxiangshu.Kernel.ReviewVerdict.parseVerdict vStr with
+            | None -> return textResult reviewerNudgePrompt
+            | Some Wanxiangshu.Kernel.ReviewVerdict.Perfect ->
+                let fb = (Dyn.str params' "feedback").Trim()
+                let res = store.resolvePendingReview(sessionId, Accepted fb)
+                if not res then return errorResult "No pending review to resolve."
+                else return { textResult "Review submitted: accepted." with display = Some false }
+            | Some Wanxiangshu.Kernel.ReviewVerdict.Revise ->
+                let fb = (Dyn.str params' "feedback").Trim()
+                if fb = "" then return textResult reviewerNudgePrompt
+                else
+                    let res = store.resolvePendingReview(sessionId, NeedsRevision fb)
+                    if not res then return errorResult "No pending review to resolve."
+                    else return { textResult "Review submitted: revision requested with feedback." with display = Some false }
+    }
 
 let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
     let tb = Dyn.get pi "typebox"
-    pi?registerCommand(loopCommand, createObj [ "description", box "Enable loop review mode for the current session"; "handler", box(fun (args: string) (ctx: obj) -> handleLoopCommand pi store args ctx |> ignore) ])
-    pi?registerCommand("loop-review", createObj [ "description", box "Pre-check a task before activating loop mode (mirrors Opencode's command.execute.before)."; "handler", box(fun (args: string) (ctx: obj) -> handleLoopReviewCommand pi store args ctx |> ignore) ])
+
+    pi?registerCommand(loopCommand, createObj [ "description", box "Enable loop review mode for the current session"; "handler", box(fun (args: string) (ctx: obj) -> handleLoopCommand pi store args ctx) ])
+    pi?registerCommand("loop-review", createObj [ "description", box "Pre-check a task before activating loop mode (mirrors Opencode's command.execute.before)."; "handler", box(fun (args: string) (ctx: obj) -> handleLoopReviewCommand pi store args ctx) ])
     pi?registerTool(
         createObj [
             "name", box "submit_review"
             "label", box "Submit Review"
             "description", box (description "submit_review")
             "parameters", objectOf [| ("report", str "Detailed description of what was changed." tb); ("affectedFiles", stringArraySchema pi "Modified or created file path."); ("wip", opt "Defaults to true: record progress without starting a reviewer. Set to false to start the reviewer for final review." tb bool_) |] tb
-            "execute",
-                box(fun (_id: string) (params': obj) (_s: obj) (_u: obj) (ctx: obj) ->
-                    promise {
-                        match getSessionIdFromContext ctx with
-                        | None -> return errorResult "Loop review is not active for this session."
-                        | Some sessionId ->
-                            let sm = Dyn.get ctx "sessionManager"
-                            let root = Dyn.str ctx "cwd"
-                            do! syncReviewFromEventLog store root sessionId
-                            let activeTask = store.getReviewTask sessionId
-                            match activeTask with
-                            | None -> return errorResult "Loop review is not active for this session."
-                            | Some activeTask ->
-                                let wip = submitReviewIsWip (optBool params' "wip")
-                                if wip then
-                                    do! appendSubmitReviewWipRecorded root sessionId |> Promise.map ignore
-                                    return textResult submitReviewWipAcknowledgment
-                                elif not (store.tryLockReview sessionId) then return errorResult "A review is already in progress."
-                                else
-                                    let report = Dyn.str params' "report"
-                                    let files =
-                                        let a = Dyn.get params' "affectedFiles"
-                                        if Dyn.isNullish a || not (Dyn.isArray a) then [||]
-                                        else unbox<obj array> a |> Array.map string
-                                    let mutable loopError : exn option = None
-                                    let mutable result : JsReviewResult option = None
-                                    try
-                                        let! r = runReviewLoop ompScope pi ctx store sessionId report files (Some activeTask)
-                                        result <- Some r
-                                    with ex -> loopError <- Some ex
-                                    store.unlockReview sessionId
-                                    match loopError, result with
-                                    | Some ex, _ -> return asErrorResult ex
-                                    | None, None -> return errorResult "Review loop returned no result."
-                                    | None, Some r ->
-                                        if r.feedback.IsNone && not (defaultArg r.terminated false) then
-                                            store.deactivateReview sessionId
-                                            return textResult "Review passed. Loop mode ended."
-                                        elif defaultArg r.terminated false then
-                                            store.deactivateReview sessionId
-                                            return errorResult ("Review terminated: " + defaultArg r.feedback "")
-                                        else return errorResult ("Review feedback:\n\n" + r.feedback.Value)
-                    })
+            "execute", box (System.Func<string, obj, obj, obj, obj, JS.Promise<ToolResult>>(fun id p s u c -> executeSubmitReview(store, pi, c, id, p, s, u)))
         ])
     pi?registerTool(
         createObj [
@@ -82,24 +124,7 @@ let registerLoopFeatures (pi: obj) (store: ReviewStore) : unit =
             "description", box (description "return_reviewer")
             "defaultInactive", box true
             "parameters", returnReviewerParameters tb
-            "execute",
-                box(fun (_id: string) (params': obj) (_s: obj) (_u: obj) (ctx: obj) ->
-                    promise {
-                        match getSessionIdFromContext ctx with
-                        | None -> return errorResult "No pending review to resolve."
-                        | Some sessionId ->
-                            match Wanxiangshu.Kernel.ReviewVerdict.parseVerdict (Dyn.str params' "verdict") with
-                            | None -> return textResult reviewerNudgePrompt
-                            | Some Wanxiangshu.Kernel.ReviewVerdict.Perfect ->
-                                let fb = (Dyn.str params' "feedback").Trim()
-                                if not (store.resolvePendingReview(sessionId, Accepted fb)) then return errorResult "No pending review to resolve."
-                                else return { textResult "Review submitted: accepted." with display = Some false }
-                            | Some Wanxiangshu.Kernel.ReviewVerdict.Revise ->
-                                let fb = (Dyn.str params' "feedback").Trim()
-                                if fb = "" then return textResult reviewerNudgePrompt
-                                elif not (store.resolvePendingReview(sessionId, NeedsRevision fb)) then return errorResult "No pending review to resolve."
-                                else return { textResult "Review submitted: revision requested with feedback." with display = Some false }
-                    })
+            "execute", box (System.Func<string, obj, obj, obj, obj, JS.Promise<ToolResult>>(fun id p s u c -> executeReturnReviewer(store, c, id, p, s, u)))
         ])
 
 let registerInputHandler (pi: obj) (store: ReviewStore) : unit =

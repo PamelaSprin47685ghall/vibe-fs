@@ -22,15 +22,27 @@ open Wanxiangshu.Shell.SubagentIo
 let private nodeBuffer : obj = jsNative
 let private byteLength (s: string) : int = nodeBuffer?byteLength(s, "utf-8")
 
+[<Global("process")>]
+let private nodeProcess : obj = jsNative
+let private envVar (name: string) : string =
+    let v = nodeProcess?env?(name)
+    if isNull v then "" else string v
+
 let executorMaxWaitMs = 60_000
 
 let ompScope = RuntimeScope()
 let private sessionExecutor = createForScope ompScope
 
 let private getExecutorMinWaitMs (scope: RuntimeScope) : int =
-    match scope.TryFindKey "omp.executor_min_wait" with
-    | Some v -> unbox<int> v
-    | None -> 500
+    let envVal = envVar "OMP_EXECUTOR_MIN_WAIT"
+    if envVal <> "" then
+        match System.Int32.TryParse envVal with
+        | true, v -> v
+        | _ -> 500
+    else
+        match scope.TryFindKey "omp.executor_min_wait" with
+        | Some v -> unbox<int> v
+        | None -> 500
 
 let private parseExecutorParams (params': obj) (ctx: obj) =
     let lang = let l = Dyn.str params' "language" in if l = "" then "shell" else l
@@ -84,10 +96,8 @@ let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj)
             | None -> ()
             | Some child ->
                 try
-                    let childSess = unbox<IChildSession> child.session
-                    match childSess.abort with
-                    | Some abort -> try abort () with _ -> ()
-                    | None -> ()
+                    if not (Dyn.isNullish (Dyn.get child.session "abort")) then
+                        try Dyn.callMethod0 child.session "abort" |> ignore with _ -> ()
                     child.dispose |> Option.iter (fun dispose -> dispose ())
                 with _ -> ()
                 childHolder <- None
