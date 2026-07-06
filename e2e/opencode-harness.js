@@ -8,12 +8,18 @@ import { createMockLLM } from './mock-llm.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let WANXIANG_ROOT = path.resolve(__dirname, '..');
-let PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Opencode/Plugin.js');
-if (!fs.existsSync(PLUGIN_JS)) {
-  WANXIANG_ROOT = path.resolve(__dirname, '../..');
-  PLUGIN_JS = path.resolve(WANXIANG_ROOT, 'build/src/Opencode/Plugin.js');
+function getPluginPath(variant) {
+  let file = 'Plugin.js';
+  if (variant === 'mimocode') file = 'PluginMimo.js';
+  if (variant === 'mimotui') file = 'PluginMimoTui.js';
+  
+  let p = path.resolve(WANXIANG_ROOT, `build/src/Opencode/${file}`);
+  if (!fs.existsSync(p)) {
+    let altRoot = path.resolve(__dirname, '../..');
+    p = path.resolve(altRoot, `build/src/Opencode/${file}`);
+  }
+  return p;
 }
-const PLUGIN_URL = pathToFileURL(PLUGIN_JS).href;
 
 function gitInit(dir) {
   execSync('git init', { cwd: dir, stdio: 'ignore' });
@@ -25,11 +31,12 @@ function gitInit(dir) {
   execSync('git commit -m init', { cwd: dir, stdio: 'ignore' });
 }
 
-async function loadPlugin() {
-  return import(PLUGIN_URL);
+async function loadPlugin(variant) {
+  const pluginUrl = pathToFileURL(getPluginPath(variant)).href;
+  return import(pluginUrl);
 }
 
-function buildMockClient(messages = []) {
+function buildMockClient(messages = [], opts = {}) {
   const messagesFn = async () => ({ data: messages });
   return {
     session: {
@@ -37,7 +44,9 @@ function buildMockClient(messages = []) {
       create: async () => ({ data: { id: 'mock-child-session' } }),
       prompt: async () => undefined,
       abort: async () => ({}),
+      ...(opts.mockSessionClient || {}),
     },
+    ...(opts.mockClientExtra || {}),
   };
 }
 
@@ -51,13 +60,14 @@ export async function start(opts = {}) {
   gitInit(workDir);
 
   const messages = opts.messages || [];
-  const client = buildMockClient(messages);
+  const client = buildMockClient(messages, opts);
 
-  const plugin = await loadPlugin();
+  const plugin = await loadPlugin(opts.variant);
   const result = await plugin.default({
     directory: workDir,
     client,
     workdir: workDir,
+    ...(opts.pluginCtxExtra || {}),
   });
 
   const sessionId = opts.sessionId || 'opencode-e2e-session';
@@ -154,6 +164,34 @@ export async function start(opts = {}) {
       const output = {};
       await hook(input, output);
       return output;
+    },
+
+    async runConfigHook(cfg) {
+      const hook = result['config'];
+      if (!hook) throw new Error('plugin has no config hook');
+      return await hook(cfg);
+    },
+
+    async runSessionPost(input) {
+      const hook = result['session.post'];
+      if (!hook) throw new Error('plugin has no session.post hook');
+      const output = {};
+      await hook(input, output);
+      return output;
+    },
+
+    async runSessionUserQueryPost(input) {
+      const hook = result['session.userQuery.post'];
+      if (!hook) throw new Error('plugin has no session.userQuery.post hook');
+      const output = {};
+      await hook(input, output);
+      return output;
+    },
+
+    async runTui(apiObj) {
+      const tui = result['tui'];
+      if (!tui) throw new Error('plugin has no tui export');
+      return await tui(apiObj);
     },
 
     async fireEvent(event) {

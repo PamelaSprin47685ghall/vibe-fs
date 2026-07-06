@@ -19,6 +19,7 @@ let decision () =
     equal "todos -> NudgeTodo" NudgeTodo (deriveAction (snap [ "a" ] "working" false None false))
     equal "todos+question -> None" NudgeNone (deriveAction (snap [ "a" ] "what now?" false None false))
     equal "todos+skip -> None" NudgeNone (deriveAction (snap [ "a" ] "done <skip-todo-check />" false None false))
+    equal "todos+skip+unclosedFence -> None" NudgeNone (deriveAction (snap [ "a" ] "I will skip this turn. <skip-todo-check />\n\n```fsharp\nlet x = 1\n" false None false))
     equal "nothing -> None" NudgeNone (deriveAction (snap [] "ok" false None false))
     equal "loop -> NudgeLoop" NudgeLoop (deriveAction (snap [] "ok" false None true))
     equal "loop+skip -> None" NudgeNone (deriveAction (snap [] "done <skip-loop-check />" false None true))

@@ -52,9 +52,11 @@ type FlatPart<'raw> =
       isUser: bool
       part: Part<'raw> }
 
+let backlogPrefixIdPrefix = "backlog-prefix-"
+
 let private synthPrefixes =
     [ "caps-synth-user-"; "caps-synth-assistant-"; "caps-synth-ack-"
-      "backlog-projection-"; "backlog-prefix-"
+      "backlog-projection-"; backlogPrefixIdPrefix
       "magic-todo-projection-"; "magic-todo-prefix-"
       "methodology-probe-"; "semble-synth-" ]
 
