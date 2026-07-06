@@ -179,7 +179,10 @@ type EventLogStore(workspaceRoot: string) =
                                 return! readEventsFile path
                         }
                     let trimmedAnchor = anchor.Trim()
-                    if isBlocked (foldNudgeDedup sessionId events) trimmedAnchor then return false
+                    let snap = foldNudgeSnapshot sessionId events
+                    let currentAnchor = nudgeAnchorKey snap.turnId snap.lastAssistantText
+                    if currentAnchor.Trim() <> trimmedAnchor then return false
+                    elif isBlocked (foldNudgeDedup sessionId events) trimmedAnchor then return false
                     else
                         let payload =
                             Map [ "action", Wanxiangshu.Kernel.Nudge.toString action; "anchor", trimmedAnchor ]

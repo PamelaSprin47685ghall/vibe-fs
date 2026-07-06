@@ -9,6 +9,7 @@ open Wanxiangshu.Shell.EventLogCodec
 open Wanxiangshu.Shell.EventLogFiles
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Kernel.EventLog.Fold
 
 let appendThenReadAll () = promise {
     let! dir = mkdtempAsync "eventlog-read-"
@@ -110,6 +111,24 @@ let selfHealingLockDeletesFileLock () = promise {
     do! rmAsync dir
 }
 
+let tryClaimNudgeDispatchPreventsOutdatedAnchor () = promise {
+    let! dir = mkdtempAsync "eventlog-claim-outdated-"
+    let sessionID = "s-claim"
+    do! appendAssistantCompletedOrFail dir sessionID "task 1" (Some "agent1") "t1" []
+    let anchorA = nudgeAnchorKey "t1" "task 1"
+
+    do! appendAssistantCompletedOrFail dir sessionID "task 2" (Some "agent1") "t2" []
+    let anchorB = nudgeAnchorKey "t2" "task 2"
+
+    let! claimA = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorA
+    check "claim never-claimed outdated anchor A" (not claimA)
+
+    let! claimB = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorB
+    check "claim latest anchor B" claimB
+
+    do! rmAsync dir
+}
+
 let run () = promise {
     do! appendThenReadAll ()
     do! syncReviewFromEventLogProjectsTask ()
@@ -119,4 +138,5 @@ let run () = promise {
     do! strictAppendLoopActivatedPersistsEvent ()
     do! strictAppendLoopActivatedFailsOnBadPath ()
     do! selfHealingLockDeletesFileLock ()
+    do! tryClaimNudgeDispatchPreventsOutdatedAnchor ()
 }

@@ -87,20 +87,7 @@ let nudgeBlockedForTurn (workspaceRoot: string) (sessionID: string) (assistantMe
     }
 
 let tryClaimNudgeDispatch (workspaceRoot: string) (sessionID: string) (action: NudgeAction) (anchor: string) : JS.Promise<bool> =
-    promise {
-        let! events = getSessionEvents workspaceRoot sessionID
-        let trimmedAnchor = anchor.Trim()
-        if isNudgeBlockedForAnchor (foldNudgeDedup sessionID events) trimmedAnchor then return false
-        else
-            let payload =
-                Map [ "action", Wanxiangshu.Kernel.Nudge.toString action; "anchor", trimmedAnchor ]
-            let ev =
-                buildEvent sessionID eventKindNudgeDispatched payload (getTimestampMs().ToString())
-            let! res = appendAndCache workspaceRoot ev
-            match res with
-            | Ok () -> return true
-            | Error _ -> return false
-    }
+    getStore(workspaceRoot).TryClaimNudgeDispatch sessionID action anchor isNudgeBlockedForAnchor
 
 let getNudgeSnapshotFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Promise<NudgeSnapshotState> =
     promise {
