@@ -94,6 +94,7 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
         "muxToolExecuteAfterBlocksRepeatedIdenticalCall", muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec
         "muxToolExecuteAfterMapsNetworkError", muxToolExecuteAfterMapsNetworkErrorSpec
         "muxStreamEndToolUseErrorTriggersNudge", muxStreamEndToolUseErrorTriggersNudgeSpec
+        "muxStreamEndToolCallsDoesNotTriggerNudge", muxStreamEndToolCallsDoesNotTriggerNudgeSpec
         "muxSessionErrorTriggersFallbackContinue", muxSessionErrorTriggersFallbackContinueSpec
         "muxStreamEndToolCallAsTextTriggersFallback", muxStreamEndToolCallAsTextTriggersFallbackSpec
     ]

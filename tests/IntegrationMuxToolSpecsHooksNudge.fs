@@ -56,3 +56,40 @@ let muxStreamEndToolUseErrorTriggersNudgeSpec () = promise {
         (nudges |> Seq.exists (fun n -> n.Contains "continue" || n.Contains "remaining" || n.Contains "incomplete"))
     do! rmAsync tmpDir
 }
+
+let muxStreamEndToolCallsDoesNotTriggerNudgeSpec () = promise {
+    let sessionID = "mux-tool-calls-nudge-session"
+    let textPart t = box {| ``type`` = "text"; text = t |}
+    let assistantText =
+        "Let me read the file: <tool_call><name>file_read</name><parameter name=\"path\">src/x.ts</parameter></tool_call>"
+    let chatHistory =
+        [| box {| role = "assistant"; parts = [| textPart assistantText |] |} |]
+    let! tmpDir = mkdtempAsync "mux-toolcalls-nudge-"
+    let deps = muxDepsWithChatHistory sessionID chatHistory
+    let deps = Dyn.withKey deps "directory" (box tmpDir)
+    let reg = createRegistration deps
+    let nudges = ResizeArray<string>()
+    let helpers =
+        createObj [
+            "getTodos", box (System.Func<obj, JS.Promise<obj>>(fun _ ->
+                promise { return box [| "investigate tool_use_error and resume work" |] }))
+            "nudge", box (System.Func<obj, obj, JS.Promise<bool>>(fun _ msg ->
+                promise {
+                    nudges.Add(string msg)
+                    return true
+                }))
+        ]
+    let eventHook = get reg "eventHook"
+    let event =
+        createObj [
+            "type", box "stream-end"
+            "workspaceId", box sessionID
+            "properties", box (createObj [
+                "metadata", box (createObj [ "muxStopReason", box "tool_calls" ])
+                "parts", box [| textPart "incomplete response" |] ])
+        ]
+    do! (eventHook $ (event, helpers)) |> unbox<JS.Promise<unit>>
+    do! Promise.sleep 50
+    check "tool_calls stream-end does NOT trigger a nudge dispatch" (nudges.Count = 0)
+    do! rmAsync tmpDir
+}

@@ -152,9 +152,9 @@ type NudgeRuntime
 
             let! snapshot = getNudgeSnapshotFromEventLog root workspaceId
 
-            // nudgeBlockedForTurn: compare current anchor against dedup anchor from fold. Single source of truth.
+            // nudgeBlockedForTurn: check current anchor against dispatched anchors Set from fold. Single source of truth.
             let currentAnchor = nudgeAnchorKey snapshot.turnId snapshot.lastAssistantText
-            let blocked = match snapshot.nudgeDedupAnchor with None -> false | Some a -> a = currentAnchor
+            let blocked = Set.contains (currentAnchor.Trim()) snapshot.dispatchedAnchors
 
             return Some
                 { todos = snapshot.openTodos
@@ -228,7 +228,9 @@ type NudgeRuntime
             match parsed with
             | Ignore -> return ()
             | StreamEnd(workspaceId, stopReason, lastMsg) ->
-                if not (Dyn.isNullish helpers) && stopReason <> "queued-message" then
+                if not (Dyn.isNullish helpers)
+                   && stopReason <> "queued-message"
+                   && (isTerminalAssistantFinish stopReason || stopReason = "tool_use_error") then
                     let! newState = runNudgeFlowWithRetryCheck runtimeState workspaceId (collectSnapshotMux helpers workspaceId lastMsg) (sendNudgeMux helpers workspaceId)
                     runtimeState <- newState
                 return ()

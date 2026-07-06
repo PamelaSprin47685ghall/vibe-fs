@@ -119,8 +119,7 @@ let agentEndHandler (piObj: obj) (_reviewStore: ReviewStore) (ctxObj: obj) : JS.
                         let! snap = getNudgeSnapshotFromEventLog root sessionId
                         let hasRunner = hasRunningRunnerJob ompScope sessionId
                         let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
-                        let dedupState = { BlockedAnchor = snap.nudgeDedupAnchor }
-                        let blocked = isNudgeBlockedForAnchor dedupState key
+                        let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
                         let snapshot : SessionSnapshot = {
                             todos = snap.openTodos
                             lastAssistantMessage = snap.lastAssistantText

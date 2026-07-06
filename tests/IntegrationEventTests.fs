@@ -50,5 +50,7 @@ let run () : JS.Promise<unit> =
         do! reusedSessionSpec ()
         do! muxForceStopTodoNudgeSpec ()
         do! opencodeForceStopTodoNudgeSpec ()
+        do! sessionStatusIdleDoesNotTriggerNudgeSpec ()
+        do! sessionErrorWithoutFallbackTriggersNudgeSpec ()
         do! nudgeWithoutChatHistoryButEventCarriesTextSpec ()
     }

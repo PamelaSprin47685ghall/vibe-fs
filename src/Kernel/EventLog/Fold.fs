@@ -83,22 +83,25 @@ let foldBacklogFromEvents (sessionId: string) (events: WanEvent list) : BacklogE
                       plan = pl }
             | _ -> None)
 
-type NudgeDedupState = { BlockedAnchor: string option }
+type NudgeDedupState = { DispatchedAnchors: Set<string> }
 
-let emptyNudgeDedupState = { BlockedAnchor = None }
+let emptyNudgeDedupState = { DispatchedAnchors = Set.empty }
 
 let private payloadAnchor (e: WanEvent) : string option =
     e.Payload
     |> Map.tryFind "anchor"
     |> Option.bind (fun t -> if t.Trim() = "" then None else Some (t.Trim()))
 
-/// Nudge dedup integral: last `nudge_dispatched` blocks same assistant anchor; wip record clears.
+/// Nudge dedup integral: collect dispatched anchors; wip record clears.
 let foldNudgeDedup (sessionId: string) (events: WanEvent list) : NudgeDedupState =
     forSession sessionId events
     |> List.fold
         (fun st e ->
             match e.Kind with
-            | k when k = eventKindNudgeDispatched -> { BlockedAnchor = payloadAnchor e }
+            | k when k = eventKindNudgeDispatched ->
+                match payloadAnchor e with
+                | Some anchor -> { DispatchedAnchors = Set.add anchor st.DispatchedAnchors }
+                | None -> st
             | k when k = eventKindSubmitReviewWipRecorded || k = eventKindNudgeDedupCleared -> emptyNudgeDedupState
             | _ -> st)
         emptyNudgeDedupState
@@ -109,7 +112,7 @@ type NudgeSnapshotState = {
     agentFromMessage: string option
     turnId: string
     isLoopActive: bool
-    nudgeDedupAnchor: string option
+    dispatchedAnchors: Set<string>
 }
 
 let private parseTodosJson (json: string) : string list =
@@ -128,7 +131,7 @@ let emptyNudgeSnapshotState : NudgeSnapshotState =
       agentFromMessage = None
       turnId = ""
       isLoopActive = false
-      nudgeDedupAnchor = None }
+      dispatchedAnchors = Set.empty }
 
 let private strOrEmpty (o: string option) : string =
     match o with Some s -> s | None -> ""
@@ -161,9 +164,11 @@ let foldNudgeSnapshot (sessionId: string) (events: WanEvent list) : NudgeSnapsho
                 | Some v when isEndVerdict v -> { st with isLoopActive = false }
                 | _ -> st
             | k when k = eventKindNudgeDispatched ->
-                { st with nudgeDedupAnchor = payloadAnchor e }
+                match payloadAnchor e with
+                | Some anchor -> { st with dispatchedAnchors = Set.add anchor st.dispatchedAnchors }
+                | None -> st
             | k when k = eventKindSubmitReviewWipRecorded || k = eventKindNudgeDedupCleared ->
-                { st with nudgeDedupAnchor = None }
+                { st with dispatchedAnchors = Set.empty }
             | k when k = eventKindWorkBacklogCommitted ->
                 let todosOpt =
                     payloadField "todosJson" e
@@ -178,6 +183,4 @@ let nudgeAnchorKey (turnId: string) (assistantMessage: string) : string =
     if tid = "" then body else tid + "\u001e" + body
 
 let isNudgeBlockedForAnchor (st: NudgeDedupState) (anchorKey: string) : bool =
-    match st.BlockedAnchor with
-    | None -> false
-    | Some a -> a = anchorKey.Trim()
+    Set.contains (anchorKey.Trim()) st.DispatchedAnchors

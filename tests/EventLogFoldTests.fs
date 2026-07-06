@@ -74,9 +74,12 @@ let foldWorkBacklogTodosJson () =
 
 let foldNudgeDedupAnchor () =
     let events =
-        [ ev "s1" eventKindNudgeDispatched (Map [ "action", "nudge-todo"; "anchor", "2\u001emsg" ]) ]
-    check "blocks" (isNudgeBlockedForAnchor (foldNudgeDedup "s1" events) "2\u001emsg")
-    check "other open" (not (isNudgeBlockedForAnchor (foldNudgeDedup "s1" events) "3\u001emsg"))
+        [ ev "s1" eventKindNudgeDispatched (Map [ "action", "nudge-todo"; "anchor", "1\u001emsg" ])
+          ev "s1" eventKindNudgeDispatched (Map [ "action", "nudge-todo"; "anchor", "2\u001emsg" ]) ]
+    let st = foldNudgeDedup "s1" events
+    check "blocks anchor 1" (isNudgeBlockedForAnchor st "1\u001emsg")
+    check "blocks anchor 2" (isNudgeBlockedForAnchor st "2\u001emsg")
+    check "other open" (not (isNudgeBlockedForAnchor st "3\u001emsg"))
 
 let run () =
     foldNudgeDedupAnchor ()

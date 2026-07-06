@@ -25,6 +25,8 @@ type NudgeTrigger
 
     let isNaturalStop (eventType: string) (props: obj) : bool =
         if eventType = "session.idle" then true
+        elif eventType = "session.error" then true
+        elif eventType = "session.interrupted" then true
         elif eventType = "session.status" then
             let statusObj = Dyn.get props "status"
             let status =
@@ -40,7 +42,7 @@ type NudgeTrigger
                 let sessionIDStr = getSessionID envelope.EventType envelope.Props
                 if sessionIDStr <> "" then
                     match envelope.EventType with
-                    | "stream-abort" ->
+                    | "stream-abort" | "session.interrupted" ->
                         markForceStopped sessionIDStr
                     | "session.error" ->
                         let errorObj = Dyn.get envelope.Props "error"
