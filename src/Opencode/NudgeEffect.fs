@@ -93,7 +93,7 @@ let private collectSnapshot (client: obj) (pluginCtx: obj) (sessionID: SessionId
                                         else Some (sprintf "%s/%s" providerID modelID)
                                 text, tid, agent, model
                         let directory = pluginDirectoryFromCtx pluginCtx
-                        do! appendAssistantCompletedOrFail directory sessionIDStr lastAssistantText agentFromMessage turnId openTodos
+                        do! appendAssistantCompletedOrFail directory sessionIDStr lastAssistantText agentFromMessage modelFromMessage turnId openTodos
                         let! snap = getNudgeSnapshotFromEventLog directory sessionIDStr
                         let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
                         let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
@@ -104,7 +104,7 @@ let private collectSnapshot (client: obj) (pluginCtx: obj) (sessionID: SessionId
                               nudgeBlockedForTurn = blocked
                               nudgeAnchorKey = key
                               agentFromMessage = snap.agentFromMessage
-                              modelFromMessage = modelFromMessage
+                              modelFromMessage = snap.modelFromMessage
                               hasActiveRunner = false }
         with _ -> return None
     }

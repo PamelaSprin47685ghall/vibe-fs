@@ -115,7 +115,8 @@ let agentEndHandler (piObj: obj) (_reviewStore: ReviewStore) (ctxObj: obj) : JS.
                         let last = lastAssistantMessage sm
                         let root = ctx.cwd |> Option.defaultValue ""
                         let turnId = lastAssistantTurnId sm
-                        do! appendAssistantCompletedOrFail root sessionId last None turnId openTodos
+                        let model = lastAssistantModel sm
+                        do! appendAssistantCompletedOrFail root sessionId last None model turnId openTodos
                         let! snap = getNudgeSnapshotFromEventLog root sessionId
                         let hasRunner = hasRunningRunnerJob ompScope sessionId
                         let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
@@ -127,7 +128,7 @@ let agentEndHandler (piObj: obj) (_reviewStore: ReviewStore) (ctxObj: obj) : JS.
                             nudgeBlockedForTurn = blocked
                             nudgeAnchorKey = key
                             agentFromMessage = snap.agentFromMessage
-                            modelFromMessage = None
+                            modelFromMessage = snap.modelFromMessage
                             hasActiveRunner = hasRunner
                         }
                         match deriveAction snapshot with

@@ -110,6 +110,7 @@ type NudgeSnapshotState = {
     openTodos: string list
     lastAssistantText: string
     agentFromMessage: string option
+    modelFromMessage: string option
     turnId: string
     isLoopActive: bool
     dispatchedAnchors: Set<string>
@@ -129,6 +130,7 @@ let emptyNudgeSnapshotState : NudgeSnapshotState =
     { openTodos = []
       lastAssistantText = ""
       agentFromMessage = None
+      modelFromMessage = None
       turnId = ""
       isLoopActive = false
       dispatchedAnchors = Set.empty }
@@ -146,6 +148,9 @@ let foldNudgeSnapshot (sessionId: string) (events: WanEvent list) : NudgeSnapsho
                 let agent =
                     payloadField "agent" e
                     |> Option.bind (fun a -> if a = "" then None else Some a)
+                let model =
+                    payloadField "model" e
+                    |> Option.bind (fun m -> if m = "" then None else Some m)
                 let tid = payloadField "turnId" e |> strOrEmpty
                 let todosFromPayload =
                     payloadField "openTodosJson" e
@@ -153,6 +158,7 @@ let foldNudgeSnapshot (sessionId: string) (events: WanEvent list) : NudgeSnapsho
                 { st with
                     lastAssistantText = msg
                     agentFromMessage = agent
+                    modelFromMessage = model
                     turnId = tid
                     openTodos = match todosFromPayload with Some t -> t | None -> st.openTodos }
             | k when k = eventKindLoopActivated ->

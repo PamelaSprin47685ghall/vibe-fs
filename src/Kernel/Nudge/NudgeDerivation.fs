@@ -10,6 +10,7 @@ type SnapshotInput =
     { openTodos: string list
       lastAssistantText: string
       agentFromMessage: string option
+      modelFromMessage: string option
       isLoopActive: bool
       hasActiveRunner: bool
       nudgeBlockedForTurn: bool
@@ -24,7 +25,7 @@ let deriveSnapshot (input: SnapshotInput) : Snapshot =
       nudgeBlockedForTurn = input.nudgeBlockedForTurn
       nudgeAnchorKey = nudgeAnchorKey input.turnId input.lastAssistantText
       agentFromMessage = input.agentFromMessage
-      modelFromMessage = None
+      modelFromMessage = input.modelFromMessage
       hasActiveRunner = input.hasActiveRunner }
 
 let deriveAction (snapshot: Snapshot) : NudgeAction =

@@ -17,7 +17,7 @@ let private toSessionSnapshot (s: NudgeSnapshotState) : SessionSnapshot =
       nudgeBlockedForTurn = false
       nudgeAnchorKey = nudgeAnchorKey s.turnId s.lastAssistantText
       agentFromMessage = s.agentFromMessage
-      modelFromMessage = None
+      modelFromMessage = s.modelFromMessage
       hasActiveRunner = false }
 
 /// No events → all fields empty/default.
@@ -30,17 +30,19 @@ let foldNudgeSnapshotEmpty () =
     check "empty: not loop active" (not s.isLoopActive)
     check "empty: no dispatched anchors" (s.dispatchedAnchors = Set.empty)
 
-/// assistant_completed populates lastAssistantText, agentFromMessage, turnId.
+/// assistant_completed populates lastAssistantText, agentFromMessage, turnId, modelFromMessage.
 let foldNudgeSnapshotAssistantCompleted () =
     let events =
         [ ev "s1" eventKindAssistantCompleted (
               Map [ "assistantMessage", "implemented feature"
                     "agent", "bookkeeper"
+                    "model", "anthropic/claude-sonnet"
                     "turnId", "t1" ]
           ) ]
     let s = foldNudgeSnapshot "s1" events
     equal "assistant text" "implemented feature" s.lastAssistantText
     equal "agent from message" (Some "bookkeeper") s.agentFromMessage
+    equal "model from message" (Some "anthropic/claude-sonnet") s.modelFromMessage
     equal "turnId" "t1" s.turnId
 
 /// loop_activated sets isLoopActive=true.
@@ -120,6 +122,7 @@ let foldNudgeSnapshotIntegrated () =
           ev "s1" eventKindAssistantCompleted (
               Map [ "assistantMessage", "working on it"
                     "agent", "bookkeeper"
+                    "model", "openai/gpt-4o"
                     "turnId", "t42" ]
           ) ]
     let s = foldNudgeSnapshot "s1" events
@@ -127,6 +130,7 @@ let foldNudgeSnapshotIntegrated () =
     check "integrated: has assistant text" (s.lastAssistantText = "working on it")
     check "integrated: not loop active" (not s.isLoopActive)
     check "integrated: has turnId" (s.turnId = "t42")
+    equal "integrated: model" (Some "openai/gpt-4o") s.modelFromMessage
     match deriveAction (toSessionSnapshot s) with
     | NudgeTodo -> check "integrated -> NudgeTodo" true
     | _ -> check "integrated -> NudgeTodo" false

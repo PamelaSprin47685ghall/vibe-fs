@@ -114,10 +114,10 @@ let selfHealingLockDeletesFileLock () = promise {
 let tryClaimNudgeDispatchPreventsOutdatedAnchor () = promise {
     let! dir = mkdtempAsync "eventlog-claim-outdated-"
     let sessionID = "s-claim"
-    do! appendAssistantCompletedOrFail dir sessionID "task 1" (Some "agent1") "t1" []
+    do! appendAssistantCompletedOrFail dir sessionID "task 1" (Some "agent1") (Some "provider/model-a") "t1" []
     let anchorA = nudgeAnchorKey "t1" "task 1"
 
-    do! appendAssistantCompletedOrFail dir sessionID "task 2" (Some "agent1") "t2" []
+    do! appendAssistantCompletedOrFail dir sessionID "task 2" (Some "agent1") (Some "provider/model-b") "t2" []
     let anchorB = nudgeAnchorKey "t2" "task 2"
 
     let! claimA = tryClaimNudgeDispatch dir sessionID Wanxiangshu.Kernel.Nudge.NudgeTodo anchorA

@@ -65,6 +65,34 @@ let lastAssistantTurnId (sessionManager: ISessionManager) : string =
     | None -> ""
     | Some i -> string i
 
+let private extractModelString (entry: obj) : string option =
+    let pickFrom info =
+        if Dyn.isNullish info then None
+        else
+            let modelVal = Dyn.get info "model"
+            if Dyn.isNullish modelVal then None
+            else
+                let providerID = Dyn.str modelVal "providerID"
+                let modelID = Dyn.str modelVal "modelID"
+                if providerID = "" || modelID = "" then None
+                else Some (sprintf "%s/%s" providerID modelID)
+    match pickFrom (Dyn.get entry "info") with
+    | Some _ as m -> m
+    | None ->
+        let msg = Dyn.get entry "message"
+        if Dyn.isNullish msg then None else pickFrom msg
+
+let lastAssistantModel (sessionManager: ISessionManager) : string option =
+    let arr = entries sessionManager
+    arr
+    |> Array.tryFindBack (fun entry ->
+        let role =
+            let m = Dyn.get entry "message"
+            if not (Dyn.isNullish m) then Dyn.str m "role"
+            else Dyn.str (Dyn.get entry "info") "role"
+        role = "assistant")
+    |> Option.bind extractModelString
+
 let private flattenTodoTasks (phases: obj array) : string list =
     phases
     |> Array.collect (fun phase ->

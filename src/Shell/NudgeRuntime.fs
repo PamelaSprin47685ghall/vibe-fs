@@ -148,7 +148,7 @@ type NudgeRuntime
                     }
 
             // Append assistant turn to event log; all downstream decisioning folds from history.
-            do! appendAssistantCompletedOrFail root workspaceId lastAssistantText agent turnId todos
+            do! appendAssistantCompletedOrFail root workspaceId lastAssistantText agent model turnId todos
 
             let! snapshot = getNudgeSnapshotFromEventLog root workspaceId
 
@@ -163,7 +163,7 @@ type NudgeRuntime
                   nudgeBlockedForTurn = blocked
                   nudgeAnchorKey = currentAnchor
                   agentFromMessage = snapshot.agentFromMessage
-                  modelFromMessage = model
+                  modelFromMessage = snapshot.modelFromMessage
                   hasActiveRunner = false }
         }
 
