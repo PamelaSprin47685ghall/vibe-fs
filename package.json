@@ -1,6 +1,6 @@
 {
   "name": "wanxiangshu",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "private": true,
   "type": "module",
   "description": "wanxiangshu: multi-agent plugin runtime in F#→JS via Fable",
