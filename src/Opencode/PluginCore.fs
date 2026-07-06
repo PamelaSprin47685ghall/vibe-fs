@@ -144,6 +144,16 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
         }))
     setKey result "experimental.chat.system.transform" (twoArgHook (fun input output -> HookTransform.systemTransform services.Directory input output))
 
+let private createReviewTestSurface (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
+    createObj
+        [ "activateReview",
+          box (System.Func<string, string, int64, unit>(fun sessionID task createdAt ->
+              reviewStore.activateReview(sessionID, task, createdAt)))
+          "deactivateReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.deactivateReview sessionID))
+          "getReviewTask", box (System.Func<string, string option>(fun sessionID -> reviewStore.getReviewTask sessionID))
+          "tryLockReview", box (System.Func<string, bool>(fun sessionID -> reviewStore.tryLockReview sessionID))
+          "unlockReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.unlockReview sessionID)) ]
+
 let private applyFallbackModelOverrides (cfg: obj) (fbCfgOpt: FallbackConfig option) : unit =
     match fbCfgOpt with
     | None -> ()
@@ -187,5 +197,6 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
                 return assignInto cfg next
             }))
         registerHooks result host ctx services
+        setKey result "__reviewStore" (box (createReviewTestSurface services.ReviewStore))
         return result
     }

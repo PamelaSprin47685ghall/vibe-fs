@@ -27,7 +27,7 @@ let getMessagesUsesSessionPrefix () =
 /// `../..` when the first guess misses is the only thing that keeps the e2e
 /// plugin load working after `npm run build-and-test`.
 let pluginJsResolvesWithParentFallback () =
-    let code = requireFile "e2e/harness.js"
+    let code = requireFile "e2e/harness-bootstrap.js"
     check "e2e.harness.PLUGIN_JS targets build/src/Opencode/Plugin.js"
         (code.Contains("build/src/Opencode/Plugin.js"))
     check "e2e.harness.PLUGIN_JS has existsSync fallback to parent"

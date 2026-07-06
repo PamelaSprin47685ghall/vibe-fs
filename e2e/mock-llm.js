@@ -90,8 +90,10 @@ function createMockLLM() {
       req.on('end', () => {
         let parsed = {};
         try { parsed = JSON.parse(body); } catch { /* keep {} */ }
-        console.error("[mock-llm] request body:", JSON.stringify(parsed));
-        console.error("[mock-llm] current queue:", JSON.stringify(_queue));
+        if (process.env.WANXIANG_E2E_VERBOSE === '1') {
+          console.error('[mock-llm] request body:', JSON.stringify(parsed));
+          console.error('[mock-llm] current queue:', JSON.stringify(_queue));
+        }
         const messages = parsed.messages || [];
         const lastUser = [...messages].reverse().find(m => m.role === 'user');
 

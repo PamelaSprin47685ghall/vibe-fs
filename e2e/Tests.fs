@@ -3,27 +3,10 @@ module Wanxiangshu.E2e.Tests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.E2e.HarnessTypes
 
 [<Import("start", "./harness.js")>]
 let start: obj -> JS.Promise<obj> = jsNative
-
-type MockLLM =
-    abstract expectTool: string -> obj -> unit
-    abstract expectText: string -> unit
-    abstract reset: unit -> unit
-    abstract calls: ResizeArray<obj>
-
-type Harness =
-    abstract mockLLM: MockLLM
-    abstract createSession: obj -> obj -> JS.Promise<obj>
-    abstract sendPrompt: string -> string -> obj -> JS.Promise<obj>
-    abstract getMessages: string -> obj -> JS.Promise<obj>
-    abstract getSessions: obj -> JS.Promise<obj>
-    abstract waitForCalls: int -> int -> JS.Promise<int>
-    abstract readFile: string -> JS.Promise<string>
-    abstract fileExists: string -> JS.Promise<bool>
-    abstract waitForFile: string -> int -> JS.Promise<bool>
-    abstract dispose: unit -> JS.Promise<unit>
 
 let private harnessFromObj (o: obj) : Harness = unbox o
 let private emptyObj = createObj []
@@ -86,7 +69,7 @@ let runAll (args: string array) : JS.Promise<int> =
         let! apiObj = start opts
         let harness = harnessFromObj apiObj
 
-        let expected = 42
+        let expected = 53
         let mutable ok = 0
         let chk l c =
             check l c
@@ -247,6 +230,8 @@ let runAll (args: string array) : JS.Promise<int> =
                 chk "e2e.fuzzy-grep-array-pattern.tool-called" (containsTool harness "fuzzy_grep")
                 let bGrep = bodies harness
                 chk "e2e.fuzzy-grep-array-pattern.output-has-blocks" (bGrep.Contains "## pattern: \\\"fuzzyGrepMulti\\\"" || bGrep.Contains "## pattern: \"fuzzyGrepMulti\"")
+
+                do! Wanxiangshu.E2e.TestsServePlugin.runServePluginChecks harness sessionID chk toolRound toolRoundWithCalls textRound containsTool bodies emptyObj
 
                 printfn "\n✓ %d/%d e2e checks passed" ok expected
                 return summary ()

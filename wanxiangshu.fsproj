@@ -545,6 +545,9 @@
     <Compile Include="tests/TestsEntriesOmp.fs" />
     <Compile Include="tests/ArchitectureTests.fs" />
     <Compile Include="e2e/MuxTests.fs" />
+    <Compile Include="e2e/OpencodePluginTests.fs" />
+    <Compile Include="e2e/HarnessTypes.fs" />
+    <Compile Include="e2e/TestsServePlugin.fs" />
     <Compile Include="e2e/Tests.fs" />
     <Compile Include="e2e/TestsOmp.fs" />
     <Compile Include="tests/Tests.fs" />
