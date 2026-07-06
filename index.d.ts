@@ -227,7 +227,7 @@ export interface PluginEvent {
 }
 
 export interface PluginEventHelpers {
-  nudge: (workspaceId: string, message: string) => Promise<boolean>;
+  nudge: (workspaceId: string, message: string, model?: string, agent?: string) => Promise<boolean>;
   getTodos: (workspaceId: string) => Promise<readonly string[]>;
 }
 

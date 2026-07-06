@@ -167,11 +167,13 @@ type NudgeRuntime
                   hasActiveRunner = false }
         }
 
-    let sendNudgeMux (helpers: obj) (workspaceId: string) (promptText: string) (_agentOpt: string option) (_modelOpt: string option) : JS.Promise<SendOutcome> =
+    let sendNudgeMux (helpers: obj) (workspaceId: string) (promptText: string) (agentOpt: string option) (modelOpt: string option) : JS.Promise<SendOutcome> =
         promise {
             try
                 let nudgeFn = Dyn.get helpers "nudge"
-                let! delivered = unbox<JS.Promise<bool>> (Dyn.call2 nudgeFn workspaceId promptText)
+                let agentVal = match agentOpt with Some a -> box a | None -> null
+                let modelVal = match modelOpt with Some m -> box m | None -> null
+                let! delivered = unbox<JS.Promise<bool>> (Dyn.call4 nudgeFn workspaceId promptText modelVal agentVal)
                 return if delivered then Delivered else Busy
             with _ -> return Busy
         }

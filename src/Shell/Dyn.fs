@@ -48,6 +48,8 @@ let call1 (f: obj) (a: obj) : obj = f $ a
 
 let call2 (f: obj) (a: obj) (b: obj) : obj = f $ (a, b)
 
+let call4 (f: obj) (a: obj) (b: obj) (c: obj) (d: obj) : obj = f $ (a, b, c, d)
+
 let callMethod0 (o: obj) (method_: string) : obj =
     emitJsExpr (o, method_) "$0[$1]()"
 
