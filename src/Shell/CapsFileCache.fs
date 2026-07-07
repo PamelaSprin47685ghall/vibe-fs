@@ -5,18 +5,52 @@ module Wanxiangshu.Shell.CapsFileCache
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.CapsFormat
+open Wanxiangshu.Shell.Clock
 open Wanxiangshu.Shell.FileSys
 open Wanxiangshu.Shell.WorkspaceFiles
 open Wanxiangshu.Shell.RuntimeScope
 
+type CapsFileReadEntry = {
+    path: string
+    callId: string
+    input: {| path: string |}
+    output: {| success: bool; file_size: int; modifiedTime: string; lines_read: int; content: string |}
+}
+
+let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]> =
+    promise {
+        let! files = findCapsFiles projectRoot
+        if List.isEmpty files then return [||]
+        else
+            let timestamp = getTimestampMs()
+            let token = string timestamp
+            let modified = System.DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime.ToString("O")
+            return
+                files
+                |> List.toArray
+                |> Array.mapi (fun index f ->
+                let lines = f.content.Split('\n')
+                { path = f.label
+                  callId = $"caps-fr-{token}-{index}"
+                  input = {| path = f.label |}
+                  output = {| success = true
+                              file_size = f.content.Length
+                              modifiedTime = modified
+                              lines_read = lines.Length
+                              content = lines |> Array.mapi (fun i line -> $"{i + 1}\t{line}") |> String.concat "\n" |} })
+    }
+
+type private INodeProcess =
+    abstract cwd : unit -> string
+
 [<Global("process")>]
-let private nodeProcess : obj = jsNative
+let private nodeProcess : INodeProcess = jsNative
 
 let private normalizeDirectory (directory: string) : string =
     let raw =
         if System.String.IsNullOrWhiteSpace directory then "."
         else directory
-    resolve (nodeProcess?cwd()) raw
+    resolve (nodeProcess.cwd()) raw
 
 let private cacheKey (sessionID: string) (directory: string) =
     sessionID + "\u0000" + normalizeDirectory directory

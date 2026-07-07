@@ -15,10 +15,10 @@ open Wanxiangshu.Shell.Dyn
 let private methodologyParameters : JsonSchema =
     mkSchema
         (createObj
-            [ "methodology", box (strEnumProp "Select which methodology to apply." enumValuesArray)
+            [ "methodology", box (strEnumProp "Select which methodology to apply." enumValuesArray.Value)
               "intent", box (strProp intentFieldDescription)
               "background", box (strProp backgroundFieldDescription)
-              "note", box (strProp unifiedNoteDescription) ])
+              "note", box (strProp unifiedNoteDescription.Value) ])
         [| "methodology"; "intent"; "background"; "note" |]
 
 let private executeMethodology (deps: obj) (toolNames: string array) : obj -> obj -> JS.Promise<string> =

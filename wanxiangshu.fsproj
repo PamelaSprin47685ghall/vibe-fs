@@ -197,6 +197,9 @@
     <Compile Include="src/Shell/OpencodeSessionEventCodecCommon.fs" />
     <Compile Include="src/Shell/OpencodeSessionEventCodec.fs" />
     <Compile Include="src/Shell/OpencodeHookInputCodec.fs" />
+    <Compile Include="src/Shell/MuxToolDefinition.fs" />
+    <Compile Include="src/Shell/ToolHookRuntime.fs" />
+    <Compile Include="src/Shell/MuxPluginCatalogShell.fs" />
     <Compile Include="src/Shell/SerialStateHolder.fs" />
     <Compile Include="src/Shell/NudgeRuntime.fs" />
     <Compile Include="src/Mux/AiSettings.fs" />

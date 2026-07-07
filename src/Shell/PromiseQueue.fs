@@ -10,7 +10,7 @@ type IExceptionObserver =
     abstract OnException: exn -> unit
 
 type SerialQueue(?observer: IExceptionObserver) =
-    let mutable tail : JS.Promise<unit> = Promise.lift ()
+    let tail = ref (Promise.lift ())
 
     member _.Enqueue(work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
         Promise.create (fun resolve reject ->
@@ -23,8 +23,9 @@ type SerialQueue(?observer: IExceptionObserver) =
                         observer |> Option.iter (fun o -> o.OnException ex)
                         reject ex
                 }
-            tail <-
-                tail
+            let oldTail = tail.Value
+            tail.Value <-
+                oldTail
                 |> Promise.catch (fun ex ->
                     observer |> Option.iter (fun o -> o.OnException ex))
                 |> Promise.bind (fun _ -> runNext () |> Promise.map ignore))

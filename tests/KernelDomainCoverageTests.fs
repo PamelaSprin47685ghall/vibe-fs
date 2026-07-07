@@ -136,7 +136,7 @@ let methTodoResultTextOne () =
     check "todo contains x" (r.Contains "x")
 
 let methEnumCount () =
-    check "enum count > 50" (enumValues.Length > 50)
+    check "enum count > 50" (enumValues.Value.Length > 50)
 
 let methSelectFieldDesc () =
     check "selectMethodologyFieldDescription contains select_methodology"

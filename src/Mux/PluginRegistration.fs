@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Config
 open Wanxiangshu.Shell
+open Wanxiangshu.Shell.MuxPluginCatalogShell
 open Wanxiangshu.Mux.PluginCatalog
 open Wanxiangshu.Mux.PluginRegistrationParts
 open Wanxiangshu.Mux.BacklogSession

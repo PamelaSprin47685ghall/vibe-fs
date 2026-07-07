@@ -25,27 +25,27 @@ let todoWriteOutputExact () =
     check "todo envelope: multiple methodologies" (hintFromTodoOutput [ "first_principles"; "deduction" ] = multi)
 
 let enumCount () =
-    check "enum: 54 values" (enumValues.Length = 54)
+    check "enum: 54 values" (enumValues.Value.Length = 54)
 
 let enumAllInCatalog () =
-    enumValues
+    enumValues.Value
     |> List.iter (fun v -> check ("catalog contains " + v) (methodologyCatalog.Contains(v)))
 
 let catalogContainsKeyphrase () =
     check "catalog: contains keyphrase" (methodologyCatalog.Contains("Methodology catalog"))
 
 let registryEntriesWellFormed () =
-    check "registry: 54 entries" (allEntries.Length = 54)
-    check "registry: enum count matches entries" (enumValues.Length = allEntries.Length)
-    allEntries
+    check "registry: 54 entries" (allEntries.Value.Length = 54)
+    check "registry: enum count matches entries" (enumValues.Value.Length = allEntries.Value.Length)
+    allEntries.Value
     |> List.iter (fun e ->
         check ("entry has shortDefinition " + e.methodologyId) (e.shortDefinition <> "")
         check ("entry has noteDescription " + e.methodologyId) (e.noteDescription <> ""))
 
 let unifiedNoteDescriptionContainsAll () =
-    check "unified note description non-empty" (unifiedNoteDescription.Length > 0)
-    for e in allEntries do
-        check ("unified note contains " + e.methodologyId) (unifiedNoteDescription.Contains(e.methodologyId))
+    check "unified note description non-empty" (unifiedNoteDescription.Value.Length > 0)
+    for e in allEntries.Value do
+        check ("unified note contains " + e.methodologyId) (unifiedNoteDescription.Value.Contains(e.methodologyId))
 
 let run () =
     todoWriteOutputExact ()

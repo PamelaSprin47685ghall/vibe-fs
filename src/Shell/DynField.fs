@@ -28,3 +28,15 @@ let strListField (a: obj) (k: string) : string list option =
         unbox<string array> v
         |> Array.toList
         |> Some
+
+let objListField (a: obj) (k: string) : obj list option =
+    let v = Dyn.get a k
+    if Dyn.isNullish v || not (Dyn.isArray v) then None
+    else
+        unbox<obj array> v
+        |> Array.toList
+        |> Some
+
+let optField (a: obj) (k: string) : obj option =
+    let v = Dyn.get a k
+    if Dyn.isNullish v then None else Some v

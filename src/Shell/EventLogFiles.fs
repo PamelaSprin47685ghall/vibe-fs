@@ -85,12 +85,20 @@ let private withWorkspaceLock (filePath: string) (action: unit -> JS.Promise<'T>
             ()
 
         let! release = lockfileLock filePath (lockfileOptions ())
-        let! caught = action () |> Promise.result
-        do! release ()
-        return
-            match caught with
-            | Ok v -> v
-            | Error ex -> raise ex
+        let mutable caught = None
+        let! resOpt =
+            promise {
+                try
+                    let! result = action ()
+                    return Some result
+                with ex ->
+                    caught <- Some ex
+                    return None
+            }
+        try do! release () with _ -> ()
+        match caught with
+        | Some ex -> return raise ex
+        | None -> return resOpt.Value
     }
 
 let private fileExists (filePath: string) : JS.Promise<bool> =

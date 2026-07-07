@@ -81,7 +81,21 @@ let foldNudgeDedupAnchor () =
     check "blocks anchor 2" (isNudgeBlockedForAnchor st "2\u001emsg")
     check "other open" (not (isNudgeBlockedForAnchor st "3\u001emsg"))
 
+let foldEventStreamFiltersOtherSessions () =
+    let events =
+        [ ev "s1" eventKindLoopActivated (Map [ "task", "s1-task" ])
+          ev "s2" eventKindLoopActivated (Map [ "task", "s2-task" ])
+          ev "s1" eventKindLoopActivated (Map [ "task", "s1-task-2" ]) ]
+    let result =
+        foldEventStream "s1" 0
+            (fun count e ->
+                if e.Kind = eventKindLoopActivated then count + 1
+                else count)
+            events
+    equal "only s1 events counted" 2 result
+
 let run () =
+    foldEventStreamFiltersOtherSessions ()
     foldNudgeDedupAnchor ()
     foldReviewTaskEmpty ()
     foldReviewTaskActivate ()

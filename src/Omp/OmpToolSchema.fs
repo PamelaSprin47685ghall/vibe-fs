@@ -24,10 +24,10 @@ let private addRequired (schema: obj) (key: string) : unit =
 let methodologyParameters (tb: obj) : obj =
     objectOf
         [|
-            ("methodology", enumOf (Wanxiangshu.Methodology.Registry.enumValuesArray) "Select which methodology to apply." tb)
+            ("methodology", enumOf (Wanxiangshu.Methodology.Registry.enumValuesArray.Value) "Select which methodology to apply." tb)
             ("intent", str intentFieldDescription tb)
             ("background", str backgroundFieldDescription tb)
-            ("note", str unifiedNoteDescription tb)
+            ("note", str unifiedNoteDescription.Value tb)
         |]
         tb
 
@@ -138,6 +138,6 @@ let todowriteParameters (tb: obj) : obj =
             ("gotchas", str gotchasDesc tb)
             ("lessonsAndConventions", str lessonsAndConventionsDesc tb)
             ("plan", str planDesc tb)
-            ("select_methodology", arrayOf (enumOf Wanxiangshu.Methodology.Registry.enumValuesArray "Methodology name" tb) selectMethodologyFieldDescription tb)
+            ("select_methodology", arrayOf (enumOf Wanxiangshu.Methodology.Registry.enumValuesArray.Value "Methodology name" tb) selectMethodologyFieldDescription tb)
         |]
         tb

@@ -7,6 +7,14 @@ open Wanxiangshu.Kernel.ToolArgs
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Shell.ToolArgsDecode
 
+/// Tools whose results should be syntax-checked after a write.
+let fileEditTools: Set<string> =
+    Set.ofList
+        [ "edit"; "write"; "ast_edit"; "ast_grep_replace"; "file_edit_replace_string"
+          "file_edit_insert"; "apply_patch" ]
+
+let isFileEditTool (tool: string) : bool = Set.contains (tool.ToLowerInvariant ()) fileEditTools
+
 /// Single-line tool output heuristic shared by Opencode/Mux tool.execute.after hooks.
 let isNetworkErrorText (text: string) : bool =
     if System.String.IsNullOrWhiteSpace text then false

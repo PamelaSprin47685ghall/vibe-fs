@@ -116,14 +116,6 @@ let checkFunctionLengths (limits: StyleLimits) (nodes: AstNodeInfo[]) : SyntaxDi
             }
         else None)
 
-/// Tools whose results should be syntax-checked after a write.
-let private fileEditTools: Set<string> =
-    Set.ofList
-        [ "edit"; "write"; "ast_edit"; "ast_grep_replace"; "file_edit_replace_string"
-          "file_edit_insert"; "apply_patch" ]
-
-let isFileEditTool (tool: string) : bool = Set.contains (tool.ToLowerInvariant ()) fileEditTools
-
 let hasSyntaxInOutput (text: string) : bool =
     match tryParse text with
     | Some msg -> msg.info |> List.exists (function InfoItem.Syntax _ -> true | _ -> false)

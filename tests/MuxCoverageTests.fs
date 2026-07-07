@@ -75,12 +75,6 @@ let wrappersMkSchema () =
     check "mkSchema required Some" (schema.required = Some [| "name" |])
     check "mkSchema additionalProperties=false" (schema.additionalProperties = Some false)
 
-let wrappersJsonStringify () =
-    let obj = createObj [ "key", box "value"; "num", box 42 ]
-    let result = jsonStringify obj
-    check "jsonStringify produces non-empty" (result.Length > 0)
-    check "jsonStringify contains key" (result.Contains("key"))
-
 let wrappersRequireWorkspaceIdPresent () =
     let config = createObj [ "workspaceId", box "ws-123" ]
     match requireWorkspaceId config "test-tool" with
@@ -179,7 +173,6 @@ let run () : unit =
     wrappersRequireStrArrayNull ()
     wrappersRequireStrArrayMissing ()
     wrappersMkSchema ()
-    wrappersJsonStringify ()
     wrappersRequireWorkspaceIdPresent ()
     wrappersRequireWorkspaceIdMissing ()
     wrappersRequireWorkspaceIdInvalid ()

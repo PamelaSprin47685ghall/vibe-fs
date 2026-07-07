@@ -5,7 +5,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Mux.PluginCatalog
 open Wanxiangshu.Mux.ReadDedup
 open Wanxiangshu.Shell.WorkspaceFiles
-open Wanxiangshu.Shell.Clock
 module Dyn = Wanxiangshu.Shell.Dyn
 
 let muxToolNames = PluginCatalog.muxToolNames
@@ -22,34 +21,7 @@ let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array)
 let deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj[] =
     ReadDedup.deduplicateModelReadOutputsWithSeen seenOutputs messages
 
-type CapsFileReadEntry =
-    { path: string
-      callId: string
-      input: {| path: string |}
-      output: {| success: bool; file_size: int; modifiedTime: string; lines_read: int; content: string |} }
-
-let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]> =
-    promise {
-        let! files = findCapsFiles projectRoot
-        if List.isEmpty files then return [||]
-        else
-            let timestamp = getTimestampMs()
-            let token = string timestamp
-            let modified = System.DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime.ToString("O")
-            return
-                files
-                |> List.toArray
-                |> Array.mapi (fun index f ->
-                let lines = f.content.Split('\n')
-                { path = f.label
-                  callId = $"caps-fr-{token}-{index}"
-                  input = {| path = f.label |}
-                  output = {| success = true
-                              file_size = f.content.Length
-                              modifiedTime = modified
-                              lines_read = lines.Length
-                              content = lines |> Array.mapi (fun i line -> $"{i + 1}\t{line}") |> String.concat "\n" |} })
-    }
+let buildCapsFileReadData = Wanxiangshu.Shell.CapsFileCache.buildCapsFileReadData
 
 let createToolCatalog deps toolNames reviewStore hostReadExec finderCache sessionScope =
     PluginCatalog.createToolCatalog deps toolNames reviewStore hostReadExec finderCache sessionScope

@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Kernel.TreeSitterKernel
+open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.TreeSitterShell
 
 let checkSyntaxBadJson () = promise {

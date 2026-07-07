@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.TreeSitterKernelTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Shell.ToolExecute
 
 let isFileEditToolTrueForEdit () =
     check "edit" (isFileEditTool "edit")

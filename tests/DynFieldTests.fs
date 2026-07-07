@@ -54,6 +54,20 @@ let strListFieldMissing () =
     let obj = unbox (createObj [])
     equal "none" None (strListField obj "items")
 
+let objListFieldPresent () =
+    let obj = unbox (createObj [ "items", box [| box 1; box 2; box 3 |] ])
+    match objListField obj "items" with
+    | Some list -> equal "abc" 3 (list.Length)
+    | None -> failwith "expected Some"
+
+let objListFieldNotArray () =
+    let obj = unbox (createObj [ "items", box "not-an-array" ])
+    equal "none" None (objListField obj "items")
+
+let objListFieldMissing () =
+    let obj = unbox (createObj [])
+    equal "none" None (objListField obj "items")
+
 let run () =
     hasFieldTrue ()
     hasFieldFalse ()
@@ -67,3 +81,6 @@ let run () =
     requiredStrFieldMissing ()
     strListFieldPresent ()
     strListFieldMissing ()
+    objListFieldPresent ()
+    objListFieldNotArray ()
+    objListFieldMissing ()

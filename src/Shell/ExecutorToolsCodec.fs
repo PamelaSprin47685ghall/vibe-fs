@@ -2,7 +2,6 @@ module Wanxiangshu.Shell.ExecutorToolsCodec
 
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.Executor
-open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.DynField
 
 type ExecutorArgs = {
@@ -13,12 +12,6 @@ type ExecutorArgs = {
     Mode: string
     WhatToSummarize: string
 }
-
-let private strListField (a: obj) (k: string) : string list =
-    let v = Dyn.get a k
-    if Dyn.isNullish v then []
-    elif Dyn.isArray v then (v :?> obj array) |> Array.map string |> Array.toList
-    else [ string v ]
 
 let private parseLanguageField (value: string) : Result<ExecutorLanguage, DomainError> =
     match value.Trim().ToLowerInvariant() with
@@ -40,34 +33,34 @@ let decodeExecutorArgs (args: obj) : Result<ExecutorArgs, DomainError> =
         match strField args "language" with
         | None -> Ok Shell
         | Some langStr -> parseLanguageField langStr
-    match languageResult with
-    | Error e -> Error e
-    | Ok language ->
+    let programResult =
         match strField args "program" with
         | None -> Error (InvalidIntent ("executor", "program", "required"))
-        | Some program when System.String.IsNullOrWhiteSpace program ->
-            Error (InvalidIntent ("executor", "program", "required"))
-        | Some program ->
-            match strField args "mode" with
-            | None -> Error (InvalidIntent ("executor", "mode", "required"))
-            | Some modeStr ->
-                match parseModeField modeStr with
-                | Error e -> Error e
-                | Ok mode ->
-                    let timeoutRaw = defaultArg (strField args "timeout_type") ""
-                    match strField args "what_to_summarize" with
-                    | None -> Error (InvalidIntent ("executor", "what_to_summarize", "required"))
-                    | Some whatToSummarize when System.String.IsNullOrWhiteSpace whatToSummarize ->
-                        Error (InvalidIntent ("executor", "what_to_summarize", "required"))
-                    | Some whatToSummarize ->
-                        Ok {
-                            Language = language
-                            Program = program
-                            Dependencies = strListField args "dependencies"
-                            TimeoutType = parseTimeout timeoutRaw
-                            Mode = mode
-                            WhatToSummarize = whatToSummarize
-                        }
+        | Some p when System.String.IsNullOrWhiteSpace p -> Error (InvalidIntent ("executor", "program", "required"))
+        | Some p -> Ok p
+    let modeResult =
+        match strField args "mode" with
+        | None -> Error (InvalidIntent ("executor", "mode", "required"))
+        | Some modeStr -> parseModeField modeStr
+    let whatResult =
+        match strField args "what_to_summarize" with
+        | None -> Error (InvalidIntent ("executor", "what_to_summarize", "required"))
+        | Some w when System.String.IsNullOrWhiteSpace w -> Error (InvalidIntent ("executor", "what_to_summarize", "required"))
+        | Some w -> Ok w
+    languageResult
+    |> Result.bind (fun language ->
+        programResult
+        |> Result.bind (fun program ->
+            modeResult
+            |> Result.bind (fun mode ->
+                whatResult
+                |> Result.map (fun whatToSummarize ->
+                    { Language = language
+                      Program = program
+                      Dependencies = defaultArg (strListField args "dependencies") []
+                      TimeoutType = parseTimeout (defaultArg (strField args "timeout_type") "")
+                      Mode = mode
+                      WhatToSummarize = whatToSummarize }))))
 
 let toExecuteOptions (cwd: string option) (decoded: ExecutorArgs) : ExecuteOptions =
     { program = decoded.Program

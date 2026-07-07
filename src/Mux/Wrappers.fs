@@ -18,43 +18,28 @@ open Wanxiangshu.Shell
 open Wanxiangshu.Shell.JsonSchemaBuilders
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.DynField
 open Wanxiangshu.Shell.MuxHostBindings
 open Wanxiangshu.Shell.WorkBacklogToolsCodec
 open Wanxiangshu.Shell.EventLogRuntime
-open Thoth.Json
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.ToolContextCodec
-open Wanxiangshu.Shell.DynField
 open Wanxiangshu.Mux.WrappersReview
+open Wanxiangshu.Shell.MuxToolDefinition
 
 let strField = Wanxiangshu.Shell.DynField.strField
 let optInt = Wanxiangshu.Shell.DynField.optInt
+let optBool = Wanxiangshu.Shell.DynField.optBool
+let optField = Wanxiangshu.Shell.DynField.optField
 
-type JsonSchema =
-    { ``type``: string
-      properties: obj
-      required: string array option
-      additionalProperties: bool option }
-
-type ToolDefinition =
-    { name: string
-      description: string
-      parameters: JsonSchema
-      execute: obj -> obj -> JS.Promise<string>
-      condition: (obj -> bool) option }
-
-let jsonStringify (o: obj) : string = Encode.Auto.toString(0, o)
-
-let optBool (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some(unbox<bool> v)
-let optField (a: obj) (k: string) = let v = Dyn.get a k in if Dyn.isNullish v then None else Some v
+type JsonSchema = Wanxiangshu.Shell.MuxToolDefinition.JsonSchema
+type ToolDefinition = Wanxiangshu.Shell.MuxToolDefinition.ToolDefinition
 
 let requireStrArray (a: obj) (k: string) : string array =
-    let v = Dyn.get a k
-    if Dyn.isNullish v || not (Dyn.isArray v) then [||]
-    else v :?> obj array |> Array.map string
+    strListField a k |> Option.map List.toArray |> Option.defaultValue [||]
 
 let mkSchema (props: obj) (required: string array) : JsonSchema =
-    { ``type`` = "object"; properties = props; required = Some required; additionalProperties = Some false }
+    MuxToolDefinition.mkSchema props required
 
 let strProp = jsonStrProp
 let numProp = jsonNumProp

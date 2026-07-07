@@ -125,7 +125,9 @@ let muxPluginCatalogToolExecuteAfterUsesLivelockGuard () =
     check "arch: Mux PluginCatalog toolExecuteAfter uses LivelockGuard.check"
         (code.Contains "LivelockGuard.check")
     check "arch: Mux PluginCatalog toolExecuteAfter must not be Promise.lift noop"
-        (not (code.Contains "toolExecuteAfter (input: obj) (output: obj) : JS.Promise<unit> = Promise.lift ()"))
+        (not (code.Contains "toolExecuteAfter (input: obj) (output: obj) : JS.Promise<unit> = Promise.lift ()'"))
+    check "arch: Mux PluginCatalog must not contain let _checkRef ="
+        (not (code.Contains "let _checkRef ="))
 
 let muxSlashCommandsLoopUsesDepsDirectory () =
     let code = requireFile "src/Mux/SlashCommands.fs" |> nonCommentCode

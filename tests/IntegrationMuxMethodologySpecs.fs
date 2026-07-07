@@ -31,6 +31,6 @@ let muxTodoWriteMethodologySchemaSpec () = promise {
         let itemsSchema = get methodologySchema "items"
         check "todo_write select_methodology items is string type" (str itemsSchema "type" = "string")
         let enumArr = unbox<obj[]> (get itemsSchema "enum")
-        check "todo_write select_methodology enum has all values" (enumArr.Length = (List.toArray enumValues).Length)
+        check "todo_write select_methodology enum has all values" (enumArr.Length = (List.toArray enumValues.Value).Length)
         check "todo_write select_methodology minItems is 1" (unbox<int> (get methodologySchema "minItems") = 1)
 }

@@ -169,3 +169,12 @@ let opencodeToolDefinitionHooksUsesHookInputCodec () =
     check "arch: Opencode ToolDefinitionHooks must not Dyn.str input toolID"
         (not (code.Contains "Dyn.str input \"toolID\""))
 
+let opencodeHookExecuteHasNoDummyRefs () =
+    let code = requireFile "src/Opencode/HookExecute.fs" |> nonCommentCode
+    check "arch: Opencode HookExecute must not contain let _ref1 ="
+        (not (code.Contains "let _ref1 ="))
+    check "arch: Opencode HookExecute must not contain let _ref2 ="
+        (not (code.Contains "let _ref2 ="))
+    check "arch: Opencode HookExecute must not contain architectureDummyRefs"
+        (not (code.Contains "architectureDummyRefs"))
+

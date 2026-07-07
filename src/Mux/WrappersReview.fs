@@ -9,8 +9,6 @@ open Wanxiangshu.Shell.DynField
 open Wanxiangshu.Shell.MuxHostBindings
 open Wanxiangshu.Shell.DelegateToolsCodec
 
-let private strField = Wanxiangshu.Shell.DynField.strField
-
 /// Encapsulates the host's native file_read execute function captured during
 /// wrapper registration. Replaces the old `obj option ref` pseudo-interface
 /// (REFACTOR.md §12): the mutable slot is private, callers go through methods.

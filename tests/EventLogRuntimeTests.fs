@@ -111,6 +111,28 @@ let selfHealingLockDeletesFileLock () = promise {
     do! rmAsync dir
 }
 
+let appendSucceedsAfterStaleLockFile () = promise {
+    let! dir = mkdtempAsync "eventlog-stale-"
+    let lockPath = dir + "/.wanxiangshu.ndjson.lock"
+    do! writeFileAsync lockPath "1"
+    let store = EventLogStore dir
+    do! store.AppendEventOrFail({ V = 1
+                                  Session = "s-stale"
+                                  Kind = eventKindLoopActivated
+                                  At = ""
+                                  Payload = Map [ "task", "stale healed" ] })
+    let! events = store.ReadAllEvents()
+    check "stale lock: append succeeded" (events.Length = 1)
+    do! store.AppendEventOrFail({ V = 1
+                                  Session = "s-stale"
+                                  Kind = eventKindLoopActivated
+                                  At = ""
+                                  Payload = Map [ "task", "second write" ] })
+    let! events2 = store.ReadAllEvents()
+    check "stale lock: second append succeeded" (events2.Length = 2)
+    do! rmAsync dir
+}
+
 let tryClaimNudgeDispatchPreventsOutdatedAnchor () = promise {
     let! dir = mkdtempAsync "eventlog-claim-outdated-"
     let sessionID = "s-claim"
@@ -148,6 +170,7 @@ let run () = promise {
     do! strictAppendLoopActivatedPersistsEvent ()
     do! strictAppendLoopActivatedFailsOnBadPath ()
     do! selfHealingLockDeletesFileLock ()
+    do! appendSucceedsAfterStaleLockFile ()
     do! tryClaimNudgeDispatchPreventsOutdatedAnchor ()
     do! testGetSessionStateMemoryCache ()
 }

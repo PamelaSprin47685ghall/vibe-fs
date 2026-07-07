@@ -18,10 +18,10 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 
 let private methodologyArgs : obj =
     box {|
-        methodology = enumReq enumValuesArray "Select which methodology to apply."
+        methodology = enumReq enumValuesArray.Value "Select which methodology to apply."
         intent = strReq intentFieldDescription
         background = strReq backgroundFieldDescription
-        note = strReq unifiedNoteDescription
+        note = strReq unifiedNoteDescription.Value
     |}
 
 let private executeMethodology (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (runtime: FallbackRuntimeState) : obj -> obj -> JS.Promise<string> =
