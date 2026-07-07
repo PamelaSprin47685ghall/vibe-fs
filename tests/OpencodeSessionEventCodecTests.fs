@@ -18,6 +18,7 @@ let run () =
     isCompletedAssistantMessageWithError ()
     isCompletedAssistantMessageTerminalFinish ()
     isCompletedAssistantMessageToolFinishNotTerminal ()
+    isCompletedAssistantMessageToolFinishWithTimeCompleted ()
     isCompletedAssistantMessageTimeCompleted ()
     decodeTodosEmptyOnNonArray ()
     decodeTodosDropsTerminalStatus ()
@@ -31,3 +32,5 @@ let run () =
     decodeLastAssistantDetectsSyntheticAgent ()
     createPromptBodyWithoutAgent ()
     createPromptBodyWithAgent ()
+    shouldSkipNudgeTrueWhenNoToolResult ()
+    shouldSkipNudgeFalseWhenToolResultPresent ()

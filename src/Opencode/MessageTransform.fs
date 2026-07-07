@@ -37,14 +37,14 @@ let private extractSessionID (messages: Message<obj> list) : string =
     |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
     |> Option.defaultValue ""
 
-let private injectSembleIntoEncoded
+let injectSembleIntoEncoded
     (directory: string)
     (agent: string)
     (sessionID: string)
     (encoded: obj array)
     : JS.Promise<obj array> =
     promise {
-        if agent <> "investigator" then
+        if agent <> "investigator" && agent <> "reviewer" then
             SembleSearch.markBreakpoint sessionID encoded.Length
             return encoded
         else

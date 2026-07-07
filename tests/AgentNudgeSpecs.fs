@@ -63,7 +63,7 @@ let selectPrompt () =
     match selectNudgePrompt opencode NudgeLoop loopSnapshot with
     | Some prompt ->
         check "selectNudgePrompt NudgeLoop returns prompt" true
-        check "loop prompt contains front matter" (prompt.Contains("---"))
+        check "loop prompt does not contain front matter" (not (prompt.Contains("---")))
     | None -> check "selectNudgePrompt NudgeLoop returns prompt" false
 
     match selectNudgePrompt opencode NudgeNone noneSnapshot with

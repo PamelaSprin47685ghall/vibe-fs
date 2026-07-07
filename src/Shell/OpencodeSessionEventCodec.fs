@@ -101,6 +101,33 @@ let decodeLastAssistant (messagesData: obj) : string * string option =
         | None -> "", None
     else "", None
 
+/// Check if nudge should be skipped based on message history.
+let shouldSkipNudge (messagesData: obj) : bool =
+    if not (Dyn.isArray messagesData) then false
+    else
+        let messagesArr = messagesData :?> obj array
+        let absoluteLastAssistantIdx =
+            messagesArr
+            |> Array.tryFindIndexBack (fun msg ->
+                let info = Dyn.get msg "info"
+                let role = Dyn.str info "role"
+                role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
+        match absoluteLastAssistantIdx with
+        | Some idx ->
+            let info = Dyn.get (messagesArr.[idx]) "info"
+            let finish = Dyn.str info "finish"
+            let isToolFinish = finish.ToLower().Contains("tool") && finish.ToLower() <> "tool_use_error"
+            if not isToolFinish then false
+            else
+                let hasToolResultAfter =
+                    messagesArr.[idx + 1 ..]
+                    |> Array.exists (fun msg ->
+                        let mInfo = Dyn.get msg "info"
+                        let mRole = Dyn.str mInfo "role"
+                        mRole = "toolResult")
+                not hasToolResultAfter
+        | None -> false
+
 /// Build the host wire prompt body for `session.prompt`. The agent-scoped
 /// variant carries an `agent` field so the host routes to the same assistant
 /// that produced the last turn; without an agent the host falls back to the

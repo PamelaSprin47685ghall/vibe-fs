@@ -58,8 +58,14 @@ let isCompletedAssistantMessage (info: obj) : bool =
         if not isAssistant || hasError then false
         else
             let finishVal = Dyn.get info "finish"
-            if not (Dyn.isNullish finishVal) && Dyn.typeIs finishVal "string" then
-                isTerminalAssistantFinish (string finishVal)
-            else
-                let timeCompleted = Dyn.get (Dyn.get info "time") "completed"
-                not (Dyn.isNullish timeCompleted) && Dyn.typeIs timeCompleted "number"
+            let isTerminalFinish =
+                not (Dyn.isNullish finishVal)
+                && Dyn.typeIs finishVal "string"
+                && isTerminalAssistantFinish (string finishVal)
+            let hasTimeCompleted =
+                let time = Dyn.get info "time"
+                if Dyn.isNullish time then false
+                else
+                    let timeCompleted = Dyn.get time "completed"
+                    not (Dyn.isNullish timeCompleted) && Dyn.typeIs timeCompleted "number"
+            isTerminalFinish || hasTimeCompleted

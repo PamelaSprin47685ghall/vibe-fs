@@ -140,7 +140,7 @@ let formatFetchResponseAllNone () =
           length = None
           content = None }
     let out = formatFetchResponse data
-    check "starts with front matter fence" (out.StartsWith "---")
+    equal "formatFetchResponseAllNone returns empty" "" out
     check "front matter has no title" (not (out.Contains "title:"))
     check "front matter has no byline" (not (out.Contains "byline:"))
     check "front matter has no length" (not (out.Contains "length:"))

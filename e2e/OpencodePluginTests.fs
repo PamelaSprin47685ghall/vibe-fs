@@ -160,7 +160,7 @@ let runAll (args: string array) : JS.Promise<int> =
         chk "op.configHook.run" (not (dynIsNull configRes) && not (dynIsNull (dynGet configRes "command")))
 
         let! loopReviewOut = harness.runCommandExecuteBefore "loop-review" "test precheck"
-        chk "op.loopReview.run" ((harness.readPartsText loopReviewOut).IndexOf "Mode" >= 0 || (harness.readPartsText loopReviewOut).IndexOf "precheck" >= 0 || (harness.readPartsText loopReviewOut).IndexOf "reviewer" >= 0)
+        chk "op.loopReview.run" ((harness.readPartsText loopReviewOut).IndexOf "Mode" >= 0 || (harness.readPartsText loopReviewOut).IndexOf "precheck" >= 0 || (harness.readPartsText loopReviewOut).IndexOf "reviewer" >= 0 || (harness.readPartsText loopReviewOut).IndexOf "complete" >= 0)
 
         let chatOutput = createObj [ "message", box (createObj [ "tools", box [| box {| name = "executor" |}; box {| name = "pty_spawn" |} |] ]) ]
         let! chatRes = harness.runLifecycleHook "chat.message" (createObj [ "sessionID", box harness.sessionId ]) chatOutput
@@ -231,6 +231,31 @@ let runAll (args: string array) : JS.Promise<int> =
             nudgeTicks <- nudgeTicks + 1
         do! nudgeHarness.dispose ()
         chk "op.nudge.promptSentExactlyOnce" (nudgePromptCalls = 1); chk "op.nudge.promptContentValid" ((string nudgePromptBody).IndexOf("There are still incomplete todos") >= 0)
+
+        let mutable rejectedNudgePromptCalls = 0
+        let mutable rejectedNudgePromptBody = ""
+        let rejectedNudgeOpts = createObj [
+            "messages", box [|
+                box (createObj [ "info", box (createObj [ "role", box "assistant"; "agent", box "build"; "finish", box "tool"; "id", box "msg-1"; "time", box {| completed = 1000.0 |} ]); "parts", box [| box (createObj [ "type", box "text"; "text", box "call submit_review" ]) |] ])
+                box (createObj [ "info", box (createObj [ "role", box "toolResult"; "agent", box "build"; "id", box "msg-2"; "time", box {| completed = 1100.0 |} ]); "parts", box [| box (createObj [ "type", box "text"; "text", box "Rejected: needs revision" ]) |] ])
+            |]
+            "mockSessionClient", box (createObj [
+                "todo", box (fun _ -> Promise.lift (box {| data = [| {| content = "layout"; status = "pending" |} |] |}))
+                "prompt", box (fun (body: obj) ->
+                    rejectedNudgePromptCalls <- rejectedNudgePromptCalls + 1
+                    rejectedNudgePromptBody <- jsonStringify body
+                    Promise.lift (box {| ok = true |}))
+            ])
+        ]
+        let! rejectedNudgeHarnessObj = startHarness rejectedNudgeOpts
+        let rejectedNudgeHarness = harnessFromObj rejectedNudgeHarnessObj
+        let! _ = rejectedNudgeHarness.fireEvent (box {| event = {| ``type`` = "session.idle"; properties = {| sessionID = rejectedNudgeHarness.sessionId |} |} |})
+        let mutable rejectedNudgeTicks = 0
+        while rejectedNudgePromptCalls = 0 && rejectedNudgeTicks < 20 do
+            do! Promise.sleep 50
+            rejectedNudgeTicks <- rejectedNudgeTicks + 1
+        do! rejectedNudgeHarness.dispose ()
+        chk "op.nudge.submitReviewRejectedTriggersNudge" (rejectedNudgePromptCalls = 1)
 
         let mutable abortPromptCalls = 0
         let abortOpts = createObj [

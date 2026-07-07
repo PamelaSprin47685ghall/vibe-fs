@@ -85,6 +85,10 @@ let isCompletedAssistantMessageTimeCompleted () =
     let info = box {| role = "assistant"; time = box {| completed = box 123 |} |}
     check "time.completed numeric counts as terminal" (isCompletedAssistantMessage info)
 
+let isCompletedAssistantMessageToolFinishWithTimeCompleted () =
+    let info = box {| role = "assistant"; finish = "tool"; time = box {| completed = box 123 |} |}
+    check "tool finish with time.completed counts as terminal" (isCompletedAssistantMessage info)
+
 let decodeTodosEmptyOnNonArray () =
     equal "decodeTodos empty on null" [] (decodeTodos null)
     equal "decodeTodos empty on undefined" [] (decodeTodos Wanxiangshu.Shell.Dyn.undefinedValue)
@@ -154,3 +158,16 @@ let createPromptBodyWithAgent () =
     let body = createPromptBody (Some "reviewer") "hello"
     let agent = Dyn.str body "agent"
     equal "body agent captured" "reviewer" agent
+
+let shouldSkipNudgeTrueWhenNoToolResult () =
+    let msg1 = messageOf (box {| role = "user" |}) (box [| part "hi" |])
+    let msg2 = messageOf (box {| role = "assistant"; finish = "tool" |}) (box [| part "call submit_review" |])
+    let messages = box [| msg1; msg2 |]
+    check "shouldSkipNudge is true when no toolResult follow tool finish" (shouldSkipNudge messages)
+
+let shouldSkipNudgeFalseWhenToolResultPresent () =
+    let msg1 = messageOf (box {| role = "user" |}) (box [| part "hi" |])
+    let msg2 = messageOf (box {| role = "assistant"; finish = "tool" |}) (box [| part "call submit_review" |])
+    let msg3 = messageOf (box {| role = "toolResult" |}) (box [| part "rejected" |])
+    let messages = box [| msg1; msg2; msg3 |]
+    check "shouldSkipNudge is false when toolResult is present after tool finish" (not (shouldSkipNudge messages))

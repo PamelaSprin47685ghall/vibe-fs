@@ -132,6 +132,8 @@ let extractContextFromMessages (startIndex: int) (messages: Message<'raw> list) 
     |> fun s -> s.Trim()
 
 let mutable private _client: Client option = None
+let setClientForTest (c: Client option) : unit =
+    _client <- c
 let mutable private _connecting: JS.Promise<Client option> option = None
 
 let private getClient () : JS.Promise<Client option> =

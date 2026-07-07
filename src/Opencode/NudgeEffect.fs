@@ -50,20 +50,8 @@ let private collectSnapshot (client: obj) (pluginCtx: obj) (sessionID: SessionId
                     let openTodos =
                         if not (List.isEmpty openTodosFromApi) then openTodosFromApi
                         else recoverOpenTodosFromMessages messagesData
-                    let absoluteLastAssistantIdx =
-                        messagesArr
-                        |> Array.tryFindIndexBack (fun msg ->
-                            let info = Dyn.get msg "info"
-                            let role = Dyn.str info "role"
-                            role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
-                    let shouldSkipNudge =
-                        match absoluteLastAssistantIdx with
-                        | Some idx ->
-                            let info = Dyn.get (messagesArr.[idx]) "info"
-                            let finish = Dyn.str info "finish"
-                            finish.ToLower().Contains("tool") && finish.ToLower() <> "tool_use_error"
-                        | None -> false
-                    if shouldSkipNudge then return None
+                    let shouldSkip = shouldSkipNudge messagesData
+                    if shouldSkip then return None
                     else
                         let lastAssistantIdx =
                             messagesArr

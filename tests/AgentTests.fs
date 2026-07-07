@@ -20,7 +20,7 @@ let canUse' () =
 
     check "reviewer can read" (canUse "reviewer" "read")
     check "reviewer denied coder" (not (canUse "reviewer" "coder"))
-    check "reviewer denied fuzzy_find" (not (canUse "reviewer" "fuzzy_find"))
+    check "reviewer can fuzzy_find" (canUse "reviewer" "fuzzy_find")
 
     check "browser can read" (canUse "browser" "read")
     check "browser denied coder" (not (canUse "browser" "coder"))
@@ -88,10 +88,10 @@ let canUseMatrix () =
         "grep",                          [ false; false; false; false; false; false; false ]
         "plan",                          [ false; false; false; false; false; false; false ]
         "memory",                        [ false; false; false; false; false; false; false ]
-        "grep_x",                        [ true;  true;  true;  false; false; false; false ]
-        "fuzzy_grep",                    [ false; true;  true;  false; false; false; false ]
-        "fuzzy_find",                    [ true;  true;  true;  false; false; false; false ]
-        "glob",                          [ true;  true;  true;  false; false; false; false ]
+        "grep_x",                        [ true;  true;  true;  true;  false; false; false ]
+        "fuzzy_grep",                    [ false; true;  true;  true;  false; false; false ]
+        "fuzzy_find",                    [ true;  true;  true;  true;  false; false; false ]
+        "glob",                          [ true;  true;  true;  true;  false; false; false ]
         "read",                          [ true;  true;  true;  true;  true;  true;  false ]
         "write",                         [ false; false; true;  false; false; false; false ]
         "edit",                          [ false; false; true;  false; false; false; false ]
@@ -107,7 +107,7 @@ let canUseMatrix () =
         "ask_user_question",             [ true;  false; false; false; false; false; false ]
         "skill",                         [ true;  false; false; false; false; false; false ]
         "coder",                         [ true;  false; false; false; false; false; false ]
-        "investigator",                  [ true;  false; true;  false; false; false; false ]
+        "investigator",                  [ true;  false; true;  true;  false; false; false ]
         "meditator",                     [ true;  false; false; false; false; false; false ]
         "browser",                       [ true;  false; false; false; false; false; false ]
         "manager",                       [ true;  false; false; false; false; false; false ]

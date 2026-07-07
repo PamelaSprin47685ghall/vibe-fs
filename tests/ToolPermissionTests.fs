@@ -138,6 +138,21 @@ let deniedToolsForHostMethodology () =
     check "browser denied todowrite" (List.contains "todowrite" denied)
     check "browser allowed read" (not (List.contains "read" denied))
 
+let testReviewerCanUseFuzzyGrep () =
+    check "reviewer can use fuzzy_grep" (canUse "reviewer" "fuzzy_grep")
+
+let testReviewerCanUseFuzzyFind () =
+    check "reviewer can use fuzzy_find" (canUse "reviewer" "fuzzy_find")
+
+let testReviewerCanSpawnInvestigatorButNotExecutor () =
+    check "reviewer can spawn investigator" (canUse "reviewer" "investigator")
+    check "reviewer cannot spawn executor" (not (canUse "reviewer" "executor"))
+    check "reviewer cannot spawn coder" (not (canUse "reviewer" "coder"))
+
+let testReviewerCannotWrite () =
+    check "reviewer cannot write" (not (canUse "reviewer" "write"))
+    check "reviewer cannot edit" (not (canUse "reviewer" "edit"))
+
 let run () =
     classifyToolAgentReport ()
     classifyToolBlockedShell ()
@@ -192,3 +207,7 @@ let run () =
     canUseForHostMethodologyDenied ()
     canUseForHostMethodologyAllowed ()
     deniedToolsForHostMethodology ()
+    testReviewerCanUseFuzzyGrep ()
+    testReviewerCanUseFuzzyFind ()
+    testReviewerCanSpawnInvestigatorButNotExecutor ()
+    testReviewerCannotWrite ()

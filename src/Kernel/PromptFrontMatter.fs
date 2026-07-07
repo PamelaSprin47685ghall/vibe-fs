@@ -87,12 +87,15 @@ let yamlSeqField (key: string) (items: obj list) : FrontMatterField =
     (key, box (items |> List.toArray))
 
 let frontMatter (fields: FrontMatterField list) : string =
-    let obj = createObj fields
-    let body = Yaml.stringify obj
-    "---\n" + body.TrimEnd('\n') + "\n---"
+    if List.isEmpty fields then ""
+    else
+        let obj = createObj fields
+        let body = Yaml.stringify obj
+        "---\n" + body.TrimEnd('\n') + "\n---"
 
 let frontMatterPrompt (fields: FrontMatterField list) (prose: string) : string =
-    frontMatter fields + "\n\n" + prose
+    if List.isEmpty fields then prose
+    else frontMatter fields + "\n\n" + prose
 
 let frontMatterRoot (value: obj) : string =
     let body = Yaml.stringify value

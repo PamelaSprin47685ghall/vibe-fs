@@ -72,12 +72,15 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
     | _, TodoFamily
     | _, MethodologyFamily -> not (shouldExcludeAgentFromProjection agent false)
     | _, Read -> true
-    | "reviewer", _
     | "browser", _ -> false
+    | "reviewer", SubagentWebSkillOrSubmit when tool = "investigator" -> true
+    | "reviewer", SubagentWebSkillOrSubmit -> false
+    | "reviewer", WritePatchFamily -> false
+    | "reviewer", _ -> true
     | "investigator", SubagentWebSkillOrSubmit when tool = "executor" -> true
     | "coder", SubagentWebSkillOrSubmit when tool = "investigator" -> true
-    | _, SubagentWebSkillOrSubmit -> agent <> "investigator" && agent <> "coder"
-    | _, WritePatchFamily -> agent <> "investigator" && agent <> "manager"
+    | _, SubagentWebSkillOrSubmit -> agent <> "investigator" && agent <> "coder" && agent <> "reviewer"
+    | _, WritePatchFamily -> agent <> "investigator" && agent <> "manager" && agent <> "reviewer"
     | "manager", FuzzyGrep -> false
     | _, _ -> true
 

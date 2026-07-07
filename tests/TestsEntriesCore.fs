@@ -98,6 +98,7 @@ open Wanxiangshu.Tests.OmpPluginCoreIntegrationTests
 open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.MessageTransformPolicyTests
 open Wanxiangshu.Tests.SembleInjectionTests
+open Wanxiangshu.Tests.SembleReviewerInjectionTests
 open Wanxiangshu.Tests.ToolCatalogClassificationTests
 open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.ExecutorKernelTests
@@ -163,6 +164,7 @@ let coreTestEntries () : (string * TestBody) list =
     "AgentNudgeSpecs.decision", TestBody.Sync (sync AgentNudgeSpecs.decision)
     "AgentNudgeSpecs.dedupFromIntegral", TestBody.Sync (sync AgentNudgeSpecs.dedupFromIntegral)
     "AgentNudgeSpecs.decideNudge'", TestBody.Sync (sync AgentNudgeSpecs.decideNudge')
+    "AgentNudgeSpecs.selectPrompt", TestBody.Sync (sync AgentNudgeSpecs.selectPrompt)
     "AgentNudgeSpecs.submitReviewWipNudgeDedup", TestBody.Sync (sync AgentNudgeSpecsWip.submitReviewWipNudgeDedup)
     "AgentNudgeSpecs.decodeTodosOpenItems", TestBody.Sync (sync AgentNudgeSpecsDecode.decodeTodosOpenItems)
     "AgentNudgeSpecsWip.submitReviewWipNudgeDedup", TestBody.Sync (sync AgentNudgeSpecsWip.submitReviewWipNudgeDedup)
@@ -268,6 +270,7 @@ let coreTestEntries () : (string * TestBody) list =
     "ToolOutputInfoTests.run", TestBody.Sync (sync ToolOutputInfoTests.run)
     "MessageTransformPolicyTests.run", TestBody.Async MessageTransformPolicyTests.run
     "SembleInjectionTests.run", TestBody.Sync (sync SembleInjectionTests.run)
+    "SembleReviewerInjectionTests.testSembleInjectsForReviewer", TestBody.Async testSembleInjectsForReviewer
     "ExecutorKernelTests.run", TestBody.Sync (sync ExecutorKernelTests.run)
     "ToolExecuteTests.run", TestBody.Sync (sync ToolExecuteTests.run)
     "TreeSitterKernelTests.run", TestBody.Sync (sync TreeSitterKernelTests.run)
