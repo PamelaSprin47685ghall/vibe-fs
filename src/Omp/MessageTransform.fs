@@ -74,27 +74,22 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
                         else
                             let! ompFiles = findOmpCapsFiles cwd
                             let baseFiles =
-                                if isNull (box ompFiles) then []
-                                else
-                                    ompFiles
-                                    |> List.choose (fun (f: OmpCapsFile) ->
-                                        if Dyn.isNullish f || Dyn.isNullish (Dyn.get f "filePath") || Dyn.isNullish (Dyn.get f "content") then None
-                                        else
-                                            Some ({ filePath = f.filePath
-                                                    label = f.label
-                                                    content = f.content } : CapsFile))
+                                ompFiles
+                                |> List.map (fun f ->
+                                    ({ filePath = f.filePath
+                                       label = f.label
+                                       content = f.content } : CapsFile))
                             return!
                                 Wanxiangshu.Shell.MessageTransformHostHooks.injectSubagentFilesIfAny
                                     ExecutorTools.ompScope plan baseFiles
                     }
                 let buildCaps encoded (capsFiles: CapsFile list) prelude =
                     let ompCaps =
-                        if isNull (box capsFiles) then []
-                        else
-                            capsFiles
-                            |> List.choose (fun f ->
-                                if Dyn.isNullish f || Dyn.isNullish (Dyn.get f "filePath") || Dyn.isNullish (Dyn.get f "content") then None
-                                else Some ({ filePath = f.filePath; label = f.label; content = f.content } : OmpCapsFile))
+                        capsFiles
+                        |> List.map (fun f ->
+                            { filePath = f.filePath
+                              label = f.label
+                              content = f.content })
                     buildCapsEntries sha256HexTruncated encoded cwd ompCaps prelude
                 return!
                     runHostMessagesTransform

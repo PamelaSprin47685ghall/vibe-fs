@@ -5,7 +5,7 @@
     "": {
       "name": "wanxiangshu",
       "dependencies": {
-        "@fable-org/fable-library-js": "^2.1.1",
+        "@fable-org/fable-library-js": "^2.4.0",
         "@modelcontextprotocol/sdk": "^1.10.2",
         "@opencode-ai/plugin": "^1.17.4",
         "opencode-pty": "^0.3.4",
@@ -80,7 +80,7 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.28.1", "", { "os": "win32", "cpu": "x64" }, "sha512-bm4Mowrv+GXMlpWX++EcXw/iLyd1o3+bJkC2DkWXYVvgZCqD/bSj9ctZeAMC3cIxgjRVR2Dufaiu4YPxr5gW1A=="],
 
-    "@fable-org/fable-library-js": ["@fable-org/fable-library-js@2.1.1", "", {}, "sha512-F/Da8Pw4MOT/+5X8j/KPCCDH6Mb8zWKZ4HXlyJhPoU2j++MvhH63FDeXICfUorpvq8XTrLy808H9Tv9TNd7VFw=="],
+    "@fable-org/fable-library-js": ["@fable-org/fable-library-js@2.4.0", "", {}, "sha512-oalAL/Y/lHqN3h/CuVr/gpvHIw9V7so8dH6KGUPijCwpMVU3gyf7jYXQQMfYqi1sg1TIn7YcQOBL5s5VbA8+Sw=="],
 
     "@ff-labs/fff-bin-darwin-arm64": ["@ff-labs/fff-bin-darwin-arm64@0.9.4", "", { "os": "darwin", "cpu": "arm64" }, "sha512-xyivu2xB++O5xXDx5Qm50JsU2aXt8YgXlGVhH/HE7UMYDrE6L6f1RYdYs8Y0bn0D3D0+bFBrN5ELPszK9E4Wbw=="],
 

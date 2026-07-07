@@ -20,9 +20,12 @@ let kernelBoundary () =
         check ("arch: " + f + " Dyn-free") (not (content.Contains "Dyn."))
         check ("arch: " + f + " no open Shell") (not (content.Contains "open Wanxiangshu.Shell"))
         check ("arch: " + f + " no [<Emit>] (arbitrary JS injection)") (not (content.Contains "[<Emit"))
+        check ("arch: " + f + " no emitJsExpr (JS injection)") (not (content.Contains "emitJsExpr"))
         check ("arch: " + f + " no UtcNow (clock side-effect)") (not (content.Contains "UtcNow"))
         check ("arch: " + f + " no DateTimeOffset (clock side-effect)") (not (content.Contains "DateTimeOffset"))
         check ("arch: " + f + " no Date.now (clock side-effect)") (not (content.Contains "Date.now"))
+        if f = "CapsFormat.fs" then
+            check ("arch: " + f + " no open Fable.Core.JsInterop") (not (content.Contains "open Fable.Core.JsInterop"))
 
 let kernelNoEmptyDefault () =
     for f in fsFilesRelative "src/Kernel" do

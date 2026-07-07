@@ -6,6 +6,7 @@ open Wanxiangshu.Mux.PluginCatalog
 open Wanxiangshu.Mux.ReadDedup
 open Wanxiangshu.Shell.WorkspaceFiles
 open Wanxiangshu.Shell.Clock
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let muxToolNames = PluginCatalog.muxToolNames
 
@@ -36,22 +37,18 @@ let buildCapsFileReadData (projectRoot: string) : JS.Promise<CapsFileReadEntry[]
             let token = string timestamp
             let modified = System.DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime.ToString("O")
             return
-                if isNull (box files) then [||]
-                else
-                    files
-                    |> List.choose (fun f ->
-                        if isNull (box f) then None
-                        else Some f)
-                    |> Array.ofList
-                    |> Array.mapi (fun index f ->
-                    { path = f.label
-                      callId = $"caps-fr-{token}-{index}"
-                      input = {| path = f.label |}
-                      output = {| success = true
-                                  file_size = f.content.Length
-                                  modifiedTime = modified
-                                  lines_read = f.content.Split('\n').Length
-                                  content = f.content.Split('\n') |> Array.mapi (fun i line -> $"{i + 1}\t{line}") |> String.concat "\n" |} })
+                files
+                |> List.toArray
+                |> Array.mapi (fun index f ->
+                let lines = f.content.Split('\n')
+                { path = f.label
+                  callId = $"caps-fr-{token}-{index}"
+                  input = {| path = f.label |}
+                  output = {| success = true
+                              file_size = f.content.Length
+                              modifiedTime = modified
+                              lines_read = lines.Length
+                              content = lines |> Array.mapi (fun i line -> $"{i + 1}\t{line}") |> String.concat "\n" |} })
     }
 
 let createToolCatalog deps toolNames reviewStore hostReadExec finderCache sessionScope =

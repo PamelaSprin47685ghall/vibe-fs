@@ -131,7 +131,7 @@ let runAll (_args: string array) : JS.Promise<int> =
                 objective = "Test investigator e2e"
                 background = "Ensure no f.content crashes"
                 questions = [| "Did it crash?" |]
-                entries = [| "README.md" |]
+                entries = [| "README.md"; "DOES_NOT_EXIST_AT_ALL.md" |]
             |}
         |]
         do! h.expectText "investigator e2e verification output: mock text content"

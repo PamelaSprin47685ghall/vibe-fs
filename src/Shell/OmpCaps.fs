@@ -54,12 +54,10 @@ let private isExcludedDir (name: string) =
     || (name.StartsWith "." && not (capsDirRe.IsMatch name))
 
 let formatOmpCapsContext (files: OmpCapsFile list) : string =
-    if isNull (box files) || List.isEmpty files then ""
+    if List.isEmpty files then ""
     else
         files
-        |> List.choose (fun f ->
-            if Dyn.isNullish f || Dyn.isNullish (Dyn.get f "content") then None
-            else Some $"<caps-context file=\"{escapeXmlAttr f.label}\">\n{f.content}\n</caps-context>")
+        |> List.map (fun f -> $"<caps-context file=\"{escapeXmlAttr f.label}\">\n{f.content}\n</caps-context>")
         |> String.concat "\n\n"
 
 let private tryReadOmpFileAsync (filePath: string) (label: string) : JS.Promise<OmpCapsFile option> =
@@ -69,7 +67,7 @@ let private tryReadOmpFileAsync (filePath: string) (label: string) : JS.Promise<
             if not (statIsFile s) || statSize s > maxFileSize then return None
             else
                 let! content = readFile filePath
-                if System.String.IsNullOrWhiteSpace content then return None
+                if System.String.IsNullOrWhiteSpace content || isNullish content || not (typeIs content "string") then return None
                 else return Some { filePath = filePath; label = label; content = content }
         with _ -> return None
     }

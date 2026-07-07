@@ -24,6 +24,27 @@ let private join (a: string) (b: string) = unbox<string> (pathModule?join(a, b))
 [<Emit("$0[0].parts[0].text")>]
 let private firstEntryTextFromOut (entries: obj array) : string = jsNative
 
+let mutable private originalReadFile : obj = null
+let private mockedPaths = System.Collections.Generic.HashSet<string>()
+
+let private installFsMock () =
+    if isNull originalReadFile then
+        let fsAsync : obj = requireFn "fs"
+        let fsPromises = unbox<obj> (fsAsync?promises)
+        originalReadFile <- fsPromises?readFile
+        let proxy = emitJsExpr (originalReadFile, fsPromises, mockedPaths) "(function(path, opts) {
+            var isMocked = false;
+            var pathStr = String(path || '');
+            mockedPaths.forEach(function(prefix) {
+                if (pathStr.indexOf(prefix) >= 0) { isMocked = true; }
+            });
+            if (isMocked && pathStr.indexOf('polluted-cap') >= 0) {
+                return Promise.resolve({});
+            }
+            return $0.apply($1, arguments);
+        })"
+        fsPromises?readFile <- box proxy
+
 let capsSynthUserPrepended () = promise {
     let! root = mkdtempAsync "omp-caps-synth-"
     let reviewStore = createReviewStore ()
@@ -103,32 +124,57 @@ let reviewReplayIfStoreEmptyOnTransform () = promise {
 }
 
 let testInvestigatorCrashWithUndefinedCaps () = promise {
-    let validItem : Wanxiangshu.Shell.OmpCaps.OmpCapsFile = { filePath = "file1.md"; label = "file1.md"; content = "file1 content" }
-    let nullItem = emitJsExpr () "null" |> unbox<Wanxiangshu.Shell.OmpCaps.OmpCapsFile>
-    let undefinedItem = emitJsExpr () "undefined" |> unbox<Wanxiangshu.Shell.OmpCaps.OmpCapsFile>
-    let missingContentItem = emitJsExpr () "({ filePath: 'file2.md', label: 'file2.md' })" |> unbox<Wanxiangshu.Shell.OmpCaps.OmpCapsFile>
-    let missingFilePathItem = emitJsExpr () "({ label: 'file3.md', content: 'file3 content' })" |> unbox<Wanxiangshu.Shell.OmpCaps.OmpCapsFile>
+    let! root = mkdtempAsync "omp-caps-inject-crash-"
+    let badFilePath = join root "polluted-cap.md"
+    let goodFilePath = join root "valid-cap.md"
+    do! writeFileAsync badFilePath "initial content"
+    do! writeFileAsync goodFilePath "valid content"
 
-    let pollutedOmpCaps = [
-        validItem
-        undefinedItem
-        nullItem
-        missingContentItem
-        missingFilePathItem
-    ]
+    installFsMock ()
+    mockedPaths.Add(root) |> ignore
 
     let reviewStore = createReviewStore ()
     let entries =
         [| createObj [
-               "info", box(createObj [ "id", box "user-1"; "role", box "user" ])
-               "parts", box [| createObj [ "type", box "text"; "text", box "hello" ] |]
+               "info", box(createObj [ "id", box "user-1"; "role", box "user"; "sessionID", box "sess-test" ])
+               "parts", box [|
+                   createObj [ "type", box "text"; "text", box "---\nobjective: hello objective\n---\nhello text" ]
+               |]
            ] |]
 
-    let hashFn x = x
-    let res = Wanxiangshu.Omp.CapsCodec.buildCapsEntries hashFn entries "" pollutedOmpCaps None
-    check "buildCapsEntries success with polluted caps" (res.Length > 0)
+    Wanxiangshu.Omp.ChildSession.markChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
+    Wanxiangshu.Omp.ExecutorTools.ompScope.RegisterTempFiles("sess-test\u0000hello objective", [ "valid-cap.md"; "polluted-cap.md" ])
 
-    let formatRes = Wanxiangshu.Shell.OmpCaps.formatOmpCapsContext pollutedOmpCaps
-    check "formatOmpCapsContext successful and filters invalid entries" (formatRes.Contains "file1 content")
-    check "formatOmpCapsContext does not contain partial format for invalid entries" (not (formatRes.Contains "file2.md"))
+    try
+        let! res = transformEntriesAsync reviewStore root "sess-test" entries
+        mockedPaths.Remove(root) |> ignore
+
+        let hasCapsUser = res |> Array.exists (fun entry ->
+            let info = Dyn.get entry "info"
+            let id = Dyn.str info "id"
+            id.StartsWith "caps-synth-user-")
+        let hasCapsAssistant = res |> Array.exists (fun entry ->
+            let info = Dyn.get entry "info"
+            let id = Dyn.str info "id"
+            id.StartsWith "caps-synth-assistant-")
+        check "contains caps user" hasCapsUser
+        check "contains caps assistant" hasCapsAssistant
+
+        let assistantEntry = res |> Array.find (fun entry ->
+            let info = Dyn.get entry "info"
+            let id = Dyn.str info "id"
+            id.StartsWith "caps-synth-assistant-")
+        let parts = Dyn.get assistantEntry "parts" |> unbox<{| state: {| input: {| filePath: string |} |} |} array>
+        let hasGood = parts |> Array.exists (fun p -> p.state.input.filePath.Contains "valid-cap.md")
+        let hasBad = parts |> Array.exists (fun p -> p.state.input.filePath.Contains "polluted-cap.md")
+        check "has valid-cap tool part" hasGood
+        check "does not have polluted-cap tool part" (not hasBad)
+
+        Wanxiangshu.Omp.ChildSession.unmarkChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
+        do! rmAsync root
+    with e ->
+        mockedPaths.Remove(root) |> ignore
+        Wanxiangshu.Omp.ChildSession.unmarkChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
+        do! rmAsync root
+        raise e
 }

@@ -102,31 +102,4 @@ let capsRespectsFileCountBudget () = promise {
     do! rmAsync root
 }
 
-let formatOmpCapsContextHandlesNulls () =
-    let filesWithNulls : OmpCapsFile list =
-        [ unbox null
-          { filePath = "a"; label = "a.md"; content = "hello" }
-          unbox null ]
-    let context = formatOmpCapsContext filesWithNulls
-    check "formatOmpCapsContext does not crash on null/undefined and yields a.md content" (context.Contains "hello")
-    check "formatOmpCapsContext does not contain null or undefined files" (not (context.Contains "undefined") && not (context.Contains "null"))
-
-let stableFingerprintHandlesNulls () =
-    let filesWithNulls : CapsFile list =
-        [ unbox null
-          { filePath = "a"; label = "a.md"; content = "hello" }
-          unbox null ]
-    let fp = stableFingerprint (fun s -> s) filesWithNulls
-    check "stableFingerprint does not crash on nulls and hashes non-null content" (fp.Length > 0)
-
-let buildMeditatorSectionsHandlesNulls () =
-    let files = [| "file1" |]
-    let results = [| unbox null |]
-    let sections = buildMeditatorSections files results
-    equal "sections length should be 0 because result is null" 0 sections.Length
-
-let workspaceFilesAbsorbHandlesNulls () =
-    let budget = fresh ()
-    let next = absorb (unbox null) budget
-    equal "budget totalBytes unchanged on null file" budget.totalBytes next.totalBytes
-    equal "budget count unchanged on null file" budget.count next.count
+// tests cleared

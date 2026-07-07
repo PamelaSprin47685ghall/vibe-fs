@@ -35,30 +35,25 @@ let private sessionBox (sessionID: string option) : obj =
     match sessionID with Some s -> box s | None -> box null
 
 let private buildToolParts (capsFiles: CapsFile list) (fp: string) (sessionID: string option) (assistantId: string) : obj array =
-    if isNull (box capsFiles) then [||]
-    else
-        capsFiles
-        |> List.mapi (fun index cap -> (index, cap))
-        |> List.choose (fun (index, cap) ->
-            if isNull (box cap) || isNull (box cap.filePath) || isNull (box cap.content) then None
-            else
-                Some (box (createObj [
-                    "type", box "tool"
-                    "tool", box "read"
-                    "callID", box $"caps-call-{fp}-{index}"
-                    "id", box $"caps-tool-{fp}-{index}"
-                    "sessionID", sessionBox sessionID
-                    "messageID", box assistantId
-                    "state", box (createObj [
-                        "status", box "completed"
-                        "input", box (createObj [ "filePath", box cap.filePath ])
-                        "output", box (formatReadOutput cap.filePath cap.content 1)
-                        "title", box $"Read {cap.filePath}"
-                        "metadata", box (createObj [])
-                        "time", box (createObj [ "start", box 0; "end", box 1 ])
-                    ])
-                ])))
-        |> Array.ofList
+    capsFiles
+    |> List.mapi (fun index cap ->
+        box (createObj [
+            "type", box "tool"
+            "tool", box "read"
+            "callID", box $"caps-call-{fp}-{index}"
+            "id", box $"caps-tool-{fp}-{index}"
+            "sessionID", sessionBox sessionID
+            "messageID", box assistantId
+            "state", box (createObj [
+                "status", box "completed"
+                "input", box (createObj [ "filePath", box cap.filePath ])
+                "output", box (formatReadOutput cap.filePath cap.content 1)
+                "title", box $"Read {cap.filePath}"
+                "metadata", box (createObj [])
+                "time", box (createObj [ "start", box 0; "end", box 1 ])
+            ])
+        ]))
+    |> Array.ofList
 
 let private buildUserMessage (userId: string) (sessionID: string option) (preludeText: string option) : obj =
     box (createObj [

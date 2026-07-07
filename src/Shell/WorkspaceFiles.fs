@@ -14,13 +14,11 @@ let fresh () : Budget = { results = ResizeArray (); totalBytes = 0; count = 0 }
 let isFull (budget: Budget) : bool = budget.count >= 2000 || budget.totalBytes >= (8 * 1_048_576)
 
 let absorb (file: CapsFile) (budget: Budget) : Budget =
-    if isNull (box file) || isNull (box file.content) then budget
+    let nextTotal = budget.totalBytes + file.content.Length
+    if nextTotal > (8 * 1_048_576) then budget
     else
-        let nextTotal = budget.totalBytes + file.content.Length
-        if nextTotal > (8 * 1_048_576) then budget
-        else
-            budget.results.Add file
-            { results = budget.results; totalBytes = nextTotal; count = budget.count + 1 }
+        budget.results.Add file
+        { results = budget.results; totalBytes = nextTotal; count = budget.count + 1 }
 
 [<Import("parse", "yaml")>]
 let private yamlParse (text: string) : obj = jsNative
@@ -49,11 +47,12 @@ let private entryIsDirectory (entry: obj) : bool = entry?isDirectory ()
 let private tryReadFileAsync (filePath: string) (label: string) : JS.Promise<CapsFile option> =
     promise {
         try
-            let! fileStat = stat filePath
-            if not (statIsFile fileStat) || statSize fileStat > maxFileSize then return None
+            let! s = stat filePath
+            if not (statIsFile s) || statSize s > maxFileSize then return None
             else
                 let! content = readFile filePath
-                return if content.Trim() = "" then None else Some { filePath = filePath; label = label; content = content }
+                if isNullish content || not (typeIs content "string") then return None
+                else return Some { filePath = filePath; label = label; content = content }
         with _ -> return None
     }
 
@@ -182,7 +181,10 @@ let readOne (cwd: string) (file: string) : JS.Promise<ReverieFileResult> =
                 return { filePath = file; content = None; skipReason = Some "too-large" }
             else
                 let! content = readFile absolute
-                return { filePath = absolute; content = Some content; skipReason = None }
+                if isNullish content || not (typeIs content "string") then
+                    return { filePath = file; content = None; skipReason = Some "unreadable" }
+                else
+                    return { filePath = absolute; content = Some content; skipReason = None }
         with _ ->
             return { filePath = file; content = None; skipReason = Some "unreadable" }
     }

@@ -6,10 +6,10 @@ open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.CapsPrelude
 open Wanxiangshu.Kernel.CapsSynthPolicy
 open Wanxiangshu.Shell.CapsSynthCommon
-open Wanxiangshu.Shell.Dyn
+module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FileSys
 
-let messageId (msg: obj) : string = str msg "id"
+let messageId (msg: obj) : string = Dyn.str msg "id"
 
 let private buildTextPart (text: string) : obj =
     createObj [ "type", box "text"; "text", box text; "state", box "done" ]
@@ -20,28 +20,24 @@ let private buildMuxMessage (id: string) (role: string) (parts: obj array) : obj
 let private buildUserMessage (userId: string) (preludeText: string option) : obj =
     buildMuxMessage userId "user" [| buildTextPart (userCapsText preludeText) |]
 
-let private buildMuxToolPart (fp: string) (index: int) (cap: CapsFile) : obj option =
-    if isNull (box cap) || isNull (box cap.filePath) || isNull (box cap.content) then None
-    else
-        Some (createObj
-            [ "type", box "dynamic-tool"
-              "toolCallId", box $"caps-fr-{fp}-{index}"
-              "toolName", box "file_read"
-              "state", box "output-available"
-              "input", box (createObj [ "path", box cap.filePath ])
-              "output",
-              box
-                  (createObj
-                       [ "success", box true
-                         "file_size", box cap.content.Length
-                         "modifiedTime", box "1970-01-01T00:00:00.000Z"
-                         "lines_read", box (cap.content.Split('\n').Length)
-                         "content", box (formatReadOutput cap.filePath cap.content 1) ]) ])
+let private buildMuxToolPart (fp: string) (index: int) (cap: CapsFile) : obj =
+    createObj
+        [ "type", box "dynamic-tool"
+          "toolCallId", box $"caps-fr-{fp}-{index}"
+          "toolName", box "file_read"
+          "state", box "output-available"
+          "input", box (createObj [ "path", box cap.filePath ])
+          "output",
+          box
+              (createObj
+                   [ "success", box true
+                     "file_size", box cap.content.Length
+                     "modifiedTime", box "1970-01-01T00:00:00.000Z"
+                     "lines_read", box (cap.content.Split('\n').Length)
+                     "content", box (formatReadOutput cap.filePath cap.content 1) ]) ]
 
 let private buildCapsAssistantMessage (id: string) (parentId: string) (capsFiles: CapsFile list) (fp: string) : obj =
-    let parts =
-        (if isNull (box capsFiles) then [||]
-         else capsFiles |> List.mapi (buildMuxToolPart fp) |> List.choose (fun x -> x) |> Array.ofList)
+    let parts = capsFiles |> List.mapi (buildMuxToolPart fp) |> Array.ofList
     buildMuxMessage id "assistant" parts
 
 let private buildAckMessage (ackId: string) : obj =

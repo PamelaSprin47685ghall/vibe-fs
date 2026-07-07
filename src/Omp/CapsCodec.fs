@@ -10,10 +10,7 @@ module Dyn = Wanxiangshu.Shell.Dyn
 
 let private entryId (entry: obj) : string =
     let info = Dyn.get entry "info"
-    if Dyn.isNullish info then ""
-    else
-        let id = Dyn.str info "id"
-        if id <> "" then id else Dyn.str entry "id"
+    if Dyn.isNullish info then "" else Dyn.str info "id"
 
 let private entrySessionId (entry: obj) : string =
     let info = Dyn.get entry "info"
@@ -31,12 +28,8 @@ let private stripExistingCapsMessages (entries: obj array) : obj array =
             id <> "" && id.StartsWith "caps-synth-")
 
 let private ompCapsToKernel (files: OmpCapsFile list) : CapsFile list =
-    if isNull (box files) then []
-    else
-        files
-        |> List.choose (fun f ->
-            if Dyn.isNullish f || Dyn.isNullish (Dyn.get f "filePath") || Dyn.isNullish (Dyn.get f "content") then None
-            else Some { filePath = f.filePath; label = f.label; content = f.content })
+    files
+    |> List.map (fun f -> { filePath = f.filePath; label = f.label; content = f.content })
 
 let private buildTextPart (text: string) : obj =
     createObj [ "type", box "text"; "text", box text ]
@@ -51,32 +44,25 @@ let private buildUserEntry (userId: string) (sessionId: string) (preludeText: st
     createObj [ "info", box info; "parts", box [| buildTextPart text |] ]
 
 let private buildReadToolPart (cap: CapsFile) (fp: string) (index: int) : obj =
-    if isNull (box cap) || isNull (box cap.filePath) || isNull (box cap.content) then box null
-    else
-        createObj [
-            "type", box "tool"
-            "tool", box "read"
-            "callID", box $"caps-call-{fp}-{index}"
-            "state",
-                box(
-                    createObj [
-                        "status", box "completed"
-                        "input", box(createObj [ "filePath", box cap.filePath ])
-                        "output", box(formatReadOutput cap.filePath cap.content 1)
-                        "error", box ""
-                    ])
-        ]
+    createObj [
+        "type", box "tool"
+        "tool", box "read"
+        "callID", box $"caps-call-{fp}-{index}"
+        "state",
+            box(
+                createObj [
+                    "status", box "completed"
+                    "input", box(createObj [ "filePath", box cap.filePath ])
+                    "output", box(formatReadOutput cap.filePath cap.content 1)
+                    "error", box ""
+                ])
+    ]
 
 let private buildAssistantEntry (assistantId: string) (parentUserId: string) (sessionId: string) (projectRoot: string) (capsFiles: CapsFile list) (fp: string) : obj =
     let parts =
-        if isNull (box capsFiles) then [||]
-        else
-            capsFiles
-            |> List.mapi (fun i cap -> (i, cap))
-            |> List.choose (fun (i, cap) ->
-                let p = buildReadToolPart cap fp i
-                if isNull (box p) then None else Some p)
-            |> List.toArray
+        capsFiles
+        |> List.mapi (fun i cap -> buildReadToolPart cap fp i)
+        |> List.toArray
     let info = createObj [ "id", box assistantId; "role", box "assistant"; "parentID", box parentUserId ]
     if sessionId <> "" then info?sessionID <- box sessionId
     if projectRoot <> "" then info?path <- box(createObj [ "cwd", box projectRoot; "root", box projectRoot ])

@@ -1,7 +1,5 @@
 module Wanxiangshu.Kernel.CapsFormat
 
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.PromptFrontMatter
 open System.Collections.Generic
 
@@ -11,25 +9,21 @@ type CapsFile = { filePath: string; label: string; content: string }
 /// Stable fingerprint over caps files — kernel decides WHAT to hash, the
 /// injected `hashFn` decides HOW (e.g. Shell.Crypto.sha256HexTruncated).
 let stableFingerprint (hashFn: string -> string) (capsFiles: CapsFile list) : string =
-    if isNull (box capsFiles) then ""
-    else
-        capsFiles
-        |> List.collect (fun cap ->
-            if isNull (box cap) || isNull (box cap.filePath) || isNull (box cap.content) then []
-            else [ cap.filePath; "\u0000"; cap.content; "\u0000" ])
-        |> String.concat ""
-        |> hashFn
+    capsFiles
+    |> List.collect (fun cap ->
+        [ cap.filePath; "\u0000"; cap.content; "\u0000" ]
+        )
+    |> String.concat ""
+    |> hashFn
+
+type CapsYamlItem = { label: string; content: string }
 
 /// Wrap already-discovered capability files as a YAML front-matter block. Pure:
 /// file discovery lives in the shell; this only formats.
 let buildCapitalsContext (files: CapsFile list) : string =
     let items =
-        if isNull (box files) then []
-        else
-            files
-            |> List.choose (fun f ->
-                if isNull (box f) then None
-                else Some (createObj [ "label", box f.label; "content", box f.content ]))
+        files
+        |> List.map (fun f -> box { label = f.label; content = f.content })
     frontMatter [ yamlSeqField "caps" items ]
 
 let formatReadOutput (filePath: string) (content: string) (startLine: int) : string =
