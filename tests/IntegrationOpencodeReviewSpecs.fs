@@ -27,7 +27,8 @@ let private mockClient (messages: obj array) : obj =
 
 let private returnReviewerTool workspaceDir messages store : obj =
     let ctx = createObj [ "directory", box workspaceDir; "client", mockClient messages ]
-    submitReviewResultTool ctx store
+    let scope = Wanxiangshu.Shell.RuntimeScope.create ()
+    submitReviewResultTool ctx store scope
 
 let private reviewerContext workspaceDir sessionID : obj =
     createObj [ "directory", box workspaceDir; "sessionID", box sessionID ]

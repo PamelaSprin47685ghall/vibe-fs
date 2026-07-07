@@ -36,8 +36,8 @@ let createTools (host: Host) (registry: ChildAgentRegistry) (finderCache: Finder
             yield "fuzzy_grep", box (fuzzyGrepTool finderCache iteratorStore)
             yield "websearch", box (websearchTool host registry ctx fallbackRuntime)
             yield "webfetch", box (webfetchTool ctx)
-            yield "submit_review", box (submitReviewTool registry ctx reviewStore)
-            yield "return_reviewer", box (submitReviewResultTool ctx reviewStore)
+            yield "submit_review", box (submitReviewTool registry ctx reviewStore sessionScope)
+            yield "return_reviewer", box (submitReviewResultTool ctx reviewStore sessionScope)
             if host = Mimocode then
                 yield todoWriteToolName host, box (mimoTodoTool ctx)
         ]

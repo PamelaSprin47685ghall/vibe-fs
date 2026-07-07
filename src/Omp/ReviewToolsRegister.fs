@@ -18,7 +18,6 @@ open Wanxiangshu.Shell.RuntimeScope
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.EventLogRuntime
-
 let private optBool (o: obj) (key: string) : bool option =
     let v = Dyn.get o key
     if Dyn.isNullish v then None else Some(unbox<bool> v)
@@ -35,7 +34,6 @@ let executeSubmitReview (store: ReviewStore, pi: obj, ctx: obj, id: string, para
         | Some sessionId ->
             let sm = Dyn.get ctx "sessionManager"
             let root = Dyn.str ctx "cwd"
-            do! syncReviewFromEventLog store root sessionId
             let activeTask = store.getReviewTask sessionId
             match activeTask with
             | None -> return errorResult "Loop review is not active for this session."

@@ -12,6 +12,7 @@ type MessageTransformPlan = {
     Excluded: bool
     IsSubagentSession: bool
     Cleaned: Message<obj> list
+    RawArray: obj array option
 }
 
 let runMessageTransformPipeline

@@ -99,6 +99,8 @@ let private injectSembleIntoEncoded
 
 let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (_client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
+        runtimeScope.TriggerInit(directory)
+        do! runtimeScope.WaitInit()
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
         | Some messagesArr ->
@@ -111,7 +113,6 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                 let backlogOps =
                     backlogSessionOpsFrom backlogSession.Host
                         (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
-                        (fun dir sid -> Wanxiangshu.Shell.EventLogRuntime.syncBacklogFromEventLog backlogSession.Host runtimeScope.Projection dir sid)
                 let plan = {
                     SessionID = sessionID
                     Agent = agent
@@ -119,6 +120,7 @@ let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtim
                     Excluded = excluded
                     IsSubagentSession = isSub
                     Cleaned = cleaned
+                    RawArray = Some messagesArr
                 }
                 let replayTexts () : JS.Promise<string seq> =
                     Promise.lift (extractTextsFromEncodedMessages messagesArr)

@@ -67,6 +67,8 @@ let private createCoreServices (host: Host) (ctx: obj) =
     let backlogSession = BacklogSession(host, scope)
     let lifecycleObserver = createSessionLifecycleObserver (host, ctx, reviewStore, childAgentRegistry, fallbackHandler, fallbackRuntime, backlogSession)
     let tools = createTools host childAgentRegistry finderCache ctx reviewStore scope fallbackRuntime
+    scope.OnInit <- Some (fun dir -> Wanxiangshu.Shell.EventLogRuntime.syncAllSessionsFromEventLogDedicated host reviewStore scope dir)
+    scope.TriggerInit(directory)
     let client = match getClientFromPluginCtx ctx with Ok c -> c | Error _ -> box null
     if not (Dyn.isNullish client) then storePtyClient client
     let mcps = box {| ``type`` = "local"; command = Wanxiangshu.Kernel.Config.getStealthBrowserMcpLocalConfig(envVar "STEALTH_BROWSER_MCP_REF").command |}
@@ -93,7 +95,7 @@ let private registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreS
     setKey result "command.execute.before" (twoArgHook (fun input output ->
         promise {
             do! services.SessionLifecycleObserver.handleCommandExecuteBefore input output
-            do! commandExecuteBefore services.ChildAgentRegistry ctx services.ReviewStore input output
+            do! commandExecuteBefore services.ChildAgentRegistry ctx services.ReviewStore services.RuntimeScope input output
         }))
     setKey result "event" (box (fun (input: obj) ->
         promise {
@@ -200,8 +202,10 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
                 registerCommands cfg
                 applyFallbackModelOverrides next services.FallbackConfig
                 return assignInto cfg next
-            }))
+             }))
         registerHooks result host ctx services
+        services.RuntimeScope.TriggerInit(services.Directory)
+        do! services.RuntimeScope.WaitInit()
         setKey result "__reviewStore" (box (createReviewTestSurface services.ReviewStore))
         return result
     }

@@ -73,9 +73,24 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
                     setToolResultText event (todoWriteOutput methodologies true)
     }
 
-let sessionStartHandler (pi: obj) (ctx: obj) : JS.Promise<unit> =
+let sessionStartHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =
     promise {
         do! NudgeHooks.applyActiveToolFilterForMainSession pi ctx
+        let sessionId = getSessionIdFromContext ctx |> Option.defaultValue ""
+        let cwd = Dyn.str ctx "cwd"
+        if sessionId <> "" && cwd <> "" then
+            do! Wanxiangshu.Shell.EventLogRuntime.syncReviewFromEventLogDedicated reviewStore cwd sessionId
+            do! Wanxiangshu.Shell.EventLogRuntime.syncBacklogFromEventLogDedicated omp backlogSession.Projection cwd sessionId
+    }
+
+/// session_prompt: lightweight re-sync before each prompt to catch cross-session durable state changes.
+let sessionPromptHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =
+    promise {
+        let sessionId = getSessionIdFromContext ctx |> Option.defaultValue ""
+        let cwd = Dyn.str ctx "cwd"
+        if sessionId <> "" && cwd <> "" then
+            do! Wanxiangshu.Shell.EventLogRuntime.syncReviewFromEventLogDedicated reviewStore cwd sessionId
+            do! Wanxiangshu.Shell.EventLogRuntime.syncBacklogFromEventLogDedicated omp backlogSession.Projection cwd sessionId
     }
 
 let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =

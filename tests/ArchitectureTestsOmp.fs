@@ -95,8 +95,6 @@ let ompReviewUsesReviewRuntime () =
         (loop.Contains "ReviewSession")
     check "arch: Omp ReviewTools uses ReviewRuntime"
         (tools.Contains "ReviewRuntime")
-    check "arch: Omp ReviewTools register syncs review from event log"
-        (tools.Contains "syncReviewFromEventLog")
 
 let ompCapsCodecExists () =
     let code = requireFile "src/Omp/CapsCodec.fs" |> nonCommentCode

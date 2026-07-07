@@ -51,7 +51,6 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
                 let backlogOps =
                     backlogSessionOpsFrom defaultBacklogSession.Host
                         (fun sid msgs -> defaultBacklogSession.GetOrRebuildBacklog(sid, msgs))
-                        (fun dir sid -> Wanxiangshu.Shell.EventLogRuntime.syncBacklogFromEventLog defaultBacklogSession.Host defaultBacklogSession.Projection dir sid)
                 let plan = {
                     SessionID = sessionId
                     Agent = agent
@@ -59,6 +58,7 @@ let transformEntriesAsyncWithAgent (reviewStore: ReviewStore) (cwd: string) (ses
                     Excluded = excluded
                     IsSubagentSession = isChildSession ExecutorTools.ompScope sessionId
                     Cleaned = cleaned
+                    RawArray = Some entriesArr
                 }
                 let replayTexts () : JS.Promise<string seq> =
                     Promise.lift (extractHistoryTexts messagesList |> Seq.ofList)

@@ -30,7 +30,6 @@ let handleLoopReviewCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: 
             if task = "" then notifyInfo "loop-review needs a task. Try /loop-review <task>."
             else
                 let root = str ctx "cwd"
-                do! syncReviewFromEventLog store root sessionId
                 if store.getReviewTask sessionId |> Option.isSome then notifyInfo "loop mode is already active."
                 else
                 let! (result: ReviewResult) = runPreReviewerSession ompScope pi ctx store task
@@ -72,7 +71,6 @@ let handleLoopCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: obj) :
                 store.deactivateReview sessionId
                 notifyInfo "loop mode cancelled."
             else
-                do! syncReviewFromEventLog store root sessionId
                 if store.getReviewTask sessionId |> Option.isSome then notifyInfo "loop mode is already active."
                 else
                 do! appendLoopActivatedOrFail root sessionId task

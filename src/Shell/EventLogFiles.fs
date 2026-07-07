@@ -71,7 +71,7 @@ let private withWorkspaceLock (filePath: string) (action: unit -> JS.Promise<'T>
             let! _ = statAsync filePath
             ()
         with _ ->
-            try do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ]) with _ -> ()
+            try do! writeFileFlagAsync filePath "" (createObj [ "flag", box "w" ]) with _ -> ()
 
         // If the lock file exists but is NOT a directory (e.g. it is a regular file),
         // delete it to prevent proper-lockfile from throwing ENOTDIR on rmdir.
@@ -93,6 +93,15 @@ let private withWorkspaceLock (filePath: string) (action: unit -> JS.Promise<'T>
             | Error ex -> raise ex
     }
 
+let private fileExists (filePath: string) : JS.Promise<bool> =
+    promise {
+        try
+            let! _ = statAsync filePath
+            return true
+        with _ ->
+            return false
+    }
+
 type EventLogStore(workspaceRoot: string) =
     let queue = SerialQueue()
     let root = workspaceRoot
@@ -105,19 +114,23 @@ type EventLogStore(workspaceRoot: string) =
         promise {
             if initDone then return ()
             else
-                do! withWorkspaceLock eventFilePath (fun () ->
-                    promise {
-                        let! events = readEventsFile eventFilePath
-                        for e in events do
-                            let sId = e.Session
-                            let oldState =
-                                match Map.tryFind sId sessionStates with
-                                | Some st -> st
-                                | None -> emptySessionState ()
-                            let newState = applyEvent oldState e
-                            sessionStates <- Map.add sId newState sessionStates
-                        initDone <- true
-                    })
+                let! exists = fileExists eventFilePath
+                if not exists then
+                    initDone <- true
+                else
+                    do! withWorkspaceLock eventFilePath (fun () ->
+                        promise {
+                            let! events = readEventsFile eventFilePath
+                            for e in events do
+                                let sId = e.Session
+                                let oldState =
+                                    match Map.tryFind sId sessionStates with
+                                    | Some st -> st
+                                    | None -> emptySessionState ()
+                                let newState = applyEvent oldState e
+                                sessionStates <- Map.add sId newState sessionStates
+                            initDone <- true
+                        })
         }
 
     let ensureInitialized () : JS.Promise<unit> =
@@ -140,6 +153,11 @@ type EventLogStore(workspaceRoot: string) =
             | Some st -> return st
             | None -> return emptySessionState ()
         }
+
+    member _.GetAllSessionStates() : Map<string, SessionState> = sessionStates
+
+    member _.EnsureInitialized() : JS.Promise<unit> =
+        ensureInitializedInternal ()
 
     member _.AppendEvent(e: WanEvent) : JS.Promise<Result<unit, string>> =
         queue.Enqueue(fun () ->

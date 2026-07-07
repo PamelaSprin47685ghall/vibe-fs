@@ -18,9 +18,10 @@ open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
 open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.RuntimeScope
 
 /// Handle /loop and /loop-review slash commands.
-let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
+let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (scope: RuntimeScope)
     (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let command = commandNameFromHookInput input
@@ -29,7 +30,8 @@ let commandExecuteBefore (childAgentRegistry: ChildAgentRegistry) (ctx: obj) (re
             let task = (commandArgumentsFromHookInput input).Trim()
             let parts = ResizeArray<obj>()
             let directory = pluginDirectoryFromCtx ctx
-            do! syncReviewFromEventLog reviewStore directory sessionID
+            scope.TriggerInit(directory)
+            do! scope.WaitInit()
             let activeTask = reviewStore.getReviewTask sessionID
             if task = "" then
                 do! appendLoopCancelledOrFail directory sessionID

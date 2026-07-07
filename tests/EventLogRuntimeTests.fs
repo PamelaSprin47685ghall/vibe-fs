@@ -22,23 +22,23 @@ let appendThenReadAll () = promise {
     do! rmAsync dir
 }
 
-let syncReviewFromEventLogProjectsTask () = promise {
+let syncReviewFromEventLogDedicatedProjectsTask () = promise {
     let! dir = mkdtempAsync "eventlog-sync-"
     let sessionID = "s-sync"
     let review = createReviewStore ()
     do! appendLoopActivated dir sessionID "ship from ndjson" |> Promise.map ignore
-    do! syncReviewFromEventLog review dir sessionID
+    do! syncReviewFromEventLogDedicated review dir sessionID
     equal "active task" (Some "ship from ndjson") (review.getReviewTask sessionID)
     do! rmAsync dir
 }
 
-let syncClearsAfterAcceptedVerdict () = promise {
+let syncDedicatedClearsAfterAcceptedVerdict () = promise {
     let! dir = mkdtempAsync "eventlog-verdict-"
     let sessionID = "s-verdict"
     let review = createReviewStore ()
     do! appendLoopActivated dir sessionID "task" |> Promise.map ignore
     do! appendReviewVerdict dir sessionID verdictAccepted None |> Promise.map ignore
-    do! syncReviewFromEventLog review dir sessionID
+    do! syncReviewFromEventLogDedicated review dir sessionID
     equal "cleared after accept" None (review.getReviewTask sessionID)
     do! rmAsync dir
 }
@@ -141,8 +141,8 @@ let testGetSessionStateMemoryCache () : JS.Promise<unit> = promise {
 
 let run () = promise {
     do! appendThenReadAll ()
-    do! syncReviewFromEventLogProjectsTask ()
-    do! syncClearsAfterAcceptedVerdict ()
+    do! syncReviewFromEventLogDedicatedProjectsTask ()
+    do! syncDedicatedClearsAfterAcceptedVerdict ()
     do! parallelAppendsBothPersist ()
     do! readStopsAtCorruptLine ()
     do! strictAppendLoopActivatedPersistsEvent ()

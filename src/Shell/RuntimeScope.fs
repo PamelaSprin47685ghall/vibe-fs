@@ -8,6 +8,8 @@ open Wanxiangshu.Shell.PromiseQueue
 
 type RuntimeScope() =
     let projection = ProjectionStore()
+    let mutable initPromise : JS.Promise<unit> option = None
+    let mutable onInit : (string -> JS.Promise<unit>) option = None
     let mutable capsFiles = Map.empty<string, CapsFile list>
     let mutable capsInflight = Map.empty<string, JS.Promise<CapsFile list>>
     let iteratorStore = createTypedIteratorStore 200
@@ -78,5 +80,26 @@ type RuntimeScope() =
 
     member _.Remove(key: string) : unit =
         extState <- Map.remove key extState
+
+    member _.InitPromise
+        with get() = initPromise
+        and set(v) = initPromise <- v
+
+    member _.OnInit
+        with get() = onInit
+        and set(v) = onInit <- v
+
+    member _.TriggerInit(workspaceRoot: string) : unit =
+        if workspaceRoot <> "" && Option.isNone initPromise then
+            match onInit with
+            | Some f ->
+                let initP = f workspaceRoot
+                initPromise <- Some initP
+            | None -> ()
+
+    member _.WaitInit() : JS.Promise<unit> =
+        match initPromise with
+        | Some p -> p
+        | None -> Promise.lift ()
 
 let create () : RuntimeScope = RuntimeScope()

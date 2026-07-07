@@ -14,7 +14,20 @@ open Wanxiangshu.Shell.Clock
 open Wanxiangshu.Shell.WorkBacklogToolsCodec
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Shell.SessionProjectionStore
+open Wanxiangshu.Shell.RuntimeScope
 open Thoth.Json
+
+[<Import("stat", "node:fs/promises")>]
+let private statAsync (path: string) : JS.Promise<obj> = jsNative
+
+let private directoryExists (path: string) : JS.Promise<bool> =
+    promise {
+        try
+            let! stats = statAsync path
+            return unbox<bool> (Wanxiangshu.Shell.Dyn.callMethod0 stats "isDirectory")
+        with _ ->
+            return false
+    }
 
 let mutable private stores: Map<string, EventLogStore> = Map.empty
 
@@ -40,20 +53,55 @@ let isLoopActiveFromEventLog (workspaceRoot: string) (sessionID: string) : JS.Pr
             return state.ReviewTask |> Option.isSome
     }
 
-let syncReviewFromEventLog (store: ReviewStore) (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
+/// Dedicated startup path: sync review + backlog for all sessions from a single
+/// read of the event file. Called once at plugin init, not on every interaction.
+let syncAllSessionsFromEventLogDedicated (host: Host) (store: ReviewStore) (scope: RuntimeScope) (workspaceRoot: string) : JS.Promise<unit> =
     promise {
-        if sessionID = "" || workspaceRoot = "" then return ()
-        else
-            let! state = getStore(workspaceRoot).GetSessionState(sessionID)
-            syncReviewProjection store sessionID state.ReviewTask
+        try
+            if workspaceRoot = "" then ()
+            else
+                let! exists = directoryExists workspaceRoot
+                if exists then
+                    let! allEvents = getStore(workspaceRoot).ReadAllEvents()
+                    let sessionIds =
+                        allEvents
+                        |> Seq.map (fun e -> e.Session)
+                        |> Seq.distinct
+                        |> Seq.toList
+                    for sid in sessionIds do
+                        let! state = getStore(workspaceRoot).GetSessionState(sid)
+                        syncReviewProjection store sid state.ReviewTask
+                        scope.Projection.StoreBacklog(host, sid, state.Backlog)
+        with _ ->
+            ()
     }
 
-let syncBacklogFromEventLog (host: Host) (projection: ProjectionStore) (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
+/// Dedicated single-session review sync for startup paths.
+let syncReviewFromEventLogDedicated (store: ReviewStore) (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
     promise {
-        if sessionID = "" || workspaceRoot = "" then ()
-        else
-            let! state = getStore(workspaceRoot).GetSessionState(sessionID)
-            projection.StoreBacklog(host, sessionID, state.Backlog)
+        try
+            if sessionID = "" || workspaceRoot = "" then ()
+            else
+                let! exists = directoryExists workspaceRoot
+                if exists then
+                    let! state = getStore(workspaceRoot).GetSessionState(sessionID)
+                    syncReviewProjection store sessionID state.ReviewTask
+        with _ ->
+            ()
+    }
+
+/// Dedicated single-session backlog sync for startup paths.
+let syncBacklogFromEventLogDedicated (host: Host) (projection: ProjectionStore) (workspaceRoot: string) (sessionID: string) : JS.Promise<unit> =
+    promise {
+        try
+            if sessionID = "" || workspaceRoot = "" then ()
+            else
+                let! exists = directoryExists workspaceRoot
+                if exists then
+                    let! state = getStore(workspaceRoot).GetSessionState(sessionID)
+                    projection.StoreBacklog(host, sessionID, state.Backlog)
+        with _ ->
+            ()
     }
 
 let appendLoopActivated (workspaceRoot: string) (sessionID: string) (task: string) : JS.Promise<Result<unit, string>> =

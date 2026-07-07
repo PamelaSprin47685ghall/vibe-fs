@@ -28,8 +28,6 @@ let commandHooksUsesToolCopyReviewMessages () =
         (code.Contains "ToolCopy")
     check "arch: CommandHooks uses reviewAlreadyActiveMessage"
         (code.Contains "reviewAlreadyActiveMessage")
-    check "arch: CommandHooks syncs review from event log"
-        (code.Contains "syncReviewFromEventLog")
     check "arch: ToolCopy defines preReviewCouldNotComplete"
         (copy.Contains "let preReviewCouldNotComplete")
     check "arch: CommandHooks must not inline With-Review Mode is already active"

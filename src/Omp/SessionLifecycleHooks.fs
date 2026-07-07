@@ -11,4 +11,5 @@ let agentEndHandler = NudgeHooks.agentEndHandler
 
 let toolResultHandler = TodoHooks.toolResultHandler
 let sessionStartHandler = TodoHooks.sessionStartHandler
+let sessionPromptHandler = TodoHooks.sessionPromptHandler
 let sessionShutdownHandler = TodoHooks.sessionShutdownHandler

@@ -23,12 +23,13 @@ open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.Dyn
-open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.OpencodeClientCodec
+open Wanxiangshu.Shell.RuntimeScope
 
 let private formatReviewResult = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult
 
-let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
+let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (scope: RuntimeScope) : obj =
     define submitReview
         (box {| report = strReq Params.submitReviewReport; affectedFiles = strArrayOpt Params.submitReviewAffectedFiles; wip = boolOptional Params.submitReviewWip |})
         (fun args context ->
@@ -41,9 +42,10 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangs
                     let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
                     let sessionID = Wanxiangshu.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId
                     promise {
+                        scope.TriggerInit(runtime.Execution.Directory)
+                        do! scope.WaitInit()
                         if sessionID = "" then return submitReviewNotNeeded
                         else
-                            do! syncReviewFromEventLog store runtime.Execution.Directory sessionID
                             let activeTask = store.getReviewTask sessionID
                             match activeTask with
                             | None -> return submitReviewNotNeeded
@@ -69,9 +71,10 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangs
                                         return formatReviewResult result
                                 finally
                                     store.unlockReview sessionID
-                    })
+                    }
+            )
 
-let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
+let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (scope: RuntimeScope) : obj =
     define submitReviewResult
         (box {| verdict = enumReq [| "PERFECT"; "REVISE" |] Params.returnReviewerVerdict
                 feedback = strOpt Params.returnReviewerFeedback |})
@@ -82,13 +85,14 @@ let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.Re
                 if id = "" then "loop" else id
             let directory = runtime.Execution.Directory
             promise {
+                scope.TriggerInit(directory)
+                do! scope.WaitInit()
                 match decodeReturnReviewerArgs args with
                 | Error e -> return wireDecodeFailure "return_reviewer" e
                 | Ok decoded ->
                     match getClientFromPluginCtx ctx with
                     | Error e -> return wireEncodeToolError "OpencodeClient" e
                     | Ok client ->
-                        do! syncReviewFromEventLog store directory sessionID
                         let! texts = Wanxiangshu.Opencode.SessionIo.readSessionTexts client sessionID directory
                         let doubleCheckDone = hasDoubleCheckAnchor texts
                         match decideReviewSubmission decoded.Verdict decoded.Feedback doubleCheckDone with

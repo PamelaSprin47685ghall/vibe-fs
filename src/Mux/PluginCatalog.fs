@@ -84,20 +84,20 @@ let createToolCatalog
     (finderCache: FinderCache)
     (sessionScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
     : ToolDefinition array =
-     let iteratorStore = sessionScope.IteratorStore
-     [| yield injectWarnWarnTddIntoMuxSchema (coderTool deps toolNames sessionScope)
-        yield investigatorTool deps toolNames sessionScope
-        yield meditatorTool deps toolNames sessionScope
-        yield browserTool deps toolNames sessionScope
-        yield injectWarnWarnTddIntoMuxSchema (executorTool deps toolNames sessionScope)
-        yield submitReviewTool deps toolNames reviewStore
-        yield websearchTool deps toolNames
-        yield webfetchTool
-        yield fuzzyGrepTool finderCache iteratorStore
-        yield fuzzyFindTool finderCache iteratorStore
-        yield injectWarnWarnTddIntoMuxSchema (writeTool deps)
-        yield readTool deps hostReadExec
-        yield methodologyTool deps toolNames |]
+    let iteratorStore = sessionScope.IteratorStore
+    [| yield injectWarnWarnTddIntoMuxSchema (coderTool deps toolNames sessionScope)
+       yield investigatorTool deps toolNames sessionScope
+       yield meditatorTool deps toolNames sessionScope
+       yield browserTool deps toolNames sessionScope
+       yield injectWarnWarnTddIntoMuxSchema (executorTool deps toolNames sessionScope)
+       yield submitReviewTool deps toolNames reviewStore sessionScope
+       yield websearchTool deps toolNames
+       yield webfetchTool
+       yield fuzzyGrepTool finderCache iteratorStore
+       yield fuzzyFindTool finderCache iteratorStore
+       yield injectWarnWarnTddIntoMuxSchema (writeTool deps)
+       yield readTool deps hostReadExec
+       yield methodologyTool deps toolNames |]
 
 let private requireWarnTddMux (tool: string) (args: obj) (output: obj) : unit =
     if not (Wanxiangshu.Kernel.WarnTdd.isModificationTool tool) then ()

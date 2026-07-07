@@ -36,13 +36,15 @@ let messagesTransform
     (output: obj)
     : JS.Promise<unit> =
     promise {
+        let decoded = decodeMuxMessagesTransformInput input deps
+        let directory = decoded.Directory
+        runtimeScope.TriggerInit(directory)
+        do! runtimeScope.WaitInit()
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
         | Some messagesArr ->
-                let decoded = decodeMuxMessagesTransformInput input deps
                 let agent = decoded.Agent
                 let sessionID = decoded.SessionID
-                let directory = decoded.Directory
                 let excluded =
                     shouldExcludeAgentFromProjection agent (isChildWorkspace deps sessionID)
                 let typedMessages = decodeMessages sessionID messagesArr
@@ -50,7 +52,6 @@ let messagesTransform
                 let backlogOps =
                     backlogSessionOpsFrom backlogSession.Host
                         (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
-                        (fun dir sid -> Wanxiangshu.Shell.EventLogRuntime.syncBacklogFromEventLog backlogSession.Host runtimeScope.Projection dir sid)
                 let plan = {
                     SessionID = sessionID
                     Agent = agent
@@ -58,6 +59,7 @@ let messagesTransform
                     Excluded = excluded
                     IsSubagentSession = isChildWorkspace deps sessionID
                     Cleaned = cleanedMessages
+                    RawArray = Some messagesArr
                 }
                 let replayTexts () : JS.Promise<string seq> =
                     Promise.lift (extractTextsFromEncodedMessages messagesArr)

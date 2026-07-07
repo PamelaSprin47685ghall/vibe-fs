@@ -8,7 +8,6 @@ let opencodeReviewUsesToolCopy () =
     check "arch: Opencode ReviewTools opens ToolCopy" (code.Contains "ToolCopy")
     check "arch: Opencode ReviewTools uses submitReviewNotNeeded" (code.Contains "submitReviewNotNeeded")
     check "arch: Opencode ReviewTools uses opencodeSubmitReviewInProgress" (code.Contains "opencodeSubmitReviewInProgress")
-    check "arch: Opencode ReviewTools syncs task from event log" (code.Contains "syncReviewFromEventLog")
     check "arch: Opencode ReviewTools must not inline you do not need review"
         (not (code.Contains "You do not need review. Just continue with your work."))
 

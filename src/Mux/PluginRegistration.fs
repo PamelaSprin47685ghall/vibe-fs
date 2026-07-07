@@ -46,4 +46,8 @@ let createRegistration (deps: obj) : obj =
         assembleRegistrationObject scope tools wrappers mcpServers eventHook slashCommands messagesTransform getToolPolicy
             (createReviewTestSurface reviewStore)
     registerTestHooks registration deps
+    scope.OnInit <- Some (fun dir -> Wanxiangshu.Shell.EventLogRuntime.syncAllSessionsFromEventLogDedicated Wanxiangshu.Kernel.HostTools.mux reviewStore scope dir)
+    let directory = if Dyn.isNullish deps then "" else Dyn.str deps "directory"
+    if directory <> "" then
+        scope.TriggerInit(directory)
     box registration

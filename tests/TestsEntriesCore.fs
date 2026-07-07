@@ -266,7 +266,7 @@ let coreTestEntries () : (string * TestBody) list =
     "TitleFetchGuardTests.skipProbeMessage", TestBody.Sync (sync TitleFetchGuardTests.skipProbeMessage)
     "ToolCatalogClassificationTests.run", TestBody.Sync (sync ToolCatalogClassificationTests.run)
     "ToolOutputInfoTests.run", TestBody.Sync (sync ToolOutputInfoTests.run)
-    "MessageTransformPolicyTests.run", TestBody.Sync (sync MessageTransformPolicyTests.run)
+    "MessageTransformPolicyTests.run", TestBody.Async MessageTransformPolicyTests.run
     "SembleInjectionTests.run", TestBody.Sync (sync SembleInjectionTests.run)
     "ExecutorKernelTests.run", TestBody.Sync (sync ExecutorKernelTests.run)
     "ToolExecuteTests.run", TestBody.Sync (sync ToolExecuteTests.run)
