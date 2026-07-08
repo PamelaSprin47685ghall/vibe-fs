@@ -24,7 +24,8 @@ type FallbackConfig =
     { DefaultChain: FallbackChain
       AgentChains: Map<string, FallbackChain>
       MaxRetries: int
-      LoopMaxContinues: int }
+      LoopMaxContinues: int
+      MaxRecoveries: int }
 
 /// Structured error extracted from a session.error or status event.
 type ErrorInput =
@@ -71,7 +72,8 @@ type SessionFallbackState =
       FailureCount: int
       Cancelled: bool
       TaskComplete: bool
-      ContinueCount: int }
+      ContinueCount: int
+      RecoveryCount: int }
 
 /// Result returned by the event-bridge hook to the host.
 type FallbackHookResult =

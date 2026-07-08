@@ -50,7 +50,8 @@ let applyFallbackModelOverridesSplitsModelAndVariant () =
                       ReasoningEffort = None
                       Thinking = false } ] ]
           MaxRetries = 2
-          LoopMaxContinues = 3 }
+          LoopMaxContinues = 3
+          MaxRecoveries = 5 }
 
     Wanxiangshu.Opencode.PluginCoreServices.applyFallbackModelOverrides cfg (Some fbCfg)
 

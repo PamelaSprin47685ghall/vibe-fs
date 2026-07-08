@@ -57,13 +57,15 @@ let handleEvent
                         let! msgs = executor.FetchMessages sessionID
 
                         if isIdleNoContentAndNoTools msgs then
-                            return Some
-                                        (FallbackEvent.SessionError
-                                            { ErrorName = "EmptyOutputError"
-                                              DomainError = None
-                                              Message = "LLM returned empty output without tools"
-                                              StatusCode = None
-                                              IsRetryable = Some true })
+                            return
+                                Some(
+                                    FallbackEvent.SessionError
+                                        { ErrorName = "EmptyOutputError"
+                                          DomainError = None
+                                          Message = "LLM returned empty output without tools"
+                                          StatusCode = None
+                                          IsRetryable = Some true }
+                                )
                         else
                             return Some FallbackEvent.SessionIdle
                     }
@@ -147,7 +149,11 @@ let handleEvent
                                 runtime.UpdateState sessionID updated
                                 finalState <- updated
                         | None ->
-                            let updated = { ns with Phase = FallbackPhase.Idle }
+                            let updated =
+                                { ns with
+                                    Phase = FallbackPhase.Idle
+                                    TaskComplete = true }
+
                             runtime.UpdateState sessionID updated
                             finalState <- updated
                 | FallbackAction.PropagateFailure -> do! executor.PropagateFailure sessionID

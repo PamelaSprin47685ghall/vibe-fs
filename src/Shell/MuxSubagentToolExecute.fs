@@ -49,22 +49,22 @@ type MuxHostAdapter
                 try
                     let! text = runMux deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
                     let cid = "mux-task-" + string (System.Random().Next(1000000))
+
                     match fromMuxConfig config with
                     | Ok runtime ->
                         let registry = unbox<ChildAgentRegistry> runtime.Execution.ChildRegistry
                         registry.RegisterChildAgent(cid, spawn.Role, None)
                     | Error _ -> ()
+
                     return Success text
                 with ex ->
                     return Failure(translateJsError ex)
             }
 
-        member _.ContinueSubagent(childID: string, prompt: string) : JS.Promise<SubagentResponse> =
+        member _.ContinueSubagent(childID: string, agent: string, prompt: string) : JS.Promise<SubagentResponse> =
             promise {
                 try
-                    // Continue Mux subagent uses same runMux structure because Mux delegation 
-                    // is stateless/session handled by upper layer, but let's route it
-                    let! text = runMux deps config spawn.AgentId prompt spawn.Title spawn.ToolOptions
+                    let! text = runMux deps config agent prompt spawn.Title spawn.ToolOptions
                     return Success text
                 with ex ->
                     return Failure(translateJsError ex)

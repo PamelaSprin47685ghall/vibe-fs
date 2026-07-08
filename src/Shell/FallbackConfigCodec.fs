@@ -108,7 +108,8 @@ let emptyConfig: FallbackConfig =
     { DefaultChain = []
       AgentChains = Map.ofList []
       MaxRetries = 2
-      LoopMaxContinues = 3 }
+      LoopMaxContinues = 3
+      MaxRecoveries = 5 }
 
 let extractFallbackConfig (frontmatter: obj) : FallbackConfig option =
     if isNullish frontmatter then
@@ -148,7 +149,8 @@ let extractFallbackConfig (frontmatter: obj) : FallbackConfig option =
                 { DefaultChain = defaultChain
                   AgentChains = agentChains
                   MaxRetries = 2
-                  LoopMaxContinues = 3 }
+                  LoopMaxContinues = 3
+                  MaxRecoveries = 5 }
 
 let loadFallbackConfig (directory: string) : FallbackConfig option =
     try

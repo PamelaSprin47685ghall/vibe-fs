@@ -36,19 +36,22 @@ let mkState
     (cancelled: bool)
     (taskComplete: bool)
     (continueCount: int)
+    (recoveryCount: int)
     =
     { Phase = phase
       CurrentIndex = currentIndex
       FailureCount = failureCount
       Cancelled = cancelled
       TaskComplete = taskComplete
-      ContinueCount = continueCount }
+      ContinueCount = continueCount
+      RecoveryCount = recoveryCount }
 
-let mkConfig (maxRetries: int) (loopMax: int) =
+let mkConfig (maxRetries: int) (loopMax: int) (maxRecoveries: int) =
     { DefaultChain = []
       AgentChains = Map.empty
       MaxRetries = maxRetries
-      LoopMaxContinues = loopMax }
+      LoopMaxContinues = loopMax
+      MaxRecoveries = maxRecoveries }
 
 let mkError (name: string) (msg: string) (sc: int option) (ret: bool option) (domainErr: DomainError option) =
     { ErrorName = name
@@ -69,8 +72,8 @@ let errAbort2 =
 let transitionIdleErrorToRetrying () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState FallbackPhase.Idle 0 0 false false 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.Idle 0 0 false false 0 0
     let err = mkError "err" "fail" None (Some true) (Some(UnknownJsError "fail"))
 
     let ns, action = transition state (SessionError err) cfg chain
@@ -85,8 +88,8 @@ let transitionIdleErrorToRetrying () =
 let transitionRetryingBusyToIdle () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState (FallbackPhase.Retrying 1) 0 0 false false 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState (FallbackPhase.Retrying 1) 0 0 false false 0 0
     let ns, action = transition state SessionBusy cfg chain
 
     equal "phase back to Idle" FallbackPhase.Idle ns.Phase
@@ -99,8 +102,8 @@ let transitionScanningErrorAdvances () =
           mkModel "oai" "m3" None None None None None false ]
 
     let chain = chain models
-    let cfg = mkConfig 2 3
-    let state = mkState (FallbackPhase.Scanning(0, 0)) 0 0 false false 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState (FallbackPhase.Scanning(0, 0)) 0 0 false false 0 0
     let err = mkError "err" "fail" None (Some true) (Some(UnknownJsError "fail"))
 
     let ns, action = transition state (SessionError err) cfg chain
@@ -119,8 +122,8 @@ let transitionScanningBusyUpdatesK () =
           mkModel "oai" "m3" None None None None None false ]
 
     let chain = chain models
-    let cfg = mkConfig 2 3
-    let state = mkState (FallbackPhase.Scanning(2, 0)) 0 1 false false 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState (FallbackPhase.Scanning(2, 0)) 0 1 false false 0 0
 
     let ns, action = transition state SessionBusy cfg chain
 
@@ -132,8 +135,8 @@ let transitionScanningBusyUpdatesK () =
 let transitionExhaustedPropagates () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 1 3
-    let state = mkState (FallbackPhase.Retrying 1) 0 0 false false 0
+    let cfg = mkConfig 1 3 5
+    let state = mkState (FallbackPhase.Retrying 1) 0 0 false false 0 0
 
     let ns, action = transition state (SessionError errRetry) cfg chain
 
@@ -147,8 +150,8 @@ let transitionExhaustedPropagates () =
 let transitionNewUserMessageResets () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState (FallbackPhase.Retrying 3) 0 5 false false 2
+    let cfg = mkConfig 2 3 5
+    let state = mkState (FallbackPhase.Retrying 3) 0 5 false false 2 0
 
     let ns, action = transition state NewUserMessage cfg chain
 
@@ -160,8 +163,8 @@ let transitionNewUserMessageResets () =
 let transitionTaskCompleteStops () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState (FallbackPhase.Retrying 1) 0 0 false false 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState (FallbackPhase.Retrying 1) 0 0 false false 0 0
 
     let ns, action = transition state TaskCompleteCalled cfg chain
 
@@ -172,8 +175,8 @@ let transitionTaskCompleteStops () =
 let transitionMessageAbortedCancels () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState FallbackPhase.Idle 0 0 false false 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.Idle 0 0 false false 0 0
 
     let ns, action = transition state (SessionError errAbort) cfg chain
 
@@ -186,23 +189,21 @@ let transitionMessageAbortedCancels () =
 let transitionLoopDetectionSendContinue () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState FallbackPhase.Idle 0 0 false false 3
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.Idle 0 0 false false 3 0
     let err = mkError "retry" "retry" None (Some true) (Some(UnknownJsError "retry"))
 
     let ns, action = transition state (SessionError err) cfg chain
 
+    equal "phase → Exhausted when ContinueCount >= LoopMaxContinues" FallbackPhase.Exhausted ns.Phase
     equal "continueCount resets to 0" 0 ns.ContinueCount
-
-    match action with
-    | FallbackAction.SendContinue m -> equal "action SendContinue" model m
-    | _ -> check "action is SendContinue" false
+    equal "action is PropagateFailure" FallbackAction.PropagateFailure action
 
 let transitionSessionIdleIdle_emitsScanToolCallAsText () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState FallbackPhase.Idle 0 0 false false 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.Idle 0 0 false false 0 0
 
     let ns, action = transition state SessionIdle cfg chain
 
@@ -212,8 +213,8 @@ let transitionSessionIdleIdle_emitsScanToolCallAsText () =
 let transitionSessionIdleTaskComplete_noScanToolCallAsText () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState FallbackPhase.Idle 0 0 false true 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.Idle 0 0 false true 0 0
 
     let ns, action = transition state SessionIdle cfg chain
 
@@ -223,8 +224,8 @@ let transitionSessionIdleTaskComplete_noScanToolCallAsText () =
 let transitionSessionIdleRetrying_emitsScanToolCallAsText () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState (FallbackPhase.Retrying 1) 0 0 false false 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState (FallbackPhase.Retrying 1) 0 0 false false 0 0
 
     let ns, action = transition state SessionIdle cfg chain
 
@@ -235,8 +236,8 @@ let transitionSessionIdleRetrying_emitsScanToolCallAsText () =
 let transitionRecoveringToolCallText_idle_emitsScanToolCallAsText () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState FallbackPhase.RecoveringToolCallText 0 0 false false 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.RecoveringToolCallText 0 0 false false 0 0
 
     let ns, action = transition state SessionIdle cfg chain
 
@@ -246,8 +247,8 @@ let transitionRecoveringToolCallText_idle_emitsScanToolCallAsText () =
 let transitionScanningToolCallText_busy_doNothing () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState FallbackPhase.ScanningToolCallText 0 0 false false 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.ScanningToolCallText 0 0 false false 0 0
 
     let ns, action = transition state SessionBusy cfg chain
 
@@ -257,14 +258,24 @@ let transitionScanningToolCallText_busy_doNothing () =
 let transitionRecoveringToolCallText_busy_doNothing () =
     let model = mkModel "oai" "gpt-5" None None None None None false
     let chain = chain [ model ]
-    let cfg = mkConfig 2 3
-    let state = mkState FallbackPhase.RecoveringToolCallText 0 0 false false 0
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.RecoveringToolCallText 0 0 false false 0 0
 
     let ns, action = transition state SessionBusy cfg chain
 
     equal "phase stays RecoveringToolCallText" FallbackPhase.RecoveringToolCallText ns.Phase
     equal "action DoNothing" FallbackAction.DoNothing action
 
+
+let transitionSessionBusyResetsTaskComplete () =
+    let model = mkModel "oai" "gpt-5" None None None None None false
+    let chain = chain [ model ]
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.Idle 0 0 false true 0 0
+
+    let ns, _ = transition state SessionBusy cfg chain
+
+    equal "TaskComplete reset to false on SessionBusy" false ns.TaskComplete
 
 let run () =
     transitionIdleErrorToRetrying ()
@@ -282,3 +293,4 @@ let run () =
     transitionRecoveringToolCallText_idle_emitsScanToolCallAsText ()
     transitionScanningToolCallText_busy_doNothing ()
     transitionRecoveringToolCallText_busy_doNothing ()
+    transitionSessionBusyResetsTaskComplete ()

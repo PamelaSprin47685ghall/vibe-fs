@@ -80,19 +80,8 @@ let private awaitChild
                             stdout.Add(s.Substring(0, remaining))
 
                         limitReached <- true
-                        removeListeners ()
-
-                        try
-                            child?stdout?destroy () |> ignore
-                        with _ ->
-                            ()
-
-                        try
-                            child?stderr?destroy () |> ignore
-                        with _ ->
-                            ()
-
                         doKill ()
+                        settle (Signaled("SIGKILL", String.concat "" stdout, String.concat "" stderr))
                     else
                         stdout.Add(s)
                         totalBytes <- totalBytes + len
@@ -110,19 +99,8 @@ let private awaitChild
                             stderr.Add(s.Substring(0, remaining))
 
                         limitReached <- true
-                        removeListeners ()
-
-                        try
-                            child?stdout?destroy () |> ignore
-                        with _ ->
-                            ()
-
-                        try
-                            child?stderr?destroy () |> ignore
-                        with _ ->
-                            ()
-
                         doKill ()
+                        settle (Signaled("SIGKILL", String.concat "" stdout, String.concat "" stderr))
                     else
                         stderr.Add(s)
                         totalBytes <- totalBytes + len

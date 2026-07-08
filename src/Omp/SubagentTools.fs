@@ -64,8 +64,9 @@ type OmpHostAdapter
                     return Failure(translateJsError ex)
             }
 
-        member _.ContinueSubagent(childID: string, prompt: string) =
-            let toolNames = [||]
+        member _.ContinueSubagent(childID: string, agent: string, prompt: string) =
+            let _toolNames = [||]
+
             promise {
                 try
                     let! text =
@@ -78,6 +79,7 @@ type OmpHostAdapter
                             signal
                             fallbackRuntime
                             fallbackConfigOpt
+
                     return Success text
                 with ex ->
                     return Failure(translateJsError ex)
@@ -116,11 +118,11 @@ let registerSubagentTools
               box (fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
                   promise {
                       try
-                           let adapter =
-                               OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+                          let adapter =
+                              OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
 
-                           let! text = dispatch omp adapter "coder" params' ompScope None
-                           return textResult text
+                          let! text = dispatch omp adapter "coder" params' ompScope None
+                          return textResult text
                       with ex ->
                           return asErrorResult ex
                   }) ]
@@ -136,11 +138,11 @@ let registerSubagentTools
               box (fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
                   promise {
                       try
-                           let adapter =
-                               OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+                          let adapter =
+                              OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
 
-                           let! text = dispatch omp adapter "investigator" params' ompScope None
-                           return textResult text
+                          let! text = dispatch omp adapter "investigator" params' ompScope None
+                          return textResult text
                       with ex ->
                           return asErrorResult ex
                   }) ]
@@ -156,11 +158,11 @@ let registerSubagentTools
               box (fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
                   promise {
                       try
-                           let adapter =
-                               OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
+                          let adapter =
+                              OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
 
-                           let! text = dispatch omp adapter "meditator" params' ompScope None
-                           return textResult text
+                          let! text = dispatch omp adapter "meditator" params' ompScope None
+                          return textResult text
                       with ex ->
                           return asErrorResult ex
                   }) ]

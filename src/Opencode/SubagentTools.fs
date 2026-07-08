@@ -86,14 +86,14 @@ type OpencodeHostAdapter
                     | Error err -> Failure err
             }
 
-        member _.ContinueSubagent(childID: string, prompt: string) : JS.Promise<SubagentResponse> =
+        member _.ContinueSubagent(childID: string, agent: string, prompt: string) : JS.Promise<SubagentResponse> =
             promise {
                 let! result =
                     runCore
                         fallbackRuntime
                         registry
                         client
-                        "coder"
+                        agent
                         "Continue"
                         prompt
                         workspaceRoot

@@ -101,7 +101,8 @@ let mkConfig () : FallbackConfig =
     { DefaultChain = []
       AgentChains = Map.empty
       MaxRetries = 2
-      LoopMaxContinues = 3 }
+      LoopMaxContinues = 3
+      MaxRecoveries = 5 }
 
 let defaultCfgLookup (_agent: string) : FallbackConfig = mkConfig ()
 

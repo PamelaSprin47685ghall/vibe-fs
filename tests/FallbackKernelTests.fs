@@ -37,19 +37,22 @@ let mkState
     (cancelled: bool)
     (taskComplete: bool)
     (continueCount: int)
+    (recoveryCount: int)
     =
     { Phase = phase
       CurrentIndex = currentIndex
       FailureCount = failureCount
       Cancelled = cancelled
       TaskComplete = taskComplete
-      ContinueCount = continueCount }
+      ContinueCount = continueCount
+      RecoveryCount = recoveryCount }
 
-let mkConfig (maxRetries: int) (loopMax: int) =
+let mkConfig (maxRetries: int) (loopMax: int) (maxRecoveries: int) =
     { DefaultChain = []
       AgentChains = Map.empty
       MaxRetries = maxRetries
-      LoopMaxContinues = loopMax }
+      LoopMaxContinues = loopMax
+      MaxRecoveries = maxRecoveries }
 
 let mkError (name: string) (msg: string) (sc: int option) (ret: bool option) (domainErr: DomainError option) =
     { ErrorName = name
@@ -107,13 +110,13 @@ let updateFailureCountBranches () =
 
 
 let classifyErrorPriority () =
-    let cfg = mkConfig 2 3
-    let baseState = mkState FallbackPhase.Idle 0 0 false false 0
+    let cfg = mkConfig 2 3 5
+    let baseState = mkState FallbackPhase.Idle 0 0 false false 0 0
 
-    let stCancelled = mkState FallbackPhase.Idle 0 0 true false 0
+    let stCancelled = mkState FallbackPhase.Idle 0 0 true false 0 0
     equal "cancelled overrides all" ErrorClass.Ignore (classifyError err401 stCancelled cfg)
 
-    let stDone = mkState FallbackPhase.Idle 0 0 false true 0
+    let stDone = mkState FallbackPhase.Idle 0 0 false true 0 0
     equal "taskComplete overrides all" ErrorClass.Ignore (classifyError err401 stDone cfg)
 
     equal "MessageAbortedError" ErrorClass.Ignore (classifyError errAbort baseState cfg)

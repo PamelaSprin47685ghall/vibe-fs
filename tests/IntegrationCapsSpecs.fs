@@ -56,6 +56,15 @@ let capsTransformSpec () =
         let msgs = unbox<obj[]> (get out "messages")
         check "caps transform injects messages" (msgs.Length = 4)
         check "caps transform preserves original" (obj.ReferenceEquals(msgs.[3], originalMsg))
+
+        let ackParts = unbox<obj[]> (get msgs.[1] "parts")
+        check "caps ack assistant first part is text" ((str ackParts.[0] "type") = "text")
+        check "caps ack assistant first part text non-empty" ((str ackParts.[0] "text").Length > 0)
+
+        let readParts = unbox<obj[]> (get msgs.[2] "parts")
+        check "caps read assistant first part is text" ((str readParts.[0] "type") = "text")
+        check "caps read assistant first part text non-empty" ((str readParts.[0] "text").Length > 0)
+
         do! rmAsync workspaceDir
     }
 
@@ -232,5 +241,14 @@ let capsAndBacklogOrderSpec () =
             ((str capsAssistantInfo "id").StartsWith(capsSynthAssistantPrefix: string))
 
         check "caps/backlog order: backlog prefix fourth" (magicId.StartsWith(backlogPrefixIdPrefix: string))
+
+        let ackParts = unbox<obj[]> (get result.[1] "parts")
+        check "caps/backlog order: ack assistant first part is text" ((str ackParts.[0] "type") = "text")
+        check "caps/backlog order: ack assistant first part text non-empty" ((str ackParts.[0] "text").Length > 0)
+
+        let readParts = unbox<obj[]> (get result.[2] "parts")
+        check "caps/backlog order: read assistant first part is text" ((str readParts.[0] "type") = "text")
+        check "caps/backlog order: read assistant first part text non-empty" ((str readParts.[0] "text").Length > 0)
+
         do! rmAsync workspaceDir
     }

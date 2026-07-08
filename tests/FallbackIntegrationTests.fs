@@ -24,7 +24,8 @@ let private mkCfg () =
     { DefaultChain = []
       AgentChains = Map.ofList []
       MaxRetries = 2
-      LoopMaxContinues = 3 }
+      LoopMaxContinues = 3
+      MaxRecoveries = 5 }
 
 let private retryErr =
     { ErrorName = "err"
@@ -53,7 +54,8 @@ let private mkState phase idx fc cc =
       FailureCount = fc
       Cancelled = false
       TaskComplete = false
-      ContinueCount = cc }
+      ContinueCount = cc
+      RecoveryCount = 0 }
 
 let scan_k1_startsFromZero () =
     let s1, _ =
@@ -102,11 +104,9 @@ let hallucination_exceedsThreshold () =
     let ns, action =
         transition (mkState FallbackPhase.Idle 0 0 3) (SessionError retryErr) cfg (mkChain ())
 
-    match action with
-    | FallbackAction.SendContinue _ -> ()
-    | _ -> failwith "expected SendContinue"
-
-    check "continueCount resets to 0" (ns.ContinueCount = 0)
+    equal "phase Exhausted when ContinueCount >= LoopMaxContinues" FallbackPhase.Exhausted ns.Phase
+    equal "continueCount resets to 0" 0 ns.ContinueCount
+    equal "action PropagateFailure" FallbackAction.PropagateFailure action
 
 let hallucination_belowThreshold () =
     let cfg = { (mkCfg ()) with LoopMaxContinues = 3 }

@@ -93,7 +93,8 @@ let mkConfig () : FallbackConfig =
     { DefaultChain = []
       AgentChains = Map.empty
       MaxRetries = 2
-      LoopMaxContinues = 3 }
+      LoopMaxContinues = 3
+      MaxRecoveries = 5 }
 
 let defaultCfgLookup (_agent: string) : FallbackConfig = mkConfig ()
 
@@ -114,7 +115,7 @@ let handleEvent_sessionIdle_idle_emitsScanToolCallAsText () =
 
         equal "consumed" false result.Consumed
         equal "phase Idle" FallbackPhase.Idle result.State.Phase
-        equal "taskComplete false" false result.State.TaskComplete
+        equal "taskComplete true" true result.State.TaskComplete
         equal "no continue calls" 0 (executor.ContinueCalls.Length)
         equal "no recover calls" 0 (executor.RecoverCalls.Length)
     }
@@ -133,7 +134,10 @@ let handleEvent_sessionIdle_idle_toolText_sendsPrompt () =
             createObj
                 [ "info", box (createObj [ "role", box "assistant" ])
                   "parts",
-                  box [| createObj [ "type", box "text"; "text", box "<function=read>\n<parameter=filePath>\n/foo\n</parameter>\n</function>" ] |] ]
+                  box
+                      [| createObj
+                             [ "type", box "text"
+                               "text", box "<function=read>\n<parameter=filePath>\n/foo\n</parameter>\n</function>" ] |] ]
 
         let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
         let executor = FakeExecutor(messages = [| toolMsg |])

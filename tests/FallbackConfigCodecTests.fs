@@ -124,7 +124,8 @@ let buildAgentModelOverrides_producesFirstModel () =
         { DefaultChain = [ mkModel "a" "default" None ]
           AgentChains = Map.ofList [ "sisyphus", [ mkModel "oai" "gpt5" (Some "high") ] ]
           MaxRetries = 2
-          LoopMaxContinues = 3 }
+          LoopMaxContinues = 3
+          MaxRecoveries = 5 }
 
     let overrides = buildAgentModelOverrides cfg
 
@@ -137,7 +138,8 @@ let defaultPreferredModel_returnsFirst () =
         { DefaultChain = [ mkModel "a" "m1" None ]
           AgentChains = Map.ofList []
           MaxRetries = 2
-          LoopMaxContinues = 3 }
+          LoopMaxContinues = 3
+          MaxRecoveries = 5 }
 
     match defaultPreferredModel cfg with
     | Some m -> equal "default model" "a/m1" m
@@ -148,7 +150,8 @@ let defaultPreferredModel_emptyChain () =
         { DefaultChain = []
           AgentChains = Map.ofList []
           MaxRetries = 2
-          LoopMaxContinues = 3 }
+          LoopMaxContinues = 3
+          MaxRecoveries = 5 }
 
     equal "empty chain → None" None (defaultPreferredModel cfg)
 

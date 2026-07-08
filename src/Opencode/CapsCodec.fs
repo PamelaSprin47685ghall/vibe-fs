@@ -130,7 +130,7 @@ let private buildAckMessage (ackId: string) (parentID: string) (sessionID: strin
         parentID
         sessionID
         projectRoot
-        [| box (createObj [ "type", box "reasoning"; "text", box acknowledgeText ]) |]
+        [| box (createObj [ "type", box "text"; "text", box acknowledgeText ]) |]
 
 /// Build the synthetic caps prefix: a single user message whose text wraps
 /// thinkText + llmText in <think></think>, then an assistant reasoning ack
@@ -174,7 +174,16 @@ let buildCapsMessages
                 if capsFiles.IsEmpty then
                     [| ackMsg |]
                 else
+                    let explainPart =
+                        box (
+                            createObj
+                                [ "type", box "text"
+                                  "text", box "I am reading the project workspace files to understand context." ]
+                        )
+
+                    let combinedParts = Array.append [| explainPart |] toolParts
+
                     [| ackMsg
-                       buildAssistantMessage assistantId userId sessionOpt projectRoot toolParts |]
+                       buildAssistantMessage assistantId userId sessionOpt projectRoot combinedParts |]
 
             Array.concat [| [| userMsg |]; assistantMessages; existingStripped |]

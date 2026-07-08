@@ -46,6 +46,7 @@ let dispatch
                 | None -> None
                 | Some reg ->
                     let sessions = reg.GetChildSessions()
+
                     if List.isEmpty sessions then
                         None
                     else
@@ -55,11 +56,13 @@ let dispatch
                             | HostAdapter.Investigator -> "investigator"
                             | HostAdapter.Meditator -> "meditator"
                             | HostAdapter.Browser -> "browser"
+
                         let matches = sessions |> List.filter (fun (_, name) -> name = agentName)
+
                         if List.isEmpty matches then
                             None
                         else
-                            Some (fst (List.last matches))
+                            Some(fst (List.last matches))
 
             let wrapWithIterator text role =
                 let spawnedChildId =
@@ -67,14 +70,15 @@ let dispatch
                     | Some cid -> Some cid
                     | None ->
                         match host with
-                        | Opencode -> Some ("child-session-1") // For fakeAdapter test to correctly find childID!
+                        | Opencode -> Some("child-session-1") // For fakeAdapter test to correctly find childID!
                         | Mimocode -> None
                         | Mux ->
                             let r = System.Random().Next(1000000)
-                            Some ("mux-task-" + string r)
+                            Some("mux-task-" + string r)
                         | Omp ->
                             let r = System.Random().Next(1000000)
-                            Some ("omp-session-" + string r)
+                            Some("omp-session-" + string r)
+
                 match spawnedChildId with
                 | None -> text
                 | Some cid ->
@@ -84,15 +88,13 @@ let dispatch
                         | HostAdapter.Investigator -> "investigator"
                         | HostAdapter.Meditator -> "meditator"
                         | HostAdapter.Browser -> "browser"
+
                     let item =
                         { childID = cid
                           agent = roleStr
                           host = host }
-                    let iter =
-                        storeSubagentIterator
-                            scope.SubagentIteratorStore
-                            "global"
-                            item
+
+                    let iter = storeSubagentIterator scope.SubagentIteratorStore "global" item
                     Wanxiangshu.Kernel.ToolOutputInfo.withIterator text iter
 
             let spawnOne role title prompt =
@@ -143,17 +145,16 @@ let dispatch
             | Typed(Browser b) -> return! spawnOne HostAdapter.Browser "Browser" (browserPromptText host b.Intent)
             | Typed(Continue c) ->
                 let cleanIter = c.Iterator.Trim()
+
                 match consumeSubagentIterator scope.SubagentIteratorStore cleanIter with
                 | None ->
                     let err =
-                        InvalidIntent(
-                            "continue",
-                            "iterator",
-                            "unknown, expired, or already consumed iterator"
-                        )
+                        InvalidIntent("continue", "iterator", "unknown, expired, or already consumed iterator")
+
                     return wireDecodeFailure "continue" err
                 | Some item ->
-                    let! response = adapter.ContinueSubagent(item.childID, c.Prompt)
+                    let! response = adapter.ContinueSubagent(item.childID, item.agent, c.Prompt)
+
                     let textResult =
                         match response with
                         | Success text ->
@@ -162,6 +163,7 @@ let dispatch
                             Wanxiangshu.Kernel.ToolOutputInfo.withIterator text cleanIter
                         | Failure err -> subagentToolFailed "continue" err
                         | Aborted -> subagentToolFailed "continue" MessageAborted
+
                     return textResult
             | Typed _ ->
                 let err = InvalidIntent(toolName, "tool", "not a subagent tool")

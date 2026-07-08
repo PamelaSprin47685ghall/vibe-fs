@@ -8,7 +8,8 @@ let private freshState: SessionFallbackState =
       FailureCount = 0
       Cancelled = false
       TaskComplete = false
-      ContinueCount = 0 }
+      ContinueCount = 0
+      RecoveryCount = 0 }
 
 type FallbackRuntimeState() =
     let mutable states = Map.ofList<string, SessionFallbackState> []
