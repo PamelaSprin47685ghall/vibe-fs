@@ -8,7 +8,10 @@ open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Kernel.ToolArgs
 open Wanxiangshu.Shell.ToolArgsDecode
+open Wanxiangshu.Shell.ToolHookRuntime
 open Wanxiangshu.Tests.IntegrationToolSetup
+
+module Dyn = Wanxiangshu.Shell.Dyn
 
 let decodeCoderBatchOk () =
     let args = createObj [ "intents", box [| sampleCoderIntent "fix" "a.ts" |] ]
@@ -161,6 +164,24 @@ let decodeSubmitReviewOk () =
         equal "submit_review ok files" 1 sr.AffectedFiles.Length
     | _ -> check "submit_review ok" false
 
+let testSanitizeNullArgs () =
+    let args =
+        createObj
+            [ "program", box "echo"
+              "dependencies", box null
+              "timeout_type", box "long"
+              "mode", box "rw"
+              "what_to_summarize", box "focus" ]
+
+    sanitizeNullArgs "executor" args
+
+    let keys = Dyn.keys args
+    check "dependencies deleted" (not (Array.contains "dependencies" keys))
+    check "program kept" (Array.contains "program" keys)
+    check "timeout_type kept" (Array.contains "timeout_type" keys)
+    check "mode kept" (Array.contains "mode" keys)
+    check "what_to_summarize kept" (Array.contains "what_to_summarize" keys)
+
 let run () =
     decodeCoderBatchOk ()
     decodeInvestigatorBatchOk ()
@@ -177,3 +198,4 @@ let run () =
     decodeApplyPatchOk ()
     decodeSubmitReviewMissingReport ()
     decodeSubmitReviewOk ()
+    testSanitizeNullArgs ()

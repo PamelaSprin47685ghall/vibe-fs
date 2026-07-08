@@ -122,12 +122,13 @@ let private shellBareDynAllowlist =
           "SembleSearchClient.fs"
           "SubagentIo.fs"
           "ToolRuntimeContext.fs"
+          "ToolHookRuntime.fs"
           "TreeSitterPlatform.fs"
           "WebSearchApi.fs"
           "WorkspaceFiles.fs" ]
 
-    // Note: ReadDedupCore.fs, ReadDedupOpenCode.fs, ReadDedupMuxPlugin.fs
-    // have been removed from the project. No allowlist entry needed.
+// Note: ReadDedupCore.fs, ReadDedupOpenCode.fs, ReadDedupMuxPlugin.fs
+// have been removed from the project. No allowlist entry needed.
 
 let shellNonCodecMustUseDynFieldHelpers () =
     for f in fsFiles "src/Shell" do

@@ -10,6 +10,9 @@ open Wanxiangshu.Shell.Dyn
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
+[<Import("Schema", "effect")>]
+let private effectSchemaNs: obj = jsNative
+
 // ── setUiLabel ────────────────────────────────────────────────────────────────
 
 let opencodeHookSchemaSetUiLabelCoder () =
@@ -211,6 +214,25 @@ let opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId () =
 
 // ── buildWorkBacklogSchema ────────────────────────────────────────────────────
 
+let opencodeHookSchemaTryBuildJsonSchemaFromEffectSchemaDefs () =
+    let effectStruct (shape: obj) : obj = effectSchemaNs?("Struct") (shape)
+    let effectString: obj = get effectSchemaNs "String"
+
+    let promptSchema =
+        (effectStruct (createObj [ "question", effectString ]))?("annotate") (createObj [ "identifier", box "QuestionPrompt" ])
+
+    let parentSchema =
+        effectStruct (createObj [ "questions", effectSchemaNs?("Array") (promptSchema) ])
+
+    let schema = Wanxiangshu.Opencode.HookSchemaCore.tryBuildJsonSchemaFromEffectSchema parentSchema
+    check "schema built successfully" (not (isNullish schema))
+
+    let defs = get schema "$defs"
+    check "$defs is present in schema" (not (isNullish defs))
+
+    let questionPrompt = get defs "QuestionPrompt"
+    check "QuestionPrompt definition is present in $defs" (not (isNullish questionPrompt))
+
 let opencodeHookSchemaBuildWorkBacklogSchema () =
     let schema = buildWorkBacklogSchema ()
     check "schema is non-null" (not (isNull schema))
@@ -243,4 +265,5 @@ let run () =
         opencodeHookSchemaInjectWarnTddNullSchema ()
         opencodeHookSchemaMergeWorkBacklogReportIntoPureSchema ()
         opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId ()
+        opencodeHookSchemaTryBuildJsonSchemaFromEffectSchemaDefs ()
     }

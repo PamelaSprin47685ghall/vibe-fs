@@ -101,7 +101,15 @@ let tryBuildJsonSchemaFromEffectSchema (parameters: obj) : obj =
             let document =
                 effectSchemaNs?("toJsonSchemaDocument") (parameters, createObj [ "additionalProperties", box true ])
 
-            get document "schema"
+            let schema = get document "schema"
+            let definitions = get document "definitions"
+
+            if isNullish definitions || (keys definitions).Length = 0 then
+                schema
+            else
+                let result = cloneShallow schema
+                result?("$defs") <- definitions
+                result
     with _ ->
         null
 

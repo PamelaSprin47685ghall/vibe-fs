@@ -79,6 +79,7 @@ let private requireWarnOmp (toolName: string) (args: obj) : string option =
 
 let applyPreExecuteHook (toolName: string) (args: obj) : string option =
     ToolHookRuntime.filterAmendFromArgs args |> ignore
+    ToolHookRuntime.sanitizeNullArgs toolName args
     normalizePatchArgs toolName args
     setUiLabel args toolName
 

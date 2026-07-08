@@ -18,6 +18,30 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolCatalog
 
+/// Look up the required field names for a given tool from ToolSpec.
+/// Falls back to empty list for unknown tools.
+let tryGetRequiredFields (toolName: string) : string list =
+    if toolName = "methodology" || toolName.StartsWith("methodology_") then
+        [ "methodology"; "intent"; "background"; "note" ]
+    else
+        try
+            (specOf toolName).requiredFields
+        with _ ->
+            []
+
+/// Remove null/undefined values from args for keys that are NOT required fields.
+/// This prevents downstream tool execution from seeing spurious null values
+/// that the LLM filler injected for optional parameters.
+let sanitizeNullArgs (toolName: string) (args: obj) : unit =
+    if not (Dyn.isNullish args) && Dyn.typeIs args "object" then
+        let req = tryGetRequiredFields toolName |> Set.ofList
+
+        for k in Dyn.keys args do
+            let v = Dyn.get args k
+
+            if Dyn.isNullish v && not (Set.contains k req) then
+                Dyn.deleteKey args k
+
 /// Validate warn_tdd on tool args: parse and delete if valid, else produce domain error string.
 let requireWarnTddOnArgs (tool: string) (args: obj) : Result<unit, string> =
     if not (WarnTdd.isModificationTool tool) then
@@ -45,6 +69,7 @@ let filterAmendFromArgs (args: obj) : int option =
     | None -> None
     | Some v ->
         Dyn.deleteKey args "amend"
+
         match v with
         | :? int as n when n > 0 -> Some n
         | :? float as f when f > 0.0 -> Some(int f)
@@ -78,6 +103,8 @@ let muxToolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
 
         if not (Dyn.isNullish args) then
             filterAmendFromArgs args |> ignore
+
+            sanitizeNullArgs tool args
 
             match requireWarnTddOnArgs tool args with
             | Result.Error e -> setHookErrorMux output e
