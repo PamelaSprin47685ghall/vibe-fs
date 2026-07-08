@@ -1,21 +1,20 @@
 ---
 import: 
   - README.md
-  - wanxiangzhen-PRD/
 models:
   agents:
     build:
-      - google/gemini-3.5-flash:high
+      - google/antigravity-gemini-3-flash-agent
       - omniroute-ai/qwen3.7-plus:fast
       - ark/minimax-m3:fast
     browser:
       - omniroute-ai/qwen3.7-plus:fast
       - ark/minimax-m3:fast
-      - google/gemini-3.5-flash:high
+      - google/antigravity-gemini-3-flash-agent
     compaction:
       - ark/deepseek-v4-flash:fast
       - ark/minimax-m3:fast
-      - google/gemini-3.5-flash:high
+      - google/antigravity-gemini-3-flash-agent
     coder:
       - meituan/LongCat-2.0:fast
       - ark/minimax-m3:fast
