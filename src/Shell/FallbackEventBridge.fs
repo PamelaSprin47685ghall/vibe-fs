@@ -99,16 +99,6 @@ let handleEvent
                 let ns, action = transition state evt cfg chain
                 runtime.UpdateState sessionID ns
 
-                let consumed =
-                    match evt with
-                    | FallbackEvent.SessionError _ ->
-                        match ns.Phase with
-                        | FallbackPhase.Exhausted -> false
-                        | _ -> true
-                    | _ -> false
-
-                runtime.SetConsumed sessionID consumed
-
                 let mutable finalState = ns
 
                 match action with
@@ -120,17 +110,49 @@ let handleEvent
                     let! msgs = executor.FetchMessages sessionID
 
                     if allTodosCompleted msgs then
-                        let updated = { ns with TaskComplete = true }
+                        let updated =
+                            { ns with
+                                Phase = FallbackPhase.Idle
+                                TaskComplete = true }
+
                         runtime.UpdateState sessionID updated
                         finalState <- updated
                     else
                         match FallbackMessageCodec.scanToolCallAsText msgs with
                         | Some promptText ->
                             match List.tryItem ns.CurrentIndex chain with
-                            | Some model -> do! executor.RecoverWithPrompt(sessionID, model, promptText)
-                            | None -> ()
-                        | None -> ()
+                            | Some model ->
+                                let updated =
+                                    { ns with
+                                        Phase = FallbackPhase.RecoveringToolCallText }
+
+                                runtime.UpdateState sessionID updated
+                                finalState <- updated
+                                do! executor.RecoverWithPrompt(sessionID, model, promptText)
+                            | None ->
+                                let updated = { ns with Phase = FallbackPhase.Idle }
+                                runtime.UpdateState sessionID updated
+                                finalState <- updated
+                        | None ->
+                            let updated = { ns with Phase = FallbackPhase.Idle }
+                            runtime.UpdateState sessionID updated
+                            finalState <- updated
                 | FallbackAction.PropagateFailure -> do! executor.PropagateFailure sessionID
+
+                let consumed =
+                    match evt with
+                    | FallbackEvent.SessionError _ ->
+                        match finalState.Phase with
+                        | FallbackPhase.Exhausted -> false
+                        | _ -> true
+                    | FallbackEvent.SessionIdle ->
+                        match finalState.Phase with
+                        | FallbackPhase.ScanningToolCallText
+                        | FallbackPhase.RecoveringToolCallText -> true
+                        | _ -> false
+                    | _ -> false
+
+                runtime.SetConsumed sessionID consumed
 
                 return
                     { Consumed = consumed

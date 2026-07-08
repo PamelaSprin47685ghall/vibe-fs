@@ -40,6 +40,11 @@ let allTodosCompleted_noneCompleted () =
     let m = mkTodoMsg [| mkTodo "in_progress"; mkTodo "pending" |]
     check "none completed → false" (not (allTodosCompleted [| m |]))
 
+let containsToolCallAsText_functionEqualsPattern () =
+    check
+        "<function=read> -> true"
+        (containsToolCallAsText "<function=read>\n<parameter=filePath>\n/foo/bar.fs\n</parameter>\n</function>")
+
 let containsToolCallAsText_noXml () =
     check "plain text → false" (not (containsToolCallAsText "just some normal text"))
 
@@ -84,6 +89,7 @@ let run () =
     allTodosCompleted_mixedStatus ()
     allTodosCompleted_withCancelled ()
     allTodosCompleted_noneCompleted ()
+    containsToolCallAsText_functionEqualsPattern ()
     containsToolCallAsText_noXml ()
     containsToolCallAsText_toolCallTag ()
     containsToolCallAsText_functionTag ()

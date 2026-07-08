@@ -69,6 +69,8 @@ let runSubagentCoreResult
                 try
                     do! promptWithAbort client (buildPromptBody options childID) signal
 
+                    do! waitForToolCallTextRecovery runtime childID
+
                     try
                         let! text = extractSessionText client childID directory
                         return Ok(formatSubagentReport noOutputText abortedPrefix text false)

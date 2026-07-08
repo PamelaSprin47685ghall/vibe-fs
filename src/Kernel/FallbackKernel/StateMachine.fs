@@ -37,7 +37,7 @@ let handleSessionError (state: SessionFallbackState) (cfg: FallbackConfig) (chai
 
             ns, FallbackAction.DoNothing
 
-        | FallbackPhase.Idle, ErrorClass.RetrySame ->
+        | (FallbackPhase.Idle | FallbackPhase.ScanningToolCallText | FallbackPhase.RecoveringToolCallText), ErrorClass.RetrySame ->
             match selectModel chain state.CurrentIndex with
             | Some m ->
                 sendOrContinue
@@ -109,6 +109,9 @@ let transition (state: SessionFallbackState) (evt: FallbackEvent) (cfg: Fallback
             { state with
                 Phase = FallbackPhase.Idle },
             FallbackAction.DoNothing
+        | FallbackPhase.ScanningToolCallText
+        | FallbackPhase.RecoveringToolCallText ->
+            state, FallbackAction.DoNothing
         | _ -> state, FallbackAction.DoNothing
 
     | FallbackEvent.SessionIdle ->
@@ -116,14 +119,20 @@ let transition (state: SessionFallbackState) (evt: FallbackEvent) (cfg: Fallback
         | FallbackPhase.Scanning(scanIdx, origIdx) -> completeScan scanIdx origIdx state
         | FallbackPhase.Retrying _ when not state.TaskComplete && not state.Cancelled ->
             { state with
-                Phase = FallbackPhase.Idle },
+                Phase = FallbackPhase.ScanningToolCallText },
             FallbackAction.ScanToolCallAsText
         | FallbackPhase.Retrying _ ->
             { state with
                 Phase = FallbackPhase.Idle },
             FallbackAction.DoNothing
         | FallbackPhase.Idle when not state.TaskComplete && not state.Cancelled ->
-            state, FallbackAction.ScanToolCallAsText
+            { state with
+                Phase = FallbackPhase.ScanningToolCallText },
+            FallbackAction.ScanToolCallAsText
+        | FallbackPhase.RecoveringToolCallText when not state.TaskComplete && not state.Cancelled ->
+            { state with
+                Phase = FallbackPhase.ScanningToolCallText },
+            FallbackAction.ScanToolCallAsText
         | _ -> state, FallbackAction.DoNothing
 
     | FallbackEvent.NewUserMessage ->

@@ -11,6 +11,14 @@ let isRecoverySettled (runtime: FallbackRuntimeState) (sessionID: string) : bool
         let st = runtime.GetOrCreateState sessionID
         st.Phase = FallbackPhase.Exhausted
 
+let isToolCallTextRecoveryInProgress (runtime: FallbackRuntimeState) (sessionID: string) : bool =
+    let st = runtime.GetOrCreateState sessionID
+
+    match st.Phase with
+    | FallbackPhase.ScanningToolCallText
+    | FallbackPhase.RecoveringToolCallText -> true
+    | _ -> false
+
 let waitForRecovery (runtime: FallbackRuntimeState) (sessionID: string) (_maxTurns: int) : JS.Promise<unit> =
     promise {
         if sessionID = "" || isRecoverySettled runtime sessionID then
@@ -21,6 +29,29 @@ let waitForRecovery (runtime: FallbackRuntimeState) (sessionID: string) (_maxTur
 
             let rec checkSettled () =
                 if isRecoverySettled runtime sessionID then
+                    resolver.Value()
+                else
+                    runtime.OnStateChanged sessionID checkSettled
+
+            runtime.OnStateChanged sessionID checkSettled
+            return! p
+    }
+
+/// Wait for tool-call-as-text recovery to complete.  Returns immediately when
+/// no scan or recovery is in progress.  The phase is set to
+/// `ScanningToolCallText` synchronously by the state machine *before* any async
+/// work, so a caller that arrives after `session.idle` is emitted but before
+/// the scan finishes will observe the in-progress phase and block.
+let waitForToolCallTextRecovery (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
+    promise {
+        if sessionID = "" || not (isToolCallTextRecoveryInProgress runtime sessionID) then
+            return ()
+        else
+            let resolver = ref (fun () -> ())
+            let p = Promise.create (fun resolve reject -> resolver.Value <- resolve)
+
+            let rec checkSettled () =
+                if not (isToolCallTextRecoveryInProgress runtime sessionID) then
                     resolver.Value()
                 else
                     runtime.OnStateChanged sessionID checkSettled

@@ -206,7 +206,7 @@ let transitionSessionIdleIdle_emitsScanToolCallAsText () =
 
     let ns, action = transition state SessionIdle cfg chain
 
-    equal "phase stays Idle" FallbackPhase.Idle ns.Phase
+    equal "phase ScanningToolCallText" FallbackPhase.ScanningToolCallText ns.Phase
     equal "action ScanToolCallAsText" FallbackAction.ScanToolCallAsText action
 
 let transitionSessionIdleTaskComplete_noScanToolCallAsText () =
@@ -228,8 +228,42 @@ let transitionSessionIdleRetrying_emitsScanToolCallAsText () =
 
     let ns, action = transition state SessionIdle cfg chain
 
-    equal "phase becomes Idle" FallbackPhase.Idle ns.Phase
+    equal "phase ScanningToolCallText" FallbackPhase.ScanningToolCallText ns.Phase
     equal "action ScanToolCallAsText" FallbackAction.ScanToolCallAsText action
+
+
+let transitionRecoveringToolCallText_idle_emitsScanToolCallAsText () =
+    let model = mkModel "oai" "gpt-5" None None None None None false
+    let chain = chain [ model ]
+    let cfg = mkConfig 2 3
+    let state = mkState FallbackPhase.RecoveringToolCallText 0 0 false false 0
+
+    let ns, action = transition state SessionIdle cfg chain
+
+    equal "phase ScanningToolCallText" FallbackPhase.ScanningToolCallText ns.Phase
+    equal "action ScanToolCallAsText" FallbackAction.ScanToolCallAsText action
+
+let transitionScanningToolCallText_busy_doNothing () =
+    let model = mkModel "oai" "gpt-5" None None None None None false
+    let chain = chain [ model ]
+    let cfg = mkConfig 2 3
+    let state = mkState FallbackPhase.ScanningToolCallText 0 0 false false 0
+
+    let ns, action = transition state SessionBusy cfg chain
+
+    equal "phase stays ScanningToolCallText" FallbackPhase.ScanningToolCallText ns.Phase
+    equal "action DoNothing" FallbackAction.DoNothing action
+
+let transitionRecoveringToolCallText_busy_doNothing () =
+    let model = mkModel "oai" "gpt-5" None None None None None false
+    let chain = chain [ model ]
+    let cfg = mkConfig 2 3
+    let state = mkState FallbackPhase.RecoveringToolCallText 0 0 false false 0
+
+    let ns, action = transition state SessionBusy cfg chain
+
+    equal "phase stays RecoveringToolCallText" FallbackPhase.RecoveringToolCallText ns.Phase
+    equal "action DoNothing" FallbackAction.DoNothing action
 
 
 let run () =
@@ -245,3 +279,6 @@ let run () =
     transitionSessionIdleIdle_emitsScanToolCallAsText ()
     transitionSessionIdleTaskComplete_noScanToolCallAsText ()
     transitionSessionIdleRetrying_emitsScanToolCallAsText ()
+    transitionRecoveringToolCallText_idle_emitsScanToolCallAsText ()
+    transitionScanningToolCallText_busy_doNothing ()
+    transitionRecoveringToolCallText_busy_doNothing ()

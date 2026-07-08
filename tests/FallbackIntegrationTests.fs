@@ -158,7 +158,7 @@ let scanning_completesOnIdle () =
 let retrying_emitsScanToolCallAsText () =
     let state = mkState (FallbackPhase.Retrying 1) 0 0 0
     let s1, action = transition state SessionIdle (mkCfg ()) (mkChain ())
-    equal "Idle after retrying idle" FallbackPhase.Idle s1.Phase
+    equal "ScanningToolCallText after retrying idle" FallbackPhase.ScanningToolCallText s1.Phase
     equal "ScanToolCallAsText" FallbackAction.ScanToolCallAsText action
 
 let continueCount_noDoubleIncrement () =
