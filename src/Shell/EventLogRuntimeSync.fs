@@ -26,7 +26,7 @@ let syncAllSessionsFromEventLogDedicated
                     for sid in sessionIds do
                         let! state = getStore(workspaceRoot).GetSessionState(sid)
                         syncReviewProjection store sid state.ReviewTask
-                        scope.Projection.StoreBacklog(host, sid, state.Backlog)
+                        scope.Projection.StoreBacklog(host, sid, List.rev state.Backlog)
         with _ -> ()
     }
 
@@ -59,6 +59,6 @@ let syncBacklogFromEventLogDedicated
                 let! exists = directoryExists workspaceRoot
                 if exists then
                     let! state = getStore(workspaceRoot).GetSessionState(sessionID)
-                    projection.StoreBacklog(host, sessionID, state.Backlog)
+                    projection.StoreBacklog(host, sessionID, List.rev state.Backlog)
         with _ -> ()
     }

@@ -8,35 +8,31 @@ type DedupVerdict =
     | AlreadySeen
     | NewContent of ReadPayload
 
-type DedupState = { seenContents: string list }
-
-let createDedupState () : DedupState = { seenContents = [] }
+let createDedupState () : DedupState = emptyState
 
 let processDedup (state: DedupState) (payload: ReadPayload) : DedupVerdict * DedupState =
-    let result = deduplicate state.seenContents payload.content
+    let result = deduplicate state payload.content
 
     if isNoChangeOutput result.output then
         AlreadySeen, state
     else
-        NewContent payload,
-        { state with
-            seenContents = result.seenOutputs }
+        NewContent payload, result.state
 
 /// Tool names that represent a file-read operation across hosts.
 let readToolNames = Set.ofList [ "read"; "file_read" ]
 
 let dedupForPath
-    (seenByPath: Map<string, string list>)
+    (seenByPath: Map<string, DedupState>)
     (payload: ReadPayload)
-    : Map<string, string list> * DedupVerdict =
-    let pathSeen = Map.tryFind payload.path seenByPath |> Option.defaultValue []
-    let verdict, nextState = processDedup { seenContents = pathSeen } payload
-    (Map.add payload.path nextState.seenContents seenByPath), verdict
+    : Map<string, DedupState> * DedupVerdict =
+    let pathState = Map.tryFind payload.path seenByPath |> Option.defaultValue emptyState
+    let verdict, nextState = processDedup pathState payload
+    (Map.add payload.path nextState seenByPath), verdict
 
 let foldDedup
-    (seenByPath: Map<string, string list>)
+    (seenByPath: Map<string, DedupState>)
     (payloads: ReadPayload list)
-    : Map<string, string list> * (string list * bool list) =
+    : Map<string, DedupState> * (string list * bool list) =
     let (nextSeen, (outputsRev, replacedRev)) =
         payloads
         |> List.fold
@@ -55,8 +51,9 @@ let collectReadOutputsByPath (payloads: ReadPayload list) : Map<string, string l
     |> List.fold
         (fun map payload ->
             let next = Map.tryFind payload.path map |> Option.defaultValue []
-            Map.add payload.path (next @ [ payload.content ]) map)
+            Map.add payload.path (payload.content :: next) map)
         Map.empty
+    |> Map.map (fun _ v -> List.rev v)
 
 let collectReadOutputs (payloads: ReadPayload list) : string list =
     payloads |> List.map (fun payload -> payload.content)

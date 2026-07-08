@@ -222,3 +222,28 @@ let ompNoEngineRef () =
     for f in fsFilesRelative "src/Omp" do
         let content = requireFile ("src/Omp/" + f)
         check ("arch: " + f + " ompNoEngineRef") (not (content.Contains "engine/"))
+
+/// Detect O(N²) list-append anti-pattern: `xs @ [y]` or `xs @ (f x)` in a fold.
+/// Correct style: prepend (`y :: xs`) + final `List.rev`, or use ResizeArray.
+let noQuadraticListAppend () =
+    let kernelFiles = fsFilesRecursive "src/Kernel" |> Seq.filter (fun p -> p.EndsWith(".fs"))
+    let shellFiles = fsFilesRecursive "src/Shell" |> Seq.filter (fun p -> p.EndsWith(".fs"))
+
+    let allFiles =
+        Seq.append kernelFiles shellFiles
+        |> Seq.filter (fun p ->
+            // These files were verified to use prepend+rev correctly
+            not (p.EndsWith "EventLog/Fold.fs")
+            && not (p.EndsWith "Wanxiangzhen/Dag.fs")
+            && not (p.EndsWith "MessageDedup.fs"))
+
+    for path in allFiles do
+        let content = requireFile path
+        // Match ` @ [` pattern (list append with literal singleton)
+        let hasAppend =
+            content.Contains ") @ ["
+            || content.Contains "st.@ (["
+            || content.Contains "] @ ["
+            || content.Contains ") @ ("
+
+        check ("arch: " + path + " no quadratic list append (use :: + List.rev)") (not hasAppend)

@@ -13,7 +13,7 @@ let collectReadOutputs (messages: obj array) : string[] =
 let collectReadOutputsByPath (messages: obj array) : Map<string, string list> =
     Wanxiangshu.Shell.ReadDedupMuxPlugin.collectReadOutputsByPath messages
 
-let deduplicateReadOutputsWithSeenByPath (seenByPath: Map<string, string list>) (messages: obj array) : obj[] =
+let deduplicateReadOutputsWithSeenByPath (seenByPath: Map<string, DedupState>) (messages: obj array) : obj[] =
     Wanxiangshu.Shell.ReadDedupMuxPlugin.deduplicateReadOutputsWithSeenByPath seenByPath messages
 
 let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : obj[] =
@@ -111,13 +111,17 @@ let private applyModelDedupToMessages (messages: obj array) (hits: ReadHit list)
             List.zip hits replaced
             |> List.choose (fun (hit, wasReplaced) -> if wasReplaced then Some hit else None)
 
-        let msgGroups = replacements |> List.groupBy (fun hit -> hit.msgIndex)
+        let msgMap =
+            replacements
+            |> List.groupBy (fun hit -> hit.msgIndex)
+            |> Map.ofList
 
         messages
         |> Array.mapi (fun i msg ->
-            match List.tryFind (fun (idx, _) -> idx = i) msgGroups with
+            match Map.tryFind i msgMap with
             | None -> msg
-            | Some(_, hitsInMsg) ->
+            | Some hitsInMsg ->
+                let partMap = hitsInMsg |> List.map (fun hit -> hit.partIndex, hit) |> Map.ofList
                 let contentObj = Wanxiangshu.Shell.Dyn.get msg "content"
 
                 if
@@ -131,7 +135,7 @@ let private applyModelDedupToMessages (messages: obj array) (hits: ReadHit list)
                     let newContent =
                         content
                         |> Array.mapi (fun j part ->
-                            match List.tryFind (fun hit -> hit.partIndex = j) hitsInMsg with
+                            match Map.tryFind j partMap with
                             | None -> part
                             | Some _ ->
                                 let newOutput = createObj [ "type", box "text"; "value", box (noChangeEnvelope ()) ]
@@ -147,7 +151,10 @@ let deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj a
         if Array.isEmpty seenOutputs then
             Map.empty
         else
-            Map.add "" (Array.toList seenOutputs) Map.empty
+            let state =
+                { fingerprints = Set.empty
+                  rawOutputs = Array.toList seenOutputs }
+            Map.add "" state Map.empty
 
     let _, (newOutputs, replaced) = foldDedup seenByPath payloads
     Array.ofList newOutputs, applyModelDedupToMessages messages hits replaced

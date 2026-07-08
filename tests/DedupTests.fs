@@ -14,24 +14,26 @@ let isNoChangeOutputFalse () =
     check "empty string is not no-change" (not (isNoChangeOutput ""))
 
 let deduplicateFirstSeen () =
-    let r = deduplicate [] "hello"
+    let r = deduplicate emptyState "hello"
     equal "first-seen output unchanged" "hello" r.output
-    check "first-seen appended to seenOutputs" (r.seenOutputs = [ "hello" ])
+    check "first-seen appended to rawOutputs" (r.state.rawOutputs = [ "hello" ])
 
 let deduplicateSeenVerbatim () =
-    let r = deduplicate [ "hello" ] "hello"
+    let s0 = { fingerprints = Set.empty; rawOutputs = [ "hello" ] }
+    let r = deduplicate s0 "hello"
     equal "verbatim repeat returns noChangeEnvelope" (noChangeEnvelope ()) r.output
-    check "verbatim repeat keeps seenOutputs" (r.seenOutputs = [ "hello" ])
+    check "verbatim repeat keeps rawOutputs" (r.state.rawOutputs = [ "hello" ])
 
 let deduplicateSubstringOfSeen () =
-    let r = deduplicate [ "hello world" ] "hello"
+    let s0 = { fingerprints = Set.empty; rawOutputs = [ "hello world" ] }
+    let r = deduplicate s0 "hello"
     equal "substring repeat returns noChangeEnvelope" (noChangeEnvelope ()) r.output
-    check "substring repeat keeps seenOutputs" (r.seenOutputs = [ "hello world" ])
+    check "substring repeat keeps rawOutputs" (r.state.rawOutputs = [ "hello world" ])
 
 let deduplicateEmptyOutput () =
-    let r = deduplicate [] ""
-    // empty output short-circuits: not appended to seen, output stays empty
-    check "empty output not appended" (r.seenOutputs = [])
+    let r = deduplicate emptyState ""
+    // empty output short-circuits: not appended to state, output stays empty
+    check "empty output not appended" (r.state.rawOutputs = [])
     check "empty output returned verbatim" (r.output = "")
 
 let processDedupFirstCall () =
@@ -179,9 +181,9 @@ let readFingerprintSubstringNoFalsePositive () =
 let deduplicateFingerprintMatchAcrossFormats () =
     let caps = formatReadOutput "src/A.fs" "alpha\nbeta\ngamma" 1 None
     let native = [ "     1|alpha"; "     2|beta"; "     3|gamma" ] |> String.concat "\n"
-    let r1 = deduplicate [] caps
+    let r1 = deduplicate emptyState caps
     equal "first-seen output unchanged" caps r1.output
-    let r2 = deduplicate r1.seenOutputs native
+    let r2 = deduplicate r1.state native
     equal "native repeat returns noChangeEnvelope" (noChangeEnvelope ()) r2.output
 
 let deduplicateFingerprintMatchAcrossLimits () =
@@ -189,8 +191,8 @@ let deduplicateFingerprintMatchAcrossLimits () =
     // so smaller window is NOT considered a duplicate of larger (different lines).
     let small = formatReadOutput "src/A.fs" "alpha\nbeta" 1 None
     let large = formatReadOutput "src/A.fs" "alpha\nbeta\ngamma" 1 None
-    let r1 = deduplicate [] large
-    let r2 = deduplicate r1.seenOutputs small
+    let r1 = deduplicate emptyState large
+    let r2 = deduplicate r1.state small
     // Different fingerprints → r2 must NOT collapse small into noChange.
     check "smaller overlapping window treated as new" (not (isNoChangeOutput r2.output))
 
@@ -200,14 +202,15 @@ let deduplicateFingerprintMatchAcrossFooterVariants () =
     let altFooter =
         "<output>\n     1|alpha\n     2|beta\n</output>\n<status>Output capped at 2 lines</status>"
 
-    let r1 = deduplicate [] caps
-    let r2 = deduplicate r1.seenOutputs altFooter
+    let r1 = deduplicate emptyState caps
+    let r2 = deduplicate r1.state altFooter
     equal "alt-footer repeat returns noChangeEnvelope" (noChangeEnvelope ()) r2.output
 
 let deduplicateLargeSubstringOfSeenDoesNotMatch () =
     let largeSeen = String.init 2500 (fun _ -> "a") + " b"
     let largeOutput = String.init 2100 (fun _ -> "a")
-    let r = deduplicate [ largeSeen ] largeOutput
+    let s0 = { fingerprints = Set.empty; rawOutputs = [ largeSeen ] }
+    let r = deduplicate s0 largeOutput
     check "large substring should not be deduplicated" (r.output = largeOutput)
 
 let run () =

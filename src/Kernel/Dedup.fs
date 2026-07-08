@@ -4,9 +4,25 @@ open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
+/// DedupState invariants:
+/// - `rawOutputs` is capped at 100 entries to bound memory and linear scan cost.
+///   When the cap is reached, the oldest entry (tail) is dropped on insertion.
+/// - `fingerprints` is unbounded but each entry is a short hash string.
+/// - Both fields grow monotonically until `rawOutputs` hits the cap.
+type DedupState =
+    { fingerprints: Set<string>
+      rawOutputs: string list }
+
+let emptyState : DedupState =
+    { fingerprints = Set.empty
+      rawOutputs = [] }
+
+/// Max rawOutputs kept per dedup state. Bounds substring scan cost to O(100) per check.
+let maxRawOutputs = 100
+
 type DedupedOutput =
     { output: string
-      seenOutputs: string list }
+      state: DedupState }
 
 let isNoChangeOutput (output: string) : bool =
     match tryParse output with
@@ -17,31 +33,55 @@ let isNoChangeOutput (output: string) : bool =
             | _ -> false)
     | None -> false
 
-/// If `output` matches a previously-seen entry (verbatim / substring, or
-/// shares the same `readFingerprint`) replace with the no-change envelope;
-/// otherwise record it. Fingerprinting lets Semble-injected reads
-/// (`CapsFormat.formatReadOutput`) dedup against real `Shell.FileSys.read`
-/// outputs even though their wrappers/footers differ.
-let deduplicate (seenOutputs: string list) (output: string) : DedupedOutput =
+let deduplicate (state: DedupState) (output: string) : DedupedOutput =
     if output.Length = 0 then
         { output = output
-          seenOutputs = seenOutputs }
+          state = state }
     else
         let fpOut = readFingerprint output
 
-        let matches (seen: string) =
+        let fpMatch =
             match fpOut with
-            | Some fp ->
-                fp = seen || (seen.Length >= output.Length && (output.Length <= 2048 || seen.Length <= 2048) && seen.Contains output)
-            | None ->
-                seen.Length >= output.Length && (output.Length <= 2048 || seen.Length <= 2048) && seen.Contains output
+            | Some fp -> Set.contains fp state.fingerprints
+            | None -> false
 
-        if List.exists matches seenOutputs then
+        let substrMatch =
+            let matches (seen: string) =
+                match fpOut with
+                | Some fp ->
+                    fp = seen ||
+                    (seen.Length >= output.Length &&
+                     (output.Length <= 2048 || seen.Length <= 2048) &&
+                     seen.Contains output)
+                | None ->
+                    seen.Length >= output.Length &&
+                    (output.Length <= 2048 || seen.Length <= 2048) &&
+                    seen.Contains output
+            List.exists matches state.rawOutputs
+
+        let isDuplicate = fpMatch || substrMatch
+
+        if isDuplicate then
             { output = noChangeEnvelope ()
-              seenOutputs = seenOutputs }
-        elif fpOut.IsSome then
-            { output = output
-              seenOutputs = fpOut.Value :: seenOutputs }
+              state = state }
         else
+            let nextState =
+                match fpOut with
+                | Some fp ->
+                    let rawOutputs' =
+                        if state.rawOutputs.Length >= maxRawOutputs then
+                            fp :: (state.rawOutputs |> List.rev |> List.tail |> List.rev)
+                        else
+                            fp :: state.rawOutputs
+                    { fingerprints = Set.add fp state.fingerprints
+                      rawOutputs = rawOutputs' }
+                | None ->
+                    let rawOutputs' =
+                        if state.rawOutputs.Length >= maxRawOutputs then
+                            output :: (state.rawOutputs |> List.rev |> List.tail |> List.rev)
+                        else
+                            output :: state.rawOutputs
+                    { fingerprints = state.fingerprints
+                      rawOutputs = rawOutputs' }
             { output = output
-              seenOutputs = output :: seenOutputs }
+              state = nextState }

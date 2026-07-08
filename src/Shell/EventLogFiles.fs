@@ -24,7 +24,7 @@ type EventLogStore(workspaceRoot: string) =
     let mutable initDone = false
     let mutable initPromise: JS.Promise<unit> option = None
     let mutable readCalled = false
-    let mutable readAllResult: WanEvent list = []
+    let readAllResult = ResizeArray<WanEvent>()
 
     let foldWan (e: WanEvent) =
         let sId = e.Session
@@ -56,7 +56,7 @@ type EventLogStore(workspaceRoot: string) =
                         withWorkspaceLock eventFilePath (fun () ->
                             promise {
                                 let! events = readEventsFile eventFilePath
-                                readAllResult <- events
+                                readAllResult.AddRange(events)
 
                                 for e in events do
                                     foldWan e
@@ -76,7 +76,7 @@ type EventLogStore(workspaceRoot: string) =
     member _.ReadAllEvents() : JS.Promise<WanEvent list> =
         promise {
             do! ensureInitialized ()
-            return readAllResult
+            return Seq.toList readAllResult
         }
 
     member _.GetSessionState(sessionId: string) : JS.Promise<SessionState> =
@@ -102,7 +102,7 @@ type EventLogStore(workspaceRoot: string) =
             promise {
                 do! ensureInitialized ()
                 foldWan e
-                readAllResult <- readAllResult @ [ e ]
+                readAllResult.Add(e) |> ignore
 
                 try
                     do! withWorkspaceLock eventFilePath (fun () -> appendLine eventFilePath e)
@@ -116,7 +116,7 @@ type EventLogStore(workspaceRoot: string) =
             promise {
                 do! ensureInitialized ()
                 foldWan e
-                readAllResult <- readAllResult @ [ e ]
+                readAllResult.Add(e) |> ignore
                 do! withWorkspaceLock eventFilePath (fun () -> appendLine eventFilePath e)
             })
 
@@ -172,7 +172,7 @@ type EventLogStore(workspaceRoot: string) =
                         buildEvent sessionId eventKindNudgeDispatched payload (getTimestampMs().ToString())
 
                     foldWan ev
-                    readAllResult <- readAllResult @ [ ev ]
+                    readAllResult.Add(ev) |> ignore
                     do! withWorkspaceLock eventFilePath (fun () -> appendLine eventFilePath ev)
                     return true
             })

@@ -1,5 +1,6 @@
 module Wanxiangshu.Shell.ReadDedupCore
 
+open Wanxiangshu.Kernel.Dedup
 open Wanxiangshu.Kernel.MessageDedup
 
 type ReadHit =
@@ -8,11 +9,11 @@ type ReadHit =
       payload: ReadPayload }
 
 let processDedupHits
-    (seenByPath: Map<string, string list>)
+    (seenByPath: Map<string, DedupState>)
     (messages: obj array)
     (getParts: obj -> obj array)
     (getHit: int -> int -> obj -> ReadHit option)
-    : (ReadHit * DedupVerdict) list * Map<string, string list> =
+    : (ReadHit * DedupVerdict) list * Map<string, DedupState> =
     let hits = ResizeArray<ReadHit>()
 
     for i in 0 .. messages.Length - 1 do

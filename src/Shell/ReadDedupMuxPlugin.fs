@@ -60,7 +60,7 @@ let collectReadOutputsByPath (messages: obj array) : Map<string, string list> =
     |> List.map (fun hit -> hit.payload)
     |> Wanxiangshu.Kernel.MessageDedup.collectReadOutputsByPath
 
-let deduplicateReadOutputsWithSeenByPath (seenByPath: Map<string, string list>) (messages: obj array) : obj[] =
+let deduplicateReadOutputsWithSeenByPath (seenByPath: Map<string, DedupState>) (messages: obj array) : obj[] =
     let getParts msg = getMessageParts msg
 
     let getHit i j part =
@@ -82,19 +82,23 @@ let deduplicateReadOutputsWithSeenByPath (seenByPath: Map<string, string list>) 
     if List.isEmpty replacements then
         messages
     else
-        let msgGroups = replacements |> List.groupBy (fun hit -> hit.msgIndex)
+        let msgMap =
+            replacements
+            |> List.groupBy (fun hit -> hit.msgIndex)
+            |> Map.ofList
 
         messages
         |> Array.mapi (fun i msg ->
-            match List.tryFind (fun (idx, _) -> idx = i) msgGroups with
+            match Map.tryFind i msgMap with
             | None -> msg
-            | Some(_, hitsInMsg) ->
+            | Some hitsInMsg ->
+                let partMap = hitsInMsg |> List.map (fun hit -> hit.partIndex, hit) |> Map.ofList
                 let parts = getMessageParts msg
 
                 let newParts =
                     parts
                     |> Array.mapi (fun j part ->
-                        match List.tryFind (fun hit -> hit.partIndex = j) hitsInMsg with
+                        match Map.tryFind j partMap with
                         | None -> part
                         | Some _ ->
                             let originalOutput = Dyn.get part "output"
@@ -114,6 +118,9 @@ let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array)
         if Array.isEmpty seenOutputs then
             Map.empty
         else
-            Map.add "" (Array.toList seenOutputs) Map.empty
+            Map.add ""
+                { fingerprints = Set.empty
+                  rawOutputs = Array.toList seenOutputs }
+                Map.empty
 
     deduplicateReadOutputsWithSeenByPath seenByPath messages

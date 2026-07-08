@@ -180,6 +180,10 @@ let nudgeAnchorKey (turnId: string) (assistantMessage: string) : string =
 let isNudgeBlockedForAnchor (st: NudgeDedupState) (anchorKey: string) : bool =
     Set.contains (anchorKey.Trim()) st.DispatchedAnchors
 
+/// SessionState invariants:
+/// - `Backlog` is stored in **reverse chronological order** (newest first) to allow
+///   O(1) prepend during fold. Consumers must `List.rev` to get chronological order.
+/// - `BacklogSnapshot.LatestEntry` is always the most recent backlog entry (or None).
 type SessionState =
     { ReviewTask: string option
       Backlog: BacklogEntry list
@@ -200,7 +204,9 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
     { ReviewTask = reviewTaskFolder st.ReviewTask e
       Backlog =
         if isBacklog then
-            st.Backlog @ (backlogEntryFromPayload e.Payload |> Option.toList)
+            match backlogEntryFromPayload e.Payload with
+            | Some entry -> entry :: st.Backlog
+            | None -> st.Backlog
         else
             st.Backlog
       BacklogSnapshot = workBacklogFolder st.BacklogSnapshot e

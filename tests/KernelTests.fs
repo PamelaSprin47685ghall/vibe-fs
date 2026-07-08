@@ -93,10 +93,10 @@ let stripLexer' () =
     check "strip pipe after quote head count" (r12.stripped.[0].count = 1)
 
 let dedup' () =
-    let s = createDedupState ()
-    let r1 = deduplicate s.seenContents "same string"
-    let r2 = deduplicate r1.seenOutputs "same string"
-    let r3 = deduplicate r1.seenOutputs "same"
+    let s = emptyState
+    let r1 = deduplicate s "same string"
+    let r2 = deduplicate r1.state "same string"
+    let r3 = deduplicate r1.state "same"
     check "dedup first" (r1.output = "same string")
     let noChange = noChangeEnvelope ()
     check "dedup second" (r2.output = noChange)

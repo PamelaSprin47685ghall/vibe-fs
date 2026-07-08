@@ -42,6 +42,7 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       "ArchitectureTests.eventLogUsesAdvisoryFlock", Sync(sync ArchitectureTestsFoundation.eventLogUsesAdvisoryFlock)
       "ArchitectureTests.ompBoundary", Sync(sync ArchitectureTestsFoundation.ompBoundary)
       "ArchitectureTests.ompNoEngineRef", Sync(sync ArchitectureTestsFoundation.ompNoEngineRef)
+      "ArchitectureTests.noQuadraticListAppend", Sync(sync ArchitectureTestsFoundation.noQuadraticListAppend)
       "ArchitectureTests.noDuplicateStateHolder", Sync(sync ArchitectureTestsFoundation.noDuplicateStateHolder)
       "ArchitectureTests.noDuplicateRunNudgeFlowCore",
       Sync(sync ArchitectureTestsFoundation.noDuplicateRunNudgeFlowCore)

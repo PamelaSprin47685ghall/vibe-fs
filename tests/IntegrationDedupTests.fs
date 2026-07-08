@@ -6,6 +6,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationDedupOpenCodeSpecs
 
+open Wanxiangshu.Kernel.Dedup
 open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Opencode.Plugin
@@ -15,7 +16,10 @@ let private deduplicateReadOutputs (messages: obj array) : obj array =
     Wanxiangshu.Mux.ReadDedup.deduplicateReadOutputsWithSeen [||] messages
 
 let private deduplicateReadOutputsAgainstHistory (history: obj array) (messages: obj array) : obj array =
-    let seenByPath = Wanxiangshu.Mux.ReadDedup.collectReadOutputsByPath history
+    let rawSeenByPath = Wanxiangshu.Mux.ReadDedup.collectReadOutputsByPath history
+    let seenByPath =
+        rawSeenByPath
+        |> Map.map (fun _ content -> { fingerprints = Set.empty; rawOutputs = content })
     Wanxiangshu.Mux.ReadDedup.deduplicateReadOutputsWithSeenByPath seenByPath messages
 
 let internal deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj array =
