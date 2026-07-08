@@ -18,18 +18,16 @@ let start () =
         )
         
         activeSession <- Some session
-        printfn "[Profiler] CPU Profiler started. Will save to /tmp/wanxiangshu.cpuprofile on process exit."
 
 let stopAndSave () =
     match activeSession with
     | Some session ->
         let cb = fun err (res: obj) ->
             if not (isNull err) then
-                printfn "[Profiler] Error stopping profiler: %O" err
+                () // error silently ignored
             else
                 let targetPath = "/tmp/wanxiangshu.cpuprofile"
                 fs?writeFileSync(targetPath, JS.JSON.stringify(res?profile))
-                printfn "[Profiler] Profile saved to %s" targetPath
             
             session?post("Profiler.disable")
             session?disconnect()

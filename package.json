@@ -36,12 +36,8 @@
     "postbuild": "node scripts/postbuild.mjs",
     "test": "node tests/runner.js",
     "build-and-test": "node scripts/build-and-test.mjs",
-    "format": "node scripts/pre-commit-formatter.mjs",
-    "e2e": "node tests/runner.js --e2e",
-    "e2e:mux": "node tests/runner.js --e2e-mux",
-    "e2e:opencode-plugin": "node tests/runner.js --e2e-opencode-plugin",
-    "e2e:wanxiangzhen": "node tests/runner.js --e2e-wanxiangzhen",
-    "e2e-omp": "node tests/runner.js --e2e-omp"
+    "build-and-test-e2e": "node scripts/build-and-test-e2e.mjs",
+    "format": "node scripts/pre-commit-formatter.mjs"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.4.0",

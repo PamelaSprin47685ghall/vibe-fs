@@ -124,7 +124,7 @@ let private shellBareDynAllowlist =
           "ToolRuntimeContext.fs"
           "TreeSitterPlatform.fs"
           "WebSearchApi.fs"
-           "WorkspaceFiles.fs" ]
+          "WorkspaceFiles.fs" ]
 
     // Note: ReadDedupCore.fs, ReadDedupOpenCode.fs, ReadDedupMuxPlugin.fs
     // have been removed from the project. No allowlist entry needed.

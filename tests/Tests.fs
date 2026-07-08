@@ -103,25 +103,7 @@ let private appendFile (path: string) (content: string) (encoding: string) : uni
 [<Import("mkdirSync", "node:fs")>]
 let private mkdirSync (path: string) (opts: obj) : unit = jsNative
 
-[<Emit("process.env.VIBE_FS_TEST_VERBOSE")>]
-let private envVerbose () : string = jsNative
-
-[<Emit("process.argv")>]
-let private cliArgv () : obj = jsNative
-
-let private verboseEnabledFromArgs () : bool =
-    let envVal = envVerbose ()
-    let envHit = not (isNull envVal) && envVal = "1"
-    let argvObj = cliArgv ()
-
-    let cliHit =
-        try
-            let arr: string[] = unbox argvObj
-            arr |> Array.exists (fun a -> a = "--verbose")
-        with _ ->
-            false
-
-    envHit || cliHit
+let private verboseEnabledFromArgs () : bool = true
 
 let private initVerboseLog () : unit =
     if verboseEnabledFromArgs () then
@@ -136,12 +118,8 @@ let private initVerboseLog () : unit =
 
         let header =
             sprintf
-                "# vibe-fs verbose test log\n# timestamp: %s\n# switch: %s\n"
+                "# vibe-fs verbose test log\n# timestamp: %s\n# switch: ALWAYS_ON\n"
                 ts
-                (if (envVerbose ()) = "1" then
-                     "VIBE_FS_TEST_VERBOSE=1"
-                 else
-                     "--verbose")
 
         appendFile logPath header "utf8"
         Assert.setVerbose (Some logPath)
@@ -171,12 +149,12 @@ let private selectedTests (selectors: string array) =
 let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
-        let isSilent = args |> Array.contains "--silent"
-        Assert.setSilent isSilent
-        let selectors = args |> Array.filter (fun a -> a <> "--verbose" && a <> "-v" && a <> "--silent")
+        Assert.setSilent false
+        let selectors = args
         initVerboseLog ()
         PluginCore.reviewStore.clearReviewSessions ()
         RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
+        
         let runnableTests = selectedTests selectors
 
         if List.isEmpty runnableTests then

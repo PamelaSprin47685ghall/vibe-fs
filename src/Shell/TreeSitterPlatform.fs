@@ -50,39 +50,48 @@ let private platformSuffix (platform: string) (arch: string) : string option =
 
 let private nodeRequire = createRequire importMetaUrl
 
+let mutable private cachedPack: Result<obj, string> option = None
+
 let internal tryGetPack () : Result<obj, string> =
-    let warmPack (pack: obj) =
-        try
-            getOrCall pack "downloadAll" |> ignore
-        with _ ->
-            ()
-
-        pack
-
-    let loadFromRootPackage () =
-        try
-            Result.Ok(nodeRequire "@kreuzberg/tree-sitter-language-pack" |> warmPack)
-        with e ->
-            Result.Error $"root package load failed: {e.Message}"
-
-    let loadFromNativePath () =
-        match platformSuffix (processPlatform ()) (processArch ()) with
-        | None -> Result.Error "Unsupported platform"
-        | Some suffix ->
+    match cachedPack with
+    | Some packResult -> packResult
+    | None ->
+        let warmPack (pack: obj) =
             try
-                let nativePath =
-                    nodeRequire?resolve ($"@kreuzberg/tree-sitter-language-pack/ts-pack-core-node.{suffix}.node")
+                getOrCall pack "downloadAll" |> ignore
+            with _ ->
+                ()
 
-                Result.Ok(nodeRequire nativePath |> warmPack)
+            pack
+
+        let loadFromRootPackage () =
+            try
+                Result.Ok(nodeRequire "@kreuzberg/tree-sitter-language-pack" |> warmPack)
             with e ->
-                Result.Error $"native pack load failed: {e.Message}"
+                Result.Error $"root package load failed: {e.Message}"
 
-    match loadFromRootPackage () with
-    | Result.Ok pack -> Result.Ok pack
-    | Result.Error rootError ->
-        match loadFromNativePath () with
-        | Result.Ok pack -> Result.Ok pack
-        | Result.Error nativeError -> Result.Error(rootError + "; " + nativeError)
+        let loadFromNativePath () =
+            match platformSuffix (processPlatform ()) (processArch ()) with
+            | None -> Result.Error "Unsupported platform"
+            | Some suffix ->
+                try
+                    let nativePath =
+                        nodeRequire?resolve ($"@kreuzberg/tree-sitter-language-pack/ts-pack-core-node.{suffix}.node")
+
+                    Result.Ok(nodeRequire nativePath |> warmPack)
+                with e ->
+                    Result.Error $"native pack load failed: {e.Message}"
+
+        let result =
+            match loadFromRootPackage () with
+            | Result.Ok pack -> Result.Ok pack
+            | Result.Error rootError ->
+                match loadFromNativePath () with
+                | Result.Ok pack -> Result.Ok pack
+                | Result.Error nativeError -> Result.Error(rootError + "; " + nativeError)
+                
+        cachedPack <- Some result
+        result
 
 let internal detectLanguage (pack: obj) (content: string) (filePath: string) : string =
     let probePath () : string option =

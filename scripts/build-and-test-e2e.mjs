@@ -21,7 +21,7 @@ if (postbuildResult.status !== 0) {
   process.exit(postbuildResult.status ?? 1);
 }
 
-const testResult = spawnSync('node', ['tests/runner.js'], {
+const testResult = spawnSync('node', ['tests/e2e.js'], {
   stdio: 'inherit',
   env: { ...process.env, FORCE_COLOR: '1' }
 });
