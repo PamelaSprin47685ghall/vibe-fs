@@ -34,7 +34,7 @@ let withBody body =
     { empty with
         body = normalizedBody body }
 
-let appendInfo item (msg: ToolOutputMessage) : ToolOutputMessage = { msg with info = msg.info @ [ item ] }
+let appendInfo item (msg: ToolOutputMessage) : ToolOutputMessage = { msg with info = item :: msg.info }
 
 let private itemKey =
     function
@@ -53,25 +53,34 @@ let private itemValue =
     | InfoItem.ExitCode n -> box n
 
 let private flatFields (items: InfoItem list) : FrontMatterField list =
+    let map =
+        items
+        |> List.fold (fun acc item ->
+            let k = itemKey item
+            let v = itemValue item
+            match Map.tryFind k acc with
+            | Some vs -> Map.add k (v :: vs) acc
+            | None -> Map.add k [ v ] acc) Map.empty
+
     let rec loop acc seen items =
         match items with
         | [] -> List.rev acc
         | item :: rest ->
             let k = itemKey item
 
-            if List.contains k seen then
+            if Set.contains k seen then
                 loop acc seen rest
             else
-                let grp = items |> List.filter (fun x -> itemKey x = k) |> List.map itemValue
+                let vs = Map.find k map |> List.rev
 
                 let field =
-                    match grp with
+                    match vs with
                     | [ v ] -> (k, v)
-                    | vs -> (k, box (vs |> List.toArray))
+                    | _ -> (k, box (List.toArray vs))
 
-                loop (field :: acc) (k :: seen) rest
+                loop (field :: acc) (Set.add k seen) rest
 
-    loop [] [] items
+    loop [] Set.empty items
 
 let render (msg: ToolOutputMessage) : string =
     if msg.info.IsEmpty && msg.body = "" then
@@ -79,7 +88,7 @@ let render (msg: ToolOutputMessage) : string =
     elif msg.info.IsEmpty then
         msg.body
     else
-        let fence = frontMatter (flatFields msg.info)
+        let fence = frontMatter (flatFields (List.rev msg.info))
 
         match msg.body with
         | "" -> fence
@@ -146,11 +155,11 @@ let withIterator (body: string) (iterator: string) : string =
                 body = body }
 
 let todoWriteOutput (methodologies: string list) (includeMeditator: bool) : string =
+    // Construct in reverse order: render applies List.rev to restore correct sequence.
     let hints =
-        [ InfoItem.Hint(hintForMethodologies methodologies) ]
-        @ (if includeMeditator then
-               [ InfoItem.Hint hintMeditator ]
-           else
-               [])
+        if includeMeditator then
+            [ InfoItem.Hint hintMeditator; InfoItem.Hint(hintForMethodologies methodologies) ]
+        else
+            [ InfoItem.Hint(hintForMethodologies methodologies) ]
 
     render { empty with info = hints; body = "" }

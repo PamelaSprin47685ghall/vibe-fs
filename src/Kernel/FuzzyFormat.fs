@@ -79,20 +79,20 @@ let formatGrepOutput (result: GrepResult option) : string =
                     (fun (lines, currentFile) m ->
                         let lines =
                             if m.relativePath <> currentFile && currentFile <> "" then
-                                lines @ [ "" ]
+                                "" :: lines
                             else
                                 lines
 
                         let lines, currentFile =
                             if m.relativePath <> currentFile then
-                                lines @ [ $"{m.relativePath}{fileAnnotation m.annotation}" ], m.relativePath
+                                ($"{m.relativePath}{fileAnnotation m.annotation}") :: lines, m.relativePath
                             else
                                 lines, currentFile
 
-                        lines @ grepMatchLines m, currentFile)
-                    ([ $"{total} {plural}"; "" ], "")
+                        grepMatchLines m |> List.fold (fun acc line -> line :: acc) lines, currentFile)
+                    ([ ""; $"{total} {plural}" ], "")
 
-            (lines |> String.concat "\n").TrimEnd('\n')
+            ((List.rev lines) |> String.concat "\n").TrimEnd('\n')
 
 type FindMatch =
     { relativePath: string

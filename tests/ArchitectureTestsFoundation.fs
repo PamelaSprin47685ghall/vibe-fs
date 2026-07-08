@@ -225,25 +225,31 @@ let ompNoEngineRef () =
 
 /// Detect O(N²) list-append anti-pattern: `xs @ [y]` or `xs @ (f x)` in a fold.
 /// Correct style: prepend (`y :: xs`) + final `List.rev`, or use ResizeArray.
+/// Scans Kernel, Shell, Mux, Opencode, Omp, Methodology — all src trees that
+/// contribute to the hot path.
+/// Allowlisted files contain `@ [` / `@ (` only in bounded (O(1)) contexts.
 let noQuadraticListAppend () =
-    let kernelFiles = fsFilesRecursive "src/Kernel" |> Seq.filter (fun p -> p.EndsWith(".fs"))
-    let shellFiles = fsFilesRecursive "src/Shell" |> Seq.filter (fun p -> p.EndsWith(".fs"))
+    let scanDirs =
+        [ "src/Kernel"; "src/Shell"; "src/Mux"
+          "src/Opencode"; "src/Omp"; "src/Methodology" ]
 
     let allFiles =
-        Seq.append kernelFiles shellFiles
-        |> Seq.filter (fun p ->
-            // These files were verified to use prepend+rev correctly
-            not (p.EndsWith "EventLog/Fold.fs")
-            && not (p.EndsWith "Wanxiangzhen/Dag.fs")
-            && not (p.EndsWith "MessageDedup.fs"))
+        scanDirs
+        |> List.collect (fun d -> fsFilesRecursive d)
+        |> Seq.filter (fun p -> p.EndsWith(".fs"))
+
+    let allowedAppends =
+        Set [
+            "src/Kernel/FuzzyFormat.fs" // grepMatchLines context concat (bounded to 2-3 elements)
+            "src/Kernel/FuzzyPath.fs" // small list concat
+            "src/Kernel/ReviewSession/Types.fs" // addChild (bounded size)
+            "src/Kernel/SubagentPrompts.fs" // field list construction
+            "src/Shell/OpencodeAgentConfigCodec.fs" // field list construction
+            "src/Mux/AiSettings.fs" // merge settings lists
+        ]
 
     for path in allFiles do
-        let content = requireFile path
-        // Match ` @ [` pattern (list append with literal singleton)
-        let hasAppend =
-            content.Contains ") @ ["
-            || content.Contains "st.@ (["
-            || content.Contains "] @ ["
-            || content.Contains ") @ ("
-
-        check ("arch: " + path + " no quadratic list append (use :: + List.rev)") (not hasAppend)
+        if not (Set.contains path allowedAppends) then
+            let code = requireFile path |> nonCommentCode
+            let hasAppend = code.Contains "@ [" || code.Contains "@ ("
+            check ($"arch: {path} has no quadratic list append") (not hasAppend)

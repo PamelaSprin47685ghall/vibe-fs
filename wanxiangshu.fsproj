@@ -660,6 +660,7 @@
     <Compile Include="tests/Wanxiangzhen/SquadUpdateIdAssignTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/TaskTests.fs"/>
     <Compile Include="tests/TestsEntriesWanxiangzhen.fs"/>
+    <Compile Include="tests/DedupRegressionTests.fs"/>
     <Compile Include="tests/TestsEntriesCoreTail.fs"/>
     <Compile Include="tests/TestsEntriesCore.fs"/>
     <Compile Include="tests/TestsEntriesCodec.fs"/>

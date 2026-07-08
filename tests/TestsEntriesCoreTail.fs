@@ -27,6 +27,7 @@ open Wanxiangshu.Tests.ToolCatalogRegistryTests
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.ToolCatalogClassificationTests
 open Wanxiangshu.Tests.ToolOutputInfoTests
+open Wanxiangshu.Tests.DedupRegressionTests
 open Wanxiangshu.Tests.MessageTransformPolicyTests
 open Wanxiangshu.Tests.SembleInjectionTests
 open Wanxiangshu.Tests.SembleInjectionDedupSpecs
@@ -137,6 +138,7 @@ let tailCoreTestEntries () : (string * TestBody) list =
       "TitleFetchGuardTests.skipProbeMessage", TestBody.Sync(sync TitleFetchGuardTests.skipProbeMessage)
       "ToolCatalogClassificationTests.run", TestBody.Sync(sync ToolCatalogClassificationTests.run)
       "ToolOutputInfoTests.run", TestBody.Sync(sync ToolOutputInfoTests.run)
+      "DedupRegressionTests.run", TestBody.Sync(sync DedupRegressionTests.run)
       "MessageTransformPolicyTests.run", TestBody.Async MessageTransformPolicyTests.run
       "SembleInjectionTests.run", TestBody.Sync(sync SembleInjectionTests.run)
       "SembleInjectionDedupSpecs.run", TestBody.Sync(sync SembleInjectionDedupSpecs.run)

@@ -152,14 +152,13 @@ let testConstants () =
 
 let testInfoItemOrdering () =
     let r =
-        render
-            { info =
-                [ hint "first hint"
-                  syntax "python"
-                  status "ok"
-                  exitCode 0
-                  iterator "iter-1" ]
-              body = "" }
+        { info = []; body = "" }
+        |> appendInfo (hint "first hint")
+        |> appendInfo (syntax "python")
+        |> appendInfo (status "ok")
+        |> appendInfo (exitCode 0)
+        |> appendInfo (iterator "iter-1")
+        |> render
 
     let lines = r.Split('\n') |> Array.toList
     let hintLine = lines |> List.tryFindIndex (fun l -> l.Contains "hint:")

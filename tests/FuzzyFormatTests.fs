@@ -225,8 +225,55 @@ let formatFindOutputTests () =
 
     check "find-singular" (out1.StartsWith "1 matching file (50 total indexed)")
 
+/// Regression: prepend+rev optimization must preserve original line ordering.
+/// Verifies exact output string to lock in the O(N²)→O(N) refactor result.
+let formatGrepOutputOrderRegression () =
+    let items =
+        [ { relativePath = "src/A.fs"
+            lineNumber = 10
+            lineContent = "alpha"
+            contextBefore = [ "before-a" ]
+            contextAfter = [ "after-a" ]
+            annotation = None }
+          { relativePath = "src/A.fs"
+            lineNumber = 20
+            lineContent = "beta"
+            contextBefore = []
+            contextAfter = []
+            annotation = None }
+          { relativePath = "src/B.fs"
+            lineNumber = 5
+            lineContent = "gamma"
+            contextBefore = []
+            contextAfter = [ "after-g" ]
+            annotation = None } ]
+
+    let out =
+        formatGrepOutput (
+            Some
+                { items = items
+                  totalMatched = Some 3
+                  regexFallbackError = None }
+        )
+
+    let expected =
+        "3 matches\n\
+         \n\
+         src/A.fs\n\
+         9- before-a\n\
+         10: alpha\n\
+         11- after-a\n\
+         20: beta\n\
+         \n\
+         src/B.fs\n\
+         5: gamma\n\
+         6- after-g"
+
+    equal "grep-order-regression" expected out
+
 let run () =
     truncateLineTests ()
     fileAnnotationTests ()
     formatGrepOutputTests ()
     formatFindOutputTests ()
+    formatGrepOutputOrderRegression ()

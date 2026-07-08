@@ -20,6 +20,16 @@ let emptyState : DedupState =
 /// Max rawOutputs kept per dedup state. Bounds substring scan cost to O(100) per check.
 let maxRawOutputs = 100
 
+/// Drop the last element of a list in a single pass: tail-recursive accumulator
+/// + one final `List.rev`. Avoids `List.rev |> List.tail |> List.rev` (O(2N)).
+let private dropLast (list: 'T list) =
+    let rec loop acc l =
+        match l with
+        | [] -> []
+        | [ _ ] -> List.rev acc
+        | x :: xs -> loop (x :: acc) xs
+    loop [] list
+
 type DedupedOutput =
     { output: string
       state: DedupState }
@@ -70,7 +80,7 @@ let deduplicate (state: DedupState) (output: string) : DedupedOutput =
                 | Some fp ->
                     let rawOutputs' =
                         if state.rawOutputs.Length >= maxRawOutputs then
-                            fp :: (state.rawOutputs |> List.rev |> List.tail |> List.rev)
+                            fp :: dropLast state.rawOutputs
                         else
                             fp :: state.rawOutputs
                     { fingerprints = Set.add fp state.fingerprints
@@ -78,7 +88,7 @@ let deduplicate (state: DedupState) (output: string) : DedupedOutput =
                 | None ->
                     let rawOutputs' =
                         if state.rawOutputs.Length >= maxRawOutputs then
-                            output :: (state.rawOutputs |> List.rev |> List.tail |> List.rev)
+                            output :: dropLast state.rawOutputs
                         else
                             output :: state.rawOutputs
                     { fingerprints = state.fingerprints

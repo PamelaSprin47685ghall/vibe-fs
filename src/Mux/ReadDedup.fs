@@ -111,17 +111,18 @@ let private applyModelDedupToMessages (messages: obj array) (hits: ReadHit list)
             List.zip hits replaced
             |> List.choose (fun (hit, wasReplaced) -> if wasReplaced then Some hit else None)
 
-        let msgMap =
+        let replacementsMap =
             replacements
-            |> List.groupBy (fun hit -> hit.msgIndex)
-            |> Map.ofList
+            |> List.fold (fun (acc: Map<int, Map<int, ReadHit>>) hit ->
+                let partsMap = Map.tryFind hit.msgIndex acc |> Option.defaultValue Map.empty
+                let partsMap' = Map.add hit.partIndex hit partsMap
+                Map.add hit.msgIndex partsMap' acc) Map.empty
 
         messages
         |> Array.mapi (fun i msg ->
-            match Map.tryFind i msgMap with
+            match Map.tryFind i replacementsMap with
             | None -> msg
-            | Some hitsInMsg ->
-                let partMap = hitsInMsg |> List.map (fun hit -> hit.partIndex, hit) |> Map.ofList
+            | Some partMap ->
                 let contentObj = Wanxiangshu.Shell.Dyn.get msg "content"
 
                 if
