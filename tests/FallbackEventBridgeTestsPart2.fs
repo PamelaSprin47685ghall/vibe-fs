@@ -133,14 +133,15 @@ let handleEvent_sessionIdle_idle_toolText_sendsPrompt () =
             createObj
                 [ "info", box (createObj [ "role", box "assistant" ])
                   "parts",
-                  box [| createObj [ "type", box "text"; "text", box "<tool_call>name=\"read\"</tool_call>" ] |] ]
+                  box [| createObj [ "type", box "text"; "text", box "<function=read>\n<parameter=filePath>\n/foo\n</parameter>\n</function>" ] |] ]
 
         let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
         let executor = FakeExecutor(messages = [| toolMsg |])
 
         let! result = handleEvent translator rt defaultCfgLookup executor (box ())
 
-        equal "phase Idle" FallbackPhase.Idle result.State.Phase
+        equal "phase RecoveringToolCallText" FallbackPhase.RecoveringToolCallText result.State.Phase
+        equal "consumed true (blocks nudge)" true result.Consumed
         equal "recover called once" 1 (executor.RecoverCalls.Length)
         let (_, _, promptText) = executor.RecoverCalls.[0]
         equal "prompt contains recovery text" true (promptText.Contains "raw text")
@@ -205,7 +206,8 @@ let handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText () =
 
         let! result = handleEvent translator rt defaultCfgLookup executor (box ())
 
-        equal "phase Idle" FallbackPhase.Idle result.State.Phase
+        equal "phase RecoveringToolCallText" FallbackPhase.RecoveringToolCallText result.State.Phase
+        equal "consumed true" true result.Consumed
         equal "recover called once" 1 (executor.RecoverCalls.Length)
     }
 

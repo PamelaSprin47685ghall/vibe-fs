@@ -52,6 +52,8 @@ type FallbackPhase =
     | Idle
     | Retrying of retryCount: int
     | Scanning of scanIndex: int * originalIndex: int
+    | ScanningToolCallText
+    | RecoveringToolCallText
     | Exhausted
 
 [<RequireQualifiedAccess>]
