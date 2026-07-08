@@ -58,7 +58,6 @@ let testTransformO1Cache () =
 
         let encodeMessages (msgs: Message<obj> list) = [||]
         let injectFn (_excluded: bool) (arr: obj array) = promise { return arr }
-        let dedupFn (_excluded: bool) (arr: obj array) = arr
         let loadCaps () = promise { return [] }
         let buildCaps (arr: obj array) (_caps: CapsFile list) (_hint: string option) = arr
 
@@ -88,7 +87,6 @@ let testTransformO1Cache () =
                 backlogOps
                 encodeMessages
                 injectFn
-                dedupFn
                 loadCaps
                 buildCaps
 
@@ -104,7 +102,6 @@ let testTransformO1Cache () =
                 backlogOps
                 encodeMessages
                 injectFn
-                dedupFn
                 loadCaps
                 buildCaps
 

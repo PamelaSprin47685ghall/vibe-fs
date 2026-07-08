@@ -71,7 +71,6 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       "ArchitectureTests.ompSourceFilesUnder300", Sync(sync ArchitectureTestsOmp.ompSourceFilesUnder300)
       "ArchitectureTests.ompFuzzyToolsUsesShellFinder", Sync(sync ArchitectureTestsOmp.ompFuzzyToolsUsesShellFinder)
       "ArchitectureTests.ompExecutorUsesShellExecute", Sync(sync ArchitectureTestsOmp.ompExecutorUsesShellExecute)
-      "ArchitectureTests.ompReadDedupModule", Sync(sync ArchitectureTestsOmp.ompReadDedupModule)
       "ArchitectureTests.ompNudgeRuntimeModule", Sync(sync ArchitectureTestsOmp.ompNudgeRuntimeModule)
       "ArchitectureTests.ompNudgeHooksDoNotReadReviewStoreForLoopState",
       Sync(sync ArchitectureTestsOmp.ompNudgeHooksDoNotReadReviewStoreForLoopState)
@@ -89,8 +88,6 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       Sync(sync ArchitectureTestsMessageTransform.muxMessageTransformUsesCommonExtractTexts)
       "ArchitectureTests.messageTransformCommonUsesHostMessagePartCodec",
       Sync(sync ArchitectureTestsMessageTransform.messageTransformCommonUsesHostMessagePartCodec)
-      "ArchitectureTests.readDedupMuxPluginUsesHostMessagePartCodec",
-      Sync(sync ArchitectureTestsMessageTransform.readDedupMuxPluginUsesHostMessagePartCodec)
       "ArchitectureTests.messagingPartCodecExists",
       Sync(sync ArchitectureTestsMessageTransform.messagingPartCodecExists)
       "ArchitectureTests.opencodeMessagingCodecUsesMessagingPartCodec",
@@ -104,8 +101,6 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       "ArchitectureTests.hostObjBoundaryDocumented", Sync(sync ArchitectureTestsWirePipeline.hostObjBoundaryDocumented)
       "ArchitectureTests.muxMessageTransformUsesMuxWorkspaceCodec",
       Sync(sync ArchitectureTestsMessageTransform.muxMessageTransformUsesMuxWorkspaceCodec)
-      "ArchitectureTests.muxMessageTransformUsesReadDedupMuxPlugin",
-      Sync(sync ArchitectureTestsMessageTransformCaps.muxMessageTransformUsesReadDedupMuxPlugin)
       "ArchitectureTests.muxMessageTransformUsesMuxHookInputCodec",
       Sync(sync ArchitectureTestsMessageTransformCaps.muxMessageTransformUsesMuxHookInputCodec)
       "ArchitectureTests.muxWrappersCaptureUsesProjectionNotModuleCapture",
@@ -180,8 +175,6 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       Sync(sync ArchitectureTestsRuntime.runtimeScopeNoModuleProjectionHelpers)
       "ArchitectureTests.backlogSessionCodecNoReportFromFlatPartDefault",
       Sync(sync ArchitectureTestsRuntime.backlogSessionCodecNoReportFromFlatPartDefault)
-      "ArchitectureTests.opencodeMessageTransformNoLocalApplyReadDedup",
-      Sync(sync ArchitectureTestsRuntime.opencodeMessageTransformNoLocalApplyReadDedup)
       "ArchitectureTests.messageTransformUsesChatTransformOutputCodec",
       Sync(sync ArchitectureTestsWirePipeline.messageTransformUsesChatTransformOutputCodec)
       "ArchitectureTests.messageTransformUsesMessageTransformCore",

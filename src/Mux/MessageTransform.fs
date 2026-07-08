@@ -16,7 +16,6 @@ open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Mux.MessagingCodec
-open Wanxiangshu.Shell.ReadDedupMuxPlugin
 open Wanxiangshu.Mux.BacklogSession
 open Wanxiangshu.Mux.CapsCodec
 open Wanxiangshu.Shell.ReviewRuntime
@@ -69,12 +68,6 @@ let messagesTransform
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)
 
-            let dedupFn excluded encoded =
-                if excluded then
-                    encoded
-                else
-                    deduplicateReadOutputsWithSeenByPath Map.empty encoded
-
             let injectFn _ encoded = Promise.lift encoded
 
             let loadCaps () =
@@ -102,7 +95,6 @@ let messagesTransform
                     backlogOps
                     encodeMessages
                     injectFn
-                    dedupFn
                     loadCaps
                     buildCaps
 

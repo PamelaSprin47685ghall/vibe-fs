@@ -14,7 +14,6 @@ open Wanxiangshu.Omp.CapsCodec
 open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Omp.MagicTodo
 open Wanxiangshu.Omp.MessagingCodec
-open Wanxiangshu.Omp.ReadDedup
 open Wanxiangshu.Omp.ToolResultEvent
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FileSys
@@ -78,13 +77,6 @@ let transformEntriesAsyncWithAgent
                 let replayTexts () : JS.Promise<string seq> =
                     Promise.lift (extractHistoryTexts messagesList |> Seq.ofList)
 
-                let dedupFn excluded encoded =
-                    if excluded then
-                        encoded
-                    else
-                        applyReadDedup encoded
-                        encoded
-
                 let injectFn _ encoded = Promise.lift encoded
 
                 let loadCaps () : JS.Promise<CapsFile list> =
@@ -129,7 +121,6 @@ let transformEntriesAsyncWithAgent
                         backlogOps
                         encodeMessages
                         injectFn
-                        dedupFn
                         loadCaps
                         buildCaps
     }

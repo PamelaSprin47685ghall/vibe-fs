@@ -19,7 +19,6 @@ let runMessageTransformPipeline
     (backlogOps: BacklogSessionOps)
     (encodeMessages: Message<obj> list -> obj array)
     (injectFn: bool -> obj array -> JS.Promise<obj array>)
-    (dedupFn: bool -> obj array -> obj array)
     (loadCaps: unit -> JS.Promise<CapsFile list>)
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
     : JS.Promise<obj array> =
@@ -32,7 +31,6 @@ let runMessageTransformPipeline
 
             let encoded = encodeMessages afterBacklog
             let! injected = injectFn plan.Excluded encoded
-            let deduped = dedupFn plan.Excluded injected
             let! capsFiles = loadCaps ()
-            return buildCaps deduped capsFiles None
+            return buildCaps injected capsFiles None
     }

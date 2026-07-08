@@ -76,8 +76,6 @@ let configSpec () =
 
 let topLevelExportsSpec () =
     check "top-level getPluginToolPolicy is function" (typeIs getPluginToolPolicy "function")
-    check "top-level collectReadOutputs is function" (typeIs collectReadOutputs "function")
-    check "top-level deduplicateReadOutputsWithSeen is function" (typeIs deduplicateReadOutputsWithSeen "function")
 
 let systemTransformSpec (p: obj) =
     promise {

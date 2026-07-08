@@ -6,14 +6,12 @@ open Wanxiangshu.Tests.FuzzyTestsPaging
 open Wanxiangshu.Tests.ShellTests
 open Wanxiangshu.Tests.ShellTestsFormat
 open Wanxiangshu.Tests.DynTests
-open Wanxiangshu.Tests.DedupTests
 open Wanxiangshu.Tests.DelegateTests
 open Wanxiangshu.Tests.DelegateToolsCodecTests
 open Wanxiangshu.Tests.PatchParserTests
 open Wanxiangshu.Tests.ResolveAiSettingsTests
 open Wanxiangshu.Tests.IntegrationPluginTests
 open Wanxiangshu.Tests.IntegrationEventTests
-open Wanxiangshu.Tests.IntegrationDedupTests
 open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
 open Wanxiangshu.Tests.IntegrationChatTests
 open Wanxiangshu.Tests.IntegrationChatTestsSubagent
@@ -27,10 +25,8 @@ open Wanxiangshu.Tests.ToolCatalogRegistryTests
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.ToolCatalogClassificationTests
 open Wanxiangshu.Tests.ToolOutputInfoTests
-open Wanxiangshu.Tests.DedupRegressionTests
 open Wanxiangshu.Tests.MessageTransformPolicyTests
 open Wanxiangshu.Tests.SembleInjectionTests
-open Wanxiangshu.Tests.SembleInjectionDedupSpecs
 open Wanxiangshu.Tests.SembleReviewerInjectionTests
 open Wanxiangshu.Tests.ExecutorKernelTests
 open Wanxiangshu.Tests.ToolExecuteTests
@@ -108,14 +104,12 @@ let tailCoreTestEntries () : (string * TestBody) list =
       TestBody.Async ShellTests.ensureJavascriptProjectRepairsModuleType
       "ShellTests.rewriteJavascriptRelativeImports", TestBody.Async ShellTests.rewriteJavascriptRelativeImports
       "DynTests.nullish", TestBody.Sync(sync DynTests.nullish)
-      "DedupTests.run", TestBody.Sync(sync DedupTests.run)
       "DelegateTests.run", TestBody.Sync(sync DelegateTests.run)
       "DelegateToolsCodecTests.run", TestBody.Sync(sync DelegateToolsCodecTests.run)
       "PatchParserTests.run", TestBody.Sync(sync PatchParserTests.run)
       "ResolveAiSettingsTests.run", TestBody.Sync(sync ResolveAiSettingsTests.run)
       "IntegrationPluginTests.run", TestBody.Async IntegrationPluginTests.run
       "IntegrationEventTests.run", TestBody.Async IntegrationEventTests.run
-      "IntegrationDedupTests.run", TestBody.Async IntegrationDedupTests.run
       "IntegrationOpencodeReviewSpecs.run", TestBody.Async IntegrationOpencodeReviewSpecs.run
       "IntegrationChatTests.run", TestBody.Async IntegrationChatTests.run
       "IntegrationChatTestsSubagent.run", TestBody.Async IntegrationChatTestsSubagent.run
@@ -138,10 +132,8 @@ let tailCoreTestEntries () : (string * TestBody) list =
       "TitleFetchGuardTests.skipProbeMessage", TestBody.Sync(sync TitleFetchGuardTests.skipProbeMessage)
       "ToolCatalogClassificationTests.run", TestBody.Sync(sync ToolCatalogClassificationTests.run)
       "ToolOutputInfoTests.run", TestBody.Sync(sync ToolOutputInfoTests.run)
-      "DedupRegressionTests.run", TestBody.Sync(sync DedupRegressionTests.run)
       "MessageTransformPolicyTests.run", TestBody.Async MessageTransformPolicyTests.run
       "SembleInjectionTests.run", TestBody.Sync(sync SembleInjectionTests.run)
-      "SembleInjectionDedupSpecs.run", TestBody.Sync(sync SembleInjectionDedupSpecs.run)
       "SembleReviewerInjectionTests.testSembleInjectsForReviewer",
       TestBody.Async testSembleInjectsForReviewer
       "ExecutorKernelTests.run", TestBody.Sync(sync ExecutorKernelTests.run)

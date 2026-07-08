@@ -55,12 +55,6 @@ let messageTransformCommonUsesHostMessagePartCodec () =
     check "arch: MessageTransformCommon opens HostMessagePartCodec" (code.Contains "HostMessagePartCodec")
     check "arch: MessageTransformCommon no Dyn.get msg parts" (not (code.Contains "Dyn.get msg \"parts\""))
 
-let readDedupMuxPluginUsesHostMessagePartCodec () =
-    let code = requireFile "src/Shell/ReadDedupMuxPlugin.fs" |> nonCommentCode
-    check "arch: ReadDedupMuxPlugin opens HostMessagePartCodec" (code.Contains "HostMessagePartCodec")
-    check "arch: ReadDedupMuxPlugin uses getMessageParts" (code.Contains "getMessageParts")
-    check "arch: ReadDedupMuxPlugin uses decodeDynamicToolReadOutput" (code.Contains "decodeDynamicToolReadOutput")
-
 let messagingPartCodecExists () =
     let code = requireFile "src/Shell/MessagingPartCodec.fs" |> nonCommentCode
     check "arch: MessagingPartCodec defines decodeTextPart" (code.Contains "let decodeTextPart")

@@ -65,10 +65,6 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "muxSummarization", (fun () -> promise { muxSummarizationSpec () })
       "muxSummarizationToolPolicy", (fun () -> promise { muxSummarizationToolPolicySpec () })
       "muxTopLevelPolicy", muxTopLevelPolicySpec
-      "muxTopLevelDedup", muxTopLevelDedupSpec
-      "muxMessagesTransformDedupsRepeatedRead", muxMessagesTransformDedupsRepeatedReadSpec
-      "muxMessagesTransformDedupsRepeatedFileRead", muxMessagesTransformDedupsRepeatedFileReadSpec
-      "muxMessagesTransformDedupsRepeatedReadForTopLevelExec", muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec
       "muxMessagesTransformAcceptedSubmitReviewEndsLoop", muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec
       "muxTodoWriteWrapperSchema", muxTodoWriteWrapperSchemaSpec
       "muxTodoWriteCapturesCompletedWorkReport", muxTodoWriteCapturesCompletedWorkReportSpec

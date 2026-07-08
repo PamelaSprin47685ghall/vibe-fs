@@ -3,9 +3,7 @@ module Wanxiangshu.Tests.KernelTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.Dedup
 open Wanxiangshu.Kernel.ToolOutputInfo
-open Wanxiangshu.Kernel.MessageDedup
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.Messaging
@@ -91,16 +89,6 @@ let stripLexer' () =
     check "strip pipe after quote one stripped" (r12.stripped.Length = 1)
     check "strip pipe after quote head name" (r12.stripped.[0].name = "head")
     check "strip pipe after quote head count" (r12.stripped.[0].count = 1)
-
-let dedup' () =
-    let s = emptyState
-    let r1 = deduplicate s "same string"
-    let r2 = deduplicate r1.state "same string"
-    let r3 = deduplicate r1.state "same"
-    check "dedup first" (r1.output = "same string")
-    let noChange = noChangeEnvelope ()
-    check "dedup second" (r2.output = noChange)
-    check "dedup substring" (r3.output = noChange)
 
 let jsBoundary' () =
     check

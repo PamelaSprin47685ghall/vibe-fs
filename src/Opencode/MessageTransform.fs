@@ -13,7 +13,6 @@ open Wanxiangshu.Shell.MessageTransformCore
 open Wanxiangshu.Shell.MessageTransformHostEntry
 open Wanxiangshu.Shell.MessageTransformHostHooks
 open Wanxiangshu.Shell.MessageTransformPipeline
-open Wanxiangshu.Shell.ReadDedupOpenCode
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.Methodology
@@ -166,13 +165,6 @@ let messagesTransform
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)
 
-            let dedupFn excluded encoded =
-                if excluded then
-                    encoded
-                else
-                    deduplicateOpencodeReadPartsInPlace encoded
-                    encoded
-
             let injectFn excluded encoded =
                 if excluded then
                     Promise.lift encoded
@@ -203,7 +195,6 @@ let messagesTransform
                     backlogOps
                     MessagingCodec.encodeMessages
                     injectFn
-                    dedupFn
                     loadCaps
                     buildCaps
 

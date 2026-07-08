@@ -223,7 +223,7 @@ npm 包主导出入口：`build/src/Mux/Plugin.js`（`"."`）；OMP：`build/src
 3. `src/Opencode/PluginCore.fs`：OpenCode / Mimocode 共用插件装配
 4. `src/Opencode/Tools.fs`：OpenCode 工具总表（含 `registerMethodologyTools`）
 5. `src/Mux/HostTools.fs` + `src/Mux/Plugin.fs`：Mux 内建工具与 `methodology_*` 注册
-6. `src/Opencode/MessageTransform.fs` + `src/Mux/MessageTransform.fs` + `src/Omp/MessageTransform.fs`：caps prelude、Magic todo、read dedup、review replay
+6. `src/Opencode/MessageTransform.fs` + `src/Mux/MessageTransform.fs` + `src/Omp/MessageTransform.fs`：caps prelude、Magic todo、review replay
 7. `src/Shell/OpencodeSessionEventCodec.fs` + `OpencodeSessionEventNudge.fs` + `src/Opencode/NudgeEffect.fs`：Opencode session event payload 边界编解码
 
 ## 目录速览

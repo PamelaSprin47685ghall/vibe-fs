@@ -57,7 +57,6 @@
     <Compile Include="src/Kernel/Nudge/RetryProgress.fs"/>
     <Compile Include="src/Kernel/Nudge/SubmitReviewHooks.fs"/>
     <Compile Include="src/Kernel/CapsFormat.fs"/>
-    <Compile Include="src/Kernel/Dedup.fs"/>
     <Compile Include="src/Kernel/Messaging.fs"/>
     <Compile Include="src/Kernel/ReviewReplayPolicy.fs"/>
     <Compile Include="src/Kernel/Message.fs"/>
@@ -65,7 +64,6 @@
     <Compile Include="src/Kernel/CapsPrelude.fs"/>
     <Compile Include="src/Kernel/PatchParser.fs"/>
     <Compile Include="src/Kernel/TreeSitterKernel.fs"/>
-    <Compile Include="src/Kernel/MessageDedup.fs"/>
     <Compile Include="src/Kernel/MessageTransformPolicy.fs"/>
     <Compile Include="src/Kernel/MethodologyCatalog.fs"/>
     <Compile Include="src/Kernel/Methodology.fs"/>
@@ -166,9 +164,7 @@
     <Compile Include="src/Shell/MessagingDecodeCore.fs"/>
     <Compile Include="src/Shell/MessagingPartCodec.fs"/>
     <Compile Include="src/Shell/MessageTransformCommon.fs"/>
-    <Compile Include="src/Shell/ReadDedupCore.fs"/>
-    <Compile Include="src/Shell/ReadDedupOpenCode.fs"/>
-    <Compile Include="src/Shell/ReadDedupMuxPlugin.fs"/>
+
     <Compile Include="src/Shell/ChatTransformOutputCodec.fs"/>
     <Compile Include="src/Shell/MessageTransformCore.fs"/>
     <Compile Include="src/Shell/MessagingEncodeHelpers.fs"/>
@@ -243,7 +239,7 @@
     <Compile Include="src/Mux/HostToolsFuzzy.fs"/>
     <Compile Include="src/Mux/HostTools.fs"/>
     <Compile Include="src/Mux/WebTools.fs"/>
-    <Compile Include="src/Mux/ReadDedup.fs"/>
+
     <Compile Include="src/Mux/MessagingCodec.fs"/>
     <Compile Include="src/Mux/CapsCodec.fs"/>
     <Compile Include="src/Mux/BacklogSession.fs"/>
@@ -301,7 +297,7 @@
     <Compile Include="src/Omp/MessagingCodec.fs"/>
     <Compile Include="src/Omp/ChildSession.fs"/>
     <Compile Include="src/Omp/MagicTodo.fs"/>
-    <Compile Include="src/Omp/ReadDedup.fs"/>
+
     <Compile Include="src/Omp/ToolResultEvent.fs"/>
     <Compile Include="src/Omp/PruneGuard.fs"/>
     <Compile Include="src/Omp/NudgeRuntime.fs"/>
@@ -430,9 +426,6 @@
     <Compile Include="tests/IntegrationEventTestsOpencodeFallbackInterrupted.fs"/>
     <Compile Include="tests/IntegrationEventTestsOpencodeFallback.fs"/>
     <Compile Include="tests/IntegrationEventTests.fs"/>
-    <Compile Include="tests/IntegrationDedupOpenCodeSpecs.fs"/>
-    <Compile Include="tests/IntegrationDedupModelSpecs.fs"/>
-    <Compile Include="tests/IntegrationDedupTests.fs"/>
     <Compile Include="tests/IntegrationToolSpecCatalog.fs"/>
     <Compile Include="tests/IntegrationChatTests.fs"/>
     <Compile Include="tests/IntegrationChatTestsSubagent.fs"/>
@@ -479,7 +472,6 @@
     <Compile Include="tests/ReviewPromptsFormatTests.fs"/>
     <Compile Include="tests/CapsSynthCommonTests.fs"/>
     <Compile Include="tests/CapsFileCacheTests.fs"/>
-    <Compile Include="tests/DedupTests.fs"/>
     <Compile Include="tests/SubagentToolPolicyTests.fs"/>
     <Compile Include="tests/SubagentPromptBuildTests.fs"/>
     <Compile Include="tests/SubagentSpawnTests.fs"/>
@@ -604,7 +596,6 @@
     <Compile Include="tests/ArchitectureTestsFallback.fs"/>
     <Compile Include="tests/TestsEntriesFallback.fs"/>
     <Compile Include="tests/SembleInjectionTests.fs"/>
-    <Compile Include="tests/SembleInjectionDedupSpecs.fs"/>
     <Compile Include="tests/OpencodeSessionLifecycleTests.fs"/>
     <Compile Include="tests/SembleReviewerInjectionTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/AssertCompat.fs"/>
@@ -661,7 +652,6 @@
     <Compile Include="tests/Wanxiangzhen/SquadUpdateIdAssignTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/TaskTests.fs"/>
     <Compile Include="tests/TestsEntriesWanxiangzhen.fs"/>
-    <Compile Include="tests/DedupRegressionTests.fs"/>
     <Compile Include="tests/TestsEntriesCoreTail.fs"/>
     <Compile Include="tests/TestsEntriesCore.fs"/>
     <Compile Include="tests/TestsEntriesCodec.fs"/>

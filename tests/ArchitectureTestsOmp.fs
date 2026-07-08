@@ -108,10 +108,6 @@ let ompExecutorUsesShellExecute () =
         "arch: Omp ExecutorTools uses ToolExecute or Shell executor path"
         (code.Contains "ToolExecute" || code.Contains "SessionExecutor")
 
-let ompReadDedupModule () =
-    let code = requireFile "src/Omp/ReadDedup.fs" |> nonCommentCode
-    check "arch: Omp ReadDedup non-empty" (code.Contains "module")
-
 let ompNudgeRuntimeModule () =
     let code = requireFile "src/Omp/NudgeRuntime.fs" |> nonCommentCode
     check "arch: Omp NudgeRuntime non-empty" (code.Contains "module")

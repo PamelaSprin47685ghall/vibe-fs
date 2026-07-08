@@ -121,7 +121,7 @@ let meditatorPrompt (sections: MeditatorFileSection list) (intent: string) : str
         [ yamlSeqField "files" (sections |> List.map fileItem)
           yamlField "question" intent ]
         [ "You are in a quiet room with the texts and the question."
-          "No tools, no distractions — just you and the problem."
+          "No tools (except the read tool to view files), no distractions — just you and the problem."
           "Read carefully. Turn it over in your mind."
           "When you are ready, answer with clarity and depth." ]
 

@@ -15,6 +15,9 @@ let subagentDispatch () =
 let subagentJoinReports () =
     KernelPromptSpecsSubagent.subagentJoinReports ()
 
+let meditatorMentionsReadCapability () =
+    KernelPromptSpecsSubagent.meditatorMentionsReadCapability ()
+
 let mimocodeFormatPromptAppendsAgentReportTail () =
     KernelPromptSpecsSubagent.mimocodeFormatPromptAppendsAgentReportTail ()
 

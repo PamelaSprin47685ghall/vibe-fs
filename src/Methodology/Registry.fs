@@ -13,5 +13,13 @@ let enumValuesArray: Lazy<string array> = lazy (enumValues.Value |> Array.ofList
 let unifiedNoteDescription: Lazy<string> =
     lazy (buildUnifiedNoteDescription allEntries.Value)
 
+/// Precomputed lookup map for O(log N) entry retrieval.
+let private entryMap: Lazy<Map<string, MethodologyEntry>> =
+    lazy (
+        allEntries.Value
+        |> List.map (fun e -> e.methodologyId, e)
+        |> Map.ofList
+    )
+
 let tryFindEntry methodologyId =
-    allEntries.Value |> List.tryFind (fun e -> e.methodologyId = methodologyId)
+    entryMap.Value |> Map.tryFind methodologyId

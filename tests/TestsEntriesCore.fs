@@ -93,7 +93,6 @@ let coreTestEntries () : (string * TestBody) list =
       "SubagentDispatcherTests.run", TestBody.Async SubagentDispatcherTests.run
       "KernelTests.headTail'", TestBody.Sync(sync KernelTests.headTail')
       "KernelTests.stripLexer'", TestBody.Sync(sync KernelTests.stripLexer')
-      "KernelTests.dedup'", TestBody.Sync(sync KernelTests.dedup')
       "KernelTests.jsBoundary'", TestBody.Sync(sync KernelTests.jsBoundary')
       "KernelPromptSpecs.hostKernel'", TestBody.Sync(sync KernelPromptSpecs.hostKernel')
       "DynFieldTests.run", TestBody.Sync(sync DynFieldTests.run)
@@ -102,6 +101,7 @@ let coreTestEntries () : (string * TestBody) list =
       "KernelPromptSpecs.mimocodeFormatPromptAppendsAgentReportTail",
       TestBody.Sync(sync KernelPromptSpecs.mimocodeFormatPromptAppendsAgentReportTail)
       "KernelPromptSpecs.subagentJoinReports", TestBody.Sync(sync KernelPromptSpecs.subagentJoinReports)
+      "KernelPromptSpecs.meditatorMentionsReadCapability", TestBody.Sync(sync KernelPromptSpecs.meditatorMentionsReadCapability)
       "KernelTests.dynDeleteKey", TestBody.Sync(sync KernelTests.dynDeleteKey)
       "KernelPromptSpecs.loopMessagesShared", TestBody.Sync(sync KernelPromptSpecs.loopMessagesShared)
       "KernelPromptSpecs.reviewerVerdictPromptsShared",

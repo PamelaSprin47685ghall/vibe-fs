@@ -5,14 +5,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.ArchitectureTestsSupport
 
-let muxMessageTransformUsesReadDedupMuxPlugin () =
-    let code = requireFile "src/Mux/MessageTransform.fs" |> nonCommentCode
-    check "arch: Mux MessageTransform opens ReadDedupMuxPlugin" (code.Contains "ReadDedupMuxPlugin")
-
-    check
-        "arch: Mux MessageTransform must not open Mux.ReadDedup for plugin dedup"
-        (not (code.Contains "Mux.ReadDedup"))
-
 let muxMessageTransformUsesMuxHookInputCodec () =
     let code = requireFile "src/Mux/MessageTransform.fs" |> nonCommentCode
     check "arch: Mux MessageTransform opens MuxHookInputCodec" (code.Contains "MuxHookInputCodec")

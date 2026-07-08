@@ -4,6 +4,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Kernel.Subagent
+open Wanxiangshu.Kernel.SubagentPrompts
 
 let subagentDispatch () =
     let host = opencode
@@ -89,3 +90,13 @@ let mimocodeFormatPromptAppendsAgentReportTail () =
     check
         "opencode browser prompt does not append agent_report tail"
         (not (opencodeBody.Contains "MUST call the agent_report"))
+
+let meditatorMentionsReadCapability () =
+    let sections =
+        [ { file = "src/Kernel/SubagentPrompts.fs"
+            content = Some "let x = 1" }
+          { file = "README.md"; content = None } ]
+    let body = meditatorPrompt sections "what is the core abstraction?"
+    check "meditator prompt mentions read tool" (body.Contains "read tool")
+    check "meditator prompt still embeds file path" (body.Contains "src/Kernel/SubagentPrompts.fs")
+    check "meditator prompt still embeds question" (body.Contains "what is the core abstraction?")

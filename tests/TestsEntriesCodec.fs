@@ -14,7 +14,6 @@ open Wanxiangshu.Tests.DelegateToolsCodecTests
 open Wanxiangshu.Tests.ResolveAiSettingsTests
 open Wanxiangshu.Tests.IntegrationPluginTests
 open Wanxiangshu.Tests.IntegrationEventTests
-open Wanxiangshu.Tests.IntegrationDedupTests
 open Wanxiangshu.Tests.IntegrationToolSpecCatalog
 open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
 open Wanxiangshu.Tests.IntegrationChatTests

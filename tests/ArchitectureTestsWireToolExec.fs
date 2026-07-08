@@ -117,8 +117,6 @@ let private shellBareDynAllowlist =
           "NudgeRuntimeMux.fs"
           "OmpHostBindings.fs"
           "OpencodeAgentConfigWire.fs"
-          "ReadDedupMuxPlugin.fs"
-          "ReadDedupOpenCode.fs"
           "SembleMcp.fs"
           "SembleSearch.fs"
           "SembleSearchClient.fs"
@@ -126,7 +124,10 @@ let private shellBareDynAllowlist =
           "ToolRuntimeContext.fs"
           "TreeSitterPlatform.fs"
           "WebSearchApi.fs"
-          "WorkspaceFiles.fs" ]
+           "WorkspaceFiles.fs" ]
+
+    // Note: ReadDedupCore.fs, ReadDedupOpenCode.fs, ReadDedupMuxPlugin.fs
+    // have been removed from the project. No allowlist entry needed.
 
 let shellNonCodecMustUseDynFieldHelpers () =
     for f in fsFiles "src/Shell" do

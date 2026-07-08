@@ -186,11 +186,4 @@ let backlogSessionCodecNoReportFromFlatPartDefault () =
     check "arch: BacklogSessionCodec must not define reportFromFlatPart" (not (reportFromFlatPartDefRe.IsMatch codec))
     check "arch: BacklogSessionCodec must not call getDefault" (not (codec.Contains "getDefault"))
 
-let opencodeMessageTransformNoLocalApplyReadDedup () =
-    let code = requireFile "src/Opencode/MessageTransform.fs" |> nonCommentCode
-    check "arch: Opencode MessageTransform no local applyReadDedup" (not (code.Contains "let private applyReadDedup"))
-    check "arch: Opencode MessageTransform uses ReadDedupOpenCode" (code.Contains "ReadDedupOpenCode")
 
-    check
-        "arch: Opencode MessageTransform calls deduplicateOpencodeReadPartsInPlace"
-        (code.Contains "deduplicateOpencodeReadPartsInPlace")

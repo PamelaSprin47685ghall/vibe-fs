@@ -4,11 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Kernel.Dedup
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Shell.SembleSearch
-open Wanxiangshu.Shell.ReadDedupOpenCode
 
 [<Global("process")>]
 let private procEnv: obj = jsNative

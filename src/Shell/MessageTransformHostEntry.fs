@@ -74,7 +74,6 @@ let runHostMessagesTransform
     (backlogOps: BacklogSessionOps)
     (encodeMessages: Message<obj> list -> obj array)
     (injectFn: bool -> obj array -> JS.Promise<obj array>)
-    (dedupFn: bool -> obj array -> obj array)
     (loadCaps: unit -> JS.Promise<CapsFile list>)
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
     : JS.Promise<obj array> =
@@ -101,7 +100,7 @@ let runHostMessagesTransform
                 pipelineRunCount <- pipelineRunCount + 1
 
                 let! result =
-                    runMessageTransformPipeline plan backlogOps encodeMessages injectFn dedupFn loadCaps buildCaps
+                    runMessageTransformPipeline plan backlogOps encodeMessages injectFn loadCaps buildCaps
 
                 cache.InputFingerprint <- currentFingerprint
                 cache.OutputFingerprint <- computeFingerprint result
