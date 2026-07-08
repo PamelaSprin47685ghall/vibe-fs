@@ -10,6 +10,12 @@ let sessionEventTypesContainsCreated () =
 let sessionEventTypesContainsDeleted () =
     check "session.deleted" (Set.contains "session.deleted" sessionEventTypes)
 
+let pluginObservedRejectsStreamingDelta () =
+    check "message.part.delta" (not (isPluginObservedHostEvent "message.part.delta"))
+
+let pluginObservedAcceptsSessionStatus () =
+    check "session.status" (isPluginObservedHostEvent "session.status")
+
 let getSessionIDFromTopLevel () =
     let props = unbox (createObj [ "sessionID", box "s1" ])
     equal "s1" "s1" (getSessionID "session.updated" props)
@@ -71,6 +77,8 @@ let isCompletedAssistantMessageNonAssistant () =
 let run () =
     sessionEventTypesContainsCreated ()
     sessionEventTypesContainsDeleted ()
+    pluginObservedRejectsStreamingDelta ()
+    pluginObservedAcceptsSessionStatus ()
     getSessionIDFromTopLevel ()
     getSessionIDFromPart ()
     getSessionIDFromInfoSessionID ()

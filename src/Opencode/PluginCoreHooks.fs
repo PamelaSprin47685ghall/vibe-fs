@@ -16,6 +16,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodec
+open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Opencode.PtySpawn
@@ -87,26 +88,30 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
         result
         "event"
         (box (fun (input: obj) ->
-            promise {
-                do! eventHandler services.ReviewStore services.RuntimeScope input
+            match decodeHostEventEnvelope input with
+            | None -> promise { return () }
+            | Some env when not (isPluginObservedHostEvent env.EventType) -> promise { return () }
+            | Some env ->
+                promise {
+                    do! eventHandler services.ReviewStore services.RuntimeScope input
 
-                let ptyCleanupSessionId =
-                    match Wanxiangshu.Shell.OpencodeHookInputCodec.decodeHostEventEnvelope input with
-                    | Some e when
-                        e.EventType = "session.deleted"
-                        || e.EventType = "session.delete"
-                        || e.EventType = "session.remove"
-                        || e.EventType = "session.close"
-                        ->
-                        Wanxiangshu.Shell.OpencodeSessionEventCodec.getSessionID e.EventType e.Props
-                    | _ -> ""
+                    let ptyCleanupSessionId =
+                        if
+                            env.EventType = "session.deleted"
+                            || env.EventType = "session.delete"
+                            || env.EventType = "session.remove"
+                            || env.EventType = "session.close"
+                        then
+                            getSessionID env.EventType env.Props
+                        else
+                            ""
 
-                if ptyCleanupSessionId <> "" then
-                    cleanupPtyBySession ptyCleanupSessionId
-                    Wanxiangshu.Shell.LivelockGuard.cleanup services.RuntimeScope ptyCleanupSessionId
+                    if ptyCleanupSessionId <> "" then
+                        cleanupPtyBySession ptyCleanupSessionId
+                        Wanxiangshu.Shell.LivelockGuard.cleanup services.RuntimeScope ptyCleanupSessionId
 
-                do! services.SessionLifecycleObserver.handleEvent input
-            }))
+                    do! services.SessionLifecycleObserver.handleEvent input
+                }))
 
     setKey
         result

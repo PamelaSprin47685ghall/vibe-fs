@@ -14,6 +14,26 @@ let sessionEventTypes =
           "session.close"
           "session.remove" ]
 
+/// Host `plugin.event` types that wanxiangshu Opencode hooks actually handle.
+/// High-frequency streaming types (`message.part.*`) are omitted so the server
+/// does not allocate a Promise chain per token.
+let pluginObservedHostEventTypes =
+    Set.ofList
+        [ "stream-abort"
+          "session.status"
+          "session.idle"
+          "session.error"
+          "session.interrupted"
+          "session.next.prompted"
+          "session.deleted"
+          "session.delete"
+          "session.remove"
+          "session.close"
+          "message.updated" ]
+
+let isPluginObservedHostEvent (eventType: string) : bool =
+    Set.contains eventType pluginObservedHostEventTypes
+
 /// Resolve the sessionID of a session event. Different event shapes stash the
 /// id in different locations — fall back through the known carriers in
 /// priority order, and only fall through to `info.id` for the lifecycle-style
