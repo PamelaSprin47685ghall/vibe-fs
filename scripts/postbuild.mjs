@@ -1,6 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+const isSilent = process.argv.includes('--silent');
+const log = (...args) => { if (!isSilent) console.log(...args); };
+const warn = (...args) => { if (!isSilent) console.warn(...args); };
+
 const root = new URL('..', import.meta.url).pathname;
 const buildDir = path.join(root, 'build');
 
@@ -15,9 +19,9 @@ const pkgSrc = path.join(root, 'build-package.json');
 const pkgDst = path.join(buildDir, 'package.json');
 if (fs.existsSync(pkgSrc)) {
   fs.copyFileSync(pkgSrc, pkgDst);
-  console.log('✓ Copied package.json');
+  log('✓ Copied package.json');
 } else {
-  console.warn('Warning: build-package.json not found');
+  warn('Warning: build-package.json not found');
 }
 
 // 3. Recursively copy non-F# assets from src/ directories to build/
@@ -41,7 +45,7 @@ function syncAssets(sourceDir, targetDir) {
   }
 }
 
-console.log('Syncing assets...');
+log('Syncing assets...');
 syncAssets(
   path.join(root, 'tests'),
   path.join(buildDir, 'tests')
@@ -50,7 +54,7 @@ syncAssets(
   path.join(root, 'e2e'),
   path.join(buildDir, 'e2e')
 );
-console.log('✓ Assets synced');
+log('✓ Assets synced');
 
 // 4. Clean Fable artifacts
 const gitignore = path.join(
@@ -58,7 +62,7 @@ const gitignore = path.join(
 );
 if (fs.existsSync(gitignore)) {
   fs.rmSync(gitignore);
-  console.log('✓ Cleaned .gitignore');
+  log('✓ Cleaned .gitignore');
 }
 
-console.log('Postbuild done.');
+log('Postbuild done.');

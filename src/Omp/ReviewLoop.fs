@@ -40,7 +40,6 @@ let private attachReviewChild
     store.setPendingReview (
         childId,
         fun kr ->
-            printfn "DEBUG: resolve callback fired, kr=%A" kr
             try
                 Dyn.callMethod0 childSession "abort" |> ignore
             with _ ->

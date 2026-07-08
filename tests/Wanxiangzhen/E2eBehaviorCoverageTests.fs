@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.Wanxiangzhen.E2eBehaviorCoverageTests
 
+open Wanxiangshu.Tests
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.MockE2eTests
 open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eTests
@@ -15,6 +16,7 @@ let entries () : (string * (unit -> unit)) list = [
         chk "coverage.mock_e2e_ge_6"   (mockLen >= 6)
         chk "coverage.opencode_e2e_ge_10" (openLen >= 10)
         chk "coverage.ext_mock_e2e_ge_25" (extLen >= 25)
-        printfn "  e2e coverage: mock=%d opencode=%d ext=%d" mockLen openLen extLen
-        printfn "  gap doc: see E2eBehaviorGapTests.entries () for behavior coverage registry")
+        if not Assert.silentEnabled then
+            printfn "  e2e coverage: mock=%d opencode=%d ext=%d" mockLen openLen extLen
+            printfn "  gap doc: see E2eBehaviorGapTests.entries () for behavior coverage registry")
 ]

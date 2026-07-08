@@ -3,13 +3,16 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 
 export async function runAll(args) {
-    console.log('Executing GitHookFormatterTests...');
+    const isSilent = args.includes('--silent');
+    const log = (...msg) => { if (!isSilent) console.log(...msg); };
+
+    log('Executing GitHookFormatterTests...');
     const formatterPath = path.resolve('./scripts/pre-commit-formatter.mjs');
     const setupPath = path.resolve('./scripts/setup-git-hooks.mjs');
 
     try {
         await fs.access(formatterPath);
-        console.log('✓ pre-commit-formatter.mjs exists.');
+        log('✓ pre-commit-formatter.mjs exists.');
     } catch (err) {
         console.error('Test failed: pre-commit-formatter.mjs is missing.');
         return 1;
@@ -17,7 +20,7 @@ export async function runAll(args) {
 
     try {
         await fs.access(setupPath);
-        console.log('✓ setup-git-hooks.mjs exists.');
+        log('✓ setup-git-hooks.mjs exists.');
     } catch (err) {
         console.error('Test failed: setup-git-hooks.mjs is missing.');
         return 1;
@@ -28,7 +31,7 @@ export async function runAll(args) {
         const pkgRaw = await fs.readFile(path.resolve('./package.json'), 'utf8');
         const pkg = JSON.parse(pkgRaw);
         if (pkg.scripts && pkg.scripts.prepare === 'node scripts/setup-git-hooks.mjs') {
-            console.log('✓ package.json scripts.prepare is correctly configured.');
+            log('✓ package.json scripts.prepare is correctly configured.');
         } else {
             console.error('Test failed: package.json scripts.prepare is missing or incorrect.');
             return 1;
@@ -66,11 +69,11 @@ export async function runAll(args) {
         const formattedContent = await fs.readFile(fsprojPath, 'utf8');
         if (!formattedContent.includes('\n') || formattedContent === unformattedContent) {
             console.error('Test failed: test.fsproj was not formatted as XML.');
-            console.log('Content remained:', formattedContent);
+            log('Content remained:', formattedContent);
             return 1;
         }
 
-        console.log('✓ .fsproj file was formatted successfully.');
+        log('✓ .fsproj file was formatted successfully.');
     } catch (err) {
         console.error('Fsproj formatting test failed with error:', err);
         return 1;
@@ -126,11 +129,11 @@ export async function runAll(args) {
         const contentAfterAll = await fs.readFile(trackedPath, 'utf8');
         if (!contentAfterAll.includes('\n') || contentAfterAll === unformatted) {
             console.error('Test failed: --all flag did not format un-staged file.');
-            console.log('Content remained:', contentAfterAll);
+            log('Content remained:', contentAfterAll);
             return 1;
         }
 
-        console.log('✓ --all flag formats un-staged files correctly.');
+        log('✓ --all flag formats un-staged files correctly.');
     } catch (err) {
         console.error('--all flag test failed with error:', err);
         return 1;
@@ -138,6 +141,6 @@ export async function runAll(args) {
         await fs.rm(tmpAllDir, { recursive: true, force: true });
     }
 
-    console.log('All GitHookFormatterTests passed.');
+    log('All GitHookFormatterTests passed.');
     return 0;
 }

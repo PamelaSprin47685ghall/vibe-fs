@@ -24,7 +24,7 @@ let private rmSync (path: string) (opts: obj) : unit = jsNative
 let private execSync (cmd: string) (opts: obj) : obj = jsNative
 
 let private git (cwd: string) (args: string) : string =
-    let r = execSync ("git " + args) (box {| cwd = cwd; encoding = "utf-8" |})
+    let r = execSync ("git " + args) (box {| cwd = cwd; encoding = "utf-8"; stdio = "pipe" |})
     string r |> (fun s -> s.TrimEnd())
 
 let private initRepo () : string =

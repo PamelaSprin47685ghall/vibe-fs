@@ -24,8 +24,8 @@ let private envVar (key: string) : string =
 let writeE2eMetaIfEnabled (rt: CoordinatorRuntime) : unit =
     let isE2e = envVar "WANXIANGZHEN_E2E" = "1" || envVar "WANXIANGZHEN_E2E_INPROCESS" = "1"
     let fullPath = pathJoin rt.ProjectRoot ".wanxiangzhen-e2e-meta.json"
-    JS.console.log("writeE2eMetaIfEnabled", "isE2e:", isE2e, "path:", fullPath, "port:", rt.CoordinatorUrl)
     if isE2e then
+        JS.console.log("writeE2eMetaIfEnabled", "isE2e:", isE2e, "path:", fullPath, "port:", rt.CoordinatorUrl)
         let meta =
             {| coordinatorUrl = rt.CoordinatorUrl
                token = rt.Token

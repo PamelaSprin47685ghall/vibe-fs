@@ -12,6 +12,9 @@ let private appendFile (path: string) (content: string) (encoding: string) : uni
 
 let mutable passed = 0
 let mutable failed = 0
+let mutable silentEnabled = false
+let setSilent (s: bool) : unit =
+    silentEnabled <- s
 let private failures = ResizeArray<string>()
 let private timings = ResizeArray<string * float>()
 let mutable private verboseEnabled = false
@@ -151,28 +154,34 @@ let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<uni
 
 /// Print the pass/fail summary and the slowest tests, return the failure count.
 let summary () : int =
-    printfn "\n==== %d passed, %d failed ====" passed failed
+    if not silentEnabled then
+        printfn "\n==== %d passed, %d failed ====" passed failed
 
-    if failures.Count > 0 then
-        printfn "FAILURES:"
-        failures |> Seq.iteri (fun i f -> printfn "  %d. %s" (i + 1) f)
+        if failures.Count > 0 then
+            printfn "FAILURES:"
+            failures |> Seq.iteri (fun i f -> printfn "  %d. %s" (i + 1) f)
 
-    if timings.Count > 0 then
-        let total = timings |> Seq.sumBy snd
-        printfn "\nTIMINGS (top 25 of %d, total %.0f ms):" timings.Count total
+        if timings.Count > 0 then
+            let total = timings |> Seq.sumBy snd
+            printfn "\nTIMINGS (top 25 of %d, total %.0f ms):" timings.Count total
 
-        timings
-        |> Seq.sortByDescending snd
-        |> Seq.truncate 25
-        |> Seq.iteri (fun i (label, ms) -> printfn "  %2d. %7.1f ms  %s" (i + 1) ms label)
+            timings
+            |> Seq.sortByDescending snd
+            |> Seq.truncate 25
+            |> Seq.iteri (fun i (label, ms) -> printfn "  %2d. %7.1f ms  %s" (i + 1) ms label)
 
-    match verboseLogPath with
-    | Some path when verboseEnabled ->
-        let footer =
-            sprintf "# summary: %d passed, %d failed, %d checks logged\n" passed failed verboseChecksLogged
+        match verboseLogPath with
+        | Some path when verboseEnabled ->
+            let footer =
+                sprintf "# summary: %d passed, %d failed, %d checks logged\n" passed failed verboseChecksLogged
 
-        appendFile path footer "utf8"
-        printfn "\nverbose log: %s" path
-    | _ -> ()
+            appendFile path footer "utf8"
+            printfn "\nverbose log: %s" path
+        | _ -> ()
+    else
+        if failures.Count > 0 then
+            printfn "\n==== %d passed, %d failed ====" passed failed
+            printfn "FAILURES:"
+            failures |> Seq.iteri (fun i f -> printfn "  %d. %s" (i + 1) f)
 
     failed

@@ -1,5 +1,6 @@
 module Wanxiangshu.Tests.Wanxiangzhen.E2eBehaviorGapTests
 
+open Wanxiangshu.Tests
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 open Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eTests
 
@@ -23,26 +24,28 @@ let entries () : (string * (unit -> unit)) list = [
         chk "gap.ext_mock_labels_unique" (live |> List.distinct |> List.length = live.Length)
     )
     ("e2e_behavior_gap.coverage_table", fun () ->
-        printfn "| label | area |"
-        printfn "|-------|------|"
-        ExtendedMockE2eTests.entriesAsync ()
-        |> List.map fst
-        |> List.iter (fun label ->
-            let area =
-                if label.Contains "replay" then "replay"
-                elif label.Contains "dependency_" || label.Contains "maxConcurrent"
-                     || label.Contains "done_beacon" || label.Contains "pid_polling" then "scheduler"
-                elif label.Contains "slave_" then "slave_http"
-                elif label.Contains "submit_" || label.Contains "worktree_add"
-                     || label.Contains "merged_" || label.Contains "http_" then "submit"
-                elif label.Contains "multi_session" || label.Contains "dispose_hook"
-                     || label.Contains "realistic_opencode" then "plugin"
-                else "unknown"
-            printfn "| %s | %s |" label area
-        )
+        if not Assert.silentEnabled then
+            printfn "| label | area |"
+            printfn "|-------|------|"
+            ExtendedMockE2eTests.entriesAsync ()
+            |> List.map fst
+            |> List.iter (fun label ->
+                let area =
+                    if label.Contains "replay" then "replay"
+                    elif label.Contains "dependency_" || label.Contains "maxConcurrent"
+                         || label.Contains "done_beacon" || label.Contains "pid_polling" then "scheduler"
+                    elif label.Contains "slave_" then "slave_http"
+                    elif label.Contains "submit_" || label.Contains "worktree_add"
+                         || label.Contains "merged_" || label.Contains "http_" then "submit"
+                    elif label.Contains "multi_session" || label.Contains "dispose_hook"
+                         || label.Contains "realistic_opencode" then "plugin"
+                    else "unknown"
+                printfn "| %s | %s |" label area
+            )
     )
     ("e2e_behavior_gap.agents_registry", fun () ->
-        printfn "BEHAVIOR GAP REGISTRY"
+        if not Assert.silentEnabled then
+            printfn "BEHAVIOR GAP REGISTRY"
         agentsBehaviors |> List.iter (fun (behavior, coverage, kind) ->
             chk "gap.agents_behavior_nonempty" (not (System.String.IsNullOrWhiteSpace behavior))
             chk "gap.agents_coverage_nonempty" (not (System.String.IsNullOrWhiteSpace coverage))

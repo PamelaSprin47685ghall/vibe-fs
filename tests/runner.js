@@ -2,6 +2,8 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('UNHANDLED REJECTION AT:', promise, 'REASON:', reason);
 });
 
+const isSilent = process.argv.includes('--silent');
+
 const isE2eMux = process.argv.includes('--e2e-mux');
 const isE2e = process.argv.includes('--e2e');
 const isE2eOmp = process.argv.includes('--e2e-omp');
@@ -29,7 +31,7 @@ if (isE2eMux) {
         }
         if (totalFailed > 0) {
             console.error(`\n✗ ${totalFailed} total failures across opencode-family e2e suites`);
-        } else {
+        } else if (!isSilent) {
             console.log('\n✓ All opencode-family e2e suites passed');
         }
         return totalFailed;
@@ -42,7 +44,9 @@ if (isE2eMux) {
         const code = await coreRun(args);
         if (code !== 0) return code;
 
-        console.log('\nRunning GitHookFormatterTests...');
+        if (!isSilent) {
+            console.log('\nRunning GitHookFormatterTests...');
+        }
         try {
             const { runAll: hookRun } = await import('./GitHookFormatterTests.js');
             return await hookRun(args);

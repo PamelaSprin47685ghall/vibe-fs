@@ -172,7 +172,9 @@ let private selectedTests (selectors: string array) =
 let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
-        let selectors = args |> Array.filter (fun a -> a <> "--verbose" && a <> "-v")
+        let isSilent = args |> Array.contains "--silent"
+        Assert.setSilent isSilent
+        let selectors = args |> Array.filter (fun a -> a <> "--verbose" && a <> "-v" && a <> "--silent")
         initVerboseLog ()
         PluginCore.reviewStore.clearReviewSessions ()
         RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope

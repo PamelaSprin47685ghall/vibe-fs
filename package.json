@@ -32,10 +32,10 @@
   ],
   "scripts": {
     "prepare": "node scripts/setup-git-hooks.mjs",
-    "build": "dotnet fable wanxiangshu.fsproj --outDir build --noCache && node scripts/postbuild.mjs",
+    "build": "dotnet fable wanxiangshu.fsproj --outDir build && node scripts/postbuild.mjs",
     "postbuild": "node scripts/postbuild.mjs",
     "test": "node tests/runner.js",
-    "build-and-test": "npm run build && npm run test",
+    "build-and-test": "node scripts/build-and-test.mjs",
     "format": "node scripts/pre-commit-formatter.mjs",
     "e2e": "node tests/runner.js --e2e",
     "e2e:mux": "node tests/runner.js --e2e-mux",
