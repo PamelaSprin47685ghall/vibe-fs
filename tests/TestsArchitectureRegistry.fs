@@ -43,6 +43,7 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       "ArchitectureTests.ompBoundary", Sync(sync ArchitectureTestsFoundation.ompBoundary)
       "ArchitectureTests.ompNoEngineRef", Sync(sync ArchitectureTestsFoundation.ompNoEngineRef)
       "ArchitectureTests.noQuadraticListAppend", Sync(sync ArchitectureTestsFoundation.noQuadraticListAppend)
+      "ArchitectureTests.parallelToolPromptSSOTGuard", Sync(sync ArchitectureTestsFoundation.parallelToolPromptSSOTGuard)
       "ArchitectureTests.noDuplicateStateHolder", Sync(sync ArchitectureTestsFoundation.noDuplicateStateHolder)
       "ArchitectureTests.noDuplicateRunNudgeFlowCore",
       Sync(sync ArchitectureTestsFoundation.noDuplicateRunNudgeFlowCore)

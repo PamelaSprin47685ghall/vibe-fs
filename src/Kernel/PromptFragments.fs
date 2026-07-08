@@ -74,3 +74,6 @@ let managerSystemPromptFor (host: Host) =
     + todoLine
 
 let managerSystemPrompt = managerSystemPromptFor opencode
+
+let parallelToolPromptProse =
+    "【万象铁律】检测到上一轮仅执行了单工具调用。严禁单步调试式控制流，杜绝拖延。请穷尽当前可并行执行的步骤，一次性调用所有正交工具（如并行 fuzzy_grep/read/write/executor），严禁一次只调用一个工具！编译器和运行时已为你站岗，速去并行执行，提高效率！"

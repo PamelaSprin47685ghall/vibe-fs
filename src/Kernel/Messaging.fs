@@ -63,7 +63,8 @@ let private synthPrefixes =
       "magic-todo-projection-"
       "magic-todo-prefix-"
       "methodology-probe-"
-      "semble-synth-" ]
+      "semble-synth-"
+      "parallel-tool-synth-" ]
 
 let classifySource (id: string) : Source =
     if id = "" then
