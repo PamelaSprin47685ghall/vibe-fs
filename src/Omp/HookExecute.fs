@@ -2,6 +2,7 @@ module Wanxiangshu.Omp.HookExecute
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.SubagentIntentsCodec
 
@@ -77,6 +78,7 @@ let private requireWarnOmp (toolName: string) (args: obj) : string option =
             Some(sprintf "Tool '%s': warn required — acknowledge this task cannot be done with other tools" toolName)
 
 let applyPreExecuteHook (toolName: string) (args: obj) : string option =
+    ToolHookRuntime.filterAmendFromArgs args |> ignore
     normalizePatchArgs toolName args
     setUiLabel args toolName
 

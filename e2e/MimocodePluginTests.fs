@@ -43,7 +43,7 @@ let private dynTypeIs (o: obj) (t: string) = typeIs o t
 let private dynStr (o: obj) (k: string) = str o k
 
 let private warnTddValue =
-    "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"
+    "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
 
 let private warnValue = "it-is-not-possible-to-do-it-using-other-tools"
 

@@ -58,6 +58,7 @@
     <Compile Include="src/Kernel/Nudge/SubmitReviewHooks.fs"/>
     <Compile Include="src/Kernel/CapsFormat.fs"/>
     <Compile Include="src/Kernel/Messaging.fs"/>
+    <Compile Include="src/Kernel/AmendFilter.fs"/>
     <Compile Include="src/Kernel/ReviewReplayPolicy.fs"/>
     <Compile Include="src/Kernel/Message.fs"/>
     <Compile Include="src/Kernel/CapsSynthPolicy.fs"/>
@@ -350,6 +351,7 @@
     <Compile Include="src/Opencode/PluginWanxiangzhen.fs"/>
     <!-- Tests -->
     <Compile Include="tests/Assert.fs"/>
+    <Compile Include="tests/AmendTests.fs"/>
     <Compile Include="tests/AsyncFlush.fs"/>
     <Compile Include="tests/EventLogFoldTests.fs"/>
     <Compile Include="tests/WanxiangzhenSquadEventTests.fs"/>

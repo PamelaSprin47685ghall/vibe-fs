@@ -79,14 +79,14 @@ let isCapsSynthIdRejects () =
 let parseWarnTddExactMatch () =
     check
         "exact canonical value parses"
-        (parseWarnTdd "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles" = Some
-                                                                                       IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+        (parseWarnTdd "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" = Some
+                                                                                                               IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
 
 let parseWarnTddCaseInsensitive () =
     check
         "uppercase variant parses"
-        (parseWarnTdd "I-AM-SURE-I-HAVE-FOLLOWED-TDD-AND-KOLMOLGOROV-PRINCIPLES" = Some
-                                                                                       IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+        (parseWarnTdd "I-AM-SURE-I-HAVE-FOLLOWED-TDD-AND-KOLMOLGOROV-PRINCIPLES-AND-KEPT-TODO-UPDATED" = Some
+                                                                                                               IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
 
 let parseWarnTddRejectsWrongValue () =
     check "wrong value returns None" (parseWarnTdd "something-else" = None)

@@ -253,3 +253,8 @@ let noQuadraticListAppend () =
             let code = requireFile path |> nonCommentCode
             let hasAppend = code.Contains "@ [" || code.Contains "@ ("
             check ($"arch: {path} has no quadratic list append") (not hasAppend)
+
+let parallelToolPromptSSOTGuard () =
+    let content = requireFile "src/Shell/MessageTransformPipeline.fs"
+    check "arch: MessageTransformPipeline references ToolCatalog.all" (content.Contains "Wanxiangshu.Kernel.ToolCatalog.all")
+    check "arch: MessageTransformPipeline does not hardcode tool catalog list" (not (content.Contains "let catalogNames =\n            [ \"coder\""))

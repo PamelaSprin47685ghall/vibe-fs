@@ -44,18 +44,31 @@ let handleEvent
     promise {
         let sessionID = translator.ExtractSessionID rawEvent
 
-        let eventOpt =
+        let! eventOpt =
             match translator.TranslateError rawEvent with
-            | Some _ as ev -> ev
+            | Some _ as ev -> promise { return ev }
             | None ->
                 if translator.IsNewUserMessage rawEvent then
-                    Some FallbackEvent.NewUserMessage
+                    promise { return Some FallbackEvent.NewUserMessage }
                 elif translator.IsSessionBusy rawEvent then
-                    Some FallbackEvent.SessionBusy
+                    promise { return Some FallbackEvent.SessionBusy }
                 elif translator.IsSessionIdle rawEvent then
-                    Some FallbackEvent.SessionIdle
+                    promise {
+                        let! msgs = executor.FetchMessages sessionID
+
+                        if isIdleNoContentAndNoTools msgs then
+                            return Some
+                                        (FallbackEvent.SessionError
+                                            { ErrorName = "EmptyOutputError"
+                                              DomainError = None
+                                              Message = "LLM returned empty output without tools"
+                                              StatusCode = None
+                                              IsRetryable = Some true })
+                        else
+                            return Some FallbackEvent.SessionIdle
+                    }
                 else
-                    None
+                    promise { return None }
 
         match eventOpt with
         | None ->

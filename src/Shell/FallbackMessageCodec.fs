@@ -160,3 +160,45 @@ let allTodosCompleted (msgs: obj array) : bool =
                     else
                         None))
         |> Option.defaultValue false
+
+/// Detect whether the last assistant message carries no tool calls and no
+/// visible text content — i.e. the LLM returned an empty output.
+let isIdleNoContentAndNoTools (msgs: obj array) : bool =
+    if isNull msgs || msgs.Length = 0 then
+        false
+    else
+        msgs
+        |> Array.rev
+        |> Array.tryPick (fun msg ->
+            let info = Dyn.get msg "info"
+
+            if Dyn.str info "role" = "assistant" then
+                let parts = Dyn.get msg "parts"
+
+                if Dyn.isArray parts then
+                    let partsArr = parts :?> obj array
+
+                    let hasTool =
+                        partsArr
+                        |> Array.exists (fun part ->
+                            let partType = Dyn.str part "type"
+                            partType = "tool" || partType = "dynamic-tool")
+
+                    if hasTool then
+                        None  // has tools → not idle-no-content, stop searching
+                    else
+                        let hasText =
+                            partsArr
+                            |> Array.exists (fun part ->
+                                if Dyn.str part "type" = "text" then
+                                    let text = Dyn.str part "text"
+                                    not (System.String.IsNullOrWhiteSpace(text))
+                                else
+                                    false)
+
+                        if hasText then None else Some true
+                else
+                    None
+            else
+                None)
+        |> Option.defaultValue false
