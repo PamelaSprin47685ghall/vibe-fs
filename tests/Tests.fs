@@ -21,8 +21,7 @@ open Wanxiangshu.Tests.IntegrationOpencodeReviewSpecs
 open Wanxiangshu.Tests.IntegrationChatTests
 open Wanxiangshu.Tests.WorkBacklogTests
 open Wanxiangshu.Tests.MethodologyTests
-
-
+open Wanxiangshu.Tests.AmendTests
 
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.TestsTestBody
