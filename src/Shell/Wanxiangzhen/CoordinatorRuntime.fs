@@ -11,7 +11,6 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.PromiseQueue
 open Wanxiangshu.Shell.Wanxiangzhen.GitShell
 open Wanxiangshu.Shell.Wanxiangzhen.HttpServer
-open Wanxiangshu.Shell.Wanxiangzhen.SquadEventDisplayCodec
 open Wanxiangshu.Shell.Wanxiangzhen.SessionIo
 open Wanxiangshu.Shell.Wanxiangzhen.PidMonitor
 
@@ -23,7 +22,9 @@ let killPid (pid: int) (signal: obj) : unit = jsNative
 
 type CoordinatorDeps =
     { PromptSession: obj -> string -> string -> JS.Promise<unit>
-      ReadAllSquadEvents: string -> JS.Promise<SquadEvent list>
+      GetLatestSquadSessionId: unit -> JS.Promise<string option>
+      GetSquadDag: string -> JS.Promise<Dag>
+      GetSquadSessions: unit -> JS.Promise<Map<string, Dag>>
       AppendSquadEvent: string -> string -> SquadEvent -> JS.Promise<Result<unit, string>>
       TryWorktreeAdd: string -> string -> string -> string -> Result<string, string>
       TryWorktreeRemoveForce: string -> string -> Result<string, string>
@@ -70,43 +71,13 @@ type CoordinatorRuntime =
       mutable InjectError: string option
       Deps: CoordinatorDeps }
 
-let rec private tryPromptWithRetry
-    (rt: CoordinatorRuntime)
-    (sessionId: string)
-    (msg: string)
-    (delay: int)
-    (remaining: int)
-    : JS.Promise<unit> =
-    if remaining <= 0 then
-        Promise.lift ()
-    else
-        promise {
-            try
-                do! rt.Deps.PromptSession rt.Client sessionId msg
-            with ex ->
-                if remaining > 1 then
-                    do! Promise.sleep delay
-                    do! tryPromptWithRetry rt sessionId msg (delay * 2) (remaining - 1)
-                else
-                    rt.InjectError <- Some(sprintf "Prompt injection failed for session %s: %s" sessionId (string ex))
-                    return ()
-        }
-
 let commitEvent (rt: CoordinatorRuntime) (e: SquadEvent) : JS.Promise<Result<unit, string>> =
     let at = rt.Deps.Now()
-    let msg = encodeEvent e
 
     rt.InjectQueue.Enqueue(fun () ->
         promise {
             let! (wr: Result<unit, string>) = rt.Deps.AppendSquadEvent rt.ProjectRoot at e
-
-            match wr with
-            | Error(err: string) -> return Error err
-            | Ok() ->
-                if rt.MasterSessionId <> "" then
-                    do! tryPromptWithRetry rt rt.MasterSessionId msg 500 3
-
-                return Ok()
+            return wr
         })
 
 let rec waitForPidDeath (deps: CoordinatorDeps) (pid: int) (remaining: int) : JS.Promise<unit> =

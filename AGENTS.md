@@ -1,6 +1,7 @@
 ---
 import: 
   - README.md
+  - wanxiangzhen-PRD/
 models:
   agents:
     build:
@@ -20,7 +21,7 @@ models:
       - ark/minimax-m3:fast
       - ark/deepseek-v4-flash:fast
     investigator:
-      - omniroute-ai/step/step-3.5-flash-2603:fast
+      - stepfun/step-3.5-flash-2603:fast
       - meituan/LongCat-2.0:fast
       - ark/deepseek-v4-flash:fast
     meditator:
@@ -32,7 +33,7 @@ models:
       - ark/deepseek-v4-flash:fast
       - meituan/LongCat-2.0:fast
     executor:
-      - omniroute-ai/step/step-3.5-flash-2603:fast
+      - stepfun/step-3.5-flash-2603:fast
       - meituan/LongCat-2.0:fast
       - ark/deepseek-v4-flash:fast
     title:

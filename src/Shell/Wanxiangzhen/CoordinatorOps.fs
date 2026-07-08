@@ -14,7 +14,6 @@ open Wanxiangshu.Shell.Wanxiangzhen.GitShell
 open Wanxiangshu.Shell.PromiseQueue
 open Wanxiangshu.Shell.Wanxiangzhen.HttpServer
 open Wanxiangshu.Shell.Wanxiangzhen.HttpCodec
-open Wanxiangshu.Shell.Wanxiangzhen.SquadEventDisplayCodec
 open Wanxiangshu.Shell.Wanxiangzhen.ConfigReader
 open Wanxiangshu.Shell.Wanxiangzhen.SessionIo
 open Wanxiangshu.Shell.Wanxiangzhen.SlaveSpawn

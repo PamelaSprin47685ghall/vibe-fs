@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.Wanxiangzhen.SquadConfig
 open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Shell.Wanxiangzhen.ConfigReader
 open Wanxiangshu.Shell.Wanxiangzhen.SquadEventLogRuntime
+open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.Wanxiangzhen.GitShell
 open Wanxiangshu.Shell.Wanxiangzhen.SlaveSpawn
 open Wanxiangshu.Shell.Wanxiangzhen.PidMonitor
@@ -28,10 +29,13 @@ let resolveMasterBranch (directory: string) (config: SquadConfig) (deps: Coordin
         with ex ->
             "master", Some(string ex.Message)
 
-let realCoordinatorDeps () : CoordinatorDeps =
+let realCoordinatorDeps (workspaceRoot: string) : CoordinatorDeps =
+    let store = getStore workspaceRoot
     let rec deps =
         { PromptSession = promptSession
-          ReadAllSquadEvents = readAllSquadEvents
+          GetLatestSquadSessionId = fun () -> store.GetLatestSquadSessionId()
+          GetSquadDag = fun sessionId -> store.GetSquadDag sessionId
+          GetSquadSessions = fun () -> store.GetSquadSessions()
           AppendSquadEvent = appendSquadEvent
           TryWorktreeAdd = tryWorktreeAdd
           TryWorktreeRemoveForce = tryWorktreeRemoveForce

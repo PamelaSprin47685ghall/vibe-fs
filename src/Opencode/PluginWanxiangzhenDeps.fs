@@ -10,8 +10,8 @@ open Wanxiangshu.Shell.Wanxiangzhen.ConfigReader
 
 open Wanxiangshu.Opencode.PluginWanxiangzhenHooks
 
-let realCoordinatorDeps () =
-    Wanxiangshu.Shell.Wanxiangzhen.CoordinatorDepsFactory.realCoordinatorDeps ()
+let realCoordinatorDeps (workspaceRoot: string) =
+    Wanxiangshu.Shell.Wanxiangzhen.CoordinatorDepsFactory.realCoordinatorDeps workspaceRoot
 
 let pluginWithDeps
     (ctx: obj)

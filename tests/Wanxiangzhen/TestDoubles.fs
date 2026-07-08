@@ -48,7 +48,9 @@ type FakeState = {
     mutable tryWorktreeAddOverride : (string -> string -> string -> string -> Result<string,string>) option
     mutable promptSessionOverride  : (obj -> string -> string -> JS.Promise<unit>) option
 
-    mutable readAllSquadEventsOverride : (string -> JS.Promise<SquadEvent list>) option
+    mutable getLatestSquadSessionIdOverride : (unit -> JS.Promise<string option>) option
+    mutable getSquadDagOverride : (string -> JS.Promise<Dag>) option
+    mutable getSquadSessionsOverride : (unit -> JS.Promise<Map<string, Dag>>) option
     mutable appendSquadEventCalls  : SquadEvent list
     mutable startPollingOverride   : (int -> (unit -> unit) -> obj) option
     mutable stopPollingOverride    : (obj -> unit) option
@@ -97,7 +99,9 @@ let mkFake () : FakeState =
       tryWorktreeAddOverride   = None
       promptSessionOverride    = None
 
-      readAllSquadEventsOverride = None
+      getLatestSquadSessionIdOverride = None
+      getSquadDagOverride = None
+      getSquadSessionsOverride = None
       appendSquadEventCalls    = []
       startPollingOverride     = None
       stopPollingOverride      = None
@@ -111,10 +115,18 @@ let mkDeps (s: FakeState) : CoordinatorDeps =
             match s.promptSessionOverride with
             | Some f -> f c m p
             | None -> s.promptSessionCalls <- s.promptSessionCalls @ [(m, p)]; Promise.lift ()
-      ReadAllSquadEvents   = fun root ->
-            match s.readAllSquadEventsOverride with
-            | Some f -> f root
-            | None -> Promise.lift []
+      GetLatestSquadSessionId = fun () ->
+            match s.getLatestSquadSessionIdOverride with
+            | Some f -> f ()
+            | None -> Promise.lift None
+      GetSquadDag       = fun sessionId ->
+            match s.getSquadDagOverride with
+            | Some f -> f sessionId
+                  | None -> Promise.lift (Wanxiangshu.Kernel.Wanxiangzhen.Dag.empty sessionId "")
+      GetSquadSessions  = fun () ->
+            match s.getSquadSessionsOverride with
+            | Some f -> f ()
+            | None -> Promise.lift Map.empty
       AppendSquadEvent     = fun _ _ e ->
             s.appendSquadEventCalls <- s.appendSquadEventCalls @ [ e ]
             Promise.lift (Ok ())

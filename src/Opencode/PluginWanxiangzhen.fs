@@ -17,7 +17,8 @@ let private twoArgHook (f: obj -> obj -> JS.Promise<unit>) =
 
 let private coordinatorPlugin (ctx: obj) : JS.Promise<obj> =
     promise {
-        let! result = PluginWanxiangzhenDeps.pluginWithDeps ctx (PluginWanxiangzhenDeps.realCoordinatorDeps ())
+        let directory = Wanxiangshu.Shell.Dyn.str ctx "directory"
+        let! result = PluginWanxiangzhenDeps.pluginWithDeps ctx (PluginWanxiangzhenDeps.realCoordinatorDeps directory)
         return result.hooks
     }
 

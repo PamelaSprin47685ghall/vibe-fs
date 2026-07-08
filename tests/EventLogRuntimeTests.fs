@@ -10,6 +10,7 @@ open Wanxiangshu.Shell.EventLogFiles
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 
 let appendThenReadAll () =
     promise {
@@ -193,6 +194,55 @@ let testGetSessionStateMemoryCache () : JS.Promise<unit> =
         do! rmAsync dir
     }
 
+let testMemoryCachingAndNoRepeatedFileReads () : JS.Promise<unit> =
+    promise {
+        let! dir = mkdtempAsync "eventlog-mem-speed-"
+        let store = EventLogStore dir
+        let! _ = appendLoopActivated dir "s-mem-speed" "task memory speed"
+        let! state = store.GetSessionState "s-mem-speed"
+        check "initial load review task" (state.ReviewTask = Some "task memory speed")
+
+        let path = eventPath dir
+        do! rmAsync path
+
+        let! events = store.ReadAllEvents()
+        check "read from memory: 1 event" (events.Length = 1)
+        check "event task matches" (events.[0].Payload |> Map.tryFind "task" = Some "task memory speed")
+
+        do! rmAsync dir
+    }
+
+let testGetSquadEventsCache () : JS.Promise<unit> =
+    promise {
+        let! dir = mkdtempAsync "eventlog-squad-cache-"
+        let store = EventLogStore dir
+        let squadEvent = SquadCreated ("s1", "req")
+        let! _ = store.AppendSquadEvent "2025-01-01T00:00:00Z" squadEvent
+        let! _ = store.GetSessionState "s-any"
+
+        let path = eventPath dir
+        do! rmAsync path
+
+        let! dag = store.GetSquadDag "s1"
+        check "squad dag restored from memory" (dag.SessionId = "s1")
+        equal "expected squad dag requirement" "req" dag.RootRequirement
+
+        do! rmAsync dir
+    }
+
+let testReadAllEventsIdempotent () : JS.Promise<unit> =
+    promise {
+        let! dir = mkdtempAsync "eventlog-readonce-"
+        let store = EventLogStore dir
+        let! _ = appendLoopActivated dir "s-once" "task once"
+        let! events1 = store.ReadAllEvents()
+        check "first read: 1 event" (events1.Length = 1)
+        let! events2 = store.ReadAllEvents()
+        check "second read: same 1 event" (events2.Length = 1)
+        check "second read: same content" (events2.[0].Payload |> Map.tryFind "task" = Some "task once")
+        do! rmAsync dir
+    }
+
 let run () =
     promise {
         do! appendThenReadAll ()
@@ -206,4 +256,7 @@ let run () =
         do! appendSucceedsAfterStaleLockFile ()
         do! tryClaimNudgeDispatchPreventsOutdatedAnchor ()
         do! testGetSessionStateMemoryCache ()
+        do! testMemoryCachingAndNoRepeatedFileReads ()
+        do! testGetSquadEventsCache ()
+        do! testReadAllEventsIdempotent ()
     }

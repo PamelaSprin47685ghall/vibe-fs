@@ -126,7 +126,9 @@ let mkObservableDeps (captures: MockCaptures) (obs: ObservableDeps) : Coordinato
         RevParseBranch      = fun _ -> obs.revParseBranchResult
         IsPidAlive          = fun _ -> obs.isPidAliveResult
         Now                 = fun () -> obs.nowResult
-        ReadAllSquadEvents  = fun _ -> Promise.lift obs.squadEventLog
+        GetLatestSquadSessionId = fun () -> Promise.lift None
+        GetSquadDag          = fun sid -> Promise.lift (Wanxiangshu.Kernel.Wanxiangzhen.Dag.empty sid "")
+        GetSquadSessions     = fun () -> Promise.lift Map.empty
         AppendSquadEvent    = fun _ _ e ->
             obs.squadEventLog <- obs.squadEventLog @ [ e ]
             Promise.lift (Ok ()) }

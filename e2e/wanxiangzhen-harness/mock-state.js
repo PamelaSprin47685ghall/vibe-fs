@@ -98,7 +98,9 @@ export function mockTryBranchDeleteForce(cwd, branch) {
 export function makeDeps(shapeFn) {
   return {
     PromptSession: (client, sessionId, msg) => mockPromptSession(client, sessionId, msg),
-    ReadAllSquadEvents: (_root) => Promise.resolve([...squadEvents]),
+    GetLatestSquadSessionId: () => Promise.resolve(null),
+    GetSquadDag: (sessionId) => Promise.resolve({ SessionId: sessionId, RootRequirement: '', Tasks: {} }),
+    GetSquadSessions: () => Promise.resolve({}),
     AppendSquadEvent: (root, at, evt) => mockAppendSquadEvent(root, at, evt, shapeFn),
     TryWorktreeAdd: (cwd, branch, wtPath, base) => mockTryWorktreeAdd(cwd, branch, wtPath, base),
     TryWorktreeRemoveForce: (cwd, wtPath) => mockTryWorktreeRemoveForce(cwd, wtPath),

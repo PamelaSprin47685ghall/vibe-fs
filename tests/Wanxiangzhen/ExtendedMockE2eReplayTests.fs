@@ -22,7 +22,11 @@ let testChatMessageCapturesSessionIdAndReplays () : JS.Promise<unit> =
         let evt2 = TasksCreated (sessionId, [("squad-a1b2", "Task A", "desc A", [])])
         let history = [ evt1; evt2 ]
 
-        s.readAllSquadEventsOverride <- Some (fun _ -> Promise.lift history)
+        s.getLatestSquadSessionIdOverride <- Some (fun () -> Promise.lift (Some sessionId))
+        s.getSquadDagOverride <-
+          Some (fun sid ->
+            let dag = List.fold foldEvent (empty sid "") history
+            Promise.lift dag)
 
         rt.MasterSessionId <- sessionId
         do! replayFromEventLog rt
@@ -47,7 +51,11 @@ let testReplayReconcilesSubmittedToMerged () : JS.Promise<unit> =
         let evt4 = TaskSubmitted (sessionId, "squad-a1b2", "sha123")
         let history = [ evt1; evt2; evt3; evt4 ]
 
-        s.readAllSquadEventsOverride <- Some (fun _ -> Promise.lift history)
+        s.getLatestSquadSessionIdOverride <- Some (fun () -> Promise.lift (Some sessionId))
+        s.getSquadDagOverride <-
+          Some (fun sid ->
+            let dag = List.fold foldEvent (empty sid "") history
+            Promise.lift dag)
         s.mergeBaseOverride <- Some (fun c a d -> s.mergeBaseIsAncestorCalls <- s.mergeBaseIsAncestorCalls @ [(c, a, d)]; true)
         s.revParseRefOverride <- Some (fun c r -> s.revParseRefCalls <- s.revParseRefCalls @ [(c, r)]; "merged-sha")
 
@@ -73,7 +81,11 @@ let testReplayWarnsOrphanRunningTasks () : JS.Promise<unit> =
         let evt3 = TaskStarted (sessionId, "squad-a1b2", "/wt/a", "squad-a1b2")
         let history = [ evt1; evt2; evt3 ]
 
-        s.readAllSquadEventsOverride <- Some (fun _ -> Promise.lift history)
+        s.getLatestSquadSessionIdOverride <- Some (fun () -> Promise.lift (Some sessionId))
+        s.getSquadDagOverride <-
+          Some (fun sid ->
+            let dag = List.fold foldEvent (empty sid "") history
+            Promise.lift dag)
         s.promptSessionOverride <- Some (fun c m p ->
             s.promptSessionCalls <- s.promptSessionCalls @ [(m, p)]
             s.orphanWarningSent <- true

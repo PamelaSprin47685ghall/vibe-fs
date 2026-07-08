@@ -112,14 +112,18 @@ let entries () : (string * (unit -> JS.Promise<unit>)) list = [
             checkBare (result.Contains "cycle")
         })
 
-    ("handleSquadUpdate success returns confirmation text and injects events", fun () ->
+    ("handleSquadUpdate success appends NDJSON without prompting LLM", fun () ->
         promise {
             let promptCalls = System.Collections.Generic.List<string * string * string>()
+            let appendedEvents = System.Collections.Generic.List<SquadEvent>()
             let recordingDeps =
                 { stubDeps () with
                     PromptSession = fun client sid msg ->
                         promptCalls.Add((string client, sid, msg)) |> ignore
-                        Promise.lift () }
+                        Promise.lift ()
+                    AppendSquadEvent = fun _ _ e ->
+                        appendedEvents.Add(e) |> ignore
+                        Promise.lift (Ok ()) }
             let rt = mkRuntimeWithDeps recordingDeps
             rt.Dag <- { rt.Dag with SessionId = "squad-session-001" }
             rt.MasterSessionId <- "squad-session-001"
@@ -129,16 +133,13 @@ let entries () : (string * (unit -> JS.Promise<unit>)) list = [
             ] |]
             let args = createObj [ "events", box events ]
             let! result = handleSquadUpdate rt args
-            // result is short confirmation text, NOT YAML frontmatter
             checkBare (not (result.StartsWith "---"))
             checkBare (result.Contains "created")
             checkBare (result.Contains "2")
-            // events were injected into the master session via PromptSession
-            checkBare (promptCalls.Count >= 1)
-            let (_, injectedSid, injectedMsg) = promptCalls.[0]
-            checkBare (injectedSid = "squad-session-001")
-            checkBare (injectedMsg.Contains "squad_event: tasks_created")
-            checkBare (injectedMsg.Contains "squad-a1b2")
+            // events were appended to NDJSON
+            checkBare (appendedEvents.Count >= 1)
+            // background events must NOT trigger session.prompt
+            checkBare (promptCalls.Count = 0)
         })
 
     ("mkRuntime produces independent GitQueue and InjectQueue", fun () ->
@@ -187,7 +188,11 @@ let entries () : (string * (unit -> JS.Promise<unit>)) list = [
             let evtTaskStarted   = TaskStarted ("squad-session-001", "squad-a1b2", "/wt/squad-a1b2", "squad-a1b2")
             let evtTaskSubmitted = TaskSubmitted ("squad-session-001", "squad-a1b2", "abc123")
             let history = [ evtSquadCreated; evtTasksCreated; evtTaskStarted; evtTaskSubmitted ]
-            let deps2 = { deps with ReadAllSquadEvents = fun _ -> Promise.lift history }
+            let deps2 =
+                { deps with
+                    GetLatestSquadSessionId = fun () -> Promise.lift (Some "squad-session-001")
+                    GetSquadDag = fun sid -> Promise.lift (List.fold foldEvent (Wanxiangshu.Kernel.Wanxiangzhen.Dag.empty sid "") history)
+                    GetSquadSessions = fun () -> Promise.lift Map.empty }
             let rt = mkRuntimeWithDeps deps2
             rt.MasterSessionId <- "squad-session-001"
             rt.GitError       <- None

@@ -20,8 +20,11 @@ type EventLogStore(workspaceRoot: string) =
     let eventFilePath = eventPath workspaceRoot
     let mutable sessionStates: Map<string, SessionState> = Map.empty
     let mutable squadProj = emptyProjection ()
+    let mutable latestSessionId: string option = None
     let mutable initDone = false
     let mutable initPromise: JS.Promise<unit> option = None
+    let mutable readCalled = false
+    let mutable readAllResult: WanEvent list = []
 
     let foldWan (e: WanEvent) =
         let sId = e.Session
@@ -33,6 +36,8 @@ type EventLogStore(workspaceRoot: string) =
 
         sessionStates <- Map.add sId (applyEvent oldState e) sessionStates
         squadProj <- applyWanEvent squadProj e
+        if isSquadEventKind e.Kind then
+            latestSessionId <- Some e.Session
 
     let ensureInitializedInternal () : JS.Promise<unit> =
         promise {
@@ -44,10 +49,14 @@ type EventLogStore(workspaceRoot: string) =
                 if not exists then
                     initDone <- true
                 else
+                    if readCalled then
+                        failwith "ReadAllEvents / ensureInitialized is restricted to be called at most once during the store lifecycle!"
+                    readCalled <- true
                     do!
                         withWorkspaceLock eventFilePath (fun () ->
                             promise {
                                 let! events = readEventsFile eventFilePath
+                                readAllResult <- events
 
                                 for e in events do
                                     foldWan e
@@ -65,7 +74,10 @@ type EventLogStore(workspaceRoot: string) =
             p
 
     member _.ReadAllEvents() : JS.Promise<WanEvent list> =
-        queue.Enqueue(fun () -> withWorkspaceLock eventFilePath (fun () -> readEventsFile eventFilePath))
+        promise {
+            do! ensureInitialized ()
+            return readAllResult
+        }
 
     member _.GetSessionState(sessionId: string) : JS.Promise<SessionState> =
         promise {
@@ -77,7 +89,11 @@ type EventLogStore(workspaceRoot: string) =
                 | None -> emptySessionState ()
         }
 
-    member _.GetAllSessionStates() : Map<string, SessionState> = sessionStates
+    member _.GetAllSessionStates() : JS.Promise<Map<string, SessionState>> =
+        promise {
+            do! ensureInitialized ()
+            return sessionStates
+        }
 
     member _.EnsureInitialized() : JS.Promise<unit> = ensureInitializedInternal ()
 
@@ -86,6 +102,7 @@ type EventLogStore(workspaceRoot: string) =
             promise {
                 do! ensureInitialized ()
                 foldWan e
+                readAllResult <- readAllResult @ [ e ]
 
                 try
                     do! withWorkspaceLock eventFilePath (fun () -> appendLine eventFilePath e)
@@ -99,6 +116,7 @@ type EventLogStore(workspaceRoot: string) =
             promise {
                 do! ensureInitialized ()
                 foldWan e
+                readAllResult <- readAllResult @ [ e ]
                 do! withWorkspaceLock eventFilePath (fun () -> appendLine eventFilePath e)
             })
 
@@ -106,6 +124,18 @@ type EventLogStore(workspaceRoot: string) =
         promise {
             do! ensureInitialized ()
             return getDag squadProj sessionId
+        }
+
+    member _.GetLatestSquadSessionId() : JS.Promise<string option> =
+        promise {
+            do! ensureInitialized ()
+            return latestSessionId
+        }
+
+    member _.GetSquadSessions() : JS.Promise<Map<string, Dag>> =
+        promise {
+            do! ensureInitialized ()
+            return squadProj.Dags
         }
 
     member this.AppendSquadEvent (at: string) (e: SquadEvent) : JS.Promise<Result<unit, string>> =
@@ -142,6 +172,7 @@ type EventLogStore(workspaceRoot: string) =
                         buildEvent sessionId eventKindNudgeDispatched payload (getTimestampMs().ToString())
 
                     foldWan ev
+                    readAllResult <- readAllResult @ [ ev ]
                     do! withWorkspaceLock eventFilePath (fun () -> appendLine eventFilePath ev)
                     return true
             })

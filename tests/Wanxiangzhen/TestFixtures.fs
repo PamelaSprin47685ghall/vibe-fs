@@ -14,7 +14,9 @@ open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
 
 let stubDeps () : CoordinatorDeps =
     { PromptSession        = fun _ _ _ -> Promise.lift ()
-      ReadAllSquadEvents   = fun _ -> Promise.lift []
+      GetLatestSquadSessionId = fun () -> Promise.lift None
+      GetSquadDag          = fun sid -> Promise.lift (Wanxiangshu.Kernel.Wanxiangzhen.Dag.empty sid "")
+      GetSquadSessions     = fun () -> Promise.lift Map.empty
       AppendSquadEvent     = fun _ _ _ -> Promise.lift (Ok ())
       TryWorktreeAdd       = fun _ _ _ _ -> Ok ""
       TryWorktreeRemoveForce = fun _ _ -> Ok ""

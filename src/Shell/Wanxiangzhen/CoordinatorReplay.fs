@@ -4,23 +4,15 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
-open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
 
 let replayFromEventLog (rt: CoordinatorRuntime) : JS.Promise<unit> =
     promise {
-        let! events = rt.Deps.ReadAllSquadEvents rt.ProjectRoot
-        let mutable currentDag = empty "" ""
-        let mutable sessions = Map.empty
-
-        for ev in events do
-            match ev with
-            | SquadCreated(sid, req) ->
-                if currentDag.SessionId <> "" && not currentDag.Tasks.IsEmpty then
-                    sessions <- sessions.Add(currentDag.SessionId, currentDag)
-
-                currentDag <- empty sid req
-            | _ -> currentDag <- foldEvent currentDag ev
+        let! latestSidOpt = rt.Deps.GetLatestSquadSessionId()
+        let sessionId = defaultArg latestSidOpt ""
+        let! currentDag = rt.Deps.GetSquadDag sessionId
+        let! dags = rt.Deps.GetSquadSessions()
+        let sessions = dags |> Map.remove sessionId
 
         let hasCommits = rt.Deps.HasCommits rt.ProjectRoot
 
