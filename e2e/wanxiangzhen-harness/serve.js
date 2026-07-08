@@ -83,7 +83,7 @@ export function spawnOpencodeChildAndGetPort(tmpDir, home, llmUrl) {
     child.on('exit', (code) => {
       reject(new Error(`opencode exited with code ${code}`));
     });
-    setTimeout(() => reject(new Error('opencode port listen timeout')), 30000);
+    setTimeout(() => reject(new Error('opencode serve timeout (port listen)')), 30000);
   });
 }
 
