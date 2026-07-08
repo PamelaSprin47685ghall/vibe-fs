@@ -353,6 +353,7 @@
     <Compile Include="tests/ShellTests.fs"/>
     <Compile Include="tests/ShellTestsFormat.fs"/>
     <Compile Include="tests/ShellCoverage2Tests.fs"/>
+    <Compile Include="tests/ShellCoverage2Livelock.fs"/>
     <Compile Include="tests/DynTests.fs"/>
     <Compile Include="tests/DynFieldTests.fs"/>
     <Compile Include="tests/DomainTests.fs"/>
@@ -509,6 +510,7 @@
     <Compile Include="tests/CoverageFillKernelTests.fs"/>
     <Compile Include="tests/CoverageFillKernel2Tests.fs"/>
     <Compile Include="tests/KernelDomainCoverageTests.fs"/>
+    <Compile Include="tests/KernelDomainCoverageTestsToolArgs.fs"/>
     <Compile Include="tests/KernelReviewCoverageTests.fs"/>
     <Compile Include="tests/CoverageFillShellTests.fs"/>
     <Compile Include="tests/CoverageFillFuzzyTests.fs"/>

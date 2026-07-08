@@ -23,6 +23,7 @@
     <Compile Include="tests/IntegrationMuxSetup.fs"/>
     <Compile Include="tests/IntegrationCapsSpecs.fs"/>
     <Compile Include="tests/IntegrationCapsSpecsSubagent.fs"/>
+    <Compile Include="tests/IntegrationCapsSpecsSubagentMux.fs"/>
     <Compile Include="tests/IntegrationToolDefSpecsMimo.fs"/>
     <Compile Include="tests/IntegrationToolDefSpecs.fs"/>
     <Compile Include="tests/IntegrationSubagentSpecs.fs"/>
@@ -54,10 +55,12 @@
     <Compile Include="tests/KernelPromptSpecsReview.fs"/>
     <Compile Include="tests/KernelPromptSpecs.fs"/>
     <Compile Include="tests/FuzzyTests.fs"/>
+    <Compile Include="tests/FuzzyTestsPromise.fs"/>
     <Compile Include="tests/FuzzyTestsPaging.fs"/>
     <Compile Include="tests/ShellTests.fs"/>
     <Compile Include="tests/ShellTestsFormat.fs"/>
     <Compile Include="tests/ShellCoverage2Tests.fs"/>
+    <Compile Include="tests/ShellCoverage2Livelock.fs"/>
     <Compile Include="tests/DynTests.fs"/>
     <Compile Include="tests/DynFieldTests.fs"/>
     <Compile Include="tests/DomainTests.fs"/>
@@ -70,12 +73,19 @@
     <Compile Include="tests/IntegrationPluginTestsMimo.fs"/>
     <Compile Include="tests/IntegrationPluginTests.fs"/>
     <Compile Include="tests/IntegrationEventTestsMux.fs"/>
+    <Compile Include="tests/IntegrationEventTestsMuxReview.fs"/>
+    <Compile Include="tests/IntegrationEventTestsMuxForceStop.fs"/>
     <Compile Include="tests/IntegrationEventTestsMuxWrappers.fs"/>
+    <Compile Include="tests/IntegrationEventTestsOpencodeSessionStatus.fs"/>
+    <Compile Include="tests/IntegrationEventTestsOpencodeSessionStatusForceStop.fs"/>
+    <Compile Include="tests/IntegrationEventTestsOpencodeSessionStatusRepeated.fs"/>
     <Compile Include="tests/IntegrationEventTestsOpencode.fs"/>
     <Compile Include="tests/IntegrationEventTestsOpencodeLoop.fs"/>
+    <Compile Include="tests/IntegrationEventTestsOpencodeFallbackInterrupted.fs"/>
     <Compile Include="tests/IntegrationEventTestsOpencodeFallback.fs"/>
     <Compile Include="tests/IntegrationEventTests.fs"/>
     <Compile Include="tests/IntegrationDedupOpenCodeSpecs.fs"/>
+    <Compile Include="tests/IntegrationDedupModelSpecs.fs"/>
     <Compile Include="tests/IntegrationDedupTests.fs"/>
     <Compile Include="tests/IntegrationToolSpecCatalog.fs"/>
     <Compile Include="tests/IntegrationChatTests.fs"/>
@@ -96,6 +106,7 @@
     <Compile Include="tests/OmpFuzzyTests.fs"/>
     <Compile Include="tests/OmpPluginTestsHarness.fs"/>
     <Compile Include="tests/OmpPluginTests.fs"/>
+    <Compile Include="tests/OmpPluginTestsLifecycle.fs"/>
     <Compile Include="tests/OmpPluginTestsAgentEnd.fs"/>
     <Compile Include="tests/OmpContextTransformTests.fs"/>
     <Compile Include="tests/OmpReviewTests.fs"/>
@@ -212,9 +223,12 @@
     <Compile Include="tests/TestsEntriesDomain.fs"/>
     <Compile Include="tests/TestsEntriesFuzzy.fs"/>
     <Compile Include="tests/CoverageFillKernelTests.fs"/>
+    <Compile Include="tests/CoverageFillKernelFuzzyPathTests.fs"/>
     <Compile Include="tests/CoverageFillKernel2Tests.fs"/>
     <Compile Include="tests/KernelDomainCoverageTests.fs"/>
+    <Compile Include="tests/KernelDomainCoverageTestsToolArgs.fs"/>
     <Compile Include="tests/KernelReviewCoverageTests.fs"/>
+    <Compile Include="tests/KernelCoverageTestsMethodology.fs"/>
     <Compile Include="tests/CoverageFillShellTests.fs"/>
     <Compile Include="tests/CoverageFillFuzzyTests.fs"/>
     <Compile Include="tests/CoverageFillMethodologyTests.fs"/>
@@ -243,6 +257,7 @@
     <Compile Include="tests/ArchitectureTestsFallback.fs"/>
     <Compile Include="tests/TestsEntriesFallback.fs"/>
     <Compile Include="tests/SembleInjectionTests.fs"/>
+    <Compile Include="tests/SembleInjectionDedupSpecs.fs"/>
     <Compile Include="tests/OpencodeSessionLifecycleTests.fs"/>
     <Compile Include="tests/SembleReviewerInjectionTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/AssertCompat.fs"/>
@@ -300,6 +315,7 @@
     <Compile Include="tests/Wanxiangzhen/SquadUpdateIdAssignTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/TaskTests.fs"/>
     <Compile Include="tests/TestsEntriesWanxiangzhen.fs"/>
+    <Compile Include="tests/TestsEntriesCoreTail.fs"/>
     <Compile Include="tests/TestsEntriesCore.fs"/>
     <Compile Include="tests/TestsEntriesCodec.fs"/>
     <Compile Include="tests/OmpReviewLoopAsyncTests.fs"/>

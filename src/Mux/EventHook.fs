@@ -3,6 +3,7 @@ module Wanxiangshu.Mux.EventHook
 open Fable.Core
 open Wanxiangshu.Kernel
 open Wanxiangshu.Shell.NudgeRuntime
+open Wanxiangshu.Shell.NudgeRuntimeTypes
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FallbackRuntimeState
@@ -80,8 +81,8 @@ let createEventHook (deps: obj) (deactivateReview: string -> unit) : obj =
 
     let cleanupOnAbort (event: obj) : unit =
         match parseHookEvent event with
-        | NudgeRuntime.StreamAbort workspaceId
-        | NudgeRuntime.AbortedError workspaceId when workspaceId <> "" -> deactivateReview workspaceId
+        | StreamAbort workspaceId
+        | AbortedError workspaceId when workspaceId <> "" -> deactivateReview workspaceId
         | _ -> ()
 
     let directory = if Dyn.isNullish deps then "" else Dyn.str deps "directory"

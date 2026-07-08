@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.SembleSearch
+open Wanxiangshu.Shell.SembleSearchClient
 open Wanxiangshu.Opencode.MessageTransform
 
 let testSembleInjectsForReviewer () =

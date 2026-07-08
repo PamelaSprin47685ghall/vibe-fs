@@ -156,6 +156,8 @@
     <Compile Include="src/Shell/EventLogSquadProjection.fs"/>
     <Compile Include="src/Shell/EventLogFiles.fs"/>
     <Compile Include="src/Shell/SembleMcp.fs"/>
+    <Compile Include="src/Shell/SembleSearchTypes.fs"/>
+    <Compile Include="src/Shell/SembleSearchClient.fs"/>
     <Compile Include="src/Shell/SembleSearch.fs"/>
     <Compile Include="src/Shell/WorkspaceFiles.fs"/>
     <Compile Include="src/Shell/HostMessagePartCodec.fs"/>
@@ -217,6 +219,8 @@
     <Compile Include="src/Shell/ToolHookRuntime.fs"/>
     <Compile Include="src/Shell/MuxPluginCatalogShell.fs"/>
     <Compile Include="src/Shell/SerialStateHolder.fs"/>
+    <Compile Include="src/Shell/NudgeRuntimeTypes.fs"/>
+    <Compile Include="src/Shell/NudgeRuntimeMux.fs"/>
     <Compile Include="src/Shell/NudgeRuntime.fs"/>
     <Compile Include="src/Mux/AiSettings.fs"/>
     <Compile Include="src/Opencode/MessagingCodec.fs"/>
@@ -281,6 +285,8 @@
     <Compile Include="src/Opencode/HookExecute.fs"/>
     <Compile Include="src/Opencode/HookTransform.fs"/>
     <Compile Include="src/Opencode/FallbackConfigLoader.fs"/>
+    <Compile Include="src/Opencode/PluginCoreServices.fs"/>
+    <Compile Include="src/Opencode/PluginCoreHooks.fs"/>
     <Compile Include="src/Opencode/PluginCore.fs"/>
     <Compile Include="src/Opencode/Plugin.fs"/>
     <Compile Include="src/Opencode/PluginMimo.fs"/>

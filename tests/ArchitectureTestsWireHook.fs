@@ -59,7 +59,9 @@ let opencodeHookExecuteUsesPatchToolsCodec () =
         (not (patchWindow.Contains "formatDomainError"))
 
 let opencodePluginCoreUsesFromOpencode () =
-    let code = requireFile "src/Opencode/PluginCore.fs" |> nonCommentCode
+    let code =
+        (requireFile "src/Opencode/PluginCore.fs" |> nonCommentCode)
+        + (requireFile "src/Opencode/PluginCoreServices.fs" |> nonCommentCode)
     check "arch: Opencode PluginCore opens ToolRuntimeContext" (code.Contains "ToolRuntimeContext")
     check "arch: Opencode PluginCore uses pluginDirectoryFromCtx" (code.Contains "pluginDirectoryFromCtx")
     check "arch: Opencode PluginCore must not Dyn.str ctx directory" (not (code.Contains "Dyn.str ctx \"directory\""))

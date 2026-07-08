@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.TestsEntriesCoverage
 open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.SearchToolsTests
 open Wanxiangshu.Tests.CoverageFillKernelTests
+open Wanxiangshu.Tests.CoverageFillKernelFuzzyPathTests
 open Wanxiangshu.Tests.CoverageFillKernel2Tests
 open Wanxiangshu.Tests.CoverageFillShellTests
 open Wanxiangshu.Tests.CoverageFillFuzzyTests
@@ -10,18 +11,23 @@ open Wanxiangshu.Tests.CoverageFillMethodologyTests
 open Wanxiangshu.Tests.FuzzySearchGrepTests
 open Wanxiangshu.Tests.CoverageFillOpencodeTests
 open Wanxiangshu.Tests.KernelDomainCoverageTests
+open Wanxiangshu.Tests.KernelDomainCoverageTestsToolArgs
 open Wanxiangshu.Tests.KernelReviewCoverageTests
+open Wanxiangshu.Tests.KernelCoverageTestsMethodology
 open Wanxiangshu.Tests.OmpToolsCoverageTests
 open Wanxiangshu.Tests.OmpCodecCoverageTests
 open Wanxiangshu.Tests.PluginMimoTuiTests
 open Wanxiangshu.Tests.ShellCoverage2Tests
+open Wanxiangshu.Tests.ShellCoverage2Livelock
 open Wanxiangshu.Tests.OpencodeHookSchemaCoverageTests
 open Wanxiangshu.Tests.OpencodeSearchToolsCoverageTests
 open Wanxiangshu.Tests.OpencodeSubagentCoverageTests
 open Wanxiangshu.Tests.ReviewerLoopTests
+open Wanxiangshu.Tests.MuxCoverageTests
 
 let coverageTestEntries () : (string * TestBody) list =
     [ "CoverageFillKernelTests.run", Sync(sync CoverageFillKernelTests.run)
+      "CoverageFillKernelFuzzyPathTests.run", Sync(sync CoverageFillKernelFuzzyPathTests.run)
       "CoverageFillKernel2Tests.run", Sync(sync CoverageFillKernel2Tests.run)
       "CoverageFillShellTests.run", Async CoverageFillShellTests.run
       "CoverageFillFuzzyTests.run", Sync(sync CoverageFillFuzzyTests.run)
@@ -29,7 +35,9 @@ let coverageTestEntries () : (string * TestBody) list =
       "CoverageFillMethodologyTests.run", Sync(sync CoverageFillMethodologyTests.run)
       "CoverageFillOpencodeTests.run", Sync(sync CoverageFillOpencodeTests.run)
       "KernelDomainCoverageTests.run", Sync(sync KernelDomainCoverageTests.run)
+      "KernelDomainCoverageTestsToolArgs.run", Sync(sync KernelDomainCoverageTestsToolArgs.run)
       "KernelReviewCoverageTests.run", Sync(sync KernelReviewCoverageTests.run)
+      "KernelCoverageTestsMethodology.run", Sync(sync KernelCoverageTestsMethodology.run)
       "OmpToolsCoverageTests.run", Async OmpToolsCoverageTests.run
       "OmpCodecCoverageTests.run", Async OmpCodecCoverageTests.run
       "SearchToolsTests.run", Async SearchToolsTests.run
@@ -38,4 +46,6 @@ let coverageTestEntries () : (string * TestBody) list =
       "OpencodeHookSchemaCoverageTests.run", Async OpencodeHookSchemaCoverageTests.run
       "OpencodeSearchToolsCoverageTests.run", Async OpencodeSearchToolsCoverageTests.run
       "OpencodeSubagentCoverageTests.run", Async OpencodeSubagentCoverageTests.run
-      "ReviewerLoopTests.run", Async ReviewerLoopTests.run ]
+      "ReviewerLoopTests.run", Async ReviewerLoopTests.run
+      "ShellCoverage2Tests.run", Sync(sync ShellCoverage2Tests.run)
+      "ShellCoverage2Livelock.run", Sync(sync ShellCoverage2Livelock.run) ]

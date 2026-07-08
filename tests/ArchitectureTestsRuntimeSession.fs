@@ -73,7 +73,7 @@ let pluginInjectsSessionScopeForExecutor () =
         "arch: Mux HostTools executor uses sessionScope.EnqueuePerSession"
         (muxHost.Contains "sessionScope.EnqueuePerSession")
 
-    let pluginCore = requireFile "src/Opencode/PluginCore.fs" |> nonCommentCode
+    let pluginCore = requireFile "src/Opencode/PluginCoreServices.fs" |> nonCommentCode
     let tools = requireFile "src/Opencode/Tools.fs" |> nonCommentCode
     let executor = requireFile "src/Opencode/ExecutorTool.fs" |> nonCommentCode
 

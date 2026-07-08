@@ -4,10 +4,16 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.IntegrationEventTestsMux
+open Wanxiangshu.Tests.IntegrationEventTestsMuxReview
+open Wanxiangshu.Tests.IntegrationEventTestsMuxForceStop
 open Wanxiangshu.Tests.IntegrationEventTestsMuxWrappers
 open Wanxiangshu.Tests.IntegrationEventTestsOpencode
+open Wanxiangshu.Tests.IntegrationEventTestsOpencodeSessionStatus
+open Wanxiangshu.Tests.IntegrationEventTestsOpencodeSessionStatusForceStop
+open Wanxiangshu.Tests.IntegrationEventTestsOpencodeSessionStatusRepeated
 open Wanxiangshu.Tests.IntegrationEventTestsOpencodeLoop
 open Wanxiangshu.Tests.IntegrationEventTestsOpencodeFallback
+open Wanxiangshu.Tests.IntegrationEventTestsOpencodeFallbackInterrupted
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Opencode.Plugin

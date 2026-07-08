@@ -7,6 +7,7 @@ open Wanxiangshu.Tests.OmpWebFetchTests
 open Wanxiangshu.Tests.OmpCapsTests
 open Wanxiangshu.Tests.OmpFuzzyTests
 open Wanxiangshu.Tests.OmpPluginTests
+open Wanxiangshu.Tests.OmpPluginTestsLifecycle
 open Wanxiangshu.Tests.OmpPluginTestsAgentEnd
 open Wanxiangshu.Tests.OmpReviewTests
 open Wanxiangshu.Tests.OmpReviewLoopAsyncTests
@@ -69,8 +70,8 @@ let ompTestEntries () : (string * TestBody) list =
       "OmpPluginTests.reviewChildInitialPromptUsesReturnReviewer",
       Sync(sync OmpPluginTests.reviewChildInitialPromptUsesReturnReviewer)
       "OmpPluginTests.fuzzyGrepExcludeAnyOfLength2", Async OmpPluginTests.fuzzyGrepExcludeAnyOfLength2
-      "OmpPluginTests.websearchSchemaRequiresQueryAndWhatToSummarize",
-      Async OmpPluginTests.websearchSchemaRequiresQueryAndWhatToSummarize
+      "OmpPluginTestsLifecycle.websearchSchemaRequiresQueryAndWhatToSummarize",
+      Async OmpPluginTestsLifecycle.websearchSchemaRequiresQueryAndWhatToSummarize
       "OmpPluginTestsAgentEnd.run", Async OmpPluginTestsAgentEnd.run
       "OmpReviewTests.returnReviewerVerdictPerfectRevise", Async OmpReviewTests.returnReviewerVerdictPerfectRevise
       "OmpReviewTests.returnReviewerViaSetPendingStateForTest",
@@ -190,10 +191,12 @@ let ompTestEntries () : (string * TestBody) list =
       "OmpHookExecuteTests.hookApplyPatchLeavesExistingPatchTextUntouched",
       Sync(sync OmpHookExecuteTests.hookApplyPatchLeavesExistingPatchTextUntouched)
       "OmpSessionLifecycleTests.isChildSessionGuard", Sync(sync OmpSessionLifecycleTests.isChildSessionGuard)
-      "OmpPluginTests.extensionRegistersLifecycleHooks", Async OmpPluginTests.extensionRegistersLifecycleHooks
-      "OmpPluginTests.toolCallHookCanBeInvoked", Async OmpPluginTests.toolCallHookCanBeInvoked
-      "OmpPluginTests.toolCallBlocksChildOnlyInMainSession", Async OmpPluginTests.toolCallBlocksChildOnlyInMainSession
-      "OmpPluginTests.turnStartRestoresMainSessionTools", Async OmpPluginTests.turnStartRestoresMainSessionTools
+      "OmpPluginTestsLifecycle.extensionRegistersLifecycleHooks", Async OmpPluginTestsLifecycle.extensionRegistersLifecycleHooks
+      "OmpPluginTestsLifecycle.toolCallHookCanBeInvoked", Async OmpPluginTestsLifecycle.toolCallHookCanBeInvoked
+      "OmpPluginTestsLifecycle.toolCallBlocksChildOnlyInMainSession",
+      Async OmpPluginTestsLifecycle.toolCallBlocksChildOnlyInMainSession
+      "OmpPluginTestsLifecycle.turnStartRestoresMainSessionTools",
+      Async OmpPluginTestsLifecycle.turnStartRestoresMainSessionTools
       "OmpCoverage2Tests.run", Async OmpCoverage2Tests.run
       "OmpTodoToolTests.run", Async OmpTodoToolTests.run
       "OmpExecutorToolsTests.registersExecutorTools", Sync(sync OmpExecutorToolsTests.registersExecutorTools)

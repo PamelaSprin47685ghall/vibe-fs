@@ -52,7 +52,7 @@ let applyFallbackModelOverridesSplitsModelAndVariant () =
           MaxRetries = 2
           LoopMaxContinues = 3 }
 
-    Wanxiangshu.Opencode.PluginCore.applyFallbackModelOverrides cfg (Some fbCfg)
+    Wanxiangshu.Opencode.PluginCoreServices.applyFallbackModelOverrides cfg (Some fbCfg)
 
     let agentObj = get cfg "agent"
     let buildObj = get agentObj "build"

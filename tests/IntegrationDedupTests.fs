@@ -18,7 +18,7 @@ let private deduplicateReadOutputsAgainstHistory (history: obj array) (messages:
     let seenByPath = Wanxiangshu.Mux.ReadDedup.collectReadOutputsByPath history
     Wanxiangshu.Mux.ReadDedup.deduplicateReadOutputsWithSeenByPath seenByPath messages
 
-let private deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj array =
+let internal deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj array =
     Wanxiangshu.Mux.ReadDedup.deduplicateModelReadOutputsWithSeen seenOutputs messages
 
 let private collectReadOutputs (messages: obj array) : string[] =
@@ -174,111 +174,6 @@ let dedupAgainstHistoryPerPathSpec () =
         "againstHistory per-path: different path not deduped"
         (str (firstOutput r.[0]) "content" = "shared across files")
 
-let dedupModelTextSpec () =
-    let seen, msgs =
-        deduplicateModelReadOutputsWithSeen
-            [||]
-            [| box
-                   {| content =
-                       [| box
-                              {| ``type`` = "tool-result"
-                                 toolName = "read"
-                                 output =
-                                  box
-                                      {| ``type`` = "text"
-                                         value = box "hello" |} |} |] |}
-               box
-                   {| content =
-                       [| box
-                              {| ``type`` = "tool-result"
-                                 toolName = "read"
-                                 output =
-                                  box
-                                      {| ``type`` = "text"
-                                         value = box "hello" |} |} |] |} |]
-
-    check "ModelMessage text: returns seen" (seen |> Array.contains "hello")
-    let firstOut = get ((unbox<obj[]> (get msgs.[0] "content")).[0]) "output"
-    let secondOut = get ((unbox<obj[]> (get msgs.[1] "content")).[0]) "output"
-    check "ModelMessage text: first preserved" (str firstOut "value" = "hello")
-    check "ModelMessage text: second replaced" (str secondOut "value" = noChangeEnvelope ())
-
-let dedupModelJsonSpec () =
-    let seen, msgs =
-        deduplicateModelReadOutputsWithSeen
-            [||]
-            [| box
-                   {| content =
-                       [| box
-                              {| ``type`` = "tool-result"
-                                 toolName = "file_read"
-                                 output =
-                                  box
-                                      {| ``type`` = "json"
-                                         value = box {| content = "json content" |} |} |} |] |}
-               box
-                   {| content =
-                       [| box
-                              {| ``type`` = "tool-result"
-                                 toolName = "file_read"
-                                 output =
-                                  box
-                                      {| ``type`` = "json"
-                                         value = box {| content = "json content" |} |} |} |] |} |]
-
-    check "ModelMessage json: returns seen" (seen |> Array.contains "json content")
-    let secondOut = get ((unbox<obj[]> (get msgs.[1] "content")).[0]) "output"
-    check "ModelMessage json: second replaced" (str secondOut "value" = noChangeEnvelope ())
-
-let dedupModelDifferentSpec () =
-    let _, msgs =
-        deduplicateModelReadOutputsWithSeen
-            [||]
-            [| box
-                   {| content =
-                       [| box
-                              {| ``type`` = "tool-result"
-                                 toolName = "read"
-                                 output =
-                                  box
-                                      {| ``type`` = "text"
-                                         value = box "first" |} |} |] |}
-               box
-                   {| content =
-                       [| box
-                              {| ``type`` = "tool-result"
-                                 toolName = "read"
-                                 output =
-                                  box
-                                      {| ``type`` = "text"
-                                         value = box "second" |} |} |] |} |]
-
-    let firstOut = get ((unbox<obj[]> (get msgs.[0] "content")).[0]) "output"
-    let secondOut = get ((unbox<obj[]> (get msgs.[1] "content")).[0]) "output"
-    check "ModelMessage different: first unchanged" (str firstOut "value" = "first")
-    check "ModelMessage different: second unchanged" (str secondOut "value" = "second")
-
-let dedupModelNonReadSpec () =
-    let _, msgs =
-        deduplicateModelReadOutputsWithSeen
-            [||]
-            [| box
-                   {| content =
-                       [| box
-                              {| ``type`` = "tool-result"
-                                 toolName = "write"
-                                 output =
-                                  box
-                                      {| ``type`` = "text"
-                                         value = box "write result" |} |} |] |} |]
-
-    let out = get ((unbox<obj[]> (get msgs.[0] "content")).[0]) "output"
-    check "ModelMessage non-read: write preserved" (str out "value" = "write result")
-
-let dedupModelEmptySpec () =
-    let _, msgs = deduplicateModelReadOutputsWithSeen [||] [||]
-    check "ModelMessage empty: empty array" (msgs.Length = 0)
-
 let run () : JS.Promise<unit> =
     promise {
         dedupStringOutputSpec ()
@@ -294,11 +189,11 @@ let run () : JS.Promise<unit> =
         dedupAgainstHistorySpec ()
         dedupAgainstHistoryWindowSpec ()
         dedupAgainstHistoryPerPathSpec ()
-        dedupModelTextSpec ()
-        dedupModelJsonSpec ()
-        dedupModelDifferentSpec ()
-        dedupModelNonReadSpec ()
-        dedupModelEmptySpec ()
+        IntegrationDedupModelSpecs.dedupModelTextSpec ()
+        IntegrationDedupModelSpecs.dedupModelJsonSpec ()
+        IntegrationDedupModelSpecs.dedupModelDifferentSpec ()
+        IntegrationDedupModelSpecs.dedupModelNonReadSpec ()
+        IntegrationDedupModelSpecs.dedupModelEmptySpec ()
         do! opencodeDedupInPlaceSpec ()
         do! opencodeDedupIgnoresBacklogFoldedReadsSpec ()
     }
