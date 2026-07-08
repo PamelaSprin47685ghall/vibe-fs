@@ -97,21 +97,22 @@ let kernelParseWarnTddCanonical () =
 
     check
         "parseWarnTdd accepts title-case (case-insensitive)"
-        (parseWarnTdd "I-Am-Sure-I-Have-Followed-Tdd-And-Kolmolgorov-Principles" = Some
-                                                                                       IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+        (parseWarnTdd "I-Am-Sure-I-Have-Followed-Tdd-And-Kolmolgorov-Principles-And-Kept-Todo-Updated" = Some
+                                                                                                               IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
 
     check
         "parseWarnTdd accepts mixed-case"
-        (parseWarnTdd "I-am-sure-i-have-followed-tdd-and-kolmolgorov-principles" = Some
-                                                                                       IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+        (parseWarnTdd "I-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" = Some
+                                                                                                               IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
 
 let kernelParseWarnTddRejectsVariants () =
     let invalidValues =
         [ ""
           "i-am-sure"
-          " i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"
-          "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles "
-          "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principle"
+          "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"
+          " i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+          "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated "
+          "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-update"
           "YES" ]
 
     for value in invalidValues do

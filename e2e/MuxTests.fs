@@ -89,7 +89,7 @@ let private toolSchemaRequiredArray (harness: Harness) (name: string) : string a
             unbox<string[]> req
 
 let private warnTddValue =
-    "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"
+    "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
 
 let runAll (args: string array) : JS.Promise<int> =
     promise {

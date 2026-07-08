@@ -115,7 +115,7 @@ let runAll (_args: string array) : JS.Promise<int> =
                        timeout_type = "short"
                        mode = "ro"
                        what_to_summarize = "stdout"
-                       warn_tdd = "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"
+                       warn_tdd = "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
                        warn = "it-is-not-possible-to-do-it-using-other-tools" |})
                 sessionId
                 (createObj [])
@@ -166,7 +166,7 @@ let runAll (_args: string array) : JS.Promise<int> =
                 (box
                     {| intents = [||]
                        tdd = "green"
-                       warn_tdd = "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles" |})
+                       warn_tdd = "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" |})
                 sessionId
                 (createObj [])
 

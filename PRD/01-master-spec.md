@@ -131,7 +131,7 @@ Modification and execution tools enforce mandatory TDD and side-effect declarati
 #### Tool Categories
 - **Modification Tools (`WarnTdd.modificationTools`)**: `coder`, `executor`, `write`, `edit`, `apply_patch`, `patch`, `ast_edit`, `ast_grep_replace`, `file_edit_replace_string`, `file_edit_insert`, `pty_spawn`, `pty_write`, `pty_read`, `pty_list`, `pty_kill`.
   - **Mandatory Argument**: `warn_tdd: string`
-  - **Canonical Value**: `"i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"`
+  - **Canonical Value**: `"i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"`
 - **High-Risk Execution Tools (`WarnTdd.warnRequiredTools`)**: `executor`, `pty_spawn`, `pty_write`, `pty_read`, `pty_list`, `pty_kill`.
   - **Mandatory Argument**: `warn: string`
   - **Canonical Value**: `"it-is-not-possible-to-do-it-using-other-tools"`
