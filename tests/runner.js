@@ -1,3 +1,7 @@
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION AT:', promise, 'REASON:', reason);
+});
+
 const isE2eMux = process.argv.includes('--e2e-mux');
 const isE2e = process.argv.includes('--e2e');
 const isE2eOmp = process.argv.includes('--e2e-omp');

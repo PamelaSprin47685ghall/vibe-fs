@@ -43,6 +43,7 @@ async function runCommand(ctx, command, sessionId, args) {
 }
 
 async function spinSchedulerAfterUpdate(runtime, taskIds) {
+  await new Promise((r) => setTimeout(r, 100));
   await spinUntil(async (prevRc) => {
     await tickScheduler(runtime, log);
     for (const id of taskIds) {

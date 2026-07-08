@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { PLUGIN_JS, gitInit } from './git.js';
 import { releaseLock } from './lock.js';
 import { waitForListening } from '../harness-bootstrap.js';
+import { createMockLLM } from '../mock-llm.js';
 
 const E2E_META = '.wanxiangzhen-e2e-meta.json';
 const NDJSON = '.wanxiangshu.ndjson';
@@ -14,7 +15,7 @@ function resolveAuthToken(authToken, meta) {
   return (!authToken) ? meta.token : authToken;
 }
 
-export function spawnOpencodeChildAndGetPort(tmpDir, home) {
+export function spawnOpencodeChildAndGetPort(tmpDir, home, llmUrl) {
   return new Promise((resolve, reject) => {
     const pluginUrl = new URL('file://' + PLUGIN_JS).href;
     const config = {
@@ -41,7 +42,7 @@ export function spawnOpencodeChildAndGetPort(tmpDir, home) {
               options: {},
             },
           },
-          options: { apiKey: 'test-key', baseURL: 'http://127.0.0.1:0' },
+          options: { apiKey: 'test-key', baseURL: `${llmUrl}/v1` },
         },
       },
       plugin: [pluginUrl],
@@ -62,12 +63,19 @@ export function spawnOpencodeChildAndGetPort(tmpDir, home) {
     
     let buf = '';
     const onData = (chunk) => {
-      buf += chunk.toString();
-      const m = buf.match(/opencode server listening on http:\/\/127\.0\.0\.1:(\d+)/) || buf.match(/http:\/\/localhost:(\d+)/) || buf.match(/:(\d+)/);
-      if (m) {
-        const port = Number(m[1]);
-        child.stdout.removeListener('data', onData);
-        resolve({ child, port });
+      try {
+        console.log('E2E_CHUNK:', chunk.toString());
+        buf += chunk.toString();
+        const m = buf.match(/opencode server listening on http:\/\/127\.0\.0\.1:(\d+)/) || buf.match(/http:\/\/localhost:(\d+)/) || buf.match(/:(\d+)/);
+        if (m) {
+          const port = Number(m[1]);
+          console.log('E2E_MATCHED_PORT:', port);
+          child.stdout.removeListener('data', onData);
+          resolve({ child, port });
+        }
+      } catch (err) {
+        console.error('onData error:', err);
+        reject(err);
       }
     };
     child.stdout.on('data', onData);
@@ -118,7 +126,7 @@ async function coordinatorPost(meta, p, body, authToken) {
   return { status: res.status, body: respBody };
 }
 
-export function assembleServeHarness(tmpDir, home, child, meta) {
+export function assembleServeHarness(tmpDir, home, child, meta, llmHandle) {
   return {
     mode: 'opencode',
     tmpDir,
@@ -142,6 +150,7 @@ export function assembleServeHarness(tmpDir, home, child, meta) {
       return fs.existsSync(ndjsonPath) ? fs.readFileSync(ndjsonPath, 'utf-8') : '';
     },
     dispose: async () => {
+      try { await llmHandle.stop(); } catch {}
       try { child.kill('SIGTERM'); } catch {}
       try { fs.rmSync(path.join(tmpDir, NDJSON), { force: true }); } catch {}
       try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
@@ -152,6 +161,9 @@ export function assembleServeHarness(tmpDir, home, child, meta) {
 }
 
 export async function startOpencode(opts) {
+  const llm = createMockLLM();
+  const llmHandle = await llm.start();
+
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'wxz-e2e-home-'));
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxz-e2e-'));
   gitInit(tmpDir, opts);
@@ -159,8 +171,9 @@ export async function startOpencode(opts) {
   let child;
   let port;
   try {
-    ({ child, port } = await spawnOpencodeChildAndGetPort(tmpDir, home));
+    ({ child, port } = await spawnOpencodeChildAndGetPort(tmpDir, home, llmHandle.url));
   } catch (e) {
+    try { await llmHandle.stop(); } catch {}
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     try { fs.rmSync(home, { recursive: true, force: true }); } catch {}
     throw e;
@@ -170,19 +183,38 @@ export async function startOpencode(opts) {
 
   let meta;
   try {
+    llmHandle.expectText('ok');
     const warmupUrl = `http://127.0.0.1:${port}/api/session`;
-    await fetch(warmupUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-opencode-directory': tmpDir },
-      body: JSON.stringify({ model: { id: 'test-model', providerID: 'test' } }),
-    }).catch(() => {});
+    try {
+      const res = await fetch(warmupUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-opencode-directory': tmpDir },
+        body: JSON.stringify({ model: { id: 'test-model', providerID: 'test' } }),
+      });
+      const data = await res.json();
+      const sessionId = data?.data?.id;
+      if (sessionId) {
+        const msgUrl = `http://127.0.0.1:${port}/session/${sessionId}/message`;
+        await fetch(msgUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-opencode-directory': tmpDir },
+          body: JSON.stringify({
+            parts: [{ type: 'text', text: 'warmup' }],
+            model: { providerID: 'test', modelID: 'test-model' }
+          }),
+        }).catch(() => {});
+      }
+    } catch (fetchErr) {
+      console.error('WARMUP FETCH ERROR:', fetchErr);
+    }
 
     meta = await waitForMetaFile(metaPath, child);
   } catch (e) {
+    try { await llmHandle.stop(); } catch {}
     try { child.kill('SIGKILL'); } catch {}
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
     try { fs.rmSync(home, { recursive: true, force: true }); } catch {}
     throw e;
   }
-  return assembleServeHarness(tmpDir, home, child, meta);
+  return assembleServeHarness(tmpDir, home, child, meta, llmHandle);
 }
