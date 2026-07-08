@@ -49,6 +49,8 @@ let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit>
 
         if WarnTdd.isWarnRequiredTool toolID then
             rewriteToolJsonSchema setKey (injectWarnIntoJsonSchema) output
+
+        rewriteToolJsonSchema setKey (injectAmendIntoJsonSchema) output
     }
 
 let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> = toolDefinitionFor opencode input output

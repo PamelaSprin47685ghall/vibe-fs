@@ -185,6 +185,7 @@
     <Compile Include="src/Shell/OmpCaps.fs"/>
     <Compile Include="src/Shell/CapsPrelude.fs"/>
     <Compile Include="src/Shell/TitleFetchGuardCommon.fs"/>
+    <Compile Include="src/Shell/ExecutorPlatform.fs"/>
     <Compile Include="src/Shell/ExecutorSpawn.fs"/>
     <Compile Include="src/Shell/ExecutorSpawnRunners.fs"/>
     <Compile Include="src/Shell/Executor.fs"/>

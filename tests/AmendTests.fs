@@ -5,6 +5,12 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.AmendFilter
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Opencode.HookSchemaDecode
+open Wanxiangshu.Shell.MuxPluginCatalogShell
+open Wanxiangshu.Shell.MuxToolDefinition
+open Wanxiangshu.Omp.OmpToolSchema
+
+module Dyn = Wanxiangshu.Shell.Dyn
 
 // ---- Test helpers ----
 
@@ -22,8 +28,7 @@ let msg role toolName callID raw : Message<obj> =
       source = Native
       raw = raw }
 
-let userMsg (raw: obj) : Message<obj> =
-    msg User "" "" raw
+let userMsg (raw: obj) : Message<obj> = msg User "" "" raw
 
 let assistantMsg (parts: Part<obj> list) (raw: obj) : Message<obj> =
     { info =
@@ -39,25 +44,28 @@ let assistantMsg (parts: Part<obj> list) (raw: obj) : Message<obj> =
       source = Native
       raw = raw }
 
-let toolResultMsg (toolName: string) (raw: obj) : Message<obj> =
-    msg ToolResult toolName "" raw
+let toolResultMsg (toolName: string) (raw: obj) : Message<obj> = msg ToolResult toolName "" raw
 
-let toolPart (callID: string) (toolName: string) : Part<obj> =
-    ToolPart(toolName, callID, None, null)
+let toolPart (callID: string) (toolName: string) : Part<obj> = ToolPart(toolName, callID, None, null)
 
 // ---- Extractor ----
 
 let amendExtractor (raw: obj) : int option =
-    if isNull raw then None
+    if isNull raw then
+        None
     else
         let v = raw?amend
-        if isNull v then None
-        elif Fable.Core.JsInterop.jsTypeof v = "number" then Some(int(unbox<float> v))
+
+        if isNull v then
+            None
+        elif Fable.Core.JsInterop.jsTypeof v = "number" then
+            Some(int (unbox<float> v))
         elif Fable.Core.JsInterop.jsTypeof v = "string" then
             match System.Int32.TryParse(string v) with
             | true, x -> Some x
             | _ -> None
-        else None
+        else
+            None
 
 // ---- Tests ----
 
@@ -66,6 +74,7 @@ let testNoAmendPreservesMessages () =
         [ userMsg (createObj [ "text", box "hello" ])
           assistantMsg [ toolPart "call-1" "read" ] (createObj [])
           toolResultMsg "read" (createObj []) ]
+
     let result = filterAmendMessages amendExtractor msgs
     equal "no amend: 3 msgs preserved" 3 (List.length result)
 
@@ -75,6 +84,7 @@ let testAmend1PopsOneToolCall () =
           assistantMsg [ toolPart "call-1" "read" ] (createObj [])
           toolResultMsg "read" (createObj [])
           userMsg (createObj [ "amend", box 1 ]) ]
+
     let result = filterAmendMessages amendExtractor msgs
     equal "amend=1: only amend msg remains" 1 (List.length result)
     check "amend=1: remaining is amend msg" (result.[0].info.role = User)
@@ -88,6 +98,7 @@ let testAmend2PopsTwoToolCalls () =
           assistantMsg [ toolPart "call-2" "write" ] (createObj [])
           toolResultMsg "write" (createObj [])
           userMsg (createObj [ "amend", box 2 ]) ]
+
     let result = filterAmendMessages amendExtractor msgs
     equal "amend=2: only amend msg remains" 1 (List.length result)
 
@@ -97,6 +108,7 @@ let testAmendExceedsAvailable () =
           assistantMsg [ toolPart "call-1" "read" ] (createObj [])
           toolResultMsg "read" (createObj [])
           userMsg (createObj [ "amend", box 10 ]) ]
+
     let result = filterAmendMessages amendExtractor msgs
     equal "amend exceeds: 1 msg remains" 1 (List.length result)
 
@@ -105,6 +117,7 @@ let testAmendZeroIgnored () =
         [ userMsg (createObj [ "text", box "hello" ])
           assistantMsg [ toolPart "call-1" "read" ] (createObj [])
           toolResultMsg "read" (createObj []) ]
+
     let result = filterAmendMessages amendExtractor msgs
     equal "amend absent: 3 msgs preserved" 3 (List.length result)
 
@@ -113,6 +126,7 @@ let testPopOneToolCallDirect () =
         [ userMsg (createObj [ "text", box "prompt" ])
           assistantMsg [ toolPart "call-1" "read" ] (createObj [])
           toolResultMsg "read" (createObj []) ]
+
     let (removed, remaining) = popOneToolCall msgs
     equal "popOne: 3 removed" 3 (List.length removed)
     equal "popOne: 0 remaining" 0 (List.length remaining)
@@ -125,6 +139,7 @@ let testPopOneToolCallMultipleChains () =
           userMsg (createObj [ "text", box "step 2" ])
           assistantMsg [ toolPart "call-2" "write" ] (createObj [])
           toolResultMsg "write" (createObj []) ]
+
     let (removed, remaining) = popOneToolCall msgs
     // Last tool call chain: user prompt + assistant tool + tool result
     equal "popOne multi: 3 removed" 3 (List.length removed)
@@ -138,6 +153,7 @@ let testPopUntilCallID2 () =
           userMsg (createObj [ "text", box "step 2" ])
           assistantMsg [ toolPart "call-2" "write" ] (createObj [])
           toolResultMsg "write" (createObj []) ]
+
     let (removed, remaining) = popUntilCallID 2 msgs
     equal "popUntil 2: 6 removed" 6 (List.length removed)
     equal "popUntil 2: 0 remaining" 0 (List.length remaining)
@@ -153,12 +169,15 @@ let testNoToolCalls () =
     let msgs =
         [ userMsg (createObj [ "text", box "hello" ])
           userMsg (createObj [ "text", box "world" ]) ]
+
     let (removed, remaining) = popOneToolCall msgs
     equal "popOne no tools: 0 removed" 0 (List.length removed)
     equal "popOne no tools: 2 remaining" 2 (List.length remaining)
 
 let testGetCallIDs () =
-    let m = assistantMsg [ toolPart "call-abc" "read"; toolPart "call-def" "write" ] (createObj [])
+    let m =
+        assistantMsg [ toolPart "call-abc" "read"; toolPart "call-def" "write" ] (createObj [])
+
     let ids = getCallIDs m
     equal "getCallIDs extracts 2" 2 (List.length ids)
     check "getCallIDs first" ((List.head ids) = "call-abc")
@@ -184,6 +203,7 @@ let testNestedAmend () =
           assistantMsg [ toolPart "call-2" "write" ] (createObj [])
           toolResultMsg "write" (createObj [])
           userMsg (createObj [ "amend", box 1 ]) ]
+
     let result = filterAmendMessages amendExtractor msgs
     // After first amend=1: pops call-1 chain → [amend=1 user, step2 user, call-2 assistant, call-2 result, amend=1 user]
     // After second amend=1: pops the last tool call chain (call-2) → [amend=1 user, amend=1 user]
@@ -204,11 +224,48 @@ let testParallelToolCalls () =
           toolResultMsg "read" (createObj [])
           toolResultMsg "write" (createObj [])
           userMsg (createObj [ "text", box "next" ]) ]
+
     let (removed, remaining) = popOneToolCall msgs
     // The parallel chain = user prompt + assistant (2 ToolParts) + 2 results = 4 messages
     equal "parallel: 4 removed" 4 (List.length removed)
     equal "parallel: 1 remaining" 1 (List.length remaining)
     check "parallel: remaining is last user" (remaining.[0].info.role = User)
+
+// ---- Amend schema injection (RED: production functions do not exist yet) ----
+
+let testAmendSchemaInjected () =
+    // Opencode: injectAmendIntoJsonSchema should add 'amend' to properties
+    let opencodeSchema =
+        createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
+
+    let opencodeResult = injectAmendIntoJsonSchema opencodeSchema
+    let opencodeProps = Dyn.get opencodeResult "properties"
+    check "opencode schema has amend property" (not (Dyn.isNullish (Dyn.get opencodeProps "amend")))
+    let amendProp = Dyn.get opencodeProps "amend"
+    equal "opencode amend type" "integer" (string (Dyn.get amendProp "type"))
+    check "opencode amend minimum = 1" (string (Dyn.get amendProp "minimum") = "1")
+
+    // Mux: injectAmendIntoMuxSchema should add 'amend' to ToolDefinition parameters
+    let muxTool =
+        { name = "coder"
+          description = "test"
+          parameters = mkSchema (createObj [ "file", box (createObj []) ]) [| "file" |]
+          execute = fun _ _ -> failwith "not implemented"
+          condition = None }
+
+    let muxResult = injectAmendIntoMuxSchema muxTool
+    let muxProps = muxResult.parameters.properties
+    check "mux schema has amend property" (not (Dyn.isNullish (Dyn.get muxProps "amend")))
+    let muxAmend = Dyn.get muxProps "amend"
+    equal "mux amend type" "integer" (string (Dyn.get muxAmend "type"))
+
+    // OMP: injectAmendIntoOmpParameters should add 'amend' to TypeBox schema
+    let ompSchema = createObj [ "properties", createObj [ "file", box (createObj []) ] ]
+    let ompResult = injectAmendIntoOmpParameters ompSchema
+    let ompProps = Dyn.get ompResult "properties"
+    check "omp schema has amend property" (not (Dyn.isNullish (Dyn.get ompProps "amend")))
+    let ompAmend = Dyn.get ompProps "amend"
+    equal "omp amend type" "integer" (string (Dyn.get ompAmend "type"))
 
 let runAll () : unit =
     timed "testNoAmendPreservesMessages" testNoAmendPreservesMessages
@@ -225,3 +282,4 @@ let runAll () : unit =
     timed "testSingleCallID" testSingleCallID
     timed "testNestedAmend" testNestedAmend
     timed "testParallelToolCalls" testParallelToolCalls
+    timed "testAmendSchemaInjected" testAmendSchemaInjected

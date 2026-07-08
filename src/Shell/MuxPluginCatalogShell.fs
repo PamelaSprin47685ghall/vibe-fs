@@ -64,3 +64,19 @@ let injectWarnIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
 
 let injectWarnWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
     injectWarnTddIntoMuxSchema (injectWarnIntoMuxSchema tool)
+
+let injectAmendIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
+    let props = tool.parameters.properties
+
+    if isNullish (props?amend) then
+        props?("amend") <-
+            box (
+                createObj
+                    [| "type", box "integer"
+                       "minimum", box 1
+                       "description",
+                       box
+                           "Undo/amend the last N tool call chains (including calls, results, and intermediate reasoning) by backtracking in history. The amend message itself is kept as a fresh starting point." |]
+            )
+
+    tool

@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Shell.ExecutorJavascript
 open Wanxiangshu.Shell.ExecutorSpawn
+open Wanxiangshu.Shell.ExecutorPlatform
 
 let private runShellProgram
     (program: string)

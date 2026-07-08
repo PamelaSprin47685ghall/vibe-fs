@@ -24,14 +24,36 @@ let private addRequired (schema: obj) (key: string) : unit =
     else
         schema?("required") <- box [| box key |]
 
+let injectAmendIntoOmpParameters (schema: obj) : obj =
+    if isNullish schema then
+        schema
+    else
+        let props = Dyn.get schema "properties"
+
+        if not (isNullish props) then
+            if isNullish (Dyn.get props "amend") then
+                props?("amend") <-
+                    box (
+                        createObj
+                            [| "type", box "integer"
+                               "minimum", box 1
+                               "description",
+                               box
+                                   "Undo/amend the last N tool call chains (including calls, results, and intermediate reasoning) by backtracking in history. The amend message itself is kept as a fresh starting point." |]
+                    )
+
+        schema
+
 let methodologyParameters (tb: obj) : obj =
-    objectOf
-        [| ("methodology",
-            enumOf (Wanxiangshu.Methodology.Registry.enumValuesArray.Value) "Select which methodology to apply." tb)
-           ("intent", str intentFieldDescription tb)
-           ("background", str backgroundFieldDescription tb)
-           ("note", str unifiedNoteDescription.Value tb) |]
-        tb
+    injectAmendIntoOmpParameters (
+        objectOf
+            [| ("methodology",
+                enumOf (Wanxiangshu.Methodology.Registry.enumValuesArray.Value) "Select which methodology to apply." tb)
+               ("intent", str intentFieldDescription tb)
+               ("background", str backgroundFieldDescription tb)
+               ("note", str unifiedNoteDescription.Value tb) |]
+            tb
+    )
 
 let private coderIntentItem (tb: obj) : obj =
     let targetShape =
@@ -68,7 +90,7 @@ let coderParameters (tb: obj) : obj =
                            "description", box warnTddDescription |]
                 )
 
-    schema
+    injectAmendIntoOmpParameters schema
 
 let private investigatorIntentItem (tb: obj) : obj =
     objectOf
@@ -79,26 +101,31 @@ let private investigatorIntentItem (tb: obj) : obj =
         tb
 
 let investigatorParameters (tb: obj) : obj =
-    objectOf [| ("intents", arrayOf (investigatorIntentItem tb) Params.investigatorIntents tb) |] tb
+    injectAmendIntoOmpParameters (
+        objectOf [| ("intents", arrayOf (investigatorIntentItem tb) Params.investigatorIntents tb) |] tb
+    )
 
 let meditatorParameters (tb: obj) : obj =
-    objectOf
-        [| ("intent", str Params.meditatorIntent tb)
-           ("files", strArray Params.meditatorFiles tb) |]
-        tb
+    injectAmendIntoOmpParameters (
+        objectOf
+            [| ("intent", str Params.meditatorIntent tb)
+               ("files", strArray Params.meditatorFiles tb) |]
+            tb
+    )
 
 let browserParameters (tb: obj) : obj =
-    objectOf [| ("intent", str Params.browserIntent tb) |] tb
+    injectAmendIntoOmpParameters (objectOf [| ("intent", str Params.browserIntent tb) |] tb)
 
 let continueParameters (tb: obj) : obj =
-    objectOf
-        [| ("iterator",
-            str
-                "The iterator ID representing the target subagent session (usually returned in the front matter of a previous subagent run)."
-                tb)
-           ("prompt",
-            str "The new query, instructions, or follow-up question to send to the subagent session." tb) |]
-        tb
+    injectAmendIntoOmpParameters (
+        objectOf
+            [| ("iterator",
+                str
+                    "The iterator ID representing the target subagent session (usually returned in the front matter of a previous subagent run)."
+                    tb)
+               ("prompt", str "The new query, instructions, or follow-up question to send to the subagent session." tb) |]
+            tb
+    )
 
 let executorParameters (tb: obj) : obj =
     let schema =
@@ -140,13 +167,15 @@ let executorParameters (tb: obj) : obj =
                 )
 
     addRequired schema "what_to_summarize"
-    schema
+    injectAmendIntoOmpParameters schema
 
 let returnReviewerParameters (tb: obj) : obj =
-    objectOf
-        [| ("verdict", enumOf [| "PERFECT"; "REVISE" |] "PERFECT to accept, REVISE to request revision" tb)
-           ("feedback", opt "Detailed, actionable feedback when requesting revision; omit when passing." tb str) |]
-        tb
+    injectAmendIntoOmpParameters (
+        objectOf
+            [| ("verdict", enumOf [| "PERFECT"; "REVISE" |] "PERFECT to accept, REVISE to request revision" tb)
+               ("feedback", opt "Detailed, actionable feedback when requesting revision; omit when passing." tb str) |]
+            tb
+    )
 
 let todowriteParameters (tb: obj) : obj =
     let todoItem =
@@ -156,16 +185,18 @@ let todowriteParameters (tb: obj) : obj =
                ("priority", str todoPriorityDesc tb) |]
             tb
 
-    objectOf
-        [| ("todos", arrayOf todoItem todosDesc tb)
-           ("ahaMoments", str ahaMomentsDesc tb)
-           ("changesAndReasons", str changesAndReasonsDesc tb)
-           ("gotchas", str gotchasDesc tb)
-           ("lessonsAndConventions", str lessonsAndConventionsDesc tb)
-           ("plan", str planDesc tb)
-           ("select_methodology",
-            arrayOf
-                (enumOf Wanxiangshu.Methodology.Registry.enumValuesArray.Value "Methodology name" tb)
-                selectMethodologyFieldDescription
-                tb) |]
-        tb
+    injectAmendIntoOmpParameters (
+        objectOf
+            [| ("todos", arrayOf todoItem todosDesc tb)
+               ("ahaMoments", str ahaMomentsDesc tb)
+               ("changesAndReasons", str changesAndReasonsDesc tb)
+               ("gotchas", str gotchasDesc tb)
+               ("lessonsAndConventions", str lessonsAndConventionsDesc tb)
+               ("plan", str planDesc tb)
+               ("select_methodology",
+                arrayOf
+                    (enumOf Wanxiangshu.Methodology.Registry.enumValuesArray.Value "Methodology name" tb)
+                    selectMethodologyFieldDescription
+                    tb) |]
+            tb
+    )

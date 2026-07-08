@@ -118,6 +118,40 @@ let private reportFieldDescs =
        "plan", planDesc |]
     |> Map.ofArray
 
+let inlineJsonAmendProperty: obj =
+    createObj
+        [ "type", box "integer"
+          "minimum", box 1
+          "description",
+          box
+              "Undo/amend the last N tool call chains (including calls, results, and intermediate reasoning) by backtracking in history. The amend message itself is kept as a fresh starting point." ]
+
+let private injectAmendIntoJsonSchemaInPlace (schema: obj) : unit =
+    let props = get schema "properties"
+
+    if not (isNullish props) then
+        if isNullish (get props "amend") then
+            props?("amend") <- inlineJsonAmendProperty
+
+let private injectAmendIntoArgsShapeInPlace (shape: obj) : unit =
+    if isNullish (get shape "amend") then
+        shape?("amend") <-
+            ToolSchema.numOpt
+                "Undo/amend the last N tool call chains (including calls, results, and intermediate reasoning) by backtracking in history. The amend message itself is kept as a fresh starting point."
+
+let injectAmendIntoJsonSchema (schema: obj) : obj =
+    if isNullish schema then
+        schema
+    else
+        let props = get schema "properties"
+
+        if not (isNullish props) then
+            injectAmendIntoJsonSchemaInPlace schema
+        else
+            injectAmendIntoArgsShapeInPlace schema
+
+        schema
+
 let mergeWorkBacklogReportIntoTaskSchema (schema: obj) : obj =
     if isNullish schema then
         schema
