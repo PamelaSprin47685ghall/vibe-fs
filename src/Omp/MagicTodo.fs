@@ -28,12 +28,26 @@ type BacklogSession(host: Host) =
             messages
 
     member this.GetOrRebuildBacklog(sessionID: string, messages: Message<obj> list) : BacklogEntry list =
-        if messages.Length > 0 then
-            let backlog = this.ReplayBacklog messages
-            projection.StoreBacklog(host, sessionID, backlog)
-            backlog
-        else
-            projection.TryGetBacklog(host, sessionID) |> Option.defaultValue []
+        let countTodoResults (mList: Message<obj> list) =
+            mList |> List.sumBy (fun m ->
+                m.parts |> List.filter (isTodoResultFor host) |> List.length
+            )
+
+        match projection.TryGetBacklog(host, sessionID) with
+        | Some backlog ->
+            if messages.Length > 0 && backlog.Length <> countTodoResults messages then
+                let nextBacklog = this.ReplayBacklog messages
+                projection.StoreBacklog(host, sessionID, nextBacklog)
+                nextBacklog
+            else
+                backlog
+        | None ->
+            if messages.Length > 0 then
+                let backlog = this.ReplayBacklog messages
+                projection.StoreBacklog(host, sessionID, backlog)
+                backlog
+            else
+                []
 
 let private shared (host: Host) : BacklogSession = BacklogSession host
 

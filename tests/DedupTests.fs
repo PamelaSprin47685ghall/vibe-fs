@@ -204,6 +204,12 @@ let deduplicateFingerprintMatchAcrossFooterVariants () =
     let r2 = deduplicate r1.seenOutputs altFooter
     equal "alt-footer repeat returns noChangeEnvelope" (noChangeEnvelope ()) r2.output
 
+let deduplicateLargeSubstringOfSeenDoesNotMatch () =
+    let largeSeen = String.init 2500 (fun _ -> "a") + " b"
+    let largeOutput = String.init 2100 (fun _ -> "a")
+    let r = deduplicate [ largeSeen ] largeOutput
+    check "large substring should not be deduplicated" (r.output = largeOutput)
+
 let run () =
     isNoChangeOutputTrue ()
     isNoChangeOutputFalse ()
@@ -224,3 +230,4 @@ let run () =
     deduplicateFingerprintMatchAcrossFormats ()
     deduplicateFingerprintMatchAcrossLimits ()
     deduplicateFingerprintMatchAcrossFooterVariants ()
+    deduplicateLargeSubstringOfSeenDoesNotMatch ()

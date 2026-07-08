@@ -19,9 +19,23 @@ type BacklogSession(scope: RuntimeScope) =
         replayBacklogWith mux (reportFromFlatPartWithProjection mux projection) messages
 
     member this.GetOrRebuildBacklog(sessionID: string, messages: Message<obj> list) : BacklogEntry list =
-        if messages.Length > 0 then
-            let backlog = this.ReplayBacklog messages
-            projection.StoreBacklog(mux, sessionID, backlog)
-            backlog
-        else
-            projection.TryGetBacklog(mux, sessionID) |> Option.defaultValue []
+        let countTodoResults (mList: Message<obj> list) =
+            mList |> List.sumBy (fun m ->
+                m.parts |> List.filter (isTodoResultFor mux) |> List.length
+            )
+
+        match projection.TryGetBacklog(mux, sessionID) with
+        | Some backlog ->
+            if messages.Length > 0 && backlog.Length <> countTodoResults messages then
+                let nextBacklog = this.ReplayBacklog messages
+                projection.StoreBacklog(mux, sessionID, nextBacklog)
+                nextBacklog
+            else
+                backlog
+        | None ->
+            if messages.Length > 0 then
+                let backlog = this.ReplayBacklog messages
+                projection.StoreBacklog(mux, sessionID, backlog)
+                backlog
+            else
+                []

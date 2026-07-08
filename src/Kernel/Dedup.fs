@@ -29,10 +29,12 @@ let deduplicate (seenOutputs: string list) (output: string) : DedupedOutput =
     else
         let fpOut = readFingerprint output
 
-        let matches seen =
+        let matches (seen: string) =
             match fpOut with
-            | Some fp -> fp = seen || seen.Contains output
-            | None -> seen.Contains output
+            | Some fp ->
+                fp = seen || (seen.Length >= output.Length && (output.Length <= 2048 || seen.Length <= 2048) && seen.Contains output)
+            | None ->
+                seen.Length >= output.Length && (output.Length <= 2048 || seen.Length <= 2048) && seen.Contains output
 
         if List.exists matches seenOutputs then
             { output = noChangeEnvelope ()

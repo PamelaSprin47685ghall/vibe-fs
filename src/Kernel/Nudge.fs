@@ -29,19 +29,22 @@ let skipLoopRe = Regex(@"<skip-loop-check\s*\/?>", RegexOptions.IgnoreCase)
 let questionRe = Regex(@"\?\s*$")
 
 let private cleanTextOutsideCodeFences (text: string) : string =
-    let lines = text.Split('\n')
-    let mutable inFence = false
-    let cleanedLines = ResizeArray<string>()
+    if not (text.Contains "```") && not (text.Contains "~~~") then
+        text
+    else
+        let lines = text.Split('\n')
+        let mutable inFence = false
+        let cleanedLines = ResizeArray<string>()
 
-    for line in lines do
-        let trimmed = line.TrimStart()
+        for line in lines do
+            let trimmed = line.TrimStart()
 
-        if trimmed.StartsWith("```") || trimmed.StartsWith("~~~") then
-            inFence <- not inFence
-        else if not inFence then
-            cleanedLines.Add(line)
+            if trimmed.StartsWith("```") || trimmed.StartsWith("~~~") then
+                inFence <- not inFence
+            else if not inFence then
+                cleanedLines.Add(line)
 
-    String.concat "\n" cleanedLines
+        String.concat "\n" cleanedLines
 
 let internal isQuestion (text: string) =
     cleanTextOutsideCodeFences text |> questionRe.IsMatch

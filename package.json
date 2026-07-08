@@ -40,6 +40,7 @@
     "e2e": "node tests/runner.js --e2e",
     "e2e:mux": "node tests/runner.js --e2e-mux",
     "e2e:opencode-plugin": "node tests/runner.js --e2e-opencode-plugin",
+    "e2e:wanxiangzhen": "node tests/runner.js --e2e-wanxiangzhen",
     "e2e-omp": "node tests/runner.js --e2e-omp"
   },
   "dependencies": {

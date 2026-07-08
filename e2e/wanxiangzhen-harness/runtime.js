@@ -14,14 +14,14 @@ export async function spinUntil(predicate, maxSteps = 200) {
 }
 
 export async function runningCount(runtime) {
-  const url = pathToFileURL(path.join(BUILD_SRC, 'Kernel', 'Wanxiangzhen', 'Dag.js')).href;
+  const url = pathToFileURL(path.join(BUILD_SRC, 'src', 'Kernel', 'Wanxiangzhen', 'Dag.js')).href;
   const dag = await import(url);
   return dag.runningCount(runtime.Dag);
 }
 
 export async function tickScheduler(runtime, log) {
   try {
-    const url = pathToFileURL(path.join(BUILD_SRC, 'Shell', 'Wanxiangzhen', 'CoordinatorOps.js')).href;
+    const url = pathToFileURL(path.join(BUILD_SRC, 'src', 'Shell', 'Wanxiangzhen', 'CoordinatorOps.js')).href;
     const ops = await import(url);
     runtime.Scheduling = false;
     await ops.schedulerTick(runtime);
@@ -31,7 +31,7 @@ export async function tickScheduler(runtime, log) {
 }
 
 export async function findTaskInDag(runtime, taskId) {
-  const url = pathToFileURL(path.join(BUILD_SRC, 'Kernel', 'Wanxiangzhen', 'Dag.js')).href;
+  const url = pathToFileURL(path.join(BUILD_SRC, 'src', 'Kernel', 'Wanxiangzhen', 'Dag.js')).href;
   const dag = await import(url);
   return dag.findTask(taskId, runtime.Dag);
 }
@@ -85,12 +85,17 @@ export function shapeWanSquadLine(evt, at) {
       payload = { requirement: fields[1] };
       break;
     case 'TasksCreated': {
-      const tasks = (fields[1] || []).map(([tid, title, desc, deps]) => ({
-        task_id: tid,
-        title,
-        description: desc,
-        ...(deps?.length ? { depends_on: deps } : {}),
-      }));
+      const tasksList = fields[1] || [];
+      const tasksArr = Array.isArray(tasksList) ? tasksList : Array.from(tasksList);
+      const tasks = tasksArr.map(([tid, title, desc, deps]) => {
+        const depsArr = deps && !Array.isArray(deps) ? Array.from(deps) : (deps || []);
+        return {
+          task_id: tid,
+          title,
+          description: desc,
+          ...(depsArr.length ? { depends_on: depsArr } : {}),
+        };
+      });
       payload = { tasksJson: JSON.stringify(tasks) };
       break;
     }

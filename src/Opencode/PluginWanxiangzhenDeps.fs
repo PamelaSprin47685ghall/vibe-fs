@@ -13,13 +13,14 @@ open Wanxiangshu.Opencode.PluginWanxiangzhenHooks
 let realCoordinatorDeps (workspaceRoot: string) =
     Wanxiangshu.Shell.Wanxiangzhen.CoordinatorDepsFactory.realCoordinatorDeps workspaceRoot
 
+type PluginWithDepsResult =
+    abstract hooks: obj with get
+    abstract runtime: CoordinatorRuntime with get
+
 let pluginWithDeps
     (ctx: obj)
     (deps: CoordinatorDeps)
-    : JS.Promise<
-          {| hooks: obj
-             runtime: CoordinatorRuntime |}
-       >
+    : JS.Promise<PluginWithDepsResult>
     =
     promise {
         let client = get ctx "client"
@@ -28,5 +29,5 @@ let pluginWithDeps
         let mb, gitError = resolveMasterBranch directory config deps
         let! rt = createWithDeps client directory config mb gitError deps
         let hooks = assembleCoordinatorHooks rt
-        return {| hooks = hooks; runtime = rt |}
+        return createObj [ "hooks", box hooks; "runtime", box rt ] |> unbox
     }

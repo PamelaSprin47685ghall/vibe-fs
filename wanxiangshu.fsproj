@@ -671,6 +671,7 @@
     <!-- E2E Tests -->
     <Compile Include="e2e/HarnessTypes.fs"/>
     <Compile Include="e2e/TestsServePlugin.fs"/>
+    <Compile Include="e2e/WanxiangzhenPluginTests.fs"/>
     <Compile Include="e2e/Tests.fs"/>
     <Compile Include="e2e/MuxTests.fs"/>
     <Compile Include="e2e/OpencodePluginTests.fs"/>

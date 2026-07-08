@@ -45,3 +45,36 @@ type OmpHarness =
     abstract expectTool: string -> obj -> JS.Promise<unit>
     abstract waitForNdjson: int -> int -> JS.Promise<bool>
     abstract dispose: unit -> JS.Promise<unit>
+
+type WanxiangzhenHarness =
+    abstract mode: string
+    abstract tmpDir: string
+    abstract token: string
+    abstract url: string
+    abstract runCommand: string -> string -> obj -> JS.Promise<obj>
+    abstract toolRound: string -> obj -> JS.Promise<obj>
+    abstract coordinatorGet: string -> string option -> JS.Promise<obj>
+    abstract coordinatorPost: string -> obj -> string option -> JS.Promise<obj>
+    abstract readMeta: unit -> string
+    abstract waitForMeta: unit -> JS.Promise<string>
+    abstract waitForScheduler: string -> JS.Promise<unit>
+    abstract ensureSchedulerCapacity: unit -> JS.Promise<unit>
+    abstract clearCallSpies: unit -> unit
+    abstract getLog: unit -> obj[]
+    abstract getSquadEvents: unit -> obj[]
+    abstract getPromptCalls: unit -> obj[]
+    abstract getSpawnCalls: unit -> obj[]
+    abstract getKillCalls: unit -> obj[]
+    abstract getWorktreeAddCalls: unit -> obj[]
+    abstract getWorktreeRemoveCalls: unit -> obj[]
+    abstract getBranchDeleteCalls: unit -> obj[]
+    abstract callSlavePlugin: obj -> string -> string -> string -> string -> string -> JS.Promise<obj>
+    abstract dispose: unit -> JS.Promise<unit>
+    abstract setRevParseRef: string -> string -> unit
+    abstract setMergeBaseResult: bool -> unit
+    abstract setMergeFfResult: string -> unit
+    abstract setStatusClean: bool -> unit
+    abstract setHasCommits: bool -> unit
+    abstract setShowRefExists: bool -> unit
+    abstract setIsPidAlive: bool -> unit
+    abstract setNowResult: string -> unit

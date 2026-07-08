@@ -19,6 +19,7 @@ let private coordinatorPlugin (ctx: obj) : JS.Promise<obj> =
     promise {
         let directory = Wanxiangshu.Shell.Dyn.str ctx "directory"
         let! result = PluginWanxiangzhenDeps.pluginWithDeps ctx (PluginWanxiangzhenDeps.realCoordinatorDeps directory)
+        Wanxiangshu.Opencode.PluginWanxiangzhenE2eMeta.writeE2eMetaIfEnabled result.runtime
         return result.hooks
     }
 
@@ -49,7 +50,8 @@ let plugin (ctx: obj) : JS.Promise<obj> =
     else
         coordinatorPlugin ctx
 
-let pluginWithDeps = PluginWanxiangzhenDeps.pluginWithDeps
+let pluginWithDeps (ctx: obj) (deps: Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime.CoordinatorDeps) =
+    PluginWanxiangzhenDeps.pluginWithDeps ctx deps
 
 [<ExportDefault>]
 let pluginModule: obj =

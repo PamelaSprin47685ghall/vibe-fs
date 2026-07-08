@@ -25,12 +25,26 @@ type BacklogSession(host: Host, scope: RuntimeScope) =
         replayBacklogWith host (BacklogSessionCodec.reportFromFlatPartWithProjection host projection) messages
 
     member this.GetOrRebuildBacklog(sessionID: string, messages: Message<obj> list) : BacklogEntry list =
-        if messages.Length > 0 then
-            let backlog = this.ReplayBacklog messages
-            projection.StoreBacklog(host, sessionID, backlog)
-            backlog
-        else
-            projection.TryGetBacklog(host, sessionID) |> Option.defaultValue []
+        let countTodoResults (mList: Message<obj> list) =
+            mList |> List.sumBy (fun m ->
+                m.parts |> List.filter (isTodoResultFor host) |> List.length
+            )
+
+        match projection.TryGetBacklog(host, sessionID) with
+        | Some backlog ->
+            if messages.Length > 0 && backlog.Length <> countTodoResults messages then
+                let nextBacklog = this.ReplayBacklog messages
+                projection.StoreBacklog(host, sessionID, nextBacklog)
+                nextBacklog
+            else
+                backlog
+        | None ->
+            if messages.Length > 0 then
+                let backlog = this.ReplayBacklog messages
+                projection.StoreBacklog(host, sessionID, backlog)
+                backlog
+            else
+                []
 
 let replayBacklogFor (host: Host) (scope: RuntimeScope) (messages: Message<obj> list) : BacklogEntry list =
     BacklogSession(host, scope).ReplayBacklog messages
