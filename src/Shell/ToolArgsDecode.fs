@@ -68,55 +68,79 @@ let private intentsField (toolName: string) (args: obj) : Result<obj, DomainErro
     else
         Ok v
 
+let private decodeRead args =
+    FileToolsCodec.decodeReadArgs args
+    |> Result.map (fun r -> Typed(ToolArgs.Read(mapRead r)))
+
+let private decodeWrite args =
+    FileToolsCodec.decodeWriteArgs args
+    |> Result.map (fun r -> Typed(ToolArgs.Write(mapWrite r)))
+
+let private decodeCoder args =
+    intentsField "coder" args
+    |> Result.bind (fun raw ->
+        parseCoderIntents raw
+        |> Result.mapError (fun msg -> ParseError("intents", msg))
+        |> Result.map CoderBatch)
+
+let private decodeInvestigator args =
+    intentsField "investigator" args
+    |> Result.bind (fun raw ->
+        parseInvestigatorIntents raw
+        |> Result.mapError (fun msg -> ParseError("intents", msg))
+        |> Result.map InvestigatorBatch)
+
+let private decodeMeditator args =
+    decodeMeditatorArgs args
+    |> Result.map (fun d -> Typed(Meditator { Intent = d.Intent; Files = d.Files }))
+
+let private decodeBrowser args =
+    decodeBrowserArgs args
+    |> Result.map (fun d -> Typed(Browser { Intent = d.Intent }))
+
+let private decodeWebsearch args =
+    WebToolsCodec.decodeWebsearchArgs args
+    |> Result.map (fun w -> Typed(ToolArgs.Websearch(mapWebsearch w)))
+
+let private decodeWebfetch args =
+    WebToolsCodec.decodeWebfetchArgs args
+    |> Result.map (fun w -> Typed(ToolArgs.Webfetch(mapWebfetch w)))
+
+let private decodeExecutor args =
+    ExecutorToolsCodec.decodeExecutorArgs args
+    |> Result.map (fun e -> Typed(ToolArgs.Executor(mapExecutor e)))
+
+let private decodeTodoWrite args =
+    decodeTodoWriteArgs args
+    |> Result.map (fun tw -> Typed(ToolArgs.TodoWrite(mapTodoWrite tw)))
+
+let private decodeApplyPatch args =
+    decodeApplyPatchFields args
+    |> Result.map (fun f -> Typed(ToolArgs.ApplyPatch { PatchText = f.PatchText }))
+
+let private decodeSubmitReview args =
+    decodeSubmitReviewArgs args
+    |> Result.map (fun sr ->
+        Typed(
+            ToolArgs.SubmitReview
+                { Report = sr.Report
+                  AffectedFiles = sr.AffectedFiles }
+        ))
+
 let decodeToolInvocation (toolName: string) (args: obj) : Result<DecodedToolInvocation, DomainError> =
     match toolName with
-    | "read" ->
-        FileToolsCodec.decodeReadArgs args
-        |> Result.map (fun r -> Typed(ToolArgs.Read(mapRead r)))
-    | "write" ->
-        FileToolsCodec.decodeWriteArgs args
-        |> Result.map (fun r -> Typed(ToolArgs.Write(mapWrite r)))
-    | "coder" ->
-        intentsField "coder" args
-        |> Result.bind (fun raw ->
-            parseCoderIntents raw
-            |> Result.mapError (fun msg -> ParseError("intents", msg))
-            |> Result.map CoderBatch)
-    | "investigator" ->
-        intentsField "investigator" args
-        |> Result.bind (fun raw ->
-            parseInvestigatorIntents raw
-            |> Result.mapError (fun msg -> ParseError("intents", msg))
-            |> Result.map InvestigatorBatch)
-    | "meditator" ->
-        decodeMeditatorArgs args
-        |> Result.map (fun d -> Typed(Meditator { Intent = d.Intent; Files = d.Files }))
-    | "browser" ->
-        decodeBrowserArgs args
-        |> Result.map (fun d -> Typed(Browser { Intent = d.Intent }))
-    | "websearch" ->
-        WebToolsCodec.decodeWebsearchArgs args
-        |> Result.map (fun w -> Typed(ToolArgs.Websearch(mapWebsearch w)))
-    | "webfetch" ->
-        WebToolsCodec.decodeWebfetchArgs args
-        |> Result.map (fun w -> Typed(ToolArgs.Webfetch(mapWebfetch w)))
-    | "executor" ->
-        ExecutorToolsCodec.decodeExecutorArgs args
-        |> Result.map (fun e -> Typed(ToolArgs.Executor(mapExecutor e)))
-    | "todowrite" ->
-        decodeTodoWriteArgs args
-        |> Result.map (fun tw -> Typed(ToolArgs.TodoWrite(mapTodoWrite tw)))
-    | "apply_patch" ->
-        decodeApplyPatchFields args
-        |> Result.map (fun f -> Typed(ToolArgs.ApplyPatch { PatchText = f.PatchText }))
-    | "submit_review" ->
-        decodeSubmitReviewArgs args
-        |> Result.map (fun sr ->
-            Typed(
-                ToolArgs.SubmitReview
-                    { Report = sr.Report
-                      AffectedFiles = sr.AffectedFiles }
-            ))
+    | "read" -> decodeRead args
+    | "write" -> decodeWrite args
+    | "coder" -> decodeCoder args
+    | "investigator" -> decodeInvestigator args
+    | "meditator" -> decodeMeditator args
+    | "browser" -> decodeBrowser args
+    | "websearch" -> decodeWebsearch args
+    | "webfetch" -> decodeWebfetch args
+    | "executor" -> decodeExecutor args
+    | "todowrite" -> decodeTodoWrite args
+    | "apply_patch" -> decodeApplyPatch args
+    | "submit_review" -> decodeSubmitReview args
     | _ -> Error(InvalidIntent(toolName, "tool", "unknown tool for ToolArgs decode"))
 
 let decodeToolArgs (toolName: string) (args: obj) : Result<ToolArgs, DomainError> =

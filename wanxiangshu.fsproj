@@ -104,6 +104,7 @@
     <Compile Include="src/Kernel/ToolArgs.fs"/>
     <Compile Include="src/Kernel/WebFetchGuard.fs"/>
     <Compile Include="src/Shell/Dyn.fs"/>
+    <Compile Include="src/Shell/Profiler.fs"/>
     <Compile Include="src/Methodology/Args.fs"/>
     <Compile Include="src/Shell/DynField.fs"/>
     <Compile Include="src/Shell/ErrorClassify.fs"/>
@@ -288,7 +289,6 @@
     <Compile Include="src/Opencode/Plugin.fs"/>
     <Compile Include="src/Opencode/PluginMimo.fs"/>
     <Compile Include="src/Opencode/PluginMimoTui.fs"/>
-
     <!-- Omp -->
     <Compile Include="src/Omp/PiResolve.fs"/>
     <Compile Include="src/Omp/Schema.fs"/>
@@ -324,7 +324,6 @@
     <Compile Include="src/Omp/FallbackHooks.fs"/>
     <Compile Include="src/Omp/PluginCore.fs"/>
     <Compile Include="src/Omp/Plugin.fs"/>
-
     <!-- Wanxiangzhen -->
     <Compile Include="src/Shell/Wanxiangzhen/ConfigReader.fs"/>
     <Compile Include="src/Shell/Wanxiangzhen/SessionIo.fs"/>
@@ -349,7 +348,6 @@
     <Compile Include="src/Opencode/PluginWanxiangzhenHooks.fs"/>
     <Compile Include="src/Opencode/PluginWanxiangzhenDeps.fs"/>
     <Compile Include="src/Opencode/PluginWanxiangzhen.fs"/>
-
     <!-- Tests -->
     <Compile Include="tests/Assert.fs"/>
     <Compile Include="tests/AsyncFlush.fs"/>
@@ -659,7 +657,6 @@
     <Compile Include="tests/TestsEntriesOmp.fs"/>
     <Compile Include="tests/ArchitectureTests.fs"/>
     <Compile Include="tests/Tests.fs"/>
-
     <!-- E2E Tests -->
     <Compile Include="e2e/HarnessTypes.fs"/>
     <Compile Include="e2e/TestsServePlugin.fs"/>

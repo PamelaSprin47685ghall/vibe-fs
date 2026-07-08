@@ -74,63 +74,65 @@ let internal handleCommandExecuteBefore (rt: CoordinatorRuntime) (input: obj) (o
         | _ -> ()
     }
 
+let private squadUpdateArgsSchema () : obj =
+    createObj
+        [ "events",
+          box (
+              createObj
+                  [ "type", box "array"
+                    "minItems", box 1
+                    "items",
+                    box (
+                        createObj
+                            [ "type", box "object"
+                              "properties",
+                              box (
+                                  createObj
+                                      [ "type",
+                                        box (
+                                            createObj
+                                                [ "type", box "string"
+                                                  "enum", box [| "tasks_created"; "squad_cancelled" |] ]
+                                        )
+                                        "tasks",
+                                        box (
+                                            createObj
+                                                [ "type", box "array"
+                                                  "items",
+                                                  box (
+                                                      createObj
+                                                          [ "type", box "object"
+                                                            "properties",
+                                                            box (
+                                                                createObj
+                                                                    [ "taskId",
+                                                                      box (createObj [ "type", box "string" ])
+                                                                      "title",
+                                                                      box (createObj [ "type", box "string" ])
+                                                                      "description",
+                                                                      box (createObj [ "type", box "string" ])
+                                                                      "dependsOn",
+                                                                      box (
+                                                                          createObj
+                                                                              [ "type", box "array"
+                                                                                "items",
+                                                                                box (
+                                                                                    createObj
+                                                                                        [ "type", box "string" ]
+                                                                                ) ]
+                                                                      ) ]
+                                                            )
+                                                            "required", box [| "title"; "description" |] ]
+                                                  ) ]
+                                        ) ]
+                              )
+                              "required", box [| "type" |] ]
+                    ) ]
+          ) ]
+
 let internal assembleCoordinatorHooks (rt: CoordinatorRuntime) : obj =
     let squadUpdateToolDef () : obj =
-        let args =
-            createObj
-                [ "events",
-                  box (
-                      createObj
-                          [ "type", box "array"
-                            "minItems", box 1
-                            "items",
-                            box (
-                                createObj
-                                    [ "type", box "object"
-                                      "properties",
-                                      box (
-                                          createObj
-                                              [ "type",
-                                                box (
-                                                    createObj
-                                                        [ "type", box "string"
-                                                          "enum", box [| "tasks_created"; "squad_cancelled" |] ]
-                                                )
-                                                "tasks",
-                                                box (
-                                                    createObj
-                                                        [ "type", box "array"
-                                                          "items",
-                                                          box (
-                                                              createObj
-                                                                  [ "type", box "object"
-                                                                    "properties",
-                                                                    box (
-                                                                        createObj
-                                                                            [ "taskId",
-                                                                              box (createObj [ "type", box "string" ])
-                                                                              "title",
-                                                                              box (createObj [ "type", box "string" ])
-                                                                              "description",
-                                                                              box (createObj [ "type", box "string" ])
-                                                                              "dependsOn",
-                                                                              box (
-                                                                                  createObj
-                                                                                      [ "type", box "array"
-                                                                                        "items",
-                                                                                        box (
-                                                                                            createObj
-                                                                                                [ "type", box "string" ]
-                                                                                        ) ]
-                                                                              ) ]
-                                                                    )
-                                                                    "required", box [| "title"; "description" |] ]
-                                                          ) ]
-                                                ) ]
-                                      )
-                                      "required", box [| "type" |] ]
-                            ) ]
-                  ) ]
+        let args = squadUpdateArgsSchema ()
 
         let executeDef =
             createObj
