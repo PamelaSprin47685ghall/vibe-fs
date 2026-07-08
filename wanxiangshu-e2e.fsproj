@@ -1,21 +1,3 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="wanxiangshu-core.fsproj"/>
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="tests/Assert.fs"/>
-    <Compile Include="tests/AsyncFlush.fs"/>
-    <Compile Include="e2e/MuxTests.fs"/>
-    <Compile Include="e2e/OpencodePluginTests.fs"/>
-    <Compile Include="e2e/MimocodePluginTests.fs"/>
-    <Compile Include="e2e/MimoTuiPluginTests.fs"/>
-    <Compile Include="e2e/HarnessTypes.fs"/>
-    <Compile Include="e2e/TestsServePlugin.fs"/>
-    <Compile Include="e2e/Tests.fs"/>
-    <Compile Include="e2e/TestsOmp.fs"/>
-  </ItemGroup>
 </Project>

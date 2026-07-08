@@ -32,17 +32,15 @@
   ],
   "scripts": {
     "prepare": "node scripts/setup-git-hooks.mjs",
-    "build": "dotnet fable wanxiangshu-core.fsproj --outDir build --noCache && dotnet fable wanxiangshu-omp.fsproj --outDir build --noCache && dotnet fable wanxiangshu-wanxiangzhen.fsproj --outDir build --noCache",
-    "build:tests": "dotnet fable wanxiangshu-tests.fsproj --outDir build --noCache",
-    "build:e2e": "dotnet fable wanxiangshu-e2e.fsproj --outDir build --noCache",
+    "build": "dotnet fable wanxiangshu.fsproj --outDir build --noCache && node scripts/postbuild.mjs",
     "postbuild": "node scripts/postbuild.mjs",
     "test": "node tests/runner.js",
-    "build-and-test": "npm run build && npm run build:tests && npm run test",
+    "build-and-test": "npm run build && npm run test",
     "format": "node scripts/pre-commit-formatter.mjs",
-    "e2e": "npm run build:e2e && node tests/runner.js --e2e",
-    "e2e:mux": "npm run build:e2e && node tests/runner.js --e2e-mux",
-    "e2e:opencode-plugin": "npm run build:e2e && node tests/runner.js --e2e-opencode-plugin",
-    "e2e-omp": "npm run build:e2e && node tests/runner.js --e2e-omp"
+    "e2e": "node tests/runner.js --e2e",
+    "e2e:mux": "node tests/runner.js --e2e-mux",
+    "e2e:opencode-plugin": "node tests/runner.js --e2e-opencode-plugin",
+    "e2e-omp": "node tests/runner.js --e2e-omp"
   },
   "dependencies": {
     "@fable-org/fable-library-js": "^2.4.0",
