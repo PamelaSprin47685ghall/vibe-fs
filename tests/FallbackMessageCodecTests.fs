@@ -83,6 +83,43 @@ let scanToolCallAsText_assistantTextClean () =
 
     check "assistant clean text → None" (None = prompt)
 
+let private mkAssistantMsg (parts: obj array) : obj =
+    createObj
+        [ "info", box (createObj [ "role", box "assistant" ])
+          "parts", box parts ]
+
+let private mkToolPart (toolName: string) : obj =
+    createObj [ "type", box "tool"; "tool", box toolName ]
+
+let private mkTextPart (text: string) : obj =
+    createObj [ "type", box "text"; "text", box text ]
+
+let private mkReasoningPart (text: string) : obj =
+    createObj [ "type", box "reasoning"; "text", box text ]
+
+let isIdleNoContentAndNoTools_noAssistant () =
+    let userMsg =
+        createObj
+            [ "info", box (createObj [ "role", box "user" ])
+              "parts", box [| mkTextPart "hello" |] ]
+    check "no assistant message → false" (not (isIdleNoContentAndNoTools [| userMsg |]))
+
+let isIdleNoContentAndNoTools_emptyAssistant () =
+    let m = mkAssistantMsg [||]
+    check "assistant with no parts → true" (isIdleNoContentAndNoTools [| m |])
+
+let isIdleNoContentAndNoTools_onlyReasoning () =
+    let m = mkAssistantMsg [| mkReasoningPart "thinking..." |]
+    check "assistant with only reasoning → true" (isIdleNoContentAndNoTools [| m |])
+
+let isIdleNoContentAndNoTools_withText () =
+    let m = mkAssistantMsg [| mkTextPart "here is help" |]
+    check "assistant with text → false" (not (isIdleNoContentAndNoTools [| m |]))
+
+let isIdleNoContentAndNoTools_withTool () =
+    let m = mkAssistantMsg [| mkToolPart "read" |]
+    check "assistant with tool → false" (not (isIdleNoContentAndNoTools [| m |]))
+
 let run () =
     allTodosCompleted_emptyArray ()
     allTodosCompleted_allCompleted ()
@@ -99,3 +136,8 @@ let run () =
     scanToolCallAsText_noAssistantText ()
     scanToolCallAsText_assistantTextWithToolCall ()
     scanToolCallAsText_assistantTextClean ()
+    isIdleNoContentAndNoTools_noAssistant ()
+    isIdleNoContentAndNoTools_emptyAssistant ()
+    isIdleNoContentAndNoTools_onlyReasoning ()
+    isIdleNoContentAndNoTools_withText ()
+    isIdleNoContentAndNoTools_withTool ()
