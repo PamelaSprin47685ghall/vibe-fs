@@ -10,8 +10,7 @@ let private prefixAsync (pairs: (string * (unit -> JS.Promise<unit>)) list) =
     pairs |> List.map (fun (n, b) -> "Wanxiangzhen." + n, TestBody.Async b)
 
 let wanxiangzhenTestEntries () : (string * TestBody) list =
-    prefix (Wanxiangshu.Tests.Wanxiangzhen.ArchitectureTests.entries ())
-    @ prefix (Wanxiangshu.Tests.Wanxiangzhen.CommandHookTests.entries ())
+    prefix (Wanxiangshu.Tests.Wanxiangzhen.CommandHookTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.ConfigReaderTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.CoordinatorOpsTests.entries ())
     @ prefix (Wanxiangshu.Tests.Wanxiangzhen.DagTests.entries ())

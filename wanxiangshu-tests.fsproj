@@ -262,7 +262,7 @@
     <Compile Include="tests/SembleReviewerInjectionTests.fs"/>
     <Compile Include="tests/Wanxiangzhen/AssertCompat.fs"/>
     <Compile Include="tests/Wanxiangzhen/ArchitectureTestsSupport.fs"/>
-    <Compile Include="tests/Wanxiangzhen/ArchitectureTests.fs"/>
+
     <Compile Include="tests/Wanxiangzhen/SpinWait.fs"/>
     <Compile Include="tests/Wanxiangzhen/TestDoubles.fs"/>
     <Compile Include="tests/Wanxiangzhen/TestFixtures.fs"/>

@@ -7,7 +7,7 @@ open Wanxiangshu.Shell.NudgeRuntimeTypes
 open Wanxiangshu.Shell.NudgeRuntimeMux
 open Wanxiangshu.Shell.EventLogRuntime
 
-let private nudgeDispatchClaim = tryClaimNudgeDispatch
+let private _eventLogNudgeIntegral = tryClaimNudgeDispatch
 
 type NudgeRuntimeState = NudgeRuntimeTypes.NudgeRuntimeState
 type NudgeRuntimeEvent = NudgeRuntimeTypes.NudgeRuntimeEvent

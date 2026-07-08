@@ -206,7 +206,7 @@ npm run build-and-test
 
 完整管线：
 
-1. `dotnet fable wanxiangshu.fsproj --outDir build`：单工程编译 Kernel+Shell+宿主适配+测试
+1. `npm run build`：`wanxiangshu-core` + `wanxiangshu-omp` + `wanxiangshu-wanxiangzhen` → `build/`
 2. 清理 `build/fable_modules/.gitignore` + 拷贝 `build-package.json` 为 `build/package.json`
 3. `node tests/runner.js`：全部测试
 

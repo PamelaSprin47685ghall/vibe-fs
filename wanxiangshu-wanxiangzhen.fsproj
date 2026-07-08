@@ -23,6 +23,7 @@
     <Compile Include="src/Shell/Wanxiangzhen/CoordinatorLifecycle.fs"/>
     <Compile Include="src/Shell/Wanxiangzhen/CoordinatorSquadUpdate.fs"/>
     <Compile Include="src/Shell/Wanxiangzhen/CoordinatorReplay.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/CoordinatorDepsFactory.fs"/>
     <Compile Include="src/Shell/Wanxiangzhen/CoordinatorBootstrap.fs"/>
     <Compile Include="src/Shell/Wanxiangzhen/SlaveRuntime.fs"/>
     <Compile Include="src/Opencode/PluginWanxiangzhenE2eMeta.fs"/>

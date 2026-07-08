@@ -187,12 +187,15 @@ wanxiangshu/
 │   └── Omp/                    # OMP host adapter
 ├── tests/                      # Unit, integration, & architecture tests
 ├── e2e/                        # End-to-end test harness with mock LLM
-├── wanxiangshu.fsproj          # F# project file (Compilation order SSOT)
+├── wanxiangshu-core.fsproj     # Kernel + Shell + Opencode + Mux (+ refs)
+├── wanxiangshu-omp.fsproj
+├── wanxiangshu-wanxiangzhen.fsproj
+├── wanxiangshu-tests.fsproj
 └── package.json                # NPM exports & build-and-test scripts
 ```
 
 #### Build Pipeline
-1. `dotnet fable wanxiangshu.fsproj --outDir build`
+1. `npm run build` (fable core + omp + wanxiangzhen → `build/`)
 2. Clean `build/fable_modules/.gitignore` & copy `build-package.json` to `build/package.json`
 3. Execute test runner: `node tests/runner.js`
 
