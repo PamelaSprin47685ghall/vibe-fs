@@ -40,6 +40,7 @@ let private attachReviewChild
     store.setPendingReview (
         childId,
         fun kr ->
+            printfn "DEBUG: resolve callback fired, kr=%A" kr
             try
                 Dyn.callMethod0 childSession "abort" |> ignore
             with _ ->
@@ -66,97 +67,36 @@ let private detachReviewChild (store: ReviewStore) (_parentId: string) (childId:
 
 let private maxNudges = 3
 
-let private getInitialGraceMs (scope: RuntimeScope) : int =
-    match scope.TryFindKey "review.grace_initial_ms" with
-    | Some v -> unbox<int> v
-    | None -> 6000
-
-let private getSubsequentGraceMs (scope: RuntimeScope) : int =
-    match scope.TryFindKey "review.grace_subsequent_ms" with
-    | Some v -> unbox<int> v
-    | None -> 10000
-
-let resetReviewLoopGracePeriods (scope: RuntimeScope) : unit =
-    scope.Remove "review.grace_initial_ms"
-    scope.Remove "review.grace_subsequent_ms"
-
-let private scheduleTimeout (fn: unit -> unit) (ms: int) : int =
-    emitJsExpr (fn, ms) "setTimeout($0, $1)"
-
-let private cancelScheduledTimeout (id: int) : unit = emitJsExpr (id) "clearTimeout($0)"
-
 let private executeNudgeCheck (childSession: obj) : JS.Promise<unit> =
     childSession?prompt (reviewerNudgePrompt) |> unbox<JS.Promise<unit>>
 
-let private scheduleNextNudge
-    (scope: RuntimeScope)
-    (childSession: obj)
-    (cancelled: ref<bool>)
-    (timeoutHandle: ref<int>)
-    (onMaxNudges: unit -> JsReviewResult)
-    (onResolve: JsReviewResult -> unit)
-    =
-    let rec schedule n =
-        if n >= maxNudges then
-            if not cancelled.Value then
-                cancelled.Value <- true
-                onResolve (onMaxNudges ())
-        else
-            let grace =
-                if n = 0 then
-                    getInitialGraceMs scope
-                else
-                    getSubsequentGraceMs scope
-
-            timeoutHandle.Value <-
-                scheduleTimeout
-                    (fun () ->
-                        if not cancelled.Value then
-                            executeNudgeCheck childSession
-                            |> Promise.map (fun () ->
-                                if not cancelled.Value then
-                                    schedule (n + 1))
-                            |> ignore)
-                    grace
-
-    schedule
-
-let private startNudgeTimer
-    (scope: RuntimeScope)
-    (childSession: obj)
-    (resolvedPromise: JS.Promise<JsReviewResult>)
-    (onMaxNudges: unit -> JsReviewResult)
-    (onResolve: JsReviewResult -> unit)
-    : unit =
-    let cancelled = ref false
-    let timeoutHandle = ref 0
-
-    resolvedPromise
-    |> Promise.map (fun r ->
-        if not cancelled.Value then
-            cancelled.Value <- true
-            cancelScheduledTimeout timeoutHandle.Value
-            onResolve r
-
-        r)
-    |> ignore
-
-    let schedule =
-        scheduleNextNudge scope childSession cancelled timeoutHandle onMaxNudges onResolve
-
-    schedule 0
-
+/// Event-driven nudge loop: races the review-resolution promise against each
+/// prompt's completion.  When the prompt wins (model finished its turn without
+/// resolving the review), a nudge is dispatched.  No timers.
 let private runNudgeLoop
-    (scope: RuntimeScope)
     (childSession: obj)
     (resolvedPromise: JS.Promise<JsReviewResult>)
+    (currentPrompt: JS.Promise<unit>)
     (onMaxNudges: unit -> JsReviewResult)
     : JS.Promise<JsReviewResult> =
-    promise {
-        let deferred, resolveDeferred = createDeferred ()
-        startNudgeTimer scope childSession resolvedPromise onMaxNudges resolveDeferred
-        return! deferred
-    }
+    let rec loop nudgeCount promptPromise =
+        promise {
+            let! winner =
+                Promise.race
+                    [ resolvedPromise |> Promise.map Some
+                      promptPromise |> Promise.map (fun () -> None) ]
+
+            match winner with
+            | Some result -> return result
+            | None ->
+                if nudgeCount >= maxNudges then
+                    return onMaxNudges ()
+                else
+                    let nextPrompt = executeNudgeCheck childSession
+                    return! loop (nudgeCount + 1) nextPrompt
+        }
+
+    loop 0 currentPrompt
 
 let runReviewLoop
     (scope: RuntimeScope)
@@ -198,7 +138,7 @@ let runReviewLoop
         else
             attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
             let initial = buildOmpReviewInitialPrompt report (files |> Array.toList) task
-            do! childSession?prompt (initial) |> unbox<JS.Promise<unit>>
+            let initialPrompt = childSession?prompt (initial) |> unbox<JS.Promise<unit>>
 
             let onMax () =
                 let sm = unbox<ISessionManager> (Dyn.get childSession "sessionManager")
@@ -209,7 +149,7 @@ let runReviewLoop
 
                 terminatedResult fb
 
-            let! outcome = runNudgeLoop scope childSession resolvedPromise onMax
+            let! outcome = runNudgeLoop childSession resolvedPromise initialPrompt onMax
             cleanupChild ()
             return outcome
     }
@@ -263,10 +203,10 @@ let runPreReviewerSession
                 else
                     attachReviewChild store parentId childId (fun r -> resolveReview r) childSession
                     let initial = reviewerPrompt taskTrim "" []
-                    do! childSession?prompt (initial) |> unbox<JS.Promise<unit>>
+                    let initialPrompt = childSession?prompt (initial) |> unbox<JS.Promise<unit>>
 
                     let! jsOutcome =
-                        runNudgeLoop scope childSession resolvedPromise (fun () ->
+                        runNudgeLoop childSession resolvedPromise initialPrompt (fun () ->
                             terminatedResult "Pre-review timed out.")
 
                     cleanupChild ()

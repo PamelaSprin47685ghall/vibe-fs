@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.IntegrationMuxFallbackSpecs
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Shell.Dyn
 
@@ -79,7 +80,7 @@ let muxSessionErrorTriggersFallbackContinueSpec () =
                   ) ]
 
         do! (eventHook $ (ev, helpers)) |> unbox<JS.Promise<unit>>
-        do! Promise.sleep 50
+        do! yieldMicrotask ()
 
         check
             "Fallback consumed the error and dispatched one continue nudge via the fallback action executor"
@@ -160,7 +161,7 @@ let muxStreamEndToolCallAsTextTriggersFallbackSpec () =
                   ) ]
 
         do! (eventHook $ (ev, helpers)) |> unbox<JS.Promise<unit>>
-        do! Promise.sleep 50
+        do! yieldMicrotask ()
 
         check "Exactly one nudge fires (fallback RecoverWithPrompt), not a second from NudgeRuntime" (nudges.Count = 1)
 

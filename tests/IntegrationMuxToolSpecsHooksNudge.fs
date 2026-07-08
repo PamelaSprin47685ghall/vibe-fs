@@ -68,7 +68,7 @@ let muxStreamEndToolUseErrorTriggersNudgeSpec () =
                   ) ]
 
         do! (eventHook $ (event, helpers)) |> unbox<JS.Promise<unit>>
-        do! Promise.sleep 50
+        do! yieldMicrotask ()
         check "tool_use_error stream-end triggers a nudge dispatch" (nudges.Count > 0)
 
         check
@@ -128,7 +128,7 @@ let muxStreamEndToolCallsDoesNotTriggerNudgeSpec () =
                   ) ]
 
         do! (eventHook $ (event, helpers)) |> unbox<JS.Promise<unit>>
-        do! Promise.sleep 50
+        do! yieldMicrotask ()
         check "tool_calls stream-end does NOT trigger a nudge dispatch" (nudges.Count = 0)
         do! rmAsync tmpDir
     }

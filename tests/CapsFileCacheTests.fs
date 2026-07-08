@@ -5,10 +5,15 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.CapsFileCache
 open Wanxiangshu.Shell.RuntimeScope
 
+let private uid = ref 0
+let private uniqueId () =
+    uid.Value <- uid.Value + 1
+    string uid.Value
+
 let getOrLoadCapsFilesCachesPerSession () =
     promise {
         let scope = create ()
-        let sessionID = "caps-file-cache-" + string (System.DateTime.UtcNow.Ticks)
+        let sessionID = "caps-file-cache-" + string (uniqueId ())
         let directory = "."
         let! first = getOrLoadCapsFilesForScope scope sessionID directory
         let! second = getOrLoadCapsFilesForScope scope sessionID directory
@@ -19,7 +24,7 @@ let getOrLoadCapsFilesCachesPerSession () =
 let getOrLoadCapsFilesIsolatesDistinctSessions () =
     promise {
         let scope = create ()
-        let ticks = string (System.DateTime.UtcNow.Ticks)
+        let ticks = string (uniqueId ())
         let sessionA = "caps-cache-a-" + ticks
         let sessionB = "caps-cache-b-" + ticks
         let directory = "."
@@ -32,7 +37,7 @@ let getOrLoadCapsFilesIsolatesDistinctSessions () =
 let getOrLoadCapsFilesIsolatesDistinctDirectories () =
     promise {
         let scope = create ()
-        let sessionID = "caps-cache-dir-" + string (System.DateTime.UtcNow.Ticks)
+        let sessionID = "caps-cache-dir-" + string (uniqueId ())
         let directoryA = "."
         let directoryB = "./caps-cache-miss-dir-" + sessionID
         let! first = getOrLoadCapsFilesForScope scope sessionID directoryA
@@ -46,7 +51,7 @@ let getOrLoadCapsFilesIsolatesDistinctDirectories () =
 let getOrLoadCapsFilesReusesAfterDirectoryRoundTrip () =
     promise {
         let scope = create ()
-        let sessionID = "caps-cache-roundtrip-" + string (System.DateTime.UtcNow.Ticks)
+        let sessionID = "caps-cache-roundtrip-" + string (uniqueId ())
         let directoryA = "."
         let directoryB = "./caps-cache-roundtrip-miss-" + sessionID
         let! first = getOrLoadCapsFilesForScope scope sessionID directoryA
@@ -61,7 +66,7 @@ let getOrLoadCapsFilesReusesAfterDirectoryRoundTrip () =
 let getOrLoadCapsFilesNormalizesDirectoryAlias () =
     promise {
         let scope = create ()
-        let sessionID = "caps-cache-alias-" + string (System.DateTime.UtcNow.Ticks)
+        let sessionID = "caps-cache-alias-" + string (uniqueId ())
         let! dot = getOrLoadCapsFilesForScope scope sessionID "."
         let! dotSlash = getOrLoadCapsFilesForScope scope sessionID "./"
         check "caps cache . and ./ same list ref" (obj.ReferenceEquals(box dot, box dotSlash))
@@ -71,7 +76,7 @@ let getOrLoadCapsFilesNormalizesDirectoryAlias () =
 let getOrLoadCapsFilesParallelMissSharesInflight () =
     promise {
         let scope = create ()
-        let sessionID = "caps-cache-inflight-" + string (System.DateTime.UtcNow.Ticks)
+        let sessionID = "caps-cache-inflight-" + string (uniqueId ())
         let directory = "."
 
         let! pair =

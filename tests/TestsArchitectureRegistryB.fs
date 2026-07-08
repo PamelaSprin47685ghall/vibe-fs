@@ -22,6 +22,7 @@ open Wanxiangshu.Tests.ArchitectureTestsOpencodeToolsSearch
 open Wanxiangshu.Tests.ArchitectureTestsOpencodeToolsExecutor
 open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.E2eHarnessContractTests
+open Wanxiangshu.Tests.ArchitectureTestsTimeIndependence
 
 let architectureTestEntriesPartB () : (string * TestBody) list =
     [ "ArchitectureTests.messageTransformUsesBacklogSessionOpsFrom",
@@ -181,4 +182,6 @@ let architectureTestEntriesPartB () : (string * TestBody) list =
       "ArchitectureTests.e2eHarnessGetMessagesUsesSessionPrefix",
       Sync(sync E2eHarnessContractTests.getMessagesUsesSessionPrefix)
       "ArchitectureTests.e2eHarnessPluginJsResolvesWithParentFallback",
-      Sync(sync E2eHarnessContractTests.pluginJsResolvesWithParentFallback) ]
+      Sync(sync E2eHarnessContractTests.pluginJsResolvesWithParentFallback)
+      "ArchitectureTests.testFilesAreTimeIndependent",
+      Sync(sync ArchitectureTestsTimeIndependence.testFilesAreTimeIndependent) ]

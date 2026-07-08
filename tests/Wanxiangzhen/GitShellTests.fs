@@ -5,6 +5,12 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Wanxiangzhen.GitShell
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
+let private uid = ref 0
+let private uniqueSuffix () =
+    uid.Value <- uid.Value + 1
+    let s = string uid.Value
+    s.PadLeft(8, '0')
+
 [<Import("mkdtempSync", "node:fs")>]
 let private mkdtemp (prefix: string) : string = jsNative
 
@@ -107,8 +113,8 @@ let entries () : (string * (unit -> unit)) list = [
 
     ("worktreeAdd then worktreeRemoveForce cycle works", fun () ->
         let dir = initRepo ()
-        let suffix = string (System.DateTime.UtcNow.Ticks)
-        let wtPath = dir + "/../worktree-test-" + suffix.Substring(suffix.Length - 8)
+        let suffix = uniqueSuffix ()
+        let wtPath = dir + "/../worktree-test-" + suffix
         try
             worktreeAdd dir "test-branch" wtPath "main"
             checkBare (showRefExists dir "test-branch")
@@ -120,8 +126,8 @@ let entries () : (string * (unit -> unit)) list = [
 
     ("branchDeleteForce deletes branch", fun () ->
         let dir = initRepo ()
-        let suffix = string (System.DateTime.UtcNow.Ticks)
-        let wtPath = dir + "/../worktree-del-" + suffix.Substring(suffix.Length - 8)
+        let suffix = uniqueSuffix ()
+        let wtPath = dir + "/../worktree-del-" + suffix
         try
             worktreeAdd dir "del-branch" wtPath "main"
             worktreeRemoveForce dir wtPath

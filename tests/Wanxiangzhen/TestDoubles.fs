@@ -187,7 +187,7 @@ let mkDeps (s: FakeState) : CoordinatorDeps =
             match s.stopPollingOverride with
             | Some f -> f h
             | None -> s.stopPollingCalls <- s.stopPollingCalls @ [h]
-      Now                  = fun () -> System.DateTime.UtcNow.ToString("o")
+      Now                  = fun () -> "2025-01-01T00:00:00.000Z"
       HasCommits           = fun c ->
             match s.hasCommitsOverride with
             | Some f -> f c

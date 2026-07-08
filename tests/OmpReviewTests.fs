@@ -115,7 +115,7 @@ let returnReviewerVerdictPerfectRevise () =
         let tool = h.tools |> Seq.find (fun t -> str t "name" = "return_reviewer")
         let reviewSessionId = "review-child-1"
         let task = "review loop task"
-        let ts = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+        let ts = 0L
         let mutable firstKr: ReviewResult option = None
         reviewStore.activateReview (reviewSessionId, task, ts)
         reviewStore.setPendingReview (reviewSessionId, (fun kr -> firstKr <- Some kr))

@@ -37,7 +37,7 @@ let stubDeps () : CoordinatorDeps =
       WaitForPidDeath      = fun _ _ -> Promise.lift ()
       StartPolling         = fun _ _ -> box null
       StopPolling          = fun _ -> ()
-      Now                  = fun () -> System.DateTime.UtcNow.ToString("o") }
+      Now                  = fun () -> "2025-01-01T00:00:00.000Z" }
 
 // ══════════════════════════════════════════════════════════════════════════════
 // mkRuntimeWithDeps — full factory accepting caller-supplied CoordinatorDeps.

@@ -11,20 +11,15 @@ open Wanxiangshu.Shell.RuntimeScope
 
 let private testScope = RuntimeScope()
 
-/// Regression: review loop must complete via async callback wakeup, not 50ms polling.
+/// Regression: review loop must complete via async callback wakeup, not polling.
 ///
 /// Construct a child session where `prompt` returns immediately WITHOUT
 /// resolving the pending review. The resolve happens asynchronously (via
-/// `store.resolvePendingReview` called from the test after a short delay).
+/// `store.resolvePendingReview` called from the test after a microtask yield).
 /// The test asserts:
 ///   1. The loop completes with the correct verdict.
-///   2. `waitForIdle` was never called — proving the loop depends on
-///      event-driven callback wakeup, not polling + waitForIdle fallback.
-///
-/// Under the current polling implementation, `waitForIdle` IS called
-/// (at least once) before the async resolve fires, so assertion 2 fails.
-/// Under the event-driven implementation, the callback directly wakes the
-/// loop without ever calling `waitForIdle`, so both assertions pass.
+///   2. `waitForIdle` was never called - proving the loop depends on
+///      event-driven callback wakeup, not polling.
 let runReviewLoopResolvesViaAsyncCallbackNotPolling () =
     promise {
         testScope.Remove "omp.coding_agent_module"
@@ -68,12 +63,25 @@ let runReviewLoopResolvesViaAsyncCallbackNotPolling () =
 
         let ctx = createObj [ "cwd", box "/tmp/ws" ]
 
+        let waitForPending () =
+            Promise.create (fun resolve _ ->
+                let checkPendingRef = ref (fun () -> ())
+                checkPendingRef.Value <- fun () ->
+                    let ids = store.getPendingReviewIds()
+                    if ids |> List.contains childId then
+                        resolve ()
+                    else
+                        let cb = checkPendingRef.Value
+                        emitJsStatement cb "queueMicrotask($0)"
+                checkPendingRef.Value ()
+            )
+
         let! outcome =
             promise {
                 let loop =
                     runReviewLoop testScope pi ctx store "parent-async" "report body" [| "src/a.fs" |] (Some "fix")
 
-                let! _ = Promise.sleep 50
+                do! waitForPending ()
                 store.resolvePendingReview (childId, Accepted "") |> ignore
                 return! loop
             }
@@ -83,11 +91,10 @@ let runReviewLoopResolvesViaAsyncCallbackNotPolling () =
         check "async-resolve no waitForIdle polling" (waitForIdleCalls.Value = 0)
     }
 
-/// Regression: nudge loop must fire nudge prompt on timeout and stop when resolved.
+/// Regression: nudge loop must fire nudge prompt on idle and stop when resolved.
 ///
-/// Set grace periods to short values (initial=10ms, subsequent=50ms).
 /// The child session prompt returns immediately without resolving.
-/// After initial prompt, the first timeout fires a nudge prompt.
+/// After initial prompt completes, the first nudge fires (event-driven).
 /// Then resolve the review asynchronously.
 /// Assert: total prompt calls = 2 (initial + 1 nudge), final outcome accepted.
 let runReviewLoopSendsNudgeOnTimeoutThenStopsOnResolve () =
@@ -131,20 +138,33 @@ let runReviewLoopSendsNudgeOnTimeoutThenStopsOnResolve () =
         )
 
         let ctx = createObj [ "cwd", box "/tmp/ws" ]
-        testScope.Add("review.grace_initial_ms", box 10)
-        testScope.Add("review.grace_subsequent_ms", box 50)
+
+        let waitForPending () =
+            Promise.create (fun resolve _ ->
+                let checkPendingRef = ref (fun () -> ())
+                checkPendingRef.Value <- fun () ->
+                    let ids = store.getPendingReviewIds()
+                    if ids |> List.contains childId then
+                        resolve ()
+                    else
+                        let cb = checkPendingRef.Value
+                        emitJsStatement cb "queueMicrotask($0)"
+                checkPendingRef.Value ()
+            )
+
+        testScope.Add("review.grace_initial_ms", box 10) |> ignore // deprecated but keep for structure
+        testScope.Add("review.grace_subsequent_ms", box 50) |> ignore
 
         let! outcome =
             promise {
                 let loop =
                     runReviewLoop testScope pi ctx store "parent-nudge" "report body" [| "src/a.fs" |] (Some "fix")
 
-                let! _ = Promise.sleep 30
+                do! waitForPending ()
                 store.resolvePendingReview (childId, Accepted "") |> ignore
                 return! loop
             }
 
-        resetReviewLoopGracePeriods testScope
         check "nudge prompt calls = 2 (initial + 1 nudge)" (promptCalls.Value = 2)
         check "nudge outcome accepted" (defaultArg outcome.accepted false)
         check "nudge outcome not terminated" (not (defaultArg outcome.terminated false))
