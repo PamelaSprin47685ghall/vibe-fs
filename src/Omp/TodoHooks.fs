@@ -20,7 +20,9 @@ open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.Dyn
+
 module Dyn = Wanxiangshu.Shell.Dyn
+
 open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Kernel.BacklogProjectionCore
@@ -41,34 +43,82 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
         let args = getToolInput event
         let content = getToolResultText event
         let sessionId = getSessionIdFromContext ctx |> Option.defaultValue ""
-        if sessionId <> "" && check ExecutorTools.ompScope sessionId toolName (JS.JSON.stringify args) content then
+
+        if
+            sessionId <> ""
+            && check ExecutorTools.ompScope sessionId toolName (JS.JSON.stringify args) content
+        then
             setToolResultText event "livelock guard: repeated identical tool call with identical result"
         else
             applyToolResultHook toolName args
             do! appendToolResultSyntax (Dyn.str ctx "cwd") event
+
             if toolName = todoWriteToolName omp then
                 let callId = getToolCallId event
                 let input = getToolInput event
-                let ahaMoments = if Dyn.isNullish input then "" else (Dyn.str input "ahaMoments").Trim()
-                let changesAndReasons = if Dyn.isNullish input then "" else (Dyn.str input "changesAndReasons").Trim()
-                let gotchas = if Dyn.isNullish input then "" else (Dyn.str input "gotchas").Trim()
-                let lessonsAndConventions = if Dyn.isNullish input then "" else (Dyn.str input "lessonsAndConventions").Trim()
-                let plan = if Dyn.isNullish input then "" else (Dyn.str input "plan").Trim()
-                if (ahaMoments <> "" || changesAndReasons <> "" || gotchas <> "" || lessonsAndConventions <> "" || plan <> "") && callId <> "" then
-                    let entry : BacklogEntry =
+
+                let ahaMoments =
+                    if Dyn.isNullish input then
+                        ""
+                    else
+                        (Dyn.str input "ahaMoments").Trim()
+
+                let changesAndReasons =
+                    if Dyn.isNullish input then
+                        ""
+                    else
+                        (Dyn.str input "changesAndReasons").Trim()
+
+                let gotchas =
+                    if Dyn.isNullish input then
+                        ""
+                    else
+                        (Dyn.str input "gotchas").Trim()
+
+                let lessonsAndConventions =
+                    if Dyn.isNullish input then
+                        ""
+                    else
+                        (Dyn.str input "lessonsAndConventions").Trim()
+
+                let plan =
+                    if Dyn.isNullish input then
+                        ""
+                    else
+                        (Dyn.str input "plan").Trim()
+
+                if
+                    (ahaMoments <> ""
+                     || changesAndReasons <> ""
+                     || gotchas <> ""
+                     || lessonsAndConventions <> ""
+                     || plan <> "")
+                    && callId <> ""
+                then
+                    let entry: BacklogEntry =
                         { ahaMoments = ahaMoments
                           changesAndReasons = changesAndReasons
                           gotchas = gotchas
                           lessonsAndConventions = lessonsAndConventions
                           plan = plan }
+
                     backlogSession.CaptureReport(callId, entry.plan)
+
                 let methodologies =
-                    let raw = if Dyn.isNullish args then null else Dyn.get args "select_methodology"
-                    if Dyn.isNullish raw || not (Dyn.isArray raw) then []
+                    let raw =
+                        if Dyn.isNullish args then
+                            null
+                        else
+                            Dyn.get args "select_methodology"
+
+                    if Dyn.isNullish raw || not (Dyn.isArray raw) then
+                        []
                     else
                         let rawArr = unbox<obj array> raw
                         rawArr |> Seq.map string |> List.ofSeq
+
                 let content = getToolResultText event
+
                 if content <> "" then
                     setToolResultText event (todoWriteOutput methodologies true)
     }
@@ -78,9 +128,16 @@ let sessionStartHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Pro
         do! NudgeHooks.applyActiveToolFilterForMainSession pi ctx
         let sessionId = getSessionIdFromContext ctx |> Option.defaultValue ""
         let cwd = Dyn.str ctx "cwd"
+
         if sessionId <> "" && cwd <> "" then
             do! Wanxiangshu.Shell.EventLogRuntime.syncReviewFromEventLogDedicated reviewStore cwd sessionId
-            do! Wanxiangshu.Shell.EventLogRuntime.syncBacklogFromEventLogDedicated omp backlogSession.Projection cwd sessionId
+
+            do!
+                Wanxiangshu.Shell.EventLogRuntime.syncBacklogFromEventLogDedicated
+                    omp
+                    backlogSession.Projection
+                    cwd
+                    sessionId
     }
 
 /// session_prompt: lightweight re-sync before each prompt to catch cross-session durable state changes.
@@ -88,9 +145,16 @@ let sessionPromptHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Pr
     promise {
         let sessionId = getSessionIdFromContext ctx |> Option.defaultValue ""
         let cwd = Dyn.str ctx "cwd"
+
         if sessionId <> "" && cwd <> "" then
             do! Wanxiangshu.Shell.EventLogRuntime.syncReviewFromEventLogDedicated reviewStore cwd sessionId
-            do! Wanxiangshu.Shell.EventLogRuntime.syncBacklogFromEventLogDedicated omp backlogSession.Projection cwd sessionId
+
+            do!
+                Wanxiangshu.Shell.EventLogRuntime.syncBacklogFromEventLogDedicated
+                    omp
+                    backlogSession.Projection
+                    cwd
+                    sessionId
     }
 
 let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =

@@ -24,6 +24,7 @@ let kernelBoundary () =
         check ("arch: " + f + " no UtcNow (clock side-effect)") (not (content.Contains "UtcNow"))
         check ("arch: " + f + " no DateTimeOffset (clock side-effect)") (not (content.Contains "DateTimeOffset"))
         check ("arch: " + f + " no Date.now (clock side-effect)") (not (content.Contains "Date.now"))
+
         if f = "CapsFormat.fs" then
             check ("arch: " + f + " no open Fable.Core.JsInterop") (not (content.Contains "open Fable.Core.JsInterop"))
 
@@ -39,22 +40,21 @@ let shellLayering () =
         check ("arch: " + f + " no Mux ref") (not (content.Contains "Wanxiangshu.Mux"))
 
 let private sourceDirs =
-    [|"src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"; "src/Omp"|]
+    [| "src/Kernel"; "src/Shell"; "src/Mux"; "src/Opencode"; "src/Omp" |]
 
-let noBuiltinDictionary () =
-    ()
+let noBuiltinDictionary () = ()
 
 let fileBodyUnder300 () =
     // Enforce <=300 lines for production code, Methodology schemas, and tests
-    let scanDirs = [|
-        "src/Kernel"
-        "src/Shell"
-        "src/Mux"
-        "src/Opencode"
-        "src/Omp"
-        "src/Methodology"
-        "tests"
-    |]
+    let scanDirs =
+        [| "src/Kernel"
+           "src/Shell"
+           "src/Mux"
+           "src/Opencode"
+           "src/Omp"
+           "src/Methodology"
+           "tests" |]
+
     for dir in scanDirs do
         for path in fsFilesRecursive dir do
             let content = requireFile path
@@ -71,34 +71,47 @@ let noDuplicateKgTestHooks () =
     for dir in [| "src/Opencode"; "src/Mux"; "src/Omp" |] do
         for f in fsFilesRelative dir do
             let content = requireFile (dir + "/" + f)
-            check ("arch: " + dir + "/" + f + " no inline takeLaunchesFromPorts")
+
+            check
+                ("arch: " + dir + "/" + f + " no inline takeLaunchesFromPorts")
                 (not (content.Contains "takeLaunchesFromPorts"))
-            check ("arch: " + dir + "/" + f + " no inline waitJobsOnPorts")
-                (not (content.Contains "waitJobsOnPorts"))
+
+            check ("arch: " + dir + "/" + f + " no inline waitJobsOnPorts") (not (content.Contains "waitJobsOnPorts"))
 
 let noDuplicateRunNudgeFlowCore () =
     for dir in [| "src/Opencode"; "src/Mux"; "src/Omp" |] do
         for f in fsFilesRelative dir do
             let content = requireFile (dir + "/" + f)
-            check ("arch: " + dir + "/" + f + " no inline tryRecordSend")
-                (not (content.Contains "tryRecordSend"))
+            check ("arch: " + dir + "/" + f + " no inline tryRecordSend") (not (content.Contains "tryRecordSend"))
 
 let nudgeDedupMustUseEventLogFold () =
-    for path in [| "src/Opencode/NudgeEffect.fs"; "src/Omp/NudgeHooks.fs"; "src/Shell/NudgeRuntime.fs" |] do
+    for path in
+        [| "src/Opencode/NudgeEffect.fs"
+           "src/Omp/NudgeHooks.fs"
+           "src/Shell/NudgeRuntime.fs" |] do
         let code = requireFile path |> nonCommentCode
         check ("arch: " + path + " no deriveAlreadyNudged") (not (code.Contains "deriveAlreadyNudged"))
-        check ("arch: " + path + " uses event-log nudge integral")
+
+        check
+            ("arch: " + path + " uses event-log nudge integral")
             (code.Contains "nudgeBlockedForTurn" || code.Contains "tryClaimNudgeDispatch")
 
 let nudgeLoopStateMustReplayHistory () =
     let opencode = requireFile "src/Opencode/NudgeEffect.fs" |> nonCommentCode
     let omp = requireFile "src/Omp/NudgeHooks.fs" |> nonCommentCode
     check "arch: Opencode NudgeEffect must not read live review-state query" (not (opencode.Contains "isReviewActive"))
-    check "arch: Opencode NudgeEffect loop state from event log"
-        (opencode.Contains "isLoopActiveFromEventLog" || opencode.Contains "getNudgeSnapshotFromEventLog")
+
+    check
+        "arch: Opencode NudgeEffect loop state from event log"
+        (opencode.Contains "isLoopActiveFromEventLog"
+         || opencode.Contains "getNudgeSnapshotFromEventLog")
+
     check "arch: Omp NudgeHooks must not read live review-state query" (not (omp.Contains "isReviewActive"))
-    check "arch: Omp NudgeHooks loop state from event log"
-        (omp.Contains "isLoopActiveFromEventLog" || omp.Contains "getNudgeSnapshotFromEventLog")
+
+    check
+        "arch: Omp NudgeHooks loop state from event log"
+        (omp.Contains "isLoopActiveFromEventLog"
+         || omp.Contains "getNudgeSnapshotFromEventLog")
 
 let returnReviewerCatalogAndHostRegistration () =
     let catalog = requireFile "src/Kernel/ToolCatalog/Review.fs"
@@ -108,7 +121,10 @@ let returnReviewerCatalogAndHostRegistration () =
     let muxPlugin = requireFile "src/Mux/PluginCatalog.fs" |> nonCommentCode
     check "arch: Opencode registers return_reviewer tool" (opencodeTools.Contains "return_reviewer")
     check "arch: OMP registers return_reviewer tool" (ompReview.Contains "return_reviewer")
-    check "arch: Mux muxToolNames omits return_reviewer (agent_report path)" (not (muxPlugin.Contains "\"return_reviewer\""))
+
+    check
+        "arch: Mux muxToolNames omits return_reviewer (agent_report path)"
+        (not (muxPlugin.Contains "\"return_reviewer\""))
 
 let noDanglingMarkers () =
     for dir in sourceDirs do
@@ -125,38 +141,36 @@ let opencodeHookSchemaNoDirectZodImport () =
 let hookSchemaNoDuplicateMethodologySchema () =
     let core = requireFile "src/Opencode/HookSchemaCore.fs" |> nonCommentCode
     let decode = requireFile "src/Opencode/HookSchemaDecode.fs" |> nonCommentCode
-    check "arch: HookSchemaCore no local selectMethodologyProperty def"
+
+    check
+        "arch: HookSchemaCore no local selectMethodologyProperty def"
         (not (core.Contains "let selectMethodologyProperty"))
-    check "arch: HookSchemaDecode no local selectMethodologyProperty def"
+
+    check
+        "arch: HookSchemaDecode no local selectMethodologyProperty def"
         (not (decode.Contains "let selectMethodologyProperty"))
 
-let private legacyInjectedOutputMarkers = [|
-    "[executor]"
-    "[syntax-check]"
-    "ends with iterator="
-|]
+let private legacyInjectedOutputMarkers =
+    [| "[executor]"; "[syntax-check]"; "ends with iterator=" |]
 
 let noLegacyInjectedToolOutputMarkers () =
     for dir in sourceDirs do
         for f in fsFilesRelative dir do
             let path = dir + "/" + f
             let content = requireFile path
+
             for marker in legacyInjectedOutputMarkers do
                 check ($"arch: {path} no legacy output marker {marker}") (not (content.Contains marker))
 
 let opencodeHookSchemaUsesIntentsRawFromArgs () =
     let codec = requireFile "src/Shell/SubagentIntentsCodec.fs" |> nonCommentCode
-    check "arch: SubagentIntentsCodec defines intentsRawFromArgs"
-        (codec.Contains "let intentsRawFromArgs")
+    check "arch: SubagentIntentsCodec defines intentsRawFromArgs" (codec.Contains "let intentsRawFromArgs")
     let core = requireFile "src/Opencode/HookSchemaCore.fs" |> nonCommentCode
-    check "arch: HookSchemaCore uses intentsRawFromArgs"
-        (core.Contains "intentsRawFromArgs")
+    check "arch: HookSchemaCore uses intentsRawFromArgs" (core.Contains "intentsRawFromArgs")
     let coreFile = requireFile "src/Opencode/HookSchemaCore.fs"
     let decodeFile = requireFile "src/Opencode/HookSchemaDecode.fs"
-    check "arch: HookSchemaCore must not Dyn.get args intents"
-        (not (coreFile.Contains "Dyn.get args \"intents\""))
-    check "arch: HookSchemaDecode must not Dyn.get args intents"
-        (not (decodeFile.Contains "Dyn.get args \"intents\""))
+    check "arch: HookSchemaCore must not Dyn.get args intents" (not (coreFile.Contains "Dyn.get args \"intents\""))
+    check "arch: HookSchemaDecode must not Dyn.get args intents" (not (decodeFile.Contains "Dyn.get args \"intents\""))
 
 let private forbiddenMuxOpencodeProjectionPatterns =
     [| System.Text.RegularExpressions.Regex(@"captureReport\s+opencode")
@@ -179,8 +193,14 @@ let muxNoOpencodeRef () =
 let muxBacklogUsesMuxHost () =
     for path in [| "src/Mux/BacklogSession.fs"; "src/Mux/Wrappers.fs" |] do
         let code = requireFile path |> nonCommentCode
+
         for re in forbiddenMuxOpencodeProjectionPatterns do
-            check ("arch: " + path + " avoids opencode SessionProjection host (" + re.ToString() + ")")
+            check
+                ("arch: "
+                 + path
+                 + " avoids opencode SessionProjection host ("
+                 + re.ToString()
+                 + ")")
                 (not (re.IsMatch code))
 
 let ompBoundary () =
@@ -194,8 +214,7 @@ let ompBoundary () =
 let eventLogUsesAdvisoryFlock () =
     let content = requireFile "src/Shell/EventLogFiles.fs"
     check "arch: EventLogFiles uses exclusive lock file" (content.Contains "withWorkspaceLock")
-    check "arch: EventLogFiles references .wanxiangshu.ndjson.lock"
-        (content.Contains ".wanxiangshu.ndjson.lock")
+    check "arch: EventLogFiles references .wanxiangshu.ndjson.lock" (content.Contains ".wanxiangshu.ndjson.lock")
 
 let ompNoEngineRef () =
     for f in fsFilesRelative "src/Omp" do

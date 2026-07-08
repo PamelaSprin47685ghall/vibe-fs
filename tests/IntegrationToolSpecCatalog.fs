@@ -25,76 +25,76 @@ open Wanxiangshu.Tests.IntegrationToolSetup
 
 let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
     let reg = sharedMuxRegistration ()
-    [
-        "wrapperSpec", fun () -> promise { wrapperSpec reg }
-        "computeCountSpec", fun () -> promise { computeCountSpec reg }
-        "subagentCapsInjection", subagentCapsInjectionSpec
-        "crossSessionIsolation", crossSessionIsolationSpec
-        "ompChildSessionObjectiveReRegister", ompChildSessionObjectiveReRegisterSpec
-        "opencodeSubsessionParentID", opencodeSubsessionParentIDSpec
-        "subagentFallbackRawText", subagentFallbackRawTextSpec
-        "muxSubsessionParentID", muxSubsessionParentIDSpec
-        "buildCapsFileReadData", buildCapsFileReadDataSpec
-        "capsTransform", capsTransformSpec
-        "capsTransformInPlace", capsTransformInPlaceSpec
-        "defaultPreludeWithoutCaps", defaultPreludeWithoutCapsSpec
-        "capsAndBacklogOrder", capsAndBacklogOrderSpec
-        "toolDefinition", toolDefinitionSpec
-        "toolExecuteBefore", toolExecuteBeforeSpec
-        "mimoApplyPatchExecuteBefore", mimoApplyPatchExecuteBeforeSpec
-        "mimoTaskExecuteRoundTrip", mimoTaskExecuteRoundTripSpec
-        "mimoTaskExecuteNestedReport", mimoTaskExecuteNestedReportSpec
-        "mimoTaskExecuteInPlaceStrip", mimoTaskExecuteInPlaceStripSpec
-        "mimoTaskExecuteStripsTaskId", mimoTaskExecuteStripsTaskIdSpec
-        "mimoTaskDefinitionHandlesZodLikeParameters", mimoTaskDefinitionHandlesZodLikeParametersSpec
-        "coderTool", coderToolSpec
-        "investigatorTool", investigatorToolSpec
-        "muxCoderInvalidIntents", muxCoderInvalidIntentsSpec
-        "investigatorToolLateClientInjection", investigatorToolLateClientInjectionSpec
-        "writeTool", fun () -> writeToolSpec reg
-        "loopCommand", fun () -> loopCommandSpec reg
-        "agentConfig", agentConfigSpec
-        "disableMimoMemoryAndCheckpoint", disableMimoMemoryAndCheckpointSpec
-        "disableMimoMemoryAndCheckpointPreservesUserAgent", disableMimoMemoryAndCheckpointPreservesUserAgentSpec
-        "applyAgentConfigForMimoDisablesWorkflow", applyAgentConfigForMimoDisablesWorkflowSpec
-        "pluginConfigHookDisablesMimoMemoryAndCheckpoint", pluginConfigHookDisablesMimoMemoryAndCheckpointSpec
-        "muxReadToolReturnsContent", muxReadToolReturnsContentSpec
-        "muxReadToolListsDirectories", muxReadToolListsDirectoriesSpec
-        "muxMessageTransformRegistered", muxMessageTransformRegisteredSpec
-        "muxSummarization", fun () -> promise { muxSummarizationSpec () }
-        "muxSummarizationToolPolicy", fun () -> promise { muxSummarizationToolPolicySpec () }
-        "muxTopLevelPolicy", muxTopLevelPolicySpec
-        "muxTopLevelDedup", muxTopLevelDedupSpec
-        "muxMessagesTransformDedupsRepeatedRead", muxMessagesTransformDedupsRepeatedReadSpec
-        "muxMessagesTransformDedupsRepeatedFileRead", muxMessagesTransformDedupsRepeatedFileReadSpec
-        "muxMessagesTransformDedupsRepeatedReadForTopLevelExec", muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec
-        "muxMessagesTransformAcceptedSubmitReviewEndsLoop", muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec
-        "muxTodoWriteWrapperSchema", muxTodoWriteWrapperSchemaSpec
-        "muxTodoWriteCapturesCompletedWorkReport", muxTodoWriteCapturesCompletedWorkReportSpec
-        "muxBacklogProjection", muxBacklogProjectionSpec
-        "muxExecutorRoCatPrependsWarning", muxExecutorRoCatPrependsWarningSpec
-        "muxMeditatorReadsFilesFromCwd", muxMeditatorReadsFilesFromCwdSpec
-        "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
-        "muxSubmitReviewPromptFormat", muxSubmitReviewPromptFormatSpec
-        "muxAgentReportWrapperFormatsVerdict", muxAgentReportWrapperFormatsVerdictSpec
-        "muxSubmitReviewUsesRolledBackHistoryTask", muxSubmitReviewUsesRolledBackHistoryTaskSpec
-        "muxLoopReviewPromptUsesFrontMatter", muxLoopReviewPromptUsesFrontMatterSpec
-        "muxSubmitReviewTwoRoundPassAccepts", muxSubmitReviewTwoRoundPassAcceptsSpec
-        "muxSubmitReviewReviseKeepsReviewActive", muxSubmitReviewReviseKeepsReviewActiveSpec
-        "muxSubmitReviewDoubleCheckRevise", muxSubmitReviewDoubleCheckReviseSpec
-        "muxSubmitReviewTerminatedCleansReviewState", muxSubmitReviewTerminatedCleansReviewStateSpec
-        "muxSubmitReviewWipSkipsReviewer", muxSubmitReviewWipSkipsReviewerSpec
-        "muxSubmitReviewOmittedWipSkipsReviewer", muxSubmitReviewOmittedWipSkipsReviewerSpec
-        "muxTodoWriteMethodologySchema", muxTodoWriteMethodologySchemaSpec
-        "muxEventHookAbortDeactivatesReview", muxEventHookAbortDeactivatesReviewSpec
-        "muxToolExecuteBeforeSetsUiLabel", muxToolExecuteBeforeSetsUiLabelSpec
-        "muxSystemTransformClearsOutputLength", muxSystemTransformClearsOutputLengthSpec
-        "muxToolSchemasAreCleanStaticallyButInjectedDynamically", muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec
-        "muxLoopSlashCommandWritesEventLogUnderDepsDirectory", muxLoopSlashCommandWritesEventLogUnderDepsDirectorySpec
-        "muxToolExecuteAfterBlocksRepeatedIdenticalCall", muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec
-        "muxToolExecuteAfterMapsNetworkError", muxToolExecuteAfterMapsNetworkErrorSpec
-        "muxStreamEndToolUseErrorTriggersNudge", muxStreamEndToolUseErrorTriggersNudgeSpec
-        "muxStreamEndToolCallsDoesNotTriggerNudge", muxStreamEndToolCallsDoesNotTriggerNudgeSpec
-        "muxSessionErrorTriggersFallbackContinue", muxSessionErrorTriggersFallbackContinueSpec
-        "muxStreamEndToolCallAsTextTriggersFallback", muxStreamEndToolCallAsTextTriggersFallbackSpec
-    ]
+
+    [ "wrapperSpec", (fun () -> promise { wrapperSpec reg })
+      "computeCountSpec", (fun () -> promise { computeCountSpec reg })
+      "subagentCapsInjection", subagentCapsInjectionSpec
+      "crossSessionIsolation", crossSessionIsolationSpec
+      "ompChildSessionObjectiveReRegister", ompChildSessionObjectiveReRegisterSpec
+      "opencodeSubsessionParentID", opencodeSubsessionParentIDSpec
+      "subagentFallbackRawText", subagentFallbackRawTextSpec
+      "muxSubsessionParentID", muxSubsessionParentIDSpec
+      "buildCapsFileReadData", buildCapsFileReadDataSpec
+      "capsTransform", capsTransformSpec
+      "capsTransformInPlace", capsTransformInPlaceSpec
+      "defaultPreludeWithoutCaps", defaultPreludeWithoutCapsSpec
+      "capsAndBacklogOrder", capsAndBacklogOrderSpec
+      "toolDefinition", toolDefinitionSpec
+      "toolExecuteBefore", toolExecuteBeforeSpec
+      "mimoApplyPatchExecuteBefore", mimoApplyPatchExecuteBeforeSpec
+      "mimoTaskExecuteRoundTrip", mimoTaskExecuteRoundTripSpec
+      "mimoTaskExecuteNestedReport", mimoTaskExecuteNestedReportSpec
+      "mimoTaskExecuteInPlaceStrip", mimoTaskExecuteInPlaceStripSpec
+      "mimoTaskExecuteStripsTaskId", mimoTaskExecuteStripsTaskIdSpec
+      "mimoTaskDefinitionHandlesZodLikeParameters", mimoTaskDefinitionHandlesZodLikeParametersSpec
+      "coderTool", coderToolSpec
+      "investigatorTool", investigatorToolSpec
+      "muxCoderInvalidIntents", muxCoderInvalidIntentsSpec
+      "investigatorToolLateClientInjection", investigatorToolLateClientInjectionSpec
+      "writeTool", (fun () -> writeToolSpec reg)
+      "loopCommand", (fun () -> loopCommandSpec reg)
+      "agentConfig", agentConfigSpec
+      "disableMimoMemoryAndCheckpoint", disableMimoMemoryAndCheckpointSpec
+      "disableMimoMemoryAndCheckpointPreservesUserAgent", disableMimoMemoryAndCheckpointPreservesUserAgentSpec
+      "applyAgentConfigForMimoDisablesWorkflow", applyAgentConfigForMimoDisablesWorkflowSpec
+      "pluginConfigHookDisablesMimoMemoryAndCheckpoint", pluginConfigHookDisablesMimoMemoryAndCheckpointSpec
+      "muxReadToolReturnsContent", muxReadToolReturnsContentSpec
+      "muxReadToolListsDirectories", muxReadToolListsDirectoriesSpec
+      "muxMessageTransformRegistered", muxMessageTransformRegisteredSpec
+      "muxSummarization", (fun () -> promise { muxSummarizationSpec () })
+      "muxSummarizationToolPolicy", (fun () -> promise { muxSummarizationToolPolicySpec () })
+      "muxTopLevelPolicy", muxTopLevelPolicySpec
+      "muxTopLevelDedup", muxTopLevelDedupSpec
+      "muxMessagesTransformDedupsRepeatedRead", muxMessagesTransformDedupsRepeatedReadSpec
+      "muxMessagesTransformDedupsRepeatedFileRead", muxMessagesTransformDedupsRepeatedFileReadSpec
+      "muxMessagesTransformDedupsRepeatedReadForTopLevelExec", muxMessagesTransformDedupsRepeatedReadForTopLevelExecSpec
+      "muxMessagesTransformAcceptedSubmitReviewEndsLoop", muxMessagesTransformAcceptedSubmitReviewEndsLoopSpec
+      "muxTodoWriteWrapperSchema", muxTodoWriteWrapperSchemaSpec
+      "muxTodoWriteCapturesCompletedWorkReport", muxTodoWriteCapturesCompletedWorkReportSpec
+      "muxBacklogProjection", muxBacklogProjectionSpec
+      "muxExecutorRoCatPrependsWarning", muxExecutorRoCatPrependsWarningSpec
+      "muxMeditatorReadsFilesFromCwd", muxMeditatorReadsFilesFromCwdSpec
+      "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
+      "muxSubmitReviewPromptFormat", muxSubmitReviewPromptFormatSpec
+      "muxAgentReportWrapperFormatsVerdict", muxAgentReportWrapperFormatsVerdictSpec
+      "muxSubmitReviewUsesRolledBackHistoryTask", muxSubmitReviewUsesRolledBackHistoryTaskSpec
+      "muxLoopReviewPromptUsesFrontMatter", muxLoopReviewPromptUsesFrontMatterSpec
+      "muxSubmitReviewTwoRoundPassAccepts", muxSubmitReviewTwoRoundPassAcceptsSpec
+      "muxSubmitReviewReviseKeepsReviewActive", muxSubmitReviewReviseKeepsReviewActiveSpec
+      "muxSubmitReviewDoubleCheckRevise", muxSubmitReviewDoubleCheckReviseSpec
+      "muxSubmitReviewTerminatedCleansReviewState", muxSubmitReviewTerminatedCleansReviewStateSpec
+      "muxSubmitReviewWipSkipsReviewer", muxSubmitReviewWipSkipsReviewerSpec
+      "muxSubmitReviewOmittedWipSkipsReviewer", muxSubmitReviewOmittedWipSkipsReviewerSpec
+      "muxTodoWriteMethodologySchema", muxTodoWriteMethodologySchemaSpec
+      "muxEventHookAbortDeactivatesReview", muxEventHookAbortDeactivatesReviewSpec
+      "muxToolExecuteBeforeSetsUiLabel", muxToolExecuteBeforeSetsUiLabelSpec
+      "muxSystemTransformClearsOutputLength", muxSystemTransformClearsOutputLengthSpec
+      "muxToolSchemasAreCleanStaticallyButInjectedDynamically",
+      muxToolSchemasAreCleanStaticallyButInjectedDynamicallySpec
+      "muxLoopSlashCommandWritesEventLogUnderDepsDirectory", muxLoopSlashCommandWritesEventLogUnderDepsDirectorySpec
+      "muxToolExecuteAfterBlocksRepeatedIdenticalCall", muxToolExecuteAfterBlocksRepeatedIdenticalCallSpec
+      "muxToolExecuteAfterMapsNetworkError", muxToolExecuteAfterMapsNetworkErrorSpec
+      "muxStreamEndToolUseErrorTriggersNudge", muxStreamEndToolUseErrorTriggersNudgeSpec
+      "muxStreamEndToolCallsDoesNotTriggerNudge", muxStreamEndToolCallsDoesNotTriggerNudgeSpec
+      "muxSessionErrorTriggersFallbackContinue", muxSessionErrorTriggersFallbackContinueSpec
+      "muxStreamEndToolCallAsTextTriggersFallback", muxStreamEndToolCallAsTextTriggersFallbackSpec ]

@@ -6,14 +6,13 @@ open Wanxiangshu.Shell.Dyn
 
 /// Session lifecycle event types that carry `id` on `info` rather than `sessionID`.
 let sessionEventTypes =
-    Set.ofList [
-        "session.created"
-        "session.updated"
-        "session.deleted"
-        "session.delete"
-        "session.close"
-        "session.remove"
-    ]
+    Set.ofList
+        [ "session.created"
+          "session.updated"
+          "session.deleted"
+          "session.delete"
+          "session.close"
+          "session.remove" ]
 
 /// Resolve the sessionID of a session event. Different event shapes stash the
 /// id in different locations — fall back through the known carriers in
@@ -22,28 +21,36 @@ let sessionEventTypes =
 let getSessionID (eventType: string) (props: obj) : string =
     let part = Dyn.get props "part"
     let info = Dyn.get props "info"
+
     let candidates =
         [ Dyn.str props "sessionID"
           Dyn.str part "sessionID"
           Dyn.str info "sessionID"
-          if eventType = "session.error" then Dyn.str props "id" else ""
+          if eventType = "session.error" then
+              Dyn.str props "id"
+          else
+              ""
           if Set.contains eventType sessionEventTypes then
               Dyn.str info "id"
-          else "" ]
+          else
+              "" ]
+
     candidates |> List.tryFind (fun s -> s <> "") |> Option.defaultValue ""
 
 /// Concatenate text content from an Opencode `parts` array. Non-array or
 /// non-text parts are silently skipped so callers can pass either a typed
 /// list or a missing payload without a separate guard.
 let getPartsText (parts: obj) : string =
-    if not (Dyn.isArray parts) then ""
+    if not (Dyn.isArray parts) then
+        ""
     else
         (parts :?> obj array)
         |> Array.choose (fun part ->
             if Dyn.str part "type" = "text" then
                 let text = Dyn.get part "text"
-                if Dyn.isNullish text then None else Some (string text)
-            else None)
+                if Dyn.isNullish text then None else Some(string text)
+            else
+                None)
         |> String.concat "\n"
 
 /// Test whether `info` represents a completed assistant message. An assistant
@@ -51,21 +58,31 @@ let getPartsText (parts: obj) : string =
 /// terminal finish OR a numeric `time.completed`. An error-bearing message is
 /// never considered completed (aborts are surfaced separately).
 let isCompletedAssistantMessage (info: obj) : bool =
-    if Dyn.isNullish info then false
+    if Dyn.isNullish info then
+        false
     else
-        let isAssistant = Dyn.str info "role" = "assistant" || Dyn.str info "type" = "assistant"
+        let isAssistant =
+            Dyn.str info "role" = "assistant" || Dyn.str info "type" = "assistant"
+
         let hasError = not (Dyn.isNullish (Dyn.get info "error"))
-        if not isAssistant || hasError then false
+
+        if not isAssistant || hasError then
+            false
         else
             let finishVal = Dyn.get info "finish"
+
             let isTerminalFinish =
                 not (Dyn.isNullish finishVal)
                 && Dyn.typeIs finishVal "string"
                 && isTerminalAssistantFinish (string finishVal)
+
             let hasTimeCompleted =
                 let time = Dyn.get info "time"
-                if Dyn.isNullish time then false
+
+                if Dyn.isNullish time then
+                    false
                 else
                     let timeCompleted = Dyn.get time "completed"
                     not (Dyn.isNullish timeCompleted) && Dyn.typeIs timeCompleted "number"
+
             isTerminalFinish || hasTimeCompleted

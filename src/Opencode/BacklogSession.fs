@@ -19,8 +19,7 @@ type BacklogSession(host: Host, scope: RuntimeScope) =
     member _.CaptureReport(callID: string, report: string) : unit =
         projection.CaptureReport(host, callID, report)
 
-    member _.TakeReport(callID: string) : string =
-        projection.TakeReport(host, callID)
+    member _.TakeReport(callID: string) : string = projection.TakeReport(host, callID)
 
     member this.ReplayBacklog(messages: Message<obj> list) : BacklogEntry list =
         replayBacklogWith host (BacklogSessionCodec.reportFromFlatPartWithProjection host projection) messages

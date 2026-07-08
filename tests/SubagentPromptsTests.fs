@@ -7,7 +7,10 @@ open Wanxiangshu.Kernel.SubagentPrompts
 let private sampleCoderIntent: CoderIntent =
     { objective = "Add auth"
       background = "Need JWT"
-      targets = [ { file = "src/Auth.fs"; guide = "Add login"; draft = None } ]
+      targets =
+        [ { file = "src/Auth.fs"
+            guide = "Add login"
+            draft = None } ]
       doNotTouch = [| "tests/" |] }
 
 let private sampleInvestigatorIntent: InvestigatorIntent =
@@ -19,20 +22,27 @@ let private sampleInvestigatorIntent: InvestigatorIntent =
 let coderPromptContainsObjective () =
     let p = coderPrompt sampleCoderIntent
     check "contains objective" (p.Contains "Add auth")
+
 let coderPromptContainsDoNotTouch () =
     let p = coderPrompt sampleCoderIntent
     check "contains do_not_touch" (p.Contains "tests/")
+
 let coderPromptContainsYaml () =
     let p = coderPrompt sampleCoderIntent
     check "contains yaml field" (p.Contains "objective:")
+
 let coderPromptEmptyDoNotTouchOmitsField () =
-    let intent = { sampleCoderIntent with doNotTouch = [||] }
+    let intent =
+        { sampleCoderIntent with
+            doNotTouch = [||] }
+
     let p = coderPrompt intent
     check "omits do_not_touch when empty" (not (p.Contains "do_not_touch"))
 
 let investigatorPromptContainsQuestions () =
     let p = investigatorPrompt sampleInvestigatorIntent
     check "contains questions" (p.Contains "Where is auth.handler?")
+
 let investigatorPromptContainsYaml () =
     let p = investigatorPrompt sampleInvestigatorIntent
     check "contains yaml" (p.Contains "objective:")
@@ -40,12 +50,16 @@ let investigatorPromptContainsYaml () =
 let browserPromptContainsTask () =
     let p = browserPrompt "Search for docs"
     check "contains task" (p.Contains "Search for docs")
+
 let browserPromptContainsStealth () =
     let p = browserPrompt "Search"
     check "contains stealth" (p.Contains "stealth-browser")
 
 let meditatorPromptContainsFiles () =
-    let sections = [ { file = "src/Auth.fs"; content = Some "let x = 1" } ]
+    let sections =
+        [ { file = "src/Auth.fs"
+            content = Some "let x = 1" } ]
+
     let p = meditatorPrompt sections "Analyze auth"
     check "contains file path" (p.Contains "src/Auth.fs")
     check "contains question" (p.Contains "Analyze auth")
@@ -57,7 +71,9 @@ let meditatorPromptSkippedSection () =
     check "contains skipped" (p.Contains meditatorSkippedSection)
 
 let executorSummarizerPromptContainsFields () =
-    let p = executorSummarizerPrompt "output" "stdout" "python" "print(1)" [] "short" "ro"
+    let p =
+        executorSummarizerPrompt "output" "stdout" "python" "print(1)" [] "short" "ro"
+
     check "contains language" (p.Contains "python")
     check "contains program" (p.Contains "print(1)")
     check "contains mode" (p.Contains "ro")
@@ -65,7 +81,9 @@ let executorSummarizerPromptContainsFields () =
     check "contains preserve directive" (p.Contains "Preserve errors")
 
 let executorSummarizerPromptEmbedsWhatToSummarize () =
-    let p = executorSummarizerPrompt "summarize exit codes and stderr only" "stdout" "python" "print(1)" [] "short" "ro"
+    let p =
+        executorSummarizerPrompt "summarize exit codes and stderr only" "stdout" "python" "print(1)" [] "short" "ro"
+
     check "what_to_summarize embedded" (p.Contains "summarize exit codes and stderr only")
     check "contains task section" (p.Contains "# Task")
 

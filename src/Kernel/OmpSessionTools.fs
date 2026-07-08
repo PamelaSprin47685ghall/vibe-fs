@@ -1,7 +1,6 @@
 module Wanxiangshu.Kernel.OmpSessionTools
 
-let ompSubagentToolNames =
-    [| "coder"; "investigator"; "meditator"; "browser" |]
+let ompSubagentToolNames = [| "coder"; "investigator"; "meditator"; "browser" |]
 
 let ompReviewChildToolNames = [| "read"; "return_reviewer" |]
 
@@ -32,14 +31,14 @@ let filterOmpMainSessionActiveTools (activeTools: string seq) : string array =
     let tools = activeTools |> Seq.toArray
     let activeSet = Set.ofArray tools
 
-    let isMainSession =
-        ompSubagentToolNames |> Array.exists activeSet.Contains
+    let isMainSession = ompSubagentToolNames |> Array.exists activeSet.Contains
 
     let withoutAlwaysStrip =
         tools |> Array.filter (fun name -> not (alwaysStripSet.Contains name))
 
     if isMainSession then
-        withoutAlwaysStrip |> Array.filter (fun name -> not (childOnlySet.Contains name))
+        withoutAlwaysStrip
+        |> Array.filter (fun name -> not (childOnlySet.Contains name))
     else
         withoutAlwaysStrip
 

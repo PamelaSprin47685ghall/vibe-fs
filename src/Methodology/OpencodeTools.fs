@@ -16,15 +16,19 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Shell.FallbackRuntimeState
 
-let private methodologyArgs : obj =
-    box {|
-        methodology = enumReq enumValuesArray.Value "Select which methodology to apply."
-        intent = strReq intentFieldDescription
-        background = strReq backgroundFieldDescription
-        note = strReq unifiedNoteDescription.Value
-    |}
+let private methodologyArgs: obj =
+    box
+        {| methodology = enumReq enumValuesArray.Value "Select which methodology to apply."
+           intent = strReq intentFieldDescription
+           background = strReq backgroundFieldDescription
+           note = strReq unifiedNoteDescription.Value |}
 
-let private executeMethodology (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (runtime: FallbackRuntimeState) : obj -> obj -> JS.Promise<string> =
+let private executeMethodology
+    (host: Host)
+    (registry: ChildAgentRegistry)
+    (ctx: obj)
+    (runtime: FallbackRuntimeState)
+    : obj -> obj -> JS.Promise<string> =
     fun args context ->
         promise {
             match parse args with
@@ -38,6 +42,7 @@ let private executeMethodology (host: Host) (registry: ChildAgentRegistry) (ctx:
                     let directory = str tc "directory"
                     let sessionID = str tc "sessionID"
                     let prompt = formatPrompt host (Meditator(intent, [])) |> List.head
+
                     let! subResult =
                         runSubagent
                             runtime
@@ -50,6 +55,7 @@ let private executeMethodology (host: Host) (registry: ChildAgentRegistry) (ctx:
                             sessionID
                             context
                             (box null)
+
                     match subResult with
                     | Ok text -> return text
                     | Error err -> return wireEncodeToolError "meditator" err
@@ -58,5 +64,11 @@ let private executeMethodology (host: Host) (registry: ChildAgentRegistry) (ctx:
 let methodologyTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (runtime: FallbackRuntimeState) : obj =
     define unifiedToolDescription methodologyArgs (executeMethodology host registry ctx runtime)
 
-let registerMethodologyTools (registry: ChildAgentRegistry) (ctx: obj) (host: Host) (runtime: FallbackRuntimeState) (target: obj) : unit =
+let registerMethodologyTools
+    (registry: ChildAgentRegistry)
+    (ctx: obj)
+    (host: Host)
+    (runtime: FallbackRuntimeState)
+    (target: obj)
+    : unit =
     target?(unifiedToolName) <- box (methodologyTool host registry ctx runtime)

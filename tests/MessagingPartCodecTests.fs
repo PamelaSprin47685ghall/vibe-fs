@@ -16,11 +16,7 @@ let toolOutputAndErrorFromHostOutputString () =
     check "string no error" (err = "")
 
 let toolOutputAndErrorFromHostOutputObject () =
-    let output =
-        createObj [
-            "content", box "body"
-            "error", box "fail msg"
-        ]
+    let output = createObj [ "content", box "body"; "error", box "fail msg" ]
     let out, err = toolOutputAndErrorFromHostOutput output
     check "object content" (out = "body")
     check "object error" (err = "fail msg")
@@ -32,17 +28,18 @@ let toolOutputAndErrorFromHostOutputNull () =
 
 let decodeMuxDynamicToolStateNoneWhenEmpty () =
     let part = createObj [ "state", box "output-available" ]
+
     match decodeMuxDynamicToolState part with
     | None -> check "empty mux part" true
     | Some _ -> check "empty mux part" false
 
 let decodeMuxDynamicToolStateSomeWithOutput () =
     let part =
-        createObj [
-            "state", box "output-available"
-            "output", box "tool result"
-            "input", box (createObj [ "operation", box (createObj [ "action", box "read" ]) ])
-        ]
+        createObj
+            [ "state", box "output-available"
+              "output", box "tool result"
+              "input", box (createObj [ "operation", box (createObj [ "action", box "read" ]) ]) ]
+
     match decodeMuxDynamicToolState part with
     | Some st ->
         check "mux status mapped" (st.status = "completed")
@@ -52,12 +49,12 @@ let decodeMuxDynamicToolStateSomeWithOutput () =
 
 let decodeOpencodeToolStateBoxSomeWithFields () =
     let state =
-        createObj [
-            "status", box "completed"
-            "output", box "out"
-            "error", box "err"
-            "input", box (createObj [ "operation", box (createObj [ "action", box "apply" ]) ])
-        ]
+        createObj
+            [ "status", box "completed"
+              "output", box "out"
+              "error", box "err"
+              "input", box (createObj [ "operation", box (createObj [ "action", box "apply" ]) ]) ]
+
     match decodeOpencodeToolStateBox state with
     | Some st ->
         check "opencode status" (st.status = "completed")
@@ -72,8 +69,7 @@ let decodeOpencodeToolStateBoxNoneWhenNull () =
     | Some _ -> check "null opencode state" false
 
 let operationActionFromInputNestedOperation () =
-    let input =
-        createObj [ "operation", box (createObj [ "action", box "write" ]) ]
+    let input = createObj [ "operation", box (createObj [ "action", box "write" ]) ]
     check "nested operation action" (operationActionFromInput input = "write")
 
 let operationActionFromInputEmptyWhenNull () =

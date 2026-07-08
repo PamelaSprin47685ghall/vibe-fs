@@ -46,6 +46,7 @@ let requiredStrFieldMissing () =
 
 let strListFieldPresent () =
     let obj = unbox (createObj [ "items", box [| "a"; "b" |] ])
+
     match strListField obj "items" with
     | Some list -> equal "ab" 2 (list.Length)
     | None -> failwith "expected Some"
@@ -56,6 +57,7 @@ let strListFieldMissing () =
 
 let objListFieldPresent () =
     let obj = unbox (createObj [ "items", box [| box 1; box 2; box 3 |] ])
+
     match objListField obj "items" with
     | Some list -> equal "abc" 3 (list.Length)
     | None -> failwith "expected Some"

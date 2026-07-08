@@ -32,6 +32,7 @@ open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeClientCodec
 open Wanxiangshu.Shell.FallbackRuntimeState
+
 module ToolSchemaModule = Wanxiangshu.Opencode.ToolSchema
 module FuzzyCommandsModule = Wanxiangshu.Shell.FuzzySearch
 
@@ -40,46 +41,68 @@ let private addIfSome (entries: ResizeArray<string * obj>) (key: string) (v: 'T 
     | Some x -> entries.Add(key, box x)
     | None -> ()
 
-let private buildFuzzyTool (description: string) (args: obj) (toolName: string) (decode: obj -> Result<'P, DomainError>) (execute: 'P -> SearchOptions -> JS.Promise<SearchOutcome>) (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
-    define description
-        args
-        (fun args context ->
-            let runtime = fromOpencode context ""
-            let scopeId = Id.sessionIdValue runtime.Execution.SessionId
-            if scopeId = "" then resolveStr (toolRequiresActiveSession toolName)
-            else
-                match decode args with
-                | Error e -> resolveStr (wireDecodeFailure toolName e)
-                | Ok p ->
-                    let o : SearchOptions =
-                        { cwd = runtime.Execution.Directory
-                          scopeId = scopeId
-                          store = Some iteratorStore
-                          finderCache = finderCache }
-                    promise {
-                        let! r = execute p o
-                        return r.output
-                    })
+let private buildFuzzyTool
+    (description: string)
+    (args: obj)
+    (toolName: string)
+    (decode: obj -> Result<'P, DomainError>)
+    (execute: 'P -> SearchOptions -> JS.Promise<SearchOutcome>)
+    (finderCache: FinderCache)
+    (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore)
+    : obj =
+    define description args (fun args context ->
+        let runtime = fromOpencode context ""
+        let scopeId = Id.sessionIdValue runtime.Execution.SessionId
 
-let fuzzyFindTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
+        if scopeId = "" then
+            resolveStr (toolRequiresActiveSession toolName)
+        else
+            match decode args with
+            | Error e -> resolveStr (wireDecodeFailure toolName e)
+            | Ok p ->
+                let o: SearchOptions =
+                    { cwd = runtime.Execution.Directory
+                      scopeId = scopeId
+                      store = Some iteratorStore
+                      finderCache = finderCache }
+
+                promise {
+                    let! r = execute p o
+                    return r.output
+                })
+
+let fuzzyFindTool
+    (finderCache: FinderCache)
+    (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore)
+    : obj =
     buildFuzzyTool
         ToolSchemaModule.fuzzyFind
-        (box {| pattern = strArrayNullish Params.fuzzyFindPattern; path = strOpt Params.fuzzyFindPath
-                limit = intMinNullish 1 Params.fuzzyFindLimit; iterator = strOpt Params.fuzzyFindIterator |})
+        (box
+            {| pattern = strArrayNullish Params.fuzzyFindPattern
+               path = strOpt Params.fuzzyFindPath
+               limit = intMinNullish 1 Params.fuzzyFindLimit
+               iterator = strOpt Params.fuzzyFindIterator |})
         "fuzzy_find"
         decodeFuzzyFindArgs
         FuzzyCommandsModule.fuzzyFind
         finderCache
         iteratorStore
 
-let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore) : obj =
+let fuzzyGrepTool
+    (finderCache: FinderCache)
+    (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore)
+    : obj =
     buildFuzzyTool
         ToolSchemaModule.fuzzyGrep
-        (box {| pattern = strArrayNullish Params.fuzzyGrepPattern; path = strOpt Params.fuzzyGrepPath
-                exclude = excludeOpt Params.fuzzyGrepExclude; searchIgnored = boolOptional Params.fuzzyGrepSearchIgnored
-                caseSensitive = boolOptional Params.fuzzyGrepCaseSensitive
-                context = intMinNullish 0 Params.fuzzyGrepContext; limit = intMinNullish 1 Params.fuzzyGrepLimit
-                iterator = strOpt Params.fuzzyGrepIterator |})
+        (box
+            {| pattern = strArrayNullish Params.fuzzyGrepPattern
+               path = strOpt Params.fuzzyGrepPath
+               exclude = excludeOpt Params.fuzzyGrepExclude
+               searchIgnored = boolOptional Params.fuzzyGrepSearchIgnored
+               caseSensitive = boolOptional Params.fuzzyGrepCaseSensitive
+               context = intMinNullish 0 Params.fuzzyGrepContext
+               limit = intMinNullish 1 Params.fuzzyGrepLimit
+               iterator = strOpt Params.fuzzyGrepIterator |})
         "fuzzy_grep"
         decodeFuzzyGrepArgs
         FuzzyCommandsModule.fuzzyGrep
@@ -87,10 +110,12 @@ let fuzzyGrepTool (finderCache: FinderCache) (iteratorStore: Wanxiangshu.Shell.F
         iteratorStore
 
 let websearchTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (fallbackRuntime: FallbackRuntimeState) : obj =
-    define websearch
-        (box {| query = strReq Params.websearchQuery
-                numResults = numOpt Params.websearchNumResults
-                what_to_summarize = strReq Params.websearchWhatToSummarize |})
+    define
+        websearch
+        (box
+            {| query = strReq Params.websearchQuery
+               numResults = numOpt Params.websearchNumResults
+               what_to_summarize = strReq Params.websearchWhatToSummarize |})
         (fun args context ->
             match decodeWebsearchArgs args with
             | Error e -> resolveStr (wireDecodeFailure "websearch" e)
@@ -99,35 +124,54 @@ let websearchTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (fallba
                 | Error e -> resolveStr (wireEncodeToolError "OpencodeClient" e)
                 | Ok client ->
                     let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
+
                     promise {
                         let body = createObj [ "query", box ws.Query; "max_results", box ws.NumResults ]
                         let! result = webApiPost "web_search" body runtime.AbortSignal
+
                         match result with
                         | Error e -> return webToolFailed "search" e
                         | Ok data ->
                             let items = parseSearchResults (Dyn.get data "results")
                             let rawResults = formatSearchResults items
+
                             if items.IsEmpty then
                                 return rawResults
                             else
-                                let prompt = formatPrompt host (WebsearchSummary(ws.WhatToSummarize, rawResults)) |> List.head
-                                return! resolveSubagentPromise "executor"
-                                    (runSubagentWithCleanup fallbackRuntime registry client "executor" "Web search summary" prompt
-                                        runtime.Execution.Directory (Id.sessionIdValue runtime.Execution.SessionId) context)
+                                let prompt =
+                                    formatPrompt host (WebsearchSummary(ws.WhatToSummarize, rawResults))
+                                    |> List.head
+
+                                return!
+                                    resolveSubagentPromise
+                                        "executor"
+                                        (runSubagentWithCleanup
+                                            fallbackRuntime
+                                            registry
+                                            client
+                                            "executor"
+                                            "Web search summary"
+                                            prompt
+                                            runtime.Execution.Directory
+                                            (Id.sessionIdValue runtime.Execution.SessionId)
+                                            context)
                     })
 
 let webfetchTool (ctx: obj) : obj =
-    define webfetch
-        (box {| url = strReq Params.webfetchUrl
-                extract_main = boolOptional Params.webfetchExtractMain
-                prefer_llms_txt = enumOpt [| "auto"; "always"; "never" |] Params.webfetchPreferLlmsTxt
-                prompt = strOpt Params.webfetchPrompt
-                timeout = numOpt Params.webfetchTimeout |})
+    define
+        webfetch
+        (box
+            {| url = strReq Params.webfetchUrl
+               extract_main = boolOptional Params.webfetchExtractMain
+               prefer_llms_txt = enumOpt [| "auto"; "always"; "never" |] Params.webfetchPreferLlmsTxt
+               prompt = strOpt Params.webfetchPrompt
+               timeout = numOpt Params.webfetchTimeout |})
         (fun args context ->
             match decodeWebfetchArgs args with
             | Error e -> resolveStr (wireDecodeFailure "webfetch" e)
             | Ok wf ->
                 let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
+
                 promise {
                     let bodyEntries = ResizeArray<(string * obj)>()
                     bodyEntries.Add("url", box wf.Url)
@@ -137,12 +181,38 @@ let webfetchTool (ctx: obj) : obj =
                     addIfSome bodyEntries "timeout" wf.Timeout
                     let body = createObj (Seq.toList bodyEntries)
                     let! result = webApiPost "web_fetch" body runtime.AbortSignal
+
                     match result with
                     | Error e -> return webToolFailed "fetch" e
                     | Ok data ->
-                        let title = if Dyn.isNullish (Dyn.get data "title") then None else Some (Dyn.str data "title")
-                        let byline = if Dyn.isNullish (Dyn.get data "byline") then None else Some (Dyn.str data "byline")
-                        let length_ = if Dyn.isNullish (Dyn.get data "length") then None else Some (unbox<int> (Dyn.get data "length"))
-                        let content = if Dyn.isNullish (Dyn.get data "content") then None else Some (Dyn.str data "content")
-                        return formatFetchResponse { title = title; byline = byline; length = length_; content = content }
+                        let title =
+                            if Dyn.isNullish (Dyn.get data "title") then
+                                None
+                            else
+                                Some(Dyn.str data "title")
+
+                        let byline =
+                            if Dyn.isNullish (Dyn.get data "byline") then
+                                None
+                            else
+                                Some(Dyn.str data "byline")
+
+                        let length_ =
+                            if Dyn.isNullish (Dyn.get data "length") then
+                                None
+                            else
+                                Some(unbox<int> (Dyn.get data "length"))
+
+                        let content =
+                            if Dyn.isNullish (Dyn.get data "content") then
+                                None
+                            else
+                                Some(Dyn.str data "content")
+
+                        return
+                            formatFetchResponse
+                                { title = title
+                                  byline = byline
+                                  length = length_
+                                  content = content }
                 })

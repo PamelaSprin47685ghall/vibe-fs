@@ -18,10 +18,12 @@ let setPendingAddsEntry () =
 let resolvePendingFiresCallback () =
     let mutable resolved = false
     let mutable suppressed = false
+
     let e =
         { emptyEffects with
             abortSuppressors = Map.add "s1" (fun () -> suppressed <- true) Map.empty }
         |> fun eff -> setPending eff "s1" (fun _ -> resolved <- true)
+
     let next, fired = resolvePending e "s1" (Accepted "")
     check "resolvePending fired true" fired
     check "resolvePending called resolver" resolved
@@ -41,15 +43,14 @@ let disposeSessionTreeTerminatesAll () =
     let mutable suppressed = 0
     let resolver _ = count <- count + 1
     let suppressor () = suppressed <- suppressed + 1
+
     let e =
         { emptyEffects with
-            abortSuppressors =
-                Map.empty
-                |> Map.add "a" suppressor
-                |> Map.add "b" suppressor }
+            abortSuppressors = Map.empty |> Map.add "a" suppressor |> Map.add "b" suppressor }
         |> fun eff -> setPending eff "a" resolver
         |> fun eff -> setPending eff "b" resolver
         |> fun eff -> setPending eff "c" resolver
+
     let next = disposeSessionTree e [ "a"; "b"; "c" ]
     check "all 3 resolvers fired" (count = 3)
     check "2 suppressors fired" (suppressed = 2)

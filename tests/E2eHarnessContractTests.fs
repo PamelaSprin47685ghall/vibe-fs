@@ -13,12 +13,15 @@ let getMessagesUsesSessionPrefix () =
     let code = requireFile "e2e/harness.js"
     let idx = code.IndexOf("async getMessages")
     check "e2e.harness.getMessages exists" (idx >= 0)
+
     if idx >= 0 then
         let body = code.Substring(idx, min 250 (code.Length - idx))
-        check "e2e.harness.getMessages GETs /session/${sessionID}/message"
+
+        check
+            "e2e.harness.getMessages GETs /session/${sessionID}/message"
             (body.Contains("request('GET', `/session/${sessionID}/message`"))
-        check "e2e.harness.getMessages must not prefix /api/session/"
-            (not (body.Contains("/api/session/")))
+
+        check "e2e.harness.getMessages must not prefix /api/session/" (not (body.Contains("/api/session/")))
 
 /// E2e harness PLUGIN_JS must resolve to build/src/Opencode/Plugin.js from both
 /// repo-root runs (__dirname=e2e) and build-dir runs (__dirname=build/e2e). The
@@ -28,9 +31,10 @@ let getMessagesUsesSessionPrefix () =
 /// plugin load working after `npm run build-and-test`.
 let pluginJsResolvesWithParentFallback () =
     let code = requireFile "e2e/harness-bootstrap.js"
-    check "e2e.harness.PLUGIN_JS targets build/src/Opencode/Plugin.js"
-        (code.Contains("build/src/Opencode/Plugin.js"))
-    check "e2e.harness.PLUGIN_JS has existsSync fallback to parent"
+    check "e2e.harness.PLUGIN_JS targets build/src/Opencode/Plugin.js" (code.Contains("build/src/Opencode/Plugin.js"))
+
+    check
+        "e2e.harness.PLUGIN_JS has existsSync fallback to parent"
         (code.Contains("existsSync") && code.Contains("../.."))
-    check "e2e.harness.WANXIANG_ROOT is mutable (let not const)"
-        (code.Contains("let WANXIANG_ROOT"))
+
+    check "e2e.harness.WANXIANG_ROOT is mutable (let not const)" (code.Contains("let WANXIANG_ROOT"))

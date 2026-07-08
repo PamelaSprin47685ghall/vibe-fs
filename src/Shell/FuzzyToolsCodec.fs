@@ -16,27 +16,34 @@ let private hasResumeIterator (iterator: string option) : bool =
 
 let private requirePositiveOptInt (tool: string) (field: string) (value: int option) : Result<unit, DomainError> =
     match value with
-    | Some n when n < 1 -> Error (InvalidIntent (tool, field, "must be >= 1"))
-    | _ -> Ok ()
+    | Some n when n < 1 -> Error(InvalidIntent(tool, field, "must be >= 1"))
+    | _ -> Ok()
 
-let private validateFuzzyFirstCall (tool: string) (pattern: string option) (iterator: string option) (limit: int option) (context: int option)
+let private validateFuzzyFirstCall
+    (tool: string)
+    (pattern: string option)
+    (iterator: string option)
+    (limit: int option)
+    (context: int option)
     : Result<unit, DomainError> =
     let patternOk =
-        if hasResumeIterator iterator then Ok ()
+        if hasResumeIterator iterator then
+            Ok()
         else
             match pattern with
-            | Some p when p.Trim() <> "" -> Ok ()
-            | _ -> Error (InvalidIntent (tool, "pattern", patternRequiredOnFirstCall))
+            | Some p when p.Trim() <> "" -> Ok()
+            | _ -> Error(InvalidIntent(tool, "pattern", patternRequiredOnFirstCall))
+
     patternOk
     |> Result.bind (fun () -> requirePositiveOptInt tool "limit" limit)
     |> Result.bind (fun () ->
         match context with
         | Some _ -> requirePositiveOptInt tool "context" context
-        | None -> Ok ())
+        | None -> Ok())
 
 let private patternsField (tool: string) (args: obj) : Result<string list, DomainError> =
     let v = Dyn.get args "pattern"
-    Ok (parseJsonArrayOrString v)
+    Ok(parseJsonArrayOrString v)
 
 let private patternHead (patterns: string list) : string option =
     match patterns with
@@ -48,6 +55,7 @@ let decodeFuzzyFindArgs (args: obj) : Result<FuzzyFindParams, DomainError> =
     |> Result.bind (fun patterns ->
         let iterator = strField args "iterator"
         let limit = optInt args "limit"
+
         validateFuzzyFirstCall "fuzzy_find" (patternHead patterns) iterator limit None
         |> Result.map (fun () ->
             { pattern = patterns
@@ -61,6 +69,7 @@ let decodeFuzzyGrepArgs (args: obj) : Result<FuzzyGrepParams, DomainError> =
         let iterator = strField args "iterator"
         let limit = optInt args "limit"
         let context = optInt args "context"
+
         validateFuzzyFirstCall "fuzzy_grep" (patternHead patterns) iterator limit context
         |> Result.map (fun () ->
             { pattern = patterns

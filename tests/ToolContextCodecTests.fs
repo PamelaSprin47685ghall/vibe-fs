@@ -8,52 +8,58 @@ open Wanxiangshu.Shell.ToolContextCodec
 
 let decodeMuxConfigMissingWorkspaceId () =
     let config = createObj []
+
     match decodeMuxConfig (unbox config) with
-    | Error (InvalidIntent ("mux", "workspaceId", "required")) -> check "mux missing workspaceId" true
+    | Error(InvalidIntent("mux", "workspaceId", "required")) -> check "mux missing workspaceId" true
     | _ -> check "mux missing workspaceId" false
 
 let decodeMuxConfigEmptyWorkspaceId () =
     let config = createObj [ "workspaceId", box "" ]
+
     match decodeMuxConfig (unbox config) with
-    | Error (InvalidIntent ("mux", "workspaceId", "required")) -> check "mux empty workspaceId" true
+    | Error(InvalidIntent("mux", "workspaceId", "required")) -> check "mux empty workspaceId" true
     | _ -> check "mux empty workspaceId" false
 
 let decodeMuxConfigSessionIdFromSessionID () =
     let config = createObj [ "workspaceId", box "ws-1"; "sessionID", box "sess-abc" ]
+
     match decodeMuxConfig (unbox config) with
     | Ok ctx -> check "mux sessionID" (Id.sessionIdValue ctx.SessionId = "sess-abc")
     | Error _ -> check "mux sessionID" false
 
 let decodeMuxConfigSessionIdFromSessionIdCamel () =
     let config = createObj [ "workspaceId", box "ws-1"; "sessionId", box "sess-camel" ]
+
     match decodeMuxConfig (unbox config) with
     | Ok ctx -> check "mux sessionId" (Id.sessionIdValue ctx.SessionId = "sess-camel")
     | Error _ -> check "mux sessionId" false
 
 let decodeMuxConfigSessionIdFromSessionSnake () =
     let config = createObj [ "workspaceId", box "ws-1"; "session_id", box "sess-snake" ]
+
     match decodeMuxConfig (unbox config) with
     | Ok ctx -> check "mux session_id" (Id.sessionIdValue ctx.SessionId = "sess-snake")
     | Error _ -> check "mux session_id" false
 
 let decodeMuxConfigSessionIdPrefersSessionID () =
     let config =
-        createObj [
-            "workspaceId", box "ws-1"
-            "sessionID", box "first"
-            "sessionId", box "second"
-            "session_id", box "third"
-        ]
+        createObj
+            [ "workspaceId", box "ws-1"
+              "sessionID", box "first"
+              "sessionId", box "second"
+              "session_id", box "third" ]
+
     match decodeMuxConfig (unbox config) with
     | Ok ctx -> check "mux session key priority" (Id.sessionIdValue ctx.SessionId = "first")
     | Error _ -> check "mux session key priority" false
 
 let decodeMuxConfigNoSession () =
     let config = createObj [ "workspaceId", box "ws-1" ]
+
     match decodeMuxConfig (unbox config) with
     | Ok ctx ->
         check "mux no session empty" (Id.sessionIdValue ctx.SessionId = "")
-        check "mux workspaceId" (ctx.WorkspaceId = Some (Id.workspaceIdQuick "ws-1"))
+        check "mux workspaceId" (ctx.WorkspaceId = Some(Id.workspaceIdQuick "ws-1"))
     | Error _ -> check "mux no session" false
 
 let decodeMuxConfigLenientMissingWorkspaceId () =
@@ -65,11 +71,8 @@ let decodeMuxConfigLenientMissingWorkspaceId () =
 
 let decodeMuxConfigOkDirectory () =
     let config =
-        createObj [
-            "workspaceId", box "ws-1"
-            "directory", box "/proj"
-            "sessionID", box "s1"
-        ]
+        createObj [ "workspaceId", box "ws-1"; "directory", box "/proj"; "sessionID", box "s1" ]
+
     match decodeMuxConfig (unbox config) with
     | Ok ctx ->
         check "mux directory" (ctx.Directory = "/proj")

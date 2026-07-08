@@ -11,14 +11,14 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 let mkChain (models: FallbackModel list) = models
 
 let mkModel (pid: string) (mid: string) : FallbackModel =
-    { ProviderID      = pid
-      ModelID         = mid
-      Variant         = None
-      Temperature     = None
-      TopP            = None
-      MaxTokens       = None
+    { ProviderID = pid
+      ModelID = mid
+      Variant = None
+      Temperature = None
+      TopP = None
+      MaxTokens = None
       ReasoningEffort = None
-      Thinking        = false }
+      Thinking = false }
 
 // ---------------------------------------------------------------------------
 // GetOrCreateState
@@ -26,7 +26,7 @@ let mkModel (pid: string) (mid: string) : FallbackModel =
 
 let getOrCreate_returnsFreshForNewSession () =
     let rt = FallbackRuntimeState()
-    let s  = rt.GetOrCreateState "sess-1"
+    let s = rt.GetOrCreateState "sess-1"
     equal "phase is Idle" FallbackPhase.Idle s.Phase
     equal "failureCount is 0" 0 s.FailureCount
     equal "cancelled is false" false s.Cancelled
@@ -43,8 +43,13 @@ let getOrCreate_returnsSameStateOnSecondCall () =
 
 let updateState_persistsChange () =
     let rt = FallbackRuntimeState()
-    let s  = rt.GetOrCreateState "sess-1"
-    let s2 = { s with FailureCount = 5; Phase = FallbackPhase.Retrying 1 }
+    let s = rt.GetOrCreateState "sess-1"
+
+    let s2 =
+        { s with
+            FailureCount = 5
+            Phase = FallbackPhase.Retrying 1 }
+
     rt.UpdateState "sess-1" s2
     let s3 = rt.GetOrCreateState "sess-1"
     equal "failureCount updated" 5 s3.FailureCount

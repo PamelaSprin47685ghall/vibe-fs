@@ -33,7 +33,13 @@ let methArgs () =
         check "partial not missing intent" (not (msg.Contains "intent"))
     | Ok _ -> check "partial args error unexpected" false
     // valid args → Ok record
-    let okArgs = createObj [ "methodology", box "test"; "intent", box "do stuff"; "background", box "ctx"; "note", box "my note" ]
+    let okArgs =
+        createObj
+            [ "methodology", box "test"
+              "intent", box "do stuff"
+              "background", box "ctx"
+              "note", box "my note" ]
+
     match parse okArgs with
     | Ok vs ->
         equal "methodology value" "test" vs.methodology
@@ -51,7 +57,8 @@ let methSchemaCommon () =
           triggerWhen = "hard"
           noteDescription = "problem_statement, assumptions_to_strip, atomic_facts, rebuild_steps"
           meditatorRole = "analyst"
-          outputSections = ["Findings"; "Plan"] }
+          outputSections = [ "Findings"; "Plan" ] }
+
     let prompt = renderMeditatorIntent entry "hi" "my note"
     check "prompt has methodology id" (prompt.Contains "first_principles")
     check "prompt has def" (prompt.Contains "rebuild from facts")
@@ -67,11 +74,21 @@ let methSchemaCommon () =
 
 let hookSchemaSetUiLabel () =
     let target = createObj [ "file", box "a.fs"; "guide", box "g" ]
-    let intentCoder = createObj [ "objective", box "do"; "background", box "ctx"; "targets", box [| target |] ]
+
+    let intentCoder =
+        createObj [ "objective", box "do"; "background", box "ctx"; "targets", box [| target |] ]
+
     let argsCoder = createObj [ "intents", box [| intentCoder |] ]
     setUiLabel argsCoder "coder"
     check "coder label set" (string argsCoder?("_ui") = "do")
-    let intentInv = createObj [ "objective", box "inv"; "background", box "ctx"; "questions", box [| box "q1" |]; "entries", box [||] ]
+
+    let intentInv =
+        createObj
+            [ "objective", box "inv"
+              "background", box "ctx"
+              "questions", box [| box "q1" |]
+              "entries", box [||] ]
+
     let argsInv = createObj [ "intents", box [| intentInv |] ]
     setUiLabel argsInv "investigator"
     check "investigator label set" (string argsInv?("_ui") = "inv")
@@ -80,7 +97,12 @@ let hookSchemaSetUiLabel () =
     check "other label not set" (isNullish (get argsOther "_ui"))
 
 let hookSchemaStripUi () =
-    let schema = createObj [ "type", box "object"; "properties", createObj [ "x", box 1; "_ui", box 2 ]; "required", box [| box "x"; box "_ui" |] ]
+    let schema =
+        createObj
+            [ "type", box "object"
+              "properties", createObj [ "x", box 1; "_ui", box 2 ]
+              "required", box [| box "x"; box "_ui" |] ]
+
     let r = stripUiFromJsonSchema schema
     let props = get r "properties"
     check "ui removed from properties" (isNullish (get props "_ui"))
@@ -89,7 +111,11 @@ let hookSchemaStripUi () =
     check "ui removed from required" (not (Array.contains (box "_ui") (unbox<obj[]> req)))
 
 let hookSchemaInjectWarnTdd () =
-    let schema = createObj [ "properties", createObj [ "name", box (createObj [ "type", box "string" ]) ]; "required", box [| box "name" |] ]
+    let schema =
+        createObj
+            [ "properties", createObj [ "name", box (createObj [ "type", box "string" ]) ]
+              "required", box [| box "name" |] ]
+
     injectWarnTddIntoJsonSchema schema |> ignore
     let props = get schema "properties"
     check "warn_tdd property added" (not (isNullish (get props "warn_tdd")))
@@ -100,7 +126,12 @@ let hookSchemaInjectWarnTdd () =
     check "nullish returns non-null" (not (isNullish r2))
 
 let hookSchemaMergeWorkBacklogReport () =
-    let jsonSchema = createObj [ "type", box "object"; "properties", createObj [ "task_id", box (createObj [ "type", box "string" ]) ]; "required", box [| box "task_id" |] ]
+    let jsonSchema =
+        createObj
+            [ "type", box "object"
+              "properties", createObj [ "task_id", box (createObj [ "type", box "string" ]) ]
+              "required", box [| box "task_id" |] ]
+
     let r = mergeWorkBacklogReportIntoTaskSchema jsonSchema
     let props = get r "properties"
     check "ahaMoments added" (not (isNullish (get props "ahaMoments")))

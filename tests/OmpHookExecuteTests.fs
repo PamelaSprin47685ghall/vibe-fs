@@ -10,12 +10,24 @@ open Wanxiangshu.Omp.HookExecute
 /// onto `_ui` so the chat UI shows a one-line summary before the agent finishes.
 let hookCoderInjectUiLabel () =
     let args =
-        createObj [
-            "intents", box [|
-                box {| objective = "Add submit_review wip field"; background = "Reviewers must record progress separately from final review."; targets = [| box {| file = "submitReview.ts"; guide = "Add wip field plus canonical acknowledgment." |} |] |}
-                box {| objective = "Wire HookExecute in SessionLifecycle"; background = "OmpSessionLifecycle.toolResult must apply labels on every tool call."; targets = [| box {| file = "SessionLifecycle.fs"; guide = "Call applyToolResultHook before backlog append." |} |] |}
-            |]
-        ]
+        createObj
+            [ "intents",
+              box
+                  [| box
+                         {| objective = "Add submit_review wip field"
+                            background = "Reviewers must record progress separately from final review."
+                            targets =
+                             [| box
+                                    {| file = "submitReview.ts"
+                                       guide = "Add wip field plus canonical acknowledgment." |} |] |}
+                     box
+                         {| objective = "Wire HookExecute in SessionLifecycle"
+                            background = "OmpSessionLifecycle.toolResult must apply labels on every tool call."
+                            targets =
+                             [| box
+                                    {| file = "SessionLifecycle.fs"
+                                       guide = "Call applyToolResultHook before backlog append." |} |] |} |] ]
+
     applyToolResultHook "coder" args
     let label = get args "_ui"
     check "ui label present" (not (isNullish label))
@@ -29,11 +41,14 @@ let hookCoderInjectUiLabel () =
 /// stuck waiting for a verbose tool call.
 let hookInvestigatorInjectUiLabel () =
     let args =
-        createObj [
-            "intents", box [|
-                box {| objective = "Confirm per-workspace writeQueues contract"; background = "Per-workspace queues keep sessions from blocking each other."; questions = [|"Is the queue map keyed by workspaceRoot?"|] |}
-            |]
-        ]
+        createObj
+            [ "intents",
+              box
+                  [| box
+                         {| objective = "Confirm per-workspace writeQueues contract"
+                            background = "Per-workspace queues keep sessions from blocking each other."
+                            questions = [| "Is the queue map keyed by workspaceRoot?" |] |} |] ]
+
     applyToolResultHook "investigator" args
     let label = get args "_ui"
     check "investigator ui label present" (not (isNullish label))
@@ -76,9 +91,8 @@ let hookPatchNameNormalisesToPatchText () =
 /// When `patchText` is already set, the hook must not overwrite it. Order
 /// matters: user-supplied canonical form wins over patch/text fallbacks.
 let hookApplyPatchLeavesExistingPatchTextUntouched () =
-    let args = createObj [
-        "patchText", box "user-supplied"
-        "patch", box "should-be-ignored"
-    ]
+    let args =
+        createObj [ "patchText", box "user-supplied"; "patch", box "should-be-ignored" ]
+
     applyToolResultHook "apply_patch" args
     check "existing patchText preserved" (str args "patchText" = "user-supplied")

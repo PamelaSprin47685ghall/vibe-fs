@@ -33,6 +33,7 @@ let hasSchemaMethod (schema: IZodSchema) (methodName: string) : bool =
         | "array" -> schema.array
         | "min" -> schema.min
         | _ -> null
+
     not (Dyn.isNullish f) && jsType f = "function"
 
 let tryCallSchemaMethod0 (schema: IZodSchema) (methodName: string) : obj option =
@@ -41,8 +42,11 @@ let tryCallSchemaMethod0 (schema: IZodSchema) (methodName: string) : obj option 
         | "unwrap" -> schema.unwrap
         | "array" -> schema.array
         | _ -> null
-    if not (Dyn.isNullish f) && jsType f = "function" then Some(f $ ())
-    else None
+
+    if not (Dyn.isNullish f) && jsType f = "function" then
+        Some(f $ ())
+    else
+        None
 
 let tryCallSchemaMethod (schema: IZodSchema) (methodName: string) (arg: obj) : obj option =
     let f =
@@ -52,61 +56,95 @@ let tryCallSchemaMethod (schema: IZodSchema) (methodName: string) (arg: obj) : o
         | "safeExtend" -> schema.safeExtend
         | "extend" -> schema.extend
         | _ -> null
-    if not (Dyn.isNullish f) && jsType f = "function" then Some(f $ (arg))
-    else None
+
+    if not (Dyn.isNullish f) && jsType f = "function" then
+        Some(f $ (arg))
+    else
+        None
 
 let tryGetNestedTaskStringSchema (schema: IZodSchema) : IZodSchema option =
     try
         let shape = schema.shape
-        if isNullish shape then None
+
+        if isNullish shape then
+            None
         else
             let operation = get shape "operation"
-            if isNullish operation then None
+
+            if isNullish operation then
+                None
             else
                 let options = get operation "options"
-                if not (isArray options) then None
+
+                if not (isArray options) then
+                    None
                 else
                     options :?> obj array
                     |> Array.tryPick (fun option ->
-                        if isNullish option then None
+                        if isNullish option then
+                            None
                         else
                             let optionZod = unbox<IZodSchema> option
                             let optionShape = optionZod.shape
-                            if isNullish optionShape then None
+
+                            if isNullish optionShape then
+                                None
                             else
                                 [| "summary"; "event_summary"; "id"; "session_id" |]
                                 |> Array.tryPick (fun key ->
                                     let candidate = get optionShape key
-                                    if isNullish candidate then None
-                                    else Some (unbox<IZodSchema> candidate)))
-    with _ -> None
+
+                                    if isNullish candidate then
+                                        None
+                                    else
+                                        Some(unbox<IZodSchema> candidate)))
+    with _ ->
+        None
 
 let scanZodShape (shape: obj) (schema: IZodSchema) : IZodSchema option * Set<string> * IZodSchema option =
     let keys = Dyn.keys shape
-    let mutable templateStr : IZodSchema option = None
-    let mutable existingReportFields : Set<string> = Set.empty
-    let mutable existingMethodology : IZodSchema option = None
+    let mutable templateStr: IZodSchema option = None
+    let mutable existingReportFields: Set<string> = Set.empty
+    let mutable existingMethodology: IZodSchema option = None
+
     for k in keys do
         let prop = unbox<IZodSchema> (get shape k)
-        if Wanxiangshu.Kernel.WorkBacklog.reportFieldNames |> List.contains k then existingReportFields <- Set.add k existingReportFields
-        if k = "select_methodology" then existingMethodology <- Some prop
+
+        if Wanxiangshu.Kernel.WorkBacklog.reportFieldNames |> List.contains k then
+            existingReportFields <- Set.add k existingReportFields
+
+        if k = "select_methodology" then
+            existingMethodology <- Some prop
+
         let def = prop._def
+
         if not (isNullish def) then
             let typeName = def.typeName
+
             if not (isNullish typeName) && string typeName = "ZodString" then
                 templateStr <- Some prop
+
     if templateStr.IsNone then
         match tryGetNestedTaskStringSchema schema with
         | Some candidate ->
             match tryCallSchemaMethod0 candidate "unwrap" with
-            | Some inner -> templateStr <- Some (unbox<IZodSchema> inner)
+            | Some inner -> templateStr <- Some(unbox<IZodSchema> inner)
             | None -> templateStr <- Some candidate
         | None -> ()
+
     (templateStr, existingReportFields, existingMethodology)
 
-let buildExtensionProperties (templateStr: IZodSchema) (existingReportFields: Set<string>) (existingMethodology: IZodSchema option) : (string * obj) list =
-    let mutable extProps : (string * obj) list = []
-    let missingReportFields = Wanxiangshu.Kernel.WorkBacklog.reportFieldNames |> List.filter (fun f -> not (Set.contains f existingReportFields))
+let buildExtensionProperties
+    (templateStr: IZodSchema)
+    (existingReportFields: Set<string>)
+    (existingMethodology: IZodSchema option)
+    : (string * obj) list =
+    let mutable extProps: (string * obj) list = []
+
+    let missingReportFields =
+        Wanxiangshu.Kernel.WorkBacklog.reportFieldNames
+        |> List.filter (fun f -> not (Set.contains f existingReportFields))
+
     for field in missingReportFields do
         let desc =
             match field with
@@ -116,40 +154,58 @@ let buildExtensionProperties (templateStr: IZodSchema) (existingReportFields: Se
             | "lessonsAndConventions" -> lessonsAndConventionsDesc
             | "plan" -> planDesc
             | _ -> ""
+
         match tryCallSchemaMethod templateStr "describe" (box desc) with
         | Some describedStr -> extProps <- (field, describedStr) :: extProps
         | None -> ()
+
     if existingMethodology.IsNone then
         match tryCallSchemaMethod0 templateStr "array" with
         | Some arr ->
             let arrZod = unbox<IZodSchema> arr
+
             match tryCallSchemaMethod arrZod "min" (box 1) with
             | Some minArr ->
                 let minArrZod = unbox<IZodSchema> minArr
-                match tryCallSchemaMethod minArrZod "describe" (box Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription) with
+
+                match
+                    tryCallSchemaMethod
+                        minArrZod
+                        "describe"
+                        (box Wanxiangshu.Kernel.Methodology.selectMethodologyFieldDescription)
+                with
                 | Some descArr -> extProps <- ("select_methodology", descArr) :: extProps
                 | None -> ()
             | None -> ()
         | None -> ()
+
     extProps
 
 let extendZodTaskSchema (schema: IZodSchema) : obj =
     try
         let shape = schema.shape
-        if isNullish shape then box schema
+
+        if isNullish shape then
+            box schema
         else
-            let templateStr, existingReportFields, existingMethodology = scanZodShape shape schema
+            let templateStr, existingReportFields, existingMethodology =
+                scanZodShape shape schema
+
             match templateStr with
             | None -> box schema
             | Some ts ->
                 let extProps = buildExtensionProperties ts existingReportFields existingMethodology
-                if List.isEmpty extProps then box schema
+
+                if List.isEmpty extProps then
+                    box schema
                 else
                     let extension = createObj extProps
+
                     match tryCallSchemaMethod schema "safeExtend" extension with
                     | Some next -> next
                     | None ->
                         match tryCallSchemaMethod schema "extend" extension with
                         | Some next -> next
                         | None -> box schema
-    with _ -> box schema
+    with _ ->
+        box schema

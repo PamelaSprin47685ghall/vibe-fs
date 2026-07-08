@@ -10,13 +10,14 @@ open Wanxiangshu.Shell.MuxAiSettingsCodec
 
 let decodeMuxDelegateConfigOk () =
     let runtime = createObj [ "x", box 1 ]
+
     let config =
-        createObj [
-            "workspaceId", box "ws-delegate"
-            "cwd", box "/tmp/ws"
-            "runtime", runtime
-            "sessionID", box "sess-1"
-        ]
+        createObj
+            [ "workspaceId", box "ws-delegate"
+              "cwd", box "/tmp/ws"
+              "runtime", runtime
+              "sessionID", box "sess-1" ]
+
     match decodeMuxDelegateConfig config with
     | Ok d ->
         check "delegate workspaceId" (d.Execution.WorkspaceId |> Option.map Id.workspaceIdValue = Some "ws-delegate")
@@ -27,8 +28,9 @@ let decodeMuxDelegateConfigOk () =
 
 let decodeMuxDelegateConfigMissingWorkspaceId () =
     let config = createObj [ "cwd", box "/tmp" ]
+
     match decodeMuxDelegateConfig config with
-    | Error (InvalidIntent ("mux", "workspaceId", "required")) -> check "delegate missing workspaceId" true
+    | Error(InvalidIntent("mux", "workspaceId", "required")) -> check "delegate missing workspaceId" true
     | _ -> check "delegate missing workspaceId" false
 
 let decodeMuxDelegateConfigLenientMissingWorkspaceId () =
@@ -45,10 +47,8 @@ let coerceThinkingLevelPublic () =
 
 let decodeMuxParentRuntimeEnvScalars () =
     let muxEnv =
-        createObj [
-            "MUX_MODEL_STRING", box " openai:gpt-5 "
-            "MUX_THINKING_LEVEL", box "med"
-        ]
+        createObj [ "MUX_MODEL_STRING", box " openai:gpt-5 "; "MUX_THINKING_LEVEL", box "med" ]
+
     let s = decodeMuxParentRuntimeEnv (unbox muxEnv)
     equal "parent model trim" (Some "openai:gpt-5") s.ModelString
     equal "parent thinking med" (Some "medium") s.ThinkingLevel
@@ -60,15 +60,14 @@ let decodeMuxParentRuntimeEnvNullish () =
 
 let readParentMuxEnvScalars () =
     let config =
-        createObj [
-            "muxEnv",
-            box (
-                createObj [
-                    "MUX_MODEL_STRING", box " anthropic:parent "
-                    "MUX_THINKING_LEVEL", box "xhigh"
-                ]
-            )
-        ]
+        createObj
+            [ "muxEnv",
+              box (
+                  createObj
+                      [ "MUX_MODEL_STRING", box " anthropic:parent "
+                        "MUX_THINKING_LEVEL", box "xhigh" ]
+              ) ]
+
     let s = readParentMuxEnv config
     equal "readParent model trim" (Some "anthropic:parent") s.ModelString
     equal "readParent thinking xhigh" (Some "xhigh") s.ThinkingLevel
@@ -80,11 +79,11 @@ let readParentMuxEnvMissingMuxEnv () =
 
 let decodeAgentAiEntryScalarsModelPrecedence () =
     let entry =
-        createObj [
-            "model", box "openai:from-model"
-            "modelString", box "ignored"
-            "thinkingLevel", box " high "
-        ]
+        createObj
+            [ "model", box "openai:from-model"
+              "modelString", box "ignored"
+              "thinkingLevel", box " high " ]
+
     let s = decodeAgentAiEntryScalars (unbox entry)
     equal "entry model" (Some "openai:from-model") s.Model
     equal "entry modelString" (Some "ignored") s.ModelString
@@ -102,14 +101,17 @@ let normalizeTrimmedStrBlank () =
 
 let readMuxConfigFileDefaultsSubagentFirst () =
     let configFile =
-        createObj [
-            "subagentAiDefaults",
-            box (createObj [ "coder", box (createObj [ "model", box "openai:sub"; "thinkingLevel", box "low" ]) ])
-            "agentAiDefaults",
-            box (createObj [ "coder", box (createObj [ "model", box "openai:agent"; "thinkingLevel", box "high" ]) ])
-        ]
-    let sources: DelegatedAiSettings option list = readMuxConfigFileDefaults configFile "coder"
+        createObj
+            [ "subagentAiDefaults",
+              box (createObj [ "coder", box (createObj [ "model", box "openai:sub"; "thinkingLevel", box "low" ]) ])
+              "agentAiDefaults",
+              box (createObj [ "coder", box (createObj [ "model", box "openai:agent"; "thinkingLevel", box "high" ]) ]) ]
+
+    let sources: DelegatedAiSettings option list =
+        readMuxConfigFileDefaults configFile "coder"
+
     check "defaults list length" (sources.Length = 2)
+
     match sources.[0] with
     | Some s -> equal "subagent model" (Some "openai:sub") s.modelString
     | None -> check "subagent present" false

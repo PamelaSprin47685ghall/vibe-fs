@@ -29,9 +29,18 @@ open Wanxiangshu.Shell.RuntimeScope
 
 let private formatReviewResult = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult
 
-let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (scope: RuntimeScope) : obj =
-    define submitReview
-        (box {| report = strReq Params.submitReviewReport; affectedFiles = strArrayOpt Params.submitReviewAffectedFiles; wip = boolOptional Params.submitReviewWip |})
+let submitReviewTool
+    (registry: ChildAgentRegistry)
+    (ctx: obj)
+    (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
+    (scope: RuntimeScope)
+    : obj =
+    define
+        submitReview
+        (box
+            {| report = strReq Params.submitReviewReport
+               affectedFiles = strArrayOpt Params.submitReviewAffectedFiles
+               wip = boolOptional Params.submitReviewWip |})
         (fun args context ->
             match decodeSubmitReviewArgs args with
             | Error e -> resolveStr (wireDecodeFailure "submit_review" e)
@@ -40,53 +49,78 @@ let submitReviewTool (registry: ChildAgentRegistry) (ctx: obj) (store: Wanxiangs
                 | Error e -> resolveStr (wireEncodeToolError "OpencodeClient" e)
                 | Ok client ->
                     let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
-                    let sessionID = Wanxiangshu.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId
+
+                    let sessionID =
+                        Wanxiangshu.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId
+
                     promise {
                         scope.TriggerInit(runtime.Execution.Directory)
                         do! scope.WaitInit()
-                        if sessionID = "" then return submitReviewNotNeeded
+
+                        if sessionID = "" then
+                            return submitReviewNotNeeded
                         else
                             let activeTask = store.getReviewTask sessionID
+
                             match activeTask with
                             | None -> return submitReviewNotNeeded
-                            | Some task when not (store.tryLockReview sessionID) -> return opencodeSubmitReviewInProgress
+                            | Some task when not (store.tryLockReview sessionID) ->
+                                return opencodeSubmitReviewInProgress
                             | Some task ->
                                 let abort =
                                     match runtime.AbortSignal with
                                     | Some s -> s
                                     | None -> null
+
                                 try
                                     if submitReviewIsWip decoded.Wip then
                                         do! appendSubmitReviewWipRecordedOrFail runtime.Execution.Directory sessionID
                                         return submitReviewWipAcknowledgment
                                     else
                                         let! result =
-                                            runSubmitReview registry client store runtime.Execution.Directory sessionID decoded.Report decoded.AffectedFiles task abort
+                                            runSubmitReview
+                                                registry
+                                                client
+                                                store
+                                                runtime.Execution.Directory
+                                                sessionID
+                                                decoded.Report
+                                                decoded.AffectedFiles
+                                                task
+                                                abort
+
                                         let verdict, fb = verdictStringFromReviewResult result
                                         do! appendReviewVerdictOrFail runtime.Execution.Directory sessionID verdict fb
+
                                         match result with
                                         | Accepted _
                                         | Terminated -> store.deactivateReview sessionID
                                         | NeedsRevision _ -> ()
+
                                         return formatReviewResult result
                                 finally
                                     store.unlockReview sessionID
-                    }
-            )
+                    })
 
 let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (scope: RuntimeScope) : obj =
-    define submitReviewResult
-        (box {| verdict = enumReq [| "PERFECT"; "REVISE" |] Params.returnReviewerVerdict
-                feedback = strOpt Params.returnReviewerFeedback |})
+    define
+        submitReviewResult
+        (box
+            {| verdict = enumReq [| "PERFECT"; "REVISE" |] Params.returnReviewerVerdict
+               feedback = strOpt Params.returnReviewerFeedback |})
         (fun args context ->
             let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
+
             let sessionID =
                 let id = Wanxiangshu.Kernel.Domain.Id.sessionIdValue runtime.Execution.SessionId
                 if id = "" then "loop" else id
+
             let directory = runtime.Execution.Directory
+
             promise {
                 scope.TriggerInit(directory)
                 do! scope.WaitInit()
+
                 match decodeReturnReviewerArgs args with
                 | Error e -> return wireDecodeFailure "return_reviewer" e
                 | Ok decoded ->
@@ -95,6 +129,7 @@ let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.Re
                     | Ok client ->
                         let! texts = Wanxiangshu.Opencode.SessionIo.readSessionTexts client sessionID directory
                         let doubleCheckDone = hasDoubleCheckAnchor texts
+
                         match decideReviewSubmission decoded.Verdict decoded.Feedback doubleCheckDone with
                         | AskDoubleCheck ->
                             let task = store.getReviewTask sessionID |> Option.defaultValue ""
@@ -102,5 +137,10 @@ let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.Re
                         | Finalize result ->
                             let verdict, fb = verdictStringFromReviewResult result
                             do! appendReviewVerdictOrFail directory sessionID verdict fb
-                            return if store.resolvePendingReview (sessionID, result) then "Verdict submitted." else "No active review to resolve."
+
+                            return
+                                if store.resolvePendingReview (sessionID, result) then
+                                    "Verdict submitted."
+                                else
+                                    "No active review to resolve."
             })

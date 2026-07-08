@@ -13,7 +13,12 @@ open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
-let registerAllTools (pi: obj) (reviewStore: ReviewStore) (fallbackRuntime: FallbackRuntimeState) (fallbackConfigOpt: FallbackConfig option) : unit =
+let registerAllTools
+    (pi: obj)
+    (reviewStore: ReviewStore)
+    (fallbackRuntime: FallbackRuntimeState)
+    (fallbackConfigOpt: FallbackConfig option)
+    : unit =
     let finderCache = FinderCache()
     let iteratorStore = ompScope.IteratorStore
     registerFuzzyTools pi finderCache iteratorStore

@@ -10,14 +10,27 @@ type StripResult = ExecutorStrip.StripResult
 let strip = ExecutorStrip.strip
 
 let headTail (s: string) (head: int) (tail: int) : string =
-    if s.Length <= head + tail then s
-    else s.Substring(0, head) + "..." + s.Substring(s.Length - tail)
+    if s.Length <= head + tail then
+        s
+    else
+        s.Substring(0, head) + "..." + s.Substring(s.Length - tail)
 
-type ExecutorLanguage = Shell | Python | Javascript
-type ExecutorTimeoutType = Short | Long
+type ExecutorLanguage =
+    | Shell
+    | Python
+    | Javascript
+
+type ExecutorTimeoutType =
+    | Short
+    | Long
 
 let languages: ExecutorLanguage list = [ Shell; Python; Javascript ]
-let timeoutMs = function Short -> 10_000 | Long -> 100_000
+
+let timeoutMs =
+    function
+    | Short -> 10_000
+    | Long -> 100_000
+
 let summaryThresholdBytes = 8192
 
 type ExecuteOptions =
@@ -42,28 +55,21 @@ let outputFromResult (result: ExecuteResult) : string =
     | Failed(o, _, _)
     | MissingExecutable(_, o) -> o
 
-let private isSpawnFailedMessage (output: string) =
-    output.StartsWith "spawn failed:"
+let private isSpawnFailedMessage (output: string) = output.StartsWith "spawn failed:"
 
 let executorInfoItems (result: ExecuteResult) : InfoItem list =
     match result with
-    | Completed(_, code) ->
-        [ InfoItem.Status "completed"; InfoItem.ExitCode code ]
-    | Truncated(_, timeoutType) ->
-        [ InfoItem.Status "killed_timeout (Output Truncated)" ]
-    | Failed(_, Some c, _) ->
-        [ InfoItem.Status "exit_error"; InfoItem.ExitCode c ]
-    | Failed(_, None, Some sig') when sig' <> "" ->
-        [ InfoItem.Status sig' ]
-    | Failed(output, _, _) when isSpawnFailedMessage output ->
-        [ InfoItem.Status "spawn_failed" ]
-    | Failed(_, None, _) ->
-        [ InfoItem.Status "exit_error" ]
-    | MissingExecutable _ ->
-        [ InfoItem.Status "missing_executable" ]
+    | Completed(_, code) -> [ InfoItem.Status "completed"; InfoItem.ExitCode code ]
+    | Truncated(_, timeoutType) -> [ InfoItem.Status "killed_timeout (Output Truncated)" ]
+    | Failed(_, Some c, _) -> [ InfoItem.Status "exit_error"; InfoItem.ExitCode c ]
+    | Failed(_, None, Some sig') when sig' <> "" -> [ InfoItem.Status sig' ]
+    | Failed(output, _, _) when isSpawnFailedMessage output -> [ InfoItem.Status "spawn_failed" ]
+    | Failed(_, None, _) -> [ InfoItem.Status "exit_error" ]
+    | MissingExecutable _ -> [ InfoItem.Status "missing_executable" ]
 
 let formatToolResponse (result: ExecuteResult) (summaryOption: string option) : string =
     let body = Option.defaultValue (outputFromResult result) summaryOption
+
     render
         { empty with
             info = executorInfoItems result
@@ -71,14 +77,28 @@ let formatToolResponse (result: ExecuteResult) (summaryOption: string option) : 
 
 let readOnlyReadCommands: Set<string> =
     Set.ofList
-        [ "head"; "tail"; "sed"; "cat"; "grep"; "rg"; "find"; "less"; "more"
-          "diff"; "wc"; "ls"; "tree" ]
+        [ "head"
+          "tail"
+          "sed"
+          "cat"
+          "grep"
+          "rg"
+          "find"
+          "less"
+          "more"
+          "diff"
+          "wc"
+          "ls"
+          "tree" ]
 
 let shouldAppendReadOnlyWarning (program: string) (language: ExecutorLanguage) : bool =
     match language with
     | Shell ->
         let stripped = (strip program).script
-        let words = stripped.Split([| ' '; '\t'; '\n'; '|'; '&'; ';' |], StringSplitOptions.RemoveEmptyEntries)
+
+        let words =
+            stripped.Split([| ' '; '\t'; '\n'; '|'; '&'; ';' |], StringSplitOptions.RemoveEmptyEntries)
+
         words
         |> Array.exists (fun word ->
             let bare = word.Split('/') |> Array.last
@@ -86,17 +106,21 @@ let shouldAppendReadOnlyWarning (program: string) (language: ExecutorLanguage) :
     | _ -> false
 
 let prependSafetyWarning (output: string) (program: string) (language: ExecutorLanguage) : string =
-    if not (shouldAppendReadOnlyWarning program language) then output
+    if not (shouldAppendReadOnlyWarning program language) then
+        output
     else
         match tryParse output with
         | Some msg -> render (appendInfo (InfoItem.Hint hintExecutorMisuse) msg)
-        | None -> render { empty with info = [ InfoItem.Hint hintExecutorMisuse ]; body = output }
+        | None ->
+            render
+                { empty with
+                    info = [ InfoItem.Hint hintExecutorMisuse ]
+                    body = output }
 
 let shouldSummarize (byteLength: string -> int) (output: string) : bool =
     byteLength output > summaryThresholdBytes
 
-let prepareShellProgram (program: string) : string =
-    (strip program).script
+let prepareShellProgram (program: string) : string = (strip program).script
 
 let prepareProgramForExecution (options: ExecuteOptions) : string =
     match options.language with
@@ -132,15 +156,25 @@ let buildSummaryPrompt
     (result: ExecuteResult)
     : string =
     let raw = outputFromResult result
+
     let capped =
         if byteLength raw > summaryInputMaxBytes then
             truncateToBytes raw summaryInputMaxBytes
             + "\n\n[Output truncated to 200000 bytes for summarization]"
         else
             raw
+
     let langStr = languageToString options.language
     let timeoutStr = timeoutToString options.timeoutType
-    executorSummarizerPrompt options.whatToSummarize capped langStr options.program options.dependencies timeoutStr options.mode
+
+    executorSummarizerPrompt
+        options.whatToSummarize
+        capped
+        langStr
+        options.program
+        options.dependencies
+        timeoutStr
+        options.mode
 
 let parseTimeout (value: string) : ExecutorTimeoutType =
     match value.Replace("-", "").ToLowerInvariant() with

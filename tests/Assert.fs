@@ -21,8 +21,8 @@ let mutable private verboseChecksLogged = 0
 let clearFailuresForRun () : unit =
     passed <- 0
     failed <- 0
-    failures.Clear ()
-    timings.Clear ()
+    failures.Clear()
+    timings.Clear()
     verboseChecksLogged <- 0
 
 /// Enable per-check log append to `path`; pass `None` to disable. Tests entry
@@ -46,15 +46,29 @@ let private logCheck (kind: string) (label: string) (passedNow: bool) (detail: s
 
 let check (label: string) (condition: bool) : unit =
     logCheck "check" label condition (if condition then None else Some "condition=false")
-    if condition then passed <- passed + 1
-    else failed <- failed + 1; failures.Add label
+
+    if condition then
+        passed <- passed + 1
+    else
+        failed <- failed + 1
+        failures.Add label
 
 let equal (label: string) (expected: 'a) (actual: 'a) : unit =
     let ok = actual = expected
-    let detail = if ok then None else Some (sprintf "expected %A, got %A" expected actual)
+
+    let detail =
+        if ok then
+            None
+        else
+            Some(sprintf "expected %A, got %A" expected actual)
+
     logCheck "equal" label ok detail
-    if ok then passed <- passed + 1
-    else failed <- failed + 1; failures.Add (sprintf "%s | expected %A, got %A" label expected actual)
+
+    if ok then
+        passed <- passed + 1
+    else
+        failed <- failed + 1
+        failures.Add(sprintf "%s | expected %A, got %A" label expected actual)
 
 [<Emit("Promise.race([$0, new Promise((_, reject) => setTimeout(() => reject(new Error($1)), $2))])")>]
 let private raceWithTimeout (p: JS.Promise<'a>) (msg: string) (ms: int) : JS.Promise<'a> = jsNative
@@ -62,6 +76,7 @@ let private raceWithTimeout (p: JS.Promise<'a>) (msg: string) (ms: int) : JS.Pro
 /// Time a synchronous test body; catches exceptions so one throwing test does not abort the suite.
 let timed (label: string) (f: unit -> unit) : unit =
     let start = now ()
+
     try
         f ()
         timings.Add(label, now () - start)
@@ -83,11 +98,13 @@ let asyncSuiteTimeoutMs = 120_000
 let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
     promise {
         let start = now ()
+
         try
             let! _ = raceWithTimeout (f ()) "TIMEOUT" asyncSpecTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
             let msg = string ex.Message
+
             if msg.Contains "TIMEOUT" then
                 failed <- failed + 1
                 failures.Add(label + $" [TIMEOUT>{asyncSpecTimeoutMs}ms]")
@@ -95,17 +112,20 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
                 printfn "TEST ASYNC %s THREW: %A" label ex
                 failed <- failed + 1
                 failures.Add(label + " [THREW]")
+
             timings.Add(label, now () - start)
     }
 
 let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
     promise {
         let start = now ()
+
         try
             let! _ = raceWithTimeout (f ()) "TIMEOUT" asyncSuiteTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
             let msg = string ex.Message
+
             if msg.Contains "TIMEOUT" then
                 failed <- failed + 1
                 failures.Add(label + $" [TIMEOUT>{asyncSuiteTimeoutMs}ms]")
@@ -113,28 +133,34 @@ let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<uni
                 printfn "TEST SUITE %s THREW: %A" label ex
                 failed <- failed + 1
                 failures.Add(label + " [THREW]")
+
             timings.Add(label, now () - start)
     }
 
 /// Print the pass/fail summary and the slowest tests, return the failure count.
 let summary () : int =
     printfn "\n==== %d passed, %d failed ====" passed failed
+
     if failures.Count > 0 then
         printfn "FAILURES:"
         failures |> Seq.iteri (fun i f -> printfn "  %d. %s" (i + 1) f)
+
     if timings.Count > 0 then
         let total = timings |> Seq.sumBy snd
         printfn "\nTIMINGS (top 25 of %d, total %.0f ms):" timings.Count total
+
         timings
         |> Seq.sortByDescending snd
         |> Seq.truncate 25
         |> Seq.iteri (fun i (label, ms) -> printfn "  %2d. %7.1f ms  %s" (i + 1) ms label)
+
     match verboseLogPath with
     | Some path when verboseEnabled ->
         let footer =
-            sprintf "# summary: %d passed, %d failed, %d checks logged\n"
-                passed failed verboseChecksLogged
+            sprintf "# summary: %d passed, %d failed, %d checks logged\n" passed failed verboseChecksLogged
+
         appendFile path footer "utf8"
         printfn "\nverbose log: %s" path
     | _ -> ()
+
     failed

@@ -13,6 +13,7 @@ let muxToolConfig (directory: string) (sessionID: string) : obj =
 
 let muxToolByName (reg: obj) (name: string) : obj =
     let tools = unbox<obj[]> (get reg "tools")
+
     tools
     |> Array.tryFind (fun t -> str t "name" = name)
     |> Option.defaultValue null
@@ -21,10 +22,13 @@ let muxToolSchema (toolDef: obj) : obj =
     if isNullish toolDef then null else get toolDef "parameters"
 
 let muxToolSchemaRequired (toolDef: obj) : string array =
-    if isNullish toolDef then [||]
+    if isNullish toolDef then
+        [||]
     else
         let schema = muxToolSchema toolDef
-        if isNullish schema then [||]
+
+        if isNullish schema then
+            [||]
         else
             let req = get schema "required"
             if isArray req then unbox<string[]> req else [||]
@@ -32,7 +36,9 @@ let muxToolSchemaRequired (toolDef: obj) : string array =
 let muxExecutorModeSchema (reg: obj) : obj =
     let executor = muxToolByName reg "executor"
     let schema = muxToolSchema executor
-    if isNullish schema then null
+
+    if isNullish schema then
+        null
     else
         let props = get schema "properties"
         if isNullish props then null else get props "mode"
@@ -41,13 +47,20 @@ let muxReviewStore (reg: obj) : obj = get reg "__reviewStore"
 
 let muxActivateReviewForTest (reg: obj) (sessionID: string) (task: string) : unit =
     let store = muxReviewStore reg
-    let activate = get store "activateReview" |> unbox<System.Func<string, string, int64, unit>>
+
+    let activate =
+        get store "activateReview" |> unbox<System.Func<string, string, int64, unit>>
+
     activate.Invoke(sessionID, task, 0L)
 
 let muxReplayReviewTaskForTest (reg: obj) (sessionID: string) (task: string option) : unit =
     let store = muxReviewStore reg
-    let activate = get store "activateReview" |> unbox<System.Func<string, string, int64, unit>>
+
+    let activate =
+        get store "activateReview" |> unbox<System.Func<string, string, int64, unit>>
+
     let deactivate = get store "deactivateReview" |> unbox<System.Func<string, unit>>
+
     match task with
     | Some value -> activate.Invoke(sessionID, value, 0L)
     | None -> deactivate.Invoke(sessionID)
@@ -71,8 +84,10 @@ let muxDepsWithChatHistory (sessionID: string) (messages: obj array) : obj =
           "resolveAgentFrontmatter",
           box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
           "getChatHistory",
-          box (System.Func<string, JS.Promise<obj array>>(fun sid ->
-              promise { return if sid = sessionID then messages else [||] })) ]
+          box (
+              System.Func<string, JS.Promise<obj array>>(fun sid ->
+                  promise { return if sid = sessionID then messages else [||] })
+          ) ]
 
 let muxMutableDepsWithChatHistory (sessionID: string) (messages: ResizeArray<obj>) : obj =
     createObj
@@ -81,21 +96,33 @@ let muxMutableDepsWithChatHistory (sessionID: string) (messages: ResizeArray<obj
           "resolveAgentFrontmatter",
           box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
           "getChatHistory",
-          box (System.Func<string, JS.Promise<obj array>>(fun sid ->
-              promise { return if sid = sessionID then messages.ToArray() else [||] })) ]
+          box (
+              System.Func<string, JS.Promise<obj array>>(fun sid ->
+                  promise { return if sid = sessionID then messages.ToArray() else [||] })
+          ) ]
 
 let mockMuxTaskServiceCapturingPrompt (prompts: ResizeArray<string>) : obj =
     createObj
         [ "create",
-          box (System.Func<obj, JS.Promise<obj>>(fun input ->
-              promise {
-                  let promptText = str input "prompt"
-                  if promptText <> "" then prompts.Add(promptText)
-                  return box {| success = true; data = box {| taskId = "reviewer-task-1"; kind = "agent" |} |}
-              }))
+          box (
+              System.Func<obj, JS.Promise<obj>>(fun input ->
+                  promise {
+                      let promptText = str input "prompt"
+
+                      if promptText <> "" then
+                          prompts.Add(promptText)
+
+                      return
+                          box
+                              {| success = true
+                                 data =
+                                  box
+                                      {| taskId = "reviewer-task-1"
+                                         kind = "agent" |} |}
+                  })
+          )
           "waitForAgentReport",
-          box (System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
-              Promise.reject (exn "simulated reviewer timeout"))) ]
+          box (System.Func<string, obj, JS.Promise<obj>>(fun _ _ -> Promise.reject (exn "simulated reviewer timeout"))) ]
 
 /// Mock task service whose reviewer rounds return queued `reportMarkdown`
 /// verdicts in order. The parent submit_review flow consumes one report per
@@ -103,43 +130,71 @@ let mockMuxTaskServiceCapturingPrompt (prompts: ResizeArray<string>) : obj =
 /// queue length matches the number of expected reviewer rounds.
 let mockMuxTaskServiceReturningVerdicts (prompts: ResizeArray<string>) (verdicts: string list) : obj =
     let queue = ResizeArray<string>(verdicts)
+
     createObj
         [ "create",
-          box (System.Func<obj, JS.Promise<obj>>(fun input ->
-              promise {
-                  let promptText = str input "prompt"
-                  if promptText <> "" then prompts.Add(promptText)
-                  return box {| success = true; data = box {| taskId = "reviewer-task-1"; kind = "agent" |} |}
-              }))
-          "waitForAgentReport",
-          box (System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
-              promise {
-                  let report = if queue.Count > 0 then let v = queue.[0] in queue.RemoveAt(0); v else ""
-                  return box {| reportMarkdown = report |}
-              })) ]
+          box (
+              System.Func<obj, JS.Promise<obj>>(fun input ->
+                  promise {
+                      let promptText = str input "prompt"
 
-let muxMessageTransform (reg: obj) : obj =
-    get reg "messagesTransform"
+                      if promptText <> "" then
+                          prompts.Add(promptText)
+
+                      return
+                          box
+                              {| success = true
+                                 data =
+                                  box
+                                      {| taskId = "reviewer-task-1"
+                                         kind = "agent" |} |}
+                  })
+          )
+          "waitForAgentReport",
+          box (
+              System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
+                  promise {
+                      let report =
+                          if queue.Count > 0 then
+                              let v = queue.[0] in
+                              queue.RemoveAt(0)
+                              v
+                          else
+                              ""
+
+                      return box {| reportMarkdown = report |}
+                  })
+          ) ]
+
+let muxMessageTransform (reg: obj) : obj = get reg "messagesTransform"
 
 let muxTextMessage (id: string) (role: string) (text: string) : obj =
-    box {| id = id; role = role; parts = [| box {| ``type`` = "text"; text = text; state = "done" |} |] |}
+    box
+        {| id = id
+           role = role
+           parts =
+            [| box
+                   {| ``type`` = "text"
+                      text = text
+                      state = "done" |} |] |}
 
 let firstTextPartText (msg: obj) : string =
     let parts = get msg "parts"
-    if isNullish parts then ""
+
+    if isNullish parts then
+        ""
     else
         let arr = unbox<obj[]> parts
-        if arr.Length = 0 then ""
-        else str arr.[0] "text"
+        if arr.Length = 0 then "" else str arr.[0] "text"
 
 let hasDynamicToolReadPart (msg: obj) : bool =
     let parts = get msg "parts"
-    if isNullish parts then false
+
+    if isNullish parts then
+        false
     else
         unbox<obj[]> parts
-        |> Array.exists (fun p ->
-            str p "type" = "dynamic-tool"
-            && str p "toolName" = "file_read")
+        |> Array.exists (fun p -> str p "type" = "dynamic-tool" && str p "toolName" = "file_read")
 
 let muxDynamicToolMessage (id: string) (toolName: string) (toolCallId: string) (input: obj) (output: obj) : obj =
     box

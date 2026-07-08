@@ -28,12 +28,21 @@ open Wanxiangshu.Shell.MuxPluginCatalogShell
 
 let muxToolNames =
     Array.append
-        [| "coder"; "investigator"; "meditator"; "browser"; "executor"
-           "submit_review"; "websearch"; "webfetch"; "fuzzy_grep"; "fuzzy_find"; "write"; "read" |]
+        [| "coder"
+           "investigator"
+           "meditator"
+           "browser"
+           "executor"
+           "submit_review"
+           "websearch"
+           "webfetch"
+           "fuzzy_grep"
+           "fuzzy_find"
+           "write"
+           "read" |]
         methodologyToolNames
 
-let private canUseMuxTopLevel (agent: string) (toolName: string) : bool =
-    canUseForHost mux agent toolName
+let private canUseMuxTopLevel (agent: string) (toolName: string) : bool = canUseForHost mux agent toolName
 
 let buildToolPolicy (toolNames: string array) (role: obj) : obj =
     let agent = if Dyn.isNullish role then "manager" else string role
@@ -49,6 +58,7 @@ let createToolCatalog
     (sessionScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
     : ToolDefinition array =
     let iteratorStore = sessionScope.IteratorStore
+
     [| yield injectWarnWarnTddIntoMuxSchema (coderTool deps toolNames sessionScope)
        yield investigatorTool deps toolNames sessionScope
        yield meditatorTool deps toolNames sessionScope
@@ -73,8 +83,10 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
         let sessionID = decoded.SessionID
         let originalOutput = hookOutputTextMux output
         let argsJson = JS.JSON.stringify decoded.Args
+
         if isNetworkErrorText originalOutput then
             setHookErrorMux output "network connection lost"
+
         if LivelockGuard.check scope sessionID tool argsJson originalOutput then
             setHookErrorMux output "livelock guard: repeated identical tool call with identical result"
     }

@@ -2,7 +2,9 @@ module Wanxiangshu.Shell.FuzzyIteratorStore
 
 open Wanxiangshu.Kernel.FuzzyQuery
 
-type GrepIteratorState = { core: FuzzyGrepState; cursor: obj option }
+type GrepIteratorState =
+    { core: FuzzyGrepState
+      cursor: obj option }
 
 let findIteratorNamespace = "ffi_f"
 let grepIteratorNamespace = "ffi_i"
@@ -22,16 +24,26 @@ let createTypedIteratorStore (maxIterators: int) : TypedIteratorStore =
 
 let private nextId (store: TypedIteratorStore) (scopeId: string) (namespace': string) : string =
     store.counter <- store.counter + 1
-    if scopeId = "global" then namespace' + string store.counter
-    else scopeId + ":" + namespace' + ":" + string store.counter
+
+    if scopeId = "global" then
+        namespace' + string store.counter
+    else
+        scopeId + ":" + namespace' + ":" + string store.counter
 
 let private trim (max: int) (m: Map<string, 't>) : Map<string, 't> =
     if Map.count m > max then
         let firstKey = m |> Map.toSeq |> Seq.head |> fst
         Map.remove firstKey m
-    else m
+    else
+        m
 
-let private storeTyped (m: Map<string, 't>) (store: TypedIteratorStore) (scopeId: string) (namespace': string) (state: 't) : string * Map<string, 't> =
+let private storeTyped
+    (m: Map<string, 't>)
+    (store: TypedIteratorStore)
+    (scopeId: string)
+    (namespace': string)
+    (state: 't)
+    : string * Map<string, 't> =
     let id = nextId store scopeId namespace'
     let updated = m |> Map.add id state |> trim store.maxIterators
     (id, updated)
@@ -42,12 +54,16 @@ let private consumeTyped (m: Map<string, 't>) (id: string) : 't option * Map<str
     | None -> None, m
 
 let storeFindIterator (store: TypedIteratorStore) (scopeId: string) (state: FuzzyFindState) : string =
-    let (id, updated) = storeTyped store.findIterators store scopeId findIteratorNamespace state
+    let (id, updated) =
+        storeTyped store.findIterators store scopeId findIteratorNamespace state
+
     store.findIterators <- updated
     id
 
 let storeGrepIterator (store: TypedIteratorStore) (scopeId: string) (state: GrepIteratorState) : string =
-    let (id, updated) = storeTyped store.grepIterators store scopeId grepIteratorNamespace state
+    let (id, updated) =
+        storeTyped store.grepIterators store scopeId grepIteratorNamespace state
+
     store.grepIterators <- updated
     id
 

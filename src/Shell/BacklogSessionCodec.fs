@@ -19,15 +19,27 @@ let backlogEntryFromTodoInput (input: obj) : BacklogEntry =
       lessonsAndConventions = Dyn.str input "lessonsAndConventions" |> fun s -> s.Trim()
       plan = Dyn.str input "plan" |> fun s -> s.Trim() }
 
-let reportFromFlatPartWithProjection (host: Host) (projection: ProjectionStore) (fp: FlatPart<obj>) : BacklogEntry option =
+let reportFromFlatPartWithProjection
+    (host: Host)
+    (projection: ProjectionStore)
+    (fp: FlatPart<obj>)
+    : BacklogEntry option =
     match fp.part with
     | ToolPart(_, callID, Some state, _) ->
         let entry = backlogEntryFromTodoInput state.input
+
         let hasAny =
-            entry.ahaMoments <> "" || entry.changesAndReasons <> "" || entry.gotchas <> "" || entry.lessonsAndConventions <> "" || entry.plan <> ""
-        if hasAny then Some entry
+            entry.ahaMoments <> ""
+            || entry.changesAndReasons <> ""
+            || entry.gotchas <> ""
+            || entry.lessonsAndConventions <> ""
+            || entry.plan <> ""
+
+        if hasAny then
+            Some entry
         elif host = Opencode || host = Mux || host = Omp then
             projection.TryGetReport(host, callID)
             |> Option.map (fun r -> { entry with ahaMoments = r })
-        else None
+        else
+            None
     | _ -> None

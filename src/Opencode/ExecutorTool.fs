@@ -26,20 +26,27 @@ open Wanxiangshu.Shell.SubagentDispatcher
 open Wanxiangshu.Shell.FallbackRuntimeState
 
 [<Global("Buffer")>]
-let private nodeBuffer : obj = jsNative
-let private byteLength (s: string) : int = nodeBuffer?byteLength(s, "utf-8")
+let private nodeBuffer: obj = jsNative
+
+let private byteLength (s: string) : int = nodeBuffer?byteLength (s, "utf-8")
 let private resolveStr (text: string) : JS.Promise<string> = Promise.lift text
 
-let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (sessionScope: RuntimeScope) (fallbackRuntime: FallbackRuntimeState) : obj =
-    define executor
-        (box {|
-            language = enumOptWithDefault [| "shell"; "python"; "javascript" |] "shell" Params.executorLanguage
-            program = strReq Params.executorProgram
-            dependencies = strArrayOpt Params.executorDeps
-            timeout_type = enumReq [| "short"; "long" |] Params.executorTimeout
-            mode = enumReq [| "ro"; "rw" |] Params.executorMode
-            what_to_summarize = strReq Params.executorWhatToSummarize
-        |})
+let executorTool
+    (host: Host)
+    (registry: ChildAgentRegistry)
+    (ctx: obj)
+    (sessionScope: RuntimeScope)
+    (fallbackRuntime: FallbackRuntimeState)
+    : obj =
+    define
+        executor
+        (box
+            {| language = enumOptWithDefault [| "shell"; "python"; "javascript" |] "shell" Params.executorLanguage
+               program = strReq Params.executorProgram
+               dependencies = strArrayOpt Params.executorDeps
+               timeout_type = enumReq [| "short"; "long" |] Params.executorTimeout
+               mode = enumReq [| "ro"; "rw" |] Params.executorMode
+               what_to_summarize = strReq Params.executorWhatToSummarize |})
         (fun args context ->
             match decodeExecutorArgs args with
             | Error e -> resolveStr (wireDomainFailure "Executor" e)
@@ -49,24 +56,55 @@ let executorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (session
                 | Ok client ->
                     let runtime = fromOpencode context (pluginDirectoryFromCtx ctx)
                     let sessionID = Id.sessionIdValue runtime.Execution.SessionId
-                    if sessionID = "" then resolveStr executorRequiresSession
+
+                    if sessionID = "" then
+                        resolveStr executorRequiresSession
                     else
-                        sessionScope.EnqueuePerSession(sessionID, fun () ->
-                            let options = toExecuteOptions (Some runtime.Execution.Directory) decoded
-                            promise {
-                                let! result = Wanxiangshu.Shell.Executor.execute options sessionID
-                                let output = outputFromResult result
-                                if not (shouldSummarize byteLength output) then
-                                    let formatted = formatToolResponse result None
-                                    return prependSafetyWarningForExecution formatted options
-                                else
-                                    let langStr = languageToString options.language
-                                    let timeoutStr = timeoutToString options.timeoutType
-                                    let prompt = formatPrompt host (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode, options.whatToSummarize)) |> List.head
-                                    let! summary =
-                                        resolveSubagentPromise "executor"
-                                            (runSubagentWithCleanup fallbackRuntime registry client "executor" "Executor summary" prompt
-                                                runtime.Execution.Directory sessionID context)
-                                    let formatted = formatToolResponse result (Some summary)
-                                    return prependSafetyWarningForExecution formatted options
-                            }))
+                        sessionScope.EnqueuePerSession(
+                            sessionID,
+                            fun () ->
+                                let options = toExecuteOptions (Some runtime.Execution.Directory) decoded
+
+                                promise {
+                                    let! result = Wanxiangshu.Shell.Executor.execute options sessionID
+                                    let output = outputFromResult result
+
+                                    if not (shouldSummarize byteLength output) then
+                                        let formatted = formatToolResponse result None
+                                        return prependSafetyWarningForExecution formatted options
+                                    else
+                                        let langStr = languageToString options.language
+                                        let timeoutStr = timeoutToString options.timeoutType
+
+                                        let prompt =
+                                            formatPrompt
+                                                host
+                                                (ExecutorSummary(
+                                                    output,
+                                                    langStr,
+                                                    options.program,
+                                                    options.dependencies,
+                                                    timeoutStr,
+                                                    options.mode,
+                                                    options.whatToSummarize
+                                                ))
+                                            |> List.head
+
+                                        let! summary =
+                                            resolveSubagentPromise
+                                                "executor"
+                                                (runSubagentWithCleanup
+                                                    fallbackRuntime
+                                                    registry
+                                                    client
+                                                    "executor"
+                                                    "Executor summary"
+                                                    prompt
+                                                    runtime.Execution.Directory
+                                                    sessionID
+                                                    context)
+
+                                        let formatted = formatToolResponse result (Some summary)
+                                        return prependSafetyWarningForExecution formatted options
+                                }
+                        ))

@@ -9,6 +9,7 @@ open Wanxiangshu.Shell.BacklogSessionCodec
 open Wanxiangshu.Omp.MagicTodo
 open Wanxiangshu.Tests.BacklogMessageBuilders
 open Wanxiangshu.Kernel.BacklogProjectionCore
+
 module Dyn = Wanxiangshu.Shell.Dyn
 
 /// Two `BacklogSession(omp)` instances must share the same backing store.
@@ -34,8 +35,22 @@ let hostPartitionedReports () =
     check "oc session drained" (sOc.TakeReport callID = "")
 
 let backlogEntryFromTodoInputHostAgnostic () =
-    let input1 = createObj [ "ahaMoments", box "from-input"; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box "" ]
-    let input2 = createObj [ "ahaMoments", box ""; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box "" ]
+    let input1 =
+        createObj
+            [ "ahaMoments", box "from-input"
+              "changesAndReasons", box ""
+              "gotchas", box ""
+              "lessonsAndConventions", box ""
+              "plan", box "" ]
+
+    let input2 =
+        createObj
+            [ "ahaMoments", box ""
+              "changesAndReasons", box ""
+              "gotchas", box ""
+              "lessonsAndConventions", box ""
+              "plan", box "" ]
+
     let input3 = createObj []
     equal "host-agnostic 1" "from-input" (backlogEntryFromTodoInput input1).ahaMoments
     equal "host-agnostic 2" "" (backlogEntryFromTodoInput input2).ahaMoments
@@ -43,7 +58,7 @@ let backlogEntryFromTodoInputHostAgnostic () =
     equal "host-agnostic opencode same" "from-input" (backlogEntryFromTodoInput input1).ahaMoments
 
 let inputOfPartNonTool () =
-    let p : Part<obj> = TextPart "hi"
+    let p: Part<obj> = TextPart "hi"
     equal "non-tool returns null" null (Wanxiangshu.Shell.BacklogSessionCodec.inputOfPart p)
 
 /// Mirror BacklogReplaySpecs.opencode: CaptureReport on BacklogSession(omp), replay
@@ -52,17 +67,25 @@ let replayBacklogOmpFallsBackToCapturedReport () =
     let session = Wanxiangshu.Omp.MagicTodo.BacklogSession omp
     let callID = "omp-fallback-c1"
     session.CaptureReport(callID, "captured omp report")
-    let input = box (createObj [ "ahaMoments", box ""; "changesAndReasons", box ""; "gotchas", box ""; "lessonsAndConventions", box ""; "plan", box "" ])
+
+    let input =
+        box (
+            createObj
+                [ "ahaMoments", box ""
+                  "changesAndReasons", box ""
+                  "gotchas", box ""
+                  "lessonsAndConventions", box ""
+                  "plan", box "" ]
+        )
+
     let msgs =
-        [ { info = { mkInfo "m1" Assistant with sessionID = "test" }
-            parts =
-              [ ToolPart(
-                  todoWriteToolName Omp,
-                  callID,
-                  Some(mkState "completed" "Todos updated." input),
-                  null) ]
+        [ { info =
+              { mkInfo "m1" Assistant with
+                  sessionID = "test" }
+            parts = [ ToolPart(todoWriteToolName Omp, callID, Some(mkState "completed" "Todos updated." input), null) ]
             source = Native
             raw = null } ]
+
     let backlog = Wanxiangshu.Omp.MagicTodo.replayBacklogFor omp msgs
     check "omp replay: one entry" (backlog.Length = 1)
     equal "omp replay: captured report preserved" "captured omp report" backlog.[0].ahaMoments

@@ -20,10 +20,27 @@ type ToolSemantic =
     | Other
 
 let private knownAgentSet =
-    Set.ofList [ "manager"; "investigator"; "coder"; "reviewer"; "browser"; "meditator"; "executor" ]
+    Set.ofList
+        [ "manager"
+          "investigator"
+          "coder"
+          "reviewer"
+          "browser"
+          "meditator"
+          "executor" ]
 
 let private blockedShellTaskGrepSet =
-    Set.ofList [ "bash"; "bash_run"; "task"; "grep"; "plan"; "memory"; "propose_plan"; "set_goal"; "get_goal"; "complete_goal" ]
+    Set.ofList
+        [ "bash"
+          "bash_run"
+          "task"
+          "grep"
+          "plan"
+          "memory"
+          "propose_plan"
+          "set_goal"
+          "get_goal"
+          "complete_goal" ]
 
 let private todoFamilySet =
     Set.ofList [ "todowrite"; "todo_write"; "todo"; "manage_todo_list" ]
@@ -47,17 +64,28 @@ let private isDispatchOrWebSkillTool (t: string) =
 let classifyTool (host: Host) (tool: Tool) : ToolSemantic =
     let t = normalizeToolName host tool
 
-    if t = "agent_report" then AgentReport
-    elif Set.contains t blockedShellTaskGrepSet then BlockedShellTaskGrep
-    elif isStealthBrowserTool t then StealthBrowser
-    elif t.StartsWith "return_" then ReturnRoleEcho
-    elif Set.contains t todoFamilySet then TodoFamily
-    elif t.StartsWith methodologyPrefix || t = "methodology" then MethodologyFamily
-    elif t = "read" then Read
-    elif isDispatchOrWebSkillTool t then SubagentWebSkillOrSubmit
-    elif Set.contains t writePatchFamilySet then WritePatchFamily
-    elif t = "fuzzy_grep" then FuzzyGrep
-    else Other
+    if t = "agent_report" then
+        AgentReport
+    elif Set.contains t blockedShellTaskGrepSet then
+        BlockedShellTaskGrep
+    elif isStealthBrowserTool t then
+        StealthBrowser
+    elif t.StartsWith "return_" then
+        ReturnRoleEcho
+    elif Set.contains t todoFamilySet then
+        TodoFamily
+    elif t.StartsWith methodologyPrefix || t = "methodology" then
+        MethodologyFamily
+    elif t = "read" then
+        Read
+    elif isDispatchOrWebSkillTool t then
+        SubagentWebSkillOrSubmit
+    elif Set.contains t writePatchFamilySet then
+        WritePatchFamily
+    elif t = "fuzzy_grep" then
+        FuzzyGrep
+    else
+        Other
 
 let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
 
@@ -91,6 +119,8 @@ let canUseForHost (host: Host) (agent: Agent) (tool: Tool) : bool =
 let canUse (agent: Agent) (tool: Tool) : bool = canUseForHost opencode agent tool
 
 let deniedToolsForHost (host: Host) (agent: Agent) (tools: Tool seq) : Tool list =
-    tools |> Seq.filter (fun tool -> not (canUseForHost host agent tool)) |> Seq.toList
+    tools
+    |> Seq.filter (fun tool -> not (canUseForHost host agent tool))
+    |> Seq.toList
 
 let deniedTools (agent: Agent) (tools: Tool seq) : Tool list = deniedToolsForHost opencode agent tools

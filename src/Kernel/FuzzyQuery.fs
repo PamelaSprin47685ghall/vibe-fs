@@ -11,17 +11,21 @@ let private isValidRegex (pattern: string) : bool =
     try
         Regex(pattern) |> ignore
         true
-    with _ -> false
+    with _ ->
+        false
 
 let detectGrepMode (pattern: string) : string =
     let escaped = escapeRegex pattern
+
     if pattern = escaped then "plain"
     elif isValidRegex pattern then "regex"
     else "plain"
 
 let checkWildcardOnly (pattern: string) (mode: string) : bool =
-    if mode = "plain" then false
-    else Regex.IsMatch(pattern.Trim(), @"^(?:[.^$]*(?:[.][*+?]|\*|\+)[.^$]*|[.^$\s]*|\.\*\??|\.*[+?]?|\.+\??|\.|\*|\?)$")
+    if mode = "plain" then
+        false
+    else
+        Regex.IsMatch(pattern.Trim(), @"^(?:[.^$]*(?:[.][*+?]|\*|\+)[.^$]*|[.^$\s]*|\.\*\??|\.*[+?]?|\.+\??|\.|\*|\?)$")
 
 type FuzzyFindParams =
     { pattern: string list
@@ -39,7 +43,11 @@ type FuzzyGrepParams =
       limit: int option
       iterator: string option }
 
-type FuzzyFindState = { query: string; pageSize: int; pageIndex: int; externalBasePath: string option }
+type FuzzyFindState =
+    { query: string
+      pageSize: int
+      pageIndex: int
+      externalBasePath: string option }
 
 type FuzzyGrepState =
     { query: string
@@ -63,17 +71,22 @@ let fuzzyIteratorDescriptionHint =
 let fuzzyFindDescriptionOmpPrefix =
     "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported.\n\nFirst call: provide pattern (an array of strings) and optional path.\nLater calls: provide only iterator.\nMultiple patterns run in parallel and results are grouped per pattern.\n"
 
-let fuzzyFindDescriptionOmp = fuzzyFindDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
+let fuzzyFindDescriptionOmp =
+    fuzzyFindDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
 
 let fuzzyGrepDescriptionOmpPrefix =
     "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked.\n\nFirst call: provide pattern (an array of strings) and optional filters.\nLater calls: provide only iterator.\nMultiple patterns run in parallel and results are grouped per pattern.\n"
 
-let fuzzyGrepDescriptionOmp = fuzzyGrepDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
+let fuzzyGrepDescriptionOmp =
+    fuzzyGrepDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
 
 let buildGrepOutput (body: string) (regexError: string option) (nextIterator: string) : string =
     let body' =
         match regexError with
         | Some error -> body + "\n\nInvalid regex: " + error + ", used literal match"
         | None -> body
-    if nextIterator = "" then body'
-    else withIterator body' nextIterator
+
+    if nextIterator = "" then
+        body'
+    else
+        withIterator body' nextIterator

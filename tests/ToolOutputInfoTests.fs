@@ -37,15 +37,30 @@ let testTryParseNonFrontMatter () =
 
 let testTryParseValid () =
     // Flat front-matter format: ---\nhint: hello\n---
-    let text = render { info = [ hint "hello" ]; body = "world" }
+    let text =
+        render
+            { info = [ hint "hello" ]
+              body = "world" }
+
     match tryParse text with
     | Some msg ->
         equal "tryParse valid body" "world" msg.body
-        check "tryParse valid hint" (List.exists (function InfoItem.Hint "hello" -> true | _ -> false) msg.info)
+
+        check
+            "tryParse valid hint"
+            (List.exists
+                (function
+                | InfoItem.Hint "hello" -> true
+                | _ -> false)
+                msg.info)
     | None -> check "tryParse valid should succeed" false
 
 let testHasExactHint () =
-    let text = render { info = [ hint "fixme"; hint "todo" ]; body = "" }
+    let text =
+        render
+            { info = [ hint "fixme"; hint "todo" ]
+              body = "" }
+
     check "hasExactHint match" (hasExactHint text "fixme")
     check "hasExactHint no match" (not (hasExactHint text "other"))
 
@@ -53,9 +68,15 @@ let testNoChangeEnvelope () =
     let r = noChangeEnvelope ()
     check "noChangeEnvelope starts with ---" (r.StartsWith "---")
     check "noChangeEnvelope has status" (r.Contains "status: No Change Since Previous Read/Write")
+
     match tryParse r with
     | Some msg ->
-        let sts = msg.info |> List.choose (function InfoItem.Status s -> Some s | _ -> None)
+        let sts =
+            msg.info
+            |> List.choose (function
+                | InfoItem.Status s -> Some s
+                | _ -> None)
+
         equal "noChangeEnvelope status value" noChangeStatus (sts |> List.head)
     | None -> check "noChangeEnvelope parseable" false
 
@@ -90,7 +111,11 @@ let testTodoWriteOutput () =
     check "todoWriteOutput empty" (rEmpty.Contains "Todos updated.")
 
 let testHintsFromOutput () =
-    let text = render { info = [ hint "a"; syntax "py"; hint "b" ]; body = "" }
+    let text =
+        render
+            { info = [ hint "a"; syntax "py"; hint "b" ]
+              body = "" }
+
     let hs = hintsFromOutput text
     equal "hintsFromOutput count" 2 (List.length hs)
     let noHints = hintsFromOutput (render { info = [ syntax "py" ]; body = "" })
@@ -104,7 +129,12 @@ let testHintForMethodologies () =
 
 let testAppendMultiple () =
     let msg = { info = []; body = "" }
-    let r = appendInfo (hint "a") msg |> appendInfo (syntax "py") |> appendInfo (status "done")
+
+    let r =
+        appendInfo (hint "a") msg
+        |> appendInfo (syntax "py")
+        |> appendInfo (status "done")
+
     equal "append info count" 3 (List.length r.info)
     check "append preserves original" (msg.info.Length = 0)
 
@@ -130,30 +160,57 @@ let testInfoItemOrdering () =
                   exitCode 0
                   iterator "iter-1" ]
               body = "" }
+
     let lines = r.Split('\n') |> Array.toList
     let hintLine = lines |> List.tryFindIndex (fun l -> l.Contains "hint:")
     let syntaxLine = lines |> List.tryFindIndex (fun l -> l.Contains "syntax:")
+
     match hintLine, syntaxLine with
     | Some hp, Some sp -> check "hint appears before syntax" (hp < sp)
     | _ -> check "ordering fields found" false
 
 let testRenderMultiHintAsArray () =
-    let r = render { info = [ hint "a"; hint "b" ]; body = "" }
+    let r =
+        render
+            { info = [ hint "a"; hint "b" ]
+              body = "" }
+
     check "multi hint uses array item a" (r.Contains "- a")
     check "multi hint uses array item b" (r.Contains "- b")
+
     match tryParse r with
     | Some msg ->
-        let hs = msg.info |> List.choose (function InfoItem.Hint h -> Some h | _ -> None)
+        let hs =
+            msg.info
+            |> List.choose (function
+                | InfoItem.Hint h -> Some h
+                | _ -> None)
+
         equal "multi hint parsed as two" 2 (List.length hs)
     | None -> check "multi hint roundtrip parseable" false
 
 let testTryParseMergesMultipleFrontMatterBlocks () =
     let text = "---\nhint: a\n---\n---\nsyntax: json\n---\nbody after"
+
     match tryParse text with
     | Some msg ->
         equal "multi-block body" "body after" msg.body
-        check "multi-block hint" (List.exists (function InfoItem.Hint "a" -> true | _ -> false) msg.info)
-        check "multi-block syntax" (List.exists (function InfoItem.Syntax "json" -> true | _ -> false) msg.info)
+
+        check
+            "multi-block hint"
+            (List.exists
+                (function
+                | InfoItem.Hint "a" -> true
+                | _ -> false)
+                msg.info)
+
+        check
+            "multi-block syntax"
+            (List.exists
+                (function
+                | InfoItem.Syntax "json" -> true
+                | _ -> false)
+                msg.info)
     | None -> check "multi-block parse should succeed" false
 
 let run () =

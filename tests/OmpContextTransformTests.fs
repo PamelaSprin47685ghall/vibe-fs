@@ -6,33 +6,39 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Omp.MessageTransform
+
 module Dyn = Wanxiangshu.Shell.Dyn
+
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Kernel.LoopMessages
 open Wanxiangshu.Kernel.PromptFrontMatter
 
 [<Import("createRequire", "node:module")>]
-let private createRequire' : string -> (string -> obj) = jsNative
+let private createRequire': string -> (string -> obj) = jsNative
 
 [<Global("import.meta")>]
-let private importMeta : obj = jsNative
+let private importMeta: obj = jsNative
 
-let private requireFn : string -> obj = createRequire'(string importMeta?url)
-let private pathModule : obj = requireFn "path"
-let private join (a: string) (b: string) = unbox<string> (pathModule?join(a, b))
+let private requireFn: string -> obj = createRequire' (string importMeta?url)
+let private pathModule: obj = requireFn "path"
+let private join (a: string) (b: string) = unbox<string> (pathModule?join (a, b))
 
 [<Emit("$0[0].parts[0].text")>]
 let private firstEntryTextFromOut (entries: obj array) : string = jsNative
 
-let mutable private originalReadFile : obj = null
+let mutable private originalReadFile: obj = null
 let private mockedPaths = System.Collections.Generic.HashSet<string>()
 
 let private installFsMock () =
     if isNull originalReadFile then
-        let fsAsync : obj = requireFn "fs"
+        let fsAsync: obj = requireFn "fs"
         let fsPromises = unbox<obj> (fsAsync?promises)
         originalReadFile <- fsPromises?readFile
-        let proxy = emitJsExpr (originalReadFile, fsPromises, mockedPaths) "(function(path, opts) {
+
+        let proxy =
+            emitJsExpr
+                (originalReadFile, fsPromises, mockedPaths)
+                "(function(path, opts) {
             var isMocked = false;
             var pathStr = String(path || '');
             mockedPaths.forEach(function(prefix) {
@@ -43,138 +49,191 @@ let private installFsMock () =
             }
             return $0.apply($1, arguments);
         })"
+
         fsPromises?readFile <- box proxy
 
-let capsSynthUserPrepended () = promise {
-    let! root = mkdtempAsync "omp-caps-synth-"
-    let reviewStore = createReviewStore ()
-    let entries =
-        [| createObj [
-               "info", box(createObj [ "id", box "user-1"; "role", box "user" ])
-               "parts", box [| createObj [ "type", box "text"; "text", box "hello" ] |]
-           ] |]
-    let! out = transformEntriesAsync reviewStore root "sess-1" (box entries)
-    check "prepends at least caps synth user" (out.Length >= entries.Length + 1)
-    let firstInfo = Dyn.get out.[0] "info"
-    check "caps user id prefix" ((Dyn.str firstInfo "id").StartsWith "caps-synth-user-")
-    let firstText = firstEntryTextFromOut out
-    check "has think prelude" (firstText.Contains "铁律")
-    do! rmAsync root
-}
+let capsSynthUserPrepended () =
+    promise {
+        let! root = mkdtempAsync "omp-caps-synth-"
+        let reviewStore = createReviewStore ()
 
-let capsReadToolsInContextTransform () = promise {
-    let! root = mkdtempAsync "omp-caps-ctx-"
-    do! writeFileAsync (join root "ARCH.md") "arch-in-context"
-    let reviewStore = createReviewStore ()
-    let entries =
-        [| createObj [
-               "info", box(createObj [ "id", box "user-1"; "role", box "user" ])
-               "parts", box [| createObj [ "type", box "text"; "text", box "hello" ] |]
-           ] |]
-    let! out = transformEntriesAsync reviewStore root "caps-sess" (box entries)
-    try
-        check "prepends user and assistant for caps" (out.Length >= entries.Length + 2)
-        let mutable foundRead = false
-        for entry in out do
-            let parts = Dyn.get entry "parts"
-            if Dyn.isArray parts then
-                for part in unbox<obj array> parts do
-                    if Dyn.str part "type" = "tool" && Dyn.str part "tool" = "read" then
-                        let state = Dyn.get part "state"
-                        let outText = Dyn.str state "output"
-                        if outText.Contains "arch-in-context" then foundRead <- true
-        check "caps file surfaced as read tool output" foundRead
-    with e ->
+        let entries =
+            [| createObj
+                   [ "info", box (createObj [ "id", box "user-1"; "role", box "user" ])
+                     "parts", box [| createObj [ "type", box "text"; "text", box "hello" ] |] ] |]
+
+        let! out = transformEntriesAsync reviewStore root "sess-1" (box entries)
+        check "prepends at least caps synth user" (out.Length >= entries.Length + 1)
+        let firstInfo = Dyn.get out.[0] "info"
+        check "caps user id prefix" ((Dyn.str firstInfo "id").StartsWith "caps-synth-user-")
+        let firstText = firstEntryTextFromOut out
+        check "has think prelude" (firstText.Contains "铁律")
         do! rmAsync root
-        raise e
-    do! rmAsync root
-}
+    }
 
-let beforeAgentStartOmitsCapsXml () = promise {
-    let! root = mkdtempAsync "omp-before-start-"
-    do! writeFileAsync (join root "ARCH.md") "should-not-be-in-system"
-    let! patch = beforeAgentStart root (box [| "line-one" |])
-    try
-        let sp = Dyn.get patch "systemPrompt"
-        let arr = if Dyn.isArray sp then unbox<string array> sp else [| string sp |]
-        let joined = String.concat "\n" arr
-        check "system prompt has user line" (joined.Contains "line-one")
-        check "system prompt omits caps-context xml" (not (joined.Contains "<caps-context"))
-    with e ->
+let capsReadToolsInContextTransform () =
+    promise {
+        let! root = mkdtempAsync "omp-caps-ctx-"
+        do! writeFileAsync (join root "ARCH.md") "arch-in-context"
+        let reviewStore = createReviewStore ()
+
+        let entries =
+            [| createObj
+                   [ "info", box (createObj [ "id", box "user-1"; "role", box "user" ])
+                     "parts", box [| createObj [ "type", box "text"; "text", box "hello" ] |] ] |]
+
+        let! out = transformEntriesAsync reviewStore root "caps-sess" (box entries)
+
+        try
+            check "prepends user and assistant for caps" (out.Length >= entries.Length + 2)
+            let mutable foundRead = false
+
+            for entry in out do
+                let parts = Dyn.get entry "parts"
+
+                if Dyn.isArray parts then
+                    for part in unbox<obj array> parts do
+                        if Dyn.str part "type" = "tool" && Dyn.str part "tool" = "read" then
+                            let state = Dyn.get part "state"
+                            let outText = Dyn.str state "output"
+
+                            if outText.Contains "arch-in-context" then
+                                foundRead <- true
+
+            check "caps file surfaced as read tool output" foundRead
+        with e ->
+            do! rmAsync root
+            raise e
+
         do! rmAsync root
-        raise e
-    do! rmAsync root
-}
+    }
 
-let reviewReplayIfStoreEmptyOnTransform () = promise {
-    let! root = mkdtempAsync "omp-review-replay-"
-    let reviewStore = createReviewStore ()
-    let sessionId = "omp-review-if-empty"
-    reviewStore.activateReview(sessionId, "task A", 1L)
-    let historyTaskB =
-        frontMatterPrompt [ yamlField taskField "task B" ] "With-Review body from history"
-    let entries =
-        [| createObj [
-               "info", box(createObj [ "id", box "user-hist"; "role", box "user" ])
-               "parts", box [| createObj [ "type", box "text"; "text", box historyTaskB ] |]
-           ] |]
-    let! _ = transformEntriesAsync reviewStore root sessionId (box entries)
-    equal "review replay IfStoreEmpty: store task unchanged when already active" (Some "task A") (reviewStore.getReviewTask sessionId)
-    do! rmAsync root
-}
+let beforeAgentStartOmitsCapsXml () =
+    promise {
+        let! root = mkdtempAsync "omp-before-start-"
+        do! writeFileAsync (join root "ARCH.md") "should-not-be-in-system"
+        let! patch = beforeAgentStart root (box [| "line-one" |])
 
-let testInvestigatorCrashWithUndefinedCaps () = promise {
-    let! root = mkdtempAsync "omp-caps-inject-crash-"
-    let badFilePath = join root "polluted-cap.md"
-    let goodFilePath = join root "valid-cap.md"
-    do! writeFileAsync badFilePath "initial content"
-    do! writeFileAsync goodFilePath "valid content"
+        try
+            let sp = Dyn.get patch "systemPrompt"
 
-    installFsMock ()
-    mockedPaths.Add(root) |> ignore
+            let arr =
+                if Dyn.isArray sp then
+                    unbox<string array> sp
+                else
+                    [| string sp |]
 
-    let reviewStore = createReviewStore ()
-    let entries =
-        [| createObj [
-               "info", box(createObj [ "id", box "user-1"; "role", box "user"; "sessionID", box "sess-test" ])
-               "parts", box [|
-                   createObj [ "type", box "text"; "text", box "---\nobjective: hello objective\n---\nhello text" ]
-               |]
-           ] |]
+            let joined = String.concat "\n" arr
+            check "system prompt has user line" (joined.Contains "line-one")
+            check "system prompt omits caps-context xml" (not (joined.Contains "<caps-context"))
+        with e ->
+            do! rmAsync root
+            raise e
 
-    Wanxiangshu.Omp.ChildSession.markChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
-    Wanxiangshu.Omp.ExecutorTools.ompScope.RegisterTempFiles("sess-test\u0000hello objective", [ "valid-cap.md"; "polluted-cap.md" ])
-
-    try
-        let! res = transformEntriesAsync reviewStore root "sess-test" entries
-        mockedPaths.Remove(root) |> ignore
-
-        let hasCapsUser = res |> Array.exists (fun entry ->
-            let info = Dyn.get entry "info"
-            let id = Dyn.str info "id"
-            id.StartsWith "caps-synth-user-")
-        let hasCapsAssistant = res |> Array.exists (fun entry ->
-            let info = Dyn.get entry "info"
-            let id = Dyn.str info "id"
-            id.StartsWith "caps-synth-assistant-")
-        check "contains caps user" hasCapsUser
-        check "contains caps assistant" hasCapsAssistant
-
-        let assistantEntry = res |> Array.find (fun entry ->
-            let info = Dyn.get entry "info"
-            let id = Dyn.str info "id"
-            id.StartsWith "caps-synth-assistant-")
-        let parts = Dyn.get assistantEntry "parts" |> unbox<{| state: {| input: {| filePath: string |} |} |} array>
-        let hasGood = parts |> Array.exists (fun p -> p.state.input.filePath.Contains "valid-cap.md")
-        let hasBad = parts |> Array.exists (fun p -> p.state.input.filePath.Contains "polluted-cap.md")
-        check "has valid-cap tool part" hasGood
-        check "does not have polluted-cap tool part" (not hasBad)
-
-        Wanxiangshu.Omp.ChildSession.unmarkChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
         do! rmAsync root
-    with e ->
-        mockedPaths.Remove(root) |> ignore
-        Wanxiangshu.Omp.ChildSession.unmarkChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
+    }
+
+let reviewReplayIfStoreEmptyOnTransform () =
+    promise {
+        let! root = mkdtempAsync "omp-review-replay-"
+        let reviewStore = createReviewStore ()
+        let sessionId = "omp-review-if-empty"
+        reviewStore.activateReview (sessionId, "task A", 1L)
+
+        let historyTaskB =
+            frontMatterPrompt [ yamlField taskField "task B" ] "With-Review body from history"
+
+        let entries =
+            [| createObj
+                   [ "info", box (createObj [ "id", box "user-hist"; "role", box "user" ])
+                     "parts", box [| createObj [ "type", box "text"; "text", box historyTaskB ] |] ] |]
+
+        let! _ = transformEntriesAsync reviewStore root sessionId (box entries)
+
+        equal
+            "review replay IfStoreEmpty: store task unchanged when already active"
+            (Some "task A")
+            (reviewStore.getReviewTask sessionId)
+
         do! rmAsync root
-        raise e
-}
+    }
+
+let testInvestigatorCrashWithUndefinedCaps () =
+    promise {
+        let! root = mkdtempAsync "omp-caps-inject-crash-"
+        let badFilePath = join root "polluted-cap.md"
+        let goodFilePath = join root "valid-cap.md"
+        do! writeFileAsync badFilePath "initial content"
+        do! writeFileAsync goodFilePath "valid content"
+
+        installFsMock ()
+        mockedPaths.Add(root) |> ignore
+
+        let reviewStore = createReviewStore ()
+
+        let entries =
+            [| createObj
+                   [ "info", box (createObj [ "id", box "user-1"; "role", box "user"; "sessionID", box "sess-test" ])
+                     "parts",
+                     box
+                         [| createObj
+                                [ "type", box "text"
+                                  "text", box "---\nobjective: hello objective\n---\nhello text" ] |] ] |]
+
+        Wanxiangshu.Omp.ChildSession.markChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
+
+        Wanxiangshu.Omp.ExecutorTools.ompScope.RegisterTempFiles(
+            "sess-test\u0000hello objective",
+            [ "valid-cap.md"; "polluted-cap.md" ]
+        )
+
+        try
+            let! res = transformEntriesAsync reviewStore root "sess-test" entries
+            mockedPaths.Remove(root) |> ignore
+
+            let hasCapsUser =
+                res
+                |> Array.exists (fun entry ->
+                    let info = Dyn.get entry "info"
+                    let id = Dyn.str info "id"
+                    id.StartsWith "caps-synth-user-")
+
+            let hasCapsAssistant =
+                res
+                |> Array.exists (fun entry ->
+                    let info = Dyn.get entry "info"
+                    let id = Dyn.str info "id"
+                    id.StartsWith "caps-synth-assistant-")
+
+            check "contains caps user" hasCapsUser
+            check "contains caps assistant" hasCapsAssistant
+
+            let assistantEntry =
+                res
+                |> Array.find (fun entry ->
+                    let info = Dyn.get entry "info"
+                    let id = Dyn.str info "id"
+                    id.StartsWith "caps-synth-assistant-")
+
+            let parts =
+                Dyn.get assistantEntry "parts"
+                |> unbox<{| state: {| input: {| filePath: string |} |} |} array>
+
+            let hasGood =
+                parts |> Array.exists (fun p -> p.state.input.filePath.Contains "valid-cap.md")
+
+            let hasBad =
+                parts
+                |> Array.exists (fun p -> p.state.input.filePath.Contains "polluted-cap.md")
+
+            check "has valid-cap tool part" hasGood
+            check "does not have polluted-cap tool part" (not hasBad)
+
+            Wanxiangshu.Omp.ChildSession.unmarkChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
+            do! rmAsync root
+        with e ->
+            mockedPaths.Remove(root) |> ignore
+            Wanxiangshu.Omp.ChildSession.unmarkChildSession Wanxiangshu.Omp.ExecutorTools.ompScope "sess-test"
+            do! rmAsync root
+            raise e
+    }

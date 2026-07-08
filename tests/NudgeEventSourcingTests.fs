@@ -8,7 +8,11 @@ open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.Nudge.Types
 
 let private ev session kind payload =
-    { V = 1; Session = session; Kind = kind; At = ""; Payload = payload }
+    { V = 1
+      Session = session
+      Kind = kind
+      At = ""
+      Payload = payload }
 
 let private toSessionSnapshot (s: NudgeSnapshotState) : SessionSnapshot =
     { todos = s.openTodos
@@ -33,12 +37,15 @@ let foldNudgeSnapshotEmpty () =
 /// assistant_completed populates lastAssistantText, agentFromMessage, turnId, modelFromMessage.
 let foldNudgeSnapshotAssistantCompleted () =
     let events =
-        [ ev "s1" eventKindAssistantCompleted (
-              Map [ "assistantMessage", "implemented feature"
+        [ ev
+              "s1"
+              eventKindAssistantCompleted
+              (Map
+                  [ "assistantMessage", "implemented feature"
                     "agent", "bookkeeper"
                     "model", "anthropic/claude-sonnet"
-                    "turnId", "t1" ]
-          ) ]
+                    "turnId", "t1" ]) ]
+
     let s = foldNudgeSnapshot "s1" events
     equal "assistant text" "implemented feature" s.lastAssistantText
     equal "agent from message" (Some "bookkeeper") s.agentFromMessage
@@ -60,6 +67,7 @@ let foldNudgeSnapshotLoopCancelled () =
     let events =
         [ ev "s1" eventKindLoopActivated (Map [ "task", "ship it" ])
           ev "s1" eventKindLoopCancelled Map.empty ]
+
     let s = foldNudgeSnapshot "s1" events
     check "not loop active after cancel" (not s.isLoopActive)
     check "no todos" (s.openTodos = [])
@@ -72,6 +80,7 @@ let foldNudgeSnapshotAcceptedClears () =
     let events =
         [ ev "s1" eventKindLoopActivated (Map [ "task", "ship it" ])
           ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictAccepted ]) ]
+
     let s = foldNudgeSnapshot "s1" events
     check "not loop active after accept" (not s.isLoopActive)
 
@@ -80,6 +89,7 @@ let foldNudgeSnapshotNeedsRevisionKeeps () =
     let events =
         [ ev "s1" eventKindLoopActivated (Map [ "task", "ship it" ])
           ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictNeedsRevision ]) ]
+
     let s = foldNudgeSnapshot "s1" events
     check "loop active after needs_revision" s.isLoopActive
 
@@ -88,6 +98,7 @@ let foldNudgeSnapshotNudgeDispatched () =
     let events =
         [ ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t1\u001emsg body" ])
           ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t2\u001emsg body" ]) ]
+
     let s = foldNudgeSnapshot "s1" events
     check "dispatched contains anchor 1" (s.dispatchedAnchors.Contains "t1\u001emsg body")
     check "dispatched contains anchor 2" (s.dispatchedAnchors.Contains "t2\u001emsg body")
@@ -98,6 +109,7 @@ let foldNudgeSnapshotDedupCleared () =
     let events =
         [ ev "s1" eventKindNudgeDispatched (Map [ "anchor", "t1\u001emsg body" ])
           ev "s1" eventKindSubmitReviewWipRecorded Map.empty ]
+
     let s = foldNudgeSnapshot "s1" events
     check "dispatched anchors cleared" (s.dispatchedAnchors = Set.empty)
 
@@ -105,12 +117,14 @@ let foldNudgeSnapshotDedupCleared () =
 let foldNudgeSnapshotWorkBacklogUpdatesTodos () =
     let events =
         [ ev "s1" eventKindWorkBacklogCommitted (Map [ "todosJson", "[\"a\",\"b\"]" ]) ]
+
     let s = foldNudgeSnapshot "s1" events
     equal "open todos from work backlog" [ "a"; "b" ] s.openTodos
 
 /// Cold start (no events) → deriveAction returns NudgeNone.
 let foldNudgeSnapshotColdStartNudgeNone () =
     let s = foldNudgeSnapshot "s1" []
+
     match deriveAction (toSessionSnapshot s) with
     | NudgeNone -> check "cold start -> NudgeNone" true
     | _ -> check "cold start -> NudgeNone" false
@@ -119,18 +133,22 @@ let foldNudgeSnapshotColdStartNudgeNone () =
 let foldNudgeSnapshotIntegrated () =
     let events =
         [ ev "s1" eventKindWorkBacklogCommitted (Map [ "todosJson", "[\"ship feature\"]" ])
-          ev "s1" eventKindAssistantCompleted (
-              Map [ "assistantMessage", "working on it"
+          ev
+              "s1"
+              eventKindAssistantCompleted
+              (Map
+                  [ "assistantMessage", "working on it"
                     "agent", "bookkeeper"
                     "model", "openai/gpt-4o"
-                    "turnId", "t42" ]
-          ) ]
+                    "turnId", "t42" ]) ]
+
     let s = foldNudgeSnapshot "s1" events
     check "integrated: has todos" (s.openTodos = [ "ship feature" ])
     check "integrated: has assistant text" (s.lastAssistantText = "working on it")
     check "integrated: not loop active" (not s.isLoopActive)
     check "integrated: has turnId" (s.turnId = "t42")
     equal "integrated: model" (Some "openai/gpt-4o") s.modelFromMessage
+
     match deriveAction (toSessionSnapshot s) with
     | NudgeTodo -> check "integrated -> NudgeTodo" true
     | _ -> check "integrated -> NudgeTodo" false

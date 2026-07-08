@@ -22,13 +22,14 @@ open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.RuntimeScope
 
 [<Global("process")>]
-let private nodeProcess : obj = jsNative
+let private nodeProcess: obj = jsNative
 
 let private eventLogRootFromDeps (deps: obj) : string =
-    if Dyn.isNullish deps then unbox<string> (nodeProcess?cwd())
+    if Dyn.isNullish deps then
+        unbox<string> (nodeProcess?cwd ())
     else
         let d = Dyn.str deps "directory"
-        if d <> "" then d else unbox<string> (nodeProcess?cwd())
+        if d <> "" then d else unbox<string> (nodeProcess?cwd ())
 
 let private syncReviewTaskFromHistory
     (scope: RuntimeScope)
@@ -40,7 +41,13 @@ let private syncReviewTaskFromHistory
         let root = eventLogRootFromDeps deps
         scope.TriggerInit(root)
         do! scope.WaitInit()
-        let getHistory = if Dyn.isNullish deps then null else Dyn.get deps "getChatHistory"
+
+        let getHistory =
+            if Dyn.isNullish deps then
+                null
+            else
+                Dyn.get deps "getChatHistory"
+
         if sessionID = "" || Dyn.isNullish getHistory then
             return reviewStore.getReviewTask sessionID
         else
@@ -53,7 +60,7 @@ let private syncReviewTaskFromHistory
 
 let private fallbackSlashConfig (deps: obj) (workspaceId: WorkspaceId) : obj =
     createObj
-        [ "cwd", box (nodeProcess?cwd())
+        [ "cwd", box (nodeProcess?cwd ())
           "workspaceId", box (Id.workspaceIdValue workspaceId)
           "taskService", box (Dyn.get deps "taskService") ]
 
@@ -63,6 +70,7 @@ let private slashConfigFromCtx (deps: obj) (workspaceId: WorkspaceId) (ctx: obj)
     else
         let runtimeObj = Dyn.get ctx "runtime"
         let runtime = if Dyn.isNullish runtimeObj then null else runtimeObj
+
         createObj
             [ "cwd", box (Dyn.str ctx "cwd")
               "workspaceId", box (Id.workspaceIdValue workspaceId)
@@ -73,6 +81,7 @@ let private slashConfigFromCtx (deps: obj) (workspaceId: WorkspaceId) (ctx: obj)
 let private pluginConfigForSlash (deps: obj) (workspaceId: WorkspaceId) : JS.Promise<obj> =
     promise {
         let resolver = Dyn.get deps "resolveWorkspacePluginContext"
+
         if not (Dyn.typeIs resolver "function") then
             return fallbackSlashConfig deps workspaceId
         else
@@ -81,13 +90,15 @@ let private pluginConfigForSlash (deps: obj) (workspaceId: WorkspaceId) : JS.Pro
     }
 
 let createLoopOnlyCommand (deps: obj) (scope: RuntimeScope) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
-    box {| key = "loop"
+    box
+        {| key = "loop"
            description = "Activate With-Review Mode. AI completes task, submits for review."
            inputHint = "<task description>"
-           execute = System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
-               match Id.tryWorkspaceId workspaceIdStr with
-               | None -> Promise.lift "Invalid workspaceId"
-               | Some wid ->
+           execute =
+            System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
+                match Id.tryWorkspaceId workspaceIdStr with
+                | None -> Promise.lift "Invalid workspaceId"
+                | Some wid ->
                     promise {
                         let root = eventLogRootFromDeps deps
                         scope.TriggerInit(root)
@@ -95,6 +106,7 @@ let createLoopOnlyCommand (deps: obj) (scope: RuntimeScope) (reviewStore: Wanxia
                         let sid = Id.workspaceIdValue wid
                         let task = args.Trim()
                         let existingTask = reviewStore.getReviewTask sid
+
                         if task = "" then
                             do! appendLoopCancelledOrFail root sid
                             reviewStore.deactivateReview sid
@@ -103,45 +115,76 @@ let createLoopOnlyCommand (deps: obj) (scope: RuntimeScope) (reviewStore: Wanxia
                             return "With-Review Mode is already active. Submit your work via submit_review."
                         else
                             do! appendLoopActivatedOrFail root sid task
-                            reviewStore.activateReview(sid, task, getTimestampMs())
-                            return buildLoopMessage task [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
-                   }) |}
+                            reviewStore.activateReview (sid, task, getTimestampMs ())
+
+                            return
+                                buildLoopMessage
+                                    task
+                                    [ "With-Review Mode is active. Complete the task above, then call submit_review with:" ]
+                    }) |}
 
 let private precheckReview
-    (deps: obj) (toolNames: string array) (workspaceId: WorkspaceId) (task: string)
+    (deps: obj)
+    (toolNames: string array)
+    (workspaceId: WorkspaceId)
+    (task: string)
     : JS.Promise<DelegateOutcome> =
     promise {
         let! config = pluginConfigForSlash deps workspaceId
         let disabledTools = deniedTools "reviewer" (Array.toList toolNames) |> Array.ofList
+
         let experiments =
             createObj
                 [ "subagentRole", box "reviewer"
                   "toolPolicy", box (createObj [ "disabledTools", box disabledTools ]) ]
-        let opts = createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
+
+        let opts =
+            createObj [ "aiSettingsAgentId", box "plan"; "experiments", box experiments ]
+
         let promptText = preReviewVerdictPrompt task
         return! Delegate.delegateWithTimeout deps config "explore" promptText "Pre-review" (Some opts) 300000
     }
 
 let private activateReview
     (deps: obj)
-    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (workspaceIdStr: string) (task: string)
-    (isPass: bool) (feedback: string) : JS.Promise<string> =
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
+    (workspaceIdStr: string)
+    (task: string)
+    (isPass: bool)
+    (feedback: string)
+    : JS.Promise<string> =
     promise {
         let root = eventLogRootFromDeps deps
         do! appendLoopActivatedOrFail root workspaceIdStr task
-        reviewStore.activateReview(workspaceIdStr, task, getTimestampMs())
+        reviewStore.activateReview (workspaceIdStr, task, getTimestampMs ())
+
         if isPass then
-            return buildLoopMessage task [ "With-Review Mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
+            return
+                buildLoopMessage
+                    task
+                    [ "With-Review Mode is active. Pre-review passed. Complete the task above, then call submit_review with:" ]
         else
-            return buildLoopMessage task [ "Pre-review feedback:"; ""; feedback; ""; "With-Review Mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
+            return
+                buildLoopMessage
+                    task
+                    [ "Pre-review feedback:"
+                      ""
+                      feedback
+                      ""
+                      "With-Review Mode is active. Address the pre-review feedback above while completing the task. Then call submit_review with:" ]
     }
 
 let private loopReviewExecute
     (scope: RuntimeScope)
-    (deps: obj) (toolNames: string array) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
-    (workspaceId: WorkspaceId) (args: string) : JS.Promise<string> =
+    (deps: obj)
+    (toolNames: string array)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
+    (workspaceId: WorkspaceId)
+    (args: string)
+    : JS.Promise<string> =
     let task = args.Trim()
     let workspaceIdStr = Id.workspaceIdValue workspaceId
+
     if task = "" then
         promise {
             let root = eventLogRootFromDeps deps
@@ -157,32 +200,49 @@ let private loopReviewExecute
             scope.TriggerInit(root)
             do! scope.WaitInit()
             let! existingTask = syncReviewTaskFromHistory scope deps reviewStore workspaceIdStr
+
             if existingTask.IsSome then
                 return "With-Review Mode is already active. Submit your work via submit_review."
             else
                 let! outcome = precheckReview deps toolNames workspaceId task
+
                 match outcome with
                 | DelegateTimeout.TimedOut ->
-                    return buildLoopMessage task [ "With-Review Mode was NOT activated because the pre-review timed out. Please retry /loop-review." ]
+                    return
+                        buildLoopMessage
+                            task
+                            [ "With-Review Mode was NOT activated because the pre-review timed out. Please retry /loop-review." ]
                 | DelegateTimeout.Report markdown ->
                     let isPass, feedback =
                         match parseReviewReportMarkdown markdown with
                         | Accepted fb -> true, fb
                         | NeedsRevision fb -> false, fb
                         | Terminated -> false, markdown
+
                     return! activateReview deps reviewStore workspaceIdStr task isPass feedback
         }
 
-let createLoopReviewCommand (scope: RuntimeScope) (deps: obj) (toolNames: string array) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
+let createLoopReviewCommand
+    (scope: RuntimeScope)
+    (deps: obj)
+    (toolNames: string array)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
+    : obj =
     box
         {| key = "loop-review"
            description = "Pre-review task description with a reviewer sub-agent, then activate With-Review Mode."
            inputHint = "<task description>"
            execute =
-               System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
-                   match Id.tryWorkspaceId workspaceIdStr with
-                   | None -> Promise.lift "Invalid workspaceId"
-                   | Some wid -> loopReviewExecute scope deps toolNames reviewStore wid args) |}
+            System.Func<string, string, JS.Promise<string>>(fun workspaceIdStr args ->
+                match Id.tryWorkspaceId workspaceIdStr with
+                | None -> Promise.lift "Invalid workspaceId"
+                | Some wid -> loopReviewExecute scope deps toolNames reviewStore wid args) |}
 
-let createSlashCommands (scope: RuntimeScope) (deps: obj) (toolNames: string array) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj array =
-    [| createLoopOnlyCommand deps scope reviewStore; createLoopReviewCommand scope deps toolNames reviewStore |]
+let createSlashCommands
+    (scope: RuntimeScope)
+    (deps: obj)
+    (toolNames: string array)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
+    : obj array =
+    [| createLoopOnlyCommand deps scope reviewStore
+       createLoopReviewCommand scope deps toolNames reviewStore |]

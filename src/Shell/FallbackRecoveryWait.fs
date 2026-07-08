@@ -17,12 +17,11 @@ let waitForRecovery (runtime: FallbackRuntimeState) (sessionID: string) (_maxTur
             return ()
         else
             let resolver = ref (fun () -> ())
-            let p = Promise.create (fun resolve reject ->
-                resolver.Value <- resolve
-            )
+            let p = Promise.create (fun resolve reject -> resolver.Value <- resolve)
+
             let rec checkSettled () =
                 if isRecoverySettled runtime sessionID then
-                    resolver.Value ()
+                    resolver.Value()
                 else
                     runtime.OnStateChanged sessionID checkSettled
 

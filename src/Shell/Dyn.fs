@@ -8,22 +8,25 @@ open Fable.Core.JsInterop
 open Fable.Core.JS
 
 [<Global>]
-let private structuredClone : obj -> obj = jsNative
+let private structuredClone: obj -> obj = jsNative
 
-let undefinedValue : obj = Unchecked.defaultof<obj>
+let undefinedValue: obj = Unchecked.defaultof<obj>
 
 let jsType (o: obj) : string = jsTypeof o
 
 let isNullish (o: obj) : bool = isNull o || jsType o = "undefined"
 
 let keys (o: obj) : string array =
-    if isNullish o then [||]
-    else JS.Constructors.Object.keys(o) |> Seq.toArray
+    if isNullish o then
+        [||]
+    else
+        JS.Constructors.Object.keys (o) |> Seq.toArray
 
 let assignInto (target: obj) (source: obj) : obj =
     if not (isNullish source) then
         for key in keys source do
             target?(key) <- source?(key)
+
     target
 
 let cloneShallow (o: obj) : obj =
@@ -50,11 +53,9 @@ let call2 (f: obj) (a: obj) (b: obj) : obj = f $ (a, b)
 
 let call4 (f: obj) (a: obj) (b: obj) (c: obj) (d: obj) : obj = f $ (a, b, c, d)
 
-let callMethod0 (o: obj) (method_: string) : obj =
-    emitJsExpr (o, method_) "$0[$1]()"
+let callMethod0 (o: obj) (method_: string) : obj = emitJsExpr (o, method_) "$0[$1]()"
 
-let callMethod1 (o: obj) (method_: string) (a: obj) : obj =
-    emitJsExpr (o, method_, a) "$0[$1]($2)"
+let callMethod1 (o: obj) (method_: string) (a: obj) : obj = emitJsExpr (o, method_, a) "$0[$1]($2)"
 
 let callMethod2 (o: obj) (method_: string) (a: obj) (b: obj) : obj =
     emitJsExpr (o, method_, a, b) "$0[$1]($2, $3)"
@@ -62,18 +63,24 @@ let callMethod2 (o: obj) (method_: string) (a: obj) (b: obj) : obj =
 let callWithThis1 (f: obj) (thisObj: obj) (a: obj) : obj =
     emitJsExpr (f, thisObj, a) "$0.call($1, $2)"
 
+let setKey (o: obj) (key: string) (v: obj) : unit =
+    if not (isNullish o) then
+        o?(key) <- v
+
 let withKey (o: obj) (key: string) (v: obj) : obj =
     let copy = cloneShallow o
     copy?(key) <- v
     copy
 
 let deleteKey (o: obj) (key: string) : unit =
-    if not (isNullish o) then emitJsExpr (o, key) "delete $0[$1]" |> ignore
+    if not (isNullish o) then
+        emitJsExpr (o, key) "delete $0[$1]" |> ignore
 
-let isArray (o: obj) : bool = JS.Constructors.Array.isArray(o)
+let isArray (o: obj) : bool = JS.Constructors.Array.isArray (o)
 
 let truthy (o: obj) : bool =
-    if isNullish o then false
+    if isNullish o then
+        false
     else
         match o with
         | :? bool as b -> b

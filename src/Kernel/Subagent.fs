@@ -12,7 +12,14 @@ type SubagentTaskKind =
     | Investigator of InvestigatorIntent list
     | Meditator of intent: string * sections: MeditatorFileSection list
     | Browser of intent: string
-    | ExecutorSummary of output: string * language: string * program: string * dependencies: string list * timeoutType: string * mode: string * whatToSummarize: string
+    | ExecutorSummary of
+        output: string *
+        language: string *
+        program: string *
+        dependencies: string list *
+        timeoutType: string *
+        mode: string *
+        whatToSummarize: string
     | WebsearchSummary of question: string * raw: string
 
 let private agentReportTail =
@@ -32,13 +39,15 @@ let private withReportTail (host: Host) (body: string) : string =
 /// agent_report tail; otherwise prompt body is identical between hosts.
 let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
     let wrap = withReportTail host
+
     match kind with
     | Coder intents -> intents |> List.map (coderPrompt >> wrap)
     | Investigator intents -> intents |> List.map (investigatorPrompt >> wrap)
     | Meditator(intent, sections) -> [ meditatorPrompt sections intent |> wrap ]
     | Browser intent -> [ browserPrompt intent |> wrap ]
     | ExecutorSummary(output, language, program, dependencies, timeoutType, mode, whatToSummarize) ->
-        [ executorSummarizerPrompt whatToSummarize output language program dependencies timeoutType mode |> wrap ]
+        [ executorSummarizerPrompt whatToSummarize output language program dependencies timeoutType mode
+          |> wrap ]
     | WebsearchSummary(question, raw) -> [ websearchSummarizerPrompt question raw |> wrap ]
 
 let promptsForParallelIntents (host: Host) (constructor: 'a -> SubagentTaskKind) (intents: 'a) : string list =

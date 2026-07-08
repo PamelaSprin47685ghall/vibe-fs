@@ -32,11 +32,17 @@ let unifiedToolDescription =
 
 let buildUnifiedNoteDescription (entries: MethodologyEntry list) : string =
     let sb = StringBuilder()
-    sb.AppendLine("Fill in the content for the selected methodology. Depending on which methodology you choose, your note should cover:")
-        |> ignore
+
+    sb.AppendLine(
+        "Fill in the content for the selected methodology. Depending on which methodology you choose, your note should cover:"
+    )
+    |> ignore
+
     sb.AppendLine() |> ignore
+
     for e in entries do
         sb.AppendLine(e.methodologyId + ": " + e.noteDescription) |> ignore
+
     sb.ToString()
 
 let renderMeditatorIntent (entry: MethodologyEntry) (intentText: string) (noteText: string) =
@@ -44,6 +50,7 @@ let renderMeditatorIntent (entry: MethodologyEntry) (intentText: string) (noteTe
         entry.outputSections
         |> List.mapi (fun i s -> $"{i + 1}. {s}")
         |> String.concat "\n"
+
     $"""You are applying the "{entry.methodologyId}" methodology.
 
 Definition: {entry.shortDefinition}

@@ -2,83 +2,152 @@ module Wanxiangshu.Methodology.Catalog4
 
 open Wanxiangshu.Methodology.SchemaCommon
 
-let entries: MethodologyEntry list = [
-    { methodologyId = "conceptual_analysis"
-      shortDefinition = "Clarify meanings, category boundaries, scope; remove category mistakes."
-      triggerWhen = "When terms collide (tool vs wrapper vs agent vs session vs task)."
-      noteDescription = "confused_concept, senses_disambiguated, category_boundaries, scope_fix, category_mistakes_found, recommended_vocabulary, glossary_entries"
-      meditatorRole = "Disambiguate vocabulary before structural changes."
-      outputSections = [ "Disambiguation table"; "Category boundaries"; "Scope fix"; "Vocabulary"; "Next actions" ] }
-    { methodologyId = "dialectical_analysis"
-      shortDefinition = "Thesis, antithesis, tension, dependency, resolution—not one-sided causality."
-      triggerWhen = "When opposing forces shape design (DRY vs 54 files, kernel purity vs host Dyn)."
-      noteDescription = "thesis, antithesis, tensions, dependencies, synthesis_path, frozen_decision, tradeoffs_accepted"
-      meditatorRole = "Mediate real opposing design forces instead of picking a slogan."
-      outputSections = [ "Thesis vs antithesis"; "Tensions"; "Synthesis"; "Accepted tradeoffs"; "Next actions" ] }
-    { methodologyId = "hermeneutic_circle"
-      shortDefinition = "Iterate part and whole until local and global meaning stabilize."
-      triggerWhen = "Understanding large codepaths, README+implementation together, PRD+tests."
-      noteDescription = "whole_artifact, part_focus, part_to_whole_updates, whole_to_part_updates, stabilized_reading, remaining_tension, reading_order"
-      meditatorRole = "Alternate local detail and global architecture until coherent."
-      outputSections = [ "Iteration log"; "Stabilized reading"; "Remaining tension"; "Reading order"; "Next actions" ] }
-    { methodologyId = "deconstruction"
-      shortDefinition = "Inspect hidden binaries, excluded voices, unstable centers in framing."
-      triggerWhen = "When PRD, AGENTS, or design docs assume hierarchy that hides alternatives."
-      noteDescription = "text_or_design, binary_oppositions, excluded_middle, unstable_center, internal_contradictions, reframe, actionable_extractions"
-      meditatorRole = "Expose rhetorical structure so decisions are not captive to false binaries."
-      outputSections = [ "Binaries and exclusions"; "Contradictions"; "Reframe"; "Actionable requirements"; "Next actions" ] }
-    { methodologyId = "renormalization"
-      shortDefinition = "Coarse-grain micro-detail; keep scale-relevant variables; find stable macro structure."
-      triggerWhen = "When micro implementation noise obscures macro behavior (54 files, hook spaghetti)."
-      noteDescription = "micro_level, macro_question, coarse_graining_map, relevant_variables, universal_pattern, micro_corrections, documentation_level"
-      meditatorRole = "Summarize micro complexity into macro laws for decision-making."
-      outputSections = [ "Coarse-graining"; "Macro variables"; "Stable pattern"; "When to re-zoom"; "Next actions" ] }
-    { methodologyId = "simplification"
-      shortDefinition = "Remove accidental complexity until only essential problem remains."
-      triggerWhen = "When solution path is cluttered with frameworks, flags, duplicate adapters."
-      noteDescription = "overcomplicated_surface, accidental_parts, essential_core, simplification_moves, invariants_preserved, simplification_metric, deferred_complexity"
-      meditatorRole = "Peel accidental layers without violating essential invariants."
-      outputSections = [ "Accidental inventory"; "Essential core"; "Simplification moves"; "Preserved invariants"; "Next actions" ] }
-    { methodologyId = "tradeoff_analysis"
-      shortDefinition = "Compare options across explicit constraints and costs."
-      triggerWhen = "When choosing between registration strategies, schema layout, host parity approaches."
-      noteDescription = "decision, options, constraints, cost_dimensions, comparison_matrix, recommendation, reversible_parts, decision_deadline"
-      meditatorRole = "Compare options honestly on named constraints—not vibes."
-      outputSections = [ "Options"; "Constraint table"; "Recommendation"; "Reversibility"; "Next actions" ] }
-    { methodologyId = "risk_analysis"
-      shortDefinition = "Identify failure modes, blast radius, irreversible decisions."
-      triggerWhen = "Before large registration change or permission matrix edits."
-      noteDescription = "proposed_change, failure_modes, blast_radius, irreversible_steps, risk_ranking, mitigations, residual_risk, monitoring"
-      meditatorRole = "Map failure modes and mitigations before irreversible edits."
-      outputSections = [ "Failure modes"; "Blast radius"; "Mitigations"; "Residual risk"; "Next actions" ] }
-    { methodologyId = "test_driven_reasoning"
-      shortDefinition = "Make expected behavior executable before or during implementation."
-      triggerWhen = "When behavior can be pinned by tests (schema registry, Args.parse required fields, architecture gates)."
-      noteDescription = "behavior_claim, executable_oracles, red_phase_plan, green_phase_plan, refactor_safeties, non_testable_residual, tdd_sequence"
-      meditatorRole = "Bind reasoning to executable oracles in tests/ArchitectureTests.fs style."
-      outputSections = [ "Behavior claim"; "Oracles"; "Red-green plan"; "TDD sequence"; "Next actions" ] }
-    { methodologyId = "debugging_trace"
-      shortDefinition = "Reproduce, isolate, instrument, verify the fault chain."
-      triggerWhen = "When a failure needs systematic narrowing (Fable build, hook, integration test)."
-      noteDescription = "failure_signature, reproduction_steps, isolation_experiments, instrumentation_points, fault_chain, verified_fix_hypothesis, ruled_out_causes, regression_guard"
-      meditatorRole = "Document reproduce→isolate→instrument→verify without guessing."
-      outputSections = [ "Reproduction"; "Isolation log"; "Fault chain"; "Fix hypothesis"; "Next actions" ] }
-    { methodologyId = "security_review"
-      shortDefinition = "Reason adversarially about trust boundaries and abuse paths."
-      triggerWhen = "When tools execute code, read files, spawn subagents, or accept huge backgrounds."
-      noteDescription = "trust_boundary, assets, threat_actors, abuse_paths, existing_controls, gap_summary, hardening_actions, out_of_scope"
-      meditatorRole = "Adversarial pass on tool and subagent boundaries."
-      outputSections = [ "Boundary map"; "Abuse paths"; "Control gaps"; "Hardening"; "Next actions" ] }
-    { methodologyId = "performance_analysis"
-      shortDefinition = "Locate bottlenecks, asymptotics, and resource constraints."
-      triggerWhen = "When many methodology notebook tools, large backgrounds, Fable compile, or session history size matters."
-      noteDescription = "performance_question, workload_model, hot_paths, complexity_notes, measurement_plan, optimization_candidates, budget, anti_optimizations"
-      meditatorRole = "Tie performance claims to workload and measurement."
-      outputSections = [ "Workload"; "Hot paths"; "Measurement"; "Candidates"; "Next actions" ] }
-    { methodologyId = "user_intent_clarification"
-      shortDefinition = "Resolve ambiguous goals before optimizing the wrong target."
-      triggerWhen = "When user request could mean schema-only, full wiring, or design discussion."
-      noteDescription = "user_request_quote, interpretations, disambiguating_questions, assumed_intent, success_criteria_per_interpretation, misinterpretation_cost, clarified_out_of_scope"
-      meditatorRole = "Make interpretations explicit before large automated work."
-      outputSections = [ "Interpretations"; "Questions"; "Working assumption"; "Success criteria"; "Next actions" ] }
-]
+let entries: MethodologyEntry list =
+    [ { methodologyId = "conceptual_analysis"
+        shortDefinition = "Clarify meanings, category boundaries, scope; remove category mistakes."
+        triggerWhen = "When terms collide (tool vs wrapper vs agent vs session vs task)."
+        noteDescription =
+          "confused_concept, senses_disambiguated, category_boundaries, scope_fix, category_mistakes_found, recommended_vocabulary, glossary_entries"
+        meditatorRole = "Disambiguate vocabulary before structural changes."
+        outputSections =
+          [ "Disambiguation table"
+            "Category boundaries"
+            "Scope fix"
+            "Vocabulary"
+            "Next actions" ] }
+      { methodologyId = "dialectical_analysis"
+        shortDefinition = "Thesis, antithesis, tension, dependency, resolution—not one-sided causality."
+        triggerWhen = "When opposing forces shape design (DRY vs 54 files, kernel purity vs host Dyn)."
+        noteDescription =
+          "thesis, antithesis, tensions, dependencies, synthesis_path, frozen_decision, tradeoffs_accepted"
+        meditatorRole = "Mediate real opposing design forces instead of picking a slogan."
+        outputSections =
+          [ "Thesis vs antithesis"
+            "Tensions"
+            "Synthesis"
+            "Accepted tradeoffs"
+            "Next actions" ] }
+      { methodologyId = "hermeneutic_circle"
+        shortDefinition = "Iterate part and whole until local and global meaning stabilize."
+        triggerWhen = "Understanding large codepaths, README+implementation together, PRD+tests."
+        noteDescription =
+          "whole_artifact, part_focus, part_to_whole_updates, whole_to_part_updates, stabilized_reading, remaining_tension, reading_order"
+        meditatorRole = "Alternate local detail and global architecture until coherent."
+        outputSections =
+          [ "Iteration log"
+            "Stabilized reading"
+            "Remaining tension"
+            "Reading order"
+            "Next actions" ] }
+      { methodologyId = "deconstruction"
+        shortDefinition = "Inspect hidden binaries, excluded voices, unstable centers in framing."
+        triggerWhen = "When PRD, AGENTS, or design docs assume hierarchy that hides alternatives."
+        noteDescription =
+          "text_or_design, binary_oppositions, excluded_middle, unstable_center, internal_contradictions, reframe, actionable_extractions"
+        meditatorRole = "Expose rhetorical structure so decisions are not captive to false binaries."
+        outputSections =
+          [ "Binaries and exclusions"
+            "Contradictions"
+            "Reframe"
+            "Actionable requirements"
+            "Next actions" ] }
+      { methodologyId = "renormalization"
+        shortDefinition = "Coarse-grain micro-detail; keep scale-relevant variables; find stable macro structure."
+        triggerWhen = "When micro implementation noise obscures macro behavior (54 files, hook spaghetti)."
+        noteDescription =
+          "micro_level, macro_question, coarse_graining_map, relevant_variables, universal_pattern, micro_corrections, documentation_level"
+        meditatorRole = "Summarize micro complexity into macro laws for decision-making."
+        outputSections =
+          [ "Coarse-graining"
+            "Macro variables"
+            "Stable pattern"
+            "When to re-zoom"
+            "Next actions" ] }
+      { methodologyId = "simplification"
+        shortDefinition = "Remove accidental complexity until only essential problem remains."
+        triggerWhen = "When solution path is cluttered with frameworks, flags, duplicate adapters."
+        noteDescription =
+          "overcomplicated_surface, accidental_parts, essential_core, simplification_moves, invariants_preserved, simplification_metric, deferred_complexity"
+        meditatorRole = "Peel accidental layers without violating essential invariants."
+        outputSections =
+          [ "Accidental inventory"
+            "Essential core"
+            "Simplification moves"
+            "Preserved invariants"
+            "Next actions" ] }
+      { methodologyId = "tradeoff_analysis"
+        shortDefinition = "Compare options across explicit constraints and costs."
+        triggerWhen = "When choosing between registration strategies, schema layout, host parity approaches."
+        noteDescription =
+          "decision, options, constraints, cost_dimensions, comparison_matrix, recommendation, reversible_parts, decision_deadline"
+        meditatorRole = "Compare options honestly on named constraints—not vibes."
+        outputSections =
+          [ "Options"
+            "Constraint table"
+            "Recommendation"
+            "Reversibility"
+            "Next actions" ] }
+      { methodologyId = "risk_analysis"
+        shortDefinition = "Identify failure modes, blast radius, irreversible decisions."
+        triggerWhen = "Before large registration change or permission matrix edits."
+        noteDescription =
+          "proposed_change, failure_modes, blast_radius, irreversible_steps, risk_ranking, mitigations, residual_risk, monitoring"
+        meditatorRole = "Map failure modes and mitigations before irreversible edits."
+        outputSections =
+          [ "Failure modes"
+            "Blast radius"
+            "Mitigations"
+            "Residual risk"
+            "Next actions" ] }
+      { methodologyId = "test_driven_reasoning"
+        shortDefinition = "Make expected behavior executable before or during implementation."
+        triggerWhen =
+          "When behavior can be pinned by tests (schema registry, Args.parse required fields, architecture gates)."
+        noteDescription =
+          "behavior_claim, executable_oracles, red_phase_plan, green_phase_plan, refactor_safeties, non_testable_residual, tdd_sequence"
+        meditatorRole = "Bind reasoning to executable oracles in tests/ArchitectureTests.fs style."
+        outputSections =
+          [ "Behavior claim"
+            "Oracles"
+            "Red-green plan"
+            "TDD sequence"
+            "Next actions" ] }
+      { methodologyId = "debugging_trace"
+        shortDefinition = "Reproduce, isolate, instrument, verify the fault chain."
+        triggerWhen = "When a failure needs systematic narrowing (Fable build, hook, integration test)."
+        noteDescription =
+          "failure_signature, reproduction_steps, isolation_experiments, instrumentation_points, fault_chain, verified_fix_hypothesis, ruled_out_causes, regression_guard"
+        meditatorRole = "Document reproduce→isolate→instrument→verify without guessing."
+        outputSections =
+          [ "Reproduction"
+            "Isolation log"
+            "Fault chain"
+            "Fix hypothesis"
+            "Next actions" ] }
+      { methodologyId = "security_review"
+        shortDefinition = "Reason adversarially about trust boundaries and abuse paths."
+        triggerWhen = "When tools execute code, read files, spawn subagents, or accept huge backgrounds."
+        noteDescription =
+          "trust_boundary, assets, threat_actors, abuse_paths, existing_controls, gap_summary, hardening_actions, out_of_scope"
+        meditatorRole = "Adversarial pass on tool and subagent boundaries."
+        outputSections = [ "Boundary map"; "Abuse paths"; "Control gaps"; "Hardening"; "Next actions" ] }
+      { methodologyId = "performance_analysis"
+        shortDefinition = "Locate bottlenecks, asymptotics, and resource constraints."
+        triggerWhen =
+          "When many methodology notebook tools, large backgrounds, Fable compile, or session history size matters."
+        noteDescription =
+          "performance_question, workload_model, hot_paths, complexity_notes, measurement_plan, optimization_candidates, budget, anti_optimizations"
+        meditatorRole = "Tie performance claims to workload and measurement."
+        outputSections = [ "Workload"; "Hot paths"; "Measurement"; "Candidates"; "Next actions" ] }
+      { methodologyId = "user_intent_clarification"
+        shortDefinition = "Resolve ambiguous goals before optimizing the wrong target."
+        triggerWhen = "When user request could mean schema-only, full wiring, or design discussion."
+        noteDescription =
+          "user_request_quote, interpretations, disambiguating_questions, assumed_intent, success_criteria_per_interpretation, misinterpretation_cost, clarified_out_of_scope"
+        meditatorRole = "Make interpretations explicit before large automated work."
+        outputSections =
+          [ "Interpretations"
+            "Questions"
+            "Working assumption"
+            "Success criteria"
+            "Next actions" ] } ]

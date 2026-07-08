@@ -9,14 +9,28 @@ type ChildId = private ChildId of string
 
 module Id =
     let private parse (label: string) (input: string) : Result<string, string> =
-        if System.String.IsNullOrEmpty input then Error $"{label} must be a non-empty string" else Ok input
+        if System.String.IsNullOrEmpty input then
+            Error $"{label} must be a non-empty string"
+        else
+            Ok input
 
-    let sessionId input = parse "SessionId" input |> Result.map SessionId
-    let workspaceId input = parse "WorkspaceId" input |> Result.map WorkspaceId
-    let agentId input = parse "AgentId" input |> Result.map AgentId
-    let toolId input = parse "ToolId" input |> Result.map ToolId
-    let callId input = parse "CallId" input |> Result.map CallId
-    let childId input = parse "ChildId" input |> Result.map ChildId
+    let sessionId input =
+        parse "SessionId" input |> Result.map SessionId
+
+    let workspaceId input =
+        parse "WorkspaceId" input |> Result.map WorkspaceId
+
+    let agentId input =
+        parse "AgentId" input |> Result.map AgentId
+
+    let toolId input =
+        parse "ToolId" input |> Result.map ToolId
+
+    let callId input =
+        parse "CallId" input |> Result.map CallId
+
+    let childId input =
+        parse "ChildId" input |> Result.map ChildId
 
     let sessionIdValue (SessionId value) = value
     let workspaceIdValue (WorkspaceId value) = value
@@ -30,7 +44,9 @@ module Id =
     let agentIdQuick (input: string) : AgentId = AgentId input
 
     let private tryId (parser: string -> Result<'id, string>) (input: string) : 'id option =
-        match parser input with Ok value -> Some value | _ -> None
+        match parser input with
+        | Ok value -> Some value
+        | _ -> None
 
     let trySessionId = tryId sessionId
     let tryWorkspaceId = tryId workspaceId
@@ -59,9 +75,14 @@ let formatDomainError (error: DomainError) : string =
     | ClientCancellation source -> $"client cancelled: {source}"
     | FileSystemFault(path, errno, msg) -> $"file system fault: path={path}, errno={errno}: {msg}"
     | NetworkTransportFailure(url, statusCode, body) ->
-        let status = match statusCode with Some s -> string s | None -> "none"
+        let status =
+            match statusCode with
+            | Some s -> string s
+            | None -> "none"
+
         $"network transport failure: url={url}, status={status}, body={body}"
-    | HostProtocolMismatch(field, expected, actual) -> $"host protocol mismatch: field={field}, expected={expected}, actual={actual}"
+    | HostProtocolMismatch(field, expected, actual) ->
+        $"host protocol mismatch: field={field}, expected={expected}, actual={actual}"
     | SessionBusy -> "session busy"
     | TaskWaitBackgrounded -> "task wait backgrounded"
     | ExecutorExecutableMissing exe -> $"executable not found: {exe}"
@@ -75,7 +96,8 @@ let formatDomainError (error: DomainError) : string =
 
 let isAbort (error: DomainError) : bool =
     match error with
-    | MessageAborted | ClientCancellation _ -> true
+    | MessageAborted
+    | ClientCancellation _ -> true
     | FileSystemFault _
     | NetworkTransportFailure _
     | HostProtocolMismatch _
@@ -91,16 +113,26 @@ let isAbort (error: DomainError) : bool =
     | UnknownJsError _ -> false
 
 let containsAbortText (message: string) : bool =
-    not (System.String.IsNullOrWhiteSpace message) && message.ToLowerInvariant().Contains("abort")
+    not (System.String.IsNullOrWhiteSpace message)
+    && message.ToLowerInvariant().Contains("abort")
 
 let private (|AbortError|_|) (name: string, tag: string) =
-    if name = "AbortError" || name = "MessageAbortedError" || tag = "MessageAborted" then Some () else None
+    if name = "AbortError" || name = "MessageAbortedError" || tag = "MessageAborted" then
+        Some()
+    else
+        None
 
 let private (|SessionBusyError|_|) (name: string, tag: string) =
-    if name = "SessionBusyError" || tag = "SessionBusy" then Some () else None
+    if name = "SessionBusyError" || tag = "SessionBusy" then
+        Some()
+    else
+        None
 
 let private (|ForegroundWaitBackgroundedError|_|) (name: string, tag: string) =
-    if name = "ForegroundWaitBackgroundedError" || tag = "TaskWaitBackgrounded" then Some () else None
+    if name = "ForegroundWaitBackgroundedError" || tag = "TaskWaitBackgrounded" then
+        Some()
+    else
+        None
 
 let classifyErrorLeaf (name: string) (tag: string) (message: string) : DomainError =
     match name, tag with
@@ -127,5 +159,9 @@ let empty: WorkspaceState = { childSessions = Map.empty }
 
 let reduce (state: WorkspaceState) (event: WorkspaceEvent) : WorkspaceState =
     match event with
-    | ChildRegistered(childId, meta) -> { state with childSessions = Map.add childId meta state.childSessions }
-    | ChildUnregistered childId -> { state with childSessions = Map.remove childId state.childSessions }
+    | ChildRegistered(childId, meta) ->
+        { state with
+            childSessions = Map.add childId meta state.childSessions }
+    | ChildUnregistered childId ->
+        { state with
+            childSessions = Map.remove childId state.childSessions }

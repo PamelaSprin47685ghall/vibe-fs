@@ -2,89 +2,165 @@ module Wanxiangshu.Methodology.Catalog2
 
 open Wanxiangshu.Methodology.SchemaCommon
 
-let entries: MethodologyEntry list = [
-    { methodologyId = "model_problem_transfer"
-      shortDefinition = "Transfer a solution skeleton from a canonical template when topology matches."
-      triggerWhen = "When the task resembles a well-known pattern: plugin adapter, state machine, codec boundary."
-      noteDescription = "canonical_template, current_problem, shared_unknowns, shared_constraints, transfer_steps, assumption_failures, reference_implementation, checklist"
-      meditatorRole = "Map current work onto a canonical repo pattern and flag broken assumptions."
-      outputSections = [ "Template mapping"; "Transfer steps"; "Failed assumptions"; "Checklist"; "Next actions" ] }
-    { methodologyId = "constructive_method"
-      shortDefinition = "Build the required object, algorithm, or witness directly."
-      triggerWhen = "When existence is shown by exhibiting a concrete construction, not by contradiction."
-      noteDescription = "object_to_construct, construction_materials, construction_steps, witness, minimality_argument, non_constructive_alternative, dependencies"
-      meditatorRole = "Exhibit an explicit build plan and witness for the required artifact."
-      outputSections = [ "Construction plan"; "Witness"; "Minimality"; "Next actions" ] }
-    { methodologyId = "reductio_ad_absurdum"
-      shortDefinition = "Assume the negation and derive a contradiction."
-      triggerWhen = "When proving an approach, invariant, or design choice cannot hold."
-      noteDescription = "claim_to_refute, assumed_negation, derivation_toward_contradiction, contradiction, facts_used, positive_alternative, limits_of_argument"
-      meditatorRole = "Assume the unwanted design and drive it into a workspace-anchored contradiction."
-      outputSections = [ "Negation setup"; "Derivation"; "Contradiction"; "Positive alternative"; "Next actions" ] }
-    { methodologyId = "invariance"
-      shortDefinition = "Find what cannot change under allowed operations, rewrites, or state transitions."
-      triggerWhen = "When refactoring, replaying history, or parallelizing work risks breaking silent conservation laws."
-      noteDescription = "system_under_study, allowed_operations, candidate_invariants, invariant_evidence, violation_symptom, non_invariants, enforcement_mechanism"
-      meditatorRole = "List conserved quantities under planned edits and tie each to evidence."
-      outputSections = [ "Operation set"; "Invariant table"; "Violation symptoms"; "Enforcement"; "Next actions" ] }
-    { methodologyId = "symmetry_analysis"
-      shortDefinition = "Exploit equivalence of cases; inspect symmetry breaking for bugs."
-      triggerWhen = "When Mux/Opencode, read/write, or dual code paths should behave mirror-wise."
-      noteDescription = "symmetry_group, equivalent_cases, symmetry_breakers, observed_asymmetry, collapse_plan, canonical_side, regression_tests"
-      meditatorRole = "Separate legitimate symmetry breaking from accidental host drift."
-      outputSections = [ "Symmetry map"; "Observed asymmetry"; "Collapse plan"; "Regression tests"; "Next actions" ] }
-    { methodologyId = "dimensional_reduction"
-      shortDefinition = "Project to a lower-dimensional view, reason there, lift conclusions cautiously."
-      triggerWhen = "When full state space is too large: long sessions, 54 tools, entire monorepo."
-      noteDescription = "full_state_description, projection, dropped_dimensions, reasoning_in_slice, lift_risks, minimal_reproduction, follow_up_projections"
-      meditatorRole = "Reason in a deliberate slice and document lift hazards."
-      outputSections = [ "Projection definition"; "In-slice reasoning"; "Lift risks"; "Minimal reproduction"; "Next actions" ] }
-    { methodologyId = "perturbation_continuity"
-      shortDefinition = "Vary one variable slightly from an easy case to see what survives and where behavior phases-changes."
-      triggerWhen = "When a hard bug sits near a working configuration (flag off, smaller input, older branch)."
-      noteDescription = "easy_baseline, hard_case, perturbations, surviving_properties, phase_change_point, bisection_plan, rollback_strategy"
-      meditatorRole = "Bisect from easy to hard via single-variable perturbations."
-      outputSections = [ "Baseline vs hard case"; "Perturbation log"; "Phase change"; "Bisection plan"; "Next actions" ] }
-    { methodologyId = "pigeonhole_principle"
-      shortDefinition = "Use counts and capacities to prove collision, overflow, or coverage must occur."
-      triggerWhen = "When exact placement is unknown but pigeonhole forces a conclusion (tools, slots, ports, ids)."
-      noteDescription = "items, slots, counting_argument, forced_conclusion, evidence_counts, mitigations, observable_signature"
-      meditatorRole = "Make counting contradiction explicit for resource or namespace limits."
-      outputSections = [ "Items vs slots"; "Counting proof"; "Forced conclusion"; "Mitigations"; "Next actions" ] }
-    { methodologyId = "duality"
-      shortDefinition = "Solve the mirrored problem when the shadow formulation is easier."
-      triggerWhen = "When direct problem is hard: producer/consumer, read/write, command/event, primal/dual search."
-      noteDescription = "primal_problem, dual_problem, correspondence_map, dual_solution_sketch, pullback_steps, duality_gap, examples_in_repo"
-      meditatorRole = "Work the shadow problem and map results back to implementation."
-      outputSections = [ "Primal–dual map"; "Dual solution"; "Pullback plan"; "Next actions" ] }
-    { methodologyId = "quotient_space"
-      shortDefinition = "Quotient by equivalence: solve on classes, map back to concrete cases."
-      triggerWhen = "When many objects differ only in irrelevant detail (paths, formatting, host wrapper noise)."
-      noteDescription = "raw_objects, equivalence_relation, equivalence_classes, problem_on_quotient, lift_map, class_counterexamples, canonicalization_function"
-      meditatorRole = "Collapse irrelevant variation via explicit equivalence before solving."
-      outputSections = [ "Equivalence definition"; "Class representatives"; "Quotient-level solution"; "Lift map"; "Next actions" ] }
-    { methodologyId = "category_mapping"
-      shortDefinition = "Preserve structure and morphisms while moving into a stronger domain (graphs, types, events)."
-      triggerWhen = "When relationships matter more than object internals."
-      noteDescription = "source_domain, target_category, object_mapping, morphism_mapping, structural_property_to_preserve, diagram_commutes_where, target_tooling"
-      meditatorRole = "Functorial map from current mess to a structured domain without dropping laws."
-      outputSections = [ "Object map"; "Morphism map"; "Preserved structure"; "Enforcement"; "Next actions" ] }
-    { methodologyId = "relaxation"
-      shortDefinition = "Temporarily weaken constraints, solve superset, project back under real constraints."
-      triggerWhen = "When hard integer, ordering, permission, or exactness constraints block search."
-      noteDescription = "hard_problem, constraints_relaxed, relaxed_solution, projection_steps, infeasible_after_projection, relaxation_cost, validation_gates"
-      meditatorRole = "Solve easier superset then honest projection with validation gates."
-      outputSections = [ "Relaxation map"; "Relaxed solution"; "Projection"; "Validation"; "Next actions" ] }
-    { methodologyId = "search_space_exploration"
-      shortDefinition = "Model candidates as a space or graph; choose traversal strategy."
-      triggerWhen = "When many design or fix options exist and ad-hoc picking is unsafe."
-      noteDescription = "search_goal, state_nodes, moves, traversal_strategy, pruned_branches, heuristic, frontier_snapshot"
-      meditatorRole = "Make the design space explicit and document traversal and pruning."
-      outputSections = [ "State graph sketch"; "Traversal strategy"; "Pruning log"; "Frontier"; "Next actions" ] }
-    { methodologyId = "branch_and_bound"
-      shortDefinition = "Prune dominated or impossible branches using bounds."
-      triggerWhen = "When exhaustive search over refactor or config options needs disciplined pruning."
-      noteDescription = "optimization_target, branches, lower_bounds, upper_bounds, pruned_branches, active_branch, bound_evidence, stop_condition"
-      meditatorRole = "Rank branches with bounds and document pruning decisions."
-      outputSections = [ "Branch table"; "Bounds"; "Pruning rationale"; "Active branch"; "Next actions" ] }
-]
+let entries: MethodologyEntry list =
+    [ { methodologyId = "model_problem_transfer"
+        shortDefinition = "Transfer a solution skeleton from a canonical template when topology matches."
+        triggerWhen = "When the task resembles a well-known pattern: plugin adapter, state machine, codec boundary."
+        noteDescription =
+          "canonical_template, current_problem, shared_unknowns, shared_constraints, transfer_steps, assumption_failures, reference_implementation, checklist"
+        meditatorRole = "Map current work onto a canonical repo pattern and flag broken assumptions."
+        outputSections =
+          [ "Template mapping"
+            "Transfer steps"
+            "Failed assumptions"
+            "Checklist"
+            "Next actions" ] }
+      { methodologyId = "constructive_method"
+        shortDefinition = "Build the required object, algorithm, or witness directly."
+        triggerWhen = "When existence is shown by exhibiting a concrete construction, not by contradiction."
+        noteDescription =
+          "object_to_construct, construction_materials, construction_steps, witness, minimality_argument, non_constructive_alternative, dependencies"
+        meditatorRole = "Exhibit an explicit build plan and witness for the required artifact."
+        outputSections = [ "Construction plan"; "Witness"; "Minimality"; "Next actions" ] }
+      { methodologyId = "reductio_ad_absurdum"
+        shortDefinition = "Assume the negation and derive a contradiction."
+        triggerWhen = "When proving an approach, invariant, or design choice cannot hold."
+        noteDescription =
+          "claim_to_refute, assumed_negation, derivation_toward_contradiction, contradiction, facts_used, positive_alternative, limits_of_argument"
+        meditatorRole = "Assume the unwanted design and drive it into a workspace-anchored contradiction."
+        outputSections =
+          [ "Negation setup"
+            "Derivation"
+            "Contradiction"
+            "Positive alternative"
+            "Next actions" ] }
+      { methodologyId = "invariance"
+        shortDefinition = "Find what cannot change under allowed operations, rewrites, or state transitions."
+        triggerWhen =
+          "When refactoring, replaying history, or parallelizing work risks breaking silent conservation laws."
+        noteDescription =
+          "system_under_study, allowed_operations, candidate_invariants, invariant_evidence, violation_symptom, non_invariants, enforcement_mechanism"
+        meditatorRole = "List conserved quantities under planned edits and tie each to evidence."
+        outputSections =
+          [ "Operation set"
+            "Invariant table"
+            "Violation symptoms"
+            "Enforcement"
+            "Next actions" ] }
+      { methodologyId = "symmetry_analysis"
+        shortDefinition = "Exploit equivalence of cases; inspect symmetry breaking for bugs."
+        triggerWhen = "When Mux/Opencode, read/write, or dual code paths should behave mirror-wise."
+        noteDescription =
+          "symmetry_group, equivalent_cases, symmetry_breakers, observed_asymmetry, collapse_plan, canonical_side, regression_tests"
+        meditatorRole = "Separate legitimate symmetry breaking from accidental host drift."
+        outputSections =
+          [ "Symmetry map"
+            "Observed asymmetry"
+            "Collapse plan"
+            "Regression tests"
+            "Next actions" ] }
+      { methodologyId = "dimensional_reduction"
+        shortDefinition = "Project to a lower-dimensional view, reason there, lift conclusions cautiously."
+        triggerWhen = "When full state space is too large: long sessions, 54 tools, entire monorepo."
+        noteDescription =
+          "full_state_description, projection, dropped_dimensions, reasoning_in_slice, lift_risks, minimal_reproduction, follow_up_projections"
+        meditatorRole = "Reason in a deliberate slice and document lift hazards."
+        outputSections =
+          [ "Projection definition"
+            "In-slice reasoning"
+            "Lift risks"
+            "Minimal reproduction"
+            "Next actions" ] }
+      { methodologyId = "perturbation_continuity"
+        shortDefinition =
+          "Vary one variable slightly from an easy case to see what survives and where behavior phases-changes."
+        triggerWhen = "When a hard bug sits near a working configuration (flag off, smaller input, older branch)."
+        noteDescription =
+          "easy_baseline, hard_case, perturbations, surviving_properties, phase_change_point, bisection_plan, rollback_strategy"
+        meditatorRole = "Bisect from easy to hard via single-variable perturbations."
+        outputSections =
+          [ "Baseline vs hard case"
+            "Perturbation log"
+            "Phase change"
+            "Bisection plan"
+            "Next actions" ] }
+      { methodologyId = "pigeonhole_principle"
+        shortDefinition = "Use counts and capacities to prove collision, overflow, or coverage must occur."
+        triggerWhen = "When exact placement is unknown but pigeonhole forces a conclusion (tools, slots, ports, ids)."
+        noteDescription =
+          "items, slots, counting_argument, forced_conclusion, evidence_counts, mitigations, observable_signature"
+        meditatorRole = "Make counting contradiction explicit for resource or namespace limits."
+        outputSections =
+          [ "Items vs slots"
+            "Counting proof"
+            "Forced conclusion"
+            "Mitigations"
+            "Next actions" ] }
+      { methodologyId = "duality"
+        shortDefinition = "Solve the mirrored problem when the shadow formulation is easier."
+        triggerWhen = "When direct problem is hard: producer/consumer, read/write, command/event, primal/dual search."
+        noteDescription =
+          "primal_problem, dual_problem, correspondence_map, dual_solution_sketch, pullback_steps, duality_gap, examples_in_repo"
+        meditatorRole = "Work the shadow problem and map results back to implementation."
+        outputSections = [ "Primal–dual map"; "Dual solution"; "Pullback plan"; "Next actions" ] }
+      { methodologyId = "quotient_space"
+        shortDefinition = "Quotient by equivalence: solve on classes, map back to concrete cases."
+        triggerWhen = "When many objects differ only in irrelevant detail (paths, formatting, host wrapper noise)."
+        noteDescription =
+          "raw_objects, equivalence_relation, equivalence_classes, problem_on_quotient, lift_map, class_counterexamples, canonicalization_function"
+        meditatorRole = "Collapse irrelevant variation via explicit equivalence before solving."
+        outputSections =
+          [ "Equivalence definition"
+            "Class representatives"
+            "Quotient-level solution"
+            "Lift map"
+            "Next actions" ] }
+      { methodologyId = "category_mapping"
+        shortDefinition =
+          "Preserve structure and morphisms while moving into a stronger domain (graphs, types, events)."
+        triggerWhen = "When relationships matter more than object internals."
+        noteDescription =
+          "source_domain, target_category, object_mapping, morphism_mapping, structural_property_to_preserve, diagram_commutes_where, target_tooling"
+        meditatorRole = "Functorial map from current mess to a structured domain without dropping laws."
+        outputSections =
+          [ "Object map"
+            "Morphism map"
+            "Preserved structure"
+            "Enforcement"
+            "Next actions" ] }
+      { methodologyId = "relaxation"
+        shortDefinition = "Temporarily weaken constraints, solve superset, project back under real constraints."
+        triggerWhen = "When hard integer, ordering, permission, or exactness constraints block search."
+        noteDescription =
+          "hard_problem, constraints_relaxed, relaxed_solution, projection_steps, infeasible_after_projection, relaxation_cost, validation_gates"
+        meditatorRole = "Solve easier superset then honest projection with validation gates."
+        outputSections =
+          [ "Relaxation map"
+            "Relaxed solution"
+            "Projection"
+            "Validation"
+            "Next actions" ] }
+      { methodologyId = "search_space_exploration"
+        shortDefinition = "Model candidates as a space or graph; choose traversal strategy."
+        triggerWhen = "When many design or fix options exist and ad-hoc picking is unsafe."
+        noteDescription =
+          "search_goal, state_nodes, moves, traversal_strategy, pruned_branches, heuristic, frontier_snapshot"
+        meditatorRole = "Make the design space explicit and document traversal and pruning."
+        outputSections =
+          [ "State graph sketch"
+            "Traversal strategy"
+            "Pruning log"
+            "Frontier"
+            "Next actions" ] }
+      { methodologyId = "branch_and_bound"
+        shortDefinition = "Prune dominated or impossible branches using bounds."
+        triggerWhen = "When exhaustive search over refactor or config options needs disciplined pruning."
+        noteDescription =
+          "optimization_target, branches, lower_bounds, upper_bounds, pruned_branches, active_branch, bound_evidence, stop_condition"
+        meditatorRole = "Rank branches with bounds and document pruning decisions."
+        outputSections =
+          [ "Branch table"
+            "Bounds"
+            "Pruning rationale"
+            "Active branch"
+            "Next actions" ] } ]

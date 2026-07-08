@@ -33,9 +33,8 @@ let noMatchReturnsEmpty () =
 
 let deduplicatesSamePath () =
     let text =
-        "*** Add File: src/Foo.fs\n"
-        + "some context\n"
-        + "*** Update File: src/Foo.fs"
+        "*** Add File: src/Foo.fs\n" + "some context\n" + "*** Update File: src/Foo.fs"
+
     let result = pathsFromPatchText text
     equal "deduplicate same path" [ "src/Foo.fs" ] result
 
@@ -44,6 +43,7 @@ let multipleDistinctPaths () =
         "*** Add File: src/A.fs\n"
         + "*** Update File: src/B.fs\n"
         + "*** Move to: src/C.fs"
+
     let result = pathsFromPatchText text
     equal "multiple distinct paths" [ "src/A.fs"; "src/B.fs"; "src/C.fs" ] result
 

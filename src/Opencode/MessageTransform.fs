@@ -34,7 +34,11 @@ open Wanxiangshu.Shell.SembleSearch
 
 let private extractSessionID (messages: Message<obj> list) : string =
     messages
-    |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None)
+    |> List.tryPick (fun m ->
+        if m.info.sessionID <> "" then
+            Some m.info.sessionID
+        else
+            None)
     |> Option.defaultValue ""
 
 let injectSembleIntoEncoded
@@ -49,10 +53,15 @@ let injectSembleIntoEncoded
             return encoded
         else
             let messages = MessagingCodec.decodeMessages encoded
+
             match SembleSearch.breakpointStart sessionID with
             | None ->
                 SembleSearch.markBreakpoint sessionID encoded.Length
-                SembleMcp.trace "DECIDE" $"reseed: no prior breakpoint, skip this turn (agent={agent}, len={encoded.Length})"
+
+                SembleMcp.trace
+                    "DECIDE"
+                    $"reseed: no prior breakpoint, skip this turn (agent={agent}, len={encoded.Length})"
+
                 return encoded
             | Some stored when stored > List.length messages ->
                 SembleSearch.markBreakpoint sessionID encoded.Length
@@ -60,36 +69,56 @@ let injectSembleIntoEncoded
                 return encoded
             | Some startIndex ->
                 let context = SembleSearch.extractContextFromMessages startIndex messages
+
                 if context.Length = 0 then
                     SembleMcp.trace "DECIDE" $"skip: empty context (start={startIndex}, len={encoded.Length})"
                     return encoded
                 else
                     let! results = SembleSearch.search context directory 3
+
                     if results.IsEmpty then
                         SembleMcp.trace "DECIDE" $"skip: no results (start={startIndex}, len={encoded.Length})"
                         return encoded
                     else
                         let rec findLastAssistant i =
-                            if i < 0 then None
+                            if i < 0 then
+                                None
                             else
                                 let m = encoded.[i]
                                 let role = Wanxiangshu.Shell.Dyn.str (Wanxiangshu.Shell.Dyn.get m "info") "role"
-                                if role = "assistant" then Some m else findLastAssistant (i - 1)
+
+                                if role = "assistant" then
+                                    Some m
+                                else
+                                    findLastAssistant (i - 1)
+
                         match findLastAssistant (encoded.Length - 1) with
                         | None ->
                             SembleMcp.trace "DECIDE" "skip: no assistant to attach reads"
                             return encoded
                         | Some lastAssistant ->
-                            let assistantId = Wanxiangshu.Shell.Dyn.str (Wanxiangshu.Shell.Dyn.get lastAssistant "info") "id"
+                            let assistantId =
+                                Wanxiangshu.Shell.Dyn.str (Wanxiangshu.Shell.Dyn.get lastAssistant "info") "id"
+
                             let newToolParts = SembleSearch.buildReadToolParts assistantId sessionID results
+
                             if Array.isEmpty newToolParts then
                                 SembleMcp.trace "DECIDE" "skip: no tool parts"
                                 return encoded
                             else
                                 let originalParts = Wanxiangshu.Shell.Dyn.get lastAssistant "parts"
+
                                 let cleaned =
-                                    if Wanxiangshu.Shell.Dyn.isNullish originalParts || not (Wanxiangshu.Shell.Dyn.isArray originalParts) then [||]
-                                    else (originalParts :?> obj array) |> Array.filter (fun p -> not ((Wanxiangshu.Shell.Dyn.str p "callID").StartsWith("semble-call-")))
+                                    if
+                                        Wanxiangshu.Shell.Dyn.isNullish originalParts
+                                        || not (Wanxiangshu.Shell.Dyn.isArray originalParts)
+                                    then
+                                        [||]
+                                    else
+                                        (originalParts :?> obj array)
+                                        |> Array.filter (fun p ->
+                                            not ((Wanxiangshu.Shell.Dyn.str p "callID").StartsWith("semble-call-")))
+
                                 let combined = Array.append cleaned newToolParts
                                 lastAssistant?parts <- box combined
                                 SembleSearch.markBreakpoint sessionID encoded.Length
@@ -97,67 +126,91 @@ let injectSembleIntoEncoded
                                 return encoded
     }
 
-let messagesTransform (registry: ChildAgentRegistry) (directory: string) (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) (backlogSession: BacklogSession) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (_client: obj) (input: obj) (output: obj) : JS.Promise<unit> =
+let messagesTransform
+    (registry: ChildAgentRegistry)
+    (directory: string)
+    (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
+    (backlogSession: BacklogSession)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
+    (_client: obj)
+    (input: obj)
+    (output: obj)
+    : JS.Promise<unit> =
     promise {
         runtimeScope.TriggerInit(directory)
         do! runtimeScope.WaitInit()
+
         match tryGetMessagesArrayFromOutput output with
         | None -> ()
         | Some messagesArr ->
-                let messagesList = MessagingCodec.decodeMessages messagesArr
-                let agent = resolveMessagesTransformAgent registry input messagesList "build"
-                let sessionID = extractSessionID messagesList
-                let cleaned = Messaging.stripSyntheticBySource messagesList
-                let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
-                let excluded = shouldExcludeAgentFromProjection agent false
-                let backlogOps =
-                    backlogSessionOpsFrom backlogSession.Host
-                        (fun sid msgs -> backlogSession.GetOrRebuildBacklog(sid, msgs))
-                let plan = {
-                    SessionID = sessionID
-                    Agent = agent
-                    Directory = directory
-                    Excluded = excluded
-                    IsSubagentSession = isSub
-                    Cleaned = cleaned
-                    RawArray = Some messagesArr
-                }
-                let replayTexts () : JS.Promise<string seq> =
-                    Promise.lift (extractTextsFromEncodedMessages messagesArr)
-                let dedupFn excluded encoded =
-                    if excluded then encoded
-                    else
-                        deduplicateOpencodeReadPartsInPlace encoded
-                        encoded
-                let injectFn excluded encoded =
-                    if excluded then Promise.lift encoded
-                    else injectSembleIntoEncoded directory agent sessionID encoded
-                let loadCaps () =
-                    let parentSessionID =
-                        registry.ResolveSubsessionParentID(Some sessionID)
-                        |> Option.defaultValue sessionID
-                    let planWithParent = { plan with SessionID = parentSessionID }
-                    loadCapsForScope runtimeScope AllowEmptyDirectory planWithParent
-                let buildCaps encoded capsFiles prelude =
-                    buildCapsMessages Wanxiangshu.Shell.FileSys.sha256HexTruncated encoded directory capsFiles prelude
-                let! final =
-                    runHostMessagesTransform
-                        reviewStore
-                        sessionID
-                        IfStoreEmpty
-                        replayTexts
-                        plan
-                        backlogOps
-                        MessagingCodec.encodeMessages
-                        injectFn
-                        dedupFn
-                        loadCaps
-                        buildCaps
-                replaceArrayInPlace messagesArr final
+            let messagesList = MessagingCodec.decodeMessages messagesArr
+            let agent = resolveMessagesTransformAgent registry input messagesList "build"
+            let sessionID = extractSessionID messagesList
+            let cleaned = Messaging.stripSyntheticBySource messagesList
+            let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
+            let excluded = shouldExcludeAgentFromProjection agent false
+
+            let backlogOps =
+                backlogSessionOpsFrom backlogSession.Host (fun sid msgs ->
+                    backlogSession.GetOrRebuildBacklog(sid, msgs))
+
+            let plan =
+                { SessionID = sessionID
+                  Agent = agent
+                  Directory = directory
+                  Excluded = excluded
+                  IsSubagentSession = isSub
+                  Cleaned = cleaned
+                  RawArray = Some messagesArr }
+
+            let replayTexts () : JS.Promise<string seq> =
+                Promise.lift (extractTextsFromEncodedMessages messagesArr)
+
+            let dedupFn excluded encoded =
+                if excluded then
+                    encoded
+                else
+                    deduplicateOpencodeReadPartsInPlace encoded
+                    encoded
+
+            let injectFn excluded encoded =
+                if excluded then
+                    Promise.lift encoded
+                else
+                    injectSembleIntoEncoded directory agent sessionID encoded
+
+            let loadCaps () =
+                let parentSessionID =
+                    registry.ResolveSubsessionParentID(Some sessionID)
+                    |> Option.defaultValue sessionID
+
+                let planWithParent =
+                    { plan with
+                        SessionID = parentSessionID }
+
+                loadCapsForScope runtimeScope AllowEmptyDirectory planWithParent
+
+            let buildCaps encoded capsFiles prelude =
+                buildCapsMessages Wanxiangshu.Shell.FileSys.sha256HexTruncated encoded directory capsFiles prelude
+
+            let! final =
+                runHostMessagesTransform
+                    reviewStore
+                    sessionID
+                    IfStoreEmpty
+                    replayTexts
+                    plan
+                    backlogOps
+                    MessagingCodec.encodeMessages
+                    injectFn
+                    dedupFn
+                    loadCaps
+                    buildCaps
+
+            replaceArrayInPlace messagesArr final
     }
 
-let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
-    unbox (target?(method)(arg))
+let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
 
 let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
     promise { setSystemOutputToDirectory directory output }

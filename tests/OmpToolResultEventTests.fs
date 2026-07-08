@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Omp.ToolResultEvent
+
 module Dyn = Wanxiangshu.Shell.Dyn
 
 let getToolInputPrefersInputOverArgs () =
@@ -19,7 +20,9 @@ let getToolInputReturnsNullishWhenNeitherPresent () =
     check "no input or args → nullish" (Dyn.isNullish (getToolInput event))
 
 let getToolCallIdPrefersToolCallId () =
-    let event = createObj [ "toolCallId", box "tc-1"; "callId", box "c-1"; "callID", box "cID-1" ]
+    let event =
+        createObj [ "toolCallId", box "tc-1"; "callId", box "c-1"; "callID", box "cID-1" ]
+
     equal "toolCallId wins" "tc-1" (getToolCallId event)
 
 let getToolCallIdFallsBackToCallId () =
@@ -41,11 +44,10 @@ let getToolResultTextFromContentArray () =
 
 let getToolResultTextFromContentArrayMixed () =
     let content =
-        [|
-            createObj [ "type", box "text"; "text", box "hello " ]
-            "plain-string-segment"
-            createObj [ "type", box "text"; "text", box "world" ]
-        |]
+        [| createObj [ "type", box "text"; "text", box "hello " ]
+           "plain-string-segment"
+           createObj [ "type", box "text"; "text", box "world" ] |]
+
     let event = createObj [ "content", box content ]
     equal "mixed array content" "hello plain-string-segmentworld" (getToolResultText event)
 
@@ -59,7 +61,9 @@ let setToolResultTextLeavesReadableText () =
     equal "round-trip readable" "hello world" (getToolResultText event)
 
 let setToolResultTextPreservesArrayForm () =
-    let event = createObj [ "content", box [| createObj [ "type", box "text"; "text", box "old" ] |] ]
+    let event =
+        createObj [ "content", box [| createObj [ "type", box "text"; "text", box "old" ] |] ]
+
     setToolResultText event "new text"
     equal "overwrite preserves array readability" "new text" (getToolResultText event)
 

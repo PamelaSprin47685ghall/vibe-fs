@@ -51,7 +51,12 @@ let catalogLazySameAsEagerListLength () =
 
 let catalogLazyIsDeferredBeforeAccess () =
     let mutable evaluated = false
-    let lazyVal = lazy (evaluated <- true; 42)
+
+    let lazyVal =
+        lazy
+            (evaluated <- true
+             42)
+
     check "lazy not created" (not lazyVal.IsValueCreated)
     check "lazy not evaluated" (not evaluated)
     let v = lazyVal.Value

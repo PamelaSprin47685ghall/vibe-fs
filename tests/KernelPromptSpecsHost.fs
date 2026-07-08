@@ -12,21 +12,36 @@ let hostKernel' () =
     let coderIntent =
         { objective = "fix bug"
           background = "user reported failure"
-          targets = [ { file = "a.ts"; guide = "fix root cause"; draft = None }; { file = "b.ts"; guide = "align types"; draft = None } ]
+          targets =
+            [ { file = "a.ts"
+                guide = "fix root cause"
+                draft = None }
+              { file = "b.ts"
+                guide = "align types"
+                draft = None } ]
           doNotTouch = [| "shared.ts" |] }
+
     let intent = coderPrompt coderIntent
     check "coder has file" (intent.IndexOf("a.ts") >= 0)
     check "coder has objective" (intent.IndexOf("fix bug") >= 0)
     check "coder has do_not_touch" (intent.IndexOf("shared.ts") >= 0)
-    let prompt = meditatorPrompt [ { file = "x.fs"; content = Some "let x = 1" } ] "why?"
+
+    let prompt =
+        meditatorPrompt
+            [ { file = "x.fs"
+                content = Some "let x = 1" } ]
+            "why?"
+
     check "meditator has question" (prompt.IndexOf("why?") >= 0)
     check "meditator has content" (prompt.IndexOf("let x = 1") >= 0)
     check "meditator read-only" (prompt.IndexOf("READ-ONLY") >= 0)
+
     let inv =
         { objective = "find auth"
           background = "need entry points"
           questions = [| "Where is auth configured?" |]
           entries = [||] }
+
     let investigatorPromptText = investigatorPrompt inv
     check "investigator has objective" (investigatorPromptText.IndexOf("find auth") >= 0)
     check "investigator read-only" (investigatorPromptText.IndexOf("READ-ONLY") >= 0)

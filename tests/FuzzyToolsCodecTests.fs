@@ -17,12 +17,12 @@ let private okGrep args =
 
 let decodeFindOkFull () =
     let args =
-        createObj [
-            "pattern", box [| "foo" |]
-            "path", box "src/"
-            "limit", box 10
-            "iterator", box "it-1"
-        ]
+        createObj
+            [ "pattern", box [| "foo" |]
+              "path", box "src/"
+              "limit", box 10
+              "iterator", box "it-1" ]
+
     let p = okFind args
     check "find pattern" (p.pattern = [ "foo" ])
     check "find path" (p.path = Some "src/")
@@ -31,15 +31,17 @@ let decodeFindOkFull () =
 
 let decodeFindMissingPatternErrors () =
     let args = createObj [ "path", box "lib" ]
+
     match decodeFuzzyFindArgs args with
-    | Error (InvalidIntent ("fuzzy_find", "pattern", "pattern is required on the first call")) ->
+    | Error(InvalidIntent("fuzzy_find", "pattern", "pattern is required on the first call")) ->
         check "find missing pattern error" true
     | _ -> check "find missing pattern error" false
 
 let decodeFindLimitBelowOneErrors () =
     let args = createObj [ "pattern", box [| "x" |]; "limit", box 0 ]
+
     match decodeFuzzyFindArgs args with
-    | Error (InvalidIntent ("fuzzy_find", "limit", "must be >= 1")) -> check "find limit zero" true
+    | Error(InvalidIntent("fuzzy_find", "limit", "must be >= 1")) -> check "find limit zero" true
     | _ -> check "find limit zero" false
 
 let decodeFindIteratorOnlyResume () =
@@ -50,14 +52,14 @@ let decodeFindIteratorOnlyResume () =
 
 let decodeGrepOkWithExcludeArray () =
     let args =
-        createObj [
-            "pattern", box [| "needle" |]
-            "exclude", box [| "test/"; "*.min.js" |]
-            "searchIgnored", box true
-            "caseSensitive", box true
-            "context", box 2
-            "limit", box 25
-        ]
+        createObj
+            [ "pattern", box [| "needle" |]
+              "exclude", box [| "test/"; "*.min.js" |]
+              "searchIgnored", box true
+              "caseSensitive", box true
+              "context", box 2
+              "limit", box 25 ]
+
     let p = okGrep args
     check "grep pattern" (p.pattern = [ "needle" ])
     check "grep exclude len" (p.exclude.Length = 2)
@@ -74,15 +76,17 @@ let decodeGrepExcludeScalar () =
 
 let decodeGrepMissingPatternErrors () =
     let args = createObj [ "path", box "src" ]
+
     match decodeFuzzyGrepArgs args with
-    | Error (InvalidIntent ("fuzzy_grep", "pattern", "pattern is required on the first call")) ->
+    | Error(InvalidIntent("fuzzy_grep", "pattern", "pattern is required on the first call")) ->
         check "grep missing pattern error" true
     | _ -> check "grep missing pattern error" false
 
 let decodeGrepLimitBelowOneErrors () =
     let args = createObj [ "pattern", box [| "x" |]; "limit", box -1 ]
+
     match decodeFuzzyGrepArgs args with
-    | Error (InvalidIntent ("fuzzy_grep", "limit", "must be >= 1")) -> check "grep limit negative" true
+    | Error(InvalidIntent("fuzzy_grep", "limit", "must be >= 1")) -> check "grep limit negative" true
     | _ -> check "grep limit negative" false
 
 let decodeGrepIteratorOnlyResume () =
@@ -93,20 +97,14 @@ let decodeGrepIteratorOnlyResume () =
     check "grep exclude empty" (p.exclude = [])
 
 let decodeGrepPatternArray () =
-    let args =
-        createObj [
-            "pattern", box [| "word1"; "word2" |]
-        ]
+    let args = createObj [ "pattern", box [| "word1"; "word2" |] ]
     let p = okGrep args
     check "grep array pattern length" (p.pattern.Length = 2)
     check "grep array pattern first" (p.pattern.[0] = "word1")
     check "grep array pattern second" (p.pattern.[1] = "word2")
 
 let decodeFindPatternArray () =
-    let args =
-        createObj [
-            "pattern", box [| "foo"; "bar"; "baz" |]
-        ]
+    let args = createObj [ "pattern", box [| "foo"; "bar"; "baz" |] ]
     let p = okFind args
     check "find array pattern length" (p.pattern.Length = 3)
     check "find array pattern first" (p.pattern.[0] = "foo")

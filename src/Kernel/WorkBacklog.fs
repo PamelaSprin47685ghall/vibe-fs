@@ -41,21 +41,38 @@ let todoStatusDesc =
 let todoPriorityDesc =
     "Priority level of the task: high, medium, low. Use priority to show execution order, not implementation difficulty."
 
-let ahaMomentsDesc = "Required (min 1024 chars). Breakthroughs and key realizations discovered during this work step. Use high-density modern Chinese."
-let changesAndReasonsDesc = "Required (min 1024 chars). What files or logic changed and the reasoning behind each change. Use high-density modern Chinese."
-let gotchasDesc = "Required (min 1024 chars). Traps, edge cases, and surprises encountered. Use high-density modern Chinese."
-let lessonsAndConventionsDesc = "Required (min 1024 chars). Patterns, conventions, or lessons future developers should keep. Use high-density modern Chinese."
-let planDesc = "Required (min 1024 chars). For initial planning, attach the detailed plan and explicitly state no implementation has started; for ongoing work, describe the next steps. Use high-density modern Chinese."
+let ahaMomentsDesc =
+    "Required (min 1024 chars). Breakthroughs and key realizations discovered during this work step. Use high-density modern Chinese."
 
-let reportFieldNames = ["ahaMoments"; "changesAndReasons"; "gotchas"; "lessonsAndConventions"; "plan"]
+let changesAndReasonsDesc =
+    "Required (min 1024 chars). What files or logic changed and the reasoning behind each change. Use high-density modern Chinese."
 
-let private consEntry (revAcc: BacklogEntry list) (entry: BacklogEntry) : BacklogEntry list =
-    entry :: revAcc
+let gotchasDesc =
+    "Required (min 1024 chars). Traps, edge cases, and surprises encountered. Use high-density modern Chinese."
+
+let lessonsAndConventionsDesc =
+    "Required (min 1024 chars). Patterns, conventions, or lessons future developers should keep. Use high-density modern Chinese."
+
+let planDesc =
+    "Required (min 1024 chars). For initial planning, attach the detailed plan and explicitly state no implementation has started; for ongoing work, describe the next steps. Use high-density modern Chinese."
+
+let reportFieldNames =
+    [ "ahaMoments"
+      "changesAndReasons"
+      "gotchas"
+      "lessonsAndConventions"
+      "plan" ]
+
+let private consEntry (revAcc: BacklogEntry list) (entry: BacklogEntry) : BacklogEntry list = entry :: revAcc
 
 /// Replay the message stream into a backlog. `entryOf` extracts the
 /// BacklogEntry for a given flat tool-result part (host-specific Dyn
 /// reading is injected by the caller, keeping this function pure).
-let replayBacklogWith (host: Host) (entryOf: FlatPart<'raw> -> BacklogEntry option) (messages: Message<'raw> list) : BacklogEntry list =
+let replayBacklogWith
+    (host: Host)
+    (entryOf: FlatPart<'raw> -> BacklogEntry option)
+    (messages: Message<'raw> list)
+    : BacklogEntry list =
     if messages.IsEmpty then
         []
     else

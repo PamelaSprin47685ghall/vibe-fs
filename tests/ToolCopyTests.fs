@@ -26,7 +26,10 @@ let submitReviewInProgress () =
     equal "in progress exact" "A review is already in progress for this session." submitReviewInProgress
 
 let opencodeSubmitReviewInProgress () =
-    equal "opencode in progress exact" "A review is already in progress. Wait for it to finish." opencodeSubmitReviewInProgress
+    equal
+        "opencode in progress exact"
+        "A review is already in progress. Wait for it to finish."
+        opencodeSubmitReviewInProgress
 
 let webSearchRequiredField () =
     let r = webSearchRequiredField "query"
@@ -45,10 +48,15 @@ let toolRequiresActiveSession () =
 
 let executorRequires () =
     check "executorRequiresSession contains executor" (executorRequiresSession.Contains "executor")
-    check "executorRequiresSession contains requires an active session" (executorRequiresSession.Contains "requires an active session")
+
+    check
+        "executorRequiresSession contains requires an active session"
+        (executorRequiresSession.Contains "requires an active session")
 
 let executorInvalidLang () =
-    check "executorInvalidLanguage contains expected shell" (executorInvalidLanguage.Contains "expected shell, python, or javascript")
+    check
+        "executorInvalidLanguage contains expected shell"
+        (executorInvalidLanguage.Contains "expected shell, python, or javascript")
 
 let webToolFailed () =
     let r = webToolFailed "label" MessageAborted
@@ -56,10 +64,16 @@ let webToolFailed () =
     check "contains aborted" (r.Contains "aborted")
 
 let reviewAlreadyActive () =
-    equal "review already active exact" "With-Review Mode is already active. Submit your work via submit_review." reviewAlreadyActiveMessage
+    equal
+        "review already active exact"
+        "With-Review Mode is already active. Submit your work via submit_review."
+        reviewAlreadyActiveMessage
 
 let preReviewPassed () =
-    equal "preReviewPassedMessage exact" "Pre-review passed. Task \"task\" already meets all criteria — no changes needed." (preReviewPassedMessage "task")
+    equal
+        "preReviewPassedMessage exact"
+        "Pre-review passed. Task \"task\" already meets all criteria — no changes needed."
+        (preReviewPassedMessage "task")
 
 let preReviewCouldNotComplete () =
     equal "preReviewCouldNotComplete exact" "Pre-review could not complete." preReviewCouldNotComplete

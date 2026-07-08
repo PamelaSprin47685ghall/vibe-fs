@@ -24,7 +24,9 @@ open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.Dyn
+
 module Dyn = Wanxiangshu.Shell.Dyn
+
 open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Kernel.EventLog.Fold
@@ -34,12 +36,15 @@ let applyActiveToolFilterForMainSession (piObj: obj) (ctxObj: obj) : JS.Promise<
     promise {
         let active =
             if Dyn.typeIs (Dyn.get piObj "getActiveTools") "function" then
-                unbox<obj array> (piObj?getActiveTools()) |> Array.map string
-            else [||]
+                unbox<obj array> (piObj?getActiveTools ()) |> Array.map string
+            else
+                [||]
+
         let filtered = filterOmpMainSessionActiveTools active
+
         if filtered.Length <> active.Length then
             if Dyn.typeIs (Dyn.get piObj "setActiveTools") "function" then
-                do! piObj?setActiveTools(filtered)
+                do! piObj?setActiveTools (filtered)
     }
 
 let beforeAgentStartHandler (piObj: obj) (event: obj) (ctxObj: obj) : JS.Promise<obj> =
@@ -55,19 +60,16 @@ let toolCallHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: ob
     promise {
         let toolName = Dyn.str event "toolName"
         let args = getToolInput event
+
         match applyToolCallHook toolName args with
-        | Some reason ->
-            return createObj [
-                "block", box true
-                "reason", box reason
-            ]
+        | Some reason -> return createObj [ "block", box true; "reason", box reason ]
         | None ->
             match getSessionIdFromContext ctx with
             | Some sessionId when not (isChildSession ompScope sessionId) && isChildOnlyTool toolName ->
-                return createObj [
-                    "block", box true
-                    "reason", box (sprintf "Tool '%s' is child-session-only; delegate via a subagent." toolName)
-                ]
+                return
+                    createObj
+                        [ "block", box true
+                          "reason", box (sprintf "Tool '%s' is child-session-only; delegate via a subagent." toolName) ]
             | _ -> return None
     }
 
@@ -75,31 +77,53 @@ let turnStartHandler (piObj: obj) (_event: obj) (ctxObj: obj) : JS.Promise<unit>
     match getSessionIdFromContext ctxObj with
     | Some sid -> clearNudgeSession sid
     | None -> ()
+
     applyActiveToolFilterForMainSession piObj ctxObj
 
 let private sendNudgeReminder (pi: IPi) (action: NudgeAction) (snapshot: SessionSnapshot) : JS.Promise<unit> =
     promise {
         if pi.sendMessage.IsSome then
             let call (msg: obj) (opts: obj) =
-                let r = pi?sendMessage(msg, opts)
+                let r = pi?sendMessage (msg, opts)
                 if Dyn.isNullish r then Promise.lift () else unbox r
+
             match action with
             | NudgeRunner ->
-                do! call (createObj [ "customType", box "wanxiangshu-runner-reminder"; "content", box (runnerReminderContent ()); "display", box false ]) (createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
+                do!
+                    call
+                        (createObj
+                            [ "customType", box "wanxiangshu-runner-reminder"
+                              "content", box (runnerReminderContent ())
+                              "display", box false ])
+                        (createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
             | NudgeLoop ->
-                do! call (createObj [ "customType", box "wanxiangshu-loop-reminder"; "content", box (loopReminderContent snapshot.todos); "display", box false ]) (createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
+                do!
+                    call
+                        (createObj
+                            [ "customType", box "wanxiangshu-loop-reminder"
+                              "content", box (loopReminderContent snapshot.todos)
+                              "display", box false ])
+                        (createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
             | NudgeTodo ->
-                do! call (createObj [ "customType", box "wanxiangshu-todo-reminder"; "content", box (todoReminderContent snapshot.todos); "display", box false ]) (createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
+                do!
+                    call
+                        (createObj
+                            [ "customType", box "wanxiangshu-todo-reminder"
+                              "content", box (todoReminderContent snapshot.todos)
+                              "display", box false ])
+                        (createObj [ "triggerTurn", box true; "deliverAs", box "nextTurn" ])
             | NudgeNone -> ()
     }
 
 let agentEndHandler (piObj: obj) (_reviewStore: ReviewStore) (ctxObj: obj) : JS.Promise<unit> =
     let pi = unbox<IPi> piObj
     let ctx = unbox<INudgeHooksContext> ctxObj
+
     match getSessionIdFromContext ctxObj with
     | None -> Promise.lift ()
     | Some sessionId ->
-        if isSessionForceStopped sessionId then Promise.lift ()
+        if isSessionForceStopped sessionId then
+            Promise.lift ()
         else
             match ctx.sessionManager with
             | None -> Promise.lift ()
@@ -108,7 +132,9 @@ let agentEndHandler (piObj: obj) (_reviewStore: ReviewStore) (ctxObj: obj) : JS.
                     match ctx.hasPendingMessages with
                     | Some fn -> Dyn.truthy (fn ())
                     | None -> false
-                if hasPending then Promise.lift ()
+
+                if hasPending then
+                    Promise.lift ()
                 else
                     promise {
                         let openTodos = openTodoStatuses sm
@@ -121,20 +147,24 @@ let agentEndHandler (piObj: obj) (_reviewStore: ReviewStore) (ctxObj: obj) : JS.
                         let hasRunner = hasRunningRunnerJob ompScope sessionId
                         let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
                         let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
-                        let snapshot : SessionSnapshot = {
-                            todos = snap.openTodos
-                            lastAssistantMessage = snap.lastAssistantText
-                            isLoopActive = snap.isLoopActive
-                            nudgeBlockedForTurn = blocked
-                            nudgeAnchorKey = key
-                            agentFromMessage = snap.agentFromMessage
-                            modelFromMessage = snap.modelFromMessage
-                            hasActiveRunner = hasRunner
-                        }
+
+                        let snapshot: SessionSnapshot =
+                            { todos = snap.openTodos
+                              lastAssistantMessage = snap.lastAssistantText
+                              isLoopActive = snap.isLoopActive
+                              nudgeBlockedForTurn = blocked
+                              nudgeAnchorKey = key
+                              agentFromMessage = snap.agentFromMessage
+                              modelFromMessage = snap.modelFromMessage
+                              hasActiveRunner = hasRunner }
+
                         match deriveAction snapshot with
                         | NudgeNone -> ()
                         | action ->
                             let! claimed = tryClaimNudgeDispatch root sessionId action snapshot.nudgeAnchorKey
-                            if not claimed then ()
-                            else do! sendNudgeReminder pi action snapshot
+
+                            if not claimed then
+                                ()
+                            else
+                                do! sendNudgeReminder pi action snapshot
                     }

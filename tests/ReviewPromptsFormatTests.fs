@@ -39,7 +39,10 @@ let formatReviewResultAcceptedWithFeedback () =
     let text = formatReviewResult result
     check "accepted with feedback contains verdict" (text.Contains "accepted")
     check "accepted with feedback contains feedback text" (text.Contains feedback)
-    check "accepted with feedback contains Review passed with feedback" (text.Contains "Review passed with the following feedback")
+
+    check
+        "accepted with feedback contains Review passed with feedback"
+        (text.Contains "Review passed with the following feedback")
 
 let formatReviewResultNeedsRevision () =
     let feedback = "Fix the boundary checks."
@@ -87,12 +90,17 @@ let bodyAfterMultiFrontMatter () =
 let multiFrontMatterExtractionToFenceStrings () =
     let input =
         "---\ntask: Ship feature\n---\n---\nauthor: Alice\nmode: review\n---\n---\nsource: compaction-anchor\n---\n---\nsquad_event: tasks_created\nsession_id: s1\n---\n---\nverdict: accepted\n---\nBody."
+
     let fences = extractFrontMatterFenceStrings input
     equal "whitelist keeps task, squad_event, verdict" 3 (List.length fences)
     check "first fence has task" (fences.[0].Contains "task")
     check "second fence has squad_event" (fences.[1].Contains "squad_event")
     check "third fence has verdict" (fences.[2].Contains "verdict")
-    check "no compaction marker in fences" (not (List.exists (fun (s: string) -> s.Contains "compaction-anchor") fences))
+
+    check
+        "no compaction marker in fences"
+        (not (List.exists (fun (s: string) -> s.Contains "compaction-anchor") fences))
+
     check "no non-whitelist blocks" (not (List.exists (fun (s: string) -> s.Contains "Alice") fences))
 
 let compactionAnchorPromptRendersMarkerAndBody () =
@@ -100,7 +108,10 @@ let compactionAnchorPromptRendersMarkerAndBody () =
     let fence2 = "---\nauthor: Bob\n---"
     let prompt = renderCompactionAnchorPrompt [ fence1; fence2 ]
     check "prompt contains body" (prompt.Contains "See above for some messages before compaction.")
-    let fenceCount = prompt.Split([| "---" |], System.StringSplitOptions.None).Length - 1
+
+    let fenceCount =
+        prompt.Split([| "---" |], System.StringSplitOptions.None).Length - 1
+
     check "prompt has two fences" (fenceCount >= 2)
 
 let compactionAnchorPromptEmptyFencesReturnsEmpty () =

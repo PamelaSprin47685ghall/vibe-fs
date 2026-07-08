@@ -3,6 +3,7 @@ module Wanxiangshu.E2e.TestsServePlugin
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.E2e.HarnessTypes
+
 [<Emit("JSON.stringify($0)")>]
 let private jsonStringify (o: obj) : string = jsNative
 
@@ -22,18 +23,53 @@ let runServePluginChecks
         let toolListBodies = bodies harness
         chk "e2e.serve.tools.websearch-listed" (containsTool harness "websearch" || toolListBodies.Contains "websearch")
         chk "e2e.serve.tools.webfetch-listed" (containsTool harness "webfetch" || toolListBodies.Contains "webfetch")
-        chk "e2e.serve.tools.methodology-listed" (containsTool harness "methodology" || toolListBodies.Contains "methodology")
 
-        do! toolRound harness sessionID "websearch" (box {| query = "wanxiangshu e2e"; numResults = 3; what_to_summarize = "errors only" |}) "run websearch"
+        chk
+            "e2e.serve.tools.methodology-listed"
+            (containsTool harness "methodology" || toolListBodies.Contains "methodology")
+
+        do!
+            toolRound
+                harness
+                sessionID
+                "websearch"
+                (box
+                    {| query = "wanxiangshu e2e"
+                       numResults = 3
+                       what_to_summarize = "errors only" |})
+                "run websearch"
+
         chk "e2e.serve.websearch.tool-called" (containsTool harness "websearch")
 
-        do! toolRound harness sessionID "webfetch" (box {| url = "file://" + harness.workDir + "/README.md"; extract_main = false |}) "webfetch README"
+        do!
+            toolRound
+                harness
+                sessionID
+                "webfetch"
+                (box
+                    {| url = "file://" + harness.workDir + "/README.md"
+                       extract_main = false |})
+                "webfetch README"
+
         chk "e2e.serve.webfetch.tool-called" (containsTool harness "webfetch")
 
         let methIntent = String.replicate 600 "intent "
         let methBg = String.replicate 600 "background "
         let methNote = String.replicate 600 "note "
-        do! toolRoundWithCalls harness sessionID "methodology" (box {| methodology = "first_principles"; intent = methIntent; background = methBg; note = methNote |}) "run methodology first_principles" 2
+
+        do!
+            toolRoundWithCalls
+                harness
+                sessionID
+                "methodology"
+                (box
+                    {| methodology = "first_principles"
+                       intent = methIntent
+                       background = methBg
+                       note = methNote |})
+                "run methodology first_principles"
+                2
+
         chk "e2e.serve.methodology.tool-called" (containsTool harness "methodology")
 
         let! loopRes = harness.runSessionCommand sessionID "loop" "implement feature X via serve" emptyObj
@@ -46,7 +82,9 @@ let runServePluginChecks
         chk "e2e.serve.loop.ndjson-task" (ndLoopText.Contains "implement feature X via serve")
         let! msgsAfterLoop = harness.getMessages sessionID emptyObj
         let historyLoop = harness.allMessagesText (unbox<obj> msgsAfterLoop)
-        chk "e2e.serve.loop.withReviewText"
+
+        chk
+            "e2e.serve.loop.withReviewText"
             (historyLoop.Contains "With-Review Mode is active"
              || ndLoopText.Contains "loop_activated")
 
@@ -57,7 +95,9 @@ let runServePluginChecks
         chk "e2e.serve.loop.cancel.ndjson" (ndAfterCancel.Contains "loop_cancelled")
         let! msgsAfterCancel = harness.getMessages sessionID emptyObj
         let historyCancel = harness.allMessagesText (unbox<obj> msgsAfterCancel)
-        chk "e2e.serve.loop.cancel.message"
+
+        chk
+            "e2e.serve.loop.cancel.message"
             (historyCancel.Contains "With-Review Mode cancelled"
              || ndAfterCancel.Contains "loop_cancelled")
 
@@ -66,16 +106,27 @@ let runServePluginChecks
         chk "e2e.serve.commands.has-loop" (cmdJson.Contains "loop")
 
         let reportMin = String.replicate 1100 "x"
+
         let todoArgs =
-            createObj [
-                "todos", box (ResizeArray([box (createObj [ "content", box "serve ndjson todo"; "status", box "in_progress"; "priority", box "high" ])]))
-                "ahaMoments", box reportMin
-                "changesAndReasons", box reportMin
-                "gotchas", box reportMin
-                "lessonsAndConventions", box reportMin
-                "plan", box reportMin
-                "select_methodology", box (ResizeArray(["first_principles"]))
-            ]
+            createObj
+                [ "todos",
+                  box (
+                      ResizeArray(
+                          [ box (
+                                createObj
+                                    [ "content", box "serve ndjson todo"
+                                      "status", box "in_progress"
+                                      "priority", box "high" ]
+                            ) ]
+                      )
+                  )
+                  "ahaMoments", box reportMin
+                  "changesAndReasons", box reportMin
+                  "gotchas", box reportMin
+                  "lessonsAndConventions", box reportMin
+                  "plan", box reportMin
+                  "select_methodology", box (ResizeArray([ "first_principles" ])) ]
+
         do! toolRound harness sessionID "todowrite" todoArgs "commit todo backlog via todowrite"
         chk "e2e.serve.todowrite.tool-called" (containsTool harness "todowrite")
         let! ndTodo = harness.waitForNdjson 2 15000

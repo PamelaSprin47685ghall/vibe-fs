@@ -25,6 +25,7 @@ let findFirstNonSynthMessageSkipsSynth () =
     let synth = msg $"{capsAssistantPrefix}x"
     let ack = msg $"{capsAcknowledgePrefix}x"
     let real = msg "anchor"
+
     match findFirstNonSynthMessage messageId [| synth; ack; real |] with
     | Some m -> equal "find anchor id" "anchor" (messageId m)
     | None -> check "expected anchor" false

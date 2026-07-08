@@ -4,20 +4,26 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.Dyn
+
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Opencode.PluginMimoTui
 
 let private childRow (id: string) (title: string) (updated: float) : obj =
-    box (createObj [ "id", box id; "title", box title; "time", box (createObj [ "updated", box updated ]) ])
+    box (
+        createObj
+            [ "id", box id
+              "title", box title
+              "time", box (createObj [ "updated", box updated ]) ]
+    )
 
 let private makeFakeApi () : obj * (unit -> obj option) =
-    let mutable toastCalls : (string * string) list = []
-    let mutable dialogReplaceCalls : obj list = []
-    let mutable dialogSelectCalls : obj list = []
-    let mutable sessionGetCalls : (string * obj) list = []
-    let mutable sessionChildrenCalls : (string * obj) list = []
-    let mutable registeredCommands : obj option = None
-    let mutable disposeHook : (unit -> unit) option = None
+    let mutable toastCalls: (string * string) list = []
+    let mutable dialogReplaceCalls: obj list = []
+    let mutable dialogSelectCalls: obj list = []
+    let mutable sessionGetCalls: (string * obj) list = []
+    let mutable sessionChildrenCalls: (string * obj) list = []
+    let mutable registeredCommands: obj option = None
+    let mutable disposeHook: (unit -> unit) option = None
 
     let toast (variant: string) (message: string) : unit =
         toastCalls <- toastCalls @ [ (variant, message) ]
@@ -40,45 +46,54 @@ let private makeFakeApi () : obj * (unit -> obj option) =
         sessionChildrenCalls <- sessionChildrenCalls @ [ (sid, dir) ]
         promise { return box {| data = box [||] |} }
 
-    let commandRegister (fn: obj) : unit =
-        registeredCommands <- Some fn
+    let commandRegister (fn: obj) : unit = registeredCommands <- Some fn
 
-    let api = createObj [
-        "ui", box (createObj [
-            "toast", box toast
-            "dialog", box (createObj [
-                "replace", box dialogReplace
-                "clear", box (System.Func<unit>(fun () -> ()))
-            ])
-            "DialogSelect", box dialogSelect
-        ])
-        "client", box (createObj [
-            "session", box (createObj [
-                "get", box sessionGet
-                "children", box sessionChildren
-            ])
-        ])
-        "command", box (createObj [
-            "register", box (System.Func<obj, unit>(commandRegister))
-        ])
-        "route", box (createObj [
-            "current", box (createObj [ "name", box "session"; "params", box (createObj [ "sessionID", box "sess-1" ]) ])
-            "navigate", box (System.Func<string, obj, unit>(fun _ _ -> ()))
-        ])
-        "state", box (createObj [
-            "path", box (createObj [ "directory", box "/workspace" ])
-            "session", box (createObj [
-                "todo", box (System.Func<string, obj>(fun _ -> box [||]))
-                "messages", box (System.Func<string, obj>(fun _ -> box [||]))
-            ])
-        ])
-        "lifecycle", box (createObj [
-            "onDispose", box (System.Func<obj, obj>(fun fn ->
-                disposeHook <- Some (unbox<unit -> unit> fn)
-                box (fun () -> ())
-            ))
-        ])
-    ]
+    let api =
+        createObj
+            [ "ui",
+              box (
+                  createObj
+                      [ "toast", box toast
+                        "dialog",
+                        box (createObj [ "replace", box dialogReplace; "clear", box (System.Func<unit>(fun () -> ())) ])
+                        "DialogSelect", box dialogSelect ]
+              )
+              "client",
+              box (createObj [ "session", box (createObj [ "get", box sessionGet; "children", box sessionChildren ]) ])
+              "command", box (createObj [ "register", box (System.Func<obj, unit>(commandRegister)) ])
+              "route",
+              box (
+                  createObj
+                      [ "current",
+                        box (
+                            createObj
+                                [ "name", box "session"
+                                  "params", box (createObj [ "sessionID", box "sess-1" ]) ]
+                        )
+                        "navigate", box (System.Func<string, obj, unit>(fun _ _ -> ())) ]
+              )
+              "state",
+              box (
+                  createObj
+                      [ "path", box (createObj [ "directory", box "/workspace" ])
+                        "session",
+                        box (
+                            createObj
+                                [ "todo", box (System.Func<string, obj>(fun _ -> box [||]))
+                                  "messages", box (System.Func<string, obj>(fun _ -> box [||])) ]
+                        ) ]
+              )
+              "lifecycle",
+              box (
+                  createObj
+                      [ "onDispose",
+                        box (
+                            System.Func<obj, obj>(fun fn ->
+                                disposeHook <- Some(unbox<unit -> unit> fn)
+                                box (fun () -> ()))
+                        ) ]
+              ) ]
+
     api, (fun () -> registeredCommands)
 
 let private runTui (apiObj: obj * (unit -> obj option)) : unit =
@@ -97,14 +112,17 @@ let registerCommandsHiddenWhenNotInSession () =
     let api, _ = makeFakeApi ()
     let homeRoute = createObj [ "name", box "home" ]
     api?route?current <- box homeRoute
-    let mutable capturedCommands : obj[] option = None
+    let mutable capturedCommands: obj[] option = None
+
     let captureRegister (fn: obj) : unit =
-        capturedCommands <- Some (unbox<obj[]> (Dyn.call0 fn))
+        capturedCommands <- Some(unbox<obj[]> (Dyn.call0 fn))
+
     api?command?register <- box (System.Func<obj, unit>(captureRegister))
     // registerCommands is called synchronously inside tuiImpl's promise body;
     // the callback fires synchronously once the promise constructor runs.
     let tuiFn = Dyn.get plugin "tui"
     tuiFn $ api |> unbox<JS.Promise<unit>> |> ignore
+
     match capturedCommands with
     | None -> check "registerCommands called" false
     | Some cmds ->
@@ -145,11 +163,14 @@ let openSubagentsVisibleChildrenTriggersDialog () =
     let api, getRegistered = makeFakeApi ()
     // override children to return one visible subagent with a non-empty title
     api?client?session?children <-
-        box (System.Func<obj, JS.Promise<obj>>(fun _ ->
-            promise {
-                let child = childRow "child-1" "coder" 1000.0
-                return box {| data = box [| child |] |}
-            }))
+        box (
+            System.Func<obj, JS.Promise<obj>>(fun _ ->
+                promise {
+                    let child = childRow "child-1" "coder" 1000.0
+                    return box {| data = box [| child |] |}
+                })
+        )
+
     runTui (api, getRegistered)
     let cb = (getRegistered ()).Value
     let cmds = unbox<obj[]> (Dyn.call0 cb)
@@ -163,8 +184,11 @@ let openSubagentsFetchErrorShowsErrorToast () =
     let api, getRegistered = makeFakeApi ()
     // make session.get throw so fetchVisibleChildren hits the with branch
     api?client?session?get <-
-        box (System.Func<obj, JS.Promise<obj>>(fun _ ->
-            promise { return (raise (System.Exception("network error")) :> obj) }))
+        box (
+            System.Func<obj, JS.Promise<obj>>(fun _ ->
+                promise { return (raise (System.Exception("network error")) :> obj) })
+        )
+
     runTui (api, getRegistered)
     let cb = (getRegistered ()).Value
     let cmds = unbox<obj[]> (Dyn.call0 cb)

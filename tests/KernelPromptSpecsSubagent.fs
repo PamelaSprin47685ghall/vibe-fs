@@ -9,10 +9,13 @@ let subagentDispatch () =
     let host = opencode
     let muxHost = mimocode
 
-    let coderIntent : CoderIntent =
+    let coderIntent: CoderIntent =
         { objective = "fix bug"
           background = "user reported failure"
-          targets = [ { file = "a.ts"; guide = "fix root cause"; draft = None } ]
+          targets =
+            [ { file = "a.ts"
+                guide = "fix root cause"
+                draft = None } ]
           doNotTouch = [||] }
 
     let opencodeCoderPrompts = formatPrompt host (Coder [ coderIntent ])
@@ -26,11 +29,12 @@ let subagentDispatch () =
     check "mux coder mentions objective" (muxBody.Contains "fix bug")
     check "mux coder ends in agent_report tail" (muxBody.Contains "agent_report")
 
-    let investigatorIntent : InvestigatorIntent =
+    let investigatorIntent: InvestigatorIntent =
         { objective = "find auth"
           background = "need entry points"
           questions = [| "Where is auth configured?" |]
           entries = [||] }
+
     let invPrompts = formatPrompt host (Investigator [ investigatorIntent ])
     check "investigator prompt count" (invPrompts |> List.length = 1)
     check "investigator prompt mentions objective" ((invPrompts |> List.head).Contains "find auth")
@@ -41,6 +45,7 @@ let subagentDispatch () =
 
     let execPrompts =
         formatPrompt host (ExecutorSummary("raw shell output", "shell", "echo 1", [ "dep1" ], "short", "ro", ""))
+
     check "executor summary prompt count is one" (execPrompts |> List.length = 1)
     let execPrompt = execPrompts |> List.head
     check "executor summary embeds language" (execPrompt.Contains "language: shell")
@@ -53,9 +58,12 @@ let subagentDispatch () =
 
     let execPromptsWithFocus =
         formatPrompt host (ExecutorSummary("out", "shell", "echo 1", [], "short", "ro", "only exit codes"))
+
     check "executor summary embeds whatToSummarize" ((execPromptsWithFocus |> List.head).Contains "only exit codes")
 
-    let webPrompts = formatPrompt host (WebsearchSummary("ts compiler", "raw search results blob"))
+    let webPrompts =
+        formatPrompt host (WebsearchSummary("ts compiler", "raw search results blob"))
+
     check "websearch prompt count is one" (webPrompts |> List.length = 1)
     let webBody = webPrompts |> List.head
     check "websearch prompt embeds question" (webBody.Contains "ts compiler")
@@ -70,9 +78,14 @@ let subagentJoinReports () =
 let mimocodeFormatPromptAppendsAgentReportTail () =
     let browserPrompts = formatPrompt Mimocode (Browser "open google.com")
     let mimocodeBody = browserPrompts |> List.head
-    check "mimocode browser prompt contains MUST call the agent_report"
+
+    check
+        "mimocode browser prompt contains MUST call the agent_report"
         (mimocodeBody.Contains "MUST call the agent_report")
+
     let opencodePrompts = formatPrompt Opencode (Browser "open google.com")
     let opencodeBody = opencodePrompts |> List.head
-    check "opencode browser prompt does not append agent_report tail"
+
+    check
+        "opencode browser prompt does not append agent_report tail"
         (not (opencodeBody.Contains "MUST call the agent_report"))

@@ -52,7 +52,7 @@ let requireWorkspaceId (config: obj) (toolName: string) : Result<string, DomainE
     decodeMuxConfig (unbox<IMuxToolContext> config)
     |> Result.map (fun ctx -> ctx.WorkspaceId |> Option.map Id.workspaceIdValue |> Option.defaultValue "")
     |> Result.mapError (function
-        | InvalidIntent (_, "workspaceId", _) -> InvalidIntent (toolName, "workspaceId", "required")
+        | InvalidIntent(_, "workspaceId", _) -> InvalidIntent(toolName, "workspaceId", "required")
         | e -> e)
 
 let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promise<obj> =
@@ -65,19 +65,22 @@ let private applySyntaxCheck (result: obj) (args: obj) (config: obj) : JS.Promis
                     match fromMuxConfig config with
                     | Ok runtime -> runtime.Execution.Directory
                     | Error _ -> ""
+
                 let! formatted = readAndCheckSyntax filePath cwd false
+
                 match formatted with
                 | None -> return result
                 | Some f ->
-                    if Dyn.typeIs result "string" then return box (addSyntax (string result) f)
+                    if Dyn.typeIs result "string" then
+                        return box (addSyntax (string result) f)
                     elif Dyn.typeIs result "object" && Dyn.truthy (Dyn.get result "success") then
                         let out = Dyn.str result "output"
-                        let wrapped =
-                            if out <> "" then addSyntax out f
-                            else addSyntax "" f
+                        let wrapped = if out <> "" then addSyntax out f else addSyntax "" f
                         return Dyn.withKey result "output" (box wrapped)
-                    else return result
-            with _ -> return result
+                    else
+                        return result
+            with _ ->
+                return result
     }
 
 let private isThenable (value: obj) : bool =
@@ -87,6 +90,7 @@ let private mkResultWrapper (targetTool: string) (callback: obj -> obj -> obj ->
     let wrapperFn =
         System.Func<obj, obj, obj>(fun tool config ->
             let orig = tool?execute
+
             if not (Dyn.typeIs orig "function") then
                 tool
             else
@@ -94,12 +98,18 @@ let private mkResultWrapper (targetTool: string) (callback: obj -> obj -> obj ->
                     System.Func<obj, obj, JS.Promise<obj>>(fun args opts ->
                         promise {
                             let raw = invokeToolExecute tool args opts
+
                             let! v =
-                                if isThenable raw then unbox<JS.Promise<obj>> raw
-                                else Promise.lift raw
+                                if isThenable raw then
+                                    unbox<JS.Promise<obj>> raw
+                                else
+                                    Promise.lift raw
+
                             return! callback v args config
                         })
+
                 Dyn.withKey tool "execute" (box executeFn))
+
     createObj [ "targetTool", box targetTool; "wrapper", box wrapperFn ]
 
 let private mkSyncResultWrapper (targetTool: string) (callback: obj -> obj) : obj =
@@ -115,14 +125,27 @@ let private todoItemForNativeWrite (item: TodoItem) : obj =
 let private todoArrayForNativeWrite (decoded: TodoWriteArgs) : obj =
     decoded.Todos |> Array.map todoItemForNativeWrite |> box
 
-let private captureTodoReportFromDecoded (host: Host) (projection: ProjectionStore) (tw: TodoWriteArgs) (o: TodoToolOpts) : unit =
-    if o.ToolCallId <> "" && (tw.AhaMoments <> "" || tw.ChangesAndReasons <> "" || tw.Gotchas <> "" || tw.LessonsAndConventions <> "" || tw.Plan <> "") then
-        let entry : BacklogEntry =
+let private captureTodoReportFromDecoded
+    (host: Host)
+    (projection: ProjectionStore)
+    (tw: TodoWriteArgs)
+    (o: TodoToolOpts)
+    : unit =
+    if
+        o.ToolCallId <> ""
+        && (tw.AhaMoments <> ""
+            || tw.ChangesAndReasons <> ""
+            || tw.Gotchas <> ""
+            || tw.LessonsAndConventions <> ""
+            || tw.Plan <> "")
+    then
+        let entry: BacklogEntry =
             { ahaMoments = tw.AhaMoments
               changesAndReasons = tw.ChangesAndReasons
               gotchas = tw.Gotchas
               lessonsAndConventions = tw.LessonsAndConventions
               plan = tw.Plan }
+
         projection.CaptureBacklogEntry(host, o.ToolCallId, entry)
 
 let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj =
@@ -131,30 +154,39 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
             let execFn =
                 System.Func<obj, obj, JS.Promise<obj>>(fun (args: obj) (opts: obj) ->
                     promise {
-                         match decodeTodoWriteArgs args, decodeTodoToolOpts opts with
-                         | Error e, _ | _, Error e ->
-                             return createObj [ "success", box false; "output", box (wireDecodeFailure "todowrite" e) ]
-                         | Ok tw, Ok o ->
+                        match decodeTodoWriteArgs args, decodeTodoToolOpts opts with
+                        | Error e, _
+                        | _, Error e ->
+                            return createObj [ "success", box false; "output", box (wireDecodeFailure "todowrite" e) ]
+                        | Ok tw, Ok o ->
                             captureTodoReportFromDecoded host projection tw o
                             let methodologies = tw.SelectMethodology
                             let nativeArgs = createObj [ "todos", todoArrayForNativeWrite tw ]
                             let raw = invokeToolExecute tool nativeArgs opts
+
                             let! result =
-                                if isThenable raw then unbox<JS.Promise<obj>> raw
-                                else Promise.lift raw
+                                if isThenable raw then
+                                    unbox<JS.Promise<obj>> raw
+                                else
+                                    Promise.lift raw
+
                             let output = todoWriteOutput methodologies true
+
                             let nextResult =
                                 if Dyn.typeIs result "object" then
                                     Dyn.withKey result "output" (box output)
                                 else
                                     createObj [ "success", box true; "output", box output ]
+
                             match fromMuxConfig opts with
                             | Ok runtime ->
                                 let root = runtime.Execution.Directory
                                 let sid = workspaceIdString runtime
+
                                 if sid <> "" && root <> "" then
                                     do! appendWorkBacklogCommitted root sid tw |> Promise.map ignore
                             | _ -> ()
+
                             return nextResult
                     })
 
@@ -165,8 +197,14 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
 
     createObj [ "targetTool", box (todoWritePromptName host); "wrapper", box wrapperFn ]
 
-let createAllWrappersFor (host: Host) (tools: obj) (hostReadExec: HostFunctionCapture) (scope: RuntimeScope) : obj array =
+let createAllWrappersFor
+    (host: Host)
+    (tools: obj)
+    (hostReadExec: HostFunctionCapture)
+    (scope: RuntimeScope)
+    : obj array =
     let projection = scope.Projection
+
     Array.append
         (mkSyntaxWrappers ())
         [| mkFileReadCapture hostReadExec

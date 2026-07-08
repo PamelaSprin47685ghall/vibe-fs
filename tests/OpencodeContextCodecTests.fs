@@ -8,9 +8,9 @@ open Wanxiangshu.Shell.OpencodeContextCodec
 open Wanxiangshu.Shell.ToolRuntimeContext
 
 [<Global("process")>]
-let private nodeProcess : obj = jsNative
+let private nodeProcess: obj = jsNative
 
-let private getCwd () : string = unbox<string> (nodeProcess?cwd())
+let private getCwd () : string = unbox<string> (nodeProcess?cwd ())
 
 let abortNullWhenContextNull () =
     let signal = getAbortSignalFromContext null

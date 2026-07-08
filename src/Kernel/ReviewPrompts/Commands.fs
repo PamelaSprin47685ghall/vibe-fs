@@ -6,8 +6,7 @@ open Wanxiangshu.Kernel.PromptFragments
 
 let withReviewCommandTemplate =
     frontMatterPrompt
-        [ yamlField commandField commandWithReview
-          yamlField taskField "$ARGUMENTS" ]
+        [ yamlField commandField commandWithReview; yamlField taskField "$ARGUMENTS" ]
         (String.concat
             "\n"
             [ "You are entering With-Review Mode."

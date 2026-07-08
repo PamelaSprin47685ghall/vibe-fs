@@ -13,10 +13,7 @@ let collectReadOutputs (messages: obj array) : string[] =
 let collectReadOutputsByPath (messages: obj array) : Map<string, string list> =
     Wanxiangshu.Shell.ReadDedupMuxPlugin.collectReadOutputsByPath messages
 
-let deduplicateReadOutputsWithSeenByPath
-    (seenByPath: Map<string, string list>)
-    (messages: obj array)
-    : obj[] =
+let deduplicateReadOutputsWithSeenByPath (seenByPath: Map<string, string list>) (messages: obj array) : obj[] =
     Wanxiangshu.Shell.ReadDedupMuxPlugin.deduplicateReadOutputsWithSeenByPath seenByPath messages
 
 let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : obj[] =
@@ -24,10 +21,14 @@ let deduplicateReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array)
 
 let private readToolNames = Set.ofList [ "read"; "file_read" ]
 
-type private ReadHit = { msgIndex: int; partIndex: int; payload: ReadPayload }
+type private ReadHit =
+    { msgIndex: int
+      partIndex: int
+      payload: ReadPayload }
 
 let private tryReadContent (output: obj) : string option =
-    if Wanxiangshu.Shell.Dyn.isNullish output then None
+    if Wanxiangshu.Shell.Dyn.isNullish output then
+        None
     elif Wanxiangshu.Shell.Dyn.typeIs output "string" then
         let s = string output
         if s = "" then None else Some s
@@ -36,7 +37,8 @@ let private tryReadContent (output: obj) : string option =
         if s = "" then None else Some s
 
 let private tryPath (input: obj) : string =
-    if Wanxiangshu.Shell.Dyn.isNullish input then ""
+    if Wanxiangshu.Shell.Dyn.isNullish input then
+        ""
     else
         match extractFilePaths input with
         | path :: _ -> path
@@ -44,24 +46,34 @@ let private tryPath (input: obj) : string =
 
 
 let private decodeModelReadPart (part: obj) : ReadPayload option =
-    if Wanxiangshu.Shell.Dyn.str part "type" <> "tool-result" then None
-    elif not (Set.contains (Wanxiangshu.Shell.Dyn.str part "toolName") readToolNames) then None
+    if Wanxiangshu.Shell.Dyn.str part "type" <> "tool-result" then
+        None
+    elif not (Set.contains (Wanxiangshu.Shell.Dyn.str part "toolName") readToolNames) then
+        None
     else
         let output = Wanxiangshu.Shell.Dyn.get part "output"
-        if Wanxiangshu.Shell.Dyn.isNullish output then None
+
+        if Wanxiangshu.Shell.Dyn.isNullish output then
+            None
         else
             let outputType = Wanxiangshu.Shell.Dyn.str output "type"
             let outputValue = Wanxiangshu.Shell.Dyn.get output "value"
-            if Wanxiangshu.Shell.Dyn.isNullish outputValue then None
+
+            if Wanxiangshu.Shell.Dyn.isNullish outputValue then
+                None
             else
                 let content =
-                    if outputType = "text" then string outputValue
+                    if outputType = "text" then
+                        string outputValue
                     elif outputType = "json" then
                         match tryReadContent outputValue with
                         | Some c -> c
                         | None -> ""
-                    else ""
-                if content = "" then None
+                    else
+                        ""
+
+                if content = "" then
+                    None
                 else
                     let path = tryPath (Wanxiangshu.Shell.Dyn.get part "input")
                     Some { path = path; content = content }
@@ -69,35 +81,53 @@ let private decodeModelReadPart (part: obj) : ReadPayload option =
 let private collectModelReadHits (messages: obj array) : ReadHit list =
     messages
     |> Array.mapi (fun i msg ->
-        if Wanxiangshu.Shell.Dyn.isNullish msg then [||]
+        if Wanxiangshu.Shell.Dyn.isNullish msg then
+            [||]
         else
             let content = Wanxiangshu.Shell.Dyn.get msg "content"
-            if Wanxiangshu.Shell.Dyn.isNullish content || not (Wanxiangshu.Shell.Dyn.isArray content) then [||]
+
+            if
+                Wanxiangshu.Shell.Dyn.isNullish content
+                || not (Wanxiangshu.Shell.Dyn.isArray content)
+            then
+                [||]
             else
                 (content :?> obj array)
                 |> Array.mapi (fun j part ->
                     decodeModelReadPart part
-                    |> Option.map (fun payload -> { msgIndex = i; partIndex = j; payload = payload }))
+                    |> Option.map (fun payload ->
+                        { msgIndex = i
+                          partIndex = j
+                          payload = payload }))
                 |> Array.choose id)
     |> Array.concat
     |> List.ofArray
 
 let private applyModelDedupToMessages (messages: obj array) (hits: ReadHit list) (replaced: bool list) : obj array =
-    if List.forall not replaced then messages
+    if List.forall not replaced then
+        messages
     else
         let replacements =
             List.zip hits replaced
             |> List.choose (fun (hit, wasReplaced) -> if wasReplaced then Some hit else None)
+
         let msgGroups = replacements |> List.groupBy (fun hit -> hit.msgIndex)
+
         messages
         |> Array.mapi (fun i msg ->
             match List.tryFind (fun (idx, _) -> idx = i) msgGroups with
             | None -> msg
-            | Some (_, hitsInMsg) ->
+            | Some(_, hitsInMsg) ->
                 let contentObj = Wanxiangshu.Shell.Dyn.get msg "content"
-                if Wanxiangshu.Shell.Dyn.isNullish contentObj || not (Wanxiangshu.Shell.Dyn.isArray contentObj) then msg
+
+                if
+                    Wanxiangshu.Shell.Dyn.isNullish contentObj
+                    || not (Wanxiangshu.Shell.Dyn.isArray contentObj)
+                then
+                    msg
                 else
                     let content = contentObj :?> obj array
+
                     let newContent =
                         content
                         |> Array.mapi (fun j part ->
@@ -106,13 +136,18 @@ let private applyModelDedupToMessages (messages: obj array) (hits: ReadHit list)
                             | Some _ ->
                                 let newOutput = createObj [ "type", box "text"; "value", box (noChangeEnvelope ()) ]
                                 Wanxiangshu.Shell.Dyn.withKey part "output" (box newOutput))
+
                     Wanxiangshu.Shell.Dyn.withKey msg "content" (box newContent))
 
 let deduplicateModelReadOutputsWithSeen (seenOutputs: string[]) (messages: obj array) : string[] * obj[] =
     let hits = collectModelReadHits messages
     let payloads = hits |> List.map (fun hit -> hit.payload)
+
     let seenByPath =
-        if Array.isEmpty seenOutputs then Map.empty
-        else Map.add "" (Array.toList seenOutputs) Map.empty
+        if Array.isEmpty seenOutputs then
+            Map.empty
+        else
+            Map.add "" (Array.toList seenOutputs) Map.empty
+
     let _, (newOutputs, replaced) = foldDedup seenByPath payloads
     Array.ofList newOutputs, applyModelDedupToMessages messages hits replaced

@@ -13,7 +13,8 @@ let _intentsRawFromArgsUsedInCore = true
 
 // --- HookSchemaCore ----------------------------------------------------------
 
-let selectMethodologyFieldDescription = HookSchemaCore.selectMethodologyFieldDescription
+let selectMethodologyFieldDescription =
+    HookSchemaCore.selectMethodologyFieldDescription
 
 let setUiLabel = HookSchemaCore.setUiLabel
 
@@ -35,4 +36,5 @@ let injectWarnTddIntoJsonSchema = HookSchemaDecode.injectWarnTddIntoJsonSchema
 
 let injectWarnIntoJsonSchema = HookSchemaDecode.injectWarnIntoJsonSchema
 
-let mergeWorkBacklogReportIntoTaskSchema = HookSchemaDecode.mergeWorkBacklogReportIntoTaskSchema
+let mergeWorkBacklogReportIntoTaskSchema =
+    HookSchemaDecode.mergeWorkBacklogReportIntoTaskSchema

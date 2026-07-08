@@ -6,25 +6,41 @@ open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.HostTools
 
 let private snap todos msg blocked agent isLoop : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
-    { todos = todos; lastAssistantMessage = msg; isLoopActive = isLoop
-      nudgeBlockedForTurn = blocked; nudgeAnchorKey = msg; agentFromMessage = agent
-      modelFromMessage = None; hasActiveRunner = false }
+    { todos = todos
+      lastAssistantMessage = msg
+      isLoopActive = isLoop
+      nudgeBlockedForTurn = blocked
+      nudgeAnchorKey = msg
+      agentFromMessage = agent
+      modelFromMessage = None
+      hasActiveRunner = false }
 
 let private snap' todos msg blocked agent isLoop hasActiveRunner : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
-    { todos = todos; lastAssistantMessage = msg; isLoopActive = isLoop
-      nudgeBlockedForTurn = blocked; nudgeAnchorKey = msg; agentFromMessage = agent
-      modelFromMessage = None; hasActiveRunner = hasActiveRunner }
+    { todos = todos
+      lastAssistantMessage = msg
+      isLoopActive = isLoop
+      nudgeBlockedForTurn = blocked
+      nudgeAnchorKey = msg
+      agentFromMessage = agent
+      modelFromMessage = None
+      hasActiveRunner = hasActiveRunner }
 
 let decision () =
     equal "todos -> NudgeTodo" NudgeTodo (deriveAction (snap [ "a" ] "working" false None false))
     equal "todos+question -> None" NudgeNone (deriveAction (snap [ "a" ] "what now?" false None false))
     equal "todos+skip -> None" NudgeNone (deriveAction (snap [ "a" ] "done <skip-todo-check />" false None false))
-    equal "todos+skip+unclosedFence -> None" NudgeNone (deriveAction (snap [ "a" ] "I will skip this turn. <skip-todo-check />\n\n```fsharp\nlet x = 1\n" false None false))
+
+    equal
+        "todos+skip+unclosedFence -> None"
+        NudgeNone
+        (deriveAction (
+            snap [ "a" ] "I will skip this turn. <skip-todo-check />\n\n```fsharp\nlet x = 1\n" false None false
+        ))
+
     equal "nothing -> None" NudgeNone (deriveAction (snap [] "ok" false None false))
     equal "loop -> NudgeLoop" NudgeLoop (deriveAction (snap [] "ok" false None true))
     equal "loop+skip -> None" NudgeNone (deriveAction (snap [] "done <skip-loop-check />" false None true))
-    equal "todos+activeRunner -> None"
-        NudgeNone (deriveAction (snap' [ "a" ] "working" false None false true))
+    equal "todos+activeRunner -> None" NudgeNone (deriveAction (snap' [ "a" ] "working" false None false true))
 
 let dedupFromIntegral () =
     equal "blocked turn -> None" NudgeNone (deriveAction (snap [ "a" ] "working" true None false))

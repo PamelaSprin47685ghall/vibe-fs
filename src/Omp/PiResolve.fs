@@ -17,36 +17,37 @@ let private existsSync (p: string) : bool = jsNative
 let private pathToFileURL (p: string) : obj = jsNative
 
 [<Global("process")>]
-let private nodeProcess : obj = jsNative
+let private nodeProcess: obj = jsNative
 
 let private piBaseCandidates () : string array =
     let home = homedir ()
     let env = nodeProcess?env?("PI_BASE")
-    let fromEnv = if isNull env then None else Some (string env)
-    [|
-        yield! (fromEnv |> Option.toArray)
-        pathJoin home ".cache/.bun/install/global/node_modules/@oh-my-pi"
-        pathJoin home ".bun/install/global/node_modules/@oh-my-pi"
-    |]
+    let fromEnv = if isNull env then None else Some(string env)
 
-let mutable private resolvedBase : string option = None
+    [| yield! (fromEnv |> Option.toArray)
+       pathJoin home ".cache/.bun/install/global/node_modules/@oh-my-pi"
+       pathJoin home ".bun/install/global/node_modules/@oh-my-pi" |]
+
+let mutable private resolvedBase: string option = None
 
 let getPiBase () : string =
     match resolvedBase with
     | Some b -> b
     | None ->
-        let found =
-            piBaseCandidates ()
-            |> Array.tryFind existsSync
+        let found = piBaseCandidates () |> Array.tryFind existsSync
+
         match found with
         | None ->
-            let tried = piBaseCandidates () |> Array.map (fun p -> "  - " + p) |> String.concat "\n"
-            failwith $"Cannot locate @oh-my-pi base path. Tried:\n{tried}\nSet PI_BASE environment variable to the @oh-my-pi install root."
+            let tried =
+                piBaseCandidates () |> Array.map (fun p -> "  - " + p) |> String.concat "\n"
+
+            failwith
+                $"Cannot locate @oh-my-pi base path. Tried:\n{tried}\nSet PI_BASE environment variable to the @oh-my-pi install root."
         | Some b ->
             resolvedBase <- Some b
             b
 
-let mutable private cachedModule : obj option = None
+let mutable private cachedModule: obj option = None
 
 let getCodingAgentModule (scope: RuntimeScope) : JS.Promise<obj> =
     promise {
@@ -63,4 +64,3 @@ let getCodingAgentModule (scope: RuntimeScope) : JS.Promise<obj> =
                 cachedModule <- Some module'
                 return module'
     }
-

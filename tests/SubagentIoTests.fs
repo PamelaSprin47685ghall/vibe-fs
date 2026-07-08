@@ -2,6 +2,7 @@ module Wanxiangshu.Tests.SubagentIoTests
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+
 module DynModule = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.SubagentIo
 
@@ -21,6 +22,7 @@ let textPartReturnsCorrectShape () =
 let textPartsReturnsArrayOfTextParts () =
     let parts = textParts [ "a"; "b" ]
     equal "count" 2 parts.Length
+
     for p in parts do
         let t = DynModule.str p "type"
         equal "type" "text" t
@@ -74,7 +76,10 @@ let buildPromptBodyBasic () =
     equal "agent" "coder" agent
 
 let buildPromptBodyWithThinkingLevel () =
-    let settings = { emptySettings with ThinkingLevel = Some "high" }
+    let settings =
+        { emptySettings with
+            ThinkingLevel = Some "high" }
+
     let body = buildPromptBody "coder" "do it" null settings
     let variant = DynModule.str body "variant"
     equal "variant" "high" variant

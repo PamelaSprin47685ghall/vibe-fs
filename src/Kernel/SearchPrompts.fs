@@ -21,15 +21,25 @@ let formatSearchResults (results: SearchResult list) : string =
     else
         let items =
             results
-            |> List.map (fun r ->
-                createObj [ "title", box r.title; "url", box r.url; "content", box r.content ])
+            |> List.map (fun r -> createObj [ "title", box r.title; "url", box r.url; "content", box r.content ])
+
         frontMatter [ yamlSeqField "results" items ]
 
 let formatFetchResponse (data: FetchResponse) : string =
     let nonEmpty (s: string) = not (System.String.IsNullOrEmpty s)
+
     let fields =
-        [ match data.title with Some v when nonEmpty v -> yield yamlField "title" v | _ -> ()
-          match data.byline with Some v when nonEmpty v -> yield yamlField "byline" v | _ -> ()
-          match data.length with Some l -> yield ("length", box l) | None -> ()
-          match data.content with Some c when nonEmpty c -> yield yamlField "content" c | _ -> () ]
+        [ match data.title with
+          | Some v when nonEmpty v -> yield yamlField "title" v
+          | _ -> ()
+          match data.byline with
+          | Some v when nonEmpty v -> yield yamlField "byline" v
+          | _ -> ()
+          match data.length with
+          | Some l -> yield ("length", box l)
+          | None -> ()
+          match data.content with
+          | Some c when nonEmpty c -> yield yamlField "content" c
+          | _ -> () ]
+
     frontMatter fields

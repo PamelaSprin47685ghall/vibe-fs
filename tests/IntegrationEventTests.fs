@@ -13,13 +13,18 @@ open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Opencode.Plugin
 open Wanxiangshu.Shell.Dyn
 
-let eventHookSpec (reg: obj) = promise {
-    let hook = get reg "eventHook"
-    check "eventHook.length === 2" (unbox<int> (hook?length) = 2)
-    let ehResult = hook $ (createObj [ "type", box "stream-abort"; "workspaceId", box "test-ws" ], null)
-    check "eventHook returns Promise" (not (isNullish (get ehResult "then")))
-    do! unbox<JS.Promise<unit>> ehResult
-}
+let eventHookSpec (reg: obj) =
+    promise {
+        let hook = get reg "eventHook"
+        check "eventHook.length === 2" (unbox<int> (hook?length) = 2)
+
+        let ehResult =
+            hook
+            $ (createObj [ "type", box "stream-abort"; "workspaceId", box "test-ws" ], null)
+
+        check "eventHook returns Promise" (not (isNullish (get ehResult "then")))
+        do! unbox<JS.Promise<unit>> ehResult
+    }
 
 let run () : JS.Promise<unit> =
     promise {

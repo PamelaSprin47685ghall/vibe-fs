@@ -4,7 +4,9 @@ open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
-type DedupedOutput = { output: string; seenOutputs: string list }
+type DedupedOutput =
+    { output: string
+      seenOutputs: string list }
 
 let isNoChangeOutput (output: string) : bool =
     match tryParse output with
@@ -22,16 +24,22 @@ let isNoChangeOutput (output: string) : bool =
 /// outputs even though their wrappers/footers differ.
 let deduplicate (seenOutputs: string list) (output: string) : DedupedOutput =
     if output.Length = 0 then
-        { output = output; seenOutputs = seenOutputs }
+        { output = output
+          seenOutputs = seenOutputs }
     else
         let fpOut = readFingerprint output
+
         let matches seen =
             match fpOut with
             | Some fp -> fp = seen || seen.Contains output
             | None -> seen.Contains output
+
         if List.exists matches seenOutputs then
-            { output = noChangeEnvelope (); seenOutputs = seenOutputs }
+            { output = noChangeEnvelope ()
+              seenOutputs = seenOutputs }
         elif fpOut.IsSome then
-            { output = output; seenOutputs = fpOut.Value :: seenOutputs }
+            { output = output
+              seenOutputs = fpOut.Value :: seenOutputs }
         else
-            { output = output; seenOutputs = output :: seenOutputs }
+            { output = output
+              seenOutputs = output :: seenOutputs }

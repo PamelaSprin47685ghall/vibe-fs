@@ -30,7 +30,10 @@ let idError parser input =
 let idSessionIdRoundtrip () =
     let sid = sessionId "s1"
     equal "sessionId Some" true (Result.isOk sid)
-    match sid with Ok v -> equal "sessionIdValue" "s1" (sessionIdValue v) | _ -> check "sessionId ok" false
+
+    match sid with
+    | Ok v -> equal "sessionIdValue" "s1" (sessionIdValue v)
+    | _ -> check "sessionId ok" false
 
 let idWorkspaceIdRoundtrip () =
     idRoundTrip workspaceId "workspaceId" workspaceIdValue "w1"
@@ -104,29 +107,37 @@ let classifyErrorLeafChecks () =
     equal "Other+abort text" (ClientCancellation "abort-text") (classifyErrorLeaf "Other" "Other" "abort text")
     equal "Other no abort" (UnknownJsError "normal") (classifyErrorLeaf "Other" "Other" "normal")
 
-// ── Kernel.Domain.WorkspaceState ──────────────────────────────────────────────let workspaceStateEmpty () =
+    // ── Kernel.Domain.WorkspaceState ──────────────────────────────────────────────let workspaceStateEmpty () =
     check "empty childSessions empty" (Map.isEmpty Domain.empty.childSessions)
 
 let workspaceStateReduceRegister () =
-    let cid = match childId "ch1" with Ok v -> v | Error _ -> failwith "childId failed"
+    let cid =
+        match childId "ch1" with
+        | Ok v -> v
+        | Error _ -> failwith "childId failed"
+
     let ev = ChildRegistered(cid, { agent = "a"; parentSessionId = None })
     let s = reduce Domain.empty ev
     equal "reduce count 1" 1 (Map.count s.childSessions)
 
 let workspaceStateReduceUnregister () =
-    let cid = match childId "ch1" with Ok v -> v | Error _ -> failwith "childId failed"
+    let cid =
+        match childId "ch1" with
+        | Ok v -> v
+        | Error _ -> failwith "childId failed"
+
     let evReg = ChildRegistered(cid, { agent = "a"; parentSessionId = None })
     let s = reduce Domain.empty evReg
     let evUnreg = ChildUnregistered cid
     let s2 = reduce s evUnreg
     check "reduce unregister back to empty" (Map.isEmpty s2.childSessions)
 
-// ── Kernel.Methodology ────────────────────────────────────────────────────────let methToolResultText () =
-    let r = methodologyToolResultText ["first_principles"]
+    // ── Kernel.Methodology ────────────────────────────────────────────────────────let methToolResultText () =
+    let r = methodologyToolResultText [ "first_principles" ]
     check "contains first_principles" (r.Contains "first_principles")
 
 let methToolResultTextMulti () =
-    let r = methodologyToolResultText ["a"; "b"]
+    let r = methodologyToolResultText [ "a"; "b" ]
     check "contains a" (r.Contains "a")
     check "contains b" (r.Contains "b")
 
@@ -134,14 +145,15 @@ let methTodoResultTextEmpty () =
     equal "empty todos" "Todos updated." (todoResultText [])
 
 let methTodoResultTextOne () =
-    let r = todoResultText ["x"]
+    let r = todoResultText [ "x" ]
     check "todo contains x" (r.Contains "x")
 
 let methEnumCount () =
     check "enum count > 50" (enumValues.Length > 50)
 
 let methSelectFieldDesc () =
-    check "selectMethodologyFieldDescription contains select_methodology"
+    check
+        "selectMethodologyFieldDescription contains select_methodology"
         (selectMethodologyFieldDescription.Contains "select_methodology")
 
 // ── Kernel.OmpPrompts ─────────────────────────────────────────────────────────
@@ -156,71 +168,149 @@ let ompBrowserPrompt () =
 
 // ── Kernel.ToolArgs constructors ──────────────────────────────────────────────
 let taRead () =
-    let a = Read { Path = "f"; Offset = None; Limit = None }
-    match a with Read r -> equal "Read.Path" "f" r.Path | _ -> check "Read case" false
+    let a =
+        Read
+            { Path = "f"
+              Offset = None
+              Limit = None }
+
+    match a with
+    | Read r -> equal "Read.Path" "f" r.Path
+    | _ -> check "Read case" false
 
 let taWrite () =
     let a = Write { FilePath = "f"; Content = "c" }
-    match a with Write w -> equal "Write.FilePath" "f" w.FilePath | _ -> check "Write case" false
+
+    match a with
+    | Write w -> equal "Write.FilePath" "f" w.FilePath
+    | _ -> check "Write case" false
 
 let taMeditator () =
     let a = Meditator { Intent = "i"; Files = [||] }
-    match a with Meditator m -> equal "Meditator.Intent" "i" m.Intent | _ -> check "Meditator case" false
+
+    match a with
+    | Meditator m -> equal "Meditator.Intent" "i" m.Intent
+    | _ -> check "Meditator case" false
 
 let taBrowser () =
     let a = Browser { Intent = "browse" }
-    match a with Browser b -> equal "Browser.Intent" "browse" b.Intent | _ -> check "Browser case" false
+
+    match a with
+    | Browser b -> equal "Browser.Intent" "browse" b.Intent
+    | _ -> check "Browser case" false
 
 let taWebsearch () =
-    let a = Websearch { Query = "q"; NumResults = 5; WhatToSummarize = "s" }
-    match a with Websearch w -> equal "Websearch.Query" "q" w.Query | _ -> check "Websearch case" false
+    let a =
+        Websearch
+            { Query = "q"
+              NumResults = 5
+              WhatToSummarize = "s" }
+
+    match a with
+    | Websearch w -> equal "Websearch.Query" "q" w.Query
+    | _ -> check "Websearch case" false
 
 let taWebfetch () =
-    let a = Webfetch { Url = "http://x"; ExtractMain = None; PreferLlmsTxt = None; Prompt = None; Timeout = None }
-    match a with Webfetch w -> equal "Webfetch.Url" "http://x" w.Url | _ -> check "Webfetch case" false
+    let a =
+        Webfetch
+            { Url = "http://x"
+              ExtractMain = None
+              PreferLlmsTxt = None
+              Prompt = None
+              Timeout = None }
+
+    match a with
+    | Webfetch w -> equal "Webfetch.Url" "http://x" w.Url
+    | _ -> check "Webfetch case" false
 
 let taExecutor () =
-    let a = Executor { Language = Shell; Program = "p"; Dependencies = []; TimeoutType = Short; Mode = "rw" }
-    match a with Executor e -> equal "Executor.Program" "p" e.Program | _ -> check "Executor case" false
+    let a =
+        Executor
+            { Language = Shell
+              Program = "p"
+              Dependencies = []
+              TimeoutType = Short
+              Mode = "rw" }
+
+    match a with
+    | Executor e -> equal "Executor.Program" "p" e.Program
+    | _ -> check "Executor case" false
 
 let taTodoWrite () =
-    let a = TodoWrite { CompletedWorkReport = "r"; Todos = [||]; SelectMethodology = [] }
-    match a with TodoWrite t -> equal "TodoWrite.Report" "r" t.CompletedWorkReport | _ -> check "TodoWrite case" false
+    let a =
+        TodoWrite
+            { CompletedWorkReport = "r"
+              Todos = [||]
+              SelectMethodology = [] }
+
+    match a with
+    | TodoWrite t -> equal "TodoWrite.Report" "r" t.CompletedWorkReport
+    | _ -> check "TodoWrite case" false
 
 
 let taApplyPatch () =
     let a = ApplyPatch { PatchText = "diff" }
-    match a with ApplyPatch p -> equal "ApplyPatch" "diff" p.PatchText | _ -> check "ApplyPatch case" false
+
+    match a with
+    | ApplyPatch p -> equal "ApplyPatch" "diff" p.PatchText
+    | _ -> check "ApplyPatch case" false
 
 let taSubmitReview () =
-    let a = SubmitReview { Report = "r"; AffectedFiles = ["f"] }
-    match a with SubmitReview s -> equal "SubmitReview.Report" "r" s.Report | _ -> check "SubmitReview case" false
+    let a =
+        SubmitReview
+            { Report = "r"
+              AffectedFiles = [ "f" ] }
+
+    match a with
+    | SubmitReview s -> equal "SubmitReview.Report" "r" s.Report
+    | _ -> check "SubmitReview case" false
 
 // ── Kernel.ToolResult ─────────────────────────────────────────────────────────
 let trWireEncodeResultOk () =
     equal "wireEncodeResult Ok" "done" (wireEncodeResult (Ok "done"))
 
 let trWireEncodeResultError () =
-    let text = wireEncodeResult (Error (ToolNotPermitted("a", "t")))
+    let text = wireEncodeResult (Error(ToolNotPermitted("a", "t")))
     check "error contains failed" (text.Contains "failed")
     check "error contains not permitted" (text.Contains "not permitted")
 
 // ── Kernel.ReviewReplayPolicy ─────────────────────────────────────────────────
 let rrpTextsFromFlatPartsTool () =
-    let toolState = { status = "completed"; output = "out"; error = ""; input = null; operationAction = "" }
-    let fp = { msgIndex = 0; partIndex = 0; isUser = false; part = ToolPart("t", "c1", Some toolState, null) }
+    let toolState =
+        { status = "completed"
+          output = "out"
+          error = ""
+          input = null
+          operationAction = "" }
+
+    let fp =
+        { msgIndex = 0
+          partIndex = 0
+          isUser = false
+          part = ToolPart("t", "c1", Some toolState, null) }
+
     let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "tool output text" ["out"] texts
+    equal "tool output text" [ "out" ] texts
 
 let rrpTextsFromFlatPartsText () =
-    let fp = { msgIndex = 0; partIndex = 0; isUser = false; part = TextPart "hello" }
+    let fp =
+        { msgIndex = 0
+          partIndex = 0
+          isUser = false
+          part = TextPart "hello" }
+
     let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "text part" ["hello"] texts
+    equal "text part" [ "hello" ] texts
 
 let rrpTextsFromFlatPartsOther () =
-    let fp = { msgIndex = 0; partIndex = 0; isUser = false; part = ToolPart("t", "c", None, null) }
+    let fp =
+        { msgIndex = 0
+          partIndex = 0
+          isUser = false
+          part = ToolPart("t", "c", None, null) }
+
     let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "no output tool" [""] texts
+    equal "no output tool" [ "" ] texts
 
 // ── Kernel.ReviewSession.Types ────────────────────────────────────────────────
 let rstEmpty () =
@@ -254,10 +344,10 @@ let rstWithFeedback () =
 let rstAddChild () =
     let e = empty "rs1" 100L
     let c1 = addChild e "c1"
-    equal "addChild new" ["c1"] c1.childIds
+    equal "addChild new" [ "c1" ] c1.childIds
     equal "addChild version" (e.version + 1) c1.version
     let dup = addChild c1 "c1"
-    equal "addChild dup" ["c1"] dup.childIds
+    equal "addChild dup" [ "c1" ] dup.childIds
     equal "addChild dup version same" c1.version dup.version
 
 // ── Kernel.Config ─────────────────────────────────────────────────────────────
@@ -270,25 +360,60 @@ let cfgStealthBrowserCommand () =
     check "cmd has uvx" (cmd.Contains "uvx")
     check "cmd has 3.13" (cmd.Contains "3.13")
     check "cmd has repo" (cmd.Contains "github.com/vibheksoni/stealth-browser-mcp")
+
 let cfgStealthBrowserLocalConfig () =
     let cfg = getStealthBrowserMcpLocalConfig ""
     equal "localConfig type" "local" cfg.``type``
     let cmd = cfg.command
     check "cmd has uvx" (Array.contains "uvx" cmd)
     check "cmd has python" (Array.contains "python" cmd)
+
 let run () =
-    idSessionIdRoundtrip (); idSessionIdEmpty ()
-    idWorkspaceIdRoundtrip (); idAgentIdRoundtrip (); idToolIdRoundtrip ()
-    idCallIdRoundtrip (); idChildIdRoundtrip ()
-    idQuick (); idTryValid (); idTryEmpty ()
-    formatAllErrors (); isAbortChecks (); containsAbortChecks (); classifyErrorLeafChecks ()
-    workspaceStateEmpty (); workspaceStateReduceRegister (); workspaceStateReduceUnregister ()
-    methToolResultText (); methToolResultTextMulti (); methTodoResultTextEmpty (); methTodoResultTextOne ()
-    methEnumCount (); methSelectFieldDesc ()
-    ompEditorPrompt (); ompGreperPrompt (); ompBrowserPrompt ()
-    taRead (); taWrite (); taMeditator (); taBrowser (); taWebsearch (); taWebfetch ()
-    taExecutor (); taTodoWrite (); taApplyPatch (); taSubmitReview ()
-    trWireEncodeResultOk (); trWireEncodeResultError ()
-    rrpTextsFromFlatPartsTool (); rrpTextsFromFlatPartsText (); rrpTextsFromFlatPartsOther ()
-    rstEmpty (); rstWithTask (); rstWithFeedback (); rstAddChild ()
-    cfgStealthBrowserRef (); cfgStealthBrowserCommand (); cfgStealthBrowserLocalConfig ()
+    idSessionIdRoundtrip ()
+    idSessionIdEmpty ()
+    idWorkspaceIdRoundtrip ()
+    idAgentIdRoundtrip ()
+    idToolIdRoundtrip ()
+    idCallIdRoundtrip ()
+    idChildIdRoundtrip ()
+    idQuick ()
+    idTryValid ()
+    idTryEmpty ()
+    formatAllErrors ()
+    isAbortChecks ()
+    containsAbortChecks ()
+    classifyErrorLeafChecks ()
+    workspaceStateEmpty ()
+    workspaceStateReduceRegister ()
+    workspaceStateReduceUnregister ()
+    methToolResultText ()
+    methToolResultTextMulti ()
+    methTodoResultTextEmpty ()
+    methTodoResultTextOne ()
+    methEnumCount ()
+    methSelectFieldDesc ()
+    ompEditorPrompt ()
+    ompGreperPrompt ()
+    ompBrowserPrompt ()
+    taRead ()
+    taWrite ()
+    taMeditator ()
+    taBrowser ()
+    taWebsearch ()
+    taWebfetch ()
+    taExecutor ()
+    taTodoWrite ()
+    taApplyPatch ()
+    taSubmitReview ()
+    trWireEncodeResultOk ()
+    trWireEncodeResultError ()
+    rrpTextsFromFlatPartsTool ()
+    rrpTextsFromFlatPartsText ()
+    rrpTextsFromFlatPartsOther ()
+    rstEmpty ()
+    rstWithTask ()
+    rstWithFeedback ()
+    rstAddChild ()
+    cfgStealthBrowserRef ()
+    cfgStealthBrowserCommand ()
+    cfgStealthBrowserLocalConfig ()

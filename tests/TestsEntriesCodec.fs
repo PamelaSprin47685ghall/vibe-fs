@@ -75,36 +75,34 @@ open Wanxiangshu.Tests.SubagentIoTests
 open Wanxiangshu.Tests.TestsTestBody
 
 let codecTestEntries () : (string * TestBody) list =
-    [
-    "SubagentToolPolicyTests.run", Sync (sync SubagentToolPolicyTests.run)
-    "SubagentPromptBuildTests.run", Sync (sync SubagentPromptBuildTests.run)
-    "SubagentSpawnTests.run", Async SubagentSpawnTests.run
-    "ToolArgsDecodeTests.run", Sync (sync ToolArgsDecodeTests.run)
-    "ToolResultWireTests.run", Sync (sync ToolResultWireTests.run)
-    "SubagentToolExecuteTests.run", Async SubagentToolExecuteTests.run
-    "WebToolsCodecTests.run", Sync (sync WebToolsCodecTests.run)
-    "ReviewToolsCodecTests.run", Sync (sync ReviewToolsCodecTests.run)
-    "FileToolsCodecTests.run", Sync (sync FileToolsCodecTests.run)
-    "FuzzyToolsCodecTests.run", Sync (sync FuzzyToolsCodecTests.run)
-    "WorkBacklogToolsCodecTests.run", Sync (sync WorkBacklogToolsCodecTests.run)
-    "PatchToolsCodecTests.run", Sync (sync PatchToolsCodecTests.run)
-    "HostMessagePartCodecTests.run", Sync (sync HostMessagePartCodecTests.run)
-    "MessagingPartCodecTests.run", Sync (sync MessagingPartCodecTests.run)
-    "ExecutorToolsCodecTests.run", Sync (sync ExecutorToolsCodecTests.run)
-    "ToolContextCodecTests.run", Sync (sync ToolContextCodecTests.run)
-    "OpencodeContextCodecTests.run", Sync (sync OpencodeContextCodecTests.run)
-    "OpencodeSessionPromptCodecTests.run", Sync (sync OpencodeSessionPromptCodecTests.run)
-    "OpencodeSessionSpawnCodecTests.run", Sync (sync OpencodeSessionSpawnCodecTests.run)
-    "SessionIoPromptBodyTests.run", Sync (sync SessionIoPromptBodyTests.run)
-    "OpencodeAgentConfigCodecTests.run", Sync (sync OpencodeAgentConfigCodecTests.run)
-    "OpencodeSessionEventCodecTests.run", Sync (sync OpencodeSessionEventCodecTests.run)
-    "OpencodeSessionEventCodecCommonTests.run", Sync (sync OpencodeSessionEventCodecCommonTests.run)
-    "MuxAiSettingsCodecTests.run", Sync (sync MuxAiSettingsCodecTests.run)
-    "MuxAiSettingsIntegrationTests.run", Async MuxAiSettingsIntegrationTests.run
-    "AgentConfigApplyTests.run", Sync (sync AgentConfigApplyTests.run)
-    "SessionExecutorScopeTests.run", Async SessionExecutorScopeTests.run
-    "CapsSynthCommonTests.run", Sync (sync CapsSynthCommonTests.run)
-    "CapsFileCacheTests.run", Async CapsFileCacheTests.run
-    "CapsFormatTests.run", Sync (sync CapsFormatTests.run)
-    "ReviewReplaySyncTests.run", Sync (sync ReviewReplaySyncTests.run)
-    ]
+    [ "SubagentToolPolicyTests.run", Sync(sync SubagentToolPolicyTests.run)
+      "SubagentPromptBuildTests.run", Sync(sync SubagentPromptBuildTests.run)
+      "SubagentSpawnTests.run", Async SubagentSpawnTests.run
+      "ToolArgsDecodeTests.run", Sync(sync ToolArgsDecodeTests.run)
+      "ToolResultWireTests.run", Sync(sync ToolResultWireTests.run)
+      "SubagentToolExecuteTests.run", Async SubagentToolExecuteTests.run
+      "WebToolsCodecTests.run", Sync(sync WebToolsCodecTests.run)
+      "ReviewToolsCodecTests.run", Sync(sync ReviewToolsCodecTests.run)
+      "FileToolsCodecTests.run", Sync(sync FileToolsCodecTests.run)
+      "FuzzyToolsCodecTests.run", Sync(sync FuzzyToolsCodecTests.run)
+      "WorkBacklogToolsCodecTests.run", Sync(sync WorkBacklogToolsCodecTests.run)
+      "PatchToolsCodecTests.run", Sync(sync PatchToolsCodecTests.run)
+      "HostMessagePartCodecTests.run", Sync(sync HostMessagePartCodecTests.run)
+      "MessagingPartCodecTests.run", Sync(sync MessagingPartCodecTests.run)
+      "ExecutorToolsCodecTests.run", Sync(sync ExecutorToolsCodecTests.run)
+      "ToolContextCodecTests.run", Sync(sync ToolContextCodecTests.run)
+      "OpencodeContextCodecTests.run", Sync(sync OpencodeContextCodecTests.run)
+      "OpencodeSessionPromptCodecTests.run", Sync(sync OpencodeSessionPromptCodecTests.run)
+      "OpencodeSessionSpawnCodecTests.run", Sync(sync OpencodeSessionSpawnCodecTests.run)
+      "SessionIoPromptBodyTests.run", Sync(sync SessionIoPromptBodyTests.run)
+      "OpencodeAgentConfigCodecTests.run", Sync(sync OpencodeAgentConfigCodecTests.run)
+      "OpencodeSessionEventCodecTests.run", Sync(sync OpencodeSessionEventCodecTests.run)
+      "OpencodeSessionEventCodecCommonTests.run", Sync(sync OpencodeSessionEventCodecCommonTests.run)
+      "MuxAiSettingsCodecTests.run", Sync(sync MuxAiSettingsCodecTests.run)
+      "MuxAiSettingsIntegrationTests.run", Async MuxAiSettingsIntegrationTests.run
+      "AgentConfigApplyTests.run", Sync(sync AgentConfigApplyTests.run)
+      "SessionExecutorScopeTests.run", Async SessionExecutorScopeTests.run
+      "CapsSynthCommonTests.run", Sync(sync CapsSynthCommonTests.run)
+      "CapsFileCacheTests.run", Async CapsFileCacheTests.run
+      "CapsFormatTests.run", Sync(sync CapsFormatTests.run)
+      "ReviewReplaySyncTests.run", Sync(sync ReviewReplaySyncTests.run) ]

@@ -25,7 +25,10 @@ type ReviewEvent =
     | Accepted
     | NeedsRevision of feedback: string
 
-type ReviewResult = Accepted of feedback: string | NeedsRevision of feedback: string | Terminated
+type ReviewResult =
+    | Accepted of feedback: string
+    | NeedsRevision of feedback: string
+    | Terminated
 
 type ReviewSession =
     { id: string
@@ -38,17 +41,38 @@ type ReviewSession =
       childIds: string list }
 
 let empty id createdAt : ReviewSession =
-    { id = id; version = 0; state = ReviewState.Inactive; createdAt = createdAt
-      originalTask = None; lastFeedback = None; parentId = None; childIds = [] }
+    { id = id
+      version = 0
+      state = ReviewState.Inactive
+      createdAt = createdAt
+      originalTask = None
+      lastFeedback = None
+      parentId = None
+      childIds = [] }
 
 let withTask task session =
-    if session.originalTask = Some task then session else { session with originalTask = Some task; version = session.version + 1 }
+    if session.originalTask = Some task then
+        session
+    else
+        { session with
+            originalTask = Some task
+            version = session.version + 1 }
 
 let withFeedback session feedback =
-    if session.lastFeedback = Some feedback then session else { session with lastFeedback = Some feedback; version = session.version + 1 }
+    if session.lastFeedback = Some feedback then
+        session
+    else
+        { session with
+            lastFeedback = Some feedback
+            version = session.version + 1 }
 
 let addChild session childId =
-    if List.contains childId session.childIds then session else { session with childIds = session.childIds @ [ childId ]; version = session.version + 1 }
+    if List.contains childId session.childIds then
+        session
+    else
+        { session with
+            childIds = session.childIds @ [ childId ]
+            version = session.version + 1 }
 
 type RoundOutcome =
     | Resolved of result: ReviewResult

@@ -7,7 +7,9 @@ open Wanxiangshu.Kernel.ReviewSession
 open Wanxiangshu.Kernel.ReviewSession.Types
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.Dyn
+
 module Dyn = Wanxiangshu.Shell.Dyn
+
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Omp.PluginCore
@@ -19,7 +21,7 @@ let reviewStoreIsSharedSingleton () =
     let s2 = reviewStore
     check "reviewStore singleton reference equality" (System.Object.ReferenceEquals(s1, s2))
     let sessionId = "core-services-1"
-    s1.activateReview(sessionId, "task", 0L)
+    s1.activateReview (sessionId, "task", 0L)
     check "shared store sees activation" (s1.getReviewTask sessionId = Some "task")
     check "shared store sees activation via second reference" (s2.getReviewTask sessionId = Some "task")
     s1.deactivateReview sessionId
@@ -27,32 +29,45 @@ let reviewStoreIsSharedSingleton () =
 
 let clearReviewStatesNoError () =
     let s = reviewStore
-    s.activateReview("core-svc-2", "x", 0L)
+    s.activateReview ("core-svc-2", "x", 0L)
     s.clearReviewSessions ()
     check "clearReviewSessions clears" (s.getReviewState "core-svc-2" |> Option.isNone)
 
 /// Minimal `pi` harness capturing `pi.on(event, handler)` registrations so a
 /// test can invoke the captured closure and observe its side effects.
 let private capturePi () : obj * (unit -> obj array) =
-    let handlers : ResizeArray<obj> = ResizeArray ()
-    let hookStore =
-        createObj [ "events", box (createObj [ "event", box handlers ]) ]
+    let handlers: ResizeArray<obj> = ResizeArray()
+    let hookStore = createObj [ "events", box (createObj [ "event", box handlers ]) ]
+
     let pi =
-        emitJsExpr hookStore
+        emitJsExpr
+            hookStore
             "((hs) => ({ on(event, handler) { if (!hs.events[event]) hs.events[event] = []; hs.events[event].push(handler); } }))($0)"
         |> unbox<obj>
+
     let getHandlers () : obj array =
         let raw =
-            emitJsExpr hookStore "((hs) => hs.events['event'] || [])($0)"
-            |> unbox<obj>
-        if Dyn.isNullish raw || not (Dyn.isArray raw) then [||] else unbox<obj array> raw
+            emitJsExpr hookStore "((hs) => hs.events['event'] || [])($0)" |> unbox<obj>
+
+        if Dyn.isNullish raw || not (Dyn.isArray raw) then
+            [||]
+        else
+            unbox<obj array> raw
+
     pi, getHandlers
 
-let private makeFakeRuntime () : FallbackRuntimeState =
-    FallbackRuntimeState()
+let private makeFakeRuntime () : FallbackRuntimeState = FallbackRuntimeState()
 
 let private makeFakeConfig () : FallbackConfig =
-    { DefaultChain = [ { ProviderID = "oai"; ModelID = "gpt5"; Variant = None; Temperature = None; TopP = None; MaxTokens = None; ReasoningEffort = None; Thinking = false } ]
+    { DefaultChain =
+        [ { ProviderID = "oai"
+            ModelID = "gpt5"
+            Variant = None
+            Temperature = None
+            TopP = None
+            MaxTokens = None
+            ReasoningEffort = None
+            Thinking = false } ]
       AgentChains = Map.ofList []
       MaxRetries = 2
       LoopMaxContinues = 3 }
@@ -64,10 +79,7 @@ let private invokeFallbackHandler (handler: obj) (event: obj) (ctx: obj) : unit 
 /// resolved through a `sessionManager.getSessionId` ctx, and assert review
 /// state matches `expectActive`.
 let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool) : unit =
-    let sessionMgr =
-        createObj [
-            "getSessionId", box(fun () -> box sessionId)
-        ]
+    let sessionMgr = createObj [ "getSessionId", box (fun () -> box sessionId) ]
     let ctx = createObj [ "sessionManager", box sessionMgr ]
     let event = createObj [ "type", box evtType ]
     let pi, getHandlers = capturePi ()
@@ -84,34 +96,48 @@ let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool
 /// abort and re-emerge as if the next session owned it.
 let abortHookDeactivatesReview () =
     let sid = "abort-hook-sid-1"
-    reviewStore.activateReview(sid, "task", 0L)
+    reviewStore.activateReview (sid, "task", 0L)
     check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
     Wanxiangshu.Shell.RunnerBackground.registerActiveRunnerSession Wanxiangshu.Omp.ExecutorTools.ompScope sid
-    check "precondition: has running runner job" (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid)
+
+    check
+        "precondition: has running runner job"
+        (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid)
+
     driveAbort "session.abort" sid false
-    check "postcondition: runner job was aborted" (not (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid))
+
+    check
+        "postcondition: runner job was aborted"
+        (not (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid))
 
 /// `stream.abort` must mirror the session.abort path: review state clears.
 let streamAbortHookDeactivatesReview () =
     let sid = "stream-abort-hook-sid-1"
-    reviewStore.activateReview(sid, "task", 0L)
+    reviewStore.activateReview (sid, "task", 0L)
     check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
     Wanxiangshu.Shell.RunnerBackground.registerActiveRunnerSession Wanxiangshu.Omp.ExecutorTools.ompScope sid
-    check "precondition: has running runner job" (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid)
+
+    check
+        "precondition: has running runner job"
+        (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid)
+
     driveAbort "stream.abort" sid false
-    check "postcondition: runner job was aborted" (not (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid))
+
+    check
+        "postcondition: runner job was aborted"
+        (not (Wanxiangshu.Shell.RunnerBackground.hasRunningRunnerJob Wanxiangshu.Omp.ExecutorTools.ompScope sid))
 
 /// `session.error` collapses to the same outcome as aborts.
 let sessionErrorHookDeactivatesReview () =
     let sid = "session-error-hook-sid-1"
-    reviewStore.activateReview(sid, "task", 0L)
+    reviewStore.activateReview (sid, "task", 0L)
     check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
     driveAbort "session.error" sid false
 
 /// Events outside the abort/error set must be ignored: review state stays put.
 let unrelatedEventLeavesReviewActive () =
     let sid = "unrelated-event-sid-1"
-    reviewStore.activateReview(sid, "task", 0L)
+    reviewStore.activateReview (sid, "task", 0L)
     check "precondition: review active" (reviewStore.getReviewTask sid = Some "task")
     driveAbort "session.idle" sid true
 
@@ -119,20 +145,36 @@ let unrelatedEventLeavesReviewActive () =
 /// review cleanup. Previously the translator looked for `props.error`, which
 /// was never set, so the event bypassed fallback entirely.
 let ompErrorEventRoutesToFallback () =
-    let sessionMgr = createObj [ "getSessionId", box(fun () -> box "omp-fb-error-sid") ]
+    let sessionMgr =
+        createObj [ "getSessionId", box (fun () -> box "omp-fb-error-sid") ]
+
     let ctx = createObj [ "sessionManager", box sessionMgr ]
-    let event = createObj [
-        "type", box "session.error"
-        "error", box(createObj [ "name", box "APIError"; "message", box "rate limit"; "statusCode", box "429"; "isRetryable", box "true" ])
-    ]
+
+    let event =
+        createObj
+            [ "type", box "session.error"
+              "error",
+              box (
+                  createObj
+                      [ "name", box "APIError"
+                        "message", box "rate limit"
+                        "statusCode", box "429"
+                        "isRetryable", box "true" ]
+              ) ]
+
     let pi, getHandlers = capturePi ()
     let mutable handlerCalled = false
     let runtime = makeFakeRuntime ()
+
     let fakeHandler (rawEvent: obj) : JS.Promise<FallbackHookResult> =
         handlerCalled <- true
-        Promise.lift { Consumed = false; State = runtime.GetOrCreateState "omp-fb-error-sid" }
+
+        Promise.lift
+            { Consumed = false
+              State = runtime.GetOrCreateState "omp-fb-error-sid" }
+
     registerAbortHandler pi reviewStore (Some fakeHandler)
-    let handlers : obj array = getHandlers ()
+    let handlers: obj array = getHandlers ()
     check "exactly one handler registered" (handlers.Length = 1)
     invokeFallbackHandler handlers.[0] event ctx
     check "fallback handler saw session.error" handlerCalled
@@ -140,17 +182,22 @@ let ompErrorEventRoutesToFallback () =
 /// Non-terminal OMP events (session.idle) must also reach the fallback
 /// handler so scan completion / CheckTodoState can fire.
 let ompIdleEventRoutesToFallback () =
-    let sessionMgr = createObj [ "getSessionId", box(fun () -> box "omp-fb-idle-sid") ]
+    let sessionMgr = createObj [ "getSessionId", box (fun () -> box "omp-fb-idle-sid") ]
     let ctx = createObj [ "sessionManager", box sessionMgr ]
     let event = createObj [ "type", box "session.idle" ]
     let pi, getHandlers = capturePi ()
     let mutable handlerCalled = false
     let runtime = makeFakeRuntime ()
+
     let fakeHandler (rawEvent: obj) : JS.Promise<FallbackHookResult> =
         handlerCalled <- true
-        Promise.lift { Consumed = false; State = runtime.GetOrCreateState "omp-fb-idle-sid" }
+
+        Promise.lift
+            { Consumed = false
+              State = runtime.GetOrCreateState "omp-fb-idle-sid" }
+
     registerAbortHandler pi reviewStore (Some fakeHandler)
-    let handlers : obj array = getHandlers ()
+    let handlers: obj array = getHandlers ()
     invokeFallbackHandler handlers.[0] event ctx
     check "fallback handler saw session.idle" handlerCalled
 

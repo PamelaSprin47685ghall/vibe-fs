@@ -23,12 +23,17 @@ let private emptyUserAgentScalars () : UserAgentScalars =
 
 let private mcpsFromField (userAgent: obj) : string array option =
     let v = Dyn.get userAgent "mcps"
-    if Dyn.isNullish v then None
-    elif Dyn.isArray v then Some ((v :?> obj array) |> Array.map string)
-    else Some [| string v |]
+
+    if Dyn.isNullish v then
+        None
+    elif Dyn.isArray v then
+        Some((v :?> obj array) |> Array.map string)
+    else
+        Some [| string v |]
 
 let private permissionMapFromObj (v: obj) : PermissionOverrides option =
-    if Dyn.isNullish v then None
+    if Dyn.isNullish v then
+        None
     else
         Dyn.keys v
         |> Array.fold
@@ -39,7 +44,8 @@ let private permissionMapFromObj (v: obj) : PermissionOverrides option =
         |> Some
 
 let toolsMapFromObj (v: obj) : ToolsOverrides option =
-    if Dyn.isNullish v then None
+    if Dyn.isNullish v then
+        None
     else
         Dyn.keys v
         |> Array.fold
@@ -56,7 +62,10 @@ let permissionMapToObj (m: PermissionOverrides) : obj =
 let toolsMapToObj (m: ToolsOverrides) : obj =
     m |> Map.toList |> List.map (fun (k, v) -> k, box v) |> createObj
 
-let private mergePermissionMaps (defaults: PermissionOverrides) (user: PermissionOverrides option) : PermissionOverrides =
+let private mergePermissionMaps
+    (defaults: PermissionOverrides)
+    (user: PermissionOverrides option)
+    : PermissionOverrides =
     match user with
     | None -> defaults
     | Some u -> Map.fold (fun acc k v -> Map.add k v acc) defaults u
@@ -73,10 +82,12 @@ let mergeToolsOverrides (defaults: ToolsOverrides) (user: ToolsOverrides option)
     mergeToolsMaps defaults user
 
 let decodeUserAgentScalars (userAgent: obj) : UserAgentScalars =
-    if Dyn.isNullish userAgent then emptyUserAgentScalars ()
+    if Dyn.isNullish userAgent then
+        emptyUserAgentScalars ()
     else
         let prompt = strField userAgent "prompt" |> Option.defaultValue ""
         let mode = strField userAgent "mode" |> Option.defaultValue ""
+
         { Prompt = prompt
           Mode = mode
           Permission = permissionMapFromObj (Dyn.get userAgent "permission")
@@ -85,8 +96,7 @@ let decodeUserAgentScalars (userAgent: obj) : UserAgentScalars =
 
 let encodeAgentScalarsRecord (scalars: UserAgentScalars) : obj =
     let pairs =
-        [ "prompt", box scalars.Prompt
-          "mode", box scalars.Mode ]
+        [ "prompt", box scalars.Prompt; "mode", box scalars.Mode ]
         @ (match scalars.Permission with
            | None -> []
            | Some m -> [ "permission", permissionMapToObj m ])
@@ -96,4 +106,5 @@ let encodeAgentScalarsRecord (scalars: UserAgentScalars) : obj =
         @ (match scalars.Mcps with
            | None -> []
            | Some arr -> [ "mcps", box arr ])
+
     createObj pairs

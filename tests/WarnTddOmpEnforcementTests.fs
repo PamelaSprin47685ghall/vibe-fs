@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.WarnTdd
 open Wanxiangshu.Shell.Dyn
+
 module Dyn = Wanxiangshu.Shell.Dyn
 
 // `applyToolCallHook` in src/Omp/HookExecute.fs returns `Some err` on
@@ -17,8 +18,7 @@ let private ompHookResult (toolName: string) (args: obj) : string option =
 let ompRejectsCoderMissing () =
     let result = ompHookResult "coder" (createObj [])
     check "omp coder missing warn_tdd returns Some" (Option.isSome result)
-    check "omp coder error mentions warn_tdd"
-          (result.IsSome && result.Value.Contains "warn_tdd")
+    check "omp coder error mentions warn_tdd" (result.IsSome && result.Value.Contains "warn_tdd")
 
 let ompRejectsCoderMalformed () =
     let result = ompHookResult "coder" (createObj [ "warn_tdd", box "wrong" ])
@@ -31,18 +31,17 @@ let ompAcceptsCoder () =
     check "omp coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
 
 let ompIgnoresNonModificationTool () =
-    check "omp read passes without warn_tdd"
-          (ompHookResult "read" (createObj []) |> Option.isNone)
+    check "omp read passes without warn_tdd" (ompHookResult "read" (createObj []) |> Option.isNone)
 
 let ompRejectsExecutorMissingWarn () =
     let result = ompHookResult "executor" (createObj [ "warn_tdd", box canonicalValue ])
     check "omp executor missing warn returns Some" (Option.isSome result)
-    check "omp executor warn error mentions warn"
-          (result.IsSome && result.Value.Contains "warn")
+    check "omp executor warn error mentions warn" (result.IsSome && result.Value.Contains "warn")
 
 let ompAcceptsExecutor () =
     let args =
         createObj [ "warn_tdd", box canonicalValue; "warn", box warnCanonicalValue ]
+
     let result = ompHookResult "executor" args
     check "omp executor canonical returns None" (Option.isNone result)
     check "omp executor warn removed from args" (Dyn.str args "warn" = "")
@@ -58,6 +57,7 @@ let exhaustiveOmpWarnTdd () =
                 createObj [ "warn", box warnCanonicalValue ]
             else
                 createObj []
+
         let result = ompHookResult tool args
         check ("omp " + tool + " missing warn_tdd returns Some") (Option.isSome result)
 
@@ -68,6 +68,7 @@ let exhaustiveOmpWarnTddAccepts () =
                 createObj [ "warn_tdd", box canonicalValue; "warn", box warnCanonicalValue ]
             else
                 createObj [ "warn_tdd", box canonicalValue ]
+
         let result = ompHookResult tool args
         check ("omp " + tool + " canonical fields return None") (Option.isNone result)
 
@@ -81,6 +82,7 @@ let exhaustiveOmpWarnAccepts () =
     for tool in warnRequiredTools do
         let args =
             createObj [ "warn_tdd", box canonicalValue; "warn", box warnCanonicalValue ]
+
         let result = ompHookResult tool args
         check ("omp " + tool + " canonical warn returns None") (Option.isNone result)
 

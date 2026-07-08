@@ -3,7 +3,9 @@ module Wanxiangshu.Omp.SessionLifecycleHooks
 open Wanxiangshu.Omp.NudgeHooks
 open Wanxiangshu.Omp.TodoHooks
 
-let applyActiveToolFilterForMainSession = NudgeHooks.applyActiveToolFilterForMainSession
+let applyActiveToolFilterForMainSession =
+    NudgeHooks.applyActiveToolFilterForMainSession
+
 let beforeAgentStartHandler = NudgeHooks.beforeAgentStartHandler
 let toolCallHandler = NudgeHooks.toolCallHandler
 let turnStartHandler = NudgeHooks.turnStartHandler

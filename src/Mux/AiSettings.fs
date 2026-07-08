@@ -1,4 +1,5 @@
 module Wanxiangshu.Mux.AiSettings
+
 open Wanxiangshu.Kernel.Domain
 
 open Fable.Core
@@ -15,22 +16,24 @@ open Wanxiangshu.Kernel.FallbackKernel.Recovery
 type DelegatedAiSettings = Wanxiangshu.Shell.DelegatedAiSettings.DelegatedAiSettings
 let emptySettings = Wanxiangshu.Shell.DelegatedAiSettings.emptySettings
 
-let private loadConfigOrDefault (deps: obj) : obj = deps?loadConfigOrDefault()
+let private loadConfigOrDefault (deps: obj) : obj = deps?loadConfigOrDefault ()
 
 let private findWorkspaceEntry (deps: obj) (configFile: obj) (workspaceId: string) : obj =
-    deps?findWorkspaceEntry(configFile, workspaceId)
+    deps?findWorkspaceEntry (configFile, workspaceId)
 
 let private resolveAgentFrontmatter (deps: obj) (runtime: obj) (cwd: string) (agentId: string) : JS.Promise<obj> =
-    unbox (deps?resolveAgentFrontmatter(runtime, cwd, agentId))
+    unbox (deps?resolveAgentFrontmatter (runtime, cwd, agentId))
 
 let mergeNamedSettings (sources: DelegatedAiSettings option list) : DelegatedAiSettings =
     sources
-    |> List.fold (fun acc source ->
-        match source with
-        | Some s ->
-            { modelString = acc.modelString |> Option.orElse s.modelString
-              thinkingLevel = acc.thinkingLevel |> Option.orElse s.thinkingLevel }
-        | None -> acc) emptySettings
+    |> List.fold
+        (fun acc source ->
+            match source with
+            | Some s ->
+                { modelString = acc.modelString |> Option.orElse s.modelString
+                  thinkingLevel = acc.thinkingLevel |> Option.orElse s.thinkingLevel }
+            | None -> acc)
+        emptySettings
 
 let private modelStringFromFallbackModel (m: FallbackModel) : string =
     match m.Variant with
@@ -42,37 +45,52 @@ let private readDescriptorModelsFromFrontmatter (fm: obj) (agentId: string) : De
     | None -> emptySettings
     | Some cfg ->
         let normId = normalizeAgentName agentId
+
         let chain =
             Map.tryFind normId cfg.AgentChains
             |> Option.orElse (Some cfg.DefaultChain)
             |> Option.defaultValue []
+
         { modelString = chain |> List.tryHead |> Option.map modelStringFromFallbackModel
           thinkingLevel = None }
 
 let resolveDelegatedAgentAiSettings (deps: obj) (config: obj) (agentId: string) : JS.Promise<DelegatedAiSettings> =
     promise {
         let d = decodeMuxDelegateConfigLenient config
-        let workspaceId = d.Execution.WorkspaceId |> Option.map Id.workspaceIdValue |> Option.defaultValue ""
+
+        let workspaceId =
+            d.Execution.WorkspaceId
+            |> Option.map Id.workspaceIdValue
+            |> Option.defaultValue ""
+
         let runtime = d.Runtime
         let cwd = d.Cwd
         let configFile = loadConfigOrDefault deps
+
         let workspace =
-            if workspaceId = "" then null
-            else readWorkspaceFromFindResult (findWorkspaceEntry deps configFile workspaceId)
+            if workspaceId = "" then
+                null
+            else
+                readWorkspaceFromFindResult (findWorkspaceEntry deps configFile workspaceId)
+
         let! fm =
             promise {
                 try
                     let! fm = resolveAgentFrontmatter deps runtime cwd agentId
                     return fm
-                with _ -> return null
+                with _ ->
+                    return null
             }
+
         let descriptorSettings = readDescriptorAiFromFrontmatter fm
         let modelsSettings = readDescriptorModelsFromFrontmatter fm agentId
+
         return
             mergeNamedSettings (
                 [ readWorkspaceAiSettingsByAgent workspace agentId ]
                 @ readMuxConfigFileDefaults configFile agentId
-                @ [ Some descriptorSettings; Some modelsSettings ])
+                @ [ Some descriptorSettings; Some modelsSettings ]
+            )
     }
 
 type ParentRuntimeAiSettings =
@@ -87,13 +105,16 @@ let private toRuntimeAiSettingsObj (settings: ParentRuntimeAiSettings) : obj =
           match settings.thinkingLevel with
           | Some v -> yield ("thinkingLevel", box v)
           | None -> () ]
+
     match fields with
     | [] -> null
     | _ -> createObj fields
 
 let buildParentRuntimeAiSettings (config: obj) : obj =
     let scalars = readParentMuxEnv config
-    if scalars.ModelString.IsNone && scalars.ThinkingLevel.IsNone then null
+
+    if scalars.ModelString.IsNone && scalars.ThinkingLevel.IsNone then
+        null
     else
         toRuntimeAiSettingsObj
             { modelString = scalars.ModelString

@@ -13,13 +13,18 @@ let private fakeStore () = createTypedIteratorStore 100
 let private optsWithStore () : SearchOptions =
     { cwd = "/tmp"
       scopeId = "s"
-      store = Some (fakeStore())
+      store = Some(fakeStore ())
       finderCache = null }
 
 // 1. noStore – resolveStore short-circuits before iterator/pattern checks
 let noStore_returnsError () =
-    let opts : SearchOptions = { cwd = "/tmp"; scopeId = "s"; store = None; finderCache = null }
-    let params' : FuzzyGrepParams =
+    let opts: SearchOptions =
+        { cwd = "/tmp"
+          scopeId = "s"
+          store = None
+          finderCache = null }
+
+    let params': FuzzyGrepParams =
         { pattern = [ "x" ]
           path = None
           exclude = []
@@ -28,14 +33,16 @@ let noStore_returnsError () =
           context = None
           limit = None
           iterator = None }
+
     match resolveGrepIteratorState params' opts with
     | Error msg -> check "noStore error mentions store" (msg.Contains "requires SearchOptions.store")
     | Ok _ -> check "noStore → Error" false
 
 // 2. missingPattern – None or empty string is declined before wildcard/iterator logic
 let missingPattern_returnsError () =
-    let opts = optsWithStore()
-    let paramsNone : FuzzyGrepParams =
+    let opts = optsWithStore ()
+
+    let paramsNone: FuzzyGrepParams =
         { pattern = []
           path = None
           exclude = []
@@ -44,14 +51,16 @@ let missingPattern_returnsError () =
           context = None
           limit = None
           iterator = None }
+
     match resolveGrepIteratorState paramsNone opts with
     | Error msg -> check "None pattern error" (msg.Contains "pattern is required")
     | Ok _ -> check "None pattern → Error" false
 
 // 3. wildcardOnly – detectGrepMode=regex + checkWildcardOnly blocks universal patterns
 let wildcardOnly_returnsError () =
-    let opts = optsWithStore()
-    let params' : FuzzyGrepParams =
+    let opts = optsWithStore ()
+
+    let params': FuzzyGrepParams =
         { pattern = [ ".*" ]
           path = None
           exclude = []
@@ -60,14 +69,16 @@ let wildcardOnly_returnsError () =
           context = None
           limit = None
           iterator = None }
+
     match resolveGrepIteratorState params' opts with
     | Error msg -> check "wildcard error mentions matches everything" (msg.Contains "matches everything")
     | Ok _ -> check "wildcardOnly → Error" false
 
 // 4. invalidIterator – consumeGrepIterator fails, bypasses pattern logic entirely
 let invalidIterator_returnsError () =
-    let opts = optsWithStore()
-    let params' : FuzzyGrepParams =
+    let opts = optsWithStore ()
+
+    let params': FuzzyGrepParams =
         { pattern = [ "anything" ]
           path = None
           exclude = []
@@ -76,14 +87,16 @@ let invalidIterator_returnsError () =
           context = None
           limit = None
           iterator = Some "bad-iterator-id" }
+
     match resolveGrepIteratorState params' opts with
     | Error msg -> check "invalid iterator error" (msg.Contains "iterator")
     | Ok _ -> check "invalidIterator → Error" false
 
 // 5. validPattern – happy path: query built, defaults filled, cursor=None
 let validPattern_returnsOk () =
-    let opts = optsWithStore()
-    let params' : FuzzyGrepParams =
+    let opts = optsWithStore ()
+
+    let params': FuzzyGrepParams =
         { pattern = [ "test" ]
           path = None
           exclude = []
@@ -92,6 +105,7 @@ let validPattern_returnsOk () =
           context = Some 2
           limit = Some 10
           iterator = None }
+
     match resolveGrepIteratorState params' opts with
     | Ok state ->
         check "query non-empty" (state.core.query <> "")
@@ -104,8 +118,9 @@ let validPattern_returnsOk () =
     | Error msg -> check "valid → Ok" false
 
 let searchIgnored_addsGitIgnoredConstraint () =
-    let opts = optsWithStore()
-    let params' : FuzzyGrepParams =
+    let opts = optsWithStore ()
+
+    let params': FuzzyGrepParams =
         { pattern = [ "needle" ]
           path = Some "node_modules/pkg"
           exclude = []
@@ -114,6 +129,7 @@ let searchIgnored_addsGitIgnoredConstraint () =
           context = None
           limit = None
           iterator = None }
+
     match resolveGrepIteratorState params' opts with
     | Ok state ->
         check "query contains ignored constraint" (state.core.query.Contains "git:ignored")

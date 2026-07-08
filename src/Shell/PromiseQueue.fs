@@ -23,11 +23,12 @@ type SerialQueue(?observer: IExceptionObserver) =
                         observer |> Option.iter (fun o -> o.OnException ex)
                         reject ex
                 }
+
             let oldTail = tail.Value
+
             tail.Value <-
                 oldTail
-                |> Promise.catch (fun ex ->
-                    observer |> Option.iter (fun o -> o.OnException ex))
+                |> Promise.catch (fun ex -> observer |> Option.iter (fun o -> o.OnException ex))
                 |> Promise.bind (fun _ -> runNext () |> Promise.map ignore))
 
 /// Race a promise against a timeout. Returns None when the timeout wins, Some
@@ -38,9 +39,11 @@ let withTimeout (timeoutMs: int) (work: JS.Promise<'T>) : JS.Promise<'T option> 
             do! Promise.sleep timeoutMs
             return None
         }
+
     let workPromise =
         promise {
             let! res = work
             return Some res
         }
+
     Promise.race [ timeoutPromise; workPromise ]

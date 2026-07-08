@@ -4,41 +4,46 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.Dyn
+
 module Dyn = Wanxiangshu.Shell.Dyn
+
 open Wanxiangshu.Omp.Plugin
 open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Kernel.FuzzyQuery
 
 let private createPiHarness () =
     let tools = ResizeArray<obj>()
+
     let hookStore =
-        createObj [
-            "tools", box tools
-            "commands", box (ResizeArray<obj>())
-            "messages", box (ResizeArray<obj>())
-            "events", box (createObj [])
-            "activeTools", box [||]
-        ]
+        createObj
+            [ "tools", box tools
+              "commands", box (ResizeArray<obj>())
+              "messages", box (ResizeArray<obj>())
+              "events", box (createObj [])
+              "activeTools", box [||] ]
+
     tools, hookStore
 
 let private piObject (hookStore: obj) : obj =
     let tb =
-        createObj [
-            "Type",
-                box(
-                    createObj [
-                        "Object", box(fun (p: obj) -> createObj [ "type", box "object"; "properties", box p ])
-                        "String", box(fun (_: obj) -> createObj [ "type", box "string" ])
-                        "Number", box(fun (_: obj) -> createObj [ "type", box "number" ])
-                        "Boolean", box(fun (_: obj) -> createObj [ "type", box "boolean" ])
-                        "Null", box(fun (_: obj) -> createObj [ "type", box "null" ])
-                        "Union", box(fun (items: obj array) -> createObj [ "anyOf", box items ])
-                        "Enum", box(fun (values: obj array) (_: obj) -> createObj [ "type", box "enum"; "values", box values ])
-                        "Array", box(fun (items: obj) -> createObj [ "type", box "array"; "items", box items ])
-                        "Optional", box(fun (schema: obj) -> schema)
-                    ])
-        ]
-    emitJsExpr hookStore
+        createObj
+            [ "Type",
+              box (
+                  createObj
+                      [ "Object", box (fun (p: obj) -> createObj [ "type", box "object"; "properties", box p ])
+                        "String", box (fun (_: obj) -> createObj [ "type", box "string" ])
+                        "Number", box (fun (_: obj) -> createObj [ "type", box "number" ])
+                        "Boolean", box (fun (_: obj) -> createObj [ "type", box "boolean" ])
+                        "Null", box (fun (_: obj) -> createObj [ "type", box "null" ])
+                        "Union", box (fun (items: obj array) -> createObj [ "anyOf", box items ])
+                        "Enum",
+                        box (fun (values: obj array) (_: obj) -> createObj [ "type", box "enum"; "values", box values ])
+                        "Array", box (fun (items: obj) -> createObj [ "type", box "array"; "items", box items ])
+                        "Optional", box (fun (schema: obj) -> schema) ]
+              ) ]
+
+    emitJsExpr
+        hookStore
         """((hs) => ({
         on(event, handler) {
             if (!hs.events[event]) hs.events[event] = [];
@@ -57,7 +62,13 @@ let private piObject (hookStore: obj) : obj =
 
 let fuzzyFindIteratorSingleUse () =
     let store = createTypedIteratorStore 10
-    let state : FuzzyFindState = { query = "src main"; pageSize = 30; pageIndex = 1; externalBasePath = None }
+
+    let state: FuzzyFindState =
+        { query = "src main"
+          pageSize = 30
+          pageIndex = 1
+          externalBasePath = None }
+
     let id = storeFindIterator store "scope" state
     let resumed = consumeFindIterator store id
     check "find resume present" resumed.IsSome
@@ -66,7 +77,8 @@ let fuzzyFindIteratorSingleUse () =
 
 let fuzzyGrepIteratorSingleUse () =
     let store = createTypedIteratorStore 10
-    let core : FuzzyGrepState =
+
+    let core: FuzzyGrepState =
         { query = "x"
           mode = "plain"
           smartCase = true
@@ -74,6 +86,7 @@ let fuzzyGrepIteratorSingleUse () =
           afterContext = 0
           pageSize = 50
           externalBasePath = Some "/tmp/demo" }
+
     let wrapped = { core = core; cursor = None }
     let id = storeGrepIterator store "scope" wrapped
     let resumed = consumeGrepIterator store id
@@ -81,12 +94,14 @@ let fuzzyGrepIteratorSingleUse () =
     equal "grep external path" (Some "/tmp/demo") resumed.Value.core.externalBasePath
     check "grep single-use" ((consumeGrepIterator store id).IsNone)
 
-let registeredFuzzyToolsExposeIteratorParam () = promise {
-    let tools, hookStore = createPiHarness ()
-    let pi = piObject hookStore
-    do! wanxiangshuExtension pi
-    for toolName in [| "fuzzy_find"; "fuzzy_grep" |] do
-        let tool = tools |> Seq.find (fun t -> str t "name" = toolName)
-        let props = Dyn.get (Dyn.get tool "parameters") "properties"
-        check (toolName + " has iterator param") (Dyn.has props "iterator")
-}
+let registeredFuzzyToolsExposeIteratorParam () =
+    promise {
+        let tools, hookStore = createPiHarness ()
+        let pi = piObject hookStore
+        do! wanxiangshuExtension pi
+
+        for toolName in [| "fuzzy_find"; "fuzzy_grep" |] do
+            let tool = tools |> Seq.find (fun t -> str t "name" = toolName)
+            let props = Dyn.get (Dyn.get tool "parameters") "properties"
+            check (toolName + " has iterator param") (Dyn.has props "iterator")
+    }

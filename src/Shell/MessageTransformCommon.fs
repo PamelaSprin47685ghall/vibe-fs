@@ -4,5 +4,4 @@ open Wanxiangshu.Shell.HostMessagePartCodec
 
 let extractTextsFromEncodedMessages (messages: obj array) : string seq =
     messages
-    |> Seq.collect (fun msg ->
-        getMessageParts msg |> extractTextLinesFromParts)
+    |> Seq.collect (fun msg -> getMessageParts msg |> extractTextLinesFromParts)

@@ -55,13 +55,19 @@ type FlatPart<'raw> =
 let backlogPrefixIdPrefix = "backlog-prefix-"
 
 let private synthPrefixes =
-    [ "caps-synth-user-"; "caps-synth-assistant-"; "caps-synth-ack-"
-      "backlog-projection-"; backlogPrefixIdPrefix
-      "magic-todo-projection-"; "magic-todo-prefix-"
-      "methodology-probe-"; "semble-synth-" ]
+    [ "caps-synth-user-"
+      "caps-synth-assistant-"
+      "caps-synth-ack-"
+      "backlog-projection-"
+      backlogPrefixIdPrefix
+      "magic-todo-projection-"
+      "magic-todo-prefix-"
+      "methodology-probe-"
+      "semble-synth-" ]
 
 let classifySource (id: string) : Source =
-    if id = "" then Native
+    if id = "" then
+        Native
     else
         synthPrefixes
         |> List.tryFind id.StartsWith
@@ -76,7 +82,8 @@ let private roleMap =
           "tool-result", ToolResult
           "tool_result", ToolResult ]
 
-let decodeRole (s: string) : Role = Map.tryFind s roleMap |> Option.defaultValue System
+let decodeRole (s: string) : Role =
+    Map.tryFind s roleMap |> Option.defaultValue System
 
 /// Pure typed copy of a tool part with its state.output overwritten.
 let setPartOutputTyped (part: Part<'raw>) (newOutput: string) : Part<'raw> =
@@ -112,15 +119,20 @@ let flatten (messages: Message<'raw> list) : FlatPart<'raw> list =
     |> List.indexed
     |> List.collect (fun (msgIdx, msg) ->
         let isUser = msg.info.role = User
+
         msg.parts
         |> List.indexed
         |> List.map (fun (partIdx, part) ->
-            { msgIndex = msgIdx; partIndex = partIdx; isUser = isUser; part = part }))
+            { msgIndex = msgIdx
+              partIndex = partIdx
+              isUser = isUser
+              part = part }))
 
 /// Skip `startIndex` messages, then collect non-empty text from assistant
 /// messages' TextParts, joining with `joiner`. Pure.
 let readAssistantText (messages: Message<'raw> list) (startIndex: int) (joiner: string) : string option =
-    if startIndex >= List.length messages then None
+    if startIndex >= List.length messages then
+        None
     else
         let chunks =
             messages.[startIndex..]
@@ -131,7 +143,11 @@ let readAssistantText (messages: Message<'raw> list) (startIndex: int) (joiner: 
                     match p with
                     | TextPart text when text <> "" -> Some text
                     | _ -> None))
-        if chunks.IsEmpty then None else Some(String.concat joiner chunks)
+
+        if chunks.IsEmpty then
+            None
+        else
+            Some(String.concat joiner chunks)
 
 /// Drop synthetic messages, keeping only Native-sourced ones. Pure.
 let stripSyntheticBySource (messages: Message<'raw> list) : Message<'raw> list =

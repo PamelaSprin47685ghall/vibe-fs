@@ -17,14 +17,11 @@ let buildOmpReviewInitialPrompt (report: string) (affectedFiles: string list) (t
         if affectedFiles.IsEmpty then
             ""
         else
-            "=== Affected Files ===\n"
-            + (affectedFiles |> String.concat "\n")
-            + "\n\n"
+            "=== Affected Files ===\n" + (affectedFiles |> String.concat "\n") + "\n\n"
 
     let taskSection =
         match task with
-        | Some t when not (System.String.IsNullOrWhiteSpace t) ->
-            "=== Original Task ===\n" + t + "\n\n"
+        | Some t when not (System.String.IsNullOrWhiteSpace t) -> "=== Original Task ===\n" + t + "\n\n"
         | _ -> ""
 
     let reportSection =

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="wanxiangshu-core.fsproj"/>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="src/Shell/Wanxiangzhen/ConfigReader.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/SessionIo.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/GitShell.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/HttpCodec.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/HttpServer.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/SlaveSpawn.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/PidMonitor.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/SymlinkShell.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/SquadEventLogRuntime.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/EventCodec.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/CoordinatorRuntime.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/CoordinatorOps.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/CoordinatorRoutes.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/CoordinatorLifecycle.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/CoordinatorSquadUpdate.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/CoordinatorReplay.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/CoordinatorBootstrap.fs"/>
+    <Compile Include="src/Shell/Wanxiangzhen/SlaveRuntime.fs"/>
+    <Compile Include="src/Opencode/PluginWanxiangzhenE2eMeta.fs"/>
+    <Compile Include="src/Opencode/PluginWanxiangzhenHooks.fs"/>
+    <Compile Include="src/Opencode/PluginWanxiangzhenDeps.fs"/>
+    <Compile Include="src/Opencode/PluginWanxiangzhen.fs"/>
+  </ItemGroup>
+</Project>

@@ -9,7 +9,8 @@ open Wanxiangshu.Shell.SessionProjectionStore
 
 let private projection = ProjectionStore()
 
-let backlogEntryFromTodoInput = Wanxiangshu.Shell.BacklogSessionCodec.backlogEntryFromTodoInput
+let backlogEntryFromTodoInput =
+    Wanxiangshu.Shell.BacklogSessionCodec.backlogEntryFromTodoInput
 
 type BacklogSession(host: Host) =
     member _.Host = host
@@ -18,11 +19,13 @@ type BacklogSession(host: Host) =
     member _.CaptureReport(callID: string, report: string) : unit =
         projection.CaptureReport(host, callID, report)
 
-    member _.TakeReport(callID: string) : string =
-        projection.TakeReport(host, callID)
+    member _.TakeReport(callID: string) : string = projection.TakeReport(host, callID)
 
     member this.ReplayBacklog(messages: Message<obj> list) : BacklogEntry list =
-        replayBacklogWith host (Wanxiangshu.Shell.BacklogSessionCodec.reportFromFlatPartWithProjection host projection) messages
+        replayBacklogWith
+            host
+            (Wanxiangshu.Shell.BacklogSessionCodec.reportFromFlatPartWithProjection host projection)
+            messages
 
     member this.GetOrRebuildBacklog(sessionID: string, messages: Message<obj> list) : BacklogEntry list =
         if messages.Length > 0 then
@@ -37,5 +40,4 @@ let private shared (host: Host) : BacklogSession = BacklogSession host
 let replayBacklogFor (host: Host) (messages: Message<obj> list) : BacklogEntry list =
     (shared host).ReplayBacklog messages
 
-let replayBacklog (messages: Message<obj> list) : BacklogEntry list =
-    replayBacklogFor omp messages
+let replayBacklog (messages: Message<obj> list) : BacklogEntry list = replayBacklogFor omp messages

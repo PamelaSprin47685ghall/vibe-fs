@@ -32,17 +32,26 @@ let transition = Wanxiangshu.Kernel.ReviewSession.StateMachine.transition
 let isActive = Wanxiangshu.Kernel.ReviewSession.StateMachine.isActive
 let initialState = Wanxiangshu.Kernel.ReviewSession.StateMachine.initialState
 let applyCommand = Wanxiangshu.Kernel.ReviewSession.StateMachine.applyCommand
-let decideAfterRound = Wanxiangshu.Kernel.ReviewSession.StateMachine.decideAfterRound
+
+let decideAfterRound =
+    Wanxiangshu.Kernel.ReviewSession.StateMachine.decideAfterRound
+
 let promptParts = Wanxiangshu.Kernel.ReviewSession.StateMachine.promptParts
 let emptyRegistry = Wanxiangshu.Kernel.ReviewSession.Registry.emptyRegistry
 let reduce = Wanxiangshu.Kernel.ReviewSession.Registry.reduce
 let actionFor = Wanxiangshu.Kernel.ReviewSession.Registry.actionFor
-let hasActiveReviewState = Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState
+
+let hasActiveReviewState =
+    Wanxiangshu.Kernel.ReviewSession.Query.hasActiveReviewState
+
 let taskOf = Wanxiangshu.Kernel.ReviewSession.Query.taskOf
 let stateOf = Wanxiangshu.Kernel.ReviewSession.Query.stateOf
 let canTransition = Wanxiangshu.Kernel.ReviewSession.Query.canTransition
 let versionOf = Wanxiangshu.Kernel.ReviewSession.Query.versionOf
-let reduceIfVersionMatches = Wanxiangshu.Kernel.ReviewSession.Query.reduceIfVersionMatches
+
+let reduceIfVersionMatches =
+    Wanxiangshu.Kernel.ReviewSession.Query.reduceIfVersionMatches
+
 let emptyEffects = Wanxiangshu.Kernel.ReviewSession.Effects.emptyEffects
 let setPending = Wanxiangshu.Kernel.ReviewSession.Effects.setPending
 let resolvePending = Wanxiangshu.Kernel.ReviewSession.Effects.resolvePending

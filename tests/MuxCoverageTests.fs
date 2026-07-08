@@ -14,15 +14,15 @@ open Wanxiangshu.Mux.WrappersReview
 open Wanxiangshu.Shell.RuntimeScope
 
 [<Import("createRequire", "node:module")>]
-let private createRequire' : string -> (string -> obj) = jsNative
+let private createRequire': string -> (string -> obj) = jsNative
 
 [<Global("import.meta")>]
-let private importMeta : obj = jsNative
+let private importMeta: obj = jsNative
 
-let private requireFn : string -> obj = createRequire'(string importMeta?url)
-let private pathModule : obj = requireFn "path"
+let private requireFn: string -> obj = createRequire' (string importMeta?url)
+let private pathModule: obj = requireFn "path"
 
-let private join (a: string) (b: string) = unbox<string> (pathModule?join(a, b))
+let private join (a: string) (b: string) = unbox<string> (pathModule?join (a, b))
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -77,12 +77,14 @@ let wrappersMkSchema () =
 
 let wrappersRequireWorkspaceIdPresent () =
     let config = createObj [ "workspaceId", box "ws-123" ]
+
     match requireWorkspaceId config "test-tool" with
     | Ok ws -> equal "requireWorkspaceId ok" "ws-123" ws
     | Error e -> check "requireWorkspaceId present ok" false
 
 let wrappersRequireWorkspaceIdMissing () =
     let config = createObj [ "other", box 1 ]
+
     match requireWorkspaceId config "test-tool" with
     | Ok _ -> check "requireWorkspaceId missing expects Error" false
     | Error _ -> check "requireWorkspaceId missing Error" true
@@ -90,6 +92,7 @@ let wrappersRequireWorkspaceIdMissing () =
 let wrappersRequireWorkspaceIdInvalid () =
     // invalidIntent is a plain object, not a record with tags; decoding fails
     let config = createObj [ "execution", box null ]
+
     match requireWorkspaceId config "test-tool" with
     | Ok _ -> check "requireWorkspaceId invalid expects Error" false
     | Error _ -> check "requireWorkspaceId invalid Error" true
@@ -115,7 +118,7 @@ let webToolsWebfetchTool () =
 
 let builtinToolsAddIfSomeSome () =
     let entries = ResizeArray<string * obj>()
-    addIfSome entries "key" (Some (box "value"))
+    addIfSome entries "key" (Some(box "value"))
     equal "addIfSome Some count" 1 entries.Count
 
 let builtinToolsAddIfSomeNone () =
@@ -149,7 +152,7 @@ let builtinToolsWriteTool () =
 let wrappersReviewHostFunctionCapture () =
     let cap = HostFunctionCapture()
     check "HostFunctionCapture TryGet None initially" (cap.TryGet() = None)
-    cap.Capture (createObj [ "fn", box (System.Func<obj, obj>(fun _ -> null)) ])
+    cap.Capture(createObj [ "fn", box (System.Func<obj, obj>(fun _ -> null)) ])
     check "HostFunctionCapture TryGet Some after Capture" (cap.TryGet() <> None)
 
 let wrappersReviewMkFileReadCapture () =

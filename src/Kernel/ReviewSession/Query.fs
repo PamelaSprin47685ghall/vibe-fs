@@ -5,9 +5,12 @@ open Wanxiangshu.Kernel.ReviewSession.StateMachine
 open Wanxiangshu.Kernel.ReviewSession.Registry
 
 let hasActiveReviewState registry id =
-    Map.tryFind id registry |> Option.map (fun s -> isActive s.state) |> Option.defaultValue false
+    Map.tryFind id registry
+    |> Option.map (fun s -> isActive s.state)
+    |> Option.defaultValue false
 
-let taskOf registry id = Map.tryFind id registry |> Option.bind (fun s -> s.originalTask)
+let taskOf registry id =
+    Map.tryFind id registry |> Option.bind (fun s -> s.originalTask)
 
 let stateOf registry id =
     Map.tryFind id registry |> Option.map (fun s -> s.state)
@@ -22,7 +25,12 @@ let canTransition registry id command =
 let versionOf registry id =
     Map.tryFind id registry |> Option.map (fun session -> session.version)
 
-let reduceIfVersionMatches (registry: Registry) (id: string) (expectedVersion: int) (action: RegistryAction) : Registry option =
+let reduceIfVersionMatches
+    (registry: Registry)
+    (id: string)
+    (expectedVersion: int)
+    (action: RegistryAction)
+    : Registry option =
     match Map.tryFind id registry with
     | Some session when session.version = expectedVersion -> Some(reduce registry action)
     | _ -> None

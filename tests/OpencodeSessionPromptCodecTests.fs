@@ -9,8 +9,11 @@ let private providerId (m: obj) = unbox<string> m?providerID
 let private modelId (m: obj) = unbox<string> m?modelID
 
 let modelObjectPassthroughFromPayload () =
-    let hostModel = createObj [ "providerID", box "anthropic"; "modelID", box "claude-3" ]
+    let hostModel =
+        createObj [ "providerID", box "anthropic"; "modelID", box "claude-3" ]
+
     let payload = createObj [ "model", hostModel ]
+
     match tryDecodePromptModelFromPayload payload with
     | None -> check "model object passthrough" false
     | Some m -> check "model object same reference" (obj.ReferenceEquals(m, hostModel))
@@ -24,6 +27,7 @@ let modelStringSlashDecodes () =
 
 let modelStringViaPayload () =
     let payload = createObj [ "modelString", box "google/gemini-pro" ]
+
     match tryDecodePromptModelFromPayload payload with
     | None -> check "modelString via payload" false
     | Some m ->
@@ -43,6 +47,7 @@ let invalidSlashNone () =
 let modelKeyWinsOverModelString () =
     let hostModel = createObj [ "providerID", box "x"; "modelID", box "y" ]
     let payload = createObj [ "model", hostModel; "modelString", box "ignored/z" ]
+
     match tryDecodePromptModelFromPayload payload with
     | None -> check "model key wins" false
     | Some m -> check "model key not parsed from modelString" (obj.ReferenceEquals(m, hostModel))

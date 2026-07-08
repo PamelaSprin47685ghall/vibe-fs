@@ -13,11 +13,10 @@ type Client(info: obj, capabilities: obj) =
     member _.close() : JS.Promise<unit> = jsNative
 
 [<Import("StdioClientTransport", "@modelcontextprotocol/sdk/client/stdio.js")>]
-type StdioClientTransport(opts: obj) =
-    class end
+type StdioClientTransport(opts: obj) = class end
 
 [<Global("process")>]
-let private nodeProcess : obj = jsNative
+let private nodeProcess: obj = jsNative
 
 let private envVar (name: string) : string =
     let v = nodeProcess?env?(name)
@@ -31,20 +30,30 @@ type SembleResult =
       startLine: int
       endLine: int
       content: string
-      score: float }
+      score: float
+      totalLines: int }
 
 let private debugLogPath () : string =
     let dir = envVar "SEMBLE_INJECT_DEBUG_DIR"
-    if dir = "" then "/tmp/wanxiangshu-semble-inject.log" else $"{dir}/wanxiangshu-semble-inject.log"
+
+    if dir = "" then
+        "/tmp/wanxiangshu-semble-inject.log"
+    else
+        $"{dir}/wanxiangshu-semble-inject.log"
 
 let debugEnabled () : bool = envVar "SEMBLE_INJECT_DEBUG" = "1"
 
 let trace (tag: string) (detail: string) : unit =
-    if not (debugEnabled ()) then ()
+    if not (debugEnabled ()) then
+        ()
     else
         let ts = System.DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
         let line = $"[semble {ts}] {tag}: {detail}\n"
-        try appendFileSync (debugLogPath ()) line "utf8" with _ -> ()
+
+        try
+            appendFileSync (debugLogPath ()) line "utf8"
+        with _ ->
+            ()
 
 let mutable private _client: Client option = None
 let mutable private _connecting: JS.Promise<Client option> option = None
@@ -56,77 +65,115 @@ let private getClient () : JS.Promise<Client option> =
         match _connecting with
         | Some p -> p
         | None ->
-            let p = promise {
-                try
-                    let c = Client(
-                        box {| name = "wanxiangshu-semble"; version = "0.1.0" |},
-                        box {| capabilities = {| tools = box [||] |} |})
-                    let cmd = getSembleMcpCommand (envVar "SEMBLE_MCP_REF")
-                    let argsStr = String.concat " " (Array.toList cmd.args)
-                    trace "CONNECT" $"spawning {cmd.command} {argsStr}"
-                    let transport = StdioClientTransport(box {|
-                        command = cmd.command
-                        args = cmd.args
-                        stderr = "pipe"
-                    |})
-                    let stderrStream = Dyn.get transport "stderr"
-                    if not (isNull stderrStream) then
-                        let onData = System.Func<obj, unit>(fun chunk ->
-                            let t = (string chunk).TrimEnd('\r', '\n')
-                            if t <> "" then trace "STDERR" (t.[.. min 199 (t.Length - 1)]))
-                        stderrStream?on("data", box onData) |> ignore
-                    do! c.connect(transport)
-                    _client <- Some c
-                    _connecting <- None
-                    trace "CONNECT" "ok"
-                    return Some c
-                with ex ->
-                    _connecting <- None
-                    trace "CONNECT" $"failed: {ex.Message}"
-                    return None
-            }
+            let p =
+                promise {
+                    try
+                        let c =
+                            Client(
+                                box
+                                    {| name = "wanxiangshu-semble"
+                                       version = "0.1.0" |},
+                                box {| capabilities = {| tools = box [||] |} |}
+                            )
+
+                        let cmd = getSembleMcpCommand (envVar "SEMBLE_MCP_REF")
+                        let argsStr = String.concat " " (Array.toList cmd.args)
+                        trace "CONNECT" $"spawning {cmd.command} {argsStr}"
+
+                        let transport =
+                            StdioClientTransport(
+                                box
+                                    {| command = cmd.command
+                                       args = cmd.args
+                                       stderr = "pipe" |}
+                            )
+
+                        let stderrStream = Dyn.get transport "stderr"
+
+                        if not (isNull stderrStream) then
+                            let onData =
+                                System.Func<obj, unit>(fun chunk ->
+                                    let t = (string chunk).TrimEnd('\r', '\n')
+
+                                    if t <> "" then
+                                        trace "STDERR" (t.[.. min 199 (t.Length - 1)]))
+
+                            stderrStream?on ("data", box onData) |> ignore
+
+                        do! c.connect (transport)
+                        _client <- Some c
+                        _connecting <- None
+                        trace "CONNECT" "ok"
+                        return Some c
+                    with ex ->
+                        _connecting <- None
+                        trace "CONNECT" $"failed: {ex.Message}"
+                        return None
+                }
+
             _connecting <- Some p
             p
 
 let private parseResults (result: obj) : SembleResult list =
     let content = Dyn.get result "content"
-    if Dyn.isNullish content || not (Dyn.isArray content) then []
+
+    if Dyn.isNullish content || not (Dyn.isArray content) then
+        []
     else
         let arr = content :?> obj array
-        if arr.Length = 0 then []
+
+        if arr.Length = 0 then
+            []
         else
             let first = arr.[0]
-            if Dyn.isNullish first then []
+
+            if Dyn.isNullish first then
+                []
             else
                 let text = Dyn.str first "text"
-                if text = "" then []
+
+                if text = "" then
+                    []
                 else
                     try
                         match Decode.Auto.fromString<obj> text with
                         | Ok parsed ->
                             let results = Dyn.get parsed "results"
-                            if Dyn.isNullish results || not (Dyn.isArray results) then []
+
+                            if Dyn.isNullish results || not (Dyn.isArray results) then
+                                []
                             else
                                 results :?> obj array
                                 |> Array.toList
                                 |> List.choose (fun r ->
                                     let filePath = Dyn.str r "file_path"
-                                    if filePath = "" then None
+
+                                    if filePath = "" then
+                                        None
                                     else
                                         let line (key: string) : int =
                                             let v = Dyn.get r key
                                             if Dyn.isNullish v then 1 else unbox<int> v
+
                                         let scoreVal =
                                             let s = Dyn.get r "score"
                                             if Dyn.isNullish s then 0.0 else unbox<float> s
+
+                                        let sLine = line "start_line"
+                                        let snippet = Dyn.str r "content"
+                                        let snippetLines = snippet.Split('\n')
+                                        let fallbackTotal = max snippetLines.Length (sLine + snippetLines.Length - 1)
+
                                         Some
                                             { filePath = filePath
-                                              startLine = line "start_line"
+                                              startLine = sLine
                                               endLine = line "end_line"
-                                              content = Dyn.str r "content"
-                                              score = scoreVal })
+                                              content = snippet
+                                              score = scoreVal
+                                              totalLines = fallbackTotal })
                         | Error _ -> []
-                    with _ -> []
+                    with _ ->
+                        []
 
 let search (query: string) (repoPath: string) (topK: int) : JS.Promise<SembleResult list> =
     promise {
@@ -136,15 +183,18 @@ let search (query: string) (repoPath: string) (topK: int) : JS.Promise<SembleRes
             return []
         | Some client ->
             try
-                let! result = client.callTool(box {|
-                    name = "search"
-                    arguments = box {|
-                        query = query
-                        repo = repoPath
-                        top_k = topK
-                        max_snippet_lines = 20
-                    |}
-                |})
+                let! result =
+                    client.callTool (
+                        box
+                            {| name = "search"
+                               arguments =
+                                box
+                                    {| query = query
+                                       repo = repoPath
+                                       top_k = topK
+                                       max_snippet_lines = 20 |} |}
+                    )
+
                 let parsed = parseResults result
                 trace "SEARCH" $"query='{query}' repo={repoPath} results={List.length parsed}"
                 return parsed

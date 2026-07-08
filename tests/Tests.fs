@@ -113,11 +113,14 @@ let private verboseEnabledFromArgs () : bool =
     let envVal = envVerbose ()
     let envHit = not (isNull envVal) && envVal = "1"
     let argvObj = cliArgv ()
+
     let cliHit =
         try
-            let arr : string[] = unbox argvObj
+            let arr: string[] = unbox argvObj
             arr |> Array.exists (fun a -> a = "--verbose")
-        with _ -> false
+        with _ ->
+            false
+
     envHit || cliHit
 
 let private initVerboseLog () : unit =
@@ -125,18 +128,29 @@ let private initVerboseLog () : unit =
         let ts = System.DateTime.Now.ToString("yyyyMMdd-HHmmss")
         let logDir = "tests/logs"
         let logPath = sprintf "%s/%s.verbose.log" logDir ts
-        try mkdirSync logDir (createObj [ "recursive", box true ]) with _ -> ()
+
+        try
+            mkdirSync logDir (createObj [ "recursive", box true ])
+        with _ ->
+            ()
+
         let header =
-            sprintf "# vibe-fs verbose test log\n# timestamp: %s\n# switch: %s\n"
-                ts (if (envVerbose ()) = "1" then "VIBE_FS_TEST_VERBOSE=1" else "--verbose")
+            sprintf
+                "# vibe-fs verbose test log\n# timestamp: %s\n# switch: %s\n"
+                ts
+                (if (envVerbose ()) = "1" then
+                     "VIBE_FS_TEST_VERBOSE=1"
+                 else
+                     "--verbose")
+
         appendFile logPath header "utf8"
         Assert.setVerbose (Some logPath)
 
-let private integrationToolFlatTests : (string * TestBody) list =
+let private integrationToolFlatTests: (string * TestBody) list =
     integrationToolSpecs ()
     |> List.map (fun (shortName, spec) -> "IntegrationTool." + shortName, Async spec)
 
-let private tests : (string * TestBody) list =
+let private tests: (string * TestBody) list =
     coreTestEntries ()
     @ (architectureTestEntries ())
     @ codecTestEntries ()
@@ -147,7 +161,7 @@ let private matchesSelector (selectors: string array) (label: string) =
     selectors.Length = 0
     || selectors
        |> Array.exists (fun selector ->
-           let trimmed = selector.Trim ()
+           let trimmed = selector.Trim()
            trimmed.Length > 0 && label.StartsWith trimmed)
 
 let private selectedTests (selectors: string array) =
@@ -156,12 +170,12 @@ let private selectedTests (selectors: string array) =
 let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
-        let selectors =
-            args |> Array.filter (fun a -> a <> "--verbose" && a <> "-v")
+        let selectors = args |> Array.filter (fun a -> a <> "--verbose" && a <> "-v")
         initVerboseLog ()
         PluginCore.reviewStore.clearReviewSessions ()
         RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
         let runnableTests = selectedTests selectors
+
         if List.isEmpty runnableTests then
             printfn "No tests matched selectors: %A" args
             return 1
@@ -175,7 +189,10 @@ let runAll (args: string array) : JS.Promise<int> =
                 match body with
                 | Sync f -> timed label f
                 | Async f ->
-                    if isIntegrationSuiteRun label then do! timedAsyncSuite label f
-                    else do! timedAsync label f
+                    if isIntegrationSuiteRun label then
+                        do! timedAsyncSuite label f
+                    else
+                        do! timedAsync label f
+
             return summary ()
     }

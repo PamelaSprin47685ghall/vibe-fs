@@ -29,22 +29,35 @@ let deriveSnapshot (input: SnapshotInput) : Snapshot =
       hasActiveRunner = input.hasActiveRunner }
 
 let deriveAction (snapshot: Snapshot) : NudgeAction =
-    if snapshot.nudgeBlockedForTurn then NudgeNone
-    elif snapshot.todos.IsEmpty && not snapshot.isLoopActive && not snapshot.hasActiveRunner then NudgeNone
+    if snapshot.nudgeBlockedForTurn then
+        NudgeNone
+    elif
+        snapshot.todos.IsEmpty
+        && not snapshot.isLoopActive
+        && not snapshot.hasActiveRunner
+    then
+        NudgeNone
     else
         let text = snapshot.lastAssistantMessage.Trim()
-        if text = "" || isQuestion text then NudgeNone
-        elif skipsTodo text || skipsLoop text then NudgeNone
+
+        if text = "" || isQuestion text then
+            NudgeNone
+        elif skipsTodo text || skipsLoop text then
+            NudgeNone
+        else if snapshot.hasActiveRunner && not snapshot.todos.IsEmpty then
+            NudgeNone
+        elif snapshot.hasActiveRunner && snapshot.todos.IsEmpty && not snapshot.isLoopActive then
+            NudgeRunner
+        elif not snapshot.todos.IsEmpty then
+            NudgeTodo
+        elif snapshot.isLoopActive then
+            NudgeLoop
         else
-            if snapshot.hasActiveRunner && not snapshot.todos.IsEmpty then NudgeNone
-            elif snapshot.hasActiveRunner && snapshot.todos.IsEmpty && not snapshot.isLoopActive then NudgeRunner
-            elif not snapshot.todos.IsEmpty then NudgeTodo
-            elif snapshot.isLoopActive then NudgeLoop
-            else NudgeNone
+            NudgeNone
 
 let selectNudgePrompt (host: Host) (action: NudgeAction) (snapshot: Snapshot) : string option =
     match action with
-    | NudgeTodo -> Some (todoNudgePromptFor snapshot.todos)
-    | NudgeLoop -> Some (loopNudgePromptFor snapshot.todos)
-    | NudgeRunner -> Some (runnerNudgePromptFor host)
+    | NudgeTodo -> Some(todoNudgePromptFor snapshot.todos)
+    | NudgeLoop -> Some(loopNudgePromptFor snapshot.todos)
+    | NudgeRunner -> Some(runnerNudgePromptFor host)
     | _ -> None

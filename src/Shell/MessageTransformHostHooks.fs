@@ -30,10 +30,12 @@ let injectSubagentFilesIfAny
                         match p with
                         | TextPart text when not (System.String.IsNullOrWhiteSpace text) ->
                             let scalars = Wanxiangshu.Kernel.PromptFrontMatter.parseFrontMatterScalars text
+
                             match Map.tryFind "objective" scalars with
-                            | Some objVal when not (System.String.IsNullOrWhiteSpace objVal) -> Some (objVal.Trim())
-                            | _ -> Some (text.Trim())
+                            | Some objVal when not (System.String.IsNullOrWhiteSpace objVal) -> Some(objVal.Trim())
+                            | _ -> Some(text.Trim())
                         | _ -> None))
+
             let tempFiles =
                 objectivesAndTexts
                 |> List.tryPick (fun key ->
@@ -41,25 +43,34 @@ let injectSubagentFilesIfAny
                     | Some files -> Some files
                     | None -> scope.TryGetTempFiles(key))
                 |> Option.defaultValue []
+
             if tempFiles.IsEmpty then
                 return baseFiles
             else
                 let! results = readReverieFiles plan.Directory tempFiles
+
                 let loaded =
                     results
                     |> List.choose (fun r ->
                         match r.content with
                         | Some content ->
-                            Some { filePath = r.filePath
-                                   label = pathRelative plan.Directory r.filePath
-                                   content = content }
+                            Some
+                                { filePath = r.filePath
+                                  label = pathRelative plan.Directory r.filePath
+                                  content = content }
                         | _ -> None)
+
                 let merged = baseFiles @ loaded
+
                 let deduped =
                     let folder (seen: Set<string>, acc: CapsFile list) (file: CapsFile) =
-                        if seen.Contains file.filePath then (seen, acc)
-                        else (seen.Add file.filePath, file :: acc)
+                        if seen.Contains file.filePath then
+                            (seen, acc)
+                        else
+                            (seen.Add file.filePath, file :: acc)
+
                     merged |> List.fold folder (Set.empty, []) |> snd |> List.rev
+
                 return deduped
     }
 
@@ -72,11 +83,13 @@ let loadCapsForScope
     (policy: CapsLoadPolicy)
     (plan: MessageTransformPlan)
     : JS.Promise<CapsFile list> =
-    if plan.Excluded then Promise.lift []
+    if plan.Excluded then
+        Promise.lift []
     else
         match policy with
         | RequireDirectory when plan.Directory = "" -> Promise.lift []
-        | RequireDirectory | AllowEmptyDirectory ->
+        | RequireDirectory
+        | AllowEmptyDirectory ->
             promise {
                 let! baseFiles = getOrLoadCapsFilesForScope scope plan.SessionID plan.Directory
                 return! injectSubagentFilesIfAny scope plan baseFiles

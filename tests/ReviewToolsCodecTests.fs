@@ -8,12 +8,15 @@ open Wanxiangshu.Shell.ReviewToolsCodec
 
 let decodeSubmitReviewMissingReport () =
     let args = createObj [ "affectedFiles", box [| "a.fs" |] ]
+
     match decodeSubmitReviewArgs args with
-    | Error (InvalidIntent ("submit_review", "report", _)) -> check "submit_review missing report" true
+    | Error(InvalidIntent("submit_review", "report", _)) -> check "submit_review missing report" true
     | _ -> check "submit_review missing report" false
 
 let decodeSubmitReviewOk () =
-    let args = createObj [ "report", box "done"; "affectedFiles", box [| "x.fs"; "y.fs" |] ]
+    let args =
+        createObj [ "report", box "done"; "affectedFiles", box [| "x.fs"; "y.fs" |] ]
+
     match decodeSubmitReviewArgs args with
     | Ok sr ->
         check "submit_review ok report" (sr.Report = "done")
@@ -22,12 +25,14 @@ let decodeSubmitReviewOk () =
 
 let decodeReturnReviewerInvalidVerdict () =
     let args = createObj [ "verdict", box "null" ]
+
     match decodeReturnReviewerArgs args with
-    | Error (InvalidIntent ("return_reviewer", "verdict", _)) -> check "return_reviewer invalid verdict" true
+    | Error(InvalidIntent("return_reviewer", "verdict", _)) -> check "return_reviewer invalid verdict" true
     | _ -> check "return_reviewer invalid verdict" false
 
 let decodeReturnReviewerRevise () =
     let args = createObj [ "verdict", box "REVISE"; "feedback", box "fix tests" ]
+
     match decodeReturnReviewerArgs args with
     | Ok rr ->
         check "return_reviewer revise verdict" (rr.Verdict = Wanxiangshu.Kernel.ReviewVerdict.Revise)

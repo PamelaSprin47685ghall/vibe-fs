@@ -9,47 +9,60 @@ open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Opencode.ReviewerLoop
 
 let makeFakeClient (store: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) (childID: string) : obj =
-    let session = createObj [
-        "create", box (fun (arg: obj) -> Promise.lift (box {| data = box {| id = childID |} |}))
-        "prompt", box (fun (arg: obj) ->
-            Promise.lift (store.resolvePendingReview(childID, Accepted "looks good") |> ignore))
-    ]
+    let session =
+        createObj
+            [ "create", box (fun (arg: obj) -> Promise.lift (box {| data = box {| id = childID |} |}))
+              "prompt",
+              box (fun (arg: obj) ->
+                  Promise.lift (store.resolvePendingReview (childID, Accepted "looks good") |> ignore)) ]
+
     createObj [ "session", box session ]
 
 let makeFakeClientNoSession () : obj = createObj []
 
-let createReviewerChild_success () = promise {
-    let store = createReviewStore ()
-    let registry = ChildAgentRegistry.Create ()
-    let client = makeFakeClient store "child-1"
-    let! childID = createReviewerChild registry client store "/tmp" (Some "parent-1") "parent-1" "Reviewer"
-    equal "childID is child-1" "child-1" childID
-    equal "child in registry" (Some "reviewer") (registry.LookupChildAgent "child-1") }
+let createReviewerChild_success () =
+    promise {
+        let store = createReviewStore ()
+        let registry = ChildAgentRegistry.Create()
+        let client = makeFakeClient store "child-1"
+        let! childID = createReviewerChild registry client store "/tmp" (Some "parent-1") "parent-1" "Reviewer"
+        equal "childID is child-1" "child-1" childID
+        equal "child in registry" (Some "reviewer") (registry.LookupChildAgent "child-1")
+    }
 
-let createReviewerChild_noSessionApi () = promise {
-    let store = createReviewStore ()
-    let registry = ChildAgentRegistry.Create ()
-    let client = makeFakeClientNoSession ()
-    let! childID = createReviewerChild registry client store "/tmp" None "s-1" "Reviewer"
-    equal "no session returns empty" "" childID }
+let createReviewerChild_noSessionApi () =
+    promise {
+        let store = createReviewStore ()
+        let registry = ChildAgentRegistry.Create()
+        let client = makeFakeClientNoSession ()
+        let! childID = createReviewerChild registry client store "/tmp" None "s-1" "Reviewer"
+        equal "no session returns empty" "" childID
+    }
 
-let runReviewerLoop_resolvesVerdict () = promise {
-    let store = createReviewStore ()
-    let registry = ChildAgentRegistry.Create ()
-    store.activateReview("child-1", "do review", 1000L)
-    let client = makeFakeClient store "child-1"
-    let! childID = createReviewerChild registry client store "/tmp" (Some "parent-1") "parent-1" "Reviewer"
-    let! result = runReviewerLoop client store "child-1" ["reviewerPrompt test"] null
-    equal "resolved verdict" (Accepted "looks good") result }
+let runReviewerLoop_resolvesVerdict () =
+    promise {
+        let store = createReviewStore ()
+        let registry = ChildAgentRegistry.Create()
+        store.activateReview ("child-1", "do review", 1000L)
+        let client = makeFakeClient store "child-1"
+        let! childID = createReviewerChild registry client store "/tmp" (Some "parent-1") "parent-1" "Reviewer"
+        let! result = runReviewerLoop client store "child-1" [ "reviewerPrompt test" ] null
+        equal "resolved verdict" (Accepted "looks good") result
+    }
 
-let runReviewerLoop_promptFailedReturnsTerminated () = promise {
-    let failingClient =
-        let session = createObj [ "prompt", box (fun (_: obj) -> Promise.reject (exn "prompt error")) ]
-        createObj [ "session", box session ]
-    let store = createReviewStore ()
-    store.activateReview("s-1", "task", 1000L)
-    let! result = runReviewerLoop failingClient store "s-1" ["reviewerPrompt test"] null
-    equal "prompt fail -> Terminated" Terminated result }
+let runReviewerLoop_promptFailedReturnsTerminated () =
+    promise {
+        let failingClient =
+            let session =
+                createObj [ "prompt", box (fun (_: obj) -> Promise.reject (exn "prompt error")) ]
+
+            createObj [ "session", box session ]
+
+        let store = createReviewStore ()
+        store.activateReview ("s-1", "task", 1000L)
+        let! result = runReviewerLoop failingClient store "s-1" [ "reviewerPrompt test" ] null
+        equal "prompt fail -> Terminated" Terminated result
+    }
 
 let run () : JS.Promise<unit> =
     promise {

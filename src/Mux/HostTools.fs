@@ -29,23 +29,45 @@ open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.ToolRuntimeContext
 
 [<Global("Buffer")>]
-let private nodeBuffer : obj = jsNative
-let private byteLength (s: string) : int = nodeBuffer?byteLength(s, "utf-8")
+let private nodeBuffer: obj = jsNative
+
+let private byteLength (s: string) : int = nodeBuffer?byteLength (s, "utf-8")
 
 let summarizationAgentId = "explore"
 let summarizationRole = "executor"
 let summarizationAiSettingsAgentId = "explore"
 
-let private summarizeWhenNeeded (deps: obj) (config: obj) (toolNames: string array) (options: ExecuteOptions) (result: ExecuteResult) : JS.Promise<string> =
+let private summarizeWhenNeeded
+    (deps: obj)
+    (config: obj)
+    (toolNames: string array)
+    (options: ExecuteOptions)
+    (result: ExecuteResult)
+    : JS.Promise<string> =
     promise {
         let output = outputFromResult result
+
         if not (shouldSummarize byteLength output) then
             let formatted = formatToolResponse result None
             return prependSafetyWarningForExecution formatted options
         else
             let langStr = languageToString options.language
             let timeoutStr = timeoutToString options.timeoutType
-            let prompt = formatPrompt mimocode (ExecutorSummary(output, langStr, options.program, options.dependencies, timeoutStr, options.mode, options.whatToSummarize)) |> List.head
+
+            let prompt =
+                formatPrompt
+                    mimocode
+                    (ExecutorSummary(
+                        output,
+                        langStr,
+                        options.program,
+                        options.dependencies,
+                        timeoutStr,
+                        options.mode,
+                        options.whatToSummarize
+                    ))
+                |> List.head
+
             let opts = toolOptions toolNames summarizationRole summarizationAiSettingsAgentId
             let! report = runMuxSubagent deps config summarizationAgentId prompt "Executor summary" opts
             let formatted = formatToolResponse result (Some report)
@@ -92,40 +114,53 @@ let private hostReadResultIsDirectoryError (result: obj) : bool =
     else
         let success = Dyn.get result "success"
         let error = Dyn.str result "error"
+
         not (Dyn.isNullish success)
         && not (Dyn.truthy success)
         && error.StartsWith "Path is a directory, not a file:"
 
-let executorTool (deps: obj) (toolNames: string array) (sessionScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope) : ToolDefinition =
+let executorTool
+    (deps: obj)
+    (toolNames: string array)
+    (sessionScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
+    : ToolDefinition =
     { name = "executor"
       description = description "executor"
       parameters =
-         mkSchema
+        mkSchema
             (createObj
-                [ "language", box (strEnumPropWithDefault Params.executorLanguage [| "shell"; "python"; "javascript" |] "shell")
+                [ "language",
+                  box (strEnumPropWithDefault Params.executorLanguage [| "shell"; "python"; "javascript" |] "shell")
                   "program", box (strProp Params.executorProgram)
                   "dependencies", box (strArrayProp Params.executorDeps)
                   "timeout_type", box (strEnumProp Params.executorTimeout [| "short"; "long" |])
                   "mode", box (strEnumProp Params.executorMode [| "ro"; "rw" |])
                   "what_to_summarize", box (strProp Params.executorWhatToSummarize) ])
             [| "program"; "timeout_type"; "mode"; "what_to_summarize" |]
-      execute = fun config args ->
-          match fromMuxConfig config with
-          | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
-          | Ok runtime ->
-              let sessionId = Id.sessionIdValue runtime.Execution.SessionId
-              if sessionId = "" then resolveStr executorRequiresSession
-              else
-                  match decodeExecutorArgs args with
-                  | Error e -> resolveStr (wireDomainFailure "Executor" e)
-                  | Ok decoded ->
-                      promise {
-                          let opts = toExecuteOptions (Some runtime.Execution.Directory) decoded
-                          let! execResult =
-                              sessionScope.EnqueuePerSession(sessionId, fun () ->
-                                  Wanxiangshu.Shell.Executor.execute opts sessionId)
-                          return! summarizeWhenNeeded deps config toolNames opts execResult
-                      }
+      execute =
+        fun config args ->
+            match fromMuxConfig config with
+            | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
+            | Ok runtime ->
+                let sessionId = Id.sessionIdValue runtime.Execution.SessionId
+
+                if sessionId = "" then
+                    resolveStr executorRequiresSession
+                else
+                    match decodeExecutorArgs args with
+                    | Error e -> resolveStr (wireDomainFailure "Executor" e)
+                    | Ok decoded ->
+                        promise {
+                            let opts = toExecuteOptions (Some runtime.Execution.Directory) decoded
+
+                            let! execResult =
+                                sessionScope.EnqueuePerSession(
+                                    sessionId,
+                                    fun () -> Wanxiangshu.Shell.Executor.execute opts sessionId
+                                )
+
+                            return! summarizeWhenNeeded deps config toolNames opts execResult
+                        }
       condition = None }
 
 let readTool (_deps: obj) (hostReadExec: HostFunctionCapture) : ToolDefinition =
@@ -144,6 +179,7 @@ let readTool (_deps: obj) (hostReadExec: HostFunctionCapture) : ToolDefinition =
             | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
             | Ok runtime ->
                 let cwd = Some runtime.Execution.Directory
+
                 promise {
                     match decodeReadArgs args with
                     | Error e -> return wireDecodeFailure "read" e
@@ -151,20 +187,22 @@ let readTool (_deps: obj) (hostReadExec: HostFunctionCapture) : ToolDefinition =
                         let path = decoded.Path
                         let offset = decoded.Offset
                         let limit = decoded.Limit
+
                         match hostReadExec.TryGet() with
                         | Some hostExec ->
                             let raw = Dyn.call2 hostExec (readArgsForHost decoded) config
+
                             let! result =
                                 if Dyn.typeIs (Dyn.get raw "then") "function" then
                                     unbox<JS.Promise<obj>> raw
                                 else
                                     Promise.lift raw
+
                             if hostReadResultIsDirectoryError result then
                                 return! read cwd path offset limit
                             else
                                 return formatHostReadResult result
-                        | None ->
-                            return! read cwd path offset limit
+                        | None -> return! read cwd path offset limit
                 }
       condition = None }
 
@@ -183,11 +221,13 @@ let writeTool (_deps: obj) : ToolDefinition =
             | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
             | Ok runtime ->
                 let cwd = Some runtime.Execution.Directory
+
                 promise {
                     match decodeWriteArgs args with
                     | Error e -> return wireDecodeFailure "write" e
                     | Ok decoded ->
                         let! result = write cwd decoded.FilePath decoded.Content
+
                         match result with
                         | Ok msg -> return msg
                         | Error e -> return wireDomainFailure "write" e

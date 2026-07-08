@@ -3,8 +3,7 @@ module Wanxiangshu.Tests.ToolCatalogRegistryTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ToolCatalog
 
-let allCountIs17 () =
-    equal "15 tools" 15 all.Length
+let allCountIs17 () = equal "15 tools" 15 all.Length
 
 let allNamesAreNonEmpty () =
     for spec in all do
@@ -26,7 +25,8 @@ let specOfUnknownThrows () =
     try
         specOf "nonexistent" |> ignore
         check "should throw" false
-    with _ -> check "threw" true
+    with _ ->
+        check "threw" true
 
 let paramDocRead () =
     let doc = paramDoc "read" "path"
@@ -36,13 +36,15 @@ let paramDocUnknownToolFieldThrows () =
     try
         paramDoc "read" "nonexistent_field" |> ignore
         check "should throw" false
-    with _ -> check "threw" true
+    with _ ->
+        check "threw" true
 
 let paramDocUnknownToolNameThrows () =
     try
         paramDoc "nonexistent" "x" |> ignore
         check "should throw" false
-    with _ -> check "threw" true
+    with _ ->
+        check "threw" true
 
 let descriptionRead () =
     equal "description" (description "read") (specOf "read").description
@@ -51,7 +53,8 @@ let descriptionUnknownThrows () =
     try
         description "nonexistent" |> ignore
         check "should throw" false
-    with _ -> check "threw" true
+    with _ ->
+        check "threw" true
 
 let subagentRequiredKeysRead () =
     let keys = subagentRequiredKeys "read"
@@ -61,7 +64,8 @@ let subagentRequiredKeysUnknownThrows () =
     try
         subagentRequiredKeys "nonexistent" |> ignore
         check "should throw" false
-    with _ -> check "threw" true
+    with _ ->
+        check "threw" true
 
 let coderSpecExists () =
     let spec = specOf "coder"
@@ -74,6 +78,7 @@ let executorSpecHasRequiredFields () =
 let allParamDocsConsistent () =
     for spec in all do
         let names = spec.paramDocs |> Map.toList |> List.map fst
+
         for n in names do
             check (spec.name + "." + n + " doc non-empty") (spec.paramDocs[n] <> "")
 

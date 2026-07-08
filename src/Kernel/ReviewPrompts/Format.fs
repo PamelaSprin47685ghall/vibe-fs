@@ -7,13 +7,14 @@ open Wanxiangshu.Kernel.PromptFrontMatter
 
 let submitReviewIsWip (wip: bool option) : bool = defaultArg wip true
 
-let submitReviewWipAcknowledgment : string =
+let submitReviewWipAcknowledgment: string =
     "Your progress report was recorded. With-Review Mode is still active — continue working until the task is fully complete, then call submit_review again."
 
 let formatReviewResult (result: ReviewResult) : string =
     match result with
     | ReviewResult.Accepted feedback ->
         let trimmed = (if isNull feedback then "" else feedback).Trim()
+
         let body =
             if trimmed = "" then
                 "Review passed. Your changes have been accepted. With-Review Mode has ended."
@@ -21,15 +22,13 @@ let formatReviewResult (result: ReviewResult) : string =
                 "Review passed with the following feedback:\n\n"
                 + trimmed
                 + "\n\nYour changes have been accepted. With-Review Mode has ended."
-        frontMatterPrompt
-            [ yamlField verdictField verdictAccepted ]
-            body
+
+        frontMatterPrompt [ yamlField verdictField verdictAccepted ] body
     | ReviewResult.Terminated ->
         frontMatterPrompt
             [ yamlField verdictField verdictTerminated ]
             "Review terminated without verdict. With-Review Mode is still active; fix the issues and call submit_review again."
     | ReviewResult.NeedsRevision feedback ->
         frontMatterPrompt
-            [ yamlField verdictField verdictNeedsRevision
-              yamlField "feedback" feedback ]
+            [ yamlField verdictField verdictNeedsRevision; yamlField "feedback" feedback ]
             "Address the feedback above. With-Review Mode is still active — fix the issues and call submit_review again."

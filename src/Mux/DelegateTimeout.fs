@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Shell.SubagentSpawn
+
 module Dyn = Wanxiangshu.Shell.Dyn
 
 type DelegateOutcome =
@@ -35,7 +36,7 @@ let delegateWithTimeout
         let timeoutPromise =
             promise {
                 do! Promise.sleep timeoutMs
-                controller.abort()
+                controller.abort ()
                 return box TimedOut
             }
 

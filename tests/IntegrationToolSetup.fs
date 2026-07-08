@@ -8,10 +8,10 @@ open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Shell.Dyn
 
 [<Import("createRequire", "node:module")>]
-let private createRequire' : string -> (string -> obj) = jsNative
+let private createRequire': string -> (string -> obj) = jsNative
 
 [<Global("import.meta")>]
-let private importMeta : obj = jsNative
+let private importMeta: obj = jsNative
 
 [<Import("mkdtempSync", "node:fs")>]
 let private mkdtempSync (template: string) : string = jsNative
@@ -22,9 +22,9 @@ let private pathJoin (a: string) (b: string) : string = jsNative
 [<Import("tmpdir", "node:os")>]
 let private tmpdir () : string = jsNative
 
-let requireFn : string -> obj = createRequire'(string importMeta?url)
-let fsAsync : obj = requireFn("fs")?promises
-let pathModule : obj = requireFn("path")
+let requireFn: string -> obj = createRequire' (string importMeta?url)
+let fsAsync: obj = get (requireFn "fs") "promises"
+let pathModule: obj = requireFn "path"
 
 let muxDepsWithFixedNow () : obj =
     createObj
@@ -34,7 +34,7 @@ let muxDepsWithFixedNow () : obj =
           box (System.Func<obj, obj, string, JS.Promise<obj>>(fun _ _ _ -> Promise.lift (createObj [])))
           "nowUtc", box (System.Func<unit, System.DateTime>(fun () -> System.DateTime(2026, 6, 25))) ]
 
-let mutable cachedMuxRegistration : obj option = None
+let mutable cachedMuxRegistration: obj option = None
 
 let sharedMuxRegistration () : obj =
     match cachedMuxRegistration with
@@ -47,54 +47,80 @@ let sharedMuxRegistration () : obj =
         cachedMuxRegistration <- Some reg
         reg
 
-let unlinkAsync (p: string) : JS.Promise<unit> =
-    unbox (fsAsync?unlink(p))
+let unlinkAsync (p: string) : JS.Promise<unit> = unbox (fsAsync?unlink (p))
 
 let executorDefinition (pluginObject: obj) : obj =
     get (get pluginObject "tool") "executor"
 
 let objectKeys (value: obj) : string array =
-    JS.Constructors.Object.keys(value) |> Seq.toArray
+    JS.Constructors.Object.keys (value) |> Seq.toArray
 
 let executorSchema (pluginObject: obj) : obj =
     let definition = executorDefinition pluginObject
     let args = get definition "args"
-    if not (isNullish args) then args else get definition "parameters"
+
+    if not (isNullish args) then
+        args
+    else
+        get definition "parameters"
 
 let private executorFieldSchema (pluginObject: obj) (field: string) : obj =
     let schema = executorSchema pluginObject
     let direct = get schema field
-    if not (isNullish direct) then direct
+
+    if not (isNullish direct) then
+        direct
     else
         let shape = get schema "shape"
-        if not (isNullish shape) then get shape field
+
+        if not (isNullish shape) then
+            get shape field
         else
             let properties = get schema "properties"
             if isNullish properties then null else get properties field
 
 let executorModeSchema (pluginObject: obj) : obj = executorFieldSchema pluginObject "mode"
-let executorLanguageSchema (pluginObject: obj) : obj = executorFieldSchema pluginObject "language"
+
+let executorLanguageSchema (pluginObject: obj) : obj =
+    executorFieldSchema pluginObject "language"
 
 let enumValues (modeSchema: obj) : string array =
     let candidates =
         [ get (get modeSchema "def") "entries"
           get modeSchema "enum"
           get modeSchema "options" ]
+
     candidates
     |> List.tryPick (fun candidate ->
-        if isNullish candidate then None
-        elif isArray candidate then Some (unbox<obj[]> candidate |> Array.map string)
+        if isNullish candidate then
+            None
+        elif isArray candidate then
+            Some(unbox<obj[]> candidate |> Array.map string)
         else
             let values = objectKeys candidate
             if values.Length = 0 then None else Some values)
     |> Option.defaultValue [||]
 
 let assistantCompletionMessage (sessionID: string) (text: string) : obj =
-    box {| info = createObj [ "id", box (sessionID + "-assistant"); "agent", box "manager"; "sessionID", box sessionID; "role", box "assistant"; "finish", box "stop"; "time", box (createObj [ "created", box 1; "completed", box 2 ]) ]
+    box
+        {| info =
+            createObj
+                [ "id", box (sessionID + "-assistant")
+                  "agent", box "manager"
+                  "sessionID", box sessionID
+                  "role", box "assistant"
+                  "finish", box "stop"
+                  "time", box (createObj [ "created", box 1; "completed", box 2 ]) ]
            parts = [| box {| ``type`` = "text"; text = text |} |] |}
 
 let userTextMessage (sessionID: string) (text: string) : obj =
-    box {| info = createObj [ "id", box (sessionID + "-user"); "agent", box "user"; "sessionID", box sessionID; "role", box "user" ]
+    box
+        {| info =
+            createObj
+                [ "id", box (sessionID + "-user")
+                  "agent", box "user"
+                  "sessionID", box sessionID
+                  "role", box "user" ]
            parts = [| box {| ``type`` = "text"; text = text |} |] |}
 
 let sampleCoderIntent (objective: string) (file: string) : obj =

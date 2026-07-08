@@ -34,7 +34,7 @@ type CoreServices =
       FallbackRuntime: FallbackRuntimeState
       FallbackConfig: FallbackConfig option }
 
-let reviewStore : ReviewStore = createReviewStore ()
+let reviewStore: ReviewStore = createReviewStore ()
 
 let private createCoreServices (pi: obj) : CoreServices =
     let finderCache = FinderCache()
@@ -42,13 +42,16 @@ let private createCoreServices (pi: obj) : CoreServices =
     let directory = Dyn.str pi "directory"
     let fallbackConfigOpt = loadFallbackConfig directory
     let fallbackRuntime = FallbackRuntimeState()
-    let configLookup : ConfigLookup =
+
+    let configLookup: ConfigLookup =
         match fallbackConfigOpt with
         | Some cfg -> (fun _ -> cfg)
         | None -> (fun _ -> emptyConfig)
+
     let sessionApi = Dyn.get pi "session"
+
     let fallbackHandler =
-        Some (createOmpFallbackHandler fallbackRuntime configLookup sessionApi)
+        Some(createOmpFallbackHandler fallbackRuntime configLookup sessionApi)
 
     { ReviewStore = reviewStore
       FinderCache = finderCache
@@ -66,29 +69,45 @@ let private createCoreServices (pi: obj) : CoreServices =
 let private applyAgentConfigIfSupported (pi: obj) : unit =
     let getConfig = Dyn.get pi "getConfig"
     let setConfig = Dyn.get pi "setConfig"
+
     if Dyn.typeIs getConfig "function" && Dyn.typeIs setConfig "function" then
         try
-            let currentRaw : obj = Dyn.call0 getConfig
+            let currentRaw: obj = Dyn.call0 getConfig
             let baseCfg = if Dyn.isNullish currentRaw then emptyObj () else currentRaw
             let next = applyAgentConfigFor baseCfg
             Dyn.call1 setConfig next |> ignore
-        with _ -> ()
+        with _ ->
+            ()
 
 /// `session.abort` / `stream.abort` / `session.error` all collapse to the
 /// same outcome: in-flight review state must clear. Without this hook,
 /// review state survives host-driven aborts and leaks across sessions.
 let private sessionEndEventTypes =
-    Set [ "session.abort"; "stream.abort"; "session.error"; "session.delete"; "session.close"; "session.remove"; "session.deleted"; "session.interrupted" ]
- 
-let registerAbortHandler (pi: obj) (reviewStore: ReviewStore)
-    (fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option) : unit =
-    let fallbackEventTypes = Set [ "session.busy"; "session.idle"; "message.updated"; "session.updated" ]
-    pi?on(
+    Set
+        [ "session.abort"
+          "stream.abort"
+          "session.error"
+          "session.delete"
+          "session.close"
+          "session.remove"
+          "session.deleted"
+          "session.interrupted" ]
+
+let registerAbortHandler
+    (pi: obj)
+    (reviewStore: ReviewStore)
+    (fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option)
+    : unit =
+    let fallbackEventTypes =
+        Set [ "session.busy"; "session.idle"; "message.updated"; "session.updated" ]
+
+    pi?on (
         "event",
-        box(fun (event: obj) (ctx: obj) ->
+        box (fun (event: obj) (ctx: obj) ->
             promise {
                 let evtType = Dyn.str event "type"
                 let sidOpt = getSessionIdFromContext ctx
+
                 match sidOpt with
                 | None -> ()
                 | Some sid ->
@@ -97,22 +116,34 @@ let registerAbortHandler (pi: obj) (reviewStore: ReviewStore)
                         | None ->
                             reviewStore.deactivateReview sid
                             Wanxiangshu.Omp.NudgeRuntime.markSessionForceStopped sid
-                            Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore Wanxiangshu.Omp.ExecutorTools.ompScope sid
+
+                            Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore
+                                Wanxiangshu.Omp.ExecutorTools.ompScope
+                                sid
                         | Some handler ->
-                            let rawEvent = createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
+                            let rawEvent =
+                                createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
+
                             let! r = handler rawEvent
+
                             if not r.Consumed then
                                 reviewStore.deactivateReview sid
                                 Wanxiangshu.Omp.NudgeRuntime.markSessionForceStopped sid
-                                Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore Wanxiangshu.Omp.ExecutorTools.ompScope sid
+
+                                Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore
+                                    Wanxiangshu.Omp.ExecutorTools.ompScope
+                                    sid
                     elif fallbackEventTypes.Contains evtType then
                         match fallbackHandler with
                         | Some handler ->
-                            let rawEvent = createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
+                            let rawEvent =
+                                createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
+
                             let! _ = handler rawEvent
                             ()
                         | None -> ()
-            }))
+            })
+    )
 
 let private registerHooks (pi: obj) (services: CoreServices) : unit =
     registerAllTools pi services.ReviewStore services.FallbackRuntime services.FallbackConfig

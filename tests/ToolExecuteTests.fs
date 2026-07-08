@@ -19,7 +19,8 @@ let mapDecodeErrorOk () =
     equal "ok" (Ok 42) result
 
 let mapDecodeErrorError () =
-    let result = mapDecodeError "executor" (Error (UpstreamTimeout 5))
+    let result = mapDecodeError "executor" (Error(UpstreamTimeout 5))
+
     match result with
     | Error msg -> check "contains tool name" (msg.Contains "executor")
     | _ -> failwith "expected Error"

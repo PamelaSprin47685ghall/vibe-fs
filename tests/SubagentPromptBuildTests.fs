@@ -10,13 +10,16 @@ open Wanxiangshu.Shell.SubagentIntentsCodec
 open Wanxiangshu.Shell.SubagentPromptBuild
 open Wanxiangshu.Shell.WorkspaceFiles
 
-let private coderSample : CoderIntent =
+let private coderSample: CoderIntent =
     { objective = "fix bug"
       background = "user reported failure"
-      targets = [ { file = "a.ts"; guide = "fix root cause"; draft = None } ]
+      targets =
+        [ { file = "a.ts"
+            guide = "fix root cause"
+            draft = None } ]
       doNotTouch = [||] }
 
-let private investigatorSample : InvestigatorIntent =
+let private investigatorSample: InvestigatorIntent =
     { objective = "find auth"
       background = "need entry points"
       questions = [| "Where is auth configured?" |]
@@ -34,9 +37,15 @@ let promptsForParallelIntentsMatchesFormatPrompt () =
 
 let buildMeditatorSectionsMatchesManualZip () =
     let files = [| "x.fs"; "y.fs" |]
+
     let results =
-        [| { ReverieFileResult.filePath = "x.fs"; content = Some "let x = 1"; skipReason = None }
-           { ReverieFileResult.filePath = "y.fs"; content = None; skipReason = None } |]
+        [| { ReverieFileResult.filePath = "x.fs"
+             content = Some "let x = 1"
+             skipReason = None }
+           { ReverieFileResult.filePath = "y.fs"
+             content = None
+             skipReason = None } |]
+
     let built = buildMeditatorSections files results
     equal "section count" 2 built.Length
     equal "first file" "x.fs" built.[0].file
@@ -64,7 +73,7 @@ let mimocodeCoderPromptsIncludeAgentReport () =
 let parallelPromptsFromIntentsInvalidReturnsParseError () =
     match parallelPromptsFromIntents opencode "coder" parseCoderIntents Coder (box "not-an-array") with
     | Ok _ -> failwith "expected ParseError"
-    | Error (ParseError (ctx, _)) -> equal "parse context" "intents" ctx
+    | Error(ParseError(ctx, _)) -> equal "parse context" "intents" ctx
     | Error other -> failwith $"unexpected error: {other}"
 
 let run () =

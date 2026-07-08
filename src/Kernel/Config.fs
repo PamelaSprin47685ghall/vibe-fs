@@ -15,13 +15,16 @@ let sembleMcpRef (envValue: string) : string =
 let getStealthBrowserMcpCommand (envValue: string) : string =
     $"uvx --python 3.13 --from git+{repo}@{stealthBrowserMcpRef envValue} python -m server"
 
-let getSembleMcpCommand (envValue: string) : {| command: string; args: string array |} =
+let getSembleMcpCommand
+    (envValue: string)
+    : {| command: string
+         args: string array |}
+    =
     {| command = "uvx"
-       args = [|
-           "--from"
+       args =
+        [| "--from"
            $"semble[mcp] @ git+{sembleRepo}@{sembleMcpRef envValue}"
-           "semble"
-       |] |}
+           "semble" |] |}
 
 let getStealthBrowserMcpLocalConfig
     (envValue: string)

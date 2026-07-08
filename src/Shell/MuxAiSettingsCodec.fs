@@ -43,31 +43,30 @@ type IMuxDelegateConfig =
     abstract runtime: obj
     abstract muxEnv: IMuxEnv
 
-type MuxDelegateAiConfig = {
-    Execution: ToolExecutionContext
-    Runtime: obj
-    Cwd: string
-}
+type MuxDelegateAiConfig =
+    { Execution: ToolExecutionContext
+      Runtime: obj
+      Cwd: string }
 
-type MuxParentRuntimeAiScalars = {
-    ModelString: string option
-    ThinkingLevel: string option
-}
+type MuxParentRuntimeAiScalars =
+    { ModelString: string option
+      ThinkingLevel: string option }
 
-type AgentAiEntryScalars = {
-    Model: string option
-    ModelString: string option
-    ThinkingLevel: string option
-}
+type AgentAiEntryScalars =
+    { Model: string option
+      ModelString: string option
+      ThinkingLevel: string option }
 
 let normalizeTrimmedStr (v: obj) : string option =
-    if Dyn.isNullish v then None
+    if Dyn.isNullish v then
+        None
     else
         let s = (string v).Trim()
         if s = "" then None else Some s
 
 let normalizeOpt (v: string) : string option =
-    if Dyn.isNullish (box v) then None
+    if Dyn.isNullish (box v) then
+        None
     else
         let t = v.Trim()
         if t = "" then None else Some t
@@ -93,80 +92,109 @@ let private delegateRuntimeAndCwd (config: IMuxDelegateConfig) : obj * string =
 
 let decodeMuxDelegateConfig (configObj: obj) : Result<MuxDelegateAiConfig, DomainError> =
     if Dyn.isNullish configObj then
-        Error (InvalidIntent ("mux-delegate", "config", "nullish"))
+        Error(InvalidIntent("mux-delegate", "config", "nullish"))
     else
         let config = unbox<IMuxDelegateConfig> configObj
+
         match decodeMuxConfig config with
         | Error e -> Error e
         | Ok ctx ->
             let runtimeObj, cwd = delegateRuntimeAndCwd config
-            Ok { Execution = ctx; Runtime = runtimeObj; Cwd = cwd }
+
+            Ok
+                { Execution = ctx
+                  Runtime = runtimeObj
+                  Cwd = cwd }
 
 let decodeMuxDelegateConfigLenient (configObj: obj) : MuxDelegateAiConfig =
     let config = unbox<IMuxDelegateConfig> configObj
     let runtimeObj, cwd = delegateRuntimeAndCwd config
+
     { Execution = decodeMuxConfigLenient config
       Runtime = runtimeObj
       Cwd = cwd }
 
 let decodeMuxParentRuntimeEnv (muxEnv: IMuxEnv) : MuxParentRuntimeAiScalars =
     if Dyn.isNullish (box muxEnv) then
-        { ModelString = None; ThinkingLevel = None }
+        { ModelString = None
+          ThinkingLevel = None }
     else
         { ModelString = normalizeTrimmedStr (box muxEnv.MUX_MODEL_STRING)
           ThinkingLevel = normalizeOpt muxEnv.MUX_THINKING_LEVEL |> Option.bind coerceThinkingLevel }
 
 let decodeAgentAiEntryScalars (entry: IAgentAiEntryScalars) : AgentAiEntryScalars =
     if Dyn.isNullish (box entry) then
-        { Model = None; ModelString = None; ThinkingLevel = None }
+        { Model = None
+          ModelString = None
+          ThinkingLevel = None }
     else
         { Model = normalizeOpt entry.model
           ModelString = normalizeOpt entry.modelString
           ThinkingLevel = normalizeOpt entry.thinkingLevel }
 
-let private namedSettingsFromRecord (source: IDelegatedAiSettingsRecord) (agentId: string) : DelegatedAiSettings option =
-    if Dyn.isNullish (box source) then None
+let private namedSettingsFromRecord
+    (source: IDelegatedAiSettingsRecord)
+    (agentId: string)
+    : DelegatedAiSettings option =
+    if Dyn.isNullish (box source) then
+        None
     else
         match source.getAgentSettings agentId with
         | None -> None
         | Some entry ->
             let s = decodeAgentAiEntryScalars entry
+
             Some
                 { modelString = s.Model |> Option.orElse s.ModelString
                   thinkingLevel = s.ThinkingLevel }
 
 let readMuxConfigFileDefaults (configFileObj: obj) (agentId: string) : DelegatedAiSettings option list =
-    if Dyn.isNullish configFileObj then [ None; None ]
+    if Dyn.isNullish configFileObj then
+        [ None; None ]
     else
         let configFile = unbox<IMuxAiConfig> configFileObj
+
         [ namedSettingsFromRecord configFile.subagentAiDefaults agentId
           namedSettingsFromRecord configFile.agentAiDefaults agentId ]
 
 let readWorkspaceAiSettingsByAgent (workspaceObj: obj) (agentId: string) : DelegatedAiSettings option =
-    if Dyn.isNullish workspaceObj then None
+    if Dyn.isNullish workspaceObj then
+        None
     else
         let workspace = unbox<IMuxWorkspace> workspaceObj
         namedSettingsFromRecord workspace.aiSettingsByAgent agentId
 
 let readDescriptorAiFromFrontmatter (fmObj: obj) : DelegatedAiSettings =
-    if Dyn.isNullish fmObj then emptySettings
+    if Dyn.isNullish fmObj then
+        emptySettings
     else
         let fm = unbox<IMuxAiObj> fmObj
         let aiScalars = fm.ai
-        if Dyn.isNullish (box aiScalars) then emptySettings
+
+        if Dyn.isNullish (box aiScalars) then
+            emptySettings
         else
             let scalars = decodeAgentAiEntryScalars aiScalars
+
             { modelString = scalars.Model |> Option.orElse scalars.ModelString
               thinkingLevel = scalars.ThinkingLevel }
 
 let readWorkspaceFromFindResult (findResult: obj) : obj =
-    if Dyn.isNullish findResult then null
-    else Dyn.get findResult "workspace"
+    if Dyn.isNullish findResult then
+        null
+    else
+        Dyn.get findResult "workspace"
 
 let readParentMuxEnv (configObj: obj) : MuxParentRuntimeAiScalars =
-    if Dyn.isNullish configObj then { ModelString = None; ThinkingLevel = None }
+    if Dyn.isNullish configObj then
+        { ModelString = None
+          ThinkingLevel = None }
     else
         let config = unbox<IMuxDelegateConfig> configObj
         let muxEnv = config.muxEnv
-        if Dyn.isNullish (box muxEnv) then { ModelString = None; ThinkingLevel = None }
-        else decodeMuxParentRuntimeEnv muxEnv
+
+        if Dyn.isNullish (box muxEnv) then
+            { ModelString = None
+              ThinkingLevel = None }
+        else
+            decodeMuxParentRuntimeEnv muxEnv

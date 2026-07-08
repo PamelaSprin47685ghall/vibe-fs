@@ -15,6 +15,7 @@ let run () =
 
     // Lock
     let r2 = reduce r1 (RegistryAction.Lock("s1", "rev1"))
+
     match Map.tryFind "s1" r2 with
     | Some s ->
         match s.state with
@@ -22,21 +23,26 @@ let run () =
             equal "Lock task" "do thing" t
             equal "Lock reviewer" "rev1" r
         | _ -> check "Lock->Locked" false
+
         check "Locked still active" (isActive s.state)
     | None -> check "s1 exists after Lock" false
 
     // Accept
     let r3 = reduce r2 (RegistryAction.Accept "s1")
+
     match Map.tryFind "s1" r3 with
     | Some s -> equal "Accept->Accepted" ReviewState.Accepted s.state
     | None -> check "s1 exists after Accept" false
+
     check "Accepted not active" (not (isActive r3.["s1"].state))
 
     // RequestRevision
     let r4 = reduce r2 (RegistryAction.RequestRevision("s1", "fix it"))
+
     match Map.tryFind "s1" r4 with
     | Some s -> equal "RequestRevision->NeedsRevision" (ReviewState.NeedsRevision "fix it") s.state
     | None -> check "s1 exists after RequestRevision" false
+
     check "NeedsRevision still active" (isActive r4.["s1"].state)
 
     // Deactivate
@@ -52,6 +58,7 @@ let run () =
 
     // AddChild
     let r6 = reduce r1 (RegistryAction.AddChild("s1", "c1"))
+
     match Map.tryFind "s1" r6 with
     | Some s -> equal "AddChild" [ "c1" ] s.childIds
     | None -> check "AddChild session exists" false
@@ -62,5 +69,10 @@ let run () =
 
     // actionFor
     equal "Accepted->Accept" (RegistryAction.Accept "s1") (actionFor "s1" (Accepted ""))
-    equal "NeedsRevision->RequestRevision" (RegistryAction.RequestRevision("s1", "bad")) (actionFor "s1" (NeedsRevision "bad"))
+
+    equal
+        "NeedsRevision->RequestRevision"
+        (RegistryAction.RequestRevision("s1", "bad"))
+        (actionFor "s1" (NeedsRevision "bad"))
+
     equal "Terminated->Deactivate" (RegistryAction.Deactivate "s1") (actionFor "s1" Terminated)

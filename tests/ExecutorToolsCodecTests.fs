@@ -9,34 +9,39 @@ open Wanxiangshu.Shell.ExecutorToolsCodec
 
 let decodeExecutorInvalidLanguage () =
     let args =
-        createObj [
-            "language", box "ruby"
-            "program", box "echo hi"
-            "timeout_type", box "short"
-            "mode", box "ro"
-            "warn", box "it-is-not-possible-to-do-it-using-other-tools"
-        ]
+        createObj
+            [ "language", box "ruby"
+              "program", box "echo hi"
+              "timeout_type", box "short"
+              "mode", box "ro"
+              "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
+
     match decodeExecutorArgs args with
-    | Error (InvalidIntent ("executor", "language", "expected shell, python, or javascript")) ->
+    | Error(InvalidIntent("executor", "language", "expected shell, python, or javascript")) ->
         check "executor invalid language" true
     | _ -> check "executor invalid language" false
 
 let decodeExecutorMissingProgram () =
-    let args = createObj [ "language", box "shell"; "mode", box "ro"; "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
+    let args =
+        createObj
+            [ "language", box "shell"
+              "mode", box "ro"
+              "warn", box "it-is-not-possible-to-do-it-using-other-tools" ]
+
     match decodeExecutorArgs args with
-    | Error (InvalidIntent ("executor", "program", "required")) -> check "executor missing program" true
+    | Error(InvalidIntent("executor", "program", "required")) -> check "executor missing program" true
     | _ -> check "executor missing program" false
 
 let decodeExecutorOkShell () =
     let args =
-         createObj [
-            "language", box "shell"
-            "program", box "echo ok"
-            "dependencies", box [| "dep-a" |]
-            "timeout_type", box "long"
-            "mode", box "rw"
-            "what_to_summarize", box "summarize exit codes and stderr only"
-        ]
+        createObj
+            [ "language", box "shell"
+              "program", box "echo ok"
+              "dependencies", box [| "dep-a" |]
+              "timeout_type", box "long"
+              "mode", box "rw"
+              "what_to_summarize", box "summarize exit codes and stderr only" ]
+
     match decodeExecutorArgs args with
     | Ok ex ->
         check "executor ok language" (ex.Language = Shell)
@@ -52,25 +57,26 @@ let decodeExecutorOkShell () =
 
 let decodeExecutorMissingWhatToSummarize () =
     let args =
-        createObj [
-            "language", box "shell"
-            "program", box "echo ok"
-            "timeout_type", box "long"
-            "mode", box "rw"
-        ]
+        createObj
+            [ "language", box "shell"
+              "program", box "echo ok"
+              "timeout_type", box "long"
+              "mode", box "rw" ]
+
     match decodeExecutorArgs args with
-    | Error (InvalidIntent ("executor", "what_to_summarize", "required")) -> check "executor missing what_to_summarize" true
+    | Error(InvalidIntent("executor", "what_to_summarize", "required")) ->
+        check "executor missing what_to_summarize" true
     | _ -> check "executor missing what_to_summarize" false
 
 let decodeExecutorMissingMode () =
     let args =
-        createObj [
-            "language", box "shell"
-            "program", box "echo ok"
-            "timeout_type", box "short"
-        ]
+        createObj
+            [ "language", box "shell"
+              "program", box "echo ok"
+              "timeout_type", box "short" ]
+
     match decodeExecutorArgs args with
-    | Error (InvalidIntent ("executor", "mode", "required")) -> check "executor missing mode" true
+    | Error(InvalidIntent("executor", "mode", "required")) -> check "executor missing mode" true
     | _ -> check "executor missing mode" false
 
 let run () =

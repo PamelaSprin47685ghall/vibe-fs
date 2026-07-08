@@ -4,17 +4,17 @@ open Wanxiangshu.Kernel.ReviewSession.Types
 
 let transition (state: ReviewState) (command: ReviewCommand) : ReviewState * ReviewEvent option =
     match state, command with
-    | ReviewState.Inactive, Activate task ->
-        ReviewState.Active task, Some(ReviewEvent.Activated task)
-    | ReviewState.Active task, Submit ->
-        ReviewState.Active task, Some ReviewEvent.Submitted
+    | ReviewState.Inactive, Activate task -> ReviewState.Active task, Some(ReviewEvent.Activated task)
+    | ReviewState.Active task, Submit -> ReviewState.Active task, Some ReviewEvent.Submitted
     | ReviewState.Active task, Lock reviewerId ->
         ReviewState.Locked(task, reviewerId), Some(ReviewEvent.LockAcquired reviewerId)
     | ReviewState.Active _, Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
-    | ReviewState.Active _, RequestRevision feedback -> ReviewState.NeedsRevision feedback, Some(ReviewEvent.NeedsRevision feedback)
+    | ReviewState.Active _, RequestRevision feedback ->
+        ReviewState.NeedsRevision feedback, Some(ReviewEvent.NeedsRevision feedback)
     | ReviewState.Locked(task, _), Unlock -> ReviewState.Active task, Some ReviewEvent.LockReleased
     | ReviewState.Locked _, Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
-    | ReviewState.Locked _, RequestRevision feedback -> ReviewState.NeedsRevision feedback, Some(ReviewEvent.NeedsRevision feedback)
+    | ReviewState.Locked _, RequestRevision feedback ->
+        ReviewState.NeedsRevision feedback, Some(ReviewEvent.NeedsRevision feedback)
     | _ -> state, None
 
 let isActive (state: ReviewState) : bool =
@@ -29,15 +29,23 @@ let initialState = ReviewState.Inactive
 
 let applyCommand (session: ReviewSession) (command: ReviewCommand) : ReviewSession =
     let nextState, event = transition session.state command
+
     match event with
     | None -> session
-    | Some _ -> { session with state = nextState; version = session.version + 1 }
+    | Some _ ->
+        { session with
+            state = nextState
+            version = session.version + 1 }
 
 let decideAfterRound nudgeCount outcome maxNudges : LoopDecision =
     match outcome with
     | Resolved result -> Finish result
     | PromptFailed -> Finish Terminated
-    | NoResult -> if nudgeCount + 1 >= maxNudges then Finish Terminated else Nudge (nudgeCount + 1)
+    | NoResult ->
+        if nudgeCount + 1 >= maxNudges then
+            Finish Terminated
+        else
+            Nudge(nudgeCount + 1)
 
 let promptParts (nudgeCount: int) (initialParts: string list) (nudgePrompt: string) : string list =
     if nudgeCount = 0 then initialParts else [ nudgePrompt ]

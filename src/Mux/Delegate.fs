@@ -16,10 +16,10 @@ open Wanxiangshu.Shell.ToolContextCodec
 open Wanxiangshu.Mux.DelegateTimeout
 
 let private taskCreate (taskService: obj) (input: obj) : JS.Promise<obj> =
-    unbox<JS.Promise<obj>>(taskService?create(input))
+    unbox<JS.Promise<obj>> (taskService?create (input))
 
 let private taskWait (taskService: obj) (taskId: string) (opts: obj) : JS.Promise<obj> =
-    unbox<JS.Promise<obj>>(taskService?waitForAgentReport(taskId, opts))
+    unbox<JS.Promise<obj>> (taskService?waitForAgentReport (taskId, opts))
 
 let private createInput
     (workspaceId: WorkspaceId)
@@ -68,10 +68,11 @@ let private resolveDelegationContext
     : JS.Promise<Result<DelegationContext, string>> =
     promise {
         match decodeDelegateConfig config with
-        | Error e -> return Error (wireDomainFailure "delegate" e)
+        | Error e -> return Error(wireDomainFailure "delegate" e)
         | Ok host ->
             let opts = defaultArg options (box null)
             let optFields = decodeDelegateOptions opts
+
             let! aiSettings =
                 if optFields.AiSettingsAgentId = "" then
                     Promise.lift emptySettings
@@ -91,7 +92,11 @@ let private resolveDelegationContext
 /// Task-wait failures: backgrounding is a graceful outcome (returned as text on
 /// the Ok channel, never thrown); every other exception becomes a typed
 /// `Error` so callers stop using exceptions as control flow (TASK §5).
-let private translateTaskWaitError (err: exn) (title: string) (taskId: string) : JS.Promise<Result<string, DomainError>> =
+let private translateTaskWaitError
+    (err: exn)
+    (title: string)
+    (taskId: string)
+    : JS.Promise<Result<string, DomainError>> =
     match translateJsError err with
     | TaskWaitBackgrounded ->
         Promise.lift (Ok $"{title} task ({taskId}) moved to background. Use task tools to monitor it.")
@@ -116,8 +121,9 @@ let private createAndWaitTask
                 ctx.experiments
 
         let! createResult = taskCreate ctx.taskService input
+
         match decodeTaskCreateResult createResult with
-        | Error e -> return Ok (wireDomainFailure "delegate.create" e)
+        | Error e -> return Ok(wireDomainFailure "delegate.create" e)
         | Ok created ->
             let waitOpts =
                 box
@@ -127,9 +133,10 @@ let private createAndWaitTask
 
             try
                 let! report = taskWait ctx.taskService created.TaskId waitOpts
+
                 match decodeTaskReport report with
                 | Ok markdown -> return Ok markdown
-                | Error e -> return Ok (wireDomainFailure "delegate.report" e)
+                | Error e -> return Ok(wireDomainFailure "delegate.report" e)
             with err ->
                 return! translateTaskWaitError err title created.TaskId
     }
@@ -144,10 +151,12 @@ let delegateToSubAgent
     : JS.Promise<string> =
     promise {
         let! ctxResult = resolveDelegationContext deps config title options
+
         match ctxResult with
         | Error msg -> return msg
         | Ok ctx ->
             let! result = createAndWaitTask ctx agentId prompt title
+
             match result with
             | Ok report -> return report
             | Error e -> return wireDomainFailure "delegate" e

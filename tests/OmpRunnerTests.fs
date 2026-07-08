@@ -12,14 +12,15 @@ let testScope = RuntimeScope()
 
 let private reset () = clearRunnerLogsForTest testScope
 
-let waitRunnerJobAfterAppendLog () = promise {
-    reset ()
-    let sessionId = "runner-wait-1"
-    appendRunnerLog testScope sessionId "line-one\nline-two"
-    let! snippet = waitRunnerJob testScope sessionId 10
-    check "wait includes log" (snippet.Contains "line-two")
-    check "wait not empty placeholder" (snippet <> "(no new output)")
-}
+let waitRunnerJobAfterAppendLog () =
+    promise {
+        reset ()
+        let sessionId = "runner-wait-1"
+        appendRunnerLog testScope sessionId "line-one\nline-two"
+        let! snippet = waitRunnerJob testScope sessionId 10
+        check "wait includes log" (snippet.Contains "line-two")
+        check "wait not empty placeholder" (snippet <> "(no new output)")
+    }
 
 let setRunnerJobStateForTestHasRunning () =
     reset ()
@@ -36,14 +37,15 @@ let abortRunnerJobClearsRunning () =
     abortRunnerJob testScope sessionId |> ignore
     check "not running after abort" (not (hasRunningRunnerJob testScope sessionId))
 
-let cleanupRunnerJobClearsRunning () = promise {
-    reset ()
-    let sessionId = "runner-cleanup-1"
-    registerActiveRunnerSession testScope sessionId
-    check "running before cleanup" (hasRunningRunnerJob testScope sessionId)
-    do! cleanupRunnerJob testScope sessionId
-    check "not running after cleanup" (not (hasRunningRunnerJob testScope sessionId))
-}
+let cleanupRunnerJobClearsRunning () =
+    promise {
+        reset ()
+        let sessionId = "runner-cleanup-1"
+        registerActiveRunnerSession testScope sessionId
+        check "running before cleanup" (hasRunningRunnerJob testScope sessionId)
+        do! cleanupRunnerJob testScope sessionId
+        check "not running after cleanup" (not (hasRunningRunnerJob testScope sessionId))
+    }
 
 let hasRunningWhenActiveExecutorRun () =
     reset ()

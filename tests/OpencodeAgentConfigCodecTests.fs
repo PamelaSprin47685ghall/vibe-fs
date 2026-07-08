@@ -19,23 +19,27 @@ let decodeScalarsPresentPromptModeAndObjects () =
     let perm = createObj [ "read", box "allow" ]
     let tools = createObj [ "write", box true ]
     let mcps = [| "mcp-a" |] :> obj
+
     let userAgent =
-        createObj [
-            "prompt", box "sys"
-            "mode", box "primary"
-            "permission", perm
-            "tools", tools
-            "mcps", mcps
-        ]
+        createObj
+            [ "prompt", box "sys"
+              "mode", box "primary"
+              "permission", perm
+              "tools", tools
+              "mcps", mcps ]
+
     let s = decodeUserAgentScalars userAgent
     check "present prompt" (s.Prompt = "sys")
     check "present mode" (s.Mode = "primary")
+
     match s.Permission with
     | Some m -> check "permission map read" (Map.find "read" m = "allow")
     | None -> check "permission some" false
+
     match s.Tools with
     | Some m -> check "tools map write" (Map.find "write" m = true)
     | None -> check "tools some" false
+
     match s.Mcps with
     | Some arr -> check "mcps array" (arr.Length = 1 && arr.[0] = "mcp-a")
     | None -> check "mcps some" false

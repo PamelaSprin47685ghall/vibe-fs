@@ -12,8 +12,7 @@ let internal executorSpec: ToolSpec =
             [ "language", "Execution language: shell, python, or javascript"
               "program", "The program to execute."
               "dependencies", "Dependencies to install (for python or javascript)."
-              "timeout_type",
-              "Execution timeout budget: 'short' (10s) or 'long' (100s)."
+              "timeout_type", "Execution timeout budget: 'short' (10s) or 'long' (100s)."
               "mode",
               "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)."
               "what_to_summarize",

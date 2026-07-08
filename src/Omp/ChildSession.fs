@@ -10,9 +10,13 @@ open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.OmpHostBindings
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.SubagentIo
+
 module Dyn = Wanxiangshu.Shell.Dyn
 
-type ChildSession = { session: obj; childId: string; dispose: (unit -> unit) option }
+type ChildSession =
+    { session: obj
+      childId: string
+      dispose: (unit -> unit) option }
 
 let private getChildIds (scope: RuntimeScope) : Set<string> =
     match scope.TryFindKey "omp_child_sessions" with
@@ -33,21 +37,30 @@ let unmarkChildSession (scope: RuntimeScope) (id: string) =
         setChildIds scope (Set.remove id ids)
 
 let isChildSession (scope: RuntimeScope) (id: string) : bool =
-    if id = "" then false else
-    let ids = getChildIds scope
-    Set.contains id ids
+    if id = "" then
+        false
+    else
+        let ids = getChildIds scope
+        Set.contains id ids
 
-let clearChildSessionsForTest (scope: RuntimeScope) () : unit =
-    setChildIds scope Set.empty<string>
+let clearChildSessionsForTest (scope: RuntimeScope) () : unit = setChildIds scope Set.empty<string>
 
 let private callOpt (ctx: obj) (key: string) : obj =
     let g = Dyn.get ctx key
     if Dyn.typeIs g "function" then Dyn.call0 g else box null
 
-let createChildSession (scope: RuntimeScope) (pi: obj) (ctx: obj) (toolNames: string array) (systemPrompt: obj option) (customTools: obj array) (modelOverride: string option)
+let createChildSession
+    (scope: RuntimeScope)
+    (pi: obj)
+    (ctx: obj)
+    (toolNames: string array)
+    (systemPrompt: obj option)
+    (customTools: obj array)
+    (modelOverride: string option)
     : JS.Promise<ChildSession> =
     promise {
         let innerPi = Dyn.get pi "pi"
+
         if Dyn.isNullish innerPi || Dyn.isNullish (Dyn.get innerPi "createAgentSession") then
             return failwith "createAgentSession unavailable"
         else
@@ -56,71 +69,98 @@ let createChildSession (scope: RuntimeScope) (pi: obj) (ctx: obj) (toolNames: st
             let cwd = string (Dyn.get ctx "cwd")
             let sessionManagerType = Dyn.get codingAgent "SessionManager"
             let sm = createSessionManager sessionManagerType cwd
+
             let sp =
                 match systemPrompt with
                 | Some v -> v
                 | None -> callOpt ctx "getSystemPrompt"
+
             let model =
                 match modelOverride with
                 | Some m -> box m
                 | None -> Dyn.get ctx "model"
 
             let myCustomTools = ResizeArray<obj>()
+
             if not (Dyn.isNullish customTools) then
-                for t in customTools do myCustomTools.Add(t)
+                for t in customTools do
+                    myCustomTools.Add(t)
 
             // Extract return_reviewer definition from parent extensions if requested
             if Array.contains "return_reviewer" toolNames then
                 let parentExtension = Dyn.get pi "extension"
+
                 if not (Dyn.isNullish parentExtension) then
                     let parentTools = Dyn.get parentExtension "tools"
+
                     if not (Dyn.isNullish parentTools) then
                         let entry = Dyn.callMethod1 parentTools "get" "return_reviewer"
+
                         if not (Dyn.isNullish entry) then
                             let def = Dyn.get entry "definition"
+
                             if not (Dyn.isNullish def) then
                                 myCustomTools.Add(def)
 
             let body =
-                createObj [
-                    "cwd", box cwd
-                    "hasUI", box false
-                    "toolNames", box toolNames
-                    "modelRegistry", Dyn.get ctx "modelRegistry"
-                    "model", model
-                    "thinkingLevel", callOpt ctx "getThinkingLevel"
-                    "systemPrompt", sp
-                    "agentsMdSearch", Dyn.get ctx "agentsMdSearch"
-                    "workspaceTree", Dyn.get ctx "workspaceTree"
-                    "sessionManager", box sm
-                    "customTools", box (myCustomTools.ToArray())
-                    "authStorage", Dyn.get ctx "authStorage"
-                    "ui", Dyn.get ctx "ui"
-                ]
+                createObj
+                    [ "cwd", box cwd
+                      "hasUI", box false
+                      "toolNames", box toolNames
+                      "modelRegistry", Dyn.get ctx "modelRegistry"
+                      "model", model
+                      "thinkingLevel", callOpt ctx "getThinkingLevel"
+                      "systemPrompt", sp
+                      "agentsMdSearch", Dyn.get ctx "agentsMdSearch"
+                      "workspaceTree", Dyn.get ctx "workspaceTree"
+                      "sessionManager", box sm
+                      "customTools", box (myCustomTools.ToArray())
+                      "authStorage", Dyn.get ctx "authStorage"
+                      "ui", Dyn.get ctx "ui" ]
+
             body?customTools <- box (myCustomTools.ToArray())
 
             let! wrapperObj = unbox<JS.Promise<obj>> (Dyn.call1 createFn (box body))
             let wrapper = unbox<IAgentSessionWrapper> wrapperObj
             let session = wrapper.session
+
             let childId =
                 if Dyn.typeIs (Dyn.get sm "getSessionId") "function" then
-                    let id : obj = sm?getSessionId()
+                    let id: obj = sm?getSessionId ()
                     if Dyn.isNullish id then "" else string id
-                else ""
+                else
+                    ""
 
-            if childId <> "" then markChildSession scope childId
+            if childId <> "" then
+                markChildSession scope childId
+
             let dispose =
                 match wrapper.dispose with
                 | Some d ->
                     let wrapped () =
-                        try d ()
-                        finally unmarkChildSession scope childId
+                        try
+                            d ()
+                        finally
+                            unmarkChildSession scope childId
+
                     Some wrapped
                 | None -> None
-            return { session = session; childId = childId; dispose = dispose }
+
+            return
+                { session = session
+                  childId = childId
+                  dispose = dispose }
     }
 
-let runSubagent (scope: RuntimeScope) (pi: obj) (ctx: obj) (toolNames: string array) (prompt: string) (signal: obj option) (fallbackRuntime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState) (fallbackConfigOpt: Wanxiangshu.Kernel.FallbackKernel.Types.FallbackConfig option)
+let runSubagent
+    (scope: RuntimeScope)
+    (pi: obj)
+    (ctx: obj)
+    (toolNames: string array)
+    (prompt: string)
+    (signal: obj option)
+    (fallbackRuntime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState)
+    (fallbackConfigOpt: Wanxiangshu.Kernel.FallbackKernel.Types.FallbackConfig option)
     : JS.Promise<string> =
     promise {
         let modelOverride, defaultChain =
@@ -128,26 +168,44 @@ let runSubagent (scope: RuntimeScope) (pi: obj) (ctx: obj) (toolNames: string ar
             | Some cfg ->
                 let firstModel =
                     match cfg.DefaultChain with
-                    | first :: _ -> Some (sprintf "%s/%s%s" first.ProviderID first.ModelID (match first.Variant with Some v -> ":" + v | None -> ""))
+                    | first :: _ ->
+                        Some(
+                            sprintf
+                                "%s/%s%s"
+                                first.ProviderID
+                                first.ModelID
+                                (match first.Variant with
+                                 | Some v -> ":" + v
+                                 | None -> "")
+                        )
                     | [] -> None
+
                 firstModel, Some cfg.DefaultChain
             | None -> None, None
+
         let sessionId =
             let s = Dyn.get ctx "sessionId"
             if Dyn.isNullish s then "" else string s
+
         let! child = createChildSession scope pi ctx toolNames None [||] modelOverride
         let session = child.session
         let childId = child.childId
+
         if childId <> "" then
             let scalars = Wanxiangshu.Kernel.PromptFrontMatter.parseFrontMatterScalars prompt
+
             match Map.tryFind "objective" scalars with
             | Some objVal when not (System.String.IsNullOrWhiteSpace objVal) ->
                 let parentKey = sessionId + "\u0000" + objVal.Trim()
+
                 match scope.TryGetTempFiles(parentKey) with
                 | Some files -> scope.RegisterTempFiles(childId + "\u0000" + objVal.Trim(), files)
                 | None -> ()
             | _ -> ()
-            defaultChain |> Option.iter (fun chain -> fallbackRuntime.SetChain childId chain)
+
+            defaultChain
+            |> Option.iter (fun chain -> fallbackRuntime.SetChain childId chain)
+
         let run =
             promise {
                 do! sessionPrompt session prompt
@@ -155,17 +213,28 @@ let runSubagent (scope: RuntimeScope) (pi: obj) (ctx: obj) (toolNames: string ar
                 let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
                 return readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
             }
+
         let cleanup () =
             let childSess = unbox<IChildSession> session
+
             match childSess.abort with
-            | Some _ -> try Dyn.callMethod0 session "abort" |> ignore with _ -> ()
+            | Some _ ->
+                try
+                    Dyn.callMethod0 session "abort" |> ignore
+                with _ ->
+                    ()
             | None -> ()
+
             child.dispose |> Option.iter (fun dispose -> dispose ())
+
         let! text = raceWithAbortSignal (Option.defaultValue (box null) signal) cleanup run
         cleanup ()
+
         if childId <> "" && fallbackRuntime.GetConsumed childId <> Some false then
             let pst = fallbackRuntime.GetOrCreateState childId
+
             if pst.Phase = Wanxiangshu.Kernel.FallbackKernel.Types.FallbackPhase.Exhausted then
                 return failwith "Fallback exhausted for child session"
+
         return text
     }

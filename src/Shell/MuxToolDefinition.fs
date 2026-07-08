@@ -17,4 +17,7 @@ type ToolDefinition =
       condition: (obj -> bool) option }
 
 let mkSchema (props: obj) (required: string array) : JsonSchema =
-    { ``type`` = "object"; properties = props; required = Some required; additionalProperties = Some false }
+    { ``type`` = "object"
+      properties = props
+      required = Some required
+      additionalProperties = Some false }

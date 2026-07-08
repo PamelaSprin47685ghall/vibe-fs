@@ -14,13 +14,13 @@ let wireEncodeResultOk () =
     check "wireEncodeResult Ok returns plain text" (wireEncodeResult (Ok "done") = "done")
 
 let wireEncodeResultErrorContainsFailed () =
-    let err = InvalidIntent ("coder", "intents", "required")
+    let err = InvalidIntent("coder", "intents", "required")
     let text = wireEncodeResult (Error err)
     check "wireEncodeResult Error contains 'failed'" (text.Contains "failed")
     check "wireEncodeResult Error contains domain error text" (text.Contains "invalid intents")
 
 let wireEncodeToolErrorFormat () =
-    let err = ParseError ("ctx", "detail")
+    let err = ParseError("ctx", "detail")
     let text = wireEncodeToolError "Subagent" err
     check "wireEncodeToolError starts with context" (text.StartsWith "Subagent failed:")
     check "wireEncodeToolError contains parse error" (text.Contains "parse error in ctx")
@@ -29,19 +29,28 @@ let wireEncodeToolErrorFormat () =
 
 let defaultExcludedAgentsTrue () =
     let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction" ]
-    agents |> List.iter (fun a -> check (sprintf "default excluded: %s" a) (shouldExcludeAgentFromProjection a false))
+
+    agents
+    |> List.iter (fun a -> check (sprintf "default excluded: %s" a) (shouldExcludeAgentFromProjection a false))
 
 let defaultExcludedAgentsFalse () =
     let agents = [ "main"; "agent"; "manager"; "user" ]
-    agents |> List.iter (fun a -> check (sprintf "not excluded: %s" a) (not (shouldExcludeAgentFromProjection a false)))
+
+    agents
+    |> List.iter (fun a -> check (sprintf "not excluded: %s" a) (not (shouldExcludeAgentFromProjection a false)))
 
 let childWorkspaceExtraExcluded () =
     let agents = [ "exec"; "explore" ]
-    agents |> List.iter (fun a -> check (sprintf "child excluded: %s" a) (shouldExcludeAgentFromProjection a true))
+
+    agents
+    |> List.iter (fun a -> check (sprintf "child excluded: %s" a) (shouldExcludeAgentFromProjection a true))
 
 let childWorkspaceDefaultStillExcluded () =
     let agents = [ "browser"; "investigator"; "executor"; "title"; "compaction" ]
-    agents |> List.iter (fun a -> check (sprintf "child still excluded: %s" a) (shouldExcludeAgentFromProjection a true))
+
+    agents
+    |> List.iter (fun a -> check (sprintf "child still excluded: %s" a) (shouldExcludeAgentFromProjection a true))
+
     check "main not excluded in child workspace" (not (shouldExcludeAgentFromProjection "main" true))
     check "agent not excluded in child workspace" (not (shouldExcludeAgentFromProjection "agent" true))
 
@@ -68,10 +77,16 @@ let isCapsSynthIdRejects () =
 // ── WarnTdd ─────────────────────────────────────────────────────────────────
 
 let parseWarnTddExactMatch () =
-    check "exact canonical value parses" (parseWarnTdd "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles" = Some IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+    check
+        "exact canonical value parses"
+        (parseWarnTdd "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles" = Some
+                                                                                       IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
 
 let parseWarnTddCaseInsensitive () =
-    check "uppercase variant parses" (parseWarnTdd "I-AM-SURE-I-HAVE-FOLLOWED-TDD-AND-KOLMOLGOROV-PRINCIPLES" = Some IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+    check
+        "uppercase variant parses"
+        (parseWarnTdd "I-AM-SURE-I-HAVE-FOLLOWED-TDD-AND-KOLMOLGOROV-PRINCIPLES" = Some
+                                                                                       IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
 
 let parseWarnTddRejectsWrongValue () =
     check "wrong value returns None" (parseWarnTdd "something-else" = None)

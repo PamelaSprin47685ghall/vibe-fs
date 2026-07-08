@@ -6,19 +6,24 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 let private errorInputIsAbort (err: ErrorInput) : bool =
     match err.DomainError with
     | Some MessageAborted -> true
-    | Some (ClientCancellation _) -> true
+    | Some(ClientCancellation _) -> true
     | _ when err.ErrorName = "AbortError" || err.ErrorName = "MessageAbortedError" -> true
     | _ -> false
 
 let private isImmediateStatusCode (sc: int option) : bool =
     match sc with
-    | Some 401 | Some 402 | Some 403 -> true
+    | Some 401
+    | Some 402
+    | Some 403 -> true
     | _ -> false
 
 let private isRetryableStatusCode (sc: int option) : bool =
     match sc with
     | Some 429
-    | Some 500 | Some 502 | Some 503 | Some 504 -> true
+    | Some 500
+    | Some 502
+    | Some 503
+    | Some 504 -> true
     | _ -> false
 
 /// Classify an error into the action class the state machine should take.
@@ -39,10 +44,17 @@ let classifyError (err: ErrorInput) (state: SessionFallbackState) (cfg: Fallback
         | FallbackPhase.Retrying count -> count
         | _ -> 0
 
-    if state.Cancelled || state.TaskComplete then ErrorClass.Ignore
-    elif errorInputIsAbort err then ErrorClass.Ignore
-    elif isImmediateStatusCode err.StatusCode then ErrorClass.ImmediateFallback
-    elif err.IsRetryable = Some false then ErrorClass.ImmediateFallback
-    elif retryCount >= cfg.MaxRetries then ErrorClass.Exhausted
-    elif err.IsRetryable = Some true || isRetryableStatusCode err.StatusCode then ErrorClass.RetrySame
-    else ErrorClass.RetrySame  // default safety net
+    if state.Cancelled || state.TaskComplete then
+        ErrorClass.Ignore
+    elif errorInputIsAbort err then
+        ErrorClass.Ignore
+    elif isImmediateStatusCode err.StatusCode then
+        ErrorClass.ImmediateFallback
+    elif err.IsRetryable = Some false then
+        ErrorClass.ImmediateFallback
+    elif retryCount >= cfg.MaxRetries then
+        ErrorClass.Exhausted
+    elif err.IsRetryable = Some true || isRetryableStatusCode err.StatusCode then
+        ErrorClass.RetrySame
+    else
+        ErrorClass.RetrySame // default safety net

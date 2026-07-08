@@ -10,9 +10,7 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 module Dyn = Wanxiangshu.Shell.Dyn
 
 type FallbackCoordinator
-    ( fallbackHandler   : (obj -> JS.Promise<FallbackHookResult>) option
-    , fallbackRuntime   : FallbackRuntimeState
-    ) =
+    (fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option, fallbackRuntime: FallbackRuntimeState) =
 
     member _.TryConsumeEvent(input: obj) : JS.Promise<bool> =
         match fallbackHandler with
@@ -25,12 +23,20 @@ type FallbackCoordinator
 
     member _.UpdateBusyCount(eventEnvelope: HostEventEnvelope option) : unit =
         match eventEnvelope with
-        | Some { EventType = "session.status"; Props = props } ->
+        | Some { EventType = "session.status"
+                 Props = props } ->
             let statusObj = Dyn.get props "status"
+
             let status =
                 let fromStatus = Dyn.str statusObj "status"
-                if fromStatus <> "" then fromStatus else Dyn.str statusObj "type"
+
+                if fromStatus <> "" then
+                    fromStatus
+                else
+                    Dyn.str statusObj "type"
+
             let sid = getSessionID "session.status" props
+
             if sid <> "" && status = "busy" then
                 fallbackRuntime.SetBusyCount sid (fallbackRuntime.GetBusyCount sid + 1)
             elif sid <> "" && status = "idle" then

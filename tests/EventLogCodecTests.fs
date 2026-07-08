@@ -11,7 +11,9 @@ let roundtripLine () =
           Kind = eventKindLoopActivated
           At = "2026-01-01T00:00:00Z"
           Payload = Map [ "task", "do thing" ] }
+
     let line = wanEventToLine e
+
     match tryParseEventLine line with
     | None -> check "parse roundtrip" false
     | Some parsed ->
@@ -21,7 +23,11 @@ let roundtripLine () =
 
 let parseRejectsGarbage () =
     check "garbage" (tryParseEventLine "not json").IsNone
-    check "empty kind" (tryParseEventLine """{"v":1,"session":"s","kind":"","at":"","payload":{}}""").IsNone
+
+    check
+        "empty kind"
+        (tryParseEventLine """{"v":1,"session":"s","kind":"","at":"","payload":{}}""")
+            .IsNone
 
 let run () =
     roundtripLine ()

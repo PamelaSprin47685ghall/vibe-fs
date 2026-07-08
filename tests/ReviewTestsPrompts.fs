@@ -12,18 +12,29 @@ let doubleCheckAnchorReplay () =
     check "anchor survives mixed history" (hasDoubleCheckAnchor [ "earlier msg"; prompt; "later msg" ])
 
 let doubleCheckPromptFormat () =
-    let prompt = Wanxiangshu.Kernel.ReviewPrompts.doubleCheckPrompt "build the login page"
+    let prompt =
+        Wanxiangshu.Kernel.ReviewPrompts.doubleCheckPrompt "build the login page"
+
     check "has front-matter fence" (prompt.Contains "---")
     check "has double-check field" (prompt.Contains "double-check:")
     check "embeds task" (prompt.Contains "build the login page")
     check "asks for re-submission" (prompt.Contains "REVISE with detailed feedback")
-    let multiline = Wanxiangshu.Kernel.ReviewPrompts.doubleCheckPrompt "task with\nnewline and ### markdown"
+
+    let multiline =
+        Wanxiangshu.Kernel.ReviewPrompts.doubleCheckPrompt "task with\nnewline and ### markdown"
+
     check "multiline original_task uses block field" (multiline.Contains "original_task: |")
     let parsed = parseFrontMatterScalars multiline
-    equal "multiline original_task round-trips" (Some "task with\nnewline and ### markdown") (Map.tryFind "original_task" parsed)
+
+    equal
+        "multiline original_task round-trips"
+        (Some "task with\nnewline and ### markdown")
+        (Map.tryFind "original_task" parsed)
 
 let reviewerPromptFormat () =
-    let prompt = Wanxiangshu.Kernel.ReviewPrompts.reviewerPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
+    let prompt =
+        Wanxiangshu.Kernel.ReviewPrompts.reviewerPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
+
     check "has front-matter fence" (prompt.Contains "---")
     check "embeds original_task in front matter" (prompt.Contains "original_task:" && prompt.Contains "ship S1")
     check "lists affected files in front-matter" (prompt.Contains "affected_files:")
@@ -41,10 +52,16 @@ let reviewerPromptFormat () =
     let multilineTask = "Line one of task\nLine two with ### markdown\nLine three"
     let mp = Wanxiangshu.Kernel.ReviewPrompts.reviewerPrompt multilineTask "" []
     let parsed = parseFrontMatterScalars mp
-    equal "multiline original_task round-trips through front-matter" (Some multilineTask) (Map.tryFind "original_task" parsed)
+
+    equal
+        "multiline original_task round-trips through front-matter"
+        (Some multilineTask)
+        (Map.tryFind "original_task" parsed)
 
 let muxReviewerVerdictPromptFormat () =
-    let prompt = Wanxiangshu.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
+    let prompt =
+        Wanxiangshu.Kernel.ReviewPrompts.reviewSubmissionVerdictPrompt "ship S1" "changed A and B" [ "a.fs"; "b.fs" ]
+
     check "mux prompt starts with front-matter" (prompt.StartsWith "---")
     check "mux prompt has no role field" (not (prompt.Contains "role:"))
     check "mux prompt has no call_id field" (not (prompt.Contains "call_id:"))
@@ -57,11 +74,17 @@ let muxReviewerVerdictPromptFormat () =
     check "mux prompt has no legacy divider" (not (prompt.Contains "==="))
 
 let muxPreReviewVerdictPromptFormat () =
-    let prompt = Wanxiangshu.Kernel.ReviewPrompts.preReviewVerdictPrompt "clarify rollout"
+    let prompt =
+        Wanxiangshu.Kernel.ReviewPrompts.preReviewVerdictPrompt "clarify rollout"
+
     check "pre-review prompt starts with front-matter" (prompt.StartsWith "---")
     check "pre-review prompt has no role field" (not (prompt.Contains "role:"))
     check "pre-review prompt has no call_id field" (not (prompt.Contains "call_id:"))
-    check "pre-review prompt carries original_task" (prompt.Contains "original_task:" && prompt.Contains "clarify rollout")
+
+    check
+        "pre-review prompt carries original_task"
+        (prompt.Contains "original_task:" && prompt.Contains "clarify rollout")
+
     check "pre-review prompt reuses review criteria" (prompt.Contains "# Evaluation Criteria")
     check "pre-review prompt names agent_report" (prompt.Contains "agent_report")
     check "pre-review prompt has no legacy divider" (not (prompt.Contains "==="))

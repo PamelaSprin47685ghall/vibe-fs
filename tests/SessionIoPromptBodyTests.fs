@@ -10,14 +10,17 @@ let private isNullish (o: obj) : bool = isNull o || jsTypeof o = "undefined"
 
 let private withKey (o: obj) (key: string) (v: obj) : obj =
     let copy = createObj []
-    for k in Constructors.Object.keys(o) |> Seq.toArray do
+
+    for k in Constructors.Object.keys (o) |> Seq.toArray do
         copy?(k) <- o?(k)
+
     copy?(key) <- v
     copy
 
 /// Mirrors `SessionIo.buildPromptBody` model branch: `createObj` payload + payload codec SSOT.
 let private applyPromptModelFromModelString (body: obj) (modelString: string) : obj =
     let payload = createObj [ "modelString", box modelString ]
+
     match tryDecodePromptModelFromPayload payload with
     | Some model -> withKey body "model" model
     | None -> body

@@ -12,7 +12,7 @@ open Wanxiangshu.Mux.SubagentTools
 open Wanxiangshu.Mux.Wrappers
 open Wanxiangshu.Shell.Dyn
 
-let private methodologyParameters : JsonSchema =
+let private methodologyParameters: JsonSchema =
     mkSchema
         (createObj
             [ "methodology", box (strEnumProp "Select which methodology to apply." enumValuesArray.Value)
@@ -35,6 +35,7 @@ let private executeMethodology (deps: obj) (toolNames: string array) : obj -> ob
                     | Some entry ->
                         let intent = renderMeditatorIntent entry parsed.intent parsed.note
                         let prompt = formatPrompt Host.Mimocode (Meditator(intent, [])) |> List.head
+
                         return!
                             runMuxSubagent
                                 deps
@@ -52,5 +53,4 @@ let methodologyTool (deps: obj) (toolNames: string array) : ToolDefinition =
       execute = executeMethodology deps toolNames
       condition = None }
 
-let methodologyToolNames : string array =
-    [| unifiedToolName |]
+let methodologyToolNames: string array = [| unifiedToolName |]

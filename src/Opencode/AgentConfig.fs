@@ -15,7 +15,7 @@ open Wanxiangshu.Shell.OpencodeAgentConfigCodec
 open Wanxiangshu.Shell.OpencodeAgentConfigWire
 
 [<Global("process")>]
-let private nodeProcess : obj = jsNative
+let private nodeProcess: obj = jsNative
 
 let envVar (name: string) : string =
     let v = nodeProcess?env?(name)
@@ -33,15 +33,42 @@ type private BuiltinAgentSpec =
 let private defaultPrimaryAliases = Set [ "manager"; "build"; "plan" ]
 
 let private builtinAgentSpecs =
-    [ { name = "manager"; defaultMode = "primary"; systemPrompt = managerSystemPrompt; defaultMcps = [||] }
-      { name = "build"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "plan"; defaultMode = "primary"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "coder"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "investigator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "meditator"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] }
-      { name = "reviewer"; defaultMode = "subagent"; systemPrompt = reviewInstructions; defaultMcps = [||] }
-      { name = "browser"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [| "stealth-browser-mcp" |] }
-      { name = "executor"; defaultMode = "subagent"; systemPrompt = ""; defaultMcps = [||] } ]
+    [ { name = "manager"
+        defaultMode = "primary"
+        systemPrompt = managerSystemPrompt
+        defaultMcps = [||] }
+      { name = "build"
+        defaultMode = "primary"
+        systemPrompt = ""
+        defaultMcps = [||] }
+      { name = "plan"
+        defaultMode = "primary"
+        systemPrompt = ""
+        defaultMcps = [||] }
+      { name = "coder"
+        defaultMode = "subagent"
+        systemPrompt = ""
+        defaultMcps = [||] }
+      { name = "investigator"
+        defaultMode = "subagent"
+        systemPrompt = ""
+        defaultMcps = [||] }
+      { name = "meditator"
+        defaultMode = "subagent"
+        systemPrompt = ""
+        defaultMcps = [||] }
+      { name = "reviewer"
+        defaultMode = "subagent"
+        systemPrompt = reviewInstructions
+        defaultMcps = [||] }
+      { name = "browser"
+        defaultMode = "subagent"
+        systemPrompt = ""
+        defaultMcps = [| "stealth-browser-mcp" |] }
+      { name = "executor"
+        defaultMode = "subagent"
+        systemPrompt = ""
+        defaultMcps = [||] } ]
 
 let private tryFindBuiltinAgent name =
     builtinAgentSpecs |> List.tryFind (fun spec -> spec.name = name)
@@ -54,20 +81,39 @@ let private permissionDefaultsFor (host: Host) (agentName: string) : OpencodeAge
     Array.append (allToolNames host) [| "methodology" |]
     |> Seq.fold
         (fun acc name ->
-            let value = if canUseForHost host agentName name then "allow" else "deny"
+            let value =
+                if canUseForHost host agentName name then
+                    "allow"
+                else
+                    "deny"
+
             Map.add name value acc)
         Map.empty
 
 let private withRoleDefaultsFor (host: Host) (name: string) (userAgent: obj) : obj =
     let spec = tryFindBuiltinAgent name
     let scalars = decodeUserAgentScalars userAgent
+
     let prompt =
-        if scalars.Prompt <> "" then scalars.Prompt
-        else spec |> Option.map (fun value -> value.systemPrompt) |> Option.defaultValue ""
+        if scalars.Prompt <> "" then
+            scalars.Prompt
+        else
+            spec |> Option.map (fun value -> value.systemPrompt) |> Option.defaultValue ""
+
     let mode =
-        if scalars.Mode <> "" then scalars.Mode
-        else spec |> Option.map (fun value -> value.defaultMode) |> Option.defaultValue "subagent"
-    let primaryDefaultMode = if defaultPrimaryAliases |> Set.contains name then "primary" else "subagent"
+        if scalars.Mode <> "" then
+            scalars.Mode
+        else
+            spec
+            |> Option.map (fun value -> value.defaultMode)
+            |> Option.defaultValue "subagent"
+
+    let primaryDefaultMode =
+        if defaultPrimaryAliases |> Set.contains name then
+            "primary"
+        else
+            "subagent"
+
     let effectiveMode = if mode <> "" then mode else primaryDefaultMode
     let userPerm = scalars.Permission
     let userTools = scalars.Tools
@@ -77,19 +123,18 @@ let private withRoleDefaultsFor (host: Host) (name: string) (userAgent: obj) : o
             { Prompt = prompt
               Mode = effectiveMode
               Permission =
-                  Some (
-                      OpencodeAgentConfigCodec.mergePermissionOverrides (permissionDefaultsFor host name) userPerm)
-              Tools =
-                  Some (OpencodeAgentConfigCodec.mergeToolsOverrides (toolDefaultsFor host name) userTools)
+                Some(OpencodeAgentConfigCodec.mergePermissionOverrides (permissionDefaultsFor host name) userPerm)
+              Tools = Some(OpencodeAgentConfigCodec.mergeToolsOverrides (toolDefaultsFor host name) userTools)
               Mcps =
-                  match scalars.Mcps with
-                  | Some userArr when userArr.Length > 0 -> Some userArr
-                  | Some _ -> Some [||]
-                  | None ->
-                      spec
-                      |> Option.map (fun value -> value.defaultMcps)
-                      |> Option.defaultValue [||]
-                      |> Some }
+                match scalars.Mcps with
+                | Some userArr when userArr.Length > 0 -> Some userArr
+                | Some _ -> Some [||]
+                | None ->
+                    spec
+                    |> Option.map (fun value -> value.defaultMcps)
+                    |> Option.defaultValue [||]
+                    |> Some }
+
     mergeConfigObj userAgent encodedScalars
 
 let disableMimoMemoryAndCheckpoint (cfg: obj) : obj =

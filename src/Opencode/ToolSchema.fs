@@ -12,12 +12,13 @@ module Params = Wanxiangshu.Kernel.ToolCatalog.Params
 
 /// The opencode plugin SDK's `tool` factory + `tool.schema` (Zod-like) builder.
 [<Import("tool", "@opencode-ai/plugin/tool")>]
-let toolFactory : obj = jsNative
-let schema : obj = Dyn.get toolFactory "schema"
+let toolFactory: obj = jsNative
+
+let schema: obj = Dyn.get toolFactory "schema"
 
 /// `o.method()` and `o.method(arg)` - explicit object-first, no pipelines.
-let call0 (o: obj) (method: string) : obj = o?(method)()
-let call1 (o: obj) (method: string) (arg: obj) : obj = o?(method)(arg)
+let call0 (o: obj) (method: string) : obj = o?(method) ()
+let call1 (o: obj) (method: string) (arg: obj) : obj = o?(method) (arg)
 
 let private invokeTool (factory: obj) (config: obj) : obj = factory $ config
 
@@ -33,17 +34,21 @@ let strMinNullish (minLen: int) (desc: string) : obj =
     call1 (call0 (call1 (str ()) "min" (box minLen)) "nullish") "describe" (box desc)
 
 let strReq (desc: string) : obj = call1 (str ()) "describe" (box desc)
-let strOpt (desc: string) : obj = call1 (call0 (str ()) "nullish") "describe" (box desc)
+
+let strOpt (desc: string) : obj =
+    call1 (call0 (str ()) "nullish") "describe" (box desc)
 
 let intMinNullish (minVal: int) (desc: string) : obj =
     let n = call1 (call0 schema "number") "int" (box 0)
     let n = call1 n "min" (box minVal)
     call1 (call0 n "nullish") "describe" (box desc)
 
-let boolOpt (desc: string) : obj = call1 (call0 (call0 schema "boolean") "nullish") "describe" (box desc)
+let boolOpt (desc: string) : obj =
+    call1 (call0 (call0 schema "boolean") "nullish") "describe" (box desc)
 
-    /// Non-nullish optional boolean: `true | false | undefined`. `null` is invalid at the schema boundary.
-let boolOptional (desc: string) : obj = call1 (call0 (call0 schema "boolean") "optional") "describe" (box desc)
+/// Non-nullish optional boolean: `true | false | undefined`. `null` is invalid at the schema boundary.
+let boolOptional (desc: string) : obj =
+    call1 (call0 (call0 schema "boolean") "optional") "describe" (box desc)
 
 let excludeOpt (desc: string) : obj =
     let s = str ()
@@ -60,8 +65,11 @@ let private strictObject (shape: obj) : obj = call0 (schemaObject shape) "strict
 /// Strict Zod object for a subagent tool; `requiredKeys` must match `ToolCatalog.subagentRequiredKeys` for that tool.
 let subagentZodShape (requiredKeys: string array) (shape: obj) : obj =
     let shapeKeys = Set.ofArray (Dyn.keys shape)
+
     for k in requiredKeys do
-        if not (Set.contains k shapeKeys) then failwithf "Opencode subagent Zod shape missing required field %s" k
+        if not (Set.contains k shapeKeys) then
+            failwithf "Opencode subagent Zod shape missing required field %s" k
+
     shape
 
 let arrayMin (item: obj) (minCount: int) (desc: string) : obj =
@@ -71,28 +79,62 @@ let coderIntentsSchema (desc: string) : obj =
     let fileField = strMin 1 coderTargetFileDesc
     let guideField = strMin 1 coderTargetGuideDesc
     let draftField = strOpt coderTargetDraftDesc
-    let targetShape = strictObject (createObj [ "file", fileField; "guide", guideField; "draft", draftField ])
+
+    let targetShape =
+        strictObject (createObj [ "file", fileField; "guide", guideField; "draft", draftField ])
+
     let targetsField = arrayMin targetShape 1 coderTargetsDesc
     let objectiveField = strMin 1 coderObjectiveDesc
     let backgroundField = strMin 1 coderBackgroundDesc
-    let doNotTouchField = call1 (call0 (arr (strMin 1 coderDoNotTouchItemDesc)) "optional") "describe" (box coderDoNotTouchDesc)
-    let inner = strictObject (createObj [ "objective", objectiveField; "background", backgroundField; "do_not_touch", doNotTouchField; "targets", targetsField ])
+
+    let doNotTouchField =
+        call1 (call0 (arr (strMin 1 coderDoNotTouchItemDesc)) "optional") "describe" (box coderDoNotTouchDesc)
+
+    let inner =
+        strictObject (
+            createObj
+                [ "objective", objectiveField
+                  "background", backgroundField
+                  "do_not_touch", doNotTouchField
+                  "targets", targetsField ]
+        )
+
     arrayMin inner 1 desc
 
 let investigatorIntentsSchema (desc: string) : obj =
     let questionItem = strMin 1 investigatorQuestionItemDesc
     let questionsField = arrayMin questionItem 1 investigatorQuestionsDesc
     let entryItem = strMin 1 investigatorEntryItemDesc
-    let entriesField = call1 (call0 (arr entryItem) "optional") "describe" (box investigatorEntriesDesc)
+
+    let entriesField =
+        call1 (call0 (arr entryItem) "optional") "describe" (box investigatorEntriesDesc)
+
     let objectiveField = strMin 1 investigatorObjectiveDesc
     let backgroundField = strMin 1 investigatorBackgroundDesc
+
     let inner =
-        strictObject (createObj [ "objective", objectiveField; "background", backgroundField; "questions", questionsField; "entries", entriesField ])
+        strictObject (
+            createObj
+                [ "objective", objectiveField
+                  "background", backgroundField
+                  "questions", questionsField
+                  "entries", entriesField ]
+        )
+
     arrayMin inner 1 desc
 
-let uiParam : obj = call1 (call0 (str ()) "optional") "describe" (box "Internal UI label. Visible to the LLM and UI, but the LLM must never fill it. Leave `_ui` unset; the tool.execute.before hook populates it automatically.")
-let strArrayReq (desc: string) : obj = call1 (arr (strMin 1 "")) "describe" (box desc)
-let strArrayOpt (desc: string) : obj = call1 (call0 (arr (strMin 1 "")) "optional") "describe" (box desc)
+let uiParam: obj =
+    call1
+        (call0 (str ()) "optional")
+        "describe"
+        (box
+            "Internal UI label. Visible to the LLM and UI, but the LLM must never fill it. Leave `_ui` unset; the tool.execute.before hook populates it automatically.")
+
+let strArrayReq (desc: string) : obj =
+    call1 (arr (strMin 1 "")) "describe" (box desc)
+
+let strArrayOpt (desc: string) : obj =
+    call1 (call0 (arr (strMin 1 "")) "optional") "describe" (box desc)
 
 let numOpt (desc: string) : obj =
     let n = call0 schema "number"
@@ -119,9 +161,15 @@ let enumArrayMin (values: string array) (minCount: int) (desc: string) : obj =
 let obj (shape: obj) : obj = call1 schema "object" shape
 
 let define (description: string) (args: obj) (execute: obj -> obj -> JS.Promise<string>) : obj =
-    invokeTool toolFactory (box {| description = description; args = args; execute = execute |})
+    invokeTool
+        toolFactory
+        (box
+            {| description = description
+               args = args
+               execute = execute |})
 
-let private toolDescription (name: string) : string = Wanxiangshu.Kernel.ToolCatalog.description name
+let private toolDescription (name: string) : string =
+    Wanxiangshu.Kernel.ToolCatalog.description name
 
 let coder = toolDescription "coder"
 

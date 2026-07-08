@@ -31,7 +31,7 @@ let isActiveNeedsRevision () =
 let transitionInactiveActivate () =
     let s, ev = transition ReviewState.Inactive (Activate "t")
     equal "state→Active" (ReviewState.Active "t") s
-    equal "event→Activated" (Some (ReviewEvent.Activated "t")) ev
+    equal "event→Activated" (Some(ReviewEvent.Activated "t")) ev
 
 let transitionActiveSubmit () =
     let s, ev = transition (ReviewState.Active "t") Submit
@@ -41,7 +41,7 @@ let transitionActiveSubmit () =
 let transitionActiveLock () =
     let s, ev = transition (ReviewState.Active "t") (Lock "rid")
     equal "state→Locked" (ReviewState.Locked("t", "rid")) s
-    equal "event→LockAcquired" (Some (ReviewEvent.LockAcquired "rid")) ev
+    equal "event→LockAcquired" (Some(ReviewEvent.LockAcquired "rid")) ev
 
 let transitionActiveAccept () =
     let s, ev = transition (ReviewState.Active "t") Accept
@@ -51,7 +51,7 @@ let transitionActiveAccept () =
 let transitionActiveRequestRevision () =
     let s, ev = transition (ReviewState.Active "t") (RequestRevision "fb")
     equal "state→NeedsRevision" (ReviewState.NeedsRevision "fb") s
-    equal "event→NeedsRevision" (Some (ReviewEvent.NeedsRevision "fb")) ev
+    equal "event→NeedsRevision" (Some(ReviewEvent.NeedsRevision "fb")) ev
 
 let transitionLockedUnlock () =
     let s, ev = transition (ReviewState.Locked("t", "rid")) Unlock
@@ -66,7 +66,7 @@ let transitionLockedAccept () =
 let transitionLockedRequestRevision () =
     let s, ev = transition (ReviewState.Locked("t", "rid")) (RequestRevision "fb")
     equal "state→NeedsRevision" (ReviewState.NeedsRevision "fb") s
-    equal "event→NeedsRevision" (Some (ReviewEvent.NeedsRevision "fb")) ev
+    equal "event→NeedsRevision" (Some(ReviewEvent.NeedsRevision "fb")) ev
 
 let transitionNoopInactiveSubmit () =
     let s, ev = transition ReviewState.Inactive Submit
@@ -86,13 +86,21 @@ let transitionNoopNeedsRevisionActivate () =
 // --- applyCommand ---
 
 let applyCommandIncrementsVersion () =
-    let session = { empty "s" 10L with state = ReviewState.Active "t"; version = 3 }
+    let session =
+        { empty "s" 10L with
+            state = ReviewState.Active "t"
+            version = 3 }
+
     let next = applyCommand session (Lock "rid")
     equal "version increments" 4 next.version
     equal "state→Locked" (ReviewState.Locked("t", "rid")) next.state
 
 let applyCommandNoop () =
-    let session = { empty "s" 10L with state = ReviewState.Inactive; version = 3 }
+    let session =
+        { empty "s" 10L with
+            state = ReviewState.Inactive
+            version = 3 }
+
     let next = applyCommand session Submit
     equal "noop version unchanged" 3 next.version
     equal "noop state unchanged" ReviewState.Inactive next.state
@@ -100,29 +108,25 @@ let applyCommandNoop () =
 // --- decideAfterRound ---
 
 let decideAfterRoundResolvedAccepted () =
-    equal "Resolved Accepted→Finish Accepted"
-        (Finish (ReviewResult.Accepted "ok"))
-        (decideAfterRound 0 (Resolved (ReviewResult.Accepted "ok")) 3)
+    equal
+        "Resolved Accepted→Finish Accepted"
+        (Finish(ReviewResult.Accepted "ok"))
+        (decideAfterRound 0 (Resolved(ReviewResult.Accepted "ok")) 3)
 
 let decideAfterRoundResolvedNeedsRevision () =
-    equal "Resolved NeedsRevision→Finish NeedsRevision"
-        (Finish (ReviewResult.NeedsRevision "bad"))
-        (decideAfterRound 0 (Resolved (ReviewResult.NeedsRevision "bad")) 3)
+    equal
+        "Resolved NeedsRevision→Finish NeedsRevision"
+        (Finish(ReviewResult.NeedsRevision "bad"))
+        (decideAfterRound 0 (Resolved(ReviewResult.NeedsRevision "bad")) 3)
 
 let decideAfterRoundPromptFailed () =
-    equal "PromptFailed→Finish Terminated"
-        (Finish ReviewResult.Terminated)
-        (decideAfterRound 0 PromptFailed 3)
+    equal "PromptFailed→Finish Terminated" (Finish ReviewResult.Terminated) (decideAfterRound 0 PromptFailed 3)
 
 let decideAfterRoundNoResultBelowMax () =
-    equal "NoResult below max→Nudge 1"
-        (Nudge 1)
-        (decideAfterRound 0 NoResult 3)
+    equal "NoResult below max→Nudge 1" (Nudge 1) (decideAfterRound 0 NoResult 3)
 
 let decideAfterRoundNoResultAtMax () =
-    equal "NoResult at max→Finish Terminated"
-        (Finish ReviewResult.Terminated)
-        (decideAfterRound 2 NoResult 3)
+    equal "NoResult at max→Finish Terminated" (Finish ReviewResult.Terminated) (decideAfterRound 2 NoResult 3)
 
 // --- promptParts ---
 

@@ -20,6 +20,6 @@ let defaultPreferredModel (cfg: FallbackConfig) : string option =
     match cfg.DefaultChain with
     | model :: _ ->
         match model.Variant with
-        | Some v -> Some (sprintf "%s/%s:%s" model.ProviderID model.ModelID v)
-        | None -> Some (sprintf "%s/%s" model.ProviderID model.ModelID)
+        | Some v -> Some(sprintf "%s/%s:%s" model.ProviderID model.ModelID v)
+        | None -> Some(sprintf "%s/%s" model.ProviderID model.ModelID)
     | [] -> None

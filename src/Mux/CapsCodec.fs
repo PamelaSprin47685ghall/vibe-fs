@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.CapsPrelude
 open Wanxiangshu.Kernel.CapsSynthPolicy
 open Wanxiangshu.Shell.CapsSynthCommon
+
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FileSys
 
@@ -28,32 +29,30 @@ let private buildMuxToolPart (fp: string) (index: int) (cap: CapsFile) : obj =
           "state", box "output-available"
           "input", box (createObj [ "path", box cap.filePath ])
           "output",
-          box
-              (createObj
-                   [ "success", box true
-                     "file_size", box cap.content.Length
-                     "modifiedTime", box "1970-01-01T00:00:00.000Z"
-                     "lines_read", box (cap.content.Split('\n').Length)
-                     "content", box (formatReadOutput cap.filePath cap.content 1) ]) ]
+          box (
+              createObj
+                  [ "success", box true
+                    "file_size", box cap.content.Length
+                    "modifiedTime", box "1970-01-01T00:00:00.000Z"
+                    "lines_read", box (cap.content.Split('\n').Length)
+                    "content", box (formatReadOutput cap.filePath cap.content 1 None) ]
+          ) ]
 
 let private buildCapsAssistantMessage (id: string) (parentId: string) (capsFiles: CapsFile list) (fp: string) : obj =
     let parts = capsFiles |> List.mapi (buildMuxToolPart fp) |> Array.ofList
     buildMuxMessage id "assistant" parts
 
 let private buildAckMessage (ackId: string) : obj =
-    buildMuxMessage ackId "assistant"
-        [| createObj [ "type", box "reasoning"; "text", box acknowledgeText ] |]
+    buildMuxMessage ackId "assistant" [| createObj [ "type", box "reasoning"; "text", box acknowledgeText ] |]
 
-let buildCapsMessages
-    (messages: obj array)
-    (capsFiles: CapsFile list)
-    (preludeText: string option)
-    : obj array =
+let buildCapsMessages (messages: obj array) (capsFiles: CapsFile list) (preludeText: string option) : obj array =
     match findFirstNonSynthMessage messageId messages with
     | None -> messages
     | Some _ ->
         let existingStripped = stripLeadingCapsSynth messageId messages
-        if existingStripped.Length = 0 then messages
+
+        if existingStripped.Length = 0 then
+            messages
         else
             let fp = stableFingerprint sha256HexTruncated capsFiles
             let userId = $"{capsUserPrefix}{fp}"
@@ -61,8 +60,11 @@ let buildCapsMessages
             let ackId = $"{capsAcknowledgePrefix}{fp}"
             let userMsg = buildUserMessage userId preludeText
             let ackMsg = buildAckMessage ackId
+
             let assistantMsgs =
-                if capsFiles.IsEmpty
-                then [| ackMsg |]
-                else [| ackMsg; buildCapsAssistantMessage assistantId userId capsFiles fp |]
+                if capsFiles.IsEmpty then
+                    [| ackMsg |]
+                else
+                    [| ackMsg; buildCapsAssistantMessage assistantId userId capsFiles fp |]
+
             Array.concat [| [| userMsg |]; assistantMsgs; existingStripped |]

@@ -4,7 +4,8 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 
 /// Perfect-square test: n > 0 && floor(sqrt(n))^2 == n.
 let isPerfectSquare (n: int) : bool =
-    if n <= 0 then false
+    if n <= 0 then
+        false
     else
         let r = int (System.Math.Sqrt(float n))
         r * r = n
@@ -16,8 +17,7 @@ let scanStartIndex (failureCount: int) (currentIndex: int) : int =
     if isPerfectSquare failureCount then 0 else currentIndex
 
 /// Safe model lookup by zero-based index.
-let selectModel (chain: FallbackChain) (index: int) : FallbackModel option =
-    chain |> List.tryItem index
+let selectModel (chain: FallbackChain) (index: int) : FallbackModel option = chain |> List.tryItem index
 
 /// Update FailureCount after a scan round completes.
 ///   n' < n  → 0          (found a model earlier in the chain; fresh start)

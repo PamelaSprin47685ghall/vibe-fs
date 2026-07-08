@@ -45,22 +45,33 @@ let private reviseNoFeedback = "No feedback provided."
 
 let formatReviewVerdictMarkdown (verdict: Verdict) (feedback: string) : string =
     let trimmedFeedback (f: string) = (if isNull f then "" else f).Trim()
+
     match verdict with
     | Perfect ->
         let f = trimmedFeedback feedback
         if f = "" then "PERFECT" else "PERFECT: " + f
     | Revise ->
         let f = trimmedFeedback feedback
-        if f = "" then "REVISE: " + reviseNoFeedback else "REVISE: " + f
+
+        if f = "" then
+            "REVISE: " + reviseNoFeedback
+        else
+            "REVISE: " + f
 
 let parseReviewReportMarkdown (markdown: string) : ReviewResult =
     let trimmed = (if isNull markdown then "" else markdown).Trim()
     let upper = trimmed.ToUpperInvariant()
+
     let extractAfterColon () =
         match trimmed.IndexOf(':') with
         | i when i >= 0 -> trimmed.Substring(i + 1).Trim()
         | _ -> ""
-    if upper = "PERFECT" then ReviewResult.Accepted ""
-    elif upper.StartsWith "PERFECT" then ReviewResult.Accepted(extractAfterColon ())
-    elif upper.StartsWith "REVISE" then ReviewResult.NeedsRevision(extractAfterColon ())
-    else ReviewResult.Terminated
+
+    if upper = "PERFECT" then
+        ReviewResult.Accepted ""
+    elif upper.StartsWith "PERFECT" then
+        ReviewResult.Accepted(extractAfterColon ())
+    elif upper.StartsWith "REVISE" then
+        ReviewResult.NeedsRevision(extractAfterColon ())
+    else
+        ReviewResult.Terminated

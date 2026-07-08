@@ -2,12 +2,12 @@ module Wanxiangshu.Shell.FallbackRuntimeState
 
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
-let private freshState : SessionFallbackState =
-    { Phase         = FallbackPhase.Idle
-      CurrentIndex  = 0
-      FailureCount  = 0
-      Cancelled     = false
-      TaskComplete  = false
+let private freshState: SessionFallbackState =
+    { Phase = FallbackPhase.Idle
+      CurrentIndex = 0
+      FailureCount = 0
+      Cancelled = false
+      TaskComplete = false
       ContinueCount = 0 }
 
 type FallbackRuntimeState() =
@@ -23,11 +23,15 @@ type FallbackRuntimeState() =
         | Some arr ->
             let copy = arr.ToArray()
             arr.Clear()
+
             for cb in copy do
-                try cb () with _ -> ()
+                try
+                    cb ()
+                with _ ->
+                    ()
         | None -> ()
 
-    member _.OnStateChanged(sessionID: string) (callback: unit -> unit) : unit =
+    member _.OnStateChanged (sessionID: string) (callback: unit -> unit) : unit =
         let list =
             match Map.tryFind sessionID listeners with
             | Some arr -> arr
@@ -35,10 +39,10 @@ type FallbackRuntimeState() =
                 let arr = ResizeArray<unit -> unit>()
                 listeners <- Map.add sessionID arr listeners
                 arr
+
         list.Add(callback)
 
-    member _.HasState(sessionID: string) : bool =
-        Map.containsKey sessionID states
+    member _.HasState(sessionID: string) : bool = Map.containsKey sessionID states
 
     member _.GetOrCreateState(sessionID: string) : SessionFallbackState =
         match Map.tryFind sessionID states with
@@ -47,17 +51,17 @@ type FallbackRuntimeState() =
             states <- Map.add sessionID freshState states
             freshState
 
-    member _.UpdateState(sessionID: string) (state: SessionFallbackState) : unit =
+    member _.UpdateState (sessionID: string) (state: SessionFallbackState) : unit =
         states <- Map.add sessionID state states
         triggerStateChanged sessionID
 
     member _.GetChain(sessionID: string) : FallbackChain =
         Map.tryFind sessionID chains |> Option.defaultValue []
 
-    member _.SetChain(sessionID: string) (chain: FallbackChain) : unit =
+    member _.SetChain (sessionID: string) (chain: FallbackChain) : unit =
         chains <- Map.add sessionID chain chains
 
-    member _.SetAgentName(sessionID: string) (agentName: string) : unit =
+    member _.SetAgentName (sessionID: string) (agentName: string) : unit =
         agents <- Map.add sessionID agentName agents
 
     member _.GetAgentName(sessionID: string) : string =
@@ -66,15 +70,14 @@ type FallbackRuntimeState() =
     member _.GetBusyCount(sessionID: string) : int =
         Map.tryFind sessionID busyCounts |> Option.defaultValue 0
 
-    member _.SetBusyCount(sessionID: string) (n: int) : unit =
+    member _.SetBusyCount (sessionID: string) (n: int) : unit =
         busyCounts <- Map.add sessionID n busyCounts
 
-    member _.SetConsumed(sessionID: string) (value: bool) : unit =
+    member _.SetConsumed (sessionID: string) (value: bool) : unit =
         consumed <- Map.add sessionID value consumed
         triggerStateChanged sessionID
 
-    member _.GetConsumed(sessionID: string) : bool option =
-        Map.tryFind sessionID consumed
+    member _.GetConsumed(sessionID: string) : bool option = Map.tryFind sessionID consumed
 
     member _.ClearConsumed(sessionID: string) : unit =
         consumed <- Map.remove sessionID consumed

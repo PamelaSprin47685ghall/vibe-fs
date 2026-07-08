@@ -10,32 +10,43 @@ open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Kernel.FuzzyQuery
 open Wanxiangshu.Kernel.FuzzyPath
 open Wanxiangshu.Shell.RuntimeScope
+
 module Livelock = Wanxiangshu.Shell.LivelockGuard
 module Dyn = Wanxiangshu.Shell.Dyn
 
 // ── FuzzyFinderShell.resultFromRaw ──────────────────────────────────────────
 
 let resultFromRawOk () =
-    let fakeObj = createObj [ "fileSearch", box (fun () -> ()); "grep", box (fun () -> ()); "destroy", box (fun () -> ()); "isDestroyed", box false ]
+    let fakeObj =
+        createObj
+            [ "fileSearch", box (fun () -> ())
+              "grep", box (fun () -> ())
+              "destroy", box (fun () -> ())
+              "isDestroyed", box false ]
+
     let raw = createObj [ "ok", box true; "value", box fakeObj ]
+
     match resultFromRaw raw with
     | Ok _ -> check "resultFromRaw ok=true → Ok" true
     | Error _ -> check "resultFromRaw ok=true → Ok" false
 
 let resultFromRawErrMsg () =
     let raw = createObj [ "ok", box false; "error", box "boom" ]
+
     match resultFromRaw raw with
     | Error msg -> equal "resultFromRaw err msg" "boom" msg
     | Ok _ -> check "resultFromRaw err msg" false
 
 let resultFromRawErrNull () =
     let raw = createObj [ "ok", box false; "error", box null ]
+
     match resultFromRaw raw with
     | Error msg -> equal "resultFromRaw err null" "createFinder failed" msg
     | Ok _ -> check "resultFromRaw err null" false
 
 let resultFromRawErrMissing () =
     let raw = createObj [ "ok", box false ]
+
     match resultFromRaw raw with
     | Error msg -> equal "resultFromRaw err missing" "createFinder failed" msg
     | Ok _ -> check "resultFromRaw err missing" false
@@ -56,31 +67,94 @@ let finderCacheDestroyAll () =
 
 let grepStateEmptyPattern () =
     let store = createTypedIteratorStore 100
-    let opts : SearchOptions = { cwd = "/tmp"; scopeId = "s1"; store = Some store; finderCache = FinderCache() }
-    let params' : FuzzyGrepParams = { pattern = []; path = None; exclude = []; searchIgnored = None; caseSensitive = None; context = None; limit = None; iterator = None }
+
+    let opts: SearchOptions =
+        { cwd = "/tmp"
+          scopeId = "s1"
+          store = Some store
+          finderCache = FinderCache() }
+
+    let params': FuzzyGrepParams =
+        { pattern = []
+          path = None
+          exclude = []
+          searchIgnored = None
+          caseSensitive = None
+          context = None
+          limit = None
+          iterator = None }
+
     match resolveGrepIteratorState params' opts with
     | Error msg -> equal "empty pattern error" "pattern is required on the first call" msg
     | Ok _ -> check "empty pattern → Error" false
 
 let grepStateWildcardOnly () =
     let store = createTypedIteratorStore 100
-    let opts : SearchOptions = { cwd = "/tmp"; scopeId = "s1"; store = Some store; finderCache = FinderCache() }
-    let params' : FuzzyGrepParams = { pattern = [ "*" ]; path = None; exclude = []; searchIgnored = None; caseSensitive = None; context = None; limit = None; iterator = None }
+
+    let opts: SearchOptions =
+        { cwd = "/tmp"
+          scopeId = "s1"
+          store = Some store
+          finderCache = FinderCache() }
+
+    let params': FuzzyGrepParams =
+        { pattern = [ "*" ]
+          path = None
+          exclude = []
+          searchIgnored = None
+          caseSensitive = None
+          context = None
+          limit = None
+          iterator = None }
+
     match resolveGrepIteratorState params' opts with
     | Error msg -> check "wildcard error mentions matches everything" (msg.Contains "matches everything")
     | Ok _ -> check "wildcard only → Error" false
 
 let grepStateNoStore () =
-    let opts : SearchOptions = { cwd = "/tmp"; scopeId = "s1"; store = None; finderCache = FinderCache() }
-    let params' : FuzzyGrepParams = { pattern = [ "foo" ]; path = None; exclude = []; searchIgnored = None; caseSensitive = None; context = None; limit = None; iterator = None }
+    let opts: SearchOptions =
+        { cwd = "/tmp"
+          scopeId = "s1"
+          store = None
+          finderCache = FinderCache() }
+
+    let params': FuzzyGrepParams =
+        { pattern = [ "foo" ]
+          path = None
+          exclude = []
+          searchIgnored = None
+          caseSensitive = None
+          context = None
+          limit = None
+          iterator = None }
+
     match resolveGrepIteratorState params' opts with
-    | Error msg -> equal "no store error" "FuzzySearch requires SearchOptions.store; inject RuntimeScope.IteratorStore from the tool registration path" msg
+    | Error msg ->
+        equal
+            "no store error"
+            "FuzzySearch requires SearchOptions.store; inject RuntimeScope.IteratorStore from the tool registration path"
+            msg
     | Ok _ -> check "no store → Error" false
 
 let grepStateValid () =
     let store = createTypedIteratorStore 100
-    let opts : SearchOptions = { cwd = "/tmp"; scopeId = "s1"; store = Some store; finderCache = FinderCache() }
-    let params' : FuzzyGrepParams = { pattern = [ "let" ]; path = None; exclude = []; searchIgnored = None; caseSensitive = Some false; context = Some 2; limit = Some 30; iterator = None }
+
+    let opts: SearchOptions =
+        { cwd = "/tmp"
+          scopeId = "s1"
+          store = Some store
+          finderCache = FinderCache() }
+
+    let params': FuzzyGrepParams =
+        { pattern = [ "let" ]
+          path = None
+          exclude = []
+          searchIgnored = None
+          caseSensitive = Some false
+          context = Some 2
+          limit = Some 30
+          iterator = None }
+
     match resolveGrepIteratorState params' opts with
     | Ok state ->
         equal "query present" true (state.core.query <> "")
@@ -93,9 +167,29 @@ let grepStateValid () =
 // ── resolveResult ────────────────────────────────────────────────────────────
 
 let resolveResultFields () =
-    let item1 = createObj [ "relativePath", box "a.fs"; "lineNumber", box 1; "lineContent", box "let x = 1"; "contextBefore", box ([||] : obj array); "contextAfter", box ([||] : obj array) ]
-    let item2 = createObj [ "relativePath", box "b.fs"; "lineNumber", box 3; "lineContent", box "let y = 2"; "contextBefore", box ([||] : obj array); "contextAfter", box ([||] : obj array) ]
-    let value = createObj [ "items", box [| item1; item2 |]; "totalMatched", box 2; "regexFallbackError", box null; "nextCursor", box "iter-1" ]
+    let item1 =
+        createObj
+            [ "relativePath", box "a.fs"
+              "lineNumber", box 1
+              "lineContent", box "let x = 1"
+              "contextBefore", box ([||]: obj array)
+              "contextAfter", box ([||]: obj array) ]
+
+    let item2 =
+        createObj
+            [ "relativePath", box "b.fs"
+              "lineNumber", box 3
+              "lineContent", box "let y = 2"
+              "contextBefore", box ([||]: obj array)
+              "contextAfter", box ([||]: obj array) ]
+
+    let value =
+        createObj
+            [ "items", box [| item1; item2 |]
+              "totalMatched", box 2
+              "regexFallbackError", box null
+              "nextCursor", box "iter-1" ]
+
     let raw = createObj [ "value", box value ]
     let resolved = resolveResult raw
     equal "matches count" 2 resolved.matches.Length
@@ -148,12 +242,27 @@ let errorMsgNoError () =
 
 let resolveStoreSome () =
     let store = createTypedIteratorStore 10
-    let opts : SearchOptions = { cwd = "/"; scopeId = "g"; store = Some store; finderCache = FinderCache() }
-    match resolveStore opts with Ok s -> check "resolveStore Some ok" true | Error _ -> check "resolveStore Some ok" false
+
+    let opts: SearchOptions =
+        { cwd = "/"
+          scopeId = "g"
+          store = Some store
+          finderCache = FinderCache() }
+
+    match resolveStore opts with
+    | Ok s -> check "resolveStore Some ok" true
+    | Error _ -> check "resolveStore Some ok" false
 
 let resolveStoreNone () =
-    let opts : SearchOptions = { cwd = "/"; scopeId = "g"; store = None; finderCache = FinderCache() }
-    match resolveStore opts with Error _ -> check "resolveStore None → Error" true | Ok _ -> check "resolveStore None → Error" false
+    let opts: SearchOptions =
+        { cwd = "/"
+          scopeId = "g"
+          store = None
+          finderCache = FinderCache() }
+
+    match resolveStore opts with
+    | Error _ -> check "resolveStore None → Error" true
+    | Ok _ -> check "resolveStore None → Error" false
 
 // ── LivelockGuard ─────────────────────────────────────────────────────────────
 

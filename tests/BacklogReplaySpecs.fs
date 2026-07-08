@@ -20,16 +20,21 @@ let replayBacklogOpencodeFallsBackToCapturedReportWhenInputMissing () =
     let s = scope ()
     s.Projection.CaptureReport(Opencode, "fallback-c1", "captured report")
     let input = box (createObj [ "todos", box [||] ])
+
     let msgs =
-        [ { info = { mkInfo "m1" Assistant with sessionID = "test" }
+        [ { info =
+              { mkInfo "m1" Assistant with
+                  sessionID = "test" }
             parts =
               [ ToolPart(
-                  todoWriteToolNameDefault,
-                  "fallback-c1",
-                  Some(mkState "completed" "Todos updated." input),
-                  null) ]
+                    todoWriteToolNameDefault,
+                    "fallback-c1",
+                    Some(mkState "completed" "Todos updated." input),
+                    null
+                ) ]
             source = Native
             raw = null } ]
+
     let backlog = replayBacklogFor Opencode s msgs
     check "opencode replay: tryGetReport fallback when input has no report" (backlog.Length = 1)
     check "opencode replay: captured report preserved" (backlog.[0].ahaMoments = "captured report")
@@ -38,30 +43,44 @@ let replayBacklogMuxFallsBackToCapturedReportWhenInputMissing () =
     let s = scope ()
     s.Projection.CaptureReport(Mux, "fallback-m1", "captured mux report")
     let input = box (createObj [ "todos", box [||] ])
+
     let msgs =
-        [ { info = { mkInfo "m1" Assistant with sessionID = "test" }
+        [ { info =
+              { mkInfo "m1" Assistant with
+                  sessionID = "test" }
             parts =
-              [ ToolPart(
-                  todoWriteToolName Mux,
-                  "fallback-m1",
-                  Some(mkState "completed" "Todos updated." input),
-                  null) ]
+              [ ToolPart(todoWriteToolName Mux, "fallback-m1", Some(mkState "completed" "Todos updated." input), null) ]
             source = Native
             raw = null } ]
+
     let backlog = replayBacklogFor Mux s msgs
     check "mux replay: tryGetReport fallback when input has no report" (backlog.Length = 1)
     check "mux replay: captured report preserved" (backlog.[0].ahaMoments = "captured mux report")
 
 let replayBacklogOpencodeDoesNotMergeConsecutiveTodoWrite () =
     let s = scope ()
-    let msgs = [ todoWriteMsg "m1" "c1" "W1"; todoWriteMsg "m2" "c2" "W2"; todoWriteMsg "m3" "c3" "W3" ]
+
+    let msgs =
+        [ todoWriteMsg "m1" "c1" "W1"
+          todoWriteMsg "m2" "c2" "W2"
+          todoWriteMsg "m3" "c3" "W3" ]
+
     let backlog = replayBacklogFor Opencode s msgs
     check "opencode: each todowrite is one backlog entry" (backlog.Length = 3)
-    check "opencode: reports not merged" (backlog.[0].ahaMoments = "W1" && backlog.[1].ahaMoments = "W2" && backlog.[2].ahaMoments = "W3")
+
+    check
+        "opencode: reports not merged"
+        (backlog.[0].ahaMoments = "W1"
+         && backlog.[1].ahaMoments = "W2"
+         && backlog.[2].ahaMoments = "W3")
 
 let replayBacklogTest () =
     let s = scope ()
-    let msgs = [ todoWriteMsg "m1" "c1" "Implemented parser"; todoWriteMsg "m2" "c2" "Fixed critical bug" ]
+
+    let msgs =
+        [ todoWriteMsg "m1" "c1" "Implemented parser"
+          todoWriteMsg "m2" "c2" "Fixed critical bug" ]
+
     let backlog = replayBacklog s msgs
     check "replay: backlog count" (backlog.Length = 2)
     check "replay: entry 1 report" (backlog.[0].ahaMoments = "Implemented parser")

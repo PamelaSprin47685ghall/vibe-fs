@@ -11,7 +11,11 @@ let pluginShape (p: obj) =
     check "plugin.event" (typeIs (get p "event") "function")
     check "plugin.mcp" (typeIs (get p "mcp") "object")
     check "plugin.tool.execute.after" (typeIs (get p "tool.execute.after") "function")
-    check "plugin.experimental.chat.messages.transform" (typeIs (get p "experimental.chat.messages.transform") "function")
+
+    check
+        "plugin.experimental.chat.messages.transform"
+        (typeIs (get p "experimental.chat.messages.transform") "function")
+
     check "plugin.experimental.chat.system.transform" (typeIs (get p "experimental.chat.system.transform") "function")
     check "plugin.command.execute.before" (typeIs (get p "command.execute.before") "function")
 

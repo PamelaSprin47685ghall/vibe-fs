@@ -31,7 +31,10 @@ type private ReviewStoreState =
       Effects: SessionEffects }
 
 let createReviewStore () : ReviewStore =
-    let mutable state : ReviewStoreState = { Registry = emptyRegistry; Effects = emptyEffects }
+    let mutable state: ReviewStoreState =
+        { Registry = emptyRegistry
+          Effects = emptyEffects }
+
     let mutable syncedSessions = Set.empty<string>
 
     let allDescendantIds sessionId =
@@ -39,62 +42,116 @@ let createReviewStore () : ReviewStore =
             match Map.tryFind id state.Registry with
             | None -> [ id ]
             | Some session -> id :: (session.childIds |> List.collect collect)
+
         collect sessionId
 
     { new ReviewStore with
         member _.activateReview(sessionID, task, createdAt) =
-            state <- { state with Registry = reduce state.Registry (RegistryAction.Activate(sessionID, task, createdAt)) }
+            state <-
+                { state with
+                    Registry = reduce state.Registry (RegistryAction.Activate(sessionID, task, createdAt)) }
+
         member _.deactivateReview(sessionID) =
             let nextEffects = disposeSessionTree state.Effects (allDescendantIds sessionID)
-            state <- { state with Effects = nextEffects; Registry = reduce state.Registry (RegistryAction.Deactivate sessionID) }
+
+            state <-
+                { state with
+                    Effects = nextEffects
+                    Registry = reduce state.Registry (RegistryAction.Deactivate sessionID) }
+
         member _.clearReviewSessions() =
-            let nextEffects = disposeSessionTree state.Effects (Map.keys state.Effects.pendingResolutions |> List.ofSeq)
-            state <- { state with Effects = nextEffects; Registry = emptyRegistry }
+            let nextEffects =
+                disposeSessionTree state.Effects (Map.keys state.Effects.pendingResolutions |> List.ofSeq)
+
+            state <-
+                { state with
+                    Effects = nextEffects
+                    Registry = emptyRegistry }
+
         member _.tryLockReview(sessionID) =
-            if not (canTransition state.Registry sessionID (ReviewCommand.Lock sessionID)) then false
+            if not (canTransition state.Registry sessionID (ReviewCommand.Lock sessionID)) then
+                false
             else
-                state <- { state with Registry = reduce state.Registry (RegistryAction.Lock(sessionID, sessionID)) }
+                state <-
+                    { state with
+                        Registry = reduce state.Registry (RegistryAction.Lock(sessionID, sessionID)) }
+
                 true
+
         member _.unlockReview(sessionID) =
-            state <- { state with Registry = reduce state.Registry (RegistryAction.Unlock sessionID) }
+            state <-
+                { state with
+                    Registry = reduce state.Registry (RegistryAction.Unlock sessionID) }
+
         member _.setPendingReview(sessionID, resolve) =
-            state <- { state with Effects = setPending state.Effects sessionID resolve }
+            state <-
+                { state with
+                    Effects = setPending state.Effects sessionID resolve }
+
         member _.setAbortSuppressor(sessionID, suppress) =
-            state <- { state with Effects = { state.Effects with abortSuppressors = Map.add sessionID suppress state.Effects.abortSuppressors } }
+            state <-
+                { state with
+                    Effects =
+                        { state.Effects with
+                            abortSuppressors = Map.add sessionID suppress state.Effects.abortSuppressors } }
+
         member _.resolvePendingReview(sessionID, result) =
             let targetID =
-                if Map.containsKey sessionID state.Effects.pendingResolutions then sessionID
+                if Map.containsKey sessionID state.Effects.pendingResolutions then
+                    sessionID
                 else
                     let descendants = allDescendantIds sessionID
+
                     descendants
                     |> List.tryFind (fun id -> Map.containsKey id state.Effects.pendingResolutions)
                     |> Option.defaultValue sessionID
+
             let nextRegistry = reduce state.Registry (actionFor targetID result)
             let nextEffects, fired = resolvePending state.Effects targetID result
-            state <- { state with Registry = nextRegistry; Effects = nextEffects }
+
+            state <-
+                { state with
+                    Registry = nextRegistry
+                    Effects = nextEffects }
+
             fired
+
         member _.getReviewTask(sessionID) = taskOf state.Registry sessionID
         member _.getReviewState(sessionID) = stateOf state.Registry sessionID
+
         member _.addChild(parentID, childID) =
-            state <- { state with Registry = reduce state.Registry (RegistryAction.AddChild(parentID, childID)) }
-        member _.getPendingReviewIds() = Map.keys state.Effects.pendingResolutions |> List.ofSeq
+            state <-
+                { state with
+                    Registry = reduce state.Registry (RegistryAction.AddChild(parentID, childID)) }
+
+        member _.getPendingReviewIds() =
+            Map.keys state.Effects.pendingResolutions |> List.ofSeq
+
         member _.getActiveSessionIds() =
             state.Registry
             |> Map.filter (fun _ s -> Wanxiangshu.Kernel.ReviewSession.StateMachine.isActive s.state)
             |> Map.keys
             |> List.ofSeq
+
         member _.hasSynced(sessionID) = Set.contains sessionID syncedSessions
-        member _.markSynced(sessionID) = syncedSessions <- Set.add sessionID syncedSessions }
+
+        member _.markSynced(sessionID) =
+            syncedSessions <- Set.add sessionID syncedSessions }
 
 let syncReviewProjection (store: ReviewStore) (sessionID: string) (task: string option) : unit =
-    if sessionID = "" then ()
+    if sessionID = "" then
+        ()
     else
         match task with
         | Some nextTask ->
-            if store.getReviewTask sessionID <> Some nextTask || store.getReviewState sessionID |> Option.isNone then
+            if
+                store.getReviewTask sessionID <> Some nextTask
+                || store.getReviewState sessionID |> Option.isNone
+            then
                 if store.getReviewState sessionID |> Option.isSome then
                     store.deactivateReview sessionID
-                store.activateReview(sessionID, nextTask, getTimestampMs())
+
+                store.activateReview (sessionID, nextTask, getTimestampMs ())
         | None ->
             if store.getReviewState sessionID |> Option.isSome then
                 store.deactivateReview sessionID

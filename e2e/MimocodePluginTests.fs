@@ -42,20 +42,25 @@ let private dynIsArr (o: obj) = isArray o
 let private dynTypeIs (o: obj) (t: string) = typeIs o t
 let private dynStr (o: obj) (k: string) = str o k
 
-let private warnTddValue = "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"
+let private warnTddValue =
+    "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"
+
 let private warnValue = "it-is-not-possible-to-do-it-using-other-tools"
 
 let runAll (args: string array) : JS.Promise<int> =
     promise {
         clearFailuresForRun ()
-        let! apiObj = startHarness (createObj ["variant", box "mimocode"])
+        let! apiObj = startHarness (createObj [ "variant", box "mimocode" ])
         let harness = harnessFromObj apiObj
         let plugin = harness.getPlugin ()
 
         let mutable ok = 0
+
         let chk label cond =
             check label cond
-            if cond then ok <- ok + 1
+
+            if cond then
+                ok <- ok + 1
 
         // --- 1. Plugin identity -----------------------------------------------
         chk "mimo.id" (dynStr plugin "id" = "wanxiangshu")
@@ -74,6 +79,7 @@ let runAll (args: string array) : JS.Promise<int> =
         let! taskDef = harness.runToolDefinition "task"
         let taskSchema = dynGet taskDef "jsonSchema"
         chk "mimo.task.jsonSchema.notNull" (not (dynIsNull taskSchema))
+
         if not (dynIsNull taskSchema) then
             let taskProps = dynGet taskSchema "properties"
             chk "mimo.task.hasAhaMoments" (not (dynIsNull (dynGet taskProps "ahaMoments")))
@@ -85,84 +91,118 @@ let runAll (args: string array) : JS.Promise<int> =
             chk "mimo.task.hasTodos" (not (dynIsNull (dynGet taskProps "todos")))
             // Check ahaMoments min=1024
             let ahaField = dynGet taskProps "ahaMoments"
-            let ahaMin = if dynIsNull ahaField then 0 else unbox<int> (dynGet ahaField "minLength")
+
+            let ahaMin =
+                if dynIsNull ahaField then
+                    0
+                else
+                    unbox<int> (dynGet ahaField "minLength")
+
             chk "mimo.task.ahaMin1024" (ahaMin >= 1024)
             // Check required includes ahaMoments
             let req = dynGet taskSchema "required"
+
             if not (dynIsNull req) && dynIsArr req then
-                let reqArr : string[] = unbox req
+                let reqArr: string[] = unbox req
                 chk "mimo.task.requiredIncludesAhaMoments" (Array.contains "ahaMoments" reqArr)
             else
                 chk "mimo.task.requiredIncludesAhaMoments" false
 
         // --- 4. task execute: missing ahaMoments -----------------------------
         let taskArgsMissing =
-            createObj [
-                "todos", box [| box {| content = "do something"; status = "pending"; priority = "high" |} |]
-                "select_methodology", box [| "first_principles" |]
-            ]
+            createObj
+                [ "todos",
+                  box
+                      [| box
+                             {| content = "do something"
+                                status = "pending"
+                                priority = "high" |} |]
+                  "select_methodology", box [| "first_principles" |] ]
+
         let! rMissing = harness.executePluginTool "task" taskArgsMissing (createEmpty ())
         chk "mimo.task.missingAha" (rMissing.Contains "ahaMoments")
 
         // --- 5. task execute: ahaMoments too short --------------------------
         let exactly1024 = System.String('x', 1024)
+
         let taskArgsShort =
-            createObj [
-                "ahaMoments", box "short"
-                "changesAndReasons", box exactly1024
-                "gotchas", box exactly1024
-                "lessonsAndConventions", box exactly1024
-                "plan", box exactly1024
-                "todos", box [| box {| content = "do something"; status = "pending"; priority = "high" |} |]
-                "select_methodology", box [| "first_principles" |]
-            ]
+            createObj
+                [ "ahaMoments", box "short"
+                  "changesAndReasons", box exactly1024
+                  "gotchas", box exactly1024
+                  "lessonsAndConventions", box exactly1024
+                  "plan", box exactly1024
+                  "todos",
+                  box
+                      [| box
+                             {| content = "do something"
+                                status = "pending"
+                                priority = "high" |} |]
+                  "select_methodology", box [| "first_principles" |] ]
+
         let! rShort = harness.executePluginTool "task" taskArgsShort (createEmpty ())
         chk "mimo.task.shortAha" (rShort.Contains "min 1024")
 
         // --- 6. task execute: all fields satisfied --------------------------
         let taskArgsFull =
-            createObj [
-                "ahaMoments", box exactly1024
-                "changesAndReasons", box exactly1024
-                "gotchas", box exactly1024
-                "lessonsAndConventions", box exactly1024
-                "plan", box exactly1024
-                "todos", box [| box {| content = "do something"; status = "pending"; priority = "high" |} |]
-                "select_methodology", box [| "first_principles" |]
-            ]
+            createObj
+                [ "ahaMoments", box exactly1024
+                  "changesAndReasons", box exactly1024
+                  "gotchas", box exactly1024
+                  "lessonsAndConventions", box exactly1024
+                  "plan", box exactly1024
+                  "todos",
+                  box
+                      [| box
+                             {| content = "do something"
+                                status = "pending"
+                                priority = "high" |} |]
+                  "select_methodology", box [| "first_principles" |] ]
+
         let! rFull = harness.executePluginTool "task" taskArgsFull (createEmpty ())
         chk "mimo.task.success" (rFull.Contains "hint:")
 
         // --- 7. task execute: missing select_methodology ---------------------
         let taskArgsNoMeth =
-            createObj [
-                "ahaMoments", box exactly1024
-                "changesAndReasons", box exactly1024
-                "gotchas", box exactly1024
-                "lessonsAndConventions", box exactly1024
-                "plan", box exactly1024
-                "todos", box [| box {| content = "do something"; status = "pending"; priority = "high" |} |]
-            ]
+            createObj
+                [ "ahaMoments", box exactly1024
+                  "changesAndReasons", box exactly1024
+                  "gotchas", box exactly1024
+                  "lessonsAndConventions", box exactly1024
+                  "plan", box exactly1024
+                  "todos",
+                  box
+                      [| box
+                             {| content = "do something"
+                                status = "pending"
+                                priority = "high" |} |] ]
+
         let! rNoMeth = harness.executePluginTool "task" taskArgsNoMeth (createEmpty ())
         chk "mimo.task.noMethodology" (rNoMeth.Contains "select_methodology")
 
         // --- 8. task execute: empty todo content ----------------------------
         let taskArgsEmptyTodo =
-            createObj [
-                "ahaMoments", box exactly1024
-                "changesAndReasons", box exactly1024
-                "gotchas", box exactly1024
-                "lessonsAndConventions", box exactly1024
-                "plan", box exactly1024
-                "todos", box [| box {| content = ""; status = "pending"; priority = "high" |} |]
-                "select_methodology", box [| "first_principles" |]
-            ]
+            createObj
+                [ "ahaMoments", box exactly1024
+                  "changesAndReasons", box exactly1024
+                  "gotchas", box exactly1024
+                  "lessonsAndConventions", box exactly1024
+                  "plan", box exactly1024
+                  "todos",
+                  box
+                      [| box
+                             {| content = ""
+                                status = "pending"
+                                priority = "high" |} |]
+                  "select_methodology", box [| "first_principles" |] ]
+
         let! rEmptyTodo = harness.executePluginTool "task" taskArgsEmptyTodo (createEmpty ())
         chk "mimo.task.emptyTodoContent" (rEmptyTodo.Contains "content")
 
         // --- 9. coder schema has warn_tdd -----------------------------------
         let! coderDef = harness.runToolDefinition "coder"
         let coderJsonSchema = dynGet coderDef "jsonSchema"
+
         if not (dynIsNull coderJsonSchema) then
             let coderProps = dynGet coderJsonSchema "properties"
             chk "mimo.coder.hasWarnTdd" (not (dynIsNull (dynGet coderProps "warn_tdd")))
@@ -171,13 +211,15 @@ let runAll (args: string array) : JS.Promise<int> =
 
         // --- 10. executor echo ----------------------------------------------
         let execArgs =
-            createObj [ "program", box "echo hello-mimo"
-                        "language", box "shell"
-                        "mode", box "ro"
-                        "timeout_type", box "short"
-                        "what_to_summarize", box "keep stdout only"
-                        "warn_tdd", box warnTddValue
-                        "warn", box warnValue ]
+            createObj
+                [ "program", box "echo hello-mimo"
+                  "language", box "shell"
+                  "mode", box "ro"
+                  "timeout_type", box "short"
+                  "what_to_summarize", box "keep stdout only"
+                  "warn_tdd", box warnTddValue
+                  "warn", box warnValue ]
+
         let! execResult = harness.runToolWithHooks "executor" execArgs (createEmpty ())
         chk "mimo.executor.echo" (execResult.Contains "hello-mimo")
 
@@ -190,6 +232,7 @@ let runAll (args: string array) : JS.Promise<int> =
         let! loopOutput = harness.runCommandExecuteBefore "loop" "implement mimo feature"
         let loopText = harness.readPartsText loopOutput
         chk "mimo.loop.active" (loopText.Contains "With-Review Mode is active")
+
         if harness.fileExists ".wanxiangshu.ndjson" then
             let eventLog = harness.readFile ".wanxiangshu.ndjson"
             chk "mimo.loop.eventLog" (eventLog.Contains "loop_activated")
@@ -203,42 +246,65 @@ let runAll (args: string array) : JS.Promise<int> =
 
         // --- 14. message transform: caps ------------------------------------
         let textPart = createObj [ "type", box "text"; "text", box "mimo test message" ]
+
         let userInfo =
-            createObj [ "id", box "mimo-user-turn"
-                        "role", box "user"
-                        "agent", box "build"
-                        "sessionID", box harness.sessionId ]
+            createObj
+                [ "id", box "mimo-user-turn"
+                  "role", box "user"
+                  "agent", box "build"
+                  "sessionID", box harness.sessionId ]
+
         let userMsg = createObj [ "info", box userInfo; "parts", box [| textPart |] ]
-        let transformInput = createObj [ "agent", box "build"; "sessionID", box harness.sessionId ]
+
+        let transformInput =
+            createObj [ "agent", box "build"; "sessionID", box harness.sessionId ]
+
         let! transformedOutput = harness.runMessageTransform transformInput [| userMsg |]
-        let messagesOut : obj[] = unbox<obj[]> (dynGet transformedOutput "messages")
+        let messagesOut: obj[] = unbox<obj[]> (dynGet transformedOutput "messages")
         chk "mimo.messageTransform.capsAdded" (messagesOut.Length > 1)
+
         if messagesOut.Length > 1 then
             let firstMsg = messagesOut.[0]
-            let firstParts : obj[] = unbox<obj[]> (dynGet firstMsg "parts")
+            let firstParts: obj[] = unbox<obj[]> (dynGet firstMsg "parts")
+
             let firstText =
-                if firstParts.Length > 0 && dynStr firstParts.[0] "type" = "text"
-                then dynStr firstParts.[0] "text"
-                else ""
+                if firstParts.Length > 0 && dynStr firstParts.[0] "type" = "text" then
+                    dynStr firstParts.[0] "text"
+                else
+                    ""
+
             chk "mimo.messageTransform.capsHasKolmolgorov" (firstText.Contains "# Kolmolgorov 宝典")
 
         // --- 15. system transform: workDir ----------------------------------
         let! systemOutput = harness.runSystemTransform (createEmpty ())
         let systemOut = dynGet systemOutput "system"
-        chk "mimo.systemTransform.hasWorkDir"
-            (not (dynIsNull systemOut) && dynIsArr systemOut
-             && (unbox<obj[]> systemOut |> Array.exists (fun s -> (string s).Contains (harness.workDir))))
+
+        chk
+            "mimo.systemTransform.hasWorkDir"
+            (not (dynIsNull systemOut)
+             && dynIsArr systemOut
+             && (unbox<obj[]> systemOut
+                 |> Array.exists (fun s -> (string s).Contains(harness.workDir))))
 
         // --- 16. config/session.post/session.userQuery.post hooks -----------
-        let configArgs = createObj [ "agent", box (createObj [ "build", box (createObj [ "model", box "test" ]) ]) ]
+        let configArgs =
+            createObj [ "agent", box (createObj [ "build", box (createObj [ "model", box "test" ]) ]) ]
+
         let! _ = harness.runConfigHook configArgs
         chk "mimo.configHook.run" true
 
-        let sessionPostArgs = createObj [ "sessionID", box harness.sessionId; "outcome", box "success"; "error", box "" ]
+        let sessionPostArgs =
+            createObj
+                [ "sessionID", box harness.sessionId
+                  "outcome", box "success"
+                  "error", box "" ]
+
         let! _ = harness.runSessionPost sessionPostArgs
         chk "mimo.sessionPostHook.run" true
 
-        let sessionUserQueryPostArgs = createObj [ "sessionID", box harness.sessionId; "error", box "" ]
+        let sessionUserQueryPostArgs =
+            createObj [ "sessionID", box harness.sessionId; "error", box "" ]
+
         let! _ = harness.runSessionUserQueryPost sessionUserQueryPostArgs
         chk "mimo.sessionUserQueryPostHook.run" true
 
@@ -248,7 +314,11 @@ let runAll (args: string array) : JS.Promise<int> =
 
         // --- 17. event: session.deleted no-throw ---------------------------
         let sessionDeletedEvent =
-            box {| event = {| ``type`` = "session.deleted"; properties = {| sessionID = harness.sessionId |} |} |}
+            box
+                {| event =
+                    {| ``type`` = "session.deleted"
+                       properties = {| sessionID = harness.sessionId |} |} |}
+
         let! _ = harness.fireEvent sessionDeletedEvent
         chk "mimo.event.sessionDeleted.noThrow" true
 

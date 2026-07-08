@@ -17,7 +17,7 @@ type RegistryAction =
 
 type Registry = Map<string, ReviewSession>
 
-let emptyRegistry : Registry = Map.empty
+let emptyRegistry: Registry = Map.empty
 
 let private set registry id session = Map.add id session registry
 
@@ -36,29 +36,30 @@ let private transitionSession registry id command =
 
 let private evictStale registry cutoff : Registry =
     let changed = registry |> Map.exists (fun _ s -> s.createdAt < cutoff)
-    if not changed then registry
-    else registry |> Map.filter (fun _ s -> s.createdAt >= cutoff)
+
+    if not changed then
+        registry
+    else
+        registry |> Map.filter (fun _ s -> s.createdAt >= cutoff)
 
 let reduce (registry: Registry) (action: RegistryAction) : Registry =
     match action with
-    | RegistryAction.Activate (id, task, createdAt) ->
+    | RegistryAction.Activate(id, task, createdAt) ->
         let seed =
             Map.tryFind id registry
             |> Option.defaultValue (empty id createdAt)
             |> withTask task
+
         set registry id (applyCommand seed (ReviewCommand.Activate task))
-    | RegistryAction.Lock (id, reviewerId) ->
-        transitionSession registry id (ReviewCommand.Lock reviewerId)
-    | RegistryAction.Unlock id ->
-        transitionSession registry id ReviewCommand.Unlock
-    | RegistryAction.Accept id ->
-        transitionSession registry id ReviewCommand.Accept
-    | RegistryAction.RequestRevision (id, feedback) ->
-        transitionSessionWithExtra registry id (ReviewCommand.RequestRevision feedback) (fun s -> withFeedback s feedback)
+    | RegistryAction.Lock(id, reviewerId) -> transitionSession registry id (ReviewCommand.Lock reviewerId)
+    | RegistryAction.Unlock id -> transitionSession registry id ReviewCommand.Unlock
+    | RegistryAction.Accept id -> transitionSession registry id ReviewCommand.Accept
+    | RegistryAction.RequestRevision(id, feedback) ->
+        transitionSessionWithExtra registry id (ReviewCommand.RequestRevision feedback) (fun s ->
+            withFeedback s feedback)
     | RegistryAction.Deactivate id -> Map.remove id registry
     | RegistryAction.Evict cutoff -> evictStale registry cutoff
-    | RegistryAction.AddChild (parentId, childId) ->
-        updateSession registry parentId (fun s -> addChild s childId)
+    | RegistryAction.AddChild(parentId, childId) -> updateSession registry parentId (fun s -> addChild s childId)
     | RegistryAction.Clear -> emptyRegistry
 
 let actionFor (id: string) (result: ReviewResult) : RegistryAction =

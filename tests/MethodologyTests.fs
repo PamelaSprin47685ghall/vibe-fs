@@ -12,16 +12,24 @@ let private hintFromTodoOutput (methodologies: string list) =
     match tryParse (todoWriteOutput methodologies false) with
     | Some msg ->
         msg.info
-        |> List.choose (function InfoItem.Hint h -> Some h | _ -> None)
+        |> List.choose (function
+            | InfoItem.Hint h -> Some h
+            | _ -> None)
         |> String.concat " "
     | None -> ""
 
 let todoWriteOutputExact () =
     check "todo envelope: empty methodologies" (hintFromTodoOutput [] = hintTodosUpdated)
-    check "todo envelope: single methodology" (
-        hintFromTodoOutput [ "first_principles" ] = hintMethodologyFollowup "first_principles")
+
+    check
+        "todo envelope: single methodology"
+        (hintFromTodoOutput [ "first_principles" ] = hintMethodologyFollowup "first_principles")
+
     let multi =
-        hintMethodologyFollowup "first_principles" + " " + hintMethodologyFollowup "deduction"
+        hintMethodologyFollowup "first_principles"
+        + " "
+        + hintMethodologyFollowup "deduction"
+
     check "todo envelope: multiple methodologies" (hintFromTodoOutput [ "first_principles"; "deduction" ] = multi)
 
 let enumCount () =
@@ -37,6 +45,7 @@ let catalogContainsKeyphrase () =
 let registryEntriesWellFormed () =
     check "registry: 54 entries" (allEntries.Value.Length = 54)
     check "registry: enum count matches entries" (enumValues.Value.Length = allEntries.Value.Length)
+
     allEntries.Value
     |> List.iter (fun e ->
         check ("entry has shortDefinition " + e.methodologyId) (e.shortDefinition <> "")
@@ -44,6 +53,7 @@ let registryEntriesWellFormed () =
 
 let unifiedNoteDescriptionContainsAll () =
     check "unified note description non-empty" (unifiedNoteDescription.Value.Length > 0)
+
     for e in allEntries.Value do
         check ("unified note contains " + e.methodologyId) (unifiedNoteDescription.Value.Contains(e.methodologyId))
 

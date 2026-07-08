@@ -3,6 +3,7 @@ module Wanxiangshu.Omp.Codec
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Omp.Schema
+
 module Dyn = Wanxiangshu.Shell.Dyn
 
 [<Erase>]
@@ -61,19 +62,22 @@ let errorResult (text: string) : ToolResult =
       isError = Some true
       display = None }
 
-let asErrorResult (error: obj) : ToolResult =
-    errorResult (string error)
+let asErrorResult (error: obj) : ToolResult = errorResult (string error)
 
 let getSessionIdFromContext (ctxObj: obj) : string option =
-    if Dyn.isNullish ctxObj then None
+    if Dyn.isNullish ctxObj then
+        None
     else
         let sm = Dyn.get ctxObj "sessionManager"
-        if Dyn.isNullish sm then None
+
+        if Dyn.isNullish sm then
+            None
         else
             let smObj = box sm
+
             if Dyn.typeIs (Dyn.get smObj "getSessionId") "function" then
-                let id : obj = smObj?getSessionId()
-                if Dyn.isNullish id then None else Some (string id)
+                let id: obj = smObj?getSessionId ()
+                if Dyn.isNullish id then None else Some(string id)
             else
                 let sid = Dyn.str smObj "sessionId"
                 if sid = "" then None else Some sid

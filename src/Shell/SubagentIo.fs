@@ -13,7 +13,7 @@ type SubagentAiSettings =
       ThinkingLevel: string option
       Variant: string option }
 
-let emptySettings : SubagentAiSettings =
+let emptySettings: SubagentAiSettings =
     { ModelString = None
       ThinkingLevel = None
       Variant = None }
@@ -34,12 +34,13 @@ let firstString (ctx: obj) (keys: string list) : string option =
     keys
     |> List.tryPick (fun key ->
         let v = Dyn.get ctx key
-        if Dyn.isNullish v then None else Some (string v))
+        if Dyn.isNullish v then None else Some(string v))
 
 /// Get the abort signal from a host `context`.  Opencode exposes it as
 /// `context.abort`; callers fall through to null on hosts that don't.
 let getAbortSignal (context: obj) : obj =
-    if Dyn.isNullish context then null
+    if Dyn.isNullish context then
+        null
     else
         let abort = Dyn.get context "abort"
         if Dyn.isNullish abort then null else abort
@@ -53,17 +54,18 @@ let extractToolContext (context: obj) (pluginDirectory: string) : ToolContext =
         match firstString context [ "directory"; "cwd"; "workspaceDir"; "workspace_dir"; "workingDirectory" ] with
         | Some s when s <> "" -> s
         | _ -> pluginDirectory
+
     let sessionID =
         match firstString context [ "sessionID"; "sessionId"; "session_id" ] with
         | Some s when s <> "" -> s
         | _ -> ""
+
     { Directory = directory
       SessionID = sessionID
       AbortSignal = getAbortSignal context }
 
 /// Dynamically invoke a method on `target`, awaiting the resulting promise.
-let invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> =
-    unbox (target?(method)(arg))
+let invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
 
 let noOutputText = "(no output)"
 let abortedPrefix = "(aborted)"
@@ -75,7 +77,8 @@ let noOutputMessage () : string = noOutputText
 let abortedPrefixMessage () : string = abortedPrefix
 
 /// Format a single text part for the host's wire format.
-let textPart (text: string) : obj = box (createObj [ "type", box "text"; "text", box text ])
+let textPart (text: string) : obj =
+    box (createObj [ "type", box "text"; "text", box text ])
 
 /// Format a list of strings as a `parts` array for the host's wire format.
 let textParts (parts: string list) : obj array =
@@ -83,24 +86,46 @@ let textParts (parts: string list) : obj array =
 
 let private tryReadPromptModel (payload: obj) : obj option =
     let promptModel = Dyn.get payload "model"
-    if not (Dyn.isNullish promptModel) then Some promptModel
+
+    if not (Dyn.isNullish promptModel) then
+        Some promptModel
     else
         let modelString = Dyn.str payload "modelString"
-        if modelString = "" then None
+
+        if modelString = "" then
+            None
         else
             let basePart =
                 match modelString.IndexOf(':') with
                 | -1 -> modelString
-                | colon -> modelString.[0..colon - 1].Trim()
-            if basePart = "" then None
+                | colon -> modelString.[0 .. colon - 1].Trim()
+
+            if basePart = "" then
+                None
             else
                 let slash = basePart.IndexOf('/')
-                if slash <= 0 || slash >= basePart.Length - 1 then None
-                else Some (box {| providerID = basePart.[0..slash-1]; modelID = basePart.[slash+1..] |})
+
+                if slash <= 0 || slash >= basePart.Length - 1 then
+                    None
+                else
+                    Some(
+                        box
+                            {| providerID = basePart.[0 .. slash - 1]
+                               modelID = basePart.[slash + 1 ..] |}
+                    )
 
 let buildPromptBody (agent: string) (prompt: string) (tools: obj) (settings: SubagentAiSettings) : obj =
-    let body = box {| agent = agent; parts = [| box {| ``type`` = "text"; text = prompt |} |] |}
-    let body = if Dyn.isNullish tools then body else Dyn.withKey body "tools" tools
+    let body =
+        box
+            {| agent = agent
+               parts = [| box {| ``type`` = "text"; text = prompt |} |] |}
+
+    let body =
+        if Dyn.isNullish tools then
+            body
+        else
+            Dyn.withKey body "tools" tools
+
     let body =
         match settings.ModelString with
         | None -> body
@@ -108,10 +133,12 @@ let buildPromptBody (agent: string) (prompt: string) (tools: obj) (settings: Sub
             match tryReadPromptModel (createObj [ "modelString", box modelString ]) with
             | Some model -> Dyn.withKey body "model" model
             | None -> body
+
     let body =
         match settings.ThinkingLevel with
         | Some level when level.Trim() <> "" -> Dyn.withKey body "variant" (box level)
         | _ -> body
+
     body
 
 /// True iff the AbortSignal has already fired.
@@ -126,26 +153,35 @@ let signalAborted (signal: obj) : bool =
 /// signal) to prevent listener accumulation when a host reuses the same
 /// signal across calls.
 let raceWithAbortSignal (signal: obj) (onAbort: unit -> unit) (work: JS.Promise<'T>) : JS.Promise<'T> =
-    if Dyn.isNullish signal then work
+    if Dyn.isNullish signal then
+        work
     else
         let rejecter =
-            emitJsExpr ()
-                "Object.assign(new Error('Aborted'), { name: 'AbortError' })"
+            emitJsExpr () "Object.assign(new Error('Aborted'), { name: 'AbortError' })"
 
         Promise.create (fun resolve reject ->
             let mutable isDone = false
-            let mutable handler : obj = null
+            let mutable handler: obj = null
 
             let removeHandler () =
                 if not (isNull handler) then
-                    try signal?removeEventListener("abort", handler) with _ -> ()
+                    try
+                        signal?removeEventListener ("abort", handler)
+                    with _ ->
+                        ()
+
                     handler <- null
 
             let settleAbort () =
                 if not isDone then
                     isDone <- true
                     removeHandler ()
-                    try onAbort () with _ -> ()
+
+                    try
+                        onAbort ()
+                    with _ ->
+                        ()
+
                     reject rejecter
 
             let settleWork (continuation: unit -> unit) () =
@@ -158,9 +194,14 @@ let raceWithAbortSignal (signal: obj) (onAbort: unit -> unit) (work: JS.Promise<
                 settleAbort ()
             else
                 handler <- box (fun () -> settleAbort ())
-                try signal?addEventListener("abort", handler) with _ -> ()
-                work?``then``(
+
+                try
+                    signal?addEventListener ("abort", handler)
+                with _ ->
+                    ()
+
+                work?``then`` (
                     (fun res -> settleWork (fun () -> resolve res) ()),
                     (fun err -> settleWork (fun () -> reject err) ())
-                ) |> ignore
-        )
+                )
+                |> ignore)

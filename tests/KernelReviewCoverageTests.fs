@@ -11,20 +11,41 @@ open Wanxiangshu.Kernel.Config
 
 // ── Kernel.ReviewReplayPolicy ─────────────────────────────────────────────────
 let rrpTextsFromFlatPartsTool () =
-    let toolState = { status = "completed"; output = "out"; error = ""; input = null; operationAction = "" }
-    let fp = { msgIndex = 0; partIndex = 0; isUser = false; part = ToolPart("t", "c1", Some toolState, null) }
+    let toolState =
+        { status = "completed"
+          output = "out"
+          error = ""
+          input = null
+          operationAction = "" }
+
+    let fp =
+        { msgIndex = 0
+          partIndex = 0
+          isUser = false
+          part = ToolPart("t", "c1", Some toolState, null) }
+
     let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "tool output text" ["out"] texts
+    equal "tool output text" [ "out" ] texts
 
 let rrpTextsFromFlatPartsText () =
-    let fp = { msgIndex = 0; partIndex = 0; isUser = false; part = TextPart "hello" }
+    let fp =
+        { msgIndex = 0
+          partIndex = 0
+          isUser = false
+          part = TextPart "hello" }
+
     let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "text part" ["hello"] texts
+    equal "text part" [ "hello" ] texts
 
 let rrpTextsFromFlatPartsOther () =
-    let fp = { msgIndex = 0; partIndex = 0; isUser = false; part = ToolPart("t", "c", None, null) }
+    let fp =
+        { msgIndex = 0
+          partIndex = 0
+          isUser = false
+          part = ToolPart("t", "c", None, null) }
+
     let texts = textsFromFlatParts [ fp ] |> Seq.toList
-    equal "no output tool" [""] texts
+    equal "no output tool" [ "" ] texts
 
 // ── Kernel.ReviewSession.Types ────────────────────────────────────────────────
 let rstEmpty () =
@@ -58,10 +79,10 @@ let rstWithFeedback () =
 let rstAddChild () =
     let e = empty "rs1" 100L
     let c1 = addChild e "c1"
-    equal "addChild new" ["c1"] c1.childIds
+    equal "addChild new" [ "c1" ] c1.childIds
     equal "addChild version" (e.version + 1) c1.version
     let dup = addChild c1 "c1"
-    equal "addChild dup" ["c1"] dup.childIds
+    equal "addChild dup" [ "c1" ] dup.childIds
     equal "addChild dup version same" c1.version dup.version
 
 // ── Kernel.Config ─────────────────────────────────────────────────────────────
@@ -83,6 +104,13 @@ let cfgStealthBrowserLocalConfig () =
     check "cmd has python" (Array.contains "python" cmd)
 
 let run () =
-    rrpTextsFromFlatPartsTool (); rrpTextsFromFlatPartsText (); rrpTextsFromFlatPartsOther ()
-    rstEmpty (); rstWithTask (); rstWithFeedback (); rstAddChild ()
-    cfgStealthBrowserRef (); cfgStealthBrowserCommand (); cfgStealthBrowserLocalConfig ()
+    rrpTextsFromFlatPartsTool ()
+    rrpTextsFromFlatPartsText ()
+    rrpTextsFromFlatPartsOther ()
+    rstEmpty ()
+    rstWithTask ()
+    rstWithFeedback ()
+    rstAddChild ()
+    cfgStealthBrowserRef ()
+    cfgStealthBrowserCommand ()
+    cfgStealthBrowserLocalConfig ()

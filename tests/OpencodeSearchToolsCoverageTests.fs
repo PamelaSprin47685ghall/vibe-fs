@@ -56,13 +56,14 @@ let searchToolsWebfetchToolName () =
     equal "webfetch tool name" spec.name "webfetch"
 
 let searchToolsWebfetchToolFullOptionsDecode () =
-    let args = createObj [
-        "url", box "https://example.com"
-        "extract_main", box true
-        "prefer_llms_txt", box "auto"
-        "prompt", box "summarize"
-        "timeout", box 30
-    ]
+    let args =
+        createObj
+            [ "url", box "https://example.com"
+              "extract_main", box true
+              "prefer_llms_txt", box "auto"
+              "prompt", box "summarize"
+              "timeout", box 30 ]
+
     match decodeWebfetchArgs args with
     | Error e -> check "webfetch decode should succeed" false
     | Ok wf ->
@@ -72,13 +73,14 @@ let searchToolsWebfetchToolFullOptionsDecode () =
         check "prompt decoded" (wf.Prompt = Some "summarize")
         check "timeout decoded" (wf.Timeout = Some 30)
 
-let run () = promise {
-    searchToolsFuzzyFindTool ()
-    searchToolsFuzzyGrepTool ()
-    searchToolsWebsearchTool ()
-    searchToolsWebfetchTool ()
-    searchToolsFuzzyFindToolName ()
-    searchToolsFuzzyGrepToolName ()
-    searchToolsWebfetchToolName ()
-    searchToolsWebfetchToolFullOptionsDecode ()
-}
+let run () =
+    promise {
+        searchToolsFuzzyFindTool ()
+        searchToolsFuzzyGrepTool ()
+        searchToolsWebsearchTool ()
+        searchToolsWebfetchTool ()
+        searchToolsFuzzyFindToolName ()
+        searchToolsFuzzyGrepToolName ()
+        searchToolsWebfetchToolName ()
+        searchToolsWebfetchToolFullOptionsDecode ()
+    }

@@ -12,12 +12,11 @@ type SubagentRole =
 
 /// Canonical request shape for spawning a subagent. Host adapters translate
 /// this into their native child-session protocol.
-type SubagentRequest = {
-    Role: SubagentRole
-    Title: string
-    Prompt: string
-    AllowedTools: string array
-}
+type SubagentRequest =
+    { Role: SubagentRole
+      Title: string
+      Prompt: string
+      AllowedTools: string array }
 
 /// Outcome of a subagent run. Aborted covers both ClientCancellation and
 /// MessageAborted so the caller never needs to match those DU cases.

@@ -21,23 +21,21 @@ open Wanxiangshu.Tests.OpencodeSubagentCoverageTests
 open Wanxiangshu.Tests.ReviewerLoopTests
 
 let coverageTestEntries () : (string * TestBody) list =
-    [
-    "CoverageFillKernelTests.run", Sync (sync CoverageFillKernelTests.run)
-    "CoverageFillKernel2Tests.run", Sync (sync CoverageFillKernel2Tests.run)
-    "CoverageFillShellTests.run", Async CoverageFillShellTests.run
-    "CoverageFillFuzzyTests.run", Sync (sync CoverageFillFuzzyTests.run)
-    "FuzzySearchGrepTests.run", Sync (sync FuzzySearchGrepTests.run)
-    "CoverageFillMethodologyTests.run", Sync (sync CoverageFillMethodologyTests.run)
-    "CoverageFillOpencodeTests.run", Sync (sync CoverageFillOpencodeTests.run)
-    "KernelDomainCoverageTests.run", Sync (sync KernelDomainCoverageTests.run)
-    "KernelReviewCoverageTests.run", Sync (sync KernelReviewCoverageTests.run)
-    "OmpToolsCoverageTests.run", Async OmpToolsCoverageTests.run
-    "OmpCodecCoverageTests.run", Async OmpCodecCoverageTests.run
-    "SearchToolsTests.run", Async SearchToolsTests.run
-    "PluginMimoTuiTests.run", Sync (sync PluginMimoTuiTests.run)
-    "MuxCoverageTests.run", Sync (sync MuxCoverageTests.run)
-    "OpencodeHookSchemaCoverageTests.run", Async OpencodeHookSchemaCoverageTests.run
-    "OpencodeSearchToolsCoverageTests.run", Async OpencodeSearchToolsCoverageTests.run
-    "OpencodeSubagentCoverageTests.run", Async OpencodeSubagentCoverageTests.run
-    "ReviewerLoopTests.run", Async ReviewerLoopTests.run
-    ]
+    [ "CoverageFillKernelTests.run", Sync(sync CoverageFillKernelTests.run)
+      "CoverageFillKernel2Tests.run", Sync(sync CoverageFillKernel2Tests.run)
+      "CoverageFillShellTests.run", Async CoverageFillShellTests.run
+      "CoverageFillFuzzyTests.run", Sync(sync CoverageFillFuzzyTests.run)
+      "FuzzySearchGrepTests.run", Sync(sync FuzzySearchGrepTests.run)
+      "CoverageFillMethodologyTests.run", Sync(sync CoverageFillMethodologyTests.run)
+      "CoverageFillOpencodeTests.run", Sync(sync CoverageFillOpencodeTests.run)
+      "KernelDomainCoverageTests.run", Sync(sync KernelDomainCoverageTests.run)
+      "KernelReviewCoverageTests.run", Sync(sync KernelReviewCoverageTests.run)
+      "OmpToolsCoverageTests.run", Async OmpToolsCoverageTests.run
+      "OmpCodecCoverageTests.run", Async OmpCodecCoverageTests.run
+      "SearchToolsTests.run", Async SearchToolsTests.run
+      "PluginMimoTuiTests.run", Sync(sync PluginMimoTuiTests.run)
+      "MuxCoverageTests.run", Sync(sync MuxCoverageTests.run)
+      "OpencodeHookSchemaCoverageTests.run", Async OpencodeHookSchemaCoverageTests.run
+      "OpencodeSearchToolsCoverageTests.run", Async OpencodeSearchToolsCoverageTests.run
+      "OpencodeSubagentCoverageTests.run", Async OpencodeSubagentCoverageTests.run
+      "ReviewerLoopTests.run", Async ReviewerLoopTests.run ]

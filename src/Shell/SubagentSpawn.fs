@@ -8,22 +8,24 @@ open Wanxiangshu.Shell.Dyn
 [<Global>]
 type AbortController() =
     member _.signal: obj = jsNative
-    member _.abort(): unit = jsNative
+    member _.abort() : unit = jsNative
 
 let private abortableConfig (config: obj) (signal: obj) = Dyn.withKey config "abortSignal" signal
 
 let runParallelSpawns (prompts: string list) (spawnOne: string -> JS.Promise<string>) : JS.Promise<string> =
     promise {
-        let! reports =
-            prompts
-            |> List.map spawnOne
-            |> Promise.all
+        let! reports = prompts |> List.map spawnOne |> Promise.all
         return joinReports reports
     }
 
-let runParallelSpawnsWithAbort (prompts: string array) (spawn: string -> obj -> JS.Promise<string>) (config: obj) : JS.Promise<string> =
+let runParallelSpawnsWithAbort
+    (prompts: string array)
+    (spawn: string -> obj -> JS.Promise<string>)
+    (config: obj)
+    : JS.Promise<string> =
     promise {
         let controller = AbortController()
+
         let! reports =
             prompts
             |> Array.map (fun prompt ->
@@ -32,9 +34,10 @@ let runParallelSpawnsWithAbort (prompts: string array) (spawn: string -> obj -> 
                         let! r = spawn prompt (abortableConfig config controller.signal)
                         return Some r
                     with _ ->
-                        controller.abort()
+                        controller.abort ()
                         return None
                 })
             |> Promise.all
+
         return joinReports (reports |> Array.choose id |> Array.toList)
     }

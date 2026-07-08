@@ -7,17 +7,16 @@ open Wanxiangshu.Shell.OpencodeSessionEventCodec
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
-let private part (text: string) : obj = box {| ``type`` = "text"; text = text |}
+let private part (text: string) : obj =
+    box {| ``type`` = "text"; text = text |}
 
 let private taskPart (todos: obj array) : obj =
-    box {|
-        ``type`` = "tool"
-        tool = "task"
-        state = box {| input = box {| todos = box todos |} |}
-    |}
+    box
+        {| ``type`` = "tool"
+           tool = "task"
+           state = box {| input = box {| todos = box todos |} |} |}
 
-let private messageOf (info: obj) (parts: obj) : obj =
-    box {| info = info; parts = parts |}
+let private messageOf (info: obj) (parts: obj) : obj = box {| info = info; parts = parts |}
 
 let getSessionIDFromPropsPrefersPropsKey () =
     let props = box {| sessionID = "from-props" |}
@@ -57,36 +56,60 @@ let getPartsTextEmptyOnEmptyArray () =
 
 let getPartsTextConcatsTextParts () =
     let parts =
-        [| part "first"
-           box {| ``type`` = "tool"; tool = "task" |}
-           part "second" |]
+        [| part "first"; box {| ``type`` = "tool"; tool = "task" |}; part "second" |]
+
     equal "getPartsText joins text parts" "first\nsecond" (getPartsText (box parts))
 
 let getPartsTextSkipsNonStringText () =
-    let parts = [| box {| ``type`` = "text"; text = Wanxiangshu.Shell.Dyn.undefinedValue |} |]
+    let parts =
+        [| box
+               {| ``type`` = "text"
+                  text = Wanxiangshu.Shell.Dyn.undefinedValue |} |]
+
     equal "getPartsText skips non-string text payloads" "" (getPartsText (box parts))
 
 let isCompletedAssistantMessageNonAssistant () =
     check "user role not completed" (not (isCompletedAssistantMessage (box {| role = "user" |})))
 
 let isCompletedAssistantMessageWithError () =
-    let info = box {| role = "assistant"; error = box "boom" |}
+    let info =
+        box
+            {| role = "assistant"
+               error = box "boom" |}
+
     check "assistant with error not completed" (not (isCompletedAssistantMessage info))
 
 let isCompletedAssistantMessageTerminalFinish () =
-    let info = box {| role = "assistant"; finish = "stop" |}
+    let info =
+        box
+            {| role = "assistant"
+               finish = "stop" |}
+
     check "assistant with terminal finish completed" (isCompletedAssistantMessage info)
 
 let isCompletedAssistantMessageToolFinishNotTerminal () =
-    let info = box {| role = "assistant"; finish = "tool-calls" |}
+    let info =
+        box
+            {| role = "assistant"
+               finish = "tool-calls" |}
+
     check "tool-calls finish not terminal" (not (isCompletedAssistantMessage info))
 
 let isCompletedAssistantMessageTimeCompleted () =
-    let info = box {| role = "assistant"; time = box {| completed = box 123 |} |}
+    let info =
+        box
+            {| role = "assistant"
+               time = box {| completed = box 123 |} |}
+
     check "time.completed numeric counts as terminal" (isCompletedAssistantMessage info)
 
 let isCompletedAssistantMessageToolFinishWithTimeCompleted () =
-    let info = box {| role = "assistant"; finish = "tool"; time = box {| completed = box 123 |} |}
+    let info =
+        box
+            {| role = "assistant"
+               finish = "tool"
+               time = box {| completed = box 123 |} |}
+
     check "tool finish with time.completed counts as terminal" (isCompletedAssistantMessage info)
 
 let decodeTodosEmptyOnNonArray () =
@@ -95,10 +118,19 @@ let decodeTodosEmptyOnNonArray () =
 
 let decodeTodosDropsTerminalStatus () =
     let todos =
-        [| box {| content = "stay"; status = "pending" |}
-           box {| content = "drop"; status = "completed" |}
-           box {| content = "stay2"; status = "in_progress" |}
-           box {| content = "drop2"; status = "cancelled" |} |]
+        [| box
+               {| content = "stay"
+                  status = "pending" |}
+           box
+               {| content = "drop"
+                  status = "completed" |}
+           box
+               {| content = "stay2"
+                  status = "in_progress" |}
+           box
+               {| content = "drop2"
+                  status = "cancelled" |} |]
+
     equal "decodeTodos keeps non-terminal" [ "stay"; "stay2" ] (decodeTodos (box todos))
 
 let decodeTodosDropsEmptyContent () =
@@ -113,17 +145,36 @@ let recoverOpenTodosFromMessagesEmptyWhenNoTaskPart () =
     equal "recover empty when no task part" [] (recoverOpenTodosFromMessages (box [| msg |]))
 
 let recoverOpenTodosFromMessagesPicksLatestTaskPart () =
-    let todo1 = taskPart [| box {| content = "older"; status = "completed" |} |]
-    let todo2 = taskPart [| box {| content = "newer"; status = "pending" |} |]
+    let todo1 =
+        taskPart
+            [| box
+                   {| content = "older"
+                      status = "completed" |} |]
+
+    let todo2 =
+        taskPart
+            [| box
+                   {| content = "newer"
+                      status = "pending" |} |]
+
     let msg1 = messageOf (box {| role = "user" |}) (box [| todo1 |])
     let msg2 = messageOf (box {| role = "assistant" |}) (box [| todo2 |])
-    equal "recover picks open todos from latest task part"
+
+    equal
+        "recover picks open todos from latest task part"
         [ "newer" ]
         (recoverOpenTodosFromMessages (box [| msg1; msg2 |]))
 
 let recoverOpenTodosFromMessagesDropsTerminal () =
-    let todos = taskPart [| box {| content = "keep"; status = "pending" |}
-                            box {| content = "drop"; status = "completed" |} |]
+    let todos =
+        taskPart
+            [| box
+                   {| content = "keep"
+                      status = "pending" |}
+               box
+                   {| content = "drop"
+                      status = "completed" |} |]
+
     let msg = messageOf (box {| role = "user" |}) (box [| todos |])
     equal "recover drops terminal todos" [ "keep" ] (recoverOpenTodosFromMessages (box [| msg |]))
 
@@ -134,7 +185,12 @@ let decodeLastAssistantEmptyWhenNoCompletedAssistant () =
     equal "agent None when no assistant" true (Option.isNone agent)
 
 let decodeLastAssistantReturnsLastTextAndAgent () =
-    let info = box {| role = "assistant"; agent = "coder"; finish = "stop" |}
+    let info =
+        box
+            {| role = "assistant"
+               agent = "coder"
+               finish = "stop" |}
+
     let msg1 = messageOf (box {| role = "user" |}) (box [| part "ignored" |])
     let msg2 = messageOf info (box [| part "answer" |])
     let text, agent = decodeLastAssistant (box [| msg1; msg2 |])
@@ -142,7 +198,12 @@ let decodeLastAssistantReturnsLastTextAndAgent () =
     equal "agent captured" (Some "coder") agent
 
 let decodeLastAssistantDetectsSyntheticAgent () =
-    let info = box {| role = "assistant"; agent = "compaction"; finish = "stop" |}
+    let info =
+        box
+            {| role = "assistant"
+               agent = "compaction"
+               finish = "stop" |}
+
     let msg = messageOf info (box [| part "should ignore" |])
     let text, _ = decodeLastAssistant (box [| msg |])
     equal "synthetic agent skipped" "" text
@@ -161,13 +222,27 @@ let createPromptBodyWithAgent () =
 
 let shouldSkipNudgeTrueWhenNoToolResult () =
     let msg1 = messageOf (box {| role = "user" |}) (box [| part "hi" |])
-    let msg2 = messageOf (box {| role = "assistant"; finish = "tool" |}) (box [| part "call submit_review" |])
+
+    let msg2 =
+        messageOf
+            (box
+                {| role = "assistant"
+                   finish = "tool" |})
+            (box [| part "call submit_review" |])
+
     let messages = box [| msg1; msg2 |]
     check "shouldSkipNudge is true when no toolResult follow tool finish" (shouldSkipNudge messages)
 
 let shouldSkipNudgeFalseWhenToolResultPresent () =
     let msg1 = messageOf (box {| role = "user" |}) (box [| part "hi" |])
-    let msg2 = messageOf (box {| role = "assistant"; finish = "tool" |}) (box [| part "call submit_review" |])
+
+    let msg2 =
+        messageOf
+            (box
+                {| role = "assistant"
+                   finish = "tool" |})
+            (box [| part "call submit_review" |])
+
     let msg3 = messageOf (box {| role = "toolResult" |}) (box [| part "rejected" |])
     let messages = box [| msg1; msg2; msg3 |]
     check "shouldSkipNudge is false when toolResult is present after tool finish" (not (shouldSkipNudge messages))

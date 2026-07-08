@@ -30,7 +30,20 @@ if (isE2eMux) {
 } else if (isE2e) {
     runAll = (await import('../build/e2e/Tests.js')).runAll;
 } else {
-    runAll = (await import('../build/tests/Tests.js')).runAll;
+    runAll = async (args) => {
+        const { runAll: coreRun } = await import('../build/tests/Tests.js');
+        const code = await coreRun(args);
+        if (code !== 0) return code;
+
+        console.log('\nRunning GitHookFormatterTests...');
+        try {
+            const { runAll: hookRun } = await import('./GitHookFormatterTests.js');
+            return await hookRun(args);
+        } catch (e) {
+            console.error('Failed to import or run GitHookFormatterTests:', e);
+            return 1;
+        }
+    };
 }
 
 const extraArgs = process.argv.slice(2).filter(a => a !== '--e2e' && a !== '--e2e-mux' && a !== '--e2e-omp' && a !== '--e2e-opencode-plugin');

@@ -9,7 +9,7 @@ open Wanxiangshu.Shell.MuxToolDefinition
 
 
 [<Global("process")>]
-let private nodeProcess : obj = jsNative
+let private nodeProcess: obj = jsNative
 
 let envVar (name: string) : string =
     let v = nodeProcess?env?(name)
@@ -22,25 +22,44 @@ let toolsToObject (tools: ToolDefinition array) : obj =
 
 let addRequired (schema: obj) (key: string) : unit =
     let existing = schema?required
+
     if Dyn.isArray existing then
-        existing?("push")(box key) |> ignore
+        existing?("push") (box key) |> ignore
     else
         schema?("required") <- box [| box key |]
 
 let injectWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
     if WarnTdd.isModificationTool tool.name then
         let props = tool.parameters.properties
+
         if isNullish (props?warn_tdd) then
-            props?("warn_tdd") <- box (createObj [| "type", box "string"; "enum", box [| box WarnTdd.canonicalValue |]; "description", box WarnTdd.warnTddDescription |])
+            props?("warn_tdd") <-
+                box (
+                    createObj
+                        [| "type", box "string"
+                           "enum", box [| box WarnTdd.canonicalValue |]
+                           "description", box WarnTdd.warnTddDescription |]
+                )
+
         addRequired tool.parameters "warn_tdd"
+
     tool
 
 let injectWarnIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
     if WarnTdd.isWarnRequiredTool tool.name then
         let props = tool.parameters.properties
+
         if isNullish (props?warn) then
-            props?("warn") <- box (createObj [| "type", box "string"; "enum", box [| box WarnTdd.warnCanonicalValue |]; "description", box WarnTdd.warnDescription |])
+            props?("warn") <-
+                box (
+                    createObj
+                        [| "type", box "string"
+                           "enum", box [| box WarnTdd.warnCanonicalValue |]
+                           "description", box WarnTdd.warnDescription |]
+                )
+
         addRequired tool.parameters "warn"
+
     tool
 
 let injectWarnWarnTddIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =

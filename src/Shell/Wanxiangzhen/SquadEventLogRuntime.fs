@@ -1,0 +1,21 @@
+module Wanxiangshu.Shell.Wanxiangzhen.SquadEventLogRuntime
+
+open Fable.Core
+open Wanxiangshu.Kernel.EventLog.Types
+open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.EventLogFiles
+open Wanxiangshu.Shell.Wanxiangzhen.SquadEventWanCodec
+open Wanxiangshu.Shell.Clock
+
+let readAllSquadEvents (workspaceRoot: string) : JS.Promise<SquadEvent list> =
+    promise {
+        let! events = getStore(workspaceRoot).ReadAllEvents()
+        return events |> List.choose trySquadEventFromWanEvent
+    }
+
+let appendSquadEvent (workspaceRoot: string) (at: string) (e: SquadEvent) : JS.Promise<Result<unit, string>> =
+    getStore(workspaceRoot).AppendSquadEvent at e
+
+let appendSquadEventNow (workspaceRoot: string) (e: SquadEvent) : JS.Promise<Result<unit, string>> =
+    appendSquadEvent workspaceRoot (getTimestampMs().ToString()) e

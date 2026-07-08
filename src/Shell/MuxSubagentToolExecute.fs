@@ -27,31 +27,42 @@ type MuxSubagentSpawn =
       Role: string
       ToolOptions: obj option }
 
-type RunMuxSubagent =
-    obj -> obj -> string -> string -> string -> obj option -> JS.Promise<string>
+type RunMuxSubagent = obj -> obj -> string -> string -> string -> obj option -> JS.Promise<string>
 
-type MuxHostAdapter(runMux: RunMuxSubagent, deps: obj, config: obj, spawn: MuxSubagentSpawn, directory: string, sessionId: string, sessionScope: RuntimeScope) =
+type MuxHostAdapter
+    (
+        runMux: RunMuxSubagent,
+        deps: obj,
+        config: obj,
+        spawn: MuxSubagentSpawn,
+        directory: string,
+        sessionId: string,
+        sessionScope: RuntimeScope
+    ) =
     interface IHostAdapter with
         member _.WorkspaceRoot = directory
         member _.SessionId = sessionId
+
         member _.SpawnSubagent(request: SubagentRequest) : JS.Promise<SubagentResponse> =
             promise {
                 try
                     let! text = runMux deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
                     return Success text
                 with ex ->
-                    return Failure (translateJsError ex)
+                    return Failure(translateJsError ex)
             }
+
         member _.RegisterTempFiles(prompt, files) =
             let key = sessionId + "\u0000" + prompt
             sessionScope.RegisterTempFiles(key, files)
+
         member _.TryGetTempFiles(prompt) =
             let key = sessionId + "\u0000" + prompt
             sessionScope.TryGetTempFiles(key)
 
 let private muxConfigMessage (title: string) (error: DomainError) : string =
     match error with
-    | InvalidIntent ("mux", "workspaceId", _) -> muxToolRequiresWorkspaceId title
+    | InvalidIntent("mux", "workspaceId", _) -> muxToolRequiresWorkspaceId title
     | _ -> subagentToolFailed title error
 
 let executeMuxSubagentTool
@@ -64,9 +75,20 @@ let executeMuxSubagentTool
     : JS.Promise<string> =
     promise {
         let toolName = spawn.Role
+
         match fromMuxConfig config with
         | Error e -> return muxConfigMessage spawn.Title e
         | Ok runtime ->
-            let adapter = MuxHostAdapter(runMux, deps, config, spawn, runtime.Execution.Directory, Id.sessionIdValue runtime.Execution.SessionId, sessionScope)
+            let adapter =
+                MuxHostAdapter(
+                    runMux,
+                    deps,
+                    config,
+                    spawn,
+                    runtime.Execution.Directory,
+                    Id.sessionIdValue runtime.Execution.SessionId,
+                    sessionScope
+                )
+
             return! dispatch mimocode adapter toolName args
     }

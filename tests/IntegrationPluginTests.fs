@@ -12,12 +12,14 @@ open Wanxiangshu.Shell.TreeSitterShell
 open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Shell.Dyn
 
-let syntaxSpec () = promise {
-    let! result = checkSyntax "const x = 1;" "test.js"
-    match result with
-    | Ok (_, errors) -> check "tree-sitter no errors" (errors.Length = 0)
-    | Failed _ -> check "tree-sitter not failed" false
-}
+let syntaxSpec () =
+    promise {
+        let! result = checkSyntax "const x = 1;" "test.js"
+
+        match result with
+        | Ok(_, errors) -> check "tree-sitter no errors" (errors.Length = 0)
+        | Failed _ -> check "tree-sitter not failed" false
+    }
 
 let webfetchSchemaSpec (reg: obj) =
     let tools = unbox<obj[]> (get reg "tools")
@@ -44,51 +46,57 @@ let countsSpec (reg: obj) =
     check "mux has submit_review tool" (names |> Array.contains "submit_review")
     check "mux does not expose return_reviewer tool" (not (names |> Array.contains "return_reviewer"))
 
-let configSpec () = promise {
-    let! workspaceDir = mkdtempAsync "plugin-config-"
-    let! p = plugin (box {| directory = workspaceDir |})
-    let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>>
-    let agents = get cfg "agent"
-    check "config manager exists" (not (isNullish (get agents "manager")))
-    check "config build exists" (not (isNullish (get agents "build")))
-    check "config plan exists" (not (isNullish (get agents "plan")))
-    let manager = get agents "manager"
-    check "config manager mode primary" (str manager "mode" = "primary")
-    let tools = get manager "tools"
-    check "config manager tools.bash false" (unbox<bool> (get tools "bash") = false)
-    check "config manager tools.glob present" (not (isNullish (get tools "glob")))
-    check "config manager tools.skill present" (not (isNullish (get tools "skill")))
-    let coder = get agents "coder"
-    let coderTools = get coder "tools"
-    check "config coder tools.question false" (not (unbox<bool> (get coderTools "question")))
-    check "config coder tools.submit_review false" (not (unbox<bool> (get coderTools "submit_review")))
-    check "config coder tools.glob present" (not (isNullish (get coderTools "glob")))
-    check "config coder tools.skill present" (not (isNullish (get coderTools "skill")))
-    let permission = get manager "permission"
-    check "config manager permission.bash deny" (str permission "bash" = "deny")
-    check "config manager permission.glob present" (not (isNullish (get permission "glob")))
-    check "config manager permission.skill present" (not (isNullish (get permission "skill")))
-    do! rmAsync workspaceDir
-}
+let configSpec () =
+    promise {
+        let! workspaceDir = mkdtempAsync "plugin-config-"
+        let! p = plugin (box {| directory = workspaceDir |})
+        let! cfg = (get p "config") $ (createObj []) |> unbox<JS.Promise<obj>>
+        let agents = get cfg "agent"
+        check "config manager exists" (not (isNullish (get agents "manager")))
+        check "config build exists" (not (isNullish (get agents "build")))
+        check "config plan exists" (not (isNullish (get agents "plan")))
+        let manager = get agents "manager"
+        check "config manager mode primary" (str manager "mode" = "primary")
+        let tools = get manager "tools"
+        check "config manager tools.bash false" (unbox<bool> (get tools "bash") = false)
+        check "config manager tools.glob present" (not (isNullish (get tools "glob")))
+        check "config manager tools.skill present" (not (isNullish (get tools "skill")))
+        let coder = get agents "coder"
+        let coderTools = get coder "tools"
+        check "config coder tools.question false" (not (unbox<bool> (get coderTools "question")))
+        check "config coder tools.submit_review false" (not (unbox<bool> (get coderTools "submit_review")))
+        check "config coder tools.glob present" (not (isNullish (get coderTools "glob")))
+        check "config coder tools.skill present" (not (isNullish (get coderTools "skill")))
+        let permission = get manager "permission"
+        check "config manager permission.bash deny" (str permission "bash" = "deny")
+        check "config manager permission.glob present" (not (isNullish (get permission "glob")))
+        check "config manager permission.skill present" (not (isNullish (get permission "skill")))
+        do! rmAsync workspaceDir
+    }
 
 let topLevelExportsSpec () =
     check "top-level getPluginToolPolicy is function" (typeIs getPluginToolPolicy "function")
     check "top-level collectReadOutputs is function" (typeIs collectReadOutputs "function")
     check "top-level deduplicateReadOutputsWithSeen is function" (typeIs deduplicateReadOutputsWithSeen "function")
 
-let systemTransformSpec (p: obj) = promise {
-    let tf = get p "experimental.chat.system.transform"
-    let systemArray = [| "baseline system prompt"; "extra prompt" |]
-    let output = createObj [ "system", box systemArray ]
-    do! tf $ (createObj [], output) |> unbox<JS.Promise<unit>>
-    let systemAfter = get output "system" |> unbox<obj array>
-    check "system transform mutates array in-place (same reference)" (obj.ReferenceEquals(systemArray, box systemAfter))
-    check "system transform replaces with single-element array" (systemAfter.Length = 1)
-    let head = systemAfter.[0] :?> string
-    check "system transform first element is not baseline" (head <> "baseline system prompt")
-    check "system transform first element is not extra" (head <> "extra prompt")
-    check "system transform first element is not empty" (head <> "")
-}
+let systemTransformSpec (p: obj) =
+    promise {
+        let tf = get p "experimental.chat.system.transform"
+        let systemArray = [| "baseline system prompt"; "extra prompt" |]
+        let output = createObj [ "system", box systemArray ]
+        do! tf $ (createObj [], output) |> unbox<JS.Promise<unit>>
+        let systemAfter = get output "system" |> unbox<obj array>
+
+        check
+            "system transform mutates array in-place (same reference)"
+            (obj.ReferenceEquals(systemArray, box systemAfter))
+
+        check "system transform replaces with single-element array" (systemAfter.Length = 1)
+        let head = systemAfter.[0] :?> string
+        check "system transform first element is not baseline" (head <> "baseline system prompt")
+        check "system transform first element is not extra" (head <> "extra prompt")
+        check "system transform first element is not empty" (head <> "")
+    }
 
 let run () : JS.Promise<unit> =
     promise {

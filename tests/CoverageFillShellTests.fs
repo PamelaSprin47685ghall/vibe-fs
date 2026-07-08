@@ -10,7 +10,9 @@ open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.NudgeRuntime
 open Wanxiangshu.Shell.TreeSitterPlatform
 open Wanxiangshu.Shell.FuzzyFinderShell
+
 module Dyn = Wanxiangshu.Shell.Dyn
+
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 
@@ -22,20 +24,19 @@ open Wanxiangshu.Kernel.Nudge.TodoStatus
 
 let private mkMockFinder (destroyed: bool) : FinderLike =
     let mutable destroyedFlag = destroyed
+
     { new FinderLike with
         member _.fileSearch(query: string, opts: obj) : obj = box {| ok = true; items = [||] |}
         member _.grep(query: string, opts: obj) : obj = box {| ok = true; items = [||] |}
         member _.destroy() : unit = destroyedFlag <- true
-        member _.isDestroyed : bool = destroyedFlag }
+        member _.isDestroyed: bool = destroyedFlag }
 
-let private mkOkRaw (finder: FinderLike) : obj =
-    box {| ok = true; value = box finder |}
+let private mkOkRaw (finder: FinderLike) : obj = box {| ok = true; value = box finder |}
 
 let private mkErrRaw (errorMsg: string) : obj =
     box {| ok = false; error = box errorMsg |}
 
-let private mkErrRawNoError () : obj =
-    box {| ok = false |}
+let private mkErrRawNoError () : obj = box {| ok = false |}
 
 // ── resultFromRaw ────────────────────────────────────────────────────────────
 //  Branch 1: ok=true, value 存在  → Ok finder
@@ -45,6 +46,7 @@ let private mkErrRawNoError () : obj =
 let ffResultFromRawOk () =
     let mock = mkMockFinder false
     let raw = mkOkRaw mock
+
     match resultFromRaw raw with
     | Ok f ->
         check "ok→Ok branch taken" true
@@ -53,12 +55,14 @@ let ffResultFromRawOk () =
 
 let ffResultFromRawErrMsg () =
     let raw = mkErrRaw "scan failed"
+
     match resultFromRaw raw with
     | Ok _ -> check "err→Error branch" false
     | Error msg -> equal "error message preserved" "scan failed" msg
 
 let ffResultFromRawErrDefault () =
-    let raw = mkErrRawNoError()
+    let raw = mkErrRawNoError ()
+
     match resultFromRaw raw with
     | Ok _ -> check "err default→Error branch" false
     | Error msg -> equal "nullish error → default" "createFinder failed" msg
@@ -93,6 +97,7 @@ let ffGetCacheHit () : JS.Promise<unit> =
         cache?instances <- Map.empty.Add("hit-cwd", mock)
         // Get 命中缓存: Promise.lift (Ok mock)
         let! r = cache.Get("hit-cwd")
+
         match r with
         | Ok f -> check "Get hit → Ok finder" (obj.ReferenceEquals(f, mock))
         | Error msg -> check ("Get hit → unexpected Error: " + msg) false
@@ -106,15 +111,17 @@ let ffGetCacheHit () : JS.Promise<unit> =
 
 let siMultiKeyHit () =
     let ctx = createObj [ "alpha" ==> "v1"; "beta" ==> "v2" ]
-    match firstString ctx ["alpha"; "beta"; "gamma"] with
+
+    match firstString ctx [ "alpha"; "beta"; "gamma" ] with
     | Some v -> equal "firstString hit first key" "v1" v
-    | None   -> check "firstString hit first key" false
+    | None -> check "firstString hit first key" false
 
 let siAllMiss () =
     let ctx = createObj [ "alpha" ==> "v1" ]
-    match firstString ctx ["x"; "y"; "z"] with
+
+    match firstString ctx [ "x"; "y"; "z" ] with
     | Some _ -> check "firstString all miss" false
-    | None   -> check "firstString all miss → None" true
+    | None -> check "firstString all miss → None" true
 
 // ── getAbortSignal ─────────────────────────────────────────────────────────────
 //  Branch A: null ctx → null
@@ -151,7 +158,7 @@ let etcSessionIdAlias () =
     equal "extractToolContext sessionId alias" "sess-123" tc.SessionID
 
 let etcFallbacks () =
-    let ctx = createObj []  // no keys
+    let ctx = createObj [] // no keys
     let tc = extractToolContext ctx "/fb"
     equal "extractToolContext dir fallback" "/fb" tc.Directory
     equal "extractToolContext sid fallback" "" tc.SessionID
@@ -166,7 +173,7 @@ let tpSingle () =
     equal "textPart text" "hello" (string (Dyn.get p "text"))
 
 let tpsMultiple () =
-    let arr = textParts ["a"; "b"; "c"]
+    let arr = textParts [ "a"; "b"; "c" ]
     equal "textParts length" 3 (int (unbox arr.Length))
     let t0 = string (Dyn.get arr.[0] "type")
     let t1 = string (Dyn.get arr.[1] "type")
@@ -184,7 +191,10 @@ let bpbNoModel () =
     check "bpb no model → no model key" (Dyn.isNullish (Dyn.get body "model"))
 
 let bpbModelString () =
-    let settings = { emptySettings with ModelString = Some "openai/gpt-4o" }
+    let settings =
+        { emptySettings with
+            ModelString = Some "openai/gpt-4o" }
+
     let body = buildPromptBody "agent" "prompt" null settings
     let model = Dyn.get body "model"
     check "bpb modelString → model non-null" (not (Dyn.isNullish model))
@@ -192,7 +202,10 @@ let bpbModelString () =
     equal "bpb modelID" "gpt-4o" (string (Dyn.get model "modelID"))
 
 let bpbThinkingLevel () =
-    let settings = { emptySettings with ThinkingLevel = Some "high" }
+    let settings =
+        { emptySettings with
+            ThinkingLevel = Some "high" }
+
     let body = buildPromptBody "agent" "prompt" null settings
     equal "bpb thinkingLevel → variant" "high" (string (Dyn.get body "variant"))
 
@@ -265,4 +278,3 @@ let run () : JS.Promise<unit> =
         // raceWithAbortSignal null
         do! rwasNullSignal ()
     }
-

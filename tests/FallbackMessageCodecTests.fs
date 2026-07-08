@@ -6,23 +6,20 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.FallbackMessageCodec
 
 let private mkTodoPart (todos: obj array) : obj =
-    createObj [
-        "type", box "tool"
-        "tool", box "task"
-        "state", box (createObj [ "input", box (createObj [ "todos", box todos ]) ])
-    ]
+    createObj
+        [ "type", box "tool"
+          "tool", box "task"
+          "state", box (createObj [ "input", box (createObj [ "todos", box todos ]) ]) ]
 
 let private mkTodoMsg (todos: obj array) : obj =
     createObj [ "parts", box [| mkTodoPart todos |] ]
 
-let private mkTodo (status: string) : obj =
-    createObj [ "status", box status ]
+let private mkTodo (status: string) : obj = createObj [ "status", box status ]
 
 let private mkAssistantTextMsg (text: string) : obj =
-    createObj [
-        "info", box (createObj [ "role", box "assistant" ])
-        "parts", box [| createObj [ "type", box "text"; "text", box text ] |]
-    ]
+    createObj
+        [ "info", box (createObj [ "role", box "assistant" ])
+          "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
 
 let allTodosCompleted_emptyArray () =
     check "empty → false" (not (allTodosCompleted [||]))
@@ -62,18 +59,23 @@ let scanToolCallAsText_noMessages () =
     check "empty → None" (None = (scanToolCallAsText [||]))
 
 let scanToolCallAsText_noAssistantText () =
-    let userMsg = createObj [
-        "info", box (createObj [ "role", box "user" ])
-        "parts", box [| createObj [ "type", box "text"; "text", box "<read>" ] |]
-    ]
+    let userMsg =
+        createObj
+            [ "info", box (createObj [ "role", box "user" ])
+              "parts", box [| createObj [ "type", box "text"; "text", box "<read>" ] |] ]
+
     check "user text → None" (None = (scanToolCallAsText [| userMsg |]))
 
 let scanToolCallAsText_assistantTextWithToolCall () =
-    let prompt = scanToolCallAsText [| mkAssistantTextMsg "I'll use <tool_call> to read" |]
+    let prompt =
+        scanToolCallAsText [| mkAssistantTextMsg "I'll use <tool_call> to read" |]
+
     check "assistant with tool call → Some" (Option.isSome prompt)
 
 let scanToolCallAsText_assistantTextClean () =
-    let prompt = scanToolCallAsText [| mkAssistantTextMsg "I'll read this file properly." |]
+    let prompt =
+        scanToolCallAsText [| mkAssistantTextMsg "I'll read this file properly." |]
+
     check "assistant clean text → None" (None = prompt)
 
 let run () =

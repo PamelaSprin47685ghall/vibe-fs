@@ -13,15 +13,16 @@ let private manualDeniedForMux (extraNames: string array) (role: string) : Set<s
     |> Set.ofList
 
 let private policyDenied (extraNames: string array) (role: string) : Set<string> =
-    disabledToolNamesForRole mux extraNames role muxSpawnToolUniverse
-    |> Set.ofArray
+    disabledToolNamesForRole mux extraNames role muxSpawnToolUniverse |> Set.ofArray
 
 let disabledMatchesManualDeniedForHost () =
     for role in [| "coder"; "investigator"; "reviewer"; "manager"; "browser" |] do
         for extra in [| [||]; [| "custom_plugin_tool" |]; [| "fuzzy_find"; "write" |] |] do
             let manual = manualDeniedForMux extra role
             let policy = policyDenied extra role
-            check $"mux disabled set matches manual deniedToolsForHost role={role} extra={extra.Length}"
+
+            check
+                $"mux disabled set matches manual deniedToolsForHost role={role} extra={extra.Length}"
                 (manual = policy)
 
 let reviewerDisabledOmitsAgentReport () =
@@ -30,8 +31,7 @@ let reviewerDisabledOmitsAgentReport () =
 
 let reviewerDisabledIncludesFileEditReplaceString () =
     let denied = policyDenied [||] "reviewer"
-    check "reviewer disabledTools includes file_edit_replace_string"
-        (Set.contains "file_edit_replace_string" denied)
+    check "reviewer disabledTools includes file_edit_replace_string" (Set.contains "file_edit_replace_string" denied)
 
 let run () =
     disabledMatchesManualDeniedForHost ()

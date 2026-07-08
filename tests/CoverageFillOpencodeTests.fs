@@ -9,13 +9,18 @@ open Wanxiangshu.Opencode.HookSchema
 open Wanxiangshu.Opencode.ToolSchema
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.ToolCatalog
+
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.Dyn
 
 // ── Opencode.ToolHelpers ───────────────────────────────────────────────────
 
 let toolHelpers () =
-    equal "formatDomainError" "ctx failed: session busy" (Wanxiangshu.Opencode.ToolHelpers.formatDomainError "ctx" SessionBusy)
+    equal
+        "formatDomainError"
+        "ctx failed: session busy"
+        (Wanxiangshu.Opencode.ToolHelpers.formatDomainError "ctx" SessionBusy)
+
     let o = createObj [ "a", box "hi"; "b", box 42; "c", box true; "d", box null ]
     equal "optStr some" (Some "hi") (optStr o "a")
     equal "optStr none" None (optStr o "missing")
@@ -52,10 +57,13 @@ let hookSchemaRewriteToolJsonSchema () =
     let rewrite (o: obj) : obj =
         o?("tag") <- "rewritten"
         o
+
     let mutable lastKey = ""
+
     let setKey (o: obj) (k: string) (v: obj) : unit =
         lastKey <- k
         o?(k) <- v
+
     let outJson = createObj [ "jsonSchema", createObj [ "a", box 1 ] ]
     rewriteToolJsonSchema setKey rewrite outJson |> ignore
     equal "jsonSchema rewritten" "rewritten" (string (outJson?("jsonSchema")?("tag")))
@@ -72,63 +80,109 @@ let hookSchemaRewriteToolJsonSchema () =
 let hookSchemaWarnRequiredAlways () =
     // (1) injectWarnIntoJsonSchema must append 'warn' to required even when 'warn' is already present.
     // First: empty required → append.
-    let schemaEmpty = createObj [
-        "type", box "object"
-        "properties", createObj [ "warn", box (createObj [| "type", box "string"; "enum", box [| box Wanxiangshu.Kernel.WarnTdd.warnCanonicalValue |]; "description", box Wanxiangshu.Kernel.WarnTdd.warnDescription |]) ]
-        "required", box [| |]
-    ]
+    let schemaEmpty =
+        createObj
+            [ "type", box "object"
+              "properties",
+              createObj
+                  [ "warn",
+                    box (
+                        createObj
+                            [| "type", box "string"
+                               "enum", box [| box Wanxiangshu.Kernel.WarnTdd.warnCanonicalValue |]
+                               "description", box Wanxiangshu.Kernel.WarnTdd.warnDescription |]
+                    ) ]
+              "required", box [||] ]
+
     let resultEmpty = injectWarnIntoJsonSchema schemaEmpty
     let reqEmpty = unbox<obj[]> (Dyn.get resultEmpty "required")
     check "warn required after injectWarn (was empty)" (reqEmpty |> Array.exists (fun x -> string x = "warn"))
     // Second: 'warn' already in required → no duplicate, still present.
-    let schemaPresent = createObj [
-        "type", box "object"
-        "properties", createObj [ "warn", box (createObj [| "type", box "string"; "enum", box [| box Wanxiangshu.Kernel.WarnTdd.warnCanonicalValue |]; "description", box Wanxiangshu.Kernel.WarnTdd.warnDescription |]) ]
-        "required", box [| box "warn" |]
-    ]
+    let schemaPresent =
+        createObj
+            [ "type", box "object"
+              "properties",
+              createObj
+                  [ "warn",
+                    box (
+                        createObj
+                            [| "type", box "string"
+                               "enum", box [| box Wanxiangshu.Kernel.WarnTdd.warnCanonicalValue |]
+                               "description", box Wanxiangshu.Kernel.WarnTdd.warnDescription |]
+                    ) ]
+              "required", box [| box "warn" |] ]
+
     let resultPresent = injectWarnIntoJsonSchema schemaPresent
     let reqPresent = unbox<obj[]> (Dyn.get resultPresent "required")
-    let warnCount = reqPresent |> Array.filter (fun x -> string x = "warn") |> Array.length
+
+    let warnCount =
+        reqPresent |> Array.filter (fun x -> string x = "warn") |> Array.length
+
     equal "warn count after injectWarn (was already present)" 1 warnCount
 
 let hookSchemaWarnTddRequiredAlways () =
     // (2) injectWarnTddIntoJsonSchema must append 'warn_tdd' to required even when 'warn_tdd' is already present.
     // First: empty required → append.
-    let schemaEmpty = createObj [
-        "type", box "object"
-        "properties", createObj [ "warn_tdd", box (createObj [| "type", box "string"; "enum", box [| box Wanxiangshu.Kernel.WarnTdd.canonicalValue |]; "description", box Params.warnTddDesc |]) ]
-        "required", box [| |]
-    ]
+    let schemaEmpty =
+        createObj
+            [ "type", box "object"
+              "properties",
+              createObj
+                  [ "warn_tdd",
+                    box (
+                        createObj
+                            [| "type", box "string"
+                               "enum", box [| box Wanxiangshu.Kernel.WarnTdd.canonicalValue |]
+                               "description", box Params.warnTddDesc |]
+                    ) ]
+              "required", box [||] ]
+
     let resultEmpty = injectWarnTddIntoJsonSchema schemaEmpty
     let reqEmpty = unbox<obj[]> (Dyn.get resultEmpty "required")
-    check "warn_tdd required after injectWarnTdd (was empty)" (reqEmpty |> Array.exists (fun x -> string x = "warn_tdd"))
+
+    check
+        "warn_tdd required after injectWarnTdd (was empty)"
+        (reqEmpty |> Array.exists (fun x -> string x = "warn_tdd"))
     // Second: 'warn_tdd' already in required → no duplicate, still present.
-    let schemaPresent = createObj [
-        "type", box "object"
-        "properties", createObj [ "warn_tdd", box (createObj [| "type", box "string"; "enum", box [| box Wanxiangshu.Kernel.WarnTdd.canonicalValue |]; "description", box Params.warnTddDesc |]) ]
-        "required", box [| box "warn_tdd" |]
-    ]
+    let schemaPresent =
+        createObj
+            [ "type", box "object"
+              "properties",
+              createObj
+                  [ "warn_tdd",
+                    box (
+                        createObj
+                            [| "type", box "string"
+                               "enum", box [| box Wanxiangshu.Kernel.WarnTdd.canonicalValue |]
+                               "description", box Params.warnTddDesc |]
+                    ) ]
+              "required", box [| box "warn_tdd" |] ]
+
     let resultPresent = injectWarnTddIntoJsonSchema schemaPresent
     let reqPresent = unbox<obj[]> (Dyn.get resultPresent "required")
-    let warnTddCount = reqPresent |> Array.filter (fun x -> string x = "warn_tdd") |> Array.length
+
+    let warnTddCount =
+        reqPresent |> Array.filter (fun x -> string x = "warn_tdd") |> Array.length
+
     equal "warn_tdd count after injectWarnTdd (was already present)" 1 warnTddCount
 
 let hookSchemaExecutorCombinedWarns () =
     // (3) Real Opencode tool.definition hook provides output.jsonSchema directly.
     // Pre-populate jsonSchema with a synthetic executor schema; injectors rewrite in-place.
-    let executorJsonSchema = createObj [
-        "type", box "object"
-        "properties", createObj [
-            "command", box (createObj [ "type", box "string"; "description", box "Command to run" ])
-        ]
-        "required", box [| box "command" |]
-    ]
+    let executorJsonSchema =
+        createObj
+            [ "type", box "object"
+              "properties",
+              createObj [ "command", box (createObj [ "type", box "string"; "description", box "Command to run" ]) ]
+              "required", box [| box "command" |] ]
+
     let output = createObj [ "jsonSchema", executorJsonSchema ]
     // Compose both injectors: warn_tdd first, then warn.
     let rewrite (schema: obj) : obj =
         injectWarnTddIntoJsonSchema schema |> ignore
         injectWarnIntoJsonSchema schema |> ignore
         schema
+
     rewriteToolJsonSchema (fun _ _ _ -> ()) rewrite output |> ignore
     let resultSchema = Dyn.get output "jsonSchema"
     check "output.jsonSchema is non-nullish" (not (Dyn.isNullish resultSchema))
@@ -146,8 +200,14 @@ let hookSchemaMethodologyNotInWarnSets () =
     // (5) A methodology tool name is in neither set.
     // methodology is the representative methodology tool name.
     let methodologyTool = "methodology"
-    check "methodology tool NOT isModificationTool" (not (Wanxiangshu.Kernel.WarnTdd.isModificationTool methodologyTool))
-    check "methodology tool NOT isWarnRequiredTool" (not (Wanxiangshu.Kernel.WarnTdd.isWarnRequiredTool methodologyTool))
+
+    check
+        "methodology tool NOT isModificationTool"
+        (not (Wanxiangshu.Kernel.WarnTdd.isModificationTool methodologyTool))
+
+    check
+        "methodology tool NOT isWarnRequiredTool"
+        (not (Wanxiangshu.Kernel.WarnTdd.isWarnRequiredTool methodologyTool))
 
 let run () =
     toolHelpers ()

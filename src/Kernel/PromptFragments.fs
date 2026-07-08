@@ -41,7 +41,12 @@ let todoNudgePromptFor (todos: string list) : string =
     frontMatterPrompt fields todoNudgePromptProse
 
 let loopNudgePromptFor (todos: string list) : string =
-    let fields = if List.isEmpty todos then [] else [ yamlStringSeqField "todos" todos ]
+    let fields =
+        if List.isEmpty todos then
+            []
+        else
+            [ yamlStringSeqField "todos" todos ]
+
     frontMatterPrompt fields loopNudgePromptProse
 
 let todoNudgePrompt = todoNudgePromptProse
@@ -52,6 +57,7 @@ let runnerNudgePromptFor (host: Host) =
         match host with
         | Omp -> "executor_wait", "executor_abort"
         | _ -> "runner_wait", "runner_abort"
+
     $"A background runner task is still active. Call {waitTool} to collect output or {abortTool} to stop it before finishing."
 
 let runnerNudgePrompt = runnerNudgePromptFor opencode

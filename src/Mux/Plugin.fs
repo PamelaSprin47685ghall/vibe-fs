@@ -5,12 +5,12 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Mux.PluginCatalog
 open Wanxiangshu.Mux.ReadDedup
 open Wanxiangshu.Shell.WorkspaceFiles
+
 module Dyn = Wanxiangshu.Shell.Dyn
 
 let muxToolNames = PluginCatalog.muxToolNames
 
-let getPluginToolPolicy (agentId: string) (role: obj) : obj =
-    buildToolPolicy muxToolNames role
+let getPluginToolPolicy (agentId: string) (role: obj) : obj = buildToolPolicy muxToolNames role
 
 let collectReadOutputs (messages: obj array) : string[] =
     Wanxiangshu.Shell.ReadDedupMuxPlugin.collectReadOutputs messages

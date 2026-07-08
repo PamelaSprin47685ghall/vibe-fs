@@ -6,10 +6,15 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.Dyn
 
 let operationActionFromInput (input: obj) : string =
-    if Dyn.isNullish input then ""
+    if Dyn.isNullish input then
+        ""
     else
         let operation = Dyn.get input "operation"
-        if Dyn.isNullish operation then "" else Dyn.str operation "action"
+
+        if Dyn.isNullish operation then
+            ""
+        else
+            Dyn.str operation "action"
 
 let toolOutputAndErrorFromHostOutput (output: obj) : string * string =
     if Dyn.isNullish output then "", ""
@@ -17,9 +22,11 @@ let toolOutputAndErrorFromHostOutput (output: obj) : string * string =
     else Dyn.str output "content", Dyn.str output "error"
 
 let decodeOpencodeToolStateBox (state: obj) : ToolState<obj> option =
-    if Dyn.isNullish state then None
+    if Dyn.isNullish state then
+        None
     else
         let input = Dyn.get state "input"
+
         Some
             { status = Dyn.str state "status"
               output = Dyn.str state "output"
@@ -36,9 +43,12 @@ let muxPartStateToKernelStatus (partState: string) : string =
 let decodeMuxDynamicToolState (part: obj) : ToolState<obj> option =
     let output = Dyn.get part "output"
     let input = Dyn.get part "input"
-    if Dyn.isNullish output && Dyn.isNullish input then None
+
+    if Dyn.isNullish output && Dyn.isNullish input then
+        None
     else
         let out, err = toolOutputAndErrorFromHostOutput output
+
         Some
             { status = muxPartStateToKernelStatus (Dyn.str part "state")
               output = out
@@ -49,5 +59,7 @@ let decodeMuxDynamicToolState (part: obj) : ToolState<obj> option =
 let decodeTextPart (part: obj) : string = Dyn.str part "text"
 
 let decodePartsFromArray (parts: obj) : obj array =
-    if Dyn.isNullish parts || not (Dyn.isArray parts) then [||]
-    else parts :?> obj array
+    if Dyn.isNullish parts || not (Dyn.isArray parts) then
+        [||]
+    else
+        parts :?> obj array

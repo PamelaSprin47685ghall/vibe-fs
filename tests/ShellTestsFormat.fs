@@ -8,7 +8,14 @@ open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Shell
 
 let webApiSearchFormat () =
-    let results = [ { title = "A"; url = "u1"; content = "ca" }; { title = "B"; url = "u2"; content = "cb" } ]
+    let results =
+        [ { title = "A"
+            url = "u1"
+            content = "ca" }
+          { title = "B"
+            url = "u2"
+            content = "cb" } ]
+
     let formatted = formatSearchResults results
     check "search results front matter" (formatted.StartsWith "---\nresults:")
     check "search embeds title A" (formatted.Contains "title: A")
@@ -19,13 +26,27 @@ let ollamaFormat = webApiSearchFormat
 
 let summarizerInputCap () =
     let bl (s: string) : int = s.Length
-    let trunc (s: string) (maxBytes: int) : string = if s.Length <= maxBytes then s else s.[..maxBytes - 1]
-    let opts : ExecuteOptions =
-        { program = "echo x"; language = Shell; dependencies = []; timeoutType = Long; mode = "ro"; cwd = None; whatToSummarize = "" }
+
+    let trunc (s: string) (maxBytes: int) : string =
+        if s.Length <= maxBytes then s else s.[.. maxBytes - 1]
+
+    let opts: ExecuteOptions =
+        { program = "echo x"
+          language = Shell
+          dependencies = []
+          timeoutType = Long
+          mode = "ro"
+          cwd = None
+          whatToSummarize = "" }
+
     let small = String.replicate 100 "x"
     let smallPrompt = buildSummaryPrompt bl trunc opts (Completed(small, 0))
     check "small output kept whole" (smallPrompt.Contains small)
-    check "small output not truncated" (not (smallPrompt.Contains "[Output truncated to 200000 bytes for summarization]"))
+
+    check
+        "small output not truncated"
+        (not (smallPrompt.Contains "[Output truncated to 200000 bytes for summarization]"))
+
     let marker = "END_OF_OUTPUT_TAIL"
     let large = String.replicate (200_000 + 100 - marker.Length) "x" + marker
     let tail = marker
@@ -34,20 +55,38 @@ let summarizerInputCap () =
     check "large output tail absent" (not (largePrompt.Contains tail))
 
 let safetyWarning () =
-    let warn program = prependSafetyWarning "OUT" program Shell
+    let warn program =
+        prependSafetyWarning "OUT" program Shell
+
     let warnForExecution program =
-        prependSafetyWarningForExecution "OUT" { program = program; language = Shell; dependencies = []; timeoutType = Short; mode = "ro"; cwd = None; whatToSummarize = "" }
+        prependSafetyWarningForExecution
+            "OUT"
+            { program = program
+              language = Shell
+              dependencies = []
+              timeoutType = Short
+              mode = "ro"
+              cwd = None
+              whatToSummarize = "" }
+
     check "leading grep warns" (hasExactHint (warn "grep foo") hintExecutorMisuse)
     check "grep after && warns" (hasExactHint (warn "cd src && grep foo") hintExecutorMisuse)
     check "grep in pipe warns" (hasExactHint (warn "ls a | grep b") hintExecutorMisuse)
     check "stripped head pipe passes" (not (hasExactHint (warn "printf hi | head -n 1") hintExecutorMisuse))
-    check "execution warning uses prepared program" (not (hasExactHint (warnForExecution "printf hi | head -n 1") hintExecutorMisuse))
+
+    check
+        "execution warning uses prepared program"
+        (not (hasExactHint (warnForExecution "printf hi | head -n 1") hintExecutorMisuse))
+
     check "real head command warns" (hasExactHint (warn "head -n 1 file.txt") hintExecutorMisuse)
     check "ls after semicolon warns" (hasExactHint (warn "echo ok; ls -la") hintExecutorMisuse)
     check "prefixed path warns" (hasExactHint (warn "/usr/bin/grep foo") hintExecutorMisuse)
     check "plain echo passes" (not (hasExactHint (warn "echo hi") hintExecutorMisuse))
     check "substring inside word ignored" (not (hasExactHint (warn "echo concatenate") hintExecutorMisuse))
-    check "non-shell language ignored" (not (hasExactHint (prependSafetyWarning "OUT" "grep foo" Python) hintExecutorMisuse))
+
+    check
+        "non-shell language ignored"
+        (not (hasExactHint (prependSafetyWarning "OUT" "grep foo" Python) hintExecutorMisuse))
 
 let executorToolResponseFormatting () =
     let completedResult = Completed("all good", 0)
@@ -86,12 +125,16 @@ let executorToolResponseFormatting () =
     check "summary response has exit_code 0" (summaryResp.Contains "exit_code: 0")
 
 let summarizerPromptOmitsReturnValue () =
-    let prompt = executorSummarizerPrompt "" "raw output" "shell" "echo 1" [] "short" "ro"
+    let prompt =
+        executorSummarizerPrompt "" "raw output" "shell" "echo 1" [] "short" "ro"
+
     check "summarizer prompt omits exit status" (not (prompt.Contains "exit status"))
     check "summarizer prompt omits non-zero" (not (prompt.ToLowerInvariant().Contains "non-zero"))
     check "summarizer empty deps yaml" (prompt.Contains "dependencies: []")
+
     let multiline =
         executorSummarizerPrompt "" "line1\nline2" "shell" "echo hi\necho bye" [ "dep1" ] "long" "ro"
+
     check "summarizer multiline program uses block field" (multiline.Contains "program: |")
     check "summarizer multiline raw output in body" (multiline.Contains "line1" && multiline.Contains "line2")
 
@@ -103,6 +146,7 @@ let formatFetchResponseAllFields () =
           byline = Some "By Author"
           length = Some 500
           content = Some "body text" }
+
     let out = formatFetchResponse data
     check "front matter contains title" (out.Contains "title: The Title")
     check "front matter contains byline" (out.Contains "byline: By Author")
@@ -115,6 +159,7 @@ let formatFetchResponseOnlyTitle () =
           byline = None
           length = None
           content = None }
+
     let out = formatFetchResponse data
     check "front matter contains title" (out.Contains "title: Only Title")
     check "front matter omits byline" (not (out.Contains "byline:"))
@@ -127,6 +172,7 @@ let formatFetchResponseOnlyContent () =
           byline = None
           length = None
           content = Some "just body" }
+
     let out = formatFetchResponse data
     check "front matter contains content" (out.Contains "just body")
     check "front matter omits title" (not (out.Contains "title:"))
@@ -139,6 +185,7 @@ let formatFetchResponseAllNone () =
           byline = None
           length = None
           content = None }
+
     let out = formatFetchResponse data
     equal "formatFetchResponseAllNone returns empty" "" out
     check "front matter has no title" (not (out.Contains "title:"))
@@ -152,6 +199,7 @@ let formatFetchResponseEmptyTitleOmitted () =
           byline = None
           length = None
           content = Some "body" }
+
     let out = formatFetchResponse data
     check "empty title omitted" (not (out.Contains "title:"))
     check "content still present" (out.Contains "body")

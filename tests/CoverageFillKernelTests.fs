@@ -36,12 +36,34 @@ let domainFormatAllErrors () =
     equal "MessageAborted" "aborted" (formatDomainError MessageAborted)
     equal "SessionBusy" "session busy" (formatDomainError SessionBusy)
     equal "TaskWaitBackgrounded" "task wait backgrounded" (formatDomainError TaskWaitBackgrounded)
-    equal "ExecutorExecutableMissing" "executable not found: bash" (formatDomainError (ExecutorExecutableMissing "bash"))
-    equal "ParseError" "parse error in json: unexpected end of input" (formatDomainError (ParseError("json", "unexpected end of input")))
-    equal "ToolNotPermitted" "tool 'write' not permitted for agent 'reader'" (formatDomainError (ToolNotPermitted("reader", "write")))
-    equal "InvalidIntent" "invalid arg for tool 'eval': missing" (formatDomainError (InvalidIntent("eval", "arg", "missing")))
+
+    equal
+        "ExecutorExecutableMissing"
+        "executable not found: bash"
+        (formatDomainError (ExecutorExecutableMissing "bash"))
+
+    equal
+        "ParseError"
+        "parse error in json: unexpected end of input"
+        (formatDomainError (ParseError("json", "unexpected end of input")))
+
+    equal
+        "ToolNotPermitted"
+        "tool 'write' not permitted for agent 'reader'"
+        (formatDomainError (ToolNotPermitted("reader", "write")))
+
+    equal
+        "InvalidIntent"
+        "invalid arg for tool 'eval': missing"
+        (formatDomainError (InvalidIntent("eval", "arg", "missing")))
+
     equal "UpstreamTimeout" "upstream timeout after 30s" (formatDomainError (UpstreamTimeout 30))
-    equal "UpstreamRefused" "upstream refused: connection reset" (formatDomainError (UpstreamRefused "connection reset"))
+
+    equal
+        "UpstreamRefused"
+        "upstream refused: connection reset"
+        (formatDomainError (UpstreamRefused "connection reset"))
+
     equal "SystemPanic" "system panic: invariant violated" (formatDomainError (SystemPanic "invariant violated"))
     equal "UnknownJsError" "some native error" (formatDomainError (UnknownJsError "some native error"))
 
@@ -62,17 +84,33 @@ let domainClassifyErrorLeaf () =
     equal "MessageAborted tag" MessageAborted (classifyErrorLeaf "SomeError" "MessageAborted" "nope")
     equal "SessionBusyError name" SessionBusy (classifyErrorLeaf "SessionBusyError" "SomeTag" "nope")
     equal "SessionBusy tag" SessionBusy (classifyErrorLeaf "SomeError" "SessionBusy" "nope")
-    equal "ForegroundWaitBackgroundedError name" TaskWaitBackgrounded (classifyErrorLeaf "ForegroundWaitBackgroundedError" "SomeTag" "nope")
+
+    equal
+        "ForegroundWaitBackgroundedError name"
+        TaskWaitBackgrounded
+        (classifyErrorLeaf "ForegroundWaitBackgroundedError" "SomeTag" "nope")
+
     equal "TaskWaitBackgrounded tag" TaskWaitBackgrounded (classifyErrorLeaf "SomeError" "TaskWaitBackgrounded" "nope")
-    equal "fallback abort text" (ClientCancellation "abort-text") (classifyErrorLeaf "UnknownError" "SomeTag" "operation aborted")
-    equal "fallback no abort" (UnknownJsError "plain failure") (classifyErrorLeaf "UnknownError" "SomeTag" "plain failure")
+
+    equal
+        "fallback abort text"
+        (ClientCancellation "abort-text")
+        (classifyErrorLeaf "UnknownError" "SomeTag" "operation aborted")
+
+    equal
+        "fallback no abort"
+        (UnknownJsError "plain failure")
+        (classifyErrorLeaf "UnknownError" "SomeTag" "plain failure")
 
 let domainReduce () =
     let cid1 =
         match childId "c1" with
         | Ok id -> id
         | Error msg -> failwith ("childId failed: " + msg)
-    let s = reduce Wanxiangshu.Kernel.Domain.empty (ChildRegistered(cid1, { agent = "a"; parentSessionId = None }))
+
+    let s =
+        reduce Wanxiangshu.Kernel.Domain.empty (ChildRegistered(cid1, { agent = "a"; parentSessionId = None }))
+
     check "reduce adds child" (Map.count s.childSessions = 1)
     let s2 = reduce s (ChildUnregistered cid1)
     equal "reduce unregister idempotent to empty" Wanxiangshu.Kernel.Domain.empty s2
@@ -80,8 +118,34 @@ let domainReduce () =
 // ── Kernel.Messaging ───────────────────────────────────────────────────────
 
 let msgFlatten () =
-    let m1 = { info = { id = "1"; sessionID = ""; role = User; agent = ""; isError = false; toolName = ""; details = null; time = null }; parts = [ TextPart "hi" ]; source = Native; raw = null }
-    let m2 = { info = { id = "2"; sessionID = ""; role = Assistant; agent = ""; isError = false; toolName = ""; details = null; time = null }; parts = [ TextPart "ok"; ToolPart("t", "c1", None, null) ]; source = Native; raw = null }
+    let m1 =
+        { info =
+            { id = "1"
+              sessionID = ""
+              role = User
+              agent = ""
+              isError = false
+              toolName = ""
+              details = null
+              time = null }
+          parts = [ TextPart "hi" ]
+          source = Native
+          raw = null }
+
+    let m2 =
+        { info =
+            { id = "2"
+              sessionID = ""
+              role = Assistant
+              agent = ""
+              isError = false
+              toolName = ""
+              details = null
+              time = null }
+          parts = [ TextPart "ok"; ToolPart("t", "c1", None, null) ]
+          source = Native
+          raw = null }
+
     let flat = flatten [ m1; m2 ]
     equal "flatten count" 3 flat.Length
     let fp0 = flat.[0]
@@ -96,27 +160,66 @@ let msgFlatten () =
 
 let msgReadAssistantText () =
     let m =
-        { info = { id = ""; sessionID = ""; role = Assistant; agent = ""; isError = false; toolName = ""; details = null; time = null }
+        { info =
+            { id = ""
+              sessionID = ""
+              role = Assistant
+              agent = ""
+              isError = false
+              toolName = ""
+              details = null
+              time = null }
           parts = [ TextPart "hello"; TextPart "world" ]
-          source = Native; raw = null }
+          source = Native
+          raw = null }
+
     equal "assistant text" (Some "hello world") (readAssistantText [ m ] 0 " ")
+
     let emptyMsg =
-        { info = { id = ""; sessionID = ""; role = Assistant; agent = ""; isError = false; toolName = ""; details = null; time = null }
+        { info =
+            { id = ""
+              sessionID = ""
+              role = Assistant
+              agent = ""
+              isError = false
+              toolName = ""
+              details = null
+              time = null }
           parts = []
-          source = Native; raw = null }
+          source = Native
+          raw = null }
+
     equal "empty parts" None (readAssistantText [ emptyMsg ] 0 " ")
     equal "startIndex past" None (readAssistantText [ m ] 1 " ")
+
     let userMsg =
-        { info = { id = ""; sessionID = ""; role = User; agent = ""; isError = false; toolName = ""; details = null; time = null }
+        { info =
+            { id = ""
+              sessionID = ""
+              role = User
+              agent = ""
+              isError = false
+              toolName = ""
+              details = null
+              time = null }
           parts = [ TextPart "hi" ]
-          source = Native; raw = null }
+          source = Native
+          raw = null }
+
     equal "no assistant" None (readAssistantText [ userMsg ] 0 " ")
 
 let msgClassifySourceAndDecodeRole () =
     equal "empty source" Native (classifySource "")
     equal "unknown source" Native (classifySource "chat-123")
-    match classifySource "caps-synth-user-x" with Synthetic k -> equal "synth user kind" "caps-synth-user-" k | _ -> failwith "expected Synthetic"
-    match classifySource "backlog-projection-y" with Synthetic _ -> () | _ -> failwith "expected Synthetic"
+
+    match classifySource "caps-synth-user-x" with
+    | Synthetic k -> equal "synth user kind" "caps-synth-user-" k
+    | _ -> failwith "expected Synthetic"
+
+    match classifySource "backlog-projection-y" with
+    | Synthetic _ -> ()
+    | _ -> failwith "expected Synthetic"
+
     equal "decode User" User (decodeRole "user")
     equal "decode Assistant" Assistant (decodeRole "assistant")
     equal "decode toolResult" ToolResult (decodeRole "toolResult")
@@ -128,19 +231,49 @@ let msgPartAccessors () =
     let tp = TextPart "hello"
     equal "partTextStr TextPart" "hello" (partTextStr tp)
     check "partIsText TextPart" (partIsText tp)
-    check "partIsText not ToolPart" (not (partIsText (ToolPart("t", "c", None, null) : Part<obj>)))
-    let tool = ToolPart("t", "c1", Some { status = ""; output = ""; error = ""; input = null; operationAction = "" }, null)
+    check "partIsText not ToolPart" (not (partIsText (ToolPart("t", "c", None, null): Part<obj>)))
+
+    let tool =
+        ToolPart(
+            "t",
+            "c1",
+            Some
+                { status = ""
+                  output = ""
+                  error = ""
+                  input = null
+                  operationAction = "" },
+            null
+        )
+
     check "partIsTool ToolPart" (partIsTool tool)
     equal "partCallID" "c1" (partCallID tool)
     check "partIsTool not TextPart" (not (partIsTool tp))
     let updated = setPartOutputTyped tool "new_out"
+
     match updated with
     | ToolPart(_, _, Some st, _) -> equal "setOutput" "new_out" st.output
     | _ -> failwith "expected ToolPart"
 
 let msgStripSynthetic () =
-    let native = { info = { id = ""; sessionID = ""; role = User; agent = ""; isError = false; toolName = ""; details = null; time = null }; parts = []; source = Native; raw = null }
-    let synth = { native with source = Synthetic "caps" }
+    let native =
+        { info =
+            { id = ""
+              sessionID = ""
+              role = User
+              agent = ""
+              isError = false
+              toolName = ""
+              details = null
+              time = null }
+          parts = []
+          source = Native
+          raw = null }
+
+    let synth =
+        { native with
+            source = Synthetic "caps" }
+
     let r = stripSyntheticBySource [ native; synth ]
     equal "strip synthetic count" 1 r.Length
     equal "stays native" Native r.[0].source
@@ -148,14 +281,37 @@ let msgStripSynthetic () =
 // ── Kernel.WebFetchGuard ───────────────────────────────────────────────────
 
 let wfgValidateUrl () =
-    match validateFetchUrl "http://example.com" with Ok () -> check "http ok" true | Error _ -> check "http ok" false
-    match validateFetchUrl "https://example.com/path" with Ok () -> check "https ok" true | Error _ -> check "https ok" false
-    match validateFetchUrl "http://[::1]" with Error msg -> equal "ipv6 literal blocked" "host not allowed" msg | Ok () -> check "ipv6 blocked" false
-    match validateFetchUrl "not a url" with Error msg -> equal "invalid url" "invalid URL" msg | Ok () -> check "invalid blocked" false
-    match validateFetchUrl "ftp://example.com" with Error msg -> equal "ftp unsupported" "unsupported URL scheme: ftp" msg | Ok () -> check "ftp blocked" false
-    match validateFetchUrl "http://localhost" with Error msg -> equal "localhost blocked" "host not allowed" msg | Ok () -> check "localhost blocked" false
-    match validateFetchUrl "http://127.0.0.1" with Error msg -> equal "private ipv4 blocked" "host not allowed" msg | Ok () -> check "loopback blocked" false
-    match validateFetchUrl "http://8.8.8.8" with Ok () -> check "public ip ok" true | Error _ -> check "public ip ok" false
+    match validateFetchUrl "http://example.com" with
+    | Ok() -> check "http ok" true
+    | Error _ -> check "http ok" false
+
+    match validateFetchUrl "https://example.com/path" with
+    | Ok() -> check "https ok" true
+    | Error _ -> check "https ok" false
+
+    match validateFetchUrl "http://[::1]" with
+    | Error msg -> equal "ipv6 literal blocked" "host not allowed" msg
+    | Ok() -> check "ipv6 blocked" false
+
+    match validateFetchUrl "not a url" with
+    | Error msg -> equal "invalid url" "invalid URL" msg
+    | Ok() -> check "invalid blocked" false
+
+    match validateFetchUrl "ftp://example.com" with
+    | Error msg -> equal "ftp unsupported" "unsupported URL scheme: ftp" msg
+    | Ok() -> check "ftp blocked" false
+
+    match validateFetchUrl "http://localhost" with
+    | Error msg -> equal "localhost blocked" "host not allowed" msg
+    | Ok() -> check "localhost blocked" false
+
+    match validateFetchUrl "http://127.0.0.1" with
+    | Error msg -> equal "private ipv4 blocked" "host not allowed" msg
+    | Ok() -> check "loopback blocked" false
+
+    match validateFetchUrl "http://8.8.8.8" with
+    | Ok() -> check "public ip ok" true
+    | Error _ -> check "public ip ok" false
 
 // ── Kernel.ExecutorStrip ───────────────────────────────────────────────────
 
@@ -210,7 +366,7 @@ let fpNormalizePathConstraint () =
 let fpBuildQuery () =
     let cwd = "/workspace"
     equal "no path no exclude" "foo" (buildQuery None "foo" [] cwd false)
-    equal "path+exclude+pattern" "src/ !node_modules/ foo" (buildQuery (Some "src") "foo" ["node_modules"] cwd false)
+    equal "path+exclude+pattern" "src/ !node_modules/ foo" (buildQuery (Some "src") "foo" [ "node_modules" ] cwd false)
     equal "external abs" "/ext/file p" (buildQuery (Some "/ext/file") "p" [] cwd true)
 
 let fpResolveSearchPath () =

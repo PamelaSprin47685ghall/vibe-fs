@@ -7,41 +7,72 @@ open Wanxiangshu.Opencode.HookSchema
 open Wanxiangshu.Shell.WorkBacklogSchema
 open Wanxiangshu.Kernel.WarnTdd
 open Wanxiangshu.Shell.Dyn
+
 module Dyn = Wanxiangshu.Shell.Dyn
 
 // ── setUiLabel ────────────────────────────────────────────────────────────────
 
 let opencodeHookSchemaSetUiLabelCoder () =
-    let args = createObj [ "intents", box [| box (createObj [
-        "objective", box "Fix bug"
-        "background", box "reason"
-        "targets", box [| createObj [ "file", box "src/a.fs"; "guide", box "fix it" ] |]
-        "do_not_touch", box [||]
-    ]) |] ]
+    let args =
+        createObj
+            [ "intents",
+              box
+                  [| box (
+                         createObj
+                             [ "objective", box "Fix bug"
+                               "background", box "reason"
+                               "targets", box [| createObj [ "file", box "src/a.fs"; "guide", box "fix it" ] |]
+                               "do_not_touch", box [||] ]
+                     ) |] ]
+
     setUiLabel args "coder"
     check "coder _ui set" (not (Dyn.isNullish (Dyn.get args "_ui")))
 
 let opencodeHookSchemaSetUiLabelInvestigator () =
-    let args = createObj [ "intents", box [| box {| objective = "Investigate"; background = "reason"; questions = [| "Q1" |]; entries = [||] |} |] ]
+    let args =
+        createObj
+            [ "intents",
+              box
+                  [| box
+                         {| objective = "Investigate"
+                            background = "reason"
+                            questions = [| "Q1" |]
+                            entries = [||] |} |] ]
+
     setUiLabel args "investigator"
     check "investigator _ui set" (not (Dyn.isNullish (Dyn.get args "_ui")))
 
 let opencodeHookSchemaSetUiLabelOther () =
-    let args = createObj [ "intents", box [| box {| objective = "Fix bug"; background = "reason"; targets = [||]; do_not_touch = [||] |} |] ]
+    let args =
+        createObj
+            [ "intents",
+              box
+                  [| box
+                         {| objective = "Fix bug"
+                            background = "reason"
+                            targets = [||]
+                            do_not_touch = [||] |} |] ]
+
     setUiLabel args "other"
     check "other _ui not set" (Dyn.isNullish (Dyn.get args "_ui"))
 
 // ── stripUiFromJsonSchema ─────────────────────────────────────────────────────
 
 let opencodeHookSchemaStripUiFromJsonSchemaWithUi () =
-    let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []); "_ui", box (createObj []) ] ]
+    let schema =
+        createObj
+            [ "type", box "object"
+              "properties", createObj [ "name", box (createObj []); "_ui", box (createObj []) ] ]
+
     let result = stripUiFromJsonSchema schema
     check "type preserved" (Dyn.str result "type" = "object")
     check "_ui removed" (Dyn.isNullish (Dyn.get (Dyn.get result "properties") "_ui"))
     check "name kept" (not (Dyn.isNullish (Dyn.get (Dyn.get result "properties") "name")))
 
 let opencodeHookSchemaStripUiFromJsonSchemaNoUi () =
-    let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
+    let schema =
+        createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
+
     let result = stripUiFromJsonSchema schema
     check "type preserved no _ui" (Dyn.str result "type" = "object")
     check "name still present" (not (Dyn.isNullish (Dyn.get (Dyn.get result "properties") "name")))
@@ -54,32 +85,60 @@ let opencodeHookSchemaStripUiFromJsonSchemaNull () =
 
 let opencodeHookSchemaRewriteToolJsonSchemaJsonSchema () =
     let mutable capturedKey = ""
-    let setKey (o: obj) (k: string) (v: obj) = capturedKey <- k; o?(k) <- v
-    let rewrite (o: obj) = o?("tag") <- "rewritten"; o
+
+    let setKey (o: obj) (k: string) (v: obj) =
+        capturedKey <- k
+        o?(k) <- v
+
+    let rewrite (o: obj) =
+        o?("tag") <- "rewritten"
+        o
+
     let outJson = createObj [ "jsonSchema", createObj [ "a", box 1 ] ]
     rewriteToolJsonSchema setKey rewrite outJson |> ignore
     equal "jsonSchema rewritten" "rewritten" (string (outJson?("jsonSchema")?("tag")))
 
 let opencodeHookSchemaRewriteToolJsonSchemaParameters () =
     let mutable capturedKey = ""
-    let setKey (o: obj) (k: string) (v: obj) = capturedKey <- k; o?(k) <- v
-    let rewrite (o: obj) = o?("tag") <- "rewritten"; o
+
+    let setKey (o: obj) (k: string) (v: obj) =
+        capturedKey <- k
+        o?(k) <- v
+
+    let rewrite (o: obj) =
+        o?("tag") <- "rewritten"
+        o
+
     let outParams = createObj [ "parameters", createObj [ "b", box 2 ] ]
     rewriteToolJsonSchema setKey rewrite outParams |> ignore
     equal "parameters rewritten" "rewritten" (string (outParams?("parameters")?("tag")))
 
 let opencodeHookSchemaRewriteToolJsonSchemaNoSchema () =
     let mutable capturedKey = ""
-    let setKey (o: obj) (k: string) (v: obj) = capturedKey <- k; o?(k) <- v
-    let rewrite (o: obj) = o?("tag") <- "rewritten"; o
+
+    let setKey (o: obj) (k: string) (v: obj) =
+        capturedKey <- k
+        o?(k) <- v
+
+    let rewrite (o: obj) =
+        o?("tag") <- "rewritten"
+        o
+
     let outNone = createObj []
     rewriteToolJsonSchema setKey rewrite outNone |> ignore
     equal "no crash key empty" "" capturedKey
 
 let opencodeHookSchemaRewriteToolJsonSchemaArgsBranch () =
     let mutable capturedKey = ""
-    let setKey (o: obj) (k: string) (v: obj) = capturedKey <- k; o?(k) <- v
-    let rewrite (o: obj) = o?("tag") <- "rewritten"; o
+
+    let setKey (o: obj) (k: string) (v: obj) =
+        capturedKey <- k
+        o?(k) <- v
+
+    let rewrite (o: obj) =
+        o?("tag") <- "rewritten"
+        o
+
     let outArgs = createObj [ "args", createObj [ "c", box 3 ] ]
     rewriteToolJsonSchema setKey rewrite outArgs |> ignore
     equal "args rewritten" "rewritten" (string (outArgs?("args")?("tag")))
@@ -87,15 +146,26 @@ let opencodeHookSchemaRewriteToolJsonSchemaArgsBranch () =
 // ── injectWarnTddIntoJsonSchema ───────────────────────────────────────────────
 
 let opencodeHookSchemaInjectWarnTddIntoEmptySchema () =
-    let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
+    let schema =
+        createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
+
     injectWarnTddIntoJsonSchema schema |> ignore
     let props = get schema "properties"
     check "warn_tdd property injected" (not (Dyn.isNullish (get props "warn_tdd")))
     let required = get schema "required"
-    check "warn_tdd added to required" (isArray required && (required :?> obj array |> Array.exists (fun x -> string x = "warn_tdd")))
+
+    check
+        "warn_tdd added to required"
+        (isArray required
+         && (required :?> obj array |> Array.exists (fun x -> string x = "warn_tdd")))
 
 let opencodeHookSchemaInjectWarnTddAlreadyPresent () =
-    let schema = createObj [ "type", box "object"; "properties", createObj [ "warn_tdd", box (createObj []) ]; "required", box [| box "warn_tdd" |] ]
+    let schema =
+        createObj
+            [ "type", box "object"
+              "properties", createObj [ "warn_tdd", box (createObj []) ]
+              "required", box [| box "warn_tdd" |] ]
+
     injectWarnTddIntoJsonSchema schema |> ignore
     let props = get schema "properties"
     check "existing warn_tdd still present" (not (Dyn.isNullish (get props "warn_tdd")))
@@ -107,7 +177,9 @@ let opencodeHookSchemaInjectWarnTddNullSchema () =
 // ── mergeWorkBacklogReportIntoTaskSchema ─────────────────────────────────────
 
 let opencodeHookSchemaMergeWorkBacklogReportIntoPureSchema () =
-    let schema = createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
+    let schema =
+        createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
+
     let result = mergeWorkBacklogReportIntoTaskSchema schema
     let props = get result "properties"
     check "ahaMoments added" (not (Dyn.isNullish (get props "ahaMoments")))
@@ -115,14 +187,14 @@ let opencodeHookSchemaMergeWorkBacklogReportIntoPureSchema () =
 
 let opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId () =
     let schema =
-        createObj [
-            "type", box "object"
-            "properties", createObj [
-                "task_id", box (createObj [ "type", box "string" ])
-                "description", box (createObj [ "type", box "string" ])
-            ]
-            "required", box [| box "task_id"; box "description" |]
-        ]
+        createObj
+            [ "type", box "object"
+              "properties",
+              createObj
+                  [ "task_id", box (createObj [ "type", box "string" ])
+                    "description", box (createObj [ "type", box "string" ]) ]
+              "required", box [| box "task_id"; box "description" |] ]
+
     let result = mergeWorkBacklogReportIntoTaskSchema schema
     let resultProps = get result "properties"
     let resultRequired = get result "required"
@@ -131,7 +203,11 @@ let opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId () =
     check "ahaMoments added" (not (Dyn.isNullish (get props "ahaMoments")))
     check "select_methodology added" (not (Dyn.isNullish (get props "select_methodology")))
     let required = resultRequired
-    check "task_id absent from required" (not (isArray required) || not ((required :?> obj array) |> Array.exists (fun x -> string x = "task_id")))
+
+    check
+        "task_id absent from required"
+        (not (isArray required)
+         || not ((required :?> obj array) |> Array.exists (fun x -> string x = "task_id")))
 
 // ── buildWorkBacklogSchema ────────────────────────────────────────────────────
 
@@ -149,21 +225,22 @@ let opencodeHookSchemaBuildWorkBacklogSchema () =
 
 // ── run ───────────────────────────────────────────────────────────────────────
 
-let run () = promise {
-    opencodeHookSchemaSetUiLabelCoder ()
-    opencodeHookSchemaSetUiLabelInvestigator ()
-    opencodeHookSchemaSetUiLabelOther ()
-    opencodeHookSchemaStripUiFromJsonSchemaWithUi ()
-    opencodeHookSchemaStripUiFromJsonSchemaNoUi ()
-    opencodeHookSchemaStripUiFromJsonSchemaNull ()
-    opencodeHookSchemaInjectWarnTddIntoEmptySchema ()
-    opencodeHookSchemaBuildWorkBacklogSchema ()
-    opencodeHookSchemaRewriteToolJsonSchemaJsonSchema ()
-    opencodeHookSchemaRewriteToolJsonSchemaParameters ()
-    opencodeHookSchemaRewriteToolJsonSchemaNoSchema ()
-    opencodeHookSchemaRewriteToolJsonSchemaArgsBranch ()
-    opencodeHookSchemaInjectWarnTddAlreadyPresent ()
-    opencodeHookSchemaInjectWarnTddNullSchema ()
-    opencodeHookSchemaMergeWorkBacklogReportIntoPureSchema ()
-    opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId ()
-}
+let run () =
+    promise {
+        opencodeHookSchemaSetUiLabelCoder ()
+        opencodeHookSchemaSetUiLabelInvestigator ()
+        opencodeHookSchemaSetUiLabelOther ()
+        opencodeHookSchemaStripUiFromJsonSchemaWithUi ()
+        opencodeHookSchemaStripUiFromJsonSchemaNoUi ()
+        opencodeHookSchemaStripUiFromJsonSchemaNull ()
+        opencodeHookSchemaInjectWarnTddIntoEmptySchema ()
+        opencodeHookSchemaBuildWorkBacklogSchema ()
+        opencodeHookSchemaRewriteToolJsonSchemaJsonSchema ()
+        opencodeHookSchemaRewriteToolJsonSchemaParameters ()
+        opencodeHookSchemaRewriteToolJsonSchemaNoSchema ()
+        opencodeHookSchemaRewriteToolJsonSchemaArgsBranch ()
+        opencodeHookSchemaInjectWarnTddAlreadyPresent ()
+        opencodeHookSchemaInjectWarnTddNullSchema ()
+        opencodeHookSchemaMergeWorkBacklogReportIntoPureSchema ()
+        opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId ()
+    }

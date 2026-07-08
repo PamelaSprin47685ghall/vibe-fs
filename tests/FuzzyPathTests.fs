@@ -32,19 +32,17 @@ let normalizePathConstraintTests () =
 
 let normalizeExcludesTests () =
     // ["node_modules"] -> ["!node_modules/"]
-    equal "single-token" ["!node_modules/"] (normalizeExcludes ["node_modules"] cwd)
+    equal "single-token" [ "!node_modules/" ] (normalizeExcludes [ "node_modules" ] cwd)
     // ["a, b"] splits by comma+whitespace
-    equal "comma-split" ["!a/"; "!b/"] (normalizeExcludes ["a, b"] cwd)
+    equal "comma-split" [ "!a/"; "!b/" ] (normalizeExcludes [ "a, b" ] cwd)
     // ["!../secret"] -> ["!../secret/"]
-    equal "negated-outside" ["!../secret/"] (normalizeExcludes ["!../secret"] cwd)
+    equal "negated-outside" [ "!../secret/" ] (normalizeExcludes [ "!../secret" ] cwd)
 
 let buildQueryTests () =
     // None path + no excludes -> just pattern
     equal "no-path-no-excludes" "foo" (buildQuery None "foo" [] cwd false)
     // path + exclude + pattern -> concatenated
-    equal "path-exclude-pattern"
-        "src/ !node_modules/ foo"
-        (buildQuery (Some "src") "foo" ["node_modules"] cwd false)
+    equal "path-exclude-pattern" "src/ !node_modules/ foo" (buildQuery (Some "src") "foo" [ "node_modules" ] cwd false)
 
 let resolveFuzzySearchPathTests () =
     // None -> cwd base, no constraint

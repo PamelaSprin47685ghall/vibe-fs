@@ -8,46 +8,59 @@ open Wanxiangshu.Kernel.TreeSitterKernel
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.TreeSitterShell
 
-let checkSyntaxBadJson () = promise {
-    let! result = checkSyntax "const x = (" "sample.ts"
-    match result with
-    | Ok(lang, errors) ->
-        if lang = "" then check "no parser skips errors" (errors.Length = 0)
-        else check "broken ts has diagnostics" (errors.Length > 0)
-    | Failed(_, reason) ->
-        check "failed reason non-empty" (reason <> "")
-}
+let checkSyntaxBadJson () =
+    promise {
+        let! result = checkSyntax "const x = (" "sample.ts"
 
-let checkSyntaxValidJson () = promise {
-    let! result = checkSyntax "{}" "sample.json"
-    match result with
-    | Ok(lang, errors) ->
-        if lang <> "" then check "valid json no errors" (errors.Length = 0)
-    | Failed(_, reason) -> check "valid json should not fail" (reason = "" && false)
-}
+        match result with
+        | Ok(lang, errors) ->
+            if lang = "" then
+                check "no parser skips errors" (errors.Length = 0)
+            else
+                check "broken ts has diagnostics" (errors.Length > 0)
+        | Failed(_, reason) -> check "failed reason non-empty" (reason <> "")
+    }
 
-let checkSyntaxBrokenJsonReports_intentionalWarningFork () = promise {
-    let! result = checkSyntax "{bad" "broken.json"
-    match result with
-    | Ok(_, errors) ->
-        check "broken json has errors" (errors.Length >= 1)
-        for err in errors do
-            check "syntax severity warning or error (tree-sitter fork)" (err.severity = "warning" || err.severity = "error")
-            check "syntax line >= 1" (err.line >= 1)
-            check "syntax column >= 1" (err.column >= 1)
-    | Failed(_, reason) ->
-        check "failed json reason" (reason.Length > 0)
-}
+let checkSyntaxValidJson () =
+    promise {
+        let! result = checkSyntax "{}" "sample.json"
 
-let checkSyntaxStyleChecks () = promise {
-    let content = "const x = \"" + String.replicate 70 "a" + "\";"
-    let! result = checkSyntax content "sample.js"
-    match result with
-    | Ok(lang, errors) ->
-        let styleWarns = errors |> Array.filter (fun e -> e.message.Contains "exceeds 72")
-        check "has exceeds 72 warning" (styleWarns.Length > 0)
-    | Failed(_, reason) -> check "should not fail" (reason = "" && false)
-}
+        match result with
+        | Ok(lang, errors) ->
+            if lang <> "" then
+                check "valid json no errors" (errors.Length = 0)
+        | Failed(_, reason) -> check "valid json should not fail" (reason = "" && false)
+    }
+
+let checkSyntaxBrokenJsonReports_intentionalWarningFork () =
+    promise {
+        let! result = checkSyntax "{bad" "broken.json"
+
+        match result with
+        | Ok(_, errors) ->
+            check "broken json has errors" (errors.Length >= 1)
+
+            for err in errors do
+                check
+                    "syntax severity warning or error (tree-sitter fork)"
+                    (err.severity = "warning" || err.severity = "error")
+
+                check "syntax line >= 1" (err.line >= 1)
+                check "syntax column >= 1" (err.column >= 1)
+        | Failed(_, reason) -> check "failed json reason" (reason.Length > 0)
+    }
+
+let checkSyntaxStyleChecks () =
+    promise {
+        let content = "const x = \"" + String.replicate 70 "a" + "\";"
+        let! result = checkSyntax content "sample.js"
+
+        match result with
+        | Ok(lang, errors) ->
+            let styleWarns = errors |> Array.filter (fun e -> e.message.Contains "exceeds 72")
+            check "has exceeds 72 warning" (styleWarns.Length > 0)
+        | Failed(_, reason) -> check "should not fail" (reason = "" && false)
+    }
 
 let supportsSyntaxDiagnosticsGrepFalse () =
     check "grep not file-edit tool" (not (isFileEditTool "grep"))

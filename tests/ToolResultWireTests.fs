@@ -8,13 +8,13 @@ let wireEncodeResultOk () =
     check "wireEncodeResult Ok" (wireEncodeResult (Ok "done") = "done")
 
 let wireEncodeResultError () =
-    let err = InvalidIntent ("coder", "intents", "required")
+    let err = InvalidIntent("coder", "intents", "required")
     let text = wireEncodeResult (Error err)
     check "wireEncodeResult Error contains failed" (text.Contains "failed")
     check "wireEncodeResult Error contains formatDomainError" (text.Contains "invalid intents")
 
 let wireEncodeToolErrorFormat () =
-    let err = ParseError ("ctx", "detail")
+    let err = ParseError("ctx", "detail")
     let text = wireEncodeToolError "Subagent" err
     check "wireEncodeToolError context" (text.StartsWith "Subagent failed:")
     check "wireEncodeToolError detail" (text.Contains "parse error in ctx")

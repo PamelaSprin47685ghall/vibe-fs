@@ -14,9 +14,11 @@ type ProjectionStore() =
             reportTables <- Map.add host (Map.add callId (report.Trim()) table) reportTables
 
     member this.TakeReport(host: Host, callId: string) : string =
-        if callId = "" then ""
+        if callId = "" then
+            ""
         else
             let table = defaultArg (Map.tryFind host reportTables) Map.empty
+
             match Map.tryFind callId table with
             | Some report ->
                 reportTables <- Map.add host (Map.remove callId table) reportTables
@@ -24,8 +26,10 @@ type ProjectionStore() =
             | None -> ""
 
     member this.TryGetReport(host: Host, callId: string) : string option =
-        if callId = "" then None
-        else Map.tryFind host reportTables |> Option.bind (Map.tryFind callId)
+        if callId = "" then
+            None
+        else
+            Map.tryFind host reportTables |> Option.bind (Map.tryFind callId)
 
     member this.CaptureBacklogEntry(host: Host, callId: string, entry: BacklogEntry) : unit =
         if callId <> "" then
@@ -33,8 +37,10 @@ type ProjectionStore() =
             backlogEntryTables <- Map.add host (Map.add callId entry table) backlogEntryTables
 
     member this.TryGetBacklogEntry(host: Host, callId: string) : BacklogEntry option =
-        if callId = "" then None
-        else Map.tryFind host backlogEntryTables |> Option.bind (Map.tryFind callId)
+        if callId = "" then
+            None
+        else
+            Map.tryFind host backlogEntryTables |> Option.bind (Map.tryFind callId)
 
     member this.StoreBacklog(host: Host, sessionId: string, backlog: BacklogEntry list) : unit =
         let table = defaultArg (Map.tryFind host backlogCaches) Map.empty

@@ -4,15 +4,16 @@ open Wanxiangshu.Kernel.PromptFrontMatter
 open System.Collections.Generic
 
 /// A discovered capability file: its absolute path, display label, and content.
-type CapsFile = { filePath: string; label: string; content: string }
+type CapsFile =
+    { filePath: string
+      label: string
+      content: string }
 
 /// Stable fingerprint over caps files — kernel decides WHAT to hash, the
 /// injected `hashFn` decides HOW (e.g. Shell.Crypto.sha256HexTruncated).
 let stableFingerprint (hashFn: string -> string) (capsFiles: CapsFile list) : string =
     capsFiles
-    |> List.collect (fun cap ->
-        [ cap.filePath; "\u0000"; cap.content; "\u0000" ]
-        )
+    |> List.collect (fun cap -> [ cap.filePath; "\u0000"; cap.content; "\u0000" ])
     |> String.concat ""
     |> hashFn
 
@@ -22,22 +23,28 @@ type CapsYamlItem = { label: string; content: string }
 /// file discovery lives in the shell; this only formats.
 let buildCapitalsContext (files: CapsFile list) : string =
     let items =
-        files
-        |> List.map (fun f -> box { label = f.label; content = f.content })
+        files |> List.map (fun f -> box { label = f.label; content = f.content })
+
     frontMatter [ yamlSeqField "caps" items ]
 
-let formatReadOutput (filePath: string) (content: string) (startLine: int) : string =
+let formatReadOutput (filePath: string) (content: string) (startLine: int) (totalLines: int option) : string =
     let lines = content.Split('\n')
-    let numbered = lines |> Array.mapi (fun i line -> $"{startLine + i}: {line}") |> String.concat "\n"
-    String.concat "\n" [
-        $"<path>{filePath}</path>"
-        "<type>file</type>"
-        "<content>"
-        numbered
-        ""
-        $"(End of file - total {lines.Length} lines)"
-        "</content>"
-    ]
+    let reported = defaultArg totalLines lines.Length
+
+    let numbered =
+        lines
+        |> Array.mapi (fun i line -> $"{startLine + i}: {line}")
+        |> String.concat "\n"
+
+    String.concat
+        "\n"
+        [ $"<path>{filePath}</path>"
+          "<type>file</type>"
+          "<content>"
+          numbered
+          ""
+          $"(End of file - total {reported} lines)"
+          "</content>" ]
 
 /// Stable fingerprint over a read tool's output body. Recognizes both
 ///   `<line>: <content>` (CapsFormat/Semble injected) and
@@ -50,6 +57,7 @@ let private skipWs (s: string) (start: int) : int =
         if i >= s.Length then i
         elif s.[i] = ' ' || s.[i] = '\t' then loop (i + 1)
         else i
+
     loop start
 
 let private skipDigits (s: string) (start: int) : int =
@@ -57,40 +65,50 @@ let private skipDigits (s: string) (start: int) : int =
         if i >= s.Length then i
         elif s.[i] >= '0' && s.[i] <= '9' then loop (i + 1)
         else i
+
     loop start
 
 let private skipOneSpace (s: string) (start: int) : int =
-    if start < s.Length && s.[start] = ' ' then start + 1 else start
+    if start < s.Length && s.[start] = ' ' then
+        start + 1
+    else
+        start
 
 let private parseLine (raw: string) : (int * string) option =
     let s = raw.TrimEnd('\r')
     let lineStart = skipWs s 0
     let numEnd = skipDigits s lineStart
-    if numEnd = lineStart || numEnd >= s.Length then None
+
+    if numEnd = lineStart || numEnd >= s.Length then
+        None
     else
         let lineNo = int (s.Substring(lineStart, numEnd - lineStart))
         let sep = s.[numEnd]
-        if sep <> ':' && sep <> '|' then None
+
+        if sep <> ':' && sep <> '|' then
+            None
         else
             let bodyStart = skipOneSpace s (numEnd + 1)
-            Some (lineNo, s.Substring(bodyStart))
+            Some(lineNo, s.Substring(bodyStart))
 
-let mutable private fingerprintCache : Map<string, string option> = Map.empty
+let mutable private fingerprintCache: Map<string, string option> = Map.empty
 let private cacheKeys = Queue<string>()
 let private maxCacheSize = 100
 
 let readFingerprint (output: string) : string option =
-    if String.length output = 0 then None
+    if String.length output = 0 then
+        None
     else
         let cacheKey = $"{output.Length}_{hash output}"
+
         match Map.tryFind cacheKey fingerprintCache with
         | Some cached -> cached
         | None ->
-            let pairs =
-                output.Split('\n')
-                |> Array.choose parseLine
+            let pairs = output.Split('\n') |> Array.choose parseLine
+
             let result =
-                if pairs.Length < 2 then None
+                if pairs.Length < 2 then
+                    None
                 else
                     pairs
                     |> Array.distinctBy fst
@@ -98,10 +116,12 @@ let readFingerprint (output: string) : string option =
                     |> Array.map snd
                     |> String.concat "\n"
                     |> Some
+
             if fingerprintCache.Count >= maxCacheSize then
                 if cacheKeys.Count > 0 then
                     let oldestKey = cacheKeys.Dequeue()
                     fingerprintCache <- Map.remove oldestKey fingerprintCache
+
             fingerprintCache <- Map.add cacheKey result fingerprintCache
             cacheKeys.Enqueue(cacheKey)
             result

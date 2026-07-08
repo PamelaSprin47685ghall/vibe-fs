@@ -5,8 +5,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Executor
 open Wanxiangshu.Kernel.SubagentPrompts
 
-let private truncateUtf8 (s: string) (max: int) =
-    truncateUtf8ByBytes s max
+let private truncateUtf8 (s: string) (max: int) = truncateUtf8ByBytes s max
 
 let private utf8ByteLength (s: string) =
     Encoding.UTF8.GetBytes s |> Array.length
@@ -165,28 +164,53 @@ let prepareShellKeepsNormal () =
 
 let buildSummaryPromptSmall () =
     let byteLength (s: string) = s.Length
-    let truncateToBytes (s: string) (max: int) = if s.Length <= max then s else s.Substring(0, max)
+
+    let truncateToBytes (s: string) (max: int) =
+        if s.Length <= max then s else s.Substring(0, max)
+
     let opts =
-        { program = "echo x"; language = Shell; dependencies = []; timeoutType = Short
-          mode = "ro"; cwd = None; whatToSummarize = "files" }
-    let prompt = buildSummaryPrompt byteLength truncateToBytes opts (Completed("small output", 0))
+        { program = "echo x"
+          language = Shell
+          dependencies = []
+          timeoutType = Short
+          mode = "ro"
+          cwd = None
+          whatToSummarize = "files" }
+
+    let prompt =
+        buildSummaryPrompt byteLength truncateToBytes opts (Completed("small output", 0))
+
     check "contains raw output" (prompt.Contains "small output")
     check "no truncation marker" (not (prompt.Contains "[Output truncated to 200000 bytes for summarization]"))
 
 let buildSummaryPromptLarge () =
     let byteLength (s: string) = utf8ByteLength s
+
     let opts =
-        { program = "echo x"; language = Shell; dependencies = []; timeoutType = Short
-          mode = "ro"; cwd = None; whatToSummarize = "files" }
+        { program = "echo x"
+          language = Shell
+          dependencies = []
+          timeoutType = Short
+          mode = "ro"
+          cwd = None
+          whatToSummarize = "files" }
+
     let large = String.replicate 200_001 "x"
     let prompt = buildSummaryPrompt byteLength truncateUtf8 opts (Completed(large, 0))
     check "large truncation marker present" (prompt.Contains "[Output truncated to 200000 bytes for summarization]")
 
 let buildSummaryPromptUtf8Boundary () =
     let byteLength (s: string) = utf8ByteLength s
+
     let opts =
-        { program = "echo x"; language = Shell; dependencies = []; timeoutType = Short
-          mode = "ro"; cwd = None; whatToSummarize = "files" }
+        { program = "echo x"
+          language = Shell
+          dependencies = []
+          timeoutType = Short
+          mode = "ro"
+          cwd = None
+          whatToSummarize = "files" }
+
     let raw = String.replicate 66_667 "你"
     let prompt = buildSummaryPrompt byteLength truncateUtf8 opts (Completed(raw, 0))
     check "utf8 truncation marker present" (prompt.Contains "[Output truncated to 200000 bytes for summarization]")

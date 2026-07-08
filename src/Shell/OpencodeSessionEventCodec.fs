@@ -20,11 +20,12 @@ open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 /// All helpers here are pure `obj → typed` decoders. Encoding back to host
 /// payloads (e.g. `createPromptBody`) lives next to the decoders so the wire
 /// format stays a single read/write site.
-
 /// Re-export shared session event helpers from Common module for single-import convenience.
 let getSessionID = OpencodeSessionEventCodecCommon.getSessionID
 let getPartsText = OpencodeSessionEventCodecCommon.getPartsText
-let isCompletedAssistantMessage = OpencodeSessionEventCodecCommon.isCompletedAssistantMessage
+
+let isCompletedAssistantMessage =
+    OpencodeSessionEventCodecCommon.isCompletedAssistantMessage
 
 /// Decode a todo list payload into the *open* todo contents, dropping items
 /// with terminal status. The returned strings are the raw `content` strings
@@ -35,47 +36,59 @@ let decodeTodos (todosData: obj) : string list =
         |> Array.choose (fun todo ->
             let status = Dyn.str todo "status"
             let content = Dyn.str todo "content"
-            if content = "" then None
+
+            if content = "" then
+                None
             else
                 match todoStatusOfString status with
                 | Some s when isTerminal s -> None
                 | _ -> Some content)
         |> Array.toList
-    else []
+    else
+        []
 
 /// Fallback open-todo recovery by walking `messagesData` backwards for a `task`
 /// tool part whose `input.todos` survives in history. Used only when the live
 /// todo API is unavailable or returns an empty list — the messages fallback is
 /// the historical record, not the authority.
 let recoverOpenTodosFromMessages (messagesData: obj) : string list =
-    if not (Dyn.isArray messagesData) then []
+    if not (Dyn.isArray messagesData) then
+        []
     else
         (messagesData :?> obj array)
         |> Array.rev
         |> Array.tryPick (fun message ->
             let parts = Dyn.get message "parts"
-            if not (Dyn.isArray parts) then None
+
+            if not (Dyn.isArray parts) then
+                None
             else
                 (parts :?> obj array)
                 |> Array.rev
                 |> Array.tryPick (fun part ->
-                    if Dyn.str part "type" <> "tool" || Dyn.str part "tool" <> "task" then None
+                    if Dyn.str part "type" <> "tool" || Dyn.str part "tool" <> "task" then
+                        None
                     else
                         let state = Dyn.get part "state"
                         let input = Dyn.get state "input"
                         let todos = Dyn.get input "todos"
-                        if not (Dyn.isArray todos) then None
+
+                        if not (Dyn.isArray todos) then
+                            None
                         else
                             let openItems =
                                 (todos :?> obj array)
                                 |> Array.choose (fun todo ->
                                     let content = Dyn.str todo "content"
                                     let status = Dyn.str todo "status"
-                                    if content = "" || status = "" then None
+
+                                    if content = "" || status = "" then
+                                        None
                                     else
                                         match todoStatusOfString status with
                                         | Some s when isTerminal s -> None
                                         | _ -> Some content)
+
                             Some openItems))
         |> Option.defaultValue [||]
         |> Array.toList
@@ -84,40 +97,57 @@ let recoverOpenTodosFromMessages (messagesData: obj) : string list =
 let decodeLastAssistant (messagesData: obj) : string * string option =
     if Dyn.isArray messagesData then
         let messagesArr = messagesData :?> obj array
+
         let lastAssistantIdx =
             messagesArr
             |> Array.tryFindIndexBack (fun msg ->
                 let info = Dyn.get msg "info"
+
                 isCompletedAssistantMessage info
                 && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
+
         match lastAssistantIdx with
         | Some idx ->
             let msg = messagesArr.[idx]
             let info = Dyn.get msg "info"
             let agentVal = Dyn.get info "agent"
-            let agent = if Dyn.isNullish agentVal then None else Some (string agentVal)
+
+            let agent =
+                if Dyn.isNullish agentVal then
+                    None
+                else
+                    Some(string agentVal)
+
             let text = getPartsText (Dyn.get msg "parts")
             text, agent
         | None -> "", None
-    else "", None
+    else
+        "", None
 
 /// Check if nudge should be skipped based on message history.
 let shouldSkipNudge (messagesData: obj) : bool =
-    if not (Dyn.isArray messagesData) then false
+    if not (Dyn.isArray messagesData) then
+        false
     else
         let messagesArr = messagesData :?> obj array
+
         let absoluteLastAssistantIdx =
             messagesArr
             |> Array.tryFindIndexBack (fun msg ->
                 let info = Dyn.get msg "info"
                 let role = Dyn.str info "role"
                 role = "assistant" && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
+
         match absoluteLastAssistantIdx with
         | Some idx ->
             let info = Dyn.get (messagesArr.[idx]) "info"
             let finish = Dyn.str info "finish"
-            let isToolFinish = finish.ToLower().Contains("tool") && finish.ToLower() <> "tool_use_error"
-            if not isToolFinish then false
+
+            let isToolFinish =
+                finish.ToLower().Contains("tool") && finish.ToLower() <> "tool_use_error"
+
+            if not isToolFinish then
+                false
             else
                 let hasToolResultAfter =
                     messagesArr.[idx + 1 ..]
@@ -125,6 +155,7 @@ let shouldSkipNudge (messagesData: obj) : bool =
                         let mInfo = Dyn.get msg "info"
                         let mRole = Dyn.str mInfo "role"
                         mRole = "toolResult")
+
                 not hasToolResultAfter
         | None -> false
 
@@ -134,18 +165,23 @@ let shouldSkipNudge (messagesData: obj) : bool =
 /// session default.
 let createPromptBody (agent: string option) (text: string) : obj =
     match agent with
-    | Some a -> box {| agent = a; parts = [| box {| ``type`` = "text"; text = text |} |] |}
+    | Some a ->
+        box
+            {| agent = a
+               parts = [| box {| ``type`` = "text"; text = text |} |] |}
     | None -> box {| parts = [| box {| ``type`` = "text"; text = text |} |] |}
 
 /// Build prompt body with optional agent and model override.
 /// Build prompt body with optional agent and model override.
 let createPromptBodyWithModel (agent: string option) (model: string option) (text: string) : obj =
     let textPart = box {| ``type`` = "text"; text = text |}
-    let parts : obj array = [| textPart |]
+    let parts: obj array = [| textPart |]
+
     let baseBody =
         match agent with
         | Some a -> box {| agent = a; parts = parts |}
         | None -> box {| parts = parts |}
+
     match model |> Option.bind tryDecodePromptModelFromModelString with
     | Some promptModel -> Dyn.withKey baseBody "model" promptModel
     | None -> baseBody

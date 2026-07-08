@@ -9,14 +9,13 @@ open Wanxiangshu.Shell.OpencodeContextCodec
 open Wanxiangshu.Shell.ToolContextCodec
 
 [<Global("process")>]
-let private nodeProcess : obj = jsNative
+let private nodeProcess: obj = jsNative
 
-let private getCwd () : string = unbox<string> (nodeProcess?cwd())
+let private getCwd () : string = unbox<string> (nodeProcess?cwd ())
 
-type IToolRuntimeContext = {
-    Execution: ToolExecutionContext
-    AbortSignal: obj option
-}
+type IToolRuntimeContext =
+    { Execution: ToolExecutionContext
+      AbortSignal: obj option }
 
 let private abortSignalOption (signal: obj) : obj option =
     if Dyn.isNullish signal then None else Some signal
@@ -24,21 +23,32 @@ let private abortSignalOption (signal: obj) : obj option =
 let fromMuxConfig (config: obj) : Result<IToolRuntimeContext, DomainError> =
     decodeMuxConfig (unbox<IMuxToolContext> config)
     |> Result.map (fun execution ->
-        { Execution = execution; AbortSignal = abortSignalOption (Dyn.get config "abortSignal") })
+        { Execution = execution
+          AbortSignal = abortSignalOption (Dyn.get config "abortSignal") })
 
 let fromOpencode (context: obj) (fallbackDir: string) : IToolRuntimeContext =
-    let execution = decodeOpencodeToolContext (unbox<IOpenCodeToolContext> context) fallbackDir
-    { Execution = execution; AbortSignal = abortSignalOption (getAbortSignalFromContext context) }
+    let execution =
+        decodeOpencodeToolContext (unbox<IOpenCodeToolContext> context) fallbackDir
+
+    { Execution = execution
+      AbortSignal = abortSignalOption (getAbortSignalFromContext context) }
 
 let pluginDirectoryFromCtx (ctx: obj) : string =
     let dir = (fromOpencode ctx "").Execution.Directory
-    if System.String.IsNullOrWhiteSpace dir then getCwd () else dir
+
+    if System.String.IsNullOrWhiteSpace dir then
+        getCwd ()
+    else
+        dir
 
 let sessionId (ctx: IToolRuntimeContext) : SessionId = ctx.Execution.SessionId
 
 let workspaceId (ctx: IToolRuntimeContext) : WorkspaceId option = ctx.Execution.WorkspaceId
 
-let sessionIdString (ctx: IToolRuntimeContext) : string = Id.sessionIdValue ctx.Execution.SessionId
+let sessionIdString (ctx: IToolRuntimeContext) : string =
+    Id.sessionIdValue ctx.Execution.SessionId
 
 let workspaceIdString (ctx: IToolRuntimeContext) : string =
-    ctx.Execution.WorkspaceId |> Option.map Id.workspaceIdValue |> Option.defaultValue ""
+    ctx.Execution.WorkspaceId
+    |> Option.map Id.workspaceIdValue
+    |> Option.defaultValue ""

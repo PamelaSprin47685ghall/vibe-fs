@@ -24,6 +24,7 @@ type ChildAgentRegistry private (state: WorkspaceState ref) =
             let meta =
                 { agent = agent
                   parentSessionId = Option.bind this.parseSessionId parentSessionID }
+
             state.Value <- reduce state.Value (ChildRegistered(childId, meta))
 
     member this.LookupChildAgent(sessionID: string) =
@@ -34,16 +35,16 @@ type ChildAgentRegistry private (state: WorkspaceState ref) =
     member this.ResolveSubsessionParentID(sessionID: string option) =
         let rec resolve visited current resolved =
             if Set.contains current visited then
-                Some (Id.sessionIdValue resolved)
+                Some(Id.sessionIdValue resolved)
             else
                 match this.parseChildId (Id.sessionIdValue current) with
-                | None -> Some (Id.sessionIdValue resolved)
+                | None -> Some(Id.sessionIdValue resolved)
                 | Some childId ->
                     match Map.tryFind childId state.Value.childSessions with
-                    | None -> Some (Id.sessionIdValue resolved)
+                    | None -> Some(Id.sessionIdValue resolved)
                     | Some meta ->
                         match meta.parentSessionId with
-                        | None -> Some (Id.sessionIdValue current)
+                        | None -> Some(Id.sessionIdValue current)
                         | Some parent -> resolve (Set.add current visited) parent parent
 
         match sessionID with
@@ -53,15 +54,14 @@ type ChildAgentRegistry private (state: WorkspaceState ref) =
             | None -> None
             | Some sid ->
                 match this.parseChildId raw with
-                | Some childId when Map.containsKey childId state.Value.childSessions ->
-                    resolve Set.empty sid sid
+                | Some childId when Map.containsKey childId state.Value.childSessions -> resolve Set.empty sid sid
                 | _ -> Some raw
 
     member this.UnregisterChildAgent(sessionID: string) =
         match this.parseChildId sessionID with
         | None -> ()
-        | Some childId ->
-            state.Value <- reduce state.Value (ChildUnregistered childId)
+        | Some childId -> state.Value <- reduce state.Value (ChildUnregistered childId)
 
 /// Per-session serial execution is provided by Wanxiangshu.Shell.SessionExecutor.
-
+/// Per-session serial execution is provided by Wanxiangshu.Shell.SessionExecutor.
+/// Per-session serial execution is provided by Wanxiangshu.Shell.SessionExecutor.

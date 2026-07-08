@@ -61,7 +61,16 @@ let canUse' () =
     check "unknown agent can fuzzy_find" (canUse "build" "fuzzy_find")
 
 let deniedTools' () =
-    let tools = [ "coder"; "investigator"; "read"; "write"; "bash"; "fuzzy_find"; "fuzzy_grep"; "agent_report" ]
+    let tools =
+        [ "coder"
+          "investigator"
+          "read"
+          "write"
+          "bash"
+          "fuzzy_find"
+          "fuzzy_grep"
+          "agent_report" ]
+
     let denied = deniedTools "investigator" tools |> Set.ofList
     check "investigator denied write" (Set.contains "write" denied)
     check "investigator denied bash" (Set.contains "bash" denied)
@@ -79,44 +88,51 @@ let deniedTools' () =
 /// reshaped without drifting behavior (REFACTOR.md §1 D8).
 let canUseMatrix () =
     let agents =
-        [ "manager"; "investigator"; "coder"; "reviewer"; "browser"; "meditator"; "executor" ]
-    let matrix : (string * (bool list)) list = [
-        "agent_report",                  [ true;  true;  true;  true;  true;  true;  true  ]
-        "bash",                          [ false; false; false; false; false; false; false ]
-        "bash_run",                      [ false; false; false; false; false; false; false ]
-        "task",                          [ false; false; false; false; false; false; false ]
-        "grep",                          [ false; false; false; false; false; false; false ]
-        "plan",                          [ false; false; false; false; false; false; false ]
-        "memory",                        [ false; false; false; false; false; false; false ]
-        "grep_x",                        [ true;  true;  true;  true;  false; false; false ]
-        "fuzzy_grep",                    [ false; true;  true;  true;  false; false; false ]
-        "fuzzy_find",                    [ true;  true;  true;  true;  false; false; false ]
-        "glob",                          [ true;  true;  true;  true;  false; false; false ]
-        "read",                          [ true;  true;  true;  true;  true;  true;  false ]
-        "write",                         [ false; false; true;  false; false; false; false ]
-        "edit",                          [ false; false; true;  false; false; false; false ]
-        "patch",                         [ false; false; true;  false; false; false; false ]
-        "ast_edit",                      [ false; false; true;  false; false; false; false ]
-        "apply_patch",                   [ false; false; true;  false; false; false; false ]
-        "websearch",                     [ true;  false; false; false; false; false; false ]
-        "webfetch",                      [ true;  false; false; false; false; false; false ]
-        "submit_review",                 [ true;  false; false; false; false; false; false ]
-        "todowrite",                     [ true;  false; true;  true;  false; false; false ]
-        "todo_write",                    [ true;  false; true;  true;  false; false; false ]
-        "question",                      [ true;  false; false; false; false; false; false ]
-        "ask_user_question",             [ true;  false; false; false; false; false; false ]
-        "skill",                         [ true;  false; false; false; false; false; false ]
-        "coder",                         [ true;  false; false; false; false; false; false ]
-        "investigator",                  [ true;  false; true;  true;  false; false; false ]
-        "meditator",                     [ true;  false; false; false; false; false; false ]
-        "browser",                       [ true;  false; false; false; false; false; false ]
-        "manager",                       [ true;  false; false; false; false; false; false ]
-        "executor",                      [ true;  true;  false; false; false; false; false ]
-        "stealth-browser-mcp_navigate",  [ false; false; false; false; true;  false; false ]
-        "return_reviewer",               [ false; false; false; true;  false; false; false ]
-        "return_coder",                  [ false; false; true;  false; false; false; false ]
-        "manage_todo_list",              [ true;  false; true;  true;  false; false; false ]
-    ]
+        [ "manager"
+          "investigator"
+          "coder"
+          "reviewer"
+          "browser"
+          "meditator"
+          "executor" ]
+
+    let matrix: (string * (bool list)) list =
+        [ "agent_report", [ true; true; true; true; true; true; true ]
+          "bash", [ false; false; false; false; false; false; false ]
+          "bash_run", [ false; false; false; false; false; false; false ]
+          "task", [ false; false; false; false; false; false; false ]
+          "grep", [ false; false; false; false; false; false; false ]
+          "plan", [ false; false; false; false; false; false; false ]
+          "memory", [ false; false; false; false; false; false; false ]
+          "grep_x", [ true; true; true; true; false; false; false ]
+          "fuzzy_grep", [ false; true; true; true; false; false; false ]
+          "fuzzy_find", [ true; true; true; true; false; false; false ]
+          "glob", [ true; true; true; true; false; false; false ]
+          "read", [ true; true; true; true; true; true; false ]
+          "write", [ false; false; true; false; false; false; false ]
+          "edit", [ false; false; true; false; false; false; false ]
+          "patch", [ false; false; true; false; false; false; false ]
+          "ast_edit", [ false; false; true; false; false; false; false ]
+          "apply_patch", [ false; false; true; false; false; false; false ]
+          "websearch", [ true; false; false; false; false; false; false ]
+          "webfetch", [ true; false; false; false; false; false; false ]
+          "submit_review", [ true; false; false; false; false; false; false ]
+          "todowrite", [ true; false; true; true; false; false; false ]
+          "todo_write", [ true; false; true; true; false; false; false ]
+          "question", [ true; false; false; false; false; false; false ]
+          "ask_user_question", [ true; false; false; false; false; false; false ]
+          "skill", [ true; false; false; false; false; false; false ]
+          "coder", [ true; false; false; false; false; false; false ]
+          "investigator", [ true; false; true; true; false; false; false ]
+          "meditator", [ true; false; false; false; false; false; false ]
+          "browser", [ true; false; false; false; false; false; false ]
+          "manager", [ true; false; false; false; false; false; false ]
+          "executor", [ true; true; false; false; false; false; false ]
+          "stealth-browser-mcp_navigate", [ false; false; false; false; true; false; false ]
+          "return_reviewer", [ false; false; false; true; false; false; false ]
+          "return_coder", [ false; false; true; false; false; false; false ]
+          "manage_todo_list", [ true; false; true; true; false; false; false ] ]
+
     matrix
     |> List.iter (fun (tool, expected) ->
         let actual = agents |> List.map (fun agent -> canUse agent tool)

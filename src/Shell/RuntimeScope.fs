@@ -8,8 +8,8 @@ open Wanxiangshu.Shell.PromiseQueue
 
 type RuntimeScope() =
     let projection = ProjectionStore()
-    let mutable initPromise : JS.Promise<unit> option = None
-    let mutable onInit : (string -> JS.Promise<unit>) option = None
+    let mutable initPromise: JS.Promise<unit> option = None
+    let mutable onInit: (string -> JS.Promise<unit>) option = None
     let mutable capsFiles = Map.empty<string, CapsFile list>
     let mutable capsInflight = Map.empty<string, JS.Promise<CapsFile list>>
     let iteratorStore = createTypedIteratorStore 200
@@ -23,6 +23,7 @@ type RuntimeScope() =
 
     member _.RegisterTempFiles(prompt: string, files: string list) : unit =
         let key = if isNull prompt then "" else prompt.Trim()
+
         if key <> "" then
             tempFilesByPrompt <- Map.add key files tempFilesByPrompt
 
@@ -30,8 +31,7 @@ type RuntimeScope() =
         let key = if isNull prompt then "" else prompt.Trim()
         if key = "" then None else Map.tryFind key tempFilesByPrompt
 
-    member _.TryGetCapsFiles(key: string) : CapsFile list option =
-        Map.tryFind key capsFiles
+    member _.TryGetCapsFiles(key: string) : CapsFile list option = Map.tryFind key capsFiles
 
     member _.AddCapsFilesIfAbsent(key: string, files: CapsFile list) : unit =
         if not (Map.containsKey key capsFiles) then
@@ -53,14 +53,13 @@ type RuntimeScope() =
                 |> Promise.catch (fun ex ->
                     capsInflight <- Map.remove key capsInflight
                     raise ex)
+
             capsInflight <- Map.add key p capsInflight
             p
 
-    member _.ClearIterators() : unit =
-        clearTypedIteratorStore iteratorStore
+    member _.ClearIterators() : unit = clearTypedIteratorStore iteratorStore
 
-    member _.ClearSessionQueues() : unit =
-        sessionQueues <- Map.empty
+    member _.ClearSessionQueues() : unit = sessionQueues <- Map.empty
 
     member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
         let queue =
@@ -70,24 +69,22 @@ type RuntimeScope() =
                 let q = SerialQueue()
                 sessionQueues <- Map.add sessionId q sessionQueues
                 q
+
         queue.Enqueue(work)
 
-    member _.TryFindKey(key: string) : obj option =
-        Map.tryFind key extState
+    member _.TryFindKey(key: string) : obj option = Map.tryFind key extState
 
-    member _.Add(key: string, value: obj) : unit =
-        extState <- Map.add key value extState
+    member _.Add(key: string, value: obj) : unit = extState <- Map.add key value extState
 
-    member _.Remove(key: string) : unit =
-        extState <- Map.remove key extState
+    member _.Remove(key: string) : unit = extState <- Map.remove key extState
 
     member _.InitPromise
-        with get() = initPromise
-        and set(v) = initPromise <- v
+        with get () = initPromise
+        and set (v) = initPromise <- v
 
     member _.OnInit
-        with get() = onInit
-        and set(v) = onInit <- v
+        with get () = onInit
+        and set (v) = onInit <- v
 
     member _.TriggerInit(workspaceRoot: string) : unit =
         if workspaceRoot <> "" && Option.isNone initPromise then

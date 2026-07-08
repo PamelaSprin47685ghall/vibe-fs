@@ -23,10 +23,11 @@ open Wanxiangshu.Opencode.BacklogSession
 module Dyn = Wanxiangshu.Shell.Dyn
 
 type ProgressObserver
-    ( host              : Host
-    , ctx               : obj
-    , backlogSession    : Wanxiangshu.Opencode.BacklogSession.BacklogSession
-    , fallbackRuntime   : FallbackRuntimeState
+    (
+        host: Host,
+        ctx: obj,
+        backlogSession: Wanxiangshu.Opencode.BacklogSession.BacklogSession,
+        fallbackRuntime: FallbackRuntimeState
     ) =
 
     let resolvedUnitPromise () : JS.Promise<unit> = Promise.lift ()
@@ -34,27 +35,36 @@ type ProgressObserver
     member _.OnChatMessage(sessionID: SessionId, agent: string, parts: obj) : JS.Promise<unit> =
         let text = getPartsText parts
         let sid = Id.sessionIdValue sessionID
+
         if not (isNudgePrompt text) && agent <> "" then
             fallbackRuntime.SetAgentName sid agent
+
         resolvedUnitPromise ()
 
-    member _.HandleToolExecuteAfter(input: obj) (output: obj) : JS.Promise<unit> =
+    member _.HandleToolExecuteAfter (input: obj) (output: obj) : JS.Promise<unit> =
         promise {
             let sessionIDStr = sessionIdFromHookInput input ""
             let tool = normalizeToolName host (toolNameFromHookInput input)
+
             if tool = todoWriteToolName host then
                 let methodologies = selectMethodologiesFromHookArgs (argsFromHookInput input)
+
                 match hookOutputString output with
                 | Some _ ->
                     setHookOutputString output (todoWriteOutput methodologies true)
-                    let directory = (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
+
+                    let directory =
+                        (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory
+
                     let sid = sessionIdFromHookInput input ""
+
                     match decodeTodoWriteArgs (argsFromHookInput input) with
                     | Ok args when sid <> "" -> do! appendWorkBacklogCommittedOrFail directory sid args
                     | _ -> ()
                 | None -> ()
             elif tool = "task_complete" then
                 let sid = sessionIdFromHookInput input ""
+
                 if sid <> "" then
                     let st = fallbackRuntime.GetOrCreateState sid
                     fallbackRuntime.UpdateState sid { st with TaskComplete = true }

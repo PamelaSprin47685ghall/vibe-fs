@@ -2,7 +2,12 @@ module Wanxiangshu.Shell.LivelockGuard
 
 open Wanxiangshu.Shell.RuntimeScope
 
-type LivelockState = { tool: string; argsJson: string; outputJson: string; count: int }
+type LivelockState =
+    { tool: string
+      argsJson: string
+      outputJson: string
+      count: int }
+
 let defaultMaxRepeats = 3
 
 let private tryGetState (scope: RuntimeScope) (sid: string) =
@@ -15,20 +20,33 @@ let private putState (scope: RuntimeScope) (sid: string) (s: LivelockState optio
         match scope.TryFindKey "livelock_state" with
         | Some v -> unbox<Map<string, LivelockState>> v
         | None -> Map.empty
-    let newM = match s with Some x -> Map.add sid x m | None -> Map.remove sid m
+
+    let newM =
+        match s with
+        | Some x -> Map.add sid x m
+        | None -> Map.remove sid m
+
     scope.Add("livelock_state", box newM)
 
 let check (scope: RuntimeScope) (sessionId: string) (tool: string) (argsJson: string) (outputJson: string) : bool =
     let same (s: LivelockState) =
         s.tool = tool && s.argsJson = argsJson && s.outputJson = outputJson
+
     match tryGetState scope sessionId with
     | Some prev when same prev ->
         let next = { prev with count = prev.count + 1 }
         putState scope sessionId (Some next)
         next.count >= defaultMaxRepeats
     | _ ->
-        putState scope sessionId (Some { tool = tool; argsJson = argsJson; outputJson = outputJson; count = 1 })
+        putState
+            scope
+            sessionId
+            (Some
+                { tool = tool
+                  argsJson = argsJson
+                  outputJson = outputJson
+                  count = 1 })
+
         false
 
-let cleanup (scope: RuntimeScope) (sessionId: string) : unit =
-    putState scope sessionId None
+let cleanup (scope: RuntimeScope) (sessionId: string) : unit = putState scope sessionId None

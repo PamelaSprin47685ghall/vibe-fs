@@ -19,22 +19,29 @@ let isSettled_trueWhenConsumed () =
 let isSettled_trueWhenExhausted () =
     let rt = FallbackRuntimeState()
     let s0 = rt.GetOrCreateState "s1"
-    rt.UpdateState "s1" { s0 with Phase = FallbackPhase.Exhausted }
+
+    rt.UpdateState
+        "s1"
+        { s0 with
+            Phase = FallbackPhase.Exhausted }
+
     check "exhausted settled" (isRecoverySettled rt "s1")
 
-let waitCompletesAfterConsumedSetAsync () = promise {
-    let rt = FallbackRuntimeState()
-    let sid = "wait-sid"
-    let waitP = waitForRecovery rt sid 32
-    do! yieldMicrotask ()
-    rt.SetConsumed sid true
-    do! waitP
-    check "wait finished after consumed" true
-}
+let waitCompletesAfterConsumedSetAsync () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let sid = "wait-sid"
+        let waitP = waitForRecovery rt sid 32
+        do! yieldMicrotask ()
+        rt.SetConsumed sid true
+        do! waitP
+        check "wait finished after consumed" true
+    }
 
-let run () = promise {
-    isSettled_falseWhenFresh ()
-    isSettled_trueWhenConsumed ()
-    isSettled_trueWhenExhausted ()
-    do! waitCompletesAfterConsumedSetAsync ()
-}
+let run () =
+    promise {
+        isSettled_falseWhenFresh ()
+        isSettled_trueWhenConsumed ()
+        isSettled_trueWhenExhausted ()
+        do! waitCompletesAfterConsumedSetAsync ()
+    }

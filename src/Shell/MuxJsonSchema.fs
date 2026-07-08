@@ -13,10 +13,12 @@ let muxObjectSchema = jsonObjectSchema
 let muxCoderIntentsSchema (intentsDesc: string) : obj =
     let targetItem =
         muxObjectSchema
-            (createObj [ "file", muxStrReq coderTargetFileDesc
-                         "guide", muxStrReq coderTargetGuideDesc
-                         "draft", muxStrOpt coderTargetDraftDesc ])
+            (createObj
+                [ "file", muxStrReq coderTargetFileDesc
+                  "guide", muxStrReq coderTargetGuideDesc
+                  "draft", muxStrOpt coderTargetDraftDesc ])
             [| "file"; "guide" |]
+
     let intentItem =
         muxObjectSchema
             (createObj
@@ -30,6 +32,7 @@ let muxCoderIntentsSchema (intentsDesc: string) : obj =
                         "items", targetItem
                         "description", box coderTargetsDesc ] ])
             [| "objective"; "background"; "targets" |]
+
     createObj
         [ "type", box "array"
           "minItems", box 1
@@ -45,6 +48,7 @@ let muxInvestigatorIntentsSchema (intentsDesc: string) : obj =
                   "questions", muxStrArrayReq investigatorQuestionsDesc
                   "entries", muxStrArrayOpt investigatorEntriesDesc ])
             [| "objective"; "background"; "questions" |]
+
     createObj
         [ "type", box "array"
           "minItems", box 1

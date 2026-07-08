@@ -32,70 +32,104 @@ let private stripExistingCapsMessages (messages: obj array) : obj array =
     stripLeadingCapsSynth messageId messages
 
 let private sessionBox (sessionID: string option) : obj =
-    match sessionID with Some s -> box s | None -> box null
+    match sessionID with
+    | Some s -> box s
+    | None -> box null
 
-let private buildToolParts (capsFiles: CapsFile list) (fp: string) (sessionID: string option) (assistantId: string) : obj array =
+let private buildToolParts
+    (capsFiles: CapsFile list)
+    (fp: string)
+    (sessionID: string option)
+    (assistantId: string)
+    : obj array =
     capsFiles
     |> List.mapi (fun index cap ->
-        box (createObj [
-            "type", box "tool"
-            "tool", box "read"
-            "callID", box $"caps-call-{fp}-{index}"
-            "id", box $"caps-tool-{fp}-{index}"
-            "sessionID", sessionBox sessionID
-            "messageID", box assistantId
-            "state", box (createObj [
-                "status", box "completed"
-                "input", box (createObj [ "filePath", box cap.filePath ])
-                "output", box (formatReadOutput cap.filePath cap.content 1)
-                "title", box $"Read {cap.filePath}"
-                "metadata", box (createObj [])
-                "time", box (createObj [ "start", box 0; "end", box 1 ])
-            ])
-        ]))
+        box (
+            createObj
+                [ "type", box "tool"
+                  "tool", box "read"
+                  "callID", box $"caps-call-{fp}-{index}"
+                  "id", box $"caps-tool-{fp}-{index}"
+                  "sessionID", sessionBox sessionID
+                  "messageID", box assistantId
+                  "state",
+                  box (
+                      createObj
+                          [ "status", box "completed"
+                            "input", box (createObj [ "filePath", box cap.filePath ])
+                            "output", box (formatReadOutput cap.filePath cap.content 1 None)
+                            "title", box $"Read {cap.filePath}"
+                            "metadata", box (createObj [])
+                            "time", box (createObj [ "start", box 0; "end", box 1 ]) ]
+                  ) ]
+        ))
     |> Array.ofList
 
 let private buildUserMessage (userId: string) (sessionID: string option) (preludeText: string option) : obj =
-    box (createObj [
-        "info", box (createObj [
-            "id", box userId
-            "sessionID", sessionBox sessionID
-            "role", box "user"
-            "time", box (createObj [ "created", box 0 ])
-            "agent", box "orchestrator"
-            "model", box (createObj [ "providerID", box ""; "modelID", box "" ])
-        ])
-        "parts", box [| box {| ``type`` = "text"; text = userCapsText preludeText |} |]
-    ])
+    box (
+        createObj
+            [ "info",
+              box (
+                  createObj
+                      [ "id", box userId
+                        "sessionID", sessionBox sessionID
+                        "role", box "user"
+                        "time", box (createObj [ "created", box 0 ])
+                        "agent", box "orchestrator"
+                        "model", box (createObj [ "providerID", box ""; "modelID", box "" ]) ]
+              )
+              "parts",
+              box
+                  [| box
+                         {| ``type`` = "text"
+                            text = userCapsText preludeText |} |] ]
+    )
 
-let private assistantInfo (assistantId: string) (parentID: string) (sessionID: string option) (projectRoot: string) : obj =
-    createObj [
-        "id", box assistantId
-        "sessionID", sessionBox sessionID
-        "role", box "assistant"
-        "time", box (createObj [ "created", box 0; "completed", box 1 ])
-        "parentID", box parentID
-        "modelID", box ""
-        "providerID", box ""
-        "mode", box "code"
-        "path", box (createObj [ "cwd", box projectRoot; "root", box projectRoot ])
-        "cost", box 0
-        "tokens", box (createObj [
-            "input", box 0
-            "output", box 0
-            "reasoning", box 0
-            "cache", box (createObj [ "read", box 0; "write", box 0 ])
-        ])
-    ]
+let private assistantInfo
+    (assistantId: string)
+    (parentID: string)
+    (sessionID: string option)
+    (projectRoot: string)
+    : obj =
+    createObj
+        [ "id", box assistantId
+          "sessionID", sessionBox sessionID
+          "role", box "assistant"
+          "time", box (createObj [ "created", box 0; "completed", box 1 ])
+          "parentID", box parentID
+          "modelID", box ""
+          "providerID", box ""
+          "mode", box "code"
+          "path", box (createObj [ "cwd", box projectRoot; "root", box projectRoot ])
+          "cost", box 0
+          "tokens",
+          box (
+              createObj
+                  [ "input", box 0
+                    "output", box 0
+                    "reasoning", box 0
+                    "cache", box (createObj [ "read", box 0; "write", box 0 ]) ]
+          ) ]
 
-let private buildAssistantMessage (assistantId: string) (parentID: string) (sessionID: string option) (projectRoot: string) (parts: obj array) : obj =
-    box (createObj [
-        "info", box (assistantInfo assistantId parentID sessionID projectRoot)
-        "parts", box parts
-    ])
+let private buildAssistantMessage
+    (assistantId: string)
+    (parentID: string)
+    (sessionID: string option)
+    (projectRoot: string)
+    (parts: obj array)
+    : obj =
+    box (
+        createObj
+            [ "info", box (assistantInfo assistantId parentID sessionID projectRoot)
+              "parts", box parts ]
+    )
 
 let private buildAckMessage (ackId: string) (parentID: string) (sessionID: string option) (projectRoot: string) : obj =
-    buildAssistantMessage ackId parentID sessionID projectRoot
+    buildAssistantMessage
+        ackId
+        parentID
+        sessionID
+        projectRoot
         [| box (createObj [ "type", box "reasoning"; "text", box acknowledgeText ]) |]
 
 /// Build the synthetic caps prefix: a single user message whose text wraps
@@ -115,9 +149,10 @@ let buildCapsMessages
     match findFirstNonSynthMessage messageId messages with
     | None -> messages
     | Some _ ->
-        let existingStripped =
-            stripExistingCapsMessages messages
-        if existingStripped.Length = 0 then messages
+        let existingStripped = stripExistingCapsMessages messages
+
+        if existingStripped.Length = 0 then
+            messages
         else
             let sessionID = messageSessionID existingStripped.[0]
             let sessionOpt = if sessionID = "" then None else Some sessionID
@@ -125,11 +160,21 @@ let buildCapsMessages
             let userId = $"{capsUserPrefix}{fp}"
             let assistantId = $"{capsAssistantPrefix}{fp}"
             let ackId = $"{capsAcknowledgePrefix}{fp}"
-            let toolParts = if capsFiles.IsEmpty then [||] else buildToolParts capsFiles fp sessionOpt assistantId
+
+            let toolParts =
+                if capsFiles.IsEmpty then
+                    [||]
+                else
+                    buildToolParts capsFiles fp sessionOpt assistantId
+
             let userMsg = buildUserMessage userId sessionOpt preludeText
             let ackMsg = buildAckMessage ackId userId sessionOpt projectRoot
+
             let assistantMessages =
-                if capsFiles.IsEmpty
-                then [| ackMsg |]
-                else [| ackMsg; buildAssistantMessage assistantId userId sessionOpt projectRoot toolParts |]
+                if capsFiles.IsEmpty then
+                    [| ackMsg |]
+                else
+                    [| ackMsg
+                       buildAssistantMessage assistantId userId sessionOpt projectRoot toolParts |]
+
             Array.concat [| [| userMsg |]; assistantMessages; existingStripped |]

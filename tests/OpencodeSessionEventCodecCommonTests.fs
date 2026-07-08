@@ -31,13 +31,19 @@ let getSessionIDFallsBackToEmpty () =
     equal "empty" "" (getSessionID "session.updated" props)
 
 let getPartsTextFromArray () =
-    let parts = box [| box (createObj [ "type", box "text"; "text", box "hello" ])
-                       box (createObj [ "type", box "text"; "text", box "world" ]) |]
+    let parts =
+        box
+            [| box (createObj [ "type", box "text"; "text", box "hello" ])
+               box (createObj [ "type", box "text"; "text", box "world" ]) |]
+
     equal "concat" "hello\nworld" (getPartsText parts)
 
 let getPartsTextSkipsNonText () =
-    let parts = box [| box (createObj [ "type", box "tool_use" ])
-                       box (createObj [ "type", box "text"; "text", box "only" ]) |]
+    let parts =
+        box
+            [| box (createObj [ "type", box "tool_use" ])
+               box (createObj [ "type", box "text"; "text", box "only" ]) |]
+
     equal "skip" "only" (getPartsText parts)
 
 let getPartsTextNonArray () =

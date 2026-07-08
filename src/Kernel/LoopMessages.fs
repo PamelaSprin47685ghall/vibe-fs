@@ -46,15 +46,14 @@ let buildLoopCommandTemplate (commandName: string) (bodyLines: string list) : st
 /// Loop cancellation carries a `verdict: cancelled` front-matter anchor so a
 /// restart replay recognizes it structurally, followed by the human-readable
 /// line. Authored once here, consumed verbatim by both hosts' cancel paths.
-let loopCancelledMessage : string =
+let loopCancelledMessage: string =
     frontMatterPrompt [ yamlField verdictField verdictCancelled ] "With-Review Mode cancelled."
 
 // ── Reconstruction from dialogue history ─────────────────────────────────────
 
 /// Parse *text* into one scalar map per front-matter block (order preserved).
 /// Each block is parsed independently so multi-front-matter blocks do not merge.
-let frontMatterScalarBlocks (text: string) : Map<string,string> list =
-    parseFrontMatterScalarBlocks text
+let frontMatterScalarBlocks (text: string) : Map<string, string> list = parseFrontMatterScalarBlocks text
 
 /// After an opencode restart the in-memory review store is gone, but the
 /// dialogue history still carries the loop messages this module and
@@ -75,15 +74,19 @@ let frontMatterScalarBlocks (text: string) : Map<string,string> list =
 ///   needs_revision/terminate verdict, or any non-front-matter prose -> task untouched
 let inferReviewTaskFromTexts (texts: string seq) : string option =
     texts
-    |> Seq.fold (fun current text ->
-        frontMatterScalarBlocks text
-        |> List.fold (fun currentBlock fields ->
-            match Map.tryFind taskField fields with
-            | Some task when task <> "" -> Some task
-            | _ ->
-                match Map.tryFind verdictField fields with
-                | Some verdict when isEndVerdict verdict -> None
-                | _ -> currentBlock) current) None
+    |> Seq.fold
+        (fun current text ->
+            frontMatterScalarBlocks text
+            |> List.fold
+                (fun currentBlock fields ->
+                    match Map.tryFind taskField fields with
+                    | Some task when task <> "" -> Some task
+                    | _ ->
+                        match Map.tryFind verdictField fields with
+                        | Some verdict when isEndVerdict verdict -> None
+                        | _ -> currentBlock)
+                current)
+        None
 
 let doubleCheckField = "double-check"
 
