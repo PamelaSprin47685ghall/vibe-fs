@@ -66,7 +66,7 @@ let private toolSchemaProperties (harness: Harness) (name: string) : obj =
         if dynIsNull args then null else args
 
 let private warnTddValue =
-    "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"
+    "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
 
 let private warnValue = "it-is-not-possible-to-do-it-using-other-tools"
 

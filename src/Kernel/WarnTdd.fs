@@ -2,7 +2,7 @@ module Wanxiangshu.Kernel.WarnTdd
 
 type WarnTdd = | IAmSureIHaveFollowedTddAndKolmolgorovPrinciples
 
-let canonicalValue = "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles"
+let canonicalValue = "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
 
 let parseWarnTdd (s: string) : WarnTdd option =
     if s.ToLowerInvariant() = canonicalValue then

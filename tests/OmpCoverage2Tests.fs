@@ -87,7 +87,7 @@ let toolCallHandler_normalToolReturnsNone () =
     let store = createReviewStore ()
     // "coder" is NOT child-only
     let event =
-        fakeEvent "coder" (createObj [ "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles" ])
+        fakeEvent "coder" (createObj [ "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" ])
 
     promise {
         let! result = toolCallHandler pi store event (fakeCtx "s1" "/tmp")
