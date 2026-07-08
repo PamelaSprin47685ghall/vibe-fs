@@ -17,6 +17,7 @@ let all: ToolSpec list =
       investigatorSpec
       meditatorSpec
       browserSpec
+      continueSpec
       executorSpec
       fuzzyFindSpec
       fuzzyGrepSpec

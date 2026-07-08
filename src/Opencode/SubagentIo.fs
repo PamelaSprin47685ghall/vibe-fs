@@ -30,6 +30,7 @@ let runSubagentCoreResult
     (context: obj)
     (tools: obj)
     (cleanup: bool)
+    (existingChildID: string option)
     : JS.Promise<Result<string, DomainError>> =
     promise {
         let signal = getAbortSignal context
@@ -46,7 +47,16 @@ let runSubagentCoreResult
                   thinkingLevel = None } }
 
         try
-            let! childResult = startSubagentSession registry client options
+            let! childResult =
+                match existingChildID with
+                | Some cid ->
+                    let parentID =
+                        registry.ResolveSubsessionParentID(
+                            if sessionID = "" then None else Some sessionID
+                        )
+                    registry.RegisterChildAgent(cid, agent, parentID)
+                    Promise.lift (Ok cid)
+                | None -> startSubagentSession registry client options
 
             match childResult with
             | Error err -> return Error err
@@ -110,7 +120,7 @@ let runSubagentWithCleanup
     (sessionID: string)
     (context: obj)
     : JS.Promise<Result<string, DomainError>> =
-    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context (box null) true
+    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context (box null) true None
 
 let runSubagent
     (runtime: FallbackRuntimeState)
@@ -124,4 +134,4 @@ let runSubagent
     (context: obj)
     (tools: obj)
     : JS.Promise<Result<string, DomainError>> =
-    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context tools false
+    runSubagentCoreResult runtime registry client agent title prompt directory sessionID context tools false None

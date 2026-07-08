@@ -32,6 +32,7 @@ let muxToolNames =
            "investigator"
            "meditator"
            "browser"
+           "continue"
            "executor"
            "submit_review"
            "websearch"
@@ -63,6 +64,7 @@ let createToolCatalog
        yield investigatorTool deps toolNames sessionScope
        yield meditatorTool deps toolNames sessionScope
        yield browserTool deps toolNames sessionScope
+       yield continueTool deps toolNames sessionScope
        yield injectWarnWarnTddIntoMuxSchema (executorTool deps toolNames sessionScope)
        yield submitReviewTool deps toolNames reviewStore sessionScope
        yield websearchTool deps toolNames

@@ -32,6 +32,11 @@ type ChildAgentRegistry private (state: WorkspaceState ref) =
         |> Option.bind (fun childId -> Map.tryFind childId state.Value.childSessions)
         |> Option.map (fun meta -> meta.agent)
 
+    member this.GetChildSessions() =
+        state.Value.childSessions
+        |> Map.toList
+        |> List.map (fun (k, v) -> Id.childIdValue k, v.agent)
+
     member this.ResolveSubsessionParentID(sessionID: string option) =
         let rec resolve visited current resolved =
             if Set.contains current visited then
@@ -61,7 +66,3 @@ type ChildAgentRegistry private (state: WorkspaceState ref) =
         match this.parseChildId sessionID with
         | None -> ()
         | Some childId -> state.Value <- reduce state.Value (ChildUnregistered childId)
-
-/// Per-session serial execution is provided by Wanxiangshu.Shell.SessionExecutor.
-/// Per-session serial execution is provided by Wanxiangshu.Shell.SessionExecutor.
-/// Per-session serial execution is provided by Wanxiangshu.Shell.SessionExecutor.

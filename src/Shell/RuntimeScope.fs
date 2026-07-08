@@ -4,6 +4,7 @@ open Fable.Core
 open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Shell.SessionProjectionStore
 open Wanxiangshu.Shell.FuzzyIteratorStore
+open Wanxiangshu.Shell.SubagentIteratorStore
 open Wanxiangshu.Shell.PromiseQueue
 
 type RuntimeScope() =
@@ -13,6 +14,7 @@ type RuntimeScope() =
     let mutable capsFiles = Map.empty<string, CapsFile list>
     let mutable capsInflight = Map.empty<string, JS.Promise<CapsFile list>>
     let iteratorStore = createTypedIteratorStore 200
+    let subagentIteratorStore = createSubagentIteratorStore 50
     let mutable sessionQueues = Map.empty<string, SerialQueue>
     let mutable extState = Map.empty<string, obj>
     let mutable tempFilesByPrompt = Map.empty<string, string list>
@@ -20,6 +22,8 @@ type RuntimeScope() =
     member _.Projection = projection
 
     member _.IteratorStore = iteratorStore
+
+    member _.SubagentIteratorStore = subagentIteratorStore
 
     member _.RegisterTempFiles(prompt: string, files: string list) : unit =
         let key = if isNull prompt then "" else prompt.Trim()
@@ -57,7 +61,9 @@ type RuntimeScope() =
             capsInflight <- Map.add key p capsInflight
             p
 
-    member _.ClearIterators() : unit = clearTypedIteratorStore iteratorStore
+    member _.ClearIterators() : unit =
+        clearTypedIteratorStore iteratorStore
+        clearSubagentIteratorStore subagentIteratorStore
 
     member _.ClearSessionQueues() : unit = sessionQueues <- Map.empty
 

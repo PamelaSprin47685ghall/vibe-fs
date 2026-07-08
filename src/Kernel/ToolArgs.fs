@@ -13,6 +13,8 @@ type MeditatorArgs = { Intent: string; Files: string array }
 
 type BrowserArgs = { Intent: string }
 
+type ContinueArgs = { Iterator: string; Prompt: string }
+
 type WebsearchArgs =
     { Query: string
       NumResults: int
@@ -58,6 +60,7 @@ type ToolArgs =
     | Write of WriteArgs
     | Meditator of MeditatorArgs
     | Browser of BrowserArgs
+    | Continue of ContinueArgs
     | Websearch of WebsearchArgs
     | Webfetch of WebfetchArgs
     | Executor of ExecutorArgs

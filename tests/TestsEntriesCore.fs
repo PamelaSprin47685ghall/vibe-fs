@@ -21,6 +21,7 @@ open Wanxiangshu.Tests.HostToolsTests
 open Wanxiangshu.Tests.ToolPermissionTests
 open Wanxiangshu.Tests.SubagentPromptsTests
 open Wanxiangshu.Tests.SubagentIntentsTests
+open Wanxiangshu.Tests.SubagentIteratorStoreTests
 open Wanxiangshu.Tests.NudgeRetryProgressTests
 open Wanxiangshu.Tests.NudgeTodoStatusTests
 open Wanxiangshu.Tests.NudgeEventSourcingTests
@@ -90,6 +91,7 @@ let coreTestEntries () : (string * TestBody) list =
       "ToolPermissionTests.run", TestBody.Sync(sync ToolPermissionTests.run)
       "SubagentPromptsTests.run", TestBody.Sync(sync SubagentPromptsTests.run)
       "SubagentIntentsTests.run", TestBody.Sync(sync SubagentIntentsTests.run)
+      "SubagentIteratorStoreTests.run", TestBody.Sync(sync SubagentIteratorStoreTests.run)
       "SubagentDispatcherTests.run", TestBody.Async SubagentDispatcherTests.run
       "KernelTests.headTail'", TestBody.Sync(sync KernelTests.headTail')
       "KernelTests.stripLexer'", TestBody.Sync(sync KernelTests.stripLexer')

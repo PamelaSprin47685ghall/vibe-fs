@@ -35,6 +35,7 @@ let createTools
               yield "investigator", box (investigatorTool host registry ctx fallbackRuntime sessionScope)
               yield "meditator", box (meditatorTool host registry ctx fallbackRuntime sessionScope)
               yield "browser", box (browserTool host registry ctx fallbackRuntime sessionScope)
+              yield "continue", box (continueTool host registry ctx fallbackRuntime sessionScope)
               yield "executor", box (executorTool host registry ctx sessionScope fallbackRuntime)
               yield "pty_spawn", box (ptySpawnTool host)
               yield "pty_write", box (ptyWriteTool host)

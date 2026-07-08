@@ -22,6 +22,10 @@ let subagentToolsUseToolCatalogRequiredKeys () =
         (mux.Contains "subagentRequiredKeys \"browser\"")
 
     check
+        "arch: Mux SubagentTools uses subagentRequiredKeys for continue"
+        (mux.Contains "subagentRequiredKeys \"continue\"")
+
+    check
         "arch: Mux SubagentTools must not hardcode [| intents; tdd |]"
         (not (mux.Contains "[| \"intents\"; \"tdd\" |]"))
 
@@ -54,6 +58,10 @@ let subagentToolsUseToolCatalogRequiredKeys () =
     check
         "arch: Opencode SubagentTools uses subagentRequiredKeys for browser"
         (opencode.Contains "subagentRequiredKeys \"browser\"")
+
+    check
+        "arch: Opencode SubagentTools uses subagentRequiredKeys for continue"
+        (opencode.Contains "subagentRequiredKeys \"continue\"")
 
     check "arch: Opencode SubagentTools uses subagentZodShape" (opencode.Contains "subagentZodShape")
 
@@ -104,6 +112,7 @@ let toolArgsDecodeCoversMajorTools () =
     check "arch: ToolArgsDecode uses decodeTodoWriteArgs" (code.Contains "decodeTodoWriteArgs")
     check "arch: ToolArgsDecode uses decodeApplyPatchFields" (code.Contains "decodeApplyPatchFields")
     check "arch: ToolArgsDecode uses decodeSubmitReviewArgs" (code.Contains "decodeSubmitReviewArgs")
+    check "arch: ToolArgsDecode covers continue tool" (code.Contains "continue")
 
 let decodedToolInvocationNoObj () =
     let code = requireFile "src/Shell/ToolArgsDecode.fs" |> nonCommentCode

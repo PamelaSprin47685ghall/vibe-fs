@@ -98,6 +98,15 @@ let private decodeBrowser args =
     decodeBrowserArgs args
     |> Result.map (fun d -> Typed(Browser { Intent = d.Intent }))
 
+let private decodeContinue args =
+    decodeContinueArgs args
+    |> Result.map (fun d ->
+        Typed(
+            Continue
+                { Iterator = d.Iterator
+                  Prompt = d.Prompt }
+        ))
+
 let private decodeWebsearch args =
     WebToolsCodec.decodeWebsearchArgs args
     |> Result.map (fun w -> Typed(ToolArgs.Websearch(mapWebsearch w)))
@@ -128,13 +137,15 @@ let private decodeSubmitReview args =
         ))
 
 let decodeToolInvocation (toolName: string) (args: obj) : Result<DecodedToolInvocation, DomainError> =
-    match toolName with
+    let cleanToolName = if toolName = "continue" then "continue" else toolName
+    match cleanToolName with
     | "read" -> decodeRead args
     | "write" -> decodeWrite args
     | "coder" -> decodeCoder args
     | "investigator" -> decodeInvestigator args
     | "meditator" -> decodeMeditator args
     | "browser" -> decodeBrowser args
+    | "continue" -> decodeContinue args
     | "websearch" -> decodeWebsearch args
     | "webfetch" -> decodeWebfetch args
     | "executor" -> decodeExecutor args

@@ -3,6 +3,7 @@ module Wanxiangshu.Shell.ToolContextCodec
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.ToolContext
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ChildAgentRegistry
 
 type IOpenCodeToolContext =
     abstract directory: string with get
@@ -52,7 +53,8 @@ let decodeOpencodeToolContext (context: IOpenCodeToolContext) (fallbackDir: stri
 
     { Directory = directory
       SessionId = Id.sessionIdQuick sessionId
-      WorkspaceId = None }
+      WorkspaceId = None
+      ChildRegistry = ChildAgentRegistry.Create() }
 
 let muxConfigDirectoryFallback (config: IMuxToolContext) : string =
     match firstNonEmpty [ config.directory; config.cwd; config.workspacePath ] with
@@ -76,7 +78,8 @@ let decodeMuxConfig (config: IMuxToolContext) : Result<ToolExecutionContext, Dom
         Ok
             { Directory = directory
               SessionId = Id.sessionIdQuick sessionId
-              WorkspaceId = Some(Id.workspaceIdQuick wid) }
+              WorkspaceId = Some(Id.workspaceIdQuick wid)
+              ChildRegistry = ChildAgentRegistry.Create() }
     else
         Error(InvalidIntent("mux", "workspaceId", "required"))
 
@@ -96,4 +99,5 @@ let decodeMuxConfigLenient (config: IMuxToolContext) : ToolExecutionContext =
 
         { Directory = directory
           SessionId = Id.sessionIdQuick sessionId
-          WorkspaceId = workspaceId |> Option.map Id.workspaceIdQuick }
+          WorkspaceId = workspaceId |> Option.map Id.workspaceIdQuick
+          ChildRegistry = ChildAgentRegistry.Create() }

@@ -109,3 +109,16 @@ let browserTool (deps: obj) (toolNames: string array) (sessionScope: RuntimeScop
       execute =
         fun config args -> execute deps toolNames sessionScope "explore" "Browser" "explore" "browser" config args
       condition = None }
+
+let continueTool (deps: obj) (toolNames: string array) (sessionScope: RuntimeScope) : ToolDefinition =
+    { name = "continue"
+      description = description "continue"
+      parameters =
+        mkSchema
+            (createObj
+                [ "iterator", box (strProp "The subsession iterator ID")
+                  "prompt", box (strProp "New instructions or question") ])
+            (subagentRequiredKeys "continue")
+      execute =
+        fun config args -> execute deps toolNames sessionScope "exec" "Continue" "exec" "continue" config args
+      condition = None }

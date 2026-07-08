@@ -32,6 +32,7 @@ type RunSubagentCoreResult =
         -> obj
         -> obj
         -> bool
+        -> string option
         -> JS.Promise<Result<string, DomainError>>
 
 type OpencodeHostAdapter
@@ -77,6 +78,30 @@ type OpencodeHostAdapter
                         toolContext
                         (box null)
                         false
+                        None
+
+                return
+                    match result with
+                    | Ok text -> Success text
+                    | Error err -> Failure err
+            }
+
+        member _.ContinueSubagent(childID: string, prompt: string) : JS.Promise<SubagentResponse> =
+            promise {
+                let! result =
+                    runCore
+                        fallbackRuntime
+                        registry
+                        client
+                        "coder"
+                        "Continue"
+                        prompt
+                        workspaceRoot
+                        sessionId
+                        toolContext
+                        (box null)
+                        false
+                        (Some childID)
 
                 return
                     match result with
@@ -108,7 +133,7 @@ let private executeSubagent
         let adapter =
             OpencodeHostAdapter(runSubagentCoreResult, registry, client, ctx, context, runtime, sessionScope)
 
-        dispatch host adapter toolName args
+        dispatch host adapter toolName args sessionScope (Some registry)
 
 let coderTool
     (host: Host)
@@ -178,3 +203,21 @@ let browserTool
         browser
         (subagentZodShape browserRequiredKeys (createObj [ "intent", strReq Params.browserIntent ]))
         (fun args context -> executeSubagent host registry ctx "browser" args context runtime sessionScope)
+
+let continueTool
+    (host: Host)
+    (registry: ChildAgentRegistry)
+    (ctx: obj)
+    (runtime: FallbackRuntimeState)
+    (sessionScope: RuntimeScope)
+    : obj =
+    let continueRequiredKeys = subagentRequiredKeys "continue"
+
+    define
+        ToolSchema.continueSpec
+        (subagentZodShape
+            continueRequiredKeys
+            (createObj
+                [ "iterator", strReq "The subsession iterator ID"
+                  "prompt", strReq "New instructions or question" ]))
+        (fun args context -> executeSubagent host registry ctx "continue" args context runtime sessionScope)

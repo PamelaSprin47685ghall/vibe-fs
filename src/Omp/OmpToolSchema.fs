@@ -90,6 +90,16 @@ let meditatorParameters (tb: obj) : obj =
 let browserParameters (tb: obj) : obj =
     objectOf [| ("intent", str Params.browserIntent tb) |] tb
 
+let continueParameters (tb: obj) : obj =
+    objectOf
+        [| ("iterator",
+            str
+                "The iterator ID representing the target subagent session (usually returned in the front matter of a previous subagent run)."
+                tb)
+           ("prompt",
+            str "The new query, instructions, or follow-up question to send to the subagent session." tb) |]
+        tb
+
 let executorParameters (tb: obj) : obj =
     let schema =
         objectOf

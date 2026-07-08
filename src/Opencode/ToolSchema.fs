@@ -193,4 +193,6 @@ let submitReview = toolDescription "submit_review"
 
 let submitReviewResult = toolDescription "return_reviewer"
 
+let continueSpec = toolDescription "continue"
+
 let executorMode = Params.executorMode

@@ -121,6 +121,8 @@
     <Compile Include="src/Shell/PromiseStr.fs"/>
     <Compile Include="src/Shell/SessionProjectionStore.fs"/>
     <Compile Include="src/Shell/FuzzyIteratorStore.fs"/>
+    <Compile Include="src/Shell/ChildAgentRegistry.fs"/>
+    <Compile Include="src/Shell/SubagentIteratorStore.fs"/>
     <Compile Include="src/Shell/RuntimeScope.fs"/>
     <Compile Include="src/Shell/LivelockGuard.fs"/>
     <Compile Include="src/Shell/SessionExecutor.fs"/>
@@ -165,7 +167,6 @@
     <Compile Include="src/Shell/MessagingDecodeCore.fs"/>
     <Compile Include="src/Shell/MessagingPartCodec.fs"/>
     <Compile Include="src/Shell/MessageTransformCommon.fs"/>
-
     <Compile Include="src/Shell/ChatTransformOutputCodec.fs"/>
     <Compile Include="src/Shell/MessageTransformCore.fs"/>
     <Compile Include="src/Shell/MessagingEncodeHelpers.fs"/>
@@ -191,7 +192,7 @@
     <Compile Include="src/Shell/FuzzySearchGrep.fs"/>
     <Compile Include="src/Shell/FuzzySearch.fs"/>
     <Compile Include="src/Shell/FuzzyToolsCodec.fs"/>
-    <Compile Include="src/Shell/ChildAgentRegistry.fs"/>
+    <Compile Include="src/Shell/FuzzyToolsCodec.fs"/>
     <Compile Include="src/Shell/ReviewToolsCodec.fs"/>
     <Compile Include="src/Shell/SubagentSimpleArgsCodec.fs"/>
     <Compile Include="src/Shell/ExecutorToolsCodec.fs"/>
@@ -240,7 +241,6 @@
     <Compile Include="src/Mux/HostToolsFuzzy.fs"/>
     <Compile Include="src/Mux/HostTools.fs"/>
     <Compile Include="src/Mux/WebTools.fs"/>
-
     <Compile Include="src/Mux/MessagingCodec.fs"/>
     <Compile Include="src/Mux/CapsCodec.fs"/>
     <Compile Include="src/Mux/BacklogSession.fs"/>
@@ -296,8 +296,8 @@
     <Compile Include="src/Omp/MessagingCodecEncode.fs"/>
     <Compile Include="src/Omp/MessagingCodec.fs"/>
     <Compile Include="src/Omp/ChildSession.fs"/>
+    <Compile Include="src/Omp/ChildSessionRegistry.fs"/>
     <Compile Include="src/Omp/MagicTodo.fs"/>
-
     <Compile Include="src/Omp/ToolResultEvent.fs"/>
     <Compile Include="src/Omp/PruneGuard.fs"/>
     <Compile Include="src/Omp/NudgeRuntime.fs"/>
@@ -511,6 +511,7 @@
     <Compile Include="tests/ToolPermissionTests.fs"/>
     <Compile Include="tests/SubagentPromptsTests.fs"/>
     <Compile Include="tests/SubagentIntentsTests.fs"/>
+    <Compile Include="tests/SubagentIteratorStoreTests.fs"/>
     <Compile Include="tests/SubagentDispatcherTests.fs"/>
     <Compile Include="tests/MethodologyRegistryTests.fs"/>
     <Compile Include="tests/ToolCatalogRegistryTests.fs"/>

@@ -12,6 +12,7 @@ type SubagentTaskKind =
     | Investigator of InvestigatorIntent list
     | Meditator of intent: string * sections: MeditatorFileSection list
     | Browser of intent: string
+    | Continue of iterator: string * prompt: string
     | ExecutorSummary of
         output: string *
         language: string *
@@ -45,6 +46,7 @@ let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
     | Investigator intents -> intents |> List.map (investigatorPrompt >> wrap)
     | Meditator(intent, sections) -> [ meditatorPrompt sections intent |> wrap ]
     | Browser intent -> [ browserPrompt intent |> wrap ]
+    | Continue(iterator, prompt) -> [ prompt ]
     | ExecutorSummary(output, language, program, dependencies, timeoutType, mode, whatToSummarize) ->
         [ executorSummarizerPrompt whatToSummarize output language program dependencies timeoutType mode
           |> wrap ]

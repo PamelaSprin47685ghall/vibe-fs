@@ -52,3 +52,15 @@ let internal browserSpec: ToolSpec =
             [ "intent",
               "Natural-language intent for the web task. Include URLs, goals, constraints, and any project context needed." ]
       requiredFields = [ "intent" ] }
+
+let internal continueSpec: ToolSpec =
+    { name = "continue"
+      description =
+        "Continue a previously running subagent session with a new prompt. "
+        + "If an automated tool (like coder, investigator, meditator, browser) finishes execution but you have follow-up questions, need clarifications, or want to continue the work on that session, it is highly recommended to call this continue tool! "
+        + "This avoids losing the context of the child session and allows incremental progress."
+      paramDocs =
+        map
+            [ "iterator", "The iterator ID representing the target subagent session (usually returned in the front matter of a previous subagent run)."
+              "prompt", "The new query, instructions, or follow-up question to send to the subagent session." ]
+      requiredFields = [ "iterator"; "prompt" ] }

@@ -95,7 +95,8 @@ let ompSourceFilesUnder300 () =
     for path in fsFilesRecursive "src/Omp" do
         let content = requireFile path
         let lineCount = content.Length - content.Replace("\n", "").Length
-        check ("arch: " + path + " <=300 lines") (lineCount <= 300)
+        let msg = "arch: " + path + " <=300 lines"
+        check msg (lineCount <= 300)
 
 let ompFuzzyToolsUsesShellFinder () =
     let code = requireFile "src/Omp/FuzzyTools.fs" |> nonCommentCode

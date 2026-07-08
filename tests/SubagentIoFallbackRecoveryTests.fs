@@ -11,6 +11,8 @@ open Wanxiangshu.Opencode.SubagentIo
 
 /// prompt rejects immediately; fallback handler sets Consumed on next microtask — without
 /// waitForRecovery, GetConsumed would be None and subagent would surface UnknownJsError.
+open Wanxiangshu.Kernel.Domain
+
 let runSubagentRecoversWhenFallbackConsumesError () =
     promise {
         let rt = FallbackRuntimeState()
@@ -49,7 +51,9 @@ let runSubagentRecoversWhenFallbackConsumesError () =
                   ) ]
 
         let runP =
-            runSubagentCoreResult rt registry client "coder" "t" "go" "/tmp" "parent-1" (box null) (box null) false
+            let rscr : FallbackRuntimeState -> ChildAgentRegistry -> obj -> string -> string -> string -> string -> string -> obj -> obj -> bool -> string option -> JS.Promise<Result<string, DomainError>> =
+                runSubagentCoreResult
+            rscr rt registry client "coder" "t" "go" "/tmp" "parent-1" (box null) (box null) false None
 
         do! yieldMicrotask ()
         rt.SetConsumed childId true
@@ -118,7 +122,9 @@ let runSubagentWaitsForToolCallTextRecovery () =
                   ) ]
 
         let runP =
-            runSubagentCoreResult rt registry client "investigator" "t" "go" "/tmp" "parent-1" (box null) (box null) false
+            let rscr : FallbackRuntimeState -> ChildAgentRegistry -> obj -> string -> string -> string -> string -> string -> obj -> obj -> bool -> string option -> JS.Promise<Result<string, DomainError>> =
+                runSubagentCoreResult
+            rscr rt registry client "investigator" "t" "go" "/tmp" "parent-1" (box null) (box null) false None
 
         do! yieldMicrotask ()
         do! yieldMicrotask ()

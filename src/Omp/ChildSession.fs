@@ -10,6 +10,7 @@ open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.OmpHostBindings
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.SubagentIo
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -18,12 +19,12 @@ type ChildSession =
       childId: string
       dispose: (unit -> unit) option }
 
-let private getChildIds (scope: RuntimeScope) : Set<string> =
+let getChildIds (scope: RuntimeScope) : Set<string> =
     match scope.TryFindKey "omp_child_sessions" with
     | Some v -> unbox<Set<string>> v
     | None -> Set.empty
 
-let private setChildIds (scope: RuntimeScope) (ids: Set<string>) : unit =
+let setChildIds (scope: RuntimeScope) (ids: Set<string>) : unit =
     scope.Add("omp_child_sessions", box ids)
 
 let markChildSession (scope: RuntimeScope) (id: string) =
@@ -43,9 +44,10 @@ let isChildSession (scope: RuntimeScope) (id: string) : bool =
         let ids = getChildIds scope
         Set.contains id ids
 
-let clearChildSessionsForTest (scope: RuntimeScope) () : unit = setChildIds scope Set.empty<string>
+let clearChildSessionsForTest (scope: RuntimeScope) () : unit =
+    setChildIds scope Set.empty<string>
 
-let private callOpt (ctx: obj) (key: string) : obj =
+let callOpt (ctx: obj) (key: string) : obj =
     let g = Dyn.get ctx key
     if Dyn.typeIs g "function" then Dyn.call0 g else box null
 
@@ -86,7 +88,6 @@ let createChildSession
                 for t in customTools do
                     myCustomTools.Add(t)
 
-            // Extract return_reviewer definition from parent extensions if requested
             if Array.contains "return_reviewer" toolNames then
                 let parentExtension = Dyn.get pi "extension"
 
@@ -152,20 +153,20 @@ let createChildSession
                   dispose = dispose }
     }
 
-let runSubagent
+let runSubagentWithId
     (scope: RuntimeScope)
     (pi: obj)
     (ctx: obj)
     (toolNames: string array)
     (prompt: string)
     (signal: obj option)
-    (fallbackRuntime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState)
-    (fallbackConfigOpt: Wanxiangshu.Kernel.FallbackKernel.Types.FallbackConfig option)
-    : JS.Promise<string> =
+    (fallbackRuntime: FallbackRuntimeState)
+    (fallbackConfigOpt: FallbackConfig option)
+    : JS.Promise<string * string> =
     promise {
         let modelOverride, defaultChain =
             match fallbackConfigOpt with
-            | Some cfg ->
+            | Some (cfg: FallbackConfig) ->
                 let firstModel =
                     match cfg.DefaultChain with
                     | first :: _ ->
@@ -192,6 +193,7 @@ let runSubagent
         let childId = child.childId
 
         if childId <> "" then
+            scope.Add("omp_session_" + childId, session)
             let scalars = Wanxiangshu.Kernel.PromptFrontMatter.parseFrontMatterScalars prompt
 
             match Map.tryFind "objective" scalars with
@@ -227,14 +229,37 @@ let runSubagent
 
             child.dispose |> Option.iter (fun dispose -> dispose ())
 
-        let! text = raceWithAbortSignal (Option.defaultValue (box null) signal) cleanup run
-        cleanup ()
-
-        if childId <> "" && fallbackRuntime.GetConsumed childId <> Some false then
+        let! text = raceWithAbortSignal (Option.defaultValue (box null) signal) (fun () -> ()) run
+        if childId <> ""
+           && fallbackRuntime.GetConsumed childId <> Some false then
             let pst = fallbackRuntime.GetOrCreateState childId
 
-            if pst.Phase = Wanxiangshu.Kernel.FallbackKernel.Types.FallbackPhase.Exhausted then
+            if pst.Phase = FallbackPhase.Exhausted then
                 return failwith "Fallback exhausted for child session"
 
+        return (text, childId)
+    }
+
+let runSubagent
+    (scope: RuntimeScope)
+    (pi: obj)
+    (ctx: obj)
+    (toolNames: string array)
+    (prompt: string)
+    (signal: obj option)
+    (fallbackRuntime: FallbackRuntimeState)
+    (fallbackConfigOpt: FallbackConfig option)
+    : JS.Promise<string> =
+    promise {
+        let! (text, _) =
+            runSubagentWithId
+                scope
+                pi
+                ctx
+                toolNames
+                prompt
+                signal
+                fallbackRuntime
+                fallbackConfigOpt
         return text
     }
