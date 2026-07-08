@@ -159,6 +159,15 @@ Nudge evaluates turn completion and prompts the model if work is incomplete.
 #### Suppression Rules
 Nudge is suppressed if the last assistant message contains `<skip-todo-check/>`, `<skip-loop-check/>`, or an unresolved question tool call (`ask_user_question` / `question`).
 
+### 3.6 Parallel Tool Calling Encouragement (FEATURE1)
+To encourage parallel tool executions and discourage linear single-tool debug loops:
+1. **Detection Logic**: During host message transforms (after backlog projection), the system checks the filtered `Native` message list. It identifies the last `Assistant` message containing tools. If and only if the message contains exactly one tool part (`allToolParts.Length = 1 && realToolParts.Length = 1`), and it is followed by a `ToolResult` message (meaning the single-tool output has returned and the LLM is preparing the next turn), it triggers prompt injection.
+2. **Exclusion Filters**:
+   - Tool calls starting with `semble-call-` or `caps-call-` are ignored as synthetic helpers.
+   - The white-list of valid tool names is dynamically derived from `ToolCatalog.all` and `"methodology"`.
+3. **Synthetic User Message**: A synthetic message with role `User` and ID `parallel-tool-synth-<callID>` is appended to the messages array. It carries a disciplined directive urging the model to schedule orthagonal tools concurrently.
+4. **Lifecycle & Decoupling**: The injected message has `source = Synthetic "parallel-tool-synth-"` and is automatically stripped by `stripSyntheticBySource` in the subsequent round, preventing context accumulation.
+
 ---
 
 ## 4. Technical & Data Specs
