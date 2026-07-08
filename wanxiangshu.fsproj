@@ -58,6 +58,7 @@
     <Compile Include="src/Kernel/Nudge/SubmitReviewHooks.fs"/>
     <Compile Include="src/Kernel/CapsFormat.fs"/>
     <Compile Include="src/Kernel/Messaging.fs"/>
+    <Compile Include="src/Kernel/AmendFilter.fs"/>
     <Compile Include="src/Kernel/ReviewReplayPolicy.fs"/>
     <Compile Include="src/Kernel/Message.fs"/>
     <Compile Include="src/Kernel/CapsSynthPolicy.fs"/>
@@ -165,7 +166,6 @@
     <Compile Include="src/Shell/MessagingDecodeCore.fs"/>
     <Compile Include="src/Shell/MessagingPartCodec.fs"/>
     <Compile Include="src/Shell/MessageTransformCommon.fs"/>
-
     <Compile Include="src/Shell/ChatTransformOutputCodec.fs"/>
     <Compile Include="src/Shell/MessageTransformCore.fs"/>
     <Compile Include="src/Shell/MessagingEncodeHelpers.fs"/>
@@ -240,7 +240,6 @@
     <Compile Include="src/Mux/HostToolsFuzzy.fs"/>
     <Compile Include="src/Mux/HostTools.fs"/>
     <Compile Include="src/Mux/WebTools.fs"/>
-
     <Compile Include="src/Mux/MessagingCodec.fs"/>
     <Compile Include="src/Mux/CapsCodec.fs"/>
     <Compile Include="src/Mux/BacklogSession.fs"/>
@@ -297,7 +296,6 @@
     <Compile Include="src/Omp/MessagingCodec.fs"/>
     <Compile Include="src/Omp/ChildSession.fs"/>
     <Compile Include="src/Omp/MagicTodo.fs"/>
-
     <Compile Include="src/Omp/ToolResultEvent.fs"/>
     <Compile Include="src/Omp/PruneGuard.fs"/>
     <Compile Include="src/Omp/NudgeRuntime.fs"/>
@@ -350,6 +348,7 @@
     <Compile Include="src/Opencode/PluginWanxiangzhen.fs"/>
     <!-- Tests -->
     <Compile Include="tests/Assert.fs"/>
+    <Compile Include="tests/AmendTests.fs"/>
     <Compile Include="tests/AsyncFlush.fs"/>
     <Compile Include="tests/EventLogFoldTests.fs"/>
     <Compile Include="tests/WanxiangzhenSquadEventTests.fs"/>

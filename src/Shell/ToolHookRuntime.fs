@@ -36,6 +36,24 @@ let requireWarnTddOnArgs (tool: string) (args: obj) : Result<unit, string> =
                     (InvalidIntent(tool, "warn_tdd", "required — acknowledge TDD + Kolmolgorov discipline"))
             )
 
+/// Read and delete the 'amend' field from tool args.
+/// Returns Some n if a valid positive integer was present, None otherwise.
+/// After this call, the 'amend' key is removed from args so downstream tool
+/// execution never sees it.
+let filterAmendFromArgs (args: obj) : int option =
+    match DynField.optField args "amend" with
+    | None -> None
+    | Some v ->
+        Dyn.deleteKey args "amend"
+        match v with
+        | :? int as n when n > 0 -> Some n
+        | :? float as f when f > 0.0 -> Some(int f)
+        | :? string as s ->
+            match System.Int32.TryParse s with
+            | true, n when n > 0 -> Some n
+            | _ -> None
+        | _ -> None
+
 /// Validate warn on tool args: parse and delete if valid, else produce domain error string.
 let requireWarnOnArgs (tool: string) (args: obj) : Result<unit, string> =
     if not (WarnTdd.isWarnRequiredTool tool) then
@@ -59,6 +77,8 @@ let muxToolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
         let args = argsFromMuxToolExecuteInput input
 
         if not (Dyn.isNullish args) then
+            filterAmendFromArgs args |> ignore
+
             match requireWarnTddOnArgs tool args with
             | Result.Error e -> setHookErrorMux output e
             | Result.Ok() -> ()

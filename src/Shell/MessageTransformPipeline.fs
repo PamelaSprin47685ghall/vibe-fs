@@ -1,8 +1,10 @@
 module Wanxiangshu.Shell.MessageTransformPipeline
 
 open Fable.Core
+open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MessageTransformCore
 
 type MessageTransformPlan =
@@ -91,8 +93,20 @@ let runMessageTransformPipeline
         if plan.Cleaned.IsEmpty then
             return [||]
         else
+            let afterAmend =
+                AmendFilter.filterAmendMessages
+                    (fun raw ->
+                        match DynField.optField raw "amend" with
+                        | None -> None
+                        | Some v ->
+                            match v with
+                            | :? int as n when n > 0 -> Some n
+                            | :? float as f when f > 0.0 -> Some(int f)
+                            | _ -> None)
+                    plan.Cleaned
+
             let afterBacklog =
-                applyBacklogProjection plan.SessionID plan.Excluded backlogOps plan.Cleaned
+                applyBacklogProjection plan.SessionID plan.Excluded backlogOps afterAmend
 
             let afterPrompt =
                 if plan.Excluded then

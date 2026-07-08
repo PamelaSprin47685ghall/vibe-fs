@@ -63,6 +63,8 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
         let args = resolveHookExecuteArgs input output
         let tool = toolNameFromHookInput input
 
+        ToolHookRuntime.filterAmendFromArgs args |> ignore
+
         match ToolHookRuntime.requireWarnTddOnArgs tool args with
         | Result.Error e -> setHookError output e
         | Result.Ok() -> ()
