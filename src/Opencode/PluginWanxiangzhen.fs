@@ -48,5 +48,12 @@ let plugin (ctx: obj) : JS.Promise<obj> =
     else
         coordinatorPlugin ctx
 
+let pluginWithDeps = PluginWanxiangzhenDeps.pluginWithDeps
+
 [<ExportDefault>]
-let pluginModule: obj = createObj [ "id", box "wanxiangzhen"; "server", box plugin ]
+let pluginModule: obj =
+    createObj
+        [ "id", box "wanxiangzhen"
+          "server", box plugin
+          "plugin", box plugin
+          "pluginWithDeps", box pluginWithDeps ]

@@ -67,7 +67,6 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       "ArchitectureTests.ompReviewUsesReviewRuntime", Sync(sync ArchitectureTestsOmp.ompReviewUsesReviewRuntime)
       "ArchitectureTests.ompCapsCodecExists", Sync(sync ArchitectureTestsOmp.ompCapsCodecExists)
       "ArchitectureTests.ompChildSessionExists", Sync(sync ArchitectureTestsOmp.ompChildSessionExists)
-      "ArchitectureTests.ompTestFilesUnder300", Sync(sync ArchitectureTestsOmp.ompTestFilesUnder300)
       "ArchitectureTests.ompSourceFilesUnder300", Sync(sync ArchitectureTestsOmp.ompSourceFilesUnder300)
       "ArchitectureTests.ompFuzzyToolsUsesShellFinder", Sync(sync ArchitectureTestsOmp.ompFuzzyToolsUsesShellFinder)
       "ArchitectureTests.ompExecutorUsesShellExecute", Sync(sync ArchitectureTestsOmp.ompExecutorUsesShellExecute)

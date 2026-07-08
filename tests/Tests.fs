@@ -29,6 +29,7 @@ open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.TestsArchitectureRegistry
 open Wanxiangshu.Tests.TestsEntriesCore
+open Wanxiangshu.Tests.TestsEntriesWanxiangzhen
 open Wanxiangshu.Tests.TestsEntriesCodec
 open Wanxiangshu.Tests.TestsEntriesOmp
 open Wanxiangshu.Tests.ReviewReplaySyncTests
@@ -152,6 +153,7 @@ let private integrationToolFlatTests: (string * TestBody) list =
 
 let private tests: (string * TestBody) list =
     coreTestEntries ()
+    @ wanxiangzhenTestEntries ()
     @ (architectureTestEntries ())
     @ codecTestEntries ()
     @ ompTestEntries ()

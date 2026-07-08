@@ -83,6 +83,7 @@
     <Compile Include="src/Kernel/Wanxiangzhen/Dag.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadUpdateIdAssign.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadEvent.fs"/>
+    <Compile Include="src/Kernel/Wanxiangzhen/EventLogParse.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/Scheduler.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/FfDecision.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadPrompts.fs"/>
@@ -197,6 +198,10 @@
     <Compile Include="src/Shell/MuxHookInputCodec.fs"/>
     <Compile Include="src/Shell/FileToolsCodec.fs"/>
     <Compile Include="src/Shell/WorkBacklogToolsCodec.fs"/>
+    <Compile Include="src/Shell/EventLogRuntimeStore.fs"/>
+    <Compile Include="src/Shell/EventLogRuntimeSync.fs"/>
+    <Compile Include="src/Shell/EventLogRuntimeAppend.fs"/>
+    <Compile Include="src/Shell/EventLogRuntimeNudge.fs"/>
     <Compile Include="src/Shell/EventLogRuntime.fs"/>
     <Compile Include="src/Shell/MessageTransformHostEntry.fs"/>
     <Compile Include="src/Shell/PatchToolsCodec.fs"/>

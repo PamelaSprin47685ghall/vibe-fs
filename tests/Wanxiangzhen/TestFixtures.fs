@@ -1,0 +1,66 @@
+module Wanxiangshu.Tests.Wanxiangzhen.TestFixtures
+
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.Wanxiangzhen.Dag
+open Wanxiangshu.Kernel.Wanxiangzhen.SquadConfig
+open Wanxiangshu.Shell.PromiseQueue
+open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Shared no-op CoordinatorDeps (20 fields, all stubs)
+// StartPolling returns null handle; override if test needs non-null.
+// ══════════════════════════════════════════════════════════════════════════════
+
+let stubDeps () : CoordinatorDeps =
+    { PromptSession        = fun _ _ _ -> Promise.lift ()
+      ReadAllSquadEvents   = fun _ -> Promise.lift []
+      AppendSquadEvent     = fun _ _ _ -> Promise.lift (Ok ())
+      TryWorktreeAdd       = fun _ _ _ _ -> Ok ""
+      TryWorktreeRemoveForce = fun _ _ -> Ok ""
+      TryBranchDeleteForce = fun _ _ -> Ok ""
+      ShowRefExists        = fun _ _ -> false
+      RevParseHead         = fun _ -> ""
+      RevParseRef          = fun _ _ -> ""
+      RevParseBranch       = fun _ -> ""
+      IsDetached           = fun _ -> false
+      StatusIsClean        = fun _ -> true
+      MergeBaseIsAncestor  = fun _ _ _ -> false
+      MergeFfOnly          = fun _ _ -> ""
+      HasCommits           = fun _ -> true
+      CreateSymlinks       = fun _ _ _ -> ()
+      SpawnSlave           = fun _ _ _ _ -> ()
+      IsPidAlive           = fun _ -> false
+      KillPid              = fun _ _ -> ()
+      WaitForPidDeath      = fun _ _ -> Promise.lift ()
+      StartPolling         = fun _ _ -> box null
+      StopPolling          = fun _ -> ()
+      Now                  = fun () -> System.DateTime.UtcNow.ToString("o") }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// mkRuntimeWithDeps — full factory accepting caller-supplied CoordinatorDeps.
+// GitQueue and InjectQueue are always two independent SerialQueue instances.
+// mkRuntime () is the zero-arg convenience form using stubDeps ().
+// ══════════════════════════════════════════════════════════════════════════════
+
+let mkRuntimeWithDeps (deps: CoordinatorDeps) : CoordinatorRuntime =
+    { Dag          = empty "" ""
+      Sessions     = Map.empty
+      Config       = defaults
+      MasterBranch = "main"
+      ProjectRoot  = "/tmp"
+      MasterSessionId = ""
+      Client       = createObj []
+      Token        = "test-token"
+      CoordinatorUrl = "http://localhost:0"
+      GitQueue     = SerialQueue ()
+      InjectQueue  = SerialQueue ()
+      Server       = { Port = 0; Url = ""; Close = fun () -> () }
+      Scheduling   = false
+      PidPollHandle = None
+      GitError     = None
+      InjectError  = None
+      Deps         = deps }
+
+let mkRuntime () : CoordinatorRuntime =
+    mkRuntimeWithDeps (stubDeps ())

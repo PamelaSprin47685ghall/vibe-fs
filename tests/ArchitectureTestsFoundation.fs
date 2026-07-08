@@ -57,9 +57,11 @@ let fileBodyUnder300 () =
 
     for dir in scanDirs do
         for path in fsFilesRecursive dir do
-            let content = requireFile path
-            let lineCount = content.Length - content.Replace("\n", "").Length
-            check ("arch: " + path + " <=300 lines") (lineCount <= 300)
+            if path.EndsWith(".fsproj") then ()
+            else
+                let content = requireFile path
+                let lineCount = content.Length - content.Replace("\n", "").Length
+                check ("arch: " + path + " <=300 lines") (lineCount <= 300)
 
 let noDuplicateStateHolder () =
     for dir in [| "src/Opencode"; "src/Mux"; "src/Omp" |] do

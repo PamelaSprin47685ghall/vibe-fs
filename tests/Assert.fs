@@ -53,6 +53,18 @@ let check (label: string) (condition: bool) : unit =
         failed <- failed + 1
         failures.Add label
 
+let chk = check
+
+let checkBare (condition: bool) : unit = check "bare" condition
+
+let isSome (o: 'a option) : unit = check "isSome" (Option.isSome o)
+
+let isNone (o: 'a option) : unit = check "isNone" (Option.isNone o)
+
+let recordException (msg: string) : unit =
+    failed <- failed + 1
+    failures.Add(msg)
+
 let equal (label: string) (expected: 'a) (actual: 'a) : unit =
     let ok = actual = expected
 
