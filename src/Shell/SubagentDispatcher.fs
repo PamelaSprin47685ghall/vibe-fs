@@ -17,6 +17,9 @@ open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.SubagentIteratorStore
 open Wanxiangshu.Shell.ToolArgsDecode
 open Wanxiangshu.Shell.ToolExecute
+open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.ToolOutputInfoTypes
 
 let resolveSubagentPromise (context: string) (p: JS.Promise<Result<string, DomainError>>) : JS.Promise<string> =
     promise {
@@ -28,6 +31,41 @@ let resolveSubagentPromise (context: string) (p: JS.Promise<Result<string, Domai
     }
 
 module HostAdapter = Wanxiangshu.Kernel.HostAdapter
+
+let formatBatchReports (reports: string list) : string =
+    let parsed =
+        reports
+        |> List.map (fun r ->
+            match tryParse r with
+            | Some msg ->
+                let iterOpt =
+                    msg.info
+                    |> List.tryPick (function
+                        | InfoItem.Iterator iter -> Some iter
+                        | _ -> None)
+
+                iterOpt, msg.body
+            | None -> None, r)
+
+    let allIterators = parsed |> List.choose fst
+
+    let fm =
+        if List.isEmpty allIterators then
+            ""
+        else
+            frontMatter [ yamlStringSeqField "iterators" allIterators ]
+
+    let formattedBlocks =
+        parsed
+        |> List.map (fun (iterOpt, body) ->
+            match iterOpt with
+            | Some iter -> $"# {iter}\n{body}"
+            | None -> body)
+
+    let joinedBlocks =
+        String.concat "\n\n" (formattedBlocks |> List.map (fun b -> b.Trim()))
+
+    if fm = "" then joinedBlocks else fm + "\n\n" + joinedBlocks
 
 let dispatch
     (host: Host)
@@ -124,7 +162,8 @@ let dispatch
                     |> List.iter (fun (prompt, intent) ->
                         adapter.RegisterTempFiles(intent.objective, coderTargetFiles intent))
 
-                    return! runParallelSpawns prompts (spawnOne HostAdapter.Coder "Coder")
+                    let! reports = prompts |> List.map (spawnOne HostAdapter.Coder "Coder") |> Promise.all
+                    return formatBatchReports (List.ofArray reports)
             | InvestigatorBatch intents ->
                 let prompts = promptsFromInvestigatorIntents host intents
 
@@ -135,7 +174,12 @@ let dispatch
                     |> List.iter (fun (prompt, intent) ->
                         adapter.RegisterTempFiles(intent.objective, Array.toList intent.entries))
 
-                    return! runParallelSpawns prompts (spawnOne HostAdapter.Investigator "Investigator")
+                    let! reports =
+                        prompts
+                        |> List.map (spawnOne HostAdapter.Investigator "Investigator")
+                        |> Promise.all
+
+                    return formatBatchReports (List.ofArray reports)
             | Typed(Meditator m) ->
                 let! promptResult = meditatorPromptFromFiles host adapter.WorkspaceRoot m.Intent m.Files
 

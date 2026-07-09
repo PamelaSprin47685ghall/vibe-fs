@@ -1,6 +1,7 @@
 module Wanxiangshu.Tests.SubagentDispatcherTests
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostAdapter
 open Wanxiangshu.Kernel.Domain
@@ -8,6 +9,7 @@ open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Shell.SubagentDispatcher
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.Dyn
 
 let fakeAdapter (response: SubagentResponse) : IHostAdapter =
     { new IHostAdapter with
@@ -90,26 +92,17 @@ let testContinueFlow () =
         let! result = dispatch Opencode fakeAdapterWithSpy "coder" sampleCoderArgs scope (Some registry)
         let containsSpawned = result.Contains "spawned"
         check "spawned has output" containsSpawned
-        let hasIter1 = result.Contains "iterator:"
+        let hasIter1 = result.Contains "iterators:"
         check "spawned has iterator" hasIter1
 
         let nextIter =
-            let cleanRes = result.Replace("\r\n", "\n").Replace("\r", "\n")
+            let parsed = Wanxiangshu.Kernel.PromptFrontMatter.parseFrontMatter result
 
-            if cleanRes.Contains("iterator:") then
-                let startIdx = cleanRes.IndexOf("iterator:") + 9
-                let remaining = cleanRes.Substring(startIdx).Trim()
-                let endIdx = remaining.IndexOf('\n')
-
-                let rawIter =
-                    if endIdx = -1 then
-                        remaining
-                    else
-                        remaining.Substring(0, endIdx)
-
-                rawIter.Replace("\"", "").Replace("'", "").Trim()
-            else
+            if isNullish parsed || isNullish parsed?iterators then
                 "failed"
+            else
+                let iterators = parsed?iterators |> unbox<string array>
+                iterators.[0]
 
         let args =
             box
