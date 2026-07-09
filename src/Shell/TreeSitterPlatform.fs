@@ -89,7 +89,7 @@ let internal tryGetPack () : Result<obj, string> =
                 match loadFromNativePath () with
                 | Result.Ok pack -> Result.Ok pack
                 | Result.Error nativeError -> Result.Error(rootError + "; " + nativeError)
-                
+
         cachedPack <- Some result
         result
 

@@ -51,8 +51,22 @@ let runSubagentRecoversWhenFallbackConsumesError () =
                   ) ]
 
         let runP =
-            let rscr : FallbackRuntimeState -> ChildAgentRegistry -> obj -> string -> string -> string -> string -> string -> obj -> obj -> bool -> string option -> JS.Promise<Result<string, DomainError>> =
+            let rscr
+                : FallbackRuntimeState
+                      -> ChildAgentRegistry
+                      -> obj
+                      -> string
+                      -> string
+                      -> string
+                      -> string
+                      -> string
+                      -> obj
+                      -> obj
+                      -> bool
+                      -> string option
+                      -> JS.Promise<Result<string, DomainError>> =
                 runSubagentCoreResult
+
             rscr rt registry client "coder" "t" "go" "/tmp" "parent-1" (box null) (box null) false None
 
         do! yieldMicrotask ()
@@ -115,15 +129,32 @@ let runSubagentWaitsForToolCallTextRecovery () =
                                                 {| data =
                                                     [| box
                                                            {| info = box {| role = "assistant" |}
-                                                              parts = [| box {| ``type`` = "text"; text = "recovered" |} |] |} |] |}
+                                                              parts =
+                                                               [| box
+                                                                      {| ``type`` = "text"
+                                                                         text = "recovered" |} |] |} |] |}
                                     })
                             )
                             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
                   ) ]
 
         let runP =
-            let rscr : FallbackRuntimeState -> ChildAgentRegistry -> obj -> string -> string -> string -> string -> string -> obj -> obj -> bool -> string option -> JS.Promise<Result<string, DomainError>> =
+            let rscr
+                : FallbackRuntimeState
+                      -> ChildAgentRegistry
+                      -> obj
+                      -> string
+                      -> string
+                      -> string
+                      -> string
+                      -> string
+                      -> obj
+                      -> obj
+                      -> bool
+                      -> string option
+                      -> JS.Promise<Result<string, DomainError>> =
                 runSubagentCoreResult
+
             rscr rt registry client "investigator" "t" "go" "/tmp" "parent-1" (box null) (box null) false None
 
         do! yieldMicrotask ()
@@ -134,10 +165,7 @@ let runSubagentWaitsForToolCallTextRecovery () =
 
         let s1 = rt.GetOrCreateState childId
 
-        rt.UpdateState
-            childId
-            { s1 with
-                Phase = FallbackPhase.Idle }
+        rt.UpdateState childId { s1 with Phase = FallbackPhase.Idle }
 
         let! result = runP
 

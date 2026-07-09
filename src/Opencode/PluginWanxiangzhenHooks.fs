@@ -105,10 +105,8 @@ let private squadUpdateArgsSchema () : obj =
                                                             "properties",
                                                             box (
                                                                 createObj
-                                                                    [ "taskId",
-                                                                      box (createObj [ "type", box "string" ])
-                                                                      "title",
-                                                                      box (createObj [ "type", box "string" ])
+                                                                    [ "taskId", box (createObj [ "type", box "string" ])
+                                                                      "title", box (createObj [ "type", box "string" ])
                                                                       "description",
                                                                       box (createObj [ "type", box "string" ])
                                                                       "dependsOn",
@@ -116,10 +114,7 @@ let private squadUpdateArgsSchema () : obj =
                                                                           createObj
                                                                               [ "type", box "array"
                                                                                 "items",
-                                                                                box (
-                                                                                    createObj
-                                                                                        [ "type", box "string" ]
-                                                                                ) ]
+                                                                                box (createObj [ "type", box "string" ]) ]
                                                                       ) ]
                                                             )
                                                             "required", box [| "title"; "description" |] ]

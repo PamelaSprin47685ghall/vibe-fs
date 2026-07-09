@@ -123,7 +123,7 @@ let topologicalOrder (tasks: (string * string list) list) : Result<string list, 
     let orderedIds = idSet |> Set.toList |> List.sort
 
     match processAll initialState orderedIds with
-    | Ok finalState -> Ok (List.rev finalState.Result)
+    | Ok finalState -> Ok(List.rev finalState.Result)
     | Error cycle -> Error cycle
 
 let detectCycle (tasks: (string * string list) list) : string list option =

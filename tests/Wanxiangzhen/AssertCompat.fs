@@ -12,8 +12,6 @@ let timed = A.timed
 let timedAsync = A.timedAsync
 let timedAsyncSuite = A.timedAsyncSuite
 
-let equal (expected: 'a) (actual: 'a) : unit =
-    A.equal "equal" expected actual
+let equal (expected: 'a) (actual: 'a) : unit = A.equal "equal" expected actual
 
-let equalLabeled (label: string) (expected: 'a) (actual: 'a) : unit =
-    A.equal label expected actual
+let equalLabeled (label: string) (expected: 'a) (actual: 'a) : unit = A.equal label expected actual

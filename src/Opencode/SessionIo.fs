@@ -75,11 +75,25 @@ let startSubagentSession = SessionIoSubagent.startSubagentSession
 
 let promptWithAbort = SessionIoSubagent.promptWithAbort
 
-let runSubagentCoreResult = fun runtime registry client agent title prompt directory sessionID context tools cleanup existingChildID ->
-    SessionIoSubagent.runSubagentCoreResult runtime registry client agent title prompt directory sessionID context tools cleanup existingChildID
+let runSubagentCoreResult =
+    fun runtime registry client agent title prompt directory sessionID context tools cleanup existingChildID ->
+        SessionIoSubagent.runSubagentCoreResult
+            runtime
+            registry
+            client
+            agent
+            title
+            prompt
+            directory
+            sessionID
+            context
+            tools
+            cleanup
+            existingChildID
 
-let runSubagentWithCleanup = fun runtime registry client agent title prompt directory sessionID context ->
-    SessionIoSubagent.runSubagentWithCleanup runtime registry client agent title prompt directory sessionID context
+let runSubagentWithCleanup =
+    fun runtime registry client agent title prompt directory sessionID context ->
+        SessionIoSubagent.runSubagentWithCleanup runtime registry client agent title prompt directory sessionID context
 
 let runSubagent
     (runtime: FallbackRuntimeState)

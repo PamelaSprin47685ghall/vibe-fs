@@ -66,15 +66,18 @@ let runReviewLoopResolvesViaAsyncCallbackNotPolling () =
         let waitForPending () =
             Promise.create (fun resolve _ ->
                 let checkPendingRef = ref (fun () -> ())
-                checkPendingRef.Value <- fun () ->
-                    let ids = store.getPendingReviewIds()
-                    if ids |> List.contains childId then
-                        resolve ()
-                    else
-                        let cb = checkPendingRef.Value
-                        emitJsStatement cb "queueMicrotask($0)"
-                checkPendingRef.Value ()
-            )
+
+                checkPendingRef.Value <-
+                    fun () ->
+                        let ids = store.getPendingReviewIds ()
+
+                        if ids |> List.contains childId then
+                            resolve ()
+                        else
+                            let cb = checkPendingRef.Value
+                            emitJsStatement cb "queueMicrotask($0)"
+
+                checkPendingRef.Value())
 
         let! outcome =
             promise {
@@ -142,15 +145,18 @@ let runReviewLoopSendsNudgeOnTimeoutThenStopsOnResolve () =
         let waitForPending () =
             Promise.create (fun resolve _ ->
                 let checkPendingRef = ref (fun () -> ())
-                checkPendingRef.Value <- fun () ->
-                    let ids = store.getPendingReviewIds()
-                    if ids |> List.contains childId then
-                        resolve ()
-                    else
-                        let cb = checkPendingRef.Value
-                        emitJsStatement cb "queueMicrotask($0)"
-                checkPendingRef.Value ()
-            )
+
+                checkPendingRef.Value <-
+                    fun () ->
+                        let ids = store.getPendingReviewIds ()
+
+                        if ids |> List.contains childId then
+                            resolve ()
+                        else
+                            let cb = checkPendingRef.Value
+                            emitJsStatement cb "queueMicrotask($0)"
+
+                checkPendingRef.Value())
 
         testScope.Add("review.grace_initial_ms", box 10) |> ignore // deprecated but keep for structure
         testScope.Add("review.grace_subsequent_ms", box 50) |> ignore

@@ -116,9 +116,7 @@ let private initVerboseLog () : unit =
             ()
 
         let header =
-            sprintf
-                "# vibe-fs verbose test log\n# timestamp: %s\n# switch: ALWAYS_ON\n"
-                ts
+            sprintf "# vibe-fs verbose test log\n# timestamp: %s\n# switch: ALWAYS_ON\n" ts
 
         appendFile logPath header "utf8"
         Assert.setVerbose (Some logPath)
@@ -153,7 +151,7 @@ let runAll (args: string array) : JS.Promise<int> =
         initVerboseLog ()
         PluginCore.reviewStore.clearReviewSessions ()
         RunnerBackground.clearRunnerLogsForTest ExecutorTools.ompScope
-        
+
         let runnableTests = selectedTests selectors
 
         if List.isEmpty runnableTests then

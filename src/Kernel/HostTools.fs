@@ -38,17 +38,16 @@ let private muxAliases = [ "todo_write"; "todo_read" ]
 let private ompAliases = [ "todo_write" ]
 
 /// Pre-built lookup set for O(log N) contains check (F# Set = AVL tree).
-let private todoWriteLookup : Set<string> =
-    Set.ofList [
-        todoWriteToolName Opencode
-        todoWriteToolName Mimocode
-        todoWriteToolName Mux
-        todoWriteToolName Omp
-        yield! opencodeAliases
-        yield! mimoAliases
-        yield! muxAliases
-        yield! ompAliases
-    ]
+let private todoWriteLookup: Set<string> =
+    Set.ofList
+        [ todoWriteToolName Opencode
+          todoWriteToolName Mimocode
+          todoWriteToolName Mux
+          todoWriteToolName Omp
+          yield! opencodeAliases
+          yield! mimoAliases
+          yield! muxAliases
+          yield! ompAliases ]
 
 /// Map a Mux host tool name to the canonical name used by permission classification.
 let normalizeToolNameForMux (toolName: string) : string =
@@ -82,8 +81,7 @@ let normalizeToolName (host: Host) (toolName: string) : string =
     | Omp, "todo_write" -> "todowrite"
     | _ -> toolName
 
-let isTodoWriteToolName (toolName: string) : bool =
-    Set.contains toolName todoWriteLookup
+let isTodoWriteToolName (toolName: string) : bool = Set.contains toolName todoWriteLookup
 
 /// Mux child-workspace spawn tool universe for `toolPolicy.disabledTools`.
 let muxSpawnToolUniverse =

@@ -61,6 +61,7 @@ let internal continueSpec: ToolSpec =
         + "This avoids losing the context of the child session and allows incremental progress."
       paramDocs =
         map
-            [ "iterator", "The iterator ID representing the target subagent session (usually returned in the front matter of a previous subagent run)."
+            [ "iterator",
+              "The iterator ID representing the target subagent session (usually returned in the front matter of a previous subagent run)."
               "prompt", "The new query, instructions, or follow-up question to send to the subagent session." ]
       requiredFields = [ "iterator"; "prompt" ] }

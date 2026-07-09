@@ -28,9 +28,9 @@ let private envVar (name: string) : string =
 let private pathResolve (cwd: string) (filePath: string) : string = jsNative
 
 [<Import("promises", "node:fs")>]
-let private fsPromises : obj = jsNative
+let private fsPromises: obj = jsNative
 
-let private readFileAsync (p: string) : JS.Promise<string> = fsPromises?readFile(p, "utf-8")
+let private readFileAsync (p: string) : JS.Promise<string> = fsPromises?readFile (p, "utf-8")
 
 let mutable private _client: Client option = None
 let setClientForTest (c: Client option) : unit = _client <- c
@@ -185,10 +185,7 @@ let search (query: string) (repoPath: string) (topK: int) : JS.Promise<SembleRes
                     )
 
                 let parsed = parseResults result
-                let! enriched =
-                    parsed
-                    |> List.map (enrichSembleResult repoPath)
-                    |> Promise.all
+                let! enriched = parsed |> List.map (enrichSembleResult repoPath) |> Promise.all
                 trace "SEARCH" $"query='{query}' repo={repoPath} results={List.length parsed}"
                 return Array.toList enriched
             with ex ->

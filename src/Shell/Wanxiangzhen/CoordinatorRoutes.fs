@@ -13,18 +13,14 @@ let routeHandler (rt: CoordinatorRuntime) : RouteHandler =
             match method, path with
             | "POST", p when p.EndsWith "/submit" ->
                 let tid = extractTaskId p "submit"
-                let sha =
-                    decodeSubmitBody body |> Option.defaultValue ""
+                let sha = decodeSubmitBody body |> Option.defaultValue ""
                 return! handleSubmit rt tid sha
             | "POST", p when p.EndsWith "/register" ->
                 let tid = extractTaskId p "register"
 
                 match decodeRegisterBody body with
                 | Some pid ->
-                    rt.Dag <-
-                        rt.Dag
-                        |> updateTask tid (fun (t: SquadTask) ->
-                            { t with SlavePid = Some pid })
+                    rt.Dag <- rt.Dag |> updateTask tid (fun (t: SquadTask) -> { t with SlavePid = Some pid })
 
                     return
                         { StatusCode = 200
@@ -84,19 +80,14 @@ let startPidPolling (rt: CoordinatorRuntime) : unit =
                         |> Map.toList
                         |> List.map snd
                         |> List.filter (fun (t: SquadTask) ->
-                            (t.Status = Running || t.Status = Submitted)
-                            && t.SlavePid.IsSome)
+                            (t.Status = Running || t.Status = Submitted) && t.SlavePid.IsSome)
 
                     for t in toCheck do
                         match t.SlavePid with
-                        | Some pid when not (rt.Deps.IsPidAlive pid) ->
-                            do! handleSlaveExit rt t.Id
+                        | Some pid when not (rt.Deps.IsPidAlive pid) -> do! handleSlaveExit rt t.Id
                         | Some pid when rt.Deps.IsPidAlive pid ->
                             let now = rt.Deps.Now()
-                            rt.Dag <-
-                                rt.Dag
-                                |> updateTask t.Id (fun x ->
-                                    { x with LastHeartbeatAt = Some now })
+                            rt.Dag <- rt.Dag |> updateTask t.Id (fun x -> { x with LastHeartbeatAt = Some now })
                         | _ -> ()
                 }
                 |> Promise.start)

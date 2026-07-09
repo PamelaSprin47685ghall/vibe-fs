@@ -96,6 +96,7 @@ let meditatorMentionsReadCapability () =
         [ { file = "src/Kernel/SubagentPrompts.fs"
             content = Some "let x = 1" }
           { file = "README.md"; content = None } ]
+
     let body = meditatorPrompt sections "what is the core abstraction?"
     check "meditator prompt mentions read tool" (body.Contains "read tool")
     check "meditator prompt still embeds file path" (body.Contains "src/Kernel/SubagentPrompts.fs")

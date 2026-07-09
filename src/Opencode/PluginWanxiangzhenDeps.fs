@@ -17,11 +17,7 @@ type PluginWithDepsResult =
     abstract hooks: obj with get
     abstract runtime: CoordinatorRuntime with get
 
-let pluginWithDeps
-    (ctx: obj)
-    (deps: CoordinatorDeps)
-    : JS.Promise<PluginWithDepsResult>
-    =
+let pluginWithDeps (ctx: obj) (deps: CoordinatorDeps) : JS.Promise<PluginWithDepsResult> =
     promise {
         let client = get ctx "client"
         let directory = str ctx "directory"

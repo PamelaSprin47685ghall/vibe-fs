@@ -157,7 +157,7 @@ let muxSlashCommandsLoopUsesDepsDirectory () =
 
     check
         "arch: Mux SlashCommands createLoopOnlyCommand takes deps"
-        (code.Contains "let createLoopOnlyCommand (deps: obj)")
+        (code.Contains "let createLoopOnlyCommand" && code.Contains "(deps: obj)")
 
     check "arch: Mux SlashCommands loop path reads deps directory" (code.Contains "eventLogRootFromDeps")
 

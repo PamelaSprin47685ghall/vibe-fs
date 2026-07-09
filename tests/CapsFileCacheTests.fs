@@ -6,6 +6,7 @@ open Wanxiangshu.Shell.CapsFileCache
 open Wanxiangshu.Shell.RuntimeScope
 
 let private uid = ref 0
+
 let private uniqueId () =
     uid.Value <- uid.Value + 1
     string uid.Value

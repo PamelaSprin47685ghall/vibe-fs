@@ -220,5 +220,3 @@ let sessionUserQueryPostErrorSpec () =
         equal "session.userQuery.post with error retries once" 1 promptCalls.Count
         do! rmAsync workspaceDir
     }
-
-

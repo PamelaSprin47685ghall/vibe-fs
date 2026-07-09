@@ -26,27 +26,27 @@ let runSubagentOnExistingSession
     : JS.Promise<string> =
     promise {
         match scope.TryFindKey("omp_session_" + childId) with
-        | None ->
-            return failwith ("Child session not found: " + childId)
+        | None -> return failwith ("Child session not found: " + childId)
         | Some sessionObj ->
             let session = unbox<obj> sessionObj
+
             let run =
                 promise {
                     do! sessionPrompt session prompt
                     do! sessionWaitForIdle session
-                    let sm =
-                        unbox<ISessionManager>
-                            (Dyn.get session "sessionManager")
+                    let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
                     let res = readAssistantText sm 0 "\n\n"
                     return Option.defaultValue noOutputText res
                 }
+
             let signalObj = Option.defaultValue (box null) signal
-            let! text =
-                raceWithAbortSignal signalObj (fun () -> ()) run
-            if childId <> ""
-               && fallbackRuntime.GetConsumed childId <> Some false then
+            let! text = raceWithAbortSignal signalObj (fun () -> ()) run
+
+            if childId <> "" && fallbackRuntime.GetConsumed childId <> Some false then
                 let pst = fallbackRuntime.GetOrCreateState childId
+
                 if pst.Phase = FallbackPhase.Exhausted then
                     return failwith "Fallback exhausted for child session"
+
             return text
     }

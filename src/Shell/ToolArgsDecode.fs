@@ -138,6 +138,7 @@ let private decodeSubmitReview args =
 
 let decodeToolInvocation (toolName: string) (args: obj) : Result<DecodedToolInvocation, DomainError> =
     let cleanToolName = if toolName = "continue" then "continue" else toolName
+
     match cleanToolName with
     | "read" -> decodeRead args
     | "write" -> decodeWrite args

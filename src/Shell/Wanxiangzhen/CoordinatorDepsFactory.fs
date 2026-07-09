@@ -22,8 +22,7 @@ let resolveMasterBranch (directory: string) (config: SquadConfig) (deps: Coordin
                 Some
                     "Repository has no commits. Run 'git commit --allow-empty -m \"Initial commit\"' before using /squad."
             elif deps.IsDetached directory then
-                "master",
-                Some "Detached HEAD detected. Please configure squad.masterBranch in AGENTS.md frontmatter."
+                "master", Some "Detached HEAD detected. Please configure squad.masterBranch in AGENTS.md frontmatter."
             else
                 deps.RevParseBranch directory, None
         with ex ->
@@ -31,6 +30,7 @@ let resolveMasterBranch (directory: string) (config: SquadConfig) (deps: Coordin
 
 let realCoordinatorDeps (workspaceRoot: string) : CoordinatorDeps =
     let store = getStore workspaceRoot
+
     let rec deps =
         { PromptSession = promptSession
           GetLatestSquadSessionId = fun () -> store.GetLatestSquadSessionId()

@@ -11,8 +11,12 @@ open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eHelpers
 // Test 1 — plugin_with_deps returns hooks containing expected keys
 let testPluginHooksShape () : JS.Promise<unit> =
     promise {
-        let captures = { prompts=[]; commands=[]; messages=[] }
-        let input    = mkMockInput captures
+        let captures =
+            { prompts = []
+              commands = []
+              messages = [] }
+
+        let input = mkMockInput captures
         let obs = mkDefaultObs ()
         let deps = mkObservableDeps captures obs
         let! result = pluginWithDeps input deps
@@ -26,8 +30,12 @@ let testPluginHooksShape () : JS.Promise<unit> =
 // Test 2 — config hook registers /squad /squad-kill /squad-status commands
 let testConfigHookRegistersCommands () : JS.Promise<unit> =
     promise {
-        let captures = { prompts=[]; commands=[]; messages=[] }
-        let input    = mkMockInput captures
+        let captures =
+            { prompts = []
+              commands = []
+              messages = [] }
+
+        let input = mkMockInput captures
         let obs = mkDefaultObs ()
         let deps = mkObservableDeps captures obs
         let! result = pluginWithDeps input deps
@@ -46,8 +54,12 @@ let testConfigHookRegistersCommands () : JS.Promise<unit> =
 // Test 3 — dispose returns a thenable
 let testDisposeReturnsPromise () : JS.Promise<unit> =
     promise {
-        let captures = { prompts=[]; commands=[]; messages=[] }
-        let input    = mkMockInput captures
+        let captures =
+            { prompts = []
+              commands = []
+              messages = [] }
+
+        let input = mkMockInput captures
         let obs = mkDefaultObs ()
         let deps = mkObservableDeps captures obs
         let! result = pluginWithDeps input deps
@@ -55,13 +67,10 @@ let testDisposeReturnsPromise () : JS.Promise<unit> =
         do! unbox<JS.Promise<unit>> (dispose $ ())
     }
 
-let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list = [
-    ("E2E.plugin_hooks_shape: pluginWithDeps returns hooks dict with expected keys",
-     testPluginHooksShape)
+let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
+    [ ("E2E.plugin_hooks_shape: pluginWithDeps returns hooks dict with expected keys", testPluginHooksShape)
 
-    ("E2E.config_hook_registers_commands: config hook writes squad / squad-kill / squad-status",
-     testConfigHookRegistersCommands)
+      ("E2E.config_hook_registers_commands: config hook writes squad / squad-kill / squad-status",
+       testConfigHookRegistersCommands)
 
-    ("E2E.dispose_returns_promise: dispose returns thenable",
-     testDisposeReturnsPromise)
-]
+      ("E2E.dispose_returns_promise: dispose returns thenable", testDisposeReturnsPromise) ]

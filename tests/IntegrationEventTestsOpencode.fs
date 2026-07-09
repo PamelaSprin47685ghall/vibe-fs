@@ -132,5 +132,3 @@ let abortedRetrySpec () =
         check "new completed assistant history resumes todo nudge" (promptCalls.Count = 1)
         do! rmAsync workspaceDir
     }
-
-

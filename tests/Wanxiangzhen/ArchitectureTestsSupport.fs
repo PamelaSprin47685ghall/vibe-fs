@@ -12,11 +12,13 @@ let existsSync (path: string) : bool = jsNative
 
 let requireFile (path: string) : string =
     chk ("arch: exists " + path) (existsSync path)
+
     if existsSync path then
         let content = readFileSync path "utf-8"
         chk ("arch: non-empty " + path) (not (System.String.IsNullOrEmpty content))
         content
-    else ""
+    else
+        ""
 
 [<Import("readdirSync", "node:fs")>]
 let readdirSync (path: string) : string array = jsNative
@@ -30,9 +32,11 @@ let isDirectory (path: string) : bool =
 
 let rec collectFsFiles (dir: string) : string list =
     let entries = readdirSync dir |> Array.toList
-    entries |> List.collect (fun name ->
+
+    entries
+    |> List.collect (fun name ->
         let full = dir + "/" + name
+
         if isDirectory full then collectFsFiles full
-        elif name.EndsWith(".fs") then [full]
-        else []
-    )
+        elif name.EndsWith(".fs") then [ full ]
+        else [])

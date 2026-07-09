@@ -191,7 +191,8 @@ let ompTestEntries () : (string * TestBody) list =
       "OmpHookExecuteTests.hookApplyPatchLeavesExistingPatchTextUntouched",
       Sync(sync OmpHookExecuteTests.hookApplyPatchLeavesExistingPatchTextUntouched)
       "OmpSessionLifecycleTests.isChildSessionGuard", Sync(sync OmpSessionLifecycleTests.isChildSessionGuard)
-      "OmpPluginTestsLifecycle.extensionRegistersLifecycleHooks", Async OmpPluginTestsLifecycle.extensionRegistersLifecycleHooks
+      "OmpPluginTestsLifecycle.extensionRegistersLifecycleHooks",
+      Async OmpPluginTestsLifecycle.extensionRegistersLifecycleHooks
       "OmpPluginTestsLifecycle.toolCallHookCanBeInvoked", Async OmpPluginTestsLifecycle.toolCallHookCanBeInvoked
       "OmpPluginTestsLifecycle.toolCallBlocksChildOnlyInMainSession",
       Async OmpPluginTestsLifecycle.toolCallBlocksChildOnlyInMainSession

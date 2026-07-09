@@ -18,14 +18,23 @@ open Wanxiangshu.Tests.Wanxiangzhen.OpencodePluginE2eHelpers
 // Test 4 — /squad command writes a squad_created frontmatter event
 let testSquadCommandCreatesSession () : JS.Promise<unit> =
     promise {
-        let captures = { prompts=[]; commands=[]; messages=[] }
-        let input    = mkMockInput captures
+        let captures =
+            { prompts = []
+              commands = []
+              messages = [] }
+
+        let input = mkMockInput captures
         let obs = mkDefaultObs ()
         let deps = mkObservableDeps captures obs
         let! result = pluginWithDeps input deps
         let rt = result.runtime
 
-        let cmdInput  = createObj [ "command", box "squad"; "sessionID", box "sess-e2e"; "arguments", box "add remember-me" ]
+        let cmdInput =
+            createObj
+                [ "command", box "squad"
+                  "sessionID", box "sess-e2e"
+                  "arguments", box "add remember-me" ]
+
         let cmdOutput = createObj [ "parts", box (System.Collections.Generic.List<obj>()) ]
         let cmdHook = get result.hooks "command.execute.before"
         do! unbox<JS.Promise<unit>> (cmdHook $ (cmdInput, cmdOutput))
@@ -42,8 +51,12 @@ let testSquadCommandCreatesSession () : JS.Promise<unit> =
 // Test 5 — full flow: /squad → squad_update → schedule → register → merged
 let testFullFlowSquadUpdateToMerged () : JS.Promise<unit> =
     promise {
-        let captures = { prompts=[]; commands=[]; messages=[] }
-        let input    = mkMockInput captures
+        let captures =
+            { prompts = []
+              commands = []
+              messages = [] }
+
+        let input = mkMockInput captures
         let obs = mkDefaultObs ()
         let deps = mkObservableDeps captures obs
         let! result = pluginWithDeps input deps
@@ -51,7 +64,12 @@ let testFullFlowSquadUpdateToMerged () : JS.Promise<unit> =
         let hooks = result.hooks
 
         // ① /squad command
-        let cmdInput  = createObj [ "command", box "squad"; "sessionID", box "sess-e2e-01"; "arguments", box "add remember-me" ]
+        let cmdInput =
+            createObj
+                [ "command", box "squad"
+                  "sessionID", box "sess-e2e-01"
+                  "arguments", box "add remember-me" ]
+
         let cmdOutput = createObj [ "parts", box (System.Collections.Generic.List<obj>()) ]
         let cmdHook = get hooks "command.execute.before"
         do! unbox<JS.Promise<unit>> (cmdHook $ (cmdInput, cmdOutput))
@@ -83,8 +101,8 @@ let testFullFlowSquadUpdateToMerged () : JS.Promise<unit> =
 
         // ⑤ set up git stubs for ff
         obs.revParseRefOverrides <- obs.revParseRefOverrides.Add("squad-e2e-01", "abc")
-        obs.mergeBaseResult  <- true
-        obs.mergeFfResult    <- "merged-sha"
+        obs.mergeBaseResult <- true
+        obs.mergeFfResult <- "merged-sha"
 
         // ⑥ POST /task/squad-e2e-01/submit
         let! subResp = (routeHandler rt) "POST" "/task/squad-e2e-01/submit" (createObj [ "commitSha", box "abc" ])
@@ -94,17 +112,22 @@ let testFullFlowSquadUpdateToMerged () : JS.Promise<unit> =
 
         match rt.Dag.Tasks |> Map.tryFind "squad-e2e-01" with
         | Some t -> checkBare (t.Status = Merged)
-        | None   -> checkBare false
+        | None -> checkBare false
 
         checkBare (obs.worktreeRemoveCalls.Length = 1)
-        checkBare (obs.branchDeleteCalls.Length   = 1)
-        checkBare (obs.squadEventLog |> List.exists (function TaskMerged _ -> true | _ -> false))
+        checkBare (obs.branchDeleteCalls.Length = 1)
+
+        checkBare (
+            obs.squadEventLog
+            |> List.exists (function
+                | TaskMerged _ -> true
+                | _ -> false)
+        )
     }
 
-let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list = [
-    ("E2E.squad_command_creates_session: /squad command injects squad_created frontmatter",
-     testSquadCommandCreatesSession)
+let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
+    [ ("E2E.squad_command_creates_session: /squad command injects squad_created frontmatter",
+       testSquadCommandCreatesSession)
 
-    ("E2E.full_flow_squad_update_to_merged: /squad → squad_update → schedule → register → submit → merged",
-     testFullFlowSquadUpdateToMerged)
-]
+      ("E2E.full_flow_squad_update_to_merged: /squad → squad_update → schedule → register → submit → merged",
+       testFullFlowSquadUpdateToMerged) ]

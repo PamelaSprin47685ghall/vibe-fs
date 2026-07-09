@@ -89,7 +89,11 @@ let private pluginConfigForSlash (deps: obj) (workspaceId: WorkspaceId) : JS.Pro
             return slashConfigFromCtx deps workspaceId ctx
     }
 
-let createLoopOnlyCommand (deps: obj) (scope: RuntimeScope) (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
+let createLoopOnlyCommand
+    (deps: obj)
+    (scope: RuntimeScope)
+    (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
+    : obj =
     box
         {| key = "loop"
            description = "Activate With-Review Mode. AI completes task, submits for review."

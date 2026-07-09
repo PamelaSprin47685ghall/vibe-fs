@@ -26,7 +26,8 @@ let sessionIoRunSubagentReturnsResult () =
 
     check
         "arch: runSubagentCoreResult outer catch returns Error not reject"
-        (sessionIo.Contains "return Error (translateJsError err)")
+        (sessionIo.Contains "return Error(translateJsError err)"
+         || sessionIo.Contains "return Error (translateJsError err)")
 
     check "arch: runSubagentCoreResult inner catch returns Error domain" (sessionIo.Contains "return Error other")
 

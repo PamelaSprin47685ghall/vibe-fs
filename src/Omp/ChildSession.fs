@@ -44,8 +44,7 @@ let isChildSession (scope: RuntimeScope) (id: string) : bool =
         let ids = getChildIds scope
         Set.contains id ids
 
-let clearChildSessionsForTest (scope: RuntimeScope) () : unit =
-    setChildIds scope Set.empty<string>
+let clearChildSessionsForTest (scope: RuntimeScope) () : unit = setChildIds scope Set.empty<string>
 
 let callOpt (ctx: obj) (key: string) : obj =
     let g = Dyn.get ctx key
@@ -166,7 +165,7 @@ let runSubagentWithId
     promise {
         let modelOverride, defaultChain =
             match fallbackConfigOpt with
-            | Some (cfg: FallbackConfig) ->
+            | Some(cfg: FallbackConfig) ->
                 let firstModel =
                     match cfg.DefaultChain with
                     | first :: _ ->
@@ -230,8 +229,8 @@ let runSubagentWithId
             child.dispose |> Option.iter (fun dispose -> dispose ())
 
         let! text = raceWithAbortSignal (Option.defaultValue (box null) signal) (fun () -> ()) run
-        if childId <> ""
-           && fallbackRuntime.GetConsumed childId <> Some false then
+
+        if childId <> "" && fallbackRuntime.GetConsumed childId <> Some false then
             let pst = fallbackRuntime.GetOrCreateState childId
 
             if pst.Phase = FallbackPhase.Exhausted then
@@ -251,15 +250,6 @@ let runSubagent
     (fallbackConfigOpt: FallbackConfig option)
     : JS.Promise<string> =
     promise {
-        let! (text, _) =
-            runSubagentWithId
-                scope
-                pi
-                ctx
-                toolNames
-                prompt
-                signal
-                fallbackRuntime
-                fallbackConfigOpt
+        let! (text, _) = runSubagentWithId scope pi ctx toolNames prompt signal fallbackRuntime fallbackConfigOpt
         return text
     }

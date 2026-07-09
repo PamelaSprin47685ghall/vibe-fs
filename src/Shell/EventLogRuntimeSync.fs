@@ -16,18 +16,23 @@ let syncAllSessionsFromEventLogDedicated
     : JS.Promise<unit> =
     promise {
         try
-            if workspaceRoot = "" then ()
+            if workspaceRoot = "" then
+                ()
             else
                 let! exists = directoryExists workspaceRoot
+
                 if exists then
                     let! allEvents = getStore(workspaceRoot).ReadAllEvents()
+
                     let sessionIds =
                         allEvents |> Seq.map (fun e -> e.Session) |> Seq.distinct |> Seq.toList
+
                     for sid in sessionIds do
                         let! state = getStore(workspaceRoot).GetSessionState(sid)
                         syncReviewProjection store sid state.ReviewTask
                         scope.Projection.StoreBacklog(host, sid, List.rev state.Backlog)
-        with _ -> ()
+        with _ ->
+            ()
     }
 
 let syncReviewFromEventLogDedicated
@@ -37,13 +42,16 @@ let syncReviewFromEventLogDedicated
     : JS.Promise<unit> =
     promise {
         try
-            if sessionID = "" || workspaceRoot = "" then ()
+            if sessionID = "" || workspaceRoot = "" then
+                ()
             else
                 let! exists = directoryExists workspaceRoot
+
                 if exists then
                     let! state = getStore(workspaceRoot).GetSessionState(sessionID)
                     syncReviewProjection store sessionID state.ReviewTask
-        with _ -> ()
+        with _ ->
+            ()
     }
 
 let syncBacklogFromEventLogDedicated
@@ -54,11 +62,14 @@ let syncBacklogFromEventLogDedicated
     : JS.Promise<unit> =
     promise {
         try
-            if sessionID = "" || workspaceRoot = "" then ()
+            if sessionID = "" || workspaceRoot = "" then
+                ()
             else
                 let! exists = directoryExists workspaceRoot
+
                 if exists then
                     let! state = getStore(workspaceRoot).GetSessionState(sessionID)
                     projection.StoreBacklog(host, sessionID, List.rev state.Backlog)
-        with _ -> ()
+        with _ ->
+            ()
     }

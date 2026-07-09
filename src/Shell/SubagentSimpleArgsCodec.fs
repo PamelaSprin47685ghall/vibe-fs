@@ -36,17 +36,22 @@ let decodeMeditatorArgs (args: obj) : Result<MeditatorArgs, DomainError> =
 let decodeBrowserArgs (args: obj) : Result<BrowserArgs, DomainError> =
     decodeIntentField "browser" "intent" args
     |> Result.map (fun intent -> { Intent = intent })
+
 let decodeContinueArgs (args: obj) : Result<ContinueArgs, DomainError> =
     let iteratorRes =
         let i = Dyn.get args "iterator"
         let iStr = if Dyn.isNullish i then "" else (string i).Trim()
         let cleanStr = iStr.Replace("\"", "").Replace("'", "").Trim()
+
         if cleanStr = "" then
             Error(InvalidIntent("continue", "iterator", "must be a string"))
-        else Ok cleanStr
+        else
+            Ok cleanStr
+
     iteratorRes
     |> Result.bind (fun iter ->
         let pr = Dyn.get args "prompt"
+
         if Dyn.isNullish pr then
             Error(InvalidIntent("continue", "prompt", "must be a string"))
         else

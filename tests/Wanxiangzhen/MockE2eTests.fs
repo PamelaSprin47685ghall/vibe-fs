@@ -20,12 +20,17 @@ open Wanxiangshu.Tests.Wanxiangzhen.TestDoubles
 
 let testHappyPath () : JS.Promise<unit> =
     promise {
-        let s    = TestDoubles.mkFake ()
+        let s = TestDoubles.mkFake ()
         let deps = TestDoubles.mkDeps s
-        let rt   = TestDoubles.mkRuntime deps
+        let rt = TestDoubles.mkRuntime deps
 
         // ① /squad → handleCommandExecuteBefore → squad_created frontmatter
-        let input  = createObj [ "command", box "squad"; "sessionID", box "squad-session-001"; "arguments", box "add remember-me" ]
+        let input =
+            createObj
+                [ "command", box "squad"
+                  "sessionID", box "squad-session-001"
+                  "arguments", box "add remember-me" ]
+
         let output = createObj [ "parts", box (System.Collections.Generic.List<obj>()) ]
         do! handleCommandExecuteBefore rt input output
 
@@ -35,8 +40,11 @@ let testHappyPath () : JS.Promise<unit> =
 
         // ② handleSquadUpdate → task Pending ( Scheduling=true suppresses fire-and-forget tick )
         rt.Scheduling <- true
-        let evts  = [| TestDoubles.mkTaskEvent "squad-a1b2" "add remember-me" "add remember-me to login" [] |]
-        let args  = TestDoubles.mkSquadUpdateArgs evts
+
+        let evts =
+            [| TestDoubles.mkTaskEvent "squad-a1b2" "add remember-me" "add remember-me to login" [] |]
+
+        let args = TestDoubles.mkSquadUpdateArgs evts
         let! reply = handleSquadUpdate rt args
         checkBare (reply.Contains "created")
         checkBare (reply.Contains "1")
@@ -94,17 +102,18 @@ let testHappyPath () : JS.Promise<unit> =
 
 let testCompetingSubmitReturnsRebaseNeeded () : JS.Promise<unit> =
     promise {
-        let s    = TestDoubles.mkFake ()   // mergeBaseTrueForFirstN = 1 → first call true, rest false
+        let s = TestDoubles.mkFake () // mergeBaseTrueForFirstN = 1 → first call true, rest false
         let deps = TestDoubles.mkDeps s
-        let rt   = TestDoubles.mkRuntime deps
+        let rt = TestDoubles.mkRuntime deps
 
         // create two independent tasks
         let evts =
             [| TestDoubles.mkTaskEvent "squad-a1b2" "Task A" "desc A" []
                TestDoubles.mkTaskEvent "squad-c3d4" "Task B" "desc B" [] |]
+
         let args = TestDoubles.mkSquadUpdateArgs evts
-        rt.Scheduling <- true     // suppress fire-and-forget tick during creation
-        let! _   = handleSquadUpdate rt args
+        rt.Scheduling <- true // suppress fire-and-forget tick during creation
+        let! _ = handleSquadUpdate rt args
 
         // start both tasks (re-enable scheduling first)
         rt.Scheduling <- false
@@ -127,12 +136,12 @@ let testCompetingSubmitReturnsRebaseNeeded () : JS.Promise<unit> =
 
         match TestDoubles.findTask "squad-a1b2" rt.Dag with
         | Some a -> checkBare (a.Status = Merged)
-        | None   -> checkBare false
+        | None -> checkBare false
 
         checkBare (s.mergeFfOnlyCalled = true)
 
         // Task B submit → rebase_needed (stale-commit guard uses default revParseRefResult="deadbeef")
-        rt.Scheduling <- false   // reset before second explicit tick
+        rt.Scheduling <- false // reset before second explicit tick
         let! respB = (routeHandler rt) "POST" "/task/squad-c3d4/submit" (createObj [ "commitSha", box "deadbeef" ])
         checkBare (respB.StatusCode = 200)
         checkBare ((str respB.Body "result") = "rebase_needed")
@@ -140,7 +149,7 @@ let testCompetingSubmitReturnsRebaseNeeded () : JS.Promise<unit> =
         // B falls back to Running
         match TestDoubles.findTask "squad-c3d4" rt.Dag with
         | Some b -> checkBare (b.Status = Running)
-        | None   -> checkBare false
+        | None -> checkBare false
 
         return ()
     }
@@ -151,13 +160,14 @@ let testCompetingSubmitReturnsRebaseNeeded () : JS.Promise<unit> =
 
 let testCycleRejected () : JS.Promise<unit> =
     promise {
-        let s    = TestDoubles.mkFake ()
+        let s = TestDoubles.mkFake ()
         let deps = TestDoubles.mkDeps s
-        let rt   = TestDoubles.mkRuntime deps
+        let rt = TestDoubles.mkRuntime deps
 
         let evts =
-            [| TestDoubles.mkTaskEvent "squad-a1b2" "A" "a" ["squad-c3d4"]
-               TestDoubles.mkTaskEvent "squad-c3d4" "B" "b" ["squad-a1b2"] |]
+            [| TestDoubles.mkTaskEvent "squad-a1b2" "A" "a" [ "squad-c3d4" ]
+               TestDoubles.mkTaskEvent "squad-c3d4" "B" "b" [ "squad-a1b2" ] |]
+
         let args = TestDoubles.mkSquadUpdateArgs evts
         rt.Scheduling <- false
         let! result = handleSquadUpdate rt args
@@ -172,11 +182,11 @@ let testCycleRejected () : JS.Promise<unit> =
 
 let testDanglingDepsRejected () : JS.Promise<unit> =
     promise {
-        let s    = TestDoubles.mkFake ()
+        let s = TestDoubles.mkFake ()
         let deps = TestDoubles.mkDeps s
-        let rt   = TestDoubles.mkRuntime deps
+        let rt = TestDoubles.mkRuntime deps
 
-        let evts = [| TestDoubles.mkTaskEvent "squad-a1b2" "A" "a" ["squad-zzzz"] |]
+        let evts = [| TestDoubles.mkTaskEvent "squad-a1b2" "A" "a" [ "squad-zzzz" ] |]
         let args = TestDoubles.mkSquadUpdateArgs evts
         rt.Scheduling <- false
         let! result = handleSquadUpdate rt args
@@ -191,17 +201,19 @@ let testDanglingDepsRejected () : JS.Promise<unit> =
 
 let testSquadStatusCommand () : JS.Promise<unit> =
     promise {
-        let s    = TestDoubles.mkFake ()
+        let s = TestDoubles.mkFake ()
         let deps = TestDoubles.mkDeps s
-        let rt   = TestDoubles.mkRuntime deps
+        let rt = TestDoubles.mkRuntime deps
         rt.MasterSessionId <- "squad-session-001"
 
-        let evts  = [| TestDoubles.mkTaskEvent "squad-a1b2" "Task A" "desc" [] |]
-        let args  = TestDoubles.mkSquadUpdateArgs evts
+        let evts = [| TestDoubles.mkTaskEvent "squad-a1b2" "Task A" "desc" [] |]
+        let args = TestDoubles.mkSquadUpdateArgs evts
         rt.Scheduling <- false
-        let! _    = handleSquadUpdate rt args
+        let! _ = handleSquadUpdate rt args
 
-        let input  = createObj [ "command", box "squad-status"; "sessionID", box ""; "arguments", box "" ]
+        let input =
+            createObj [ "command", box "squad-status"; "sessionID", box ""; "arguments", box "" ]
+
         let output = createObj [ "parts", box (System.Collections.Generic.List<obj>()) ]
         do! handleCommandExecuteBefore rt input output
 
@@ -218,16 +230,16 @@ let testSquadStatusCommand () : JS.Promise<unit> =
 
 let testSquadKillCommand () : JS.Promise<unit> =
     promise {
-        let s    = TestDoubles.mkFake ()
+        let s = TestDoubles.mkFake ()
         let deps = TestDoubles.mkDeps s
-        let rt   = TestDoubles.mkRuntime deps
+        let rt = TestDoubles.mkRuntime deps
         rt.MasterSessionId <- "squad-session-001"
 
         // ① create task, suppress auto-tick
-        let evts  = [| TestDoubles.mkTaskEvent "squad-a1b2" "Task A" "desc A" [] |]
-        let args  = TestDoubles.mkSquadUpdateArgs evts
+        let evts = [| TestDoubles.mkTaskEvent "squad-a1b2" "Task A" "desc A" [] |]
+        let args = TestDoubles.mkSquadUpdateArgs evts
         rt.Scheduling <- true
-        let! _    = handleSquadUpdate rt args
+        let! _ = handleSquadUpdate rt args
 
         // ② manual tick → Running + worktree + branch + spawn
         rt.Scheduling <- false
@@ -242,10 +254,12 @@ let testSquadKillCommand () : JS.Promise<unit> =
 
         // ③ register pid
         let pid = 98765
-        let! _  = (routeHandler rt) "POST" "/task/squad-a1b2/register" (createObj [ "pid", box pid ])
+        let! _ = (routeHandler rt) "POST" "/task/squad-a1b2/register" (createObj [ "pid", box pid ])
 
         // ④ /squad-kill (no session id → kill current session)
-        let input  = createObj [ "command", box "squad-kill"; "sessionID", box ""; "arguments", box "" ]
+        let input =
+            createObj [ "command", box "squad-kill"; "sessionID", box ""; "arguments", box "" ]
+
         let output = createObj [ "parts", box (System.Collections.Generic.List<obj>()) ]
         do! handleCommandExecuteBefore rt input output
 
@@ -258,25 +272,20 @@ let testSquadKillCommand () : JS.Promise<unit> =
         match TestDoubles.findTask "squad-a1b2" rt.Dag with
         | None -> checkBare false
         | Some t -> checkBare (t.Status = Cancelled)
+
         return ()
     }
 
-let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list = [
-    ("MockE2e.happy_path: /squad → update → schedule → register → submit → merged",
-     testHappyPath)
+let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
+    [ ("MockE2e.happy_path: /squad → update → schedule → register → submit → merged", testHappyPath)
 
-    ("MockE2e.competing_submit: second submit rebase_needed after first merged",
-     testCompetingSubmitReturnsRebaseNeeded)
+      ("MockE2e.competing_submit: second submit rebase_needed after first merged",
+       testCompetingSubmitReturnsRebaseNeeded)
 
-    ("MockE2e.cycle_rejected: handleSquadUpdate rejects DAG cycle",
-     testCycleRejected)
+      ("MockE2e.cycle_rejected: handleSquadUpdate rejects DAG cycle", testCycleRejected)
 
-    ("MockE2e.dangling_deps_rejected: unknown dep blocked",
-     testDanglingDepsRejected)
+      ("MockE2e.dangling_deps_rejected: unknown dep blocked", testDanglingDepsRejected)
 
-    ("MockE2e.squad_status_command: /squad-status shows task list",
-     testSquadStatusCommand)
+      ("MockE2e.squad_status_command: /squad-status shows task list", testSquadStatusCommand)
 
-    ("MockE2e.squad_kill_command: /squad-kill cancels running task, KillPid called, no cleanup",
-     testSquadKillCommand)
-]
+      ("MockE2e.squad_kill_command: /squad-kill cancels running task, KillPid called, no cleanup", testSquadKillCommand) ]

@@ -62,7 +62,13 @@ let private execute
     (config: obj)
     (args: obj)
     : JS.Promise<string> =
-    executeMuxSubagentTool runMuxSubagent deps (spawnFor deps toolNames agentId title aiSettingsAgentId role) args config sessionScope
+    executeMuxSubagentTool
+        runMuxSubagent
+        deps
+        (spawnFor deps toolNames agentId title aiSettingsAgentId role)
+        args
+        config
+        sessionScope
 
 let coderTool (deps: obj) (toolNames: string array) (sessionScope: RuntimeScope) : ToolDefinition =
     { name = "coder"
@@ -119,6 +125,5 @@ let continueTool (deps: obj) (toolNames: string array) (sessionScope: RuntimeSco
                 [ "iterator", box (strProp "The subsession iterator ID")
                   "prompt", box (strProp "New instructions or question") ])
             (subagentRequiredKeys "continue")
-      execute =
-        fun config args -> execute deps toolNames sessionScope "exec" "Continue" "exec" "continue" config args
+      execute = fun config args -> execute deps toolNames sessionScope "exec" "Continue" "exec" "continue" config args
       condition = None }

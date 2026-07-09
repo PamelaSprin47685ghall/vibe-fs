@@ -15,11 +15,7 @@ let unifiedNoteDescription: Lazy<string> =
 
 /// Precomputed lookup map for O(log N) entry retrieval.
 let private entryMap: Lazy<Map<string, MethodologyEntry>> =
-    lazy (
-        allEntries.Value
-        |> List.map (fun e -> e.methodologyId, e)
-        |> Map.ofList
-    )
+    lazy (allEntries.Value |> List.map (fun e -> e.methodologyId, e) |> Map.ofList)
 
 let tryFindEntry methodologyId =
     entryMap.Value |> Map.tryFind methodologyId

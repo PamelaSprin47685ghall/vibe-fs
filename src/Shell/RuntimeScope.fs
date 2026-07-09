@@ -106,5 +106,5 @@ type RuntimeScope() =
         | None -> Promise.lift ()
 
 let create () : RuntimeScope =
-    Wanxiangshu.Shell.Profiler.initGlobal()
+    Wanxiangshu.Shell.Profiler.initGlobal ()
     RuntimeScope()

@@ -16,6 +16,7 @@ open Wanxiangshu.Tests.ReviewVerdictTests
 open Wanxiangshu.Tests.ToolCopyTests
 open Wanxiangshu.Tests.JsArrayMutateTests
 open Wanxiangshu.Tests.FallbackAgentAndModelTests
+open Wanxiangshu.Tests.FallbackAgentAndModelPart2Tests
 
 let fallbackTestEntries () : (string * TestBody) list =
     [ "FallbackKernelTests.run", Sync(sync FallbackKernelTests.run)
@@ -23,6 +24,7 @@ let fallbackTestEntries () : (string * TestBody) list =
       "FallbackRuntimeStateTests.run", Sync(sync FallbackRuntimeStateTests.run)
       "FallbackEventBridgeTests.run", Async FallbackEventBridgeTests.run
       "FallbackAgentAndModelTests.run", Async FallbackAgentAndModelTests.run
+      "FallbackAgentAndModelPart2Tests.run", Async FallbackAgentAndModelPart2Tests.run
       "FallbackMessageCodecTests.run", Sync(sync FallbackMessageCodecTests.run)
       "FallbackIntegrationTests.run", Sync(sync FallbackIntegrationTests.run)
       "FallbackRecoveryWaitTests.run", Async FallbackRecoveryWaitTests.run

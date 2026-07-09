@@ -23,35 +23,42 @@ let private writeFileSync (path: string) (data: string) : unit = jsNative
 let private withTempDir (f: string -> JS.Promise<unit>) : JS.Promise<unit> =
     promise {
         let dir = mkdtempSync "wanxiangshu-el-"
-        try do! f dir
-        finally rmSync dir (createObj [ "recursive", box true; "force", box true ])
+
+        try
+            do! f dir
+        finally
+            rmSync dir (createObj [ "recursive", box true; "force", box true ])
     }
 
-let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list = [
-    ("SquadEventLogFs.append and read round-trip", fun () ->
-        withTempDir (fun dir ->
-            promise {
-                let ev = SquadCreated ("s1", "req")
-                let! w = appendSquadEvent dir "t1" ev
-                match w with
-                | Error e -> failwith e
-                | Ok () -> ()
-                let! events = readAllSquadEvents dir
-                equal 1 events.Length
-                match events.[0] with
-                | SquadCreated (sid, req) ->
-                    equal "s1" sid
-                    equal "req" req
-                | _ -> check "" false
-            }))
+let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
+    [ ("SquadEventLogFs.append and read round-trip",
+       fun () ->
+           withTempDir (fun dir ->
+               promise {
+                   let ev = SquadCreated("s1", "req")
+                   let! w = appendSquadEvent dir "t1" ev
 
-    ("SquadEventLogFs.truncate on corrupt tail line", fun () ->
-        withTempDir (fun dir ->
-            promise {
-                let! _ = appendSquadEvent dir "t" (TasksCreated ("s1", [ ("a", "t", "d", []) ]))
-                let path = Wanxiangshu.Shell.EventLogCodec.eventPath dir
-                writeFileSync path (readFileSync path "utf-8" + "\n{not-json\n")
-                let! events = readAllSquadEvents dir
-                equal 1 events.Length
-            }))
-]
+                   match w with
+                   | Error e -> failwith e
+                   | Ok() -> ()
+
+                   let! events = readAllSquadEvents dir
+                   equal 1 events.Length
+
+                   match events.[0] with
+                   | SquadCreated(sid, req) ->
+                       equal "s1" sid
+                       equal "req" req
+                   | _ -> check "" false
+               }))
+
+      ("SquadEventLogFs.truncate on corrupt tail line",
+       fun () ->
+           withTempDir (fun dir ->
+               promise {
+                   let! _ = appendSquadEvent dir "t" (TasksCreated("s1", [ ("a", "t", "d", []) ]))
+                   let path = Wanxiangshu.Shell.EventLogCodec.eventPath dir
+                   writeFileSync path (readFileSync path "utf-8" + "\n{not-json\n")
+                   let! events = readAllSquadEvents dir
+                   equal 1 events.Length
+               })) ]

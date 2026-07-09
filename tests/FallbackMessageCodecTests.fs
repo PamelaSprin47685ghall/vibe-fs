@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.FallbackMessageCodec
+open Wanxiangshu.Shell.FallbackMessageParser
 
 let private mkTodoPart (todos: obj array) : obj =
     createObj

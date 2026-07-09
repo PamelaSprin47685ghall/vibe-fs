@@ -230,5 +230,3 @@ let reviewChildInitialPromptUsesReturnReviewer () =
     check "review child prompt has return_reviewer" (initial.Contains "return_reviewer")
     check "review child prompt PERFECT verdict" (initial.Contains "PERFECT")
     check "review child prompt no submit_review_result" (not (initial.Contains "submit_review_result"))
-
-

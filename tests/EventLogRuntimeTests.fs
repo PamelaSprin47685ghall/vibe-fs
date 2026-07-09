@@ -216,7 +216,7 @@ let testGetSquadEventsCache () : JS.Promise<unit> =
     promise {
         let! dir = mkdtempAsync "eventlog-squad-cache-"
         let store = EventLogStore dir
-        let squadEvent = SquadCreated ("s1", "req")
+        let squadEvent = SquadCreated("s1", "req")
         let! _ = store.AppendSquadEvent "2025-01-01T00:00:00Z" squadEvent
         let! _ = store.GetSessionState "s-any"
 

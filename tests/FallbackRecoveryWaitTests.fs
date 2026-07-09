@@ -76,6 +76,7 @@ let waitForToolCallTextRecovery_completesWhenPhaseClears () =
                 Phase = FallbackPhase.RecoveringToolCallText }
 
         let resolved = ref false
+
         let waitP =
             promise {
                 do! waitForToolCallTextRecovery rt sid
@@ -85,10 +86,7 @@ let waitForToolCallTextRecovery_completesWhenPhaseClears () =
         do! yieldMicrotask ()
         check "wait is pending" (not resolved.Value)
 
-        rt.UpdateState
-            sid
-            { s0 with
-                Phase = FallbackPhase.Idle }
+        rt.UpdateState sid { s0 with Phase = FallbackPhase.Idle }
 
         do! waitP
         check "wait finished after phase cleared" true

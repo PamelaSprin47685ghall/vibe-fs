@@ -40,7 +40,11 @@ let private emptyInfo id role =
 
 let formatReadOutputPrefixesLines () =
     let out =
-        formatReadOutput sampleResult.filePath sampleResult.content sampleResult.startLine (Some sampleResult.totalLines)
+        formatReadOutput
+            sampleResult.filePath
+            sampleResult.content
+            sampleResult.startLine
+            (Some sampleResult.totalLines)
 
     check "has path tag" (out.Contains "<path>src/auth.py</path>")
     check "has type tag" (out.Contains "<type>file</type>")

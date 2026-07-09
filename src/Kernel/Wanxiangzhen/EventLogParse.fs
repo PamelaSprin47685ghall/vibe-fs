@@ -6,9 +6,12 @@ let parseLinesWithTruncate (tryParse: string -> 'a option) (lines: string list) 
         | [] -> List.rev acc
         | line :: tail ->
             let t = if isNull line then "" else line.Trim()
-            if t = "" then go acc tail
+
+            if t = "" then
+                go acc tail
             else
                 match tryParse t with
                 | Some v -> go (v :: acc) tail
                 | None -> List.rev acc
+
     go [] lines

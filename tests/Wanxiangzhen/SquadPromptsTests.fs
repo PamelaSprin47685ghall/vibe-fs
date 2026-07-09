@@ -11,25 +11,29 @@ let private masterBranch = "main"
 let private prompt () : string =
     buildSlavePrompt taskId title description masterBranch
 
-let entries () : (string * (unit -> unit)) list = [
-    ("buildSlavePrompt output starts with ---\\ntask: frontmatter", fun () ->
-        let p = prompt ()
-        checkBare (p.StartsWith "---\ntask: "))
+let entries () : (string * (unit -> unit)) list =
+    [ ("buildSlavePrompt output starts with ---\\ntask: frontmatter",
+       fun () ->
+           let p = prompt ()
+           checkBare (p.StartsWith "---\ntask: "))
 
-    ("buildSlavePrompt contains taskId and title", fun () ->
-        let p = prompt ()
-        checkBare (p.Contains (sprintf "task %s" taskId))
-        checkBare (p.Contains title))
+      ("buildSlavePrompt contains taskId and title",
+       fun () ->
+           let p = prompt ()
+           checkBare (p.Contains(sprintf "task %s" taskId))
+           checkBare (p.Contains title))
 
-    ("buildSlavePrompt contains submit_to_squad", fun () ->
-        let p = prompt ()
-        checkBare (p.Contains "submit_to_squad"))
+      ("buildSlavePrompt contains submit_to_squad",
+       fun () ->
+           let p = prompt ()
+           checkBare (p.Contains "submit_to_squad"))
 
-    ("buildSlavePrompt contains git rebase + masterBranch", fun () ->
-        let p = prompt ()
-        checkBare (p.Contains (sprintf "git rebase %s" masterBranch)))
+      ("buildSlavePrompt contains git rebase + masterBranch",
+       fun () ->
+           let p = prompt ()
+           checkBare (p.Contains(sprintf "git rebase %s" masterBranch)))
 
-    ("buildSlavePrompt contains /loop or With-Review", fun () ->
-        let p = prompt ()
-        checkBare (p.Contains "/loop" || p.Contains "With-Review"))
-]
+      ("buildSlavePrompt contains /loop or With-Review",
+       fun () ->
+           let p = prompt ()
+           checkBare (p.Contains "/loop" || p.Contains "With-Review")) ]

@@ -80,13 +80,13 @@ let parseWarnTddExactMatch () =
     check
         "exact canonical value parses"
         (parseWarnTdd "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" = Some
-                                                                                                               IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+                                                                                                             IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
 
 let parseWarnTddCaseInsensitive () =
     check
         "uppercase variant parses"
         (parseWarnTdd "I-AM-SURE-I-HAVE-FOLLOWED-TDD-AND-KOLMOLGOROV-PRINCIPLES-AND-KEPT-TODO-UPDATED" = Some
-                                                                                                               IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+                                                                                                             IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
 
 let parseWarnTddRejectsWrongValue () =
     check "wrong value returns None" (parseWarnTdd "something-else" = None)

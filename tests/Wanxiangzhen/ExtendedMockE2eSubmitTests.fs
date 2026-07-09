@@ -18,17 +18,17 @@ open Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eHelpers
 
 let testWorktreeAddFailureInjectsTaskError () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
         rt.MasterSessionId <- "squad-session-001"
 
-        let evts  = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
-        let args  = mkSquadUpdateArgs evts
+        let evts = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
+        let args = mkSquadUpdateArgs evts
         rt.Scheduling <- true
-        let! _    = handleSquadUpdate rt args
+        let! _ = handleSquadUpdate rt args
 
-        s.tryWorktreeAddOverride <- Some (fun c b p b2 -> Error "disk full")
+        s.tryWorktreeAddOverride <- Some(fun c b p b2 -> Error "disk full")
 
         rt.Scheduling <- false
         do! schedulerTick rt
@@ -38,27 +38,37 @@ let testWorktreeAddFailureInjectsTaskError () : JS.Promise<unit> =
         | None -> checkBare false
         | Some t -> checkBare (t.Status = Pending)
 
-        checkBare (s.appendSquadEventCalls |> List.exists (function TaskError _ -> true | _ -> false))
+        checkBare (
+            s.appendSquadEventCalls
+            |> List.exists (function
+                | TaskError _ -> true
+                | _ -> false)
+        )
     }
 
 let testMergedWithAlreadyDeadSlaveDoesNotCrash () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
         rt.MasterSessionId <- "squad-session-001"
 
-        let evts  = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
-        let args  = mkSquadUpdateArgs evts
+        let evts = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
+        let args = mkSquadUpdateArgs evts
         rt.Scheduling <- true
-        let! _    = handleSquadUpdate rt args
+        let! _ = handleSquadUpdate rt args
         rt.Scheduling <- false
         do! schedulerTick rt
         let! _ = (routeHandler rt) "POST" "/task/squad-a1b2/register" (createObj [ "pid", box 12345 ])
 
         s.isPidAliveResult <- false
 
-        s.killPidOverride <- Some (fun p signal -> s.killPidCalled <- true; s.killPidPid <- Some p; s.killPidSignal <- Some signal; failwith "ESRCH")
+        s.killPidOverride <-
+            Some(fun p signal ->
+                s.killPidCalled <- true
+                s.killPidPid <- Some p
+                s.killPidSignal <- Some signal
+                failwith "ESRCH")
 
         s.revParseRefOverrides <- s.revParseRefOverrides.Add("squad-a1b2", "deadbeef")
         let! resp = (routeHandler rt) "POST" "/task/squad-a1b2/submit" (createObj [ "commitSha", box "deadbeef" ])
@@ -79,20 +89,20 @@ let testMergedWithAlreadyDeadSlaveDoesNotCrash () : JS.Promise<unit> =
 
 let testSubmitRebaseNeededReturnsRunning () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
         rt.MasterSessionId <- "squad-session-001"
 
-        let evts  = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
-        let args  = mkSquadUpdateArgs evts
+        let evts = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
+        let args = mkSquadUpdateArgs evts
         rt.Scheduling <- true
-        let! _    = handleSquadUpdate rt args
+        let! _ = handleSquadUpdate rt args
         rt.Scheduling <- false
         do! schedulerTick rt
         let! _ = (routeHandler rt) "POST" "/task/squad-a1b2/register" (createObj [ "pid", box 111 ])
 
-        s.mergeBaseOverride <- Some (fun c a d -> false)
+        s.mergeBaseOverride <- Some(fun c a d -> false)
 
         s.revParseRefOverrides <- s.revParseRefOverrides.Add("squad-a1b2", "deadbeef")
         let! resp = (routeHandler rt) "POST" "/task/squad-a1b2/submit" (createObj [ "commitSha", box "deadbeef" ])
@@ -103,24 +113,24 @@ let testSubmitRebaseNeededReturnsRunning () : JS.Promise<unit> =
         match findTask "squad-a1b2" rt.Dag with
         | None -> checkBare false
         | Some t -> checkBare (t.Status = Running)
-     }
+    }
 
 let testSubmitStaleCommit () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
         rt.MasterSessionId <- "squad-session-001"
 
-        let evts  = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
-        let args  = mkSquadUpdateArgs evts
+        let evts = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
+        let args = mkSquadUpdateArgs evts
         rt.Scheduling <- true
-        let! _    = handleSquadUpdate rt args
+        let! _ = handleSquadUpdate rt args
         rt.Scheduling <- false
         do! schedulerTick rt
         let! _ = (routeHandler rt) "POST" "/task/squad-a1b2/register" (createObj [ "pid", box 111 ])
 
-        s.revParseRefOverride <- Some (fun c r -> "actual-sha")
+        s.revParseRefOverride <- Some(fun c r -> "actual-sha")
 
         let! resp = (routeHandler rt) "POST" "/task/squad-a1b2/submit" (createObj [ "commitSha", box "deadbeef" ])
 
@@ -130,24 +140,24 @@ let testSubmitStaleCommit () : JS.Promise<unit> =
         match findTask "squad-a1b2" rt.Dag with
         | None -> checkBare false
         | Some t -> checkBare (t.Status = Running)
-     }
+    }
 
 let testSubmitCoordinatorNotReadyDirty () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
         rt.MasterSessionId <- "squad-session-001"
 
-        let evts  = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
-        let args  = mkSquadUpdateArgs evts
+        let evts = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
+        let args = mkSquadUpdateArgs evts
         rt.Scheduling <- true
-        let! _    = handleSquadUpdate rt args
+        let! _ = handleSquadUpdate rt args
         rt.Scheduling <- false
         do! schedulerTick rt
         let! _ = (routeHandler rt) "POST" "/task/squad-a1b2/register" (createObj [ "pid", box 111 ])
 
-        s.statusIsCleanOverride <- Some (fun c -> false)
+        s.statusIsCleanOverride <- Some(fun c -> false)
 
         s.revParseRefOverrides <- s.revParseRefOverrides.Add("squad-a1b2", "deadbeef")
         let! resp = (routeHandler rt) "POST" "/task/squad-a1b2/submit" (createObj [ "commitSha", box "deadbeef" ])
@@ -158,13 +168,13 @@ let testSubmitCoordinatorNotReadyDirty () : JS.Promise<unit> =
         match findTask "squad-a1b2" rt.Dag with
         | None -> checkBare false
         | Some t -> checkBare (t.Status = Running)
-     }
+    }
 
 let testHttpTaskNotFound404 () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
         rt.MasterSessionId <- "squad-session-001"
 
         let! resp = (routeHandler rt) "GET" "/task/unknown-task-id" (createObj [])
@@ -174,15 +184,15 @@ let testHttpTaskNotFound404 () : JS.Promise<unit> =
 
 let testHttpBadRegisterBody400 () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
         rt.MasterSessionId <- "squad-session-001"
 
-        let evts  = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
-        let args  = mkSquadUpdateArgs evts
+        let evts = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
+        let args = mkSquadUpdateArgs evts
         rt.Scheduling <- true
-        let! _    = handleSquadUpdate rt args
+        let! _ = handleSquadUpdate rt args
         rt.Scheduling <- false
         do! schedulerTick rt
 
@@ -191,25 +201,17 @@ let testHttpBadRegisterBody400 () : JS.Promise<unit> =
         checkBare ((str resp.Body "result") = "bad_request")
     }
 
-let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list = [
-    ("ExtendedMockE2e.worktree_add_failure_injects_task_error",
-     testWorktreeAddFailureInjectsTaskError)
+let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
+    [ ("ExtendedMockE2e.worktree_add_failure_injects_task_error", testWorktreeAddFailureInjectsTaskError)
 
-    ("ExtendedMockE2e.merged_with_already_dead_slave_does_not_crash",
-     testMergedWithAlreadyDeadSlaveDoesNotCrash)
+      ("ExtendedMockE2e.merged_with_already_dead_slave_does_not_crash", testMergedWithAlreadyDeadSlaveDoesNotCrash)
 
-    ("ExtendedMockE2e.submit_rebase_needed_returns_running",
-     testSubmitRebaseNeededReturnsRunning)
+      ("ExtendedMockE2e.submit_rebase_needed_returns_running", testSubmitRebaseNeededReturnsRunning)
 
-    ("ExtendedMockE2e.submit_stale_commit_branch",
-     testSubmitStaleCommit)
+      ("ExtendedMockE2e.submit_stale_commit_branch", testSubmitStaleCommit)
 
-    ("ExtendedMockE2e.submit_coordinator_not_ready_dirty",
-     testSubmitCoordinatorNotReadyDirty)
+      ("ExtendedMockE2e.submit_coordinator_not_ready_dirty", testSubmitCoordinatorNotReadyDirty)
 
-    ("ExtendedMockE2e.http_task_not_found_404",
-     testHttpTaskNotFound404)
+      ("ExtendedMockE2e.http_task_not_found_404", testHttpTaskNotFound404)
 
-    ("ExtendedMockE2e.http_bad_register_body_400",
-     testHttpBadRegisterBody400)
-]
+      ("ExtendedMockE2e.http_bad_register_body_400", testHttpBadRegisterBody400) ]

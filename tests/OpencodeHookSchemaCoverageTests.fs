@@ -13,6 +13,9 @@ module Dyn = Wanxiangshu.Shell.Dyn
 [<Import("Schema", "effect")>]
 let private effectSchemaNs: obj = jsNative
 
+[<Emit("$0[$1]($2)")>]
+let private callMethod1 (o: obj) (name: string) (arg: obj) : obj = jsNative
+
 // ── setUiLabel ────────────────────────────────────────────────────────────────
 
 let opencodeHookSchemaSetUiLabelCoder () =
@@ -215,16 +218,22 @@ let opencodeHookSchemaMergeWorkBacklogReportRemoveTaskId () =
 // ── buildWorkBacklogSchema ────────────────────────────────────────────────────
 
 let opencodeHookSchemaTryBuildJsonSchemaFromEffectSchemaDefs () =
-    let effectStruct (shape: obj) : obj = effectSchemaNs?("Struct") (shape)
+    let effectStruct (shape: obj) : obj =
+        callMethod1 effectSchemaNs "Struct" shape
+
     let effectString: obj = get effectSchemaNs "String"
 
+    let structInstance = effectStruct (createObj [ "question", effectString ])
+
     let promptSchema =
-        (effectStruct (createObj [ "question", effectString ]))?("annotate") (createObj [ "identifier", box "QuestionPrompt" ])
+        callMethod1 structInstance "annotate" (createObj [ "identifier", box "QuestionPrompt" ])
 
-    let parentSchema =
-        effectStruct (createObj [ "questions", effectSchemaNs?("Array") (promptSchema) ])
+    let arrayType = callMethod1 effectSchemaNs "Array" promptSchema
+    let parentSchema = effectStruct (createObj [ "questions", arrayType ])
 
-    let schema = Wanxiangshu.Opencode.HookSchemaCore.tryBuildJsonSchemaFromEffectSchema parentSchema
+    let schema =
+        Wanxiangshu.Opencode.HookSchemaCore.tryBuildJsonSchemaFromEffectSchema parentSchema
+
     check "schema built successfully" (not (isNullish schema))
 
     let defs = get schema "$defs"

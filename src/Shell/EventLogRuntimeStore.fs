@@ -45,10 +45,12 @@ let assistantPayload
             [ "assistantMessage", assistantMessage
               "turnId", turnId
               "openTodosJson", Encode.Auto.toString (0, openTodos) ]
+
     let withAgent =
         match agent with
         | Some a when a <> "" -> Map.add "agent" a baseMap
         | _ -> baseMap
+
     match model with
     | Some m when m <> "" -> Map.add "model" m withAgent
     | _ -> withAgent

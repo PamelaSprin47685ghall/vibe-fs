@@ -22,45 +22,57 @@ let private existsSync (path: string) : bool = jsNative
 let private pathJoin (a: string) (b: string) : string = jsNative
 
 let private cleanup (dir: string) : unit =
-    try rmSync dir (createObj [ "recursive", box true; "force", box true ]) with _ -> ()
+    try
+        rmSync dir (createObj [ "recursive", box true; "force", box true ])
+    with _ ->
+        ()
 
-let entries () : (string * (unit -> unit)) list = [
-    ("readConfig non-existent path returns defaults", fun () ->
-        let config = readConfig "/tmp/nonexistent-wanxiangzhen-test"
-        equal 3 config.MaxConcurrent
-        equal [] config.SharedDirs)
+let entries () : (string * (unit -> unit)) list =
+    [ ("readConfig non-existent path returns defaults",
+       fun () ->
+           let config = readConfig "/tmp/nonexistent-wanxiangzhen-test"
+           equal 3 config.MaxConcurrent
+           equal [] config.SharedDirs)
 
-    ("readConfig with full squad config parses all fields", fun () ->
-        let temp = mkdtemp "wanxiangzhen-test-"
-        let yamlContent = "---\nsquad:\n  maxConcurrent: 5\n  terminal: kitty\n  masterBranch: main\n  sharedDirs:\n    - node_modules\n    - .venv\n---"
-        writeFile (pathJoin temp "AGENTS.md") yamlContent
-        let config = readConfig temp
-        equal 5 config.MaxConcurrent
-        equal "kitty" config.Terminal
-        match config.MasterBranch with
-        | Some b -> equal "main" b
-        | None -> check "" false
-        equal ["node_modules"; ".venv"] config.SharedDirs
-        cleanup temp)
+      ("readConfig with full squad config parses all fields",
+       fun () ->
+           let temp = mkdtemp "wanxiangzhen-test-"
 
-    ("readConfig with invalid yaml returns defaults", fun () ->
-        let temp = mkdtemp "wanxiangzhen-test-"
-        writeFile (pathJoin temp "AGENTS.md") "---\nsquad: {{broken yaml\n---"
-        let config = readConfig temp
-        equal 3 config.MaxConcurrent
-        cleanup temp)
+           let yamlContent =
+               "---\nsquad:\n  maxConcurrent: 5\n  terminal: kitty\n  masterBranch: main\n  sharedDirs:\n    - node_modules\n    - .venv\n---"
 
-    ("readConfig with empty file returns defaults", fun () ->
-        let temp = mkdtemp "wanxiangzhen-test-"
-        writeFile (pathJoin temp "AGENTS.md") ""
-        let config = readConfig temp
-        equal 3 config.MaxConcurrent
-        cleanup temp)
+           writeFile (pathJoin temp "AGENTS.md") yamlContent
+           let config = readConfig temp
+           equal 5 config.MaxConcurrent
+           equal "kitty" config.Terminal
 
-    ("readConfig with file missing frontmatter returns defaults", fun () ->
-        let temp = mkdtemp "wanxiangzhen-test-"
-        writeFile (pathJoin temp "AGENTS.md") "just text\nno frontmatter"
-        let config = readConfig temp
-        equal 3 config.MaxConcurrent
-        cleanup temp)
-]
+           match config.MasterBranch with
+           | Some b -> equal "main" b
+           | None -> check "" false
+
+           equal [ "node_modules"; ".venv" ] config.SharedDirs
+           cleanup temp)
+
+      ("readConfig with invalid yaml returns defaults",
+       fun () ->
+           let temp = mkdtemp "wanxiangzhen-test-"
+           writeFile (pathJoin temp "AGENTS.md") "---\nsquad: {{broken yaml\n---"
+           let config = readConfig temp
+           equal 3 config.MaxConcurrent
+           cleanup temp)
+
+      ("readConfig with empty file returns defaults",
+       fun () ->
+           let temp = mkdtemp "wanxiangzhen-test-"
+           writeFile (pathJoin temp "AGENTS.md") ""
+           let config = readConfig temp
+           equal 3 config.MaxConcurrent
+           cleanup temp)
+
+      ("readConfig with file missing frontmatter returns defaults",
+       fun () ->
+           let temp = mkdtemp "wanxiangzhen-test-"
+           writeFile (pathJoin temp "AGENTS.md") "just text\nno frontmatter"
+           let config = readConfig temp
+           equal 3 config.MaxConcurrent
+           cleanup temp) ]

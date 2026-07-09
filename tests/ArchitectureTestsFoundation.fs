@@ -57,7 +57,8 @@ let fileBodyUnder300 () =
 
     for dir in scanDirs do
         for path in fsFilesRecursive dir do
-            if path.EndsWith(".fsproj") then ()
+            if path.EndsWith(".fsproj") then
+                ()
             else
                 let content = requireFile path
                 let lineCount = content.Length - content.Replace("\n", "").Length
@@ -230,8 +231,12 @@ let ompNoEngineRef () =
 /// Allowlisted files contain `@ [` / `@ (` only in bounded (O(1)) contexts.
 let noQuadraticListAppend () =
     let scanDirs =
-        [ "src/Kernel"; "src/Shell"; "src/Mux"
-          "src/Opencode"; "src/Omp"; "src/Methodology" ]
+        [ "src/Kernel"
+          "src/Shell"
+          "src/Mux"
+          "src/Opencode"
+          "src/Omp"
+          "src/Methodology" ]
 
     let allFiles =
         scanDirs
@@ -239,14 +244,13 @@ let noQuadraticListAppend () =
         |> Seq.filter (fun p -> p.EndsWith(".fs"))
 
     let allowedAppends =
-        Set [
-            "src/Kernel/FuzzyFormat.fs" // grepMatchLines context concat (bounded to 2-3 elements)
-            "src/Kernel/FuzzyPath.fs" // small list concat
-            "src/Kernel/ReviewSession/Types.fs" // addChild (bounded size)
-            "src/Kernel/SubagentPrompts.fs" // field list construction
-            "src/Shell/OpencodeAgentConfigCodec.fs" // field list construction
-            "src/Mux/AiSettings.fs" // merge settings lists
-        ]
+        Set
+            [ "src/Kernel/FuzzyFormat.fs" // grepMatchLines context concat (bounded to 2-3 elements)
+              "src/Kernel/FuzzyPath.fs" // small list concat
+              "src/Kernel/ReviewSession/Types.fs" // addChild (bounded size)
+              "src/Kernel/SubagentPrompts.fs" // field list construction
+              "src/Shell/OpencodeAgentConfigCodec.fs" // field list construction
+              "src/Mux/AiSettings.fs" ] // merge settings lists
 
     for path in allFiles do
         if not (Set.contains path allowedAppends) then
@@ -256,5 +260,11 @@ let noQuadraticListAppend () =
 
 let parallelToolPromptSSOTGuard () =
     let content = requireFile "src/Shell/MessageTransformPipeline.fs"
-    check "arch: MessageTransformPipeline references ToolCatalog.all" (content.Contains "Wanxiangshu.Kernel.ToolCatalog.all")
-    check "arch: MessageTransformPipeline does not hardcode tool catalog list" (not (content.Contains "let catalogNames =\n            [ \"coder\""))
+
+    check
+        "arch: MessageTransformPipeline references ToolCatalog.all"
+        (content.Contains "Wanxiangshu.Kernel.ToolCatalog.all")
+
+    check
+        "arch: MessageTransformPipeline does not hardcode tool catalog list"
+        (not (content.Contains "let catalogNames =\n            [ \"coder\""))

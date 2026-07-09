@@ -6,10 +6,10 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
 
 [<Global("process")>]
-let private nodeProcess : obj = jsNative
+let private nodeProcess: obj = jsNative
 
 [<Global>]
-let private JSON : obj = jsNative
+let private JSON: obj = jsNative
 
 [<Import("writeFileSync", "node:fs")>]
 let private writeFileSync (path: string) (data: string) : unit = jsNative
@@ -22,13 +22,18 @@ let private envVar (key: string) : string =
     if isNullish e then "" else str e key
 
 let writeE2eMetaIfEnabled (rt: CoordinatorRuntime) : unit =
-    let isE2e = envVar "WANXIANGZHEN_E2E" = "1" || envVar "WANXIANGZHEN_E2E_INPROCESS" = "1"
+    let isE2e =
+        envVar "WANXIANGZHEN_E2E" = "1" || envVar "WANXIANGZHEN_E2E_INPROCESS" = "1"
+
     let fullPath = pathJoin rt.ProjectRoot ".wanxiangzhen-e2e-meta.json"
+
     if isE2e then
-        JS.console.log("writeE2eMetaIfEnabled", "isE2e:", isE2e, "path:", fullPath, "port:", rt.CoordinatorUrl)
+        JS.console.log ("writeE2eMetaIfEnabled", "isE2e:", isE2e, "path:", fullPath, "port:", rt.CoordinatorUrl)
+
         let meta =
             {| coordinatorUrl = rt.CoordinatorUrl
                token = rt.Token
                masterSessionId = rt.MasterSessionId
                sessionId = rt.Dag.SessionId |}
+
         writeFileSync fullPath (string (JSON?stringify(meta)))

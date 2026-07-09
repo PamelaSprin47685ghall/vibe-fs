@@ -13,20 +13,21 @@ open Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eHelpers
 
 let testChatMessageCapturesSessionIdAndReplays () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
 
         let sessionId = "squad-session-001"
-        let evt1 = SquadCreated (sessionId, "add remember-me")
-        let evt2 = TasksCreated (sessionId, [("squad-a1b2", "Task A", "desc A", [])])
+        let evt1 = SquadCreated(sessionId, "add remember-me")
+        let evt2 = TasksCreated(sessionId, [ ("squad-a1b2", "Task A", "desc A", []) ])
         let history = [ evt1; evt2 ]
 
-        s.getLatestSquadSessionIdOverride <- Some (fun () -> Promise.lift (Some sessionId))
+        s.getLatestSquadSessionIdOverride <- Some(fun () -> Promise.lift (Some sessionId))
+
         s.getSquadDagOverride <-
-          Some (fun sid ->
-            let dag = List.fold foldEvent (empty sid "") history
-            Promise.lift dag)
+            Some(fun sid ->
+                let dag = List.fold foldEvent (empty sid "") history
+                Promise.lift dag)
 
         rt.MasterSessionId <- sessionId
         do! replayFromEventLog rt
@@ -36,28 +37,37 @@ let testChatMessageCapturesSessionIdAndReplays () : JS.Promise<unit> =
         match findTask "squad-a1b2" rt.Dag with
         | None -> checkBare false
         | Some t -> checkBare (t.Status = Pending)
-     }
+    }
 
 let testReplayReconcilesSubmittedToMerged () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
 
         let sessionId = "squad-session-001"
-        let evt1 = SquadCreated (sessionId, "req")
-        let evt2 = TasksCreated (sessionId, [("squad-a1b2", "A", "desc", [])])
-        let evt3 = TaskStarted (sessionId, "squad-a1b2", "/wt/a", "squad-a1b2")
-        let evt4 = TaskSubmitted (sessionId, "squad-a1b2", "sha123")
+        let evt1 = SquadCreated(sessionId, "req")
+        let evt2 = TasksCreated(sessionId, [ ("squad-a1b2", "A", "desc", []) ])
+        let evt3 = TaskStarted(sessionId, "squad-a1b2", "/wt/a", "squad-a1b2")
+        let evt4 = TaskSubmitted(sessionId, "squad-a1b2", "sha123")
         let history = [ evt1; evt2; evt3; evt4 ]
 
-        s.getLatestSquadSessionIdOverride <- Some (fun () -> Promise.lift (Some sessionId))
+        s.getLatestSquadSessionIdOverride <- Some(fun () -> Promise.lift (Some sessionId))
+
         s.getSquadDagOverride <-
-          Some (fun sid ->
-            let dag = List.fold foldEvent (empty sid "") history
-            Promise.lift dag)
-        s.mergeBaseOverride <- Some (fun c a d -> s.mergeBaseIsAncestorCalls <- s.mergeBaseIsAncestorCalls @ [(c, a, d)]; true)
-        s.revParseRefOverride <- Some (fun c r -> s.revParseRefCalls <- s.revParseRefCalls @ [(c, r)]; "merged-sha")
+            Some(fun sid ->
+                let dag = List.fold foldEvent (empty sid "") history
+                Promise.lift dag)
+
+        s.mergeBaseOverride <-
+            Some(fun c a d ->
+                s.mergeBaseIsAncestorCalls <- s.mergeBaseIsAncestorCalls @ [ (c, a, d) ]
+                true)
+
+        s.revParseRefOverride <-
+            Some(fun c r ->
+                s.revParseRefCalls <- s.revParseRefCalls @ [ (c, r) ]
+                "merged-sha")
 
         rt.MasterSessionId <- sessionId
         do! replayFromEventLog rt
@@ -71,28 +81,31 @@ let testReplayReconcilesSubmittedToMerged () : JS.Promise<unit> =
 
 let testReplayWarnsOrphanRunningTasks () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
 
         let sessionId = "squad-session-001"
-        let evt1 = SquadCreated (sessionId, "req")
-        let evt2 = TasksCreated (sessionId, [("squad-a1b2", "A", "desc", [])])
-        let evt3 = TaskStarted (sessionId, "squad-a1b2", "/wt/a", "squad-a1b2")
+        let evt1 = SquadCreated(sessionId, "req")
+        let evt2 = TasksCreated(sessionId, [ ("squad-a1b2", "A", "desc", []) ])
+        let evt3 = TaskStarted(sessionId, "squad-a1b2", "/wt/a", "squad-a1b2")
         let history = [ evt1; evt2; evt3 ]
 
-        s.getLatestSquadSessionIdOverride <- Some (fun () -> Promise.lift (Some sessionId))
+        s.getLatestSquadSessionIdOverride <- Some(fun () -> Promise.lift (Some sessionId))
+
         s.getSquadDagOverride <-
-          Some (fun sid ->
-            let dag = List.fold foldEvent (empty sid "") history
-            Promise.lift dag)
-        s.promptSessionOverride <- Some (fun c m p ->
-            s.promptSessionCalls <- s.promptSessionCalls @ [(m, p)]
-            s.orphanWarningSent <- true
-            Promise.lift ())
+            Some(fun sid ->
+                let dag = List.fold foldEvent (empty sid "") history
+                Promise.lift dag)
+
+        s.promptSessionOverride <-
+            Some(fun c m p ->
+                s.promptSessionCalls <- s.promptSessionCalls @ [ (m, p) ]
+                s.orphanWarningSent <- true
+                Promise.lift ())
 
         rt.MasterSessionId <- sessionId
-        s.mergeBaseOverride <- Some (fun _ _ _ -> false)
+        s.mergeBaseOverride <- Some(fun _ _ _ -> false)
         do! replayFromEventLog rt
 
         match findTask "squad-a1b2" rt.Dag with
@@ -100,17 +113,16 @@ let testReplayWarnsOrphanRunningTasks () : JS.Promise<unit> =
         | Some t -> checkBare (t.Status = Running)
 
         checkBare s.orphanWarningSent
-        let callMsg = s.promptSessionCalls |> List.tryHead |> Option.map snd |> Option.defaultValue ""
+
+        let callMsg =
+            s.promptSessionCalls |> List.tryHead |> Option.map snd |> Option.defaultValue ""
+
         checkBare (callMsg.Contains "orphan" || callMsg.Contains "Orphan")
     }
 
-let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list = [
-    ("ExtendedMockE2e.chat_message_captures_session_id_and_replays",
-     testChatMessageCapturesSessionIdAndReplays)
+let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
+    [ ("ExtendedMockE2e.chat_message_captures_session_id_and_replays", testChatMessageCapturesSessionIdAndReplays)
 
-    ("ExtendedMockE2e.replay_reconciles_submitted_to_merged",
-     testReplayReconcilesSubmittedToMerged)
+      ("ExtendedMockE2e.replay_reconciles_submitted_to_merged", testReplayReconcilesSubmittedToMerged)
 
-    ("ExtendedMockE2e.replay_warns_orphan_running_tasks",
-     testReplayWarnsOrphanRunningTasks)
-]
+      ("ExtendedMockE2e.replay_warns_orphan_running_tasks", testReplayWarnsOrphanRunningTasks) ]

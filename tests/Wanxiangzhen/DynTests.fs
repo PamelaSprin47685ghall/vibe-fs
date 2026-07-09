@@ -7,117 +7,124 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Tests.Wanxiangzhen.AssertCompat
 
 [<Emit("[1, 2, 3]")>]
-let private jsArray : obj = jsNative
+let private jsArray: obj = jsNative
 
 let private mkObj (pairs: (string * obj) list) : obj =
     createObj (pairs |> List.map (fun (k, v) -> k ==> v))
 
-let private mkNull : obj = null :> obj
-let private mkUndef : obj = Unchecked.defaultof<obj>
+let private mkNull: obj = null :> obj
+let private mkUndef: obj = Unchecked.defaultof<obj>
 
-let entries () : (string * (unit -> unit)) list = [
+let entries () : (string * (unit -> unit)) list =
+    [
 
-    ("Dyn.isNullish null", fun () ->
-        checkBare (isNullish mkNull))
+      ("Dyn.isNullish null", (fun () -> checkBare (isNullish mkNull)))
 
-    ("Dyn.isNullish undefined", fun () ->
-        checkBare (isNullish mkUndef))
+      ("Dyn.isNullish undefined", (fun () -> checkBare (isNullish mkUndef)))
 
-    ("Dyn.isNullish emptyString", fun () ->
-        checkBare (not (isNullish "")))
+      ("Dyn.isNullish emptyString", (fun () -> checkBare (not (isNullish ""))))
 
-    ("Dyn.isNullish obj", fun () ->
-        let o = mkObj ["x" ==> box 1]
-        checkBare (not (isNullish o)))
+      ("Dyn.isNullish obj",
+       fun () ->
+           let o = mkObj [ "x" ==> box 1 ]
+           checkBare (not (isNullish o)))
 
-    ("Dyn.keys returns key array", fun () ->
-        let o = mkObj ["a" ==> box 1; "b" ==> box 2]
-        let k = keys o
-        checkBare (k.Length = 2)
-        checkBare (Seq.exists (fun key -> key = "a") k)
-        checkBare (Seq.exists (fun key -> key = "b") k))
+      ("Dyn.keys returns key array",
+       fun () ->
+           let o = mkObj [ "a" ==> box 1; "b" ==> box 2 ]
+           let k = keys o
+           checkBare (k.Length = 2)
+           checkBare (Seq.exists (fun key -> key = "a") k)
+           checkBare (Seq.exists (fun key -> key = "b") k))
 
-    ("Dyn.get existing key", fun () ->
-        let o = mkObj ["x" ==> box 42]
-        equal 42 (unbox<int> (get o "x")))
+      ("Dyn.get existing key",
+       fun () ->
+           let o = mkObj [ "x" ==> box 42 ]
+           equal 42 (unbox<int> (get o "x")))
 
-    ("Dyn.get missing key returns undefinedValue", fun () ->
-        let o = mkObj ["x" ==> box 1]
-        checkBare (isNullish (get o "no-such-key")))
+      ("Dyn.get missing key returns undefinedValue",
+       fun () ->
+           let o = mkObj [ "x" ==> box 1 ]
+           checkBare (isNullish (get o "no-such-key")))
 
-    ("Dyn.str existing returns string", fun () ->
-        let o = mkObj ["s" ==> "hello"]
-        equal "hello" (str o "s"))
+      ("Dyn.str existing returns string",
+       fun () ->
+           let o = mkObj [ "s" ==> "hello" ]
+           equal "hello" (str o "s"))
 
-    ("Dyn.str missing returns empty string", fun () ->
-        let o = mkObj ["x" ==> box 1]
-        equal "" (str o "no-such-key"))
+      ("Dyn.str missing returns empty string",
+       fun () ->
+           let o = mkObj [ "x" ==> box 1 ]
+           equal "" (str o "no-such-key"))
 
-    ("Dyn.opt existing -> Some", fun () ->
-        let o = mkObj ["v" ==> box 99]
-        isSome (opt o "v"))
+      ("Dyn.opt existing -> Some",
+       fun () ->
+           let o = mkObj [ "v" ==> box 99 ]
+           isSome (opt o "v"))
 
-    ("Dyn.opt missing -> None", fun () ->
-        let o = mkObj ["x" ==> box 1]
-        isNone (opt o "no-such-key"))
+      ("Dyn.opt missing -> None",
+       fun () ->
+           let o = mkObj [ "x" ==> box 1 ]
+           isNone (opt o "no-such-key"))
 
-    ("Dyn.has existing -> true", fun () ->
-        let o = mkObj ["k" ==> box 1]
-        checkBare (has o "k"))
+      ("Dyn.has existing -> true",
+       fun () ->
+           let o = mkObj [ "k" ==> box 1 ]
+           checkBare (has o "k"))
 
-    ("Dyn.has missing -> false", fun () ->
-        let o = mkObj ["k" ==> box 1]
-        checkBare (not (has o "no-such-key")))
+      ("Dyn.has missing -> false",
+       fun () ->
+           let o = mkObj [ "k" ==> box 1 ]
+           checkBare (not (has o "no-such-key")))
 
-    ("Dyn.typeIs object", fun () ->
-        let o = mkObj []
-        checkBare (typeIs o "object"))
+      ("Dyn.typeIs object",
+       fun () ->
+           let o = mkObj []
+           checkBare (typeIs o "object"))
 
-    ("Dyn.isArray true for array", fun () ->
-        checkBare (isArray jsArray))
+      ("Dyn.isArray true for array", (fun () -> checkBare (isArray jsArray)))
 
-    ("Dyn.isArray false for non-array", fun () ->
-        let o = mkObj ["x" ==> box 1]
-        checkBare (not (isArray o)))
+      ("Dyn.isArray false for non-array",
+       fun () ->
+           let o = mkObj [ "x" ==> box 1 ]
+           checkBare (not (isArray o)))
 
-    ("Dyn.truthy null false", fun () ->
-        checkBare (not (truthy mkNull)))
+      ("Dyn.truthy null false", (fun () -> checkBare (not (truthy mkNull))))
 
-    ("Dyn.truthy 0 false", fun () ->
-        checkBare (not (truthy (box 0))))
+      ("Dyn.truthy 0 false", (fun () -> checkBare (not (truthy (box 0)))))
 
-    ("Dyn.truthy emptyString false", fun () ->
-        checkBare (not (truthy "")))
+      ("Dyn.truthy emptyString false", (fun () -> checkBare (not (truthy ""))))
 
-    ("Dyn.truthy true", fun () ->
-        checkBare (truthy (box true)))
+      ("Dyn.truthy true", (fun () -> checkBare (truthy (box true))))
 
-    ("Dyn.truthy emptyObject true", fun () ->
-        checkBare (truthy (mkObj [])))
+      ("Dyn.truthy emptyObject true", (fun () -> checkBare (truthy (mkObj []))))
 
-    ("Dyn.withKey adds key to new object", fun () ->
-        let o = mkObj ["a" ==> box 1]
-        let c = withKey o "b" (box 2)
-        checkBare (has c "b")
-        equal 2 (unbox<int> (get c "b"))
-        // original unchanged
-        checkBare (not (has o "b")))
+      ("Dyn.withKey adds key to new object",
+       fun () ->
+           let o = mkObj [ "a" ==> box 1 ]
+           let c = withKey o "b" (box 2)
+           checkBare (has c "b")
+           equal 2 (unbox<int> (get c "b"))
+           // original unchanged
+           checkBare (not (has o "b")))
 
-    ("Dyn.cloneShallow independent copy", fun () ->
-        let o = mkObj ["x" ==> box 1]
-        let c = cloneShallow o
-        equal 1 (unbox<int> (get c "x"))
-        // setting copy must not affect original
-        setKey c "x" (box 99)
-        equal 1 (unbox<int> (get o "x")))
+      ("Dyn.cloneShallow independent copy",
+       fun () ->
+           let o = mkObj [ "x" ==> box 1 ]
+           let c = cloneShallow o
+           equal 1 (unbox<int> (get c "x"))
+           // setting copy must not affect original
+           setKey c "x" (box 99)
+           equal 1 (unbox<int> (get o "x")))
 
-    ("Dyn.setKey mutates object", fun () ->
-        let o = mkObj ["k" ==> box 1]
-        setKey o "k" (box 42)
-        equal 42 (unbox<int> (get o "k")))
+      ("Dyn.setKey mutates object",
+       fun () ->
+           let o = mkObj [ "k" ==> box 1 ]
+           setKey o "k" (box 42)
+           equal 42 (unbox<int> (get o "k")))
 
-    ("Dyn.deleteKey removes key", fun () ->
-        let o = mkObj ["k" ==> box 1]
-        deleteKey o "k"
-        checkBare (not (has o "k")))
-]
+      ("Dyn.deleteKey removes key",
+       fun () ->
+           let o = mkObj [ "k" ==> box 1 ]
+           deleteKey o "k"
+           checkBare (not (has o "k"))) ]

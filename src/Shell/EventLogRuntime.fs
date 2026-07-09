@@ -8,24 +8,41 @@ open Wanxiangshu.Shell.EventLogRuntimeNudge
 
 let getStore = EventLogRuntimeStore.getStore
 
-let syncAllSessionsFromEventLogDedicated = EventLogRuntimeSync.syncAllSessionsFromEventLogDedicated
-let syncReviewFromEventLogDedicated = EventLogRuntimeSync.syncReviewFromEventLogDedicated
-let syncBacklogFromEventLogDedicated = EventLogRuntimeSync.syncBacklogFromEventLogDedicated
+let syncAllSessionsFromEventLogDedicated =
+    EventLogRuntimeSync.syncAllSessionsFromEventLogDedicated
+
+let syncReviewFromEventLogDedicated =
+    EventLogRuntimeSync.syncReviewFromEventLogDedicated
+
+let syncBacklogFromEventLogDedicated =
+    EventLogRuntimeSync.syncBacklogFromEventLogDedicated
 
 let appendLoopActivated = EventLogRuntimeAppend.appendLoopActivated
 let appendLoopCancelled = EventLogRuntimeAppend.appendLoopCancelled
 let appendReviewVerdict = EventLogRuntimeAppend.appendReviewVerdict
-let appendSubmitReviewWipRecorded = EventLogRuntimeAppend.appendSubmitReviewWipRecorded
+
+let appendSubmitReviewWipRecorded =
+    EventLogRuntimeAppend.appendSubmitReviewWipRecorded
+
 let appendNudgeDedupCleared = EventLogRuntimeAppend.appendNudgeDedupCleared
 let appendWorkBacklogCommitted = EventLogRuntimeAppend.appendWorkBacklogCommitted
 let appendLoopActivatedOrFail = EventLogRuntimeAppend.appendLoopActivatedOrFail
 let appendLoopCancelledOrFail = EventLogRuntimeAppend.appendLoopCancelledOrFail
 let appendReviewVerdictOrFail = EventLogRuntimeAppend.appendReviewVerdictOrFail
-let appendSubmitReviewWipRecordedOrFail = EventLogRuntimeAppend.appendSubmitReviewWipRecordedOrFail
-let appendNudgeDedupClearedOrFail = EventLogRuntimeAppend.appendNudgeDedupClearedOrFail
-let appendWorkBacklogCommittedOrFail = EventLogRuntimeAppend.appendWorkBacklogCommittedOrFail
+
+let appendSubmitReviewWipRecordedOrFail =
+    EventLogRuntimeAppend.appendSubmitReviewWipRecordedOrFail
+
+let appendNudgeDedupClearedOrFail =
+    EventLogRuntimeAppend.appendNudgeDedupClearedOrFail
+
+let appendWorkBacklogCommittedOrFail =
+    EventLogRuntimeAppend.appendWorkBacklogCommittedOrFail
+
 let appendAssistantCompleted = EventLogRuntimeAppend.appendAssistantCompleted
-let appendAssistantCompletedOrFail = EventLogRuntimeAppend.appendAssistantCompletedOrFail
+
+let appendAssistantCompletedOrFail =
+    EventLogRuntimeAppend.appendAssistantCompletedOrFail
 
 let isLoopActiveFromEventLog = EventLogRuntimeNudge.isLoopActiveFromEventLog
 let nudgeBlockedForTurn = EventLogRuntimeNudge.nudgeBlockedForTurn

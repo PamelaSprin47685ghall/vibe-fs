@@ -18,9 +18,9 @@ open Wanxiangshu.Tests.Wanxiangzhen.ExtendedMockE2eHelpers
 
 let testMaxConcurrentLimitsReadyTasks () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
         rt.Config <- { rt.Config with MaxConcurrent = 2 }
         rt.MasterSessionId <- "squad-session-001"
 
@@ -30,6 +30,7 @@ let testMaxConcurrentLimitsReadyTasks () : JS.Promise<unit> =
                mkTaskEvent "squad-e5f6" "C" "desc C" []
                mkTaskEvent "squad-g7h8" "D" "desc D" []
                mkTaskEvent "squad-i9j0" "E" "desc E" [] |]
+
         let args = mkSquadUpdateArgs evts
         rt.Scheduling <- true
         let! _ = handleSquadUpdate rt args
@@ -37,8 +38,18 @@ let testMaxConcurrentLimitsReadyTasks () : JS.Promise<unit> =
         rt.Scheduling <- false
         do! schedulerTick rt
 
-        let running = rt.Dag.Tasks |> Map.toList |> List.map snd |> List.filter (fun t -> t.Status = Running)
-        let pending = rt.Dag.Tasks |> Map.toList |> List.map snd |> List.filter (fun t -> t.Status = Pending)
+        let running =
+            rt.Dag.Tasks
+            |> Map.toList
+            |> List.map snd
+            |> List.filter (fun t -> t.Status = Running)
+
+        let pending =
+            rt.Dag.Tasks
+            |> Map.toList
+            |> List.map snd
+            |> List.filter (fun t -> t.Status = Pending)
+
         checkBare (running.Length = 2)
         checkBare (pending.Length = 3)
 
@@ -47,7 +58,12 @@ let testMaxConcurrentLimitsReadyTasks () : JS.Promise<unit> =
         | Some firstTask ->
             let! _ = (routeHandler rt) "POST" (sprintf "/task/%s/register" firstTask.Id) (createObj [ "pid", box 111 ])
             s.revParseRefOverrides <- s.revParseRefOverrides.Add(firstTask.Id, "deadbeef")
-            let! _ = (routeHandler rt) "POST" (sprintf "/task/%s/submit" firstTask.Id) (createObj [ "commitSha", box "deadbeef" ])
+
+            let! _ =
+                (routeHandler rt)
+                    "POST"
+                    (sprintf "/task/%s/submit" firstTask.Id)
+                    (createObj [ "commitSha", box "deadbeef" ])
 
             match findTask firstTask.Id rt.Dag with
             | Some t -> checkBare (t.Status = Merged)
@@ -56,24 +72,35 @@ let testMaxConcurrentLimitsReadyTasks () : JS.Promise<unit> =
             rt.Scheduling <- false
             do! schedulerTick rt
 
-            let running2 = rt.Dag.Tasks |> Map.toList |> List.map snd |> List.filter (fun t -> t.Status = Running)
-            let pending2 = rt.Dag.Tasks |> Map.toList |> List.map snd |> List.filter (fun t -> t.Status = Pending)
+            let running2 =
+                rt.Dag.Tasks
+                |> Map.toList
+                |> List.map snd
+                |> List.filter (fun t -> t.Status = Running)
+
+            let pending2 =
+                rt.Dag.Tasks
+                |> Map.toList
+                |> List.map snd
+                |> List.filter (fun t -> t.Status = Pending)
+
             checkBare (running2.Length = 2)
             checkBare (pending2.Length = 2)
     }
 
 let testDependencyChainSchedulesSequentially () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
-        s.mergeBaseOverride <- Some (fun _ _ _ -> true)
+        let rt = mkRuntime deps
+        s.mergeBaseOverride <- Some(fun _ _ _ -> true)
         rt.MasterSessionId <- "squad-session-001"
 
         let evts =
             [| mkTaskEvent "squad-a1b2" "A" "desc A" []
-               mkTaskEvent "squad-c3d4" "B" "desc B" ["squad-a1b2"]
-               mkTaskEvent "squad-e5f6" "C" "desc C" ["squad-c3d4"] |]
+               mkTaskEvent "squad-c3d4" "B" "desc B" [ "squad-a1b2" ]
+               mkTaskEvent "squad-e5f6" "C" "desc C" [ "squad-c3d4" ] |]
+
         let args = mkSquadUpdateArgs evts
         rt.Scheduling <- true
         let! _ = handleSquadUpdate rt args
@@ -84,9 +111,11 @@ let testDependencyChainSchedulesSequentially () : JS.Promise<unit> =
         match findTask "squad-a1b2" rt.Dag with
         | None -> checkBare false
         | Some a -> checkBare (a.Status = Running)
+
         match findTask "squad-c3d4" rt.Dag with
         | None -> checkBare false
         | Some b -> checkBare (b.Status = Pending)
+
         match findTask "squad-e5f6" rt.Dag with
         | None -> checkBare false
         | Some c -> checkBare (c.Status = Pending)
@@ -104,6 +133,7 @@ let testDependencyChainSchedulesSequentially () : JS.Promise<unit> =
         match findTask "squad-c3d4" rt.Dag with
         | None -> checkBare false
         | Some b -> checkBare (b.Status = Running)
+
         match findTask "squad-e5f6" rt.Dag with
         | None -> checkBare false
         | Some c -> checkBare (c.Status = Pending)
@@ -125,15 +155,15 @@ let testDependencyChainSchedulesSequentially () : JS.Promise<unit> =
 
 let testDoneBeaconMarksTaskDone () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
         rt.MasterSessionId <- "squad-session-001"
 
-        let evts  = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
-        let args  = mkSquadUpdateArgs evts
+        let evts = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
+        let args = mkSquadUpdateArgs evts
         rt.Scheduling <- true
-        let! _    = handleSquadUpdate rt args
+        let! _ = handleSquadUpdate rt args
         rt.Scheduling <- false
         do! schedulerTick rt
 
@@ -153,21 +183,25 @@ let testDoneBeaconMarksTaskDone () : JS.Promise<unit> =
 
 let testPidPollingDetectsSlaveDeath () : JS.Promise<unit> =
     promise {
-        let s    = mkFake ()
+        let s = mkFake ()
         let deps = mkDeps s
-        let rt   = mkRuntime deps
+        let rt = mkRuntime deps
         rt.MasterSessionId <- "squad-session-001"
 
-        let evts  = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
-        let args  = mkSquadUpdateArgs evts
+        let evts = [| mkTaskEvent "squad-a1b2" "A" "desc A" [] |]
+        let args = mkSquadUpdateArgs evts
         rt.Scheduling <- true
-        let! _    = handleSquadUpdate rt args
+        let! _ = handleSquadUpdate rt args
         rt.Scheduling <- false
         do! schedulerTick rt
         let! _ = (routeHandler rt) "POST" "/task/squad-a1b2/register" (createObj [ "pid", box 12345 ])
 
-        let mutable capturedCheck : (unit -> unit) option = None
-        s.startPollingOverride <- Some (fun ms f -> capturedCheck <- Some f; box "poll-handle")
+        let mutable capturedCheck: (unit -> unit) option = None
+
+        s.startPollingOverride <-
+            Some(fun ms f ->
+                capturedCheck <- Some f
+                box "poll-handle")
 
         let _ = startPidPolling rt
         checkBare (capturedCheck.IsSome)
@@ -175,29 +209,27 @@ let testPidPollingDetectsSlaveDeath () : JS.Promise<unit> =
         s.isPidAliveResult <- false
 
         match capturedCheck with
-            | None -> checkBare false
-            | Some checkFn -> checkFn ()
+        | None -> checkBare false
+        | Some checkFn -> checkFn ()
 
-        do! waitUntil (fun () ->
-            match findTask "squad-a1b2" rt.Dag with
-            | Some t -> t.Status = Done
-            | None -> false) 2000
+        do!
+            waitUntil
+                (fun () ->
+                    match findTask "squad-a1b2" rt.Dag with
+                    | Some t -> t.Status = Done
+                    | None -> false)
+                2000
 
         match findTask "squad-a1b2" rt.Dag with
         | None -> checkBare false
         | Some t -> checkBare (t.Status = Done)
     }
 
-let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list = [
-    ("ExtendedMockE2e.maxConcurrent_limits_ready_tasks",
-     testMaxConcurrentLimitsReadyTasks)
+let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
+    [ ("ExtendedMockE2e.maxConcurrent_limits_ready_tasks", testMaxConcurrentLimitsReadyTasks)
 
-    ("ExtendedMockE2e.dependency_chain_schedules_sequentially",
-     testDependencyChainSchedulesSequentially)
+      ("ExtendedMockE2e.dependency_chain_schedules_sequentially", testDependencyChainSchedulesSequentially)
 
-    ("ExtendedMockE2e.done_beacon_marks_task_done",
-     testDoneBeaconMarksTaskDone)
+      ("ExtendedMockE2e.done_beacon_marks_task_done", testDoneBeaconMarksTaskDone)
 
-    ("ExtendedMockE2e.pid_polling_detects_slave_death",
-     testPidPollingDetectsSlaveDeath)
-]
+      ("ExtendedMockE2e.pid_polling_detects_slave_death", testPidPollingDetectsSlaveDeath) ]

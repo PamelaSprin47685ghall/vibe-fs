@@ -98,12 +98,12 @@ let kernelParseWarnTddCanonical () =
     check
         "parseWarnTdd accepts title-case (case-insensitive)"
         (parseWarnTdd "I-Am-Sure-I-Have-Followed-Tdd-And-Kolmolgorov-Principles-And-Kept-Todo-Updated" = Some
-                                                                                                               IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+                                                                                                             IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
 
     check
         "parseWarnTdd accepts mixed-case"
         (parseWarnTdd "I-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" = Some
-                                                                                                               IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
+                                                                                                             IAmSureIHaveFollowedTddAndKolmolgorovPrinciples)
 
 let kernelParseWarnTddRejectsVariants () =
     let invalidValues =

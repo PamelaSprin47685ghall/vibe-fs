@@ -26,9 +26,8 @@ type BacklogSession(host: Host, scope: RuntimeScope) =
 
     member this.GetOrRebuildBacklog(sessionID: string, messages: Message<obj> list) : BacklogEntry list =
         let countTodoResults (mList: Message<obj> list) =
-            mList |> List.sumBy (fun m ->
-                m.parts |> List.filter (isTodoResultFor host) |> List.length
-            )
+            mList
+            |> List.sumBy (fun m -> m.parts |> List.filter (isTodoResultFor host) |> List.length)
 
         match projection.TryGetBacklog(host, sessionID) with
         | Some backlog ->

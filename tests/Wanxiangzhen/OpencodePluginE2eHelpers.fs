@@ -13,7 +13,7 @@ open Wanxiangshu.Tests.Wanxiangzhen.SpinWait
 
 // Process / env helpers (slave mode needs SQUAD_* env vars)
 [<Global("process")>]
-let private nodeProcess : obj = jsNative
+let private nodeProcess: obj = jsNative
 
 let internal setEnv (key: string) (value: string) : unit =
     setKey (get nodeProcess "env") key (box value)
@@ -22,60 +22,64 @@ let internal clearEnv (key: string) : unit =
     setKey (get nodeProcess "env") key (box "")
 
 // MockCaptures — records calls made through the mock PluginInput client
-type MockCaptures = {
-    mutable prompts   : obj list
-    mutable commands  : obj list
-    mutable messages  : obj list
-}
+type MockCaptures =
+    { mutable prompts: obj list
+      mutable commands: obj list
+      mutable messages: obj list }
 
 // mkMockInput — builds an opencode-shaped PluginInput with captured client calls
 let mkMockInput (captures: MockCaptures) : obj =
-    let client = createObj [
-        "session", box (createObj [
-            "prompt",   box (fun (p: obj) ->
-                captures.prompts <- captures.prompts @ [ p ]
-                Promise.lift (box null))
-            "messages", box (fun (m: obj) ->
-                captures.messages <- captures.messages @ [ m ]
-                Promise.lift (box {| data = [||] |}))
-            "command",  box (fun (c: obj) ->
-                captures.commands <- captures.commands @ [ c ]
-                Promise.lift (box null))
-        ])
-    ]
-    createObj [
-        "client",                box client
-        "directory",             box "/tmp/project"
-        "worktree",              box "/tmp/project"
-        "serverUrl",             box "http://localhost:0"
-        "experimental_workspace", box (createObj [ "register", box (fun _ _ -> ()) ])
-        "project",               box (createObj [])
-        "$",                     box (createObj [])
-    ]
+    let client =
+        createObj
+            [ "session",
+              box (
+                  createObj
+                      [ "prompt",
+                        box (fun (p: obj) ->
+                            captures.prompts <- captures.prompts @ [ p ]
+                            Promise.lift (box null))
+                        "messages",
+                        box (fun (m: obj) ->
+                            captures.messages <- captures.messages @ [ m ]
+                            Promise.lift (box {| data = [||] |}))
+                        "command",
+                        box (fun (c: obj) ->
+                            captures.commands <- captures.commands @ [ c ]
+                            Promise.lift (box null)) ]
+              ) ]
+
+    createObj
+        [ "client", box client
+          "directory", box "/tmp/project"
+          "worktree", box "/tmp/project"
+          "serverUrl", box "http://localhost:0"
+          "experimental_workspace", box (createObj [ "register", box (fun _ _ -> ()) ])
+          "project", box (createObj [])
+          "$", box (createObj []) ]
 
 // ObservableDeps — mirrors CoordinatorDeps, each field records the call
-type ObservableDeps = {
-    // call-records
-    mutable spawnSlaveCalls           : (string * string * obj * string) list
-    mutable killPidCalls              : (int * obj) list
-    mutable worktreeAddCalls          : (string * string * string * string) list
-    mutable worktreeRemoveCalls       : (string * string) list
-    mutable branchDeleteCalls         : (string * string) list
-    mutable mergeBaseCalls            : (string * string * string) list
-    mutable mergeFfCalls              : (string * string) list
-    mutable revParseRefCalls          : (string * string) list
-    mutable showRefExistsCalls        : (string * string) list
-    // configurable return values
-    mutable revParseBranchResult      : string
-    mutable revParseRefResult         : string
-    mutable revParseRefOverrides      : Map<string, string>
-    mutable showRefExistsResult       : bool
-    mutable mergeBaseResult           : bool
-    mutable mergeFfResult             : string
-    mutable isPidAliveResult          : bool
-    mutable nowResult                 : string
-    mutable squadEventLog             : SquadEvent list
-}
+type ObservableDeps =
+    {
+      // call-records
+      mutable spawnSlaveCalls: (string * string * obj * string) list
+      mutable killPidCalls: (int * obj) list
+      mutable worktreeAddCalls: (string * string * string * string) list
+      mutable worktreeRemoveCalls: (string * string) list
+      mutable branchDeleteCalls: (string * string) list
+      mutable mergeBaseCalls: (string * string * string) list
+      mutable mergeFfCalls: (string * string) list
+      mutable revParseRefCalls: (string * string) list
+      mutable showRefExistsCalls: (string * string) list
+      // configurable return values
+      mutable revParseBranchResult: string
+      mutable revParseRefResult: string
+      mutable revParseRefOverrides: Map<string, string>
+      mutable showRefExistsResult: bool
+      mutable mergeBaseResult: bool
+      mutable mergeFfResult: string
+      mutable isPidAliveResult: bool
+      mutable nowResult: string
+      mutable squadEventLog: SquadEvent list }
 
 let mkDefaultObs () : ObservableDeps =
     { spawnSlaveCalls = []
@@ -99,43 +103,68 @@ let mkDefaultObs () : ObservableDeps =
 
 let mkObservableDeps (captures: MockCaptures) (obs: ObservableDeps) : CoordinatorDeps =
     let baseDeps = stubDeps ()
+
     { baseDeps with
-        PromptSession       = fun (client: obj) (sessionId: string) (msg: string) ->
-            let part  = createObj [ "type", box "text"; "text", box msg ]
-            let arg   = createObj [
-                "path",  box (createObj [ "id", box sessionId ])
-                "body",  box (createObj [ "parts", box [| part |] ]) ]
-            let session = get client "session"
-            session?("prompt")(arg) |> unbox<JS.Promise<obj>> |> Promise.map ignore
-        SpawnSlave          = fun t wt e p -> obs.spawnSlaveCalls <- obs.spawnSlaveCalls @ [ (t, wt, e, p) ]
-        KillPid             = fun p signal  -> obs.killPidCalls      <- obs.killPidCalls      @ [ (p, signal) ]
-        TryWorktreeAdd      = fun c b p b2 -> obs.worktreeAddCalls   <- obs.worktreeAddCalls   @ [ (c, b, p, b2) ]; Ok ""
-        TryWorktreeRemoveForce = fun c p -> obs.worktreeRemoveCalls <- obs.worktreeRemoveCalls @ [ (c, p) ]; Ok ""
-        TryBranchDeleteForce  = fun c b -> obs.branchDeleteCalls   <- obs.branchDeleteCalls   @ [ (c, b) ]; Ok ""
-        MergeBaseIsAncestor = fun c a d ->
-            obs.mergeBaseCalls <- obs.mergeBaseCalls @ [ (c, a, d) ]; obs.mergeBaseResult
-        MergeFfOnly         = fun c b ->
-            obs.mergeFfCalls   <- obs.mergeFfCalls   @ [ (c, b) ]; obs.mergeFfResult
-        RevParseRef         = fun c r ->
-            obs.revParseRefCalls <- obs.revParseRefCalls @ [ (c, r) ]
-            match obs.revParseRefOverrides.TryGetValue r with
-            | true, v -> v
-            | false, _ -> obs.revParseRefResult
-        ShowRefExists       = fun c b ->
-            obs.showRefExistsCalls <- obs.showRefExistsCalls @ [ (c, b) ]; obs.showRefExistsResult
-        RevParseBranch      = fun _ -> obs.revParseBranchResult
-        IsPidAlive          = fun _ -> obs.isPidAliveResult
-        Now                 = fun () -> obs.nowResult
+        PromptSession =
+            fun (client: obj) (sessionId: string) (msg: string) ->
+                let part = createObj [ "type", box "text"; "text", box msg ]
+
+                let arg =
+                    createObj
+                        [ "path", box (createObj [ "id", box sessionId ])
+                          "body", box (createObj [ "parts", box [| part |] ]) ]
+
+                let session = get client "session"
+                session?("prompt") (arg) |> unbox<JS.Promise<obj>> |> Promise.map ignore
+        SpawnSlave = fun t wt e p -> obs.spawnSlaveCalls <- obs.spawnSlaveCalls @ [ (t, wt, e, p) ]
+        KillPid = fun p signal -> obs.killPidCalls <- obs.killPidCalls @ [ (p, signal) ]
+        TryWorktreeAdd =
+            fun c b p b2 ->
+                obs.worktreeAddCalls <- obs.worktreeAddCalls @ [ (c, b, p, b2) ]
+                Ok ""
+        TryWorktreeRemoveForce =
+            fun c p ->
+                obs.worktreeRemoveCalls <- obs.worktreeRemoveCalls @ [ (c, p) ]
+                Ok ""
+        TryBranchDeleteForce =
+            fun c b ->
+                obs.branchDeleteCalls <- obs.branchDeleteCalls @ [ (c, b) ]
+                Ok ""
+        MergeBaseIsAncestor =
+            fun c a d ->
+                obs.mergeBaseCalls <- obs.mergeBaseCalls @ [ (c, a, d) ]
+                obs.mergeBaseResult
+        MergeFfOnly =
+            fun c b ->
+                obs.mergeFfCalls <- obs.mergeFfCalls @ [ (c, b) ]
+                obs.mergeFfResult
+        RevParseRef =
+            fun c r ->
+                obs.revParseRefCalls <- obs.revParseRefCalls @ [ (c, r) ]
+
+                match obs.revParseRefOverrides.TryGetValue r with
+                | true, v -> v
+                | false, _ -> obs.revParseRefResult
+        ShowRefExists =
+            fun c b ->
+                obs.showRefExistsCalls <- obs.showRefExistsCalls @ [ (c, b) ]
+                obs.showRefExistsResult
+        RevParseBranch = fun _ -> obs.revParseBranchResult
+        IsPidAlive = fun _ -> obs.isPidAliveResult
+        Now = fun () -> obs.nowResult
         GetLatestSquadSessionId = fun () -> Promise.lift None
-        GetSquadDag          = fun sid -> Promise.lift (Wanxiangshu.Kernel.Wanxiangzhen.Dag.empty sid "")
-        GetSquadSessions     = fun () -> Promise.lift Map.empty
-        AppendSquadEvent    = fun _ _ e ->
-            obs.squadEventLog <- obs.squadEventLog @ [ e ]
-            Promise.lift (Ok ()) }
+        GetSquadDag = fun sid -> Promise.lift (Wanxiangshu.Kernel.Wanxiangzhen.Dag.empty sid "")
+        GetSquadSessions = fun () -> Promise.lift Map.empty
+        AppendSquadEvent =
+            fun _ _ e ->
+                obs.squadEventLog <- obs.squadEventLog @ [ e ]
+                Promise.lift (Ok()) }
 
 // waitForScheduler — polls rt.Dag until a task transitions Pending→Running
 let waitForScheduler (rt: CoordinatorRuntime) (taskId: string) : JS.Promise<unit> =
-    spinUntil (fun () ->
-        match rt.Dag.Tasks |> Map.tryFind taskId with
-        | Some t -> t.Status = Running
-        | None -> false) 500
+    spinUntil
+        (fun () ->
+            match rt.Dag.Tasks |> Map.tryFind taskId with
+            | Some t -> t.Status = Running
+            | None -> false)
+        500

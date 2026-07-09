@@ -13,31 +13,31 @@ open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
 // ══════════════════════════════════════════════════════════════════════════════
 
 let stubDeps () : CoordinatorDeps =
-    { PromptSession        = fun _ _ _ -> Promise.lift ()
+    { PromptSession = fun _ _ _ -> Promise.lift ()
       GetLatestSquadSessionId = fun () -> Promise.lift None
-      GetSquadDag          = fun sid -> Promise.lift (Wanxiangshu.Kernel.Wanxiangzhen.Dag.empty sid "")
-      GetSquadSessions     = fun () -> Promise.lift Map.empty
-      AppendSquadEvent     = fun _ _ _ -> Promise.lift (Ok ())
-      TryWorktreeAdd       = fun _ _ _ _ -> Ok ""
+      GetSquadDag = fun sid -> Promise.lift (Wanxiangshu.Kernel.Wanxiangzhen.Dag.empty sid "")
+      GetSquadSessions = fun () -> Promise.lift Map.empty
+      AppendSquadEvent = fun _ _ _ -> Promise.lift (Ok())
+      TryWorktreeAdd = fun _ _ _ _ -> Ok ""
       TryWorktreeRemoveForce = fun _ _ -> Ok ""
       TryBranchDeleteForce = fun _ _ -> Ok ""
-      ShowRefExists        = fun _ _ -> false
-      RevParseHead         = fun _ -> ""
-      RevParseRef          = fun _ _ -> ""
-      RevParseBranch       = fun _ -> ""
-      IsDetached           = fun _ -> false
-      StatusIsClean        = fun _ -> true
-      MergeBaseIsAncestor  = fun _ _ _ -> false
-      MergeFfOnly          = fun _ _ -> ""
-      HasCommits           = fun _ -> true
-      CreateSymlinks       = fun _ _ _ -> ()
-      SpawnSlave           = fun _ _ _ _ -> ()
-      IsPidAlive           = fun _ -> false
-      KillPid              = fun _ _ -> ()
-      WaitForPidDeath      = fun _ _ -> Promise.lift ()
-      StartPolling         = fun _ _ -> box null
-      StopPolling          = fun _ -> ()
-      Now                  = fun () -> "2025-01-01T00:00:00.000Z" }
+      ShowRefExists = fun _ _ -> false
+      RevParseHead = fun _ -> ""
+      RevParseRef = fun _ _ -> ""
+      RevParseBranch = fun _ -> ""
+      IsDetached = fun _ -> false
+      StatusIsClean = fun _ -> true
+      MergeBaseIsAncestor = fun _ _ _ -> false
+      MergeFfOnly = fun _ _ -> ""
+      HasCommits = fun _ -> true
+      CreateSymlinks = fun _ _ _ -> ()
+      SpawnSlave = fun _ _ _ _ -> ()
+      IsPidAlive = fun _ -> false
+      KillPid = fun _ _ -> ()
+      WaitForPidDeath = fun _ _ -> Promise.lift ()
+      StartPolling = fun _ _ -> box null
+      StopPolling = fun _ -> ()
+      Now = fun () -> "2025-01-01T00:00:00.000Z" }
 
 // ══════════════════════════════════════════════════════════════════════════════
 // mkRuntimeWithDeps — full factory accepting caller-supplied CoordinatorDeps.
@@ -46,23 +46,25 @@ let stubDeps () : CoordinatorDeps =
 // ══════════════════════════════════════════════════════════════════════════════
 
 let mkRuntimeWithDeps (deps: CoordinatorDeps) : CoordinatorRuntime =
-    { Dag          = empty "" ""
-      Sessions     = Map.empty
-      Config       = defaults
+    { Dag = empty "" ""
+      Sessions = Map.empty
+      Config = defaults
       MasterBranch = "main"
-      ProjectRoot  = "/tmp"
+      ProjectRoot = "/tmp"
       MasterSessionId = ""
-      Client       = createObj []
-      Token        = "test-token"
+      Client = createObj []
+      Token = "test-token"
       CoordinatorUrl = "http://localhost:0"
-      GitQueue     = SerialQueue ()
-      InjectQueue  = SerialQueue ()
-      Server       = { Port = 0; Url = ""; Close = fun () -> () }
-      Scheduling   = false
+      GitQueue = SerialQueue()
+      InjectQueue = SerialQueue()
+      Server =
+        { Port = 0
+          Url = ""
+          Close = fun () -> () }
+      Scheduling = false
       PidPollHandle = None
-      GitError     = None
-      InjectError  = None
-      Deps         = deps }
+      GitError = None
+      InjectError = None
+      Deps = deps }
 
-let mkRuntime () : CoordinatorRuntime =
-    mkRuntimeWithDeps (stubDeps ())
+let mkRuntime () : CoordinatorRuntime = mkRuntimeWithDeps (stubDeps ())

@@ -160,6 +160,7 @@ let trWireEncodeResultOk () =
 let trWireEncodeResultError () =
     let text =
         wireEncodeResult (Error(Wanxiangshu.Kernel.Domain.ToolNotPermitted("a", "t")))
+
     check "error contains failed" (text.Contains "failed")
     check "error contains not permitted" (text.Contains "not permitted")
 

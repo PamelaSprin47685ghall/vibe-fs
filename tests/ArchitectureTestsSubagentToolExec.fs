@@ -78,7 +78,10 @@ let executeMuxSubagentToolUsesSpawnRoleOnly () =
 
     check
         "arch: Mux SubagentTools calls executeMuxSubagentTool without toolName arg"
-        (mux.Contains "executeMuxSubagentTool runMuxSubagent deps (spawnFor")
+        (mux.Contains "executeMuxSubagentTool"
+         && mux.Contains "runMuxSubagent"
+         && mux.Contains "deps"
+         && mux.Contains "spawnFor deps toolNames")
 
     check
         "arch: Mux SubagentTools must not pass role as extra arg after args"

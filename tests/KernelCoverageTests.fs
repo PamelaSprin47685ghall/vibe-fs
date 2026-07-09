@@ -60,6 +60,7 @@ let idTryEmpty () =
 
 let idSessionIdEmpty () =
     equal "sessionId empty" None (sessionId "" |> Option.ofResult)
+
 let formatAllErrors () =
     equal "MessageAborted" "aborted" (formatDomainError MessageAborted)
     equal "SessionBusy" "session busy" (formatDomainError SessionBusy)

@@ -185,5 +185,3 @@ let backlogSessionCodecNoReportFromFlatPartDefault () =
 
     check "arch: BacklogSessionCodec must not define reportFromFlatPart" (not (reportFromFlatPartDefRe.IsMatch codec))
     check "arch: BacklogSessionCodec must not call getDefault" (not (codec.Contains "getDefault"))
-
-

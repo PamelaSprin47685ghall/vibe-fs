@@ -117,6 +117,7 @@
     <Compile Include="src/Shell/PromiseQueue.fs"/>
     <Compile Include="src/Shell/FallbackConfigCodec.fs"/>
     <Compile Include="src/Shell/FallbackRuntimeState.fs"/>
+    <Compile Include="src/Shell/FallbackMessageParser.fs"/>
     <Compile Include="src/Shell/FallbackMessageCodec.fs"/>
     <Compile Include="src/Shell/FallbackEventBridge.fs"/>
     <Compile Include="src/Shell/FallbackRecoveryWait.fs"/>
@@ -594,6 +595,7 @@
     <Compile Include="tests/FallbackEventBridgeTestsPart2.fs"/>
     <Compile Include="tests/FallbackEventBridgeTests.fs"/>
     <Compile Include="tests/FallbackAgentAndModelTests.fs"/>
+    <Compile Include="tests/FallbackAgentAndModelPart2Tests.fs"/>
     <Compile Include="tests/FallbackRecoveryWaitTests.fs"/>
     <Compile Include="tests/SubagentIoFallbackRecoveryTests.fs"/>
     <Compile Include="tests/SubagentIoFallbackRecoveryTestsPart2.fs"/>

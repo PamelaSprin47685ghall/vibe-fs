@@ -55,12 +55,15 @@ let private itemValue =
 let private flatFields (items: InfoItem list) : FrontMatterField list =
     let map =
         items
-        |> List.fold (fun acc item ->
-            let k = itemKey item
-            let v = itemValue item
-            match Map.tryFind k acc with
-            | Some vs -> Map.add k (v :: vs) acc
-            | None -> Map.add k [ v ] acc) Map.empty
+        |> List.fold
+            (fun acc item ->
+                let k = itemKey item
+                let v = itemValue item
+
+                match Map.tryFind k acc with
+                | Some vs -> Map.add k (v :: vs) acc
+                | None -> Map.add k [ v ] acc)
+            Map.empty
 
     let rec loop acc seen items =
         match items with
@@ -158,7 +161,8 @@ let todoWriteOutput (methodologies: string list) (includeMeditator: bool) : stri
     // Construct in reverse order: render applies List.rev to restore correct sequence.
     let hints =
         if includeMeditator then
-            [ InfoItem.Hint hintMeditator; InfoItem.Hint(hintForMethodologies methodologies) ]
+            [ InfoItem.Hint hintMeditator
+              InfoItem.Hint(hintForMethodologies methodologies) ]
         else
             [ InfoItem.Hint(hintForMethodologies methodologies) ]
 
