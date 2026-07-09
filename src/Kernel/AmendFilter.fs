@@ -164,7 +164,11 @@ let popUntilCallID (count: int) (messages: Message<'raw> list) : (Message<'raw> 
 /// Scan messages left-to-right, applying amend markers as they appear.
 /// An amend=N marker triggers N pops from the accumulated history.
 /// The amend message itself is never added to the accumulator (no self-harm).
-let filterAmendMessages (extractor: 'raw -> int option) (messages: Message<'raw> list) : Message<'raw> list =
+let filterAmendMessages
+    (extractor: 'raw -> int option)
+    (cleaner: 'raw -> 'raw)
+    (messages: Message<'raw> list)
+    : Message<'raw> list =
     let tryGetAmend raw = extractor raw
 
     let rec popN n acc =
@@ -184,7 +188,8 @@ let filterAmendMessages (extractor: 'raw -> int option) (messages: Message<'raw>
                 let tempNormal = List.rev acc
                 let poppedNormal = popN n tempNormal
                 let newAcc = List.rev poppedNormal
-                processMessages (msg :: newAcc) rest
+                let cleanMsg = { msg with raw = cleaner msg.raw }
+                processMessages (cleanMsg :: newAcc) rest
             | _ -> processMessages (msg :: acc) rest
 
     processMessages [] messages

@@ -76,11 +76,19 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                     sanitizeEmptyStrings visited item
         elif typeIs v "object" then
             if visited.Add(v) then
-                for propName in [| "message"; "content"; "text" |] do
+                for propName in
+                    [| "message"
+                       "content"
+                       "text"
+                       "reasoning"
+                       "thought"
+                       "output"
+                       "error"
+                       "errorText" |] do
                     let valObj = get v propName
 
                     if not (isNullish valObj) && typeIs valObj "string" && (string valObj) = "" then
-                        setKey v propName (box " ")
+                        setKey v propName (box ".")
 
                 let keysArr = keys v
 
@@ -114,23 +122,28 @@ let runHostMessagesTransform
             let cache = getSessionCache sessionTransformCaches sessionID
             let currentFingerprint = computeFingerprint raw
 
-            if cache.InputFingerprint = currentFingerprint then
-                return cache.OutputArray
-            elif
-                cache.OutputFingerprint = currentFingerprint
-                || System.Object.ReferenceEquals(cache.OutputArray, raw)
-            then
-                return raw
-            else
-                pipelineRunCount <- pipelineRunCount + 1
+            let! finalResult =
+                if cache.InputFingerprint = currentFingerprint then
+                    promise { return cache.OutputArray }
+                elif
+                    cache.OutputFingerprint = currentFingerprint
+                    || System.Object.ReferenceEquals(cache.OutputArray, raw)
+                then
+                    promise { return raw }
+                else
+                    promise {
+                        pipelineRunCount <- pipelineRunCount + 1
 
-                let! result = runMessageTransformPipeline plan backlogOps encodeMessages injectFn loadCaps buildCaps
+                        let! result =
+                            runMessageTransformPipeline plan backlogOps encodeMessages injectFn loadCaps buildCaps
 
-                let visited = System.Collections.Generic.HashSet<obj>()
-                sanitizeEmptyStrings visited result
+                        cache.InputFingerprint <- currentFingerprint
+                        cache.OutputFingerprint <- computeFingerprint result
+                        cache.OutputArray <- result
+                        return result
+                    }
 
-                cache.InputFingerprint <- currentFingerprint
-                cache.OutputFingerprint <- computeFingerprint result
-                cache.OutputArray <- result
-                return result
+            let visited = System.Collections.Generic.HashSet<obj>()
+            sanitizeEmptyStrings visited finalResult
+            return finalResult
     }

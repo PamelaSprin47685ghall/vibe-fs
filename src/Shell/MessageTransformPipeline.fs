@@ -1,6 +1,7 @@
 module Wanxiangshu.Shell.MessageTransformPipeline
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.Messaging
@@ -110,6 +111,13 @@ let runMessageTransformPipeline
                                 | :? int as n when n > 0 -> Some n
                                 | :? float as f when f > 0.0 -> Some(int f)
                                 | _ -> None)
+                        (fun raw ->
+                            if Dyn.isNullish raw || not (Dyn.typeIs raw "object") then
+                                raw
+                            else
+                                let copy = JS.Constructors.Object.assign (createObj [], raw)
+                                Dyn.deleteKey copy "amend"
+                                copy)
                         plan.Cleaned
 
             let afterBacklog =

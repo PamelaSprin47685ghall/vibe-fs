@@ -5,10 +5,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.AmendFilter
 open Wanxiangshu.Kernel.Messaging
-open Wanxiangshu.Opencode.HookSchemaDecode
-open Wanxiangshu.Shell.MuxPluginCatalogShell
-open Wanxiangshu.Shell.MuxToolDefinition
-open Wanxiangshu.Omp.OmpToolSchema
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -62,13 +58,21 @@ let amendExtractor (raw: obj) : int option =
         else
             None
 
+let amendCleaner (raw: obj) : obj =
+    if isNull raw || jsTypeof raw <> "object" then
+        raw
+    else
+        let copy = JS.Constructors.Object.assign (createObj [], raw)
+        Dyn.deleteKey copy "amend"
+        copy
+
 let testNoAmendPreservesMessages () =
     let msgs =
         [ userMsg (createObj [ "text", box "hello" ])
           assistantMsg [ toolPart "call-1" "read" ] (createObj [])
           toolResultMsg "read" (createObj []) ]
 
-    let result = filterAmendMessages amendExtractor msgs
+    let result = filterAmendMessages amendExtractor amendCleaner msgs
     equal "no amend: 3 msgs preserved" 3 (List.length result)
 
 let testAmend1PopsOneToolCall () =
@@ -78,9 +82,12 @@ let testAmend1PopsOneToolCall () =
           toolResultMsg "read" (createObj [])
           userMsg (createObj [ "amend", box 1 ]) ]
 
-    let result = filterAmendMessages amendExtractor msgs
+    let result = filterAmendMessages amendExtractor amendCleaner msgs
     equal "amend=1: only amend msg remains" 1 (List.length result)
     check "amend=1: remaining is amend msg" (result.[0].info.role = User)
+    check "amend property is removed in result" (Dyn.isNullish (Dyn.get result.[0].raw "amend"))
+    equal "original msg raw amend is preserved" 1 (int (unbox<float> (Dyn.get msgs.[3].raw "amend")))
+    check "raw reference is shallow-copied, not aliased" (not (obj.ReferenceEquals(result.[0].raw, msgs.[3].raw)))
 
 let testAmend2PopsTwoToolCalls () =
     let msgs =
@@ -92,8 +99,11 @@ let testAmend2PopsTwoToolCalls () =
           toolResultMsg "write" (createObj [])
           userMsg (createObj [ "amend", box 2 ]) ]
 
-    let result = filterAmendMessages amendExtractor msgs
+    let result = filterAmendMessages amendExtractor amendCleaner msgs
     equal "amend=2: only amend msg remains" 1 (List.length result)
+    check "amend property is removed in result" (Dyn.isNullish (Dyn.get result.[0].raw "amend"))
+    equal "original msg raw amend is preserved" 2 (int (unbox<float> (Dyn.get msgs.[6].raw "amend")))
+    check "raw reference is shallow-copied, not aliased" (not (obj.ReferenceEquals(result.[0].raw, msgs.[6].raw)))
 
 let testAmendExceedsAvailable () =
     let msgs =
@@ -102,7 +112,7 @@ let testAmendExceedsAvailable () =
           toolResultMsg "read" (createObj [])
           userMsg (createObj [ "amend", box 10 ]) ]
 
-    let result = filterAmendMessages amendExtractor msgs
+    let result = filterAmendMessages amendExtractor amendCleaner msgs
     equal "amend exceeds: 1 msg remains" 1 (List.length result)
 
 let testAmendZeroIgnored () =
@@ -111,7 +121,7 @@ let testAmendZeroIgnored () =
           assistantMsg [ toolPart "call-1" "read" ] (createObj [])
           toolResultMsg "read" (createObj []) ]
 
-    let result = filterAmendMessages amendExtractor msgs
+    let result = filterAmendMessages amendExtractor amendCleaner msgs
     equal "amend absent: 3 msgs preserved" 3 (List.length result)
 
 let testPopOneToolCallDirect () =
@@ -154,7 +164,7 @@ let testEmptyList () =
     let (removed, remaining) = popOneToolCall []
     equal "popOne empty: 0 removed" 0 (List.length removed)
     equal "popOne empty: 0 remaining" 0 (List.length remaining)
-    let result = filterAmendMessages amendExtractor []
+    let result = filterAmendMessages amendExtractor amendCleaner []
     equal "filter empty: 0 result" 0 (List.length result)
 
 let testNoToolCalls () =
@@ -191,7 +201,7 @@ let testNestedAmend () =
           toolResultMsg "write" (createObj [])
           userMsg (createObj [ "amend", box 1 ]) ]
 
-    let result = filterAmendMessages amendExtractor msgs
+    let result = filterAmendMessages amendExtractor amendCleaner msgs
     equal "nested amend: 2 msgs remain (both amend markers)" 2 (List.length result)
     check "nested amend: first is amend marker" (result.[0].info.role = User)
     check "nested amend: second is amend marker" (result.[1].info.role = User)
@@ -245,37 +255,6 @@ let testAmendPopsCorrectToolResultByRawCallID () =
     let lastCallID = Dyn.get lastRemaining.raw "callID" |> string
     equal "raw-callID pop: last remaining is call-1 (delayed)" "call-1" lastCallID
 
-let testAmendSchemaInjected () =
-    let opencodeSchema =
-        createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
-
-    let opencodeResult = injectAmendIntoJsonSchema opencodeSchema
-    let opencodeProps = Dyn.get opencodeResult "properties"
-    check "opencode schema has amend property" (not (Dyn.isNullish (Dyn.get opencodeProps "amend")))
-    let amendProp = Dyn.get opencodeProps "amend"
-    equal "opencode amend type" "integer" (string (Dyn.get amendProp "type"))
-    check "opencode amend minimum = 1" (string (Dyn.get amendProp "minimum") = "1")
-
-    let muxTool =
-        { name = "coder"
-          description = "test"
-          parameters = mkSchema (createObj [ "file", box (createObj []) ]) [| "file" |]
-          execute = (fun _ _ -> failwith "not implemented")
-          condition = (None: (obj -> bool) option) }
-
-    let muxResult = injectAmendIntoMuxSchema muxTool
-    let muxProps = muxResult.parameters.properties
-    check "mux schema has amend property" (not (Dyn.isNullish (Dyn.get muxProps "amend")))
-    let muxAmend = Dyn.get muxProps "amend"
-    equal "mux amend type" "integer" (string (Dyn.get muxAmend "type"))
-
-    let ompSchema = createObj [ "properties", createObj [ "file", box (createObj []) ] ]
-    let ompResult = injectAmendIntoOmpParameters ompSchema
-    let ompProps = Dyn.get ompResult "properties"
-    check "omp schema has amend property" (not (Dyn.isNullish (Dyn.get ompProps "amend")))
-    let ompAmend = Dyn.get ompProps "amend"
-    equal "omp amend type" "integer" (string (Dyn.get ompAmend "type"))
-
 let runAll () : unit =
     timed "testNoAmendPreservesMessages" testNoAmendPreservesMessages
     timed "testAmend1PopsOneToolCall" testAmend1PopsOneToolCall
@@ -292,4 +271,3 @@ let runAll () : unit =
     timed "testNestedAmend" testNestedAmend
     timed "testParallelToolCalls" testParallelToolCalls
     timed "testAmendPopsCorrectToolResultByRawCallID" testAmendPopsCorrectToolResultByRawCallID
-    timed "testAmendSchemaInjected" testAmendSchemaInjected

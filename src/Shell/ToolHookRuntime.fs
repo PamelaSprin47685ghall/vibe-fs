@@ -29,8 +29,8 @@ let tryGetRequiredFields (toolName: string) : string list =
         with _ ->
             []
 
-/// Remove null/undefined values from args for keys that are NOT required fields.
-/// This prevents downstream tool execution from seeing spurious null values
+/// Remove null/undefined and empty object {} values from args for keys that are NOT required fields.
+/// This prevents downstream tool execution from seeing spurious null/{} values
 /// that the LLM filler injected for optional parameters.
 let sanitizeNullArgs (toolName: string) (args: obj) : unit =
     if not (Dyn.isNullish args) && Dyn.typeIs args "object" then
@@ -38,8 +38,15 @@ let sanitizeNullArgs (toolName: string) (args: obj) : unit =
 
         for k in Dyn.keys args do
             let v = Dyn.get args k
+            let isNullish = Dyn.isNullish v
 
-            if Dyn.isNullish v && not (Set.contains k req) then
+            let isEmptyObject =
+                not isNullish
+                && Dyn.typeIs v "object"
+                && not (Dyn.isArray v)
+                && (Dyn.keys v).Length = 0
+
+            if (isNullish || isEmptyObject) && not (Set.contains k req) then
                 Dyn.deleteKey args k
 
 /// Validate warn_tdd on tool args: parse and delete if valid, else produce domain error string.

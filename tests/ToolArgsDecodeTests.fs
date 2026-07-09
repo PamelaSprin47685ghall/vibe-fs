@@ -171,16 +171,20 @@ let testSanitizeNullArgs () =
               "dependencies", box null
               "timeout_type", box "long"
               "mode", box "rw"
-              "what_to_summarize", box "focus" ]
+              "what_to_summarize", box (createObj []) // Empty object on required field, must be kept
+              "empty_obj", box (createObj []) // Empty object on optional field, must be deleted
+              "non_empty_obj", box (createObj [ "a", box 1 ]) ] // Non-empty object on optional field, must be kept
 
     sanitizeNullArgs "executor" args
 
     let keys = Dyn.keys args
     check "dependencies deleted" (not (Array.contains "dependencies" keys))
+    check "empty_obj deleted" (not (Array.contains "empty_obj" keys))
     check "program kept" (Array.contains "program" keys)
     check "timeout_type kept" (Array.contains "timeout_type" keys)
     check "mode kept" (Array.contains "mode" keys)
     check "what_to_summarize kept" (Array.contains "what_to_summarize" keys)
+    check "non_empty_obj kept" (Array.contains "non_empty_obj" keys)
 
 let run () =
     decodeCoderBatchOk ()

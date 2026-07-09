@@ -34,6 +34,7 @@ open Wanxiangshu.Tests.EventLogCodecTests
 open Wanxiangshu.Tests.EventLogRuntimeTests
 open Wanxiangshu.Tests.EventLogRuntimeRobustnessTests
 open Wanxiangshu.Tests.AmendTests
+open Wanxiangshu.Tests.AmendSchemaTests
 
 let coreTestEntries () : (string * TestBody) list =
     [ "ReviewTests.transition'", TestBody.Sync(sync ReviewTests.transition')
@@ -120,7 +121,8 @@ let coreTestEntries () : (string * TestBody) list =
       "KernelPromptSpecs.executorSummarizerNoExitStatus",
       TestBody.Sync(sync KernelPromptSpecs.executorSummarizerNoExitStatus)
       "KernelPromptSpecs.domainErrorsShared", TestBody.Sync(sync KernelPromptSpecs.domainErrorsShared)
-      "AmendTests.runAll", TestBody.Sync AmendTests.runAll ]
+      "AmendTests.runAll", TestBody.Sync AmendTests.runAll
+      "AmendSchemaTests.runAll", TestBody.Sync AmendSchemaTests.runAll ]
     @ TestsEntriesCoreTail.tailCoreTestEntries ()
     @ TestsEntriesFallback.tailTestEntries ()
     @ fallbackTestEntries ()

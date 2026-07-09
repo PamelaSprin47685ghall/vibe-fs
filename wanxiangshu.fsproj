@@ -355,6 +355,7 @@
     <!-- Tests -->
     <Compile Include="tests/Assert.fs"/>
     <Compile Include="tests/AmendTests.fs"/>
+    <Compile Include="tests/AmendSchemaTests.fs"/>
     <Compile Include="tests/AsyncFlush.fs"/>
     <Compile Include="tests/EventLogFoldTests.fs"/>
     <Compile Include="tests/WanxiangzhenSquadEventTests.fs"/>
