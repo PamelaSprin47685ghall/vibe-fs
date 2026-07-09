@@ -10,6 +10,8 @@ open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.JsArrayMutate
 
+let emptyTextPlaceholder = "\u200B"
+
 type ReviewReplayMode =
     | IfStoreEmpty
     | Always
@@ -121,25 +123,29 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
 
                     if not (isNullish contentVal) then
                         if typeIs contentVal "string" && (string contentVal).Trim() = "" then
-                            contentVal <- box "."
+                            contentVal <- box emptyTextPlaceholder
                             setKey v "content" contentVal
                         elif isArray contentVal && (unbox<obj array> contentVal).Length = 0 then
                             replaceArrayInPlace
                                 (unbox<obj array> contentVal)
-                                [| box (createObj [ "type", box "text"; "text", box "." ]) |]
+                                [| box (createObj [ "type", box "text"; "text", box emptyTextPlaceholder ]) |]
 
                     if not (isNullish partsVal) then
                         if isArray partsVal && (unbox<obj array> partsVal).Length = 0 then
                             replaceArrayInPlace
                                 (unbox<obj array> partsVal)
-                                [| box (createObj [ "type", box "text"; "text", box "." ]) |]
+                                [| box (createObj [ "type", box "text"; "text", box emptyTextPlaceholder ]) |]
 
                     let contentVal2 = get v "content"
                     let partsVal2 = get v "parts"
 
                     if isNullish contentVal2 && isNullish partsVal2 then
-                        setKey v "content" (box ".")
-                        setKey v "parts" (box [| box (createObj [ "type", box "text"; "text", box "." ]) |])
+                        setKey v "content" (box emptyTextPlaceholder)
+
+                        setKey
+                            v
+                            "parts"
+                            (box [| box (createObj [ "type", box "text"; "text", box emptyTextPlaceholder ]) |])
                     elif isNullish contentVal2 then
                         setKey v "content" partsVal2
                     elif isNullish partsVal2 then
@@ -167,7 +173,9 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                                     hasText <- true
 
                         if not hasText then
-                            let newPart = box (createObj [ "type", box "text"; "text", box "." ])
+                            let newPart =
+                                box (createObj [ "type", box "text"; "text", box emptyTextPlaceholder ])
+
                             replaceArrayInPlace arr (Array.append arr [| newPart |])
 
                 for propName in
@@ -184,11 +192,11 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
 
                     if not (isNullish valObj) then
                         if typeIs valObj "string" && (string valObj).Trim() = "" then
-                            setKey v propName (box ".")
+                            setKey v propName (box emptyTextPlaceholder)
                         elif isArray valObj && (unbox<obj array> valObj).Length = 0 then
                             replaceArrayInPlace
                                 (unbox<obj array> valObj)
-                                [| box (createObj [ "type", box "text"; "text", box "." ]) |]
+                                [| box (createObj [ "type", box "text"; "text", box emptyTextPlaceholder ]) |]
 
                 let keysArr = keys v
 
