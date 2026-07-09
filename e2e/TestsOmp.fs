@@ -3,6 +3,7 @@ module Wanxiangshu.E2e.OmpTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.E2e.HarnessTypes
 open Wanxiangshu.E2e.OmpTestsSpecs
 
 [<Import("start", "./omp-runner.js")>]

@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.TestsArchitectureRegistry
 open Fable.Core
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.ArchitectureTestsFoundation
+open Wanxiangshu.Tests.ArchitectureTestsTreeSitter
 open Wanxiangshu.Tests.ArchitectureTestsMessageTransform
 open Wanxiangshu.Tests.ArchitectureTestsMessageTransformCaps
 open Wanxiangshu.Tests.ArchitectureTestsSubagent
@@ -24,6 +25,7 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       "ArchitectureTests.kernelNoEmptyDefault", Sync(sync ArchitectureTestsFoundation.kernelNoEmptyDefault)
       "ArchitectureTests.shellLayering", Sync(sync ArchitectureTestsFoundation.shellLayering)
       "ArchitectureTests.fileBodyUnder300", Sync(sync ArchitectureTestsFoundation.fileBodyUnder300)
+      "ArchitectureTests.treeSitterStyleChecks", Async ArchitectureTestsTreeSitter.treeSitterStyleChecks
       "ArchitectureTests.returnReviewerCatalogAndHostRegistration",
       Sync(sync ArchitectureTestsFoundation.returnReviewerCatalogAndHostRegistration)
       "ArchitectureTests.noDanglingMarkers", Sync(sync ArchitectureTestsFoundation.noDanglingMarkers)

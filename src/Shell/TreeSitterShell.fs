@@ -122,7 +122,9 @@ let private runGeneralStyleChecks (content: string) : SyntaxDiagnostic[] =
 let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckResult> =
     promise {
         match tryGetPack () with
-        | Result.Error reason -> return Failed("", reason)
+        | Result.Error _ ->
+            let styleErrors = runGeneralStyleChecks content
+            return Ok("", styleErrors)
         | Result.Ok pack ->
             let lang = detectLanguage pack content filePath
 

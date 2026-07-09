@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.TempWorkspace
 open Wanxiangshu.Tests.IntegrationToolSetup
+open Wanxiangshu.Tests.IntegrationSubagentMockClient
 
 open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Opencode.Plugin
@@ -16,56 +17,10 @@ open Wanxiangshu.Shell.Dyn
 
 let investigatorToolSpec () =
     promise {
-        let createCalls = ResizeArray<obj>()
-        let promptCalls = ResizeArray<obj>()
-        let mutable pObj: obj = null
+        let pObjRef = ref null
 
-        let mockClient =
-            createObj
-                [ "session",
-                  box (
-                      createObj
-                          [ "create",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun arg ->
-                                    (promise {
-                                        createCalls.Add(arg)
-                                        return box {| data = box {| id = "child-investigator-session" |} |}
-                                    }))
-                            )
-                            "prompt",
-                            box (
-                                System.Func<obj, JS.Promise<unit>>(fun arg ->
-                                    (promise {
-                                        promptCalls.Add(arg)
-
-                                        if not (isNull pObj) then
-                                            let runtime =
-                                                pObj?__fallbackRuntime
-                                                |> unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState>
-
-                                            let childId = "child-investigator-session"
-                                            runtime.ClearSubsessionPending childId
-                                            runtime.SetTaskComplete childId true
-                                    }))
-                            )
-                            "messages",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    (promise {
-                                        return
-                                            box
-                                                {| data =
-                                                    [| box
-                                                           {| info = box {| role = "assistant" |}
-                                                              parts =
-                                                               [| box
-                                                                      {| ``type`` = "text"
-                                                                         text = "Found src/Opencode/Tools.fs" |} |] |} |] |}
-                                    }))
-                            )
-                            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ()))) ]
-                  ) ]
+        let createCalls, promptCalls, mockClient =
+            makeMockClient pObjRef "investigator-parent" "Found src/Opencode/Tools.fs"
 
         let! workspaceDir = mkdtempAsync "investigator-tool-"
 
@@ -76,7 +31,7 @@ let investigatorToolSpec () =
                        client = mockClient |}
             )
 
-        pObj <- p
+        pObjRef.Value <- p
 
         let investigator = get (get p "tool") "investigator"
 
@@ -104,56 +59,10 @@ let investigatorToolSpec () =
 
 let coderToolSpec () =
     promise {
-        let createCalls = ResizeArray<obj>()
-        let promptCalls = ResizeArray<obj>()
-        let mutable pObj: obj = null
+        let pObjRef = ref null
 
-        let mockClient =
-            createObj
-                [ "session",
-                  box (
-                      createObj
-                          [ "create",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun arg ->
-                                    (promise {
-                                        createCalls.Add(arg)
-                                        return box {| data = box {| id = "child-coder-session" |} |}
-                                    }))
-                            )
-                            "prompt",
-                            box (
-                                System.Func<obj, JS.Promise<unit>>(fun arg ->
-                                    (promise {
-                                        promptCalls.Add(arg)
-
-                                        if not (isNull pObj) then
-                                            let runtime =
-                                                pObj?__fallbackRuntime
-                                                |> unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState>
-
-                                            let childId = "child-coder-session"
-                                            runtime.ClearSubsessionPending childId
-                                            runtime.SetTaskComplete childId true
-                                    }))
-                            )
-                            "messages",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    (promise {
-                                        return
-                                            box
-                                                {| data =
-                                                    [| box
-                                                           {| info = box {| role = "assistant" |}
-                                                              parts =
-                                                               [| box
-                                                                      {| ``type`` = "text"
-                                                                         text = "Coder finished" |} |] |} |] |}
-                                    }))
-                            )
-                            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ()))) ]
-                  ) ]
+        let createCalls, promptCalls, mockClient =
+            makeMockClient pObjRef "coder-parent" "Coder finished"
 
         let! workspaceDir = mkdtempAsync "coder-tool-"
 
@@ -164,7 +73,7 @@ let coderToolSpec () =
                        client = mockClient |}
             )
 
-        pObj <- p
+        pObjRef.Value <- p
 
         let coder = get (get p "tool") "coder"
 
@@ -209,61 +118,15 @@ let coderToolSpec () =
 
 let investigatorToolLateClientInjectionSpec () =
     promise {
-        let createCalls = ResizeArray<obj>()
-        let promptCalls = ResizeArray<obj>()
-        let mutable pObj: obj = null
+        let pObjRef = ref null
 
-        let mockClient =
-            createObj
-                [ "session",
-                  box (
-                      createObj
-                          [ "create",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun arg ->
-                                    (promise {
-                                        createCalls.Add(arg)
-                                        return box {| data = box {| id = "child-investigator-session-late" |} |}
-                                    }))
-                            )
-                            "prompt",
-                            box (
-                                System.Func<obj, JS.Promise<unit>>(fun arg ->
-                                    (promise {
-                                        promptCalls.Add(arg)
-
-                                        if not (isNull pObj) then
-                                            let runtime =
-                                                pObj?__fallbackRuntime
-                                                |> unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState>
-
-                                            let childId = "child-investigator-session-late"
-                                            runtime.ClearSubsessionPending childId
-                                            runtime.SetTaskComplete childId true
-                                    }))
-                            )
-                            "messages",
-                            box (
-                                System.Func<obj, JS.Promise<obj>>(fun _ ->
-                                    (promise {
-                                        return
-                                            box
-                                                {| data =
-                                                    [| box
-                                                           {| info = box {| role = "assistant" |}
-                                                              parts =
-                                                               [| box
-                                                                      {| ``type`` = "text"
-                                                                         text = "Late client injection worked" |} |] |} |] |}
-                                    }))
-                            )
-                            "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> (Promise.lift ()))) ]
-                  ) ]
+        let createCalls, promptCalls, mockClient =
+            makeMockClient pObjRef "investigator-parent-late" "Late client injection worked"
 
         let! workspaceDir = mkdtempAsync "investigator-tool-late-client-"
         let ctx = createObj [ "directory", box workspaceDir ]
         let! p = plugin ctx
-        pObj <- p
+        pObjRef.Value <- p
         ctx?("client") <- mockClient
         let investigator = get (get p "tool") "investigator"
 

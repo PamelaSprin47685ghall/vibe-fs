@@ -3,6 +3,7 @@ module Wanxiangshu.E2e.MimocodePluginTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.E2e.MimocodePluginSpecsPart
 open Wanxiangshu.E2e.MimocodePluginSpecs
 
 [<Import("start", "./opencode-harness.js")>]

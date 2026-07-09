@@ -373,6 +373,7 @@
     <Compile Include="tests/IntegrationCapsSpecsSubagentMux.fs"/>
     <Compile Include="tests/IntegrationToolDefSpecsMimo.fs"/>
     <Compile Include="tests/IntegrationToolDefSpecs.fs"/>
+    <Compile Include="tests/IntegrationSubagentMockClient.fs"/>
     <Compile Include="tests/IntegrationSubagentSpecs.fs"/>
     <Compile Include="tests/IntegrationOpencodeReviewSpecs.fs"/>
     <Compile Include="tests/IntegrationMuxReviewSpecs.fs"/>
@@ -543,6 +544,7 @@
     <Compile Include="tests/ArchitectureTestsSupport.fs"/>
     <Compile Include="tests/ArchitectureTestsTimeIndependence.fs"/>
     <Compile Include="tests/ArchitectureTestsFoundation.fs"/>
+    <Compile Include="tests/ArchitectureTestsTreeSitter.fs"/>
     <Compile Include="tests/ArchitectureTestsMessageTransform.fs"/>
     <Compile Include="tests/ArchitectureTestsMessageTransformCaps.fs"/>
     <Compile Include="tests/ArchitectureTestsSubagentCatalog.fs"/>
@@ -680,9 +682,13 @@
     <Compile Include="e2e/OpencodePluginTestsPart2.fs"/>
     <Compile Include="e2e/OpencodePluginTestsPart3.fs"/>
     <Compile Include="e2e/OpencodePluginTests.fs"/>
+    <Compile Include="e2e/MimocodePluginSpecsPart.fs"/>
+    <Compile Include="e2e/MimocodePluginSpecSections.fs"/>
     <Compile Include="e2e/MimocodePluginSpecs.fs"/>
     <Compile Include="e2e/MimocodePluginTests.fs"/>
     <Compile Include="e2e/MimoTuiPluginTests.fs"/>
+    <Compile Include="e2e/TestsOmpSpecsPart.fs"/>
+    <Compile Include="e2e/TestsOmpSpecsLifecycle.fs"/>
     <Compile Include="e2e/TestsOmpSpecs.fs"/>
     <Compile Include="e2e/TestsOmp.fs"/>
   </ItemGroup>
