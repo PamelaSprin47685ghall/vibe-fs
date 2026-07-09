@@ -96,6 +96,7 @@ let private sessionEndEventTypes =
 let registerAbortHandler
     (pi: obj)
     (reviewStore: ReviewStore)
+    (fallbackRuntime: FallbackRuntimeState)
     (fallbackHandler: (obj -> JS.Promise<FallbackHookResult>) option)
     : unit =
     let fallbackEventTypes =
@@ -124,23 +125,37 @@ let registerAbortHandler
                             let rawEvent =
                                 createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
 
-                            let! r = handler rawEvent
+                            if sid <> "" then
+                                fallbackRuntime.SetEventHandlingActive sid true
 
-                            if not r.Consumed then
-                                reviewStore.deactivateReview sid
-                                Wanxiangshu.Omp.NudgeRuntime.markSessionForceStopped sid
+                            try
+                                let! r = handler rawEvent
 
-                                Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore
-                                    Wanxiangshu.Omp.ExecutorTools.ompScope
-                                    sid
+                                if not r.Consumed then
+                                    reviewStore.deactivateReview sid
+                                    Wanxiangshu.Omp.NudgeRuntime.markSessionForceStopped sid
+
+                                    Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore
+                                        Wanxiangshu.Omp.ExecutorTools.ompScope
+                                        sid
+                            finally
+                                if sid <> "" then
+                                    fallbackRuntime.SetEventHandlingActive sid false
                     elif fallbackEventTypes.Contains evtType then
                         match fallbackHandler with
                         | Some handler ->
                             let rawEvent =
                                 createObj [ "event", box event; "props", box (createObj [ "sessionID", box sid ]) ]
 
-                            let! _ = handler rawEvent
-                            ()
+                            if sid <> "" then
+                                fallbackRuntime.SetEventHandlingActive sid true
+
+                            try
+                                let! _ = handler rawEvent
+                                ()
+                            finally
+                                if sid <> "" then
+                                    fallbackRuntime.SetEventHandlingActive sid false
                         | None -> ()
             })
     )
@@ -149,7 +164,7 @@ let private registerHooks (pi: obj) (services: CoreServices) : unit =
     registerAllTools pi services.ReviewStore services.FallbackRuntime services.FallbackConfig
     registerInputHandler pi services.ReviewStore
     registerSessionLifecycle pi services.ReviewStore
-    registerAbortHandler pi services.ReviewStore services.FallbackHandler
+    registerAbortHandler pi services.ReviewStore services.FallbackRuntime services.FallbackHandler
 
 let pluginFor (pi: obj) : JS.Promise<unit> =
     promise {

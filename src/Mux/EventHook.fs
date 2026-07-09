@@ -102,11 +102,21 @@ let createEventHook (deps: obj) (deactivateReview: string -> unit) : obj =
     let fn =
         System.Func<obj, obj, JS.Promise<unit>>(fun event helpers ->
             promise {
-                cleanupOnAbort event
-                let! fbResult = fallbackHandler event
+                let decoded = decodeHookEvent event
+                let workspaceId = decoded.workspaceId
 
-                if not fbResult.Consumed then
-                    do! runtime.HandleEvent(parseHookEvent event, helpers)
+                if workspaceId <> "" then
+                    fallbackRuntime.SetEventHandlingActive workspaceId true
+
+                try
+                    cleanupOnAbort event
+                    let! fbResult = fallbackHandler event
+
+                    if not fbResult.Consumed then
+                        do! runtime.HandleEvent(parseHookEvent event, helpers)
+                finally
+                    if workspaceId <> "" then
+                        fallbackRuntime.SetEventHandlingActive workspaceId false
             })
 
     box fn

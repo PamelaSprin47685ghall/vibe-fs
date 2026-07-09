@@ -60,33 +60,45 @@ type SessionLifecycleObserver
         promise {
             let eventEnvelope = decodeHostEventEnvelope input
 
-            match eventEnvelope with
-            | Some { EventType = "session.status"
-                     Props = props } ->
-                let statusObj = Dyn.get props "status"
-                let agentName = Dyn.str statusObj "agent"
-                let sid = getSessionID "session.status" props
+            let sid =
+                match eventEnvelope with
+                | Some env -> getSessionID env.EventType env.Props
+                | None -> ""
 
+            if sid <> "" then
+                fallbackRuntime.SetEventHandlingActive sid true
+
+            try
+                match eventEnvelope with
+                | Some { EventType = "session.status"
+                         Props = props } ->
+                    let statusObj = Dyn.get props "status"
+                    let agentName = Dyn.str statusObj "agent"
+                    let sid = getSessionID "session.status" props
+
+                    if sid <> "" then
+                        if agentName <> "" then
+                            fallbackRuntime.SetAgentName sid agentName
+
+                        let modelObj = Dyn.get statusObj "model"
+
+                        match Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj modelObj with
+                        | Some m -> fallbackRuntime.SetModel sid m
+                        | None -> ()
+                | _ -> ()
+
+                fallback.UpdateBusyCount eventEnvelope
+                do! nudge.TrackLifetimeEvents eventEnvelope
+
+                let! fbConsumed = fallback.TryConsumeEvent input
+
+                if fbConsumed then
+                    return ()
+                else
+                    do! nudge.HandleNaturalStop eventEnvelope
+            finally
                 if sid <> "" then
-                    if agentName <> "" then
-                        fallbackRuntime.SetAgentName sid agentName
-
-                    let modelObj = Dyn.get statusObj "model"
-
-                    match Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj modelObj with
-                    | Some m -> fallbackRuntime.SetModel sid m
-                    | None -> ()
-            | _ -> ()
-
-            fallback.UpdateBusyCount eventEnvelope
-            do! nudge.TrackLifetimeEvents eventEnvelope
-
-            let! fbConsumed = fallback.TryConsumeEvent input
-
-            if fbConsumed then
-                return ()
-            else
-                do! nudge.HandleNaturalStop eventEnvelope
+                    fallbackRuntime.SetEventHandlingActive sid false
         }
 
 let createSessionLifecycleObserver

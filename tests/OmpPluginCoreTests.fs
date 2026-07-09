@@ -84,7 +84,8 @@ let private driveAbort (evtType: string) (sessionId: string) (expectActive: bool
     let ctx = createObj [ "sessionManager", box sessionMgr ]
     let event = createObj [ "type", box evtType ]
     let pi, getHandlers = capturePi ()
-    registerAbortHandler pi reviewStore None
+    let runtime = FallbackRuntimeState()
+    registerAbortHandler pi reviewStore runtime None
     let handlers = getHandlers ()
     check $"{evtType} captured exactly one handler" (handlers.Length = 1)
     let handler = handlers.[0]
@@ -174,7 +175,7 @@ let ompErrorEventRoutesToFallback () =
             { Consumed = false
               State = runtime.GetOrCreateState "omp-fb-error-sid" }
 
-    registerAbortHandler pi reviewStore (Some fakeHandler)
+    registerAbortHandler pi reviewStore runtime (Some fakeHandler)
     let handlers: obj array = getHandlers ()
     check "exactly one handler registered" (handlers.Length = 1)
     invokeFallbackHandler handlers.[0] event ctx
@@ -197,7 +198,7 @@ let ompIdleEventRoutesToFallback () =
             { Consumed = false
               State = runtime.GetOrCreateState "omp-fb-idle-sid" }
 
-    registerAbortHandler pi reviewStore (Some fakeHandler)
+    registerAbortHandler pi reviewStore runtime (Some fakeHandler)
     let handlers: obj array = getHandlers ()
     invokeFallbackHandler handlers.[0] event ctx
     check "fallback handler saw session.idle" handlerCalled

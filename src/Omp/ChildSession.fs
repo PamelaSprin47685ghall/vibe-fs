@@ -9,6 +9,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.OmpHostBindings
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.FallbackRecoveryWait
 open Wanxiangshu.Shell.SubagentIo
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
@@ -209,8 +210,16 @@ let runSubagentWithId
 
         let run =
             promise {
+                if childId <> "" then
+                    fallbackRuntime.SetSubsessionPending childId true
+
                 do! sessionPrompt session prompt
                 do! sessionWaitForIdle session
+
+                if childId <> "" then
+                    fallbackRuntime.SetSubsessionPending childId false
+                    do! waitForSubagentSettle fallbackRuntime childId
+
                 let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
                 return readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
             }

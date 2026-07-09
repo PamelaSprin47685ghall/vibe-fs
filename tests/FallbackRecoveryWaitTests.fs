@@ -99,6 +99,33 @@ let waitForToolCallTextRecovery_returnsImmediatelyWhenIdle () =
         check "returned immediately" true
     }
 
+let isSubagentSettled_falseWhenEventHandlingActive () =
+    let rt = FallbackRuntimeState()
+    let sid = "t-sess-event"
+    rt.SetEventHandlingActive sid true
+    check "subagent not settled while event handling is active" (not (isSubagentSettled rt sid))
+
+let waitForSubagentSettle_waitsUntilEventHandlingInactive () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let sid = "t-sess-event-wait"
+        rt.SetEventHandlingActive sid true
+        let resolved = ref false
+
+        let waitP =
+            promise {
+                do! waitForSubagentSettle rt sid
+                resolved.Value <- true
+            }
+
+        do! yieldMicrotask ()
+        check "wait is pending while handling active" (not resolved.Value)
+        rt.SetEventHandlingActive sid false
+        do! yieldMicrotask ()
+        do! waitP
+        check "wait completed after handling finished" resolved.Value
+    }
+
 let run () =
     promise {
         isSettled_falseWhenFresh ()
@@ -110,4 +137,6 @@ let run () =
         isToolCallTextRecovery_notInProgressWhenIdle ()
         do! waitForToolCallTextRecovery_completesWhenPhaseClears ()
         do! waitForToolCallTextRecovery_returnsImmediatelyWhenIdle ()
+        isSubagentSettled_falseWhenEventHandlingActive ()
+        do! waitForSubagentSettle_waitsUntilEventHandlingInactive ()
     }
