@@ -18,6 +18,7 @@ let investigatorToolSpec () =
     promise {
         let createCalls = ResizeArray<obj>()
         let promptCalls = ResizeArray<obj>()
+        let mutable pObj: obj = null
 
         let mockClient =
             createObj
@@ -33,7 +34,21 @@ let investigatorToolSpec () =
                                     }))
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> (promise { promptCalls.Add(arg) })))
+                            box (
+                                System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                    (promise {
+                                        promptCalls.Add(arg)
+
+                                        if not (isNull pObj) then
+                                            let runtime =
+                                                pObj?__fallbackRuntime
+                                                |> unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState>
+
+                                            let childId = "child-investigator-session"
+                                            runtime.ClearSubsessionPending childId
+                                            runtime.SetTaskComplete childId true
+                                    }))
+                            )
                             "messages",
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -60,6 +75,8 @@ let investigatorToolSpec () =
                     {| directory = workspaceDir
                        client = mockClient |}
             )
+
+        pObj <- p
 
         let investigator = get (get p "tool") "investigator"
 
@@ -89,6 +106,7 @@ let coderToolSpec () =
     promise {
         let createCalls = ResizeArray<obj>()
         let promptCalls = ResizeArray<obj>()
+        let mutable pObj: obj = null
 
         let mockClient =
             createObj
@@ -104,7 +122,21 @@ let coderToolSpec () =
                                     }))
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> (promise { promptCalls.Add(arg) })))
+                            box (
+                                System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                    (promise {
+                                        promptCalls.Add(arg)
+
+                                        if not (isNull pObj) then
+                                            let runtime =
+                                                pObj?__fallbackRuntime
+                                                |> unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState>
+
+                                            let childId = "child-coder-session"
+                                            runtime.ClearSubsessionPending childId
+                                            runtime.SetTaskComplete childId true
+                                    }))
+                            )
                             "messages",
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -131,6 +163,8 @@ let coderToolSpec () =
                     {| directory = workspaceDir
                        client = mockClient |}
             )
+
+        pObj <- p
 
         let coder = get (get p "tool") "coder"
 
@@ -177,6 +211,7 @@ let investigatorToolLateClientInjectionSpec () =
     promise {
         let createCalls = ResizeArray<obj>()
         let promptCalls = ResizeArray<obj>()
+        let mutable pObj: obj = null
 
         let mockClient =
             createObj
@@ -192,7 +227,21 @@ let investigatorToolLateClientInjectionSpec () =
                                     }))
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> (promise { promptCalls.Add(arg) })))
+                            box (
+                                System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                    (promise {
+                                        promptCalls.Add(arg)
+
+                                        if not (isNull pObj) then
+                                            let runtime =
+                                                pObj?__fallbackRuntime
+                                                |> unbox<Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState>
+
+                                            let childId = "child-investigator-session-late"
+                                            runtime.ClearSubsessionPending childId
+                                            runtime.SetTaskComplete childId true
+                                    }))
+                            )
                             "messages",
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -214,6 +263,7 @@ let investigatorToolLateClientInjectionSpec () =
         let! workspaceDir = mkdtempAsync "investigator-tool-late-client-"
         let ctx = createObj [ "directory", box workspaceDir ]
         let! p = plugin ctx
+        pObj <- p
         ctx?("client") <- mockClient
         let investigator = get (get p "tool") "investigator"
 

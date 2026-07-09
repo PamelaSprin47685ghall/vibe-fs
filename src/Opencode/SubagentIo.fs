@@ -77,6 +77,7 @@ let runSubagentCoreResult
                         abortAndUnregister ()
 
                 try
+                    runtime.SetSubsessionPending childID true
                     do! promptWithAbort client (buildPromptBody options childID) signal
 
                     do! waitForSubagentSettle runtime childID
@@ -95,6 +96,7 @@ let runSubagentCoreResult
                     match translateJsError err with
                     | MessageAborted
                     | ClientCancellation _ ->
+                        runtime.SetSubsessionPending childID false
                         abortAndUnregister ()
 
                         if not (Dyn.isNullish signal) && Dyn.truthy (Dyn.get signal "aborted") then

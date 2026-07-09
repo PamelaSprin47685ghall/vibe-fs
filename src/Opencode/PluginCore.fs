@@ -38,5 +38,6 @@ let pluginFor (host: Host) (ctx: obj) : JS.Promise<obj> =
         services.RuntimeScope.TriggerInit(services.Directory)
         do! services.RuntimeScope.WaitInit()
         setKey result "__reviewStore" (box (createReviewTestSurface services.ReviewStore))
+        setKey result "__fallbackRuntime" (box services.FallbackRuntime)
         return result
     }

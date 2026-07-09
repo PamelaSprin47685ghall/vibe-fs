@@ -34,7 +34,8 @@ type CoreServices =
       BacklogSession: BacklogSession
       Tools: obj
       McpMap: obj
-      FallbackConfig: FallbackConfig option }
+      FallbackConfig: FallbackConfig option
+      FallbackRuntime: FallbackRuntimeState }
 
 let createCoreServices (host: Host) (ctx: obj) =
     let reviewStore = Wanxiangshu.Shell.ReviewRuntime.createReviewStore ()
@@ -116,7 +117,8 @@ let createCoreServices (host: Host) (ctx: obj) =
       BacklogSession = backlogSession
       Tools = tools
       McpMap = mcpMap
-      FallbackConfig = fallbackConfigOpt }
+      FallbackConfig = fallbackConfigOpt
+      FallbackRuntime = fallbackRuntime }
 
 let createReviewTestSurface (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     createObj

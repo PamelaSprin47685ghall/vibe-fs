@@ -43,6 +43,7 @@ let handleEvent
 
     promise {
         let sessionID = translator.ExtractSessionID rawEvent
+        runtime.SetSubsessionPending sessionID false
 
         let! eventOpt =
             match translator.TranslateError rawEvent with

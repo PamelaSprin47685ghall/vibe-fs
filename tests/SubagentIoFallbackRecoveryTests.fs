@@ -71,6 +71,7 @@ let runSubagentRecoversWhenFallbackConsumesError () =
 
         do! yieldMicrotask ()
         rt.SetConsumed childId true
+        rt.SetTaskComplete childId true
 
         let! result = runP
 
@@ -165,7 +166,11 @@ let runSubagentWaitsForToolCallTextRecovery () =
 
         let s1 = rt.GetOrCreateState childId
 
-        rt.UpdateState childId { s1 with Phase = FallbackPhase.Idle }
+        rt.UpdateState
+            childId
+            { s1 with
+                Phase = FallbackPhase.Idle
+                TaskComplete = true }
 
         let! result = runP
 

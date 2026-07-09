@@ -64,28 +64,31 @@ let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) : bool
     if sessionID = "" then
         true
     else
+        let st = runtime.GetOrCreateState sessionID
         let busy = runtime.GetBusyCount sessionID > 0
-
-        let fbActive =
-            if not (runtime.HasState sessionID) then
-                false
-            else
-                let st = runtime.GetOrCreateState sessionID
-
-                match st.Phase with
-                | FallbackPhase.Scanning _
-                | FallbackPhase.Retrying _
-                | FallbackPhase.ScanningToolCallText
-                | FallbackPhase.RecoveringToolCallText -> true
-                | FallbackPhase.Idle ->
-                    match runtime.GetConsumed sessionID with
-                    | Some true -> true
-                    | _ -> false
-                | FallbackPhase.Exhausted -> false
-
         let nudgeAct = runtime.IsNudgeActive sessionID
 
-        not busy && not fbActive && not nudgeAct
+        if st.TaskComplete && not busy && not nudgeAct then
+            true
+        else
+            let fbActive =
+                if not (runtime.HasState sessionID) then
+                    false
+                else
+                    match st.Phase with
+                    | FallbackPhase.Scanning _
+                    | FallbackPhase.Retrying _
+                    | FallbackPhase.ScanningToolCallText
+                    | FallbackPhase.RecoveringToolCallText -> true
+                    | FallbackPhase.Idle ->
+                        match runtime.GetConsumed sessionID with
+                        | Some true -> true
+                        | _ -> false
+                    | FallbackPhase.Exhausted -> false
+
+            let pending = runtime.IsSubsessionPending sessionID
+
+            not pending && not busy && not fbActive && not nudgeAct
 
 let waitForSubagentSettle (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
     promise {

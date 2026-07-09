@@ -38,6 +38,7 @@ let subagentParentSpec () =
     promise {
         let createCalls = ResizeArray<obj>()
         let promptCalls = ResizeArray<obj>()
+        let runtime = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
 
         let mockClient =
             createObj
@@ -53,7 +54,15 @@ let subagentParentSpec () =
                                     }))
                             )
                             "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun arg -> (promise { promptCalls.Add(arg) })))
+                            box (
+                                System.Func<obj, JS.Promise<unit>>(fun arg ->
+                                    (promise {
+                                        promptCalls.Add(arg)
+                                        let childId = "child-session-123"
+                                        runtime.ClearSubsessionPending childId
+                                        runtime.SetTaskComplete childId true
+                                    }))
+                            )
                             "messages",
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -83,7 +92,7 @@ let subagentParentSpec () =
 
         let! result =
             runSubagent
-                (Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState())
+                runtime
                 registry
                 mockClient
                 "browser"
@@ -112,7 +121,7 @@ let nestedSubagentSpec () =
     promise {
         let createCalls = ResizeArray<obj>()
 
-        let mkClient () =
+        let mkClient (runtime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState) =
             createObj
                 [ "session",
                   box (
@@ -125,7 +134,15 @@ let nestedSubagentSpec () =
                                         return box {| data = box {| id = $"child-{createCalls.Count}" |} |}
                                     }))
                             )
-                            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ()))
+                            "prompt",
+                            box (
+                                System.Func<obj, JS.Promise<unit>>(fun _ ->
+                                    (promise {
+                                        let cid = $"child-{createCalls.Count}"
+                                        runtime.ClearSubsessionPending cid
+                                        runtime.SetTaskComplete cid true
+                                    }))
+                            )
                             "messages",
                             box (System.Func<obj, JS.Promise<obj>>(fun _ -> (promise { return box {| data = [||] |} })))
                             "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
@@ -134,11 +151,13 @@ let nestedSubagentSpec () =
         let registry = ChildAgentRegistry.Create()
         let! workspaceDir = mkdtempAsync "nested-subagent-"
 
+        let runtime1 = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
+
         do!
             runSubagent
-                (Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState())
+                runtime1
                 registry
-                (mkClient ())
+                (mkClient runtime1)
                 "browser"
                 "Browser"
                 "first"
@@ -148,11 +167,13 @@ let nestedSubagentSpec () =
                 null
             |> Promise.map (fun _ -> ())
 
+        let runtime2 = Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState()
+
         do!
             runSubagent
-                (Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState())
+                runtime2
                 registry
-                (mkClient ())
+                (mkClient runtime2)
                 "coder"
                 "Coder"
                 "second"

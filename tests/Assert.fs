@@ -111,11 +111,13 @@ let timed (label: string) (f: unit -> unit) : unit =
         timings.Add(label, now () - start)
 
 /// Per-spec async ceiling (integration sub-specs use this inside their own loops).
-let asyncSpecTimeoutMs = 5000
+/// 铁律：单个测试 1s 封顶。挂起测试必须立刻暴露，绝不姑息。禁止调大。
+let asyncSpecTimeoutMs = 1000
 
 /// Suite-level async ceiling: one `*.run` that sequences many sub-specs must not
 /// inherit the 1s per-spec budget (e.g. other Integration*.run suites).
-let asyncSuiteTimeoutMs = 120_000
+/// 铁律：套件同样 1s 封顶。慢测试拆成更小子测试，禁止调大。
+let asyncSuiteTimeoutMs = 1000
 
 /// Time an asynchronous test body with a 1s hard timeout; return a unit promise.
 /// Promise failure / timeout / throw are all converged into a single failure record.
