@@ -13,6 +13,8 @@ open Wanxiangshu.Shell.ReviewRuntime
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
+let private zeroWidth = "\u200B"
+
 let private mkMsg id role parts =
     { info =
         { id = id
@@ -82,15 +84,15 @@ let testMessageSanitization () =
         let msgObj = res1.[0]
 
         for prop in [| "message"; "content"; "reasoning"; "thought"; "errorText" |] do
-            equal prop "." (string (Dyn.get msgObj prop))
+            equal prop zeroWidth (string (Dyn.get msgObj prop))
 
         let parts = Dyn.get msgObj "parts" :?> obj array
         equal "parts length" 3 parts.Length
-        equal "text changed to dot" "." (string (Dyn.get parts.[0] "text"))
-        equal "output changed to dot" "." (string (Dyn.get parts.[1] "output"))
-        equal "error changed to dot" "." (string (Dyn.get parts.[2] "error"))
+        equal "text changed to zero width" zeroWidth (string (Dyn.get parts.[0] "text"))
+        equal "output changed to zero width" zeroWidth (string (Dyn.get parts.[1] "output"))
+        equal "error changed to zero width" zeroWidth (string (Dyn.get parts.[2] "error"))
         let! res2 = runTransform "sanitize-session" [ mkMsg "user" User [] ]
-        equal "cached message remains dot" "." (string (Dyn.get res2.[0] "message"))
+        equal "cached message remains zero width" zeroWidth (string (Dyn.get res2.[0] "message"))
     }
 
 let testEmptyArrayAndMissingContentSanitization () =
@@ -173,7 +175,7 @@ let testEmptyArrayAndMissingContentSanitization () =
         check "content1 should be same array reference" (System.Object.ReferenceEquals(content1, contentRef))
         let parts1Arr = parts1 :?> obj array
         check "parts1 should not be empty" (parts1Arr.Length > 0)
-        equal "parts1 first element text" "." (string (Dyn.get parts1Arr.[0] "text"))
+        equal "parts1 first element text" zeroWidth (string (Dyn.get parts1Arr.[0] "text"))
 
         // Case 2 check
         let msg2 = res.[1]
@@ -181,7 +183,7 @@ let testEmptyArrayAndMissingContentSanitization () =
         check "content2 should be array" (Dyn.isArray content2)
         let content2Arr = content2 :?> obj array
         check "content2 should not be empty" (content2Arr.Length > 0)
-        equal "content2 first element text" "." (string (Dyn.get content2Arr.[0] "text"))
+        equal "content2 first element text" zeroWidth (string (Dyn.get content2Arr.[0] "text"))
 
         // Case 3 check
         let msg3 = res.[2]
@@ -199,10 +201,10 @@ let testEmptyArrayAndMissingContentSanitization () =
         // Case 4 check
         let msg4 = res.[3]
         let content4 = Dyn.get msg4 "content"
-        equal "content4 should be dot" "." (string content4)
+        equal "content4 should be zero width" zeroWidth (string content4)
         let parts4 = Dyn.get msg4 "parts" :?> obj array
         check "parts4 should not be empty" (parts4.Length > 0)
-        equal "parts4 first element text" "." (string (Dyn.get parts4.[0] "text"))
+        equal "parts4 first element text" zeroWidth (string (Dyn.get parts4.[0] "text"))
 
         // Case 5 check
         let msg5 = res.[4]
@@ -221,10 +223,10 @@ let testEmptyArrayAndMissingContentSanitization () =
         // Case 7 check: role="user" with no properties was sanitized
         let msg7 = res.[6]
         let content7 = Dyn.get msg7 "content"
-        equal "content7 should be dot" "." (string content7)
+        equal "content7 should be zero width" zeroWidth (string content7)
         let parts7 = Dyn.get msg7 "parts" :?> obj array
         check "parts7 should not be empty" (parts7.Length > 0)
-        equal "parts7 first element text" "." (string (Dyn.get parts7.[0] "text"))
+        equal "parts7 first element text" zeroWidth (string (Dyn.get parts7.[0] "text"))
 
         // Case 8 check: nested info object was skipped and NOT mutated
         let msg8 = res.[7]
