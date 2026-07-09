@@ -125,11 +125,34 @@ let execute_validReturnsTextResult () : JS.Promise<unit> =
         check "result mentions apply" (hasText result "apply")
     }
 
+let execute_invalidTodoStatusReturnsError () : JS.Promise<unit> =
+    let h = createPiHarness ()
+    let pi = piObject h
+    registerTodoTool pi
+    let tool = findTodoTool h
+
+    let params' =
+        createObj
+            [ "ahaMoments", box (System.String('a', 1024))
+              "changesAndReasons", box (System.String('b', 1024))
+              "gotchas", box (System.String('c', 1024))
+              "lessonsAndConventions", box (System.String('d', 1024))
+              "plan", box (System.String('e', 1024))
+              "select_methodology", box [| "first_principles" |]
+              "todos", box [| createObj [ "content", box "x"; "status", box "invalid-status" ] |] ]
+
+    promise {
+        let! result = invokeExecute tool params'
+        check "error when todo status invalid" (Dyn.truthy (Dyn.get result "isError"))
+        check "error mentions invalid status" (hasText result "Invalid todo status")
+    }
+
 let run () : JS.Promise<unit> =
     promise {
         registerTodoTool_addsTool ()
         do! execute_missingReportReturnsError ()
         do! execute_missingMethodologyReturnsError ()
         do! execute_invalidTodoReturnsError ()
+        do! execute_invalidTodoStatusReturnsError ()
         do! execute_validReturnsTextResult ()
     }

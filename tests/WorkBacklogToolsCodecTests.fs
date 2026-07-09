@@ -46,7 +46,7 @@ let decodeTodoOk () =
         check "todo ok ahaMoments" (tw.AhaMoments = "x".PadRight(1024, 'a'))
         equal "todo ok todos count" 2 tw.Todos.Length
         check "todo ok first content" (tw.Todos.[0].Content = "实现 codec")
-        check "todo ok first status" (tw.Todos.[0].Status = "in_progress")
+        check "todo ok first status" (tw.Todos.[0].Status = Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.InProgress)
         equal "todo ok methodology count" 2 tw.SelectMethodology.Length
         check "todo ok methodology head" (tw.SelectMethodology.[0] = "test_driven_reasoning")
     | Error _ -> check "todo ok" false
@@ -79,9 +79,31 @@ let decodeTodoItemMissingAhaMoments () =
     | Error(InvalidIntent("todowrite", "ahaMoments", _)) -> check "todo item missing ahaMoments" true
     | _ -> check "todo item missing ahaMoments" false
 
+let decodeTodoInvalidStatusOrPriority () =
+    let args =
+        createObj
+            [ "ahaMoments", box ("x".PadRight(1024, 'a'))
+              "changesAndReasons", box ("x".PadRight(1024, 'b'))
+              "gotchas", box ("x".PadRight(1024, 'c'))
+              "lessonsAndConventions", box ("x".PadRight(1024, 'd'))
+              "plan", box ("x".PadRight(1024, 'e'))
+              "select_methodology", box [| "test_driven_reasoning" |]
+              "todos",
+              box
+                  [| createObj
+                         [ "content", box "实现 codec"
+                           "status", box "invalid-status"
+                           "priority", box "high" ] |] ]
+
+    match decodeTodoWriteArgs args with
+    | Error(InvalidIntent("todowrite", "todos", msg)) ->
+        check "todo invalid status gets error" (msg.Contains("unknown status: invalid-status"))
+    | _ -> check "todo invalid status gets error" false
+
 let run () =
     decodeTodoMissingCompletedWorkReport ()
     decodeTodoOk ()
     decodeTodoToolOptsExtractsToolCallId ()
     decodeTodoToolOptsMissingToolCallId ()
     decodeTodoItemMissingAhaMoments ()
+    decodeTodoInvalidStatusOrPriority ()

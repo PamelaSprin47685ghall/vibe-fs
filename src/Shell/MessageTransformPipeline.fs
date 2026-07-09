@@ -14,7 +14,8 @@ type MessageTransformPlan =
       Excluded: bool
       IsSubagentSession: bool
       Cleaned: Message<obj> list
-      RawArray: obj array option }
+      RawArray: obj array option
+      SembleInjectEnabled: bool }
 
 let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list) : Message<obj> list =
     let cleaned = messages |> List.filter (fun m -> m.source = Native)
@@ -53,20 +54,22 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
         else
             let targetCallID =
                 match List.tryHead realToolParts with
-                | Some (ToolPart(_, callID, _, _)) -> callID
+                | Some(ToolPart(_, callID, _, _)) -> callID
                 | _ -> ""
 
             if targetCallID = "" then
                 messages
             else
-                let lastIdx = cleaned |> List.findIndex (fun m -> m.info.id = lastAssistantMsg.info.id)
+                let lastIdx =
+                    cleaned |> List.findIndex (fun m -> m.info.id = lastAssistantMsg.info.id)
+
                 let laterMessages = cleaned.[lastIdx + 1 ..]
                 let hasResult = laterMessages |> List.exists (fun m -> m.info.role = ToolResult)
 
                 if not hasResult then
                     messages
                 else
-                    let synthMsg : Message<obj> =
+                    let synthMsg: Message<obj> =
                         { info =
                             { id = "parallel-tool-synth-" + targetCallID
                               sessionID = sessionID
@@ -79,6 +82,7 @@ let tryInjectParallelToolPrompt (sessionID: string) (messages: Message<obj> list
                           parts = [ TextPart Wanxiangshu.Kernel.PromptFragments.parallelToolPromptProse ]
                           source = Synthetic "parallel-tool-synth-"
                           raw = null }
+
                     List.append messages [ synthMsg ]
 
 let runMessageTransformPipeline
@@ -94,16 +98,19 @@ let runMessageTransformPipeline
             return [||]
         else
             let afterAmend =
-                AmendFilter.filterAmendMessages
-                    (fun raw ->
-                        match DynField.optField raw "amend" with
-                        | None -> None
-                        | Some v ->
-                            match v with
-                            | :? int as n when n > 0 -> Some n
-                            | :? float as f when f > 0.0 -> Some(int f)
-                            | _ -> None)
+                if plan.SembleInjectEnabled then
                     plan.Cleaned
+                else
+                    AmendFilter.filterAmendMessages
+                        (fun raw ->
+                            match DynField.optField raw "amend" with
+                            | None -> None
+                            | Some v ->
+                                match v with
+                                | :? int as n when n > 0 -> Some n
+                                | :? float as f when f > 0.0 -> Some(int f)
+                                | _ -> None)
+                        plan.Cleaned
 
             let afterBacklog =
                 applyBacklogProjection plan.SessionID plan.Excluded backlogOps afterAmend

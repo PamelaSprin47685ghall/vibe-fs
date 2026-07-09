@@ -104,6 +104,7 @@ let shellCodecFilesNoLocalStrField () =
 let private shellBareDynAllowlist =
     Set.ofList
         [ "ExecutorJavascript.fs"
+          "FallbackEventBridge.fs"
           "FuzzyFinderShell.fs"
           "FuzzySearch.fs"
           "FuzzySearchHelpers.fs"

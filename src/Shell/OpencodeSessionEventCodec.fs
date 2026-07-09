@@ -142,21 +142,24 @@ let shouldSkipNudge (messagesData: obj) : bool =
         | Some idx ->
             let info = Dyn.get (messagesArr.[idx]) "info"
             let finish = Dyn.str info "finish"
+            let finishLower = finish.ToLower()
 
-            let isToolFinish =
-                finish.ToLower().Contains("tool") && finish.ToLower() <> "tool_use_error"
-
-            if not isToolFinish then
-                false
+            if finishLower.Contains("abort") || finishLower.Contains("cancel") then
+                true
             else
-                let hasToolResultAfter =
-                    messagesArr.[idx + 1 ..]
-                    |> Array.exists (fun msg ->
-                        let mInfo = Dyn.get msg "info"
-                        let mRole = Dyn.str mInfo "role"
-                        mRole = "toolResult")
+                let isToolFinish = finishLower.Contains("tool") && finishLower <> "tool_use_error"
 
-                not hasToolResultAfter
+                if not isToolFinish then
+                    false
+                else
+                    let hasToolResultAfter =
+                        messagesArr.[idx + 1 ..]
+                        |> Array.exists (fun msg ->
+                            let mInfo = Dyn.get msg "info"
+                            let mRole = Dyn.str mInfo "role"
+                            mRole = "toolResult")
+
+                    not hasToolResultAfter
         | None -> false
 
 /// Build the host wire prompt body for `session.prompt`. The agent-scoped

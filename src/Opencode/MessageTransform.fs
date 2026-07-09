@@ -149,6 +149,9 @@ let messagesTransform
             let isSub = registry.ResolveSubsessionParentID(Some sessionID) |> Option.isSome
             let excluded = shouldExcludeAgentFromProjection agent false
 
+            let sembleInjectEnabled =
+                not excluded && (agent = "investigator" || agent = "reviewer")
+
             let backlogOps =
                 backlogSessionOpsFrom backlogSession.Host (fun sid msgs ->
                     backlogSession.GetOrRebuildBacklog(sid, msgs))
@@ -160,7 +163,8 @@ let messagesTransform
                   Excluded = excluded
                   IsSubagentSession = isSub
                   Cleaned = cleaned
-                  RawArray = Some messagesArr }
+                  RawArray = Some messagesArr
+                  SembleInjectEnabled = sembleInjectEnabled }
 
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)

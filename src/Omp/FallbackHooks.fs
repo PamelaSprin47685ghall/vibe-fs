@@ -68,27 +68,60 @@ let ompEventTranslator: IEventTranslator =
             Dyn.str eventObj "type" = "message.updated"
             && Dyn.str (Dyn.get eventObj "info") "role" = "user" }
 
-let ompActionExecutor (sessionApi: obj) : IActionExecutor =
+let private tryGetSession (sessionID: string) (sessionApi: obj) : obj option =
+    match Wanxiangshu.Omp.ExecutorTools.ompScope.TryFindKey("omp_session_" + sessionID) with
+    | Some s -> Some s
+    | None ->
+        if not (Dyn.isNullish sessionApi) then
+            Some sessionApi
+        else
+            None
+
+let private captureModel (session: obj) : FallbackModel option =
+    let model = Dyn.get session "model"
+    Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj model
+
+let private captureAgent (session: obj) : string option =
+    let agent = Dyn.str session "agent"
+    if agent <> "" then Some agent else None
+
+let ompActionExecutor (runtime: FallbackRuntimeState) (sessionApi: obj) : IActionExecutor =
     let invoke (method_: string) (arg: obj) : JS.Promise<obj> =
         if Dyn.isNullish sessionApi then
             Promise.lift (unbox null)
         else
             unbox<JS.Promise<obj>> (sessionApi?(method_) (arg))
 
+    let resolveModelAndAgent (fallbackModel: FallbackModel) (sessionID: string) =
+        let sessionOpt = tryGetSession sessionID sessionApi
+        let sessionAgentOpt = sessionOpt |> Option.bind captureAgent
+        let finalModel = fallbackModel
+
+        let modelStr =
+            match finalModel.Variant with
+            | Some v -> sprintf "%s/%s:%s" finalModel.ProviderID finalModel.ModelID v
+            | None -> sprintf "%s/%s" finalModel.ProviderID finalModel.ModelID
+
+        let agent =
+            match sessionAgentOpt with
+            | Some sa -> sa
+            | None -> runtime.GetAgentName sessionID
+
+        modelStr, agent
+
     { new IActionExecutor with
         member _.SendContinue(sessionID, model) =
             promise {
-                let modelStr =
-                    match model.Variant with
-                    | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
-                    | None -> sprintf "%s/%s" model.ProviderID model.ModelID
+                let modelStr, agent = resolveModelAndAgent model sessionID
 
-                let body =
-                    box
-                        {| prompt =
-                            box
-                                {| text = "continue"
-                                   model = modelStr |} |}
+                let pObj =
+                    let p =
+                        {| text = "continue"
+                           model = modelStr |}
+
+                    if agent <> "" then Dyn.withKey p "agent" agent else box p
+
+                let body = box {| prompt = pObj |}
 
                 let arg = box {| sessionId = sessionID; body = body |}
                 do! invoke "sessionPrompt" arg |> Promise.map ignore
@@ -96,17 +129,16 @@ let ompActionExecutor (sessionApi: obj) : IActionExecutor =
 
         member _.RecoverWithPrompt(sessionID, model, promptText) =
             promise {
-                let modelStr =
-                    match model.Variant with
-                    | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
-                    | None -> sprintf "%s/%s" model.ProviderID model.ModelID
+                let modelStr, agent = resolveModelAndAgent model sessionID
 
-                let body =
-                    box
-                        {| prompt =
-                            box
-                                {| text = promptText
-                                   model = modelStr |} |}
+                let pObj =
+                    let p =
+                        {| text = promptText
+                           model = modelStr |}
+
+                    if agent <> "" then Dyn.withKey p "agent" agent else box p
+
+                let body = box {| prompt = pObj |}
 
                 let arg = box {| sessionId = sessionID; body = body |}
                 do! invoke "sessionPrompt" arg |> Promise.map ignore
@@ -126,7 +158,15 @@ let ompActionExecutor (sessionApi: obj) : IActionExecutor =
 
         member _.PropagateFailure(_sessionID: string) = Promise.lift ()
 
-        member _.CaptureCurrentModel(_sessionID: string) = Promise.lift None
+        member _.CaptureCurrentModel(sessionID: string) =
+            promise {
+                match runtime.GetModel sessionID with
+                | Some m -> return Some m
+                | None ->
+                    match tryGetSession sessionID sessionApi with
+                    | Some sess -> return captureModel sess
+                    | None -> return None
+            }
 
     }
 
@@ -141,7 +181,7 @@ let private clearConsumedOnNewUserMessage (runtime: FallbackRuntimeState) (sessi
     if ompEventTranslator.IsNewUserMessage rawEvent then
         runtime.ClearConsumed sessionID
 
-let private bindAgentName (runtime: FallbackRuntimeState) (rawEvent: obj) : unit =
+let private bindAgentAndModel (runtime: FallbackRuntimeState) (rawEvent: obj) : unit =
     let eventObj = Dyn.get rawEvent "event"
     let eventType = Dyn.str eventObj "type"
 
@@ -149,13 +189,19 @@ let private bindAgentName (runtime: FallbackRuntimeState) (rawEvent: obj) : unit
         let info = Dyn.get eventObj "info"
 
         if not (Dyn.isNullish info) then
-            let agent = Dyn.str info "agent"
+            let sid = ompEventTranslator.ExtractSessionID rawEvent
 
-            if agent <> "" then
-                let sid = ompEventTranslator.ExtractSessionID rawEvent
+            if sid <> "" then
+                let agent = Dyn.str info "agent"
 
-                if sid <> "" then
+                if agent <> "" then
                     runtime.SetAgentName sid agent
+
+                let modelObj = Dyn.get info "model"
+
+                match Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj modelObj with
+                | Some m -> runtime.SetModel sid m
+                | None -> ()
 
 let createOmpFallbackHandler
     (runtime: FallbackRuntimeState)
@@ -163,12 +209,12 @@ let createOmpFallbackHandler
     (sessionApi: obj)
     : (obj -> JS.Promise<FallbackHookResult>) =
     let baseHandler =
-        createHandler ompEventTranslator runtime configLookup (ompActionExecutor sessionApi)
+        createHandler ompEventTranslator runtime configLookup (ompActionExecutor runtime sessionApi)
 
     fun (rawEvent: obj) ->
         promise {
             let sessionID = ompEventTranslator.ExtractSessionID rawEvent
-            bindAgentName runtime rawEvent
+            bindAgentAndModel runtime rawEvent
             let! result = baseHandler rawEvent
             setConsumedFromResult runtime sessionID result
             clearConsumedOnNewUserMessage runtime sessionID rawEvent

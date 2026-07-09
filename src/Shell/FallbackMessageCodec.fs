@@ -3,6 +3,8 @@ module Wanxiangshu.Shell.FallbackMessageCodec
 
 open System.Text.RegularExpressions
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
 /// Regex patterns that detect XML-style tool calls emitted as raw text.
 /// Covers wrappers (tool_call/function/invoke), closing tags, name attributes,
@@ -66,21 +68,72 @@ let private truncatedOpenCloseRegexes =
        { Open = Regex(@"\{""name""\s*:", RegexOptions.IgnoreCase)
          Close = Regex(@"\}", RegexOptions.IgnoreCase) } |]
 
+let stripMarkdownCode (text: string) : string =
+    if System.String.IsNullOrEmpty(text) then
+        ""
+    else
+        let len = text.Length
+        let sb = System.Text.StringBuilder(len)
+        let mutable i = 0
+
+        while i < len do
+            if i + 2 < len && text.[i] = '`' && text.[i + 1] = '`' && text.[i + 2] = '`' then
+                i <- i + 3
+                let mutable found = false
+
+                while i + 2 < len && not found do
+                    if text.[i] = '`' && text.[i + 1] = '`' && text.[i + 2] = '`' then
+                        found <- true
+                        i <- i + 3
+                    else
+                        i <- i + 1
+
+                if not found then
+                    i <- len
+            elif text.[i] = '`' then
+                i <- i + 1
+                let mutable found = false
+
+                while i < len && not found do
+                    if text.[i] = '`' then
+                        found <- true
+                        i <- i + 1
+                    else
+                        i <- i + 1
+
+                if not found then
+                    i <- len
+            else
+                sb.Append(text.[i]) |> ignore
+                i <- i + 1
+
+        sb.ToString()
+
 /// Test whether a raw text string contains an XML tool call pattern.
 let containsToolCallAsText (text: string) : bool =
-    if System.String.IsNullOrEmpty(text) then
-        false
-    elif text.Length <= 10 then
+    if System.String.IsNullOrEmpty(text) || text.Length <= 10 then
         false
     else
-        let hasSimpleMatch =
-            toolCallRegexes |> Array.exists (fun regex -> regex.IsMatch(text))
+        let cleaned = stripMarkdownCode text
 
-        if hasSimpleMatch then
-            true
+        if cleaned.Length <= 10 then
+            false
         else
-            truncatedOpenCloseRegexes
-            |> Array.exists (fun pair -> pair.Open.IsMatch(text) && not (pair.Close.IsMatch(text)))
+            let hasSimpleMatch =
+                toolCallRegexes |> Array.exists (fun regex -> regex.IsMatch(cleaned))
+
+            let isRealCall =
+                hasSimpleMatch
+                || (truncatedOpenCloseRegexes
+                    |> Array.exists (fun pair -> pair.Open.IsMatch(cleaned) && not (pair.Close.IsMatch(cleaned))))
+
+            isRealCall
+            && (cleaned.Contains("=")
+                || cleaned.Contains("/")
+                || cleaned.Contains("<tool_call")
+                || cleaned.Contains("<function")
+                || cleaned.Contains("<invoke")
+                || cleaned.Contains("{"))
 
 /// Scanner prompt returned when a tool-call-as-text is detected.
 let private recoveryPrompt =
@@ -88,39 +141,30 @@ let private recoveryPrompt =
 
 /// Scan messages backwards for the most recent assistant text containing an
 /// XML tool call pattern. Returns the recovery prompt when detected.
-///
-/// This is based on opencode-auto-resume's raw-tool-call detection pattern
-/// with Wanxiangshu protocol extensions: it walks messages in reverse order,
-/// checks each assistant part of type "text", and tests whether the text content
-/// contains any tool call regex pattern (simple match or open/close truncation).
 let scanToolCallAsText (msgs: obj array) : string option =
     if isNull msgs || msgs.Length = 0 then
         None
     else
-        let hasToolText =
+        let lastAssistant =
             msgs
             |> Array.rev
-            |> Array.exists (fun msg ->
-                let info = Dyn.get msg "info"
+            |> Array.tryFind (fun msg -> Dyn.str (Dyn.get msg "info") "role" = "assistant")
 
-                if Dyn.str info "role" <> "assistant" then
-                    false
-                else
-                    let parts = Dyn.get msg "parts"
+        match lastAssistant with
+        | None -> None
+        | Some msg ->
+            let parts = Dyn.get msg "parts"
 
-                    if not (Dyn.isArray parts) then
-                        false
-                    else
-                        (parts :?> obj array)
-                        |> Array.rev
-                        |> Array.exists (fun part ->
-                            if Dyn.str part "type" <> "text" then
-                                false
-                            else
-                                let text = Dyn.str part "text"
-                                containsToolCallAsText text))
+            if not (Dyn.isArray parts) then
+                None
+            else
+                let hasToolText =
+                    (parts :?> obj array)
+                    |> Array.rev
+                    |> Array.exists (fun part ->
+                        Dyn.str part "type" = "text" && containsToolCallAsText (Dyn.str part "text"))
 
-        if hasToolText then Some recoveryPrompt else None
+                if hasToolText then Some recoveryPrompt else None
 
 /// Scan messages backwards for the most recent task/todowrite tool part and
 /// report whether every todo item is in a terminal status.
@@ -139,21 +183,15 @@ let allTodosCompleted (msgs: obj array) : bool =
                 (parts :?> obj array)
                 |> Array.rev
                 |> Array.tryPick (fun part ->
-                    let partType = Dyn.str part "type"
-                    let tool = Dyn.str part "tool"
+                    let pt, tl = Dyn.str part "type", Dyn.str part "tool"
 
-                    if
-                        (partType = "tool" || partType = "dynamic-tool")
-                        && (tool = "task" || tool = "todowrite")
-                    then
-                        let input = Dyn.get (Dyn.get part "state") "input"
-                        let todos = Dyn.get input "todos"
+                    if (pt = "tool" || pt = "dynamic-tool") && (tl = "task" || tl = "todowrite") then
+                        let todos = Dyn.get (Dyn.get (Dyn.get part "state") "input") "todos"
 
                         if Dyn.isArray todos then
                             (todos :?> obj array)
-                            |> Array.forall (fun todo ->
-                                let s = Dyn.str todo "status"
-                                s = "completed" || s = "cancelled")
+                            |> Array.forall (fun t ->
+                                let s = Dyn.str t "status" in s = "completed" || s = "cancelled")
                             |> Some
                         else
                             None
@@ -170,35 +208,106 @@ let isIdleNoContentAndNoTools (msgs: obj array) : bool =
         msgs
         |> Array.rev
         |> Array.tryPick (fun msg ->
-            let info = Dyn.get msg "info"
-
-            if Dyn.str info "role" = "assistant" then
+            if Dyn.str (Dyn.get msg "info") "role" <> "assistant" then
+                None
+            else
                 let parts = Dyn.get msg "parts"
 
-                if Dyn.isArray parts then
-                    let partsArr = parts :?> obj array
+                if not (Dyn.isArray parts) then
+                    None
+                else
+                    let arr = parts :?> obj array
 
                     let hasTool =
-                        partsArr
-                        |> Array.exists (fun part ->
-                            let partType = Dyn.str part "type"
-                            partType = "tool" || partType = "dynamic-tool")
+                        arr
+                        |> Array.exists (fun p -> let pt = Dyn.str p "type" in pt = "tool" || pt = "dynamic-tool")
 
                     if hasTool then
-                        None  // has tools → not idle-no-content, stop searching
+                        None
                     else
-                        let hasText =
-                            partsArr
-                            |> Array.exists (fun part ->
-                                if Dyn.str part "type" = "text" then
-                                    let text = Dyn.str part "text"
-                                    not (System.String.IsNullOrWhiteSpace(text))
-                                else
-                                    false)
-
-                        if hasText then None else Some true
-                else
-                    None
-            else
-                None)
+                        Some(
+                            not (
+                                arr
+                                |> Array.exists (fun p ->
+                                    Dyn.str p "type" = "text"
+                                    && not (System.String.IsNullOrWhiteSpace(Dyn.str p "text")))
+                            )
+                        ))
         |> Option.defaultValue false
+
+/// Check if the last assistant message shows it was aborted by the user.
+/// Returns Some ErrorInput if aborted, otherwise None.
+let tryGetLastAssistantAbortInfo (msgs: obj array) : ErrorInput option =
+    if isNull msgs || msgs.Length = 0 then
+        None
+    else
+        msgs
+        |> Array.rev
+        |> Array.tryPick (fun msg ->
+            let info = Dyn.get msg "info"
+
+            if isNull info || Dyn.str info "role" <> "assistant" then
+                None
+            else
+                let f, err = Dyn.str info "finish", Dyn.get info "error"
+
+                let isAbort =
+                    f = "abort"
+                    || f = "interrupted"
+                    || f = "cancelled"
+                    || (not (isNull err)
+                        && (Dyn.str err "name" = "MessageAbortedError" || Dyn.str err "name" = "AbortError"))
+
+                if isAbort then
+                    Some
+                        { ErrorName = "MessageAbortedError"
+                          DomainError = Some MessageAborted
+                          Message = "Generation aborted before producing content"
+                          StatusCode = None
+                          IsRetryable = Some false }
+                else
+                    None)
+
+/// Decode a FallbackModel from a raw host object (which can be a string like "openai/gpt-5" or an object).
+let decodeModelFromObj (modelObj: obj) : FallbackModel option =
+    if isNull modelObj || Dyn.isNullish modelObj then
+        None
+    elif Dyn.typeIs modelObj "string" then
+        let s = string modelObj
+        let slash = s.IndexOf('/')
+
+        if slash <= 0 || slash >= s.Length - 1 then
+            None
+        else
+            Some
+                { ProviderID = s.[0 .. slash - 1].Trim()
+                  ModelID = s.[slash + 1 ..].Trim()
+                  Variant = None
+                  Temperature = None
+                  TopP = None
+                  MaxTokens = None
+                  ReasoningEffort = None
+                  Thinking = false }
+    else
+        let getStr k k2 =
+            let v = Dyn.str modelObj k in if v <> "" then v else Dyn.str modelObj k2
+
+        let provider = getStr "providerID" "provider"
+
+        let modelId =
+            let v = Dyn.str modelObj "modelID"
+            let v = if v <> "" then v else Dyn.str modelObj "id"
+            if v <> "" then v else Dyn.str modelObj "model"
+
+        if provider <> "" && modelId <> "" then
+            Some
+                { ProviderID = provider
+                  ModelID = modelId
+                  Variant = None
+                  Temperature = None
+                  TopP = None
+                  MaxTokens = None
+                  ReasoningEffort = None
+                  Thinking = false }
+        else
+            None

@@ -72,22 +72,43 @@ let registerTodoTool (pi: obj) : unit =
                           match validateTodos params' with
                           | Error msg -> return errorResult msg
                           | Ok() ->
-                              match getSessionIdFromContext ctx with
-                              | Some sid ->
-                                  let root = Dyn.str ctx "cwd"
+                              let mutable parseError = None
 
-                                  let todos =
-                                      let raw = Dyn.get params' "todos"
+                              let todos =
+                                  let raw = Dyn.get params' "todos"
 
-                                      if Dyn.isNullish raw || not (Dyn.isArray raw) then
-                                          [||]
-                                      else
-                                          unbox<obj array> raw
-                                          |> Array.map (fun item ->
-                                              { Content = Dyn.str item "content"
-                                                Status = Dyn.str item "status"
-                                                Priority = Dyn.str item "priority" })
+                                  if Dyn.isNullish raw || not (Dyn.isArray raw) then
+                                      [||]
+                                  else
+                                      unbox<obj array> raw
+                                      |> Array.map (fun item ->
+                                          let statusStr = Dyn.str item "status"
+                                          let priorityStr = Dyn.str item "priority"
 
+                                          let status =
+                                              match parseTodoItemStatus statusStr with
+                                              | Ok s -> s
+                                              | Error _ ->
+                                                  parseError <- Some $"Invalid todo status: %s{statusStr}"
+                                                  Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Todo
+
+                                          let priority =
+                                              if System.String.IsNullOrWhiteSpace priorityStr then
+                                                  Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.Low
+                                              else
+                                                  match parseTodoItemPriority priorityStr with
+                                                  | Ok p -> p
+                                                  | Error _ ->
+                                                      parseError <- Some $"Invalid todo priority: %s{priorityStr}"
+                                                      Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.Low
+
+                                          { Content = Dyn.str item "content"
+                                            Status = status
+                                            Priority = priority })
+
+                              match parseError with
+                              | Some err -> return errorResult err
+                              | None ->
                                   let args =
                                       { AhaMoments = ahaMoments
                                         ChangesAndReasons = changesAndReasons
@@ -97,10 +118,14 @@ let registerTodoTool (pi: obj) : unit =
                                         Todos = todos
                                         SelectMethodology = methodologies }
 
-                                  if root <> "" then
-                                      do! appendWorkBacklogCommittedOrFail root sid args
-                              | None -> ()
+                                  match getSessionIdFromContext ctx with
+                                  | Some sid ->
+                                      let root = Dyn.str ctx "cwd"
 
-                              return textResult (todoWriteOutput methodologies false)
+                                      if root <> "" then
+                                          do! appendWorkBacklogCommittedOrFail root sid args
+                                  | None -> ()
+
+                                  return textResult (todoWriteOutput methodologies false)
                   }) ]
     )

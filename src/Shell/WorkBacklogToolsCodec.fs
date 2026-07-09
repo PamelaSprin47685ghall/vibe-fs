@@ -2,12 +2,13 @@ module Wanxiangshu.Shell.WorkBacklogToolsCodec
 
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.ToolArgs
 open Wanxiangshu.Shell.DynField
 
 type TodoItem =
     { Content: string
-      Status: string
-      Priority: string }
+      Status: TodoItemStatus
+      Priority: TodoItemPriority }
 
 type TodoWriteArgs =
     { AhaMoments: string
@@ -33,21 +34,40 @@ let private requireNonBlank
     | Some s when not (System.String.IsNullOrWhiteSpace s) -> Ok(s.Trim())
     | _ -> Error(InvalidIntent(tool, field, sprintf "item %d: %s required" index label))
 
+let parseTodoItemStatus (s: string) : Result<TodoItemStatus, DomainError> =
+    match s.Trim().ToLowerInvariant() with
+    | "pending" -> Ok Todo
+    | "in_progress"
+    | "inprogress" -> Ok InProgress
+    | "completed" -> Ok Completed
+    | "cancelled"
+    | "canceled" -> Ok Cancelled
+    | other -> Error(InvalidIntent("todowrite", "todos", sprintf "unknown status: %s" other))
+
+let parseTodoItemPriority (s: string) : Result<TodoItemPriority, DomainError> =
+    match s.Trim().ToLowerInvariant() with
+    | "low" -> Ok Low
+    | "medium" -> Ok Medium
+    | "high" -> Ok High
+    | other -> Error(InvalidIntent("todowrite", "todos", sprintf "unknown priority: %s" other))
+
 let private decodeTodoItem (todo: obj) (index: int) : Result<TodoItem, DomainError> =
     let contentResult =
         requireNonBlank "todowrite" "todos" index "content" (strField todo "content")
 
-    let statusResult =
+    let statusRawResult =
         requireNonBlank "todowrite" "todos" index "status" (strField todo "status")
 
-    let priorityResult =
+    let priorityRawResult =
         requireNonBlank "todowrite" "todos" index "priority" (strField todo "priority")
 
     contentResult
     |> Result.bind (fun content ->
-        statusResult
+        statusRawResult
+        |> Result.bind parseTodoItemStatus
         |> Result.bind (fun status ->
-            priorityResult
+            priorityRawResult
+            |> Result.bind parseTodoItemPriority
             |> Result.map (fun priority ->
                 { Content = content
                   Status = status

@@ -197,8 +197,10 @@ let capsAndBacklogOrderSpec () =
               Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Plan = report + "_plan"
               Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Todos =
                 [| { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Content = content
-                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Status = status
-                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Priority = priority } |]
+                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Status =
+                       Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
+                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Priority =
+                       Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.High } |]
               Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
 
         do!

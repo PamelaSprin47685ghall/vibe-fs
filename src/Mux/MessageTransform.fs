@@ -63,7 +63,8 @@ let messagesTransform
                   Excluded = excluded
                   IsSubagentSession = isChildWorkspace deps sessionID
                   Cleaned = cleanedMessages
-                  RawArray = Some messagesArr }
+                  RawArray = Some messagesArr
+                  SembleInjectEnabled = false }
 
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)

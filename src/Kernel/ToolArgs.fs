@@ -35,10 +35,21 @@ type ExecutorArgs =
       Mode: string
       WhatToSummarize: string }
 
+type TodoItemStatus =
+    | Todo
+    | InProgress
+    | Completed
+    | Cancelled
+
+type TodoItemPriority =
+    | Low
+    | Medium
+    | High
+
 type TodoItem =
     { Content: string
-      Status: string
-      Priority: string }
+      Status: TodoItemStatus
+      Priority: TodoItemPriority }
 
 type TodoWriteArgs =
     { AhaMoments: string

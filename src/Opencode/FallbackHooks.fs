@@ -50,7 +50,7 @@ let private invokeClient (client: obj) (method_: string) (arg: obj) : JS.Promise
             else
                 unbox<JS.Promise<obj>> (Dyn.callMethod1 session method_ arg)
 
-let private tryReadLatestAssistantInfo (client: obj) (sessionID: string) : JS.Promise<obj option> =
+let private tryReadLatestMessageInfo (client: obj) (sessionID: string) : JS.Promise<obj option> =
     promise {
         let arg = box {| path = box {| id = sessionID |} |}
         let! resp = invokeClient client "messages" arg
@@ -65,41 +65,47 @@ let private tryReadLatestAssistantInfo (client: obj) (sessionID: string) : JS.Pr
                 messages
                 |> Array.tryFindBack (fun msg ->
                     let info = Dyn.get msg "info"
-                    not (Dyn.isNullish info) && Dyn.str info "role" = "assistant")
+
+                    if Dyn.isNullish info then
+                        false
+                    else
+                        let mObj = Dyn.get info "model"
+                        let aObj = Dyn.get info "agent"
+                        not (Dyn.isNullish mObj) || (not (Dyn.isNullish aObj) && string aObj <> ""))
                 |> Option.map (fun msg -> Dyn.get msg "info")
     }
+
+let private tryGetSessionModelAndAgent (client: obj) : (FallbackModel option * string option) =
+    match getSessionApiFromClient client with
+    | Error _ -> None, None
+    | Ok session ->
+        let mOpt =
+            let modelObj = Dyn.get session "model"
+            Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj modelObj
+
+        let aOpt =
+            let agentStr = Dyn.str session "agent"
+            if agentStr <> "" then Some agentStr else None
+
+        mOpt, aOpt
 
 let private tryReadCurrentModel (client: obj) (sessionID: string) : JS.Promise<FallbackModel option> =
     promise {
         if Dyn.isNullish client then
             return None
         else
-            let! infoOpt = tryReadLatestAssistantInfo client sessionID
+            let sessionModel, _ = tryGetSessionModelAndAgent client
 
-            match infoOpt with
-            | None -> return None
-            | Some info ->
-                let model = Dyn.get info "model"
+            match sessionModel with
+            | Some m -> return Some m
+            | None ->
+                let! infoOpt = tryReadLatestMessageInfo client sessionID
 
-                if Dyn.isNullish model then
-                    return None
-                else
-                    let provider = Dyn.str model "providerID"
-                    let modelId = Dyn.str model "modelID"
-
-                    if provider = "" || modelId = "" then
-                        return None
-                    else
-                        return
-                            Some
-                                { ProviderID = provider
-                                  ModelID = modelId
-                                  Variant = None
-                                  Temperature = None
-                                  TopP = None
-                                  MaxTokens = None
-                                  ReasoningEffort = None
-                                  Thinking = false }
+                match infoOpt with
+                | None -> return None
+                | Some info ->
+                    let model = Dyn.get info "model"
+                    return Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj model
     }
 
 let opencodeEventTranslator: IEventTranslator =
@@ -170,26 +176,39 @@ let opencodeEventTranslator: IEventTranslator =
             getEventType rawEvent = "message.updated"
             && Dyn.str (Dyn.get (getProps rawEvent) "info") "role" = "user" }
 
-let opencodeActionExecutor (client: obj) : IActionExecutor =
-    { new IActionExecutor with
-        member _.SendContinue(sessionID, model) =
-            promise {
-                let modelStr =
-                    match model.Variant with
-                    | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
-                    | None -> sprintf "%s/%s" model.ProviderID model.ModelID
+let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActionExecutor =
+    let resolveModelAndAgent (fallbackModel: FallbackModel) (sessionID: string) (infoOpt: obj option) =
+        let _, sessionAgentOpt = tryGetSessionModelAndAgent client
+        let finalModel = fallbackModel
 
-                let! infoOpt = tryReadLatestAssistantInfo client sessionID
+        let modelStr =
+            match finalModel.Variant with
+            | Some v -> sprintf "%s/%s:%s" finalModel.ProviderID finalModel.ModelID v
+            | None -> sprintf "%s/%s" finalModel.ProviderID finalModel.ModelID
 
-                let agent =
+        let agent =
+            match sessionAgentOpt with
+            | Some sa -> Some sa
+            | None ->
+                let fromMsg =
                     infoOpt
                     |> Option.map (fun info -> Dyn.str info "agent")
                     |> Option.filter (fun value -> value <> "")
 
-                let body =
-                    match agent with
-                    | Some value -> createPromptBodyWithModel (Some value) (Some modelStr) "continue"
-                    | None -> createPromptBodyWithModel None (Some modelStr) "continue"
+                match fromMsg with
+                | Some a -> Some a
+                | None ->
+                    let fromRuntime = runtime.GetAgentName sessionID
+                    if fromRuntime <> "" then Some fromRuntime else None
+
+        modelStr, agent
+
+    { new IActionExecutor with
+        member _.SendContinue(sessionID, model) =
+            promise {
+                let! infoOpt = tryReadLatestMessageInfo client sessionID
+                let modelStr, agent = resolveModelAndAgent model sessionID infoOpt
+                let body = createPromptBodyWithModel agent (Some modelStr) "continue"
 
                 let arg =
                     box
@@ -213,26 +232,18 @@ let opencodeActionExecutor (client: obj) : IActionExecutor =
 
         member _.PropagateFailure _sessionID = Promise.lift ()
 
-        member _.CaptureCurrentModel sessionID = tryReadCurrentModel client sessionID
+        member _.CaptureCurrentModel sessionID =
+            promise {
+                match runtime.GetModel sessionID with
+                | Some m -> return Some m
+                | None -> return! tryReadCurrentModel client sessionID
+            }
 
         member _.RecoverWithPrompt(sessionID, model, promptText) =
             promise {
-                let modelStr =
-                    match model.Variant with
-                    | Some v -> sprintf "%s/%s:%s" model.ProviderID model.ModelID v
-                    | None -> sprintf "%s/%s" model.ProviderID model.ModelID
-
-                let! infoOpt = tryReadLatestAssistantInfo client sessionID
-
-                let agent =
-                    infoOpt
-                    |> Option.map (fun info -> Dyn.str info "agent")
-                    |> Option.filter (fun value -> value <> "")
-
-                let body =
-                    match agent with
-                    | Some value -> createPromptBodyWithModel (Some value) (Some modelStr) promptText
-                    | None -> createPromptBodyWithModel None (Some modelStr) promptText
+                let! infoOpt = tryReadLatestMessageInfo client sessionID
+                let modelStr, agent = resolveModelAndAgent model sessionID infoOpt
+                let body = createPromptBodyWithModel agent (Some modelStr) promptText
 
                 let arg =
                     box
@@ -262,7 +273,7 @@ let createOpencodeFallbackHandler
     (_registry: ChildAgentRegistry)
     : (obj -> JS.Promise<FallbackHookResult>) =
     let baseHandler =
-        createHandler opencodeEventTranslator runtime configLookup (opencodeActionExecutor client)
+        createHandler opencodeEventTranslator runtime configLookup (opencodeActionExecutor runtime client)
 
     fun rawEvent ->
         promise {

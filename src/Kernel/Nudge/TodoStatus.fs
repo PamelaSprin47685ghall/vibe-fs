@@ -11,6 +11,13 @@ type TodoStatus =
     | InProgress
     | Pending
 
+let fromTodoItemStatus (s: Wanxiangshu.Kernel.ToolArgs.TodoItemStatus) : TodoStatus =
+    match s with
+    | Wanxiangshu.Kernel.ToolArgs.Todo -> Pending
+    | Wanxiangshu.Kernel.ToolArgs.InProgress -> InProgress
+    | Wanxiangshu.Kernel.ToolArgs.Completed -> Completed
+    | Wanxiangshu.Kernel.ToolArgs.Cancelled -> Cancelled
+
 let todoStatusOfString (s: string) : TodoStatus option =
     match s.ToLowerInvariant() with
     | "completed" -> Some Completed

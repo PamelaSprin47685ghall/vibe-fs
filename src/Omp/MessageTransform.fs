@@ -72,7 +72,9 @@ let transformEntriesAsyncWithAgent
                       Excluded = excluded
                       IsSubagentSession = isChildSession ExecutorTools.ompScope sessionId
                       Cleaned = cleaned
-                      RawArray = Some entriesArr }
+                      RawArray = Some entriesArr
+                      SembleInjectEnabled = false }
+
 
                 let replayTexts () : JS.Promise<string seq> =
                     Promise.lift (extractHistoryTexts messagesList |> Seq.ofList)

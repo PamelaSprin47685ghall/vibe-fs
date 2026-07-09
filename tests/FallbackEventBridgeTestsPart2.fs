@@ -9,7 +9,7 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackEventBridge
 
 
-type FakeExecutor(?messages: obj array) =
+type FakeExecutor(?messages: obj array, ?currentModel: FallbackModel) =
     let mutable continueCalls: ResizeArray<string * FallbackModel> = ResizeArray()
 
     let mutable recoverCalls: ResizeArray<string * FallbackModel * string> =
@@ -33,7 +33,7 @@ type FakeExecutor(?messages: obj array) =
             propagateCalls.Add(sessionID)
             Promise.lift ()
 
-        member _.CaptureCurrentModel(_sessionID: string) : JS.Promise<FallbackModel option> = Promise.lift None
+        member _.CaptureCurrentModel(_sessionID: string) : JS.Promise<FallbackModel option> = Promise.lift currentModel
 
     member _.ContinueCalls = continueCalls |> Seq.toList
     member _.RecoverCalls = recoverCalls |> Seq.toList
@@ -215,6 +215,51 @@ let handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText () =
         equal "recover called once" 1 (executor.RecoverCalls.Length)
     }
 
+let handleEvent_chainPrependsCurrentModel () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let sid = "sess-prepend"
+        rt.SetAgentName sid "coder"
+
+        let m0 = mkModel "anthropic" "claude-4"
+        let m1 = mkModel "openai" "gpt-5"
+        let m2 = mkModel "zai" "glm-5"
+
+        let executor = FakeExecutor(currentModel = m0)
+
+        let tr =
+            FakeTranslator(sid, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator
+
+        let customLookup (agent: string) =
+            { mkConfig () with
+                DefaultChain = [ m1; m2 ] }
+
+        let handler = createHandler tr rt customLookup executor
+        let! res = handler (box ())
+
+        let chain = rt.GetChain sid
+        equal "chain has 3 models" 3 chain.Length
+        equal "first is current model m0" m0 chain.[0]
+        equal "second is m1" m1 chain.[1]
+        equal "third is m2" m2 chain.[2]
+
+        let rt2 = FallbackRuntimeState()
+        let sid2 = "sess-prepend-exists"
+        rt2.SetAgentName sid2 "coder"
+        let executor2 = FakeExecutor(currentModel = m1)
+
+        let tr2 =
+            FakeTranslator(sid2, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator
+
+        let handler2 = createHandler tr2 rt2 customLookup executor2
+        let! res2 = handler2 (box ())
+
+        let chain2 = rt2.GetChain sid2
+        equal "chain2 has 2 models" 2 chain2.Length
+        equal "first is m1" m1 chain2.[0]
+        equal "second is m2" m2 chain2.[1]
+    }
+
 
 let run () =
     promise {
@@ -222,4 +267,5 @@ let run () =
         do! handleEvent_sessionIdle_idle_toolText_sendsPrompt ()
         do! handleEvent_sessionIdle_idle_todosComplete_setsTaskComplete ()
         do! handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText ()
+        do! handleEvent_chainPrependsCurrentModel ()
     }

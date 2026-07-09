@@ -95,6 +95,7 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
     | _, StealthBrowser -> agent = "browser"
     | _, ReturnRoleEcho -> tool = sprintf "return_%s" agent
     | "meditator", Read -> true
+    | "meditator", SubagentWebSkillOrSubmit when tool = "investigator" -> true
     | "meditator", _
     | "executor", _ -> false
     | _, TodoFamily

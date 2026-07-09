@@ -32,6 +32,7 @@ open Wanxiangshu.Tests.EventLogFoldTests
 open Wanxiangshu.Tests.WanxiangzhenSquadEventTests
 open Wanxiangshu.Tests.EventLogCodecTests
 open Wanxiangshu.Tests.EventLogRuntimeTests
+open Wanxiangshu.Tests.EventLogRuntimeRobustnessTests
 open Wanxiangshu.Tests.AmendTests
 
 let coreTestEntries () : (string * TestBody) list =
@@ -60,6 +61,7 @@ let coreTestEntries () : (string * TestBody) list =
       "WanxiangzhenSquadEventTests.run", TestBody.Sync(sync WanxiangzhenSquadEventTests.run)
       "EventLogCodecTests.run", TestBody.Sync(sync EventLogCodecTests.run)
       "EventLogRuntimeTests.run", TestBody.Async EventLogRuntimeTests.run
+      "EventLogRuntimeRobustnessTests.run", TestBody.Async EventLogRuntimeRobustnessTests.run
       "ReviewTests.inferReviewTaskFromTexts'", TestBody.Sync(sync ReviewTestsReplay.inferReviewTaskFromTexts')
       "ReviewTests.parseFrontMatterScalars'", TestBody.Sync(sync ReviewTestsReplay.parseFrontMatterScalars')
       "KernelPromptSpecsReview.yamlFrontMatterRoundTrip",
@@ -104,7 +106,8 @@ let coreTestEntries () : (string * TestBody) list =
       "KernelPromptSpecs.mimocodeFormatPromptAppendsAgentReportTail",
       TestBody.Sync(sync KernelPromptSpecs.mimocodeFormatPromptAppendsAgentReportTail)
       "KernelPromptSpecs.subagentJoinReports", TestBody.Sync(sync KernelPromptSpecs.subagentJoinReports)
-      "KernelPromptSpecs.meditatorMentionsReadCapability", TestBody.Sync(sync KernelPromptSpecs.meditatorMentionsReadCapability)
+      "KernelPromptSpecs.meditatorMentionsReadCapability",
+      TestBody.Sync(sync KernelPromptSpecs.meditatorMentionsReadCapability)
       "KernelTests.dynDeleteKey", TestBody.Sync(sync KernelTests.dynDeleteKey)
       "KernelPromptSpecs.loopMessagesShared", TestBody.Sync(sync KernelPromptSpecs.loopMessagesShared)
       "KernelPromptSpecs.reviewerVerdictPromptsShared",

@@ -1,6 +1,7 @@
 module Wanxiangshu.Tests.MessageTransformPolicyTests
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.MessageTransformPolicy
 open Wanxiangshu.Kernel.HostTools
@@ -50,7 +51,8 @@ let testTransformO1Cache () =
               Excluded = false
               IsSubagentSession = false
               Cleaned = []
-              RawArray = None }
+              RawArray = None
+              SembleInjectEnabled = false }
 
         let backlogOps =
             { Host = opencode
@@ -109,7 +111,15 @@ let testTransformO1Cache () =
     }
 
 let mkMsg id role parts =
-    { info = { id = id; sessionID = "test"; role = role; agent = "main"; isError = false; toolName = ""; details = null; time = null }
+    { info =
+        { id = id
+          sessionID = "test"
+          role = role
+          agent = "main"
+          isError = false
+          toolName = ""
+          details = null
+          time = null }
       parts = parts
       source = Native
       raw = null }
@@ -117,7 +127,11 @@ let mkMsg id role parts =
 let testSingleToolCallPromptInjection () =
     promise {
         let reviewStore = createReviewStore ()
-        let backlogOps = { Host = opencode; GetOrRebuildBacklog = fun _ _ -> [] }
+
+        let backlogOps =
+            { Host = opencode
+              GetOrRebuildBacklog = fun _ _ -> [] }
+
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
         let injectFn _ (arr: obj array) = promise { return arr }
         let loadCaps () = promise { return [] }
@@ -131,14 +145,27 @@ let testSingleToolCallPromptInjection () =
                   Excluded = excluded
                   IsSubagentSession = false
                   Cleaned = msgs
-                  RawArray = None }
-            runHostMessagesTransform reviewStore sessionID IfStoreEmpty (fun _ -> promise { return Seq.empty }) plan backlogOps encodeMessages injectFn loadCaps buildCaps
+                  RawArray = None
+                  SembleInjectEnabled = false }
+
+            runHostMessagesTransform
+                reviewStore
+                sessionID
+                IfStoreEmpty
+                (fun _ -> promise { return Seq.empty })
+                plan
+                backlogOps
+                encodeMessages
+                injectFn
+                loadCaps
+                buildCaps
 
         // Case 1: 单工具调用 + ToolResult -> 应当被附加
         let msgs1 =
             [ mkMsg "user" User []
               mkMsg "assist" Assistant [ ToolPart("read", "call-1", None, null) ]
               mkMsg "result" ToolResult [] ]
+
         let! res1 = runTransform "s1" false msgs1
         equal "Case 1 output length (should be 4)" 4 res1.Length
         let lastMsg = res1.[res1.Length - 1] :?> Message<obj>
@@ -147,15 +174,21 @@ let testSingleToolCallPromptInjection () =
 
         let promptText =
             match lastMsg.parts |> List.tryHead with
-            | Some (TextPart txt) -> txt
+            | Some(TextPart txt) -> txt
             | _ -> ""
+
         check "promptText contains '并行'" (promptText.Contains("并行"))
 
         // Case 2: 双工具调用 + ToolResult -> 不应附加
         let msgs2 =
             [ mkMsg "user" User []
-              mkMsg "assist" Assistant [ ToolPart("read", "call-1", None, null); ToolPart("write", "call-2", None, null) ]
+              mkMsg
+                  "assist"
+                  Assistant
+                  [ ToolPart("read", "call-1", None, null)
+                    ToolPart("write", "call-2", None, null) ]
               mkMsg "result" ToolResult [] ]
+
         let! res2 = runTransform "s2" false msgs2
         equal "Case 2 length" 3 res2.Length
 
@@ -164,14 +197,20 @@ let testSingleToolCallPromptInjection () =
             [ mkMsg "user" User []
               mkMsg "assist" Assistant [ ToolPart("read", "semble-call-123", None, null) ]
               mkMsg "result" ToolResult [] ]
+
         let! res3 = runTransform "s3" false msgs3
         equal "Case 3 length" 3 res3.Length
 
         // Case 4: 混合场景 (1 个真工具 + 1 个 semble 工具) -> 不应附加
         let msgs4 =
             [ mkMsg "user" User []
-              mkMsg "assist" Assistant [ ToolPart("read", "call-1", None, null); ToolPart("write", "semble-call-2", None, null) ]
+              mkMsg
+                  "assist"
+                  Assistant
+                  [ ToolPart("read", "call-1", None, null)
+                    ToolPart("write", "semble-call-2", None, null) ]
               mkMsg "result" ToolResult [] ]
+
         let! res4 = runTransform "s4" false msgs4
         equal "Case 4 length" 3 res4.Length
 
@@ -190,8 +229,65 @@ let testSingleToolCallPromptInjection () =
             [ mkMsg "dup-id" User []
               mkMsg "dup-id" Assistant [ ToolPart("read", "call-1", None, null) ]
               mkMsg "dup-id" ToolResult [] ]
+
         let! res7 = runTransform "s7" false msgs7
         equal "Case 7 length with duplicate IDs" 4 res7.Length
+    }
+
+let testAmendSkippedWhenSembleInjectEnabled () =
+    promise {
+        let reviewStore = createReviewStore ()
+
+        let backlogOps =
+            { Host = opencode
+              GetOrRebuildBacklog = fun _ _ -> [] }
+
+        let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
+        let injectFn _ (arr: obj array) = promise { return arr }
+        let loadCaps () = promise { return [] }
+        let buildCaps (arr: obj array) _ _ = arr
+
+        let msgs =
+            [ mkMsg "user1" User []
+              mkMsg "assist1" Assistant [ ToolPart("read", "call-1", None, null) ]
+              mkMsg "result1" ToolResult []
+              { info =
+                  { id = "amend-msg"
+                    sessionID = "test"
+                    role = User
+                    agent = "main"
+                    isError = false
+                    toolName = ""
+                    details = null
+                    time = null }
+                parts = []
+                source = Native
+                raw = createObj [ "amend", box 1 ] } ]
+
+        let plan =
+            { SessionID = "s-amend-semble"
+              Agent = "main"
+              Directory = ""
+              Excluded = true
+              IsSubagentSession = false
+              Cleaned = msgs
+              RawArray = None
+              SembleInjectEnabled = true }
+
+        let! res =
+            runHostMessagesTransform
+                reviewStore
+                "s-amend-semble"
+                IfStoreEmpty
+                (fun _ -> promise { return Seq.empty })
+                plan
+                backlogOps
+                encodeMessages
+                injectFn
+                loadCaps
+                buildCaps
+
+        equal "amend skipped: output should preserve all 4 messages" 4 res.Length
     }
 
 let run () =
@@ -202,4 +298,5 @@ let run () =
         childWorkspaceNotExcluded ()
         do! testTransformO1Cache ()
         do! testSingleToolCallPromptInjection ()
+        do! testAmendSkippedWhenSembleInjectEnabled ()
     }

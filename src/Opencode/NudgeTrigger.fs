@@ -19,6 +19,7 @@ type NudgeTrigger
     (
         host: Host,
         ctx: obj,
+        fallbackRuntime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState,
         markForceStopped: string -> unit,
         removeForceStopped: string -> unit,
         isForceStopped: string -> bool
@@ -96,15 +97,21 @@ type NudgeTrigger
                 | Some sessionID ->
                     if isNaturalStop eventType props && not (isForceStopped sessionIDStr) then
                         match getClientFromPluginCtx ctx with
-                        | Ok client -> do! dispatchPostStopFromHistory host client ctx sessionID
+                        | Ok client ->
+                            try
+                                fallbackRuntime.SetNudgeActive sessionIDStr true
+                                do! dispatchPostStopFromHistory host client ctx sessionID
+                            finally
+                                fallbackRuntime.SetNudgeActive sessionIDStr false
                         | Error _ -> ()
         }
 
 let createNudgeTrigger
     (host: Host)
     (ctx: obj)
+    (fallbackRuntime: Wanxiangshu.Shell.FallbackRuntimeState.FallbackRuntimeState)
     (markForceStopped: string -> unit)
     (removeForceStopped: string -> unit)
     (isForceStopped: string -> bool)
     : NudgeTrigger =
-    NudgeTrigger(host, ctx, markForceStopped, removeForceStopped, isForceStopped)
+    NudgeTrigger(host, ctx, fallbackRuntime, markForceStopped, removeForceStopped, isForceStopped)

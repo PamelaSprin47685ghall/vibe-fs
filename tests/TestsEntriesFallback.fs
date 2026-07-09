@@ -9,21 +9,25 @@ open Wanxiangshu.Tests.FallbackMessageCodecTests
 open Wanxiangshu.Tests.FallbackIntegrationTests
 open Wanxiangshu.Tests.FallbackRecoveryWaitTests
 open Wanxiangshu.Tests.SubagentIoFallbackRecoveryTests
+open Wanxiangshu.Tests.SubagentIoFallbackRecoveryTestsPart2
 open Wanxiangshu.Tests.ArchitectureTestsFallback
 open Wanxiangshu.Tests.WebFetchGuardTests
 open Wanxiangshu.Tests.ReviewVerdictTests
 open Wanxiangshu.Tests.ToolCopyTests
 open Wanxiangshu.Tests.JsArrayMutateTests
+open Wanxiangshu.Tests.FallbackAgentAndModelTests
 
 let fallbackTestEntries () : (string * TestBody) list =
     [ "FallbackKernelTests.run", Sync(sync FallbackKernelTests.run)
       "FallbackConfigCodecTests.run", Sync(sync FallbackConfigCodecTests.run)
       "FallbackRuntimeStateTests.run", Sync(sync FallbackRuntimeStateTests.run)
       "FallbackEventBridgeTests.run", Async FallbackEventBridgeTests.run
+      "FallbackAgentAndModelTests.run", Async FallbackAgentAndModelTests.run
       "FallbackMessageCodecTests.run", Sync(sync FallbackMessageCodecTests.run)
       "FallbackIntegrationTests.run", Sync(sync FallbackIntegrationTests.run)
       "FallbackRecoveryWaitTests.run", Async FallbackRecoveryWaitTests.run
       "SubagentIoFallbackRecoveryTests.run", Async SubagentIoFallbackRecoveryTests.run
+      "SubagentIoFallbackRecoveryTestsPart2.run", Async SubagentIoFallbackRecoveryTestsPart2.run
       "Arch.Fallback.zeroTimer", Sync(sync ArchitectureTestsFallback.zeroTimer)
       "Arch.Fallback.kernelPurity", Sync(sync ArchitectureTestsFallback.kernelPurity)
       "Arch.Fallback.ompFallbackIsolation", Sync(sync ArchitectureTestsFallback.ompFallbackIsolation)

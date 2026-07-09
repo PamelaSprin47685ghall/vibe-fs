@@ -59,3 +59,48 @@ let waitForToolCallTextRecovery (runtime: FallbackRuntimeState) (sessionID: stri
             runtime.OnStateChanged sessionID checkSettled
             return! p
     }
+
+let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) : bool =
+    if sessionID = "" then
+        true
+    else
+        let busy = runtime.GetBusyCount sessionID > 0
+
+        let fbActive =
+            if not (runtime.HasState sessionID) then
+                false
+            else
+                let st = runtime.GetOrCreateState sessionID
+
+                match st.Phase with
+                | FallbackPhase.Scanning _
+                | FallbackPhase.Retrying _
+                | FallbackPhase.ScanningToolCallText
+                | FallbackPhase.RecoveringToolCallText -> true
+                | FallbackPhase.Idle ->
+                    match runtime.GetConsumed sessionID with
+                    | Some true -> true
+                    | _ -> false
+                | FallbackPhase.Exhausted -> false
+
+        let nudgeAct = runtime.IsNudgeActive sessionID
+
+        not busy && not fbActive && not nudgeAct
+
+let waitForSubagentSettle (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
+    promise {
+        if sessionID = "" || isSubagentSettled runtime sessionID then
+            return ()
+        else
+            let resolver = ref (fun () -> ())
+            let p = Promise.create (fun resolve reject -> resolver.Value <- resolve)
+
+            let rec checkSettled () =
+                if isSubagentSettled runtime sessionID then
+                    resolver.Value()
+                else
+                    runtime.OnStateChanged sessionID checkSettled
+
+            runtime.OnStateChanged sessionID checkSettled
+            return! p
+    }

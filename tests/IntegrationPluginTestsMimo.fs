@@ -130,6 +130,20 @@ let mimoConfigSpec () =
                makeTaskMessage "mimo-msg-3" "Third report from the final task." "" "" "" "" |]
 
         let todoInput report content status priority =
+            let parsedStatus =
+                match status with
+                | "in_progress" -> Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.InProgress
+                | "completed" -> Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
+                | "cancelled" -> Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Cancelled
+                | _ -> Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Todo
+
+            let parsedPriority =
+                match priority with
+                | "low" -> Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.Low
+                | "medium" -> Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.Medium
+                | "high" -> Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.High
+                | _ -> Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.Low
+
             { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.AhaMoments = report
               Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.ChangesAndReasons = report + "_changes"
               Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Gotchas = report + "_gotchas"
@@ -137,8 +151,8 @@ let mimoConfigSpec () =
               Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Plan = report + "_plan"
               Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.Todos =
                 [| { Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Content = content
-                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Status = status
-                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Priority = priority } |]
+                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Status = parsedStatus
+                     Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoItem.Priority = parsedPriority } |]
               Wanxiangshu.Shell.WorkBacklogToolsCodec.TodoWriteArgs.SelectMethodology = [] }
 
         do!

@@ -54,20 +54,28 @@ let handleEvent
                     promise { return Some FallbackEvent.SessionBusy }
                 elif translator.IsSessionIdle rawEvent then
                     promise {
-                        let! msgs = executor.FetchMessages sessionID
+                        let state = runtime.GetOrCreateState sessionID
 
-                        if isIdleNoContentAndNoTools msgs then
-                            return
-                                Some(
-                                    FallbackEvent.SessionError
-                                        { ErrorName = "EmptyOutputError"
-                                          DomainError = None
-                                          Message = "LLM returned empty output without tools"
-                                          StatusCode = None
-                                          IsRetryable = Some true }
-                                )
-                        else
+                        if state.Cancelled then
                             return Some FallbackEvent.SessionIdle
+                        else
+                            let! msgs = executor.FetchMessages sessionID
+
+                            match FallbackMessageCodec.tryGetLastAssistantAbortInfo msgs with
+                            | Some abortErr -> return Some(FallbackEvent.SessionError abortErr)
+                            | None ->
+                                if isIdleNoContentAndNoTools msgs then
+                                    return
+                                        Some(
+                                            FallbackEvent.SessionError
+                                                { ErrorName = "EmptyOutputError"
+                                                  DomainError = None
+                                                  Message = "LLM returned empty output without tools"
+                                                  StatusCode = None
+                                                  IsRetryable = Some true }
+                                        )
+                                else
+                                    return Some FallbackEvent.SessionIdle
                     }
                 else
                     promise { return None }
@@ -90,22 +98,34 @@ let handleEvent
                     if not (List.isEmpty existing) then
                         return existing
                     else
+                        let! currentModel = executor.CaptureCurrentModel sessionID
+
                         let resolved =
                             Map.tryFind (normalizeAgentName agentName) cfg.AgentChains
                             |> Option.defaultValue cfg.DefaultChain
 
-                        if not (List.isEmpty resolved) then
-                            runtime.SetChain sessionID resolved
-                            return resolved
-                        else
-                            let! currentModel = executor.CaptureCurrentModel sessionID
-
+                        let finalChain =
                             match currentModel with
                             | Some current ->
-                                let single = [ current ]
-                                runtime.SetChain sessionID single
-                                return single
-                            | None -> return []
+                                match resolved with
+                                | first :: _ when
+                                    first.ProviderID = current.ProviderID && first.ModelID = current.ModelID
+                                    ->
+                                    resolved
+                                | _ ->
+                                    let filtered =
+                                        resolved
+                                        |> List.filter (fun m ->
+                                            m.ProviderID <> current.ProviderID || m.ModelID <> current.ModelID)
+
+                                    current :: filtered
+                            | None -> resolved
+
+                        if not (List.isEmpty finalChain) then
+                            runtime.SetChain sessionID finalChain
+                            return finalChain
+                        else
+                            return []
                 }
 
             if List.isEmpty chain then

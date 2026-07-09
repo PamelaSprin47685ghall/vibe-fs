@@ -83,10 +83,19 @@ let scanToolCallAsText_assistantTextClean () =
 
     check "assistant clean text → None" (None = prompt)
 
+let scanToolCallAsText_markdownOrTextDiscussionNotToolCall () =
+    let prompt1 =
+        scanToolCallAsText [| mkAssistantTextMsg "Please use `<read>` tool to read the file." |]
+
+    check "markdown inline code should not trigger recovery" (None = prompt1)
+
+    let prompt2 =
+        scanToolCallAsText [| mkAssistantTextMsg "The concept of <read> and <write> in file system." |]
+
+    check "discussion text should not trigger recovery" (None = prompt2)
+
 let private mkAssistantMsg (parts: obj array) : obj =
-    createObj
-        [ "info", box (createObj [ "role", box "assistant" ])
-          "parts", box parts ]
+    createObj [ "info", box (createObj [ "role", box "assistant" ]); "parts", box parts ]
 
 let private mkToolPart (toolName: string) : obj =
     createObj [ "type", box "tool"; "tool", box toolName ]
@@ -102,6 +111,7 @@ let isIdleNoContentAndNoTools_noAssistant () =
         createObj
             [ "info", box (createObj [ "role", box "user" ])
               "parts", box [| mkTextPart "hello" |] ]
+
     check "no assistant message → false" (not (isIdleNoContentAndNoTools [| userMsg |]))
 
 let isIdleNoContentAndNoTools_emptyAssistant () =
@@ -136,6 +146,7 @@ let run () =
     scanToolCallAsText_noAssistantText ()
     scanToolCallAsText_assistantTextWithToolCall ()
     scanToolCallAsText_assistantTextClean ()
+    scanToolCallAsText_markdownOrTextDiscussionNotToolCall ()
     isIdleNoContentAndNoTools_noAssistant ()
     isIdleNoContentAndNoTools_emptyAssistant ()
     isIdleNoContentAndNoTools_onlyReasoning ()

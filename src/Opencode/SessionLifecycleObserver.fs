@@ -41,6 +41,7 @@ type SessionLifecycleObserver
         createNudgeTrigger
             host
             ctx
+            fallbackRuntime
             (fun sid -> forceStoppedSessions <- Set.add sid forceStoppedSessions)
             (fun sid -> forceStoppedSessions <- Set.remove sid forceStoppedSessions)
             (fun sid -> Set.contains sid forceStoppedSessions)
@@ -64,12 +65,17 @@ type SessionLifecycleObserver
                      Props = props } ->
                 let statusObj = Dyn.get props "status"
                 let agentName = Dyn.str statusObj "agent"
+                let sid = getSessionID "session.status" props
 
-                if agentName <> "" then
-                    let sid = getSessionID "session.status" props
-
-                    if sid <> "" then
+                if sid <> "" then
+                    if agentName <> "" then
                         fallbackRuntime.SetAgentName sid agentName
+
+                    let modelObj = Dyn.get statusObj "model"
+
+                    match Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj modelObj with
+                    | Some m -> fallbackRuntime.SetModel sid m
+                    | None -> ()
             | _ -> ()
 
             fallback.UpdateBusyCount eventEnvelope

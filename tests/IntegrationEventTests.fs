@@ -51,6 +51,8 @@ let run () : JS.Promise<unit> =
         do! sessionPostErrorSpec ()
         do! sessionUserQueryPostErrorSpec ()
         do! sessionInterruptedEventSpec ()
+        do! sessionInterruptedMessageIdleEventSpec ()
+        do! sessionInterruptedMessageWithContentIdleEventSpec ()
         do! repeatedAssistantSpec ()
         do! repeatedIdleBeforeHistoryPersistsNudgeSpec ()
         do! sessionStatusIdleAndSessionIdleDedupSpec ()

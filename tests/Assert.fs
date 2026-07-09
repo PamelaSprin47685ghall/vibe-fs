@@ -3,9 +3,19 @@
 module Wanxiangshu.Tests.Assert
 
 open Fable.Core
+open Fable.Core.JsInterop
 
 [<Emit("performance.now()")>]
 let private now () : float = jsNative
+
+/// Safely extract an error message from a caught exception object that may be
+/// undefined/null or lack a `Message` property (JS interop boundary).
+let private getErrorMessage (ex: obj) : string =
+    if isNull ex then
+        ""
+    else
+        let msg = ex?Message
+        if isNull msg then "" else string msg
 
 [<Import("appendFileSync", "node:fs")>]
 let private appendFile (path: string) (content: string) (encoding: string) : unit = jsNative
@@ -13,8 +23,7 @@ let private appendFile (path: string) (content: string) (encoding: string) : uni
 let mutable passed = 0
 let mutable failed = 0
 let mutable silentEnabled = false
-let setSilent (s: bool) : unit =
-    silentEnabled <- s
+let setSilent (s: bool) : unit = silentEnabled <- s
 let private failures = ResizeArray<string>()
 let private timings = ResizeArray<string * float>()
 let mutable private verboseEnabled = false
@@ -118,7 +127,7 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
             let! _ = raceWithTimeout (f ()) "TIMEOUT" asyncSpecTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
-            let msg = string ex.Message
+            let msg = getErrorMessage ex
 
             if msg.Contains "TIMEOUT" then
                 failed <- failed + 1
@@ -139,7 +148,7 @@ let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<uni
             let! _ = raceWithTimeout (f ()) "TIMEOUT" asyncSuiteTimeoutMs
             timings.Add(label, now () - start)
         with ex ->
-            let msg = string ex.Message
+            let msg = getErrorMessage ex
 
             if msg.Contains "TIMEOUT" then
                 failed <- failed + 1
@@ -178,10 +187,9 @@ let summary () : int =
             appendFile path footer "utf8"
             printfn "\nverbose log: %s" path
         | _ -> ()
-    else
-        if failures.Count > 0 then
-            printfn "\n==== %d passed, %d failed ====" passed failed
-            printfn "FAILURES:"
-            failures |> Seq.iteri (fun i f -> printfn "  %d. %s" (i + 1) f)
+    else if failures.Count > 0 then
+        printfn "\n==== %d passed, %d failed ====" passed failed
+        printfn "FAILURES:"
+        failures |> Seq.iteri (fun i f -> printfn "  %d. %s" (i + 1) f)
 
     failed

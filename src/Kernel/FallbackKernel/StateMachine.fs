@@ -33,7 +33,7 @@ let handleSessionError (state: SessionFallbackState) (cfg: FallbackConfig) (chai
         match state.Phase, errorClass with
         | _, ErrorClass.Ignore ->
             let ns =
-                if err.ErrorName = "AbortError" || err.ErrorName = "MessageAbortedError" then
+                if errorInputIsAbort err then
                     { state with Cancelled = true }
                 else
                     state

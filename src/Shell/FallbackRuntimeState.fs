@@ -15,8 +15,10 @@ type FallbackRuntimeState() =
     let mutable states = Map.ofList<string, SessionFallbackState> []
     let mutable chains = Map.ofList<string, FallbackChain> []
     let mutable agents = Map.ofList<string, string> []
+    let mutable models = Map.ofList<string, FallbackModel> []
     let mutable busyCounts = Map.ofList<string, int> []
     let mutable consumed = Map.ofList<string, bool> []
+    let mutable nudgeActive = Map.ofList<string, bool> []
     let mutable listeners = Map.empty<string, ResizeArray<unit -> unit>>
 
     let triggerStateChanged (sessionID: string) : unit =
@@ -43,6 +45,11 @@ type FallbackRuntimeState() =
 
         list.Add(callback)
 
+    member _.HasListeners(sessionID: string) : bool =
+        match Map.tryFind sessionID listeners with
+        | Some arr -> arr.Count > 0
+        | None -> false
+
     member _.HasState(sessionID: string) : bool = Map.containsKey sessionID states
 
     member _.GetOrCreateState(sessionID: string) : SessionFallbackState =
@@ -68,6 +75,11 @@ type FallbackRuntimeState() =
     member _.GetAgentName(sessionID: string) : string =
         Map.tryFind sessionID agents |> Option.defaultValue ""
 
+    member _.SetModel (sessionID: string) (model: FallbackModel) : unit =
+        models <- Map.add sessionID model models
+
+    member _.GetModel(sessionID: string) : FallbackModel option = Map.tryFind sessionID models
+
     member _.GetBusyCount(sessionID: string) : int =
         Map.tryFind sessionID busyCounts |> Option.defaultValue 0
 
@@ -84,10 +96,34 @@ type FallbackRuntimeState() =
         consumed <- Map.remove sessionID consumed
         triggerStateChanged sessionID
 
+    member _.SetNudgeActive (sessionID: string) (value: bool) : unit =
+        nudgeActive <- Map.add sessionID value nudgeActive
+        triggerStateChanged sessionID
+
+    member _.IsNudgeActive(sessionID: string) : bool =
+        Map.tryFind sessionID nudgeActive |> Option.defaultValue false
+
+    member this.SetContinueActive (sessionID: string) (value: bool) : unit =
+        let s = this.GetOrCreateState sessionID
+
+        let nextPhase =
+            if value then
+                FallbackPhase.Retrying 1
+            else
+                FallbackPhase.Idle
+
+        this.UpdateState sessionID { s with Phase = nextPhase }
+
+    member this.SetTaskComplete (sessionID: string) (value: bool) : unit =
+        let s = this.GetOrCreateState sessionID
+        this.UpdateState sessionID { s with TaskComplete = value }
+
     member _.CleanupSession(sessionID: string) : unit =
         states <- Map.remove sessionID states
         chains <- Map.remove sessionID chains
         agents <- Map.remove sessionID agents
+        models <- Map.remove sessionID models
         busyCounts <- Map.remove sessionID busyCounts
         consumed <- Map.remove sessionID consumed
+        nudgeActive <- Map.remove sessionID nudgeActive
         triggerStateChanged sessionID

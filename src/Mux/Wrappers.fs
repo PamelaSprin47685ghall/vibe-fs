@@ -120,7 +120,14 @@ let private mkSyntaxWrappers () : obj array =
        mkResultWrapper "file_edit_insert" (fun result args config -> applySyntaxCheck result args config) |]
 
 let private todoItemForNativeWrite (item: TodoItem) : obj =
-    createObj [ "content", box item.Content; "status", box item.Status ]
+    let statusStr =
+        match item.Status with
+        | ToolArgs.Todo -> "pending"
+        | ToolArgs.InProgress -> "in_progress"
+        | ToolArgs.Completed -> "completed"
+        | ToolArgs.Cancelled -> "cancelled"
+
+    createObj [ "content", box item.Content; "status", box statusStr ]
 
 let private todoArrayForNativeWrite (decoded: TodoWriteArgs) : obj =
     decoded.Todos |> Array.map todoItemForNativeWrite |> box

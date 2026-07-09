@@ -52,6 +52,9 @@
     <Compile Include="src/Kernel/ToolCatalog/Classification.fs"/>
     <Compile Include="src/Kernel/ToolCatalog/Registry.fs"/>
     <Compile Include="src/Kernel/ToolCatalogParams.fs"/>
+    <Compile Include="src/Kernel/ExecutorStrip.fs"/>
+    <Compile Include="src/Kernel/Executor.fs"/>
+    <Compile Include="src/Kernel/ToolArgs.fs"/>
     <Compile Include="src/Kernel/Nudge.fs"/>
     <Compile Include="src/Kernel/Nudge/TodoStatus.fs"/>
     <Compile Include="src/Kernel/Nudge/RetryProgress.fs"/>
@@ -101,8 +104,6 @@
     <Compile Include="src/Kernel/FuzzyQuery.fs"/>
     <Compile Include="src/Kernel/FuzzyFormat.fs"/>
     <Compile Include="src/Kernel/ExecutorStrip.fs"/>
-    <Compile Include="src/Kernel/Executor.fs"/>
-    <Compile Include="src/Kernel/ToolArgs.fs"/>
     <Compile Include="src/Kernel/WebFetchGuard.fs"/>
     <Compile Include="src/Shell/Dyn.fs"/>
     <Compile Include="src/Shell/Profiler.fs"/>
@@ -360,6 +361,7 @@
     <Compile Include="tests/EventLogTestSeed.fs"/>
     <Compile Include="tests/TempWorkspace.fs"/>
     <Compile Include="tests/EventLogRuntimeTests.fs"/>
+    <Compile Include="tests/EventLogRuntimeRobustnessTests.fs"/>
     <Compile Include="tests/IntegrationToolSetup.fs"/>
     <Compile Include="tests/EventDrivenHarness.fs"/>
     <Compile Include="tests/EventDrivenHarnessDemo.fs"/>
@@ -591,8 +593,10 @@
     <Compile Include="tests/FallbackRuntimeStateTests.fs"/>
     <Compile Include="tests/FallbackEventBridgeTestsPart2.fs"/>
     <Compile Include="tests/FallbackEventBridgeTests.fs"/>
+    <Compile Include="tests/FallbackAgentAndModelTests.fs"/>
     <Compile Include="tests/FallbackRecoveryWaitTests.fs"/>
     <Compile Include="tests/SubagentIoFallbackRecoveryTests.fs"/>
+    <Compile Include="tests/SubagentIoFallbackRecoveryTestsPart2.fs"/>
     <Compile Include="tests/FallbackMessageCodecTests.fs"/>
     <Compile Include="tests/FallbackIntegrationTests.fs"/>
     <Compile Include="tests/ArchitectureTestsFallback.fs"/>

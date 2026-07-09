@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Kernel
 open Wanxiangshu.Kernel.Domain
+open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Shell.ChildAgentRegistry
@@ -51,9 +52,8 @@ let runSubagentCoreResult
                 match existingChildID with
                 | Some cid ->
                     let parentID =
-                        registry.ResolveSubsessionParentID(
-                            if sessionID = "" then None else Some sessionID
-                        )
+                        registry.ResolveSubsessionParentID(if sessionID = "" then None else Some sessionID)
+
                     registry.RegisterChildAgent(cid, agent, parentID)
                     Promise.lift (Ok cid)
                 | None -> startSubagentSession registry client options
@@ -79,11 +79,16 @@ let runSubagentCoreResult
                 try
                     do! promptWithAbort client (buildPromptBody options childID) signal
 
-                    do! waitForToolCallTextRecovery runtime childID
+                    do! waitForSubagentSettle runtime childID
 
                     try
-                        let! text = extractSessionText client childID directory
-                        return Ok(formatSubagentReport noOutputText abortedPrefix text false)
+                        let st = runtime.GetOrCreateState childID
+
+                        if st.Cancelled then
+                            return Ok abortedPrefix
+                        else
+                            let! text = extractSessionText client childID directory
+                            return Ok(formatSubagentReport noOutputText abortedPrefix text false)
                     finally
                         cleanupChildIfRequested ()
                 with err ->
@@ -98,15 +103,22 @@ let runSubagentCoreResult
                             let! text = extractSessionText client childID directory
                             return Ok(formatSubagentReport noOutputText abortedPrefix text true)
                     | other ->
-                        do! waitForRecovery runtime childID 48
+                        do! waitForSubagentSettle runtime childID
 
-                        match runtime.GetConsumed childID with
-                        | Some true ->
+                        let st = runtime.GetOrCreateState childID
+
+                        let isSuccess =
+                            (st.TaskComplete || runtime.GetConsumed childID = Some true)
+                            && st.Phase <> FallbackPhase.Exhausted
+                            && not st.Cancelled
+
+                        if isSuccess then
                             let! text = extractSessionText client childID directory
                             return Ok(formatSubagentReport noOutputText abortedPrefix text false)
-                        | _ -> return Error other
+                        else
+                            return Error other
         with err ->
-            return Error (translateJsError err)
+            return Error(translateJsError err)
     }
 
 let runSubagentWithCleanup

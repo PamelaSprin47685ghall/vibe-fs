@@ -15,6 +15,7 @@ let canUse' () =
     check "submit_review denied for investigator" (not (canUse "investigator" "submit_review"))
 
     check "meditator can read" (canUse "meditator" "read")
+    check "meditator can investigator dispatch" (canUse "meditator" "investigator")
     check "executor denied read" (not (canUse "executor" "read"))
     check "meditator agent_report ok" (canUse "meditator" "agent_report")
 
@@ -123,7 +124,7 @@ let canUseMatrix () =
           "ask_user_question", [ true; false; false; false; false; false; false ]
           "skill", [ true; false; false; false; false; false; false ]
           "coder", [ true; false; false; false; false; false; false ]
-          "investigator", [ true; false; true; true; false; false; false ]
+          "investigator", [ true; false; true; true; false; true; false ]
           "meditator", [ true; false; false; false; false; false; false ]
           "browser", [ true; false; false; false; false; false; false ]
           "manager", [ true; false; false; false; false; false; false ]

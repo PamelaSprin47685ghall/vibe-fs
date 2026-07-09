@@ -15,9 +15,10 @@ open Wanxiangshu.Shell.PromiseQueue
 
 let lockFileName = ".wanxiangshu.ndjson.lock"
 
-type EventLogStore(workspaceRoot: string) =
+type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEvent -> JS.Promise<unit>) =
     let queue = SerialQueue()
     let eventFilePath = eventPath workspaceRoot
+    let appendLineFn = defaultArg appendLineOverride appendLine
     let mutable sessionStates: Map<string, SessionState> = Map.empty
     let mutable squadProj = emptyProjection ()
     let mutable latestSessionId: string option = None
@@ -36,6 +37,7 @@ type EventLogStore(workspaceRoot: string) =
 
         sessionStates <- Map.add sId (applyEvent oldState e) sessionStates
         squadProj <- applyWanEvent squadProj e
+
         if isSquadEventKind e.Kind then
             latestSessionId <- Some e.Session
 
@@ -50,8 +52,11 @@ type EventLogStore(workspaceRoot: string) =
                     initDone <- true
                 else
                     if readCalled then
-                        failwith "ReadAllEvents / ensureInitialized is restricted to be called at most once during the store lifecycle!"
+                        failwith
+                            "ReadAllEvents / ensureInitialized is restricted to be called at most once during the store lifecycle!"
+
                     readCalled <- true
+
                     do!
                         withWorkspaceLock eventFilePath (fun () ->
                             promise {
@@ -101,11 +106,11 @@ type EventLogStore(workspaceRoot: string) =
         queue.Enqueue(fun () ->
             promise {
                 do! ensureInitialized ()
-                foldWan e
-                readAllResult.Add(e) |> ignore
 
                 try
-                    do! withWorkspaceLock eventFilePath (fun () -> appendLine eventFilePath e)
+                    do! withWorkspaceLock eventFilePath (fun () -> appendLineFn eventFilePath e)
+                    foldWan e
+                    readAllResult.Add(e) |> ignore
                     return Ok()
                 with ex ->
                     return Error ex.Message
@@ -115,9 +120,9 @@ type EventLogStore(workspaceRoot: string) =
         queue.Enqueue(fun () ->
             promise {
                 do! ensureInitialized ()
+                do! withWorkspaceLock eventFilePath (fun () -> appendLineFn eventFilePath e)
                 foldWan e
                 readAllResult.Add(e) |> ignore
-                do! withWorkspaceLock eventFilePath (fun () -> appendLine eventFilePath e)
             })
 
     member _.GetSquadDag(sessionId: string) : JS.Promise<Dag> =
@@ -171,8 +176,8 @@ type EventLogStore(workspaceRoot: string) =
                     let ev =
                         buildEvent sessionId eventKindNudgeDispatched payload (getTimestampMs().ToString())
 
+                    do! withWorkspaceLock eventFilePath (fun () -> appendLineFn eventFilePath ev)
                     foldWan ev
                     readAllResult.Add(ev) |> ignore
-                    do! withWorkspaceLock eventFilePath (fun () -> appendLine eventFilePath ev)
                     return true
             })

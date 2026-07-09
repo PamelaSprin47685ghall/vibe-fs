@@ -3,7 +3,7 @@ module Wanxiangshu.Kernel.FallbackKernel.Decision
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
-let private errorInputIsAbort (err: ErrorInput) : bool =
+let errorInputIsAbort (err: ErrorInput) : bool =
     match err.DomainError with
     | Some MessageAborted -> true
     | Some(ClientCancellation _) -> true
