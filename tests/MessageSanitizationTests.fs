@@ -101,20 +101,32 @@ let testEmptyArrayAndMissingContentSanitization () =
             { Host = opencode
               GetOrRebuildBacklog = fun _ _ -> [] }
 
+        let partsRef = [||]
+        let contentRef = [||]
+        let partsRef5 = [| box (createObj [ "type", box "text"; "text", box "hello" ]) |]
+
         let encodeMessages (msgs: Message<obj> list) =
             [|
                // Case 1: parts is empty array
                createObj
-                   [ "id", box "msg-1"
-                     "role", box "assistant"
-                     "parts", box [||]
-                     "content", box [||] ]
+                   [ "info", box (createObj [ "id", box "msg-1"; "role", box "assistant" ])
+                     "parts", box partsRef
+                     "content", box contentRef ]
                // Case 2: content is empty array
-               createObj [ "id", box "msg-2"; "role", box "assistant"; "content", box [||] ]
+               createObj
+                   [ "info", box (createObj [ "id", box "msg-2"; "role", box "assistant" ])
+                     "content", box [||] ]
                // Case 3: content and parts are nullish/missing
-               createObj [ "id", box "msg-3"; "role", box "assistant" ]
+               createObj [ "info", box (createObj [ "id", box "msg-3"; "role", box "assistant" ]) ]
                // Case 4: user + content empty string + parts empty array
-               createObj [ "id", box "msg-4"; "role", box "user"; "content", box ""; "parts", box [||] ] |]
+               createObj
+                   [ "info", box (createObj [ "id", box "msg-4"; "role", box "user" ])
+                     "content", box ""
+                     "parts", box [||] ]
+               // Case 5: content missing, parts present (should sync content <- parts)
+               createObj [ "id", box "msg-5"; "role", box "assistant"; "parts", box partsRef5 ]
+               // Case 6: parts missing, content present as string (should sync parts <- content wrap)
+               createObj [ "id", box "msg-6"; "role", box "assistant"; "content", box "world" ] |]
 
         let injectFn _ (arr: obj array) = promise { return arr }
         let loadCaps () = promise { return [] }
@@ -143,13 +155,17 @@ let testEmptyArrayAndMissingContentSanitization () =
                 loadCaps
                 buildCaps
 
-        equal "sanitize result length" 4 res.Length
+        equal "sanitize result length" 6 res.Length
 
         // Case 1 check
         let msg1 = res.[0]
-        let parts1 = Dyn.get msg1 "parts" :?> obj array
-        check "parts1 should not be empty" (parts1.Length > 0)
-        equal "parts1 first element text" "." (string (Dyn.get parts1.[0] "text"))
+        let parts1 = Dyn.get msg1 "parts"
+        let content1 = Dyn.get msg1 "content"
+        check "parts1 should be same array reference" (System.Object.ReferenceEquals(parts1, partsRef))
+        check "content1 should be same array reference" (System.Object.ReferenceEquals(content1, contentRef))
+        let parts1Arr = parts1 :?> obj array
+        check "parts1 should not be empty" (parts1Arr.Length > 0)
+        equal "parts1 first element text" "." (string (Dyn.get parts1Arr.[0] "text"))
 
         // Case 2 check
         let msg2 = res.[1]
@@ -179,6 +195,20 @@ let testEmptyArrayAndMissingContentSanitization () =
         let parts4 = Dyn.get msg4 "parts" :?> obj array
         check "parts4 should not be empty" (parts4.Length > 0)
         equal "parts4 first element text" "." (string (Dyn.get parts4.[0] "text"))
+
+        // Case 5 check
+        let msg5 = res.[4]
+        let content5 = Dyn.get msg5 "content"
+        let parts5 = Dyn.get msg5 "parts"
+        check "msg5 content should be same as parts reference" (System.Object.ReferenceEquals(content5, parts5))
+
+        // Case 6 check
+        let msg6 = res.[5]
+        let content6 = Dyn.get msg6 "content"
+        let parts6 = Dyn.get msg6 "parts" :?> obj array
+        equal "msg6 content should be world" "world" (string content6)
+        check "msg6 parts should be array" (parts6.Length > 0)
+        equal "msg6 parts first element text" "world" (string (Dyn.get parts6.[0] "text"))
     }
 
 let run () =

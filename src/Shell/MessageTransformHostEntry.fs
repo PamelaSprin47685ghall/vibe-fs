@@ -8,6 +8,7 @@ open Wanxiangshu.Shell.MessageTransformCore
 open Wanxiangshu.Shell.MessageTransformPipeline
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.JsArrayMutate
 
 type ReviewReplayMode =
     | IfStoreEmpty
@@ -77,15 +78,84 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                     sanitizeEmptyStrings visited item
         elif typeIs v "object" then
             if visited.Add(v) then
-                let roleVal = get v "role"
+                let roleVal =
+                    let directRole = get v "role"
 
-                if not (isNullish roleVal) && typeIs roleVal "string" && (string roleVal) <> "" then
-                    let contentVal = get v "content"
-                    let partsVal = get v "parts"
+                    if
+                        not (isNullish directRole)
+                        && typeIs directRole "string"
+                        && (string directRole) <> ""
+                    then
+                        directRole
+                    else
+                        let infoObj = get v "info"
 
-                    if isNullish contentVal && isNullish partsVal then
+                        let infoRole =
+                            if not (isNullish infoObj) then
+                                get infoObj "role"
+                            else
+                                box null
+
+                        if not (isNullish infoRole) && typeIs infoRole "string" && (string infoRole) <> "" then
+                            infoRole
+                        else
+                            let msgObj = get v "message"
+
+                            let msgRole =
+                                if not (isNullish msgObj) then
+                                    get msgObj "role"
+                                else
+                                    box null
+
+                            if not (isNullish msgRole) && typeIs msgRole "string" && (string msgRole) <> "" then
+                                msgRole
+                            else
+                                box null
+
+                let isMessage =
+                    if isNullish roleVal || not (typeIs roleVal "string") || (string roleVal) = "" then
+                        false
+                    else
+                        let hasParts = not (isNullish (get v "parts"))
+                        let hasContent = not (isNullish (get v "content"))
+                        let hasInfo = not (isNullish (get v "info"))
+                        hasParts || hasContent || hasInfo
+
+                if isMessage then
+                    let mutable contentVal = get v "content"
+                    let mutable partsVal = get v "parts"
+
+                    if not (isNullish contentVal) then
+                        if typeIs contentVal "string" && (string contentVal) = "" then
+                            contentVal <- box "."
+                            setKey v "content" contentVal
+                        elif isArray contentVal && (unbox<obj array> contentVal).Length = 0 then
+                            replaceArrayInPlace
+                                (unbox<obj array> contentVal)
+                                [| box (createObj [ "type", box "text"; "text", box "." ]) |]
+
+                    if not (isNullish partsVal) then
+                        if isArray partsVal && (unbox<obj array> partsVal).Length = 0 then
+                            replaceArrayInPlace
+                                (unbox<obj array> partsVal)
+                                [| box (createObj [ "type", box "text"; "text", box "." ]) |]
+
+                    let contentVal2 = get v "content"
+                    let partsVal2 = get v "parts"
+
+                    if isNullish contentVal2 && isNullish partsVal2 then
                         setKey v "content" (box ".")
                         setKey v "parts" (box [| box (createObj [ "type", box "text"; "text", box "." ]) |])
+                    elif isNullish contentVal2 then
+                        setKey v "content" partsVal2
+                    elif isNullish partsVal2 then
+                        if isArray contentVal2 then
+                            setKey v "parts" contentVal2
+                        else
+                            setKey
+                                v
+                                "parts"
+                                (box [| box (createObj [ "type", box "text"; "text", box (string contentVal2) ]) |])
 
                 for propName in
                     [| "message"
@@ -103,7 +173,9 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                         if typeIs valObj "string" && (string valObj) = "" then
                             setKey v propName (box ".")
                         elif isArray valObj && (unbox<obj array> valObj).Length = 0 then
-                            setKey v propName (box [| box (createObj [ "type", box "text"; "text", box "." ]) |])
+                            replaceArrayInPlace
+                                (unbox<obj array> valObj)
+                                [| box (createObj [ "type", box "text"; "text", box "." ]) |]
 
                 let keysArr = keys v
 
