@@ -105,7 +105,10 @@ let testEmptyArrayAndMissingContentSanitization () =
         let contentRef = [||]
         let partsRef5 = [| box (createObj [ "type", box "text"; "text", box "hello" ]) |]
 
-        let encodeMessages (msgs: Message<obj> list) =
+        let infoObj =
+            createObj [ "id", box "msg-8"; "role", box "assistant"; "error", box "" ]
+
+        let raw =
             [|
                // Case 1: parts is empty array
                createObj
@@ -126,7 +129,11 @@ let testEmptyArrayAndMissingContentSanitization () =
                // Case 5: content missing, parts present (should sync content <- parts)
                createObj [ "id", box "msg-5"; "role", box "assistant"; "parts", box partsRef5 ]
                // Case 6: parts missing, content present as string (should sync parts <- content wrap)
-               createObj [ "id", box "msg-6"; "role", box "assistant"; "content", box "world" ] |]
+               createObj [ "id", box "msg-6"; "role", box "assistant"; "content", box "world" ]
+               // Case 7: role="user" with no properties (simplified message)
+               createObj [ "role", box "user" ]
+               // Case 8: nested info object (to verify info skipping)
+               createObj [ "info", box infoObj; "parts", box [||] ] |]
 
         let injectFn _ (arr: obj array) = promise { return arr }
         let loadCaps () = promise { return [] }
@@ -138,8 +145,8 @@ let testEmptyArrayAndMissingContentSanitization () =
               Directory = ""
               Excluded = false
               IsSubagentSession = false
-              Cleaned = [ mkMsg "assistant" Assistant [] ]
-              RawArray = None
+              Cleaned = []
+              RawArray = Some raw
               SembleInjectEnabled = false }
 
         let! res =
@@ -150,12 +157,13 @@ let testEmptyArrayAndMissingContentSanitization () =
                 (fun _ -> promise { return Seq.empty })
                 plan
                 backlogOps
-                encodeMessages
+                (fun _ -> [||])
                 injectFn
                 loadCaps
                 buildCaps
 
-        equal "sanitize result length" 6 res.Length
+        check "res should be same array reference as raw" (System.Object.ReferenceEquals(res, raw))
+        equal "sanitize result length" 8 res.Length
 
         // Case 1 check
         let msg1 = res.[0]
@@ -209,6 +217,20 @@ let testEmptyArrayAndMissingContentSanitization () =
         equal "msg6 content should be world" "world" (string content6)
         check "msg6 parts should be array" (parts6.Length > 0)
         equal "msg6 parts first element text" "world" (string (Dyn.get parts6.[0] "text"))
+
+        // Case 7 check: role="user" with no properties was sanitized
+        let msg7 = res.[6]
+        let content7 = Dyn.get msg7 "content"
+        equal "content7 should be dot" "." (string content7)
+        let parts7 = Dyn.get msg7 "parts" :?> obj array
+        check "parts7 should not be empty" (parts7.Length > 0)
+        equal "parts7 first element text" "." (string (Dyn.get parts7.[0] "text"))
+
+        // Case 8 check: nested info object was skipped and NOT mutated
+        let msg8 = res.[7]
+        let infoObjRes = Dyn.get msg8 "info"
+        equal "info role remains unchanged" "assistant" (string (Dyn.get infoObjRes "role"))
+        equal "info error remains empty" "" (string (Dyn.get infoObjRes "error"))
     }
 
 let run () =

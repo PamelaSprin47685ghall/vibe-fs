@@ -113,13 +113,7 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                                 box null
 
                 let isMessage =
-                    if isNullish roleVal || not (typeIs roleVal "string") || (string roleVal) = "" then
-                        false
-                    else
-                        let hasParts = not (isNullish (get v "parts"))
-                        let hasContent = not (isNullish (get v "content"))
-                        let hasInfo = not (isNullish (get v "info"))
-                        hasParts || hasContent || hasInfo
+                    not (isNullish roleVal) && typeIs roleVal "string" && (string roleVal) <> ""
 
                 if isMessage then
                     let mutable contentVal = get v "content"
@@ -180,10 +174,11 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                 let keysArr = keys v
 
                 for key in keysArr do
-                    let child = get v key
+                    if key <> "info" then
+                        let child = get v key
 
-                    if not (isNullish child) && (typeIs child "object" || isArray child) then
-                        sanitizeEmptyStrings visited child
+                        if not (isNullish child) && (typeIs child "object" || isArray child) then
+                            sanitizeEmptyStrings visited child
 
 let runHostMessagesTransform
     (_reviewStore: ReviewStore)
@@ -198,14 +193,16 @@ let runHostMessagesTransform
     (buildCaps: obj array -> CapsFile list -> string option -> obj array)
     : JS.Promise<obj array> =
     promise {
-        if plan.Cleaned.IsEmpty then
-            return [||]
-        else
-            let raw =
-                match plan.RawArray with
-                | Some a -> a
-                | None -> [||]
+        let raw =
+            match plan.RawArray with
+            | Some a -> a
+            | None -> [||]
 
+        if plan.Cleaned.IsEmpty then
+            let visited = System.Collections.Generic.HashSet<obj>()
+            sanitizeEmptyStrings visited raw
+            return raw
+        else
             let cache = getSessionCache sessionTransformCaches sessionID
             let currentFingerprint = computeFingerprint raw
 
