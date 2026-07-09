@@ -98,3 +98,9 @@ let applyToolCallHook (toolName: string) (args: obj) : string option = applyPreE
 /// fire under race conditions, so `tool_result` is the last safe insertion point.
 let applyToolResultHook (toolName: string) (args: obj) : unit =
     applyPreExecuteHook toolName args |> ignore
+
+    if not (Dyn.isNullish args) then
+        let amendVal = Dyn.get args "_amend"
+
+        if not (Dyn.isNullish amendVal) then
+            ToolHookRuntime.restoreAmendToArgs args amendVal

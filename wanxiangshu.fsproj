@@ -525,6 +525,7 @@
     <Compile Include="tests/TreeSitterKernelTests.fs"/>
     <Compile Include="tests/PatchParserTests.fs"/>
     <Compile Include="tests/MessageTransformPolicyTests.fs"/>
+    <Compile Include="tests/MessageSanitizationTests.fs"/>
     <Compile Include="tests/ToolCatalogClassificationTests.fs"/>
     <Compile Include="tests/ToolOutputInfoTests.fs"/>
     <Compile Include="tests/ExecutorKernelTests.fs"/>

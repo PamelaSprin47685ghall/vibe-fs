@@ -63,7 +63,11 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
         let args = resolveHookExecuteArgs input output
         let tool = toolNameFromHookInput input
 
-        ToolHookRuntime.filterAmendFromArgs args |> ignore
+        match ToolHookRuntime.filterAmendFromArgs args with
+        | Some n ->
+            output?("_amend") <- box n
+            input?("_amend") <- box n
+        | None -> ()
 
         ToolHookRuntime.sanitizeNullArgs tool args
 
@@ -101,6 +105,33 @@ let toolExecuteAfterFor
             Id.sessionIdValue (fromOpencode input pluginDirectory).Execution.SessionId
 
         let originalOutput = hookOutputText output
+
+        let decodedArgs = argsFromHookInput input
+
+        let amendVal =
+            let fromOutput = Dyn.get output "_amend"
+
+            if not (Dyn.isNullish fromOutput) then
+                fromOutput
+            else
+                let fromInput = Dyn.get input "_amend"
+
+                if not (Dyn.isNullish fromInput) then
+                    fromInput
+                else
+                    let fromArgs =
+                        if not (Dyn.isNullish decodedArgs) then
+                            Dyn.get decodedArgs "_amend"
+                        else
+                            null
+
+                    if not (Dyn.isNullish fromArgs) then fromArgs else null
+
+        if not (Dyn.isNullish amendVal) then
+            ToolHookRuntime.restoreAmendToArgs decodedArgs amendVal
+            let outputArgs = argsFromHookOutput output
+            ToolHookRuntime.restoreAmendToArgs outputArgs amendVal
+
         let argsJson = JS.JSON.stringify (argsFromHookInput input)
 
         if isNetworkErrorText originalOutput then

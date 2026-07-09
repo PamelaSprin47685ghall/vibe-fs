@@ -85,6 +85,33 @@ let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promi
         let tool = decoded.Tool
         let sessionID = decoded.SessionID
         let originalOutput = hookOutputTextMux output
+
+        let amendVal =
+            let fromOutput = Dyn.get output "_amend"
+
+            if not (Dyn.isNullish fromOutput) then
+                fromOutput
+            else
+                let fromInput = Dyn.get input "_amend"
+
+                if not (Dyn.isNullish fromInput) then
+                    fromInput
+                else
+                    let fromArgs =
+                        if not (Dyn.isNullish decoded.Args) then
+                            Dyn.get decoded.Args "_amend"
+                        else
+                            null
+
+                    if not (Dyn.isNullish fromArgs) then fromArgs else null
+
+        if not (Dyn.isNullish amendVal) then
+            restoreAmendToArgs decoded.Args amendVal
+            let inputArgs = argsFromMuxToolExecuteInput input
+            restoreAmendToArgs inputArgs amendVal
+            let outputArgs = argsFromHookOutputMux output
+            restoreAmendToArgs outputArgs amendVal
+
         let argsJson = JS.JSON.stringify decoded.Args
 
         if isNetworkErrorText originalOutput then
