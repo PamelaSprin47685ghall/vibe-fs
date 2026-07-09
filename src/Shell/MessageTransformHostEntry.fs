@@ -1,6 +1,7 @@
 module Wanxiangshu.Shell.MessageTransformHostEntry
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.CapsFormat
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.MessageTransformCore
@@ -76,9 +77,20 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                     sanitizeEmptyStrings visited item
         elif typeIs v "object" then
             if visited.Add(v) then
+                let roleVal = get v "role"
+
+                if not (isNullish roleVal) && typeIs roleVal "string" && (string roleVal) <> "" then
+                    let contentVal = get v "content"
+                    let partsVal = get v "parts"
+
+                    if isNullish contentVal && isNullish partsVal then
+                        setKey v "content" (box ".")
+                        setKey v "parts" (box [| box (createObj [ "type", box "text"; "text", box "." ]) |])
+
                 for propName in
                     [| "message"
                        "content"
+                       "parts"
                        "text"
                        "reasoning"
                        "thought"
@@ -87,8 +99,11 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                        "errorText" |] do
                     let valObj = get v propName
 
-                    if not (isNullish valObj) && typeIs valObj "string" && (string valObj) = "" then
-                        setKey v propName (box ".")
+                    if not (isNullish valObj) then
+                        if typeIs valObj "string" && (string valObj) = "" then
+                            setKey v propName (box ".")
+                        elif isArray valObj && (unbox<obj array> valObj).Length = 0 then
+                            setKey v propName (box [| box (createObj [ "type", box "text"; "text", box "." ]) |])
 
                 let keysArr = keys v
 
