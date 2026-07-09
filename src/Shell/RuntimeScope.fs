@@ -18,6 +18,11 @@ type RuntimeScope() =
     let mutable sessionQueues = Map.empty<string, SerialQueue>
     let mutable extState = Map.empty<string, obj>
     let mutable tempFilesByPrompt = Map.empty<string, string list>
+    let mutable childSessionCounter = 0
+
+    member _.NextChildSessionId() : int =
+        childSessionCounter <- childSessionCounter + 1
+        childSessionCounter
 
     member _.Projection = projection
 

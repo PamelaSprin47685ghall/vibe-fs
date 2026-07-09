@@ -12,6 +12,11 @@ open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Shell.WebToolsCodec
 
+let private specOf (name: string) =
+    match Wanxiangshu.Kernel.ToolCatalog.specOf name with
+    | Ok s -> s
+    | Error e -> failwith e
+
 let searchToolsFuzzyFindTool () =
     let finderCache = FinderCache()
     let iteratorStore = createTypedIteratorStore 200

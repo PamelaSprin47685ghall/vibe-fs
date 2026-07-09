@@ -673,12 +673,15 @@
     <Compile Include="e2e/HarnessTypes.fs"/>
     <Compile Include="e2e/TestsServePlugin.fs"/>
     <Compile Include="e2e/WanxiangzhenPluginTests.fs"/>
+    <Compile Include="e2e/TestsPart2.fs"/>
     <Compile Include="e2e/Tests.fs"/>
+    <Compile Include="e2e/MuxTestsPart2.fs"/>
     <Compile Include="e2e/MuxTests.fs"/>
+    <Compile Include="e2e/OpencodePluginTestsPart2.fs"/>
+    <Compile Include="e2e/OpencodePluginTestsPart3.fs"/>
     <Compile Include="e2e/OpencodePluginTests.fs"/>
     <Compile Include="e2e/MimocodePluginTests.fs"/>
     <Compile Include="e2e/MimoTuiPluginTests.fs"/>
     <Compile Include="e2e/TestsOmp.fs"/>
-    <Compile Include="e2e/TestsServePlugin.fs"/>
   </ItemGroup>
 </Project>

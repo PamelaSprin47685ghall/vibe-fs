@@ -33,19 +33,23 @@ let all: ToolSpec list =
 let private byName: Map<string, ToolSpec> =
     all |> List.map (fun spec -> spec.name, spec) |> Map.ofList
 
-let specOf (name: string) : ToolSpec =
+let specOf (name: string) : Result<ToolSpec, string> =
     match Map.tryFind name byName with
-    | Some spec -> spec
-    | None -> failwithf "ToolCatalog: unknown tool %s" name
+    | Some spec -> Ok spec
+    | None -> Error(sprintf "ToolCatalog: unknown tool %s" name)
 
-let paramDoc (name: string) (field: string) : string =
-    let spec = specOf name
+let paramDoc (name: string) (field: string) : Result<string, string> =
+    match specOf name with
+    | Error e -> Error e
+    | Ok spec ->
+        match Map.tryFind field spec.paramDocs with
+        | Some doc -> Ok doc
+        | None -> Error(sprintf "ToolCatalog: unknown param %s.%s" name field)
 
-    match Map.tryFind field spec.paramDocs with
-    | Some doc -> doc
-    | None -> failwithf "ToolCatalog: unknown param %s.%s" name field
+let description (name: string) : Result<string, string> =
+    name |> specOf |> Result.map (fun spec -> spec.description)
 
-let description (name: string) : string = (specOf name).description
-
-let subagentRequiredKeys (toolName: string) : string array =
-    (specOf toolName).requiredFields |> List.toArray
+let subagentRequiredKeys (toolName: string) : Result<string array, string> =
+    toolName
+    |> specOf
+    |> Result.map (fun spec -> spec.requiredFields |> List.toArray)

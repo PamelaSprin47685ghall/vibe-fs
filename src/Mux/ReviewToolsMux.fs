@@ -25,6 +25,11 @@ open Wanxiangshu.Shell.PromiseStr
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.EventLogRuntime
 
+let private description (name: string) : string =
+    match Wanxiangshu.Kernel.ToolCatalog.description name with
+    | Ok d -> d
+    | Error e -> failwith e
+
 let private reviewerOpts (toolNames: string array) : obj =
     let experiments =
         createObj

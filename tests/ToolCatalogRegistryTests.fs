@@ -18,62 +18,59 @@ let allNamesAreUnique () =
     equal "unique" names (names |> List.distinct)
 
 let specOfRead () =
-    let spec = specOf "read"
-    equal "name" "read" spec.name
+    match specOf "read" with
+    | Ok spec -> equal "name" "read" spec.name
+    | Error e -> check ("specOf read failed: " + e) false
 
-let specOfUnknownThrows () =
-    try
-        specOf "nonexistent" |> ignore
-        check "should throw" false
-    with _ ->
-        check "threw" true
+let specOfUnknownReturnsError () =
+    match specOf "nonexistent" with
+    | Error msg -> check "contains unknown tool" (msg.Contains("unknown tool"))
+    | Ok _ -> check "should not succeed" false
 
 let paramDocRead () =
-    let doc = paramDoc "read" "path"
-    check "non-empty" (doc <> "")
+    match paramDoc "read" "path" with
+    | Ok doc -> check "non-empty" (doc <> "")
+    | Error e -> check ("paramDoc failed: " + e) false
 
-let paramDocUnknownToolFieldThrows () =
-    try
-        paramDoc "read" "nonexistent_field" |> ignore
-        check "should throw" false
-    with _ ->
-        check "threw" true
+let paramDocUnknownToolFieldReturnsError () =
+    match paramDoc "read" "nonexistent_field" with
+    | Error msg -> check "contains unknown param" (msg.Contains("unknown param"))
+    | Ok _ -> check "should not succeed" false
 
-let paramDocUnknownToolNameThrows () =
-    try
-        paramDoc "nonexistent" "x" |> ignore
-        check "should throw" false
-    with _ ->
-        check "threw" true
+let paramDocUnknownToolNameReturnsError () =
+    match paramDoc "nonexistent" "x" with
+    | Error msg -> check "contains unknown tool" (msg.Contains("unknown tool"))
+    | Ok _ -> check "should not succeed" false
 
 let descriptionRead () =
-    equal "description" (description "read") (specOf "read").description
+    match description "read", specOf "read" with
+    | Ok desc, Ok spec -> equal "description" desc spec.description
+    | _ -> check "descriptionRead failed" false
 
-let descriptionUnknownThrows () =
-    try
-        description "nonexistent" |> ignore
-        check "should throw" false
-    with _ ->
-        check "threw" true
+let descriptionUnknownReturnsError () =
+    match description "nonexistent" with
+    | Error msg -> check "contains unknown tool" (msg.Contains("unknown tool"))
+    | Ok _ -> check "should not succeed" false
 
 let subagentRequiredKeysRead () =
-    let keys = subagentRequiredKeys "read"
-    check "read keys non-empty" (keys.Length > 0)
+    match subagentRequiredKeys "read" with
+    | Ok keys -> check "read keys non-empty" (keys.Length > 0)
+    | Error e -> check ("subagentRequiredKeys failed: " + e) false
 
-let subagentRequiredKeysUnknownThrows () =
-    try
-        subagentRequiredKeys "nonexistent" |> ignore
-        check "should throw" false
-    with _ ->
-        check "threw" true
+let subagentRequiredKeysUnknownReturnsError () =
+    match subagentRequiredKeys "nonexistent" with
+    | Error msg -> check "contains unknown tool" (msg.Contains("unknown tool"))
+    | Ok _ -> check "should not succeed" false
 
 let coderSpecExists () =
-    let spec = specOf "coder"
-    check "name" (spec.name = "coder")
+    match specOf "coder" with
+    | Ok spec -> check "name" (spec.name = "coder")
+    | Error e -> check ("coderSpecExists failed: " + e) false
 
 let executorSpecHasRequiredFields () =
-    let spec = specOf "executor"
-    check "has required fields" (spec.requiredFields.Length > 0)
+    match specOf "executor" with
+    | Ok spec -> check "has required fields" (spec.requiredFields.Length > 0)
+    | Error e -> check ("executorSpecHasRequiredFields failed: " + e) false
 
 let allParamDocsConsistent () =
     for spec in all do
@@ -88,14 +85,14 @@ let run () =
     allDescriptionsAreNonEmpty ()
     allNamesAreUnique ()
     specOfRead ()
-    specOfUnknownThrows ()
+    specOfUnknownReturnsError ()
     paramDocRead ()
-    paramDocUnknownToolFieldThrows ()
-    paramDocUnknownToolNameThrows ()
+    paramDocUnknownToolFieldReturnsError ()
+    paramDocUnknownToolNameReturnsError ()
     descriptionRead ()
-    descriptionUnknownThrows ()
+    descriptionUnknownReturnsError ()
     subagentRequiredKeysRead ()
-    subagentRequiredKeysUnknownThrows ()
+    subagentRequiredKeysUnknownReturnsError ()
     coderSpecExists ()
     executorSpecHasRequiredFields ()
     allParamDocsConsistent ()

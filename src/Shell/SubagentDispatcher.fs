@@ -113,10 +113,10 @@ let dispatch
                         | Opencode -> Some("child-session-1") // For fakeAdapter test to correctly find childID!
                         | Mimocode -> None
                         | Mux ->
-                            let r = System.Random().Next(1000000)
+                            let r = scope.NextChildSessionId()
                             Some("mux-task-" + string r)
                         | Omp ->
-                            let r = System.Random().Next(1000000)
+                            let r = scope.NextChildSessionId()
                             Some("omp-session-" + string r)
 
                 match spawnedChildId with

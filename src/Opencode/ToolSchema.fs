@@ -169,7 +169,9 @@ let define (description: string) (args: obj) (execute: obj -> obj -> JS.Promise<
                execute = execute |})
 
 let private toolDescription (name: string) : string =
-    Wanxiangshu.Kernel.ToolCatalog.description name
+    match Wanxiangshu.Kernel.ToolCatalog.description name with
+    | Ok desc -> desc
+    | Error e -> failwith e
 
 let coder = toolDescription "coder"
 

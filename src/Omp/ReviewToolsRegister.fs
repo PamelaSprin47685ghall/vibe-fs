@@ -18,6 +18,11 @@ open Wanxiangshu.Shell.RuntimeScope
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
+let private description (name: string) : string =
+    match Wanxiangshu.Kernel.ToolCatalog.description name with
+    | Ok d -> d
+    | Error e -> failwith e
+
 open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.EventLogRuntime
 

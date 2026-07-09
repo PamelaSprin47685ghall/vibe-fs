@@ -24,6 +24,11 @@ open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.Dyn
 
+let private description (name: string) : string =
+    match Wanxiangshu.Kernel.ToolCatalog.description name with
+    | Ok d -> d
+    | Error e -> failwith e
+
 let websearchTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = "websearch"
       description = description "websearch"

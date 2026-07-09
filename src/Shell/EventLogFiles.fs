@@ -43,7 +43,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
 
     let ensureInitializedInternal () : JS.Promise<unit> =
         promise {
-            if initDone then
+            if initDone || readCalled then
                 return ()
             else
                 let! exists = fileExists eventFilePath
@@ -51,10 +51,6 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
                 if not exists then
                     initDone <- true
                 else
-                    if readCalled then
-                        failwith
-                            "ReadAllEvents / ensureInitialized is restricted to be called at most once during the store lifecycle!"
-
                     readCalled <- true
 
                     do!
@@ -100,7 +96,7 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
             return sessionStates
         }
 
-    member _.EnsureInitialized() : JS.Promise<unit> = ensureInitializedInternal ()
+    member _.EnsureInitialized() : JS.Promise<unit> = ensureInitialized ()
 
     member _.AppendEvent(e: WanEvent) : JS.Promise<Result<unit, string>> =
         queue.Enqueue(fun () ->

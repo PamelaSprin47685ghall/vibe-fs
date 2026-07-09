@@ -17,6 +17,11 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
+let private description (name: string) : string =
+    match Wanxiangshu.Kernel.ToolCatalog.description name with
+    | Ok d -> d
+    | Error e -> failwith e
+
 let private coderChildTools =
     [| "read"
        "edit"

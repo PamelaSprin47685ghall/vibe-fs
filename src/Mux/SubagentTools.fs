@@ -18,6 +18,16 @@ open Wanxiangshu.Shell.SubagentDispatcher
 
 open Wanxiangshu.Shell.RuntimeScope
 
+let private description (name: string) : string =
+    match Wanxiangshu.Kernel.ToolCatalog.description name with
+    | Ok d -> d
+    | Error e -> failwith e
+
+let private subagentRequiredKeys (toolName: string) : string array =
+    match Wanxiangshu.Kernel.ToolCatalog.subagentRequiredKeys toolName with
+    | Ok keys -> keys
+    | Error e -> failwith e
+
 let private disabledToolsForRole (toolNames: string array) (role: string) : string array =
     SubagentToolPolicy.disabledToolNamesForRole mux toolNames role muxSpawnToolUniverse
 

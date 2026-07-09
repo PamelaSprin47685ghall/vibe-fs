@@ -120,7 +120,7 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                     let mutable partsVal = get v "parts"
 
                     if not (isNullish contentVal) then
-                        if typeIs contentVal "string" && (string contentVal) = "" then
+                        if typeIs contentVal "string" && (string contentVal).Trim() = "" then
                             contentVal <- box "."
                             setKey v "content" contentVal
                         elif isArray contentVal && (unbox<obj array> contentVal).Length = 0 then
@@ -164,7 +164,7 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                     let valObj = get v propName
 
                     if not (isNullish valObj) then
-                        if typeIs valObj "string" && (string valObj) = "" then
+                        if typeIs valObj "string" && (string valObj).Trim() = "" then
                             setKey v propName (box ".")
                         elif isArray valObj && (unbox<obj array> valObj).Length = 0 then
                             replaceArrayInPlace

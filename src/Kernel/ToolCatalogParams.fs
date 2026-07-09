@@ -3,7 +3,11 @@ module Wanxiangshu.Kernel.ToolCatalog.Params
 open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.WarnTdd
 
-let private doc tool field = paramDoc tool field
+let private doc tool field =
+    match paramDoc tool field with
+    | Ok d -> d
+    | Error e -> failwith e
+
 let private coder = doc "coder"
 let coderIntents = coder "intents"
 let coderTdd = coder "tdd"

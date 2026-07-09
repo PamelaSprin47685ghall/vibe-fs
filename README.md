@@ -71,7 +71,7 @@ JS/Node 无线程级并发，但有大量异步交错。策略不是到处加锁
 
 ### Kernel：纯规则层
 
-不是"公共工具箱"，是"真正稳定的系统语义"。81 个 `.fs` 文件，按子目录+顶层分六类：
+不是"公共工具箱"，是"真正稳定的系统语义"。90 个 `.fs` 文件，按子目录+顶层分六类：
 
 1. 领域状态机（子目录）：
    - `ReviewSession/`：`Types`/`StateMachine`/`Registry`/`Query`/`Effects`/`Facade`
@@ -88,7 +88,7 @@ JS/Node 无线程级并发，但有大量异步交错。策略不是到处加锁
 
 ### Shell：现实世界边界
 
-把 Kernel 需要的能力从 Node 取回，100 个 `.fs` 文件按功能分簇：
+把 Kernel 需要的能力从 Node 取回，137 个 `.fs` 文件按功能分簇：
 
 - 文件系统：`FileSys`/`WorkspaceFiles`
 - 搜索后端：`FuzzyFinderShell`/`FuzzySearch`(+`Find`/`Grep`/`Helpers`)/`FuzzyIteratorStore`
@@ -230,14 +230,14 @@ npm 包主导出入口：`build/src/Mux/Plugin.js`（`"."`）；OMP：`build/src
 
 ```text
 src/
-  Kernel/       纯领域规则、状态机、格式协议、共享提示词（81 .fs，含 EventLog/ FallbackKernel/ Nudge/ ReviewPrompts/ ReviewSession/ ToolCatalog/ 子目录）
-  Shell/        Node/文件系统/网络/第三方库/串行队列 + 全部宿主 obj 边界 codec（100 .fs）
+  Kernel/       纯领域规则、状态机、格式协议、共享提示词（90 .fs，含 EventLog/ FallbackKernel/ Nudge/ ReviewPrompts/ ReviewSession/ ToolCatalog/ 子目录）
+  Shell/        Node/文件系统/网络/第三方库/串行队列 + 全部宿主 obj 边界 codec（137 .fs）
   Methodology/  54 个方法论 schema + Registry + Opencode/Mux/Omp 工具注册（11 .fs，数据驱动 Catalog1-4）
-  Opencode/     OpenCode / Mimocode 插件适配层与 TUI 扩展（39 .fs）
-  Mux/          Mux 注册与 wrapper 适配层（22 .fs）
-  Omp/          oh-my-pi 扩展适配层（仅 Kernel+Shell，35 .fs）
-tests/          纯内核 + Shell + 集成 + 插件契约 + 架构边界探针（232 .fs，含 23 个 ArchitectureTests*）
-e2e/            端到端插件测试（1 .fs + 3 .js：harness/mock-llm/stealth-mcp-fixture）
+  Opencode/     OpenCode / Mimocode 插件适配层与 TUI 扩展（49 .fs）
+  Mux/          Mux 注册与 wrapper 适配层（21 .fs）
+  Omp/          oh-my-pi 扩展适配层（仅 Kernel+Shell，33 .fs）
+tests/          纯内核 + Shell + 集成 + 插件契约 + 架构边界探针（317 .fs，含 23 个 ArchitectureTests*）
+e2e/            端到端插件测试（13 .fs + 3 .js：harness/mock-llm/stealth-mcp-fixture）
 build/          Fable 编译后的 JS 产物
 ```
 

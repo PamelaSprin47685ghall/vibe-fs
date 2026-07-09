@@ -24,10 +24,9 @@ let tryGetRequiredFields (toolName: string) : string list =
     if toolName = "methodology" || toolName.StartsWith("methodology_") then
         [ "methodology"; "intent"; "background"; "note" ]
     else
-        try
-            (specOf toolName).requiredFields
-        with _ ->
-            []
+        match specOf toolName with
+        | Ok spec -> spec.requiredFields
+        | Error _ -> []
 
 /// Remove null/undefined and empty object {} values from args for keys that are NOT required fields.
 /// This prevents downstream tool execution from seeing spurious null/{} values
@@ -61,11 +60,10 @@ let requireWarnTddOnArgs (tool: string) (args: obj) : Result<unit, string> =
             Dyn.deleteKey args "warn_tdd"
             Result.Ok()
         | None ->
-            Result.Error(
-                wireDomainFailure
-                    tool
-                    (InvalidIntent(tool, "warn_tdd", "required — acknowledge TDD + Kolmolgorov discipline"))
-            )
+            let err =
+                InvalidIntent(tool, "warn_tdd", "required — acknowledge TDD + Kolmolgorov discipline")
+
+            Result.Error(wireDomainFailure tool err)
 
 [<Emit("Object.defineProperty($0, '_amend', { value: $1, enumerable: false, writable: true, configurable: true })")>]
 let private defineHiddenAmend (args: obj) (value: obj) : unit = jsNative
@@ -111,11 +109,10 @@ let requireWarnOnArgs (tool: string) (args: obj) : Result<unit, string> =
             Dyn.deleteKey args "warn"
             Result.Ok()
         else
-            Result.Error(
-                wireDomainFailure
-                    tool
-                    (InvalidIntent(tool, "warn", "required — acknowledge this task cannot be done with other tools"))
-            )
+            let err =
+                InvalidIntent(tool, "warn", "required — acknowledge this task cannot be done with other tools")
+
+            Result.Error(wireDomainFailure tool err)
 
 let muxToolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
@@ -139,12 +136,18 @@ let muxToolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
             | Result.Error e -> setHookErrorMux output e
             | Result.Ok() -> ()
 
-            let raw = args?intents
+            let rawOpt: obj option = args?intents
 
             let labelResult =
                 match tool with
-                | "coder" -> joinCoderUiLabel (Option.defaultValue null raw |> box)
-                | "investigator" -> joinInvestigatorUiLabel (Option.defaultValue null raw |> box)
+                | "coder" ->
+                    match rawOpt with
+                    | Some r -> joinCoderUiLabel r
+                    | None -> Result.Error ""
+                | "investigator" ->
+                    match rawOpt with
+                    | Some r -> joinInvestigatorUiLabel r
+                    | None -> Result.Error ""
                 | _ -> Result.Error ""
 
             match labelResult with

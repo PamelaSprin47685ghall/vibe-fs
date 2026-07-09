@@ -28,6 +28,11 @@ open Wanxiangshu.Mux.BuiltinToolsFuzzy
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.ToolRuntimeContext
 
+let private description (name: string) : string =
+    match Wanxiangshu.Kernel.ToolCatalog.description name with
+    | Ok d -> d
+    | Error e -> failwith e
+
 [<Global("Buffer")>]
 let private nodeBuffer: obj = jsNative
 

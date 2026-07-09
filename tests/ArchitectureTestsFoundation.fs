@@ -53,7 +53,8 @@ let fileBodyUnder300 () =
            "src/Opencode"
            "src/Omp"
            "src/Methodology"
-           "tests" |]
+           "tests"
+           "e2e" |]
 
     for dir in scanDirs do
         for path in fsFilesRecursive dir do

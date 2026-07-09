@@ -8,6 +8,11 @@ open Wanxiangshu.Kernel.ToolCatalog
 open Wanxiangshu.Kernel.ReviewPrompts
 open Wanxiangshu.Kernel.ReviewPrompts.Instructions
 
+let private specOf (name: string) =
+    match Wanxiangshu.Kernel.ToolCatalog.specOf name with
+    | Ok s -> s
+    | Error e -> failwith e
+
 let hostKernel' () =
     let coderIntent =
         { objective = "fix bug"

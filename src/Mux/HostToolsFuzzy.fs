@@ -15,6 +15,11 @@ open Wanxiangshu.Shell.FuzzyToolsCodec
 open Wanxiangshu.Shell.ToolContextCodec
 open Wanxiangshu.Shell.ToolRuntimeContext
 
+let private description (name: string) : string =
+    match Wanxiangshu.Kernel.ToolCatalog.description name with
+    | Ok d -> d
+    | Error e -> failwith e
+
 module FuzzyCommandsModule = Wanxiangshu.Shell.FuzzySearch
 
 let private searchOptionsFromRuntime

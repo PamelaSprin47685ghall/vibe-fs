@@ -20,6 +20,11 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.RuntimeScope
 
+let private subagentRequiredKeys (toolName: string) : string array =
+    match Wanxiangshu.Kernel.ToolCatalog.subagentRequiredKeys toolName with
+    | Ok keys -> keys
+    | Error e -> failwith e
+
 type RunSubagentCoreResult =
     FallbackRuntimeState
         -> ChildAgentRegistry

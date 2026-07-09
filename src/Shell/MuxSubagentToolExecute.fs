@@ -48,7 +48,8 @@ type MuxHostAdapter
             promise {
                 try
                     let! text = runMux deps config spawn.AgentId request.Prompt spawn.Title spawn.ToolOptions
-                    let cid = "mux-task-" + string (System.Random().Next(1000000))
+                    let counterVal = sessionScope.NextChildSessionId()
+                    let cid = "mux-task-" + string counterVal
 
                     match fromMuxConfig config with
                     | Ok runtime ->
