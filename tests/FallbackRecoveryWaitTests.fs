@@ -126,6 +126,33 @@ let waitForSubagentSettle_waitsUntilEventHandlingInactive () =
         check "wait completed after handling finished" resolved.Value
     }
 
+let isSubagentSettled_falseWhenAwaitingBusy () =
+    let rt = FallbackRuntimeState()
+    let sid = "t-sess-awaiting"
+    rt.SetAwaitingBusy sid true
+    check "subagent not settled while awaiting busy" (not (isSubagentSettled rt sid))
+
+let waitForSubagentSettle_waitsUntilAwaitingBusyInactive () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let sid = "t-sess-awaiting-wait"
+        rt.SetAwaitingBusy sid true
+        let resolved = ref false
+
+        let waitP =
+            promise {
+                do! waitForSubagentSettle rt sid
+                resolved.Value <- true
+            }
+
+        do! yieldMicrotask ()
+        check "wait is pending while awaiting busy" (not resolved.Value)
+        rt.SetAwaitingBusy sid false
+        do! yieldMicrotask ()
+        do! waitP
+        check "wait completed after awaiting busy finished" resolved.Value
+    }
+
 let run () =
     promise {
         isSettled_falseWhenFresh ()
@@ -139,4 +166,6 @@ let run () =
         do! waitForToolCallTextRecovery_returnsImmediatelyWhenIdle ()
         isSubagentSettled_falseWhenEventHandlingActive ()
         do! waitForSubagentSettle_waitsUntilEventHandlingInactive ()
+        isSubagentSettled_falseWhenAwaitingBusy ()
+        do! waitForSubagentSettle_waitsUntilAwaitingBusyInactive ()
     }

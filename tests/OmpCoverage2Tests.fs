@@ -16,6 +16,7 @@ open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Omp.NudgeRuntime
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Omp.MagicTodo
+open Wanxiangshu.Shell.FallbackRuntimeState
 
 let private testScope = RuntimeScope()
 
@@ -149,7 +150,8 @@ let turnStartHandler_filtersChildOnlyTools () =
     let pi = piObject h
     // harness activeTools already contains "coder" so isMainSession = true in filterOmpMainSessionActiveTools
     promise {
-        do! turnStartHandler pi (createObj []) (fakeCtx "main-1" "/tmp")
+        let rt = FallbackRuntimeState()
+        do! turnStartHandler pi (createObj []) (fakeCtx "main-1" "/tmp") rt
         let filtered = unbox<string array> (Dyn.get h.hookStore "activeTools")
 
         let childOnlyInFiltered =

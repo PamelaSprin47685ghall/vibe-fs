@@ -24,6 +24,7 @@ open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.FallbackRuntimeState
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -47,10 +48,20 @@ let applyActiveToolFilterForMainSession (piObj: obj) (ctxObj: obj) : JS.Promise<
                 do! piObj?setActiveTools (filtered)
     }
 
-let beforeAgentStartHandler (piObj: obj) (event: obj) (ctxObj: obj) : JS.Promise<obj> =
+let beforeAgentStartHandler
+    (piObj: obj)
+    (event: obj)
+    (ctxObj: obj)
+    (fallbackRuntime: FallbackRuntimeState)
+    : JS.Promise<obj> =
     promise {
         let cwd = Dyn.str ctxObj "cwd"
         let sp = Dyn.get event "systemPrompt"
+
+        match getSessionIdFromContext ctxObj with
+        | Some sid -> fallbackRuntime.SetAwaitingBusy sid false
+        | None -> ()
+
         let! patch = beforeAgentStart cwd sp
         do! applyActiveToolFilterForMainSession piObj ctxObj
         return patch
@@ -73,9 +84,16 @@ let toolCallHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: ob
             | _ -> return None
     }
 
-let turnStartHandler (piObj: obj) (_event: obj) (ctxObj: obj) : JS.Promise<unit> =
+let turnStartHandler
+    (piObj: obj)
+    (event: obj)
+    (ctxObj: obj)
+    (fallbackRuntime: FallbackRuntimeState)
+    : JS.Promise<unit> =
     match getSessionIdFromContext ctxObj with
-    | Some sid -> clearNudgeSession sid
+    | Some sid ->
+        clearNudgeSession sid
+        fallbackRuntime.SetAwaitingBusy sid false
     | None -> ()
 
     applyActiveToolFilterForMainSession piObj ctxObj
@@ -115,7 +133,12 @@ let private sendNudgeReminder (pi: IPi) (action: NudgeAction) (snapshot: Session
             | NudgeNone -> ()
     }
 
-let agentEndHandler (piObj: obj) (_reviewStore: ReviewStore) (ctxObj: obj) : JS.Promise<unit> =
+let agentEndHandler
+    (piObj: obj)
+    (_reviewStore: ReviewStore)
+    (fallbackRuntime: FallbackRuntimeState)
+    (ctxObj: obj)
+    : JS.Promise<unit> =
     let pi = unbox<IPi> piObj
     let ctx = unbox<INudgeHooksContext> ctxObj
 
@@ -166,5 +189,6 @@ let agentEndHandler (piObj: obj) (_reviewStore: ReviewStore) (ctxObj: obj) : JS.
                             if not claimed then
                                 ()
                             else
+                                fallbackRuntime.SetAwaitingBusy sessionId true
                                 do! sendNudgeReminder pi action snapshot
                     }

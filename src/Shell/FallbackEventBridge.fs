@@ -45,6 +45,13 @@ let handleEvent
         let sessionID = translator.ExtractSessionID rawEvent
         runtime.SetSubsessionPending sessionID false
 
+        if
+            translator.IsSessionBusy rawEvent
+            || translator.IsSessionIdle rawEvent
+            || translator.IsSessionError rawEvent
+        then
+            runtime.SetAwaitingBusy sessionID false
+
         let! eventOpt =
             match translator.TranslateError rawEvent with
             | Some _ as ev -> promise { return ev }
@@ -139,8 +146,11 @@ let handleEvent
 
                 match action with
                 | FallbackAction.DoNothing -> ()
-                | FallbackAction.SendContinue model -> do! executor.SendContinue(sessionID, model)
+                | FallbackAction.SendContinue model ->
+                    runtime.SetAwaitingBusy sessionID true
+                    do! executor.SendContinue(sessionID, model)
                 | FallbackAction.RecoverWithPrompt(model, promptText) ->
+                    runtime.SetAwaitingBusy sessionID true
                     do! executor.RecoverWithPrompt(sessionID, model, promptText)
                 | FallbackAction.ScanToolCallAsText ->
                     let! msgs = executor.FetchMessages sessionID
@@ -164,6 +174,7 @@ let handleEvent
 
                                 runtime.UpdateState sessionID updated
                                 finalState <- updated
+                                runtime.SetAwaitingBusy sessionID true
                                 do! executor.RecoverWithPrompt(sessionID, model, promptText)
                             | None ->
                                 let updated = { ns with Phase = FallbackPhase.Idle }

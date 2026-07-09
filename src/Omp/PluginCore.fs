@@ -163,7 +163,7 @@ let registerAbortHandler
 let private registerHooks (pi: obj) (services: CoreServices) : unit =
     registerAllTools pi services.ReviewStore services.FallbackRuntime services.FallbackConfig
     registerInputHandler pi services.ReviewStore
-    registerSessionLifecycle pi services.ReviewStore
+    registerSessionLifecycle pi services.ReviewStore services.FallbackRuntime
     registerAbortHandler pi services.ReviewStore services.FallbackRuntime services.FallbackHandler
 
 let pluginFor (pi: obj) : JS.Promise<unit> =

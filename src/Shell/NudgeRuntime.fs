@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Shell.NudgeRuntimeTypes
 open Wanxiangshu.Shell.NudgeRuntimeMux
 open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.FallbackRuntimeState
 
 let private _eventLogNudgeIntegral = tryClaimNudgeDispatch
 
@@ -14,7 +15,12 @@ type NudgeRuntimeEvent = NudgeRuntimeTypes.NudgeRuntimeEvent
 let emptyRuntimeState = NudgeRuntimeTypes.emptyRuntimeState
 let runNudgeFlowCore = NudgeRuntimeTypes.runNudgeFlowCore
 
-type NudgeRuntime(getChatHistory: (string -> JS.Promise<obj array>) option, workspaceDirectory: string) =
+type NudgeRuntime
+    (
+        getChatHistory: (string -> JS.Promise<obj array>) option,
+        workspaceDirectory: string,
+        fallbackRuntime: FallbackRuntimeState
+    ) =
 
     let mutable runtimeState = emptyRuntimeState
 
@@ -34,7 +40,7 @@ type NudgeRuntime(getChatHistory: (string -> JS.Promise<obj array>) option, work
                             runtimeState
                             workspaceId
                             (collectSnapshotMux getChatHistory workspaceDirectory helpers workspaceId lastMsg)
-                            (sendNudgeMux helpers workspaceId)
+                            (sendNudgeMux fallbackRuntime helpers workspaceId)
 
                     runtimeState <- newState
 
@@ -64,5 +70,6 @@ type NudgeRuntime(getChatHistory: (string -> JS.Promise<obj array>) option, work
 let createNudgeRuntime
     (getChatHistory: (string -> JS.Promise<obj array>) option)
     (workspaceDirectory: string)
+    (fallbackRuntime: FallbackRuntimeState)
     : NudgeRuntime =
-    NudgeRuntime(getChatHistory, workspaceDirectory)
+    NudgeRuntime(getChatHistory, workspaceDirectory, fallbackRuntime)

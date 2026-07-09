@@ -63,7 +63,7 @@ let waitForToolCallTextRecovery (runtime: FallbackRuntimeState) (sessionID: stri
 let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) : bool =
     if sessionID = "" then
         true
-    else if runtime.IsEventHandlingActive sessionID then
+    else if runtime.IsEventHandlingActive sessionID || runtime.IsAwaitingBusy sessionID then
         false
     else
         let st = runtime.GetOrCreateState sessionID

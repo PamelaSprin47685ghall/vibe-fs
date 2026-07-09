@@ -11,6 +11,7 @@ open Wanxiangshu.Shell.OpencodeHookInputCodec
 open Wanxiangshu.Shell.OpencodeSessionEventCodecCommon
 open Wanxiangshu.Kernel.EventLog.Fold
 open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.NudgeRuntimeTypes
 
 [<Global("process")>]
@@ -147,6 +148,7 @@ let collectSnapshotMux
     }
 
 let sendNudgeMux
+    (fallbackRuntime: FallbackRuntimeState)
     (helpers: obj)
     (workspaceId: string)
     (promptText: string)
@@ -167,6 +169,7 @@ let sendNudgeMux
                 | Some m -> box m
                 | None -> null
 
+            fallbackRuntime.SetAwaitingBusy workspaceId true
             let! delivered = unbox<JS.Promise<bool>> (Dyn.call4 nudgeFn workspaceId promptText modelVal agentVal)
             return if delivered then Delivered else Busy
         with _ ->

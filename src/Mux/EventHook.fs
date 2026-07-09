@@ -87,10 +87,10 @@ let createEventHook (deps: obj) (deactivateReview: string -> unit) : obj =
 
     let directory = if Dyn.isNullish deps then "" else Dyn.str deps "directory"
 
-    let runtime = createNudgeRuntime getChatHistory directory
-
     let fallbackRuntime = FallbackRuntimeState()
     let fallbackConfigOpt = loadFallbackConfig directory
+
+    let runtime = createNudgeRuntime getChatHistory directory fallbackRuntime
 
     let configLookup: ConfigLookup =
         match fallbackConfigOpt with

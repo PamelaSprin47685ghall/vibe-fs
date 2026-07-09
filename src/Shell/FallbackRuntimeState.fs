@@ -21,6 +21,7 @@ type FallbackRuntimeState() =
     let mutable nudgeActive = Map.ofList<string, bool> []
     let mutable subsessionPending = Map.ofList<string, bool> []
     let mutable eventHandlingActive = Map.ofList<string, bool> []
+    let mutable awaitingBusy = Map.ofList<string, bool> []
     let mutable listeners = Map.empty<string, ResizeArray<unit -> unit>>
 
     let triggerStateChanged (sessionID: string) : unit =
@@ -123,6 +124,13 @@ type FallbackRuntimeState() =
     member _.IsEventHandlingActive(sessionID: string) : bool =
         Map.tryFind sessionID eventHandlingActive |> Option.defaultValue false
 
+    member _.SetAwaitingBusy (sessionID: string) (value: bool) : unit =
+        awaitingBusy <- Map.add sessionID value awaitingBusy
+        triggerStateChanged sessionID
+
+    member _.IsAwaitingBusy(sessionID: string) : bool =
+        Map.tryFind sessionID awaitingBusy |> Option.defaultValue false
+
     member this.SetContinueActive (sessionID: string) (value: bool) : unit =
         let s = this.GetOrCreateState sessionID
 
@@ -148,4 +156,5 @@ type FallbackRuntimeState() =
         nudgeActive <- Map.remove sessionID nudgeActive
         subsessionPending <- Map.remove sessionID subsessionPending
         eventHandlingActive <- Map.remove sessionID eventHandlingActive
+        awaitingBusy <- Map.remove sessionID awaitingBusy
         triggerStateChanged sessionID
