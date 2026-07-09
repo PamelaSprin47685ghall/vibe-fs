@@ -234,62 +234,6 @@ let testSingleToolCallPromptInjection () =
         equal "Case 7 length with duplicate IDs" 4 res7.Length
     }
 
-let testAmendSkippedWhenSembleInjectEnabled () =
-    promise {
-        let reviewStore = createReviewStore ()
-
-        let backlogOps =
-            { Host = opencode
-              GetOrRebuildBacklog = fun _ _ -> [] }
-
-        let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
-        let injectFn _ (arr: obj array) = promise { return arr }
-        let loadCaps () = promise { return [] }
-        let buildCaps (arr: obj array) _ _ = arr
-
-        let msgs =
-            [ mkMsg "user1" User []
-              mkMsg "assist1" Assistant [ ToolPart("read", "call-1", None, null) ]
-              mkMsg "result1" ToolResult []
-              { info =
-                  { id = "amend-msg"
-                    sessionID = "test"
-                    role = User
-                    agent = "main"
-                    isError = false
-                    toolName = ""
-                    details = null
-                    time = null }
-                parts = []
-                source = Native
-                raw = createObj [ "amend", box 1 ] } ]
-
-        let plan =
-            { SessionID = "s-amend-semble"
-              Agent = "main"
-              Directory = ""
-              Excluded = true
-              IsSubagentSession = false
-              Cleaned = msgs
-              RawArray = None
-              SembleInjectEnabled = true }
-
-        let! res =
-            runHostMessagesTransform
-                reviewStore
-                "s-amend-semble"
-                IfStoreEmpty
-                (fun _ -> promise { return Seq.empty })
-                plan
-                backlogOps
-                encodeMessages
-                injectFn
-                loadCaps
-                buildCaps
-
-        equal "amend skipped: output should preserve all 4 messages" 4 res.Length
-    }
-
 let run () =
     promise {
         defaultExcludedTrue ()
@@ -298,5 +242,4 @@ let run () =
         childWorkspaceNotExcluded ()
         do! testTransformO1Cache ()
         do! testSingleToolCallPromptInjection ()
-        do! testAmendSkippedWhenSembleInjectEnabled ()
     }

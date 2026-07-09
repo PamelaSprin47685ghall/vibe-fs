@@ -50,8 +50,7 @@ let tailCoreTestEntries () : (string * TestBody) list =
       "FuzzyTests.fuzzyFallbackNotice", TestBody.Sync(sync FuzzyTests.fuzzyFallbackNotice)
       "FuzzyTests.scanTimeoutConfigurable", TestBody.Sync(sync FuzzyTests.scanTimeoutConfigurable)
       "FuzzyTests.iteratorCounterUniqueness", TestBody.Sync(sync FuzzyTests.iteratorCounterUniqueness)
-      "FuzzyTestsPromise.finderCacheConcurrencyRace",
-      TestBody.Async FuzzyTestsPromise.finderCacheConcurrencyRace
+      "FuzzyTestsPromise.finderCacheConcurrencyRace", TestBody.Async FuzzyTestsPromise.finderCacheConcurrencyRace
       "FuzzyTestsPromise.grepMaxMatchesPerFileRespectsPageSize",
       TestBody.Async FuzzyTestsPromise.grepMaxMatchesPerFileRespectsPageSize
       "FuzzyTestsPromise.findPagingWhenTotalMatchedIsNone",
@@ -63,14 +62,11 @@ let tailCoreTestEntries () : (string * TestBody) list =
       "FuzzyTestsPaging.totalMatchedSemantics", TestBody.Sync(sync FuzzyTestsPaging.totalMatchedSemantics)
       "FuzzyTestsPaging.grepOutputNotices", TestBody.Sync(sync FuzzyTestsPaging.grepOutputNotices)
       "FuzzyTestsPaging.iteratorNamespaceConstants", TestBody.Sync(sync FuzzyTestsPaging.iteratorNamespaceConstants)
-      "FuzzyTestsPaging.iteratorStoreStronglyTyped",
-      TestBody.Sync(sync FuzzyTestsPaging.iteratorStoreStronglyTyped)
-      "FuzzyTestsPaging.runWithFinderSharedPipeline",
-      TestBody.Sync(sync FuzzyTestsPaging.runWithFinderSharedPipeline)
+      "FuzzyTestsPaging.iteratorStoreStronglyTyped", TestBody.Sync(sync FuzzyTestsPaging.iteratorStoreStronglyTyped)
+      "FuzzyTestsPaging.runWithFinderSharedPipeline", TestBody.Sync(sync FuzzyTestsPaging.runWithFinderSharedPipeline)
       "FuzzyTestsPaging.resolveStoreRequiresInjection",
       TestBody.Sync(sync FuzzyTestsPaging.resolveStoreRequiresInjection)
-      "FuzzyTestsPaging.emptyIteratorTreatedAsAbsent",
-      TestBody.Sync(sync FuzzyTestsPaging.emptyIteratorTreatedAsAbsent)
+      "FuzzyTestsPaging.emptyIteratorTreatedAsAbsent", TestBody.Sync(sync FuzzyTestsPaging.emptyIteratorTreatedAsAbsent)
       "ShellTests.webApiFetchInit", TestBody.Sync(sync ShellTests.webApiFetchInit)
       "ShellTests.webApiResponseMethodCall", TestBody.Sync(sync ShellTests.webApiResponseMethodCall)
       "ShellTests.webApiKeyValidation", TestBody.Sync(sync ShellTests.webApiKeyValidation)
@@ -78,10 +74,8 @@ let tailCoreTestEntries () : (string * TestBody) list =
       "ShellTestsFormat.safetyWarning", TestBody.Sync(sync ShellTestsFormat.safetyWarning)
       "ShellTests.capsFileShape", TestBody.Sync(sync ShellTests.capsFileShape)
       "ShellTests.capsFileSizeLimit", TestBody.Sync(sync ShellTests.capsFileSizeLimit)
-      "ShellTests.stripHeadTailPipesOutsideQuotes",
-      TestBody.Sync(sync ShellTests.stripHeadTailPipesOutsideQuotes)
-      "ShellTests.stripHeadTailPipesHeadTailChain",
-      TestBody.Sync(sync ShellTests.stripHeadTailPipesHeadTailChain)
+      "ShellTests.stripHeadTailPipesOutsideQuotes", TestBody.Sync(sync ShellTests.stripHeadTailPipesOutsideQuotes)
+      "ShellTests.stripHeadTailPipesHeadTailChain", TestBody.Sync(sync ShellTests.stripHeadTailPipesHeadTailChain)
       "ShellTestsFormat.ollamaFormat", TestBody.Sync(sync ShellTestsFormat.ollamaFormat)
       "ShellTestsFormat.webApiSearchFormat", TestBody.Sync(sync ShellTestsFormat.webApiSearchFormat)
       "ShellTestsFormat.summarizerInputCap", TestBody.Sync(sync ShellTestsFormat.summarizerInputCap)
@@ -89,14 +83,11 @@ let tailCoreTestEntries () : (string * TestBody) list =
       TestBody.Sync(sync ShellTestsFormat.executorToolResponseFormatting)
       "ShellTestsFormat.summarizerPromptOmitsReturnValue",
       TestBody.Sync(sync ShellTestsFormat.summarizerPromptOmitsReturnValue)
-      "ShellTestsFormat.formatFetchResponseAllFields",
-      TestBody.Sync(sync ShellTestsFormat.formatFetchResponseAllFields)
-      "ShellTestsFormat.formatFetchResponseOnlyTitle",
-      TestBody.Sync(sync ShellTestsFormat.formatFetchResponseOnlyTitle)
+      "ShellTestsFormat.formatFetchResponseAllFields", TestBody.Sync(sync ShellTestsFormat.formatFetchResponseAllFields)
+      "ShellTestsFormat.formatFetchResponseOnlyTitle", TestBody.Sync(sync ShellTestsFormat.formatFetchResponseOnlyTitle)
       "ShellTestsFormat.formatFetchResponseOnlyContent",
       TestBody.Sync(sync ShellTestsFormat.formatFetchResponseOnlyContent)
-      "ShellTestsFormat.formatFetchResponseAllNone",
-      TestBody.Sync(sync ShellTestsFormat.formatFetchResponseAllNone)
+      "ShellTestsFormat.formatFetchResponseAllNone", TestBody.Sync(sync ShellTestsFormat.formatFetchResponseAllNone)
       "ShellTestsFormat.formatFetchResponseEmptyTitleOmitted",
       TestBody.Sync(sync ShellTestsFormat.formatFetchResponseEmptyTitleOmitted)
       "ShellTests.readDirectoryListing", TestBody.Async ShellTests.readDirectoryListing
@@ -125,17 +116,16 @@ let tailCoreTestEntries () : (string * TestBody) list =
       "TitleFetchGuardTests.wrap", TestBody.Sync(sync TitleFetchGuardTests.wrap)
       "TitleFetchGuardTests.detect", TestBody.Sync(sync TitleFetchGuardTests.detect)
       "TitleFetchGuardTests.tryWrapString", TestBody.Sync(sync TitleFetchGuardTests.tryWrapString)
-      "TitleFetchGuardTests.rewriteStringContent",
-      TestBody.Sync(sync TitleFetchGuardTests.rewriteStringContent)
-      "TitleFetchGuardTests.rewriteArrayContent",
-      TestBody.Sync(sync TitleFetchGuardTests.rewriteArrayContent)
+      "TitleFetchGuardTests.rewriteStringContent", TestBody.Sync(sync TitleFetchGuardTests.rewriteStringContent)
+      "TitleFetchGuardTests.rewriteArrayContent", TestBody.Sync(sync TitleFetchGuardTests.rewriteArrayContent)
       "TitleFetchGuardTests.skipProbeMessage", TestBody.Sync(sync TitleFetchGuardTests.skipProbeMessage)
       "ToolCatalogClassificationTests.run", TestBody.Sync(sync ToolCatalogClassificationTests.run)
       "ToolOutputInfoTests.run", TestBody.Sync(sync ToolOutputInfoTests.run)
       "MessageTransformPolicyTests.run", TestBody.Async MessageTransformPolicyTests.run
       "SembleInjectionTests.run", TestBody.Sync(sync SembleInjectionTests.run)
-      "SembleReviewerInjectionTests.testSembleInjectsForReviewer",
-      TestBody.Async testSembleInjectsForReviewer
+      "SembleReviewerInjectionTests.testSembleInjectsForReviewer", TestBody.Async testSembleInjectsForReviewer
+      "SembleReviewerInjectionTests.testAmendSkippedWhenSembleInjectEnabled",
+      TestBody.Async testAmendSkippedWhenSembleInjectEnabled
       "ExecutorKernelTests.run", TestBody.Sync(sync ExecutorKernelTests.run)
       "ToolExecuteTests.run", TestBody.Sync(sync ToolExecuteTests.run)
       "TreeSitterKernelTests.run", TestBody.Sync(sync TreeSitterKernelTests.run)

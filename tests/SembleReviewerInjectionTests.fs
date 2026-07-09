@@ -3,10 +3,16 @@ module Wanxiangshu.Tests.SembleReviewerInjectionTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell
 open Wanxiangshu.Shell.SembleSearch
 open Wanxiangshu.Shell.SembleSearchClient
 open Wanxiangshu.Opencode.MessageTransform
+open Wanxiangshu.Shell.MessageTransformPipeline
+open Wanxiangshu.Shell.MessageTransformHostEntry
+open Wanxiangshu.Shell.MessageTransformCore
+open Wanxiangshu.Kernel.Messaging
+open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Shell.ReviewRuntime
 
 let testSembleInjectsForReviewer () =
     promise {
@@ -48,4 +54,74 @@ let testSembleInjectsForReviewer () =
             equal "reviewer breakpoint remains unchanged" (Some 0) bpAfterReviewer
         finally
             setClientForTest None
+    }
+
+let private mkMsg id role parts =
+    { info =
+        { id = id
+          sessionID = "test"
+          role = role
+          agent = "main"
+          isError = false
+          toolName = ""
+          details = null
+          time = null }
+      parts = parts
+      source = Native
+      raw = null }
+
+let testAmendSkippedWhenSembleInjectEnabled () =
+    promise {
+        let reviewStore = createReviewStore ()
+
+        let backlogOps =
+            { Host = Opencode
+              GetOrRebuildBacklog = fun _ _ -> [] }
+
+        let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
+        let injectFn _ (arr: obj array) = promise { return arr }
+        let loadCaps () = promise { return [] }
+        let buildCaps (arr: obj array) _ _ = arr
+
+        let msgs =
+            [ mkMsg "user1" User []
+              mkMsg "assist1" Assistant [ ToolPart("read", "call-1", None, null) ]
+              mkMsg "result1" ToolResult []
+              { info =
+                  { id = "amend-msg"
+                    sessionID = "test"
+                    role = User
+                    agent = "main"
+                    isError = false
+                    toolName = ""
+                    details = null
+                    time = null }
+                parts = []
+                source = Native
+                raw = createObj [ "amend", box 1 ] } ]
+
+        let plan =
+            { SessionID = "s-amend-semble"
+              Agent = "main"
+              Directory = ""
+              Excluded = true
+              IsSubagentSession = false
+              Cleaned = msgs
+              RawArray = None
+              SembleInjectEnabled = true }
+
+        let! res =
+            runHostMessagesTransform
+                reviewStore
+                "s-amend-semble"
+                IfStoreEmpty
+                (fun _ -> promise { return Seq.empty })
+                plan
+                backlogOps
+                encodeMessages
+                injectFn
+                loadCaps
+                buildCaps
+
+        equal "amend skipped: output should preserve all 4 messages" 4 res.Length
     }
