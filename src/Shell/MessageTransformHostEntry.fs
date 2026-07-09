@@ -151,6 +151,25 @@ let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSe
                                 "parts"
                                 (box [| box (createObj [ "type", box "text"; "text", box (string contentVal2) ]) |])
 
+                    let partsVal3 = get v "parts"
+
+                    if isArray partsVal3 then
+                        let arr = unbox<obj array> partsVal3
+                        let mutable hasText = false
+
+                        for i = 0 to arr.Length - 1 do
+                            let item = arr.[i]
+
+                            if not (isNullish item) && typeIs item "object" then
+                                let t = get item "type"
+
+                                if not (isNullish t) && typeIs t "string" && (string t) = "text" then
+                                    hasText <- true
+
+                        if not hasText then
+                            let newPart = box (createObj [ "type", box "text"; "text", box "." ])
+                            replaceArrayInPlace arr (Array.append arr [| newPart |])
+
                 for propName in
                     [| "message"
                        "content"

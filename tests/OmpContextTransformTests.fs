@@ -215,16 +215,37 @@ let testInvestigatorCrashWithUndefinedCaps () =
                     let id = Dyn.str info "id"
                     id.StartsWith "caps-synth-assistant-")
 
-            let parts =
-                Dyn.get assistantEntry "parts"
-                |> unbox<{| state: {| input: {| filePath: string |} |} |} array>
+            let parts = Dyn.get assistantEntry "parts" |> unbox<obj array>
 
             let hasGood =
-                parts |> Array.exists (fun p -> p.state.input.filePath.Contains "valid-cap.md")
+                parts
+                |> Array.exists (fun p ->
+                    let state = Dyn.get p "state"
+
+                    if not (Dyn.isNullish state) then
+                        let input = Dyn.get state "input"
+
+                        if not (Dyn.isNullish input) then
+                            (Dyn.str input "filePath").Contains "valid-cap.md"
+                        else
+                            false
+                    else
+                        false)
 
             let hasBad =
                 parts
-                |> Array.exists (fun p -> p.state.input.filePath.Contains "polluted-cap.md")
+                |> Array.exists (fun p ->
+                    let state = Dyn.get p "state"
+
+                    if not (Dyn.isNullish state) then
+                        let input = Dyn.get state "input"
+
+                        if not (Dyn.isNullish input) then
+                            (Dyn.str input "filePath").Contains "polluted-cap.md"
+                        else
+                            false
+                    else
+                        false)
 
             check "has valid-cap tool part" hasGood
             check "does not have polluted-cap tool part" (not hasBad)

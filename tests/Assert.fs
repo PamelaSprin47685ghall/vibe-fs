@@ -134,6 +134,7 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
                 failures.Add(label + $" [TIMEOUT>{asyncSpecTimeoutMs}ms]")
             else
                 printfn "TEST ASYNC %s THREW: %A" label ex
+                Fable.Core.JS.console.error (ex)
                 failed <- failed + 1
                 failures.Add(label + " [THREW]")
 
