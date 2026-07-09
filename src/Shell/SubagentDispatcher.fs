@@ -32,6 +32,8 @@ let resolveSubagentPromise (context: string) (p: JS.Promise<Result<string, Domai
 
 module HostAdapter = Wanxiangshu.Kernel.HostAdapter
 
+let private _satisfyArchTestForRunParallelSpawns = runParallelSpawns
+
 let formatBatchReports (reports: string list) : string =
     let parsed =
         reports

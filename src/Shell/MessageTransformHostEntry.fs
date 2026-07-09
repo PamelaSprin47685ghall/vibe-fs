@@ -6,6 +6,7 @@ open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Shell.MessageTransformCore
 open Wanxiangshu.Shell.MessageTransformPipeline
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.Dyn
 
 type ReviewReplayMode =
     | IfStoreEmpty
@@ -65,6 +66,30 @@ let private getSessionCache
         dict.[sessionID] <- c
         c
 
+let rec private sanitizeEmptyStrings (visited: System.Collections.Generic.HashSet<obj>) (v: obj) : unit =
+    if not (isNullish v) then
+        if isArray v then
+            if visited.Add(v) then
+                let arr = unbox<obj array> v
+
+                for item in arr do
+                    sanitizeEmptyStrings visited item
+        elif typeIs v "object" then
+            if visited.Add(v) then
+                for propName in [| "message"; "content"; "text" |] do
+                    let valObj = get v propName
+
+                    if not (isNullish valObj) && typeIs valObj "string" && (string valObj) = "" then
+                        setKey v propName (box " ")
+
+                let keysArr = keys v
+
+                for key in keysArr do
+                    let child = get v key
+
+                    if not (isNullish child) && (typeIs child "object" || isArray child) then
+                        sanitizeEmptyStrings visited child
+
 let runHostMessagesTransform
     (_reviewStore: ReviewStore)
     (sessionID: string)
@@ -99,8 +124,10 @@ let runHostMessagesTransform
             else
                 pipelineRunCount <- pipelineRunCount + 1
 
-                let! result =
-                    runMessageTransformPipeline plan backlogOps encodeMessages injectFn loadCaps buildCaps
+                let! result = runMessageTransformPipeline plan backlogOps encodeMessages injectFn loadCaps buildCaps
+
+                let visited = System.Collections.Generic.HashSet<obj>()
+                sanitizeEmptyStrings visited result
 
                 cache.InputFingerprint <- currentFingerprint
                 cache.OutputFingerprint <- computeFingerprint result
