@@ -147,6 +147,10 @@ let messagesTransform
                 backlogSessionOpsFrom backlogSession.Host (fun sid msgs ->
                     backlogSession.GetOrRebuildBacklog(sid, msgs))
 
+            let! maxInputTokens =
+                Wanxiangshu.Shell.ContextBudgetUsageCodec
+                    .resolveMaxInputTokens [ _client; input ] sessionID
+
             let plan =
                 { SessionID = sessionID
                   Agent = agent
@@ -157,11 +161,7 @@ let messagesTransform
                   RawArray = Some messagesArr
                   SembleInjectEnabled = sembleInjectEnabled
                   Scope = runtimeScope
-                  MaxInputTokens =
-                      let maxTokensVal = Dyn.get input "maxInputTokens"
-                      if not (Dyn.isNullish maxTokensVal) && Dyn.typeIs maxTokensVal "number" then
-                          int (unbox<float> maxTokensVal)
-                      else 200000
+                  MaxInputTokens = maxInputTokens
                   GetContextUsage =
                       match ContextBudgetUsageCodec.tryGetRealContextUsage _client sessionID with
                       | Some f -> f

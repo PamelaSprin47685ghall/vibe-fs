@@ -46,7 +46,10 @@ let subagentCapsInjectionSpec () =
             let reviewStore = createReviewStore ()
             let userEntry = mockUserMsg "user-1" "test" prompt
             let entries = [| userEntry |]
-            let! out = transformEntriesAsyncWithAgent reviewStore workspaceDir "test" (box entries) "coder" (fun _ -> Promise.lift None)
+            let! out =
+                transformEntriesAsyncWithAgent
+                    reviewStore workspaceDir "test" (box entries) "coder"
+                    (fun _ -> Promise.lift None) (box null)
             let mutable foundTargetRead = false
 
             for entry in out do
@@ -84,7 +87,10 @@ let crossSessionIsolationSpec () =
         markChildSession ExecutorTools.ompScope "session-B"
 
         try
-            let! out = transformEntriesAsyncWithAgent reviewStore workspaceDir "session-B" (box entries) "coder" (fun _ -> Promise.lift None)
+            let! out =
+                transformEntriesAsyncWithAgent
+                    reviewStore workspaceDir "session-B" (box entries) "coder"
+                    (fun _ -> Promise.lift None) (box null)
             let mutable foundA = false
             let mutable foundB = false
 
@@ -263,7 +269,10 @@ let subagentFallbackRawTextSpec () =
         markChildSession ExecutorTools.ompScope "test-session"
 
         try
-            let! out = transformEntriesAsyncWithAgent reviewStore workspaceDir "test-session" (box entries) "coder" (fun _ -> Promise.lift None)
+            let! out =
+                transformEntriesAsyncWithAgent
+                    reviewStore workspaceDir "test-session" (box entries) "coder"
+                    (fun _ -> Promise.lift None) (box null)
             let mutable foundRawRead = false
 
             for entry in out do
