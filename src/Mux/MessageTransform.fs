@@ -25,6 +25,7 @@ open Wanxiangshu.Shell.MuxHookInputCodec
 open Wanxiangshu.Shell.MuxWorkspaceCodec
 open Wanxiangshu.Shell.ChatTransformOutputCodec
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.ContextBudgetUsageCodec
 
 let messagesTransform
     (deps: obj)
@@ -56,6 +57,9 @@ let messagesTransform
                 backlogSessionOpsFrom backlogSession.Host (fun sid msgs ->
                     backlogSession.GetOrRebuildBacklog(sid, msgs))
 
+            let! maxInputTokens =
+                resolveMaxInputTokens [ deps; input ] sessionID
+
             let plan =
                 { SessionID = sessionID
                   Agent = agent
@@ -66,11 +70,7 @@ let messagesTransform
                   RawArray = Some messagesArr
                   SembleInjectEnabled = false
                   Scope = runtimeScope
-                  MaxInputTokens =
-                      let maxTokensVal = get deps "maxInputTokens"
-                      if not (isNullish maxTokensVal) && typeIs maxTokensVal "number" then
-                          int (unbox<float> maxTokensVal)
-                      else 200000
+                  MaxInputTokens = maxInputTokens
                   GetContextUsage =
                       match ContextBudgetUsageCodec.tryGetRealContextUsage deps sessionID with
                       | Some f -> f

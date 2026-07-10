@@ -45,6 +45,7 @@ let transformEntriesAsyncWithAgent
     (entriesObj: obj)
     (agent: string)
     (getContextUsage: obj array -> JS.Promise<int option>)
+    (ctx: obj)
     : JS.Promise<obj array> =
     promise {
         if Dyn.isNullish entriesObj || not (Dyn.isArray entriesObj) then
@@ -66,6 +67,10 @@ let transformEntriesAsyncWithAgent
                     backlogSessionOpsFrom defaultBacklogSession.Host (fun sid msgs ->
                         defaultBacklogSession.GetOrRebuildBacklog(sid, msgs))
 
+                let! maxInputTokens =
+                    Wanxiangshu.Shell.ContextBudgetUsageCodec
+                        .resolveMaxInputTokens [ ctx ] sessionId
+
                 let plan =
                     { SessionID = sessionId
                       Agent = agent
@@ -76,7 +81,7 @@ let transformEntriesAsyncWithAgent
                       RawArray = Some entriesArr
                       SembleInjectEnabled = false
                       Scope = ExecutorTools.ompScope
-                      MaxInputTokens = 200000
+                      MaxInputTokens = maxInputTokens
                       GetContextUsage = getContextUsage }
 
 
@@ -137,7 +142,7 @@ let transformEntriesAsync
     (sessionId: string)
     (entriesObj: obj)
     : JS.Promise<obj array> =
-    transformEntriesAsyncWithAgent reviewStore cwd sessionId entriesObj "manager" (fun _ -> Promise.lift None)
+    transformEntriesAsyncWithAgent reviewStore cwd sessionId entriesObj "manager" (fun _ -> Promise.lift None) (box null)
 
 let beforeAgentStart (_cwd: string) (systemPrompt: obj) : JS.Promise<obj> =
     promise {
@@ -192,6 +197,7 @@ let registerContextTransform (pi: obj) (reviewStore: ReviewStore) : unit =
                         entries
                         agent
                         getContextUsage
+                        ctx
                 event?entries <- transformed
                 return event
         }
