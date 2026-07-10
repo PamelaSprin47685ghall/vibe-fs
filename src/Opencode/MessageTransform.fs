@@ -165,16 +165,7 @@ let messagesTransform
                   GetContextUsage =
                       match ContextBudgetUsageCodec.tryGetRealContextUsage _client sessionID with
                       | Some f -> f
-                      | None ->
-                          match ContextBudgetUsageCodec.tryGetGetContextUsage input with
-                          | Some f -> f
-                          | None ->
-                              match ContextBudgetUsageCodec.tryGetGetContextUsage _client with
-                              | Some f -> f
-                              | None ->
-                                  match ContextBudgetUsageCodec.tryGetGetContextUsage output with
-                                  | Some f -> f
-                                  | None -> fun _ -> Promise.lift None }
+                      | None -> fun _ -> Promise.lift None }
 
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)

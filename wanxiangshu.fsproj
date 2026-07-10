@@ -680,6 +680,7 @@
     <Compile Include="tests/ContextBudgetHookTests.fs"/>
     <Compile Include="tests/ContextBudgetNoReinjectTests.fs"/>
     <Compile Include="tests/ContextBudgetAfterTodoTests.fs"/>
+    <Compile Include="tests/ContextBudgetRealApiSpecs.fs"/>
     <Compile Include="tests/ContextBudgetIntegrationTests.fs"/>
     <Compile Include="tests/Tests.fs"/>
     <!-- E2E Tests -->

@@ -76,7 +76,23 @@ Attention: the system context is about to be suspended. You must immediately for
 
 ## 测试
 
-`ContextBudgetAfterTodoTests`、`ContextBudgetIntegrationTests`、`ContextBudgetHookTests` 等。
+`ContextBudgetAfterTodoTests`、`ContextBudgetIntegrationTests`、`ContextBudgetHookTests`、`ContextBudgetRealApiSpecs` 等。
+
+## maxInputTokens / currentTokens 获取（OpenCode v1 SDK）
+
+`Shell/ContextBudgetUsageCodec.resolveMaxInputTokens` 获取 $b$（上下文窗口上限）：
+
+1. **同步**：在 target/session/client 上找 `model.limit.input` 或 `model.limit.context`
+2. **异步**：`session.get({ sessionID })` → `data.model.{id, providerID}` → `provider.list()` → 查找 `models[modelID].limit.input`（优先）或 `.limit.context`（后备）
+3. **兜底**：返回 `0`（API 不可用 → 跳过 budget nudge，安全降级）
+
+`tryGetRealContextUsage` 获取 $a$（当前 token 占用）：
+
+`session.get({ sessionID })` → `data.tokens.input + data.tokens.cache.read`
+
+> OpenCode v1 SDK `Session.tokens` 无 `total` 字段。当前占用 = `input + cache.read`（同 `overflow.ts:usable()` 语义）。
+
+> `MaxInputTokens <= 0` 时 `applyContextBudget` 直接跳过（不注入 nudge）。
 
 ## 相关
 

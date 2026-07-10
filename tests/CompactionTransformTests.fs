@@ -144,20 +144,20 @@ let testMuxCompactionTransform () =
 
 let testTryGetRealContextUsage () =
     promise {
-        let mockGet = fun (arg: obj) ->
+        let mockGet (_arg: obj) =
             promise {
-                let path = Dyn.get arg "path"
-                let id = if Dyn.isNullish path then "" else Dyn.str path "id"
-                if id = "s-test-real-api" then
-                    return createObj [
-                        "data", createObj [
-                            "tokens", createObj [
-                                "total", box 54321
+                return createObj [
+                    "data", createObj [
+                        "tokens", createObj [
+                            "input", box 49321
+                            "output", box 3000
+                            "reasoning", box 500
+                            "cache", createObj [
+                                "read", box 5000; "write", box 0
                             ]
                         ]
                     ]
-                else
-                    return null
+                ]
             }
         let mockSession = createObj [
             "get", box (System.Func<obj, JS.Promise<obj>>(mockGet))
@@ -165,12 +165,16 @@ let testTryGetRealContextUsage () =
         let mockClient = createObj [
             "session", mockSession
         ]
-        
-        let getUsageOpt = Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetRealContextUsage mockClient "s-test-real-api"
+
+        let getUsageOpt =
+            Wanxiangshu.Shell.ContextBudgetUsageCodec
+                .tryGetRealContextUsage mockClient "s-test-real-api"
         check "tryGetRealContextUsage should return Some" getUsageOpt.IsSome
         let getUsage = getUsageOpt.Value
         let! tokens = getUsage [||]
-        equal "tokens should be Some 54321" (Some 54321) tokens
+        // input + cache.read = 49321 + 5000 = 54321
+        equal "tokens = input + cache.read = 54321"
+            (Some 54321) tokens
     }
 
 let testApplyContextBudgetBacklogContentChange () =

@@ -185,10 +185,7 @@ let registerContextTransform (pi: obj) (reviewStore: ReviewStore) : unit =
                 let getContextUsage =
                     match Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetRealContextUsage ctx sessionId with
                     | Some f -> f
-                    | None ->
-                        match Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetGetContextUsage ctx with
-                        | Some f -> f
-                        | None -> fun _ -> Promise.lift None
+                    | None -> fun _ -> Promise.lift None
                 let! transformed =
                     transformEntriesAsyncWithAgent
                         reviewStore

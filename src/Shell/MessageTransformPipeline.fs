@@ -121,7 +121,7 @@ let applyContextBudget
     (encodeMessages: Message<obj> list -> obj array)
     : JS.Promise<Message<obj> list> =
     promise {
-        if plan.Excluded || messages.IsEmpty then
+        if plan.Excluded || messages.IsEmpty || plan.MaxInputTokens <= 0 then
             return messages
         else
             let totalBytes = JS.JSON.stringify(encodedAll).Length

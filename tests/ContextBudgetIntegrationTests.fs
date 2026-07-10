@@ -1,14 +1,17 @@
 module Wanxiangshu.Tests.ContextBudgetIntegrationTests
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.ContextBudget
 open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.MessageTransformCore
 open Wanxiangshu.Shell.MessageTransformPipeline
 open Wanxiangshu.Shell.ContextBudgetUsageCodec
+open Wanxiangshu.Tests.ContextBudgetRealApiSpecs
 
 let spec_runMessageTransformPipeline_nudge () =
     promise {
@@ -47,68 +50,65 @@ let spec_runMessageTransformPipeline_nudge () =
         let messages = [ { info = msgInfo; parts = []; source = Native; raw = null } ]
         let planWithMessages = { plan with Cleaned = messages }
 
-        let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
+        let encodeMessages (msgs: Message<obj> list) =
+            msgs |> List.map box |> List.toArray
         let injectFn _ (arr: obj array) = promise { return arr }
         let loadCaps () = promise { return [] }
         let buildCaps (arr: obj array) _ _ = arr
 
-        let! res = runMessageTransformPipeline planWithMessages backlogOps encodeMessages injectFn loadCaps buildCaps
+        let! res =
+            runMessageTransformPipeline
+                planWithMessages backlogOps encodeMessages
+                injectFn loadCaps buildCaps
         equal "nudge should be injected in pipeline" 2 res.Length
         let lastMsg = res.[1]
-        let idVal = Dyn.get lastMsg "info" |> fun info -> Dyn.str info "id"
-        check "last msg id starts with nudge prefix" (idVal.StartsWith("context-budget-nudge-"))
+        let idVal = Dyn.get lastMsg "info" |> fun i -> Dyn.str i "id"
+        check "nudge prefix" (idVal.StartsWith("context-budget-nudge-"))
     }
 
-let spec_tryExtractMaxInputTokens () =
-    let t1 = Fable.Core.JsInterop.createObj [ "maxInputTokens", box 50000 ]
-    equal "extract t1" (Some 50000) (tryExtractMaxInputTokens t1)
-    
-    let t2 = Fable.Core.JsInterop.createObj [ "session", Fable.Core.JsInterop.createObj [ "maxInputTokens", box 100000 ] ]
-    equal "extract t2" (Some 100000) (tryExtractMaxInputTokens t2)
+/// RED: tryExtractMaxInputTokens must read model.limit.context/input
+let spec_tryExtractMaxInputTokens_realSchema () =
+    let mkLimit ctx inp outOpt =
+        let fields =
+            [ "context", box ctx
+              "output", box outOpt ]
+            @ (match inp with Some i -> [ "input", box i ] | None -> [])
+        createObj fields
 
-    let t3 = Fable.Core.JsInterop.createObj [ "client", Fable.Core.JsInterop.createObj [ "session", Fable.Core.JsInterop.createObj [ "maxInputTokens", box 120000 ] ] ]
-    equal "extract t3" (Some 120000) (tryExtractMaxInputTokens t3)
+    let t1 = createObj [
+        "session", createObj [
+            "model", createObj [ "limit", mkLimit 128000 (Some 200000) 8000 ]
+        ]
+    ]
+    equal "extract limit.input"
+        (Some 200000) (tryExtractMaxInputTokens t1)
 
-    let t4 = Fable.Core.JsInterop.createObj [ "session", Fable.Core.JsInterop.createObj [ "model", Fable.Core.JsInterop.createObj [ "maxInputTokens", box 150000 ] ] ]
-    equal "extract t4" (Some 150000) (tryExtractMaxInputTokens t4)
+    let t2 = createObj [
+        "session", createObj [
+            "model", createObj [ "limit", mkLimit 128000 None 8000 ]
+        ]
+    ]
+    equal "extract limit.context (no input)"
+        (Some 128000) (tryExtractMaxInputTokens t2)
 
-    let t5 = Fable.Core.JsInterop.createObj [ "session", Fable.Core.JsInterop.createObj [ "model", Fable.Core.JsInterop.createObj [ "contextWindow", box 180000 ] ] ]
-    equal "extract t5" (Some 180000) (tryExtractMaxInputTokens t5)
+    let t3 = createObj []
+    equal "empty obj → None" None (tryExtractMaxInputTokens t3)
 
-    let t6 = Fable.Core.JsInterop.createObj []
-    equal "extract t6" None (tryExtractMaxInputTokens t6)
-
-let spec_tryGetMaxInputTokensAsync () =
-    promise {
-        let mockGet (arg: obj) =
-            promise {
-                let res = Fable.Core.JsInterop.createObj [ "data", Fable.Core.JsInterop.createObj [ "model", Fable.Core.JsInterop.createObj [ "maxInputTokens", box 80000 ] ] ]
-                return res
-            }
-        let t = Fable.Core.JsInterop.createObj [ "session", Fable.Core.JsInterop.createObj [ "get", box mockGet ] ]
-        let! limit = tryGetMaxInputTokensAsync t "sess-id"
-        equal "async extract" (Some 80000) limit
-
-        let t2 = Fable.Core.JsInterop.createObj []
-        let! limit2 = tryGetMaxInputTokensAsync t2 "sess-id"
-        equal "async extract fallback" None limit2
-    }
-
-let spec_resolveMaxInputTokens () =
-    promise {
-        let t1 = Fable.Core.JsInterop.createObj []
-        let! res1 = resolveMaxInputTokens [ t1 ] "sess-id"
-        equal "resolve fallback" 200000 res1
-
-        let t2 = Fable.Core.JsInterop.createObj [ "maxInputTokens", box 60000 ]
-        let! res2 = resolveMaxInputTokens [ t1; t2 ] "sess-id"
-        equal "resolve priority" 60000 res2
-    }
+    let t4 = createObj [
+        "client", createObj [
+            "session", createObj [
+                "model", createObj [
+                    "limit", mkLimit 100000 None 4000
+                ]
+            ]
+        ]
+    ]
+    equal "extract client.session.model.limit.context"
+        (Some 100000) (tryExtractMaxInputTokens t4)
 
 let run () : JS.Promise<unit> =
     promise {
         do! spec_runMessageTransformPipeline_nudge ()
-        spec_tryExtractMaxInputTokens ()
-        do! spec_tryGetMaxInputTokensAsync ()
-        do! spec_resolveMaxInputTokens ()
+        spec_tryExtractMaxInputTokens_realSchema ()
+        do! ContextBudgetRealApiSpecs.run ()
     }
