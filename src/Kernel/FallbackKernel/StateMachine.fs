@@ -24,17 +24,26 @@ let private completeScan (scanIdx: int) (origIdx: int) (state: SessionFallbackSt
         FailureCount = k },
     FallbackAction.DoNothing
 
+let private busyLifecycle (state: SessionFallbackState) =
+    match state.Lifecycle with
+    | FallbackLifecycle.TaskComplete ->
+        { state with
+            Lifecycle = FallbackLifecycle.Active }
+    | _ -> state
+
 let handleSessionError (state: SessionFallbackState) (cfg: FallbackConfig) (chain: FallbackChain) (err: ErrorInput) =
-    if state.Cancelled || state.TaskComplete then
-        state, FallbackAction.DoNothing
-    else
+    match state.Lifecycle, state.Phase with
+    | FallbackLifecycle.Cancelled, _
+    | FallbackLifecycle.TaskComplete, _ -> state, FallbackAction.DoNothing
+    | _, _ ->
         let errorClass = classifyError err state cfg
 
         match state.Phase, errorClass with
         | _, ErrorClass.Ignore ->
             let ns =
                 if errorInputIsAbort err then
-                    { state with Cancelled = true }
+                    { state with
+                        Lifecycle = FallbackLifecycle.Cancelled }
                 else
                     state
 
@@ -104,35 +113,41 @@ let handleSessionError (state: SessionFallbackState) (cfg: FallbackConfig) (chai
                 FallbackAction.PropagateFailure
 
 let private handleSessionBusy (state: SessionFallbackState) =
-    let ns = { state with TaskComplete = false }
+    match state.Lifecycle with
+    | FallbackLifecycle.TaskComplete -> busyLifecycle state, FallbackAction.DoNothing
+    | _ ->
+        let ns = busyLifecycle state
 
-    match state.Phase with
-    | FallbackPhase.Scanning(scanIdx, origIdx) -> completeScan scanIdx origIdx ns
-    | FallbackPhase.Retrying _ -> { ns with Phase = FallbackPhase.Idle }, FallbackAction.DoNothing
-    | FallbackPhase.ScanningToolCallText
-    | FallbackPhase.RecoveringToolCallText -> ns, FallbackAction.DoNothing
-    | _ -> ns, FallbackAction.DoNothing
+        match ns.Phase with
+        | FallbackPhase.Scanning(scanIdx, origIdx) -> completeScan scanIdx origIdx ns
+        | FallbackPhase.Retrying _ -> { ns with Phase = FallbackPhase.Idle }, FallbackAction.DoNothing
+        | FallbackPhase.ScanningToolCallText
+        | FallbackPhase.RecoveringToolCallText -> ns, FallbackAction.DoNothing
+        | _ -> ns, FallbackAction.DoNothing
 
 let private handleSessionIdle (state: SessionFallbackState) =
-    match state.Phase with
-    | FallbackPhase.Scanning(scanIdx, origIdx) -> completeScan scanIdx origIdx state
-    | FallbackPhase.Retrying _ when not state.TaskComplete && not state.Cancelled ->
+    match state.Lifecycle with
+    | FallbackLifecycle.Cancelled -> state, FallbackAction.DoNothing
+    | FallbackLifecycle.TaskComplete ->
         { state with
-            Phase = FallbackPhase.ScanningToolCallText },
-        FallbackAction.ScanToolCallAsText
-    | FallbackPhase.Retrying _ ->
-        { state with
-            Phase = FallbackPhase.Idle },
+            Lifecycle = FallbackLifecycle.Active },
         FallbackAction.DoNothing
-    | FallbackPhase.Idle when not state.TaskComplete && not state.Cancelled ->
-        { state with
-            Phase = FallbackPhase.ScanningToolCallText },
-        FallbackAction.ScanToolCallAsText
-    | FallbackPhase.RecoveringToolCallText when not state.TaskComplete && not state.Cancelled ->
-        { state with
-            Phase = FallbackPhase.ScanningToolCallText },
-        FallbackAction.ScanToolCallAsText
-    | _ -> state, FallbackAction.DoNothing
+    | FallbackLifecycle.Active ->
+        match state.Phase with
+        | FallbackPhase.Scanning(scanIdx, origIdx) -> completeScan scanIdx origIdx state
+        | FallbackPhase.Retrying _ ->
+            { state with
+                Phase = FallbackPhase.ScanningToolCallText },
+            FallbackAction.ScanToolCallAsText
+        | FallbackPhase.Idle ->
+            { state with
+                Phase = FallbackPhase.ScanningToolCallText },
+            FallbackAction.ScanToolCallAsText
+        | FallbackPhase.RecoveringToolCallText ->
+            { state with
+                Phase = FallbackPhase.ScanningToolCallText },
+            FallbackAction.ScanToolCallAsText
+        | _ -> state, FallbackAction.DoNothing
 
 let private handleNewUserMessage (state: SessionFallbackState) =
     { state with
@@ -140,14 +155,13 @@ let private handleNewUserMessage (state: SessionFallbackState) =
         ContinueCount = 0
         FailureCount = 0
         CurrentIndex = 0
-        Cancelled = false
-        TaskComplete = false },
+        Lifecycle = FallbackLifecycle.Active },
     FallbackAction.DoNothing
 
 let private handleTaskCompleteCalled (state: SessionFallbackState) =
     { state with
         Phase = FallbackPhase.Idle
-        TaskComplete = true },
+        Lifecycle = FallbackLifecycle.TaskComplete },
     FallbackAction.DoNothing
 
 let transition (state: SessionFallbackState) (evt: FallbackEvent) (cfg: FallbackConfig) (chain: FallbackChain) =

@@ -9,6 +9,7 @@ open Wanxiangshu.Kernel.Nudge.SubmitReviewHooks
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Methodology
 open Wanxiangshu.Kernel.ToolOutputInfo
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
 open Wanxiangshu.Shell
 open Wanxiangshu.Shell.Dyn
@@ -67,7 +68,11 @@ type ProgressObserver
 
                 if sid <> "" then
                     let st = fallbackRuntime.GetOrCreateState sid
-                    fallbackRuntime.UpdateState sid { st with TaskComplete = true }
+
+                    fallbackRuntime.UpdateState
+                        sid
+                        { st with
+                            Lifecycle = FallbackLifecycle.TaskComplete }
             elif tool = "submit_review" then
                 match hookOutputString output with
                 | Some text when isSubmitReviewWipProgressOutput text -> ()

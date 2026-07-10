@@ -36,7 +36,7 @@ let runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () =
             childId
             { s0 with
                 Phase = FallbackPhase.Idle
-                TaskComplete = false }
+                Lifecycle = FallbackLifecycle.Active }
 
         rt.SetConsumed childId false
         let textExtracted = ref false
@@ -98,7 +98,12 @@ let runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () =
         check "busy blocks extract" (not textExtracted.Value)
 
         rt.SetBusyCount childId 0
-        rt.SetTaskComplete childId true
+        let s0 = rt.GetOrCreateState childId
+
+        rt.UpdateState
+            childId
+            { s0 with
+                Lifecycle = FallbackLifecycle.TaskComplete }
 
         let! result = runP
 
@@ -194,7 +199,8 @@ let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
         rt.UpdateState
             childId
             { s0 with
-                Phase = FallbackPhase.Retrying 1 }
+                Phase = FallbackPhase.Retrying 1
+                Lifecycle = FallbackLifecycle.Active }
 
         rt.SetConsumed childId true
         rt.ClearSubsessionPending childId

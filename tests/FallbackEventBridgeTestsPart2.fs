@@ -115,7 +115,7 @@ let handleEvent_sessionIdle_idle_emitsScanToolCallAsText () =
 
         equal "consumed" false result.Consumed
         equal "phase Idle" FallbackPhase.Idle result.State.Phase
-        equal "taskComplete true" true result.State.TaskComplete
+        equal "lifecycle TaskComplete" FallbackLifecycle.TaskComplete result.State.Lifecycle
         equal "no continue calls" 0 (executor.ContinueCalls.Length)
         equal "no recover calls" 0 (executor.RecoverCalls.Length)
     }
@@ -179,7 +179,7 @@ let handleEvent_sessionIdle_idle_todosComplete_setsTaskComplete () =
         let! result = handleEvent translator rt defaultCfgLookup executor "" (box ())
 
         equal "phase Idle" FallbackPhase.Idle result.State.Phase
-        equal "taskComplete true" true result.State.TaskComplete
+        equal "lifecycle TaskComplete" FallbackLifecycle.TaskComplete result.State.Lifecycle
         equal "no recover calls" 0 (executor.RecoverCalls.Length)
     }
 
@@ -234,7 +234,7 @@ let handleEvent_sessionBusy_duringRetrying_consumedTrue () =
         let! r = handleEvent tr rt defaultCfgLookup (FakeExecutor()) "" (box ())
         equal "consumed true during retrying" true r.Consumed
         equal "phase Idle after busy" FallbackPhase.Idle r.State.Phase
-        equal "taskComplete false" false r.State.TaskComplete
+        equal "lifecycle Active" FallbackLifecycle.Active r.State.Lifecycle
     }
 
 let handleEvent_chainPrependsCurrentModel () =

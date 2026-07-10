@@ -7,6 +7,7 @@ open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolOutputInfoTypes
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.AsyncFlush
+open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackRuntimeState
 
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -79,7 +80,7 @@ let run
                       let isComplete =
                           if not (Dyn.isNullish runtimeRef.Value) then
                               let rt: FallbackRuntimeState = unbox runtimeRef.Value
-                              rt.GetOrCreateState(childID).TaskComplete
+                              rt.GetOrCreateState(childID).Lifecycle = FallbackLifecycle.TaskComplete
                           else
                               false
 

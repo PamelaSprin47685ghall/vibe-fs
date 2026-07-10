@@ -98,7 +98,7 @@ let nudgeDedupMustUseEventLogFold () =
 
         check
             ("arch: " + path + " uses event-log nudge integral")
-            (code.Contains "nudgeBlockedForTurn" || code.Contains "tryClaimNudgeDispatch")
+            (code.Contains "blockStatus" || code.Contains "tryClaimNudgeDispatch")
 
 let nudgeLoopStateMustReplayHistory () =
     let opencode = requireFile "src/Opencode/NudgeEffect.fs" |> nonCommentCode
@@ -119,15 +119,22 @@ let nudgeLoopStateMustReplayHistory () =
 
 let hostMustNotDirectlyMutateReviewRegistry () =
     let dirs = [| "src/Opencode"; "src/Mux"; "src/Omp" |]
+
     for dir in dirs do
         for f in fsFilesRelative dir do
             let path = dir + "/" + f
             let code = requireFile path |> nonCommentCode
+
             check
-                ("arch: " + path + " no direct .activateReview (use event-log append + syncReviewProjection)")
+                ("arch: "
+                 + path
+                 + " no direct .activateReview (use event-log append + syncReviewProjection)")
                 (not (code.Contains ".activateReview"))
+
             check
-                ("arch: " + path + " no direct .deactivateReview (use event-log append + syncReviewProjection)")
+                ("arch: "
+                 + path
+                 + " no direct .deactivateReview (use event-log append + syncReviewProjection)")
                 (not (code.Contains ".deactivateReview"))
 
 let returnReviewerCatalogAndHostRegistration () =

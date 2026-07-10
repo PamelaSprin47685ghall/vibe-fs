@@ -106,7 +106,12 @@ let runSubagentWaitsForNudgeToComplete () =
         rt.SetNudgeActive childId false
 
         let s1 = rt.GetOrCreateState childId
-        rt.UpdateState childId { s1 with TaskComplete = true }
+
+        rt.UpdateState
+            childId
+            { s1 with
+                Lifecycle = FallbackLifecycle.TaskComplete }
+
         rt.ClearSubsessionPending childId
 
         let! result = runP
@@ -216,7 +221,7 @@ let runSubagentWaitsForContinueToComplete () =
             childId
             { s1 with
                 Phase = FallbackPhase.Idle
-                TaskComplete = true }
+                Lifecycle = FallbackLifecycle.TaskComplete }
 
         rt.SetConsumed childId false
         rt.ClearSubsessionPending childId

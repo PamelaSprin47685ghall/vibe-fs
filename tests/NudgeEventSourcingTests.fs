@@ -17,12 +17,11 @@ let private ev session kind payload =
 let private toSessionSnapshot (s: NudgeSnapshotState) : SessionSnapshot =
     { todos = s.openTodos
       lastAssistantMessage = s.lastAssistantText
-      isLoopActive = s.isLoopActive
-      nudgeBlockedForTurn = false
+      workState = s.workState
+      blockStatus = NudgeBlockStatus.Allowed
       nudgeAnchorKey = nudgeAnchorKey s.turnId s.lastAssistantText
       agentFromMessage = s.agentFromMessage
-      modelFromMessage = s.modelFromMessage
-      hasActiveRunner = false }
+      modelFromMessage = s.modelFromMessage }
 
 /// No events → all fields empty/default.
 let foldNudgeSnapshotEmpty () =
@@ -31,7 +30,13 @@ let foldNudgeSnapshotEmpty () =
     check "empty: no text" (s.lastAssistantText = "")
     check "empty: no agent" (s.agentFromMessage = None)
     check "empty: no turnId" (s.turnId = "")
-    check "empty: not loop active" (not s.isLoopActive)
+
+    check
+        "empty: not loop active"
+        (match s.workState with
+         | SessionWorkState.LoopActive _ -> false
+         | _ -> true)
+
     check "empty: no dispatched anchors" (s.dispatchedAnchors = Set.empty)
 
 /// assistant_completed populates lastAssistantText, agentFromMessage, turnId, modelFromMessage.
@@ -56,7 +61,13 @@ let foldNudgeSnapshotAssistantCompleted () =
 let foldNudgeSnapshotLoopActivated () =
     let events = [ ev "s1" eventKindLoopActivated (Map [ "task", "ship it" ]) ]
     let s = foldNudgeSnapshot "s1" events
-    check "loop active after activate" s.isLoopActive
+
+    let isLoopActive =
+        match s.workState with
+        | SessionWorkState.LoopActive _ -> true
+        | _ -> false
+
+    check "loop active after activate" isLoopActive
     check "no todos" (s.openTodos = [])
     check "no text" (s.lastAssistantText = "")
     check "no agent" (s.agentFromMessage = None)
@@ -69,7 +80,13 @@ let foldNudgeSnapshotLoopCancelled () =
           ev "s1" eventKindLoopCancelled Map.empty ]
 
     let s = foldNudgeSnapshot "s1" events
-    check "not loop active after cancel" (not s.isLoopActive)
+
+    let isLoopActive =
+        match s.workState with
+        | SessionWorkState.LoopActive _ -> true
+        | _ -> false
+
+    check "not loop active after cancel" (not isLoopActive)
     check "no todos" (s.openTodos = [])
     check "no text" (s.lastAssistantText = "")
     check "no agent" (s.agentFromMessage = None)
@@ -82,7 +99,13 @@ let foldNudgeSnapshotAcceptedClears () =
           ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictAccepted ]) ]
 
     let s = foldNudgeSnapshot "s1" events
-    check "not loop active after accept" (not s.isLoopActive)
+
+    let isLoopActive =
+        match s.workState with
+        | SessionWorkState.LoopActive _ -> true
+        | _ -> false
+
+    check "not loop active after accept" (not isLoopActive)
 
 /// review_verdict needs_revision keeps isLoopActive.
 let foldNudgeSnapshotNeedsRevisionKeeps () =
@@ -91,7 +114,13 @@ let foldNudgeSnapshotNeedsRevisionKeeps () =
           ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictNeedsRevision ]) ]
 
     let s = foldNudgeSnapshot "s1" events
-    check "loop active after needs_revision" s.isLoopActive
+
+    let isLoopActive =
+        match s.workState with
+        | SessionWorkState.LoopActive _ -> true
+        | _ -> false
+
+    check "loop active after needs_revision" isLoopActive
 
 /// nudge_dispatched adds both anchors to dispatchedAnchors.
 let foldNudgeSnapshotNudgeDispatched () =
@@ -145,7 +174,13 @@ let foldNudgeSnapshotIntegrated () =
     let s = foldNudgeSnapshot "s1" events
     check "integrated: has todos" (s.openTodos = [ "ship feature" ])
     check "integrated: has assistant text" (s.lastAssistantText = "working on it")
-    check "integrated: not loop active" (not s.isLoopActive)
+
+    let isLoopActive =
+        match s.workState with
+        | SessionWorkState.LoopActive _ -> true
+        | _ -> false
+
+    check "integrated: not loop active" (not isLoopActive)
     check "integrated: has turnId" (s.turnId = "t42")
     equal "integrated: model" (Some "openai/gpt-4o") s.modelFromMessage
 

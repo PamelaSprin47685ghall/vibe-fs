@@ -190,7 +190,7 @@ let handleEvent_sessionAborted_setsCancelled () =
         let! result = handleEvent translator rt defaultCfgLookup executor "" (box ())
 
         equal "consumed" true result.Consumed
-        equal "cancelled true" true result.State.Cancelled
+        equal "lifecycle Cancelled" FallbackLifecycle.Cancelled result.State.Lifecycle
     }
 
 let handleEvent_newUserMessage_resetsState () =
@@ -223,7 +223,7 @@ let handleEvent_newUserMessage_resetsState () =
         equal "phase Idle" FallbackPhase.Idle result.State.Phase
         equal "continueCount 0" 0 result.State.ContinueCount
         equal "failureCount 0" 0 result.State.FailureCount
-        equal "cancelled false" false result.State.Cancelled
+        equal "lifecycle Active" FallbackLifecycle.Active result.State.Lifecycle
     }
 
 let createHandler_returnsCallable () =

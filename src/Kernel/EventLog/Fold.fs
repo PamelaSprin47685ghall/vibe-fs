@@ -3,6 +3,7 @@ module Wanxiangshu.Kernel.EventLog.Fold
 open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.EventLog.FallbackInjectionFold
 open Wanxiangshu.Kernel.BacklogProjectionCore
+open Wanxiangshu.Kernel.Nudge.Types
 
 let private payloadTask (e: WanEvent) : string option =
     e.Payload
@@ -32,7 +33,6 @@ let private reviewTaskFolder (current: string option) (e: WanEvent) : string opt
         | _ -> current
     | _ -> current
 
-/// Integrate loop state for one session; file line order preserved in `events`.
 let foldReviewTask (sessionId: string) (events: WanEvent list) : string option =
     foldEventStream sessionId None reviewTaskFolder events
 
@@ -89,7 +89,6 @@ let private nudgeDedupFolder (st: NudgeDedupState) (e: WanEvent) : NudgeDedupSta
     | k when k = eventKindSubmitReviewWipRecorded || k = eventKindNudgeDedupCleared -> emptyNudgeDedupState
     | _ -> st
 
-/// Nudge dedup integral: collect dispatched anchors; wip record clears.
 let foldNudgeDedup (sessionId: string) (events: WanEvent list) : NudgeDedupState =
     foldEventStream sessionId emptyNudgeDedupState nudgeDedupFolder events
 
@@ -99,7 +98,7 @@ type NudgeSnapshotState =
       agentFromMessage: string option
       modelFromMessage: string option
       turnId: string
-      isLoopActive: bool
+      workState: SessionWorkState
       dispatchedAnchors: Set<string> }
 
 let private parseTodosJson (json: string) : string list =
@@ -122,13 +121,17 @@ let private parseTodosJson (json: string) : string list =
                 Some(s.Substring(1, s.Length - 2)))
         |> Array.toList
 
+let private updateWorkState (st: NudgeSnapshotState) (loopActive: bool) : NudgeSnapshotState =
+    { st with
+        workState = getSessionWorkState false loopActive st.openTodos }
+
 let emptyNudgeSnapshotState: NudgeSnapshotState =
     { openTodos = []
       lastAssistantText = ""
       agentFromMessage = None
       modelFromMessage = None
       turnId = ""
-      isLoopActive = false
+      workState = SessionWorkState.Idle
       dispatchedAnchors = Set.empty }
 
 let private strOrEmpty (o: string option) : string =
@@ -150,6 +153,12 @@ let private nudgeSnapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSn
         let tid = payloadField "turnId" e |> strOrEmpty
         let todosFromPayload = payloadField "openTodosJson" e |> Option.map parseTodosJson
 
+        let loopActive =
+            match st.workState with
+            | SessionWorkState.LoopActive _ -> true
+            | SessionWorkState.RunnerActive(_, loopActive) -> loopActive
+            | _ -> false
+
         { st with
             lastAssistantText = msg
             agentFromMessage = agent
@@ -158,12 +167,13 @@ let private nudgeSnapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSn
             openTodos =
                 match todosFromPayload with
                 | Some t -> t
-                | None -> st.openTodos }
-    | k when k = eventKindLoopActivated -> { st with isLoopActive = true }
-    | k when k = eventKindLoopCancelled -> { st with isLoopActive = false }
+                | None -> st.openTodos
+            workState = getSessionWorkState false loopActive st.openTodos }
+    | k when k = eventKindLoopActivated -> updateWorkState st true
+    | k when k = eventKindLoopCancelled -> updateWorkState st false
     | k when k = eventKindReviewVerdict ->
         match payloadVerdict e with
-        | Some v when isEndVerdict v -> { st with isLoopActive = false }
+        | Some v when isEndVerdict v -> updateWorkState st false
         | _ -> st
     | k when k = eventKindNudgeDispatched ->
         match payloadAnchor e with
@@ -177,8 +187,15 @@ let private nudgeSnapshotFolder (st: NudgeSnapshotState) (e: WanEvent) : NudgeSn
     | k when k = eventKindWorkBacklogCommitted ->
         let todosOpt = payloadField "todosJson" e |> Option.map parseTodosJson
 
+        let loopActive =
+            match st.workState with
+            | SessionWorkState.LoopActive _ -> true
+            | SessionWorkState.RunnerActive(_, loopActive) -> loopActive
+            | _ -> false
+
         { st with
-            openTodos = todosOpt |> Option.defaultValue st.openTodos }
+            openTodos = todosOpt |> Option.defaultValue st.openTodos
+            workState = getSessionWorkState false loopActive st.openTodos }
     | _ -> st
 
 let foldNudgeSnapshot (sessionId: string) (events: WanEvent list) : NudgeSnapshotState =
@@ -243,10 +260,6 @@ let private subagentFolder (current: Map<string, SubagentState>) (e: WanEvent) :
                 Map.add childId state current
     | _ -> current
 
-/// SessionState invariants:
-/// - `Backlog` is stored in **reverse chronological order** (newest first) to allow
-///   O(1) prepend during fold. Consumers must `List.rev` to get chronological order.
-/// - `BacklogSnapshot.LatestEntry` is always the most recent backlog entry (or None).
 type SessionState =
     { ReviewTask: string option
       Backlog: BacklogEntry list
@@ -282,6 +295,5 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
       Subagents = subagentFolder st.Subagents e
       FallbackInjection = fallbackInjectionFolder st.FallbackInjection e }
 
-/// Fold subagents map for one session.
 let foldSubagents (sessionId: string) (events: WanEvent list) : Map<string, SubagentState> =
     foldEventStream sessionId Map.empty subagentFolder events
