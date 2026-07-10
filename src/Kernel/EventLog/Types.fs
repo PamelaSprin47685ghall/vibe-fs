@@ -36,6 +36,4 @@ let verdictNeedsRevision = "needs_revision"
 let verdictTerminated = "terminated"
 
 let isEndVerdict (verdict: string) : bool =
-    verdict = verdictAccepted
-    || verdict = verdictCancelled
-    || verdict = verdictTerminated
+    verdict = verdictAccepted || verdict = verdictCancelled

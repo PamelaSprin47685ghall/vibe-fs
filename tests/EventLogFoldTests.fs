@@ -50,6 +50,13 @@ let foldReviewTaskCancelClears () =
 
     equal "cancel clears" None (foldReviewTask "s1" events)
 
+let foldReviewTaskTerminatedKeeps () =
+    let events =
+        [ ev "s1" eventKindLoopActivated (Map [ "task", "ship S1" ])
+          ev "s1" eventKindReviewVerdict (Map [ "verdict", verdictTerminated ]) ]
+
+    equal "terminated keeps" (Some "ship S1") (foldReviewTask "s1" events)
+
 let foldWorkBacklogLatestEntry () =
     let full a p =
         Map
@@ -131,5 +138,6 @@ let run () =
     foldReviewTaskNeedsRevisionStays ()
     foldReviewTaskLastActivateWins ()
     foldReviewTaskCancelClears ()
+    foldReviewTaskTerminatedKeeps ()
     foldWorkBacklogLatestEntry ()
     foldWorkBacklogTodosJson ()
