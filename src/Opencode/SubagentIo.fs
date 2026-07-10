@@ -77,6 +77,8 @@ let runSubagentCoreResult
                         abortAndUnregister ()
 
                 try
+                    let initSt = runtime.GetOrCreateState childID
+                    runtime.UpdateState childID { initSt with TaskComplete = false }
                     runtime.SetSubsessionPending childID true
                     do! promptWithAbort client (buildPromptBody options childID) signal
 

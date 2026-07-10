@@ -12,6 +12,15 @@ let private deferred () : JS.Promise<unit> * (unit -> unit) =
     let promise = Promise.create (fun resolve _ -> resolver.Value <- resolve)
     promise, (fun () -> resolver.Value())
 
+let private withTimeout<'T> (p: JS.Promise<'T>) : JS.Promise<'T> =
+    let timeoutPromise =
+        promise {
+            do! Promise.sleep 1000
+            return! Promise.reject (System.Exception("Timeout after 1000ms"))
+        }
+
+    Promise.race [ p; unbox timeoutPromise ]
+
 let run
     (startHarness: obj -> JS.Promise<obj>)
     (check: string -> bool -> unit)
@@ -92,7 +101,7 @@ let run
                                 entries = [||] |} |] ]
 
         let toolPromise = harness.executePluginTool "investigator" args (createEmpty ())
-        do! firstPromptSeen
+        do! withTimeout firstPromptSeen
 
         let errorEvent =
             createObj
@@ -114,7 +123,7 @@ let run
 
         let! _ = harness.fireEvent errorEvent
 
-        do! secondPromptSeen
+        do! withTimeout secondPromptSeen
         let runtime: FallbackRuntimeState = unbox runtimeRef.Value
         runtime.SetContinueActive childID true
         runtime.SetConsumed childID true
@@ -137,7 +146,7 @@ let run
         if not completedBeforePhaseReset then
             runtime.SetContinueActive childID false
 
-        let! result = completion
+        let! result = withTimeout completion
         check "e2e parent waits for child terminal state" completedBeforePhaseReset
         check "e2e child final output is complete" (result.Contains "final child output")
         do! harness.dispose ()

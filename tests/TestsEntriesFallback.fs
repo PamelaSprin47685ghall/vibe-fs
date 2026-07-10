@@ -29,6 +29,7 @@ let fallbackTestEntries () : (string * TestBody) list =
       "FallbackMessageCodecTests.run", Sync(sync FallbackMessageCodecTests.run)
       "FallbackIntegrationTests.run", Sync(sync FallbackIntegrationTests.run)
       "FallbackRecoveryWaitTests.run", Async FallbackRecoveryWaitTests.run
+      "FallbackRecoveryWaitTestsPart2.run", Async FallbackRecoveryWaitTestsPart2.run
       "SubagentIoFallbackRecoveryTests.run", Async SubagentIoFallbackRecoveryTests.run
       "SubagentIoFallbackRecoveryTestsPart2.run", Async SubagentIoFallbackRecoveryTestsPart2.run
       "SubagentIoFallbackRecoveryTestsPart3.run", Async SubagentIoFallbackRecoveryTestsPart3.run

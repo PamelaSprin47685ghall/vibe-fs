@@ -608,6 +608,7 @@
     <Compile Include="tests/FallbackAgentAndModelTests.fs"/>
     <Compile Include="tests/FallbackAgentAndModelPart2Tests.fs"/>
     <Compile Include="tests/FallbackRecoveryWaitTests.fs"/>
+    <Compile Include="tests/FallbackRecoveryWaitTestsPart2.fs"/>
     <Compile Include="tests/SubagentIoFallbackRecoveryTests.fs"/>
     <Compile Include="tests/SubagentIoFallbackRecoveryTestsPart2.fs"/>
     <Compile Include="tests/SubagentIoFallbackRecoveryTestsPart3.fs"/>
@@ -699,6 +700,7 @@
     <Compile Include="e2e/OpencodePluginTestsPart3.fs"/>
     <Compile Include="e2e/OpencodePluginTestsPart4.fs"/>
     <Compile Include="e2e/OpencodePluginSubagentRecoveryTests.fs"/>
+    <Compile Include="e2e/OpencodePluginContinueRecoveryTests.fs"/>
     <Compile Include="e2e/OpencodePluginNudgeTests.fs"/>
     <Compile Include="e2e/OpencodePluginTests.fs"/>
     <Compile Include="e2e/MimocodePluginSpecsPart.fs"/>

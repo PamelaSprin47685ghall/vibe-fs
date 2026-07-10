@@ -130,6 +130,11 @@ let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
         let promptRelease: JS.Promise<unit> =
             Promise.create (fun resolve _ -> promptReleaseResolver.Value <- resolve)
 
+        let promptRejectedResolver = ref (fun () -> ())
+
+        let promptRejected: JS.Promise<unit> =
+            Promise.create (fun resolve _ -> promptRejectedResolver.Value <- resolve)
+
         let textExtracted = ref false
 
         let finalMessagePart = createObj [ "type", box "text"; "text", box "final-output" ]
@@ -154,6 +159,7 @@ let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
                           promise {
                               promptStartedResolver.Value()
                               do! promptRelease
+                              promptRejectedResolver.Value()
                               return! Promise.reject (exn "network connection lost")
                           })
                   )
@@ -173,7 +179,7 @@ let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
                 registry
                 client
                 "investigator"
-                "Test"
+                "Continue"
                 "go"
                 "/tmp"
                 "parent-2"
@@ -191,11 +197,13 @@ let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
             { s0 with
                 Phase = FallbackPhase.Retrying 1 }
 
-        rt.SetTaskComplete childId true
         rt.SetConsumed childId true
         rt.ClearSubsessionPending childId
 
         promptReleaseResolver.Value()
+        do! promptRejected
+        check "continue error waits before completion" (not textExtracted.Value)
+        rt.SetTaskComplete childId true
         do! yieldMicrotask ()
         do! yieldMicrotask ()
         do! yieldMicrotask ()
