@@ -1,6 +1,7 @@
 ---
 import: 
   - README.md
+  - docs/
 models:
   agents:
     build:
