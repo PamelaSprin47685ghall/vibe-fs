@@ -62,6 +62,7 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
     promise {
         let args = resolveHookExecuteArgs input output
         let tool = toolNameFromHookInput input
+        ToolHookRuntime.coerceArgsTypes tool args
 
         match ToolHookRuntime.filterAmendFromArgs args with
         | Some n ->

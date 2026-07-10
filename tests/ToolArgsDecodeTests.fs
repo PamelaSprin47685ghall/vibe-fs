@@ -186,6 +186,43 @@ let testSanitizeNullArgs () =
     check "what_to_summarize kept" (Array.contains "what_to_summarize" keys)
     check "non_empty_obj kept" (Array.contains "non_empty_obj" keys)
 
+let testCoerceArgsTypesOk () =
+    let readArgs =
+        createObj [ "path", box "a.txt"; "offset", box "123"; "limit", box "456" ]
+
+    coerceArgsTypes "read" readArgs
+
+    let fetchArgs = createObj [ "url", box "http://localhost"; "timeout", box "15" ]
+
+    coerceArgsTypes "webfetch" fetchArgs
+
+    let intentsJson =
+        """[{"objective":"fix bug","background":"test","targets":[{"file":"a.ts","guide":"fix it"}]}]"""
+
+    let coderArgs =
+        createObj
+            [ "intents", box intentsJson
+              "tdd", box "red"
+              "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" ]
+
+    coerceArgsTypes "coder" coderArgs
+
+    match decodeToolInvocation "read" readArgs with
+    | Ok(Typed(ToolArgs.Read r)) ->
+        check "read offset coerced" (r.Offset = Some 123)
+        check "read limit coerced" (r.Limit = Some 456)
+    | _ -> check "read coerced failed" false
+
+    match decodeToolInvocation "webfetch" fetchArgs with
+    | Ok(Typed(ToolArgs.Webfetch w)) -> check "webfetch timeout coerced" (w.Timeout = Some 15)
+    | _ -> check "webfetch coerced failed" false
+
+    match decodeToolInvocation "coder" coderArgs with
+    | Ok(CoderBatch [ intent ]) ->
+        check "coder intents coerced objective" (intent.objective = "fix bug")
+        check "coder intents coerced file" (intent.targets.Head.file = "a.ts")
+    | _ -> check "coder coerced failed" false
+
 let run () =
     decodeCoderBatchOk ()
     decodeInvestigatorBatchOk ()
@@ -203,3 +240,4 @@ let run () =
     decodeSubmitReviewMissingReport ()
     decodeSubmitReviewOk ()
     testSanitizeNullArgs ()
+    testCoerceArgsTypesOk ()

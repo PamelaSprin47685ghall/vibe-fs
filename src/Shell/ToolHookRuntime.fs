@@ -133,12 +133,67 @@ let requireWarnReuseOnArgs (tool: string) (args: obj) : Result<unit, string> =
 
             Result.Error(wireDomainFailure tool err)
 
+/// Pre-process tool args: coerce string-encoded numbers to numbers,
+/// parse JSON-stringified arrays/objects, etc.
+let coerceArgsTypes (toolName: string) (args: obj) : unit =
+    if not (Dyn.isNullish args) && Dyn.typeIs args "object" then
+        let cleanTool =
+            match toolName.ToLowerInvariant() with
+            | "file_read"
+            | "read" -> "read"
+            | "file_write"
+            | "write" -> "write"
+            | "task"
+            | "todowrite" -> "todowrite"
+            | other -> other
+
+        let isExpectedNumber field =
+            match cleanTool, field with
+            | "read", ("offset" | "limit") -> true
+            | "websearch", "numResults" -> true
+            | "webfetch", "timeout" -> true
+            | _ -> false
+
+        let isExpectedObject field =
+            match cleanTool, field with
+            | "coder", "intents" -> true
+            | "investigator", "intents" -> true
+            | "executor", "dependencies" -> true
+            | "todowrite", ("todos" | "select_methodology") -> true
+            | "submit_review", "affectedFiles" -> true
+            | _ -> false
+
+        for k in Dyn.keys args do
+            let v = Dyn.get args k
+
+            if not (Dyn.isNullish v) && Dyn.typeIs v "string" then
+                let s = unbox<string> v
+
+                if isExpectedNumber k then
+                    match System.Int32.TryParse s with
+                    | true, n -> args?(k) <- box n
+                    | _ -> ()
+                elif isExpectedObject k then
+                    let trimmed = s.Trim()
+
+                    if
+                        (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
+                        || (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
+                    then
+                        try
+                            let parsed = JS.JSON.parse s
+                            args?(k) <- parsed
+                        with _ ->
+                            ()
+
 let muxToolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let tool = toolNameFromHookInputMux input
         let args = argsFromMuxToolExecuteInput input
 
         if not (Dyn.isNullish args) then
+            coerceArgsTypes tool args
+
             match filterAmendFromArgs args with
             | Some n ->
                 output?("_amend") <- box n

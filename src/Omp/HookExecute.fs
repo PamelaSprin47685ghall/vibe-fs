@@ -94,6 +94,7 @@ let private requireWarnReuseOmp (toolName: string) (args: obj) : string option =
             )
 
 let applyPreExecuteHook (toolName: string) (args: obj) : string option =
+    ToolHookRuntime.coerceArgsTypes toolName args
     ToolHookRuntime.filterAmendFromArgs args |> ignore
     ToolHookRuntime.sanitizeNullArgs toolName args
     normalizePatchArgs toolName args
