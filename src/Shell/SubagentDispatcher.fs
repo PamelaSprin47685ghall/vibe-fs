@@ -182,12 +182,6 @@ let dispatch
                         |> Promise.all
 
                     return formatBatchReports (List.ofArray reports)
-            | Typed(Meditator m) ->
-                let! promptResult = meditatorPromptFromFiles host adapter.WorkspaceRoot m.Intent m.Files
-
-                match promptResult with
-                | Error e -> return subagentToolFailed "meditator" e
-                | Ok prompt -> return! spawnOne HostAdapter.Meditator "Meditator" prompt
             | Typed(Browser b) -> return! spawnOne HostAdapter.Browser "Browser" (browserPromptText host b.Intent)
             | Typed(Continue c) ->
                 let cleanIter = c.Iterator.Trim()

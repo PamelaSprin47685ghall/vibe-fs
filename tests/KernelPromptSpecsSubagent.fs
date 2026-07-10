@@ -92,12 +92,13 @@ let mimocodeFormatPromptAppendsAgentReportTail () =
         (not (opencodeBody.Contains "MUST call the agent_report"))
 
 let meditatorMentionsReadCapability () =
-    let sections =
-        [ { file = "src/Kernel/SubagentPrompts.fs"
-            content = Some "let x = 1" }
-          { file = "README.md"; content = None } ]
-
-    let body = meditatorPrompt sections "what is the core abstraction?"
+    let dummyEntry : Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
+        { methodologyId = "test_methodology"
+          shortDefinition = "test def"
+          triggerWhen = "test trigger"
+          noteDescription = "test note desc"
+          meditatorRole = "test role"
+          outputSections = [] }
+    let body = Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent dummyEntry "what is the core abstraction?" "my background" "note detail"
     check "meditator prompt mentions read tool" (body.Contains "read tool")
-    check "meditator prompt still embeds file path" (body.Contains "src/Kernel/SubagentPrompts.fs")
     check "meditator prompt still embeds question" (body.Contains "what is the core abstraction?")

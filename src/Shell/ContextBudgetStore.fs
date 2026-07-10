@@ -9,7 +9,7 @@ open Wanxiangshu.Shell.SerialStateHolder
 type ContextBudgetEntry =
     { State: ContextState option
       LastUsage: {| tokenCount: int; textBytes: int |} option
-      LastTodoCount: int
+      LastBacklog: Wanxiangshu.Kernel.BacklogProjectionCore.BacklogEntry list
       NudgeInjected: bool }
 
 let private keyFor (sessionID: string) = "contextbudget_" + sessionID
@@ -17,7 +17,7 @@ let private keyFor (sessionID: string) = "contextbudget_" + sessionID
 let private defaultEntry : ContextBudgetEntry =
     { State = None
       LastUsage = None
-      LastTodoCount = 0
+      LastBacklog = []
       NudgeInjected = false }
 
 let private getHolder (scope: RuntimeScope) (sessionID: string) : StateHolder<ContextBudgetEntry> =

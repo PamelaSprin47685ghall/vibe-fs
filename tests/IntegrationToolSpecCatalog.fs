@@ -70,7 +70,6 @@ let integrationToolSpecs () : (string * (unit -> JS.Promise<unit>)) list =
       "muxTodoWriteCapturesCompletedWorkReport", muxTodoWriteCapturesCompletedWorkReportSpec
       "muxBacklogProjection", muxBacklogProjectionSpec
       "muxExecutorRoCatPrependsWarning", muxExecutorRoCatPrependsWarningSpec
-      "muxMeditatorReadsFilesFromCwd", muxMeditatorReadsFilesFromCwdSpec
       "muxSubmitReviewNoActiveReview", muxSubmitReviewNoActiveReviewSpec
       "muxSubmitReviewPromptFormat", muxSubmitReviewPromptFormatSpec
       "muxAgentReportWrapperFormatsVerdict", muxAgentReportWrapperFormatsVerdictSpec

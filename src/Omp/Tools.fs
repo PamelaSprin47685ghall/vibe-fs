@@ -26,6 +26,6 @@ let registerAllTools
     registerExecutorTools pi
     registerSubagentTools pi fallbackRuntime fallbackConfigOpt
     registerTodoTool pi
-    registerMethodologyTools pi fallbackRuntime fallbackConfigOpt
+    registerMeditatorTools pi fallbackRuntime fallbackConfigOpt
     registerLoopFeatures pi reviewStore
     registerContextTransform pi reviewStore

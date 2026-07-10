@@ -71,7 +71,12 @@ let messagesTransform
                       if not (isNullish maxTokensVal) && typeIs maxTokensVal "number" then
                           int (unbox<float> maxTokensVal)
                       else 200000
-                  GetContextUsage = ContextBudgetUsageCodec.tryGetGetContextUsage deps |> Option.defaultValue (fun _ -> Promise.lift None) }
+                  GetContextUsage =
+                      match ContextBudgetUsageCodec.tryGetRealContextUsage deps sessionID with
+                      | Some f -> f
+                      | None ->
+                          ContextBudgetUsageCodec.tryGetGetContextUsage deps
+                          |> Option.defaultValue (fun _ -> Promise.lift None) }
 
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)

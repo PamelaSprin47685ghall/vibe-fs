@@ -90,10 +90,6 @@ let private decodeInvestigator args =
         |> Result.mapError (fun msg -> ParseError("intents", msg))
         |> Result.map InvestigatorBatch)
 
-let private decodeMeditator args =
-    decodeMeditatorArgs args
-    |> Result.map (fun d -> Typed(Meditator { Intent = d.Intent; Files = d.Files }))
-
 let private decodeBrowser args =
     decodeBrowserArgs args
     |> Result.map (fun d -> Typed(Browser { Intent = d.Intent }))
@@ -144,7 +140,6 @@ let decodeToolInvocation (toolName: string) (args: obj) : Result<DecodedToolInvo
     | "write" -> decodeWrite args
     | "coder" -> decodeCoder args
     | "investigator" -> decodeInvestigator args
-    | "meditator" -> decodeMeditator args
     | "browser" -> decodeBrowser args
     | "continue" -> decodeContinue args
     | "websearch" -> decodeWebsearch args

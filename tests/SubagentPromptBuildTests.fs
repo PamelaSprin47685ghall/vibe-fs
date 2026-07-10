@@ -36,27 +36,22 @@ let promptsForParallelIntentsMatchesFormatPrompt () =
         equal $"investigator prompts match formatPrompt host={host}" invFormat invHelper
 
 let buildMeditatorSectionsMatchesManualZip () =
-    let files = [| "x.fs"; "y.fs" |]
-
-    let results =
-        [| { ReverieFileResult.filePath = "x.fs"
-             content = Some "let x = 1"
-             skipReason = None }
-           { ReverieFileResult.filePath = "y.fs"
-             content = None
-             skipReason = None } |]
-
-    let built = buildMeditatorSections files results
-    equal "section count" 2 built.Length
-    equal "first file" "x.fs" built.[0].file
-    equal "first content" (Some "let x = 1") built.[0].content
-    equal "second content" None built.[1].content
-
+    let dummyEntry : Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
+        { methodologyId = "test_methodology"
+          shortDefinition = "test def"
+          triggerWhen = "test trigger"
+          noteDescription = "test note desc"
+          meditatorRole = "test role"
+          outputSections = [] }
+    let viaText = Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
     for host in [| opencode; mimocode |] do
-        let sections = built |> Array.toList
-        let viaText = meditatorPromptText host "why?" sections
-        let viaFormat = formatPrompt host (Meditator("why?", sections)) |> List.head
-        equal $"meditator prompt matches formatPrompt host={host}" viaFormat viaText
+        let viaFormat = formatPrompt host (Meditator viaText) |> List.head
+        let expected =
+            if host = mimocode then
+                viaText + "\n\nWhen you have finished the task, you MUST call the agent_report tool. Use structuredOutput with relatedFiles (and relatedCode where applicable) so the caller can act on your findings."
+            else
+                viaText
+        equal $"meditator prompt matches formatPrompt host={host}" expected viaFormat
 
 let browserPromptTextMatchesFormatPrompt () =
     for host in [| opencode; mimocode |] do

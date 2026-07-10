@@ -104,19 +104,6 @@ let investigatorTool (deps: obj) (toolNames: string array) (sessionScope: Runtim
             execute deps toolNames sessionScope "explore" "Investigator" "explore" "investigator" config args
       condition = None }
 
-let meditatorTool (deps: obj) (toolNames: string array) (sessionScope: RuntimeScope) : ToolDefinition =
-    { name = "meditator"
-      description = description "meditator"
-      parameters =
-        mkSchema
-            (createObj
-                [ "intent", box (strProp Params.meditatorIntent)
-                  "files", box (strArrayProp Params.meditatorFiles) ])
-            (subagentRequiredKeys "meditator")
-      execute =
-        fun config args -> execute deps toolNames sessionScope "explore" "Meditator" "exec" "meditator" config args
-      condition = None }
-
 let browserTool (deps: obj) (toolNames: string array) (sessionScope: RuntimeScope) : ToolDefinition =
     { name = "browser"
       description = description "browser"

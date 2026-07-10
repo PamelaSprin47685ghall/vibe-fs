@@ -3,8 +3,6 @@ module Wanxiangshu.Shell.SubagentSimpleArgsCodec
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Shell.Dyn
 
-type MeditatorArgs = { Intent: string; Files: string array }
-
 type BrowserArgs = { Intent: string }
 
 type ContinueArgs = { Iterator: string; Prompt: string }
@@ -26,12 +24,6 @@ let private strArrayField (a: obj) (k: string) : string array =
         (v :?> obj array) |> Array.map string
     else
         [| string v |]
-
-let decodeMeditatorArgs (args: obj) : Result<MeditatorArgs, DomainError> =
-    decodeIntentField "meditator" "intent" args
-    |> Result.map (fun intent ->
-        { Intent = intent
-          Files = strArrayField args "files" })
 
 let decodeBrowserArgs (args: obj) : Result<BrowserArgs, DomainError> =
     decodeIntentField "browser" "intent" args

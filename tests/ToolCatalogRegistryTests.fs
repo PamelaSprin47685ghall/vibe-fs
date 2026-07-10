@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.ToolCatalogRegistryTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ToolCatalog
 
-let allCountIs17 () = equal "17 tools" 17 all.Length
+let allCountIs16 () = equal "16 tools" 16 all.Length
 
 let allNamesAreNonEmpty () =
     for spec in all do
@@ -80,7 +80,7 @@ let allParamDocsConsistent () =
             check (spec.name + "." + n + " doc non-empty") (spec.paramDocs[n] <> "")
 
 let run () =
-    allCountIs17 ()
+    allCountIs16 ()
     allNamesAreNonEmpty ()
     allDescriptionsAreNonEmpty ()
     allNamesAreUnique ()

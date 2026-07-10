@@ -30,7 +30,6 @@ let muxToolNames =
     Array.append
         [| "coder"
            "investigator"
-           "meditator"
            "browser"
            "continue"
            "executor"
@@ -42,7 +41,7 @@ let muxToolNames =
            "fuzzy_continue"
            "write"
            "read" |]
-        methodologyToolNames
+        meditatorToolNames
 
 let private canUseMuxTopLevel (agent: string) (toolName: string) : bool = canUseForHost mux agent toolName
 
@@ -63,7 +62,6 @@ let createToolCatalog
 
     [| yield injectWarnWarnTddIntoMuxSchema (coderTool deps toolNames sessionScope)
        yield investigatorTool deps toolNames sessionScope
-       yield meditatorTool deps toolNames sessionScope
        yield browserTool deps toolNames sessionScope
        yield continueTool deps toolNames sessionScope
        yield injectWarnWarnTddIntoMuxSchema (executorTool deps toolNames sessionScope)
@@ -75,7 +73,7 @@ let createToolCatalog
        yield fuzzyContinueTool finderCache iteratorStore
        yield injectWarnWarnTddIntoMuxSchema (writeTool deps)
        yield readTool deps hostReadExec
-       yield methodologyTool deps toolNames |]
+       yield meditatorTool deps toolNames |]
     |> Array.map (injectAmendIntoMuxSchema >> injectWarnReuseIntoMuxSchema)
 
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =

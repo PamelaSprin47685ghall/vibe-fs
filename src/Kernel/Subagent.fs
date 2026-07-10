@@ -10,7 +10,7 @@ open Wanxiangshu.Kernel.SubagentPrompts
 type SubagentTaskKind =
     | Coder of CoderIntent list
     | Investigator of InvestigatorIntent list
-    | Meditator of intent: string * sections: MeditatorFileSection list
+    | Meditator of intent: string
     | Browser of intent: string
     | Continue of iterator: string * prompt: string
     | ExecutorSummary of
@@ -44,7 +44,7 @@ let formatPrompt (host: Host) (kind: SubagentTaskKind) : string list =
     match kind with
     | Coder intents -> intents |> List.map (coderPrompt >> wrap)
     | Investigator intents -> intents |> List.map (investigatorPrompt >> wrap)
-    | Meditator(intent, sections) -> [ meditatorPrompt sections intent |> wrap ]
+    | Meditator intent -> [ intent |> wrap ]
     | Browser intent -> [ browserPrompt intent |> wrap ]
     | Continue(iterator, prompt) -> [ prompt ]
     | ExecutorSummary(output, language, program, dependencies, timeoutType, mode, whatToSummarize) ->
@@ -57,9 +57,6 @@ let promptsForParallelIntents (host: Host) (constructor: 'a -> SubagentTaskKind)
 
 let browserPromptText (host: Host) (intent: string) : string =
     formatPrompt host (Browser intent) |> List.head
-
-let meditatorPromptText (host: Host) (intent: string) (sections: MeditatorFileSection list) : string =
-    formatPrompt host (Meditator(intent, sections)) |> List.head
 
 let reportSeparator = "\n---\n"
 

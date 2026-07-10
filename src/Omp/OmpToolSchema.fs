@@ -61,7 +61,7 @@ let private injectWarnReuseIntoOmpParameters (schema: obj) (toolName: string) : 
 
     schema
 
-let methodologyParameters (tb: obj) : obj =
+let meditatorParameters (tb: obj) : obj =
     injectAmendIntoOmpParameters (
         objectOf
             [| ("methodology",
@@ -123,16 +123,6 @@ let investigatorParameters (tb: obj) : obj =
             objectOf [| ("intents", arrayOf (investigatorIntentItem tb) Params.investigatorIntents tb) |] tb
         ))
         "investigator"
-
-let meditatorParameters (tb: obj) : obj =
-    injectWarnReuseIntoOmpParameters
-        (injectAmendIntoOmpParameters (
-            objectOf
-                [| ("intent", str Params.meditatorIntent tb)
-                   ("files", strArray Params.meditatorFiles tb) |]
-                tb
-        ))
-        "meditator"
 
 let browserParameters (tb: obj) : obj =
     injectWarnReuseIntoOmpParameters

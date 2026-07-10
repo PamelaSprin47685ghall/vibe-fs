@@ -9,8 +9,6 @@ type ReadArgs =
 
 type WriteArgs = { FilePath: string; Content: string }
 
-type MeditatorArgs = { Intent: string; Files: string array }
-
 type BrowserArgs = { Intent: string }
 
 type ContinueArgs = { Iterator: string; Prompt: string }
@@ -69,7 +67,6 @@ type SubmitReviewArgs =
 type ToolArgs =
     | Read of ReadArgs
     | Write of WriteArgs
-    | Meditator of MeditatorArgs
     | Browser of BrowserArgs
     | Continue of ContinueArgs
     | Websearch of WebsearchArgs

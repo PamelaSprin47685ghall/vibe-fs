@@ -42,6 +42,7 @@ type OmpHarness =
     abstract fileExists: string -> JS.Promise<bool>
     abstract getCommands: unit -> JS.Promise<obj>
     abstract getRemainingExpectations: unit -> int
+    abstract calls: ResizeArray<obj>
     abstract expectText: string -> JS.Promise<unit>
     abstract expectTool: string -> obj -> JS.Promise<unit>
     abstract waitForNdjson: int -> int -> JS.Promise<bool>

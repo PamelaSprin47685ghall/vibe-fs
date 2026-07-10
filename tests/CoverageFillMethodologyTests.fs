@@ -59,7 +59,7 @@ let methSchemaCommon () =
           meditatorRole = "analyst"
           outputSections = [ "Findings"; "Plan" ] }
 
-    let prompt = renderMeditatorIntent entry "hi" "my note"
+    let prompt = renderMeditatorIntent entry "hi" "my background" "my note"
     check "prompt has methodology id" (prompt.Contains "first_principles")
     check "prompt has def" (prompt.Contains "rebuild from facts")
     check "prompt has trigger" (prompt.Contains "hard")
@@ -68,7 +68,9 @@ let methSchemaCommon () =
     check "prompt has section order" (prompt.Contains "1. Findings")
     check "prompt has section 2" (prompt.Contains "2. Plan")
     check "prompt has intent" (prompt.Contains "hi")
+    check "prompt has background" (prompt.Contains "my background")
     check "prompt has note" (prompt.Contains "my note")
+    check "prompt has quiet room" (prompt.Contains "quiet room")
 
 // ── Opencode.HookSchema ────────────────────────────────────────────────────
 

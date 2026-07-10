@@ -42,20 +42,20 @@ let registersCoreToolsIdempotent () =
               "todowrite" ] do
             check ("has tool " + expected) (names.Contains expected)
 
-        check "OMP parity: registers methodology tool" (names.Contains "methodology")
+        check "OMP parity: registers meditator tool" (names.Contains "meditator")
         check "has loop command" (h1.commands |> Seq.exists (fun c -> Dyn.str c "name" = "loop"))
     }
 
-let methodologySchemaUnifiedNote () =
+let meditatorSchemaUnifiedNote () =
     promise {
         resetPluginState ()
         let h = createPiHarness ()
         let pi = piObject h
         do! wanxiangshuExtension pi
-        let methodology = h.tools |> Seq.tryFind (fun t -> Dyn.str t "name" = "methodology")
-        check "methodology tool registered" (methodology.IsSome)
+        let meditator = h.tools |> Seq.tryFind (fun t -> Dyn.str t "name" = "meditator")
+        check "meditator tool registered" (meditator.IsSome)
 
-        match methodology with
+        match meditator with
         | None -> ()
         | Some tool ->
             let props = Dyn.get (Dyn.get tool "parameters") "properties"

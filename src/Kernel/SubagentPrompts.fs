@@ -7,7 +7,6 @@ open Wanxiangshu.Kernel.SubagentIntents
 open Wanxiangshu.Kernel.PromptFrontMatter
 open Wanxiangshu.Kernel.PromptFragments
 
-let meditatorSkippedSection = "(skipped)"
 let executorSummaryMaxBytes = 200_000
 
 let private utf8CharWidth (text: string) (index: int) : int * int =
@@ -61,9 +60,6 @@ let capExecutorSummaryOutput (output: string) : string =
         truncateUtf8ByBytes output executorSummaryMaxBytes
         + "\n\n[Output truncated to 200000 bytes for summarization]"
 
-type MeditatorFileSection =
-    { file: string; content: string option }
-
 let private coderTargetItem (t: CoderTarget) : obj =
     let fields =
         [ "file", box t.file; "guide", box t.guide ]
@@ -110,20 +106,6 @@ let investigatorPrompt (intent: InvestigatorIntent) : string =
         [ "You are a codebase search agent. Explore the workspace and answer questions."
           "Use fuzzy_find, glob, fuzzy_grep, and read. Report concrete file paths and line-number references, and answer each question explicitly."
           "Return your report with relatedFiles and line ranges." ]
-
-let meditatorPrompt (sections: MeditatorFileSection list) (intent: string) : string =
-    let fileItem (s: MeditatorFileSection) : obj =
-        createObj
-            [ "path", box s.file
-              "content", box (Option.defaultValue meditatorSkippedSection s.content) ]
-
-    agentPrompt
-        [ yamlSeqField "files" (sections |> List.map fileItem)
-          yamlField "question" intent ]
-        [ "You are in a quiet room with the texts and the question."
-          "No tools (except the read tool to view files), no distractions — just you and the problem."
-          "Read carefully. Turn it over in your mind."
-          "When you are ready, answer with clarity and depth." ]
 
 let browserPrompt (intent: string) : string =
     agentPrompt

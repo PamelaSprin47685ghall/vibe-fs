@@ -46,7 +46,7 @@ let ompToolsRegisterAll () =
     let code = requireFile "src/Omp/Tools.fs" |> nonCommentCode
     check "arch: Omp Tools defines registerAllTools" (code.Contains "let registerAllTools")
     check "arch: Omp Tools registers fuzzy tools" (code.Contains "registerFuzzyTools")
-    check "arch: Omp Tools registers methodology tools" (code.Contains "registerMethodologyTools")
+    check "arch: Omp Tools registers methodology tools" (code.Contains "registerMeditatorTools")
     check "arch: Omp Tools registers executor tools" (code.Contains "registerExecutorTools")
     check "arch: Omp Tools registers subagent tools" (code.Contains "registerSubagentTools")
 

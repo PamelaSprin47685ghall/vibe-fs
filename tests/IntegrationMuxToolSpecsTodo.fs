@@ -117,7 +117,7 @@ let muxTodoWriteCapturesCompletedWorkReportSpec () =
                                   lessonsAndConventions = System.String('d', 1024)
                                   plan = System.String('e', 1024) })
 
-            check "mux todo_write wrapper keeps nudge behavior" (hasExactHint (str result "output") hintMeditator)
+            check "mux todo_write wrapper keeps nudge behavior" (hasExactHint (str result "output") hintTodosUpdated)
     }
 
 let muxBacklogProjectionSpec () =

@@ -9,7 +9,7 @@ open Wanxiangshu.Methodology.Registry
 open Wanxiangshu.Methodology.SchemaCommon
 
 let private hintFromTodoOutput (methodologies: string list) =
-    match tryParse (todoWriteOutput methodologies false) with
+    match tryParse (todoWriteOutput methodologies) with
     | Some msg ->
         msg.info
         |> List.choose (function

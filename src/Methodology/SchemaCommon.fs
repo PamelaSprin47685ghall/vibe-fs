@@ -23,7 +23,7 @@ let backgroundFieldDescription =
     + string notebookRecommendedWords
     + " words or more when helpful; there is no minimum word count. Include: current task objective and acceptance criteria; relevant repository paths and symbols; prior attempts and outcomes; constraints from AGENTS.md, README, PRD, or user messages; open questions; risks; and how this methodology should frame the next work step. Do not paste tool catalogs or generic methodology essays—anchor every paragraph to this workspace and this turn."
 
-let unifiedToolName = "methodology"
+let unifiedToolName = "meditator"
 
 let unifiedToolDescription =
     "Record a durable, structured methodology notebook entry for this workspace and turn. "
@@ -45,7 +45,7 @@ let buildUnifiedNoteDescription (entries: MethodologyEntry list) : string =
 
     sb.ToString()
 
-let renderMeditatorIntent (entry: MethodologyEntry) (intentText: string) (noteText: string) =
+let renderMeditatorIntent (entry: MethodologyEntry) (intentText: string) (backgroundText: string) (noteText: string) =
     let sections =
         entry.outputSections
         |> List.mapi (fun i s -> $"{i + 1}. {s}")
@@ -60,9 +60,16 @@ Role: {entry.meditatorRole}
 
 Intent: {intentText}
 
+Background: {backgroundText}
+
 Note: {noteText}
 
 Produce the tool output in dense modern Chinese unless the inputs are explicitly English-only. Structure your answer with these sections:
 {sections}
 
-Do not call tools. Do not propose code edits unless the inputs ask for implementation plans. End with concrete next actions the parent can execute without you."""
+Do not call tools. Do not propose code edits unless the inputs ask for implementation plans. End with concrete next actions the parent can execute without you.
+
+You are in a quiet room with the question.
+No tools (except the read tool to view files), no distractions — just you and the problem.
+Read carefully. Turn it over in your mind.
+When you are ready, answer with clarity and depth."""

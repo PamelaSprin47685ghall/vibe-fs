@@ -194,11 +194,15 @@ let runAll (args: string array) : JS.Promise<int> =
                         sessionID
                         "meditator"
                         (box
-                            {| intent = "analyze"
-                               files = ResizeArray([]) |})
+                            {| methodology = "first_principles"
+                               intent = "reasoning"
+                               background = "context"
+                               note = "analysis" |})
                         "run meditator"
 
                 chk "e2e.meditator.tool-called" (containsTool harness "meditator")
+                let bMeditator = bodies harness
+                chk "e2e.meditator.prompt-contains-background" (bMeditator.Contains "context")
 
                 // 10. browser
                 do! browserMcpRound harness sessionID

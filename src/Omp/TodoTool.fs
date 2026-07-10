@@ -126,6 +126,6 @@ let registerTodoTool (pi: obj) : unit =
                                           do! appendWorkBacklogCommittedOrFail root sid args
                                   | None -> ()
 
-                                  return textResult (todoWriteOutput methodologies false)
+                                  return textResult (todoWriteOutput methodologies)
                   }) ]
     )

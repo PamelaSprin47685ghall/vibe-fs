@@ -33,8 +33,8 @@ let private executeMethodology
                     match tryFindEntry parsed.methodology with
                     | None -> return errorResult ("Error: unknown methodology: " + parsed.methodology)
                     | Some entry ->
-                        let intent = renderMeditatorIntent entry parsed.intent parsed.note
-                        let prompt = formatPrompt omp (Meditator(intent, [])) |> List.head
+                        let intent = renderMeditatorIntent entry parsed.intent parsed.background parsed.note
+                        let prompt = formatPrompt omp (Meditator intent) |> List.head
 
                         try
                             let! text =
@@ -53,7 +53,7 @@ let private executeMethodology
                             return asErrorResult ex
             })
 
-let registerMethodologyTools
+let registerMeditatorTools
     (pi: obj)
     (fallbackRuntime: FallbackRuntimeState)
     (fallbackConfigOpt: FallbackConfig option)
@@ -65,6 +65,6 @@ let registerMethodologyTools
             [ "name", box unifiedToolName
               "label", box unifiedToolName
               "description", box unifiedToolDescription
-              "parameters", box (methodologyParameters tb)
+              "parameters", box (meditatorParameters tb)
               "execute", box (executeMethodology pi fallbackRuntime fallbackConfigOpt) ]
     )

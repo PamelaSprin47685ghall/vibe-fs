@@ -177,8 +177,6 @@ let coder = toolDescription "coder"
 
 let investigator = toolDescription "investigator"
 
-let meditator = toolDescription "meditator"
-
 let browser = toolDescription "browser"
 
 let executor = toolDescription "executor"

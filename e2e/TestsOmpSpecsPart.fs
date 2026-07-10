@@ -159,18 +159,6 @@ let runOmpAgentTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: s
             (coderStr.Contains "Invalid LLM input for coder"
              && not (coderStr.Contains "\"isError\":false"))
 
-        do! h.expectText "meditator output mock analysis"
-
-        let! meditatorResult =
-            h.triggerTool "meditator" (box {| intent = "analyze"; files = [||] |}) sessionId (createObj [])
-
-        let medStr = jsonStringify meditatorResult
-
-        chk
-            "e2e-omp.meditator.responded"
-            (medStr.Contains "meditator output mock analysis"
-             && not (medStr.Contains "error"))
-
         do! h.expectText "browser mock debug view text"
 
         let! browserResult = h.triggerTool "browser" (box {| intent = "browse" |}) sessionId (createObj [])
@@ -190,7 +178,7 @@ let runOmpMethodology (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: 
 
             let! res =
                 h.triggerTool
-                    "methodology"
+                    "meditator"
                     (box
                         {| methodology = m
                            note = String.replicate 1100 "n"
@@ -201,7 +189,11 @@ let runOmpMethodology (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: 
 
             let resStr = jsonStringify res
             let expected = m.Replace("_", " ") + " output"
-            chk ("e2e-omp.methodology." + m + ".responded") (resStr.Contains expected && not (resStr.Contains "error"))
+            chk ("e2e-omp.meditator." + m + ".responded") (resStr.Contains expected && not (resStr.Contains "error"))
+
+            let expectedBackground = String.replicate 1100 "b"
+            let callsStr = jsonStringify h.calls
+            chk ("e2e-omp.meditator." + m + ".prompt-contains-background") (callsStr.Contains expectedBackground)
     }
 
 let runOmpInvestigator (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =

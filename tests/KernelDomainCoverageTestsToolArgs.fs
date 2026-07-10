@@ -39,13 +39,6 @@ let taWrite () =
     | Write w -> equal "Write.FilePath" "f" w.FilePath
     | _ -> check "Write case" false
 
-let taMeditator () =
-    let a = Meditator { Intent = "i"; Files = [||] }
-
-    match a with
-    | Meditator m -> equal "Meditator.Intent" "i" m.Intent
-    | _ -> check "Meditator case" false
-
 let taBrowser () =
     let a = Browser { Intent = "browse" }
 
@@ -138,7 +131,6 @@ let run () =
     ompBrowserPrompt ()
     taRead ()
     taWrite ()
-    taMeditator ()
     taBrowser ()
     taWebsearch ()
     taWebfetch ()

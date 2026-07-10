@@ -156,26 +156,6 @@ let registerSubagentTools
 
     pi?registerTool (
         createObj
-            [ "name", box "meditator"
-              "label", box "Meditator"
-              "description", box (description "meditator")
-              "parameters", meditatorParameters tb
-              "execute",
-              box (fun (_id: string) (params': obj) (signal: obj) (_u: obj) (ctx: obj) ->
-                  promise {
-                      try
-                          let adapter =
-                              OmpHostAdapter(ompScope, pi, ctx, Some signal, fallbackRuntime, fallbackConfigOpt)
-
-                          let! text = dispatch omp adapter "meditator" params' ompScope None
-                          return textResult text
-                      with ex ->
-                          return asErrorResult ex
-                  }) ]
-    )
-
-    pi?registerTool (
-        createObj
             [ "name", box "browser"
               "label", box "Browser"
               "description", box (description "browser")

@@ -42,58 +42,6 @@ let muxExecutorRoCatPrependsWarningSpec () =
         do! rmAsync workspaceDir
     }
 
-let muxMeditatorReadsFilesFromCwdSpec () =
-    promise {
-        let! workspaceDir = mkdtempAsync "mux-meditator-files-"
-        let filePath = pathModule?join (workspaceDir, "note.md")
-        do! writeFileAsync filePath "deep context"
-        let reg = sharedMuxRegistration ()
-        let meditator = muxToolByName reg "meditator"
-
-        if isNullish meditator then
-            check "mux registration exposes meditator tool" false
-        else
-            let prompts = ResizeArray<string>()
-
-            let taskService =
-                createObj
-                    [ "create",
-                      box (
-                          System.Func<obj, JS.Promise<obj>>(fun input ->
-                              promise {
-                                  prompts.Add(str input "prompt")
-
-                                  return
-                                      box
-                                          {| success = true
-                                             data =
-                                              box
-                                                  {| taskId = "meditator-task-1"
-                                                     kind = "agent" |} |}
-                              })
-                      )
-                      "waitForAgentReport",
-                      box (
-                          System.Func<string, obj, JS.Promise<obj>>(fun _ _ ->
-                              Promise.lift (box {| reportMarkdown = "meditated" |}))
-                      ) ]
-
-            let ctx =
-                createObj
-                    [ "cwd", box workspaceDir
-                      "workspaceId", box "mux-meditator-files"
-                      "taskService", box taskService ]
-
-            let args = createObj [ "intent", box "reason"; "files", box [| "note.md" |] ]
-            let! result = ((get meditator "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-            let promptText = if prompts.Count > 0 then prompts.[0] else ""
-            check "mux meditator returns subagent report" (result = "meditated")
-            check "mux meditator prompt keeps requested relative file path" (promptText.Contains "note.md")
-            check "mux meditator prompt includes file content" (promptText.Contains "deep context")
-            check "mux meditator prompt does not mark readable file skipped" (not (promptText.Contains "(skipped)"))
-
-        do! rmAsync workspaceDir
-    }
 
 let muxExecutorModeSchemaSpec () =
     promise {

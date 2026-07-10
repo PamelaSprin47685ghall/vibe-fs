@@ -51,7 +51,7 @@ type ProgressObserver
 
                 match hookOutputString output with
                 | Some _ ->
-                    setHookOutputString output (todoWriteOutput methodologies true)
+                    setHookOutputString output (todoWriteOutput methodologies)
 
                     let directory =
                         (fromOpencode input (pluginDirectoryFromCtx ctx)).Execution.Directory

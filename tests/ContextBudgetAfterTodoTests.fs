@@ -34,7 +34,7 @@ let spec_applyContextBudget_afterTodoResets () =
         // Start phase with totalTokens = 30000, totalBytes = 100, backlogBytes = 0
         let state = beginPhase 30000L 100L 0L
         ContextBudgetStore.update scope "sess-after-todo" (fun entry ->
-            { entry with State = Some state; LastTodoCount = 0; NudgeInjected = true })
+            { entry with State = Some state; LastBacklog = []; NudgeInjected = true })
 
         // 1. Simulate new todo: add one entry to backlog
         let newTodoEntry =
@@ -60,7 +60,7 @@ let spec_applyContextBudget_afterTodoResets () =
         // Since LastTodoCount (0) <> backlogRef length (1), it should begin a new phase and reset nudgeInjected
         let! res = applyContextBudget plan backlogOps messages [||] (fun _ -> [||])
         let updatedStore = ContextBudgetStore.get scope "sess-after-todo"
-        equal "last todo count updated" 1 updatedStore.LastTodoCount
+        equal "last todo count updated" 1 updatedStore.LastBacklog.Length
         equal "nudgeInjected reset" false updatedStore.NudgeInjected
     }
 
@@ -92,7 +92,7 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
         let mutable currentTokens = 30000L
         let state = beginPhase currentTokens 100L 0L
         ContextBudgetStore.update scope sessionID (fun entry ->
-            { entry with State = Some state; LastTodoCount = 0; NudgeInjected = false })
+            { entry with State = Some state; LastBacklog = []; NudgeInjected = false })
 
         for i in 1 .. 5 do
             // Update plan context usage return value
@@ -132,7 +132,7 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
             let! resTodo = applyContextBudget nextPlan backlogOps messages [||] (fun _ -> [||])
             
             let updatedStore = ContextBudgetStore.get scope sessionID
-            equal "LastTodoCount updated" i updatedStore.LastTodoCount
+            equal "LastTodoCount updated" i updatedStore.LastBacklog.Length
             equal "NudgeInjected reset" false updatedStore.NudgeInjected
     }
 

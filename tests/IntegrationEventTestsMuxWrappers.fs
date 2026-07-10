@@ -70,7 +70,7 @@ let todoWriteWrapperSpec (reg: obj) =
         check "todo_write wrapper succeeds after codec decode" (truthy (get result "success"))
         let output = str result "output"
         check "todo_write wrapper produces output" (output.Length > 0)
-        check "todo_write wrapper includes meditator hint in envelope" (hasExactHint output hintMeditator)
+        check "todo_write wrapper includes methodology followup hint in envelope" (hasExactHint output (hintMethodologyFollowup "test_driven_reasoning"))
     }
 
 let todoWriteWrapperDecodeFailureSpec (reg: obj) =

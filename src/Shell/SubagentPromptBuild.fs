@@ -26,21 +26,4 @@ let parallelPromptsFromIntents
     | Error message -> Error(ParseError("intents", message))
     | Ok intents -> Ok(promptsForParallelIntents host constructor intents)
 
-let buildMeditatorSections (files: string array) (results: ReverieFileResult array) : MeditatorFileSection array =
-    Array.zip files results
-    |> Array.map (fun (file, r) -> { file = file; content = r.content })
 
-let meditatorPromptFromFiles
-    (host: Host)
-    (cwd: string)
-    (intent: string)
-    (files: string array)
-    : JS.Promise<Result<string, DomainError>> =
-    promise {
-        let! readResults = readReverieFiles cwd (List.ofArray files)
-
-        let sections =
-            buildMeditatorSections files (List.toArray readResults) |> Array.toList
-
-        return Ok(meditatorPromptText host intent sections)
-    }

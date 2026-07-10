@@ -50,7 +50,7 @@ let ompTestEntries () : (string * TestBody) list =
       "OmpKernelTests.executorSummarizerPromptCarriesWhatToSummarize",
       Sync(sync OmpKernelTests.executorSummarizerPromptCarriesWhatToSummarize)
       "OmpPluginTests.registersCoreToolsIdempotent", Async OmpPluginTests.registersCoreToolsIdempotent
-      "OmpPluginTests.methodologySchemaUnifiedNote", Async OmpPluginTests.methodologySchemaUnifiedNote
+      "OmpPluginTests.meditatorSchemaUnifiedNote", Async OmpPluginTests.meditatorSchemaUnifiedNote
       "OmpPluginTests.sessionStartStripsMainSessionTools", Async OmpPluginTests.sessionStartStripsMainSessionTools
       "OmpPluginTests.fuzzyDescriptionsMatchMuxWording", Sync(sync OmpPluginTests.fuzzyDescriptionsMatchMuxWording)
       "OmpContextTransformTests.capsSynthUserPrepended", Async OmpContextTransformTests.capsSynthUserPrepended

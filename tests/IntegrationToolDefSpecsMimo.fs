@@ -94,7 +94,7 @@ let mimoTaskExecuteRoundTripSpec () =
             (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ])
             |> unbox<JS.Promise<string>>
 
-        check "mimo task execute returns todo envelope" (result.Contains hintMeditator)
+        check "mimo task execute returns todo envelope" (result.Contains (hintMethodologyFollowup "first_principles"))
         do! rmAsync workspaceDir
     }
 
@@ -123,7 +123,7 @@ let mimoTaskExecuteNestedReportSpec () =
             (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ])
             |> unbox<JS.Promise<string>>
 
-        check "mimo task execute with methodology returns success" (result.Contains hintMeditator)
+        check "mimo task execute with methodology returns success" (result.Contains (hintMethodologyFollowup "first_principles"))
         do! rmAsync workspaceDir
     }
 
@@ -182,7 +182,7 @@ let mimoTaskExecuteStripsTaskIdSpec () =
             (get taskTool "execute") $ (args, createObj [ "sessionID", box "s1" ])
             |> unbox<JS.Promise<string>>
 
-        check "mimo task execute ignores stray task_id" (result.Contains hintMeditator)
+        check "mimo task execute ignores stray task_id" (result.Contains (hintMethodologyFollowup "first_principles"))
         do! rmAsync workspaceDir
     }
 

@@ -37,11 +37,11 @@ let private executeMethodology
                 match tryFindEntry parsed.methodology with
                 | None -> return "Error: unknown methodology: " + parsed.methodology
                 | Some entry ->
-                    let intent = renderMeditatorIntent entry parsed.intent parsed.note
+                    let intent = renderMeditatorIntent entry parsed.intent parsed.background parsed.note
                     let tc = extractToolContext context (str ctx "directory")
                     let directory = str tc "directory"
                     let sessionID = str tc "sessionID"
-                    let prompt = formatPrompt host (Meditator(intent, [])) |> List.head
+                    let prompt = formatPrompt host (Meditator intent) |> List.head
 
                     let! subResult =
                         runSubagent
@@ -61,14 +61,14 @@ let private executeMethodology
                     | Error err -> return wireEncodeToolError "meditator" err
         }
 
-let methodologyTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (runtime: FallbackRuntimeState) : obj =
+let meditatorTool (host: Host) (registry: ChildAgentRegistry) (ctx: obj) (runtime: FallbackRuntimeState) : obj =
     define unifiedToolDescription methodologyArgs (executeMethodology host registry ctx runtime)
 
-let registerMethodologyTools
+let registerMeditatorTools
     (registry: ChildAgentRegistry)
     (ctx: obj)
     (host: Host)
     (runtime: FallbackRuntimeState)
     (target: obj)
     : unit =
-    target?(unifiedToolName) <- box (methodologyTool host registry ctx runtime)
+    target?(unifiedToolName) <- box (meditatorTool host registry ctx runtime)

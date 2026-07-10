@@ -29,19 +29,6 @@ let internal investigatorSpec: ToolSpec =
               "Non-empty array of investigator intents. Each item is dispatched to its own processing pipeline, all running concurrently." ]
       requiredFields = [ "intents" ] }
 
-let internal meditatorSpec: ToolSpec =
-    { name = "meditator"
-      description =
-        "Dispatch a detailed intent or question for deep structured analysis. The analysis engine processes the input and returns a reasoned conclusion. "
-        + "IMPORTANT: The engine processes only what you provide — put full context into the intent and list every file path needed. Do NOT assume prior knowledge of the project background."
-      paramDocs =
-        map
-            [ "intent",
-              "Natural-language intent or question for deep analysis. Include all background, design rationale, and specific requirements; do not assume prior context."
-              "files",
-              "File paths provided to the analysis engine. Include design docs, relevant code, or background material." ]
-      requiredFields = [ "intent"; "files" ] }
-
 let internal browserSpec: ToolSpec =
     { name = "browser"
       description =

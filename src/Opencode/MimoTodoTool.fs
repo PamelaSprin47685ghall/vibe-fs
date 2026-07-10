@@ -112,4 +112,4 @@ let mimoTodoTool (_pluginCtx: obj) : obj =
             else
                 match decodeTodoItems args with
                 | Error error -> resolveStr error
-                | Ok _ -> resolveStr (todoWriteOutput methodologies true))
+                | Ok _ -> resolveStr (todoWriteOutput methodologies))

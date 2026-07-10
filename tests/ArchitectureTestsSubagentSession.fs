@@ -46,9 +46,7 @@ let opencodeSubagentToolsUsesSimpleArgsCodec () =
     let code = requireFile "src/Opencode/SubagentTools.fs" |> nonCommentCode
     let decode = requireFile "src/Shell/ToolArgsDecode.fs" |> nonCommentCode
     let codec = requireFile "src/Shell/SubagentSimpleArgsCodec.fs" |> nonCommentCode
-    check "arch: SubagentSimpleArgsCodec defines decodeMeditatorArgs" (codec.Contains "let decodeMeditatorArgs")
     check "arch: SubagentSimpleArgsCodec defines decodeBrowserArgs" (codec.Contains "let decodeBrowserArgs")
-    check "arch: ToolArgsDecode uses decodeMeditatorArgs" (decode.Contains "decodeMeditatorArgs")
     check "arch: ToolArgsDecode uses decodeBrowserArgs" (decode.Contains "decodeBrowserArgs")
 
     check

@@ -33,7 +33,6 @@ let createTools
         createObj
             [ yield "coder", box (coderTool host registry ctx fallbackRuntime sessionScope)
               yield "investigator", box (investigatorTool host registry ctx fallbackRuntime sessionScope)
-              yield "meditator", box (meditatorTool host registry ctx fallbackRuntime sessionScope)
               yield "browser", box (browserTool host registry ctx fallbackRuntime sessionScope)
               yield "continue", box (continueTool host registry ctx fallbackRuntime sessionScope)
               yield "executor", box (executorTool host registry ctx sessionScope fallbackRuntime)
@@ -52,7 +51,7 @@ let createTools
               if host = Mimocode then
                   yield todoWriteToolName host, box (mimoTodoTool ctx) ]
 
-    registerMethodologyTools registry ctx host fallbackRuntime tools
+    registerMeditatorTools registry ctx host fallbackRuntime tools
     tools
 
 // Test helper that supplies an empty fallback runtime.

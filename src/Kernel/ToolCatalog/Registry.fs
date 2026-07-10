@@ -15,7 +15,6 @@ let isFileEditTool = Wanxiangshu.Kernel.ToolCatalog.Classification.isFileEditToo
 let all: ToolSpec list =
     [ coderSpec
       investigatorSpec
-      meditatorSpec
       browserSpec
       continueSpec
       executorSpec

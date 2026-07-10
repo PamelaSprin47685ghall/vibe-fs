@@ -27,6 +27,9 @@ export function createOmpHarness({ sendCommand, child, releaseLock, mockLlm }) {
             if (mockLlm) return mockLlm.getRemainingExpectations();
             return 0;
         },
+        get calls() {
+            return mockLlm ? mockLlm.calls : [];
+        },
 
         async runCommand(name, args, sessionId) {
             const res = await sendCommand({ type: 'runCommand', name, args, sessionId });

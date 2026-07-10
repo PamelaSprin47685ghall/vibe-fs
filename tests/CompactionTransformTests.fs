@@ -142,10 +142,101 @@ let testMuxCompactionTransform () =
         check "Mux compacted content contains 'hello mux'" (content.Contains("hello mux"))
     }
 
+let testTryGetRealContextUsage () =
+    promise {
+        let mockGet = fun (arg: obj) ->
+            promise {
+                let path = Dyn.get arg "path"
+                let id = if Dyn.isNullish path then "" else Dyn.str path "id"
+                if id = "s-test-real-api" then
+                    return createObj [
+                        "data", createObj [
+                            "tokens", createObj [
+                                "total", box 54321
+                            ]
+                        ]
+                    ]
+                else
+                    return null
+            }
+        let mockSession = createObj [
+            "get", box (System.Func<obj, JS.Promise<obj>>(mockGet))
+        ]
+        let mockClient = createObj [
+            "session", mockSession
+        ]
+        
+        let getUsageOpt = Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetRealContextUsage mockClient "s-test-real-api"
+        check "tryGetRealContextUsage should return Some" getUsageOpt.IsSome
+        let getUsage = getUsageOpt.Value
+        let! tokens = getUsage [||]
+        equal "tokens should be Some 54321" (Some 54321) tokens
+    }
+
+let testApplyContextBudgetBacklogContentChange () =
+    promise {
+        let scope = Wanxiangshu.Shell.RuntimeScope.create()
+        let sessionID = "s-budget-backlog-change"
+        let plan =
+            { SessionID = sessionID
+              Agent = "main"
+              Directory = ""
+              Excluded = false
+              IsSubagentSession = false
+              Cleaned = []
+              RawArray = None
+              SembleInjectEnabled = false
+              Scope = scope
+              MaxInputTokens = 100000
+              GetContextUsage = (fun _ -> Promise.lift (Some 35000)) }
+
+        let backlog1 = [
+            { ahaMoments = "aha1"
+              changesAndReasons = "changes1"
+              gotchas = "gotchas1"
+              lessonsAndConventions = "lessons1"
+              plan = "plan1" }
+        ]
+        let backlog2 = [
+            { ahaMoments = "aha1"
+              changesAndReasons = "changes1"
+              gotchas = "gotchas1"
+              lessonsAndConventions = "lessons1"
+              plan = "plan2" // 内容改变，数量不变
+            }
+        ]
+
+        let mutable currentBacklog = backlog1
+        let backlogOps =
+            { Host = opencode
+              GetOrRebuildBacklog = fun _ _ -> currentBacklog }
+
+        let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
+        
+        let messages = [ mkMsg "msg1" User [] ]
+        let encoded = [| box "msg" |]
+
+        // 第一次调用，会触发初始化
+        let! _ = applyContextBudget plan backlogOps messages encoded encodeMessages
+        let storeAfter1 = Wanxiangshu.Shell.ContextBudgetStore.get scope sessionID
+        equal "LastBacklog length should be 1" 1 storeAfter1.LastBacklog.Length
+        equal "LastBacklog plan should be plan1" "plan1" storeAfter1.LastBacklog.[0].plan
+
+        // 修改内容
+        currentBacklog <- backlog2
+        
+        // 再次调用，虽然数量没变，但因为内容变化应该引起 LastBacklog 的更新
+        let! _ = applyContextBudget plan backlogOps messages encoded encodeMessages
+        let storeAfter2 = Wanxiangshu.Shell.ContextBudgetStore.get scope sessionID
+        equal "LastBacklog plan after change should be plan2" "plan2" storeAfter2.LastBacklog.[0].plan
+    }
+
 let run () =
     promise {
         do! testCompactionThresholdAndTransform ()
         testContextBudgetF ()
         do! testApplyContextBudgetShortCircuit ()
         do! testMuxCompactionTransform ()
+        do! testTryGetRealContextUsage ()
+        do! testApplyContextBudgetBacklogContentChange ()
     }

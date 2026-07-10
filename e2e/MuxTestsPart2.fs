@@ -5,6 +5,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Tests.Assert
 
+[<Emit("JSON.stringify($0)")>]
+let private jsonStringify (o: obj) : string = jsNative
+
 type MockLLM =
     abstract expectTool: string -> obj -> unit
     abstract expectText: string -> unit
@@ -68,15 +71,6 @@ let runRest
                 (fun r -> r.Contains "investigator output mock text")
                 "mux.execute.investigator.success"
 
-        harness.mockLLM.expectText "meditator output mock analysis"
-
-        do!
-            runTool
-                "meditator"
-                (createObj [ "intent", box "analyze"; "files", box [| "mux-e2e-test.txt" |] ])
-                (fun r -> r.Contains "meditator output mock analysis")
-                "mux.execute.meditator.success"
-
         harness.mockLLM.expectText "browser mock debug view text"
 
         do!
@@ -102,18 +96,22 @@ let runRest
                 (fun r -> r.Contains "Example Domain")
                 "mux.execute.webfetch.success"
 
-        harness.mockLLM.expectText "methodology mock report output"
+        harness.mockLLM.expectText "meditator mock report output"
 
         do!
             runTool
-                "methodology"
+                "meditator"
                 (createObj
                     [ "methodology", box "first_principles"
                       "note", box (String.replicate 1100 "n")
                       "background", box (String.replicate 1100 "b")
                       "intent", box (String.replicate 1100 "i") ])
-                (fun r -> r.Contains "methodology mock report output")
-                "mux.execute.methodology.success"
+                (fun r -> r.Contains "meditator mock report output")
+                "mux.execute.meditator.success"
+
+        let lastReq = harness.getLastLlmRequest()
+        let lastReqStr = jsonStringify lastReq
+        chk "mux.meditator.prompt-contains-background" (lastReqStr.Contains (String.replicate 1100 "b"))
 
         let coderIntents =
             [| box

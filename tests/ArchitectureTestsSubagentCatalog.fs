@@ -14,10 +14,6 @@ let subagentToolsUseToolCatalogRequiredKeys () =
         (mux.Contains "subagentRequiredKeys \"investigator\"")
 
     check
-        "arch: Mux SubagentTools uses subagentRequiredKeys for meditator"
-        (mux.Contains "subagentRequiredKeys \"meditator\"")
-
-    check
         "arch: Mux SubagentTools uses subagentRequiredKeys for browser"
         (mux.Contains "subagentRequiredKeys \"browser\"")
 
@@ -50,10 +46,6 @@ let subagentToolsUseToolCatalogRequiredKeys () =
     check
         "arch: Opencode SubagentTools uses subagentRequiredKeys for investigator"
         (opencode.Contains "subagentRequiredKeys \"investigator\"")
-
-    check
-        "arch: Opencode SubagentTools uses subagentRequiredKeys for meditator"
-        (opencode.Contains "subagentRequiredKeys \"meditator\"")
 
     check
         "arch: Opencode SubagentTools uses subagentRequiredKeys for browser"

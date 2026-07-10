@@ -177,24 +177,6 @@ let investigatorTool
                   "_ui", uiParam ]))
         (fun args context -> executeSubagent host registry ctx "investigator" args context runtime sessionScope)
 
-let meditatorTool
-    (host: Host)
-    (registry: ChildAgentRegistry)
-    (ctx: obj)
-    (runtime: FallbackRuntimeState)
-    (sessionScope: RuntimeScope)
-    : obj =
-    let meditatorRequiredKeys = subagentRequiredKeys "meditator"
-
-    define
-        meditator
-        (subagentZodShape
-            meditatorRequiredKeys
-            (createObj
-                [ "intent", strReq Params.meditatorIntent
-                  "files", strArrayReq Params.meditatorFiles ]))
-        (fun args context -> executeSubagent host registry ctx "meditator" args context runtime sessionScope)
-
 let browserTool
     (host: Host)
     (registry: ChildAgentRegistry)

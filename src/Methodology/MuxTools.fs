@@ -33,8 +33,8 @@ let private executeMethodology (deps: obj) (toolNames: string array) : obj -> ob
                     match tryFindEntry parsed.methodology with
                     | None -> return "Error: unknown methodology: " + parsed.methodology
                     | Some entry ->
-                        let intent = renderMeditatorIntent entry parsed.intent parsed.note
-                        let prompt = formatPrompt Host.Mimocode (Meditator(intent, [])) |> List.head
+                        let intent = renderMeditatorIntent entry parsed.intent parsed.background parsed.note
+                        let prompt = formatPrompt Host.Mimocode (Meditator intent) |> List.head
 
                         return!
                             runMuxSubagent
@@ -46,11 +46,11 @@ let private executeMethodology (deps: obj) (toolNames: string array) : obj -> ob
                                 (toolOptions toolNames "exec" "meditator")
         }
 
-let methodologyTool (deps: obj) (toolNames: string array) : ToolDefinition =
+let meditatorTool (deps: obj) (toolNames: string array) : ToolDefinition =
     { name = unifiedToolName
       description = unifiedToolDescription
       parameters = methodologyParameters
       execute = executeMethodology deps toolNames
       condition = None }
 
-let methodologyToolNames: string array = [| unifiedToolName |]
+let meditatorToolNames: string array = [| unifiedToolName |]

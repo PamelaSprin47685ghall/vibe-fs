@@ -120,7 +120,7 @@ let toolResultHandler (_pi: obj) (_reviewStore: ReviewStore) (event: obj) (ctx: 
                 let content = getToolResultText event
 
                 if content <> "" then
-                    setToolResultText event (todoWriteOutput methodologies true)
+                    setToolResultText event (todoWriteOutput methodologies)
     }
 
 let sessionStartHandler (pi: obj) (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<unit> =

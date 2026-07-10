@@ -31,15 +31,17 @@ let hostKernel' () =
     check "coder has objective" (intent.IndexOf("fix bug") >= 0)
     check "coder has do_not_touch" (intent.IndexOf("shared.ts") >= 0)
 
-    let prompt =
-        meditatorPrompt
-            [ { file = "x.fs"
-                content = Some "let x = 1" } ]
-            "why?"
+    let dummyEntry : Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
+        { methodologyId = "test_methodology"
+          shortDefinition = "test def"
+          triggerWhen = "test trigger"
+          noteDescription = "test note desc"
+          meditatorRole = "test role"
+          outputSections = [] }
+    let prompt = Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent dummyEntry "why?" "my background" "note detail"
 
     check "meditator has question" (prompt.IndexOf("why?") >= 0)
-    check "meditator has content" (prompt.IndexOf("let x = 1") >= 0)
-    check "meditator read-only" (prompt.IndexOf("READ-ONLY") >= 0)
+    check "meditator read-only" (prompt.IndexOf("quiet room") >= 0)
 
     let inv =
         { objective = "find auth"
@@ -91,7 +93,6 @@ let toolCatalogCentralized () =
     let names = allSpecs |> List.map (fun spec -> spec.name) |> Set.ofList
     check "catalog covers coder" (Set.contains "coder" names)
     check "catalog covers investigator" (Set.contains "investigator" names)
-    check "catalog covers meditator" (Set.contains "meditator" names)
     check "catalog covers browser" (Set.contains "browser" names)
     check "catalog covers executor" (Set.contains "executor" names)
     check "catalog covers submit_review" (Set.contains "submit_review" names)

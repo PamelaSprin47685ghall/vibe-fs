@@ -13,9 +13,6 @@ let hintExecutorMisuse =
 
 let hintTodoRefresh = "Update todo list NOW and settle down your progress!"
 
-let hintMeditator =
-    "Think thrice before acting NOW and consider calling meditator tool to improve reasoning!"
-
 let hintTodosUpdated = "Todos updated."
 
 let hintMethodologyFollowup (methodologyId: string) =
@@ -157,13 +154,6 @@ let withIterator (body: string) (iterator: string) : string =
                 info = [ InfoItem.Iterator iterator ]
                 body = body }
 
-let todoWriteOutput (methodologies: string list) (includeMeditator: bool) : string =
-    // Construct in reverse order: render applies List.rev to restore correct sequence.
-    let hints =
-        if includeMeditator then
-            [ InfoItem.Hint hintMeditator
-              InfoItem.Hint(hintForMethodologies methodologies) ]
-        else
-            [ InfoItem.Hint(hintForMethodologies methodologies) ]
-
+let todoWriteOutput (methodologies: string list) : string =
+    let hints = [ InfoItem.Hint(hintForMethodologies methodologies) ]
     render { empty with info = hints; body = "" }

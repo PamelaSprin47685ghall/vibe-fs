@@ -34,7 +34,7 @@ let toolExecuteAfterSpec (p: obj) =
 
         check
             "tool.execute.after includes meditator hint"
-            (hasExactHint (unbox<string> (get output "output")) hintMeditator)
+            (hasExactHint (unbox<string> (get output "output")) hintTodosUpdated)
     }
 
 let abortedRetrySpec () =

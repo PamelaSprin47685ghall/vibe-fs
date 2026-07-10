@@ -55,20 +55,18 @@ let browserPromptContainsStealth () =
     let p = browserPrompt "Search"
     check "contains stealth" (p.Contains "stealth-browser")
 
-let meditatorPromptContainsFiles () =
-    let sections =
-        [ { file = "src/Auth.fs"
-            content = Some "let x = 1" } ]
-
-    let p = meditatorPrompt sections "Analyze auth"
-    check "contains file path" (p.Contains "src/Auth.fs")
-    check "contains question" (p.Contains "Analyze auth")
-    check "contains content" (p.Contains "let x = 1")
-
-let meditatorPromptSkippedSection () =
-    let sections = [ { file = "src/Auth.fs"; content = None } ]
-    let p = meditatorPrompt sections "Analyze"
-    check "contains skipped" (p.Contains meditatorSkippedSection)
+let meditatorPromptContainsQuestion () =
+    let dummyEntry : Wanxiangshu.Methodology.SchemaCommon.MethodologyEntry =
+        { methodologyId = "test_methodology"
+          shortDefinition = "test def"
+          triggerWhen = "test trigger"
+          noteDescription = "test note desc"
+          meditatorRole = "test role"
+          outputSections = [] }
+    let p = Wanxiangshu.Methodology.SchemaCommon.renderMeditatorIntent dummyEntry "Analyze auth" "JWT background" "note detail"
+    check "contains question/intent" (p.Contains "Analyze auth")
+    check "contains background" (p.Contains "JWT background")
+    check "contains quiet room" (p.Contains "quiet room")
 
 let executorSummarizerPromptContainsFields () =
     let p =
@@ -102,8 +100,7 @@ let run () =
     investigatorPromptContainsYaml ()
     browserPromptContainsTask ()
     browserPromptContainsStealth ()
-    meditatorPromptContainsFiles ()
-    meditatorPromptSkippedSection ()
+    meditatorPromptContainsQuestion ()
     executorSummarizerPromptContainsFields ()
     executorSummarizerPromptEmbedsWhatToSummarize ()
     websearchSummarizerPromptContains ()

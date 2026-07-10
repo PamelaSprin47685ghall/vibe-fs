@@ -48,7 +48,6 @@ let subagentToolsUseKernelPromptHelpers () =
     let dispatcher = requireFile "src/Shell/SubagentDispatcher.fs" |> nonCommentCode
     let opencode = requireFile "src/Opencode/SubagentTools.fs" |> nonCommentCode
     check ("arch: SubagentDispatcher uses promptsFromCoderIntents") (dispatcher.Contains "promptsFromCoderIntents")
-    check ("arch: SubagentDispatcher uses meditatorPromptFromFiles") (dispatcher.Contains "meditatorPromptFromFiles")
     check ("arch: SubagentDispatcher uses browserPromptText") (dispatcher.Contains "browserPromptText")
 
     check
@@ -56,22 +55,8 @@ let subagentToolsUseKernelPromptHelpers () =
         (not (opencode.Contains "promptsForParallelIntents"))
 
     check
-        "arch: Opencode SubagentTools must not call meditatorPromptText locally"
-        (not (opencode.Contains "meditatorPromptText"))
-
-    check
-        "arch: Opencode SubagentTools must not call buildMeditatorSections locally"
-        (not (opencode.Contains "buildMeditatorSections"))
-
-    check
         "arch: Mux SubagentTools must not call promptsForParallelIntents locally"
         (not (mux.Contains "promptsForParallelIntents"))
-
-    check "arch: Mux SubagentTools must not call meditatorPromptText locally" (not (mux.Contains "meditatorPromptText"))
-
-    check
-        "arch: Mux SubagentTools must not call buildMeditatorSections locally"
-        (not (mux.Contains "buildMeditatorSections"))
 
     check
         "arch: Mux SubagentTools must not call formatPrompt opencode (Coder"

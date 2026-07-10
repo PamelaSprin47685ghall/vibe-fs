@@ -143,12 +143,11 @@ let applyContextBudget
                     { entry with LastUsage = Some {| tokenCount = currentTokens; textBytes = totalBytes |} })
 
                 let backlog = backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned
-                let latestTodoCount = backlog.Length
                 let currentStore = ContextBudgetStore.get plan.Scope plan.SessionID
 
                 let! state =
                     promise {
-                        if latestTodoCount <> currentStore.LastTodoCount || currentStore.State.IsNone then
+                        if backlog <> currentStore.LastBacklog || currentStore.State.IsNone then
                             let stableMessages =
                                 projectBacklogFor
                                     backlogOps.Host
@@ -175,7 +174,7 @@ let applyContextBudget
                             ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
                                 { entry with
                                     State = Some newState
-                                    LastTodoCount = latestTodoCount
+                                    LastBacklog = backlog
                                     NudgeInjected = false })
                             return newState
                         else

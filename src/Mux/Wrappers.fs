@@ -177,7 +177,7 @@ let private mkTodoWriteWrapper (host: Host) (projection: ProjectionStore) : obj 
                                 else
                                     Promise.lift raw
 
-                            let output = todoWriteOutput methodologies true
+                            let output = todoWriteOutput methodologies
 
                             let nextResult =
                                 if Dyn.typeIs result "object" then
