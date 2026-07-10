@@ -13,6 +13,8 @@ open Wanxiangshu.Opencode.HookSchema
 open Wanxiangshu.Opencode.BacklogSession
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.OpencodeHookInputCodec
+open Wanxiangshu.Shell.ToolHookRuntime
+open Wanxiangshu.Opencode.HookSchemaCore
 
 let private setKey (o: obj) (k: string) (v: obj) : unit = o?(k) <- v
 
@@ -54,6 +56,27 @@ let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit>
             rewriteToolJsonSchema setKey (injectWarnReuseIntoJsonSchema) output
 
         rewriteToolJsonSchema setKey (injectAmendIntoJsonSchema) output
+
+        let schemaForRegistry =
+            let jsonSchema = get output "jsonSchema"
+
+            if not (isNullish jsonSchema) then
+                jsonSchema
+            else
+                let parameters = get output "parameters"
+
+                if not (isNullish parameters) then
+                    let fromEffect = tryBuildJsonSchemaFromEffectSchema parameters
+
+                    if not (isNullish fromEffect) then
+                        fromEffect
+                    else
+                        parameters
+                else
+                    null
+
+        if not (isNullish schemaForRegistry) then
+            registerSchemaTypes toolID schemaForRegistry
     }
 
 let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> = toolDefinitionFor opencode input output

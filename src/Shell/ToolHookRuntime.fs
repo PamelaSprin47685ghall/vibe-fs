@@ -9,14 +9,92 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.DynField
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.ToolContextCodec
-open Wanxiangshu.Shell.SubagentIntentsCodec
-open Wanxiangshu.Shell.MuxHookInputCodec
-open Wanxiangshu.Shell.LivelockGuard
-open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Kernel.ToolResult
-open Wanxiangshu.Kernel.HostTools
-open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Kernel.ToolCatalog
+
+/// Schema-level type for a single tool parameter field.
+/// Used by the generic coerceArgsTypes to replace the ad-hoc whitelist.
+type SchemaType =
+    | SString
+    | SNumber
+    | SBoolean
+    | SArray
+    | SObject
+
+let private registry = ResizeArray<string * string * SchemaType>()
+
+/// Register the parameter types for a given tool.
+/// Each entry is (toolName, fieldName, schemaType).
+let registerToolParameterTypes (entries: (string * string * SchemaType) list) : unit =
+    for entry in entries do
+        registry.Add entry
+
+let private removeRegistryForTool (tool: string) : unit =
+    let mutable i = registry.Count - 1
+
+    while i >= 0 do
+        let (t, _, _) = registry.[i]
+
+        if t = tool then
+            registry.RemoveAt i
+
+        i <- i - 1
+
+let private schemaTypeOfJsonField (fieldSchema: obj) : SchemaType option =
+    if Dyn.isNullish fieldSchema then
+        None
+    else
+        let rawType = Dyn.get fieldSchema "type"
+
+        let typeName =
+            if Dyn.isNullish rawType then
+                ""
+            elif Dyn.isArray rawType then
+                let arr = unbox<obj array> rawType
+
+                if arr.Length > 0 then string arr.[0] else ""
+            else
+                string rawType
+
+        match typeName with
+        | "integer"
+        | "number" -> Some SNumber
+        | "boolean" -> Some SBoolean
+        | "array" -> Some SArray
+        | "object" -> Some SObject
+        | "string" -> Some SString
+        | _ -> None
+
+/// Walk a JSON-schema-shaped object and collect (fieldName, SchemaType) pairs.
+let extractSchemaTypes (schema: obj) : (string * SchemaType) list =
+    if Dyn.isNullish schema then
+        []
+    else
+        let props = Dyn.get schema "properties"
+
+        if Dyn.isNullish props || not (Dyn.typeIs props "object") then
+            []
+        else
+            Dyn.keys props
+            |> Array.choose (fun key ->
+                match schemaTypeOfJsonField (Dyn.get props key) with
+                | Some st -> Some(key, st)
+                | None -> None)
+            |> Array.toList
+
+/// Replace prior registrations for this tool, then register types from schema.
+let registerSchemaTypes (toolName: string) (schema: obj) : unit =
+    if toolName <> "" then
+        removeRegistryForTool toolName
+
+        extractSchemaTypes schema
+        |> List.map (fun (field, st) -> (toolName, field, st))
+        |> registerToolParameterTypes
+
+/// Look up the registered SchemaType for a (tool, field) pair.
+let parseSchemaToTypes (tool: string) (field: string) : SchemaType option =
+    registry
+    |> Seq.tryPick (fun (t, f, s) -> if t = tool && f = field then Some s else None)
 
 /// Look up the required field names for a given tool from ToolSpec.
 /// Falls back to empty list for unknown tools.
@@ -133,35 +211,50 @@ let requireWarnReuseOnArgs (tool: string) (args: obj) : Result<unit, string> =
 
             Result.Error(wireDomainFailure tool err)
 
+let private canonicalToolName (toolName: string) : string =
+    match toolName.ToLowerInvariant() with
+    | "file_read"
+    | "read" -> "read"
+    | "file_write"
+    | "write" -> "write"
+    | "task"
+    | "todowrite" -> "todowrite"
+    | other -> other
+
+let private tryParseJsonString (s: string) : obj option =
+    let trimmed = s.Trim()
+
+    if
+        (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
+        || (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
+    then
+        try
+            Some(JS.JSON.parse s)
+        with _ ->
+            None
+    else
+        None
+
+let private tryCoerceStringValue (expected: SchemaType) (s: string) : obj option =
+    match expected with
+    | SNumber ->
+        match System.Int32.TryParse s with
+        | true, n -> Some(box n)
+        | _ -> None
+    | SBoolean ->
+        match s.Trim().ToLowerInvariant() with
+        | "true" -> Some(box true)
+        | "false" -> Some(box false)
+        | _ -> None
+    | SArray
+    | SObject -> tryParseJsonString s
+    | SString -> None
+
 /// Pre-process tool args: coerce string-encoded numbers to numbers,
 /// parse JSON-stringified arrays/objects, etc.
 let coerceArgsTypes (toolName: string) (args: obj) : unit =
     if not (Dyn.isNullish args) && Dyn.typeIs args "object" then
-        let cleanTool =
-            match toolName.ToLowerInvariant() with
-            | "file_read"
-            | "read" -> "read"
-            | "file_write"
-            | "write" -> "write"
-            | "task"
-            | "todowrite" -> "todowrite"
-            | other -> other
-
-        let isExpectedNumber field =
-            match cleanTool, field with
-            | "read", ("offset" | "limit") -> true
-            | "websearch", "numResults" -> true
-            | "webfetch", "timeout" -> true
-            | _ -> false
-
-        let isExpectedObject field =
-            match cleanTool, field with
-            | "coder", "intents" -> true
-            | "investigator", "intents" -> true
-            | "executor", "dependencies" -> true
-            | "todowrite", ("todos" | "select_methodology") -> true
-            | "submit_review", "affectedFiles" -> true
-            | _ -> false
+        let cleanTool = canonicalToolName toolName
 
         for k in Dyn.keys args do
             let v = Dyn.get args k
@@ -169,118 +262,24 @@ let coerceArgsTypes (toolName: string) (args: obj) : unit =
             if not (Dyn.isNullish v) && Dyn.typeIs v "string" then
                 let s = unbox<string> v
 
-                if isExpectedNumber k then
-                    match System.Int32.TryParse s with
-                    | true, n -> args?(k) <- box n
-                    | _ -> ()
-                elif isExpectedObject k then
-                    let trimmed = s.Trim()
+                match parseSchemaToTypes cleanTool k with
+                | Some expected ->
+                    match tryCoerceStringValue expected s with
+                    | Some coerced -> args?(k) <- coerced
+                    | None -> ()
+                | None -> ()
 
-                    if
-                        (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
-                        || (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
-                    then
-                        try
-                            let parsed = JS.JSON.parse s
-                            args?(k) <- parsed
-                        with _ ->
-                            ()
+let private registerCoreToolSchemas () : unit =
+    registerToolParameterTypes
+        [ ("read", "offset", SNumber)
+          ("read", "limit", SNumber)
+          ("websearch", "numResults", SNumber)
+          ("webfetch", "timeout", SNumber)
+          ("coder", "intents", SArray)
+          ("investigator", "intents", SArray)
+          ("executor", "dependencies", SObject)
+          ("todowrite", "todos", SArray)
+          ("todowrite", "select_methodology", SArray)
+          ("submit_review", "affectedFiles", SArray) ]
 
-let muxToolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
-    promise {
-        let tool = toolNameFromHookInputMux input
-        let args = argsFromMuxToolExecuteInput input
-
-        if not (Dyn.isNullish args) then
-            coerceArgsTypes tool args
-
-            match filterAmendFromArgs args with
-            | Some n ->
-                output?("_amend") <- box n
-                input?("_amend") <- box n
-            | None -> ()
-
-            sanitizeNullArgs tool args
-
-            let mutable hasError = false
-
-            match requireWarnTddOnArgs tool args with
-            | Result.Error e ->
-                setHookErrorMux output e
-                hasError <- true
-            | Result.Ok() -> ()
-
-            if not hasError then
-                match requireWarnOnArgs tool args with
-                | Result.Error e ->
-                    setHookErrorMux output e
-                    hasError <- true
-                | Result.Ok() -> ()
-
-            if not hasError then
-                match requireWarnReuseOnArgs tool args with
-                | Result.Error e ->
-                    setHookErrorMux output e
-                    hasError <- true
-                | Result.Ok() -> ()
-
-            let rawOpt: obj option = args?intents
-
-            let labelResult =
-                match tool with
-                | "coder" ->
-                    match rawOpt with
-                    | Some r -> joinCoderUiLabel r
-                    | None -> Result.Error ""
-                | "investigator" ->
-                    match rawOpt with
-                    | Some r -> joinInvestigatorUiLabel r
-                    | None -> Result.Error ""
-                | _ -> Result.Error ""
-
-            match labelResult with
-            | Result.Ok label when label <> "" -> args?("_ui") <- box label
-            | _ -> ()
-    }
-
-let muxToolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promise<unit> =
-    promise {
-        let decoded = decodeMuxToolExecuteAfterInput input (box null)
-        let tool = decoded.Tool
-        let sessionID = decoded.SessionID
-        let originalOutput = hookOutputTextMux output
-
-        let amendVal =
-            let fromOutput = Dyn.get output "_amend"
-
-            if not (Dyn.isNullish fromOutput) then
-                fromOutput
-            else
-                let fromInput = Dyn.get input "_amend"
-
-                if not (Dyn.isNullish fromInput) then
-                    fromInput
-                else
-                    let fromArgs =
-                        if not (Dyn.isNullish decoded.Args) then
-                            Dyn.get decoded.Args "_amend"
-                        else
-                            null
-
-                    if not (Dyn.isNullish fromArgs) then fromArgs else null
-
-        if not (Dyn.isNullish amendVal) then
-            restoreAmendToArgs decoded.Args amendVal
-            let inputArgs = argsFromMuxToolExecuteInput input
-            restoreAmendToArgs inputArgs amendVal
-            let outputArgs = argsFromHookOutputMux output
-            restoreAmendToArgs outputArgs amendVal
-
-        let argsJson = JS.JSON.stringify decoded.Args
-
-        if isNetworkErrorText originalOutput then
-            setHookErrorMux output "network connection lost"
-
-        if LivelockGuard.check scope sessionID tool argsJson originalOutput then
-            setHookErrorMux output "livelock guard: repeated identical tool call with identical result"
-    }
+do registerCoreToolSchemas ()

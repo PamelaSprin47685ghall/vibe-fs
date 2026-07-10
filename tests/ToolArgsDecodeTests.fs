@@ -164,6 +164,44 @@ let decodeSubmitReviewOk () =
         equal "submit_review ok files" 1 sr.AffectedFiles.Length
     | _ -> check "submit_review ok" false
 
+let testCoerceUnknownToolArgsOk () =
+    registerToolParameterTypes
+        [ ("my_custom_tool", "count", SchemaType.SNumber)
+          ("my_custom_tool", "verbose", SchemaType.SBoolean)
+          ("my_custom_tool", "items", SchemaType.SArray)
+          ("my_custom_tool", "config", SchemaType.SObject)
+          ("my_custom_tool", "name", SchemaType.SString) ]
+
+    let args =
+        createObj
+            [ "count", box "42"
+              "verbose", box "true"
+              "items", box """["a","b"]"""
+              "config", box """{"key":"val"}"""
+              "name", box "hello" ]
+
+    coerceArgsTypes "my_custom_tool" args
+
+    let count = Dyn.get args "count"
+    check "custom number coerced" (not (Dyn.typeIs count "string"))
+    check "custom number value" (unbox<int> count = 42)
+
+    let verbose = Dyn.get args "verbose"
+    check "custom boolean coerced" (not (Dyn.typeIs verbose "string"))
+    check "custom boolean value" (unbox<bool> verbose = true)
+
+    let items = Dyn.get args "items"
+    check "custom array coerced" (not (Dyn.typeIs items "string"))
+    check "custom array is array" (Dyn.isArray items)
+
+    let config = Dyn.get args "config"
+    check "custom object coerced" (not (Dyn.typeIs config "string"))
+    check "custom object is object" (Dyn.typeIs config "object")
+
+    let name = Dyn.get args "name"
+    check "string field not coerced" (Dyn.typeIs name "string")
+    check "string field preserved" (unbox<string> name = "hello")
+
 let testSanitizeNullArgs () =
     let args =
         createObj
@@ -241,3 +279,4 @@ let run () =
     decodeSubmitReviewOk ()
     testSanitizeNullArgs ()
     testCoerceArgsTypesOk ()
+    testCoerceUnknownToolArgsOk ()

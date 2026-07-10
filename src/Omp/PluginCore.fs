@@ -26,6 +26,7 @@ open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackConfigCodec
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Omp.FallbackHooks
+open Wanxiangshu.Shell.ToolHookRuntime
 
 type CoreServices =
     { ReviewStore: ReviewStore
@@ -37,7 +38,26 @@ type CoreServices =
 
 let reviewStore: ReviewStore = createReviewStore ()
 
+let private wrapRegisterToolForSchema (pi: obj) : unit =
+    let original = Dyn.get pi "registerTool"
+
+    if Dyn.isNullish original || not (Dyn.typeIs original "function") then
+        ()
+    else
+        pi?registerTool <-
+            box (fun (toolDef: obj) ->
+                let name = Dyn.str toolDef "name"
+
+                if name <> "" then
+                    let parameters = Dyn.get toolDef "parameters"
+
+                    if not (Dyn.isNullish parameters) then
+                        registerSchemaTypes name parameters
+
+                Dyn.call1 original toolDef |> ignore)
+
 let private createCoreServices (pi: obj) : CoreServices =
+    wrapRegisterToolForSchema pi
     let finderCache = FinderCache()
 
     let directory = Dyn.str pi "directory"

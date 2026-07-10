@@ -25,6 +25,7 @@ open Wanxiangshu.Shell.LivelockGuard
 open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.ToolHookRuntime
 open Wanxiangshu.Shell.MuxPluginCatalogShell
+open Wanxiangshu.Shell.SubagentIntentsCodec
 
 let muxToolNames =
     Array.append
@@ -60,24 +61,84 @@ let createToolCatalog
     : ToolDefinition array =
     let iteratorStore = sessionScope.IteratorStore
 
-    [| yield injectWarnWarnTddIntoMuxSchema (coderTool deps toolNames sessionScope)
-       yield investigatorTool deps toolNames sessionScope
-       yield browserTool deps toolNames sessionScope
-       yield continueTool deps toolNames sessionScope
-       yield injectWarnWarnTddIntoMuxSchema (executorTool deps toolNames sessionScope)
-       yield submitReviewTool deps toolNames reviewStore sessionScope
-       yield websearchTool deps toolNames
-       yield webfetchTool
-       yield fuzzyGrepTool finderCache iteratorStore
-       yield fuzzyFindTool finderCache iteratorStore
-       yield fuzzyContinueTool finderCache iteratorStore
-       yield injectWarnWarnTddIntoMuxSchema (writeTool deps)
-       yield readTool deps hostReadExec
-       yield meditatorTool deps toolNames |]
-    |> Array.map (injectAmendIntoMuxSchema >> injectWarnReuseIntoMuxSchema)
+    let catalog =
+        [| yield injectWarnWarnTddIntoMuxSchema (coderTool deps toolNames sessionScope)
+           yield investigatorTool deps toolNames sessionScope
+           yield browserTool deps toolNames sessionScope
+           yield continueTool deps toolNames sessionScope
+           yield injectWarnWarnTddIntoMuxSchema (executorTool deps toolNames sessionScope)
+           yield submitReviewTool deps toolNames reviewStore sessionScope
+           yield websearchTool deps toolNames
+           yield webfetchTool
+           yield fuzzyGrepTool finderCache iteratorStore
+           yield fuzzyFindTool finderCache iteratorStore
+           yield fuzzyContinueTool finderCache iteratorStore
+           yield injectWarnWarnTddIntoMuxSchema (writeTool deps)
+           yield readTool deps hostReadExec
+           yield meditatorTool deps toolNames |]
+        |> Array.map (injectAmendIntoMuxSchema >> injectWarnReuseIntoMuxSchema)
+
+    for t in catalog do
+        ToolHookRuntime.registerSchemaTypes t.name (box t.parameters)
+
+    catalog
 
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
-    ToolHookRuntime.muxToolExecuteBefore input output
+    promise {
+        let tool = toolNameFromHookInputMux input
+        let args = argsFromMuxToolExecuteInput input
+
+        if not (Dyn.isNullish args) then
+            ToolHookRuntime.coerceArgsTypes tool args
+
+            match ToolHookRuntime.filterAmendFromArgs args with
+            | Some n ->
+                output?("_amend") <- box n
+                input?("_amend") <- box n
+            | None -> ()
+
+            ToolHookRuntime.sanitizeNullArgs tool args
+
+            let mutable hasError = false
+
+            match ToolHookRuntime.requireWarnTddOnArgs tool args with
+            | Result.Error e ->
+                setHookErrorMux output e
+                hasError <- true
+            | Result.Ok() -> ()
+
+            if not hasError then
+                match ToolHookRuntime.requireWarnOnArgs tool args with
+                | Result.Error e ->
+                    setHookErrorMux output e
+                    hasError <- true
+                | Result.Ok() -> ()
+
+            if not hasError then
+                match ToolHookRuntime.requireWarnReuseOnArgs tool args with
+                | Result.Error e ->
+                    setHookErrorMux output e
+                    hasError <- true
+                | Result.Ok() -> ()
+
+            let rawOpt: obj option = args?intents
+
+            let labelResult =
+                match tool with
+                | "coder" ->
+                    match rawOpt with
+                    | Some r -> joinCoderUiLabel r
+                    | None -> Result.Error ""
+                | "investigator" ->
+                    match rawOpt with
+                    | Some r -> joinInvestigatorUiLabel r
+                    | None -> Result.Error ""
+                | _ -> Result.Error ""
+
+            match labelResult with
+            | Result.Ok label when label <> "" -> args?("_ui") <- box label
+            | _ -> ()
+    }
 
 let toolExecuteAfter (scope: RuntimeScope) (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
