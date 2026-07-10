@@ -128,11 +128,11 @@ let resolveNudgeModel
                 | Some m -> Some m
                 | None -> defaultModel
             | _ ->
-                match tryGetModelStringFromMessage lastUserMsg with
-                | Some m -> Some m
+                match fallbackRuntime.GetInjectedModel sessionID with
+                | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)
                 | None ->
-                    match fallbackRuntime.GetInjectedModel sessionID with
-                    | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)
+                    match tryGetModelStringFromMessage lastUserMsg with
+                    | Some m -> Some m
                     | None ->
                         match fallbackRuntime.GetModel sessionID with
                         | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)

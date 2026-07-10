@@ -120,7 +120,6 @@
     <Compile Include="src/Shell/FallbackRuntimeState.fs"/>
     <Compile Include="src/Shell/FallbackMessageParser.fs"/>
     <Compile Include="src/Shell/FallbackMessageCodec.fs"/>
-    <Compile Include="src/Shell/FallbackEventBridge.fs"/>
     <Compile Include="src/Shell/FallbackRecoveryWait.fs"/>
     <Compile Include="src/Shell/PromiseStr.fs"/>
     <Compile Include="src/Shell/SessionProjectionStore.fs"/>
@@ -213,6 +212,7 @@
     <Compile Include="src/Shell/EventLogRuntimeAppend.fs"/>
     <Compile Include="src/Shell/EventLogRuntimeNudge.fs"/>
     <Compile Include="src/Shell/EventLogRuntime.fs"/>
+    <Compile Include="src/Shell/FallbackEventBridge.fs"/>
     <Compile Include="src/Shell/MessageTransformHostEntry.fs"/>
     <Compile Include="src/Shell/PatchToolsCodec.fs"/>
     <Compile Include="src/Shell/ToolArgsDecode.fs"/>

@@ -30,7 +30,7 @@ let private parseAtMs (raw: string) : int64 option =
         | true, n -> Some n
         | _ -> None
 
-let private fallbackInjectionFolder (st: FallbackInjectionState) (e: WanEvent) : FallbackInjectionState =
+let fallbackInjectionFolder (st: FallbackInjectionState) (e: WanEvent) : FallbackInjectionState =
     if e.Kind <> eventKindFallbackContinueInjected then
         st
     else
