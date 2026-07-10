@@ -24,17 +24,7 @@ let noStore_returnsError () =
           store = None
           finderCache = null }
 
-    let params': FuzzyGrepParams =
-        { pattern = [ "x" ]
-          path = None
-          exclude = []
-          searchIgnored = None
-          caseSensitive = None
-          context = None
-          limit = None
-          iterator = None }
-
-    match resolveGrepIteratorState params' opts with
+    match resolveStore opts with
     | Error msg -> check "noStore error mentions store" (msg.Contains "requires SearchOptions.store")
     | Ok _ -> check "noStore → Error" false
 
@@ -49,8 +39,7 @@ let missingPattern_returnsError () =
           searchIgnored = None
           caseSensitive = None
           context = None
-          limit = None
-          iterator = None }
+          limit = None }
 
     match resolveGrepIteratorState paramsNone opts with
     | Error msg -> check "None pattern error" (msg.Contains "pattern is required")
@@ -67,30 +56,19 @@ let wildcardOnly_returnsError () =
           searchIgnored = None
           caseSensitive = None
           context = None
-          limit = None
-          iterator = None }
+          limit = None }
 
     match resolveGrepIteratorState params' opts with
     | Error msg -> check "wildcard error mentions matches everything" (msg.Contains "matches everything")
     | Ok _ -> check "wildcardOnly → Error" false
 
-// 4. invalidIterator – consumeGrepIterator fails, bypasses pattern logic entirely
+// 4. invalidIterator – consumeGrepIterator returns None for unknown iterator id
 let invalidIterator_returnsError () =
-    let opts = optsWithStore ()
+    let store = fakeStore ()
 
-    let params': FuzzyGrepParams =
-        { pattern = [ "anything" ]
-          path = None
-          exclude = []
-          searchIgnored = None
-          caseSensitive = None
-          context = None
-          limit = None
-          iterator = Some "bad-iterator-id" }
-
-    match resolveGrepIteratorState params' opts with
-    | Error msg -> check "invalid iterator error" (msg.Contains "iterator")
-    | Ok _ -> check "invalidIterator → Error" false
+    match consumeGrepIterator store "bad-iterator-id" with
+    | None -> check "invalid iterator is None" true
+    | Some _ -> check "invalid iterator should be None" false
 
 // 5. validPattern – happy path: query built, defaults filled, cursor=None
 let validPattern_returnsOk () =
@@ -103,8 +81,7 @@ let validPattern_returnsOk () =
           searchIgnored = None
           caseSensitive = None
           context = Some 2
-          limit = Some 10
-          iterator = None }
+          limit = Some 10 }
 
     match resolveGrepIteratorState params' opts with
     | Ok state ->
@@ -127,8 +104,7 @@ let searchIgnored_addsGitIgnoredConstraint () =
           searchIgnored = Some true
           caseSensitive = None
           context = None
-          limit = None
-          iterator = None }
+          limit = None }
 
     match resolveGrepIteratorState params' opts with
     | Ok state ->

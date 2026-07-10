@@ -31,36 +31,6 @@ let fshResolveStore () =
     | Error msg -> check "no store error" (msg.Contains "store")
     | Ok _ -> check "no store error" false
 
-let fshResolveIteratorBranch () =
-    let store = createTypedIteratorStore 10
-    let freshCalled = ref false
-
-    let onFresh () =
-        freshCalled.Value <- true
-        Error "fresh-fn-called"
-
-    match resolveIteratorBranch store None consumeFindIterator "find" onFresh with
-    | Error msg -> equal "fresh called" "fresh-fn-called" msg
-    | Ok _ -> check "fresh called" false
-
-    freshCalled.Value <- false
-
-    match resolveIteratorBranch store (Some "missing-id") consumeFindIterator "find" onFresh with
-    | Error msg -> check "missing id error" (msg.Contains "missing-id")
-    | Ok _ -> check "missing id error" false
-
-    let state: FuzzyFindState =
-        { query = "q"
-          pageSize = 30
-          pageIndex = 0
-          externalBasePath = None }
-
-    let storedId = storeFindIterator store "s" state
-
-    match resolveIteratorBranch store (Some storedId) consumeFindIterator "find" onFresh with
-    | Ok s -> equal "consumed query" "q" s.query
-    | Error _ -> check "consumed" false
-
 let fshRunWithFinder () =
     let errResult = Error "finder failed"
     let r = runWithFinder errResult None (fun _ -> { output = "ok"; isError = false })
@@ -131,7 +101,6 @@ let fshErrorMsg () =
 let run () =
     fshParseExclude ()
     fshResolveStore ()
-    fshResolveIteratorBranch ()
     fshRunWithFinder ()
     fshItemsOf ()
     fshStringListOf ()

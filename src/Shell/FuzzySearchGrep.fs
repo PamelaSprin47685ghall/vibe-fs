@@ -52,13 +52,9 @@ let resolveGrepIteratorStateForPattern
                   cursor = None }
 
 let resolveGrepIteratorState (params': FuzzyGrepParams) (opts: SearchOptions) : Result<GrepIteratorState, string> =
-    match resolveStore opts with
-    | Error msg -> Error msg
-    | Ok store ->
-        resolveIteratorBranch store params'.iterator consumeGrepIterator "fuzzy_grep" (fun () ->
-            match params'.pattern with
-            | [] -> Error "pattern is required on the first call"
-            | first :: _ -> resolveGrepIteratorStateForPattern first params' opts)
+    match params'.pattern with
+    | [] -> Error "pattern is required on the first call"
+    | first :: _ -> resolveGrepIteratorStateForPattern first params' opts
 
 let private runGrep
     (finder: FinderLike)
@@ -222,6 +218,16 @@ let private fuzzyGrepMulti
 
 let fuzzyGrep (params': FuzzyGrepParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     match params'.pattern with
-    | [ single ] -> fuzzyGrepSingle params' opts
+    | [ _ ]
     | [] -> fuzzyGrepSingle params' opts
     | multi -> fuzzyGrepMulti multi params' opts
+
+let fuzzyGrepContinue (iteratorState: GrepIteratorState) (store: TypedIteratorStore) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
+    promise {
+        let! finderResult = acquireFinderFromOptions iteratorState.core.externalBasePath opts
+        return
+            runWithFinder
+                finderResult
+                iteratorState.core.externalBasePath
+                (runGrepWithFinder iteratorState.core iteratorState.cursor store opts)
+    }

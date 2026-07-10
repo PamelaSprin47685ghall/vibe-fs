@@ -29,11 +29,12 @@ let private coderChildTools =
        "find"
        "fuzzy_find"
        "fuzzy_grep"
+       "fuzzy_continue"
        "lsp"
        "investigator" |]
 
 let private investigatorChildTools =
-    [| "read"; "find"; "fuzzy_find"; "fuzzy_grep" |]
+    [| "read"; "find"; "fuzzy_find"; "fuzzy_grep"; "fuzzy_continue" |]
 
 type OmpHostAdapter
     (

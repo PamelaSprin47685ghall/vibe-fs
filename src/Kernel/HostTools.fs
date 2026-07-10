@@ -146,6 +146,7 @@ let allToolNames (host: Host) : string array =
        "pty_kill"
        "fuzzy_find"
        "fuzzy_grep"
+       "fuzzy_continue"
        "websearch"
        "webfetch"
        "submit_review"

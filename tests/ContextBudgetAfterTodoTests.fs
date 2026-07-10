@@ -29,7 +29,7 @@ let spec_applyContextBudget_afterTodoResets () =
         let backlogRef = ref ([]: BacklogEntry list)
         let backlogOps =
             { Host = opencode
-              GetOrRebuildBacklog = (fun _ _ -> !backlogRef) }
+              GetOrRebuildBacklog = (fun _ _ -> backlogRef.Value) }
 
         // Start phase with totalTokens = 30000, totalBytes = 100, backlogBytes = 0
         let state = beginPhase 30000L 100L 0L
@@ -43,7 +43,7 @@ let spec_applyContextBudget_afterTodoResets () =
               gotchas = "gotchas"
               lessonsAndConventions = "lessons"
               plan = "plan" }
-        backlogRef := [ newTodoEntry ]
+        backlogRef.Value <- [ newTodoEntry ]
 
         let msgInfo : MessageInfo<obj> =
             { id = "user-1"
@@ -86,7 +86,7 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
         let backlogRef = ref ([]: BacklogEntry list)
         let backlogOps =
             { Host = opencode
-              GetOrRebuildBacklog = (fun _ _ -> !backlogRef) }
+              GetOrRebuildBacklog = (fun _ _ -> backlogRef.Value) }
 
         // Start phase 0
         let mutable currentTokens = 30000L
@@ -124,7 +124,7 @@ let spec_applyContextBudget_fiveConsecutiveTodos () =
                   gotchas = "gotchas"
                   lessonsAndConventions = "lessons"
                   plan = "plan" }
-            backlogRef := !backlogRef @ [ newTodoEntry ]
+            backlogRef.Value <- backlogRef.Value @ [ newTodoEntry ]
             
             // Update base prompt tokens for the next phase
             currentTokens <- currentTokens + 5000L

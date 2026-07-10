@@ -63,14 +63,6 @@ let resolveStore (opts: SearchOptions) : Result<TypedIteratorStore, string> =
 let internal iteratorError toolName it =
     $"{toolName} iterator error: unknown, expired, or already consumed iterator \"{it}\""
 
-let internal resolveIteratorBranch (store: TypedIteratorStore) iterator consume toolName onFresh =
-    match iterator with
-    | Some it when it <> "" ->
-        match consume store it with
-        | Some s -> Ok s
-        | None -> Error(iteratorError toolName it)
-    | _ -> onFresh ()
-
 let acquireFinderFromOptions externalBasePath (opts: SearchOptions) =
     match externalBasePath with
     | Some basep -> opts.finderCache.Get basep

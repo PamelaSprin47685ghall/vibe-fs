@@ -33,13 +33,9 @@ let resolveFindSearchStateForPattern
               externalBasePath = externalBasePath }
 
 let resolveFindSearchState (params': FuzzyFindParams) (opts: SearchOptions) : Result<FuzzyFindState, string> =
-    match resolveStore opts with
-    | Error msg -> Error msg
-    | Ok store ->
-        resolveIteratorBranch store params'.iterator consumeFindIterator "fuzzy_find" (fun () ->
-            match params'.pattern with
-            | [] -> Error "pattern is required on the first call"
-            | first :: _ -> resolveFindSearchStateForPattern first params' opts)
+    match params'.pattern with
+    | [] -> Error "pattern is required on the first call"
+    | first :: _ -> resolveFindSearchStateForPattern first params' opts
 
 let findNextIterator
     (state: FuzzyFindState)
@@ -190,6 +186,12 @@ let private fuzzyFindMulti
 
 let fuzzyFind (params': FuzzyFindParams) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
     match params'.pattern with
-    | [ single ] -> fuzzyFindSingle params' opts
+    | [ _ ]
     | [] -> fuzzyFindSingle params' opts
     | multi -> fuzzyFindMulti multi params' opts
+
+let fuzzyFindContinue (state: FuzzyFindState) (store: TypedIteratorStore) (opts: SearchOptions) : JS.Promise<SearchOutcome> =
+    promise {
+        let! finderResult = acquireFinderFromOptions state.externalBasePath opts
+        return runWithFinder finderResult state.externalBasePath (runFind state store opts)
+    }

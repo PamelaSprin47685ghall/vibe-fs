@@ -78,10 +78,9 @@ let fuzzyFindTool
     buildFuzzyTool
         ToolSchemaModule.fuzzyFind
         (box
-            {| pattern = strArrayNullish Params.fuzzyFindPattern
+            {| pattern = strArrayReq Params.fuzzyFindPattern
                path = strOpt Params.fuzzyFindPath
-               limit = intMinNullish 1 Params.fuzzyFindLimit
-               iterator = strOpt Params.fuzzyFindIterator |})
+               limit = intMinNullish 1 Params.fuzzyFindLimit |})
         "fuzzy_find"
         decodeFuzzyFindArgs
         FuzzyCommandsModule.fuzzyFind
@@ -95,17 +94,30 @@ let fuzzyGrepTool
     buildFuzzyTool
         ToolSchemaModule.fuzzyGrep
         (box
-            {| pattern = strArrayNullish Params.fuzzyGrepPattern
+            {| pattern = strArrayReq Params.fuzzyGrepPattern
                path = strOpt Params.fuzzyGrepPath
                exclude = excludeOpt Params.fuzzyGrepExclude
                searchIgnored = boolOptional Params.fuzzyGrepSearchIgnored
                caseSensitive = boolOptional Params.fuzzyGrepCaseSensitive
                context = intMinNullish 0 Params.fuzzyGrepContext
-               limit = intMinNullish 1 Params.fuzzyGrepLimit
-               iterator = strOpt Params.fuzzyGrepIterator |})
+               limit = intMinNullish 1 Params.fuzzyGrepLimit |})
         "fuzzy_grep"
         decodeFuzzyGrepArgs
         FuzzyCommandsModule.fuzzyGrep
+        finderCache
+        iteratorStore
+
+let fuzzyContinueTool
+    (finderCache: FinderCache)
+    (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore)
+    : obj =
+    buildFuzzyTool
+        ToolSchemaModule.fuzzyContinue
+        (box
+            {| iterator = strReq Params.fuzzyContinueIterator |})
+        "fuzzy_continue"
+        decodeFuzzyContinueArgs
+        FuzzyCommandsModule.fuzzyContinue
         finderCache
         iteratorStore
 

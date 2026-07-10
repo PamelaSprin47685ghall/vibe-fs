@@ -21,6 +21,7 @@ let all: ToolSpec list =
       executorSpec
       fuzzyFindSpec
       fuzzyGrepSpec
+      fuzzyContinueSpec
       websearchSpec
       webfetchSpec
       submitReviewSpec

@@ -30,8 +30,7 @@ let checkWildcardOnly (pattern: string) (mode: string) : bool =
 type FuzzyFindParams =
     { pattern: string list
       path: string option
-      limit: int option
-      iterator: string option }
+      limit: int option }
 
 type FuzzyGrepParams =
     { pattern: string list
@@ -40,8 +39,10 @@ type FuzzyGrepParams =
       searchIgnored: bool option
       caseSensitive: bool option
       context: int option
-      limit: int option
-      iterator: string option }
+      limit: int option }
+
+type FuzzyContinueParams =
+    { iterator: string }
 
 type FuzzyFindState =
     { query: string
@@ -64,18 +65,18 @@ let fuzzyIteratorDescriptionHint =
     "Every result "
     + "ends with "
     + "iterator="
-    + "\"...\"; iteration is finished when it becomes "
+    + "\"...\"; feed this iterator value into the fuzzy_continue tool to get the next page; iteration is finished when it becomes "
     + "iterator="
     + "\"\"."
 
 let fuzzyFindDescriptionOmpPrefix =
-    "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported.\n\nFirst call: provide pattern (an array of strings) and optional path.\nLater calls: provide only iterator.\nMultiple patterns run in parallel and results are grouped per pattern.\n"
+    "Search for files by fuzzy path text matching. Returns file paths ranked by relevance and frecency. Regex and glob syntax are not supported.\n\nFirst call: provide pattern (an array of strings) and optional path. To fetch the next page, call fuzzy_continue with the iterator emitted in the YAML front matter.\nMultiple patterns run in parallel and results are grouped per pattern.\n"
 
 let fuzzyFindDescriptionOmp =
     fuzzyFindDescriptionOmpPrefix + fuzzyIteratorDescriptionHint
 
 let fuzzyGrepDescriptionOmpPrefix =
-    "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked.\n\nFirst call: provide pattern (an array of strings) and optional filters.\nLater calls: provide only iterator.\nMultiple patterns run in parallel and results are grouped per pattern.\n"
+    "Search file contents using fuzzy-aware content search. Smart-case, git-aware, frecency-ranked.\n\nFirst call: provide pattern (an array of strings) and optional filters. To fetch the next page, call fuzzy_continue with the iterator emitted in the YAML front matter.\nMultiple patterns run in parallel and results are grouped per pattern.\n"
 
 let fuzzyGrepDescriptionOmp =
     fuzzyGrepDescriptionOmpPrefix + fuzzyIteratorDescriptionHint

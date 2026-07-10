@@ -241,3 +241,4 @@ let writeTool (_deps: obj) : ToolDefinition =
 
 let fuzzyFindTool = BuiltinToolsFuzzy.fuzzyFindTool
 let fuzzyGrepTool = BuiltinToolsFuzzy.fuzzyGrepTool
+let fuzzyContinueTool = BuiltinToolsFuzzy.fuzzyContinueTool

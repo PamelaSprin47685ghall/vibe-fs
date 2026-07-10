@@ -108,6 +108,7 @@ let canUseMatrix () =
           "grep_x", [ true; true; true; true; false; false; false ]
           "fuzzy_grep", [ false; true; true; true; false; false; false ]
           "fuzzy_find", [ true; true; true; true; false; false; false ]
+          "fuzzy_continue", [ true; true; true; true; false; false; false ]
           "glob", [ true; true; true; true; false; false; false ]
           "read", [ true; true; true; true; true; true; false ]
           "write", [ false; false; true; false; false; false; false ]

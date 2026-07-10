@@ -48,9 +48,8 @@ let fuzzyFindTool
             (createObj
                 [ "pattern", box (strArrayProp Params.fuzzyFindPattern)
                   "path", box (strProp Params.fuzzyFindPath)
-                  "limit", box (numProp Params.fuzzyFindLimit)
-                  "iterator", box (strProp Params.fuzzyFindIterator) ])
-            [||]
+                  "limit", box (numProp Params.fuzzyFindLimit) ])
+            [| "pattern" |]
       execute =
         fun config args ->
             match fromMuxConfig config with
@@ -82,9 +81,8 @@ let fuzzyGrepTool
                   "searchIgnored", box (boolProp Params.fuzzyGrepSearchIgnored)
                   "caseSensitive", box (boolProp Params.fuzzyGrepCaseSensitive)
                   "context", box (numProp Params.fuzzyGrepContext)
-                  "limit", box (numProp Params.fuzzyGrepLimit)
-                  "iterator", box (strProp Params.fuzzyGrepIterator) ])
-            [||]
+                  "limit", box (numProp Params.fuzzyGrepLimit) ])
+            [| "pattern" |]
       execute =
         fun config args ->
             match fromMuxConfig config with
@@ -97,6 +95,33 @@ let fuzzyGrepTool
 
                     promise {
                         let! r = FuzzyCommandsModule.fuzzyGrep p o
+                        return r.output
+                    }
+      condition = None }
+
+let fuzzyContinueTool
+    (finderCache: FinderCache)
+    (iteratorStore: Wanxiangshu.Shell.FuzzyIteratorStore.TypedIteratorStore)
+    : ToolDefinition =
+    { name = "fuzzy_continue"
+      description = description "fuzzy_continue"
+      parameters =
+        mkSchema
+            (createObj
+                [ "iterator", box (strProp Params.fuzzyContinueIterator) ])
+            [| "iterator" |]
+      execute =
+        fun config args ->
+            match fromMuxConfig config with
+            | Error e -> resolveStr (wireEncodeToolError "MuxConfig" e)
+            | Ok runtime ->
+                match decodeFuzzyContinueArgs args with
+                | Error e -> resolveStr (wireDecodeFailure "fuzzy_continue" e)
+                | Ok p ->
+                    let o = searchOptionsFromRuntime runtime finderCache iteratorStore
+
+                    promise {
+                        let! r = FuzzyCommandsModule.fuzzyContinue p o
                         return r.output
                     }
       condition = None }

@@ -81,8 +81,7 @@ let grepStateEmptyPattern () =
           searchIgnored = None
           caseSensitive = None
           context = None
-          limit = None
-          iterator = None }
+          limit = None }
 
     match resolveGrepIteratorState params' opts with
     | Error msg -> equal "empty pattern error" "pattern is required on the first call" msg
@@ -104,8 +103,7 @@ let grepStateWildcardOnly () =
           searchIgnored = None
           caseSensitive = None
           context = None
-          limit = None
-          iterator = None }
+          limit = None }
 
     match resolveGrepIteratorState params' opts with
     | Error msg -> check "wildcard error mentions matches everything" (msg.Contains "matches everything")
@@ -118,17 +116,7 @@ let grepStateNoStore () =
           store = None
           finderCache = FinderCache() }
 
-    let params': FuzzyGrepParams =
-        { pattern = [ "foo" ]
-          path = None
-          exclude = []
-          searchIgnored = None
-          caseSensitive = None
-          context = None
-          limit = None
-          iterator = None }
-
-    match resolveGrepIteratorState params' opts with
+    match resolveStore opts with
     | Error msg ->
         equal
             "no store error"
@@ -152,8 +140,7 @@ let grepStateValid () =
           searchIgnored = None
           caseSensitive = Some false
           context = Some 2
-          limit = Some 30
-          iterator = None }
+          limit = Some 30 }
 
     match resolveGrepIteratorState params' opts with
     | Ok state ->

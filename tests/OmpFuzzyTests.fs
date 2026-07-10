@@ -100,8 +100,12 @@ let registeredFuzzyToolsExposeIteratorParam () =
         let pi = piObject hookStore
         do! wanxiangshuExtension pi
 
+        let continueTool = tools |> Seq.find (fun t -> str t "name" = "fuzzy_continue")
+        let props = Dyn.get (Dyn.get continueTool "parameters") "properties"
+        check "fuzzy_continue has iterator param" (Dyn.has props "iterator")
+
         for toolName in [| "fuzzy_find"; "fuzzy_grep" |] do
             let tool = tools |> Seq.find (fun t -> str t "name" = toolName)
             let props = Dyn.get (Dyn.get tool "parameters") "properties"
-            check (toolName + " has iterator param") (Dyn.has props "iterator")
+            check (toolName + " has no iterator param") (not (Dyn.has props "iterator"))
     }

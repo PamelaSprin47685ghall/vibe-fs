@@ -77,8 +77,7 @@ let grepMaxMatchesPerFileRespectsPageSize () =
               searchIgnored = None
               caseSensitive = None
               context = None
-              limit = Some 100
-              iterator = None }
+              limit = Some 100 }
 
         let! _ = fuzzyGrep params' opts
 
@@ -125,8 +124,7 @@ let findPagingWhenTotalMatchedIsNone () =
         let params': FuzzyFindParams =
             { pattern = [ "q" ]
               path = None
-              limit = Some 30
-              iterator = None }
+              limit = Some 30 }
 
         let! outcome = fuzzyFind params' opts
         check "iterator generated when totalMatched=None at page boundary" (outcome.output.Contains "iterator:")
@@ -175,8 +173,7 @@ let grepMultiPropagatesErrorAndSafety () =
               searchIgnored = None
               caseSensitive = None
               context = None
-              limit = Some 100
-              iterator = None }
+              limit = Some 100 }
 
         let! outcome = fuzzyGrep params' opts
         check "multi grep isError is true" outcome.isError

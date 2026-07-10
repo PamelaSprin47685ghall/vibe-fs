@@ -41,7 +41,7 @@ let countsSpec (reg: obj) =
     let tools = unbox<obj[]> (get reg "tools")
     let names = tools |> Array.map (fun t -> str t "name")
     check "wrapper count" (wrappers.Length = 5)
-    equal "tool count" 14 tools.Length
+    equal "tool count" 15 tools.Length
     check "mux has methodology tool" (names |> Array.contains "methodology")
     check "mux has submit_review tool" (names |> Array.contains "submit_review")
     check "mux does not expose return_reviewer tool" (not (names |> Array.contains "return_reviewer"))

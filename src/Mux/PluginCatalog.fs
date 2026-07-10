@@ -39,6 +39,7 @@ let muxToolNames =
            "webfetch"
            "fuzzy_grep"
            "fuzzy_find"
+           "fuzzy_continue"
            "write"
            "read" |]
         methodologyToolNames
@@ -71,6 +72,7 @@ let createToolCatalog
        yield webfetchTool
        yield fuzzyGrepTool finderCache iteratorStore
        yield fuzzyFindTool finderCache iteratorStore
+       yield fuzzyContinueTool finderCache iteratorStore
        yield injectWarnWarnTddIntoMuxSchema (writeTool deps)
        yield readTool deps hostReadExec
        yield methodologyTool deps toolNames |]

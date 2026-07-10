@@ -223,12 +223,11 @@ let emptyIteratorTreatedAsAbsent () =
     let params': FuzzyFindParams =
         { pattern = [ "q" ]
           path = None
-          limit = None
-          iterator = Some "" }
+          limit = None }
 
     match resolveFindSearchState params' opts with
-    | Ok _ -> check "empty iterator falls through to fresh search" true
-    | Error msg -> check ("empty iterator must not error: " + msg) false
+    | Ok _ -> check "fresh search without iterator succeeds" true
+    | Error msg -> check ("fresh search must not error: " + msg) false
 
     let storedId =
         Wanxiangshu.Shell.FuzzyIteratorStore.storeFindIterator
@@ -239,22 +238,10 @@ let emptyIteratorTreatedAsAbsent () =
               pageIndex = 0
               externalBasePath = None }
 
-    let resumed: FuzzyFindParams =
-        { pattern = []
-          path = None
-          limit = None
-          iterator = Some storedId }
+    match Wanxiangshu.Shell.FuzzyIteratorStore.consumeFindIterator store storedId with
+    | Some _ -> check "stored iterator resumes" true
+    | None -> check "stored iterator resumes" false
 
-    match resolveFindSearchState resumed opts with
-    | Ok _ -> check "stored iterator resumes" true
-    | Error _ -> check "stored iterator resumes" false
-
-    let bogus: FuzzyFindParams =
-        { pattern = []
-          path = None
-          limit = None
-          iterator = Some "nope" }
-
-    match resolveFindSearchState bogus opts with
-    | Error _ -> check "unknown iterator still errors" true
-    | Ok _ -> check "unknown iterator still errors" false
+    match Wanxiangshu.Shell.FuzzyIteratorStore.consumeFindIterator store "nope" with
+    | None -> check "unknown iterator returns None" true
+    | Some _ -> check "unknown iterator returns None" false

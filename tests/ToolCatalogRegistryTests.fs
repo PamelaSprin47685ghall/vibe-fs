@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.ToolCatalogRegistryTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ToolCatalog
 
-let allCountIs17 () = equal "16 tools" 16 all.Length
+let allCountIs17 () = equal "17 tools" 17 all.Length
 
 let allNamesAreNonEmpty () =
     for spec in all do
