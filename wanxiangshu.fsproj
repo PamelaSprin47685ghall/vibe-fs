@@ -607,6 +607,7 @@
     <Compile Include="tests/FallbackRecoveryWaitTests.fs"/>
     <Compile Include="tests/SubagentIoFallbackRecoveryTests.fs"/>
     <Compile Include="tests/SubagentIoFallbackRecoveryTestsPart2.fs"/>
+    <Compile Include="tests/SubagentIoFallbackRecoveryTestsPart3.fs"/>
     <Compile Include="tests/FallbackMessageCodecTests.fs"/>
     <Compile Include="tests/FallbackIntegrationTests.fs"/>
     <Compile Include="tests/ArchitectureTestsFallback.fs"/>

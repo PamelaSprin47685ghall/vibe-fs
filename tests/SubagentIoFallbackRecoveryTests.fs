@@ -9,6 +9,18 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Opencode.SubagentIo
 
+let private waitForListenerRegistered (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
+    let rec poll () =
+        promise {
+            if runtime.HasListeners sessionID then
+                return ()
+            else
+                do! yieldMicrotask ()
+                return! poll ()
+        }
+
+    poll ()
+
 /// prompt rejects immediately; fallback handler sets Consumed on next microtask — without
 /// waitForRecovery, GetConsumed would be None and subagent would surface UnknownJsError.
 open Wanxiangshu.Kernel.Domain
@@ -69,7 +81,9 @@ let runSubagentRecoversWhenFallbackConsumesError () =
 
             rscr rt registry client "coder" "t" "go" "/tmp" "parent-1" (box null) (box null) false None
 
+        do! waitForListenerRegistered rt childId
         do! yieldMicrotask ()
+        rt.ClearSubsessionPending childId
         rt.SetConsumed childId true
         rt.SetTaskComplete childId true
 
@@ -158,8 +172,7 @@ let runSubagentWaitsForToolCallTextRecovery () =
 
             rscr rt registry client "investigator" "t" "go" "/tmp" "parent-1" (box null) (box null) false None
 
-        do! yieldMicrotask ()
-        do! yieldMicrotask ()
+        do! waitForListenerRegistered rt childId
         do! yieldMicrotask ()
 
         check "text not extracted while recovery in progress" (not textExtracted.Value)
@@ -171,6 +184,8 @@ let runSubagentWaitsForToolCallTextRecovery () =
             { s1 with
                 Phase = FallbackPhase.Idle
                 TaskComplete = true }
+
+        rt.ClearSubsessionPending childId
 
         let! result = runP
 

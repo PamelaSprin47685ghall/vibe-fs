@@ -98,7 +98,7 @@ HTTP / hook / squad_update
 
 ## 7. 实施顺序（任务强制）
 
-1. **文档**：`README.md`、`PRD/PRD.md`、`PRD/DEV_TALK.md`、`PRD/EventSourcing.md`（本文件）、`AGENTS.md`。
+1. **文档**：`README.md`、`01-master-spec.md`、`03-dev-talk.md`、`02-event-sourcing.md`（本文件）、`AGENTS.md`。
 2. **测试**：`tests/EventLog*` — 行 round-trip、`foldEvents` 与现 `EventReplayTests` 等价、损坏截断、replay + git reconcile（改 stub 为事件列表）。
 3. **开发**：Shell EventLog → `replayFromEventLog` / `appendSquadEvent` 接线；调用点 **先 append 后改 Dag**；删除以 session 历史为 SSOT 的路径。
 
@@ -109,7 +109,7 @@ HTTP / hook / squad_update
 - `npm run build-and-test` 全绿。
 - Kernel 无 `Dyn`；fold 在 Kernel；append/fs 仅在 Shell。
 
-## 9. 与 PRD 对照
+## 9. 与 master-spec 章节对照
 
 - 替代 PRD §2.2「历史是事实」中 **对话历史** 段落 → 本文件 §1。
 - 替代 PRD §5.4 重放伪代码 → `replayFromEventLog`。

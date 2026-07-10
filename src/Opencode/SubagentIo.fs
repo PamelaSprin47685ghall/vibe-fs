@@ -79,9 +79,9 @@ let runSubagentCoreResult
                 try
                     runtime.SetSubsessionPending childID true
                     do! promptWithAbort client (buildPromptBody options childID) signal
-                    runtime.SetSubsessionPending childID false
 
                     do! waitForSubagentSettle runtime childID
+                    runtime.ClearSubsessionPending childID
 
                     try
                         let st = runtime.GetOrCreateState childID
@@ -97,7 +97,7 @@ let runSubagentCoreResult
                     match translateJsError err with
                     | MessageAborted
                     | ClientCancellation _ ->
-                        runtime.SetSubsessionPending childID false
+                        runtime.ClearSubsessionPending childID
                         abortAndUnregister ()
 
                         if not (Dyn.isNullish signal) && Dyn.truthy (Dyn.get signal "aborted") then
@@ -106,13 +106,13 @@ let runSubagentCoreResult
                             let! text = extractSessionText client childID directory
                             return Ok(formatSubagentReport noOutputText abortedPrefix text true)
                     | other ->
-                        runtime.SetSubsessionPending childID false
                         do! waitForSubagentSettle runtime childID
+                        runtime.ClearSubsessionPending childID
 
                         let st = runtime.GetOrCreateState childID
 
                         let isSuccess =
-                            (st.TaskComplete || runtime.GetConsumed childID = Some true)
+                            st.TaskComplete
                             && st.Phase <> FallbackPhase.Exhausted
                             && not st.Cancelled
 

@@ -107,6 +107,7 @@ let runSubagentWaitsForNudgeToComplete () =
 
         let s1 = rt.GetOrCreateState childId
         rt.UpdateState childId { s1 with TaskComplete = true }
+        rt.ClearSubsessionPending childId
 
         let! result = runP
 
@@ -218,6 +219,7 @@ let runSubagentWaitsForContinueToComplete () =
                 TaskComplete = true }
 
         rt.SetConsumed childId false
+        rt.ClearSubsessionPending childId
 
         let! result = runP
 
