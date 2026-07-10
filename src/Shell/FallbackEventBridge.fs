@@ -95,123 +95,134 @@ let handleEvent
                   State = runtime.GetOrCreateState sessionID }
 
         | Some evt ->
-            let state = runtime.GetOrCreateState sessionID
-            let agentName = runtime.GetAgentName sessionID
-            let cfg = configLookup agentName
-
-            let! chain =
-                promise {
-                    let existing = runtime.GetChain sessionID
-
-                    if not (List.isEmpty existing) then
-                        return existing
-                    else
-                        let! currentModel = executor.CaptureCurrentModel sessionID
-
-                        let resolved =
-                            Map.tryFind (normalizeAgentName agentName) cfg.AgentChains
-                            |> Option.defaultValue cfg.DefaultChain
-
-                        let finalChain =
-                            match currentModel with
-                            | Some current ->
-                                match resolved with
-                                | first :: _ when
-                                    first.ProviderID = current.ProviderID && first.ModelID = current.ModelID
-                                    ->
-                                    resolved
-                                | _ ->
-                                    let filtered =
-                                        resolved
-                                        |> List.filter (fun m ->
-                                            m.ProviderID <> current.ProviderID || m.ModelID <> current.ModelID)
-
-                                    current :: filtered
-                            | None -> resolved
-
-                        if not (List.isEmpty finalChain) then
-                            runtime.SetChain sessionID finalChain
-                            return finalChain
-                        else
-                            return []
-                }
-
-            if List.isEmpty chain then
-                return { Consumed = false; State = state }
-            else
-                let ns, action = transition state evt cfg chain
+            if evt = FallbackEvent.NewUserMessage then
+                runtime.SetChain sessionID []
+                runtime.ClearModel sessionID
+                let state = runtime.GetOrCreateState sessionID
+                let agentName = runtime.GetAgentName sessionID
+                let cfg = configLookup agentName
+                let ns, _ = transition state evt cfg []
                 runtime.UpdateState sessionID ns
+                runtime.SetConsumed sessionID false
+                return { Consumed = false; State = ns }
+            else
+                let state = runtime.GetOrCreateState sessionID
+                let agentName = runtime.GetAgentName sessionID
+                let cfg = configLookup agentName
 
-                let mutable finalState = ns
+                let! chain =
+                    promise {
+                        let existing = runtime.GetChain sessionID
 
-                match action with
-                | FallbackAction.DoNothing -> ()
-                | FallbackAction.SendContinue model ->
-                    runtime.SetAwaitingBusy sessionID true
-                    do! executor.SendContinue(sessionID, model)
-                | FallbackAction.RecoverWithPrompt(model, promptText) ->
-                    runtime.SetAwaitingBusy sessionID true
-                    do! executor.RecoverWithPrompt(sessionID, model, promptText)
-                | FallbackAction.ScanToolCallAsText ->
-                    let! msgs = executor.FetchMessages sessionID
+                        if not (List.isEmpty existing) then
+                            return existing
+                        else
+                            let! currentModel = executor.CaptureCurrentModel sessionID
 
-                    if allTodosCompleted msgs then
-                        let updated =
-                            { ns with
-                                Phase = FallbackPhase.Idle
-                                TaskComplete = true }
+                            let resolved =
+                                Map.tryFind (normalizeAgentName agentName) cfg.AgentChains
+                                |> Option.defaultValue cfg.DefaultChain
 
-                        runtime.UpdateState sessionID updated
-                        finalState <- updated
-                    else
-                        match FallbackMessageCodec.scanToolCallAsText msgs with
-                        | Some promptText ->
-                            match List.tryItem ns.CurrentIndex chain with
-                            | Some model ->
-                                let updated =
-                                    { ns with
-                                        Phase = FallbackPhase.RecoveringToolCallText }
+                            let finalChain =
+                                match currentModel with
+                                | Some current ->
+                                    match resolved with
+                                    | first :: _ when
+                                        first.ProviderID = current.ProviderID && first.ModelID = current.ModelID
+                                        ->
+                                        resolved
+                                    | _ ->
+                                        let filtered =
+                                            resolved
+                                            |> List.filter (fun m ->
+                                                m.ProviderID <> current.ProviderID || m.ModelID <> current.ModelID)
 
-                                runtime.UpdateState sessionID updated
-                                finalState <- updated
-                                runtime.SetAwaitingBusy sessionID true
-                                do! executor.RecoverWithPrompt(sessionID, model, promptText)
-                            | None ->
-                                let updated = { ns with Phase = FallbackPhase.Idle }
-                                runtime.UpdateState sessionID updated
-                                finalState <- updated
-                        | None ->
-                            let isToolFinish = FallbackMessageCodec.isLastAssistantToolFinish msgs
-                            let hasResult = FallbackMessageCodec.hasToolResultAfter msgs
-                            let taskComplete = (not isToolFinish) || hasResult
+                                        current :: filtered
+                                | None -> resolved
 
+                            if not (List.isEmpty finalChain) then
+                                runtime.SetChain sessionID finalChain
+                                return finalChain
+                            else
+                                return []
+                    }
+
+                if List.isEmpty chain then
+                    return { Consumed = false; State = state }
+                else
+                    let ns, action = transition state evt cfg chain
+                    runtime.UpdateState sessionID ns
+
+                    let mutable finalState = ns
+
+                    match action with
+                    | FallbackAction.DoNothing -> ()
+                    | FallbackAction.SendContinue model ->
+                        runtime.SetAwaitingBusy sessionID true
+                        do! executor.SendContinue(sessionID, model)
+                    | FallbackAction.RecoverWithPrompt(model, promptText) ->
+                        runtime.SetAwaitingBusy sessionID true
+                        do! executor.RecoverWithPrompt(sessionID, model, promptText)
+                    | FallbackAction.ScanToolCallAsText ->
+                        let! msgs = executor.FetchMessages sessionID
+
+                        if allTodosCompleted msgs then
                             let updated =
                                 { ns with
                                     Phase = FallbackPhase.Idle
-                                    TaskComplete = taskComplete }
+                                    TaskComplete = true }
 
                             runtime.UpdateState sessionID updated
                             finalState <- updated
-                | FallbackAction.PropagateFailure -> do! executor.PropagateFailure sessionID
+                        else
+                            match FallbackMessageCodec.scanToolCallAsText msgs with
+                            | Some promptText ->
+                                match List.tryItem ns.CurrentIndex chain with
+                                | Some model ->
+                                    let updated =
+                                        { ns with
+                                            Phase = FallbackPhase.RecoveringToolCallText }
 
-                let consumed =
-                    match evt with
-                    | FallbackEvent.SessionError _ ->
-                        match finalState.Phase with
-                        | FallbackPhase.Exhausted -> false
-                        | _ -> true
-                    | FallbackEvent.SessionIdle ->
-                        match finalState.Phase with
-                        | FallbackPhase.ScanningToolCallText
-                        | FallbackPhase.RecoveringToolCallText -> true
+                                    runtime.UpdateState sessionID updated
+                                    finalState <- updated
+                                    runtime.SetAwaitingBusy sessionID true
+                                    do! executor.RecoverWithPrompt(sessionID, model, promptText)
+                                | None ->
+                                    let updated = { ns with Phase = FallbackPhase.Idle }
+                                    runtime.UpdateState sessionID updated
+                                    finalState <- updated
+                            | None ->
+                                let isToolFinish = FallbackMessageCodec.isLastAssistantToolFinish msgs
+                                let hasResult = FallbackMessageCodec.hasToolResultAfter msgs
+                                let taskComplete = (not isToolFinish) || hasResult
+
+                                let updated =
+                                    { ns with
+                                        Phase = FallbackPhase.Idle
+                                        TaskComplete = taskComplete }
+
+                                runtime.UpdateState sessionID updated
+                                finalState <- updated
+                    | FallbackAction.PropagateFailure -> do! executor.PropagateFailure sessionID
+
+                    let consumed =
+                        match evt with
+                        | FallbackEvent.SessionError _ ->
+                            match finalState.Phase with
+                            | FallbackPhase.Exhausted -> false
+                            | _ -> true
+                        | FallbackEvent.SessionIdle ->
+                            match finalState.Phase with
+                            | FallbackPhase.ScanningToolCallText
+                            | FallbackPhase.RecoveringToolCallText -> true
+                            | _ -> false
                         | _ -> false
-                    | _ -> false
 
-                runtime.SetConsumed sessionID consumed
+                    runtime.SetConsumed sessionID consumed
 
-                return
-                    { Consumed = consumed
-                      State = finalState }
+                    return
+                        { Consumed = consumed
+                          State = finalState }
     }
 
 // ---------------------------------------------------------------------------

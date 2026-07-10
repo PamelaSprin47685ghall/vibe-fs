@@ -148,6 +148,9 @@ type FallbackRuntimeState() =
         let s = this.GetOrCreateState sessionID
         this.UpdateState sessionID { s with TaskComplete = value }
 
+    member _.ClearModel(sessionID: string) : unit =
+        models <- Map.remove sessionID models
+
     member _.CleanupSession(sessionID: string) : unit =
         states <- Map.remove sessionID states
         chains <- Map.remove sessionID chains

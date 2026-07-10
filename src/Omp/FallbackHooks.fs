@@ -66,7 +66,8 @@ let ompEventTranslator: IEventTranslator =
             let eventObj = Dyn.get rawEvent "event"
 
             Dyn.str eventObj "type" = "message.updated"
-            && Dyn.str (Dyn.get eventObj "info") "role" = "user" }
+            && Dyn.str (Dyn.get eventObj "info") "role" = "user"
+            && not (Wanxiangshu.Shell.FallbackMessageCodec.isSystemForcedUserMessage eventObj) }
 
 let private tryGetSession (sessionID: string) (sessionApi: obj) : obj option =
     match Wanxiangshu.Omp.ExecutorTools.ompScope.TryFindKey("omp_session_" + sessionID) with
@@ -109,6 +110,18 @@ let ompActionExecutor (runtime: FallbackRuntimeState) (sessionApi: obj) : IActio
 
         modelStr, agent
 
+    let fetchMessages (sessionID: string) : JS.Promise<obj array> =
+        promise {
+            let arg = box {| sessionId = sessionID |}
+            let! resp = invoke "sessionMessages" arg
+            let data = Dyn.get resp "data"
+
+            if Dyn.isArray data then
+                return (data :?> obj array)
+            else
+                return [||]
+        }
+
     { new IActionExecutor with
         member _.SendContinue(sessionID, model) =
             promise {
@@ -144,28 +157,22 @@ let ompActionExecutor (runtime: FallbackRuntimeState) (sessionApi: obj) : IActio
                 do! invoke "sessionPrompt" arg |> Promise.map ignore
             }
 
-        member _.FetchMessages sessionID =
-            promise {
-                let arg = box {| sessionId = sessionID |}
-                let! resp = invoke "sessionMessages" arg
-                let data = Dyn.get resp "data"
-
-                if Dyn.isArray data then
-                    return (data :?> obj array)
-                else
-                    return [||]
-            }
+        member _.FetchMessages sessionID = fetchMessages sessionID
 
         member _.PropagateFailure(_sessionID: string) = Promise.lift ()
 
         member _.CaptureCurrentModel(sessionID: string) =
             promise {
-                match runtime.GetModel sessionID with
+                let! msgs = fetchMessages sessionID
+                match Wanxiangshu.Shell.FallbackMessageCodec.tryGetLatestUserModel msgs with
                 | Some m -> return Some m
                 | None ->
-                    match tryGetSession sessionID sessionApi with
-                    | Some sess -> return captureModel sess
-                    | None -> return None
+                    match runtime.GetModel sessionID with
+                    | Some m -> return Some m
+                    | None ->
+                        match tryGetSession sessionID sessionApi with
+                        | Some sess -> return captureModel sess
+                        | None -> return None
             }
 
     }

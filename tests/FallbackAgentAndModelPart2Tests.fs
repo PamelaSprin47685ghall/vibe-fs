@@ -118,10 +118,107 @@ let opencodeSessionStatusCapturesActiveModelSpec () =
         equal "modelId is gpt-4o" "gpt-4o" modelOpt.Value.ModelID
     }
 
+let opencodeCaptureCurrentModelPrioritizesLatestUserMessageModelSpec () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let sid = "priority-user-model"
+
+        rt.SetModel sid { ProviderID = "openai"; ModelID = "gpt-4-busy"
+                          Variant = None; Temperature = None; TopP = None; MaxTokens = None; ReasoningEffort = None; Thinking = false }
+
+        let mockClient =
+            createObj
+                [ "session",
+                  box (
+                      createObj
+                          [ "messages",
+                            box (fun _ ->
+                                Promise.lift (
+                                    box
+                                        {| data =
+                                            [| box
+                                                   {| info =
+                                                       box
+                                                           {| role = "user"
+                                                              model =
+                                                               box
+                                                                   {| providerID = "anthropic"
+                                                                      modelID = "claude-3-5" |} |}
+                                                      parts = [||] |} |] |}
+                                )) ]
+                  ) ]
+
+        let executor = opencodeActionExecutor rt mockClient
+        let! modelOpt = executor.CaptureCurrentModel sid
+        check "model is captured" modelOpt.IsSome
+        equal "should prioritize user message model" "anthropic" modelOpt.Value.ProviderID
+        equal "should prioritize user message model id" "claude-3-5" modelOpt.Value.ModelID
+    }
+
+let opencodeNewUserMessageResetsChainAndModelSpec () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let sid = "reset-chain-model"
+
+        let testModel = { ProviderID = "openai"; ModelID = "gpt-4"; Variant = None; Temperature = None; TopP = None; MaxTokens = None; ReasoningEffort = None; Thinking = false }
+        rt.SetChain sid [ testModel ]
+        rt.SetModel sid testModel
+
+        let rawEvent =
+            createObj
+                [ "event",
+                  box (
+                      createObj
+                          [ "type", box "message.updated"
+                            "properties",
+                            box (
+                                createObj [ "info", box (createObj [ "sessionID", box sid; "role", box "user" ]) ]
+                            ) ]
+                  ) ]
+
+        let registry = ChildAgentRegistry.Create()
+        let configLookup = fun _ ->
+            { LoopMaxContinues = 3
+              MaxRetries = 3
+              MaxRecoveries = 3
+              AgentChains = Map.empty
+              DefaultChain = [] }
+
+        let mockClient =
+            createObj
+                [ "session",
+                  box (
+                      createObj
+                          [ "messages", box (fun _ -> Promise.lift (box {| data = [||] |})) ]
+                  ) ]
+
+        let handler = createOpencodeFallbackHandler mockClient rt configLookup registry
+
+        let observer =
+            createSessionLifecycleObserver (
+                Opencode,
+                null,
+                createReviewStore (),
+                registry,
+                Some handler,
+                rt,
+                BacklogSession(Opencode, create ())
+            )
+
+        do! observer.handleEvent rawEvent
+
+        let chain = rt.GetChain sid
+        let modelOpt = rt.GetModel sid
+        equal "chain should be cleared" 0 chain.Length
+        check "model should be cleared" modelOpt.IsNone
+    }
+
 let run () =
     promise {
         do! opencodeCaptureCurrentModelDecodesStringModelSpec ()
         do! ompCaptureCurrentModelDecodesStringModelSpec ()
         do! opencodeCaptureCurrentModelDecodesFromUserMessageSpec ()
         do! opencodeSessionStatusCapturesActiveModelSpec ()
+        do! opencodeCaptureCurrentModelPrioritizesLatestUserMessageModelSpec ()
+        do! opencodeNewUserMessageResetsChainAndModelSpec ()
     }

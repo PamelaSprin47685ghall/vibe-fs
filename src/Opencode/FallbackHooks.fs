@@ -174,7 +174,8 @@ let opencodeEventTranslator: IEventTranslator =
 
         member _.IsNewUserMessage rawEvent =
             getEventType rawEvent = "message.updated"
-            && Dyn.str (Dyn.get (getProps rawEvent) "info") "role" = "user" }
+            && Dyn.str (Dyn.get (getProps rawEvent) "info") "role" = "user"
+            && not (Wanxiangshu.Shell.FallbackMessageCodec.isSystemForcedUserMessage (getProps rawEvent)) }
 
 let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActionExecutor =
     let resolveModelAndAgent (fallbackModel: FallbackModel) (sessionID: string) (infoOpt: obj option) =
@@ -203,6 +204,18 @@ let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActi
 
         modelStr, agent
 
+    let fetchMessages (sessionID: string) : JS.Promise<obj array> =
+        promise {
+            let arg = box {| path = box {| id = sessionID |} |}
+            let! resp = invokeClient client "messages" arg
+            let data = Dyn.get resp "data"
+
+            if Dyn.isArray data then
+                return (data :?> obj array)
+            else
+                return [||]
+        }
+
     { new IActionExecutor with
         member _.SendContinue(sessionID, model) =
             promise {
@@ -218,25 +231,19 @@ let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActi
                 do! invokeClient client "prompt" arg |> Promise.map ignore
             }
 
-        member _.FetchMessages sessionID =
-            promise {
-                let arg = box {| path = box {| id = sessionID |} |}
-                let! resp = invokeClient client "messages" arg
-                let data = Dyn.get resp "data"
-
-                if Dyn.isArray data then
-                    return (data :?> obj array)
-                else
-                    return [||]
-            }
+        member _.FetchMessages sessionID = fetchMessages sessionID
 
         member _.PropagateFailure _sessionID = Promise.lift ()
 
         member _.CaptureCurrentModel sessionID =
             promise {
-                match runtime.GetModel sessionID with
+                let! msgs = fetchMessages sessionID
+                match Wanxiangshu.Shell.FallbackMessageCodec.tryGetLatestUserModel msgs with
                 | Some m -> return Some m
-                | None -> return! tryReadCurrentModel client sessionID
+                | None ->
+                    match runtime.GetModel sessionID with
+                    | Some m -> return Some m
+                    | None -> return! tryReadCurrentModel client sessionID
             }
 
         member _.RecoverWithPrompt(sessionID, model, promptText) =
