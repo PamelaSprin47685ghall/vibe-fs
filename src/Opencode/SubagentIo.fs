@@ -77,10 +77,18 @@ let runSubagentCoreResult
                         abortAndUnregister ()
 
                 try
-                    // Continue/spawn runs reuse the childID. Explicitly reset TaskComplete to false
-                    // at the start of a new run to prevent residual state from previous turns from bypassing the settle logic.
+                    // Reset TaskComplete ONLY for new spawn (existingChildID is None).
+                    // For continue (existingChildID is Some), TaskComplete will be set to false when the subsession
+                    // receives a new tool/nudge cycle.
+                    // Note: We intentionally do NOT clear Consumed or Retrying phase at the start of a continue call
+                    // because they represent the ongoing fallback state chain. Once the new run completes and triggers
+                    // a new task_complete event hook, it will update the state to Phase = Idle and TaskComplete = true,
+                    // cleanly overriding the residual Retrying phase.
                     let initSt = runtime.GetOrCreateState childID
-                    runtime.UpdateState childID { initSt with TaskComplete = false }
+
+                    if existingChildID.IsNone then
+                        runtime.UpdateState childID { initSt with TaskComplete = false }
+
                     runtime.SetSubsessionPending childID true
                     do! promptWithAbort client (buildPromptBody options childID) signal
 
@@ -124,8 +132,7 @@ let runSubagentCoreResult
 
                         let st = runtime.GetOrCreateState childID
 
-                        let isSuccess =
-                            st.TaskComplete && st.Phase <> FallbackPhase.Exhausted && not st.Cancelled
+                        let isSuccess = st.TaskComplete && not st.Cancelled
 
                         if isSuccess then
                             let! text = extractSessionText client childID directory

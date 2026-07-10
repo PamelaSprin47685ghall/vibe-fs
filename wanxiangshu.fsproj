@@ -303,6 +303,7 @@
     <Compile Include="src/Omp/Codec.fs"/>
     <Compile Include="src/Omp/MessagingCodecEncode.fs"/>
     <Compile Include="src/Omp/MessagingCodec.fs"/>
+    <Compile Include="src/Omp/ChildSessionCommon.fs"/>
     <Compile Include="src/Omp/ChildSession.fs"/>
     <Compile Include="src/Omp/ChildSessionRegistry.fs"/>
     <Compile Include="src/Omp/MagicTodo.fs"/>
@@ -612,6 +613,7 @@
     <Compile Include="tests/SubagentIoFallbackRecoveryTests.fs"/>
     <Compile Include="tests/SubagentIoFallbackRecoveryTestsPart2.fs"/>
     <Compile Include="tests/SubagentIoFallbackRecoveryTestsPart3.fs"/>
+    <Compile Include="tests/SubagentIoFallbackRecoveryTestsPart4.fs"/>
     <Compile Include="tests/FallbackMessageCodecTests.fs"/>
     <Compile Include="tests/FallbackIntegrationTests.fs"/>
     <Compile Include="tests/ArchitectureTestsFallback.fs"/>

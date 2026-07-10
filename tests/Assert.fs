@@ -98,6 +98,11 @@ let equal (label: string) (expected: 'a) (actual: 'a) : unit =
 [<Emit("Promise.race([$0, new Promise((_, reject) => setTimeout(() => reject(new Error($1)), $2))])")>]
 let private raceWithTimeout (p: JS.Promise<'a>) (msg: string) (ms: int) : JS.Promise<'a> = jsNative
 
+[<Emit("new Promise(resolve => setTimeout(resolve, $0))")>]
+let private sleepJs (ms: int) : JS.Promise<unit> = jsNative
+
+let sleep (ms: int) : JS.Promise<unit> = sleepJs ms
+
 let withTimeout<'T> (p: JS.Promise<'T>) : JS.Promise<'T> =
     raceWithTimeout p "Timeout after 1000ms" 1000
 

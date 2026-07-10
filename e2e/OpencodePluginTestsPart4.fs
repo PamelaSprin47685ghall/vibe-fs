@@ -87,8 +87,12 @@ let runPart4
                           [ "get",
                             box (fun _ -> Promise.lift (box {| data = box {| model = box "anthropic/claude-3-5" |} |}))
                             "prompt",
-                            box (fun (body: obj) ->
-                                let modelVal = Dyn.get body "model"
+                            box (fun (arg: obj) ->
+                                let realBody =
+                                    let b = Dyn.get arg "body"
+                                    if Dyn.isNullish b then arg else b
+
+                                let modelVal = Dyn.get realBody "model"
 
                                 if not (Dyn.isNullish modelVal) then
                                     continueModel <- Dyn.str modelVal "modelID"
@@ -104,12 +108,13 @@ let runPart4
                 box
                     {| event =
                         {| ``type`` = "session.error"
-                           error =
-                            {| name = "RateLimitError"
-                               message = "rate limit"
-                               statusCode = "429"
-                               isRetryable = "true" |}
-                           properties = {| sessionID = continueHarness.sessionId |} |} |}
+                           properties =
+                            {| sessionID = continueHarness.sessionId
+                               error =
+                                {| name = "RateLimitError"
+                                   message = "rate limit"
+                                   statusCode = "429"
+                                   isRetryable = "true" |} |} |} |}
             )
 
         let mutable continueTicks = 0

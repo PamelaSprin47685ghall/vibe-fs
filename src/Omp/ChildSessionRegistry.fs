@@ -34,59 +34,16 @@ let runSubagentOnExistingSession
             let session = unbox<obj> sessionObj
 
             let run =
-                promise {
-                    if childId <> "" && fallbackConfigOpt.IsSome then
-                        let initSt = fallbackRuntime.GetOrCreateState childId
-                        fallbackRuntime.UpdateState childId { initSt with TaskComplete = false }
-                        fallbackRuntime.SetSubsessionPending childId true
-
-                    try
-                        do! sessionPrompt session prompt
-                        do! sessionWaitForIdle session
-
-                        if childId <> "" then
-                            fallbackRuntime.SetSubsessionPending childId false
-
-                            if fallbackConfigOpt.IsSome then
-                                do! waitForSubagentSettle fallbackRuntime childId
-
-                        let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
-                        let res = readAssistantText sm 0 "\n\n"
-                        return Option.defaultValue noOutputText res
-                    with err ->
-                        if childId <> "" && fallbackConfigOpt.IsSome then
-                            match translateJsError err with
-                            | MessageAborted
-                            | ClientCancellation _ ->
-                                fallbackRuntime.SetSubsessionPending childId false
-                                return abortedPrefix
-                            | other ->
-                                do! waitForSubagentSettle fallbackRuntime childId
-                                fallbackRuntime.SetSubsessionPending childId false
-
-                                let st = fallbackRuntime.GetOrCreateState childId
-
-                                let isSuccess =
-                                    st.TaskComplete && st.Phase <> FallbackPhase.Exhausted && not st.Cancelled
-
-                                if isSuccess then
-                                    let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
-                                    let res = readAssistantText sm 0 "\n\n"
-                                    return Option.defaultValue noOutputText res
-                                else
-                                    return! Promise.reject err
-                        else
-                            return! Promise.reject err
-                }
+                Wanxiangshu.Omp.ChildSessionCommon.runOmpSubagentCore
+                    fallbackRuntime
+                    fallbackConfigOpt
+                    childId
+                    session
+                    prompt
+                    false
 
             let signalObj = Option.defaultValue (box null) signal
             let! text = raceWithAbortSignal signalObj (fun () -> ()) run
-
-            if childId <> "" && fallbackRuntime.GetConsumed childId <> Some false then
-                let pst = fallbackRuntime.GetOrCreateState childId
-
-                if pst.Phase = FallbackPhase.Exhausted then
-                    return failwith "Fallback exhausted for child session"
 
             return text
     }

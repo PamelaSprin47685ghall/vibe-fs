@@ -141,6 +141,28 @@ let run
         let iterator = iteratorFromOutput spawnOutput
         check "continue e2e spawn returns iterator" iterator.IsSome
 
+        let statusEvent =
+            createObj
+                [ "event",
+                  box (
+                      createObj
+                          [ "type", box "session.status"
+                            "properties",
+                            box (
+                                createObj
+                                    [ "sessionID", box childID
+                                      "status",
+                                      box
+                                          {| ``type`` = "idle"
+                                             agent = "investigator"
+                                             model =
+                                              {| providerID = "test"
+                                                 modelID = "test-model" |} |} ]
+                            ) ]
+                  ) ]
+
+        let! _ = harness.fireEvent statusEvent
+
         match iterator with
         | None -> failwith "spawn did not return an iterator"
         | Some iterator ->
@@ -148,6 +170,19 @@ let run
 
             let continueArgs =
                 createObj [ "iterator", box iterator; "prompt", box "resume work" ]
+
+            // Fire session.status type=busy to simulate the host starting a new prompt turn and resetting TaskComplete
+            let busyEvent =
+                createObj
+                    [ "event",
+                      box (
+                          createObj
+                              [ "type", box "session.status"
+                                "properties",
+                                box (createObj [ "sessionID", box childID; "status", box {| ``type`` = "busy" |} ]) ]
+                      ) ]
+
+            let! _ = harness.fireEvent busyEvent
 
             let continueP = harness.executePluginTool "continue" continueArgs (createEmpty ())
             do! withTimeout continuePromptSeen
