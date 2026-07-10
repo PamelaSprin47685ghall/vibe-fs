@@ -26,9 +26,15 @@ PRD/
 ├── README.md                           # Directory Index, Navigation & Architecture Map
 ├── 01-master-spec.md                   # Master Product Requirement Document (Core System)
 ├── 02-event-sourcing.md                # Event Sourcing & Durable Persistence Specification
+├── 03-continue-subagent.md             # Subagent Multi-Turn Continue Tool Specification
 ├── 03-fallback-recovery.md             # Model Fallback & Heuristic Degradation System PRD
 ├── 04-semble-mcp-injection.md          # Semble MCP & Investigator Breakpoint Injection Specification
-└── 05-architecture-refactoring.md      # Type Safety & System Architecture Refactoring Roadmap
+├── 05-architecture-refactoring.md      # Type Safety & System Architecture Refactoring Roadmap
+├── 07-hooks-complexity-audit.md        # Performance Hooks O(1) Complexity Audit Checklist
+├── 08-amend-filter-spec.md              # Auto Amend (Backtracking) Mechanism Specification
+├── 08-parallel-tools-and-empty-output.md # Parallel Tooling & Empty Output Fallback Spec
+├── 09-context-budget-todowrite-trigger.md # Context Budget Active todowrite Trigger Spec
+└── 10-context-budget-integration.md    # Context Budget Pipeline Integration Spec
 ```
 
 ---
@@ -39,9 +45,15 @@ PRD/
 | :--- | :--- | :--- | :--- |
 | [`01-master-spec.md`](./01-master-spec.md) | **Master Product Specification** | Core Kernel/Shell architecture, Host adapters (OpenCode, Mimocode, Mux, OMP), With-Review Mode (`/loop`), WorkBacklog (`todowrite`), 54 Methodology Notebook Tools, Subagents, Tool Permissions & Catalog. | Architects, Engineers, QA |
 | [`02-event-sourcing.md`](./02-event-sourcing.md) | **Event Sourcing & Persistence** | SSOT specification for `.wanxiangshu.ndjson`, file locking (`.wanxiangshu.ndjson.lock`), event types, state fold pure functions, and host compaction decoupling. | Core Developers, Storage Engineers |
+| [`03-continue-subagent.md`](./03-continue-subagent.md) | **Subagent Multi-Turn Continue** | Subagent multi-turn session iterator store, continue tool interface, and polymorphic child session interaction protocols. | Core Developers, Plugin Developers |
 | [`03-fallback-recovery.md`](./03-fallback-recovery.md) | **Fallback & Model Recovery** | Inner-loop fallback state machine, Perfect-Square heuristic algorithm, zero-timer design, AGENTS.md YAML models configuration, and event routing. | Infrastructure Engineers, Reliability Engineers |
 | [`04-semble-mcp-injection.md`](./04-semble-mcp-injection.md) | **Semble MCP Injection Plan** | Best-effort stdio MCP client lifecycle, `investigator` context window breakpoint extraction, synthetic `read` message pair construction, and transform hook pipeline. | Plugin & Integration Developers |
 | [`05-architecture-refactoring.md`](./05-architecture-refactoring.md) | **Architecture Refactoring Roadmap** | System defect diagnosis, 5-stage refactoring roadmap, DTO boundary defense (`Shell.Contracts`), `IHostAdapter` polyfill, and structured `DomainError` hierarchy. | System Architects, Tech Leads |
+| [`07-hooks-complexity-audit.md`](./07-hooks-complexity-audit.md) | **Hooks O(1) Complexity Audit** | O(1) audit paths and complexity analysis of Mux/Opencode/Omp transform hooks, event log append buffer, list append replacements, and topology sort optimizations. | Core Developers, Performance Engineers |
+| [`08-amend-filter-spec.md`](./08-amend-filter-spec.md) | **Auto Amend Backtracking** | Before-Hook tool args filtering, O(N) stack pruning fold recursive traversal, and callID-associated parallel tool results atomic pop boundaries. | Core Developers, QA |
+| [`08-parallel-tools-and-empty-output.md`](./08-parallel-tools-and-empty-output.md) | **Parallel Tooling & Empty Output** | warn_tdd value upgrade, single tool call detection and synthetic parallel prompt injections, and empty output fallback recovery transitions. | Core Developers, QA |
+| [`09-context-budget-todowrite-trigger.md`](./09-context-budget-todowrite-trigger.md) | **Context Budget todowrite Trigger** | Mathematical formulation of active backlog folding conditions, beginPhase estimation formulas, and 80% compaction fallback guards. | Core Developers, Storage Engineers |
+| [`10-context-budget-integration.md`](./10-context-budget-integration.md) | **Context Budget Integration** | MessageTransformPipeline applyContextBudget integration hooks, nudge lock state, and context budget store definition. | Core Developers, Plugin Developers |
 
 ---
 

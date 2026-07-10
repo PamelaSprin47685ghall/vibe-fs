@@ -142,22 +142,26 @@ type FallbackModel = {
     TopP: float option
     MaxTokens: int option
     ReasoningEffort: string option
+    Thinking: bool
 }
 
 type FallbackChain = FallbackModel list
 
+[<RequireQualifiedAccess>]
 type ErrorClass =
-    | Ignore              // Abort errors, ESC cancel
-    | RetrySame           // Transient retryable error (count < maxRetries)
-    | ImmediateFallback   // HTTP 401/402/403, non-retryable error
-    | Exhausted           // Max retries reached, enter scanning
+    | Ignore
+    | ImmediateFallback
+    | RetrySame
+    | Exhausted
 
+[<RequireQualifiedAccess>]
 type FallbackPhase =
     | Idle
     | Retrying of retryCount: int
     | Scanning of scanIndex: int * originalIndex: int
+    | ScanningToolCallText
+    | RecoveringToolCallText
     | Exhausted
-    | Propagated
 
 type SessionFallbackState = {
     Phase: FallbackPhase
@@ -166,27 +170,27 @@ type SessionFallbackState = {
     Cancelled: bool
     TaskComplete: bool
     ContinueCount: int
-    Todos: TodoItem list
+    RecoveryCount: int
 }
 
 type FallbackEvent =
-    | SessionError of error: ErrorInput
-    | SessionIdle
+    | SessionError of err: ErrorInput
     | SessionBusy
+    | SessionIdle
     | NewUserMessage
     | TaskCompleteCalled
-    | TodoUpdated of TodoItem list
 
+[<RequireQualifiedAccess>]
 type FallbackAction =
     | DoNothing
     | SendContinue of model: FallbackModel
-    | AbortAndResume of model: FallbackModel
-    | PropagateFailure
+    | RecoverWithPrompt of model: FallbackModel * promptText: string
     | ScanToolCallAsText
-    | CheckTodoState
+    | PropagateFailure
 
 and ErrorInput = {
     ErrorName: string
+    DomainError: DomainError option
     Message: string
     StatusCode: int option
     IsRetryable: bool option

@@ -97,11 +97,12 @@ and HostPartDto =
 namespace Wanxiangshu.Kernel
 
 type IHostAdapter =
-    abstract member GetSessionId: hostContext: obj -> string
-    abstract member GetCwd: hostContext: obj -> string
-    abstract member ResolveAgentRole: sessionID: string -> string
-    abstract member SpawnSubagent: role: string * prompt: string * parentID: string -> JS.Promise<string>
-    abstract member SendNudgePrompt: sessionID: string * promptText: string -> JS.Promise<unit>
+    abstract WorkspaceRoot: string
+    abstract SessionId: string
+    abstract SpawnSubagent: request: SubagentRequest -> JS.Promise<SubagentResponse>
+    abstract ContinueSubagent: childID: string * agent: string * prompt: string -> JS.Promise<SubagentResponse>
+    abstract RegisterTempFiles: prompt: string * files: string list -> unit
+    abstract TryGetTempFiles: prompt: string -> string list option
 ```
 
 ### 4.4 Stage 4: Strongly Typed Domain Error Hierarchy

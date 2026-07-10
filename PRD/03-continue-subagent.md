@@ -31,7 +31,7 @@
    - **执行过程**：
      - 从 `SubagentIteratorStore` 中取出该 `iterator` 并回收（单次有效/防并发）。
      - 还原出 `childID` 及 `agent`。
-     - 调用 `IHostAdapter.ContinueSubagent(childID, prompt)` 向该子会话发送 prompt 并等待执行结果。
+      - 调用 `IHostAdapter.ContinueSubagent(childID, agent, prompt)` 向该子会话发送 prompt 并等待执行结果。
    - **返回结果**：
      - 返回子代理本次追问的输出。
      - 如果执行成功，重新存入 Store 并生成新的 `iterator` ID，通过 YAML front matter 的 `iterator` 返回。
@@ -53,7 +53,7 @@
   注入 `SubagentIteratorStore` 实例，提供访问与生命周期事件钩子。
 - **`IHostAdapter`**:
   增加接口成员：
-  `abstract ContinueSubagent: childID: string * prompt: string -> JS.Promise<SubagentResponse>`
+  `abstract ContinueSubagent: childID: string * agent: string * prompt: string -> JS.Promise<SubagentResponse>`
 
 ### 3.3 宿主适配层接线
 - **Opencode**:

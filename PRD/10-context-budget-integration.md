@@ -16,14 +16,21 @@ Attention: the system context is about to be suspended. You must immediately for
 
 ### 3.1 入口位置
 
-集成在 `src/Shell/MessageTransformPipeline.fs` 的 `runMessageTransformPipeline` 中，紧接 `applyBacklogProjection` 之后、并行工具提示注入之前。
+集成在 `src/Shell/MessageTransformPipeline.fs` 的 `runMessageTransformPipeline` 中，紧接 `applyBacklogProjection` 之后。由于需要进行 Token 异步计算，管线使用了 `Promise` 包装。
 
-```
+```fsharp
 let afterBacklog =
     applyBacklogProjection plan.SessionID plan.Excluded backlogOps afterAmend
 
-let afterBudget =
-    applyContextBudget plan.SessionID plan.Excluded backlogOps afterBacklog
+let! afterBudget, encodedBacklogOpt =
+    if plan.Excluded then
+        promise { return afterBacklog, None }
+    else
+        promise {
+            let encodedBacklog = encodeMessages afterBacklog
+            let! res = applyContextBudget plan backlogOps afterBacklog encodedBacklog encodeMessages
+            return res, Some encodedBacklog
+        }
 
 let afterPrompt =
     if plan.Excluded then
@@ -32,73 +39,121 @@ let afterPrompt =
         tryInjectParallelToolPrompt plan.SessionID afterBudget
 ```
 
-### 3.2 新增函数
+### 3.2 管道预算判定函数
 
-`src/Shell/MessageTransformPipeline.fs` 新增：
+`src/Shell/MessageTransformPipeline.fs` 内部实现 `applyContextBudget`：
 
-```
-let contextBudgetNudgeText =
-    "Attention: the system context is about to be suspended. You must immediately force an emergency stop to all work and call the todowrite tool."
-
-let buildContextBudgetNudgeMessage
-    (sessionID: string)
-    (time: obj)
-    : Message<obj> =
-    { info =
-        { id = "context-budget-nudge-" + System.Guid.NewGuid().ToString()
-          sessionID = sessionID
-          role = User
-          agent = "orchestrator"
-          isError = false
-          toolName = ""
-          details = null
-          time = time }
-      parts = [ TextPart contextBudgetNudgeText ]
-      source = Synthetic "context-budget-nudge"
-      raw = null }
-
+```fsharp
 let applyContextBudget
-    (sessionID: string)
-    (excluded: bool)
+    (plan: MessageTransformPlan)
     (backlogOps: BacklogSessionOps)
     (messages: Message<obj> list)
-    : Message<obj> list =
-    if excluded then
-        messages
-    else
-        let state = ContextBudgetStore.get sessionID
-        let projected = applyBacklogProjection sessionID false backlogOps messages
-
-        let currentTokens =
-            estimateTokenCount projected
-
-        let backlogTokens =
-            estimateBacklogTokenCount sessionID projected
-
-        let phaseBase = state.phaseBaseTokens
-        let backlogAtStart = state.backlogTokensAtPhaseStart
-
-        if ContextBudget.F currentTokens plan.MaxInputTokens backlogAtStart phaseBase then
-            messages @ [ buildContextBudgetNudgeMessage sessionID (null) ]
+    (encodedAll: obj array)
+    (encodeMessages: Message<obj> list -> obj array)
+    : JS.Promise<Message<obj> list> =
+    promise {
+        if plan.Excluded || messages.IsEmpty then
+            return messages
         else
-            messages
+            let totalBytes = JS.JSON.stringify(encodedAll).Length
+            let! tokenCountOpt = plan.GetContextUsage encodedAll
+            let storeEntry = ContextBudgetStore.get plan.Scope plan.SessionID
+
+            let currentTokens =
+                match tokenCountOpt with
+                | Some t -> t
+                | None ->
+                    match ContextBudget.estimateTokens totalBytes storeEntry.LastUsage with
+                    | Some t -> t
+                    | None -> 0
+
+            if currentTokens <= 0 then
+                return messages
+            else
+                ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
+                    { entry with LastUsage = Some {| tokenCount = currentTokens; textBytes = totalBytes |} })
+
+                let backlog = backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned
+                let currentStore = ContextBudgetStore.get plan.Scope plan.SessionID
+
+                let! state =
+                    promise {
+                        if backlog <> currentStore.LastBacklog || currentStore.State.IsNone then
+                            let stableMessages =
+                                projectBacklogFor
+                                    backlogOps.Host
+                                    plan.Cleaned
+                                    backlog
+                                    true
+                                    plan.SessionID
+                            let stableEncoded = encodeMessages stableMessages
+                            let stableBytes = JS.JSON.stringify(stableEncoded).Length
+                            let! stableTokensOpt = plan.GetContextUsage stableEncoded
+
+                            let stableTokens =
+                                match stableTokensOpt with
+                                | Some t -> int64 t
+                                | None ->
+                                    let currentLastUsage = (ContextBudgetStore.get plan.Scope plan.SessionID).LastUsage
+                                    match ContextBudget.estimateTokens stableBytes currentLastUsage with
+                                    | Some t -> int64 t
+                                    | None -> int64 currentTokens
+
+                            let backlogBytes = ContextBudgetUsageCodec.backlogBytesFromEncoded backlogOps.Host stableEncoded
+                            let newState = ContextBudget.beginPhase stableTokens (int64 stableBytes) (int64 backlogBytes)
+
+                            ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
+                                { entry with
+                                    State = Some newState
+                                    LastBacklog = backlog
+                                    NudgeInjected = false })
+                            return newState
+                        else
+                            return currentStore.State.Value
+                    }
+
+                let state_c = state.backlogTokensAtPhaseStart
+                let state_s = state.phaseBaseTokens - state_c
+
+                if ContextBudget.isCompactingRequired state.phaseBaseTokens (int64 plan.MaxInputTokens) then
+                    return messages
+                elif ContextBudget.F (int64 currentTokens) (int64 plan.MaxInputTokens) state_c state_s then
+                    let updatedStore = ContextBudgetStore.get plan.Scope plan.SessionID
+                    if updatedStore.NudgeInjected then
+                        return messages
+                    else
+                        ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
+                            { entry with NudgeInjected = true })
+                        return List.append messages [ buildContextBudgetNudgeMessage plan.SessionID ]
+                else
+                    return messages
+    }
 ```
 
 ### 3.3 ContextBudgetStore
 
-`src/Shell/SessionProjectionStore.fs` 或新建 `src/Shell/ContextBudgetStore.fs`：
+`src/Shell/ContextBudgetStore.fs`：
 
-- 按 `sessionID` 保存 `ContextState`。
-- 成功 `todowrite` 后调用 `afterSuccessfulTodo` 更新。
-- 进程重启时由 `EventLogRuntime` 重放 NDJSON 重建。
+- 按 `sessionID` 保存 `ContextBudgetEntry`，结构如下：
+  ```fsharp
+  type ContextBudgetEntry =
+      { State: ContextState option
+        LastUsage: {| tokenCount: int; textBytes: int |} option
+        LastBacklog: Wanxiangshu.Kernel.BacklogProjectionCore.BacklogEntry list
+        NudgeInjected: bool }
+  ```
+- 包含 `get`、`put`、`update` 函数，利用宿主 `RuntimeScope` 进行线程安全的按会话隔离缓存。
+- 当 `backlog <> currentStore.LastBacklog` 时，自动在 `applyContextBudget` 内部调用 `ContextBudget.beginPhase` 并重置 `NudgeInjected = false`。
+- 进程重启时由 `EventLogRuntime` 重放 NDJSON 重建待办事项，从而在首次会话进入管道时自动折叠生成新的 `ContextState`。
 
-### 3.4 Token 计数策略
+### 3.4 Token 计数与字节率估算策略
 
-`estimateTokenCount` 与 `estimateBacklogTokenCount` 必须精确：
+`ContextBudget.estimateTokens` 使用如下的比例估计：
 
-- 使用 `encodeMessages` 输出后的数组，调用宿主暴露的 tokenizer 或近似函数。
-- 如果宿主未提供 tokenizer，则使用比例估计公式 `(last token count / last text bytes) * (current text bytes)` 进行估算。如果没有任何历史测量比例，则该 turn 不进行 nudge 强制，交由 compact 作为最后 fallback 机制。
-- `estimateBacklogTokenCount` 将 projected prompt 中的 backlog 投影移除后计数，差值即为 $c$。
+- 如果宿主平台提供了 Token 计数 API，使用 `plan.GetContextUsage` 获取精确数值。
+- 如果没有，则使用最近一次成功测量的比例进行估算：
+  $$\text{estimated} = \frac{\text{last token count} \times \text{current text bytes}}{\text{last text bytes}}$$
+- 使用 `ContextBudgetUsageCodec.backlogBytesFromEncoded` 通过模式匹配识别 `backlog` 消息，以精准排除/提取待办投影在总大小中的字节数。
 
 ## 4. 状态流转
 

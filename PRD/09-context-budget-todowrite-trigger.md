@@ -18,12 +18,12 @@ compact 仅应作为"backlog 投影与不可压缩基线已大到无法有效腾
 
 | 符号 | 含义 |
 |------|------|
-| $N$ / $b$ | LLM 最大输入上下文 token 数 |
-| $a$ | 当前请求发送前，已精确 token 化的完整上下文占用 |
-| $c$ | 当前 backlog 投影在 $a$ 中的边际 token 占用 |
-| $s$ | 当前阶段起点时，除 backlog 外的精确上下文占用 |
+| $N$ / $b$ | LLM 最大输入上下文 token 数 (`maxInputTokens`) |
+| $a$ | 当前请求发送前，已精确 token 化的完整上下文占用 (`currentTokens`) |
+| $c$ | 本阶段起点时 backlog 的估算 token 占用 (`backlogTokensAtPhaseStart`) |
+| $s$ | 本阶段起点时，非 backlog 的基础开销：`phaseBaseTokens - backlogTokensAtPhaseStart` |
 | $u$ | 当前阶段自起点以来新增占用：$a - s - c$ |
-| $P$ | 当前阶段起点总上下文占用：$s + c$ |
+| $P$ | 当前阶段起点总上下文占用：$s + c$ (`phaseBaseTokens`) |
 | $H$ | 阶段可用空间：$b - P$ |
 
 阶段起点：最近一次成功 `todowrite` 经投影完成后的第一个稳定 prompt；首次会话则为当前任务开始点。
@@ -33,7 +33,8 @@ compact 仅应作为"backlog 投影与不可压缩基线已大到无法有效腾
 1. 不引入任何未来量：不预测下一次 `todowrite` 大小，不使用历史最大值。
 2. 所有输入必须是已发生且可精确 token 化的数据，或基于历史最近已知比例进行推算。
 3. 允许使用比率估算作为 Fallback 机制：若当前请求无法直接获取 token 计数，则允许通过公式 `(last token count / last text bytes) * (current text bytes) = estimated token count` 进行比率估计，其中比例由历史最近一次成功测量的值动态提供。
-4. compact 是最后 fallback，不是正常触发策略。
+4. 当阶段起点基线占总空间的 80% 以上时（即 `phaseBaseTokens >= (maxInputTokens * 8) / 10`），视为无空间继续折叠，必须回落到系统级的 compact fallback。
+5. 所有判定计算和比率估算在内核中使用 `int64` 执行以防止大上下文下的整数乘法溢出。
 
 ## 4. 数学推导
 
@@ -76,8 +77,8 @@ $$F(a, b, c, s) = 2(a - s - c) \ge b - s - c$$
 
 ```
 type ContextState = {
-    phaseBaseTokens: int
-    backlogTokensAtPhaseStart: int
+    phaseBaseTokens: int64
+    backlogTokensAtPhaseStart: int64
 }
 ```
 
@@ -85,21 +86,18 @@ type ContextState = {
 
 ```
 function beginPhase(
-    projectedPrompt: Prompt,
-    backlogProjection: PromptPart,
-    tokenizer: Prompt -> int
+    totalTokens: int64,
+    totalBytes: int64,
+    backlogBytes: int64
 ) -> ContextState:
 
-    phaseBase = tokenizer(projectedPrompt)
-    withoutBacklog = removeBacklog(projectedPrompt, backlogProjection)
-    backlog = phaseBase - tokenizer(withoutBacklog)
-
-    require 0 <= backlog
-    require backlog <= phaseBase
+    backlogTokens = 
+        if totalBytes <= 0 then 0
+        else (totalTokens * backlogBytes) / totalBytes
 
     return ContextState(
-        phaseBaseTokens = phaseBase,
-        backlogTokensAtPhaseStart = backlog
+        phaseBaseTokens = totalTokens,
+        backlogTokensAtPhaseStart = backlogTokens
     )
 ```
 
@@ -107,50 +105,42 @@ function beginPhase(
 
 ```
 function F(
-    currentPromptTokens: int,
-    maxInputTokens: int,
-    state: ContextState
+    a: int64, 
+    b: int64, 
+    c: int64, 
+    s: int64
 ) -> bool:
-
-    require currentPromptTokens >= state.phaseBaseTokens
-    require maxInputTokens > 0
-
-    phaseGrowth = currentPromptTokens - state.phaseBaseTokens
-    freeAtPhaseStart = maxInputTokens - state.phaseBaseTokens
-
-    return 2 * phaseGrowth >= freeAtPhaseStart
-```
-
-等价显式接口：
-
-```
-function F(a: int, b: int, c: int, s: int) -> bool:
-    require a >= s + c
-    require 0 <= c
-    require 0 <= s
-    require b > 0
-
     return 2 * a >= b + s + c
 ```
 
-### 5.4 成功 todowrite 后重新测量
+### 5.4 极限收缩拦截函数
+
+```
+function isCompactingRequired(
+    phaseBaseTokens: int64,
+    maxInputTokens: int64
+) -> bool:
+    return phaseBaseTokens >= (maxInputTokens * 8) / 10
+```
+
+### 5.5 成功 todowrite 后重新测量
 
 ```
 function afterSuccessfulTodo(
-    projectedPrompt: Prompt,
-    backlogProjection: PromptPart,
-    tokenizer: Prompt -> int
+    totalTokens: int64,
+    totalBytes: int64,
+    backlogBytes: int64
 ) -> ContextState:
-    return beginPhase(projectedPrompt, backlogProjection, tokenizer)
+    return beginPhase(totalTokens, totalBytes, backlogBytes)
 ```
 
 ## 6. 调用位置
 
 | 位置 | 行为 |
 |------|------|
-| 各宿主 `MessageTransform.fs` | 交付 LLM 前调用 `F`；返回 true 则注入约束，强制下一次 assistant 调用 `todowrite` |
-| `SessionProjectionStore.fs` | 每次成功 `todowrite` 后调用 `afterSuccessfulTodo` 更新 `ContextState` |
-| 宿主入口点 | `ContextState` 按 session 存于 `RuntimeScope`；重启后通过事件重放重新计算 |
+| `MessageTransformPipeline.fs` | 交付 LLM 前判定 `F` 与 `isCompactingRequired`；符合条件则追加 nudge 并将 `NudgeInjected` 置为 true |
+| `ContextBudgetStore.fs` | 每次成功 `todowrite` 后调用 `afterSuccessfulTodo` 更新并在 `LastBacklog` 改变时重置 `NudgeInjected` |
+| 宿主入口点 | `ContextState` 按 session 存于 `RuntimeScope`；重启后通过事件重放重新 fold 状态 |
 
 ## 7. 数值示例
 

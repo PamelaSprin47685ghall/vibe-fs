@@ -211,7 +211,7 @@ wanxiangshu/
 ### 4.2 Tool Catalog & Host Normalization (15 Core Tools)
 
 Kernel Catalog (`src/Kernel/ToolCatalog/Registry.fs`):
-`coder`, `investigator`, `meditator`, `browser`, `executor`, `fuzzy_find`, `fuzzy_grep`, `websearch`, `webfetch`, `submit_review`, `return_reviewer`, `read`, `write`, `executor_wait`, `executor_abort`.
+`coder`, `investigator`, `browser`, `continue`, `executor`, `fuzzy_find`, `fuzzy_grep`, `fuzzy_continue`, `websearch`, `webfetch`, `submit_review`, `return_reviewer`, `read`, `write`, `executor_wait`, `executor_abort`.
 
 #### Host Tool Name Normalization Table (`HostTools.fs`)
 
