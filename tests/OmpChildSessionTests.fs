@@ -80,7 +80,11 @@ let runSubagentOnExistingSessionDoesNotResetTaskComplete () =
         let rt = FallbackRuntimeState()
         let childId = "omp-child-continue-reset"
         let s0 = rt.GetOrCreateState childId
-        rt.UpdateState childId { s0 with TaskComplete = true }
+
+        rt.UpdateState
+            childId
+            { s0 with
+                Lifecycle = FallbackLifecycle.TaskComplete }
 
         let promptCalled = ref false
         let sessionManagerMock = createObj [ "getSessionId", box (fun () -> box childId) ]
@@ -127,7 +131,10 @@ let runSubagentOnExistingSessionDoesNotResetTaskComplete () =
                 (Some config)
 
         do! yieldMicrotask ()
-        check "OMP continue does NOT reset TaskComplete to false" (rt.GetOrCreateState childId).TaskComplete
+
+        check
+            "OMP continue does NOT reset TaskComplete to false"
+            ((rt.GetOrCreateState childId).Lifecycle = FallbackLifecycle.TaskComplete)
 
         let! text = runP
         equal "OMP continue gets output" "(no output)" text

@@ -17,7 +17,11 @@ let runSubagentContinueDoesNotResetTaskComplete () =
         registry.RegisterChildAgent(childId, "investigator", Some "parent-3")
 
         let s0 = rt.GetOrCreateState childId
-        rt.UpdateState childId { s0 with TaskComplete = true }
+
+        rt.UpdateState
+            childId
+            { s0 with
+                Lifecycle = FallbackLifecycle.TaskComplete }
 
         let textExtracted = ref false
         let promptStartedResolver = ref (fun () -> ())
@@ -73,7 +77,11 @@ let runSubagentContinueDoesNotResetTaskComplete () =
                 (Some childId)
 
         let! result = runP
-        check "TaskComplete not reset on continue, resolves early" (rt.GetOrCreateState childId).TaskComplete
+
+        check
+            "TaskComplete not reset on continue, resolves early"
+            ((rt.GetOrCreateState childId).Lifecycle = FallbackLifecycle.TaskComplete)
+
         check "text extracted immediately" textExtracted.Value
 
         match result with
@@ -89,7 +97,11 @@ let runSubagentContinueResetsTaskComplete () =
         registry.RegisterChildAgent(childId, "investigator", Some "parent-4")
 
         let s0 = rt.GetOrCreateState childId
-        rt.UpdateState childId { s0 with TaskComplete = false }
+
+        rt.UpdateState
+            childId
+            { s0 with
+                Lifecycle = FallbackLifecycle.TaskComplete }
 
         let textExtracted = ref false
         let promptStartedResolver = ref (fun () -> ())
@@ -162,7 +174,11 @@ let runSubagentSpawnResetsTaskComplete () =
         let childId = "child-spawn-reset"
 
         let s0 = rt.GetOrCreateState childId
-        rt.UpdateState childId { s0 with TaskComplete = true }
+
+        rt.UpdateState
+            childId
+            { s0 with
+                Lifecycle = FallbackLifecycle.TaskComplete }
 
         let textExtracted = ref false
         let promptStartedResolver = ref (fun () -> ())

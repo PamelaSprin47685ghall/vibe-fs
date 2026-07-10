@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Opencode.NudgeTrigger
+open Wanxiangshu.Kernel.Nudge.Types
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Shell
@@ -17,22 +18,28 @@ open Wanxiangshu.Tests.TempWorkspace
 let private snap todos msg blocked agent isLoop : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos
       lastAssistantMessage = msg
-      isLoopActive = isLoop
-      nudgeBlockedForTurn = blocked
+      workState = getSessionWorkState false isLoop todos
+      blockStatus =
+        (if blocked then
+             NudgeBlockStatus.Blocked
+         else
+             NudgeBlockStatus.Allowed)
       nudgeAnchorKey = msg
       agentFromMessage = agent
-      modelFromMessage = None
-      hasActiveRunner = false }
+      modelFromMessage = None }
 
 let private snap' todos msg blocked agent isLoop hasActiveRunner : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos
       lastAssistantMessage = msg
-      isLoopActive = isLoop
-      nudgeBlockedForTurn = blocked
+      workState = getSessionWorkState hasActiveRunner isLoop todos
+      blockStatus =
+        (if blocked then
+             NudgeBlockStatus.Blocked
+         else
+             NudgeBlockStatus.Allowed)
       nudgeAnchorKey = msg
       agentFromMessage = agent
-      modelFromMessage = None
-      hasActiveRunner = hasActiveRunner }
+      modelFromMessage = None }
 
 let test_isNaturalStop () =
     equal "session.idle → true" true (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.idle" null)

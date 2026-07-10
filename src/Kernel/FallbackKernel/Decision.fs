@@ -44,7 +44,7 @@ let classifyError (err: ErrorInput) (state: SessionFallbackState) (cfg: Fallback
         | FallbackPhase.Retrying count -> count
         | _ -> 0
 
-    if state.Cancelled || state.TaskComplete then
+    if state.Lifecycle <> FallbackLifecycle.Active then
         ErrorClass.Ignore
     elif errorInputIsAbort err then
         ErrorClass.Ignore

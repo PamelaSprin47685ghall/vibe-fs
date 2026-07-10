@@ -31,7 +31,10 @@ let runOmpSubagentCore
             let initSt = fallbackRuntime.GetOrCreateState childId
 
             if resetTaskComplete then
-                fallbackRuntime.UpdateState childId { initSt with TaskComplete = false }
+                fallbackRuntime.UpdateState
+                    childId
+                    { initSt with
+                        Lifecycle = FallbackLifecycle.Active }
 
             fallbackRuntime.SetSubsessionPending childId true
 
@@ -47,9 +50,13 @@ let runOmpSubagentCore
 
             let st = fallbackRuntime.GetOrCreateState childId
 
-            if fallbackConfigOpt.IsSome && not st.TaskComplete && not st.Cancelled then
+            if
+                fallbackConfigOpt.IsSome
+                && st.Lifecycle <> FallbackLifecycle.TaskComplete
+                && st.Lifecycle <> FallbackLifecycle.Cancelled
+            then
                 return! Promise.reject (failwith "Subagent failed to complete")
-            elif st.Cancelled then
+            elif st.Lifecycle = FallbackLifecycle.Cancelled then
                 return abortedPrefix
             else
                 let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
@@ -66,7 +73,7 @@ let runOmpSubagentCore
                     fallbackRuntime.SetSubsessionPending childId false
 
                     let st = fallbackRuntime.GetOrCreateState childId
-                    let isSuccess = st.TaskComplete && not st.Cancelled
+                    let isSuccess = st.Lifecycle = FallbackLifecycle.TaskComplete
 
                     if isSuccess then
                         let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")

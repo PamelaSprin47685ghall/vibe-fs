@@ -29,7 +29,7 @@ let getOrCreate_returnsFreshForNewSession () =
     let s = rt.GetOrCreateState "sess-1"
     equal "phase is Idle" FallbackPhase.Idle s.Phase
     equal "failureCount is 0" 0 s.FailureCount
-    equal "cancelled is false" false s.Cancelled
+    equal "lifecycle is Active" FallbackLifecycle.Active s.Lifecycle
 
 let getOrCreate_returnsSameStateOnSecondCall () =
     let rt = FallbackRuntimeState()

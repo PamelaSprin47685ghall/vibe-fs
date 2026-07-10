@@ -52,8 +52,7 @@ let private mkState phase idx fc cc =
     { Phase = phase
       CurrentIndex = idx
       FailureCount = fc
-      Cancelled = false
-      TaskComplete = false
+      Lifecycle = FallbackLifecycle.Active
       ContinueCount = cc
       RecoveryCount = 0 }
 
@@ -122,7 +121,7 @@ let taskComplete_stopsRecovery () =
     let s1, _ =
         transition (mkState FallbackPhase.Idle 0 0 0) TaskCompleteCalled (mkCfg ()) (mkChain ())
 
-    check "TaskComplete=true" s1.TaskComplete
+    check "TaskComplete=true" (s1.Lifecycle = FallbackLifecycle.TaskComplete)
     let _, action = transition s1 (SessionError retryErr) (mkCfg ()) (mkChain ())
     equal "DoNothing after TaskComplete" FallbackAction.DoNothing action
 
@@ -130,7 +129,7 @@ let escCancel_stopsRecovery () =
     let s1, _ =
         transition (mkState FallbackPhase.Idle 0 0 0) (SessionError abortErr) (mkCfg ()) (mkChain ())
 
-    check "Cancelled=true" s1.Cancelled
+    check "Cancelled=true" (s1.Lifecycle = FallbackLifecycle.Cancelled)
     let _, action = transition s1 (SessionError retryErr) (mkCfg ()) (mkChain ())
     equal "DoNothing after Cancelled" FallbackAction.DoNothing action
 
@@ -143,7 +142,7 @@ let sessionIdle_idlePhase_scanToolCallAsText () =
 let sessionIdle_taskComplete_doNothing () =
     let s0 =
         { (mkState FallbackPhase.Idle 0 0 0) with
-            TaskComplete = true }
+            Lifecycle = FallbackLifecycle.TaskComplete }
 
     let _, action = transition s0 SessionIdle (mkCfg ()) (mkChain ())
     equal "DoNothing" FallbackAction.DoNothing action

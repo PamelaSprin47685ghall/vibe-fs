@@ -5,6 +5,7 @@ open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Kernel.PromptFragments
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.Nudge.Types
 
 type SnapshotInput =
     { openTodos: string list
@@ -19,37 +20,37 @@ type SnapshotInput =
 type Snapshot = Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot
 
 let deriveSnapshot (input: SnapshotInput) : Snapshot =
+    let workState =
+        getSessionWorkState input.hasActiveRunner input.isLoopActive input.openTodos
+
+    let blockStatus =
+        if input.nudgeBlockedForTurn then
+            NudgeBlockStatus.Blocked
+        else
+            NudgeBlockStatus.Allowed
+
     { todos = input.openTodos
       lastAssistantMessage = input.lastAssistantText
-      isLoopActive = input.isLoopActive
-      nudgeBlockedForTurn = input.nudgeBlockedForTurn
+      workState = workState
+      blockStatus = blockStatus
       nudgeAnchorKey = nudgeAnchorKey input.turnId input.lastAssistantText
       agentFromMessage = input.agentFromMessage
-      modelFromMessage = input.modelFromMessage
-      hasActiveRunner = input.hasActiveRunner }
+      modelFromMessage = input.modelFromMessage }
 
 let deriveAction (snapshot: Snapshot) : NudgeAction =
-    if snapshot.nudgeBlockedForTurn then
-        NudgeNone
-    elif
-        snapshot.todos.IsEmpty
-        && not snapshot.isLoopActive
-        && not snapshot.hasActiveRunner
-    then
-        NudgeNone
-    else
-        let text = snapshot.lastAssistantMessage.Trim()
+    let text = snapshot.lastAssistantMessage.Trim()
 
-        if snapshot.hasActiveRunner && not snapshot.todos.IsEmpty then
-            NudgeNone
-        elif snapshot.hasActiveRunner && snapshot.todos.IsEmpty && not snapshot.isLoopActive then
-            NudgeRunner
-        elif not snapshot.todos.IsEmpty && not (skipsTodo text) then
-            NudgeTodo
-        elif snapshot.isLoopActive && not (skipsReview text) then
-            NudgeLoop
-        else
-            NudgeNone
+    match snapshot.blockStatus, snapshot.workState with
+    | NudgeBlockStatus.Blocked, _ -> NudgeNone
+    | _, SessionWorkState.Idle -> NudgeNone
+    | _, SessionWorkState.RunnerActive(true, _) -> NudgeNone
+    | _, SessionWorkState.RunnerActive(false, true) when not (skipsReview text) -> NudgeLoop
+    | _, SessionWorkState.RunnerActive(false, false) -> NudgeRunner
+    | _, SessionWorkState.RunnerActive(false, true) -> NudgeNone
+    | _, SessionWorkState.LoopActive true when not (skipsTodo text) -> NudgeTodo
+    | _, SessionWorkState.LoopActive _ when not (skipsReview text) -> NudgeLoop
+    | _, SessionWorkState.BacklogActive _ when not (skipsTodo text) -> NudgeTodo
+    | _ -> NudgeNone
 
 let selectNudgePrompt (host: Host) (action: NudgeAction) (snapshot: Snapshot) : string option =
     match action with

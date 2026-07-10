@@ -6,8 +6,7 @@ let private freshState: SessionFallbackState =
     { Phase = FallbackPhase.Idle
       CurrentIndex = 0
       FailureCount = 0
-      Cancelled = false
-      TaskComplete = false
+      Lifecycle = FallbackLifecycle.Active
       ContinueCount = 0
       RecoveryCount = 0 }
 
@@ -148,7 +147,15 @@ type FallbackRuntimeState() =
 
     member this.SetTaskComplete (sessionID: string) (value: bool) : unit =
         let s = this.GetOrCreateState sessionID
-        this.UpdateState sessionID { s with TaskComplete = value }
+
+        this.UpdateState
+            sessionID
+            { s with
+                Lifecycle =
+                    if value then
+                        FallbackLifecycle.TaskComplete
+                    else
+                        FallbackLifecycle.Active }
 
     member _.ClearModel(sessionID: string) : unit = models <- Map.remove sessionID models
 

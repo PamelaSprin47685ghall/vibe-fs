@@ -5,16 +5,20 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.EventLog.Fold
+open Wanxiangshu.Kernel.Nudge.Types
 
 let private snap todos msg blocked agent : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos
       lastAssistantMessage = msg
-      isLoopActive = false
-      nudgeBlockedForTurn = blocked
+      workState = getSessionWorkState false false todos
+      blockStatus =
+        (if blocked then
+             NudgeBlockStatus.Blocked
+         else
+             NudgeBlockStatus.Allowed)
       nudgeAnchorKey = msg
       agentFromMessage = agent
-      modelFromMessage = None
-      hasActiveRunner = false }
+      modelFromMessage = None }
 
 let private ev session kind payload =
     { V = 1
@@ -45,7 +49,7 @@ let decideNudgeWipAllowsAfterClear () =
     let d =
         deriveAction
             { snapStillNudged with
-                isLoopActive = true }
+                workState = getSessionWorkState false true snapStillNudged.todos }
 
     equal "integral blocked -> NudgeNone" NudgeNone d
 

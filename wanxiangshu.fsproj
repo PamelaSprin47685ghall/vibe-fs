@@ -92,13 +92,13 @@
     <Compile Include="src/Kernel/Wanxiangzhen/SquadPrompts.fs"/>
     <Compile Include="src/Kernel/EventLog/Types.fs"/>
     <Compile Include="src/Kernel/EventLog/FallbackInjectionFold.fs"/>
+    <Compile Include="src/Kernel/Nudge/Types.fs"/>
     <Compile Include="src/Kernel/EventLog/Fold.fs"/>
     <Compile Include="src/Kernel/BacklogProjection.fs"/>
     <Compile Include="src/Kernel/WorkBacklog.fs"/>
     <Compile Include="src/Kernel/ToolResult.fs"/>
     <Compile Include="src/Kernel/ToolCopy.fs"/>
     <Compile Include="src/Kernel/ToolContext.fs"/>
-    <Compile Include="src/Kernel/Nudge/Types.fs"/>
     <Compile Include="src/Kernel/Nudge/NudgeDerivation.fs"/>
     <Compile Include="src/Kernel/Config.fs"/>
     <Compile Include="src/Kernel/FuzzyPath.fs"/>

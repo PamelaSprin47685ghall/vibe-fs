@@ -65,13 +65,19 @@ type FallbackAction =
     | ScanToolCallAsText
     | PropagateFailure
 
+/// Lifecycle status of a fallback session (replaces Cancelled+TaskComplete booleans).
+[<RequireQualifiedAccess>]
+type FallbackLifecycle =
+    | Active
+    | Cancelled
+    | TaskComplete
+
 /// Per-session state tracked by the fallback runtime.
 type SessionFallbackState =
     { Phase: FallbackPhase
       CurrentIndex: int
       FailureCount: int
-      Cancelled: bool
-      TaskComplete: bool
+      Lifecycle: FallbackLifecycle
       ContinueCount: int
       RecoveryCount: int }
 

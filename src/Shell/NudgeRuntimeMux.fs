@@ -143,16 +143,29 @@ let collectSnapshotMux
         let currentAnchor = nudgeAnchorKey snapshot.turnId snapshot.lastAssistantText
         let blocked = Set.contains (currentAnchor.Trim()) snapshot.dispatchedAnchors
 
+        let loopActive =
+            match snapshot.workState with
+            | SessionWorkState.LoopActive _ -> true
+            | SessionWorkState.RunnerActive(_, loopActive) -> loopActive
+            | _ -> false
+
+        let workState = getSessionWorkState false loopActive snapshot.openTodos
+
+        let blockStatus =
+            if blocked then
+                NudgeBlockStatus.Blocked
+            else
+                NudgeBlockStatus.Allowed
+
         return
             Some
                 { todos = snapshot.openTodos
                   lastAssistantMessage = snapshot.lastAssistantText
-                  isLoopActive = snapshot.isLoopActive
-                  nudgeBlockedForTurn = blocked
+                  workState = workState
+                  blockStatus = blockStatus
                   nudgeAnchorKey = currentAnchor
                   agentFromMessage = snapshot.agentFromMessage
-                  modelFromMessage = snapshot.modelFromMessage
-                  hasActiveRunner = false }
+                  modelFromMessage = snapshot.modelFromMessage }
     }
 
 let sendNudgeMux

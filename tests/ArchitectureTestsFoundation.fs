@@ -103,7 +103,7 @@ let nudgeDedupMustUseEventLogFold () =
 
         check
             ("arch: " + path + " uses event-log nudge integral")
-            (code.Contains "nudgeBlockedForTurn" || code.Contains "tryClaimNudgeDispatch")
+            (code.Contains "blockStatus" || code.Contains "tryClaimNudgeDispatch")
 
 let nudgeLoopStateMustReplayHistory () =
     let opencode = requireFile "src/Opencode/NudgeEffect.fs" |> nonCommentCode

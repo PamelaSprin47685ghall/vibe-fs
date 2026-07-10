@@ -146,7 +146,7 @@ let isSubagentSettled_falseAfterFallbackContinueWhileTaskIncomplete () =
         sid
         { s0 with
             Phase = FallbackPhase.Idle
-            TaskComplete = false }
+            Lifecycle = FallbackLifecycle.Active }
 
     check "Idle + Consumed + TaskComplete=false not settled" (not (isSubagentSettled rt sid))
 
@@ -164,8 +164,8 @@ let isSubagentSettled_falseAfterSessionBusyDuringRetrying () =
     rt.UpdateState
         sid
         { s0 with
-            Phase = FallbackPhase.Retrying 1
-            TaskComplete = false }
+            Phase = FallbackPhase.Idle
+            Lifecycle = FallbackLifecycle.Active }
 
     rt.SetConsumed sid true
 
@@ -210,7 +210,7 @@ let isSubagentSettled_trueWhenConsumedFalseAndIdle () =
         sid
         { s0 with
             Phase = FallbackPhase.Idle
-            TaskComplete = false }
+            Lifecycle = FallbackLifecycle.Active }
 
     check "Consumed=false + Idle + no active gates → settled" (isSubagentSettled rt sid)
 
@@ -263,7 +263,7 @@ let isSubagentSettled_trueWhenTaskCompleteDespiteRetrying () =
         sid
         { s0 with
             Phase = FallbackPhase.Retrying 1
-            TaskComplete = true }
+            Lifecycle = FallbackLifecycle.TaskComplete }
 
     rt.SetConsumed sid true
 

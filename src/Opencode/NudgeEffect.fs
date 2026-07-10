@@ -138,16 +138,29 @@ let private collectSnapshot
                                     let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
                                     let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
 
+                                    let loopActive =
+                                        match snap.workState with
+                                        | SessionWorkState.LoopActive _ -> true
+                                        | SessionWorkState.RunnerActive(_, loopActive) -> loopActive
+                                        | _ -> false
+
+                                    let workState = getSessionWorkState false loopActive snap.openTodos
+
+                                    let blockStatus =
+                                        if blocked then
+                                            NudgeBlockStatus.Blocked
+                                        else
+                                            NudgeBlockStatus.Allowed
+
                                     return
                                         Some
                                             { todos = snap.openTodos
                                               lastAssistantMessage = snap.lastAssistantText
-                                              isLoopActive = snap.isLoopActive
-                                              nudgeBlockedForTurn = blocked
+                                              workState = workState
+                                              blockStatus = blockStatus
                                               nudgeAnchorKey = key
                                               agentFromMessage = snap.agentFromMessage
-                                              modelFromMessage = snap.modelFromMessage
-                                              hasActiveRunner = false }
+                                              modelFromMessage = snap.modelFromMessage }
         with _ ->
             return None
     }

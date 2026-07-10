@@ -72,7 +72,7 @@ let waitForToolCallTextRecovery (runtime: FallbackRuntimeState) (sessionID: stri
 let fallbackGateOpen (runtime: FallbackRuntimeState) (sessionID: string) : bool =
     let taskComplete =
         match runtime.TryGetState sessionID with
-        | Some state -> state.TaskComplete
+        | Some state -> state.Lifecycle = FallbackLifecycle.TaskComplete
         | None -> false
 
     if taskComplete then
@@ -96,22 +96,22 @@ let fallbackGateOpen (runtime: FallbackRuntimeState) (sessionID: string) : bool 
             | FallbackPhase.ScanningToolCallText
             | FallbackPhase.RecoveringToolCallText -> true
             | FallbackPhase.Idle ->
-                // Idle + consumed=true + TaskComplete=false = fallback continue received
+                // Idle + consumed=true + Lifecycle=Active = fallback continue received
                 // but model turn still running → not terminal, gate stays open.
                 match runtime.GetConsumed sessionID with
-                | Some true -> not st.TaskComplete
+                | Some true -> st.Lifecycle <> FallbackLifecycle.TaskComplete
                 | _ -> false
             | FallbackPhase.Exhausted -> false
         | None -> false
 
 /// True when the session has reached a terminal observation: TaskComplete, Exhausted,
 /// or consumed=false.  A fresh session with no state and no consumed result is NOT
-/// terminal — terminality requires explicit evidence (TaskComplete / Exhausted / Consumed=false).
+/// terminal — terminality requires explicit evidence (Lifecycle=TaskComplete / Exhausted / Consumed=false).
 /// Uses TryGetState so observation never creates hidden state.
 let terminalObservation (runtime: FallbackRuntimeState) (sessionID: string) : bool =
     match runtime.TryGetState sessionID with
     | Some st ->
-        st.TaskComplete
+        st.Lifecycle = FallbackLifecycle.TaskComplete
         || st.Phase = FallbackPhase.Exhausted
         || (runtime.GetConsumed sessionID = Some false)
     | None -> (runtime.GetConsumed sessionID = Some false)
@@ -126,13 +126,13 @@ let gateState (runtime: FallbackRuntimeState) (sessionID: string) : GateState =
 
 /// The session is settled only when: non-empty sessionID, terminal observation holds,
 /// and the gate model resolves to Resolve (no higher-priority gate open).
-/// TaskComplete=true immediately overrides and settles the gate.
+/// Lifecycle=TaskComplete immediately overrides and settles the gate.
 let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) : bool =
     if sessionID = "" then
         false
     else
         match runtime.TryGetState sessionID with
-        | Some st when st.TaskComplete -> true
+        | Some st when st.Lifecycle = FallbackLifecycle.TaskComplete -> true
         | _ ->
             if not (terminalObservation runtime sessionID) then
                 false

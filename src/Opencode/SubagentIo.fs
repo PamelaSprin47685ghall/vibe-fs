@@ -87,7 +87,10 @@ let runSubagentCoreResult
                     let initSt = runtime.GetOrCreateState childID
 
                     if existingChildID.IsNone then
-                        runtime.UpdateState childID { initSt with TaskComplete = false }
+                        runtime.UpdateState
+                            childID
+                            { initSt with
+                                Lifecycle = FallbackLifecycle.Active }
 
                     runtime.SetSubsessionPending childID true
                     do! promptWithAbort client (buildPromptBody options childID) signal
@@ -98,13 +101,16 @@ let runSubagentCoreResult
                     try
                         let st = runtime.GetOrCreateState childID
 
-                        if st.Cancelled then
+                        if st.Lifecycle = FallbackLifecycle.Cancelled then
                             return Ok abortedPrefix
-                        elif not st.TaskComplete && st.Phase <> FallbackPhase.Exhausted then
+                        elif
+                            st.Lifecycle <> FallbackLifecycle.TaskComplete
+                            && st.Phase <> FallbackPhase.Exhausted
+                        then
                             do! waitForSubagentSettle runtime childID
                             let st2 = runtime.GetOrCreateState childID
 
-                            if st2.Cancelled then
+                            if st2.Lifecycle = FallbackLifecycle.Cancelled then
                                 return Ok abortedPrefix
                             else
                                 let! text = extractSessionText client childID directory
@@ -132,7 +138,7 @@ let runSubagentCoreResult
 
                         let st = runtime.GetOrCreateState childID
 
-                        let isSuccess = st.TaskComplete && not st.Cancelled
+                        let isSuccess = st.Lifecycle = FallbackLifecycle.TaskComplete
 
                         if isSuccess then
                             let! text = extractSessionText client childID directory

@@ -67,7 +67,7 @@ let handleEvent
                     promise {
                         let state = runtime.GetOrCreateState sessionID
 
-                        if state.Cancelled then
+                        if state.Lifecycle = FallbackLifecycle.Cancelled then
                             return Some FallbackEvent.SessionIdle
                         else
                             let! msgs = executor.FetchMessages sessionID
@@ -184,7 +184,7 @@ let handleEvent
                             let updated =
                                 { ns with
                                     Phase = FallbackPhase.Idle
-                                    TaskComplete = true }
+                                    Lifecycle = FallbackLifecycle.TaskComplete }
 
                             runtime.UpdateState sessionID updated
                             finalState <- updated
@@ -213,7 +213,11 @@ let handleEvent
                                 let updated =
                                     { ns with
                                         Phase = FallbackPhase.Idle
-                                        TaskComplete = taskComplete }
+                                        Lifecycle =
+                                            (if taskComplete then
+                                                 FallbackLifecycle.TaskComplete
+                                             else
+                                                 FallbackLifecycle.Active) }
 
                                 runtime.UpdateState sessionID updated
                                 finalState <- updated
