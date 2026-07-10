@@ -63,7 +63,12 @@ let fileBodyUnder300 () =
             else
                 let content = requireFile path
                 let lineCount = content.Length - content.Replace("\n", "").Length
-                check ("arch: " + path + " <=300 lines") (lineCount <= 300)
+
+                check
+                    ("arch: "
+                     + path
+                     + " <=300 lines. Do not compress code to bypass length limits; you must split files.")
+                    (lineCount <= 300)
 
 let noDuplicateStateHolder () =
     for dir in [| "src/Opencode"; "src/Mux"; "src/Omp" |] do
@@ -119,15 +124,22 @@ let nudgeLoopStateMustReplayHistory () =
 
 let hostMustNotDirectlyMutateReviewRegistry () =
     let dirs = [| "src/Opencode"; "src/Mux"; "src/Omp" |]
+
     for dir in dirs do
         for f in fsFilesRelative dir do
             let path = dir + "/" + f
             let code = requireFile path |> nonCommentCode
+
             check
-                ("arch: " + path + " no direct .activateReview (use event-log append + syncReviewProjection)")
+                ("arch: "
+                 + path
+                 + " no direct .activateReview (use event-log append + syncReviewProjection)")
                 (not (code.Contains ".activateReview"))
+
             check
-                ("arch: " + path + " no direct .deactivateReview (use event-log append + syncReviewProjection)")
+                ("arch: "
+                 + path
+                 + " no direct .deactivateReview (use event-log append + syncReviewProjection)")
                 (not (code.Contains ".deactivateReview"))
 
 let returnReviewerCatalogAndHostRegistration () =

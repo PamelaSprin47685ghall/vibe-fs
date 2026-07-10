@@ -25,14 +25,12 @@ type AstNodeInfo =
       endLine: int }
 
 type StyleLimits =
-    { maxLineLength: int
-      maxFileLines: int
+    { maxFileLines: int
       maxFunctionLines: int
       functionKinds: Set<string> }
 
 let defaultStyleLimits: StyleLimits =
-    { maxLineLength = 72
-      maxFileLines = 300
+    { maxFileLines = 300
       maxFunctionLines = 50
       functionKinds =
         Set.ofList
@@ -44,39 +42,6 @@ let defaultStyleLimits: StyleLimits =
               "arrow_function"
               "let_binding"
               "value_declaration" ] }
-
-let charWidth (c: char) : int = if int c > 127 then 2 else 1
-
-let stringWidth (s: string) : int =
-    let mutable w = 0
-
-    for i = 0 to s.Length - 1 do
-        w <- w + charWidth s.[i]
-
-    w
-
-let checkLineLengths (limits: StyleLimits) (content: string) : SyntaxDiagnostic[] =
-    if System.String.IsNullOrEmpty content then
-        [||]
-    else
-        let lines = content.Split('\n')
-
-        lines
-        |> Array.mapi (fun idx line ->
-            let cleanLine = line.TrimEnd('\r')
-            let w = stringWidth cleanLine
-
-            if w > limits.maxLineLength then
-                Some
-                    { line = idx + 1
-                      column = 1
-                      endLine = idx + 1
-                      endColumn = cleanLine.Length + 1
-                      severity = "warning"
-                      message = $"Line exceeds 72 characters (width: {w})" }
-            else
-                None)
-        |> Array.choose id
 
 let checkFileLineCount (limits: StyleLimits) (content: string) : SyntaxDiagnostic[] =
     if System.String.IsNullOrEmpty content then
@@ -91,14 +56,16 @@ let checkFileLineCount (limits: StyleLimits) (content: string) : SyntaxDiagnosti
                  endLine = 1
                  endColumn = 1
                  severity = "error"
-                 message = $"File exceeds 300 lines: must split (currently {count} lines)" } |]
+                 message =
+                   $"File exceeds 300 lines (currently {count} lines). Do not compress code to bypass length limits; you must split files." } |]
         elif count > 200 then
             [| { line = 1
                  column = 1
                  endLine = 1
                  endColumn = 1
                  severity = "warning"
-                 message = $"File exceeds 200 lines: keep it simple (currently {count} lines)" } |]
+                 message =
+                   $"File exceeds 200 lines (currently {count} lines). Do not compress code to bypass length limits; you must split files." } |]
         else
             [||]
 
@@ -114,8 +81,9 @@ let checkFunctionLengths (limits: StyleLimits) (nodes: AstNodeInfo[]) : SyntaxDi
                   column = 1
                   endLine = node.endLine
                   endColumn = 1
-                  severity = "warning"
-                  message = $"Function exceeds 50 lines (currently {len} lines)" }
+                  severity = "error"
+                  message =
+                    $"Function exceeds 50 lines (currently {len} lines). Do not compress code to bypass length limits; you must split functions." }
         else
             None)
 

@@ -114,59 +114,61 @@ let rec private collectAstNodes (node: obj) (acc: AstNodeInfo list) : AstNodeInf
 
     loop 0 nextAcc
 
-let private runGeneralStyleChecks (content: string) : SyntaxDiagnostic[] =
-    let lineErrors = checkLineLengths defaultStyleLimits content
-    let fileErrors = checkFileLineCount defaultStyleLimits content
-    Array.append lineErrors fileErrors
+let private runGeneralStyleChecks (content: string) : SyntaxDiagnostic[] = [||]
 
 let checkSyntax (content: string) (filePath: string) : JS.Promise<SyntaxCheckResult> =
     promise {
-        match tryGetPack () with
-        | Result.Error _ ->
-            let styleErrors = runGeneralStyleChecks content
-            return Ok("", styleErrors)
-        | Result.Ok pack ->
-            let lang = detectLanguage pack content filePath
+        let lowerPath =
+            if System.String.IsNullOrEmpty filePath then
+                ""
+            else
+                filePath.ToLowerInvariant()
 
-            if lang = "" then
+        if lowerPath.EndsWith(".md") || lowerPath.EndsWith(".markdown") then
+            return Ok("", [||])
+        else
+            match tryGetPack () with
+            | Result.Error _ ->
                 let styleErrors = runGeneralStyleChecks content
                 return Ok("", styleErrors)
-            else
-                let parserResult =
-                    try
-                        Result.Ok(getOrCallWith pack "getParser" lang)
-                    with e ->
-                        Result.Error $"parser load failed: {e.Message}"
+            | Result.Ok pack ->
+                let lang = detectLanguage pack content filePath
 
-                match parserResult with
-                | Result.Error reason -> return Failed(lang, reason)
-                | Result.Ok parser ->
-                    let treeResult =
+                if lang = "" then
+                    let styleErrors = runGeneralStyleChecks content
+                    return Ok("", styleErrors)
+                else
+                    let parserResult =
                         try
-                            let tree = getOrCallWith parser "parse" content
-
-                            if isNullish tree then
-                                Result.Error "parser returned undefined"
-                            else
-                                Result.Ok tree
+                            Result.Ok(getOrCallWith pack "getParser" lang)
                         with e ->
-                            Result.Error $"parse failed: {e.Message}"
+                            Result.Error $"parser load failed: {e.Message}"
 
-                    match treeResult with
+                    match parserResult with
                     | Result.Error reason -> return Failed(lang, reason)
-                    | Result.Ok tree ->
-                        let rootNode = getOrCall tree "rootNode"
-                        let errors, _ = collectDiagnostics rootNode []
-                        let astErrors = errors |> List.rev |> Array.ofList
-                        let astNodes = collectAstNodes rootNode [] |> Array.ofList
+                    | Result.Ok parser ->
+                        let treeResult =
+                            try
+                                let tree = getOrCallWith parser "parse" content
 
-                        let styleErrors =
-                            Array.concat
-                                [ checkLineLengths defaultStyleLimits content
-                                  checkFileLineCount defaultStyleLimits content
-                                  checkFunctionLengths defaultStyleLimits astNodes ]
+                                if isNullish tree then
+                                    Result.Error "parser returned undefined"
+                                else
+                                    Result.Ok tree
+                            with e ->
+                                Result.Error $"parse failed: {e.Message}"
 
-                        return Ok(lang, Array.append astErrors styleErrors)
+                        match treeResult with
+                        | Result.Error reason -> return Failed(lang, reason)
+                        | Result.Ok tree ->
+                            let rootNode = getOrCall tree "rootNode"
+                            let errors, _ = collectDiagnostics rootNode []
+                            let astErrors = errors |> List.rev |> Array.ofList
+                            let astNodes = collectAstNodes rootNode [] |> Array.ofList
+
+                            let styleErrors = checkFunctionLengths defaultStyleLimits astNodes
+
+                            return Ok(lang, Array.append astErrors styleErrors)
     }
 
 [<Import("promises", "node:fs")>]

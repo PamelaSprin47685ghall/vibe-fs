@@ -89,13 +89,23 @@ let ompTestFilesUnder300 () =
             let path = "tests/" + f
             let content = requireFile path
             let lineCount = content.Length - content.Replace("\n", "").Length
-            check ("arch: " + path + " <=300 lines") (lineCount <= 300)
+
+            check
+                ("arch: "
+                 + path
+                 + " <=300 lines. Do not compress code to bypass length limits; you must split files.")
+                (lineCount <= 300)
 
 let ompSourceFilesUnder300 () =
     for path in fsFilesRecursive "src/Omp" do
         let content = requireFile path
         let lineCount = content.Length - content.Replace("\n", "").Length
-        let msg = "arch: " + path + " <=300 lines"
+
+        let msg =
+            "arch: "
+            + path
+            + " <=300 lines. Do not compress code to bypass length limits; you must split files."
+
         check msg (lineCount <= 300)
 
 let ompFuzzyToolsUsesShellFinder () =

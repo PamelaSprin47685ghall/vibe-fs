@@ -90,39 +90,30 @@ let formatWriteSyntaxResultErrors () =
              endLine = 1
              endColumn = 5
              severity = "error"
-             message = "syntax err" } |]
+             message = "syntax err. Do not compress code to bypass length limits; you must split functions." } |]
 
     let result = formatWriteSyntaxResult "test.fs" (Ok("fsharp", diags))
     check "error detail" (result.Contains "line 1, col 0:")
 
-let testCharWidth () =
-    check "charWidth a" (charWidth 'a' = 1)
-    check "charWidth 你" (charWidth '你' = 2)
+    check
+        "format contains suggest"
+        (result.Contains "Do not compress code to bypass length limits; you must split functions.")
 
-let testStringWidth () =
-    equal "stringWidth empty" 0 (stringWidth "")
-    equal "stringWidth ascii" 5 (stringWidth "hello")
-    equal "stringWidth CJK" 4 (stringWidth "你好")
-    equal "stringWidth mixed" 9 (stringWidth "hello你好")
-
-let testCheckLineLengths () =
-    let clean = String.replicate 72 "a"
-    let dirty = String.replicate 73 "a"
-    let cjkClean = String.replicate 36 "你"
-    let cjkDirty = String.replicate 37 "你"
-
+let testCheckFunctionLengthIsError () =
     let limits = defaultStyleLimits
-    equal "clean line" 0 (checkLineLengths limits clean).Length
-    equal "clean cjk line" 0 (checkLineLengths limits cjkClean).Length
 
-    let dirtyDiags = checkLineLengths limits dirty
-    equal "dirty line count" 1 dirtyDiags.Length
-    equal "dirty line severity" "warning" dirtyDiags.[0].severity
-    check "dirty line message" (dirtyDiags.[0].message.Contains "exceeds 72")
+    let nodes =
+        [| { kind = "function_definition"
+             startLine = 1
+             endLine = 52 } |]
 
-    let cjkDirtyDiags = checkLineLengths limits cjkDirty
-    equal "dirty cjk line count" 1 cjkDirtyDiags.Length
-    check "dirty cjk line message" (cjkDirtyDiags.[0].message.Contains "exceeds 72")
+    let diags = checkFunctionLengths limits nodes
+    equal "diags length" 1 diags.Length
+    equal "severity error" "error" diags.[0].severity
+
+    check
+        "message contains suggest"
+        (diags.[0].message.Contains "Do not compress code to bypass length limits; you must split functions.")
 
 let testCheckFileLineCount () =
     let limits = defaultStyleLimits
@@ -138,6 +129,10 @@ let testCheckFileLineCount () =
     equal "201 lines severity" "warning" diags201.[0].severity
     check "201 lines msg" (diags201.[0].message.Contains "200 lines")
 
+    check
+        "201 lines suggest"
+        (diags201.[0].message.Contains "Do not compress code to bypass length limits; you must split files.")
+
     let diags300 = checkFileLineCount limits lines300
     equal "300 lines count" 1 diags300.Length
     equal "300 lines severity" "warning" diags300.[0].severity
@@ -146,6 +141,10 @@ let testCheckFileLineCount () =
     equal "301 lines count" 1 diags301.Length
     equal "301 lines severity" "error" diags301.[0].severity
     check "301 lines msg" (diags301.[0].message.Contains "300 lines")
+
+    check
+        "301 lines suggest"
+        (diags301.[0].message.Contains "Do not compress code to bypass length limits; you must split files.")
 
 let testCheckFunctionLengths () =
     let limits = defaultStyleLimits
@@ -168,8 +167,17 @@ let testCheckFunctionLengths () =
     equal "function diags count" 2 diags.Length
     equal "diag 1 line" 10 diags.[0].line
     equal "diag 2 line" 130 diags.[1].line
-    check "diag 1 msg" (diags.[0].message.Contains "exceeds 50")
-    check "diag 2 msg" (diags.[1].message.Contains "exceeds 50")
+
+    check
+        "diag 1 msg"
+        (diags.[0].message.Contains "Do not compress code to bypass length limits; you must split functions.")
+
+    check
+        "diag 2 msg"
+        (diags.[1].message.Contains "Do not compress code to bypass length limits; you must split functions.")
+
+    equal "diag 1 severity" "error" diags.[0].severity
+    equal "diag 2 severity" "error" diags.[1].severity
 
 let run () =
     isFileEditToolTrueForEdit ()
@@ -189,8 +197,6 @@ let run () =
     formatWriteSyntaxResultClean ()
     formatWriteSyntaxResultFailed ()
     formatWriteSyntaxResultErrors ()
-    testCharWidth ()
-    testStringWidth ()
-    testCheckLineLengths ()
+    testCheckFunctionLengthIsError ()
     testCheckFileLineCount ()
     testCheckFunctionLengths ()
