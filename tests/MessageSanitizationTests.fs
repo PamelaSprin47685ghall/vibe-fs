@@ -65,7 +65,10 @@ let testMessageSanitization () =
                   IsSubagentSession = false
                   Cleaned = msgs
                   RawArray = None
-                  SembleInjectEnabled = false }
+                  SembleInjectEnabled = false
+                  Scope = Wanxiangshu.Shell.RuntimeScope.create()
+                  MaxInputTokens = 200000
+                  GetContextUsage = (fun _ -> Promise.lift None) }
 
             runHostMessagesTransform
                 reviewStore
@@ -149,7 +152,10 @@ let testEmptyArrayAndMissingContentSanitization () =
               IsSubagentSession = false
               Cleaned = []
               RawArray = Some raw
-              SembleInjectEnabled = false }
+              SembleInjectEnabled = false
+              Scope = Wanxiangshu.Shell.RuntimeScope.create()
+              MaxInputTokens = 200000
+              GetContextUsage = (fun _ -> Promise.lift None) }
 
         let! res =
             runHostMessagesTransform

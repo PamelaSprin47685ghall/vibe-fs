@@ -44,6 +44,7 @@ let transformEntriesAsyncWithAgent
     (sessionId: string)
     (entriesObj: obj)
     (agent: string)
+    (getContextUsage: obj array -> JS.Promise<int option>)
     : JS.Promise<obj array> =
     promise {
         if Dyn.isNullish entriesObj || not (Dyn.isArray entriesObj) then
@@ -73,7 +74,10 @@ let transformEntriesAsyncWithAgent
                       IsSubagentSession = isChildSession ExecutorTools.ompScope sessionId
                       Cleaned = cleaned
                       RawArray = Some entriesArr
-                      SembleInjectEnabled = false }
+                      SembleInjectEnabled = false
+                      Scope = ExecutorTools.ompScope
+                      MaxInputTokens = 200000
+                      GetContextUsage = getContextUsage }
 
 
                 let replayTexts () : JS.Promise<string seq> =
@@ -133,7 +137,7 @@ let transformEntriesAsync
     (sessionId: string)
     (entriesObj: obj)
     : JS.Promise<obj array> =
-    transformEntriesAsyncWithAgent reviewStore cwd sessionId entriesObj "manager"
+    transformEntriesAsyncWithAgent reviewStore cwd sessionId entriesObj "manager" (fun _ -> Promise.lift None)
 
 let beforeAgentStart (_cwd: string) (systemPrompt: obj) : JS.Promise<obj> =
     promise {
@@ -173,7 +177,18 @@ let registerContextTransform (pi: obj) (reviewStore: ReviewStore) : unit =
             if Dyn.isNullish entries then
                 return event
             else
-                let! transformed = transformEntriesAsyncWithAgent reviewStore cwd sessionId entries agent
+                let getContextUsage =
+                    match Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetGetContextUsage ctx with
+                    | Some f -> f
+                    | None -> fun _ -> Promise.lift None
+                let! transformed =
+                    transformEntriesAsyncWithAgent
+                        reviewStore
+                        cwd
+                        sessionId
+                        entries
+                        agent
+                        getContextUsage
                 event?entries <- transformed
                 return event
         }

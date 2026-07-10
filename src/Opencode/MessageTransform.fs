@@ -164,7 +164,23 @@ let messagesTransform
                   IsSubagentSession = isSub
                   Cleaned = cleaned
                   RawArray = Some messagesArr
-                  SembleInjectEnabled = sembleInjectEnabled }
+                  SembleInjectEnabled = sembleInjectEnabled
+                  Scope = runtimeScope
+                  MaxInputTokens =
+                      let maxTokensVal = Dyn.get input "maxInputTokens"
+                      if not (Dyn.isNullish maxTokensVal) && Dyn.typeIs maxTokensVal "number" then
+                          int (unbox<float> maxTokensVal)
+                      else 200000
+                  GetContextUsage =
+                      match ContextBudgetUsageCodec.tryGetGetContextUsage input with
+                      | Some f -> f
+                      | None ->
+                          match ContextBudgetUsageCodec.tryGetGetContextUsage _client with
+                          | Some f -> f
+                          | None ->
+                              match ContextBudgetUsageCodec.tryGetGetContextUsage output with
+                              | Some f -> f
+                              | None -> fun _ -> Promise.lift None }
 
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)
