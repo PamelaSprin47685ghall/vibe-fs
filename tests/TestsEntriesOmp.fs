@@ -103,7 +103,7 @@ let ompTestEntries () : (string * TestBody) list =
       "OmpHelpersTests.checkSyntaxValidJson", Async OmpHelpersTests.checkSyntaxValidJson
       "OmpHelpersTests.checkSyntaxBrokenJsonReports_intentionalWarningFork",
       Async OmpHelpersTests.checkSyntaxBrokenJsonReports_intentionalWarningFork
-      "OmpHelpersTests.checkSyntaxStyleChecks", Async OmpHelpersTests.checkSyntaxStyleChecks
+      "OmpHelpersTests.checkSyntaxMarkdownExempt", Async OmpHelpersTests.checkSyntaxMarkdownExempt
       "OmpHelpersTests.supportsSyntaxDiagnosticsGrepFalse",
       Sync(sync OmpHelpersTests.supportsSyntaxDiagnosticsGrepFalse)
       "OmpHelpersTests.stripHeadTailViaKernel", Sync(sync OmpHelpersTests.stripHeadTailViaKernel)

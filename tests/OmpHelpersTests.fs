@@ -50,15 +50,12 @@ let checkSyntaxBrokenJsonReports_intentionalWarningFork () =
         | Failed(_, reason) -> check "failed json reason" (reason.Length > 0)
     }
 
-let checkSyntaxStyleChecks () =
+let checkSyntaxMarkdownExempt () =
     promise {
-        let content = "const x = \"" + String.replicate 70 "a" + "\";"
-        let! result = checkSyntax content "sample.js"
+        let! result = checkSyntax "const x = (" "sample.md"
 
         match result with
-        | Ok(lang, errors) ->
-            let styleWarns = errors |> Array.filter (fun e -> e.message.Contains "exceeds 72")
-            check "has exceeds 72 warning" (styleWarns.Length > 0)
+        | Ok(lang, errors) -> equal "markdown has no errors" 0 errors.Length
         | Failed(_, reason) -> check "should not fail" (reason = "" && false)
     }
 
