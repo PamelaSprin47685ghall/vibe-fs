@@ -133,12 +133,8 @@ let private rebuildPhaseState
     promise {
         if backlog <> currentStore.LastBacklog || currentStore.State.IsNone then
             let stableMessages =
-                projectBacklogFor
-                    backlogOps.Host
-                    plan.Cleaned
-                    backlog
-                    true
-                    plan.SessionID
+                projectBacklogFor backlogOps.Host plan.Cleaned backlog true plan.SessionID
+
             let stableEncoded = encodeMessages stableMessages
             let stableBytes = JS.JSON.stringify(stableEncoded).Length
             let! stableTokensOpt = plan.GetContextUsage stableEncoded
@@ -148,36 +144,48 @@ let private rebuildPhaseState
                 | Some t -> int64 t
                 | None ->
                     let currentLastUsage = (ContextBudgetStore.get plan.Scope plan.SessionID).LastUsage
+
                     match ContextBudget.estimateTokens stableBytes currentLastUsage with
                     | Some t -> int64 t
                     | None -> int64 currentTokens
 
-            let backlogBytes = ContextBudgetUsageCodec.backlogBytesFromEncoded backlogOps.Host stableEncoded
-            let newState = ContextBudget.beginPhase stableTokens (int64 stableBytes) (int64 backlogBytes)
+            let backlogBytes =
+                ContextBudgetUsageCodec.backlogBytesFromEncoded backlogOps.Host stableEncoded
+
+            let newState =
+                ContextBudget.beginPhase stableTokens (int64 stableBytes) (int64 backlogBytes)
 
             ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
                 { entry with
                     State = Some newState
                     LastBacklog = backlog
                     NudgeInjected = false })
+
             return newState
         else
             return currentStore.State.Value
     }
 
-let private checkAndInjectNudge (plan: MessageTransformPlan) (currentTokens: int) (state: ContextBudget.ContextState) (messages: Message<obj> list) : Message<obj> list =
+let private checkAndInjectNudge
+    (plan: MessageTransformPlan)
+    (currentTokens: int)
+    (state: ContextBudget.ContextState)
+    (messages: Message<obj> list)
+    : Message<obj> list =
     let state_c = state.backlogTokensAtPhaseStart
     let state_s = state.phaseBaseTokens - state_c
 
-    if ContextBudget.isCompactingRequired state.phaseBaseTokens (int64 plan.MaxInputTokens) then
+    let effectiveMaxInputTokens = (int64 plan.MaxInputTokens * 75L) / 100L
+
+    if ContextBudget.isCompactingRequired state.phaseBaseTokens effectiveMaxInputTokens then
         messages
-    elif ContextBudget.F (int64 currentTokens) (int64 plan.MaxInputTokens) state_c state_s then
+    elif ContextBudget.F (int64 currentTokens) effectiveMaxInputTokens state_c state_s then
         let updatedStore = ContextBudgetStore.get plan.Scope plan.SessionID
+
         if updatedStore.NudgeInjected then
             messages
         else
-            ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
-                { entry with NudgeInjected = true })
+            ContextBudgetStore.update plan.Scope plan.SessionID (fun entry -> { entry with NudgeInjected = true })
             List.append messages [ buildContextBudgetNudgeMessage plan.SessionID ]
     else
         messages
@@ -202,11 +210,18 @@ let applyContextBudget
                 return messages
             else
                 ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
-                    { entry with LastUsage = Some {| tokenCount = currentTokens; textBytes = totalBytes |} })
+                    { entry with
+                        LastUsage =
+                            Some
+                                {| tokenCount = currentTokens
+                                   textBytes = totalBytes |} })
 
                 let backlog = backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned
                 let currentStore = ContextBudgetStore.get plan.Scope plan.SessionID
-                let! state = rebuildPhaseState plan backlogOps backlog currentStore encodeMessages currentTokens totalBytes
+
+                let! state =
+                    rebuildPhaseState plan backlogOps backlog currentStore encodeMessages currentTokens totalBytes
+
                 return checkAndInjectNudge plan currentTokens state messages
     }
 
@@ -265,10 +280,8 @@ let runMessageTransformPipeline
 
             let encoded =
                 match encodedBacklogOpt with
-                | Some encodedBacklog when afterPrompt.Length = afterBacklog.Length ->
-                    encodedBacklog
-                | _ ->
-                    encodeMessages afterPrompt
+                | Some encodedBacklog when afterPrompt.Length = afterBacklog.Length -> encodedBacklog
+                | _ -> encodeMessages afterPrompt
 
             let! injected = injectFn plan.Excluded encoded
             let! capsFiles = loadCaps ()

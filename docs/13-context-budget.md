@@ -18,15 +18,17 @@
 
 ## 触发函数 F
 
-安全条件 $u \le (b-P)/2$，等价：
+由于宿主 OpenCode 在输入 token 达到 75% 时就会触发 compaction 截断历史，因此在管线中传入触发函数的 $b$ 限制为有效上限（即物理限制 $b_{\text{eff}} = \lfloor b \times 75\% \rfloor$），以确保在 75% 之前强制触发 todowrite。
 
-$$F(a,b,c,s) \equiv 2a \ge b + s + c$$
+安全条件 $u \le (b_{\text{eff}}-P)/2$，等价：
 
-实现：`Shell/ContextBudget.fs` 中 `F`（`int64` 防溢出）。
+$$F(a,b_{\text{eff}},c,s) \equiv 2a \ge b_{\text{eff}} + s + c$$
+
+实现：`Shell/ContextBudget.fs` 中 `F`（`int64` 防溢出）；管线 `MessageTransformPipeline.fs` 中传入 effectiveMaxInputTokens。
 
 ## 极限 compact 守卫
 
-若 `phaseBaseTokens >= (maxInputTokens * 8) / 10`，不再注入 budget nudge，交宿主 compact。
+若 `phaseBaseTokens >= (maxInputTokens * 8) / 10`（此处的 `maxInputTokens` 为经过 75% 折损后的有效上限 $b_{\text{eff}}$，即占原始总窗口大小的 60%），不再注入 budget nudge，交宿主 compact。
 
 ## beginPhase / afterSuccessfulTodo
 
