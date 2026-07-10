@@ -141,6 +141,13 @@ let methTodoResultTextEmpty () =
 let methTodoResultTextOne () =
     let r = todoResultText [ "x" ]
     check "todo contains x" (r.Contains "x")
+    check "todoResultTextDomain has summary clause" (r.Contains "summary" || r.Contains "summarizing")
+    check "todoResultTextDomain has difficulty clause" (r.Contains "difficult" || r.Contains "complex")
+
+    check
+        "todoResultTextDomain has negative instruction for completion"
+        (r.ToLowerInvariant().Contains "not need"
+         || r.ToLowerInvariant().Contains "no need")
 
 let methEnumCount () =
     check "enum count > 50" (enumValues.Value.Length > 50)

@@ -125,6 +125,14 @@ let testHintForMethodologies () =
     equal "hintForMethodologies empty" "Todos updated." (hintForMethodologies [])
     check "hintForMethodologies nonempty" ((hintForMethodologies [ "a" ]).Contains "a")
     check "hintForMethodologies multiple" ((hintForMethodologies [ "a"; "b" ]).Contains "b")
+    let prompt = hintForMethodologies [ "first_principles" ]
+    check "prompt has summary clause" (prompt.Contains "summary" || prompt.Contains "summarizing")
+    check "prompt has difficulty clause" (prompt.Contains "difficult" || prompt.Contains "complex")
+
+    check
+        "prompt has negative instruction for completion"
+        (prompt.ToLowerInvariant().Contains "not need"
+         || prompt.ToLowerInvariant().Contains "no need")
 
 let testAppendMultiple () =
     let msg = { info = []; body = "" }

@@ -16,7 +16,7 @@ let hintTodoRefresh = "Update todo list NOW and settle down your progress!"
 let hintTodosUpdated = "Todos updated."
 
 let hintMethodologyFollowup (methodologyId: string) =
-    $"Great! Now apply {methodologyId} to actual work NOW and you MUST think over and then call methodology tool with {methodologyId} selected asap!"
+    $"Great! Please apply {methodologyId} to the subsequent steps. If all work has been fully completed and this is purely a summary/handover, you do NOT need to call the methodology tool. Otherwise, for any remaining tasks, the more difficult/complex the problem is, the more critical it is to think over and call the methodology tool with {methodologyId} selected to guide your next work step."
 
 let hintForMethodologies (methodologies: string list) : string =
     match methodologies with
