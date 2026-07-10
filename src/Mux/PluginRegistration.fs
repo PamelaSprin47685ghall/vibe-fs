@@ -51,7 +51,7 @@ let createRegistration (deps: obj) : obj =
     let mcpServers =
         box {| ``stealth-browser-mcp`` = getStealthBrowserMcpCommand (envVar "STEALTH_BROWSER_MCP_REF") |}
 
-    let messagesTransform =
+    let messagesTransform, compactingTransform =
         createMessageTransforms deps scope backlogSession reviewStore
 
     let eventHook, slashCommands, getToolPolicy =
@@ -66,6 +66,7 @@ let createRegistration (deps: obj) : obj =
             eventHook
             slashCommands
             messagesTransform
+            compactingTransform
             getToolPolicy
             (createReviewTestSurface reviewStore)
 

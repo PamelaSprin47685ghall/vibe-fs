@@ -21,12 +21,16 @@ let createMessageTransforms
     (scope: RuntimeScope)
     (backlogSession: BacklogSession)
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
-    : obj =
+    : obj * obj =
     let messagesTransformFn =
         System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
             messagesTransform deps scope backlogSession reviewStore input output)
 
-    box messagesTransformFn
+    let compactingTransformFn =
+        System.Func<obj, obj, JS.Promise<unit>>(fun input output ->
+            compactingTransform deps scope backlogSession input output)
+
+    (box messagesTransformFn, box compactingTransformFn)
 
 let createEventHooksSlashAndPolicy
     (deps: obj)
@@ -66,6 +70,7 @@ let assembleRegistrationObject
     (eventHook: obj)
     (slashCommands: obj)
     (messagesTransform: obj)
+    (compactingTransform: obj)
     (getToolPolicy: obj)
     (reviewTestSurface: obj)
     : obj =
@@ -78,6 +83,7 @@ let assembleRegistrationObject
           "eventHook", box eventHook
           "slashCommands", box slashCommands
           "messagesTransform", box messagesTransform
+          "compactingTransform", box compactingTransform
           "getToolPolicy", box getToolPolicy
           "__reviewStore", box reviewTestSurface
           "tool.execute.after",

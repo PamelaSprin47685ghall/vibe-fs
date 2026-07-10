@@ -26,6 +26,7 @@ open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.ToolCatalogClassificationTests
 open Wanxiangshu.Tests.ToolOutputInfoTests
 open Wanxiangshu.Tests.MessageTransformPolicyTests
+open Wanxiangshu.Tests.CompactionTransformTests
 open Wanxiangshu.Tests.MessageSanitizationTests
 open Wanxiangshu.Tests.SembleInjectionTests
 open Wanxiangshu.Tests.SembleReviewerInjectionTests
@@ -123,6 +124,7 @@ let tailCoreTestEntries () : (string * TestBody) list =
       "ToolCatalogClassificationTests.run", TestBody.Sync(sync ToolCatalogClassificationTests.run)
       "ToolOutputInfoTests.run", TestBody.Sync(sync ToolOutputInfoTests.run)
       "MessageTransformPolicyTests.run", TestBody.Async MessageTransformPolicyTests.run
+      "CompactionTransformTests.run", TestBody.Async CompactionTransformTests.run
       "MessageSanitizationTests.run", TestBody.Async MessageSanitizationTests.run
       "SembleInjectionTests.run", TestBody.Sync(sync SembleInjectionTests.run)
       "SembleReviewerInjectionTests.testSembleInjectsForReviewer", TestBody.Async testSembleInjectsForReviewer

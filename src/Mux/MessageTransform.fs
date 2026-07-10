@@ -109,3 +109,28 @@ let messagesTransform
             if not cleanedMessages.IsEmpty then
                 replaceArrayInPlace messagesArr final
     }
+
+let compactingTransform
+    (deps: obj)
+    (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
+    (backlogSession: BacklogSession)
+    (input: obj)
+    (output: obj)
+    : JS.Promise<unit> =
+    promise {
+        let decoded = decodeMuxMessagesTransformInput input deps
+        let directory = decoded.Directory
+        runtimeScope.TriggerInit(directory)
+        do! runtimeScope.WaitInit()
+
+        match tryGetMessagesArrayFromOutput output with
+        | None -> ()
+        | Some messagesArr ->
+            let sessionID = decoded.SessionID
+            let typedMessages = decodeMessages sessionID messagesArr
+            let cleaned = stripSyntheticBySource typedMessages
+            let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
+            let result = Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog
+            let encoded = encodeMessages result
+            replaceArrayInPlace messagesArr encoded
+    }

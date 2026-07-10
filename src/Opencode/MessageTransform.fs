@@ -31,15 +31,6 @@ open Wanxiangshu.Shell.JsArrayMutate
 open Wanxiangshu.Shell.SembleMcp
 open Wanxiangshu.Shell.SembleSearch
 
-let private extractSessionID (messages: Message<obj> list) : string =
-    messages
-    |> List.tryPick (fun m ->
-        if m.info.sessionID <> "" then
-            Some m.info.sessionID
-        else
-            None)
-    |> Option.defaultValue ""
-
 let injectSembleIntoEncoded
     (directory: string)
     (agent: string)
@@ -225,3 +216,28 @@ let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> 
 
 let systemTransform (directory: string) (_input: obj) (output: obj) : JS.Promise<unit> =
     promise { setSystemOutputToDirectory directory output }
+
+let compactingTransform
+    (registry: ChildAgentRegistry)
+    (directory: string)
+    (runtimeScope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
+    (backlogSession: BacklogSession)
+    (_client: obj)
+    (input: obj)
+    (output: obj)
+    : JS.Promise<unit> =
+    promise {
+        runtimeScope.TriggerInit(directory)
+        do! runtimeScope.WaitInit()
+
+        match tryGetMessagesArrayFromOutput output with
+        | None -> ()
+        | Some messagesArr ->
+            let messagesList = MessagingCodec.decodeMessages messagesArr
+            let sessionID = extractSessionID messagesList
+            let cleaned = Messaging.stripSyntheticBySource messagesList
+            let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
+            let result = Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog
+            let encoded = MessagingCodec.encodeMessages result
+            replaceArrayInPlace messagesArr encoded
+    }

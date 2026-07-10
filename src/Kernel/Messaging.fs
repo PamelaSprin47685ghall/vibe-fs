@@ -160,3 +160,9 @@ let readAssistantText (messages: Message<'raw> list) (startIndex: int) (joiner: 
 /// Drop synthetic messages, keeping only Native-sourced ones. Pure.
 let stripSyntheticBySource (messages: Message<'raw> list) : Message<'raw> list =
     messages |> List.filter (fun m -> m.source = Native)
+
+/// Extract the first non-empty session ID from a list of messages. Pure.
+let extractSessionID (messages: Message<'raw> list) : string =
+    match messages |> List.tryPick (fun m -> if m.info.sessionID <> "" then Some m.info.sessionID else None) with
+    | Some sid -> sid
+    | None -> ""

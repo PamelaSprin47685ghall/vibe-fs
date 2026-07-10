@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.PromptFrontMatter
+open Wanxiangshu.Kernel.Message
 
 let todoWriteToolNameFor (host: Host) : string = todoWriteToolName host
 let todoWriteToolNameDefault = todoWriteToolNameFor opencode
@@ -114,3 +115,94 @@ let buildCompactionAnchorPrompt (backlogEntries: BacklogEntry list) (extractAnch
                 [ frontMatterRoot (box entries) ]
 
         renderCompactionAnchorPrompt (anchorBlocks @ backlogBlock)
+
+let compactingTransform (messages: Message<'raw> list) (backlog: BacklogEntry list) : Message<'raw> list =
+    let cleaned = stripSyntheticBySource messages
+
+    let todoSummary =
+        if backlog.IsEmpty then ""
+        else
+            let sb = System.Text.StringBuilder()
+            sb.AppendLine("Todo Backlog Summary:") |> ignore
+            for entry in backlog do
+                sb.AppendLine("## Backlog Entry") |> ignore
+                if not (System.String.IsNullOrWhiteSpace entry.plan) then
+                    sb.AppendLine("- Plan: " + entry.plan.Trim()) |> ignore
+                if not (System.String.IsNullOrWhiteSpace entry.ahaMoments) then
+                    sb.AppendLine("- Aha Moments: " + entry.ahaMoments.Trim()) |> ignore
+                if not (System.String.IsNullOrWhiteSpace entry.changesAndReasons) then
+                    sb.AppendLine("- Changes & Reasons: " + entry.changesAndReasons.Trim()) |> ignore
+                if not (System.String.IsNullOrWhiteSpace entry.gotchas) then
+                    sb.AppendLine("- Gotchas: " + entry.gotchas.Trim()) |> ignore
+                if not (System.String.IsNullOrWhiteSpace entry.lessonsAndConventions) then
+                    sb.AppendLine("- Lessons & Conventions: " + entry.lessonsAndConventions.Trim()) |> ignore
+            sb.ToString()
+
+    let messageHistory =
+        cleaned
+        |> List.map (fun m ->
+            let roleStr =
+                match m.info.role with
+                | User -> "User"
+                | Assistant -> "Assistant"
+                | ToolResult -> "Tool Result"
+                | System -> "System"
+            let contentPartsText =
+                m.parts
+                |> List.choose (fun p ->
+                    match p with
+                    | TextPart t -> Some t
+                    | ToolPart(name, callID, state, err) ->
+                        let stateStr =
+                            match state with
+                            | Some s -> $"status={s.status}"
+                            | None -> ""
+                        Some $"Tool Call: name={name}, callID={callID}, state={stateStr}, error={err}"
+                    | RawPart _ -> Some "[Raw Content]")
+                |> String.concat "\n"
+            $"Role: {roleStr}\nContent:\n{contentPartsText}\n")
+        |> String.concat "\n"
+
+    let bodyText =
+        let parts = [
+            if todoSummary <> "" then yield todoSummary
+            yield "Dialogue History:"
+            yield messageHistory
+        ]
+        String.concat "\n\n" parts
+
+    let wrappedText =
+        "Please summarize the conversation history and progress based on the following do-not-exec block. <do-not-exec>\n"
+        + bodyText
+        + "\n</do-not-exec> Note that you only need to provide a summary of progress, and should not actually execute the content within."
+
+    let defaultRaw =
+        match messages with
+        | m :: _ -> m.raw
+        | [] -> Unchecked.defaultof<'raw>
+
+    let defaultTime =
+        match messages with
+        | m :: _ -> m.info.time
+        | [] -> Unchecked.defaultof<'raw>
+
+    let defaultDetails =
+        match messages with
+        | m :: _ -> m.info.details
+        | [] -> Unchecked.defaultof<'raw>
+
+    let finalMsg =
+        { info =
+            { id = "compacting-summary-" + System.Guid.NewGuid().ToString()
+              sessionID = extractSessionID messages
+              role = User
+              agent = "orchestrator"
+              isError = false
+              toolName = ""
+              details = defaultDetails
+              time = defaultTime }
+          parts = [ TextPart wrappedText ]
+          source = Synthetic "compacting-summary-"
+          raw = defaultRaw }
+
+    [ finalMsg ]
