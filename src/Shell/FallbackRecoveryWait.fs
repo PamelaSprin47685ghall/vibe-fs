@@ -86,7 +86,6 @@ let fallbackGateOpen (runtime: FallbackRuntimeState) (sessionID: string) : bool 
     elif runtime.GetBusyCount sessionID > 0 then
         true
     elif runtime.IsNudgeActive sessionID then
-        // nudge activity alone doesn't open the fallback gate, but it blocks resolve
         false
     else
         match runtime.TryGetState sessionID with
@@ -112,18 +111,10 @@ let fallbackGateOpen (runtime: FallbackRuntimeState) (sessionID: string) : bool 
 let terminalObservation (runtime: FallbackRuntimeState) (sessionID: string) : bool =
     match runtime.TryGetState sessionID with
     | Some st ->
-        if st.TaskComplete then
-            true
-        elif st.Phase = FallbackPhase.Exhausted then
-            true
-        else
-            match runtime.GetConsumed sessionID with
-            | Some false -> true
-            | _ -> false
-    | None ->
-        match runtime.GetConsumed sessionID with
-        | Some false -> true
-        | _ -> false
+        st.TaskComplete
+        || st.Phase = FallbackPhase.Exhausted
+        || (runtime.GetConsumed sessionID = Some false)
+    | None -> (runtime.GetConsumed sessionID = Some false)
 
 /// Derive the GateState from runtime observation.
 /// NeedReviewNudge is always false here because review/nudge dispatch is represented
@@ -135,14 +126,19 @@ let gateState (runtime: FallbackRuntimeState) (sessionID: string) : GateState =
 
 /// The session is settled only when: non-empty sessionID, terminal observation holds,
 /// and the gate model resolves to Resolve (no higher-priority gate open).
+/// TaskComplete=true immediately overrides and settles the gate.
 let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) : bool =
     if sessionID = "" then
         false
-    elif not (terminalObservation runtime sessionID) then
-        false
     else
-        let gates = gateState runtime sessionID
-        decide gates = Resolve
+        match runtime.TryGetState sessionID with
+        | Some st when st.TaskComplete -> true
+        | _ ->
+            if not (terminalObservation runtime sessionID) then
+                false
+            else
+                let gates = gateState runtime sessionID
+                decide gates = Resolve
 
 /// Register OnStateChanged exactly once; resolve on the next state-change signal.
 let private waitForStateChange (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =

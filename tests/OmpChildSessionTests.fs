@@ -75,7 +75,7 @@ let createChildSessionRunnerToolNames () =
             equal ("runner child tool " + string i) ompRunnerChildToolNames.[i] captured.Value.[i]
     }
 
-let runSubagentOnExistingSessionResetsTaskComplete () =
+let runSubagentOnExistingSessionDoesNotResetTaskComplete () =
     promise {
         let rt = FallbackRuntimeState()
         let childId = "omp-child-continue-reset"
@@ -127,9 +127,8 @@ let runSubagentOnExistingSessionResetsTaskComplete () =
                 (Some config)
 
         do! yieldMicrotask ()
-        check "OMP continue resets TaskComplete to false" (not (rt.GetOrCreateState childId).TaskComplete)
+        check "OMP continue does NOT reset TaskComplete to false" (rt.GetOrCreateState childId).TaskComplete
 
-        rt.SetTaskComplete childId true
         let! text = runP
         equal "OMP continue gets output" "(no output)" text
     }
@@ -232,6 +231,6 @@ let run () =
     promise {
         do! createChildSessionReviewToolNames ()
         do! createChildSessionRunnerToolNames ()
-        do! runSubagentOnExistingSessionResetsTaskComplete ()
+        do! runSubagentOnExistingSessionDoesNotResetTaskComplete ()
         do! runSubagentOnExistingSessionCompletesDespiteRetryingAfterNetworkError ()
     }

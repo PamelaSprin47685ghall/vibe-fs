@@ -10,6 +10,12 @@ open Wanxiangshu.E2e.OpencodePluginContinueRecoveryTests
 module Dyn = Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.Dyn
 
+let private deferred (name: string) : JS.Promise<unit> * (unit -> unit) =
+    let resolver = ref (fun () -> ())
+    let pending = Promise.create (fun resolve _ -> resolver.Value <- resolve)
+
+    pending, (fun () -> resolver.Value())
+
 let runNudgeTests
     (harness: Harness)
     (chk: string -> bool -> unit)
@@ -69,13 +75,14 @@ let runNudgeTests
                            properties = {| sessionID = nudgeAbortHarness.sessionId |} |} |}
             )
 
-        do! Promise.sleep 100
+        do! yieldMicrotask ()
         do! nudgeAbortHarness.dispose ()
         chk "op.nudge.skippedWhenLastAssistantFinishIsAbort" (nudgeAbortPromptCalls = 0)
 
         // --- 12. Fallback continue on tool-finish idle followed by error --------
         let mutable fbPromptCalls = 0
         let mutable fbPromptText = ""
+        let fbPromptCalled, signalFbPromptCalled = deferred "fbPromptCalled"
 
         let fbOpts =
             createObj
@@ -114,6 +121,7 @@ let runNudgeTests
                                     let firstPart = partsArr.[0]
                                     fbPromptText <- Dyn.str firstPart "text"
 
+                                signalFbPromptCalled ()
                                 Promise.lift (box {| ok = true |}))
                             "model",
                             box
@@ -137,7 +145,7 @@ let runNudgeTests
                            properties = {| sessionID = fbHarness.sessionId |} |} |}
             )
 
-        do! Promise.sleep 100
+        do! yieldMicrotask ()
 
         let! _ =
             fbHarness.runLifecycleHook
@@ -148,11 +156,7 @@ let runNudgeTests
                       "error", box (createObj [ "name", box "EmptyOutputError"; "message", box "empty output" ]) ])
                 (createObj [])
 
-        let mutable fbTicks = 0
-
-        while fbPromptCalls = 0 && fbTicks < 20 do
-            do! Promise.sleep 50
-            fbTicks <- fbTicks + 1
+        do! withTimeout fbPromptCalled
 
         do! fbHarness.dispose ()
         chk "op.fallback.continueOnToolFinishIdleError" (fbPromptCalls = 1)
@@ -160,6 +164,7 @@ let runNudgeTests
 
         // --- 13. Bug1: loop active + empty text → nudge loop ---------------
         let mutable bug1PromptCalls = 0
+        let bug1PromptCalled, signalBug1PromptCalled = deferred "bug1PromptCalled"
 
         let bug1Msgs: obj array =
             [| box (
@@ -186,6 +191,7 @@ let runNudgeTests
                             "prompt",
                             box (fun _ ->
                                 bug1PromptCalls <- bug1PromptCalls + 1
+                                signalBug1PromptCalled ()
                                 Promise.lift (box {| ok = true |}))
                             "create", box (fun _ -> Promise.lift (box {| data = {| id = "mock-review" |} |})) ]
                   ) ]
@@ -194,7 +200,6 @@ let runNudgeTests
         let bug1Harness = unbox<Harness> bug1HarnessObj
 
         let! _ = bug1Harness.runCommandExecuteBefore "loop" "fix the bug"
-        do! Promise.sleep 50
 
         let! _ =
             bug1Harness.fireEvent (
@@ -204,7 +209,7 @@ let runNudgeTests
                            properties = {| sessionID = bug1Harness.sessionId |} |} |}
             )
 
-        do! Promise.sleep 100
+        do! withTimeout bug1PromptCalled
         do! bug1Harness.dispose ()
         chk "op.bug1.loopActiveEmptyTextTriggersNudge" (bug1PromptCalls >= 1)
 
