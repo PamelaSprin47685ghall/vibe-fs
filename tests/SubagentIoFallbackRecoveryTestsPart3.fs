@@ -39,7 +39,6 @@ let runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () =
                 TaskComplete = false }
 
         rt.SetConsumed childId false
-
         let textExtracted = ref false
 
         let client =
@@ -215,14 +214,6 @@ let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
 
         let completedBeforePhaseReset = textExtracted.Value
 
-        if not completedBeforePhaseReset then
-            let current = rt.GetOrCreateState childId
-
-            rt.UpdateState
-                childId
-                { current with
-                    Phase = FallbackPhase.Idle }
-
         let! result = runP
 
         check "completed before residual phase reset" completedBeforePhaseReset
@@ -232,8 +223,88 @@ let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
         | Error _ -> failwith "expected Ok result"
     }
 
+let runSubagentContinueResetsTaskComplete () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let registry = ChildAgentRegistry.Create()
+        let childId = "child-continue-reset"
+        registry.RegisterChildAgent(childId, "investigator", Some "parent-3")
+
+        let s0 = rt.GetOrCreateState childId
+        rt.UpdateState childId { s0 with TaskComplete = true }
+
+        let textExtracted = ref false
+        let promptStartedResolver = ref (fun () -> ())
+
+        let promptStarted =
+            Promise.create (fun resolve _ -> promptStartedResolver.Value <- resolve)
+
+        let finalMessages =
+            createObj
+                [ "data",
+                  box
+                      [| createObj
+                             [ "info", box (createObj [ "role", box "assistant" ])
+                               "parts", box [| box (createObj [ "type", box "text"; "text", box "final-output" ]) |] ] |] ]
+
+        let session =
+            createObj
+                [ "create",
+                  box (
+                      System.Func<obj, JS.Promise<obj>>(fun _ ->
+                          promise { return box {| data = box {| id = childId |} |} })
+                  )
+                  "prompt",
+                  box (
+                      System.Func<obj, JS.Promise<unit>>(fun _ ->
+                          promise {
+                              promptStartedResolver.Value()
+                              do! yieldMicrotask ()
+                              return ()
+                          })
+                  )
+                  "messages",
+                  box (
+                      System.Func<obj, JS.Promise<obj>>(fun _ ->
+                          textExtracted.Value <- true
+                          Promise.lift finalMessages)
+                  )
+                  "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
+
+        let client = createObj [ "session", box session ]
+
+        let runP =
+            runSubagentCoreResult
+                rt
+                registry
+                client
+                "investigator"
+                "Continue"
+                "go"
+                "/tmp"
+                "parent-3"
+                (box null)
+                (box null)
+                false
+                (Some childId)
+
+        do! promptStarted
+        do! yieldMicrotask ()
+        do! yieldMicrotask ()
+        check "TaskComplete reset to false blocks early extract on continue" (not textExtracted.Value)
+
+        rt.SetTaskComplete childId true
+        let! result = runP
+        check "text extracted after continue task completes" textExtracted.Value
+
+        match result with
+        | Ok text -> check "continue output present" (text.Contains "final-output")
+        | Error _ -> failwith "expected Ok"
+    }
+
 let run () =
     promise {
         do! runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve ()
         do! runSubagentCompletesDespiteRetryingPhaseAfterNetworkError ()
+        do! runSubagentContinueResetsTaskComplete ()
     }

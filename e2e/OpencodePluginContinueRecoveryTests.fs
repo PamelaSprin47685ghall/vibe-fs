@@ -16,7 +16,11 @@ open Wanxiangshu.Kernel.PromptFrontMatter
 let private deferred (name: string) : JS.Promise<unit> * (unit -> unit) =
     let resolver = ref (fun () -> ())
     let pending = Promise.create (fun resolve _ -> resolver.Value <- resolve)
-    pending, (fun () -> resolver.Value())
+
+    pending,
+    (fun () ->
+        printfn "signal %s called" name
+        resolver.Value())
 
 let private iteratorFromOutput (output: string) : string option =
     let parsed = parseFrontMatter output
@@ -31,15 +35,6 @@ let private iteratorFromOutput (output: string) : string option =
         else
             let arr: string array = unbox iters
             if arr.Length > 0 then Some arr.[0] else None
-
-let private withTimeout<'T> (p: JS.Promise<'T>) : JS.Promise<'T> =
-    let timeoutPromise =
-        promise {
-            do! Promise.sleep 1000
-            return! Promise.reject (System.Exception("Timeout after 1000ms"))
-        }
-
-    Promise.race [ p; unbox timeoutPromise ]
 
 let run
     (startHarness: obj -> JS.Promise<obj>)
@@ -67,6 +62,7 @@ let run
                   "prompt",
                   box (fun _ ->
                       promptCount.Value <- promptCount.Value + 1
+                      printfn "mockSessionClient.prompt called, count = %d" promptCount.Value
 
                       match promptCount.Value with
                       | 1 ->

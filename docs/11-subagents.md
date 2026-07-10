@@ -57,7 +57,7 @@
 
 **等待门**：`waitForSubagentSettle` 在 `FallbackPhase.Retrying` 时保持等待，**但当 `TaskComplete=true` 时必须释放**。终态事实覆盖残留相位——相位是过程，终态是结果。
 
-**测试纪律**：验证事件顺序（状态转换、promise resolve 时机），不验证文本内容或固定时间。使用 `yieldMicrotask`、`Promise.create` 事件门闩、状态断言，禁用 `Promise.sleep`、`Date.now`。
+**测试纪律**：验证事件顺序（状态转换、promise resolve 时机），不验证文本内容。使用 `yieldMicrotask`、`Promise.create` 事件门闩、状态断言，禁用 `Promise.sleep` 和 `Date.now`。对于 E2E 测试中的所有异步等待，必须应用统一的 1 秒超时定时器辅助方法 `withTimeout` 进行 race 包装，以实现 fail-fast 效果，绝对不能无限期超时挂起。
 
 ## 相关
 

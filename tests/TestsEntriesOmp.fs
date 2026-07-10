@@ -87,6 +87,8 @@ let ompTestEntries () : (string * TestBody) list =
       Async OmpChildSessionTests.createChildSessionReviewToolNames
       "OmpChildSessionTests.createChildSessionRunnerToolNames",
       Async OmpChildSessionTests.createChildSessionRunnerToolNames
+      "OmpChildSessionTests.runSubagentOnExistingSessionResetsTaskComplete",
+      Async OmpChildSessionTests.runSubagentOnExistingSessionResetsTaskComplete
       "OmpRunnerTests.waitRunnerJobAfterAppendLog", Async OmpRunnerTests.waitRunnerJobAfterAppendLog
       "OmpRunnerTests.setRunnerJobStateForTestHasRunning", Sync(sync OmpRunnerTests.setRunnerJobStateForTestHasRunning)
       "OmpRunnerTests.abortRunnerJobClearsRunning", Sync(sync OmpRunnerTests.abortRunnerJobClearsRunning)
@@ -120,12 +122,9 @@ let ompTestEntries () : (string * TestBody) list =
       "OmpPluginCoreTests.reviewStoreIsSharedSingleton", Sync(sync OmpPluginCoreTests.reviewStoreIsSharedSingleton)
       "OmpPluginCoreTests.clearReviewStatesNoError", Sync(sync OmpPluginCoreTests.clearReviewStatesNoError)
       "OmpPluginCoreTests.abortHookDeactivatesReview", Async OmpPluginCoreTests.abortHookDeactivatesReview
-      "OmpPluginCoreTests.streamAbortHookDeactivatesReview",
-      Async OmpPluginCoreTests.streamAbortHookDeactivatesReview
-      "OmpPluginCoreTests.sessionErrorHookDeactivatesReview",
-      Async OmpPluginCoreTests.sessionErrorHookDeactivatesReview
-      "OmpPluginCoreTests.unrelatedEventLeavesReviewActive",
-      Async OmpPluginCoreTests.unrelatedEventLeavesReviewActive
+      "OmpPluginCoreTests.streamAbortHookDeactivatesReview", Async OmpPluginCoreTests.streamAbortHookDeactivatesReview
+      "OmpPluginCoreTests.sessionErrorHookDeactivatesReview", Async OmpPluginCoreTests.sessionErrorHookDeactivatesReview
+      "OmpPluginCoreTests.unrelatedEventLeavesReviewActive", Async OmpPluginCoreTests.unrelatedEventLeavesReviewActive
       "OmpMagicTodoTests.sharedSessionStoreByHost", Sync(sync OmpMagicTodoTests.sharedSessionStoreByHost)
       "OmpMagicTodoTests.hostPartitionedReports", Sync(sync OmpMagicTodoTests.hostPartitionedReports)
       "OmpMagicTodoTests.backlogEntryFromTodoInputHostAgnostic",

@@ -98,6 +98,9 @@ let equal (label: string) (expected: 'a) (actual: 'a) : unit =
 [<Emit("Promise.race([$0, new Promise((_, reject) => setTimeout(() => reject(new Error($1)), $2))])")>]
 let private raceWithTimeout (p: JS.Promise<'a>) (msg: string) (ms: int) : JS.Promise<'a> = jsNative
 
+let withTimeout<'T> (p: JS.Promise<'T>) : JS.Promise<'T> =
+    raceWithTimeout p "Timeout after 1000ms" 1000
+
 /// Time a synchronous test body; catches exceptions so one throwing test does not abort the suite.
 let timed (label: string) (f: unit -> unit) : unit =
     currentTestLabel <- label
@@ -125,6 +128,7 @@ let asyncSuiteTimeoutMs = 1000
 /// Promise failure / timeout / throw are all converged into a single failure record.
 let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
     currentTestLabel <- label
+
     promise {
         let start = now ()
 
@@ -148,6 +152,7 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
 
 let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
     currentTestLabel <- label
+
     promise {
         let start = now ()
 
