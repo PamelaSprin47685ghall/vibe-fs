@@ -18,6 +18,7 @@ type ToolSemantic =
     | FuzzyGrep
     | SearchFamily
     | SubagentWebSkillOrSubmit
+    | PtyFamily
     | Other
 
 let private knownAgentSet =
@@ -61,6 +62,7 @@ let private isDispatchOrWebSkillTool (t: string) =
     || t = "ask_user_question"
     || t = "skill"
     || t = "submit_review"
+    || t = "continue"
 
 let classifyTool (host: Host) (tool: Tool) : ToolSemantic =
     let t = normalizeToolName host tool
@@ -87,6 +89,8 @@ let classifyTool (host: Host) (tool: Tool) : ToolSemantic =
         FuzzyGrep
     elif t = "fuzzy_find" || t = "fuzzy_continue" || t = "glob" || t = "grep_x" then
         SearchFamily
+    elif t.StartsWith "pty_" then
+        PtyFamily
     else
         Other
 
@@ -97,6 +101,11 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
     | _, BlockedShellTaskGrep -> false
     | _, StealthBrowser -> agent = "browser"
     | _, ReturnRoleEcho -> tool = sprintf "return_%s" agent
+    | _, PtyFamily ->
+        if agent = "investigator" || agent = "manager" then
+            true
+        else
+            false
     | "meditator", Read -> true
     | "meditator", SubagentWebSkillOrSubmit when tool = "investigator" -> true
     | "meditator", _

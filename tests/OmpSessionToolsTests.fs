@@ -21,8 +21,6 @@ let mainSessionStripsChildOnlyAndBash () =
            "meditator"
            "browser"
            "executor"
-           "executor_wait"
-           "executor_abort"
            "submit_review"
            "return_reviewer"
            "websearch"

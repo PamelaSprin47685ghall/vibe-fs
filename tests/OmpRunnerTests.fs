@@ -66,6 +66,4 @@ let abortExecutorRunClearsActive () =
     check "not running after abort" (not (hasRunningRunnerJob testScope sessionId))
 
 let executorChildToolNamesMatchOmpSessionTools () =
-    equal "executor child names length" ompRunnerChildToolNames.Length 2
-    equal "executor child wait" "executor_wait" ompRunnerChildToolNames.[0]
-    equal "executor child abort" "executor_abort" ompRunnerChildToolNames.[1]
+    equal "executor child names length" 0 ompRunnerChildToolNames.Length

@@ -15,8 +15,6 @@ let runOmpToolRegistry (h: OmpHarness) (chk: string -> bool -> unit) =
             [ "fuzzy_find"
               "fuzzy_grep"
               "executor"
-              "executor_wait"
-              "executor_abort"
               "todowrite"
               "submit_review"
               "return_reviewer"
@@ -98,18 +96,6 @@ let runOmpExecutorTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId
 
         let execStr = jsonStringify executorResult
         chk "e2e-omp.executor.responded" (execStr.Contains "hello" && not (execStr.Contains "error"))
-
-        let! execWaitResult = h.triggerTool "executor_wait" (box {| ms = 100 |}) sessionId (createObj [])
-
-        let waitStr = jsonStringify execWaitResult
-        chk "e2e-omp.executor_wait.responded" (not (waitStr.Contains "error"))
-
-        let! execAbortResult = h.triggerTool "executor_abort" (createObj []) sessionId (createObj [])
-        let abortStr = jsonStringify execAbortResult
-
-        chk
-            "e2e-omp.executor_abort.responded"
-            (abortStr.Contains "Runner abort requested." && not (abortStr.Contains "error"))
     }
 
 let runOmpWebTools (h: OmpHarness) (chk: string -> bool -> unit) (sessionId: string) =

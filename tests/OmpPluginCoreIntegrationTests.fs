@@ -48,8 +48,6 @@ let private createHarness () : PiHarness =
                      "meditator"
                      "browser"
                      "executor"
-                     "executor_wait"
-                     "executor_abort"
                      "submit_review"
                      "return_reviewer"
                      "websearch"

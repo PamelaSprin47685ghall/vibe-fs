@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.ToolCatalogRegistryTests
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.ToolCatalog
 
-let allCountIs16 () = equal "16 tools" 16 all.Length
+let allCountIs19 () = equal "19 tools" 19 all.Length
 
 let allNamesAreNonEmpty () =
     for spec in all do
@@ -79,8 +79,23 @@ let allParamDocsConsistent () =
         for n in names do
             check (spec.name + "." + n + " doc non-empty") (spec.paramDocs[n] <> "")
 
+let ptySpawnSpecExists () =
+    match specOf "pty_spawn" with
+    | Ok spec -> equal "name" "pty_spawn" spec.name
+    | Error e -> check ("ptySpawnSpecExists failed: " + e) false
+
+let executorWaitNotExist () =
+    match specOf "executor_wait" with
+    | Error msg -> check "contains unknown tool" (msg.Contains("unknown tool"))
+    | Ok _ -> check "executor_wait should not exist in catalog" false
+
+let executorAbortNotExist () =
+    match specOf "executor_abort" with
+    | Error msg -> check "contains unknown tool" (msg.Contains("unknown tool"))
+    | Ok _ -> check "executor_abort should not exist in catalog" false
+
 let run () =
-    allCountIs16 ()
+    allCountIs19 ()
     allNamesAreNonEmpty ()
     allDescriptionsAreNonEmpty ()
     allNamesAreUnique ()
@@ -96,3 +111,6 @@ let run () =
     coderSpecExists ()
     executorSpecHasRequiredFields ()
     allParamDocsConsistent ()
+    ptySpawnSpecExists ()
+    executorWaitNotExist ()
+    executorAbortNotExist ()

@@ -137,8 +137,6 @@ let allToolNames (host: Host) : string array =
        "meditator"
        "browser"
        "executor"
-       "executor_wait"
-       "executor_abort"
        "pty_spawn"
        "pty_write"
        "pty_read"

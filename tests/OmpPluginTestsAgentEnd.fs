@@ -216,14 +216,6 @@ let agentEndTodoNudgeWhenOpenPhases () =
         do! rmAsync workspaceDir
     }
 
-let runnerNudgePromptUsesExecutorToolNames () =
-    let text =
-        Wanxiangshu.Kernel.PromptFragments.runnerNudgePromptFor Wanxiangshu.Kernel.HostTools.omp
-
-    check "runner nudge names executor_wait" (text.Contains "executor_wait")
-    check "runner nudge names executor_abort" (text.Contains "executor_abort")
-    check "runner nudge avoids legacy runner_wait" (not (text.Contains "runner_wait"))
-
 let run () =
     promise {
         do! agentEndRunnerNudgeBeforeLoop ()
@@ -231,5 +223,4 @@ let run () =
         do! agentEndSkipsLoopNudgeWithoutWorkerTaskAnchor ()
         do! agentEndSkipsLoopNudgeWhenPendingMessages ()
         do! agentEndTodoNudgeWhenOpenPhases ()
-        runnerNudgePromptUsesExecutorToolNames ()
     }

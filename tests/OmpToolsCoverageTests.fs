@@ -25,8 +25,8 @@ let run () =
         Wanxiangshu.Omp.ExecutorTools.registerExecutorTools pi
         let names = toolNames h |> Set.ofList
         check "executor tool registered" (names.Contains "executor")
-        check "executor_wait tool registered" (names.Contains "executor_wait")
-        check "executor_abort tool registered" (names.Contains "executor_abort")
+        check "executor_wait tool not registered" (not (names.Contains "executor_wait"))
+        check "executor_abort tool not registered" (not (names.Contains "executor_abort"))
         let execTool = h.tools |> Seq.find (fun t -> Dyn.str t "name" = "executor")
         check "executor has parameters" (Dyn.has execTool "parameters")
         check "executor has execute" (Dyn.has execTool "execute")

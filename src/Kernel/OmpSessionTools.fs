@@ -4,7 +4,7 @@ let ompSubagentToolNames = [| "coder"; "investigator"; "meditator"; "browser" |]
 
 let ompReviewChildToolNames = [| "read"; "return_reviewer" |]
 
-let ompRunnerChildToolNames = [| "executor_wait"; "executor_abort" |]
+let ompRunnerChildToolNames = [||]
 
 let ompChildOnlyToolNames =
     [| "find"
@@ -13,8 +13,6 @@ let ompChildOnlyToolNames =
        "lsp"
        "fuzzy_find"
        "fuzzy_grep"
-       "executor_wait"
-       "executor_abort"
        "return_reviewer"
        "search"
        "glob"

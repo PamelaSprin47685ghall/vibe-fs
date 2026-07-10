@@ -30,29 +30,8 @@ let private nodeBuffer: obj = jsNative
 
 let private byteLength (s: string) : int = nodeBuffer?byteLength (s, "utf-8")
 
-[<Global("process")>]
-let private nodeProcess: obj = jsNative
-
-let private envVar (name: string) : string =
-    let v = nodeProcess?env?(name)
-    if isNull v then "" else string v
-
-let executorMaxWaitMs = 60_000
-
 let ompScope = RuntimeScope()
 let private sessionExecutor = createForScope ompScope
-
-let private getExecutorMinWaitMs (scope: RuntimeScope) : int =
-    let envVal = envVar "OMP_EXECUTOR_MIN_WAIT"
-
-    if envVal <> "" then
-        match System.Int32.TryParse envVal with
-        | true, v -> v
-        | _ -> 500
-    else
-        match scope.TryFindKey "omp.executor_min_wait" with
-        | Some v -> unbox<int> v
-        | None -> 500
 
 let private parseExecutorParams (params': obj) (ctx: obj) =
     let lang = let l = Dyn.str params' "language" in if l = "" then "shell" else l
@@ -72,14 +51,7 @@ let private parseExecutorParams (params': obj) (ctx: obj) =
     let cwd = Dyn.str ctx "cwd"
     (lang, program, what, timeoutType, mode, deps, cwd)
 
-let private runExecutorJob
-    (pi: obj)
-    (ctx: obj)
-    (parentId: string)
-    (childId: string)
-    (options: ExecuteOptions)
-    (signal: obj)
-    =
+let private runExecutorJob (options: ExecuteOptions) (signal: obj) (childId: string) =
     promise {
         let runWork =
             sessionExecutor.EnqueuePerSession(
@@ -87,20 +59,11 @@ let private runExecutorJob
                 fun () ->
                     promise {
                         let! r = executeWith defaultExecuteDeps options childId None
-                        let output = outputFromResult r
-                        appendRunnerLog ompScope childId output
-
-                        if parentId <> "" then
-                            appendRunnerLog ompScope parentId output
-
                         return r
                     }
             )
 
         let onSignalAbort () =
-            if parentId <> "" then
-                abortRunnerJob ompScope parentId |> ignore
-
             if childId <> "" then
                 abortExecutorRun childId
 
@@ -130,8 +93,6 @@ let private summarizeOutput
 
 let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj) (_onUpdate: obj) (ctx: obj) =
     promise {
-        let parentId = getSessionIdFromContext ctx |> Option.defaultValue ""
-
         let (lang, program, what, timeoutType, mode, deps, cwd) =
             parseExecutorParams params' ctx
 
@@ -154,18 +115,13 @@ let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj)
 
                 childHolder <- None
 
-        let finishJob () =
-            if parentId <> "" then
-                unregisterActiveRunnerSession ompScope parentId
-                unregisterRunnerChild ompScope parentId
-
-            disposeChild ()
+        let finishJob () = disposeChild ()
 
         if System.String.IsNullOrWhiteSpace what then
             return errorResult "Executor: what_to_summarize is required."
         else
             try
-                let! child = createChildSession ompScope pi ctx ompRunnerChildToolNames None [||] None
+                let! child = createChildSession ompScope pi ctx [||] None [||] None
                 childHolder <- Some child
                 let childSession = child.session
                 let childCtx = createObj [ "sessionManager", Dyn.get childSession "sessionManager" ]
@@ -175,10 +131,6 @@ let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj)
                     finishJob ()
                     return errorResult "Executor child session unavailable"
                 else
-                    if parentId <> "" then
-                        registerActiveRunnerSession ompScope parentId
-                        registerRunnerChild ompScope parentId childId disposeChild
-
                     let options =
                         { program = program
                           language = parseLanguage lang
@@ -188,7 +140,7 @@ let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj)
                           cwd = Some cwd
                           whatToSummarize = what }
 
-                    let! result = runExecutorJob pi ctx parentId childId options signal
+                    let! result = runExecutorJob options signal childId
                     let output = outputFromResult result
 
                     if not (shouldSummarize byteLength output) then
@@ -207,26 +159,6 @@ let private executeExecutor (pi: obj) (_id: string) (params': obj) (signal: obj)
                     return asErrorResult ex
     }
 
-let private executeWait (_id: string) (params': obj) (_s: obj) (_u: obj) (ctx: obj) =
-    promise {
-        match getSessionIdFromContext ctx with
-        | None -> return errorResult "No executor session found."
-        | Some sid ->
-            let ms = defaultArg (optInt params' "ms") 2000
-            let waitMs = max (getExecutorMinWaitMs ompScope) (min executorMaxWaitMs ms)
-            let! snippet = waitRunnerJob ompScope sid waitMs
-            return textResult snippet
-    }
-
-let private executeAbort (_id: string) (_p: obj) (_s: obj) (_u: obj) (ctx: obj) =
-    promise {
-        match getSessionIdFromContext ctx with
-        | None -> return errorResult "No executor session found."
-        | Some sid ->
-            let msg = abortRunnerJob ompScope sid
-            return textResult msg
-    }
-
 let registerExecutorTools (pi: obj) : unit =
     let tb = Dyn.get pi "typebox"
 
@@ -237,24 +169,4 @@ let registerExecutorTools (pi: obj) : unit =
               "description", box (description "executor")
               "parameters", executorParameters tb
               "execute", box (fun id p s u c -> executeExecutor pi id p s u c) ]
-    )
-
-    pi?registerTool (
-        createObj
-            [ "name", box "executor_wait"
-              "label", box "Executor Wait"
-              "description", box (description "executor_wait")
-              "defaultInactive", box true
-              "parameters", objectOf [| ("ms", opt "Wait time in milliseconds." tb num) |] tb
-              "execute", box (fun id p s u c -> executeWait id p s u c) ]
-    )
-
-    pi?registerTool (
-        createObj
-            [ "name", box "executor_abort"
-              "label", box "Executor Abort"
-              "description", box (description "executor_abort")
-              "defaultInactive", box true
-              "parameters", objectOf [||] tb
-              "execute", box (fun id p s u c -> executeAbort id p s u c) ]
     )

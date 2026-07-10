@@ -27,8 +27,11 @@ let all: ToolSpec list =
       returnReviewerSpec
       readSpec
       writeSpec
-      executorWaitSpec
-      executorAbortSpec ]
+      ptySpawnSpec
+      ptyWriteSpec
+      ptyReadSpec
+      ptyListSpec
+      ptyKillSpec ]
 
 let private byName: Map<string, ToolSpec> =
     all |> List.map (fun spec -> spec.name, spec) |> Map.ofList

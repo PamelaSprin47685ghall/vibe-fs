@@ -131,9 +131,15 @@ let canUseMatrix () =
           "manager", [ true; false; false; false; false; false; false ]
           "executor", [ true; true; false; false; false; false; false ]
           "stealth-browser-mcp_navigate", [ false; false; false; false; true; false; false ]
+          "pty_spawn", [ true; true; false; false; false; false; false ]
+          "pty_write", [ true; true; false; false; false; false; false ]
+          "pty_read", [ true; true; false; false; false; false; false ]
+          "pty_list", [ true; true; false; false; false; false; false ]
+          "pty_kill", [ true; true; false; false; false; false; false ]
           "return_reviewer", [ false; false; false; true; false; false; false ]
           "return_coder", [ false; false; true; false; false; false; false ]
-          "manage_todo_list", [ true; false; true; true; false; false; false ] ]
+          "manage_todo_list", [ true; false; true; true; false; false; false ]
+          "continue", [ true; false; false; false; false; false; false ] ]
 
     matrix
     |> List.iter (fun (tool, expected) ->
