@@ -148,6 +148,44 @@ let kernelWarnDescriptionsDiffer () =
 
     check "warnTddDescription contains 'Kolmolgorov'" (warnTddDescription.Contains("Kolmolgorov"))
 
+let kernelIsSubagentToolMatrix () =
+    let cases =
+        [ "coder", true
+          "investigator", true
+          "meditator", true
+          "browser", true
+          "read", false
+          "write", false
+          "executor", false ]
+
+    for (tool, expected) in cases do
+        equal ("isSubagentTool " + tool) expected (isSubagentTool tool)
+
+let kernelParseWarnReuseCanonical () =
+    check "parseWarnReuse accepts canonical" (parseWarnReuse warnReuseCanonicalValue)
+
+    check
+        "parseWarnReuse accepts case variant"
+        (parseWarnReuse "THIS-TASK-IS-NOT-SUITABLE-TO-BE-COMPLETED-VIA-CONTINUE-TOOL")
+
+    check
+        "parseWarnReuse accepts spaces"
+        (parseWarnReuse "  this-task-is-not-suitable-to-be-completed-via-continue-tool  ")
+
+let kernelParseWarnReuseRejectsVariants () =
+    let invalid = [ ""; "yes"; "true"; "continue-tool"; "this task is not suitable" ]
+
+    for v in invalid do
+        check ("parseWarnReuse rejects " + v) (not (parseWarnReuse v))
+
+let kernelWarnReuseDescriptionNonEmpty () =
+    check "warnReuseDescription non-empty" (warnReuseDescription <> "")
+
+    check
+        "warnReuseDescription contains subagent"
+        (warnReuseDescription.Contains("subagent")
+         || warnReuseDescription.Contains("continue"))
+
 let run () =
     kernelWarnTddSet ()
     kernelWarnRequiredSet ()
@@ -159,3 +197,7 @@ let run () =
     kernelParseWarnRejectsVariants ()
     kernelCanonicalValuesAreNonEmpty ()
     kernelWarnDescriptionsDiffer ()
+    kernelIsSubagentToolMatrix ()
+    kernelParseWarnReuseCanonical ()
+    kernelParseWarnReuseRejectsVariants ()
+    kernelWarnReuseDescriptionNonEmpty ()

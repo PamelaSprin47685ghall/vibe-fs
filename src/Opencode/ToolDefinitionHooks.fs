@@ -50,6 +50,9 @@ let toolDefinitionFor (host: Host) (input: obj) (output: obj) : JS.Promise<unit>
         if WarnTdd.isWarnRequiredTool toolID then
             rewriteToolJsonSchema setKey (injectWarnIntoJsonSchema) output
 
+        if WarnTdd.isSubagentTool toolID then
+            rewriteToolJsonSchema setKey (injectWarnReuseIntoJsonSchema) output
+
         rewriteToolJsonSchema setKey (injectAmendIntoJsonSchema) output
     }
 

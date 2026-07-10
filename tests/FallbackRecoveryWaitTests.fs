@@ -132,6 +132,24 @@ let isSubagentSettled_falseWhenAwaitingBusy () =
     rt.SetAwaitingBusy sid true
     check "subagent not settled while awaiting busy" (not (isSubagentSettled rt sid))
 
+/// Regression: after a fallback continue receives a busy event, phase becomes
+/// Idle and consumed remains true while the continued model turn is still
+/// running.  Idle + Consumed + TaskComplete=false must NOT be considered settled,
+/// otherwise result extraction can race ahead of fallback work.
+let isSubagentSettled_falseAfterFallbackContinueWhileTaskIncomplete () =
+    let rt = FallbackRuntimeState()
+    let sid = "t-sess-continue-incomplete"
+    rt.SetConsumed sid true
+    let s0 = rt.GetOrCreateState sid
+
+    rt.UpdateState
+        sid
+        { s0 with
+            Phase = FallbackPhase.Idle
+            TaskComplete = false }
+
+    check "Idle + Consumed + TaskComplete=false not settled" (not (isSubagentSettled rt sid))
+
 let waitForSubagentSettle_waitsUntilAwaitingBusyInactive () =
     promise {
         let rt = FallbackRuntimeState()
@@ -153,6 +171,60 @@ let waitForSubagentSettle_waitsUntilAwaitingBusyInactive () =
         check "wait completed after awaiting busy finished" resolved.Value
     }
 
+/// Terminal observation: consumed=false + Phase=Idle + no pending/busy/nudge
+/// → gate model resolves to Resolve → settled.
+let isSubagentSettled_trueWhenConsumedFalseAndIdle () =
+    let rt = FallbackRuntimeState()
+    let sid = "t-sess-consumed-false"
+    rt.SetConsumed sid false
+    let s0 = rt.GetOrCreateState sid
+
+    rt.UpdateState
+        sid
+        { s0 with
+            Phase = FallbackPhase.Idle
+            TaskComplete = false }
+
+    check "Consumed=false + Idle + no active gates → settled" (isSubagentSettled rt sid)
+
+/// Regression: nested gate loop must close fallback gate first, then nudge gate,
+/// then resolve only when terminal observation holds.  Opening event-handling
+/// (fallback gate) + nudge (todo gate), then clearing fallback first must keep
+/// the promise pending; only after nudge clears and consumed=false does it resolve.
+let waitForSubagentSettle_nestedGateLoopResolvesInOrder () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let sid = "nested-gate-sess"
+        rt.GetOrCreateState sid |> ignore
+        rt.SetEventHandlingActive sid true
+        rt.SetNudgeActive sid true
+        let resolved = ref false
+
+        let waitP =
+            promise {
+                do! waitForSubagentSettle rt sid
+                resolved.Value <- true
+            }
+
+        do! yieldMicrotask ()
+        check "pending while both gates open" (not resolved.Value)
+
+        // Close fallback gate only — nudge still active → still pending.
+        rt.SetEventHandlingActive sid false
+        do! yieldMicrotask ()
+        check "still pending after fallback gate closes" (not resolved.Value)
+
+        // Close nudge gate — consumed still None → not terminal → still pending.
+        rt.SetNudgeActive sid false
+        do! yieldMicrotask ()
+        check "still pending after nudge gate closes (no consumed)" (not resolved.Value)
+
+        // Mark consumed=false → terminal observation + Resolve → settles.
+        rt.SetConsumed sid false
+        do! waitP
+        check "resolved after terminal observation" resolved.Value
+    }
+
 let run () =
     promise {
         isSettled_falseWhenFresh ()
@@ -167,5 +239,8 @@ let run () =
         isSubagentSettled_falseWhenEventHandlingActive ()
         do! waitForSubagentSettle_waitsUntilEventHandlingInactive ()
         isSubagentSettled_falseWhenAwaitingBusy ()
+        isSubagentSettled_falseAfterFallbackContinueWhileTaskIncomplete ()
         do! waitForSubagentSettle_waitsUntilAwaitingBusyInactive ()
+        isSubagentSettled_trueWhenConsumedFalseAndIdle ()
+        do! waitForSubagentSettle_nestedGateLoopResolvesInOrder ()
     }

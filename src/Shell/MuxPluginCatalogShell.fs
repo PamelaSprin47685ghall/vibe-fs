@@ -80,3 +80,20 @@ let injectAmendIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
             )
 
     tool
+
+let injectWarnReuseIntoMuxSchema (tool: ToolDefinition) : ToolDefinition =
+    if WarnTdd.isSubagentTool tool.name then
+        let props = tool.parameters.properties
+
+        if isNullish (props?warn_reuse) then
+            props?("warn_reuse") <-
+                box (
+                    createObj
+                        [| "type", box "string"
+                           "enum", box [| box WarnTdd.warnReuseCanonicalValue |]
+                           "description", box WarnTdd.warnReuseDescription |]
+                )
+
+        addRequired tool.parameters "warn_reuse"
+
+    tool

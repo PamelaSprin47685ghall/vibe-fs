@@ -35,6 +35,7 @@ open Wanxiangshu.Tests.EventLogRuntimeTests
 open Wanxiangshu.Tests.EventLogRuntimeRobustnessTests
 open Wanxiangshu.Tests.AmendTests
 open Wanxiangshu.Tests.AmendSchemaTests
+open Wanxiangshu.Tests.TestsEntriesSessionLoop
 
 let coreTestEntries () : (string * TestBody) list =
     [ "ReviewTests.transition'", TestBody.Sync(sync ReviewTests.transition')
@@ -123,6 +124,7 @@ let coreTestEntries () : (string * TestBody) list =
       "KernelPromptSpecs.domainErrorsShared", TestBody.Sync(sync KernelPromptSpecs.domainErrorsShared)
       "AmendTests.runAll", TestBody.Sync AmendTests.runAll
       "AmendSchemaTests.runAll", TestBody.Sync AmendSchemaTests.runAll ]
+    @ sessionLoopTestEntries ()
     @ TestsEntriesCoreTail.tailCoreTestEntries ()
     @ TestsEntriesFallback.tailTestEntries ()
     @ fallbackTestEntries ()

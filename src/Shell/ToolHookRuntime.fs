@@ -114,6 +114,25 @@ let requireWarnOnArgs (tool: string) (args: obj) : Result<unit, string> =
 
             Result.Error(wireDomainFailure tool err)
 
+let requireWarnReuseOnArgs (tool: string) (args: obj) : Result<unit, string> =
+    if not (WarnTdd.isSubagentTool tool) then
+        Result.Ok()
+    else
+        let raw = DynField.strField args "warn_reuse" |> Option.defaultValue ""
+
+        if WarnTdd.parseWarnReuse raw then
+            Dyn.deleteKey args "warn_reuse"
+            Result.Ok()
+        else
+            let err =
+                InvalidIntent(
+                    tool,
+                    "warn_reuse",
+                    "required — acknowledge this task is not suitable for completion via continue tool"
+                )
+
+            Result.Error(wireDomainFailure tool err)
+
 let muxToolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
     promise {
         let tool = toolNameFromHookInputMux input
@@ -128,13 +147,27 @@ let muxToolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
 
             sanitizeNullArgs tool args
 
+            let mutable hasError = false
+
             match requireWarnTddOnArgs tool args with
-            | Result.Error e -> setHookErrorMux output e
+            | Result.Error e ->
+                setHookErrorMux output e
+                hasError <- true
             | Result.Ok() -> ()
 
-            match requireWarnOnArgs tool args with
-            | Result.Error e -> setHookErrorMux output e
-            | Result.Ok() -> ()
+            if not hasError then
+                match requireWarnOnArgs tool args with
+                | Result.Error e ->
+                    setHookErrorMux output e
+                    hasError <- true
+                | Result.Ok() -> ()
+
+            if not hasError then
+                match requireWarnReuseOnArgs tool args with
+                | Result.Error e ->
+                    setHookErrorMux output e
+                    hasError <- true
+                | Result.Ok() -> ()
 
             let rawOpt: obj option = args?intents
 

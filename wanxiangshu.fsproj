@@ -105,6 +105,7 @@
     <Compile Include="src/Kernel/FuzzyFormat.fs"/>
     <Compile Include="src/Kernel/ExecutorStrip.fs"/>
     <Compile Include="src/Kernel/WebFetchGuard.fs"/>
+    <Compile Include="src/Kernel/SessionLoop.fs"/>
     <Compile Include="src/Shell/Dyn.fs"/>
     <Compile Include="src/Shell/Profiler.fs"/>
     <Compile Include="src/Methodology/Args.fs"/>
@@ -356,6 +357,7 @@
     <Compile Include="tests/Assert.fs"/>
     <Compile Include="tests/AmendTests.fs"/>
     <Compile Include="tests/AmendSchemaTests.fs"/>
+    <Compile Include="tests/SessionLoopTests.fs"/>
     <Compile Include="tests/AsyncFlush.fs"/>
     <Compile Include="tests/EventLogFoldTests.fs"/>
     <Compile Include="tests/WanxiangzhenSquadEventTests.fs"/>
@@ -665,6 +667,7 @@
     <Compile Include="tests/Wanxiangzhen/TaskTests.fs"/>
     <Compile Include="tests/TestsEntriesWanxiangzhen.fs"/>
     <Compile Include="tests/TestsEntriesCoreTail.fs"/>
+    <Compile Include="tests/TestsEntriesSessionLoop.fs"/>
     <Compile Include="tests/TestsEntriesCore.fs"/>
     <Compile Include="tests/TestsEntriesCodec.fs"/>
     <Compile Include="tests/OmpReviewLoopAsyncTests.fs"/>

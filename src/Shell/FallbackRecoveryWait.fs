@@ -2,22 +2,27 @@ module Wanxiangshu.Shell.FallbackRecoveryWait
 
 open Fable.Core
 open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Kernel.SessionLoop
 open Wanxiangshu.Shell.FallbackRuntimeState
+
+// ── Recovery settlement (unchanged logic, kept for backward compat) ──
 
 let isRecoverySettled (runtime: FallbackRuntimeState) (sessionID: string) : bool =
     match runtime.GetConsumed sessionID with
     | Some true -> true
     | _ ->
-        let st = runtime.GetOrCreateState sessionID
-        st.Phase = FallbackPhase.Exhausted
+        match runtime.TryGetState sessionID with
+        | Some st -> st.Phase = FallbackPhase.Exhausted
+        | None -> false
 
 let isToolCallTextRecoveryInProgress (runtime: FallbackRuntimeState) (sessionID: string) : bool =
-    let st = runtime.GetOrCreateState sessionID
-
-    match st.Phase with
-    | FallbackPhase.ScanningToolCallText
-    | FallbackPhase.RecoveringToolCallText -> true
-    | _ -> false
+    match runtime.TryGetState sessionID with
+    | Some st ->
+        match st.Phase with
+        | FallbackPhase.ScanningToolCallText
+        | FallbackPhase.RecoveringToolCallText -> true
+        | _ -> false
+    | None -> false
 
 let waitForRecovery (runtime: FallbackRuntimeState) (sessionID: string) (_maxTurns: int) : JS.Promise<unit> =
     promise {
@@ -60,52 +65,112 @@ let waitForToolCallTextRecovery (runtime: FallbackRuntimeState) (sessionID: stri
             return! p
     }
 
-let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) : bool =
-    if sessionID = "" then
+// ── Subagent settlement via explicit SessionLoop gate model ──
+
+/// True when fallback work is actively in progress or the session is busy in any way.
+/// Maps to `NeedFallbackContinue` in the gate model.
+let fallbackGateOpen (runtime: FallbackRuntimeState) (sessionID: string) : bool =
+    if runtime.IsEventHandlingActive sessionID then
         true
-    else if runtime.IsEventHandlingActive sessionID || runtime.IsAwaitingBusy sessionID then
+    elif runtime.IsAwaitingBusy sessionID then
+        true
+    elif runtime.IsSubsessionPending sessionID then
+        true
+    elif runtime.GetBusyCount sessionID > 0 then
+        true
+    elif runtime.IsNudgeActive sessionID then
+        // nudge activity alone doesn't open the fallback gate, but it blocks resolve
         false
     else
-        let st = runtime.GetOrCreateState sessionID
-        let busy = runtime.GetBusyCount sessionID > 0
-        let nudgeAct = runtime.IsNudgeActive sessionID
+        match runtime.TryGetState sessionID with
+        | Some st ->
+            match st.Phase with
+            | FallbackPhase.Retrying _
+            | FallbackPhase.Scanning _
+            | FallbackPhase.ScanningToolCallText
+            | FallbackPhase.RecoveringToolCallText -> true
+            | FallbackPhase.Idle ->
+                // Idle + consumed=true + TaskComplete=false = fallback continue received
+                // but model turn still running → not terminal, gate stays open.
+                match runtime.GetConsumed sessionID with
+                | Some true -> not st.TaskComplete
+                | _ -> false
+            | FallbackPhase.Exhausted -> false
+        | None -> false
 
-        if st.TaskComplete && not busy && not nudgeAct then
+/// True when the session has reached a terminal observation: TaskComplete, Exhausted,
+/// or consumed=false.  A fresh session with no state and no consumed result is NOT
+/// terminal — terminality requires explicit evidence (TaskComplete / Exhausted / Consumed=false).
+/// Uses TryGetState so observation never creates hidden state.
+let terminalObservation (runtime: FallbackRuntimeState) (sessionID: string) : bool =
+    match runtime.TryGetState sessionID with
+    | Some st ->
+        if st.TaskComplete then
+            true
+        elif st.Phase = FallbackPhase.Exhausted then
             true
         else
-            let fbActive =
-                if not (runtime.HasState sessionID) then
-                    false
-                else
-                    match st.Phase with
-                    | FallbackPhase.Scanning _
-                    | FallbackPhase.Retrying _
-                    | FallbackPhase.ScanningToolCallText
-                    | FallbackPhase.RecoveringToolCallText -> true
-                    | FallbackPhase.Idle ->
-                        match runtime.GetConsumed sessionID with
-                        | Some true -> true
-                        | _ -> false
-                    | FallbackPhase.Exhausted -> false
+            match runtime.GetConsumed sessionID with
+            | Some false -> true
+            | _ -> false
+    | None ->
+        match runtime.GetConsumed sessionID with
+        | Some false -> true
+        | _ -> false
 
-            let pending = runtime.IsSubsessionPending sessionID
+/// Derive the GateState from runtime observation.
+/// NeedReviewNudge is always false here because review/nudge dispatch is represented
+/// by the runtime's active gate (event handling / awaiting busy), not a separate nudge flag.
+let gateState (runtime: FallbackRuntimeState) (sessionID: string) : GateState =
+    { NeedFallbackContinue = fallbackGateOpen runtime sessionID
+      NeedTodoNudge = runtime.IsNudgeActive sessionID
+      NeedReviewNudge = false }
 
-            not pending && not busy && not fbActive && not nudgeAct
+/// The session is settled only when: non-empty sessionID, terminal observation holds,
+/// and the gate model resolves to Resolve (no higher-priority gate open).
+let isSubagentSettled (runtime: FallbackRuntimeState) (sessionID: string) : bool =
+    if sessionID = "" then
+        false
+    elif not (terminalObservation runtime sessionID) then
+        false
+    else
+        let gates = gateState runtime sessionID
+        decide gates = Resolve
 
-let waitForSubagentSettle (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
+/// Register OnStateChanged exactly once; resolve on the next state-change signal.
+let private waitForStateChange (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
+    Promise.create (fun resolve _ -> runtime.OnStateChanged sessionID (fun () -> resolve ()))
+
+/// Nested gate loop: fallback continue gate must settle first, then todo/review
+/// nudge gates, then resolve.  Each gate waits for exactly one state change
+/// before re-evaluating, mirroring the priority order in `SessionLoop.decide`.
+let rec waitForSubagentSettle (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
     promise {
-        if sessionID = "" || isSubagentSettled runtime sessionID then
+        if sessionID = "" then
+            return ()
+        elif isSubagentSettled runtime sessionID then
             return ()
         else
-            let resolver = ref (fun () -> ())
-            let p = Promise.create (fun resolve reject -> resolver.Value <- resolve)
-
-            let rec checkSettled () =
-                if isSubagentSettled runtime sessionID then
-                    resolver.Value()
+            match decide (gateState runtime sessionID) with
+            | FallbackContinue ->
+                do! waitForStateChange runtime sessionID
+                return! waitForSubagentSettle runtime sessionID
+            | TodoNudge
+            | ReviewNudge ->
+                do! waitForStateChange runtime sessionID
+                return! waitForSubagentSettle runtime sessionID
+            | Resolve ->
+                if terminalObservation runtime sessionID then
+                    return ()
+                elif
+                    not (runtime.HasState sessionID)
+                    && not (runtime.IsAwaitingBusy sessionID)
+                    && not (runtime.IsNudgeActive sessionID)
+                then
+                    // No runtime state ever registered and no gates open → caller
+                    // has observed the host's initial idle boundary → settle.
+                    return ()
                 else
-                    runtime.OnStateChanged sessionID checkSettled
-
-            runtime.OnStateChanged sessionID checkSettled
-            return! p
+                    do! waitForStateChange runtime sessionID
+                    return! waitForSubagentSettle runtime sessionID
     }

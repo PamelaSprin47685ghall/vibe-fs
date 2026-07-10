@@ -77,6 +77,22 @@ let private requireWarnOmp (toolName: string) (args: obj) : string option =
         else
             Some(sprintf "Tool '%s': warn required — acknowledge this task cannot be done with other tools" toolName)
 
+let private requireWarnReuseOmp (toolName: string) (args: obj) : string option =
+    if not (Wanxiangshu.Kernel.WarnTdd.isSubagentTool toolName) then
+        None
+    else
+        let raw = Dyn.str args "warn_reuse"
+
+        if Wanxiangshu.Kernel.WarnTdd.parseWarnReuse raw then
+            Dyn.deleteKey args "warn_reuse"
+            None
+        else
+            Some(
+                sprintf
+                    "Tool '%s': warn_reuse required — acknowledge this task is not suitable for completion via continue tool"
+                    toolName
+            )
+
 let applyPreExecuteHook (toolName: string) (args: obj) : string option =
     ToolHookRuntime.filterAmendFromArgs args |> ignore
     ToolHookRuntime.sanitizeNullArgs toolName args
@@ -85,7 +101,10 @@ let applyPreExecuteHook (toolName: string) (args: obj) : string option =
 
     match requireWarnTddOmp toolName args with
     | Some err -> Some err
-    | None -> requireWarnOmp toolName args
+    | None ->
+        match requireWarnOmp toolName args with
+        | Some err -> Some err
+        | None -> requireWarnReuseOmp toolName args
 
 /// Apply the Omp pre-tool argument normalisations that must run before any
 /// downstream consumer reads the args reference. pi exposes a `tool_call`

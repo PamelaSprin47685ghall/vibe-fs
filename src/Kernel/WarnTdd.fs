@@ -54,3 +54,22 @@ let warnTddDescription =
     "Warning acknowledgement: '"
     + canonicalValue
     + "' — acknowledge that tests are written first (TDD) and Kolmolgorov discipline is followed."
+
+// ── warn_reuse (acknowledgement for subagent tools that should not be dispatched via continue) ──
+
+let warnReuseCanonicalValue =
+    "this-task-is-not-suitable-to-be-completed-via-continue-tool"
+
+let parseWarnReuse (s: string) : bool =
+    s.ToLowerInvariant().Trim() = warnReuseCanonicalValue
+
+let subagentTools: Set<string> =
+    Set.ofList [ "coder"; "investigator"; "meditator"; "browser" ]
+
+let isSubagentTool (tool: string) : bool =
+    Set.contains (tool.ToLowerInvariant()) subagentTools
+
+let warnReuseDescription =
+    "Warning acknowledgement: '"
+    + warnReuseCanonicalValue
+    + "' — acknowledge that this task is not suitable for completion via continue tool."

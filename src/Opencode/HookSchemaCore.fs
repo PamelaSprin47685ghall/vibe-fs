@@ -182,6 +182,12 @@ let inlineJsonWarnProperty: obj =
           "enum", [| WarnTdd.warnCanonicalValue |] |> box
           "description", box WarnTdd.warnDescription ]
 
+let inlineJsonWarnReuseProperty: obj =
+    createObj
+        [ "type", box "string"
+          "enum", [| WarnTdd.warnReuseCanonicalValue |] |> box
+          "description", box WarnTdd.warnReuseDescription ]
+
 let buildWorkBacklogSchema () : obj =
     WorkBacklogSchema.buildWorkBacklogSchema ()
 

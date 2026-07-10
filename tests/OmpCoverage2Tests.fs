@@ -91,7 +91,8 @@ let toolCallHandler_normalToolReturnsNone () =
         fakeEvent
             "coder"
             (createObj
-                [ "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" ])
+                [ "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated"
+                  "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
 
     promise {
         let! result = toolCallHandler pi store event (fakeCtx "s1" "/tmp")

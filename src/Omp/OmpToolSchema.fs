@@ -44,6 +44,23 @@ let injectAmendIntoOmpParameters (schema: obj) : obj =
 
         schema
 
+let private injectWarnReuseIntoOmpParameters (schema: obj) (toolName: string) : obj =
+    if isSubagentTool toolName then
+        addRequired schema "warn_reuse"
+        let props = Dyn.get schema "properties"
+
+        if not (isNullish props) then
+            if isNullish (Dyn.get props "warn_reuse") then
+                props?("warn_reuse") <-
+                    box (
+                        createObj
+                            [| "type", box "string"
+                               "enum", box [| box warnReuseCanonicalValue |]
+                               "description", box warnReuseDescription |]
+                    )
+
+    schema
+
 let methodologyParameters (tb: obj) : obj =
     injectAmendIntoOmpParameters (
         objectOf
@@ -90,7 +107,7 @@ let coderParameters (tb: obj) : obj =
                            "description", box warnTddDescription |]
                 )
 
-    injectAmendIntoOmpParameters schema
+    injectWarnReuseIntoOmpParameters schema "coder"
 
 let private investigatorIntentItem (tb: obj) : obj =
     objectOf
@@ -101,20 +118,26 @@ let private investigatorIntentItem (tb: obj) : obj =
         tb
 
 let investigatorParameters (tb: obj) : obj =
-    injectAmendIntoOmpParameters (
-        objectOf [| ("intents", arrayOf (investigatorIntentItem tb) Params.investigatorIntents tb) |] tb
-    )
+    injectWarnReuseIntoOmpParameters
+        (injectAmendIntoOmpParameters (
+            objectOf [| ("intents", arrayOf (investigatorIntentItem tb) Params.investigatorIntents tb) |] tb
+        ))
+        "investigator"
 
 let meditatorParameters (tb: obj) : obj =
-    injectAmendIntoOmpParameters (
-        objectOf
-            [| ("intent", str Params.meditatorIntent tb)
-               ("files", strArray Params.meditatorFiles tb) |]
-            tb
-    )
+    injectWarnReuseIntoOmpParameters
+        (injectAmendIntoOmpParameters (
+            objectOf
+                [| ("intent", str Params.meditatorIntent tb)
+                   ("files", strArray Params.meditatorFiles tb) |]
+                tb
+        ))
+        "meditator"
 
 let browserParameters (tb: obj) : obj =
-    injectAmendIntoOmpParameters (objectOf [| ("intent", str Params.browserIntent tb) |] tb)
+    injectWarnReuseIntoOmpParameters
+        (injectAmendIntoOmpParameters (objectOf [| ("intent", str Params.browserIntent tb) |] tb))
+        "browser"
 
 let continueParameters (tb: obj) : obj =
     injectAmendIntoOmpParameters (

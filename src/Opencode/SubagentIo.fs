@@ -79,6 +79,7 @@ let runSubagentCoreResult
                 try
                     runtime.SetSubsessionPending childID true
                     do! promptWithAbort client (buildPromptBody options childID) signal
+                    runtime.SetSubsessionPending childID false
 
                     do! waitForSubagentSettle runtime childID
 
@@ -105,6 +106,7 @@ let runSubagentCoreResult
                             let! text = extractSessionText client childID directory
                             return Ok(formatSubagentReport noOutputText abortedPrefix text true)
                     | other ->
+                        runtime.SetSubsessionPending childID false
                         do! waitForSubagentSettle runtime childID
 
                         let st = runtime.GetOrCreateState childID

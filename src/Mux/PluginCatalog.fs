@@ -74,7 +74,7 @@ let createToolCatalog
        yield injectWarnWarnTddIntoMuxSchema (writeTool deps)
        yield readTool deps hostReadExec
        yield methodologyTool deps toolNames |]
-    |> Array.map injectAmendIntoMuxSchema
+    |> Array.map (injectAmendIntoMuxSchema >> injectWarnReuseIntoMuxSchema)
 
 let toolExecuteBefore (input: obj) (output: obj) : JS.Promise<unit> =
     ToolHookRuntime.muxToolExecuteBefore input output

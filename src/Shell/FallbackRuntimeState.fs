@@ -55,6 +55,8 @@ type FallbackRuntimeState() =
 
     member _.HasState(sessionID: string) : bool = Map.containsKey sessionID states
 
+    member _.TryGetState(sessionID: string) : SessionFallbackState option = Map.tryFind sessionID states
+
     member _.GetOrCreateState(sessionID: string) : SessionFallbackState =
         match Map.tryFind sessionID states with
         | Some s -> s

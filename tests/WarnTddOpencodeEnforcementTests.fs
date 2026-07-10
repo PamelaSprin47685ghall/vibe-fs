@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.WarnTdd
 open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Opencode.HookSchema
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -54,10 +55,13 @@ let opencodeRejectsCoderMalformed () =
 
 let opencodeAcceptsCoder () =
     promise {
-        let args = createObj [ "warn_tdd", box canonicalValue ]
+        let args =
+            createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box warnReuseCanonicalValue ]
+
         let! err = runOpencodeHook "coder" args
         check "opencode coder canonical passes" (err = "")
         check "opencode coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
+        check "opencode coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
     }
 
 let opencodeIgnoresNonModificationTool () =
@@ -149,11 +153,14 @@ let exhaustiveOpencodeWarnTdd () : JS.Promise<unit> =
 let exhaustiveOpencodeWarnTddAccepts () : JS.Promise<unit> =
     promise {
         for tool in modificationTools do
-            let args =
-                if isWarnRequiredTool tool then
-                    createObj [ "warn_tdd", box canonicalValue; "warn", box warnCanonicalValue ]
-                else
-                    createObj [ "warn_tdd", box canonicalValue ]
+            let args = createObj []
+            args?warn_tdd <- box canonicalValue
+
+            if isWarnRequiredTool tool then
+                args?warn <- box warnCanonicalValue
+
+            if isSubagentTool tool then
+                args?warn_reuse <- box warnReuseCanonicalValue
 
             let! err = runOpencodeHook tool args
             check ("opencode " + tool + " canonical fields pass") (err = "")
@@ -174,6 +181,69 @@ let exhaustiveOpencodeWarnAccepts () : JS.Promise<unit> =
             check ("opencode " + tool + " canonical warn passes") (err = "")
     }
 
+// ── warn_reuse: subagent tools must carry warn_reuse acknowledgement ──
+
+let opencodeRejectsCoderMissingWarnReuse () =
+    promise {
+        let! err = runOpencodeHook "coder" (createObj [ "warn_tdd", box canonicalValue ])
+        check "opencode coder missing warn_reuse rejects" (err <> "")
+        check "opencode coder error mentions warn_reuse" (err.Contains "warn_reuse")
+    }
+
+let opencodeRejectsCoderMalformedWarnReuse () =
+    promise {
+        let! err = runOpencodeHook "coder" (createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box "wrong" ])
+        check "opencode coder malformed warn_reuse rejects" (err <> "")
+    }
+
+let opencodeAcceptsCoderWithWarnReuse () =
+    promise {
+        let args =
+            createObj [ "warn_tdd", box canonicalValue; "warn_reuse", box warnReuseCanonicalValue ]
+
+        let! err = runOpencodeHook "coder" args
+        check "opencode coder canonical warn_reuse passes" (err = "")
+        check "opencode coder warn_tdd removed from args" (Dyn.str args "warn_tdd" = "")
+        check "opencode coder warn_reuse removed from args" (Dyn.str args "warn_reuse" = "")
+    }
+
+let opencodeNonSubagentIgnoresWarnReuse () =
+    promise {
+        let! err = runRaw "read"
+        check "opencode read ignoring warn_reuse passes" (err = "")
+    }
+
+// ── Opencode Hook Schema warn_reuse injection tests ─────────────────────────
+
+let opencodeHookSchemaInjectWarnReuseIntoEmptySchema () =
+    let schema =
+        createObj [ "type", box "object"; "properties", createObj [ "name", box (createObj []) ] ]
+
+    injectWarnReuseIntoJsonSchema schema |> ignore
+    let props = get schema "properties"
+    check "warn_reuse property injected" (not (Dyn.isNullish (get props "warn_reuse")))
+    let required = get schema "required"
+
+    check
+        "warn_reuse added to required"
+        (isArray required
+         && (required :?> obj array |> Array.exists (fun x -> string x = "warn_reuse")))
+
+let opencodeHookSchemaInjectWarnReuseAlreadyPresent () =
+    let schema =
+        createObj
+            [ "type", box "object"
+              "properties", createObj [ "warn_reuse", box (createObj []) ]
+              "required", box [| box "warn_reuse" |] ]
+
+    injectWarnReuseIntoJsonSchema schema |> ignore
+    let props = get schema "properties"
+    check "existing warn_reuse still present" (not (Dyn.isNullish (get props "warn_reuse")))
+
+let opencodeHookSchemaInjectWarnReuseNullSchema () =
+    let result = injectWarnReuseIntoJsonSchema null
+    check "null schema returns null" (isNull result)
+
 let run () : JS.Promise<unit> =
     promise {
         do! opencodeRejectsCoderMissing ()
@@ -190,4 +260,11 @@ let run () : JS.Promise<unit> =
         do! exhaustiveOpencodeWarnTddAccepts ()
         do! exhaustiveOpencodeWarn ()
         do! exhaustiveOpencodeWarnAccepts ()
+        do! opencodeRejectsCoderMissingWarnReuse ()
+        do! opencodeRejectsCoderMalformedWarnReuse ()
+        do! opencodeAcceptsCoderWithWarnReuse ()
+        do! opencodeNonSubagentIgnoresWarnReuse ()
+        opencodeHookSchemaInjectWarnReuseIntoEmptySchema ()
+        opencodeHookSchemaInjectWarnReuseAlreadyPresent ()
+        opencodeHookSchemaInjectWarnReuseNullSchema ()
     }

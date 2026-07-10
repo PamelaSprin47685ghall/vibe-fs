@@ -71,13 +71,27 @@ let toolExecuteBeforeFor (host: Host) (input: obj) (output: obj) : JS.Promise<un
 
         ToolHookRuntime.sanitizeNullArgs tool args
 
+        let mutable hasError = false
+
         match ToolHookRuntime.requireWarnTddOnArgs tool args with
-        | Result.Error e -> setHookError output e
+        | Result.Error e ->
+            setHookError output e
+            hasError <- true
         | Result.Ok() -> ()
 
-        match ToolHookRuntime.requireWarnOnArgs tool args with
-        | Result.Error e -> setHookError output e
-        | Result.Ok() -> ()
+        if not hasError then
+            match ToolHookRuntime.requireWarnOnArgs tool args with
+            | Result.Error e ->
+                setHookError output e
+                hasError <- true
+            | Result.Ok() -> ()
+
+        if not hasError then
+            match ToolHookRuntime.requireWarnReuseOnArgs tool args with
+            | Result.Error e ->
+                setHookError output e
+                hasError <- true
+            | Result.Ok() -> ()
 
         HookSchema.setUiLabel args tool
 

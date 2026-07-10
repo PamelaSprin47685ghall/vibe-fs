@@ -139,6 +139,47 @@ let private injectAmendIntoArgsShapeInPlace (shape: obj) : unit =
             ToolSchema.numOpt
                 "Undo/amend the last N tool call chains (including calls, results, and intermediate reasoning) by backtracking in history. The amend message itself is kept as a fresh starting point."
 
+let private inlineJsonWarnReuseProperty =
+    Wanxiangshu.Opencode.HookSchemaCore.inlineJsonWarnReuseProperty
+
+let private appendRequiredWarnReuseInPlace (schema: obj) : unit =
+    let existingRequired = get schema "required"
+
+    if isArray existingRequired then
+        let arr = unbox<obj[]> existingRequired
+
+        if not (arr |> Array.exists (fun x -> string x = "warn_reuse")) then
+            existingRequired?("push") (box "warn_reuse") |> ignore
+    else
+        schema?("required") <- box [| box "warn_reuse" |]
+
+let private injectWarnReuseIntoJsonSchemaInPlace (schema: obj) : unit =
+    let props = get schema "properties"
+
+    if not (isNullish props) then
+        if isNullish (get props "warn_reuse") then
+            props?("warn_reuse") <- inlineJsonWarnReuseProperty
+
+        appendRequiredWarnReuseInPlace schema
+
+let private injectWarnReuseIntoArgsShapeInPlace (shape: obj) : unit =
+    if isNullish (get shape "warn_reuse") then
+        shape?("warn_reuse") <- enumReq [| WarnTdd.warnReuseCanonicalValue |] WarnTdd.warnReuseDescription
+
+/// Inject warn_reuse into an Opencode tool schema in place.
+let injectWarnReuseIntoJsonSchema (schema: obj) : obj =
+    if isNullish schema then
+        schema
+    else
+        let props = get schema "properties"
+
+        if not (isNullish props) then
+            injectWarnReuseIntoJsonSchemaInPlace schema
+        else
+            injectWarnReuseIntoArgsShapeInPlace schema
+
+        schema
+
 let injectAmendIntoJsonSchema (schema: obj) : obj =
     if isNullish schema then
         schema
