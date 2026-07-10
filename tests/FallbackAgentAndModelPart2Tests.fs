@@ -123,8 +123,16 @@ let opencodeCaptureCurrentModelPrioritizesLatestUserMessageModelSpec () =
         let rt = FallbackRuntimeState()
         let sid = "priority-user-model"
 
-        rt.SetModel sid { ProviderID = "openai"; ModelID = "gpt-4-busy"
-                          Variant = None; Temperature = None; TopP = None; MaxTokens = None; ReasoningEffort = None; Thinking = false }
+        rt.SetModel
+            sid
+            { ProviderID = "openai"
+              ModelID = "gpt-4-busy"
+              Variant = None
+              Temperature = None
+              TopP = None
+              MaxTokens = None
+              ReasoningEffort = None
+              Thinking = false }
 
         let mockClient =
             createObj
@@ -160,7 +168,16 @@ let opencodeNewUserMessageResetsChainAndModelSpec () =
         let rt = FallbackRuntimeState()
         let sid = "reset-chain-model"
 
-        let testModel = { ProviderID = "openai"; ModelID = "gpt-4"; Variant = None; Temperature = None; TopP = None; MaxTokens = None; ReasoningEffort = None; Thinking = false }
+        let testModel =
+            { ProviderID = "openai"
+              ModelID = "gpt-4"
+              Variant = None
+              Temperature = None
+              TopP = None
+              MaxTokens = None
+              ReasoningEffort = None
+              Thinking = false }
+
         rt.SetChain sid [ testModel ]
         rt.SetModel sid testModel
 
@@ -171,26 +188,21 @@ let opencodeNewUserMessageResetsChainAndModelSpec () =
                       createObj
                           [ "type", box "message.updated"
                             "properties",
-                            box (
-                                createObj [ "info", box (createObj [ "sessionID", box sid; "role", box "user" ]) ]
-                            ) ]
+                            box (createObj [ "info", box (createObj [ "sessionID", box sid; "role", box "user" ]) ]) ]
                   ) ]
 
         let registry = ChildAgentRegistry.Create()
-        let configLookup = fun _ ->
-            { LoopMaxContinues = 3
-              MaxRetries = 3
-              MaxRecoveries = 3
-              AgentChains = Map.empty
-              DefaultChain = [] }
+
+        let configLookup =
+            fun _ ->
+                { LoopMaxContinues = 3
+                  MaxRetries = 3
+                  MaxRecoveries = 3
+                  AgentChains = Map.empty
+                  DefaultChain = [] }
 
         let mockClient =
-            createObj
-                [ "session",
-                  box (
-                      createObj
-                          [ "messages", box (fun _ -> Promise.lift (box {| data = [||] |})) ]
-                  ) ]
+            createObj [ "session", box (createObj [ "messages", box (fun _ -> Promise.lift (box {| data = [||] |})) ]) ]
 
         let handler = createOpencodeFallbackHandler mockClient rt configLookup registry
 
@@ -213,6 +225,34 @@ let opencodeNewUserMessageResetsChainAndModelSpec () =
         check "model should be cleared" modelOpt.IsNone
     }
 
+let opencodeCaptureCurrentModelPrioritizesSessionGetAsyncSpec () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let sid = "manual-model-async-priority"
+
+        // Mock client: client.session.get({ sessionID }) returns { data: { model: "openai/gpt-4o" } }
+        let mockSessionGet =
+            System.Func<obj, JS.Promise<obj>>(fun _ ->
+                Promise.lift (box {| data = box {| model = box "openai/gpt-4o" |} |}))
+
+        let mockClient =
+            createObj
+                [ "session",
+                  box (
+                      createObj
+                          [ "get", box mockSessionGet
+                            "model", box null
+                            "messages", box (fun _ -> Promise.lift (box {| data = [||] |})) ]
+                  ) ]
+
+        let executor = opencodeActionExecutor rt mockClient
+        let! modelOpt = executor.CaptureCurrentModel sid
+
+        check "model captured from session.get() async" modelOpt.IsSome
+        equal "provider openai" "openai" modelOpt.Value.ProviderID
+        equal "modelId gpt-4o" "gpt-4o" modelOpt.Value.ModelID
+    }
+
 let run () =
     promise {
         do! opencodeCaptureCurrentModelDecodesStringModelSpec ()
@@ -221,4 +261,5 @@ let run () =
         do! opencodeSessionStatusCapturesActiveModelSpec ()
         do! opencodeCaptureCurrentModelPrioritizesLatestUserMessageModelSpec ()
         do! opencodeNewUserMessageResetsChainAndModelSpec ()
+        do! opencodeCaptureCurrentModelPrioritizesSessionGetAsyncSpec ()
     }

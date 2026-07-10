@@ -75,28 +75,69 @@ let private tryReadLatestMessageInfo (client: obj) (sessionID: string) : JS.Prom
                 |> Option.map (fun msg -> Dyn.get msg "info")
     }
 
-let private tryGetSessionModelAndAgent (client: obj) : (FallbackModel option * string option) =
-    match getSessionApiFromClient client with
-    | Error _ -> None, None
-    | Ok session ->
-        let mOpt =
-            let modelObj = Dyn.get session "model"
-            Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj modelObj
+let private getSessionStaticModelAndAgent (session: obj) : FallbackModel option * string option =
+    let modelObj = Dyn.get session "model"
+    let modelOpt = Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj modelObj
 
-        let aOpt =
-            let agentStr = Dyn.str session "agent"
-            if agentStr <> "" then Some agentStr else None
+    let agentOpt =
+        let agentStr = Dyn.str session "agent"
+        if agentStr <> "" then Some agentStr else None
 
-        mOpt, aOpt
+    modelOpt, agentOpt
+
+let private tryGetSessionModelAndAgentAsync
+    (client: obj)
+    (sessionID: string)
+    : JS.Promise<FallbackModel option * string option> =
+    promise {
+        if Dyn.isNullish client then
+            return None, None
+        else
+            match getSessionApiFromClient client with
+            | Error _ -> return None, None
+            | Ok session ->
+                let api: obj = Dyn.get session "get"
+
+                if Dyn.isNullish api then
+                    // session.get missing → fallback to static properties
+                    return getSessionStaticModelAndAgent session
+                else
+                    try
+                        let! resp =
+                            unbox<JS.Promise<obj>> (Dyn.callMethod1 session "get" (box {| sessionID = sessionID |}))
+
+                        if Dyn.isNullish resp then
+                            return getSessionStaticModelAndAgent session
+                        else
+                            let data = Dyn.get resp "data"
+
+                            if Dyn.isNullish data then
+                                return getSessionStaticModelAndAgent session
+                            else
+                                let modelOpt =
+                                    let modelObj = Dyn.get data "model"
+                                    Wanxiangshu.Shell.FallbackMessageCodec.decodeModelFromObj modelObj
+
+                                let agentOpt =
+                                    let agentStr = Dyn.str data "agent"
+                                    if agentStr <> "" then Some agentStr else None
+
+                                match modelOpt, agentOpt with
+                                | None, None -> return getSessionStaticModelAndAgent session
+                                | _ -> return modelOpt, agentOpt
+                    with _ ->
+                        // session.get threw → fallback to static properties
+                        return getSessionStaticModelAndAgent session
+    }
 
 let private tryReadCurrentModel (client: obj) (sessionID: string) : JS.Promise<FallbackModel option> =
     promise {
         if Dyn.isNullish client then
             return None
         else
-            let sessionModel, _ = tryGetSessionModelAndAgent client
+            let! liveModelOpt, _ = tryGetSessionModelAndAgentAsync client sessionID
 
-            match sessionModel with
+            match liveModelOpt with
             | Some m -> return Some m
             | None ->
                 let! infoOpt = tryReadLatestMessageInfo client sessionID
@@ -131,9 +172,8 @@ let opencodeEventTranslator: IEventTranslator =
                 )
             elif eventType = "session.status" then
                 let statusObj = Dyn.get (getProps rawEvent) "status"
-                let statusType = Dyn.str statusObj "type"
 
-                if statusType = "interrupted" then
+                if Dyn.str statusObj "type" = "interrupted" then
                     Some(
                         FallbackEvent.SessionError
                             { ErrorName = "MessageAbortedError"
@@ -155,22 +195,17 @@ let opencodeEventTranslator: IEventTranslator =
             t = "session.error" || t = "session.interrupted"
 
         member _.IsSessionIdle rawEvent =
-            let eventType = getEventType rawEvent
+            let t = getEventType rawEvent
 
-            if eventType = "session.idle" then
-                true
-            elif eventType = "session.status" then
-                Dyn.str (Dyn.get (getProps rawEvent) "status") "type" = "idle"
-            else
-                false
+            t = "session.idle"
+            || (t = "session.status"
+                && Dyn.str (Dyn.get (getProps rawEvent) "status") "type" = "idle")
 
         member _.IsSessionBusy rawEvent =
-            let eventType = getEventType rawEvent
+            let t = getEventType rawEvent
 
-            if eventType = "session.status" then
-                Dyn.str (Dyn.get (getProps rawEvent) "status") "type" = "busy"
-            else
-                false
+            t = "session.status"
+            && Dyn.str (Dyn.get (getProps rawEvent) "status") "type" = "busy"
 
         member _.IsNewUserMessage rawEvent =
             getEventType rawEvent = "message.updated"
@@ -178,8 +213,12 @@ let opencodeEventTranslator: IEventTranslator =
             && not (Wanxiangshu.Shell.FallbackMessageCodec.isSystemForcedUserMessage (getProps rawEvent)) }
 
 let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActionExecutor =
-    let resolveModelAndAgent (fallbackModel: FallbackModel) (sessionID: string) (infoOpt: obj option) =
-        let _, sessionAgentOpt = tryGetSessionModelAndAgent client
+    let resolveModelAndAgent
+        (liveAgentOpt: string option)
+        (fallbackModel: FallbackModel)
+        (sessionID: string)
+        (infoOpt: obj option)
+        =
         let finalModel = fallbackModel
 
         let modelStr =
@@ -188,7 +227,7 @@ let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActi
             | None -> sprintf "%s/%s" finalModel.ProviderID finalModel.ModelID
 
         let agent =
-            match sessionAgentOpt with
+            match liveAgentOpt with
             | Some sa -> Some sa
             | None ->
                 let fromMsg =
@@ -219,8 +258,9 @@ let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActi
     { new IActionExecutor with
         member _.SendContinue(sessionID, model) =
             promise {
+                let! _, liveAgentOpt = tryGetSessionModelAndAgentAsync client sessionID
                 let! infoOpt = tryReadLatestMessageInfo client sessionID
-                let modelStr, agent = resolveModelAndAgent model sessionID infoOpt
+                let modelStr, agent = resolveModelAndAgent liveAgentOpt model sessionID infoOpt
                 let body = createPromptBodyWithModel agent (Some modelStr) "continue"
 
                 let arg =
@@ -238,6 +278,7 @@ let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActi
         member _.CaptureCurrentModel sessionID =
             promise {
                 let! msgs = fetchMessages sessionID
+
                 match Wanxiangshu.Shell.FallbackMessageCodec.tryGetLatestUserModel msgs with
                 | Some m -> return Some m
                 | None ->
@@ -248,8 +289,9 @@ let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActi
 
         member _.RecoverWithPrompt(sessionID, model, promptText) =
             promise {
+                let! _, liveAgentOpt = tryGetSessionModelAndAgentAsync client sessionID
                 let! infoOpt = tryReadLatestMessageInfo client sessionID
-                let modelStr, agent = resolveModelAndAgent model sessionID infoOpt
+                let modelStr, agent = resolveModelAndAgent liveAgentOpt model sessionID infoOpt
                 let body = createPromptBodyWithModel agent (Some modelStr) promptText
 
                 let arg =

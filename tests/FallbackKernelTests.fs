@@ -144,10 +144,93 @@ let classifyErrorPriority () =
     equal "unknown default → RetrySame" ErrorClass.RetrySame (classifyError unknown baseState cfg)
 
 
+let transitionSessionIdleIdle_emitsScanToolCallAsText () =
+    let model = mkModel "oai" "gpt-5" None None None None None false
+    let chain = chain [ model ]
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.Idle 0 0 false false 0 0
+
+    let ns, action = transition state SessionIdle cfg chain
+
+    equal "phase ScanningToolCallText" FallbackPhase.ScanningToolCallText ns.Phase
+    equal "action ScanToolCallAsText" FallbackAction.ScanToolCallAsText action
+
+let transitionSessionIdleTaskComplete_noScanToolCallAsText () =
+    let model = mkModel "oai" "gpt-5" None None None None None false
+    let chain = chain [ model ]
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.Idle 0 0 false true 0 0
+
+    let ns, action = transition state SessionIdle cfg chain
+
+    equal "phase stays Idle" FallbackPhase.Idle ns.Phase
+    equal "action DoNothing when TaskComplete" FallbackAction.DoNothing action
+
+let transitionSessionIdleRetrying_emitsScanToolCallAsText () =
+    let model = mkModel "oai" "gpt-5" None None None None None false
+    let chain = chain [ model ]
+    let cfg = mkConfig 2 3 5
+    let state = mkState (FallbackPhase.Retrying 1) 0 0 false false 0 0
+
+    let ns, action = transition state SessionIdle cfg chain
+
+    equal "phase ScanningToolCallText" FallbackPhase.ScanningToolCallText ns.Phase
+    equal "action ScanToolCallAsText" FallbackAction.ScanToolCallAsText action
+
+let transitionRecoveringToolCallText_idle_emitsScanToolCallAsText () =
+    let model = mkModel "oai" "gpt-5" None None None None None false
+    let chain = chain [ model ]
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.RecoveringToolCallText 0 0 false false 0 0
+
+    let ns, action = transition state SessionIdle cfg chain
+
+    equal "phase ScanningToolCallText" FallbackPhase.ScanningToolCallText ns.Phase
+    equal "action ScanToolCallAsText" FallbackAction.ScanToolCallAsText action
+
+let transitionScanningToolCallText_busy_doNothing () =
+    let model = mkModel "oai" "gpt-5" None None None None None false
+    let chain = chain [ model ]
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.ScanningToolCallText 0 0 false false 0 0
+
+    let ns, action = transition state SessionBusy cfg chain
+
+    equal "phase stays ScanningToolCallText" FallbackPhase.ScanningToolCallText ns.Phase
+    equal "action DoNothing" FallbackAction.DoNothing action
+
+let transitionRecoveringToolCallText_busy_doNothing () =
+    let model = mkModel "oai" "gpt-5" None None None None None false
+    let chain = chain [ model ]
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.RecoveringToolCallText 0 0 false false 0 0
+
+    let ns, action = transition state SessionBusy cfg chain
+
+    equal "phase stays RecoveringToolCallText" FallbackPhase.RecoveringToolCallText ns.Phase
+    equal "action DoNothing" FallbackAction.DoNothing action
+
+let transitionSessionBusyResetsTaskComplete () =
+    let model = mkModel "oai" "gpt-5" None None None None None false
+    let chain = chain [ model ]
+    let cfg = mkConfig 2 3 5
+    let state = mkState FallbackPhase.Idle 0 0 false true 0 0
+
+    let ns, _ = transition state SessionBusy cfg chain
+
+    equal "TaskComplete reset to false on SessionBusy" false ns.TaskComplete
+
 let run () =
     isPerfectSquareBoundary ()
     scanStartIndexPerfectSquares ()
     scanStartIndexNonSquares ()
     updateFailureCountBranches ()
     classifyErrorPriority ()
+    transitionSessionIdleIdle_emitsScanToolCallAsText ()
+    transitionSessionIdleTaskComplete_noScanToolCallAsText ()
+    transitionSessionIdleRetrying_emitsScanToolCallAsText ()
+    transitionRecoveringToolCallText_idle_emitsScanToolCallAsText ()
+    transitionScanningToolCallText_busy_doNothing ()
+    transitionRecoveringToolCallText_busy_doNothing ()
+    transitionSessionBusyResetsTaskComplete ()
     FallbackKernelTestsPart2.run ()

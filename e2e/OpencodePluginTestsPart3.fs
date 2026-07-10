@@ -6,6 +6,8 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.E2e.OpencodePluginTestsPart2
 
+module Dyn = Wanxiangshu.Shell.Dyn
+
 let runPart3
     (harness: Harness)
     (chk: string -> bool -> unit)
@@ -261,6 +263,52 @@ let runPart3
 
         do! errNudgeHarness.dispose ()
         chk "op.sessionPost.errorTriggersNudge" (errNudgeCalls = 1)
+
+        // --- 11. continue priority -------------------------------------------
+        let mutable continueModel = ""
+
+        let continueOpts =
+            createObj
+                [ "messages", box [||]
+                  "mockSessionClient",
+                  box (
+                      createObj
+                          [ "get",
+                            box (fun _ -> Promise.lift (box {| data = box {| model = box "anthropic/claude-3-5" |} |}))
+                            "prompt",
+                            box (fun (body: obj) ->
+                                let modelVal = Dyn.get body "model"
+
+                                if not (Dyn.isNullish modelVal) then
+                                    continueModel <- Dyn.str modelVal "modelID"
+
+                                Promise.lift (box {| ok = true |})) ]
+                  ) ]
+
+        let! continueHarnessObj = startHarness continueOpts
+        let continueHarness = unbox<Harness> continueHarnessObj
+
+        let! _ =
+            continueHarness.fireEvent (
+                box
+                    {| event =
+                        {| ``type`` = "session.error"
+                           error =
+                            {| name = "RateLimitError"
+                               message = "rate limit"
+                               statusCode = "429"
+                               isRetryable = "true" |}
+                           properties = {| sessionID = continueHarness.sessionId |} |} |}
+            )
+
+        let mutable continueTicks = 0
+
+        while continueModel = "" && continueTicks < 20 do
+            do! Promise.sleep 50
+            continueTicks <- continueTicks + 1
+
+        do! continueHarness.dispose ()
+        chk "op.continue.prioritizesManualModel" (continueModel = "claude-3-5")
 
         do! harness.dispose ()
 
