@@ -167,7 +167,7 @@ let muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec () =
                        "submit_review"
                        "wip-call"
                        (createObj [])
-                       (box submitReviewWipAcknowledgment) |]
+                        (box (formatWipAcknowledgment "Implement feature X")) |]
 
         do!
             hook $ (streamEnd "continued after wip report", helpers)

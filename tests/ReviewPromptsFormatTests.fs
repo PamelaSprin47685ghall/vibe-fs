@@ -117,6 +117,20 @@ let compactionAnchorPromptRendersMarkerAndBody () =
 let compactionAnchorPromptEmptyFencesReturnsEmpty () =
     equal "empty fences returns empty string" "" (renderCompactionAnchorPrompt [])
 
+// ── formatWipAcknowledgment ──────────────────────────────────────────────────
+
+let formatWipAcknowledgmentProducesFrontMatter () =
+    let task = "Implement the new feature: format wip acknowledgment."
+    let text = formatWipAcknowledgment task
+    check "output is non-empty" (text <> "")
+    check "output contains frontmatter delimiter" (text.Contains "---")
+    check "output mentions With-Review Mode" (text.Contains "With-Review Mode")
+    check "output mentions submit_review" (text.Contains "submit_review")
+    let parsed = parseFrontMatter text
+    check "parsed task field equals input" (parsed?("task") = box task)
+    let body = bodyAfterFrontMatter text
+    check "body equals original acknowledgment" (body.Trim() = submitReviewWipAcknowledgment)
+
 let run () =
     submitReviewIsWipNoneDefaultsTrue ()
     submitReviewIsWipSomeTrue ()
@@ -132,3 +146,4 @@ let run () =
     multiFrontMatterExtractionToFenceStrings ()
     compactionAnchorPromptRendersMarkerAndBody ()
     compactionAnchorPromptEmptyFencesReturnsEmpty ()
+    formatWipAcknowledgmentProducesFrontMatter ()

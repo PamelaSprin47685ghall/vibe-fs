@@ -56,7 +56,7 @@ let executeSubmitReview
 
                 if isWip then
                     do! appendSubmitReviewWipRecorded root sessionId |> Promise.map ignore
-                    return textResult submitReviewWipAcknowledgment
+                    return textResult (formatWipAcknowledgment activeTask)
                 elif not (store.tryLockReview sessionId) then
                     return errorResult "A review is already in progress."
                 else

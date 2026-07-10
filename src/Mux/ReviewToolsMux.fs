@@ -97,7 +97,7 @@ let submitReviewTool
                                 try
                                     if submitReviewIsWip decoded.Wip then
                                         do! appendSubmitReviewWipRecordedOrFail root workspaceId
-                                        return submitReviewWipAcknowledgment
+                                        return formatWipAcknowledgment originalTask
                                     else
                                         let report = decoded.Report
                                         let affectedFiles = decoded.AffectedFiles

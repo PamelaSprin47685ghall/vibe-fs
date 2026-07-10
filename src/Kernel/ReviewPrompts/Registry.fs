@@ -52,6 +52,9 @@ let submitReviewIsWip = Wanxiangshu.Kernel.ReviewPrompts.Format.submitReviewIsWi
 let submitReviewWipAcknowledgment =
     Wanxiangshu.Kernel.ReviewPrompts.Format.submitReviewWipAcknowledgment
 
+let formatWipAcknowledgment =
+    Wanxiangshu.Kernel.ReviewPrompts.Format.formatWipAcknowledgment
+
 let formatReviewResult = Wanxiangshu.Kernel.ReviewPrompts.Format.formatReviewResult
 
 module ReviewerVerdictPrompts = Wanxiangshu.Kernel.ReviewPrompts.Instructions.ReviewerVerdictPrompts
