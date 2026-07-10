@@ -17,6 +17,7 @@ open Wanxiangshu.Shell.TitleFetchGuardCommon
 open Wanxiangshu.Omp.MessageTransform
 open Wanxiangshu.Shell.OmpCaps
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.SessionExecutor
 open Wanxiangshu.Shell.TreeSitterShell
@@ -115,7 +116,12 @@ let registerAbortHandler
                     if sessionEndEventTypes.Contains evtType then
                         match fallbackHandler with
                         | None ->
-                            reviewStore.deactivateReview sid
+                            let root = Dyn.str ctx "cwd"
+
+                            if root <> "" then
+                                do! appendLoopCancelledOrFail root sid
+                                do! syncReviewFromEventLogDedicated reviewStore root sid
+
                             Wanxiangshu.Omp.NudgeRuntime.markSessionForceStopped sid
 
                             Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore
@@ -132,7 +138,12 @@ let registerAbortHandler
                                 let! r = handler rawEvent
 
                                 if not r.Consumed then
-                                    reviewStore.deactivateReview sid
+                                    let root = Dyn.str ctx "cwd"
+
+                                    if root <> "" then
+                                        do! appendLoopCancelledOrFail root sid
+                                        do! syncReviewFromEventLogDedicated reviewStore root sid
+
                                     Wanxiangshu.Omp.NudgeRuntime.markSessionForceStopped sid
 
                                     Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore

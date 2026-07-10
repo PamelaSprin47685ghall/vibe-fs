@@ -113,13 +113,14 @@ let createLoopOnlyCommand
 
                         if task = "" then
                             do! appendLoopCancelledOrFail root sid
-                            reviewStore.deactivateReview sid
+                            do! syncReviewFromEventLogDedicated reviewStore root sid
                             return loopCancelledMessage
                         elif existingTask.IsSome then
-                            return "With-Review Mode is already active. Submit your work via submit_review."
+                            return
+                                "With-Review Mode is already active. Submit your work via submit_review."
                         else
                             do! appendLoopActivatedOrFail root sid task
-                            reviewStore.activateReview (sid, task, getTimestampMs ())
+                            do! syncReviewFromEventLogDedicated reviewStore root sid
 
                             return
                                 buildLoopMessage
@@ -149,7 +150,7 @@ let private precheckReview
         return! Delegate.delegateWithTimeout deps config "explore" promptText "Pre-review" (Some opts) 300000
     }
 
-let private activateReview
+let private finalizeLoopReviewActivation
     (deps: obj)
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (workspaceIdStr: string)
@@ -160,7 +161,7 @@ let private activateReview
     promise {
         let root = eventLogRootFromDeps deps
         do! appendLoopActivatedOrFail root workspaceIdStr task
-        reviewStore.activateReview (workspaceIdStr, task, getTimestampMs ())
+        do! syncReviewFromEventLogDedicated reviewStore root workspaceIdStr
 
         if isPass then
             return
@@ -195,7 +196,7 @@ let private loopReviewExecute
             scope.TriggerInit(root)
             do! scope.WaitInit()
             do! appendLoopCancelledOrFail root workspaceIdStr
-            reviewStore.deactivateReview workspaceIdStr
+            do! syncReviewFromEventLogDedicated reviewStore root workspaceIdStr
             return loopCancelledMessage
         }
     else
@@ -223,7 +224,7 @@ let private loopReviewExecute
                         | NeedsRevision fb -> false, fb
                         | Terminated -> false, markdown
 
-                    return! activateReview deps reviewStore workspaceIdStr task isPass feedback
+                    return! finalizeLoopReviewActivation deps reviewStore workspaceIdStr task isPass feedback
         }
 
 let createLoopReviewCommand

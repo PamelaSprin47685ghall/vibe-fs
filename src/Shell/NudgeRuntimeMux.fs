@@ -67,6 +67,7 @@ let messageTexts (message: obj) : string list =
             | _ -> None)
 
 let collectSnapshotMux
+    (fallbackRuntime: FallbackRuntimeState)
     (getChatHistory: (string -> JS.Promise<obj array>) option)
     (workspaceDirectory: string)
     (helpers: obj)
@@ -122,8 +123,15 @@ let collectSnapshotMux
                                     else
                                         Some(sprintf "%s/%s" providerID modelID)
 
+                            let resolvedModel =
+                                Wanxiangshu.Shell.NudgeRuntimeTypes.resolveNudgeModel
+                                    messages
+                                    fallbackRuntime
+                                    workspaceId
+                                    model
+
                             let finalText = if text = "" then lastMsgFromEvent else text
-                            return finalText, agent, tid, model
+                            return finalText, agent, tid, resolvedModel
                     with _ ->
                         return lastMsgFromEvent, None, "", None
                 }

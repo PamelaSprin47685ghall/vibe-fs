@@ -20,6 +20,7 @@ open Wanxiangshu.Opencode.ReviewerLoop
 open Wanxiangshu.Shell.PromiseStr
 open Wanxiangshu.Shell.ReviewToolsCodec
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.ToolRuntimeContext
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Shell.Dyn
@@ -91,11 +92,11 @@ let submitReviewTool
 
                                         let verdict, fb = verdictStringFromReviewResult result
                                         do! appendReviewVerdictOrFail runtime.Execution.Directory sessionID verdict fb
-
-                                        match result with
-                                        | Accepted _
-                                        | Terminated -> store.deactivateReview sessionID
-                                        | NeedsRevision _ -> ()
+                                        do!
+                                            syncReviewFromEventLogDedicated
+                                                store
+                                                runtime.Execution.Directory
+                                                sessionID
 
                                         return formatReviewResult result
                                 finally

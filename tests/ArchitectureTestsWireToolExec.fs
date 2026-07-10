@@ -116,6 +116,7 @@ let private shellBareDynAllowlist =
           "OmpCaps.fs"
           "NudgeRuntime.fs"
           "NudgeRuntimeMux.fs"
+          "NudgeRuntimeTypes.fs"
           "OmpHostBindings.fs"
           "OpencodeAgentConfigWire.fs"
           "SembleMcp.fs"

@@ -1,6 +1,8 @@
 // Based on opencode-auto-resume raw-tool-call detection patterns + Wanxiangshu protocol extensions.
 module Wanxiangshu.Shell.FallbackMessageCodec
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types

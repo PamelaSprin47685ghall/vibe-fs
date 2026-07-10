@@ -117,7 +117,7 @@ let returnReviewerVerdictPerfectRevise () =
         let task = "review loop task"
         let ts = 0L
         let mutable firstKr: ReviewResult option = None
-        reviewStore.activateReview (reviewSessionId, task, ts)
+        reviewStore.applyReviewTaskProjection (reviewSessionId, Some task)
         reviewStore.setPendingReview (reviewSessionId, (fun kr -> firstKr <- Some kr))
 
         let ctx1 =

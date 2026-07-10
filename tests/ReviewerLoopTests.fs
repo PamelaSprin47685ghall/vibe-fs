@@ -43,7 +43,7 @@ let runReviewerLoop_resolvesVerdict () =
     promise {
         let store = createReviewStore ()
         let registry = ChildAgentRegistry.Create()
-        store.activateReview ("child-1", "do review", 1000L)
+        store.applyReviewTaskProjection ("child-1", Some "do review")
         let client = makeFakeClient store "child-1"
         let! childID = createReviewerChild registry client store "/tmp" (Some "parent-1") "parent-1" "Reviewer"
         let! result = runReviewerLoop client store "child-1" [ "reviewerPrompt test" ] null
@@ -53,7 +53,7 @@ let runReviewerLoop_resolvesVerdict () =
 let runReviewerLoop_rebindsPendingEachRound () =
     promise {
         let store = createReviewStore ()
-        store.activateReview ("child-1", "task", 1000L)
+        store.applyReviewTaskProjection ("child-1", Some "task")
         let mutable promptCount = 0
         let mutable secondRoundHadPending = false
 
@@ -87,7 +87,7 @@ let runReviewerLoop_promptFailedReturnsTerminated () =
             createObj [ "session", box session ]
 
         let store = createReviewStore ()
-        store.activateReview ("s-1", "task", 1000L)
+        store.applyReviewTaskProjection ("s-1", Some "task")
         let! result = runReviewerLoop failingClient store "s-1" [ "reviewerPrompt test" ] null
         equal "prompt fail -> Terminated" Terminated result
     }

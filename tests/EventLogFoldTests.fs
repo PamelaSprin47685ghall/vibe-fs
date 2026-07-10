@@ -106,8 +106,24 @@ let foldEventStreamFiltersOtherSessions () =
 
     equal "only s1 events counted" 2 result
 
+let foldSubagentsTest () =
+    let events =
+        [ ev "s1" eventKindSubagentSpawned (Map [ "childId", "c1"; "agent", "coder"; "title", "Test Coder" ])
+          ev "s1" eventKindSubagentContinued (Map [ "childId", "c1"; "prompt", "Hello" ])
+          ev "s1" eventKindSubagentContinued (Map [ "childId", "c1"; "prompt", "World" ]) ]
+
+    let result = foldSubagents "s1" events
+    check "subagent exists in map" (Map.containsKey "c1" result)
+    let state = Map.find "c1" result
+    equal "childId matches" "c1" state.ChildId
+    equal "agent matches" "coder" state.Agent
+    equal "title matches" "Test Coder" state.Title
+    equal "continued prompts length" 2 state.ContinuedPrompts.Length
+    equal "latest continued prompt" "World" (List.head state.ContinuedPrompts)
+
 let run () =
     foldEventStreamFiltersOtherSessions ()
+    foldSubagentsTest ()
     foldNudgeDedupAnchor ()
     foldReviewTaskEmpty ()
     foldReviewTaskActivate ()

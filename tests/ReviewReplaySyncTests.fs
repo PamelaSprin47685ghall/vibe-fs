@@ -45,7 +45,7 @@ let syncReviewFromTextsActivatesFromTexts () =
 
 let syncReviewFromTextsDeactivatesOnEndVerdict () =
     let store = createReviewStore ()
-    store.activateReview ("s3", "active-task", 1L)
+    store.applyReviewTaskProjection ("s3", Some "active-task")
     let accept = Wanxiangshu.Kernel.ReviewPrompts.formatReviewResult (Accepted "")
     syncReviewFromTexts store "s3" [ accept ]
     check "end verdict deactivates review" (store.getReviewState "s3" |> Option.isNone)

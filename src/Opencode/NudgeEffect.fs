@@ -19,6 +19,7 @@ open Wanxiangshu.Shell.OpencodeSessionEventCodec
 open Wanxiangshu.Shell.ErrorClassify
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Shell.NudgeRuntime
+open Wanxiangshu.Shell.FallbackRuntimeState
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
 
@@ -35,7 +36,12 @@ let private getPartsText (parts: obj) : string =
                 None)
         |> String.concat "\n"
 
-let private collectSnapshot (client: obj) (pluginCtx: obj) (sessionID: SessionId) : JS.Promise<SessionSnapshot option> =
+let private collectSnapshot
+    (fallbackRuntime: FallbackRuntimeState)
+    (client: obj)
+    (pluginCtx: obj)
+    (sessionID: SessionId)
+    : JS.Promise<SessionSnapshot option> =
     promise {
         try
             let sessionIDStr = Id.sessionIdValue sessionID
@@ -104,7 +110,14 @@ let private collectSnapshot (client: obj) (pluginCtx: obj) (sessionID: SessionId
                                         else
                                             Some(sprintf "%s/%s" providerID modelID)
 
-                                text, tid, agent, model
+                                let resolvedModel =
+                                    Wanxiangshu.Shell.NudgeRuntimeTypes.resolveNudgeModel
+                                        messagesArr
+                                        fallbackRuntime
+                                        sessionIDStr
+                                        model
+
+                                text, tid, agent, resolvedModel
 
                         let directory = pluginDirectoryFromCtx pluginCtx
 
@@ -178,6 +191,7 @@ let private sendNudgeOutcome
 
 let startNudgeFlow
     (host: Host)
+    (fallbackRuntime: FallbackRuntimeState)
     (runtimeState: NudgeRuntimeState)
     (client: obj)
     (pluginCtx: obj)
@@ -191,11 +205,17 @@ let startNudgeFlow
         root
         runtimeState
         sid
-        (fun () -> collectSnapshot client pluginCtx sessionID)
+        (fun () -> collectSnapshot fallbackRuntime client pluginCtx sessionID)
         (fun promptText agentOpt modelOpt -> sendNudgeOutcome client sessionID promptText agentOpt modelOpt)
 
-let dispatchPostStopFromHistory (host: Host) (client: obj) (pluginCtx: obj) (sessionID: SessionId) : JS.Promise<unit> =
+let dispatchPostStopFromHistory
+    (host: Host)
+    (fallbackRuntime: FallbackRuntimeState)
+    (client: obj)
+    (pluginCtx: obj)
+    (sessionID: SessionId)
+    : JS.Promise<unit> =
     promise {
-        let! _ = startNudgeFlow host emptyRuntimeState client pluginCtx sessionID
+        let! _ = startNudgeFlow host fallbackRuntime emptyRuntimeState client pluginCtx sessionID
         return ()
     }

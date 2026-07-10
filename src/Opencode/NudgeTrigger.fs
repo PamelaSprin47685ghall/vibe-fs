@@ -100,7 +100,7 @@ type NudgeTrigger
                         | Ok client ->
                             try
                                 fallbackRuntime.SetNudgeActive sessionIDStr true
-                                do! dispatchPostStopFromHistory host client ctx sessionID
+                                do! dispatchPostStopFromHistory host fallbackRuntime client ctx sessionID
                             finally
                                 fallbackRuntime.SetNudgeActive sessionIDStr false
                         | Error _ -> ()

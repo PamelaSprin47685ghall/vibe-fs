@@ -44,6 +44,11 @@ let appendAssistantCompleted = EventLogRuntimeAppend.appendAssistantCompleted
 let appendAssistantCompletedOrFail =
     EventLogRuntimeAppend.appendAssistantCompletedOrFail
 
+let appendSubagentSpawned = EventLogRuntimeAppend.appendSubagentSpawned
+let appendSubagentSpawnedOrFail = EventLogRuntimeAppend.appendSubagentSpawnedOrFail
+let appendSubagentContinued = EventLogRuntimeAppend.appendSubagentContinued
+let appendSubagentContinuedOrFail = EventLogRuntimeAppend.appendSubagentContinuedOrFail
+
 let isLoopActiveFromEventLog = EventLogRuntimeNudge.isLoopActiveFromEventLog
 let nudgeBlockedForTurn = EventLogRuntimeNudge.nudgeBlockedForTurn
 let tryClaimNudgeDispatch = EventLogRuntimeNudge.tryClaimNudgeDispatch

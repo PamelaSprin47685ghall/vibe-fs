@@ -3,6 +3,8 @@ module Wanxiangshu.Omp.Plugin
 open Fable.Core
 open Wanxiangshu.Omp.PluginCore
 
+let reviewStore = PluginCore.reviewStore
+
 let private registered = JS.Constructors.Set.Create<obj>()
 
 [<ExportDefault>]

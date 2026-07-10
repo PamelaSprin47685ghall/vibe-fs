@@ -106,7 +106,7 @@ let reviewerLoop () =
 
 let runtime () =
     let store = createReviewStore ()
-    store.activateReview ("w1", "task A", 100)
+    store.applyReviewTaskProjection ("w1", Some "task A")
     check "store active" (store.getReviewState "w1" |> Option.isSome)
     equal "store task" (Some "task A") (store.getReviewTask "w1")
     check "store lock" (store.tryLockReview "w1")
@@ -121,11 +121,11 @@ let runtime () =
 /// Parent deactivate must not fire Terminated on child pending (second review race).
 let deactivateParentPreservesChildPending () =
     let store = createReviewStore ()
-    store.activateReview ("parent", "task", 100)
+    store.applyReviewTaskProjection ("parent", Some "task")
     store.addChild ("parent", "child-reviewer")
     let mutable childResolved = false
     store.setPendingReview ("child-reviewer", (fun _ -> childResolved <- true))
-    store.deactivateReview "parent"
+    store.applyReviewTaskProjection ("parent", None)
     check "parent registry cleared" (store.getReviewState "parent" |> Option.isNone)
     check "child pending survives parent deactivate" (not childResolved)
     check "child pending still resolvable" (store.resolvePendingReview ("child-reviewer", Accepted ""))

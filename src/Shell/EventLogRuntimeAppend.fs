@@ -150,3 +150,61 @@ let appendAssistantCompletedOrFail
             eventKindAssistantCompleted
             (assistantPayload assistantMessage agent model turnId openTodos)
             (getTimestampMs().ToString()))
+
+let appendSubagentSpawned
+    (workspaceRoot: string)
+    (sessionID: string)
+    (childId: string)
+    (agent: string)
+    (title: string)
+    : JS.Promise<Result<unit, string>> =
+    append
+        workspaceRoot
+        (buildEvent
+            sessionID
+            eventKindSubagentSpawned
+            (Map [ "childId", childId; "agent", agent; "title", title ])
+            (getTimestampMs().ToString()))
+
+let appendSubagentSpawnedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (childId: string)
+    (agent: string)
+    (title: string)
+    : JS.Promise<unit> =
+    appendOrFail
+        workspaceRoot
+        (buildEvent
+            sessionID
+            eventKindSubagentSpawned
+            (Map [ "childId", childId; "agent", agent; "title", title ])
+            (getTimestampMs().ToString()))
+
+let appendSubagentContinued
+    (workspaceRoot: string)
+    (sessionID: string)
+    (childId: string)
+    (prompt: string)
+    : JS.Promise<Result<unit, string>> =
+    append
+        workspaceRoot
+        (buildEvent
+            sessionID
+            eventKindSubagentContinued
+            (Map [ "childId", childId; "prompt", prompt ])
+            (getTimestampMs().ToString()))
+
+let appendSubagentContinuedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (childId: string)
+    (prompt: string)
+    : JS.Promise<unit> =
+    appendOrFail
+        workspaceRoot
+        (buildEvent
+            sessionID
+            eventKindSubagentContinued
+            (Map [ "childId", childId; "prompt", prompt ])
+            (getTimestampMs().ToString()))

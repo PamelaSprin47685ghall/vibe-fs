@@ -121,11 +121,7 @@ let submitReviewTool
 
                                         let vStr, fb = verdictStringFromReviewResult verdict
                                         do! appendReviewVerdictOrFail root workspaceId vStr fb
-
-                                        match verdict with
-                                        | Accepted _
-                                        | Terminated -> reviewStore.deactivateReview workspaceId
-                                        | NeedsRevision _ -> ()
+                                        do! syncReviewFromEventLogDedicated reviewStore root workspaceId
 
                                         return formatReviewResult verdict
                                 finally

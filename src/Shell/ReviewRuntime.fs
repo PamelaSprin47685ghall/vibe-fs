@@ -6,8 +6,7 @@ open Wanxiangshu.Shell.Clock
 
 /// The full host-facing review store: pure registry kernel plus effect side-table.
 type ReviewStore =
-    abstract member activateReview: sessionID: string * task: string * createdAt: int64 -> unit
-    abstract member deactivateReview: sessionID: string -> unit
+    abstract member applyReviewTaskProjection: sessionID: string * task: string option -> unit
     abstract member clearReviewSessions: unit -> unit
     abstract member tryLockReview: sessionID: string -> bool
     abstract member unlockReview: sessionID: string -> unit
@@ -19,8 +18,6 @@ type ReviewStore =
     abstract member getReviewTask: sessionID: string -> string option
     abstract member getReviewState: sessionID: string -> ReviewState option
     abstract member addChild: parentID: string * childID: string -> unit
-    abstract member hasSynced: sessionID: string -> bool
-    abstract member markSynced: sessionID: string -> unit
 
 /// Single atomic state cell: the pure registry projection plus the effect
 /// side-table fold together so every store method is one `state <- { ... }`
@@ -35,8 +32,6 @@ let createReviewStore () : ReviewStore =
         { Registry = emptyRegistry
           Effects = emptyEffects }
 
-    let mutable syncedSessions = Set.empty<string>
-
     let allDescendantIds sessionId =
         let rec collect id =
             match Map.tryFind id state.Registry with
@@ -45,19 +40,41 @@ let createReviewStore () : ReviewStore =
 
         collect sessionId
 
+    let applyTaskProjection sessionID task =
+        if sessionID = "" then
+            ()
+        else
+            match task with
+            | Some nextTask ->
+                if
+                    taskOf state.Registry sessionID <> Some nextTask
+                    || stateOf state.Registry sessionID |> Option.isNone
+                then
+                    if stateOf state.Registry sessionID |> Option.isSome then
+                        let nextEffects = disposeSessionTree state.Effects [ sessionID ]
+
+                        state <-
+                            { state with
+                                Effects = nextEffects
+                                Registry = reduce state.Registry (RegistryAction.Deactivate sessionID) }
+
+                    state <-
+                        { state with
+                            Registry =
+                                reduce
+                                    state.Registry
+                                    (RegistryAction.Activate(sessionID, nextTask, getTimestampMs ())) }
+            | None ->
+                if stateOf state.Registry sessionID |> Option.isSome then
+                    let nextEffects = disposeSessionTree state.Effects [ sessionID ]
+
+                    state <-
+                        { state with
+                            Effects = nextEffects
+                            Registry = reduce state.Registry (RegistryAction.Deactivate sessionID) }
+
     { new ReviewStore with
-        member _.activateReview(sessionID, task, createdAt) =
-            state <-
-                { state with
-                    Registry = reduce state.Registry (RegistryAction.Activate(sessionID, task, createdAt)) }
-
-        member _.deactivateReview(sessionID) =
-            let nextEffects = disposeSessionTree state.Effects [ sessionID ]
-
-            state <-
-                { state with
-                    Effects = nextEffects
-                    Registry = reduce state.Registry (RegistryAction.Deactivate sessionID) }
+        member _.applyReviewTaskProjection(sessionID, task) = applyTaskProjection sessionID task
 
         member _.clearReviewSessions() =
             let nextEffects =
@@ -131,27 +148,7 @@ let createReviewStore () : ReviewStore =
             state.Registry
             |> Map.filter (fun _ s -> Wanxiangshu.Kernel.ReviewSession.StateMachine.isActive s.state)
             |> Map.keys
-            |> List.ofSeq
-
-        member _.hasSynced(sessionID) = Set.contains sessionID syncedSessions
-
-        member _.markSynced(sessionID) =
-            syncedSessions <- Set.add sessionID syncedSessions }
+            |> List.ofSeq }
 
 let syncReviewProjection (store: ReviewStore) (sessionID: string) (task: string option) : unit =
-    if sessionID = "" then
-        ()
-    else
-        match task with
-        | Some nextTask ->
-            if
-                store.getReviewTask sessionID <> Some nextTask
-                || store.getReviewState sessionID |> Option.isNone
-            then
-                if store.getReviewState sessionID |> Option.isSome then
-                    store.deactivateReview sessionID
-
-                store.activateReview (sessionID, nextTask, getTimestampMs ())
-        | None ->
-            if store.getReviewState sessionID |> Option.isSome then
-                store.deactivateReview sessionID
+    store.applyReviewTaskProjection (sessionID, task)

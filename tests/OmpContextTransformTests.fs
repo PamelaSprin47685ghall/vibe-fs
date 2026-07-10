@@ -138,7 +138,7 @@ let reviewReplayIfStoreEmptyOnTransform () =
         let! root = mkdtempAsync "omp-review-replay-"
         let reviewStore = createReviewStore ()
         let sessionId = "omp-review-if-empty"
-        reviewStore.activateReview (sessionId, "task A", 1L)
+        reviewStore.applyReviewTaskProjection (sessionId, Some "task A")
 
         let historyTaskB =
             frontMatterPrompt [ yamlField taskField "task B" ] "With-Review body from history"

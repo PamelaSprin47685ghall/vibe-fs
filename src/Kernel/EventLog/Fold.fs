@@ -180,6 +180,47 @@ let nudgeAnchorKey (turnId: string) (assistantMessage: string) : string =
 let isNudgeBlockedForAnchor (st: NudgeDedupState) (anchorKey: string) : bool =
     Set.contains (anchorKey.Trim()) st.DispatchedAnchors
 
+type SubagentState =
+    { ChildId: string
+      Agent: string
+      Title: string
+      ContinuedPrompts: string list }
+
+let private subagentFolder (current: Map<string, SubagentState>) (e: WanEvent) : Map<string, SubagentState> =
+    match e.Kind with
+    | k when k = eventKindSubagentSpawned ->
+        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
+        if childId = "" then
+            current
+        else
+            let agent = defaultArg (e.Payload |> Map.tryFind "agent") ""
+            let title = defaultArg (e.Payload |> Map.tryFind "title") ""
+            let state =
+                { ChildId = childId
+                  Agent = agent
+                  Title = title
+                  ContinuedPrompts = [] }
+            Map.add childId state current
+    | k when k = eventKindSubagentContinued ->
+        let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
+        if childId = "" then
+            current
+        else
+            match Map.tryFind childId current with
+            | Some state ->
+                let prompt = defaultArg (e.Payload |> Map.tryFind "prompt") ""
+                let updated = { state with ContinuedPrompts = prompt :: state.ContinuedPrompts }
+                Map.add childId updated current
+            | None ->
+                let prompt = defaultArg (e.Payload |> Map.tryFind "prompt") ""
+                let state =
+                    { ChildId = childId
+                      Agent = ""
+                      Title = ""
+                      ContinuedPrompts = [ prompt ] }
+                Map.add childId state current
+    | _ -> current
+
 /// SessionState invariants:
 /// - `Backlog` is stored in **reverse chronological order** (newest first) to allow
 ///   O(1) prepend during fold. Consumers must `List.rev` to get chronological order.
@@ -189,14 +230,16 @@ type SessionState =
       Backlog: BacklogEntry list
       BacklogSnapshot: WorkBacklogSnapshot
       NudgeDedup: NudgeDedupState
-      NudgeSnapshot: NudgeSnapshotState }
+      NudgeSnapshot: NudgeSnapshotState
+      Subagents: Map<string, SubagentState> }
 
 let emptySessionState () : SessionState =
     { ReviewTask = None
       Backlog = []
       BacklogSnapshot = { TodosJson = None; LatestEntry = None }
       NudgeDedup = emptyNudgeDedupState
-      NudgeSnapshot = emptyNudgeSnapshotState }
+      NudgeSnapshot = emptyNudgeSnapshotState
+      Subagents = Map.empty }
 
 let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
     let isBacklog = e.Kind = eventKindWorkBacklogCommitted
@@ -211,4 +254,9 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
             st.Backlog
       BacklogSnapshot = workBacklogFolder st.BacklogSnapshot e
       NudgeDedup = nudgeDedupFolder st.NudgeDedup e
-      NudgeSnapshot = nudgeSnapshotFolder st.NudgeSnapshot e }
+      NudgeSnapshot = nudgeSnapshotFolder st.NudgeSnapshot e
+      Subagents = subagentFolder st.Subagents e }
+
+/// Fold subagents map for one session.
+let foldSubagents (sessionId: string) (events: WanEvent list) : Map<string, SubagentState> =
+    foldEventStream sessionId Map.empty subagentFolder events

@@ -54,6 +54,8 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       Sync(sync ArchitectureTestsFoundation.nudgeDedupMustUseEventLogFold)
       "ArchitectureTests.nudgeLoopStateMustReplayHistory",
       Sync(sync ArchitectureTestsFoundation.nudgeLoopStateMustReplayHistory)
+      "ArchitectureTests.hostMustNotDirectlyMutateReviewRegistry",
+      Sync(sync ArchitectureTestsFoundation.hostMustNotDirectlyMutateReviewRegistry)
       "ArchitectureTests.ompMessageTransformUsesProjectionPolicy",
       Sync(sync ArchitectureTestsOmp.ompMessageTransformUsesProjectionPolicy)
       "ArchitectureTests.ompMessageTransformUsesShellCaps",

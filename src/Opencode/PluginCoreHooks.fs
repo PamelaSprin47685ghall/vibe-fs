@@ -106,7 +106,7 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
             | Some env when not (isPluginObservedHostEvent env.EventType) -> promise { return () }
             | Some env ->
                 promise {
-                    do! eventHandler services.ReviewStore services.RuntimeScope input
+                    do! EventHooks.eventHandler services.ReviewStore services.RuntimeScope ctx input
 
                     let ptyCleanupSessionId =
                         if

@@ -119,13 +119,13 @@ let ompTestEntries () : (string * TestBody) list =
       "SubagentIoTests.signalAbortedNullIsFalse", Sync(sync SubagentIoTests.signalAbortedNullIsFalse)
       "OmpPluginCoreTests.reviewStoreIsSharedSingleton", Sync(sync OmpPluginCoreTests.reviewStoreIsSharedSingleton)
       "OmpPluginCoreTests.clearReviewStatesNoError", Sync(sync OmpPluginCoreTests.clearReviewStatesNoError)
-      "OmpPluginCoreTests.abortHookDeactivatesReview", Sync(sync OmpPluginCoreTests.abortHookDeactivatesReview)
+      "OmpPluginCoreTests.abortHookDeactivatesReview", Async OmpPluginCoreTests.abortHookDeactivatesReview
       "OmpPluginCoreTests.streamAbortHookDeactivatesReview",
-      Sync(sync OmpPluginCoreTests.streamAbortHookDeactivatesReview)
+      Async OmpPluginCoreTests.streamAbortHookDeactivatesReview
       "OmpPluginCoreTests.sessionErrorHookDeactivatesReview",
-      Sync(sync OmpPluginCoreTests.sessionErrorHookDeactivatesReview)
+      Async OmpPluginCoreTests.sessionErrorHookDeactivatesReview
       "OmpPluginCoreTests.unrelatedEventLeavesReviewActive",
-      Sync(sync OmpPluginCoreTests.unrelatedEventLeavesReviewActive)
+      Async OmpPluginCoreTests.unrelatedEventLeavesReviewActive
       "OmpMagicTodoTests.sharedSessionStoreByHost", Sync(sync OmpMagicTodoTests.sharedSessionStoreByHost)
       "OmpMagicTodoTests.hostPartitionedReports", Sync(sync OmpMagicTodoTests.hostPartitionedReports)
       "OmpMagicTodoTests.backlogEntryFromTodoInputHostAgnostic",

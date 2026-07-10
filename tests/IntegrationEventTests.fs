@@ -19,14 +19,14 @@ open Wanxiangshu.Mux.Plugin
 open Wanxiangshu.Opencode.Plugin
 open Wanxiangshu.Shell.Dyn
 
-let eventHookSpec (reg: obj) =
+let eventHookSpec (reg: obj) (workspaceId: string) =
     promise {
         let hook = get reg "eventHook"
         check "eventHook.length === 2" (unbox<int> (hook?length) = 2)
 
         let ehResult =
             hook
-            $ (createObj [ "type", box "stream-abort"; "workspaceId", box "test-ws" ], null)
+            $ (createObj [ "type", box "stream-abort"; "workspaceId", box workspaceId ], null)
 
         check "eventHook returns Promise" (not (isNullish (get ehResult "then")))
         do! unbox<JS.Promise<unit>> ehResult
@@ -34,8 +34,11 @@ let eventHookSpec (reg: obj) =
 
 let run () : JS.Promise<unit> =
     promise {
-        let reg = createRegistration (createObj [])
-        do! eventHookSpec reg
+        let! muxEventDir = mkdtempAsync "mux-event-hook-"
+        let muxWorkspaceId = "mux-event-ws"
+        let reg =
+            createRegistration (createObj [ "directory", box muxEventDir ])
+        do! eventHookSpec reg muxWorkspaceId
         do! repeatedTodoNudgeSpec ()
         do! reviewerReviseRenudgesLoopSpec ()
         do! muxSubmitReviewWipDoesNotSuppressLoopNudgeSpec ()

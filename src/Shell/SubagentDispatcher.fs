@@ -104,38 +104,45 @@ let dispatch
                         else
                             Some(fst (List.last matches))
 
-            let wrapWithIterator text role =
-                let spawnedChildId =
-                    match getChildIDForSpawn role with
-                    | Some cid -> Some cid
-                    | None ->
-                        match host with
-                        | Opencode -> Some("child-session-1") // For fakeAdapter test to correctly find childID!
-                        | Mimocode -> None
-                        | Mux ->
-                            let r = scope.NextChildSessionId()
-                            Some("mux-task-" + string r)
-                        | Omp ->
-                            let r = scope.NextChildSessionId()
-                            Some("omp-session-" + string r)
+            let wrapWithIterator text role title =
+                promise {
+                    let spawnedChildId =
+                        match getChildIDForSpawn role with
+                        | Some cid -> Some cid
+                        | None ->
+                            match host with
+                            | Opencode -> Some("child-session-1") // For fakeAdapter test to correctly find childID!
+                            | Mimocode -> None
+                            | Mux ->
+                                let r = scope.NextChildSessionId()
+                                Some("mux-task-" + string r)
+                            | Omp ->
+                                let r = scope.NextChildSessionId()
+                                Some("omp-session-" + string r)
 
-                match spawnedChildId with
-                | None -> text
-                | Some cid ->
-                    let roleStr =
-                        match role with
-                        | HostAdapter.Coder -> "coder"
-                        | HostAdapter.Investigator -> "investigator"
-                        | HostAdapter.Meditator -> "meditator"
-                        | HostAdapter.Browser -> "browser"
+                    match spawnedChildId with
+                    | None -> return text
+                    | Some cid ->
+                        let roleStr =
+                            match role with
+                            | HostAdapter.Coder -> "coder"
+                            | HostAdapter.Investigator -> "investigator"
+                            | HostAdapter.Meditator -> "meditator"
+                            | HostAdapter.Browser -> "browser"
 
-                    let item =
-                        { childID = cid
-                          agent = roleStr
-                          host = host }
+                        let item =
+                            { childID = cid
+                              agent = roleStr
+                              host = host }
 
-                    let iter = storeSubagentIterator scope.SubagentIteratorStore "global" item
-                    Wanxiangshu.Kernel.ToolOutputInfo.withIterator text iter
+                        let iter = storeSubagentIterator scope.SubagentIteratorStore "global" item
+                        let root = adapter.WorkspaceRoot
+                        let parentSid = adapter.SessionId
+                        if root <> "" && parentSid <> "" then
+                            do! Wanxiangshu.Shell.EventLogRuntime.appendSubagentSpawnedOrFail root parentSid cid roleStr title
+
+                        return Wanxiangshu.Kernel.ToolOutputInfo.withIterator text iter
+                }
 
             let spawnOne role title prompt =
                 let request =
@@ -148,7 +155,9 @@ let dispatch
                     let! response = adapter.SpawnSubagent request
 
                     match response with
-                    | Success text -> return wrapWithIterator text role
+                    | Success text ->
+                        let! res = wrapWithIterator text role title
+                        return res
                     | Failure err -> return subagentToolFailed toolName err
                     | Aborted -> return subagentToolFailed toolName MessageAborted
                 }
@@ -195,14 +204,21 @@ let dispatch
                 | Some item ->
                     let! response = adapter.ContinueSubagent(item.childID, item.agent, c.Prompt)
 
-                    let textResult =
-                        match response with
-                        | Success text ->
-                            // Re-store/preserve the exact same iterator ID so the caller can reuse it directly!
-                            preserveSubagentIterator scope.SubagentIteratorStore cleanIter item
-                            Wanxiangshu.Kernel.ToolOutputInfo.withIterator text cleanIter
-                        | Failure err -> subagentToolFailed "continue" err
-                        | Aborted -> subagentToolFailed "continue" MessageAborted
+                    let! textResult =
+                        promise {
+                            match response with
+                            | Success text ->
+                                let root = adapter.WorkspaceRoot
+                                let parentSid = adapter.SessionId
+                                if root <> "" && parentSid <> "" then
+                                    do! Wanxiangshu.Shell.EventLogRuntime.appendSubagentContinuedOrFail root parentSid item.childID c.Prompt
+
+                                // Re-store/preserve the exact same iterator ID so the caller can reuse it directly!
+                                preserveSubagentIterator scope.SubagentIteratorStore cleanIter item
+                                return Wanxiangshu.Kernel.ToolOutputInfo.withIterator text cleanIter
+                            | Failure err -> return subagentToolFailed "continue" err
+                            | Aborted -> return subagentToolFailed "continue" MessageAborted
+                        }
 
                     return textResult
             | Typed _ ->

@@ -15,6 +15,8 @@ open Wanxiangshu.Omp.ReviewToolsLoop
 open Wanxiangshu.Omp.Schema
 open Wanxiangshu.Shell.DynField
 open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.ReviewRuntime
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -94,12 +96,11 @@ let executeSubmitReview
                                 Wanxiangshu.Kernel.EventLog.Types.verdictNeedsRevision
 
                         do! appendReviewVerdictOrFail root sessionId verdict r.feedback
+                        do! syncReviewFromEventLogDedicated store root sessionId
 
                         if r.feedback.IsNone && not (defaultArg r.terminated false) then
-                            store.deactivateReview sessionId
                             return textResult "Review passed. Loop mode ended."
                         elif defaultArg r.terminated false then
-                            store.deactivateReview sessionId
                             return errorResult ("Review terminated: " + defaultArg r.feedback "")
                         else
                             return errorResult ("Review feedback:\n\n" + r.feedback.Value)

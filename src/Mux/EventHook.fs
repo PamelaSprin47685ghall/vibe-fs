@@ -9,6 +9,9 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackConfigCodec
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.RuntimeScope
 open Wanxiangshu.Mux.FallbackHooks
 
 type private DecodedHookEvent =
@@ -67,7 +70,7 @@ let private parseHookEvent (event: obj) : NudgeRuntimeEvent =
         | "error" when decoded.errorType = "aborted" -> AbortedError decoded.workspaceId
         | _ -> Ignore
 
-let createEventHook (deps: obj) (deactivateReview: string -> unit) : obj =
+let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope) : obj =
     let getChatHistory =
         if Dyn.isNullish deps then
             None
@@ -78,12 +81,6 @@ let createEventHook (deps: obj) (deactivateReview: string -> unit) : obj =
                 None
             else
                 Some(fun (workspaceId: string) -> unbox<JS.Promise<obj array>> (Dyn.call1 getter workspaceId))
-
-    let cleanupOnAbort (event: obj) : unit =
-        match parseHookEvent event with
-        | StreamAbort workspaceId
-        | AbortedError workspaceId when workspaceId <> "" -> deactivateReview workspaceId
-        | _ -> ()
 
     let directory = if Dyn.isNullish deps then "" else Dyn.str deps "directory"
 
@@ -109,7 +106,18 @@ let createEventHook (deps: obj) (deactivateReview: string -> unit) : obj =
                     fallbackRuntime.SetEventHandlingActive workspaceId true
 
                 try
-                    cleanupOnAbort event
+                    match parseHookEvent event with
+                    | StreamAbort workspaceId
+                    | AbortedError workspaceId when workspaceId <> "" ->
+                        let root = if directory = "" then workspaceId else directory
+                        scope.TriggerInit(root)
+                        do! scope.WaitInit()
+                        do! appendLoopCancelledOrFail root workspaceId
+                        do! syncReviewFromEventLogDedicated reviewStore root workspaceId
+
+                        Wanxiangshu.Shell.RunnerBackground.abortRunnerJobCore scope workspaceId
+                    | _ -> ()
+
                     let! fbResult = fallbackHandler event
 
                     if not fbResult.Consumed then

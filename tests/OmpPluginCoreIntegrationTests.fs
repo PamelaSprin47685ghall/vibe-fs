@@ -146,8 +146,8 @@ let reviewStoreSharedWithTools () =
         let pi = piObject h
         do! Plugin.wanxiangshuExtension pi
         let sessionId = "shared-store-1"
-        reviewStore.activateReview (sessionId, "t", 0L)
+        reviewStore.applyReviewTaskProjection (sessionId, Some "t")
         check "plugin pre-activation visible" (reviewStore.getReviewTask sessionId = Some "t")
-        reviewStore.deactivateReview sessionId
+        reviewStore.applyReviewTaskProjection (sessionId, None)
         check "deactivation observed" (reviewStore.getReviewState sessionId |> Option.isNone)
     }

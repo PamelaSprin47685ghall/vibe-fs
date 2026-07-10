@@ -19,6 +19,8 @@ open Wanxiangshu.Kernel.WorkBacklog
 open Wanxiangshu.Kernel.ToolOutputInfo
 open Wanxiangshu.Shell.RunnerBackground
 open Wanxiangshu.Shell.LivelockGuard
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.ReviewRuntime
 open Wanxiangshu.Shell.Dyn
 
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -164,7 +166,12 @@ let sessionShutdownHandler (reviewStore: ReviewStore) (ctx: obj) : JS.Promise<un
         | Some sessionId ->
             clearNudgeSession sessionId
             clearTypedIteratorScope ompScope.IteratorStore sessionId
-            reviewStore.deactivateReview sessionId
+            let cwd = Dyn.str ctx "cwd"
+
+            if cwd <> "" then
+                do! appendLoopCancelledOrFail cwd sessionId
+                do! syncReviewFromEventLogDedicated reviewStore cwd sessionId
+
             do! cleanupRunnerJob ExecutorTools.ompScope sessionId
             Wanxiangshu.Shell.LivelockGuard.cleanup ExecutorTools.ompScope sessionId
     }

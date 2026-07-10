@@ -49,9 +49,10 @@ let toolDefinition (input: obj) (output: obj) : JS.Promise<unit> =
 let eventHandler
     (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore)
     (scope: Wanxiangshu.Shell.RuntimeScope.RuntimeScope)
+    (ctx: obj)
     (input: obj)
     : JS.Promise<unit> =
-    EventHooks.eventHandler reviewStore scope input
+    EventHooks.eventHandler reviewStore scope ctx input
 
 let noop (_a: obj) (_b: obj) : JS.Promise<unit> = ChatHooks.noop _a _b
 let noopEvent (_a: obj) : JS.Promise<unit> = ChatHooks.noopEvent _a

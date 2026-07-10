@@ -122,12 +122,11 @@ let createCoreServices (host: Host) (ctx: obj) =
 
 let createReviewTestSurface (reviewStore: Wanxiangshu.Shell.ReviewRuntime.ReviewStore) : obj =
     createObj
-        [ "activateReview",
+        [ "applyReviewTaskProjection",
           box (
-              System.Func<string, string, int64, unit>(fun sessionID task createdAt ->
-                  reviewStore.activateReview (sessionID, task, createdAt))
+              System.Func<string, string option, unit>(fun sessionID task ->
+                  reviewStore.applyReviewTaskProjection (sessionID, task))
           )
-          "deactivateReview", box (System.Func<string, unit>(fun sessionID -> reviewStore.deactivateReview sessionID))
           "getReviewTask",
           box (System.Func<string, string option>(fun sessionID -> reviewStore.getReviewTask sessionID))
           "tryLockReview", box (System.Func<string, bool>(fun sessionID -> reviewStore.tryLockReview sessionID))

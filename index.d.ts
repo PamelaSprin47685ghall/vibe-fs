@@ -339,8 +339,8 @@ export function deduplicateModelReadOutputsWithSeen(
 
 declare module "wanxiangshu/omp" {
   export interface OmpReviewStore {
-    activateReview(sessionId: string, task: string, createdAt: number): void;
-    deactivateReview(sessionId: string): void;
+    applyReviewTaskProjection(sessionId: string, task: string | undefined): void;
+    syncReviewProjection(sessionId: string, task: string | undefined): void;
     tryLockReview(sessionId: string): boolean;
     unlockReview(sessionId: string): void;
     setPendingReview(sessionId: string, resolve: (result: unknown) => void): void;

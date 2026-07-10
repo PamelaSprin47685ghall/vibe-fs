@@ -48,22 +48,18 @@ let muxReviewStore (reg: obj) : obj = get reg "__reviewStore"
 let muxActivateReviewForTest (reg: obj) (sessionID: string) (task: string) : unit =
     let store = muxReviewStore reg
 
-    let activate =
-        get store "activateReview" |> unbox<System.Func<string, string, int64, unit>>
+    let apply =
+        get store "applyReviewTaskProjection" |> unbox<System.Func<string, string option, unit>>
 
-    activate.Invoke(sessionID, task, 0L)
+    apply.Invoke(sessionID, Some task)
 
 let muxReplayReviewTaskForTest (reg: obj) (sessionID: string) (task: string option) : unit =
     let store = muxReviewStore reg
 
-    let activate =
-        get store "activateReview" |> unbox<System.Func<string, string, int64, unit>>
+    let apply =
+        get store "applyReviewTaskProjection" |> unbox<System.Func<string, string option, unit>>
 
-    let deactivate = get store "deactivateReview" |> unbox<System.Func<string, unit>>
-
-    match task with
-    | Some value -> activate.Invoke(sessionID, value, 0L)
-    | None -> deactivate.Invoke(sessionID)
+    apply.Invoke(sessionID, task)
 
 let muxIsReviewActiveForTest (reg: obj) (sessionID: string) : bool =
     let store = muxReviewStore reg

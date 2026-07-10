@@ -47,7 +47,7 @@ let handleLoopReviewCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: 
                     | Terminated -> notifyInfo "Pre-review could not complete."
                     | NeedsRevision feedback ->
                         do! appendLoopActivatedOrFail root sessionId task
-                        store.activateReview (sessionId, task, getTimestampMs ())
+                        do! syncReviewFromEventLogDedicated store root sessionId
 
                         pi?sendMessage (
                             createObj
@@ -90,13 +90,13 @@ let handleLoopCommand (pi: obj) (store: ReviewStore) (args: string) (ctx: obj) :
 
             if task = "" then
                 do! appendLoopCancelledOrFail root sessionId
-                store.deactivateReview sessionId
+                do! syncReviewFromEventLogDedicated store root sessionId
                 notifyInfo "loop mode cancelled."
             else if store.getReviewTask sessionId |> Option.isSome then
                 notifyInfo "loop mode is already active."
             else
                 do! appendLoopActivatedOrFail root sessionId task
-                store.activateReview (sessionId, task, getTimestampMs ())
+                do! syncReviewFromEventLogDedicated store root sessionId
 
                 pi?sendMessage (
                     createObj

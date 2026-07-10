@@ -1,12 +1,14 @@
 module Wanxiangshu.Shell.NudgeRuntime
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 open Wanxiangshu.Shell.NudgeRuntimeTypes
 open Wanxiangshu.Shell.NudgeRuntimeMux
 open Wanxiangshu.Shell.EventLogRuntime
 open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Kernel.FallbackKernel.Types
 
 let private _eventLogNudgeIntegral = tryClaimNudgeDispatch
 
@@ -39,7 +41,7 @@ type NudgeRuntime
                             workspaceDirectory
                             runtimeState
                             workspaceId
-                            (collectSnapshotMux getChatHistory workspaceDirectory helpers workspaceId lastMsg)
+                            (collectSnapshotMux fallbackRuntime getChatHistory workspaceDirectory helpers workspaceId lastMsg)
                             (sendNudgeMux fallbackRuntime helpers workspaceId)
 
                     runtimeState <- newState

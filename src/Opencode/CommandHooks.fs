@@ -43,7 +43,7 @@ let commandExecuteBefore
 
             if task = "" then
                 do! appendLoopCancelledOrFail directory sessionID
-                reviewStore.deactivateReview sessionID
+                do! syncReviewFromEventLogDedicated reviewStore directory sessionID
 
                 parts.Add(
                     box
@@ -58,7 +58,7 @@ let commandExecuteBefore
                 )
             elif command = "loop" then
                 do! appendLoopActivatedOrFail directory sessionID task
-                reviewStore.activateReview (sessionID, task, getTimestampMs ())
+                do! syncReviewFromEventLogDedicated reviewStore directory sessionID
 
                 let msg =
                     buildLoopMessage
@@ -87,7 +87,7 @@ let commandExecuteBefore
                     )
                 | NeedsRevision feedback ->
                     do! appendLoopActivatedOrFail directory sessionID task
-                    reviewStore.activateReview (sessionID, task, getTimestampMs ())
+                    do! syncReviewFromEventLogDedicated reviewStore directory sessionID
 
                     let msg =
                         buildLoopMessage
