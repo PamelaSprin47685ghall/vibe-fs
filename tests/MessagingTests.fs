@@ -140,6 +140,21 @@ let stripSyntheticBySourceRemovesSynthetic () =
     let result = stripSyntheticBySource [ msg ]
     equal "empty" 0 (List.length result)
 
+let isToolResultRoleStringTool () =
+    check "tool is toolresult" (isToolResultRoleString "tool")
+
+let isToolResultRoleStringToolResultCamel () =
+    check "toolResult is toolresult" (isToolResultRoleString "toolResult")
+
+let isToolResultRoleStringToolResultHyphen () =
+    check "tool-result is toolresult" (isToolResultRoleString "tool-result")
+
+let isToolResultRoleStringToolResultUnderscore () =
+    check "tool_result is toolresult" (isToolResultRoleString "tool_result")
+
+let isToolResultRoleStringUserIsFalse () =
+    check "user is not toolresult" (not (isToolResultRoleString "user"))
+
 let run () =
     classifySourceEmptyIsNative ()
     classifySourceUnknownIsNative ()
@@ -166,3 +181,8 @@ let run () =
     partIsToolFalse ()
     stripSyntheticBySourceKeepsNative ()
     stripSyntheticBySourceRemovesSynthetic ()
+    isToolResultRoleStringTool ()
+    isToolResultRoleStringToolResultCamel ()
+    isToolResultRoleStringToolResultHyphen ()
+    isToolResultRoleStringToolResultUnderscore ()
+    isToolResultRoleStringUserIsFalse ()

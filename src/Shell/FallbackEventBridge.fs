@@ -181,10 +181,14 @@ let handleEvent
                                 runtime.UpdateState sessionID updated
                                 finalState <- updated
                         | None ->
+                            let isToolFinish = FallbackMessageCodec.isLastAssistantToolFinish msgs
+                            let hasResult = FallbackMessageCodec.hasToolResultAfter msgs
+                            let taskComplete = (not isToolFinish) || hasResult
+
                             let updated =
                                 { ns with
                                     Phase = FallbackPhase.Idle
-                                    TaskComplete = true }
+                                    TaskComplete = taskComplete }
 
                             runtime.UpdateState sessionID updated
                             finalState <- updated

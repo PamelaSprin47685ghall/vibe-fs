@@ -13,6 +13,7 @@ let runPart3
     (jsonStringify: obj -> string)
     (ok: int)
     (summary: unit -> int)
+    (createEmpty: unit -> obj)
     : JS.Promise<int> =
     promise {
         // --- 9. Nudge & Force-Stop workflow -----------------------------------

@@ -1,6 +1,7 @@
 module Wanxiangshu.Shell.OpencodeSessionEventCodec
 
 open Fable.Core.JsInterop
+open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.Nudge.TodoStatus
 
@@ -157,7 +158,7 @@ let shouldSkipNudge (messagesData: obj) : bool =
                         |> Array.exists (fun msg ->
                             let mInfo = Dyn.get msg "info"
                             let mRole = Dyn.str mInfo "role"
-                            mRole = "toolResult")
+                            isToolResultRoleString mRole)
 
                     not hasToolResultAfter
         | None -> false

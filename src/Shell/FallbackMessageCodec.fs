@@ -5,6 +5,7 @@ open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackMessageParser
+open Wanxiangshu.Kernel.Messaging
 
 /// Scanner prompt returned when a tool-call-as-text is detected.
 let private recoveryPrompt =
@@ -182,3 +183,35 @@ let decodeModelFromObj (modelObj: obj) : FallbackModel option =
                   Thinking = false }
         else
             None
+
+/// Find the index of the last assistant message.
+let lastAssistantIndex (msgs: obj array) : int option =
+    if isNull msgs || msgs.Length = 0 then
+        None
+    else
+        msgs
+        |> Array.tryFindIndexBack (fun msg -> Dyn.str (Dyn.get msg "info") "role" = "assistant")
+
+/// Check if the last assistant message finished because of a tool call.
+let isLastAssistantToolFinish (msgs: obj array) : bool =
+    match lastAssistantIndex msgs with
+    | None -> false
+    | Some idx ->
+        let info = Dyn.get msgs.[idx] "info"
+        let finish = Dyn.str info "finish"
+        let finishLower = finish.ToLower()
+        finishLower.Contains("tool") && finishLower <> "tool_use_error"
+
+/// Check if there is any tool result message after the last assistant turn.
+let hasToolResultAfter (msgs: obj array) : bool =
+    match lastAssistantIndex msgs with
+    | None -> false
+    | Some idx ->
+        if idx + 1 >= msgs.Length then
+            false
+        else
+            msgs.[idx + 1 ..]
+            |> Array.exists (fun msg ->
+                let mInfo = Dyn.get msg "info"
+                let mRole = Dyn.str mInfo "role"
+                isToolResultRoleString mRole)

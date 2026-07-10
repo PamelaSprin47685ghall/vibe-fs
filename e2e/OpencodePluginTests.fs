@@ -220,5 +220,6 @@ let runAll (args: string array) : JS.Promise<int> =
                 dynIsNull
                 dynStr
 
-        return! OpencodePluginTestsPart3.runPart3 harness chk startHarness jsonStringify ok summary
+        let! _ = OpencodePluginTestsPart3.runPart3 harness chk startHarness jsonStringify ok (fun () -> 0) createEmpty
+        return! Wanxiangshu.E2e.OpencodePluginNudgeTests.runNudgeTests harness chk startHarness jsonStringify ok summary createEmpty
     }

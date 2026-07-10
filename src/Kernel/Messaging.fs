@@ -79,12 +79,18 @@ let private roleMap =
     Map.ofList
         [ "user", User
           "assistant", Assistant
-          "toolResult", ToolResult
+          "toolresult", ToolResult
           "tool-result", ToolResult
-          "tool_result", ToolResult ]
+          "tool_result", ToolResult
+          "tool", ToolResult
+          "system", System ]
 
 let decodeRole (s: string) : Role =
-    Map.tryFind s roleMap |> Option.defaultValue System
+    let lowered = s.Trim().ToLowerInvariant()
+    Map.tryFind lowered roleMap |> Option.defaultValue System
+
+let isToolResultRoleString (s: string) : bool =
+    decodeRole s = ToolResult
 
 /// Pure typed copy of a tool part with its state.output overwritten.
 let setPartOutputTyped (part: Part<'raw>) (newOutput: string) : Part<'raw> =
