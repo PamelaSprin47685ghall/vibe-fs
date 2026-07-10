@@ -64,7 +64,7 @@
 3. review loop 活跃（**事件 fold**）→ `nudge-loop`
 4. 否则 → none
 
-**抑制**：末条 assistant 含 `<skip-todo-check/>`、`<skip-loop-check/>`，或存在未决 `question` / `ask_user_question`。
+**抑制**：末条 assistant 含 `<skip-todo-check/>`（跳过待办检查）或 `<skip-review-check/>`（跳过 review/loop 检查）。两者独立：只写一个不跳过另一个；两个都写则两个都跳过。
 
 **与 context budget**：`context-budget-nudge` 优先级更高（见 [13](./13-context-budget.md)）。
 

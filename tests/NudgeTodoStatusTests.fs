@@ -58,6 +58,7 @@ let run () =
     let loopPromptWithFm = loopNudgePromptFor [ "todo1" ]
     check "loopNudgePromptFor contains front matter" (loopPromptWithFm.Contains("---"))
     check "loopNudgePromptFor contains original prose" (loopPromptWithFm.Contains("You are in loop mode"))
+    check "loopNudgePromptFor contains skip-review-check" (loopPromptWithFm.Contains("skip-review-check"))
 
     // --- isNudgePrompt recognizes new format ---
     check "isNudgePrompt recognizes todoNudgePromptFor" (isNudgePrompt todoPromptWithFm)
