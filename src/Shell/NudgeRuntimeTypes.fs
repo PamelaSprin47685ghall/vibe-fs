@@ -30,10 +30,6 @@ let isNudgePromptText (text: string) : bool =
     || t.Contains("the system context is about to be suspended")
     || t.Contains("You must immediately force an emergency stop")
 
-let isContinuePromptText (text: string) : bool =
-    let t = text.Trim()
-    t = "continue"
-
 let private messageTexts (message: obj) : string list =
     let parts = Dyn.get message "parts"
 
@@ -68,9 +64,7 @@ let private messageTexts (message: obj) : string list =
 let classifyUserMessage (msg: obj) : string =
     let text = messageTexts msg |> String.concat "\n"
 
-    if isContinuePromptText text then "continue"
-    elif isNudgePromptText text then "nudge"
-    else "user"
+    if isNudgePromptText text then "nudge" else "user"
 
 let tryGetModelStringFromMessage (msg: obj) : string option =
     let info = Dyn.get msg "info"
@@ -129,19 +123,20 @@ let resolveNudgeModel
         | None -> defaultModel
         | Some lastUserMsg ->
             match classifyUserMessage lastUserMsg with
-            | "user" ->
-                match tryGetModelStringFromMessage lastUserMsg with
-                | Some m -> Some m
-                | None -> defaultModel
             | "nudge" ->
                 match tryGetModelStringFromMessage lastUserMsg with
                 | Some m -> Some m
                 | None -> defaultModel
-            | "continue" ->
-                match fallbackRuntime.GetModel(sessionID) with
-                | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)
-                | None -> None
-            | _ -> defaultModel
+            | _ ->
+                match tryGetModelStringFromMessage lastUserMsg with
+                | Some m -> Some m
+                | None ->
+                    match fallbackRuntime.GetInjectedModel sessionID with
+                    | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)
+                    | None ->
+                        match fallbackRuntime.GetModel sessionID with
+                        | Some m -> Some(sprintf "%s/%s" m.ProviderID m.ModelID)
+                        | None -> defaultModel
 
 let runNudgeFlowCore
     (host: Host)

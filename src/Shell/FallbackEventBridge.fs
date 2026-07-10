@@ -7,6 +7,8 @@ open Wanxiangshu.Shell.FallbackMessageCodec
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackConfigCodec
 open Wanxiangshu.Shell.PromiseQueue
+open Wanxiangshu.Shell.EventLogRuntimeAppend
+open Wanxiangshu.Shell.Clock
 
 // ---------------------------------------------------------------------------
 // Host-facing interfaces
@@ -18,7 +20,7 @@ type IEventTranslator =
     abstract IsSessionError: obj -> bool
     abstract IsSessionIdle: obj -> bool
     abstract IsSessionBusy: obj -> bool
-    abstract IsNewUserMessage: obj -> bool
+    abstract IsNewUserMessage: sessionID: string * rawEvent: obj -> bool
 
 type IActionExecutor =
     abstract SendContinue: sessionID: string * model: FallbackModel -> JS.Promise<unit>
@@ -38,6 +40,7 @@ let handleEvent
     (runtime: FallbackRuntimeState)
     (configLookup: ConfigLookup)
     (executor: IActionExecutor)
+    (workspaceRoot: string)
     (rawEvent: obj)
     : JS.Promise<FallbackHookResult> =
 
@@ -56,7 +59,7 @@ let handleEvent
             match translator.TranslateError rawEvent with
             | Some _ as ev -> promise { return ev }
             | None ->
-                if translator.IsNewUserMessage rawEvent then
+                if translator.IsNewUserMessage(sessionID, rawEvent) then
                     promise { return Some FallbackEvent.NewUserMessage }
                 elif translator.IsSessionBusy rawEvent then
                     promise { return Some FallbackEvent.SessionBusy }
@@ -158,6 +161,17 @@ let handleEvent
                     match action with
                     | FallbackAction.DoNothing -> ()
                     | FallbackAction.SendContinue model ->
+                        let atMs = getTimestampMs ()
+                        let agent = runtime.GetAgentName sessionID
+
+                        let modelStr =
+                            match model.Variant with
+                            | Some v -> model.ProviderID + "/" + model.ModelID + ":" + v
+                            | None -> model.ProviderID + "/" + model.ModelID
+
+                        do! appendFallbackContinueInjectedOrFail workspaceRoot sessionID modelStr agent atMs
+                        runtime.SetInjectedAt sessionID atMs
+                        runtime.SetInjectedModel sessionID model
                         runtime.SetAwaitingBusy sessionID true
                         do! executor.SendContinue(sessionID, model)
                     | FallbackAction.RecoverWithPrompt(model, promptText) ->
@@ -239,6 +253,7 @@ let createHandler
     (runtime: FallbackRuntimeState)
     (configLookup: ConfigLookup)
     (executor: IActionExecutor)
+    (workspaceRoot: string)
     : (obj -> JS.Promise<FallbackHookResult>) =
 
     let mutable queues = Map.ofList<string, SerialQueue> []
@@ -255,6 +270,8 @@ let createHandler
                     queues <- Map.add sessionID q queues
                     q
 
-            let! result = queue.Enqueue(fun () -> handleEvent translator runtime configLookup executor rawEvent)
+            let! result =
+                queue.Enqueue(fun () -> handleEvent translator runtime configLookup executor workspaceRoot rawEvent)
+
             return result
         }

@@ -15,7 +15,44 @@ open Wanxiangshu.Shell.FallbackEventBridge
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Opencode.FallbackHooksHelper
 
-let opencodeEventTranslator: IEventTranslator =
+/// Zero-width space character used as the fallback `SendContinue` prompt
+/// text. It is invisible in any UI but still parsed by LLMs as a non-empty
+/// text, so it triggers the protocol-driven "continue" loop without leaving
+/// a "continue" footprint in the LLM history that the consumer side could
+/// mistake for a real user message.
+let private zwsChar = "​"
+
+let private isNewUserMessageImpl (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : bool =
+    let t = getEventType rawEvent
+
+    if t <> "message.updated" then
+        false
+    else
+        let info = Dyn.get (getProps rawEvent) "info"
+
+        if Dyn.str info "role" <> "user" then
+            false
+        else
+            let msgTime =
+                let time = Dyn.get info "time"
+
+                if isNull time then
+                    0L
+                else
+                    let completed = Dyn.get time "completed"
+
+                    if isNull completed then
+                        0L
+                    else
+                        match completed with
+                        | :? int64 as i -> i
+                        | :? float as f -> int64 f
+                        | :? int as i32 -> int64 i32
+                        | _ -> 0L
+
+            not (runtime.IsInjectedSince sessionID msgTime)
+
+let opencodeEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
     { new IEventTranslator with
         member _.TranslateError rawEvent =
             let eventType = getEventType rawEvent
@@ -74,10 +111,8 @@ let opencodeEventTranslator: IEventTranslator =
             t = "session.status"
             && resolveStatusValue (Dyn.get (getProps rawEvent) "status") = "busy"
 
-        member _.IsNewUserMessage rawEvent =
-            getEventType rawEvent = "message.updated"
-            && Dyn.str (Dyn.get (getProps rawEvent) "info") "role" = "user"
-            && not (Wanxiangshu.Shell.FallbackMessageCodec.isSystemForcedUserMessage (getProps rawEvent)) }
+        member _.IsNewUserMessage(sessionID, rawEvent) =
+            isNewUserMessageImpl runtime sessionID rawEvent }
 
 let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActionExecutor =
     let resolveModelAndAgent
@@ -128,7 +163,7 @@ let opencodeActionExecutor (runtime: FallbackRuntimeState) (client: obj) : IActi
                 let! _, liveAgentOpt = tryGetSessionModelAndAgentAsync client sessionID
                 let! infoOpt = tryReadLatestMessageInfo client sessionID
                 let modelStr, agent = resolveModelAndAgent liveAgentOpt model sessionID infoOpt
-                let body = createPromptBodyWithModel agent (Some modelStr) "continue"
+                let body = createPromptBodyWithModel agent (Some modelStr) zwsChar
 
                 let arg =
                     box
@@ -179,21 +214,24 @@ let private setConsumedFromResult
     runtime.SetConsumed sessionID result.Consumed
 
 let private clearConsumedOnNewUserMessage (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : unit =
-    if opencodeEventTranslator.IsNewUserMessage rawEvent then
+    if isNewUserMessageImpl runtime sessionID rawEvent then
         runtime.ClearConsumed sessionID
 
 let createOpencodeFallbackHandler
     (client: obj)
     (runtime: FallbackRuntimeState)
     (configLookup: ConfigLookup)
+    (workspaceRoot: string)
     (_registry: ChildAgentRegistry)
     : (obj -> JS.Promise<FallbackHookResult>) =
+    let translator = opencodeEventTranslator runtime
+
     let baseHandler =
-        createHandler opencodeEventTranslator runtime configLookup (opencodeActionExecutor runtime client)
+        createHandler translator runtime configLookup (opencodeActionExecutor runtime client) workspaceRoot
 
     fun rawEvent ->
         promise {
-            let sessionID = opencodeEventTranslator.ExtractSessionID rawEvent
+            let sessionID = translator.ExtractSessionID rawEvent
             let! result = baseHandler rawEvent
             setConsumedFromResult runtime sessionID result
             clearConsumedOnNewUserMessage runtime sessionID rawEvent

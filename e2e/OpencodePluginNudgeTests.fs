@@ -160,7 +160,7 @@ let runNudgeTests
 
         do! fbHarness.dispose ()
         chk "op.fallback.continueOnToolFinishIdleError" (fbPromptCalls = 1)
-        chk "op.fallback.continueBodyCorrect" (fbPromptText = "continue")
+        chk "op.fallback.continueBodyCorrect" (fbPromptText = "​")
 
         // --- 13. Bug1: loop active + empty text → nudge loop ---------------
         let mutable bug1PromptCalls = 0

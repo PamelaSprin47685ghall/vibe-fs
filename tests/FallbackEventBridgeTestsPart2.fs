@@ -66,7 +66,7 @@ type FakeTranslator(sessionID: string, evt: FallbackEvent) =
             | FallbackEvent.SessionBusy -> true
             | _ -> false
 
-        member _.IsNewUserMessage(_raw: obj) : bool =
+        member _.IsNewUserMessage(_sid, _raw: obj) : bool =
             match _ev with
             | FallbackEvent.NewUserMessage -> true
             | _ -> false
@@ -111,7 +111,7 @@ let handleEvent_sessionIdle_idle_emitsScanToolCallAsText () =
         let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
         let executor = FakeExecutor()
 
-        let! result = handleEvent translator rt defaultCfgLookup executor (box ())
+        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ())
 
         equal "consumed" false result.Consumed
         equal "phase Idle" FallbackPhase.Idle result.State.Phase
@@ -142,7 +142,7 @@ let handleEvent_sessionIdle_idle_toolText_sendsPrompt () =
         let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
         let executor = FakeExecutor(messages = [| toolMsg |])
 
-        let! result = handleEvent translator rt defaultCfgLookup executor (box ())
+        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ())
 
         equal "phase RecoveringToolCallText" FallbackPhase.RecoveringToolCallText result.State.Phase
         equal "consumed true (blocks nudge)" true result.Consumed
@@ -176,7 +176,7 @@ let handleEvent_sessionIdle_idle_todosComplete_setsTaskComplete () =
         let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
         let executor = FakeExecutor(messages = [| todoMsg |])
 
-        let! result = handleEvent translator rt defaultCfgLookup executor (box ())
+        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ())
 
         equal "phase Idle" FallbackPhase.Idle result.State.Phase
         equal "taskComplete true" true result.State.TaskComplete
@@ -208,7 +208,7 @@ let handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText () =
         let translator = FakeTranslator(sid, FallbackEvent.SessionIdle) :> IEventTranslator
         let executor = FakeExecutor(messages = [| toolMsg |])
 
-        let! result = handleEvent translator rt defaultCfgLookup executor (box ())
+        let! result = handleEvent translator rt defaultCfgLookup executor "" (box ())
 
         equal "phase RecoveringToolCallText" FallbackPhase.RecoveringToolCallText result.State.Phase
         equal "consumed true" true result.Consumed
@@ -231,7 +231,7 @@ let handleEvent_sessionBusy_duringRetrying_consumedTrue () =
 
         rt.SetConsumed sid true
         let tr = FakeTranslator(sid, FallbackEvent.SessionBusy) :> IEventTranslator
-        let! r = handleEvent tr rt defaultCfgLookup (FakeExecutor()) (box ())
+        let! r = handleEvent tr rt defaultCfgLookup (FakeExecutor()) "" (box ())
         equal "consumed true during retrying" true r.Consumed
         equal "phase Idle after busy" FallbackPhase.Idle r.State.Phase
         equal "taskComplete false" false r.State.TaskComplete
@@ -256,7 +256,7 @@ let handleEvent_chainPrependsCurrentModel () =
             { mkConfig () with
                 DefaultChain = [ m1; m2 ] }
 
-        let handler = createHandler tr rt customLookup executor
+        let handler = createHandler tr rt customLookup executor ""
         let! res = handler (box ())
 
         let chain = rt.GetChain sid
@@ -273,7 +273,7 @@ let handleEvent_chainPrependsCurrentModel () =
         let tr2 =
             FakeTranslator(sid2, FallbackEvent.SessionError(mkRetryableErr ())) :> IEventTranslator
 
-        let handler2 = createHandler tr2 rt2 customLookup executor2
+        let handler2 = createHandler tr2 rt2 customLookup executor2 ""
         let! res2 = handler2 (box ())
 
         let chain2 = rt2.GetChain sid2

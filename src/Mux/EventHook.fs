@@ -94,7 +94,8 @@ let createEventHook (deps: obj) (reviewStore: ReviewStore) (scope: RuntimeScope)
         | Some cfg -> (fun _ -> cfg)
         | None -> (fun _ -> emptyConfig)
 
-    let fallbackHandler = createMuxFallbackHandler fallbackRuntime configLookup deps
+    let fallbackHandler =
+        createMuxFallbackHandler fallbackRuntime configLookup deps directory
 
     let fn =
         System.Func<obj, obj, JS.Promise<unit>>(fun event helpers ->

@@ -19,6 +19,7 @@ open Wanxiangshu.Tests.ToolCopyTests
 open Wanxiangshu.Tests.JsArrayMutateTests
 open Wanxiangshu.Tests.FallbackAgentAndModelTests
 open Wanxiangshu.Tests.FallbackAgentAndModelPart2Tests
+open Wanxiangshu.Tests.FallbackInjectionFoldTests
 
 let fallbackTestEntries () : (string * TestBody) list =
     [ "FallbackKernelTests.run", Sync(sync FallbackKernelTests.run)
@@ -27,6 +28,7 @@ let fallbackTestEntries () : (string * TestBody) list =
       "FallbackEventBridgeTests.run", Async FallbackEventBridgeTests.run
       "FallbackAgentAndModelTests.run", Async FallbackAgentAndModelTests.run
       "FallbackAgentAndModelPart2Tests.run", Async FallbackAgentAndModelPart2Tests.run
+      "FallbackInjectionFoldTests.run", Sync(sync FallbackInjectionFoldTests.run)
       "FallbackMessageCodecTests.run", Sync(sync FallbackMessageCodecTests.run)
       "FallbackIntegrationTests.run", Sync(sync FallbackIntegrationTests.run)
       "FallbackRecoveryWaitTests.run", Async FallbackRecoveryWaitTests.run
@@ -38,7 +40,9 @@ let fallbackTestEntries () : (string * TestBody) list =
       "Arch.Fallback.zeroTimer", Sync(sync ArchitectureTestsFallback.zeroTimer)
       "Arch.Fallback.kernelPurity", Sync(sync ArchitectureTestsFallback.kernelPurity)
       "Arch.Fallback.ompFallbackIsolation", Sync(sync ArchitectureTestsFallback.ompFallbackIsolation)
-      "Arch.Fallback.configSsot", Sync(sync ArchitectureTestsFallback.configSsot) ]
+      "Arch.Fallback.configSsot", Sync(sync ArchitectureTestsFallback.configSsot)
+      "Arch.Fallback.injectionStateMustReplayHistory",
+      Sync(sync ArchitectureTestsFallback.fallbackInjectionStateMustReplayHistory) ]
 
 let tailTestEntries () : (string * TestBody) list =
     [ "WebFetchGuardTests.run", Sync(sync WebFetchGuardTests.run)

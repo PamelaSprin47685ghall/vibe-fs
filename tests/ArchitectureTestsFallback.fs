@@ -45,3 +45,25 @@ let configSsot () =
     let codec = requireFile "src/Shell/FallbackConfigCodec.fs" |> nonCommentCode
     check "arch: FallbackConfigCodec defines extractFallbackConfig" (codec.Contains "let extractFallbackConfig")
     check "arch: FallbackConfigCodec defines loadFallbackConfig" (codec.Contains "let loadFallbackConfig")
+
+let consumerFiles =
+    [| "src/Shell/FallbackMessageCodec.fs"; "src/Shell/NudgeRuntimeTypes.fs" |]
+
+let fallbackInjectionStateMustReplayHistory () =
+    for path in consumerFiles do
+        let code = requireFile path |> nonCommentCode
+        check ("arch: " + path + " forbids text = \"​\" sniffing") (not (code.Contains "text = \"​\""))
+        check ("arch: " + path + " forbids t = \"​\" sniffing") (not (code.Contains "t = \"​\""))
+
+    let bridge = requireFile "src/Shell/FallbackEventBridge.fs" |> nonCommentCode
+    check "arch: FallbackEventBridge.handleEvent takes workspaceRoot" (bridge.Contains "workspaceRoot: string")
+
+    let runtime = requireFile "src/Shell/FallbackRuntimeState.fs" |> nonCommentCode
+    check "arch: FallbackRuntimeState exposes GetInjectedModel" (runtime.Contains "GetInjectedModel")
+    check "arch: FallbackRuntimeState exposes IsInjectedSince" (runtime.Contains "IsInjectedSince")
+
+    let types = requireFile "src/Kernel/EventLog/Types.fs" |> nonCommentCode
+
+    check
+        "arch: Kernel EventLog declares fallback_continue_injected kind"
+        (types.Contains "eventKindFallbackContinueInjected")

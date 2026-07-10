@@ -22,6 +22,8 @@ type FallbackRuntimeState() =
     let mutable subsessionPending = Map.ofList<string, bool> []
     let mutable eventHandlingActive = Map.ofList<string, bool> []
     let mutable awaitingBusy = Map.ofList<string, bool> []
+    let mutable injectedModels = Map.ofList<string, FallbackModel> []
+    let mutable injectedAts = Map.ofList<string, int64> []
     let mutable listeners = Map.empty<string, ResizeArray<unit -> unit>>
 
     let triggerStateChanged (sessionID: string) : unit =
@@ -148,8 +150,26 @@ type FallbackRuntimeState() =
         let s = this.GetOrCreateState sessionID
         this.UpdateState sessionID { s with TaskComplete = value }
 
-    member _.ClearModel(sessionID: string) : unit =
-        models <- Map.remove sessionID models
+    member _.ClearModel(sessionID: string) : unit = models <- Map.remove sessionID models
+
+    member _.SetInjectedModel (sessionID: string) (model: FallbackModel) : unit =
+        injectedModels <- Map.add sessionID model injectedModels
+
+    member _.GetInjectedModel(sessionID: string) : FallbackModel option = Map.tryFind sessionID injectedModels
+
+    member _.SetInjectedAt (sessionID: string) (atMs: int64) : unit =
+        injectedAts <- Map.add sessionID atMs injectedAts
+
+    member _.GetInjectedAt(sessionID: string) : int64 option = Map.tryFind sessionID injectedAts
+
+    member _.IsInjectedSince (sessionID: string) (msgTimeMs: int64) : bool =
+        match Map.tryFind sessionID injectedAts with
+        | Some at -> msgTimeMs >= at
+        | None -> false
+
+    member _.ClearInjected(sessionID: string) : unit =
+        injectedModels <- Map.remove sessionID injectedModels
+        injectedAts <- Map.remove sessionID injectedAts
 
     member _.CleanupSession(sessionID: string) : unit =
         states <- Map.remove sessionID states
@@ -162,4 +182,6 @@ type FallbackRuntimeState() =
         subsessionPending <- Map.remove sessionID subsessionPending
         eventHandlingActive <- Map.remove sessionID eventHandlingActive
         awaitingBusy <- Map.remove sessionID awaitingBusy
+        injectedModels <- Map.remove sessionID injectedModels
+        injectedAts <- Map.remove sessionID injectedAts
         triggerStateChanged sessionID

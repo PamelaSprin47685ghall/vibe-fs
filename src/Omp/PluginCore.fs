@@ -72,7 +72,7 @@ let private createCoreServices (pi: obj) : CoreServices =
     let sessionApi = Dyn.get pi "session"
 
     let fallbackHandler =
-        Some(createOmpFallbackHandler fallbackRuntime configLookup sessionApi)
+        Some(createOmpFallbackHandler fallbackRuntime configLookup sessionApi directory)
 
     { ReviewStore = reviewStore
       FinderCache = finderCache

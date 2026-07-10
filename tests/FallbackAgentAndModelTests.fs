@@ -50,7 +50,7 @@ let ompFallbackHooksPreservesAgentAndModelSpec () =
         check "sessionPrompt was called" (not (isNull lastPromptArg))
         let body = Dyn.get lastPromptArg "body"
         let prompt = Dyn.get body "prompt"
-        equal "prompt has text continue" "continue" (Dyn.str prompt "text")
+        equal "prompt has text zero-width" "​" (Dyn.str prompt "text")
         equal "prompt has agent coder" "coder" (Dyn.str prompt "agent")
         equal "prompt has model gpt-5" "openai/gpt-5" (Dyn.str prompt "model")
     }
@@ -114,7 +114,7 @@ let opencodeExecutorUsesRuntimeAgentWhenNoAssistantMessageSpec () =
         let body = Dyn.get lastPromptArg "body"
         equal "body has agent investigator" "investigator" (Dyn.str body "agent")
         let parts = unbox<obj array> (Dyn.get body "parts")
-        equal "body prompt text has continue" "continue" (Dyn.str parts.[0] "text")
+        equal "body prompt text is zero-width" "​" (Dyn.str parts.[0] "text")
     }
 
 let opencodeExecutorRespectsUserSelectedModelAndAgentSpec () =

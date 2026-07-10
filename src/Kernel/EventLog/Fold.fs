@@ -1,6 +1,7 @@
 module Wanxiangshu.Kernel.EventLog.Fold
 
 open Wanxiangshu.Kernel.EventLog.Types
+open Wanxiangshu.Kernel.EventLog.FallbackInjectionFold
 open Wanxiangshu.Kernel.BacklogProjectionCore
 
 let private payloadTask (e: WanEvent) : string option =
@@ -103,15 +104,18 @@ type NudgeSnapshotState =
 
 let private parseTodosJson (json: string) : string list =
     let trimmed = json.Trim()
+
     if trimmed = "" || trimmed = "[]" then
         []
     else if trimmed.Length < 2 || trimmed.[0] <> '[' || trimmed.[trimmed.Length - 1] <> ']' then
         []
     else
         let inner = trimmed.Substring(1, trimmed.Length - 2)
+
         inner.Split(',')
         |> Array.choose (fun segment ->
             let s = segment.Trim()
+
             if s.Length < 2 || s.[0] <> '"' || s.[s.Length - 1] <> '"' then
                 None
             else
@@ -198,34 +202,44 @@ let private subagentFolder (current: Map<string, SubagentState>) (e: WanEvent) :
     match e.Kind with
     | k when k = eventKindSubagentSpawned ->
         let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
+
         if childId = "" then
             current
         else
             let agent = defaultArg (e.Payload |> Map.tryFind "agent") ""
             let title = defaultArg (e.Payload |> Map.tryFind "title") ""
+
             let state =
                 { ChildId = childId
                   Agent = agent
                   Title = title
                   ContinuedPrompts = [] }
+
             Map.add childId state current
     | k when k = eventKindSubagentContinued ->
         let childId = defaultArg (e.Payload |> Map.tryFind "childId") ""
+
         if childId = "" then
             current
         else
             match Map.tryFind childId current with
             | Some state ->
                 let prompt = defaultArg (e.Payload |> Map.tryFind "prompt") ""
-                let updated = { state with ContinuedPrompts = prompt :: state.ContinuedPrompts }
+
+                let updated =
+                    { state with
+                        ContinuedPrompts = prompt :: state.ContinuedPrompts }
+
                 Map.add childId updated current
             | None ->
                 let prompt = defaultArg (e.Payload |> Map.tryFind "prompt") ""
+
                 let state =
                     { ChildId = childId
                       Agent = ""
                       Title = ""
                       ContinuedPrompts = [ prompt ] }
+
                 Map.add childId state current
     | _ -> current
 
@@ -239,7 +253,8 @@ type SessionState =
       BacklogSnapshot: WorkBacklogSnapshot
       NudgeDedup: NudgeDedupState
       NudgeSnapshot: NudgeSnapshotState
-      Subagents: Map<string, SubagentState> }
+      Subagents: Map<string, SubagentState>
+      FallbackInjection: FallbackInjectionState }
 
 let emptySessionState () : SessionState =
     { ReviewTask = None
@@ -247,7 +262,8 @@ let emptySessionState () : SessionState =
       BacklogSnapshot = { TodosJson = None; LatestEntry = None }
       NudgeDedup = emptyNudgeDedupState
       NudgeSnapshot = emptyNudgeSnapshotState
-      Subagents = Map.empty }
+      Subagents = Map.empty
+      FallbackInjection = emptyFallbackInjectionState }
 
 let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
     let isBacklog = e.Kind = eventKindWorkBacklogCommitted
@@ -263,7 +279,8 @@ let applyEvent (st: SessionState) (e: WanEvent) : SessionState =
       BacklogSnapshot = workBacklogFolder st.BacklogSnapshot e
       NudgeDedup = nudgeDedupFolder st.NudgeDedup e
       NudgeSnapshot = nudgeSnapshotFolder st.NudgeSnapshot e
-      Subagents = subagentFolder st.Subagents e }
+      Subagents = subagentFolder st.Subagents e
+      FallbackInjection = fallbackInjectionFolder st.FallbackInjection e }
 
 /// Fold subagents map for one session.
 let foldSubagents (sessionId: string) (events: WanEvent list) : Map<string, SubagentState> =

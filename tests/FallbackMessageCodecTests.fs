@@ -5,7 +5,9 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Shell.FallbackMessageCodec
 open Wanxiangshu.Shell.FallbackMessageParser
+
 module Dyn = Wanxiangshu.Shell.Dyn
+
 open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.NudgeRuntimeTypes
 
@@ -137,14 +139,22 @@ let isIdleNoContentAndNoTools_withTool () =
 let private mkMsg (role: string) (text: string) (modelStr: string option) : obj =
     let info =
         let baseObj = createObj [ "role", box role ]
+
         match modelStr with
         | Some m ->
             let parts = m.Split('/')
+
             if parts.Length = 2 then
-                Dyn.withKey baseObj "model" (box {| providerID = parts.[0]; modelID = parts.[1] |})
+                Dyn.withKey
+                    baseObj
+                    "model"
+                    (box
+                        {| providerID = parts.[0]
+                           modelID = parts.[1] |})
             else
                 Dyn.withKey baseObj "model" (box m)
         | None -> baseObj
+
     createObj
         [ "info", box info
           "parts", box [| createObj [ "type", box "text"; "text", box text ] |] ]
@@ -157,6 +167,7 @@ let testResolveNudgeModel () =
     let msgs1 =
         [| mkMsg "user" "some query" (Some "openai/gpt-4")
            mkMsg "assistant" "thinking..." (Some "openai/gpt-4") |]
+
     let res1 = resolveNudgeModel msgs1 runtime sid (Some "openai/gpt-3.5")
     equal "use last user model when real user prompt" (Some "openai/gpt-4") res1
 
@@ -164,14 +175,17 @@ let testResolveNudgeModel () =
     let msgs2 =
         [| mkMsg "user" "some query" None
            mkMsg "assistant" "thinking..." (Some "openai/gpt-4") |]
+
     let res2 = resolveNudgeModel msgs2 runtime sid (Some "openai/gpt-3.5")
     equal "fallback to assistant model when user msg has no model" (Some "openai/gpt-4") res2
 
-    // Test case 3: Continue message -> fallback to runtime fallback model
+    // Test case 3: Fallback-injected user message -> use injected model
     let msgs3 =
-        [| mkMsg "user" "continue" (Some "openai/gpt-4")
+        [| mkMsg "user" "​" (Some "openai/gpt-4")
            mkMsg "assistant" "thinking..." (Some "openai/gpt-4") |]
-    runtime.SetModel sid
+
+    runtime.SetInjectedModel
+        sid
         { ProviderID = "anthropic"
           ModelID = "claude-3-sonnet"
           Variant = None
@@ -180,13 +194,18 @@ let testResolveNudgeModel () =
           MaxTokens = None
           ReasoningEffort = None
           Thinking = false }
+
     let res3 = resolveNudgeModel msgs3 runtime sid (Some "openai/gpt-4")
-    equal "use fallback runtime model when last msg is continue" (Some "anthropic/claude-3-sonnet") res3
+    equal "use injected model from runtime state" (Some "anthropic/claude-3-sonnet") res3
 
     // Test case 4: Nudge message -> use same model
     let msgs4 =
-        [| mkMsg "user" "There are still incomplete todos. Continue working through the remaining items." (Some "openai/gpt-3.5")
+        [| mkMsg
+               "user"
+               "There are still incomplete todos. Continue working through the remaining items."
+               (Some "openai/gpt-3.5")
            mkMsg "assistant" "thinking..." (Some "openai/gpt-4") |]
+
     let res4 = resolveNudgeModel msgs4 runtime sid (Some "openai/gpt-4")
     equal "use nudge model or last assistant model for nudge prompt" (Some "openai/gpt-3.5") res4
 

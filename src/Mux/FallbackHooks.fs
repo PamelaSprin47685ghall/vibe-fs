@@ -65,7 +65,7 @@ let muxEventTranslator: IEventTranslator =
 
         member _.IsSessionBusy(rawEvent: obj) : bool = false
 
-        member _.IsNewUserMessage(_rawEvent: obj) : bool = false }
+        member _.IsNewUserMessage(_sessionID, _rawEvent) : bool = false }
 
 let muxActionExecutor (helpers: obj) : IActionExecutor =
     let invokeNudge (workspaceId: string) (text: string) : JS.Promise<unit> =
@@ -119,5 +119,6 @@ let createMuxFallbackHandler
     (runtime: FallbackRuntimeState)
     (configLookup: ConfigLookup)
     (helpers: obj)
+    (workspaceRoot: string)
     : (obj -> JS.Promise<FallbackHookResult>) =
-    createHandler muxEventTranslator runtime configLookup (muxActionExecutor helpers)
+    createHandler muxEventTranslator runtime configLookup (muxActionExecutor helpers) workspaceRoot
