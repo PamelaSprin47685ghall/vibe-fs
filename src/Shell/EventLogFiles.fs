@@ -80,14 +80,15 @@ type EventLogStore(workspaceRoot: string, ?appendLineOverride: string -> WanEven
             return Seq.toList readAllResult
         }
 
-    member _.GetSessionState(sessionId: string) : JS.Promise<SessionState> =
+    member _.GetSessionStateSync(sessionId: string) : SessionState =
+        match Map.tryFind sessionId sessionStates with
+        | Some st -> st
+        | None -> emptySessionState ()
+
+    member this.GetSessionState(sessionId: string) : JS.Promise<SessionState> =
         promise {
             do! ensureInitialized ()
-
-            return
-                match Map.tryFind sessionId sessionStates with
-                | Some st -> st
-                | None -> emptySessionState ()
+            return this.GetSessionStateSync(sessionId)
         }
 
     member _.GetAllSessionStates() : JS.Promise<Map<string, SessionState>> =

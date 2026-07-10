@@ -63,13 +63,13 @@ let transformEntriesAsyncWithAgent
 
                 let cleaned = stripSyntheticBySource messagesList
 
+                defaultBacklogSession.WorkspaceRoot <- cwd
+
                 let backlogOps =
                     backlogSessionOpsFrom defaultBacklogSession.Host (fun sid msgs ->
                         defaultBacklogSession.GetOrRebuildBacklog(sid, msgs))
 
-                let! maxInputTokens =
-                    Wanxiangshu.Shell.ContextBudgetUsageCodec
-                        .resolveMaxInputTokens [ ctx ] sessionId
+                let! maxInputTokens = Wanxiangshu.Shell.ContextBudgetUsageCodec.resolveMaxInputTokens [ ctx ] sessionId
 
                 let plan =
                     { SessionID = sessionId
@@ -142,7 +142,14 @@ let transformEntriesAsync
     (sessionId: string)
     (entriesObj: obj)
     : JS.Promise<obj array> =
-    transformEntriesAsyncWithAgent reviewStore cwd sessionId entriesObj "manager" (fun _ -> Promise.lift None) (box null)
+    transformEntriesAsyncWithAgent
+        reviewStore
+        cwd
+        sessionId
+        entriesObj
+        "manager"
+        (fun _ -> Promise.lift None)
+        (box null)
 
 let beforeAgentStart (_cwd: string) (systemPrompt: obj) : JS.Promise<obj> =
     promise {
@@ -186,15 +193,10 @@ let registerContextTransform (pi: obj) (reviewStore: ReviewStore) : unit =
                     match Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetRealContextUsage ctx sessionId with
                     | Some f -> f
                     | None -> fun _ -> Promise.lift None
+
                 let! transformed =
-                    transformEntriesAsyncWithAgent
-                        reviewStore
-                        cwd
-                        sessionId
-                        entries
-                        agent
-                        getContextUsage
-                        ctx
+                    transformEntriesAsyncWithAgent reviewStore cwd sessionId entries agent getContextUsage ctx
+
                 event?entries <- transformed
                 return event
         }

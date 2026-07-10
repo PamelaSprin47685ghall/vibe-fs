@@ -52,9 +52,13 @@ let opencodeMessageTransformUsesShellCapsCache () =
     check "arch: Opencode MessageTransform no direct findCapsFiles" (not (code.Contains "findCapsFiles"))
 
 let noReconstructReviewStateInMessageTransforms () =
-    for path in [| "src/Opencode/MessageTransform.fs"; "src/Mux/MessageTransform.fs" |] do
+    for path in
+        [| "src/Opencode/MessageTransform.fs"
+           "src/Mux/MessageTransform.fs"
+           "src/Omp/MessageTransform.fs" |] do
         let content = requireFile path
         check ("arch: " + path + " no reconstructReviewState") (not (content.Contains "reconstructReviewState"))
+        check ("arch: " + path + " no syncReviewFromTexts") (not (content.Contains "syncReviewFromTexts"))
 
 let messageTransformUsesHostEntry () =
     let hostEntry =

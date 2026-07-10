@@ -20,8 +20,11 @@ type RuntimeScope() =
     let mutable extState = Map.empty<string, obj>
     let mutable tempFilesByPrompt = Map.empty<string, string list>
     let mutable childSessionCounter = 0
+    let mutable workspaceRoot = ""
 
-    member _.RandomGen with get() = randomGen and set(v) = randomGen <- v
+    member _.RandomGen
+        with get () = randomGen
+        and set (v) = randomGen <- v
 
     member _.NextChildSessionId() : int =
         childSessionCounter <- childSessionCounter + 1
@@ -100,11 +103,18 @@ type RuntimeScope() =
         with get () = onInit
         and set (v) = onInit <- v
 
-    member _.TriggerInit(workspaceRoot: string) : unit =
-        if workspaceRoot <> "" && Option.isNone initPromise then
+    member _.WorkspaceRoot
+        with get () = workspaceRoot
+        and set (v) = workspaceRoot <- v
+
+    member _.TriggerInit(workspaceRootStr: string) : unit =
+        if workspaceRootStr <> "" then
+            workspaceRoot <- workspaceRootStr
+
+        if workspaceRootStr <> "" && Option.isNone initPromise then
             match onInit with
             | Some f ->
-                let initP = f workspaceRoot
+                let initP = f workspaceRootStr
                 initPromise <- Some initP
             | None -> ()
 

@@ -11,8 +11,19 @@ open Wanxiangshu.Kernel.BacklogProjectionCore
 open Wanxiangshu.Shell.MessageTransformCore
 open Wanxiangshu.Shell.MessageTransformPipeline
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.EventLogRuntimeStore
+open Wanxiangshu.Kernel.EventLog.Types
+open Wanxiangshu.Shell.WorkBacklogToolsCodec
+open Wanxiangshu.Opencode.BacklogSession
 
 module Dyn = Wanxiangshu.Shell.Dyn
+
+[<Import("mkdtempSync", "node:fs")>]
+let private mkdtemp (prefix: string) : string = jsNative
+
+[<Import("rmSync", "node:fs")>]
+let private rm (path: string) (opts: obj) : unit = jsNative
 
 let mkMsg id role parts =
     { info =
@@ -30,38 +41,39 @@ let mkMsg id role parts =
 
 let testCompactionThresholdAndTransform () =
     promise {
-        // 1. 测试 Threshold 判定
         let b = 100000L
         check "79% is not compacting" (not (Wanxiangshu.Kernel.ContextBudget.isCompactingRequired 79000L b))
         check "80% is compacting" (Wanxiangshu.Kernel.ContextBudget.isCompactingRequired 80000L b)
         check "81% is compacting" (Wanxiangshu.Kernel.ContextBudget.isCompactingRequired 81000L b)
 
-        // 2. 测试 compactingTransform 转换
-        let msgs = [
-            mkMsg "user-1" User [ TextPart "hello" ]
-            mkMsg "assist-1" Assistant [ TextPart "do something" ]
-            mkMsg "user-2" User [ TextPart "do next" ]
-        ]
-        
-        let backlog : BacklogEntry list = [
-            { ahaMoments = "aha"
-              changesAndReasons = "changes"
-              gotchas = "gotchas"
-              lessonsAndConventions = "lessons"
-              plan = "my plan" }
-        ]
+        let msgs =
+            [ mkMsg "user-1" User [ TextPart "hello" ]
+              mkMsg "assist-1" Assistant [ TextPart "do something" ]
+              mkMsg "user-2" User [ TextPart "do next" ] ]
+
+        let backlog: BacklogEntry list =
+            [ { ahaMoments = "aha"
+                changesAndReasons = "changes"
+                gotchas = "gotchas"
+                lessonsAndConventions = "lessons"
+                plan = "my plan" } ]
 
         let fixedGuid = "test-guid-deterministic"
         let guidGen () = fixedGuid
-        let compacted = Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform msgs backlog guidGen
+
+        let compacted =
+            Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform msgs backlog guidGen
+
         equal "Compacted should contain exactly 1 message" 1 compacted.Length
         let first = compacted.[0]
         equal "Compacted message role should be user" User first.info.role
         equal "Compacted message id should use fixed guid" ("compacting-summary-" + fixedGuid) first.info.id
+
         let content =
             match first.parts.[0] with
             | TextPart t -> t
             | _ -> ""
+
         check "Should contain <do-not-exec>" (content.Contains("<do-not-exec>"))
         check "Should contain </do-not-exec>" (content.Contains("</do-not-exec>"))
         check "Should contain 'my plan'" (content.Contains("my plan"))
@@ -70,10 +82,7 @@ let testCompactionThresholdAndTransform () =
     }
 
 let testContextBudgetF () =
-    // F(a, b, c, s) = 2a >= b + s + c
-    // 当 a=60000, b=100000, c=10000, s=10000 时，2*60000 >= 100000 + 10000 + 10000 (true)
     check "F should be true" (Wanxiangshu.Kernel.ContextBudget.F 60000L 100000L 10000L 10000L)
-    // 当 a=59000 时，118000 < 120000 (false)
     check "F should be false" (not (Wanxiangshu.Kernel.ContextBudget.F 59000L 100000L 10000L 10000L))
 
 let testApplyContextBudgetShortCircuit () =
@@ -87,7 +96,7 @@ let testApplyContextBudgetShortCircuit () =
               Cleaned = []
               RawArray = None
               SembleInjectEnabled = false
-              Scope = Wanxiangshu.Shell.RuntimeScope.create()
+              Scope = Wanxiangshu.Shell.RuntimeScope.create ()
               MaxInputTokens = 100000
               GetContextUsage = (fun _ -> Promise.lift (Some 90000)) }
 
@@ -95,10 +104,7 @@ let testApplyContextBudgetShortCircuit () =
             { Host = opencode
               GetOrRebuildBacklog = fun _ _ -> [] }
 
-        let msgs = [
-            mkMsg "msg1" User []
-        ]
-
+        let msgs = [ mkMsg "msg1" User [] ]
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
 
         let! result = applyContextBudget plan backlogOps msgs [||] encodeMessages
@@ -107,33 +113,28 @@ let testApplyContextBudgetShortCircuit () =
 
 let testMuxCompactionTransform () =
     promise {
-        let runtimeScope = Wanxiangshu.Shell.RuntimeScope.create()
+        let runtimeScope = Wanxiangshu.Shell.RuntimeScope.create ()
         let backlogSession = Wanxiangshu.Mux.BacklogSession.BacklogSession(runtimeScope)
-        
-        let deps = createObj [
-            "directory", box ""
-            "maxInputTokens", box 100000
-            "RandomGen", box (fun () -> 0.12345)
-        ]
-        
-        let input = createObj [
-            "sessionID", box "s-mux"
-            "agent", box "main"
-        ]
 
-        let originalMsg = createObj [
-            "id", box "msg-mux-1"
-            "role", box "user"
-            "agent", box "main"
-            "parts", box [| box (createObj [ "type", box "text"; "text", box "hello mux" ]) |]
-        ]
-        
-        let output = createObj [
-            "messages", box [| originalMsg |]
-        ]
+        let deps =
+            createObj
+                [ "directory", box ""
+                  "maxInputTokens", box 100000
+                  "RandomGen", box (fun () -> 0.12345) ]
+
+        let input = createObj [ "sessionID", box "s-mux"; "agent", box "main" ]
+
+        let originalMsg =
+            createObj
+                [ "id", box "msg-mux-1"
+                  "role", box "user"
+                  "agent", box "main"
+                  "parts", box [| box (createObj [ "type", box "text"; "text", box "hello mux" ]) |] ]
+
+        let output = createObj [ "messages", box [| originalMsg |] ]
 
         do! Wanxiangshu.Mux.MessageTransform.compactingTransform deps runtimeScope backlogSession input output
-        
+
         let messages = Wanxiangshu.Shell.Dyn.get output "messages" :?> obj array
         equal "Mux compacted length should be 1" 1 messages.Length
         let first = messages.[0]
@@ -150,41 +151,37 @@ let testTryGetRealContextUsage () =
     promise {
         let mockGet (_arg: obj) =
             promise {
-                return createObj [
-                    "data", createObj [
-                        "tokens", createObj [
-                            "input", box 49321
-                            "output", box 3000
-                            "reasoning", box 500
-                            "cache", createObj [
-                                "read", box 5000; "write", box 0
-                            ]
-                        ]
-                    ]
-                ]
+                return
+                    createObj
+                        [ "data",
+                          createObj
+                              [ "tokens",
+                                createObj
+                                    [ "input", box 49321
+                                      "output", box 3000
+                                      "reasoning", box 500
+                                      "cache", createObj [ "read", box 5000; "write", box 0 ] ] ] ]
             }
-        let mockSession = createObj [
-            "get", box (System.Func<obj, JS.Promise<obj>>(mockGet))
-        ]
-        let mockClient = createObj [
-            "session", mockSession
-        ]
+
+        let mockSession =
+            createObj [ "get", box (System.Func<obj, JS.Promise<obj>>(mockGet)) ]
+
+        let mockClient = createObj [ "session", mockSession ]
 
         let getUsageOpt =
-            Wanxiangshu.Shell.ContextBudgetUsageCodec
-                .tryGetRealContextUsage mockClient "s-test-real-api"
+            Wanxiangshu.Shell.ContextBudgetUsageCodec.tryGetRealContextUsage mockClient "s-test-real-api"
+
         check "tryGetRealContextUsage should return Some" getUsageOpt.IsSome
         let getUsage = getUsageOpt.Value
         let! tokens = getUsage [||]
-        // input + cache.read = 49321 + 5000 = 54321
-        equal "tokens = input + cache.read = 54321"
-            (Some 54321) tokens
+        equal "tokens = input + cache.read = 54321" (Some 54321) tokens
     }
 
 let testApplyContextBudgetBacklogContentChange () =
     promise {
-        let scope = Wanxiangshu.Shell.RuntimeScope.create()
+        let scope = Wanxiangshu.Shell.RuntimeScope.create ()
         let sessionID = "s-budget-backlog-change"
+
         let plan =
             { SessionID = sessionID
               Agent = "main"
@@ -198,45 +195,72 @@ let testApplyContextBudgetBacklogContentChange () =
               MaxInputTokens = 100000
               GetContextUsage = (fun _ -> Promise.lift (Some 35000)) }
 
-        let backlog1 = [
-            { ahaMoments = "aha1"
-              changesAndReasons = "changes1"
-              gotchas = "gotchas1"
-              lessonsAndConventions = "lessons1"
-              plan = "plan1" }
-        ]
-        let backlog2 = [
-            { ahaMoments = "aha1"
-              changesAndReasons = "changes1"
-              gotchas = "gotchas1"
-              lessonsAndConventions = "lessons1"
-              plan = "plan2" // 内容改变，数量不变
-            }
-        ]
+        let backlog1 =
+            [ { ahaMoments = "aha1"
+                changesAndReasons = "changes1"
+                gotchas = "gotchas1"
+                lessonsAndConventions = "lessons1"
+                plan = "plan1" } ]
+
+        let backlog2 =
+            [ { ahaMoments = "aha1"
+                changesAndReasons = "changes1"
+                gotchas = "gotchas1"
+                lessonsAndConventions = "lessons1"
+                plan = "plan2" } ]
 
         let mutable currentBacklog = backlog1
+
         let backlogOps =
             { Host = opencode
               GetOrRebuildBacklog = fun _ _ -> currentBacklog }
 
         let encodeMessages (msgs: Message<obj> list) = msgs |> List.map box |> List.toArray
-        
         let messages = [ mkMsg "msg1" User [] ]
         let encoded = [| box "msg" |]
 
-        // 第一次调用，会触发初始化
         let! _ = applyContextBudget plan backlogOps messages encoded encodeMessages
         let storeAfter1 = Wanxiangshu.Shell.ContextBudgetStore.get scope sessionID
         equal "LastBacklog length should be 1" 1 storeAfter1.LastBacklog.Length
         equal "LastBacklog plan should be plan1" "plan1" storeAfter1.LastBacklog.[0].plan
 
-        // 修改内容
         currentBacklog <- backlog2
-        
-        // 再次调用，虽然数量没变，但因为内容变化应该引起 LastBacklog 的更新
+
         let! _ = applyContextBudget plan backlogOps messages encoded encodeMessages
         let storeAfter2 = Wanxiangshu.Shell.ContextBudgetStore.get scope sessionID
         equal "LastBacklog plan after change should be plan2" "plan2" storeAfter2.LastBacklog.[0].plan
+    }
+
+let testBacklogSessionRecoversFromEventLogOnCompaction () =
+    promise {
+        let tempDir = mkdtemp "compaction-test-"
+
+        try
+            let sessionID = "s-compaction-eventlog"
+            let scope = Wanxiangshu.Shell.RuntimeScope.create ()
+            scope.WorkspaceRoot <- tempDir
+            scope.TriggerInit(tempDir)
+            do! scope.WaitInit()
+
+            let args: TodoWriteArgs =
+                { Todos =
+                    [| { Content = "test todo"
+                         Status = Wanxiangshu.Kernel.ToolArgs.TodoItemStatus.Completed
+                         Priority = Wanxiangshu.Kernel.ToolArgs.TodoItemPriority.High } |]
+                  AhaMoments = "Compaction aha"
+                  ChangesAndReasons = "Compaction changes"
+                  Gotchas = "Compaction gotchas"
+                  LessonsAndConventions = "Compaction lessons"
+                  Plan = "Compaction plan"
+                  SelectMethodology = [ "first_principles" ] }
+
+            do! appendWorkBacklogCommittedOrFail tempDir sessionID args
+
+            let backlog = BacklogSession(opencode, scope).GetOrRebuildBacklog(sessionID, [])
+            equal "backlog length should be 1" 1 backlog.Length
+            equal "backlog ahaMoments should be from event log" "Compaction aha" backlog.[0].ahaMoments
+        finally
+            rm tempDir (createObj [ "recursive", box true; "force", box true ])
     }
 
 let run () =
@@ -247,4 +271,5 @@ let run () =
         do! testMuxCompactionTransform ()
         do! testTryGetRealContextUsage ()
         do! testApplyContextBudgetBacklogContentChange ()
+        do! testBacklogSessionRecoversFromEventLogOnCompaction ()
     }
