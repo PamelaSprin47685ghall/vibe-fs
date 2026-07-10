@@ -64,7 +64,14 @@ let messagesTransform
                   IsSubagentSession = isChildWorkspace deps sessionID
                   Cleaned = cleanedMessages
                   RawArray = Some messagesArr
-                  SembleInjectEnabled = false }
+                  SembleInjectEnabled = false
+                  Scope = runtimeScope
+                  MaxInputTokens =
+                      let maxTokensVal = get deps "maxInputTokens"
+                      if not (isNullish maxTokensVal) && typeIs maxTokensVal "number" then
+                          int (unbox<float> maxTokensVal)
+                      else 200000
+                  GetContextUsage = ContextBudgetUsageCodec.tryGetGetContextUsage deps |> Option.defaultValue (fun _ -> Promise.lift None) }
 
             let replayTexts () : JS.Promise<string seq> =
                 Promise.lift (extractTextsFromEncodedMessages messagesArr)

@@ -60,6 +60,7 @@
     <Compile Include="src/Kernel/Nudge/RetryProgress.fs"/>
     <Compile Include="src/Kernel/Nudge/SubmitReviewHooks.fs"/>
     <Compile Include="src/Kernel/CapsFormat.fs"/>
+    <Compile Include="src/Kernel/ContextBudget.fs"/>
     <Compile Include="src/Kernel/Messaging.fs"/>
     <Compile Include="src/Kernel/AmendFilter.fs"/>
     <Compile Include="src/Kernel/ReviewReplayPolicy.fs"/>
@@ -103,7 +104,6 @@
     <Compile Include="src/Kernel/FuzzyPath.fs"/>
     <Compile Include="src/Kernel/FuzzyQuery.fs"/>
     <Compile Include="src/Kernel/FuzzyFormat.fs"/>
-    <Compile Include="src/Kernel/ExecutorStrip.fs"/>
     <Compile Include="src/Kernel/WebFetchGuard.fs"/>
     <Compile Include="src/Kernel/SessionLoop.fs"/>
     <Compile Include="src/Shell/Dyn.fs"/>
@@ -174,6 +174,9 @@
     <Compile Include="src/Shell/ChatTransformOutputCodec.fs"/>
     <Compile Include="src/Shell/MessageTransformCore.fs"/>
     <Compile Include="src/Shell/MessagingEncodeHelpers.fs"/>
+    <Compile Include="src/Shell/SerialStateHolder.fs"/>
+    <Compile Include="src/Shell/ContextBudgetUsageCodec.fs"/>
+    <Compile Include="src/Shell/ContextBudgetStore.fs"/>
     <Compile Include="src/Shell/MessageTransformPipeline.fs"/>
     <Compile Include="src/Shell/OpencodeClientCodec.fs"/>
     <Compile Include="src/Shell/SessionIoSpawn.fs"/>
@@ -196,7 +199,6 @@
     <Compile Include="src/Shell/FuzzySearchFind.fs"/>
     <Compile Include="src/Shell/FuzzySearchGrep.fs"/>
     <Compile Include="src/Shell/FuzzySearch.fs"/>
-    <Compile Include="src/Shell/FuzzyToolsCodec.fs"/>
     <Compile Include="src/Shell/FuzzyToolsCodec.fs"/>
     <Compile Include="src/Shell/ReviewToolsCodec.fs"/>
     <Compile Include="src/Shell/SubagentSimpleArgsCodec.fs"/>
@@ -222,7 +224,6 @@
     <Compile Include="src/Shell/MuxToolDefinition.fs"/>
     <Compile Include="src/Shell/ToolHookRuntime.fs"/>
     <Compile Include="src/Shell/MuxPluginCatalogShell.fs"/>
-    <Compile Include="src/Shell/SerialStateHolder.fs"/>
     <Compile Include="src/Shell/NudgeRuntimeTypes.fs"/>
     <Compile Include="src/Shell/NudgeRuntimeMux.fs"/>
     <Compile Include="src/Shell/NudgeRuntime.fs"/>
@@ -673,6 +674,11 @@
     <Compile Include="tests/OmpReviewLoopAsyncTests.fs"/>
     <Compile Include="tests/TestsEntriesOmp.fs"/>
     <Compile Include="tests/ArchitectureTests.fs"/>
+    <Compile Include="tests/ContextBudgetSpecs.fs"/>
+    <Compile Include="tests/ContextBudgetHookTests.fs"/>
+    <Compile Include="tests/ContextBudgetNoReinjectTests.fs"/>
+    <Compile Include="tests/ContextBudgetAfterTodoTests.fs"/>
+    <Compile Include="tests/ContextBudgetIntegrationTests.fs"/>
     <Compile Include="tests/Tests.fs"/>
     <!-- E2E Tests -->
     <Compile Include="e2e/HarnessTypes.fs"/>

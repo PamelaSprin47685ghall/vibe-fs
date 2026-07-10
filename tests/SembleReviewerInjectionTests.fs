@@ -108,7 +108,10 @@ let testAmendSkippedWhenSembleInjectEnabled () =
               IsSubagentSession = false
               Cleaned = msgs
               RawArray = None
-              SembleInjectEnabled = true }
+              SembleInjectEnabled = true
+              Scope = Wanxiangshu.Shell.RuntimeScope.create()
+              MaxInputTokens = 200000
+              GetContextUsage = (fun _ -> Promise.lift None) }
 
         let! res =
             runHostMessagesTransform

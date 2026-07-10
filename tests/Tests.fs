@@ -37,6 +37,11 @@ open Wanxiangshu.Tests.SubagentPromptBuildTests
 open Wanxiangshu.Tests.SubagentSpawnTests
 open Wanxiangshu.Tests.WebToolsCodecTests
 open Wanxiangshu.Tests.ReviewToolsCodecTests
+open Wanxiangshu.Tests.ContextBudgetSpecs
+open Wanxiangshu.Tests.ContextBudgetHookTests
+open Wanxiangshu.Tests.ContextBudgetNoReinjectTests
+open Wanxiangshu.Tests.ContextBudgetAfterTodoTests
+open Wanxiangshu.Tests.ContextBudgetIntegrationTests
 
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Wanxiangshu.Tests.ExecutorTests
@@ -131,6 +136,11 @@ let private tests: (string * TestBody) list =
     @ (architectureTestEntries ())
     @ codecTestEntries ()
     @ ompTestEntries ()
+    @ [ "ContextBudgetSpecs.run", TestBody.Sync(sync ContextBudgetSpecs.run)
+        "ContextBudgetHookTests.run", TestBody.Async ContextBudgetHookTests.run
+        "ContextBudgetNoReinjectTests.run", TestBody.Async ContextBudgetNoReinjectTests.run
+        "ContextBudgetAfterTodoTests.run", TestBody.Async ContextBudgetAfterTodoTests.run
+        "ContextBudgetIntegrationTests.run", TestBody.Async ContextBudgetIntegrationTests.run ]
     @ integrationToolFlatTests
 
 let private matchesSelector (selectors: string array) (label: string) =
