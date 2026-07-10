@@ -38,6 +38,13 @@ let resolvePendingUnknownIdReturnsFalse () =
     equal "pending count unchanged" e.pendingResolutions.Count next.pendingResolutions.Count
     equal "suppressor count unchanged" e.abortSuppressors.Count next.abortSuppressors.Count
 
+let disposeSessionTreeSkipsUnknownIds () =
+    let mutable count = 0
+    let e = setPending emptyEffects "only" (fun _ -> count <- count + 1)
+    let next = disposeSessionTree e [ "ghost" ]
+    check "unknown id does not fire resolver" (count = 0)
+    check "unknown id keeps pending" (Map.containsKey "only" next.pendingResolutions)
+
 let disposeSessionTreeTerminatesAll () =
     let mutable count = 0
     let mutable suppressed = 0
@@ -65,4 +72,5 @@ let run () : unit =
     setPendingAddsEntry ()
     resolvePendingFiresCallback ()
     resolvePendingUnknownIdReturnsFalse ()
+    disposeSessionTreeSkipsUnknownIds ()
     disposeSessionTreeTerminatesAll ()

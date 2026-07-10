@@ -135,12 +135,12 @@ let submitReviewResultTool (ctx: obj) (store: Wanxiangshu.Shell.ReviewRuntime.Re
                             let task = store.getReviewTask sessionID |> Option.defaultValue ""
                             return doubleCheckPrompt task
                         | Finalize result ->
-                            let verdict, fb = verdictStringFromReviewResult result
-                            do! appendReviewVerdictOrFail directory sessionID verdict fb
+                            let resolved = store.resolvePendingReview (sessionID, result)
 
-                            return
-                                if store.resolvePendingReview (sessionID, result) then
-                                    "Verdict submitted."
-                                else
-                                    "No active review to resolve."
+                            if not resolved then
+                                return "No active review to resolve."
+                            else
+                                let verdict, fb = verdictStringFromReviewResult result
+                                do! appendReviewVerdictOrFail directory sessionID verdict fb
+                                return "Verdict submitted."
             })

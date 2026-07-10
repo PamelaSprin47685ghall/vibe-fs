@@ -95,6 +95,8 @@ let runReviewerLoop
 
         let rec loop nudgeCount =
             promise {
+                reviewStore.setPendingReview (childID, (fun r -> verdict.Value <- Some r))
+
                 let parts = promptParts nudgeCount initialParts reviewerNudgePrompt
                 let! outcome = runRound parts
 

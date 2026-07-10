@@ -42,7 +42,10 @@ let disposeSessionTree (effects: SessionEffects) sessionIds : SessionEffects =
     sessionIds
     |> List.fold
         (fun acc id ->
-            match fireClear acc id Terminated with
-            | None -> acc
-            | Some next -> next)
+            if not (Map.containsKey id acc.pendingResolutions) then
+                acc
+            else
+                match fireClear acc id Terminated with
+                | None -> acc
+                | Some next -> next)
         effects

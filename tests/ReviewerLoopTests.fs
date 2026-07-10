@@ -50,6 +50,34 @@ let runReviewerLoop_resolvesVerdict () =
         equal "resolved verdict" (Accepted "looks good") result
     }
 
+let runReviewerLoop_rebindsPendingEachRound () =
+    promise {
+        let store = createReviewStore ()
+        store.activateReview ("child-1", "task", 1000L)
+        let mutable promptCount = 0
+        let mutable secondRoundHadPending = false
+
+        let session =
+            createObj
+                [ "prompt",
+                  box (fun (_: obj) ->
+                      promptCount <- promptCount + 1
+
+                      if promptCount = 1 then
+                          Promise.lift ()
+                      else
+                          secondRoundHadPending <-
+                              store.resolvePendingReview ("child-1", Accepted "nudge-round")
+
+                          Promise.lift ()) ]
+
+        let client = createObj [ "session", box session ]
+        let! result = runReviewerLoop client store "child-1" [ "p1" ] null
+        check "nudge round ran" (promptCount >= 2)
+        check "second prompt could resolve pending" secondRoundHadPending
+        equal "verdict from nudge round" (Accepted "nudge-round") result
+    }
+
 let runReviewerLoop_promptFailedReturnsTerminated () =
     promise {
         let failingClient =
@@ -69,5 +97,6 @@ let run () : JS.Promise<unit> =
         do! createReviewerChild_success ()
         do! createReviewerChild_noSessionApi ()
         do! runReviewerLoop_resolvesVerdict ()
+        do! runReviewerLoop_rebindsPendingEachRound ()
         do! runReviewerLoop_promptFailedReturnsTerminated ()
     }

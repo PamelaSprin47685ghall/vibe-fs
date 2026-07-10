@@ -52,7 +52,7 @@ let createReviewStore () : ReviewStore =
                     Registry = reduce state.Registry (RegistryAction.Activate(sessionID, task, createdAt)) }
 
         member _.deactivateReview(sessionID) =
-            let nextEffects = disposeSessionTree state.Effects (allDescendantIds sessionID)
+            let nextEffects = disposeSessionTree state.Effects [ sessionID ]
 
             state <-
                 { state with

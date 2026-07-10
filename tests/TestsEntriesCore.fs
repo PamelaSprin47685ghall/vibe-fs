@@ -43,6 +43,8 @@ let coreTestEntries () : (string * TestBody) list =
       "ReviewTests.resultMapping", TestBody.Sync(sync ReviewTests.resultMapping)
       "ReviewTests.reviewerLoop", TestBody.Sync(sync ReviewTests.reviewerLoop)
       "ReviewTests.runtime", TestBody.Sync(sync ReviewTests.runtime)
+      "ReviewTests.deactivateParentPreservesChildPending",
+      TestBody.Sync(sync ReviewTests.deactivateParentPreservesChildPending)
       "ReviewTests.promptPartsBranches", TestBody.Sync(sync ReviewTests.promptPartsBranches)
       "ReviewTests.resolvePendingClearsSuppressor", TestBody.Sync(sync ReviewTests.resolvePendingClearsSuppressor)
       "ReviewSessionEffectsTests.emptyEffectsHasEmptyMaps",
@@ -52,6 +54,8 @@ let coreTestEntries () : (string * TestBody) list =
       TestBody.Sync(sync ReviewSessionEffectsTests.resolvePendingFiresCallback)
       "ReviewSessionEffectsTests.resolvePendingUnknownIdReturnsFalse",
       TestBody.Sync(sync ReviewSessionEffectsTests.resolvePendingUnknownIdReturnsFalse)
+      "ReviewSessionEffectsTests.disposeSessionTreeSkipsUnknownIds",
+      TestBody.Sync(sync ReviewSessionEffectsTests.disposeSessionTreeSkipsUnknownIds)
       "ReviewSessionEffectsTests.disposeSessionTreeTerminatesAll",
       TestBody.Sync(sync ReviewSessionEffectsTests.disposeSessionTreeTerminatesAll)
       "ReviewSessionRegistryTests.run", TestBody.Sync(sync ReviewSessionRegistryTests.run)

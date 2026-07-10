@@ -118,6 +118,19 @@ let runtime () =
     store.clearReviewSessions ()
     check "cleared" (store.getReviewState "w1" |> Option.isNone)
 
+/// Parent deactivate must not fire Terminated on child pending (second review race).
+let deactivateParentPreservesChildPending () =
+    let store = createReviewStore ()
+    store.activateReview ("parent", "task", 100)
+    store.addChild ("parent", "child-reviewer")
+    let mutable childResolved = false
+    store.setPendingReview ("child-reviewer", (fun _ -> childResolved <- true))
+    store.deactivateReview "parent"
+    check "parent registry cleared" (store.getReviewState "parent" |> Option.isNone)
+    check "child pending survives parent deactivate" (not childResolved)
+    check "child pending still resolvable" (store.resolvePendingReview ("child-reviewer", Accepted ""))
+    check "child callback fired after explicit resolve" childResolved
+
 let promptPartsBranches () =
     let initial = [ "task body"; "extra detail" ]
     let nudge = "please answer"
