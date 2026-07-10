@@ -75,4 +75,4 @@ let run () =
         (RegistryAction.RequestRevision("s1", "bad"))
         (actionFor "s1" (NeedsRevision "bad"))
 
-    equal "Terminated->Deactivate" (RegistryAction.Deactivate "s1") (actionFor "s1" Terminated)
+    equal "Terminated->NoOp" RegistryAction.NoOp (actionFor "s1" Terminated)

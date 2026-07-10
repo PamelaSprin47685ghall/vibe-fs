@@ -14,6 +14,7 @@ type RegistryAction =
     | RequestRevision of id: string * feedback: string
     | AddChild of parentId: string * childId: string
     | Clear
+    | NoOp
 
 type Registry = Map<string, ReviewSession>
 
@@ -61,9 +62,10 @@ let reduce (registry: Registry) (action: RegistryAction) : Registry =
     | RegistryAction.Evict cutoff -> evictStale registry cutoff
     | RegistryAction.AddChild(parentId, childId) -> updateSession registry parentId (fun s -> addChild s childId)
     | RegistryAction.Clear -> emptyRegistry
+    | RegistryAction.NoOp -> registry
 
 let actionFor (id: string) (result: ReviewResult) : RegistryAction =
     match result with
     | Accepted _ -> RegistryAction.Accept id
     | NeedsRevision feedback -> RegistryAction.RequestRevision(id, feedback)
-    | Terminated -> RegistryAction.Deactivate id
+    | Terminated -> RegistryAction.NoOp
