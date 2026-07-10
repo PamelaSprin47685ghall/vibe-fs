@@ -10,6 +10,9 @@ let submitReviewIsWip (wip: bool option) : bool = defaultArg wip true
 let submitReviewWipAcknowledgment: string =
     "Your progress report was recorded. With-Review Mode is still active — continue working until the task is fully complete, then call submit_review again."
 
+let formatWipAcknowledgment (task: string) : string =
+    frontMatterPrompt [ yamlField "task" task ] submitReviewWipAcknowledgment
+
 let formatReviewResult (result: ReviewResult) : string =
     match result with
     | ReviewResult.Accepted feedback ->

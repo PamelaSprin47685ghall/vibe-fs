@@ -221,7 +221,7 @@ let muxSubmitReviewOmittedWipSkipsReviewerSpec () =
             createObj [ "report", box "Partial progress"; "affectedFiles", box [| "a.ts" |] ]
 
         let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-        check "submit_review omitted wip returns kernel acknowledgment" (result = submitReviewWipAcknowledgment)
+        check "submit_review omitted wip returns kernel acknowledgment" (result = formatWipAcknowledgment "Implement feature X")
         check "submit_review omitted wip does not delegate to reviewer" (prompts.Count = 0)
         check "submit_review omitted wip keeps review session active" (muxIsReviewActiveForTest reg sessionID)
         do! rmAsync workspaceDir
@@ -255,7 +255,7 @@ let muxSubmitReviewWipSkipsReviewerSpec () =
                   "wip", box true ]
 
         let! result = ((get submitTool "execute") $ (ctx, args)) |> unbox<JS.Promise<string>>
-        check "submit_review wip returns kernel acknowledgment" (result = submitReviewWipAcknowledgment)
+        check "submit_review wip returns kernel acknowledgment" (result = formatWipAcknowledgment "Implement feature X")
         check "submit_review wip does not delegate to reviewer" (prompts.Count = 0)
         check "submit_review wip keeps review session active" (muxIsReviewActiveForTest reg sessionID)
         do! rmAsync workspaceDir

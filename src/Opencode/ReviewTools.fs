@@ -75,7 +75,7 @@ let submitReviewTool
                                 try
                                     if submitReviewIsWip decoded.Wip then
                                         do! appendSubmitReviewWipRecordedOrFail runtime.Execution.Directory sessionID
-                                        return submitReviewWipAcknowledgment
+                                        return formatWipAcknowledgment task
                                     else
                                         let! result =
                                             runSubmitReview
