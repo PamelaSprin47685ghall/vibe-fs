@@ -56,7 +56,7 @@ let entriesAsync () : (string * (unit -> JS.Promise<unit>)) list =
        fun () ->
            withTempDir (fun dir ->
                promise {
-                   let! _ = appendSquadEvent dir "t" (TasksCreated("s1", [ ("a", "t", "d", []) ]))
+                   let! _ = appendSquadEvent dir "t" (TasksCreated("s1", [ { taskId = "a"; title = "t"; description = "d"; dependsOn = [] } ]))
                    let path = Wanxiangshu.Shell.EventLogCodec.eventPath dir
                    writeFileSync path (readFileSync path "utf-8" + "\n{not-json\n")
                    let! events = readAllSquadEvents dir

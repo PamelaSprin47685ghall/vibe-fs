@@ -16,6 +16,7 @@ type ToolSemantic =
     | Read
     | WritePatchFamily
     | FuzzyGrep
+    | SearchFamily
     | SubagentWebSkillOrSubmit
     | Other
 
@@ -84,6 +85,8 @@ let classifyTool (host: Host) (tool: Tool) : ToolSemantic =
         WritePatchFamily
     elif t = "fuzzy_grep" then
         FuzzyGrep
+    elif t = "fuzzy_find" || t = "fuzzy_continue" || t = "glob" || t = "grep_x" then
+        SearchFamily
     else
         Other
 
@@ -111,7 +114,9 @@ let canUseSemantic (agent: Agent) (semantic: ToolSemantic) (tool: Tool) : bool =
     | _, SubagentWebSkillOrSubmit -> agent <> "investigator" && agent <> "coder" && agent <> "reviewer"
     | _, WritePatchFamily -> agent <> "investigator" && agent <> "manager" && agent <> "reviewer"
     | "manager", FuzzyGrep -> false
-    | _, _ -> true
+    | _, FuzzyGrep -> agent <> "manager"
+    | _, SearchFamily -> agent <> "browser" && agent <> "meditator" && agent <> "executor"
+    | _, Other -> false
 
 let canUseForHost (host: Host) (agent: Agent) (tool: Tool) : bool =
     let normalized = normalizeToolName host tool

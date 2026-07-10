@@ -6,7 +6,7 @@ let buildSlavePrompt (taskId: string) (title: string) (description: string) (mas
          You are executing squad task %s: %s\n\
          Task description:\n%s\n\n\
          Complete the task following the review workflow.\n\
-         Activate With-Review Mode by calling /loop <task description>.\n\
+         Activate With-Review Mode by following the review workflow below.\n\
          After development, call submit_review for review.\n\
          After review PASS, git commit, then call submit_to_squad.\n\
          If review REJECT, fix per feedback and re-review until PASS.\n\

@@ -28,6 +28,18 @@ let private extractFrontmatter (text: string) : string option =
         else
             Some(afterFirst.Substring(0, endIdx).Trim())
 
+let private safeInt (o: obj) : int =
+    try
+        unbox<int> o
+    with _ ->
+        try
+            int (unbox<float> o)
+        with _ ->
+            try
+                int (string o)
+            with _ ->
+                0
+
 let private parseSquadConfig (parsed: obj) : SquadConfig =
     let squad = get parsed "squad"
 
@@ -43,7 +55,7 @@ let private parseSquadConfig (parsed: obj) : SquadConfig =
             if isNullish mc then
                 defaults.MaxConcurrent
             else
-                unbox<int> mc
+                safeInt mc
           Terminal =
             if System.String.IsNullOrEmpty term then
                 defaults.Terminal

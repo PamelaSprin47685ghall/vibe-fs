@@ -35,6 +35,7 @@ let private env (key: string) : string =
 
 let readSlaveConfig () : SlaveConfig option =
     let url = env "SQUAD_COORDINATOR_URL"
+    printfn "DEBUG SLAVE: env SQUAD_COORDINATOR_URL = '%s'" url
 
     if url = "" then
         None
@@ -99,6 +100,8 @@ let submitToSquad (cfg: SlaveConfig) : JS.Promise<SubmitOutcome> =
 
                 if resStatus res = 404 then
                     return TaskNotFound
+                elif resStatus res = 401 then
+                    return Unauthorized
                 else
                     let! bodyText = resText res
                     let parsed = JSON?("parse")(bodyText)

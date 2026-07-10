@@ -62,7 +62,6 @@
     <Compile Include="src/Kernel/CapsFormat.fs"/>
     <Compile Include="src/Kernel/ContextBudget.fs"/>
     <Compile Include="src/Kernel/Messaging.fs"/>
-    <Compile Include="src/Kernel/AmendFilter.fs"/>
     <Compile Include="src/Kernel/ReviewReplayPolicy.fs"/>
     <Compile Include="src/Kernel/Message.fs"/>
     <Compile Include="src/Kernel/CapsSynthPolicy.fs"/>
@@ -85,8 +84,8 @@
     <Compile Include="src/Kernel/Wanxiangzhen/SquadTask.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadConfig.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/Dag.fs"/>
-    <Compile Include="src/Kernel/Wanxiangzhen/SquadUpdateIdAssign.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/SquadEvent.fs"/>
+    <Compile Include="src/Kernel/Wanxiangzhen/SquadUpdateIdAssign.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/EventLogParse.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/Scheduler.fs"/>
     <Compile Include="src/Kernel/Wanxiangzhen/FfDecision.fs"/>
@@ -172,6 +171,7 @@
     <Compile Include="src/Shell/MessagingPartCodec.fs"/>
     <Compile Include="src/Shell/MessageTransformCommon.fs"/>
     <Compile Include="src/Shell/ChatTransformOutputCodec.fs"/>
+    <Compile Include="src/Shell/AmendFilter.fs"/>
     <Compile Include="src/Shell/MessageTransformCore.fs"/>
     <Compile Include="src/Shell/MessagingEncodeHelpers.fs"/>
     <Compile Include="src/Shell/SerialStateHolder.fs"/>
@@ -548,6 +548,7 @@
     <Compile Include="tests/ArchitectureTestsSupport.fs"/>
     <Compile Include="tests/ArchitectureTestsTimeIndependence.fs"/>
     <Compile Include="tests/ArchitectureTestsFoundation.fs"/>
+    <Compile Include="tests/ArchitectureTestsFoundationB.fs"/>
     <Compile Include="tests/ArchitectureTestsTreeSitter.fs"/>
     <Compile Include="tests/ArchitectureTestsMessageTransform.fs"/>
     <Compile Include="tests/ArchitectureTestsMessageTransformCaps.fs"/>
@@ -618,6 +619,7 @@
     <Compile Include="tests/Wanxiangzhen/AssertCompat.fs"/>
     <Compile Include="tests/Wanxiangzhen/ArchitectureTestsSupport.fs"/>
     <Compile Include="tests/Wanxiangzhen/SpinWait.fs"/>
+    <Compile Include="tests/Wanxiangzhen/TestTypes.fs"/>
     <Compile Include="tests/Wanxiangzhen/TestDoubles.fs"/>
     <Compile Include="tests/Wanxiangzhen/TestFixtures.fs"/>
     <Compile Include="tests/Wanxiangzhen/CommandHookTests.fs"/>

@@ -19,7 +19,7 @@ let testChatMessageCapturesSessionIdAndReplays () : JS.Promise<unit> =
 
         let sessionId = "squad-session-001"
         let evt1 = SquadCreated(sessionId, "add remember-me")
-        let evt2 = TasksCreated(sessionId, [ ("squad-a1b2", "Task A", "desc A", []) ])
+        let evt2 = TasksCreated(sessionId, [ { taskId = "squad-a1b2"; title = "Task A"; description = "desc A"; dependsOn = [] } ])
         let history = [ evt1; evt2 ]
 
         s.getLatestSquadSessionIdOverride <- Some(fun () -> Promise.lift (Some sessionId))
@@ -47,7 +47,7 @@ let testReplayReconcilesSubmittedToMerged () : JS.Promise<unit> =
 
         let sessionId = "squad-session-001"
         let evt1 = SquadCreated(sessionId, "req")
-        let evt2 = TasksCreated(sessionId, [ ("squad-a1b2", "A", "desc", []) ])
+        let evt2 = TasksCreated(sessionId, [ { taskId = "squad-a1b2"; title = "A"; description = "desc"; dependsOn = [] } ])
         let evt3 = TaskStarted(sessionId, "squad-a1b2", "/wt/a", "squad-a1b2")
         let evt4 = TaskSubmitted(sessionId, "squad-a1b2", "sha123")
         let history = [ evt1; evt2; evt3; evt4 ]
@@ -87,7 +87,7 @@ let testReplayWarnsOrphanRunningTasks () : JS.Promise<unit> =
 
         let sessionId = "squad-session-001"
         let evt1 = SquadCreated(sessionId, "req")
-        let evt2 = TasksCreated(sessionId, [ ("squad-a1b2", "A", "desc", []) ])
+        let evt2 = TasksCreated(sessionId, [ { taskId = "squad-a1b2"; title = "A"; description = "desc"; dependsOn = [] } ])
         let evt3 = TaskStarted(sessionId, "squad-a1b2", "/wt/a", "squad-a1b2")
         let history = [ evt1; evt2; evt3 ]
 

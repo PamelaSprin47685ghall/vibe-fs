@@ -56,6 +56,7 @@ let realCoordinatorDeps (workspaceRoot: string) : CoordinatorDeps =
           WaitForPidDeath = fun pid r -> waitForPidDeath deps pid r
           StartPolling = startPolling
           StopPolling = stopPolling
-          Now = fun () -> System.DateTime.UtcNow.ToString("o") }
+          Now = fun () -> System.DateTime.UtcNow.ToString("o")
+          RandomGen = fun () -> JS.Math.random () }
 
     deps

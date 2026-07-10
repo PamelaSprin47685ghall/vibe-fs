@@ -15,12 +15,12 @@ let private fmKey (e: SquadEvent) =
      | TasksCreated(_, tasks) ->
          let items = System.Collections.Generic.List<obj>()
 
-         for (tid, title, desc, deps) in tasks do
+         for item in tasks do
              let o2 =
-                 createObj [ "task_id", box tid; "title", box title; "description", box desc ]
+                 createObj [ "task_id", box item.taskId; "title", box item.title; "description", box item.description ]
 
-             if deps <> [] then
-                 setKey o2 "depends_on" (box (List.toArray deps))
+             if item.dependsOn <> [] then
+                 setKey o2 "depends_on" (box (List.toArray item.dependsOn))
 
              items.Add o2
 
@@ -88,33 +88,33 @@ let private parseEvent (parsed: obj) (typeName: string) : SquadEvent option =
         let req = strField "requirement" |> Option.defaultValue ""
         Some(SquadCreated(sid, req))
     | "tasks_created" ->
-        let tasksRaw = get parsed "tasks"
+         let tasksRaw = get parsed "tasks"
 
-        let tasks =
-            if isNullish tasksRaw || not (isArray tasksRaw) then
-                []
-            else
-                (tasksRaw :?> obj array)
-                |> Array.toList
-                |> List.choose (fun o ->
-                    let tid = str o "task_id"
+         let tasks =
+             if isNullish tasksRaw || not (isArray tasksRaw) then
+                 []
+             else
+                 (tasksRaw :?> obj array)
+                 |> Array.toList
+                 |> List.choose (fun o ->
+                     let tid = str o "task_id"
 
-                    if tid = "" then
-                        None
-                    else
-                        let title = str o "title"
-                        let desc = str o "description"
-                        let depsArr = get o "depends_on"
+                     if tid = "" then
+                         None
+                     else
+                         let title = str o "title"
+                         let desc = str o "description"
+                         let depsArr = get o "depends_on"
 
-                        let deps =
-                            if isNullish depsArr || not (isArray depsArr) then
-                                []
-                            else
-                                (depsArr :?> obj array) |> Array.map string |> Array.toList
+                         let deps =
+                             if isNullish depsArr || not (isArray depsArr) then
+                                 []
+                             else
+                                 (depsArr :?> obj array) |> Array.map string |> Array.toList
 
-                        Some(tid, title, desc, deps))
+                         Some { taskId = tid; title = title; description = desc; dependsOn = deps })
 
-        Some(TasksCreated(sid, tasks))
+         Some(TasksCreated(sid, tasks))
     | "task_started" ->
         let tid = optStr "task_id"
         let wt = optStr "worktree_path"
@@ -156,15 +156,12 @@ let decodeEvents (text: string) : SquadEvent list =
                 let rest = afterStart.Substring(endIdx + 4)
 
                 let evOpt =
-                    try
-                        let parsed = parse yamlText
-                        let typeName = str parsed "squad_event"
+                    let parsed = parse yamlText
+                    let typeName = str parsed "squad_event"
 
-                        match eventTypeNameFromString typeName with
-                        | None -> None
-                        | Some _ -> parseEvent parsed typeName
-                    with _ ->
-                        None
+                    match eventTypeNameFromString typeName with
+                    | None -> None
+                    | Some _ -> parseEvent parsed typeName
 
                 match evOpt with
                 | Some ev -> scan rest (ev :: acc)

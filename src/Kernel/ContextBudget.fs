@@ -52,6 +52,3 @@ let estimateTokens (currentTextBytes: int) (lastUsage: {| tokenCount: int; textB
         let estimated = (int64 u.tokenCount * int64 currentTextBytes) / int64 u.textBytes
         Some (int estimated)
     | _ -> None
-
-let inferMaxTokens (modelStr: string option) (hostMaxTokens: int option) : int =
-    0

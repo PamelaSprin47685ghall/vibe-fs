@@ -25,6 +25,7 @@ let mutable failed = 0
 let mutable silentEnabled = false
 let setSilent (s: bool) : unit = silentEnabled <- s
 let private failures = ResizeArray<string>()
+let mutable private currentTestLabel = ""
 let private timings = ResizeArray<string * float>()
 let mutable private verboseEnabled = false
 let mutable private verboseLogPath: string option = None
@@ -99,6 +100,7 @@ let private raceWithTimeout (p: JS.Promise<'a>) (msg: string) (ms: int) : JS.Pro
 
 /// Time a synchronous test body; catches exceptions so one throwing test does not abort the suite.
 let timed (label: string) (f: unit -> unit) : unit =
+    currentTestLabel <- label
     let start = now ()
 
     try
@@ -122,6 +124,7 @@ let asyncSuiteTimeoutMs = 1000
 /// Time an asynchronous test body with a 1s hard timeout; return a unit promise.
 /// Promise failure / timeout / throw are all converged into a single failure record.
 let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
+    currentTestLabel <- label
     promise {
         let start = now ()
 
@@ -144,6 +147,7 @@ let timedAsync (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
     }
 
 let timedAsyncSuite (label: string) (f: unit -> JS.Promise<'a>) : JS.Promise<unit> =
+    currentTestLabel <- label
     promise {
         let start = now ()
 

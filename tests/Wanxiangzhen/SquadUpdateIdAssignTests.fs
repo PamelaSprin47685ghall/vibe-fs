@@ -26,5 +26,5 @@ let entries () : (string * (unit -> unit)) list =
                  RefExists = (fun _ -> false) }
 
            match assignTaskIds Set.empty [ (None, "t", "d", []) ] gen with
-           | Ok [ (id, _, _, _) ] -> equal "squad-abcd" id
+           | Ok [ item ] -> equal "squad-abcd" item.taskId
            | _ -> check "" false) ]

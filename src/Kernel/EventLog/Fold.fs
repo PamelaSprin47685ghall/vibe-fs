@@ -2,7 +2,6 @@ module Wanxiangshu.Kernel.EventLog.Fold
 
 open Wanxiangshu.Kernel.EventLog.Types
 open Wanxiangshu.Kernel.BacklogProjectionCore
-open Thoth.Json
 
 let private payloadTask (e: WanEvent) : string option =
     e.Payload
@@ -103,12 +102,21 @@ type NudgeSnapshotState =
       dispatchedAnchors: Set<string> }
 
 let private parseTodosJson (json: string) : string list =
-    if json = "" then
+    let trimmed = json.Trim()
+    if trimmed = "" || trimmed = "[]" then
+        []
+    else if trimmed.Length < 2 || trimmed.[0] <> '[' || trimmed.[trimmed.Length - 1] <> ']' then
         []
     else
-        match Decode.Auto.fromString<string list> json with
-        | Ok list -> list
-        | Error _ -> []
+        let inner = trimmed.Substring(1, trimmed.Length - 2)
+        inner.Split(',')
+        |> Array.choose (fun segment ->
+            let s = segment.Trim()
+            if s.Length < 2 || s.[0] <> '"' || s.[s.Length - 1] <> '"' then
+                None
+            else
+                Some(s.Substring(1, s.Length - 2)))
+        |> Array.toList
 
 let emptyNudgeSnapshotState: NudgeSnapshotState =
     { openTodos = []

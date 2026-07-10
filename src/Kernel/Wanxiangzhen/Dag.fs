@@ -72,7 +72,8 @@ let runningCount (dag: Dag) : int =
 type private VisitState =
     { Visited: Set<string>
       Visiting: Set<string>
-      Result: string list }
+      Result: string list
+      Path: string list }
 
 let topologicalOrder (tasks: (string * string list) list) : Result<string list, string list> =
     let depMap = tasks |> Map.ofList
@@ -80,13 +81,15 @@ let topologicalOrder (tasks: (string * string list) list) : Result<string list, 
 
     let rec visit (state: VisitState) (id: string) : Result<VisitState, string list> =
         if state.Visiting.Contains id then
-            Error [ id ]
+            let path = List.rev state.Path
+            let cycle = List.foldBack (fun x acc -> x :: acc) (path |> List.skipWhile (fun x -> x <> id)) [ id ]
+            Error cycle
         elif state.Visited.Contains id then
             Ok state
         else
             let visiting' = state.Visiting.Add id
             let deps = Map.tryFind id depMap |> Option.defaultValue []
-            let st' = { state with Visiting = visiting' }
+            let st' = { state with Visiting = visiting'; Path = id :: state.Path }
 
             let rec processDeps (st: VisitState) (remaining: string list) : Result<VisitState, string list> =
                 match remaining with
@@ -103,7 +106,8 @@ let topologicalOrder (tasks: (string * string list) list) : Result<string list, 
                     { stDep with
                         Visiting = stDep.Visiting.Remove id
                         Visited = stDep.Visited.Add id
-                        Result = id :: stDep.Result }
+                        Result = id :: stDep.Result
+                        Path = state.Path }
 
                 Ok stOut
 
@@ -118,7 +122,8 @@ let topologicalOrder (tasks: (string * string list) list) : Result<string list, 
     let initialState =
         { Visited = Set.empty
           Visiting = Set.empty
-          Result = [] }
+          Result = []
+          Path = [] }
 
     let orderedIds = idSet |> Set.toList |> List.sort
 

@@ -75,7 +75,7 @@ let withWorkspaceLock (filePath: string) (action: unit -> JS.Promise<'T>) : JS.P
             ()
         with _ ->
             try
-                do! writeFileFlagAsync filePath "" (createObj [ "flag", box "w" ])
+                do! writeFileFlagAsync filePath "" (createObj [ "flag", box "wx" ])
             with _ ->
                 ()
 

@@ -20,7 +20,7 @@ let entries () : (string * (unit -> unit)) list =
            let d = empty "s1" ""
 
            let d2 =
-               foldEvent d (TasksCreated("s1", [ ("a", "t", "d", []); ("b", "u", "e", [ "a" ]) ]))
+               foldEvent d (TasksCreated("s1", [ { taskId = "a"; title = "t"; description = "d"; dependsOn = [] }; { taskId = "b"; title = "u"; description = "e"; dependsOn = [ "a" ] } ]))
 
            equal Pending (findTask "a" d2).Value.Status
            equal Pending (findTask "b" d2).Value.Status
@@ -69,7 +69,7 @@ let entries () : (string * (unit -> unit)) list =
       ("Event.foldEvents sequence",
        fun () ->
            let events =
-               [ TasksCreated("s1", [ ("a", "t", "d", []) ])
+               [ TasksCreated("s1", [ { taskId = "a"; title = "t"; description = "d"; dependsOn = [] } ])
                  TaskStarted("s1", "a", "/wt", "a")
                  TaskSubmitted("s1", "a", "sha")
                  TaskMerged("s1", "a", "sha") ]

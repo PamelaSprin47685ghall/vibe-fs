@@ -1,6 +1,7 @@
 module Wanxiangshu.Tests.TestsArchitectureRegistryB
 
 open Fable.Core
+open Wanxiangshu.Tests.ArchitectureTestsFoundationB
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.ArchitectureTestsFoundation
 open Wanxiangshu.Tests.ArchitectureTestsMessageTransform
@@ -184,4 +185,7 @@ let architectureTestEntriesPartB () : (string * TestBody) list =
       "ArchitectureTests.e2eHarnessPluginJsResolvesWithParentFallback",
       Sync(sync E2eHarnessContractTests.pluginJsResolvesWithParentFallback)
       "ArchitectureTests.testFilesAreTimeIndependent",
-      Sync(sync ArchitectureTestsTimeIndependence.testFilesAreTimeIndependent) ]
+      Sync(sync ArchitectureTestsTimeIndependence.testFilesAreTimeIndependent)
+      "ArchitectureTests.wanxiangzhenBoundary", Sync(sync ArchitectureTestsFoundationB.wanxiangzhenBoundary)
+      "ArchitectureTests.wanxiangzhenGitQueue", Sync(sync ArchitectureTestsFoundationB.wanxiangzhenGitQueue)
+      "ArchitectureTests.wanxiangzhenReconcile", Sync(sync ArchitectureTestsFoundationB.wanxiangzhenReconcile) ]

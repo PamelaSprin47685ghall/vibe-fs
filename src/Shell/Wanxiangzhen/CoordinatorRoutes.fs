@@ -10,7 +10,8 @@ open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorOps
 let routeHandler (rt: CoordinatorRuntime) : RouteHandler =
     fun method path body ->
         promise {
-            match method, path with
+            let p = path.Split('?').[0]
+            match method, p with
             | "POST", p when p.EndsWith "/submit" ->
                 let tid = extractTaskId p "submit"
                 let sha = decodeSubmitBody body |> Option.defaultValue ""
@@ -20,7 +21,9 @@ let routeHandler (rt: CoordinatorRuntime) : RouteHandler =
 
                 match decodeRegisterBody body with
                 | Some pid ->
-                    rt.Dag <- rt.Dag |> updateTask tid (fun (t: SquadTask) -> { t with SlavePid = Some pid })
+                    do! rt.DagQueue.Enqueue(fun () ->
+                        rt.Dag <- rt.Dag |> updateTask tid (fun (t: SquadTask) -> { t with SlavePid = Some pid })
+                        Promise.lift ())
 
                     return
                         { StatusCode = 200
@@ -74,21 +77,22 @@ let startPidPolling (rt: CoordinatorRuntime) : unit =
     rt.PidPollHandle <-
         Some(
             rt.Deps.StartPolling 2000 (fun () ->
-                promise {
-                    let toCheck =
-                        rt.Dag.Tasks
-                        |> Map.toList
-                        |> List.map snd
-                        |> List.filter (fun (t: SquadTask) ->
-                            (t.Status = Running || t.Status = Submitted) && t.SlavePid.IsSome)
+                rt.DagQueue.Enqueue(fun () ->
+                    promise {
+                        let toCheck =
+                            rt.Dag.Tasks
+                            |> Map.toList
+                            |> List.map snd
+                            |> List.filter (fun (t: SquadTask) ->
+                                (t.Status = Running || t.Status = Submitted) && t.SlavePid.IsSome)
 
-                    for t in toCheck do
-                        match t.SlavePid with
-                        | Some pid when not (rt.Deps.IsPidAlive pid) -> do! handleSlaveExit rt t.Id
-                        | Some pid when rt.Deps.IsPidAlive pid ->
-                            let now = rt.Deps.Now()
-                            rt.Dag <- rt.Dag |> updateTask t.Id (fun x -> { x with LastHeartbeatAt = Some now })
-                        | _ -> ()
-                }
+                        for t in toCheck do
+                            match t.SlavePid with
+                            | Some pid when not (rt.Deps.IsPidAlive pid) -> do! handleSlaveExitCore rt t.Id
+                            | Some pid when rt.Deps.IsPidAlive pid ->
+                                let now = rt.Deps.Now()
+                                rt.Dag <- rt.Dag |> updateTask t.Id (fun x -> { x with LastHeartbeatAt = Some now })
+                            | _ -> ()
+                    })
                 |> Promise.start)
         )

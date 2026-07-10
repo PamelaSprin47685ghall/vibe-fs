@@ -17,24 +17,21 @@ models:
       - ark/minimax-m3:fast
       - google/antigravity-gemini-3-flash-agent
     coder:
-      - meituan/LongCat-2.0:fast
+      - stepfun/step-3.5-flash-2603:fast
       - ark/minimax-m3:fast
       - ark/deepseek-v4-flash:fast
     investigator:
       - stepfun/step-3.5-flash-2603:fast
-      - meituan/LongCat-2.0:fast
       - ark/deepseek-v4-flash:fast
     meditator:
-      - meituan/LongCat-2.0:fast
+      - stepfun/step-3.5-flash-2603:fast
       - ark/minimax-m3:fast
       - ark/deepseek-v4-flash:fast
     reviewer:
       - ark/minimax-m3:fast
       - ark/deepseek-v4-flash:fast
-      - meituan/LongCat-2.0:fast
     executor:
       - stepfun/step-3.5-flash-2603:fast
-      - meituan/LongCat-2.0:fast
       - ark/deepseek-v4-flash:fast
     title:
       - agnes/agnes-2.0-flash:fast

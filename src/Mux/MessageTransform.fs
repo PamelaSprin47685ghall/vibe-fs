@@ -133,7 +133,13 @@ let compactingTransform
             let typedMessages = decodeMessages sessionID messagesArr
             let cleaned = stripSyntheticBySource typedMessages
             let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
-            let result = Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog
+            let guidGen () =
+                let rg = get deps "RandomGen"
+                if not (isNullish rg) then
+                    string (rg $ ())
+                else
+                    System.Guid.NewGuid().ToString()
+            let result = Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
             let encoded = encodeMessages result
             replaceArrayInPlace messagesArr encoded
     }

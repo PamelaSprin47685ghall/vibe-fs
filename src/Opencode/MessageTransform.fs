@@ -231,7 +231,8 @@ let compactingTransform
             let sessionID = extractSessionID messagesList
             let cleaned = Messaging.stripSyntheticBySource messagesList
             let backlog = backlogSession.GetOrRebuildBacklog(sessionID, cleaned)
-            let result = Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog
+            let guidGen () = string (runtimeScope.RandomGen ())
+            let result = Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform cleaned backlog guidGen
             let encoded = MessagingCodec.encodeMessages result
             replaceArrayInPlace messagesArr encoded
     }

@@ -1,4 +1,4 @@
-module Wanxiangshu.Kernel.AmendFilter
+module Wanxiangshu.Shell.AmendFilter
 
 open Fable.Core
 open Fable.Core.JsInterop

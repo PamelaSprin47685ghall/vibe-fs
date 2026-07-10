@@ -51,11 +51,14 @@ let testCompactionThresholdAndTransform () =
               plan = "my plan" }
         ]
 
-        let compacted = Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform msgs backlog
+        let fixedGuid = "test-guid-deterministic"
+        let guidGen () = fixedGuid
+        let compacted = Wanxiangshu.Kernel.BacklogProjectionCore.compactingTransform msgs backlog guidGen
         equal "Compacted should contain exactly 1 message" 1 compacted.Length
         let first = compacted.[0]
         equal "Compacted message role should be user" User first.info.role
-        let content = 
+        equal "Compacted message id should use fixed guid" ("compacting-summary-" + fixedGuid) first.info.id
+        let content =
             match first.parts.[0] with
             | TextPart t -> t
             | _ -> ""
@@ -110,6 +113,7 @@ let testMuxCompactionTransform () =
         let deps = createObj [
             "directory", box ""
             "maxInputTokens", box 100000
+            "RandomGen", box (fun () -> 0.12345)
         ]
         
         let input = createObj [

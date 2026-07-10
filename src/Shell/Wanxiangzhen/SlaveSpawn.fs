@@ -6,6 +6,8 @@ open Wanxiangshu.Shell.Dyn
 [<Import("spawn", "node:child_process")>]
 let private childSpawn (cmd: string) (args: string array) (opts: obj) : obj = jsNative
 
+let private shellEscape (s: string) : string = s.Replace("'", "'\\''")
+
 let buildSlaveCommand (terminal: string) (worktree: string) (prompt: string) : string * string array =
     let ocArgs = [| "tui"; "--prompt"; prompt |]
 
@@ -18,7 +20,7 @@ let buildSlaveCommand (terminal: string) (worktree: string) (prompt: string) : s
     | "wezterm" -> "wezterm", Array.append [| "start"; "--cwd"; worktree; "--"; "opencode" |] ocArgs
     | "wt" -> "wt.exe", Array.append [| "-d"; worktree; "opencode" |] ocArgs
     | "iterm2" ->
-        let script = sprintf "cd %s && opencode tui --prompt '%s'" worktree prompt
+        let script = sprintf "cd '%s' && opencode tui --prompt '%s'" (shellEscape worktree) (shellEscape prompt)
 
         "osascript",
         [| "-e"

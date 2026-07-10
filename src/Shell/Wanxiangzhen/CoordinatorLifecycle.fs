@@ -8,7 +8,7 @@ open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
 open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorOps
 
-let handleSquadKill (rt: CoordinatorRuntime) (optSessionId: string option) : JS.Promise<unit> =
+let handleSquadKillCore (rt: CoordinatorRuntime) (optSessionId: string option) : JS.Promise<unit> =
     promise {
         let targetDagOpt =
             match optSessionId with
@@ -30,7 +30,7 @@ let handleSquadKill (rt: CoordinatorRuntime) (optSessionId: string option) : JS.
                 | _ -> rt.Dag.SessionId
 
             for t in toKill do
-                t.SlavePid |> Option.iter (safeKillPid rt.Deps)
+                t.SlavePid |> Option.iter (safeKillPid rt)
 
             let! appendOk = commitEvent rt (SquadCancelled targetSessionId)
 
@@ -47,3 +47,6 @@ let handleSquadKill (rt: CoordinatorRuntime) (optSessionId: string option) : JS.
 
                 schedulerTick rt |> Promise.start
     }
+
+let handleSquadKill (rt: CoordinatorRuntime) (optSessionId: string option) : JS.Promise<unit> =
+    rt.DagQueue.Enqueue(fun () -> handleSquadKillCore rt optSessionId)

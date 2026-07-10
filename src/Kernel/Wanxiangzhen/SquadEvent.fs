@@ -3,9 +3,15 @@ module Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 
+type TaskItem =
+    { taskId: string
+      title: string
+      description: string
+      dependsOn: string list }
+
 type SquadEvent =
     | SquadCreated of sessionId: string * requirement: string
-    | TasksCreated of sessionId: string * tasks: (string * string * string * string list) list
+    | TasksCreated of sessionId: string * tasks: TaskItem list
     | TaskStarted of sessionId: string * taskId: string * worktreePath: string * branchName: string
     | TaskSubmitted of sessionId: string * taskId: string * commitSha: string
     | TaskMerged of sessionId: string * taskId: string * masterSha: string
@@ -85,8 +91,8 @@ let foldEvent (dag: Dag) (e: SquadEvent) : Dag =
     | TasksCreated(_, tasks) ->
         tasks
         |> List.fold
-            (fun d (tid, title, desc, deps) ->
-                let t = create tid title desc deps ""
+            (fun d item ->
+                let t = create item.taskId item.title item.description item.dependsOn ""
                 addTask t d)
             dag
     | TaskStarted(_, tid, wt, branch) ->

@@ -45,12 +45,15 @@ type CoordinatorDeps =
       WaitForPidDeath: int -> int -> JS.Promise<unit>
       StartPolling: int -> (unit -> unit) -> obj
       StopPolling: obj -> unit
-      Now: unit -> string }
+      Now: unit -> string
+      RandomGen: unit -> float }
 
-let generateTaskId () : string =
+let generateTaskIdWith (randomGen: unit -> float) : string =
     let hex = "0123456789abcdef"
-    let chars = [| for _ in 0..3 -> hex[int (JS.Math.random () * 16.0)] |]
+    let chars = [| for _ in 0..3 -> hex[int (randomGen () * 16.0)] |]
     "squad-" + System.String(chars)
+
+let generateTaskId () : string = generateTaskIdWith JS.Math.random
 
 type CoordinatorRuntime =
     { mutable Dag: Dag
@@ -63,6 +66,7 @@ type CoordinatorRuntime =
       Token: string
       CoordinatorUrl: string
       GitQueue: SerialQueue
+      DagQueue: SerialQueue
       InjectQueue: SerialQueue
       Server: StartedServer
       mutable Scheduling: bool

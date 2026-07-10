@@ -62,51 +62,56 @@ let validateTaskFields (events: obj list) : SquadUpdateOutcome option =
                 InvalidInput(sprintf "task '%s' must have non-empty title and description." badId)))
 
 let private aggregateAssignedTasks (events: obj list) : RawTask list * bool =
-    events
-    |> List.fold
-        (fun (acc, hasCancelled) e ->
-            if str e "type" = "tasks_created" then
-                let tasks = (get e "tasks") :?> obj array |> Array.toList
+    let rawTasks, hasCancelled =
+        events
+        |> List.fold
+            (fun (acc, hasCancelled) e ->
+                if str e "type" = "tasks_created" then
+                    let tasks = (get e "tasks") :?> obj array |> Array.toList
 
-                let extracted =
-                    tasks
-                    |> List.map (fun t ->
-                        (get t "taskId" |> fun v -> if isNullish v then None else Some(string v)),
-                        str t "title",
-                        str t "description",
-                        let dr = get t "dependsOn"
+                    let extracted =
+                        tasks
+                        |> List.map (fun t ->
+                            (get t "taskId" |> fun v -> if isNullish v then None else Some(string v)),
+                            str t "title",
+                            str t "description",
+                            let dr = get t "dependsOn"
 
-                        if isNullish dr || not (isArray dr) then
-                            []
-                        else
-                            (dr :?> obj array) |> Array.map string |> Array.toList)
+                            if isNullish dr || not (isArray dr) then
+                                []
+                            else
+                                (dr :?> obj array) |> Array.map string |> Array.toList)
 
-                (acc @ extracted, hasCancelled)
-            else
-                (acc, true))
-        ([], false)
+                    let newAcc =
+                        extracted
+                        |> List.fold (fun a x -> x :: a) acc
+                    (newAcc, hasCancelled)
+                else
+                    (acc, true))
+            ([], false)
+    (List.rev rawTasks, hasCancelled)
 
 let private commitAssigned
     (rt: CoordinatorRuntime)
     (existingTaskIds: Set<string>)
-    (assigned: (string * string * string * string list) list)
+    (assigned: TaskItem list)
     (hasCancelled: bool)
     : JS.Promise<Result<string, SquadUpdateOutcome>> =
     promise {
-        let newIds = assigned |> List.map (fun (id, _, _, _) -> id) |> Set.ofList
+        let newIds = assigned |> List.map (fun item -> item.taskId) |> Set.ofList
         let allIds = Set.union existingTaskIds newIds
 
         let dangling =
             assigned
-            |> List.collect (fun (id, _, _, deps) ->
-                deps
+            |> List.collect (fun item ->
+                item.dependsOn
                 |> List.filter (fun d -> not (Set.contains d allIds))
-                |> List.map (fun d -> id, d))
+                |> List.map (fun d -> item.taskId, d))
 
         if dangling <> [] then
             return Error(DependencyErrors dangling)
         else
-            let depsList = assigned |> List.map (fun (id, _, _, deps) -> id, deps)
+            let depsList = assigned |> List.map (fun item -> item.taskId, item.dependsOn)
 
             let existingDeps =
                 rt.Dag.Tasks |> Map.toList |> List.map (fun (id, t) -> id, t.DependsOn)
@@ -114,40 +119,40 @@ let private commitAssigned
             match detectCycle (existingDeps @ depsList) with
             | Some cycle -> return Error(CycleDetected cycle)
             | None ->
-                let createdTasks =
-                    assigned |> List.map (fun (tid, title, desc, deps) -> tid, title, desc, deps)
-
                 let! appendOk =
-                    if createdTasks = [] then
+                    if assigned = [] then
                         Promise.lift (Ok())
                     else
-                        commitEvent rt (TasksCreated(rt.Dag.SessionId, createdTasks))
+                        commitEvent rt (TasksCreated(rt.Dag.SessionId, assigned))
 
                 match appendOk with
                 | Error err ->
                     rt.InjectError <- Some(sprintf "TasksCreated append failed: %s" err)
                     return Error(InvalidInput "event log append failed.")
                 | Ok() ->
-                    if createdTasks <> [] then
+                    if assigned <> [] then
                         let now = rt.Deps.Now()
-
-                        for (tid, title, desc, deps) in assigned do
-                            rt.Dag <- rt.Dag |> addTask (create tid title desc deps now)
+                        let updatedDag =
+                            assigned
+                            |> List.fold (fun dag item ->
+                                let t = create item.taskId item.title item.description item.dependsOn now
+                                addTask t dag) rt.Dag
+                        rt.Dag <- updatedDag
 
                     if hasCancelled then
-                        do! handleSquadKill rt None
+                        do! handleSquadKillCore rt None
 
                     let resultText =
-                        if hasCancelled && createdTasks = [] then
+                        if hasCancelled && assigned = [] then
                             sprintf "Squad session %s cancelled." rt.Dag.SessionId
                         else
-                            sprintf "%d task(s) created, scheduler notified." (List.length createdTasks)
+                            sprintf "%d task(s) created, scheduler notified." (List.length assigned)
 
                     schedulerTick rt |> Promise.start |> ignore
                     return Ok resultText
     }
 
-let handleSquadUpdate (rt: CoordinatorRuntime) (args: obj) : JS.Promise<string> =
+let private handleSquadUpdateCore (rt: CoordinatorRuntime) (args: obj) : JS.Promise<string> =
     promise {
         match parseEventsArgs args with
         | None -> return formatSquadUpdateOutcome (InvalidInput "events must be a non-empty array.")
@@ -165,7 +170,7 @@ let handleSquadUpdate (rt: CoordinatorRuntime) (args: obj) : JS.Promise<string> 
                         let existingTaskIds = rt.Dag.Tasks |> Map.toList |> List.map fst |> Set.ofList
 
                         let idGen =
-                            { Generate = generateTaskId
+                            { Generate = fun () -> generateTaskIdWith rt.Deps.RandomGen
                               RefExists = fun cand -> rt.Deps.ShowRefExists rt.ProjectRoot cand }
 
                         match assignTaskIds existingTaskIds allRawTasks idGen with
@@ -175,3 +180,6 @@ let handleSquadUpdate (rt: CoordinatorRuntime) (args: obj) : JS.Promise<string> 
                             | Error o -> return formatSquadUpdateOutcome o
                             | Ok text -> return text
     }
+
+let handleSquadUpdate (rt: CoordinatorRuntime) (args: obj) : JS.Promise<string> =
+    rt.DagQueue.Enqueue(fun () -> handleSquadUpdateCore rt args)

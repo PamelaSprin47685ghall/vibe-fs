@@ -13,6 +13,11 @@ open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
 // ══════════════════════════════════════════════════════════════════════════════
 
 let stubDeps () : CoordinatorDeps =
+    let mutable seed = 42
+    let prng () =
+        seed <- (seed * 1103515245 + 12345) &&& 0x7FFFFFFF
+        float seed / 2147483647.0
+
     { PromptSession = fun _ _ _ -> Promise.lift ()
       GetLatestSquadSessionId = fun () -> Promise.lift None
       GetSquadDag = fun sid -> Promise.lift (Wanxiangshu.Kernel.Wanxiangzhen.Dag.empty sid "")
@@ -37,7 +42,8 @@ let stubDeps () : CoordinatorDeps =
       WaitForPidDeath = fun _ _ -> Promise.lift ()
       StartPolling = fun _ _ -> box null
       StopPolling = fun _ -> ()
-      Now = fun () -> "2025-01-01T00:00:00.000Z" }
+      Now = fun () -> "2025-01-01T00:00:00.000Z"
+      RandomGen = prng }
 
 // ══════════════════════════════════════════════════════════════════════════════
 // mkRuntimeWithDeps — full factory accepting caller-supplied CoordinatorDeps.
@@ -56,6 +62,7 @@ let mkRuntimeWithDeps (deps: CoordinatorDeps) : CoordinatorRuntime =
       Token = "test-token"
       CoordinatorUrl = "http://localhost:0"
       GitQueue = SerialQueue()
+      DagQueue = SerialQueue()
       InjectQueue = SerialQueue()
       Server =
         { Port = 0

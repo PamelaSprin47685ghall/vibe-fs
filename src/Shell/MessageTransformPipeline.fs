@@ -113,6 +113,75 @@ let buildContextBudgetNudgeMessage (sessionID: string) : Message<obj> =
       source = Synthetic "context-budget-nudge-"
       raw = null }
 
+let private estimateCurrentTokens (totalBytes: int) (tokenCountOpt: int option) (storeEntry: ContextBudgetEntry) : int =
+    match tokenCountOpt with
+    | Some t -> t
+    | None ->
+        match ContextBudget.estimateTokens totalBytes storeEntry.LastUsage with
+        | Some t -> t
+        | None -> 0
+
+let private rebuildPhaseState
+    (plan: MessageTransformPlan)
+    (backlogOps: BacklogSessionOps)
+    (backlog: Wanxiangshu.Kernel.BacklogProjectionCore.BacklogEntry list)
+    (currentStore: ContextBudgetEntry)
+    (encodeMessages: Message<obj> list -> obj array)
+    (currentTokens: int)
+    (totalBytes: int)
+    : JS.Promise<ContextBudget.ContextState> =
+    promise {
+        if backlog <> currentStore.LastBacklog || currentStore.State.IsNone then
+            let stableMessages =
+                projectBacklogFor
+                    backlogOps.Host
+                    plan.Cleaned
+                    backlog
+                    true
+                    plan.SessionID
+            let stableEncoded = encodeMessages stableMessages
+            let stableBytes = JS.JSON.stringify(stableEncoded).Length
+            let! stableTokensOpt = plan.GetContextUsage stableEncoded
+
+            let stableTokens =
+                match stableTokensOpt with
+                | Some t -> int64 t
+                | None ->
+                    let currentLastUsage = (ContextBudgetStore.get plan.Scope plan.SessionID).LastUsage
+                    match ContextBudget.estimateTokens stableBytes currentLastUsage with
+                    | Some t -> int64 t
+                    | None -> int64 currentTokens
+
+            let backlogBytes = ContextBudgetUsageCodec.backlogBytesFromEncoded backlogOps.Host stableEncoded
+            let newState = ContextBudget.beginPhase stableTokens (int64 stableBytes) (int64 backlogBytes)
+
+            ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
+                { entry with
+                    State = Some newState
+                    LastBacklog = backlog
+                    NudgeInjected = false })
+            return newState
+        else
+            return currentStore.State.Value
+    }
+
+let private checkAndInjectNudge (plan: MessageTransformPlan) (currentTokens: int) (state: ContextBudget.ContextState) (messages: Message<obj> list) : Message<obj> list =
+    let state_c = state.backlogTokensAtPhaseStart
+    let state_s = state.phaseBaseTokens - state_c
+
+    if ContextBudget.isCompactingRequired state.phaseBaseTokens (int64 plan.MaxInputTokens) then
+        messages
+    elif ContextBudget.F (int64 currentTokens) (int64 plan.MaxInputTokens) state_c state_s then
+        let updatedStore = ContextBudgetStore.get plan.Scope plan.SessionID
+        if updatedStore.NudgeInjected then
+            messages
+        else
+            ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
+                { entry with NudgeInjected = true })
+            List.append messages [ buildContextBudgetNudgeMessage plan.SessionID ]
+    else
+        messages
+
 let applyContextBudget
     (plan: MessageTransformPlan)
     (backlogOps: BacklogSessionOps)
@@ -127,14 +196,7 @@ let applyContextBudget
             let totalBytes = JS.JSON.stringify(encodedAll).Length
             let! tokenCountOpt = plan.GetContextUsage encodedAll
             let storeEntry = ContextBudgetStore.get plan.Scope plan.SessionID
-
-            let currentTokens =
-                match tokenCountOpt with
-                | Some t -> t
-                | None ->
-                    match ContextBudget.estimateTokens totalBytes storeEntry.LastUsage with
-                    | Some t -> t
-                    | None -> 0
+            let currentTokens = estimateCurrentTokens totalBytes tokenCountOpt storeEntry
 
             if currentTokens <= 0 then
                 return messages
@@ -144,58 +206,8 @@ let applyContextBudget
 
                 let backlog = backlogOps.GetOrRebuildBacklog plan.SessionID plan.Cleaned
                 let currentStore = ContextBudgetStore.get plan.Scope plan.SessionID
-
-                let! state =
-                    promise {
-                        if backlog <> currentStore.LastBacklog || currentStore.State.IsNone then
-                            let stableMessages =
-                                projectBacklogFor
-                                    backlogOps.Host
-                                    plan.Cleaned
-                                    backlog
-                                    true
-                                    plan.SessionID
-                            let stableEncoded = encodeMessages stableMessages
-                            let stableBytes = JS.JSON.stringify(stableEncoded).Length
-                            let! stableTokensOpt = plan.GetContextUsage stableEncoded
-
-                            let stableTokens =
-                                match stableTokensOpt with
-                                | Some t -> int64 t
-                                | None ->
-                                    let currentLastUsage = (ContextBudgetStore.get plan.Scope plan.SessionID).LastUsage
-                                    match ContextBudget.estimateTokens stableBytes currentLastUsage with
-                                    | Some t -> int64 t
-                                    | None -> int64 currentTokens
-
-                            let backlogBytes = ContextBudgetUsageCodec.backlogBytesFromEncoded backlogOps.Host stableEncoded
-                            let newState = ContextBudget.beginPhase stableTokens (int64 stableBytes) (int64 backlogBytes)
-
-                            ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
-                                { entry with
-                                    State = Some newState
-                                    LastBacklog = backlog
-                                    NudgeInjected = false })
-                            return newState
-                        else
-                            return currentStore.State.Value
-                    }
-
-                let state_c = state.backlogTokensAtPhaseStart
-                let state_s = state.phaseBaseTokens - state_c
-
-                if ContextBudget.isCompactingRequired state.phaseBaseTokens (int64 plan.MaxInputTokens) then
-                    return messages
-                elif ContextBudget.F (int64 currentTokens) (int64 plan.MaxInputTokens) state_c state_s then
-                    let updatedStore = ContextBudgetStore.get plan.Scope plan.SessionID
-                    if updatedStore.NudgeInjected then
-                        return messages
-                    else
-                        ContextBudgetStore.update plan.Scope plan.SessionID (fun entry ->
-                            { entry with NudgeInjected = true })
-                        return List.append messages [ buildContextBudgetNudgeMessage plan.SessionID ]
-                else
-                    return messages
+                let! state = rebuildPhaseState plan backlogOps backlog currentStore encodeMessages currentTokens totalBytes
+                return checkAndInjectNudge plan currentTokens state messages
     }
 
 let runMessageTransformPipeline

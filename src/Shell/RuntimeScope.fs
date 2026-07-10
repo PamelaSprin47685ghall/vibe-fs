@@ -11,6 +11,7 @@ type RuntimeScope() =
     let projection = ProjectionStore()
     let mutable initPromise: JS.Promise<unit> option = None
     let mutable onInit: (string -> JS.Promise<unit>) option = None
+    let mutable randomGen: unit -> float = fun () -> JS.Math.random ()
     let mutable capsFiles = Map.empty<string, CapsFile list>
     let mutable capsInflight = Map.empty<string, JS.Promise<CapsFile list>>
     let iteratorStore = createTypedIteratorStore 200
@@ -19,6 +20,8 @@ type RuntimeScope() =
     let mutable extState = Map.empty<string, obj>
     let mutable tempFilesByPrompt = Map.empty<string, string list>
     let mutable childSessionCounter = 0
+
+    member _.RandomGen with get() = randomGen and set(v) = randomGen <- v
 
     member _.NextChildSessionId() : int =
         childSessionCounter <- childSessionCounter + 1

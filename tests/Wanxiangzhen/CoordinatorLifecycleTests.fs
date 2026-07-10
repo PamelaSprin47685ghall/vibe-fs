@@ -241,7 +241,7 @@ let entries () : (string * (unit -> JS.Promise<unit>)) list =
                let evtSquadCreated = SquadCreated("squad-session-001", "add remember-me")
 
                let evtTasksCreated =
-                   TasksCreated("squad-session-001", [ ("squad-a1b2", "Task A", "desc A", []) ])
+                    TasksCreated("squad-session-001", [ { taskId = "squad-a1b2"; title = "Task A"; description = "desc A"; dependsOn = [] } ])
 
                let evtTaskStarted =
                    TaskStarted("squad-session-001", "squad-a1b2", "/wt/squad-a1b2", "squad-a1b2")

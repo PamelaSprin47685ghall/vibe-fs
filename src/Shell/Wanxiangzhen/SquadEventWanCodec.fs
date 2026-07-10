@@ -19,25 +19,29 @@ let private payloadOpt (payload: Map<string, string>) (key: string) : string opt
     |> Map.tryFind key
     |> Option.bind (fun s -> if s = "" then None else Some s)
 
-let private encodeTasks (tasks: (string * string * string * string list) list) : string =
+let private encodeTasks (tasks: TaskItem list) : string =
     let rows =
         tasks
-        |> List.map (fun (tid, title, desc, deps) ->
-            { task_id = tid
-              title = title
-              description = desc
-              depends_on = if deps = [] then None else Some deps })
+        |> List.map (fun item ->
+            { task_id = item.taskId
+              title = item.title
+              description = item.description
+              depends_on = if item.dependsOn = [] then None else Some item.dependsOn })
 
     Encode.Auto.toString (4, rows)
 
-let private decodeTasks (json: string) : (string * string * string * string list) list =
+let private decodeTasks (json: string) : TaskItem list =
     if json = "" then
         []
     else
         match Decode.Auto.fromString<TaskRow list> json with
         | Ok rows ->
             rows
-            |> List.map (fun r -> (r.task_id, r.title, r.description, r.depends_on |> Option.defaultValue []))
+            |> List.map (fun r ->
+                { taskId = r.task_id
+                  title = r.title
+                  description = r.description
+                  dependsOn = r.depends_on |> Option.defaultValue [] })
         | Error _ -> []
 
 let squadEventToWanEvent (at: string) (e: SquadEvent) : WanEvent =

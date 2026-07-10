@@ -20,7 +20,7 @@ let createWithDeps
     : JS.Promise<CoordinatorRuntime> =
     promise {
         let token =
-            System.String([| for _ in 0..31 -> "0123456789abcdef".[int (JS.Math.random () * 16.0)] |])
+            System.String([| for _ in 0..31 -> "0123456789abcdef".[int (deps.RandomGen () * 16.0)] |])
 
         let rtRef = ref None
 
@@ -46,6 +46,7 @@ let createWithDeps
               Token = token
               CoordinatorUrl = server.Url
               GitQueue = SerialQueue()
+              DagQueue = SerialQueue()
               InjectQueue = SerialQueue()
               Server = server
               Scheduling = false

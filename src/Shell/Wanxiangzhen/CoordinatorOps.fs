@@ -22,6 +22,12 @@ open Wanxiangshu.Shell.Wanxiangzhen.SymlinkShell
 open Wanxiangshu.Kernel.Yaml
 open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorRuntime
 
+[<Import("dirname", "node:path")>]
+let private pathDirname (p: string) : string = jsNative
+
+[<Import("join", "node:path")>]
+let private pathJoin (a: string) (b: string) : string = jsNative
+
 [<Global("process")>]
 let private nodeProcess: obj = jsNative
 
@@ -59,12 +65,9 @@ let private startTask (rt: CoordinatorRuntime) (taskId: string) : JS.Promise<uni
                 let! _ = commitEvent rt (TaskError(rt.Dag.SessionId, taskId, errorMessage))
                 return ()
 
-            let parent =
-                let lastSlash = rt.ProjectRoot.LastIndexOf '/'
-                rt.ProjectRoot.Substring(0, lastSlash + 1)
-
+            let parent = pathDirname rt.ProjectRoot
             let branchName = resolveBranchName rt taskId 5
-            let wtPath = parent + "worktree-" + branchName
+            let wtPath = pathJoin parent ("worktree-" + branchName)
 
             match rt.Deps.TryWorktreeAdd rt.ProjectRoot branchName wtPath rt.MasterBranch with
             | Error e ->
@@ -91,9 +94,12 @@ let private startTask (rt: CoordinatorRuntime) (taskId: string) : JS.Promise<uni
                     rt.Dag <-
                         rt.Dag
                         |> updateTask taskId (fun (t: SquadTask) ->
-                            { (withStatus t Running now) with
-                                WorktreePath = Some wtPath
-                                BranchName = Some branchName })
+                            match tryWithStatus t Running now with
+                            | Ok t2 ->
+                                { t2 with
+                                    WorktreePath = Some wtPath
+                                    BranchName = Some branchName }
+                            | Error _ -> t)
     }
 
 let schedulerTick (rt: CoordinatorRuntime) : JS.Promise<unit> =
@@ -112,7 +118,17 @@ let schedulerTick (rt: CoordinatorRuntime) : JS.Promise<unit> =
                 rt.Scheduling <- false
         }
 
-let handleSlaveExit (rt: CoordinatorRuntime) (taskId: string) : JS.Promise<unit> =
+let private cleanupAndReport (rt: CoordinatorRuntime) (task: SquadTask) : JS.Promise<unit> =
+    promise {
+        cleanupTask rt task
+        match rt.GitError with
+        | Some err ->
+            let! _ = commitEvent rt (TaskError(rt.Dag.SessionId, task.Id, sprintf "cleanup failed: %s" err))
+            rt.GitError <- None
+        | None -> ()
+    }
+
+let handleSlaveExitCore (rt: CoordinatorRuntime) (taskId: string) : JS.Promise<unit> =
     promise {
         match findTask taskId rt.Dag with
         | None -> return ()
@@ -124,18 +140,24 @@ let handleSlaveExit (rt: CoordinatorRuntime) (taskId: string) : JS.Promise<unit>
             | Error _ -> return ()
             | Ok() ->
                 let now = rt.Deps.Now()
-                rt.Dag <- rt.Dag |> updateTask taskId (fun (t: SquadTask) -> withStatus t Done now)
-                cleanupTask rt task
+                rt.Dag <- rt.Dag |> updateTask taskId (fun (t: SquadTask) ->
+                    match tryWithStatus t Done now with
+                    | Ok t2 -> t2
+                    | Error _ -> t)
+                do! cleanupAndReport rt task
                 do! schedulerTick rt
     }
 
-let safeKillPid (deps: CoordinatorDeps) (pid: int) : unit =
-    try
-        deps.KillPid pid (box "SIGTERM")
-    with _ ->
-        ()
+let handleSlaveExit (rt: CoordinatorRuntime) (taskId: string) : JS.Promise<unit> =
+    rt.DagQueue.Enqueue(fun () -> handleSlaveExitCore rt taskId)
 
-let handleSubmit (rt: CoordinatorRuntime) (taskId: string) (reportedSha: string) : JS.Promise<HttpResponse> =
+let safeKillPid (rt: CoordinatorRuntime) (pid: int) : unit =
+    try
+        rt.Deps.KillPid pid (box "SIGTERM")
+    with ex ->
+        rt.GitError <- Some(sprintf "kill pid %d failed: %s" pid (string ex.Message))
+
+let private handleSubmitCore (rt: CoordinatorRuntime) (taskId: string) (reportedSha: string) : JS.Promise<HttpResponse> =
     match findTask taskId rt.Dag with
     | None ->
         Promise.lift
@@ -158,7 +180,10 @@ let handleSubmit (rt: CoordinatorRuntime) (taskId: string) (reportedSha: string)
                       Body = encodeResult "event_log_failed" }
             | Ok() ->
                 let now = rt.Deps.Now()
-                rt.Dag <- rt.Dag |> updateTask taskId (fun (t: SquadTask) -> withStatus t Submitted now)
+                rt.Dag <- rt.Dag |> updateTask taskId (fun (t: SquadTask) ->
+                    match tryWithStatus t Submitted now with
+                    | Ok t2 -> t2
+                    | Error _ -> t)
 
                 let! result =
                     rt.GitQueue.Enqueue(fun () ->
@@ -187,36 +212,42 @@ let handleSubmit (rt: CoordinatorRuntime) (taskId: string) (reportedSha: string)
                     let! mCommit = commitEvent rt (TaskMerged(rt.Dag.SessionId, taskId, sha))
 
                     match mCommit with
-                    | Error _ ->
-                        let n2 = rt.Deps.Now()
-                        rt.Dag <- rt.Dag |> updateTask taskId (fun (t: SquadTask) -> withStatus t Running n2)
+                    | Error err ->
+                        do! commitEvent rt (TaskError(rt.Dag.SessionId, taskId, sprintf "git merged but event log write failed: %s" err)) |> Promise.map ignore
                     | Ok() ->
                         let n2 = rt.Deps.Now()
 
                         rt.Dag <-
                             rt.Dag
                             |> updateTask taskId (fun (t: SquadTask) ->
-                                { (withStatus t SquadTaskStatus.Merged n2) with
-                                    MergedSha = Some sha })
+                                match tryWithStatus t SquadTaskStatus.Merged n2 with
+                                | Ok t2 -> { t2 with MergedSha = Some sha }
+                                | Error _ -> t)
 
                     match findTask taskId rt.Dag with
                     | Some t ->
                         match t.SlavePid with
                         | Some pid ->
-                            safeKillPid rt.Deps pid
+                            safeKillPid rt pid
                             do! rt.Deps.WaitForPidDeath pid 5
                         | None -> ()
 
-                        cleanupTask rt t
+                        do! cleanupAndReport rt t
                     | None -> ()
 
                     do! schedulerTick rt
                 | _ ->
                     let n2 = rt.Deps.Now()
-                    rt.Dag <- rt.Dag |> updateTask taskId (fun (t: SquadTask) -> withStatus t Running n2)
+                    rt.Dag <- rt.Dag |> updateTask taskId (fun (t: SquadTask) ->
+                        match tryWithStatus t Running n2 with
+                        | Ok t2 -> t2
+                        | Error _ -> t)
                     do! schedulerTick rt
 
                 return
                     { StatusCode = 200
                       Body = encodeFfResponseBody result }
         }
+
+let handleSubmit (rt: CoordinatorRuntime) (taskId: string) (reportedSha: string) : JS.Promise<HttpResponse> =
+    rt.DagQueue.Enqueue(fun () -> handleSubmitCore rt taskId reportedSha)

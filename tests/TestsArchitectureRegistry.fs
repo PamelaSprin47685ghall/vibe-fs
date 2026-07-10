@@ -3,6 +3,7 @@ module Wanxiangshu.Tests.TestsArchitectureRegistry
 open Fable.Core
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Tests.ArchitectureTestsFoundation
+open Wanxiangshu.Tests.ArchitectureTestsFoundationB
 open Wanxiangshu.Tests.ArchitectureTestsTreeSitter
 open Wanxiangshu.Tests.ArchitectureTestsMessageTransform
 open Wanxiangshu.Tests.ArchitectureTestsMessageTransformCaps
@@ -44,9 +45,9 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       "ArchitectureTests.eventLogUsesAdvisoryFlock", Sync(sync ArchitectureTestsFoundation.eventLogUsesAdvisoryFlock)
       "ArchitectureTests.ompBoundary", Sync(sync ArchitectureTestsFoundation.ompBoundary)
       "ArchitectureTests.ompNoEngineRef", Sync(sync ArchitectureTestsFoundation.ompNoEngineRef)
-      "ArchitectureTests.noQuadraticListAppend", Sync(sync ArchitectureTestsFoundation.noQuadraticListAppend)
+      "ArchitectureTests.noQuadraticListAppend", Sync(sync ArchitectureTestsFoundationB.noQuadraticListAppend)
       "ArchitectureTests.parallelToolPromptSSOTGuard",
-      Sync(sync ArchitectureTestsFoundation.parallelToolPromptSSOTGuard)
+      Sync(sync ArchitectureTestsFoundationB.parallelToolPromptSSOTGuard)
       "ArchitectureTests.noDuplicateStateHolder", Sync(sync ArchitectureTestsFoundation.noDuplicateStateHolder)
       "ArchitectureTests.noDuplicateRunNudgeFlowCore",
       Sync(sync ArchitectureTestsFoundation.noDuplicateRunNudgeFlowCore)
@@ -186,7 +187,10 @@ let architectureTestEntriesPartA () : (string * TestBody) list =
       "ArchitectureTests.messageTransformUsesMessageTransformCore",
       Sync(sync ArchitectureTestsWirePipeline.messageTransformUsesMessageTransformCore)
       "ArchitectureTests.messageTransformUsesPipeline",
-      Sync(sync ArchitectureTestsWirePipeline.messageTransformUsesPipeline) ]
+      Sync(sync ArchitectureTestsWirePipeline.messageTransformUsesPipeline)
+      "ArchitectureTests.wanxiangzhenBoundary", Sync(sync ArchitectureTestsFoundationB.wanxiangzhenBoundary)
+      "ArchitectureTests.wanxiangzhenGitQueue", Sync(sync ArchitectureTestsFoundationB.wanxiangzhenGitQueue)
+      "ArchitectureTests.wanxiangzhenReconcile", Sync(sync ArchitectureTestsFoundationB.wanxiangzhenReconcile) ]
 
 open Wanxiangshu.Tests.TestsArchitectureRegistryB
 

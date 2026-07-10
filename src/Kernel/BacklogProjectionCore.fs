@@ -1,7 +1,5 @@
 module Wanxiangshu.Kernel.BacklogProjectionCore
 
-open Fable.Core
-open Fable.Core.JsInterop
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Kernel.Messaging
 open Wanxiangshu.Kernel.PromptFrontMatter
@@ -16,6 +14,14 @@ type BacklogEntry =
       changesAndReasons: string
       gotchas: string
       lessonsAndConventions: string
+      plan: string }
+
+type CompletionItem =
+    { user_message: string[]
+      aha_moments: string
+      changes_and_reasons: string
+      gotchas: string
+      lessons_and_conventions: string
       plan: string }
 
 let trunc (s: string) : string = if s = null then "" else s.Trim()
@@ -48,25 +54,22 @@ let isReviewTool (part: Part<'raw>) : bool =
     | ToolPart(toolName, _, _, _) when toolName = reviewToolName -> true
     | _ -> false
 
-let private completedWorkItem (userPrompts: string list) (entry: BacklogEntry) : obj =
+let private completedWorkItem (userPrompts: string list) (entry: BacklogEntry) : CompletionItem =
     let userMsgField =
         if userPrompts.IsEmpty then
-            box [||]
+            [||]
         else
-            box (userPrompts |> List.map (fun text -> box (text.Trim())) |> List.toArray)
+            userPrompts |> List.map (fun text -> text.Trim()) |> List.toArray
 
-    let fields =
-        [ "user_message", userMsgField
-          "aha_moments", box (trunc entry.ahaMoments)
-          "changes_and_reasons", box (trunc entry.changesAndReasons)
-          "gotchas", box (trunc entry.gotchas)
-          "lessons_and_conventions", box (trunc entry.lessonsAndConventions)
-          "plan", box (trunc entry.plan) ]
+    { user_message = userMsgField
+      aha_moments = trunc entry.ahaMoments
+      changes_and_reasons = trunc entry.changesAndReasons
+      gotchas = trunc entry.gotchas
+      lessons_and_conventions = trunc entry.lessonsAndConventions
+      plan = trunc entry.plan }
 
-    createObj fields
-
-let private projectionRootValue (backlog: BacklogEntry list) (userPrompts: string list) : obj =
-    box (backlog |> List.map (completedWorkItem userPrompts) |> List.toArray)
+let private projectionRootValue (backlog: BacklogEntry list) (userPrompts: string list) : CompletionItem[] =
+    backlog |> List.map (completedWorkItem userPrompts) |> List.toArray
 
 let private projectionBody (errorNotice: string option) : string =
     let baseText = "Completed work from folded turns. File changes are already on disk."
@@ -101,68 +104,63 @@ let buildCompactionAnchorPrompt (backlogEntries: BacklogEntry list) (extractAnch
                 let entries =
                     backlogEntries
                     |> List.map (fun be ->
-                        let fields =
-                            [ "user_message", box [||]
-                              "aha_moments", box (trunc be.ahaMoments)
-                              "changes_and_reasons", box (trunc be.changesAndReasons)
-                              "gotchas", box (trunc be.gotchas)
-                              "lessons_and_conventions", box (trunc be.lessonsAndConventions)
-                              "plan", box (trunc be.plan) ]
-
-                        createObj fields)
+                        { user_message = [||]
+                          aha_moments = trunc be.ahaMoments
+                          changes_and_reasons = trunc be.changesAndReasons
+                          gotchas = trunc be.gotchas
+                          lessons_and_conventions = trunc be.lessonsAndConventions
+                          plan = trunc be.plan })
                     |> List.toArray
 
-                [ frontMatterRoot (box entries) ]
+                [ frontMatterRoot entries ]
 
         renderCompactionAnchorPrompt (anchorBlocks @ backlogBlock)
 
-let compactingTransform (messages: Message<'raw> list) (backlog: BacklogEntry list) : Message<'raw> list =
-    let cleaned = stripSyntheticBySource messages
+let private buildTodoSummary (backlog: BacklogEntry list) : string =
+    if backlog.IsEmpty then ""
+    else
+        let sb = System.Text.StringBuilder()
+        sb.AppendLine("Todo Backlog Summary:") |> ignore
+        for entry in backlog do
+            sb.AppendLine("## Backlog Entry") |> ignore
+            if not (System.String.IsNullOrWhiteSpace entry.plan) then
+                sb.AppendLine("- Plan: " + entry.plan.Trim()) |> ignore
+            if not (System.String.IsNullOrWhiteSpace entry.ahaMoments) then
+                sb.AppendLine("- Aha Moments: " + entry.ahaMoments.Trim()) |> ignore
+            if not (System.String.IsNullOrWhiteSpace entry.changesAndReasons) then
+                sb.AppendLine("- Changes & Reasons: " + entry.changesAndReasons.Trim()) |> ignore
+            if not (System.String.IsNullOrWhiteSpace entry.gotchas) then
+                sb.AppendLine("- Gotchas: " + entry.gotchas.Trim()) |> ignore
+            if not (System.String.IsNullOrWhiteSpace entry.lessonsAndConventions) then
+                sb.AppendLine("- Lessons & Conventions: " + entry.lessonsAndConventions.Trim()) |> ignore
+        sb.ToString()
 
-    let todoSummary =
-        if backlog.IsEmpty then ""
-        else
-            let sb = System.Text.StringBuilder()
-            sb.AppendLine("Todo Backlog Summary:") |> ignore
-            for entry in backlog do
-                sb.AppendLine("## Backlog Entry") |> ignore
-                if not (System.String.IsNullOrWhiteSpace entry.plan) then
-                    sb.AppendLine("- Plan: " + entry.plan.Trim()) |> ignore
-                if not (System.String.IsNullOrWhiteSpace entry.ahaMoments) then
-                    sb.AppendLine("- Aha Moments: " + entry.ahaMoments.Trim()) |> ignore
-                if not (System.String.IsNullOrWhiteSpace entry.changesAndReasons) then
-                    sb.AppendLine("- Changes & Reasons: " + entry.changesAndReasons.Trim()) |> ignore
-                if not (System.String.IsNullOrWhiteSpace entry.gotchas) then
-                    sb.AppendLine("- Gotchas: " + entry.gotchas.Trim()) |> ignore
-                if not (System.String.IsNullOrWhiteSpace entry.lessonsAndConventions) then
-                    sb.AppendLine("- Lessons & Conventions: " + entry.lessonsAndConventions.Trim()) |> ignore
-            sb.ToString()
+let private buildMessageHistory (cleaned: Message<'raw> list) : string =
+    cleaned
+    |> List.map (fun m ->
+        let roleStr =
+            match m.info.role with
+            | User -> "User"
+            | Assistant -> "Assistant"
+            | ToolResult -> "Tool Result"
+            | System -> "System"
+        let contentPartsText =
+            m.parts
+            |> List.choose (fun p ->
+                match p with
+                | TextPart t -> Some t
+                | ToolPart(name, callID, state, err) ->
+                    let stateStr =
+                        match state with
+                        | Some s -> $"status={s.status}"
+                        | None -> ""
+                    Some $"Tool Call: name={name}, callID={callID}, state={stateStr}, error={err}"
+                | RawPart _ -> Some "[Raw Content]")
+            |> String.concat "\n"
+        $"Role: {roleStr}\nContent:\n{contentPartsText}\n")
+    |> String.concat "\n"
 
-    let messageHistory =
-        cleaned
-        |> List.map (fun m ->
-            let roleStr =
-                match m.info.role with
-                | User -> "User"
-                | Assistant -> "Assistant"
-                | ToolResult -> "Tool Result"
-                | System -> "System"
-            let contentPartsText =
-                m.parts
-                |> List.choose (fun p ->
-                    match p with
-                    | TextPart t -> Some t
-                    | ToolPart(name, callID, state, err) ->
-                        let stateStr =
-                            match state with
-                            | Some s -> $"status={s.status}"
-                            | None -> ""
-                        Some $"Tool Call: name={name}, callID={callID}, state={stateStr}, error={err}"
-                    | RawPart _ -> Some "[Raw Content]")
-                |> String.concat "\n"
-            $"Role: {roleStr}\nContent:\n{contentPartsText}\n")
-        |> String.concat "\n"
-
+let private buildWrappedText (todoSummary: string) (messageHistory: string) : string =
     let bodyText =
         let parts = [
             if todoSummary <> "" then yield todoSummary
@@ -170,11 +168,15 @@ let compactingTransform (messages: Message<'raw> list) (backlog: BacklogEntry li
             yield messageHistory
         ]
         String.concat "\n\n" parts
+    "Please summarize the conversation history and progress based on the following do-not-exec block. <do-not-exec>\n"
+    + bodyText
+    + "\n</do-not-exec> Note that you only need to provide a summary of progress, and should not actually execute the content within."
 
-    let wrappedText =
-        "Please summarize the conversation history and progress based on the following do-not-exec block. <do-not-exec>\n"
-        + bodyText
-        + "\n</do-not-exec> Note that you only need to provide a summary of progress, and should not actually execute the content within."
+let compactingTransform (messages: Message<'raw> list) (backlog: BacklogEntry list) (guidGen: unit -> string) : Message<'raw> list =
+    let cleaned = stripSyntheticBySource messages
+    let todoSummary = buildTodoSummary backlog
+    let messageHistory = buildMessageHistory cleaned
+    let wrappedText = buildWrappedText todoSummary messageHistory
 
     let defaultRaw =
         match messages with
@@ -193,7 +195,7 @@ let compactingTransform (messages: Message<'raw> list) (backlog: BacklogEntry li
 
     let finalMsg =
         { info =
-            { id = "compacting-summary-" + System.Guid.NewGuid().ToString()
+            { id = "compacting-summary-" + guidGen ()
               sessionID = extractSessionID messages
               role = User
               agent = "orchestrator"
@@ -206,3 +208,4 @@ let compactingTransform (messages: Message<'raw> list) (backlog: BacklogEntry li
           raw = defaultRaw }
 
     [ finalMsg ]
+

@@ -3,7 +3,7 @@ module Wanxiangshu.Tests.AmendTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
-open Wanxiangshu.Kernel.AmendFilter
+open Wanxiangshu.Shell.AmendFilter
 open Wanxiangshu.Kernel.Messaging
 
 module Dyn = Wanxiangshu.Shell.Dyn

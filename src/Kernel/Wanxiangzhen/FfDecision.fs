@@ -11,6 +11,7 @@ type SubmitOutcome =
     | Response of FfResult
     | TaskNotFound
     | CoordinatorUnreachable
+    | Unauthorized
     | LocalGitError of message: string
 
 let ffResultLabel (r: FfResult) : string =
@@ -38,4 +39,5 @@ let formatSubmitOutcome (masterBranch: string) (o: SubmitOutcome) : string =
     | TaskNotFound ->
         "Task not found on coordinator. The coordinator may have restarted and lost state. Report to user and stop."
     | CoordinatorUnreachable -> "Coordinator unreachable (crashed or port changed). Report to user and wait."
+    | Unauthorized -> "Authentication failed (token mismatch). The coordinator may have restarted. Report to user and stop."
     | LocalGitError msg -> sprintf "Local git error: %s. Fix the git issue and call submit_to_squad again." msg

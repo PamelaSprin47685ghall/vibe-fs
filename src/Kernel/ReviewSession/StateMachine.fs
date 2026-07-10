@@ -15,7 +15,33 @@ let transition (state: ReviewState) (command: ReviewCommand) : ReviewState * Rev
     | ReviewState.Locked _, Accept -> ReviewState.Accepted, Some ReviewEvent.Accepted
     | ReviewState.Locked _, RequestRevision feedback ->
         ReviewState.NeedsRevision feedback, Some(ReviewEvent.NeedsRevision feedback)
-    | _ -> state, None
+    // Inactive: only Activate is valid (matched above)
+    | ReviewState.Inactive, Submit
+    | ReviewState.Inactive, Lock _
+    | ReviewState.Inactive, Unlock
+    | ReviewState.Inactive, Accept
+    | ReviewState.Inactive, RequestRevision _ -> state, None
+    // Active: Submit/Lock/Accept/RequestRevision valid (above), Activate/Unlock invalid
+    | ReviewState.Active _, Activate _
+    | ReviewState.Active _, Unlock -> state, None
+    // Locked: Unlock/Accept/RequestRevision valid (above), Activate/Submit/Lock invalid
+    | ReviewState.Locked _, Activate _
+    | ReviewState.Locked _, Submit
+    | ReviewState.Locked _, Lock _ -> state, None
+    // Accepted: all commands invalid
+    | ReviewState.Accepted, Activate _
+    | ReviewState.Accepted, Submit
+    | ReviewState.Accepted, Lock _
+    | ReviewState.Accepted, Unlock
+    | ReviewState.Accepted, Accept
+    | ReviewState.Accepted, RequestRevision _ -> state, None
+    // NeedsRevision: all commands invalid
+    | ReviewState.NeedsRevision _, Activate _
+    | ReviewState.NeedsRevision _, Submit
+    | ReviewState.NeedsRevision _, Lock _
+    | ReviewState.NeedsRevision _, Unlock
+    | ReviewState.NeedsRevision _, Accept
+    | ReviewState.NeedsRevision _, RequestRevision _ -> state, None
 
 let isActive (state: ReviewState) : bool =
     match state with

@@ -1,16 +1,17 @@
 module Wanxiangshu.Tests.WanxiangzhenSquadEventTests
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadTask
 open Wanxiangshu.Kernel.Wanxiangzhen.Dag
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadEvent
 open Wanxiangshu.Kernel.Wanxiangzhen.SquadUpdateIdAssign
-open Fable.Core.JsInterop
 open Wanxiangshu.Shell.Wanxiangzhen.CoordinatorSquadUpdate
 
 let foldEventsMergedChain () =
     let events =
-        [ TasksCreated("s1", [ ("a", "t", "d", []) ])
+        [ TasksCreated("s1", [ { taskId = "a"; title = "t"; description = "d"; dependsOn = [] } ])
           TaskStarted("s1", "a", "/wt", "a")
           TaskSubmitted("s1", "a", "sha")
           TaskMerged("s1", "a", "sha") ]
@@ -25,7 +26,7 @@ let squadCreatedSetsRequirement () =
 let squadCancelledMarksNonTerminalCancelled () =
     let d0 =
         foldEvents
-            [ TasksCreated("s1", [ ("a", "t", "d", []) ])
+            [ TasksCreated("s1", [ { taskId = "a"; title = "t"; description = "d"; dependsOn = [] } ])
               TaskStarted("s1", "a", "/wt", "b") ]
             (empty "s1" "")
 
@@ -38,7 +39,7 @@ let assignTaskIdsReusesExplicitId () =
           RefExists = fun (_: string) -> false }
 
     match assignTaskIds Set.empty [ (Some "a", "t", "d", []) ] gen with
-    | Ok [ (id, _, _, _) ] -> equal "explicit id" "a" id
+    | Ok [ item ] -> equal "explicit id" "a" item.taskId
     | _ -> failwith "expected Ok"
 
 let detectCycleFindsABA () =
