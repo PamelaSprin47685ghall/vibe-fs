@@ -10,7 +10,10 @@ let strField (a: obj) (k: string) : string option =
 
 let optInt (a: obj) (k: string) : int option =
     let v = Dyn.get a k
-    if Dyn.isNullish v then None else Some(unbox<int> v)
+
+    if Dyn.isNullish v then None
+    elif Dyn.typeIs v "number" then Some(int (unbox<float> v))
+    else Some(unbox<int> v)
 
 let optBool (a: obj) (k: string) : bool option =
     let v = Dyn.get a k

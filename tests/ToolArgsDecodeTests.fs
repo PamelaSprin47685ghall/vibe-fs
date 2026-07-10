@@ -164,44 +164,6 @@ let decodeSubmitReviewOk () =
         equal "submit_review ok files" 1 sr.AffectedFiles.Length
     | _ -> check "submit_review ok" false
 
-let testCoerceUnknownToolArgsOk () =
-    registerToolParameterTypes
-        [ ("my_custom_tool", "count", SchemaType.SNumber)
-          ("my_custom_tool", "verbose", SchemaType.SBoolean)
-          ("my_custom_tool", "items", SchemaType.SArray)
-          ("my_custom_tool", "config", SchemaType.SObject)
-          ("my_custom_tool", "name", SchemaType.SString) ]
-
-    let args =
-        createObj
-            [ "count", box "42"
-              "verbose", box "true"
-              "items", box """["a","b"]"""
-              "config", box """{"key":"val"}"""
-              "name", box "hello" ]
-
-    coerceArgsTypes "my_custom_tool" args
-
-    let count = Dyn.get args "count"
-    check "custom number coerced" (not (Dyn.typeIs count "string"))
-    check "custom number value" (unbox<int> count = 42)
-
-    let verbose = Dyn.get args "verbose"
-    check "custom boolean coerced" (not (Dyn.typeIs verbose "string"))
-    check "custom boolean value" (unbox<bool> verbose = true)
-
-    let items = Dyn.get args "items"
-    check "custom array coerced" (not (Dyn.typeIs items "string"))
-    check "custom array is array" (Dyn.isArray items)
-
-    let config = Dyn.get args "config"
-    check "custom object coerced" (not (Dyn.typeIs config "string"))
-    check "custom object is object" (Dyn.typeIs config "object")
-
-    let name = Dyn.get args "name"
-    check "string field not coerced" (Dyn.typeIs name "string")
-    check "string field preserved" (unbox<string> name = "hello")
-
 let testSanitizeNullArgs () =
     let args =
         createObj
@@ -224,43 +186,6 @@ let testSanitizeNullArgs () =
     check "what_to_summarize kept" (Array.contains "what_to_summarize" keys)
     check "non_empty_obj kept" (Array.contains "non_empty_obj" keys)
 
-let testCoerceArgsTypesOk () =
-    let readArgs =
-        createObj [ "path", box "a.txt"; "offset", box "123"; "limit", box "456" ]
-
-    coerceArgsTypes "read" readArgs
-
-    let fetchArgs = createObj [ "url", box "http://localhost"; "timeout", box "15" ]
-
-    coerceArgsTypes "webfetch" fetchArgs
-
-    let intentsJson =
-        """[{"objective":"fix bug","background":"test","targets":[{"file":"a.ts","guide":"fix it"}]}]"""
-
-    let coderArgs =
-        createObj
-            [ "intents", box intentsJson
-              "tdd", box "red"
-              "warn_tdd", box "i-am-sure-i-have-followed-tdd-and-kolmolgorov-principles-and-kept-todo-updated" ]
-
-    coerceArgsTypes "coder" coderArgs
-
-    match decodeToolInvocation "read" readArgs with
-    | Ok(Typed(ToolArgs.Read r)) ->
-        check "read offset coerced" (r.Offset = Some 123)
-        check "read limit coerced" (r.Limit = Some 456)
-    | _ -> check "read coerced failed" false
-
-    match decodeToolInvocation "webfetch" fetchArgs with
-    | Ok(Typed(ToolArgs.Webfetch w)) -> check "webfetch timeout coerced" (w.Timeout = Some 15)
-    | _ -> check "webfetch coerced failed" false
-
-    match decodeToolInvocation "coder" coderArgs with
-    | Ok(CoderBatch [ intent ]) ->
-        check "coder intents coerced objective" (intent.objective = "fix bug")
-        check "coder intents coerced file" (intent.targets.Head.file = "a.ts")
-    | _ -> check "coder coerced failed" false
-
 let run () =
     decodeCoderBatchOk ()
     decodeInvestigatorBatchOk ()
@@ -278,5 +203,3 @@ let run () =
     decodeSubmitReviewMissingReport ()
     decodeSubmitReviewOk ()
     testSanitizeNullArgs ()
-    testCoerceArgsTypesOk ()
-    testCoerceUnknownToolArgsOk ()

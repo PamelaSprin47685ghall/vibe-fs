@@ -47,6 +47,7 @@ open Wanxiangshu.Tests.ContextBudgetRealApiSpecs
 open Wanxiangshu.Tests.ExecutorToolsCodecTests
 open Wanxiangshu.Tests.ExecutorTests
 open Wanxiangshu.Tests.ToolArgsDecodeTests
+open Wanxiangshu.Tests.ToolArgsCoerceTests
 open Wanxiangshu.Tests.ToolResultWireTests
 open Wanxiangshu.Tests.SubagentToolExecuteTests
 open Wanxiangshu.Tests.FileToolsCodecTests

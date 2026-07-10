@@ -11,6 +11,7 @@ open Wanxiangshu.Shell.ToolExecute
 open Wanxiangshu.Shell.ToolContextCodec
 open Wanxiangshu.Kernel.ToolResult
 open Wanxiangshu.Kernel.ToolCatalog
+open Thoth.Json
 
 /// Schema-level type for a single tool parameter field.
 /// Used by the generic coerceArgsTypes to replace the ad-hoc whitelist.
@@ -221,34 +222,36 @@ let private canonicalToolName (toolName: string) : string =
     | "todowrite" -> "todowrite"
     | other -> other
 
-let private tryParseJsonString (s: string) : obj option =
+let private tryCoerceStringValue (expected: SchemaType) (s: string) : obj option =
     let trimmed = s.Trim()
 
-    if
-        (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
-        || (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
-    then
-        try
-            Some(JS.JSON.parse s)
-        with _ ->
-            None
-    else
-        None
-
-let private tryCoerceStringValue (expected: SchemaType) (s: string) : obj option =
     match expected with
+    | SString -> None
     | SNumber ->
-        match System.Int32.TryParse s with
-        | true, n -> Some(box n)
+        match System.Double.TryParse trimmed with
+        | true, d -> Some(box d)
         | _ -> None
     | SBoolean ->
-        match s.Trim().ToLowerInvariant() with
+        match trimmed.ToLowerInvariant() with
         | "true" -> Some(box true)
         | "false" -> Some(box false)
         | _ -> None
-    | SArray
-    | SObject -> tryParseJsonString s
-    | SString -> None
+    | SObject ->
+        match Decode.Auto.fromString<obj> trimmed with
+        | Ok parsed ->
+            if
+                not (Dyn.isNullish parsed)
+                && Dyn.typeIs parsed "object"
+                && not (Dyn.isArray parsed)
+            then
+                Some parsed
+            else
+                None
+        | Error _ -> None
+    | SArray ->
+        match Decode.Auto.fromString<obj> trimmed with
+        | Ok parsed -> if Dyn.isArray parsed then Some parsed else None
+        | Error _ -> None
 
 /// Pre-process tool args: coerce string-encoded numbers to numbers,
 /// parse JSON-stringified arrays/objects, etc.

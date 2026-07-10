@@ -22,6 +22,7 @@ open Wanxiangshu.Tests.MethodologyTests
 open Wanxiangshu.Tests.TitleFetchGuardTests
 open Wanxiangshu.Tests.TestsTestBody
 open Wanxiangshu.Tests.ReviewReplaySyncTests
+open Wanxiangshu.Tests.ToolArgsCoerceTests
 open Wanxiangshu.Tests.CapsSynthCommonTests
 open Wanxiangshu.Tests.CapsFileCacheTests
 open Wanxiangshu.Tests.CapsFormatTests
@@ -78,6 +79,7 @@ let codecTestEntries () : (string * TestBody) list =
       "SubagentPromptBuildTests.run", Sync(sync SubagentPromptBuildTests.run)
       "SubagentSpawnTests.run", Async SubagentSpawnTests.run
       "ToolArgsDecodeTests.run", Sync(sync ToolArgsDecodeTests.run)
+      "ToolArgsCoerceTests.run", Sync(sync ToolArgsCoerceTests.run)
       "ToolResultWireTests.run", Sync(sync ToolResultWireTests.run)
       "SubagentToolExecuteTests.run", Async SubagentToolExecuteTests.run
       "WebToolsCodecTests.run", Sync(sync WebToolsCodecTests.run)
