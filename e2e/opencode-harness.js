@@ -21,12 +21,12 @@ function getPluginPath(variant) {
   return p;
 }
 
-function gitInit(dir) {
+function gitInit(dir, agentsContent = '- e2e test workspace\n') {
   execSync('git init', { cwd: dir, stdio: 'ignore' });
   execSync('git config user.email test@example.com', { cwd: dir, stdio: 'ignore' });
   execSync('git config user.name test', { cwd: dir, stdio: 'ignore' });
   fs.writeFileSync(path.join(dir, 'README.md'), '# test\n');
-  fs.writeFileSync(path.join(dir, 'AGENTS.md'), '- e2e test workspace\n');
+  fs.writeFileSync(path.join(dir, 'AGENTS.md'), agentsContent);
   execSync('git add README.md AGENTS.md', { cwd: dir, stdio: 'ignore' });
   execSync('git commit -m init', { cwd: dir, stdio: 'ignore' });
 }
@@ -57,7 +57,7 @@ export async function start(opts = {}) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-e2e-'));
   const workDir = path.join(home, 'workspace');
   fs.mkdirSync(workDir, { recursive: true });
-  gitInit(workDir);
+  gitInit(workDir, opts.agentsContent);
 
   const messages = opts.messages || [];
   const client = buildMockClient(messages, opts);
@@ -224,6 +224,7 @@ export async function start(opts = {}) {
     },
 
     getReviewStore() { return result.__reviewStore || null; },
+    getFallbackRuntime() { return result.__fallbackRuntime || null; },
 
     // Parts text extraction from output.parts ------------------------------
     readPartsText(output) {

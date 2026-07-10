@@ -695,6 +695,7 @@
     <Compile Include="e2e/MuxTests.fs"/>
     <Compile Include="e2e/OpencodePluginTestsPart2.fs"/>
     <Compile Include="e2e/OpencodePluginTestsPart3.fs"/>
+    <Compile Include="e2e/OpencodePluginSubagentRecoveryTests.fs"/>
     <Compile Include="e2e/OpencodePluginNudgeTests.fs"/>
     <Compile Include="e2e/OpencodePluginTests.fs"/>
     <Compile Include="e2e/MimocodePluginSpecsPart.fs"/>

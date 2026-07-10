@@ -46,6 +46,19 @@
 
 `SubagentIteratorStoreTests`、`IntegrationSubagentSpecs`、`ArchitectureTestsSubagent*`。
 
+## 恢复错误与子会话完成协议
+
+`session.prompt` 网络错误（`ECONNREFUSED`、`network connection lost` 等）是**可恢复中间事实**，不等于子会话终态。Fallback 系统可能已启动重试（`FallbackPhase.Retrying`），但子会话本身可能已完成工作（`TaskComplete=true`）。
+
+**完成协议**：父工具（`continue`、`coder`、`investigator` 等）返回必须发生在终态之后：
+- `TaskComplete=true`（子会话明确完成）
+- `FallbackPhase.Exhausted`（重试链耗尽）
+- 明确不可恢复失败（如 `MessageAborted`、`ClientCancellation`）
+
+**等待门**：`waitForSubagentSettle` 在 `FallbackPhase.Retrying` 时保持等待，**但当 `TaskComplete=true` 时必须释放**。终态事实覆盖残留相位——相位是过程，终态是结果。
+
+**测试纪律**：验证事件顺序（状态转换、promise resolve 时机），不验证文本内容或固定时间。使用 `yieldMicrotask`、`Promise.create` 事件门闩、状态断言，禁用 `Promise.sleep`、`Date.now`。
+
 ## 相关
 
 - [08-tools-and-permissions.md](./08-tools-and-permissions.md)

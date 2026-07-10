@@ -70,7 +70,14 @@ let waitForToolCallTextRecovery (runtime: FallbackRuntimeState) (sessionID: stri
 /// True when fallback work is actively in progress or the session is busy in any way.
 /// Maps to `NeedFallbackContinue` in the gate model.
 let fallbackGateOpen (runtime: FallbackRuntimeState) (sessionID: string) : bool =
-    if runtime.IsEventHandlingActive sessionID then
+    let taskComplete =
+        match runtime.TryGetState sessionID with
+        | Some state -> state.TaskComplete
+        | None -> false
+
+    if taskComplete then
+        false
+    elif runtime.IsEventHandlingActive sessionID then
         true
     elif runtime.IsAwaitingBusy sessionID then
         true

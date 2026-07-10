@@ -3,9 +3,12 @@ module Wanxiangshu.E2e.OpencodePluginNudgeTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Tests.Assert
+open Wanxiangshu.Tests.AsyncFlush
 open Wanxiangshu.E2e.OpencodePluginTestsPart2
+open Wanxiangshu.E2e.OpencodePluginSubagentRecoveryTests
 
 module Dyn = Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.Dyn
 
 let runNudgeTests
     (harness: Harness)
@@ -204,6 +207,8 @@ let runNudgeTests
         do! Promise.sleep 100
         do! bug1Harness.dispose ()
         chk "op.bug1.loopActiveEmptyTextTriggersNudge" (bug1PromptCalls >= 1)
+
+        do! Wanxiangshu.E2e.OpencodePluginSubagentRecoveryTests.run startHarness chk createEmpty
 
         return summary ()
     }

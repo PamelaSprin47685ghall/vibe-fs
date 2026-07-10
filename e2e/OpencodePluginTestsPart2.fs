@@ -25,6 +25,7 @@ type Harness =
     abstract fireEvent: obj -> JS.Promise<obj>
     abstract fireStreamAbort: string -> JS.Promise<obj>
     abstract getReviewStore: unit -> obj
+    abstract getFallbackRuntime: unit -> obj
     abstract readPartsText: obj -> string
     abstract readFile: string -> string
     abstract fileExists: string -> bool

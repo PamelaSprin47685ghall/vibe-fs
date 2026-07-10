@@ -252,6 +252,23 @@ let waitForSubagentSettle_nestedGateLoopResolvesInOrder () =
         check "resolved after terminal observation" resolved.Value
     }
 
+/// Regression: TaskComplete=true must override residual Retrying phase.
+/// Terminal fact (TaskComplete) is the result; phase is the process.
+let isSubagentSettled_trueWhenTaskCompleteDespiteRetrying () =
+    let rt = FallbackRuntimeState()
+    let sid = "t-sess-retrying-complete"
+    let s0 = rt.GetOrCreateState sid
+
+    rt.UpdateState
+        sid
+        { s0 with
+            Phase = FallbackPhase.Retrying 1
+            TaskComplete = true }
+
+    rt.SetConsumed sid true
+
+    check "TaskComplete=true overrides Retrying → settled" (isSubagentSettled rt sid)
+
 let run () =
     promise {
         isSettled_falseWhenFresh ()
@@ -271,4 +288,5 @@ let run () =
         do! waitForSubagentSettle_waitsUntilAwaitingBusyInactive ()
         isSubagentSettled_trueWhenConsumedFalseAndIdle ()
         do! waitForSubagentSettle_nestedGateLoopResolvesInOrder ()
+        isSubagentSettled_trueWhenTaskCompleteDespiteRetrying ()
     }

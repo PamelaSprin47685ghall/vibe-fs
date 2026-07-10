@@ -8,6 +8,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.ChildAgentRegistry
 open Wanxiangshu.Opencode.SubagentIo
+open Wanxiangshu.Kernel.Domain
 
 let private waitForListenerRegistered (runtime: FallbackRuntimeState) (sessionID: string) : JS.Promise<unit> =
     let rec poll () =
@@ -51,8 +52,7 @@ let runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () =
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
                                     promise { return box {| data = box {| id = childId |} |} })
                             )
-                            "prompt",
-                            box (System.Func<obj, JS.Promise<unit>>(fun _ -> promise { return () }))
+                            "prompt", box (System.Func<obj, JS.Promise<unit>>(fun _ -> promise { return () }))
                             "messages",
                             box (
                                 System.Func<obj, JS.Promise<obj>>(fun _ ->
@@ -110,5 +110,122 @@ let runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () =
         | Error _ -> failwith "expected Ok"
     }
 
+/// Regression: prompt network error → inner catch waitForSubagentSettle.
+/// With Phase=Retrying + TaskComplete=true, old impl hangs because
+/// fallbackGateOpen ignores TaskComplete. Must NOT hang; must extract text.
+let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let registry = ChildAgentRegistry.Create()
+        let childId = "child-retrying-complete"
+        registry.RegisterChildAgent(childId, "investigator", Some "parent-2")
+
+        let promptStartedResolver = ref (fun () -> ())
+
+        let promptStarted: JS.Promise<unit> =
+            Promise.create (fun resolve _ -> promptStartedResolver.Value <- resolve)
+
+        let promptReleaseResolver = ref (fun () -> ())
+
+        let promptRelease: JS.Promise<unit> =
+            Promise.create (fun resolve _ -> promptReleaseResolver.Value <- resolve)
+
+        let textExtracted = ref false
+
+        let finalMessagePart = createObj [ "type", box "text"; "text", box "final-output" ]
+
+        let finalMessage =
+            createObj
+                [ "info", box (createObj [ "role", box "assistant" ])
+                  "parts", box [| box finalMessagePart |] ]
+
+        let finalMessages = createObj [ "data", box [| box finalMessage |] ]
+
+        let session =
+            createObj
+                [ "create",
+                  box (
+                      System.Func<obj, JS.Promise<obj>>(fun _ ->
+                          promise { return box {| data = box {| id = childId |} |} })
+                  )
+                  "prompt",
+                  box (
+                      System.Func<obj, JS.Promise<unit>>(fun _ ->
+                          promise {
+                              promptStartedResolver.Value()
+                              do! promptRelease
+                              return! Promise.reject (exn "network connection lost")
+                          })
+                  )
+                  "messages",
+                  box (
+                      System.Func<obj, JS.Promise<obj>>(fun _ ->
+                          textExtracted.Value <- true
+                          Promise.lift finalMessages)
+                  )
+                  "abort", box (System.Func<obj, JS.Promise<unit>>(fun _ -> Promise.lift ())) ]
+
+        let client = createObj [ "session", box session ]
+
+        let runP =
+            runSubagentCoreResult
+                rt
+                registry
+                client
+                "investigator"
+                "Test"
+                "go"
+                "/tmp"
+                "parent-2"
+                (box null)
+                (box null)
+                false
+                (Some childId)
+
+        do! promptStarted
+
+        let s0 = rt.GetOrCreateState childId
+
+        rt.UpdateState
+            childId
+            { s0 with
+                Phase = FallbackPhase.Retrying 1 }
+
+        rt.SetTaskComplete childId true
+        rt.SetConsumed childId true
+        rt.ClearSubsessionPending childId
+
+        promptReleaseResolver.Value()
+        do! yieldMicrotask ()
+        do! yieldMicrotask ()
+        do! yieldMicrotask ()
+        do! yieldMicrotask ()
+        do! yieldMicrotask ()
+        do! yieldMicrotask ()
+        do! yieldMicrotask ()
+        do! yieldMicrotask ()
+
+        let completedBeforePhaseReset = textExtracted.Value
+
+        if not completedBeforePhaseReset then
+            let current = rt.GetOrCreateState childId
+
+            rt.UpdateState
+                childId
+                { current with
+                    Phase = FallbackPhase.Idle }
+
+        let! result = runP
+
+        check "completed before residual phase reset" completedBeforePhaseReset
+
+        match result with
+        | Ok text -> check "output contains final-output" (text.Contains "final-output")
+        | Error _ -> failwith "expected Ok result"
+    }
+
 let run () =
-    promise { do! runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve () }
+    promise {
+        do! runSubagentDoesNotExtractTextWhilePendingAfterEarlyPromptResolve ()
+        do! runSubagentCompletesDespiteRetryingPhaseAfterNetworkError ()
+    }
