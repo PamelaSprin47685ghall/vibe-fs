@@ -251,8 +251,7 @@ let runSubagentContinueResetsTaskComplete () =
             createObj
                 [ "create",
                   box (
-                      System.Func<obj, JS.Promise<obj>>(fun _ ->
-                          promise { return box {| data = box {| id = childId |} |} })
+                      System.Func<obj, JS.Promise<obj>>(fun _ -> Promise.lift (box {| data = box {| id = childId |} |}))
                   )
                   "prompt",
                   box (
@@ -260,7 +259,6 @@ let runSubagentContinueResetsTaskComplete () =
                           promise {
                               promptStartedResolver.Value()
                               do! yieldMicrotask ()
-                              return ()
                           })
                   )
                   "messages",

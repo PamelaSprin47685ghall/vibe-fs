@@ -134,9 +134,104 @@ let runSubagentOnExistingSessionResetsTaskComplete () =
         equal "OMP continue gets output" "(no output)" text
     }
 
+let runSubagentOnExistingSessionCompletesDespiteRetryingAfterNetworkError () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let childId = "omp-child-net-err"
+
+        let s0 = rt.GetOrCreateState childId
+
+        rt.UpdateState
+            childId
+            { s0 with
+                Phase = FallbackPhase.Retrying 1 }
+
+        let promptStartedResolver = ref (fun () -> ())
+
+        let promptStarted =
+            Promise.create (fun resolve _ -> promptStartedResolver.Value <- resolve)
+
+        let promptReleaseResolver = ref (fun () -> ())
+
+        let promptRelease =
+            Promise.create (fun resolve _ -> promptReleaseResolver.Value <- resolve)
+
+        let promptRejectedResolver = ref (fun () -> ())
+
+        let promptRejected =
+            Promise.create (fun resolve _ -> promptRejectedResolver.Value <- resolve)
+
+        let sessionManagerMock = createObj [ "getSessionId", box (fun () -> box childId) ]
+
+        let sessionMock =
+            createObj
+                [ "prompt",
+                  box (fun (_p: string) ->
+                      promise {
+                          promptStartedResolver.Value()
+                          do! promptRelease
+                          promptRejectedResolver.Value()
+                          return! Promise.reject (System.Exception("network connection lost"))
+                      })
+                  "waitForIdle", box (fun () -> Promise.lift ())
+                  "sessionManager", box sessionManagerMock ]
+
+        let scope = RuntimeScope()
+        scope.Add("omp_session_" + childId, sessionMock)
+
+        let pi = createObj []
+        let ctx = createObj [ "sessionId", box "parent-omp-session" ]
+
+        let config =
+            { DefaultChain =
+                [ { ProviderID = "test"
+                    ModelID = "test-model"
+                    Variant = None
+                    Temperature = None
+                    TopP = None
+                    MaxTokens = None
+                    ReasoningEffort = None
+                    Thinking = false } ]
+              AgentChains = Map.empty
+              MaxRetries = 2
+              LoopMaxContinues = 3
+              MaxRecoveries = 5 }
+
+        let runP =
+            Wanxiangshu.Omp.ChildSessionRegistry.runSubagentOnExistingSession
+                scope
+                pi
+                ctx
+                childId
+                "continue prompt"
+                None
+                rt
+                (Some config)
+
+        do! promptStarted
+        rt.SetConsumed childId true
+        rt.ClearSubsessionPending childId
+
+        promptReleaseResolver.Value()
+        do! promptRejected
+
+        do! yieldMicrotask ()
+        do! yieldMicrotask ()
+        let done_ = ref false
+        runP |> Promise.iter (fun _ -> done_.Value <- true) |> ignore
+        do! yieldMicrotask ()
+        check "OMP continue recovery blocks resolve before TaskComplete" (not done_.Value)
+
+        rt.SetTaskComplete childId true
+        let! text = runP
+        check "OMP continue recovery resolves after TaskComplete" done_.Value
+        equal "OMP continue recovery returns no-output" "(no output)" text
+    }
+
 let run () =
     promise {
         do! createChildSessionReviewToolNames ()
         do! createChildSessionRunnerToolNames ()
         do! runSubagentOnExistingSessionResetsTaskComplete ()
+        do! runSubagentOnExistingSessionCompletesDespiteRetryingAfterNetworkError ()
     }

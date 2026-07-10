@@ -11,6 +11,8 @@ open Wanxiangshu.Shell.OmpHostBindings
 open Wanxiangshu.Shell.FallbackRuntimeState
 open Wanxiangshu.Shell.FallbackRecoveryWait
 open Wanxiangshu.Shell.SubagentIo
+open Wanxiangshu.Shell.ErrorClassify
+open Wanxiangshu.Kernel.Domain
 open Wanxiangshu.Kernel.FallbackKernel.Types
 
 module Dyn = Wanxiangshu.Shell.Dyn
@@ -215,17 +217,41 @@ let runSubagentWithId
                     fallbackRuntime.UpdateState childId { initSt with TaskComplete = false }
                     fallbackRuntime.SetSubsessionPending childId true
 
-                do! sessionPrompt session prompt
-                do! sessionWaitForIdle session
+                try
+                    do! sessionPrompt session prompt
+                    do! sessionWaitForIdle session
 
-                if childId <> "" then
-                    fallbackRuntime.SetSubsessionPending childId false
+                    if childId <> "" then
+                        fallbackRuntime.SetSubsessionPending childId false
 
-                    if fallbackConfigOpt.IsSome then
-                        do! waitForSubagentSettle fallbackRuntime childId
+                        if fallbackConfigOpt.IsSome then
+                            do! waitForSubagentSettle fallbackRuntime childId
 
-                let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
-                return readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
+                    let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
+                    return readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
+                with err ->
+                    if childId <> "" && fallbackConfigOpt.IsSome then
+                        match translateJsError err with
+                        | MessageAborted
+                        | ClientCancellation _ ->
+                            fallbackRuntime.SetSubsessionPending childId false
+                            return abortedPrefix
+                        | other ->
+                            do! waitForSubagentSettle fallbackRuntime childId
+                            fallbackRuntime.SetSubsessionPending childId false
+
+                            let st = fallbackRuntime.GetOrCreateState childId
+
+                            let isSuccess =
+                                st.TaskComplete && st.Phase <> FallbackPhase.Exhausted && not st.Cancelled
+
+                            if isSuccess then
+                                let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
+                                return readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText
+                            else
+                                return! Promise.reject err
+                    else
+                        return! Promise.reject err
             }
 
         let cleanup () =

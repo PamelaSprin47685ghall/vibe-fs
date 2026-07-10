@@ -89,6 +89,8 @@ let ompTestEntries () : (string * TestBody) list =
       Async OmpChildSessionTests.createChildSessionRunnerToolNames
       "OmpChildSessionTests.runSubagentOnExistingSessionResetsTaskComplete",
       Async OmpChildSessionTests.runSubagentOnExistingSessionResetsTaskComplete
+      "OmpChildSessionTests.runSubagentOnExistingSessionCompletesDespiteRetryingAfterNetworkError",
+      Async OmpChildSessionTests.runSubagentOnExistingSessionCompletesDespiteRetryingAfterNetworkError
       "OmpRunnerTests.waitRunnerJobAfterAppendLog", Async OmpRunnerTests.waitRunnerJobAfterAppendLog
       "OmpRunnerTests.setRunnerJobStateForTestHasRunning", Sync(sync OmpRunnerTests.setRunnerJobStateForTestHasRunning)
       "OmpRunnerTests.abortRunnerJobClearsRunning", Sync(sync OmpRunnerTests.abortRunnerJobClearsRunning)
