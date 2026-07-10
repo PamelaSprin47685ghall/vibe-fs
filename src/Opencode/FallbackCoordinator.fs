@@ -26,15 +26,7 @@ type FallbackCoordinator
         | Some { EventType = "session.status"
                  Props = props } ->
             let statusObj = Dyn.get props "status"
-
-            let status =
-                let fromStatus = Dyn.str statusObj "status"
-
-                if fromStatus <> "" then
-                    fromStatus
-                else
-                    Dyn.str statusObj "type"
-
+            let status = resolveStatusValue statusObj
             let sid = getSessionID "session.status" props
 
             if sid <> "" && status = "busy" then

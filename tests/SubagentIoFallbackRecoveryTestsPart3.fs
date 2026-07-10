@@ -203,14 +203,9 @@ let runSubagentCompletesDespiteRetryingPhaseAfterNetworkError () =
         do! promptRejected
         check "continue error waits before completion" (not textExtracted.Value)
         rt.SetTaskComplete childId true
-        do! yieldMicrotask ()
-        do! yieldMicrotask ()
-        do! yieldMicrotask ()
-        do! yieldMicrotask ()
-        do! yieldMicrotask ()
-        do! yieldMicrotask ()
-        do! yieldMicrotask ()
-        do! yieldMicrotask ()
+
+        for _ in 1..8 do
+            do! yieldMicrotask ()
 
         let completedBeforePhaseReset = textExtracted.Value
 

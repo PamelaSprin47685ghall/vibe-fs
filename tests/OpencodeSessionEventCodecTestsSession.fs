@@ -197,6 +197,18 @@ let decodeLastAssistantReturnsLastTextAndAgent () =
     equal "text from last assistant" "answer" text
     equal "agent captured" (Some "coder") agent
 
+let decodeLastAssistantFallbackWhenFinishAndTimeMissing () =
+    let info =
+        box
+            {| role = "assistant"
+               agent = "coder" |}
+
+    let msg1 = messageOf (box {| role = "user" |}) (box [| part "ignored" |])
+    let msg2 = messageOf info (box [| part "answer" |])
+    let text, agent = decodeLastAssistant (box [| msg1; msg2 |])
+    equal "text from last assistant fallback" "answer" text
+    equal "agent captured fallback" (Some "coder") agent
+
 let decodeLastAssistantDetectsSyntheticAgent () =
     let info =
         box

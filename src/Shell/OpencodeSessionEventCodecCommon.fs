@@ -106,3 +106,16 @@ let isCompletedAssistantMessage (info: obj) : bool =
                     not (Dyn.isNullish timeCompleted) && Dyn.typeIs timeCompleted "number"
 
             isTerminalFinish || hasTimeCompleted
+
+let resolveStatusValue (statusObj: obj) : string =
+    if Dyn.isNullish statusObj then
+        ""
+    elif Dyn.typeIs statusObj "string" then
+        string statusObj
+    else
+        let fromStatus = Dyn.str statusObj "status"
+
+        if fromStatus <> "" then
+            fromStatus
+        else
+            Dyn.str statusObj "type"

@@ -38,8 +38,9 @@ let opencodeEventTranslator: IEventTranslator =
                 )
             elif eventType = "session.status" then
                 let statusObj = Dyn.get (getProps rawEvent) "status"
+                let status = resolveStatusValue statusObj
 
-                if Dyn.str statusObj "type" = "interrupted" then
+                if status = "interrupted" || status = "abort" then
                     Some(
                         FallbackEvent.SessionError
                             { ErrorName = "MessageAbortedError"
@@ -65,13 +66,13 @@ let opencodeEventTranslator: IEventTranslator =
 
             t = "session.idle"
             || (t = "session.status"
-                && Dyn.str (Dyn.get (getProps rawEvent) "status") "type" = "idle")
+                && resolveStatusValue (Dyn.get (getProps rawEvent) "status") = "idle")
 
         member _.IsSessionBusy rawEvent =
             let t = getEventType rawEvent
 
             t = "session.status"
-            && Dyn.str (Dyn.get (getProps rawEvent) "status") "type" = "busy"
+            && resolveStatusValue (Dyn.get (getProps rawEvent) "status") = "busy"
 
         member _.IsNewUserMessage rawEvent =
             getEventType rawEvent = "message.updated"

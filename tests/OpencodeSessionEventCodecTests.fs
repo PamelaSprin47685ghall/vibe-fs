@@ -29,6 +29,7 @@ let run () =
     recoverOpenTodosFromMessagesDropsTerminal ()
     decodeLastAssistantEmptyWhenNoCompletedAssistant ()
     decodeLastAssistantReturnsLastTextAndAgent ()
+    decodeLastAssistantFallbackWhenFinishAndTimeMissing ()
     decodeLastAssistantDetectsSyntheticAgent ()
     createPromptBodyWithoutAgent ()
     createPromptBodyWithAgent ()

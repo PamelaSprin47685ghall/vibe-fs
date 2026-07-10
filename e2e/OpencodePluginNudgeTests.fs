@@ -208,6 +208,66 @@ let runNudgeTests
         do! bug1Harness.dispose ()
         chk "op.bug1.loopActiveEmptyTextTriggersNudge" (bug1PromptCalls >= 1)
 
+        // --- 14. Bug2: loop active + missing finish/time + string status idle -> nudge loop ---
+        let mutable bug2PromptCalls = 0
+        let mutable bug2PromptText = ""
+
+        let bug2Msgs: obj array =
+            [| box (
+                   createObj
+                       [ "info",
+                         box (createObj [ "role", box "assistant"; "agent", box "build"; "id", box "msg-bug2-1" ])
+                         "parts", box [| box (createObj [ "type", box "text"; "text", box "work complete" ]) |] ]
+               ) |]
+
+        let bug2Opts =
+            createObj
+                [ "messages", box bug2Msgs
+                  "mockSessionClient",
+                  box (
+                      createObj
+                          [ "todo", box (fun _ -> Promise.lift (box {| data = [||] |}))
+                            "prompt",
+                            box (fun (arg: obj) ->
+                                bug2PromptCalls <- bug2PromptCalls + 1
+                                let body = Dyn.get arg "body"
+                                let parts = Dyn.get body "parts"
+
+                                if not (Dyn.isNullish parts) && Dyn.isArray parts then
+                                    let partsArr = unbox<obj array> parts
+                                    let firstPart = partsArr.[0]
+                                    bug2PromptText <- Dyn.str firstPart "text"
+
+                                Promise.lift (box {| ok = true |}))
+                            "create", box (fun _ -> Promise.lift (box {| data = {| id = "mock-review" |} |})) ]
+                  ) ]
+
+        let! bug2HarnessObj = startHarness bug2Opts
+        let bug2Harness = unbox<Harness> bug2HarnessObj
+
+        let! _ = bug2Harness.runCommandExecuteBefore "loop" "fix the bug"
+        do! Promise.sleep 50
+
+        // status is a string instead of object
+        let statusEvent =
+            box
+                {| event =
+                    box
+                        {| ``type`` = "session.status"
+                           properties =
+                            box
+                                {| sessionID = bug2Harness.sessionId
+                                   status = box "idle" |} |} |}
+
+        let! _ = bug2Harness.fireEvent statusEvent
+        do! Promise.sleep 100
+        do! bug2Harness.dispose ()
+        chk "op.bug2.loopActiveMissingFinishTriggersNudge" (bug2PromptCalls >= 1)
+
+        chk
+            "op.bug2.nudgeIsLoopNudge"
+            (bug2PromptText.Contains("You are in loop mode. You must call the submit_review"))
+
         do! Wanxiangshu.E2e.OpencodePluginContinueRecoveryTests.run startHarness chk createEmpty
 
         return summary ()

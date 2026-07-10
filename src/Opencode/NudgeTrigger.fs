@@ -32,17 +32,7 @@ type NudgeTrigger
         elif eventType = "session.error" then
             true
         elif eventType = "session.status" then
-            let statusObj = Dyn.get props "status"
-
-            let status =
-                let fromStatus = Dyn.str statusObj "status"
-
-                if fromStatus <> "" then
-                    fromStatus
-                else
-                    Dyn.str statusObj "type"
-
-            status = "idle"
+            resolveStatusValue (Dyn.get props "status") = "idle"
         else
             false
 
@@ -77,16 +67,12 @@ type NudgeTrigger
                         let statusObj = Dyn.get envelope.Props "status"
 
                         if not (Dyn.isNullish statusObj) then
-                            let status =
-                                let fromStatus = Dyn.str statusObj "status"
-
-                                if fromStatus <> "" then
-                                    fromStatus
-                                else
-                                    Dyn.str statusObj "type"
+                            let status = resolveStatusValue statusObj
 
                             if status = "interrupted" || status = "abort" then
                                 markForceStopped sessionIDStr
+                            elif status = "busy" then
+                                removeForceStopped sessionIDStr
                     | "session.deleted"
                     | "session.delete"
                     | "session.remove"

@@ -88,6 +88,7 @@ let coreTestEntries () : (string * TestBody) list =
       "AgentNudgeSpecs.dedupFromIntegral", TestBody.Sync(sync AgentNudgeSpecs.dedupFromIntegral)
       "AgentNudgeSpecs.decideNudge'", TestBody.Sync(sync AgentNudgeSpecs.decideNudge')
       "AgentNudgeSpecs.selectPrompt", TestBody.Sync(sync AgentNudgeSpecs.selectPrompt)
+      "AgentNudgeSpecs.runAsync", TestBody.Async AgentNudgeSpecs.runAsync
       "AgentNudgeSpecs.submitReviewWipNudgeDedup", TestBody.Sync(sync AgentNudgeSpecsWip.submitReviewWipNudgeDedup)
       "AgentNudgeSpecs.decodeTodosOpenItems", TestBody.Sync(sync AgentNudgeSpecsDecode.decodeTodosOpenItems)
       "AgentNudgeSpecsWip.submitReviewWipNudgeDedup", TestBody.Sync(sync AgentNudgeSpecsWip.submitReviewWipNudgeDedup)

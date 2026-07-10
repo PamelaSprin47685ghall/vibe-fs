@@ -23,19 +23,6 @@ open Wanxiangshu.Shell.FallbackRuntimeState
 
 let private invoke1 (arg: obj) (method: string) (target: obj) : JS.Promise<obj> = unbox (target?(method) (arg))
 
-let private getPartsText (parts: obj) : string =
-    if not (Dyn.isArray parts) then
-        ""
-    else
-        (parts :?> obj array)
-        |> Array.choose (fun part ->
-            if Dyn.str part "type" = "text" then
-                let text = Dyn.get part "text"
-                if Dyn.isNullish text then None else Some(string text)
-            else
-                None)
-        |> String.concat "\n"
-
 let private collectSnapshot
     (fallbackRuntime: FallbackRuntimeState)
     (client: obj)
@@ -52,6 +39,7 @@ let private collectSnapshot
             else
                 match getSessionApiFromClient client with
                 | Error _ -> return None
+                | Ok session when not (Dyn.has session "todo") || not (Dyn.has session "messages") -> return None
                 | Ok session ->
                     let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
                     let openTodosFromApi = decodeTodos (Dyn.get todoResp "data")
@@ -74,13 +62,7 @@ let private collectSnapshot
                         if shouldSkip then
                             return None
                         else
-                            let lastAssistantIdx =
-                                messagesArr
-                                |> Array.tryFindIndexBack (fun msg ->
-                                    let info = Dyn.get msg "info"
-
-                                    isCompletedAssistantMessage info
-                                    && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
+                            let lastAssistantIdx = tryFindLastAssistantIdx messagesArr
 
                             match lastAssistantIdx with
                             | None -> return None
@@ -98,7 +80,18 @@ let private collectSnapshot
                                 let text = getPartsText (Dyn.get msg "parts")
                                 let time = Dyn.get info "time"
                                 let completed = Dyn.str time "completed"
-                                let tid = if completed <> "" then completed else Dyn.str info "id"
+
+                                let tid =
+                                    if completed <> "" then
+                                        completed
+                                    else
+                                        let msgId = Dyn.str info "id"
+
+                                        if msgId <> "" then
+                                            msgId
+                                        else
+                                            sprintf "nudge-fallback-anchor-%d" idx
+
                                 let modelVal = Dyn.get info "model"
 
                                 let model =

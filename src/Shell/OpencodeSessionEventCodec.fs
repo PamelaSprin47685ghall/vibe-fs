@@ -94,20 +94,39 @@ let recoverOpenTodosFromMessages (messagesData: obj) : string list =
         |> Option.defaultValue [||]
         |> Array.toList
 
+/// Try the strict completed-assistant predicate first, then fall back to the
+/// last assistant message that has no error and is not a synthetic agent.
+let tryFindLastAssistantIdx (messagesArr: obj array) : int option =
+    let strict =
+        messagesArr
+        |> Array.tryFindIndexBack (fun msg ->
+            let info = Dyn.get msg "info"
+
+            isCompletedAssistantMessage info
+            && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
+
+    match strict with
+    | Some _ -> strict
+    | None ->
+        messagesArr
+        |> Array.tryFindIndexBack (fun msg ->
+            let info = Dyn.get msg "info"
+
+            let isAssistant =
+                Dyn.str info "role" = "assistant" || Dyn.str info "type" = "assistant"
+
+            let hasError = not (Dyn.isNullish (Dyn.get info "error"))
+
+            isAssistant
+            && not hasError
+            && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
+
 /// Locate the last completed assistant message in `messagesData` → `(text, agent)`.
 let decodeLastAssistant (messagesData: obj) : string * string option =
     if Dyn.isArray messagesData then
         let messagesArr = messagesData :?> obj array
 
-        let lastAssistantIdx =
-            messagesArr
-            |> Array.tryFindIndexBack (fun msg ->
-                let info = Dyn.get msg "info"
-
-                isCompletedAssistantMessage info
-                && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
-
-        match lastAssistantIdx with
+        match tryFindLastAssistantIdx messagesArr with
         | Some idx ->
             let msg = messagesArr.[idx]
             let info = Dyn.get msg "info"

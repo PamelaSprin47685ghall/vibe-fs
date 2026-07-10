@@ -5,6 +5,14 @@ open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.HostTools
 open Wanxiangshu.Opencode.NudgeTrigger
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Shell
+open Wanxiangshu.Shell.Dyn
+open Wanxiangshu.Shell.EventLogRuntime
+open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Opencode.NudgeEffect
+open Wanxiangshu.Tests.TempWorkspace
 
 let private snap todos msg blocked agent isLoop : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos
@@ -38,6 +46,16 @@ let test_isNaturalStop () =
         "session.error → true"
         true
         (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.error" null)
+
+    equal
+        "session.status with string idle → true"
+        true
+        (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.status" (box {| status = "idle" |}))
+
+    equal
+        "session.status with string busy → false"
+        false
+        (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.status" (box {| status = "busy" |}))
 
 let decision () =
     equal "todos -> NudgeTodo" NudgeTodo (deriveAction (snap [ "a" ] "working" false None false))
@@ -133,3 +151,89 @@ let run () =
     decideNudge' ()
     selectPrompt ()
     test_isNaturalStop ()
+
+let test_dispatchPostStopFromHistory () : JS.Promise<unit> =
+    promise {
+        let! dir = mkdtempAsync "nudge-integration-test-"
+        let sessionIDStr = "s-dispatch-nudge-test"
+        let sessionID = Wanxiangshu.Kernel.Domain.Id.sessionIdQuick sessionIDStr
+
+        let mutable promptCalled = false
+        let mutable promptText = ""
+
+        let mockSession =
+            createObj
+                [ "todo"
+                  ==> System.Func<obj, _>(fun arg -> Promise.lift (createObj [ "data" ==> [||] ]))
+                  "messages"
+                  ==> System.Func<obj, _>(fun arg ->
+                      let msg =
+                          createObj
+                              [ "info" ==> createObj [ "role" ==> "assistant"; "agent" ==> "build" ]
+                                "parts"
+                                ==> [| createObj [ "type" ==> "text"; "text" ==> "working hard on loop" ] |] ]
+
+                      Promise.lift (createObj [ "data" ==> [| msg |] ]))
+                  "prompt"
+                  ==> System.Func<obj, _>(fun arg ->
+                      promptCalled <- true
+                      let body = Dyn.get arg "body"
+                      let parts = Dyn.get body "parts"
+
+                      if not (Dyn.isNullish parts) && Dyn.isArray parts then
+                          let partsArr = unbox<obj array> parts
+                          let firstPart = partsArr.[0]
+                          promptText <- Dyn.str firstPart "text"
+
+                      Promise.lift (box {| ok = true |})) ]
+
+        let mockClient = createObj [ "session", box mockSession ]
+
+        let mockPluginCtx =
+            createObj [ "client" ==> mockClient; "directory" ==> dir; "sessionID" ==> sessionIDStr ]
+
+        let rt = FallbackRuntimeState()
+
+        try
+            let ndjsonFile = System.IO.Path.Combine(dir, ".wanxiangshu.ndjson")
+
+            if System.IO.File.Exists(ndjsonFile) then
+                System.IO.File.Delete(ndjsonFile)
+
+            let lockFile = System.IO.Path.Combine(dir, ".wanxiangshu.ndjson.lock")
+
+            if System.IO.File.Exists(lockFile) then
+                System.IO.File.Delete(lockFile)
+        with _ ->
+            ()
+
+        do! appendLoopActivatedOrFail dir sessionIDStr "fix the issue"
+
+        do!
+            dispatchPostStopFromHistory
+                Wanxiangshu.Kernel.HostTools.Host.Opencode
+                rt
+                mockClient
+                mockPluginCtx
+                sessionID
+                (fun _ -> false)
+
+        check "dispatchPostStopFromHistory triggered prompt" promptCalled
+        check "promptText is loop nudge" (promptText.Contains("You are in loop mode. You must call the submit_review"))
+
+        try
+            let ndjsonFile = System.IO.Path.Combine(dir, ".wanxiangshu.ndjson")
+
+            if System.IO.File.Exists(ndjsonFile) then
+                System.IO.File.Delete(ndjsonFile)
+
+            let lockFile = System.IO.Path.Combine(dir, ".wanxiangshu.ndjson.lock")
+
+            if System.IO.File.Exists(lockFile) then
+                System.IO.File.Delete(lockFile)
+        with _ ->
+            ()
+    }
+
+let runAsync () =
+    promise { do! test_dispatchPostStopFromHistory () }
