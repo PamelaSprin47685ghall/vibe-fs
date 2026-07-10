@@ -40,12 +40,19 @@ models:
 
 最后 assistant 无 tool、text 为空 → `EmptyOutputError` → Fallback continue，**阻止 nudge**（见 [10](./10-message-transform.md)）。
 
+## 注入事件 SSOT
+
+`SendContinue` 副作用由 NDJSON 事件 `fallback_continue_injected` 表达（payload: `model` / `agent` / `at`）。`FallbackEventBridge.handleEvent` 接受 `workspaceRoot`，**先** append 事件，**再** 同步 `FallbackRuntimeState.SetInjectedAt` + `SetInjectedModel`，**最后** 调 `IActionExecutor.SendContinue`（注入零宽 U+200B 文本）。
+
+消费端（`resolveNudgeModel` / `tryGetLatestUserModel` / 哨兵 `IsNewUserMessage`）**不**嗅探消息文本，**只**读 `runtime.GetInjectedModel` + `runtime.IsInjectedSince` 内存投影（由事件 fold 回填）。重启时 `EventLogStore.ReadAllEvents` → `foldFallbackInjection` → `applyEvent` 重建 `SessionState.FallbackInjection`。
+
 ## 模块
 
 | 层 | 路径 |
 | :--- | :--- |
 | FSM | `Kernel/FallbackKernel/` |
-| 运行时 | `Shell/FallbackRuntimeState`、`FallbackMessageCodec`、`FallbackEventBridge` |
+| 注入事件 fold | `Kernel/EventLog/FallbackInjectionFold.fs`（`FallbackInjectionState`） |
+| 运行时 | `Shell/FallbackRuntimeState`、`FallbackEventBridge` |
 | 宿主 hook | 各 `*/Fallback*` |
 
 ## 测试

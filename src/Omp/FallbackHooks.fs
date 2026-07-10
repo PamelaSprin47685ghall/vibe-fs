@@ -24,7 +24,38 @@ let ompErrorInput (errorObj: obj) : ErrorInput =
         let ir = Dyn.str errorObj "isRetryable"
         if ir <> "" then Some(ir = "true") else None }
 
-let ompEventTranslator: IEventTranslator =
+let private zwsChar = "​"
+
+let private ompIsNewUserMessageImpl (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : bool =
+    let eventObj = Dyn.get rawEvent "event"
+
+    if Dyn.str eventObj "type" <> "message.updated" then
+        false
+    else if Dyn.str (Dyn.get eventObj "info") "role" <> "user" then
+        false
+    else
+        let info = Dyn.get eventObj "info"
+
+        let msgTime =
+            let time = Dyn.get info "time"
+
+            if isNull time then
+                0L
+            else
+                let completed = Dyn.get time "completed"
+
+                if isNull completed then
+                    0L
+                else
+                    match completed with
+                    | :? int64 as i -> i
+                    | :? float as f -> int64 f
+                    | :? int as i32 -> int64 i32
+                    | _ -> 0L
+
+        not (runtime.IsInjectedSince sessionID msgTime)
+
+let ompEventTranslator (runtime: FallbackRuntimeState) : IEventTranslator =
     { new IEventTranslator with
         member _.TranslateError(rawEvent: obj) : FallbackEvent option =
             let eventObj = Dyn.get rawEvent "event"
@@ -62,12 +93,8 @@ let ompEventTranslator: IEventTranslator =
         member _.IsSessionBusy(rawEvent: obj) : bool =
             Dyn.str (Dyn.get rawEvent "event") "type" = "session.busy"
 
-        member _.IsNewUserMessage(rawEvent: obj) : bool =
-            let eventObj = Dyn.get rawEvent "event"
-
-            Dyn.str eventObj "type" = "message.updated"
-            && Dyn.str (Dyn.get eventObj "info") "role" = "user"
-            && not (Wanxiangshu.Shell.FallbackMessageCodec.isSystemForcedUserMessage eventObj) }
+        member _.IsNewUserMessage(sessionID, rawEvent) : bool =
+            ompIsNewUserMessageImpl runtime sessionID rawEvent }
 
 let private tryGetSession (sessionID: string) (sessionApi: obj) : obj option =
     match Wanxiangshu.Omp.ExecutorTools.ompScope.TryFindKey("omp_session_" + sessionID) with
@@ -128,9 +155,7 @@ let ompActionExecutor (runtime: FallbackRuntimeState) (sessionApi: obj) : IActio
                 let modelStr, agent = resolveModelAndAgent model sessionID
 
                 let pObj =
-                    let p =
-                        {| text = "continue"
-                           model = modelStr |}
+                    let p = {| text = zwsChar; model = modelStr |}
 
                     if agent <> "" then Dyn.withKey p "agent" agent else box p
 
@@ -164,6 +189,7 @@ let ompActionExecutor (runtime: FallbackRuntimeState) (sessionApi: obj) : IActio
         member _.CaptureCurrentModel(sessionID: string) =
             promise {
                 let! msgs = fetchMessages sessionID
+
                 match Wanxiangshu.Shell.FallbackMessageCodec.tryGetLatestUserModel msgs with
                 | Some m -> return Some m
                 | None ->
@@ -185,7 +211,7 @@ let private setConsumedFromResult
     runtime.SetConsumed sessionID result.Consumed
 
 let private clearConsumedOnNewUserMessage (runtime: FallbackRuntimeState) (sessionID: string) (rawEvent: obj) : unit =
-    if ompEventTranslator.IsNewUserMessage rawEvent then
+    if ompIsNewUserMessageImpl runtime sessionID rawEvent then
         runtime.ClearConsumed sessionID
 
 let private bindAgentAndModel (runtime: FallbackRuntimeState) (rawEvent: obj) : unit =
@@ -196,7 +222,7 @@ let private bindAgentAndModel (runtime: FallbackRuntimeState) (rawEvent: obj) : 
         let info = Dyn.get eventObj "info"
 
         if not (Dyn.isNullish info) then
-            let sid = ompEventTranslator.ExtractSessionID rawEvent
+            let sid = Dyn.str (Dyn.get rawEvent "props") "sessionID"
 
             if sid <> "" then
                 let agent = Dyn.str info "agent"
@@ -214,13 +240,16 @@ let createOmpFallbackHandler
     (runtime: FallbackRuntimeState)
     (configLookup: ConfigLookup)
     (sessionApi: obj)
+    (workspaceRoot: string)
     : (obj -> JS.Promise<FallbackHookResult>) =
+    let translator = ompEventTranslator runtime
+
     let baseHandler =
-        createHandler ompEventTranslator runtime configLookup (ompActionExecutor runtime sessionApi)
+        createHandler translator runtime configLookup (ompActionExecutor runtime sessionApi) workspaceRoot
 
     fun (rawEvent: obj) ->
         promise {
-            let sessionID = ompEventTranslator.ExtractSessionID rawEvent
+            let sessionID = translator.ExtractSessionID rawEvent
             bindAgentAndModel runtime rawEvent
             let! result = baseHandler rawEvent
             setConsumedFromResult runtime sessionID result

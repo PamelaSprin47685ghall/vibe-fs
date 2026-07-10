@@ -208,3 +208,36 @@ let appendSubagentContinuedOrFail
             eventKindSubagentContinued
             (Map [ "childId", childId; "prompt", prompt ])
             (getTimestampMs().ToString()))
+
+let private fallbackInjectionPayload (modelStr: string) (agentStr: string) (atMs: int64) =
+    Map [ "model", modelStr; "agent", agentStr; "at", atMs.ToString() ]
+
+let appendFallbackContinueInjected
+    (workspaceRoot: string)
+    (sessionID: string)
+    (modelStr: string)
+    (agentStr: string)
+    (atMs: int64)
+    : JS.Promise<Result<unit, string>> =
+    append
+        workspaceRoot
+        (buildEvent
+            sessionID
+            eventKindFallbackContinueInjected
+            (fallbackInjectionPayload modelStr agentStr atMs)
+            (getTimestampMs().ToString()))
+
+let appendFallbackContinueInjectedOrFail
+    (workspaceRoot: string)
+    (sessionID: string)
+    (modelStr: string)
+    (agentStr: string)
+    (atMs: int64)
+    : JS.Promise<unit> =
+    appendOrFail
+        workspaceRoot
+        (buildEvent
+            sessionID
+            eventKindFallbackContinueInjected
+            (fallbackInjectionPayload modelStr agentStr atMs)
+            (getTimestampMs().ToString()))

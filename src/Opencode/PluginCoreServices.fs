@@ -65,6 +65,7 @@ let createCoreServices (host: Host) (ctx: obj) =
                 client
                 fallbackRuntime
                 fallbackConfigLookup
+                directory
                 childAgentRegistry
         )
 

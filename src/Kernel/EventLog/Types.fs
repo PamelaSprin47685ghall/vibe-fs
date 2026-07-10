@@ -16,6 +16,7 @@ let eventKindWorkBacklogCommitted = "work_backlog_committed"
 let eventKindNudgeDispatched = "nudge_dispatched"
 let eventKindSubmitReviewWipRecorded = "submit_review_wip_recorded"
 let eventKindNudgeDedupCleared = "nudge_dedup_cleared"
+let eventKindFallbackContinueInjected = "fallback_continue_injected"
 
 let eventKindSubagentSpawned = "subagent_spawned"
 let eventKindSubagentContinued = "subagent_continued"
