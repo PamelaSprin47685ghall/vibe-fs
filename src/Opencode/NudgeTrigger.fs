@@ -25,12 +25,11 @@ type NudgeTrigger
         isForceStopped: string -> bool
     ) =
 
-    let isNaturalStop (eventType: string) (props: obj) : bool =
+    /// Exposed as internal for unit testing of event-classification logic.
+    static member internal isNaturalStop (eventType: string) (props: obj) : bool =
         if eventType = "session.idle" then
             true
         elif eventType = "session.error" then
-            true
-        elif eventType = "session.interrupted" then
             true
         elif eventType = "session.status" then
             let statusObj = Dyn.get props "status"
@@ -56,6 +55,7 @@ type NudgeTrigger
                 if sessionIDStr <> "" then
                     match envelope.EventType with
                     | "stream-abort"
+                    | "session.abort"
                     | "session.interrupted" -> markForceStopped sessionIDStr
                     | "session.error" ->
                         let errorObj = Dyn.get envelope.Props "error"
@@ -73,6 +73,20 @@ type NudgeTrigger
                             then
                                 markForceStopped sessionIDStr
                     | "session.next.prompted" -> removeForceStopped sessionIDStr
+                    | "session.status" ->
+                        let statusObj = Dyn.get envelope.Props "status"
+
+                        if not (Dyn.isNullish statusObj) then
+                            let status =
+                                let fromStatus = Dyn.str statusObj "status"
+
+                                if fromStatus <> "" then
+                                    fromStatus
+                                else
+                                    Dyn.str statusObj "type"
+
+                            if status = "interrupted" || status = "abort" then
+                                markForceStopped sessionIDStr
                     | "session.deleted"
                     | "session.delete"
                     | "session.remove"
@@ -95,12 +109,23 @@ type NudgeTrigger
                 match Id.trySessionId sessionIDStr with
                 | None -> ()
                 | Some sessionID ->
-                    if isNaturalStop eventType props && not (isForceStopped sessionIDStr) then
+                    if NudgeTrigger.isNaturalStop eventType props && not (isForceStopped sessionIDStr) then
                         match getClientFromPluginCtx ctx with
                         | Ok client ->
                             try
                                 fallbackRuntime.SetNudgeActive sessionIDStr true
-                                do! dispatchPostStopFromHistory host fallbackRuntime client ctx sessionID
+
+                                let dispatchPostStop
+                                    : Host
+                                          -> FallbackRuntimeState.FallbackRuntimeState
+                                          -> obj
+                                          -> obj
+                                          -> SessionId
+                                          -> (string -> bool)
+                                          -> JS.Promise<unit> =
+                                    dispatchPostStopFromHistory
+
+                                do! dispatchPostStop host fallbackRuntime client ctx sessionID isForceStopped
                             finally
                                 fallbackRuntime.SetNudgeActive sessionIDStr false
                         | Error _ -> ()

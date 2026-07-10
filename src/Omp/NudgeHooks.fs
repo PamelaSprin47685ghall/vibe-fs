@@ -160,35 +160,40 @@ let agentEndHandler
                     Promise.lift ()
                 else
                     promise {
-                        let openTodos = openTodoStatuses sm
-                        let last = lastAssistantMessage sm
-                        let root = ctx.cwd |> Option.defaultValue ""
-                        let turnId = lastAssistantTurnId sm
-                        let model = lastAssistantModel sm
-                        do! appendAssistantCompletedOrFail root sessionId last None model turnId openTodos
-                        let! snap = getNudgeSnapshotFromEventLog root sessionId
-                        let hasRunner = hasRunningRunnerJob ompScope sessionId
-                        let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
-                        let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
+                        if isSessionForceStopped sessionId then
+                            return ()
+                        else
+                            let openTodos = openTodoStatuses sm
+                            let last = lastAssistantMessage sm
+                            let root = ctx.cwd |> Option.defaultValue ""
+                            let turnId = lastAssistantTurnId sm
+                            let model = lastAssistantModel sm
+                            do! appendAssistantCompletedOrFail root sessionId last None model turnId openTodos
+                            let! snap = getNudgeSnapshotFromEventLog root sessionId
+                            let hasRunner = hasRunningRunnerJob ompScope sessionId
+                            let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
+                            let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
 
-                        let snapshot: SessionSnapshot =
-                            { todos = snap.openTodos
-                              lastAssistantMessage = snap.lastAssistantText
-                              isLoopActive = snap.isLoopActive
-                              nudgeBlockedForTurn = blocked
-                              nudgeAnchorKey = key
-                              agentFromMessage = snap.agentFromMessage
-                              modelFromMessage = snap.modelFromMessage
-                              hasActiveRunner = hasRunner }
+                            let snapshot: SessionSnapshot =
+                                { todos = snap.openTodos
+                                  lastAssistantMessage = snap.lastAssistantText
+                                  isLoopActive = snap.isLoopActive
+                                  nudgeBlockedForTurn = blocked
+                                  nudgeAnchorKey = key
+                                  agentFromMessage = snap.agentFromMessage
+                                  modelFromMessage = snap.modelFromMessage
+                                  hasActiveRunner = hasRunner }
 
-                        match deriveAction snapshot with
-                        | NudgeNone -> ()
-                        | action ->
-                            let! claimed = tryClaimNudgeDispatch root sessionId action snapshot.nudgeAnchorKey
+                            match deriveAction snapshot with
+                            | NudgeNone -> ()
+                            | action ->
+                                let! claimed = tryClaimNudgeDispatch root sessionId action snapshot.nudgeAnchorKey
 
-                            if not claimed then
-                                ()
-                            else
-                                fallbackRuntime.SetAwaitingBusy sessionId true
-                                do! sendNudgeReminder pi action snapshot
+                                if not claimed then
+                                    ()
+                                elif isSessionForceStopped sessionId then
+                                    ()
+                                else
+                                    fallbackRuntime.SetAwaitingBusy sessionId true
+                                    do! sendNudgeReminder pi action snapshot
                     }

@@ -23,6 +23,7 @@ let emptyRuntimeState =
 
 let isNudgePromptText (text: string) : bool =
     let t = text.Trim()
+
     t.Contains("There are still incomplete todos")
     || t.Contains("You are in loop mode. You must call the submit_review")
     || t.Contains("A background runner task is still active")
@@ -35,6 +36,7 @@ let isContinuePromptText (text: string) : bool =
 
 let private messageTexts (message: obj) : string list =
     let parts = Dyn.get message "parts"
+
     if not (Dyn.isArray parts) then
         []
     else
@@ -49,43 +51,49 @@ let private messageTexts (message: obj) : string list =
             | "dynamic-tool" ->
                 let output =
                     let direct = Dyn.get part "output"
+
                     if not (Dyn.isNullish direct) then
                         string direct
                     else
                         let state = Dyn.get part "state"
-                        if Dyn.isNullish state then "" else string (Dyn.get state "output")
+
+                        if Dyn.isNullish state then
+                            ""
+                        else
+                            string (Dyn.get state "output")
+
                 if output = "" then None else Some output
             | _ -> None)
 
 let classifyUserMessage (msg: obj) : string =
     let text = messageTexts msg |> String.concat "\n"
-    if isContinuePromptText text then
-        "continue"
-    elif isNudgePromptText text then
-        "nudge"
-    else
-        "user"
+
+    if isContinuePromptText text then "continue"
+    elif isNudgePromptText text then "nudge"
+    else "user"
 
 let tryGetModelStringFromMessage (msg: obj) : string option =
     let info = Dyn.get msg "info"
+
     if isNull info || Dyn.isNullish info then
         None
     else
         let modelVal = Dyn.get info "model"
+
         if isNull modelVal || Dyn.isNullish modelVal then
             None
+        else if Dyn.typeIs modelVal "string" then
+            let s = string modelVal
+            if s = "" then None else Some s
         else
-            if Dyn.typeIs modelVal "string" then
-                let s = string modelVal
-                if s = "" then None else Some s
+            let providerID = Dyn.str modelVal "providerID"
+            let modelID = Dyn.str modelVal "modelID"
+
+            if providerID = "" || modelID = "" then
+                let idVal = Dyn.str modelVal "id"
+                if idVal <> "" then Some idVal else None
             else
-                let providerID = Dyn.str modelVal "providerID"
-                let modelID = Dyn.str modelVal "modelID"
-                if providerID = "" || modelID = "" then
-                    let idVal = Dyn.str modelVal "id"
-                    if idVal <> "" then Some idVal else None
-                else
-                    Some(sprintf "%s/%s" providerID modelID)
+                Some(sprintf "%s/%s" providerID modelID)
 
 let resolveNudgeModel
     (msgs: obj array)
@@ -102,6 +110,7 @@ let resolveNudgeModel
                 let role = Dyn.str msg "role"
                 let info = Dyn.get msg "info"
                 let msgRole = if not (Dyn.isNullish info) then Dyn.str info "role" else ""
+
                 (role = "assistant" || msgRole = "assistant")
                 && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
             |> Option.bind tryGetModelStringFromMessage
@@ -161,6 +170,8 @@ let runNudgeFlowCore
                         }
 
                     if not claimed then
+                        return runtimeState
+                    elif Set.contains sessionKey runtimeState.forceStoppedSessions then
                         return runtimeState
                     else
                         let! _ = sendNudge promptText snapshot.agentFromMessage snapshot.modelFromMessage

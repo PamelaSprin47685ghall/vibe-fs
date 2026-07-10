@@ -41,112 +41,120 @@ let private collectSnapshot
     (client: obj)
     (pluginCtx: obj)
     (sessionID: SessionId)
+    (isForceStopped: string -> bool)
     : JS.Promise<SessionSnapshot option> =
     promise {
         try
             let sessionIDStr = Id.sessionIdValue sessionID
 
-            match getSessionApiFromClient client with
-            | Error _ -> return None
-            | Ok session ->
-                let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
-                let openTodosFromApi = decodeTodos (Dyn.get todoResp "data")
-                let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
-                let messagesData = Dyn.get messagesResp "data"
+            if isForceStopped sessionIDStr then
+                return None
+            else
+                match getSessionApiFromClient client with
+                | Error _ -> return None
+                | Ok session ->
+                    let! todoResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "todo" session
+                    let openTodosFromApi = decodeTodos (Dyn.get todoResp "data")
+                    let! messagesResp = invoke1 (box {| path = {| id = sessionIDStr |} |}) "messages" session
+                    let messagesData = Dyn.get messagesResp "data"
 
-                if not (Dyn.isArray messagesData) then
-                    return None
-                else
-                    let messagesArr = messagesData :?> obj array
-
-                    let openTodos =
-                        if not (List.isEmpty openTodosFromApi) then
-                            openTodosFromApi
-                        else
-                            recoverOpenTodosFromMessages messagesData
-
-                    let shouldSkip = shouldSkipNudge messagesData
-
-                    if shouldSkip then
+                    if not (Dyn.isArray messagesData) then
                         return None
                     else
-                        let lastAssistantIdx =
-                            messagesArr
-                            |> Array.tryFindIndexBack (fun msg ->
+                        let messagesArr = messagesData :?> obj array
+
+                        let openTodos =
+                            if not (List.isEmpty openTodosFromApi) then
+                                openTodosFromApi
+                            else
+                                recoverOpenTodosFromMessages messagesData
+
+                        let shouldSkip = shouldSkipNudge messagesData
+
+                        if shouldSkip then
+                            return None
+                        else
+                            let lastAssistantIdx =
+                                messagesArr
+                                |> Array.tryFindIndexBack (fun msg ->
+                                    let info = Dyn.get msg "info"
+
+                                    isCompletedAssistantMessage info
+                                    && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
+
+                            match lastAssistantIdx with
+                            | None -> return None
+                            | Some idx ->
+                                let msg = messagesArr.[idx]
                                 let info = Dyn.get msg "info"
+                                let agentVal = Dyn.get info "agent"
 
-                                isCompletedAssistantMessage info
-                                && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
-
-                        match lastAssistantIdx with
-                        | None -> return None
-                        | Some idx ->
-                            let msg = messagesArr.[idx]
-                            let info = Dyn.get msg "info"
-                            let agentVal = Dyn.get info "agent"
-
-                            let agent =
-                                if Dyn.isNullish agentVal then
-                                    None
-                                else
-                                    Some(string agentVal)
-
-                            let text = getPartsText (Dyn.get msg "parts")
-                            let time = Dyn.get info "time"
-                            let completed = Dyn.str time "completed"
-                            let tid = if completed <> "" then completed else Dyn.str info "id"
-                            let modelVal = Dyn.get info "model"
-
-                            let model =
-                                if Dyn.isNullish modelVal then
-                                    None
-                                else
-                                    let providerID = Dyn.str modelVal "providerID"
-                                    let modelID = Dyn.str modelVal "modelID"
-
-                                    if providerID = "" || modelID = "" then
+                                let agent =
+                                    if Dyn.isNullish agentVal then
                                         None
                                     else
-                                        Some(sprintf "%s/%s" providerID modelID)
+                                        Some(string agentVal)
 
-                            let resolvedModel =
-                                Wanxiangshu.Shell.NudgeRuntimeTypes.resolveNudgeModel
-                                    messagesArr
-                                    fallbackRuntime
-                                    sessionIDStr
-                                    model
+                                let text = getPartsText (Dyn.get msg "parts")
+                                let time = Dyn.get info "time"
+                                let completed = Dyn.str time "completed"
+                                let tid = if completed <> "" then completed else Dyn.str info "id"
+                                let modelVal = Dyn.get info "model"
 
-                            let lastAssistantText = text
-                            let turnId = tid
-                            let agentFromMessage = agent
-                            let modelFromMessage = resolvedModel
+                                let model =
+                                    if Dyn.isNullish modelVal then
+                                        None
+                                    else
+                                        let providerID = Dyn.str modelVal "providerID"
+                                        let modelID = Dyn.str modelVal "modelID"
 
-                            let directory = pluginDirectoryFromCtx pluginCtx
+                                        if providerID = "" || modelID = "" then
+                                            None
+                                        else
+                                            Some(sprintf "%s/%s" providerID modelID)
 
-                            do!
-                                appendAssistantCompletedOrFail
-                                    directory
-                                    sessionIDStr
-                                    lastAssistantText
-                                    agentFromMessage
-                                    modelFromMessage
-                                    turnId
-                                    openTodos
+                                let resolvedModel =
+                                    Wanxiangshu.Shell.NudgeRuntimeTypes.resolveNudgeModel
+                                        messagesArr
+                                        fallbackRuntime
+                                        sessionIDStr
+                                        model
 
-                            let! snap = getNudgeSnapshotFromEventLog directory sessionIDStr
-                            let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
-                            let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
+                                let lastAssistantText = text
+                                let turnId = tid
+                                let agentFromMessage = agent
+                                let modelFromMessage = resolvedModel
 
-                            return
-                                Some
-                                    { todos = snap.openTodos
-                                      lastAssistantMessage = snap.lastAssistantText
-                                      isLoopActive = snap.isLoopActive
-                                      nudgeBlockedForTurn = blocked
-                                      nudgeAnchorKey = key
-                                      agentFromMessage = snap.agentFromMessage
-                                      modelFromMessage = snap.modelFromMessage
-                                      hasActiveRunner = false }
+                                let directory = pluginDirectoryFromCtx pluginCtx
+
+                                do!
+                                    appendAssistantCompletedOrFail
+                                        directory
+                                        sessionIDStr
+                                        lastAssistantText
+                                        agentFromMessage
+                                        modelFromMessage
+                                        turnId
+                                        openTodos
+
+                                let! snap = getNudgeSnapshotFromEventLog directory sessionIDStr
+
+                                if isForceStopped sessionIDStr then
+                                    return None
+                                else
+                                    let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
+                                    let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
+
+                                    return
+                                        Some
+                                            { todos = snap.openTodos
+                                              lastAssistantMessage = snap.lastAssistantText
+                                              isLoopActive = snap.isLoopActive
+                                              nudgeBlockedForTurn = blocked
+                                              nudgeAnchorKey = key
+                                              agentFromMessage = snap.agentFromMessage
+                                              modelFromMessage = snap.modelFromMessage
+                                              hasActiveRunner = false }
         with _ ->
             return None
     }
@@ -198,6 +206,7 @@ let startNudgeFlow
     (client: obj)
     (pluginCtx: obj)
     (sessionID: SessionId)
+    (isForceStopped: string -> bool)
     : JS.Promise<NudgeRuntimeState> =
     let sid = Id.sessionIdValue sessionID
     let root = pluginDirectoryFromCtx pluginCtx
@@ -207,7 +216,7 @@ let startNudgeFlow
         root
         runtimeState
         sid
-        (fun () -> collectSnapshot fallbackRuntime client pluginCtx sessionID)
+        (fun () -> collectSnapshot fallbackRuntime client pluginCtx sessionID isForceStopped)
         (fun promptText agentOpt modelOpt -> sendNudgeOutcome client sessionID promptText agentOpt modelOpt)
 
 let dispatchPostStopFromHistory
@@ -216,8 +225,9 @@ let dispatchPostStopFromHistory
     (client: obj)
     (pluginCtx: obj)
     (sessionID: SessionId)
+    (isForceStopped: string -> bool)
     : JS.Promise<unit> =
     promise {
-        let! _ = startNudgeFlow host fallbackRuntime emptyRuntimeState client pluginCtx sessionID
+        let! _ = startNudgeFlow host fallbackRuntime emptyRuntimeState client pluginCtx sessionID isForceStopped
         return ()
     }

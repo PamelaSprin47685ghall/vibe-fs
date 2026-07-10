@@ -4,6 +4,7 @@ open Wanxiangshu.Tests.Assert
 open Wanxiangshu.Kernel.Nudge
 open Wanxiangshu.Kernel.NudgeDerivation
 open Wanxiangshu.Kernel.HostTools
+open Wanxiangshu.Opencode.NudgeTrigger
 
 let private snap todos msg blocked agent isLoop : Wanxiangshu.Kernel.Nudge.Types.SessionSnapshot =
     { todos = todos
@@ -24,6 +25,19 @@ let private snap' todos msg blocked agent isLoop hasActiveRunner : Wanxiangshu.K
       agentFromMessage = agent
       modelFromMessage = None
       hasActiveRunner = hasActiveRunner }
+
+let test_isNaturalStop () =
+    equal "session.idle → true" true (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.idle" null)
+
+    equal
+        "session.interrupted → false"
+        false
+        (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.interrupted" null)
+
+    equal
+        "session.error → true"
+        true
+        (Wanxiangshu.Opencode.NudgeTrigger.NudgeTrigger.isNaturalStop "session.error" null)
 
 let decision () =
     equal "todos -> NudgeTodo" NudgeTodo (deriveAction (snap [ "a" ] "working" false None false))
@@ -118,3 +132,4 @@ let run () =
     dedupFromIntegral ()
     decideNudge' ()
     selectPrompt ()
+    test_isNaturalStop ()

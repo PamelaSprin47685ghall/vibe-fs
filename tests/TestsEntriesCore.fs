@@ -84,6 +84,7 @@ let coreTestEntries () : (string * TestBody) list =
       "AgentTests.canUseMatrix", TestBody.Sync(sync AgentTests.canUseMatrix)
       "AgentTests.deniedTools'", TestBody.Sync(sync AgentTests.deniedTools')
       "AgentNudgeSpecs.decision", TestBody.Sync(sync AgentNudgeSpecs.decision)
+      "AgentNudgeSpecs.test_isNaturalStop", TestBody.Sync(sync AgentNudgeSpecs.test_isNaturalStop)
       "AgentNudgeSpecs.dedupFromIntegral", TestBody.Sync(sync AgentNudgeSpecs.dedupFromIntegral)
       "AgentNudgeSpecs.decideNudge'", TestBody.Sync(sync AgentNudgeSpecs.decideNudge')
       "AgentNudgeSpecs.selectPrompt", TestBody.Sync(sync AgentNudgeSpecs.selectPrompt)
