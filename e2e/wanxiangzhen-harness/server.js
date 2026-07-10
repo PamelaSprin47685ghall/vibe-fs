@@ -230,6 +230,7 @@ export async function startInProcess(opts) {
   try {
     ({ hooks, runtime } = await pluginWithDeps(ctx, deps));
   } catch (e) {
+    console.error("PLUGIN_WITH_DEPS_ERROR:", e.stack || e);
     releaseLock();
     throw e;
   }

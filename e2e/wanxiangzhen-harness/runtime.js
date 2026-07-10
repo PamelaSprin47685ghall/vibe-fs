@@ -87,7 +87,16 @@ export function shapeWanSquadLine(evt, at) {
     case 'TasksCreated': {
       const tasksList = fields[1] || [];
       const tasksArr = Array.isArray(tasksList) ? tasksList : Array.from(tasksList);
-      const tasks = tasksArr.map(([tid, title, desc, deps]) => {
+      const tasks = tasksArr.map((item) => {
+        let tid, title, desc, deps;
+        if (Array.isArray(item)) {
+          [tid, title, desc, deps] = item;
+        } else {
+          tid = item.taskId || item.task_id || item.fields?.[0];
+          title = item.title || item.fields?.[1];
+          desc = item.description || item.fields?.[2];
+          deps = item.dependsOn || item.depends_on || item.fields?.[3];
+        }
         const depsArr = deps && !Array.isArray(deps) ? Array.from(deps) : (deps || []);
         return {
           task_id: tid,

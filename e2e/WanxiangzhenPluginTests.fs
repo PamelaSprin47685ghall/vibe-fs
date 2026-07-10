@@ -135,6 +135,6 @@ let runAll (args: string array) : JS.Promise<int> =
             printfn "\n✓ %d wanxiangzhen E2E checks passed" ok
             return summary ()
         with ex ->
-            printfn "E2E ERROR: %O" ex
+            printfn "E2E ERROR: %s\nSTACK: %s" ex.Message ex.StackTrace
             return 1
     }

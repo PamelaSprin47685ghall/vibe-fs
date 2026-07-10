@@ -40,9 +40,9 @@ let deriveAction (snapshot: Snapshot) : NudgeAction =
     else
         let text = snapshot.lastAssistantMessage.Trim()
 
-        if text = "" || isQuestion text then
+        if text <> "" && isQuestion text then
             NudgeNone
-        elif skipsTodo text || skipsLoop text then
+        elif text <> "" && (skipsTodo text || skipsLoop text) then
             NudgeNone
         else if snapshot.hasActiveRunner && not snapshot.todos.IsEmpty then
             NudgeNone

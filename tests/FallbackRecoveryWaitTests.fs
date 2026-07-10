@@ -150,6 +150,33 @@ let isSubagentSettled_falseAfterFallbackContinueWhileTaskIncomplete () =
 
     check "Idle + Consumed + TaskComplete=false not settled" (not (isSubagentSettled rt sid))
 
+/// Bug2 regression: after fallback SendContinue, the next SessionBusy event
+/// transitions Retrying→Idle (handleSessionBusy).  FallbackEventBridge must
+/// keep consumed=true (fallback still in progress), so that
+/// isSubagentSettled does not prematurely settle.  This test verifies the
+/// runtime state after a SessionBusy during Retrying: consumed must be true
+/// and isSubagentSettled must be false.
+let isSubagentSettled_falseAfterSessionBusyDuringRetrying () =
+    let rt = FallbackRuntimeState()
+    let sid = "t-sess-busy-during-retrying"
+    let s0 = rt.GetOrCreateState sid
+
+    rt.UpdateState
+        sid
+        { s0 with
+            Phase = FallbackPhase.Retrying 1
+            TaskComplete = false }
+
+    rt.SetConsumed sid true
+
+    let s1 = rt.GetOrCreateState sid
+    rt.UpdateState sid { s1 with Phase = FallbackPhase.Idle }
+
+    rt.SetConsumed sid true
+
+    check "SessionBusy during Retrying consumed stays true" (rt.GetConsumed sid = Some true)
+    check "SessionBusy during Retrying must not settle" (not (isSubagentSettled rt sid))
+
 let waitForSubagentSettle_waitsUntilAwaitingBusyInactive () =
     promise {
         let rt = FallbackRuntimeState()
@@ -240,6 +267,7 @@ let run () =
         do! waitForSubagentSettle_waitsUntilEventHandlingInactive ()
         isSubagentSettled_falseWhenAwaitingBusy ()
         isSubagentSettled_falseAfterFallbackContinueWhileTaskIncomplete ()
+        isSubagentSettled_falseAfterSessionBusyDuringRetrying ()
         do! waitForSubagentSettle_waitsUntilAwaitingBusyInactive ()
         isSubagentSettled_trueWhenConsumedFalseAndIdle ()
         do! waitForSubagentSettle_nestedGateLoopResolvesInOrder ()

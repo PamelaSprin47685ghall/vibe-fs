@@ -215,6 +215,28 @@ let handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText () =
         equal "recover called once" 1 (executor.RecoverCalls.Length)
     }
 
+let handleEvent_sessionBusy_duringRetrying_consumedTrue () =
+    promise {
+        let model = mkModel "oai" "gpt-5"
+        let rt = FallbackRuntimeState()
+        let sid = "sess-busy-retrying"
+        rt.SetChain sid [ model ]
+        rt.SetAgentName sid "reviewer"
+        let s0 = rt.GetOrCreateState sid
+
+        rt.UpdateState
+            sid
+            { s0 with
+                Phase = FallbackPhase.Retrying 1 }
+
+        rt.SetConsumed sid true
+        let tr = FakeTranslator(sid, FallbackEvent.SessionBusy) :> IEventTranslator
+        let! r = handleEvent tr rt defaultCfgLookup (FakeExecutor()) (box ())
+        equal "consumed true during retrying" true r.Consumed
+        equal "phase Idle after busy" FallbackPhase.Idle r.State.Phase
+        equal "taskComplete false" false r.State.TaskComplete
+    }
+
 let handleEvent_chainPrependsCurrentModel () =
     promise {
         let rt = FallbackRuntimeState()
@@ -267,5 +289,6 @@ let run () =
         do! handleEvent_sessionIdle_idle_toolText_sendsPrompt ()
         do! handleEvent_sessionIdle_idle_todosComplete_setsTaskComplete ()
         do! handleEvent_sessionIdle_retryToIdle_emitsScanToolCallAsText ()
+        do! handleEvent_sessionBusy_duringRetrying_consumedTrue ()
         do! handleEvent_chainPrependsCurrentModel ()
     }

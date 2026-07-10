@@ -216,6 +216,11 @@ let handleEvent
                             | FallbackPhase.ScanningToolCallText
                             | FallbackPhase.RecoveringToolCallText -> true
                             | _ -> false
+                        | FallbackEvent.SessionBusy ->
+                            match state.Phase with
+                            | FallbackPhase.Retrying _
+                            | FallbackPhase.Scanning _ -> true
+                            | _ -> false
                         | _ -> false
 
                     runtime.SetConsumed sessionID consumed

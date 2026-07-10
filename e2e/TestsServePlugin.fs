@@ -24,9 +24,7 @@ let runServePluginChecks
         chk "e2e.serve.tools.websearch-listed" (containsTool harness "websearch" || toolListBodies.Contains "websearch")
         chk "e2e.serve.tools.webfetch-listed" (containsTool harness "webfetch" || toolListBodies.Contains "webfetch")
 
-        chk
-            "e2e.serve.tools.methodology-listed"
-            (containsTool harness "methodology" || toolListBodies.Contains "methodology")
+        chk "e2e.serve.tools.meditator-listed" (containsTool harness "meditator" || toolListBodies.Contains "meditator")
 
         do!
             toolRound
@@ -61,16 +59,16 @@ let runServePluginChecks
             toolRoundWithCalls
                 harness
                 sessionID
-                "methodology"
+                "meditator"
                 (box
                     {| methodology = "first_principles"
                        intent = methIntent
                        background = methBg
                        note = methNote |})
-                "run methodology first_principles"
+                "run meditator first_principles"
                 2
 
-        chk "e2e.serve.methodology.tool-called" (containsTool harness "methodology")
+        chk "e2e.serve.meditator.tool-called" (containsTool harness "meditator")
 
         let! loopRes = harness.runSessionCommand sessionID "loop" "implement feature X via serve" emptyObj
         let loopData = unbox<obj> loopRes

@@ -67,7 +67,8 @@ let runRest
                 (createObj
                     [ "intents", box investigatorIntents
                       "tdd", box "green"
-                      "warn_tdd", box warnTddValue ])
+                      "warn_tdd", box warnTddValue
+                      "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
                 (fun r -> r.Contains "investigator output mock text")
                 "mux.execute.investigator.success"
 
@@ -76,7 +77,9 @@ let runRest
         do!
             runTool
                 "browser"
-                (createObj [ "intent", box "browse" ])
+                (createObj
+                    [ "intent", box "browse"
+                      "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
                 (fun r -> r.Contains "browser mock debug view text")
                 "mux.execute.browser.success"
 
@@ -105,13 +108,14 @@ let runRest
                     [ "methodology", box "first_principles"
                       "note", box (String.replicate 1100 "n")
                       "background", box (String.replicate 1100 "b")
-                      "intent", box (String.replicate 1100 "i") ])
+                      "intent", box (String.replicate 1100 "i")
+                      "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
                 (fun r -> r.Contains "meditator mock report output")
                 "mux.execute.meditator.success"
 
-        let lastReq = harness.getLastLlmRequest()
+        let lastReq = harness.getLastLlmRequest ()
         let lastReqStr = jsonStringify lastReq
-        chk "mux.meditator.prompt-contains-background" (lastReqStr.Contains (String.replicate 1100 "b"))
+        chk "mux.meditator.prompt-contains-background" (lastReqStr.Contains(String.replicate 1100 "b"))
 
         let coderIntents =
             [| box
@@ -130,7 +134,8 @@ let runRest
                 (createObj
                     [ "intents", box coderIntents
                       "tdd", box "green"
-                      "warn_tdd", box warnTddValue ])
+                      "warn_tdd", box warnTddValue
+                      "warn_reuse", box "this-task-is-not-suitable-to-be-completed-via-continue-tool" ])
                 (fun r -> r.Contains "coder mock execution output")
                 "mux.execute.coder.success"
 

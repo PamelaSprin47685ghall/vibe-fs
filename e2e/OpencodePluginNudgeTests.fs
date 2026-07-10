@@ -80,12 +80,7 @@ let runNudgeTests
                   box
                       [| box (
                              createObj
-                                 [ "info",
-                                   box (
-                                       createObj
-                                           [ "role", box "user"
-                                             "id", box "msg-user-1" ]
-                                   )
+                                 [ "info", box (createObj [ "role", box "user"; "id", box "msg-user-1" ])
                                    "parts",
                                    box [| box (createObj [ "type", box "text"; "text", box "implement layout" ]) |] ]
                          )
@@ -100,8 +95,7 @@ let runNudgeTests
                                              "id", box "msg-assistant-1"
                                              "time", box {| completed = 1000.0 |} ]
                                    )
-                                   "parts",
-                                   box [| box (createObj [ "type", box "text"; "text", box "calling tool" ]) |] ]
+                                   "parts", box [| box (createObj [ "type", box "text"; "text", box "calling tool" ]) |] ]
                          ) |]
                   "mockSessionClient",
                   box (
@@ -111,13 +105,17 @@ let runNudgeTests
                                 fbPromptCalls <- fbPromptCalls + 1
                                 let body = Dyn.get arg "body"
                                 let parts = Dyn.get body "parts"
+
                                 if not (Dyn.isNullish parts) && Dyn.isArray parts then
                                     let partsArr = unbox<obj array> parts
                                     let firstPart = partsArr.[0]
                                     fbPromptText <- Dyn.str firstPart "text"
+
                                 Promise.lift (box {| ok = true |}))
                             "model",
-                            box {| id = "test-model"; providerID = "test" |} ]
+                            box
+                                {| id = "test-model"
+                                   providerID = "test" |} ]
                   ) ]
 
         let! fbHarnessObj = startHarness fbOpts
@@ -125,6 +123,7 @@ let runNudgeTests
 
         let fbConfigArgs =
             createObj [ "agent", box (createObj [ "build", box (createObj [ "model", box "test" ]) ]) ]
+
         let! _ = fbHarness.runConfigHook fbConfigArgs
 
         let! _ =
@@ -134,6 +133,7 @@ let runNudgeTests
                         {| ``type`` = "session.idle"
                            properties = {| sessionID = fbHarness.sessionId |} |} |}
             )
+
         do! Promise.sleep 100
 
         let! _ =
@@ -142,15 +142,11 @@ let runNudgeTests
                 (createObj
                     [ "sessionID", box fbHarness.sessionId
                       "outcome", box "error"
-                      "error",
-                      box (
-                          createObj
-                              [ "name", box "EmptyOutputError"
-                                "message", box "empty output" ]
-                      ) ])
+                      "error", box (createObj [ "name", box "EmptyOutputError"; "message", box "empty output" ]) ])
                 (createObj [])
 
         let mutable fbTicks = 0
+
         while fbPromptCalls = 0 && fbTicks < 20 do
             do! Promise.sleep 50
             fbTicks <- fbTicks + 1
@@ -158,6 +154,56 @@ let runNudgeTests
         do! fbHarness.dispose ()
         chk "op.fallback.continueOnToolFinishIdleError" (fbPromptCalls = 1)
         chk "op.fallback.continueBodyCorrect" (fbPromptText = "continue")
+
+        // --- 13. Bug1: loop active + empty text → nudge loop ---------------
+        let mutable bug1PromptCalls = 0
+
+        let bug1Msgs: obj array =
+            [| box (
+                   createObj
+                       [ "info",
+                         box (
+                             createObj
+                                 [ "role", box "assistant"
+                                   "agent", box "build"
+                                   "finish", box "stop"
+                                   "id", box "msg-bug1-1"
+                                   "time", box {| completed = 2000.0 |} ]
+                         )
+                         "parts", box [||] ]
+               ) |]
+
+        let bug1Opts =
+            createObj
+                [ "messages", box bug1Msgs
+                  "mockSessionClient",
+                  box (
+                      createObj
+                          [ "todo", box (fun _ -> Promise.lift (box {| data = [||] |}))
+                            "prompt",
+                            box (fun _ ->
+                                bug1PromptCalls <- bug1PromptCalls + 1
+                                Promise.lift (box {| ok = true |}))
+                            "create", box (fun _ -> Promise.lift (box {| data = {| id = "mock-review" |} |})) ]
+                  ) ]
+
+        let! bug1HarnessObj = startHarness bug1Opts
+        let bug1Harness = unbox<Harness> bug1HarnessObj
+
+        let! _ = bug1Harness.runCommandExecuteBefore "loop" "fix the bug"
+        do! Promise.sleep 50
+
+        let! _ =
+            bug1Harness.fireEvent (
+                box
+                    {| event =
+                        {| ``type`` = "session.idle"
+                           properties = {| sessionID = bug1Harness.sessionId |} |} |}
+            )
+
+        do! Promise.sleep 100
+        do! bug1Harness.dispose ()
+        chk "op.bug1.loopActiveEmptyTextTriggersNudge" (bug1PromptCalls >= 1)
 
         return summary ()
     }

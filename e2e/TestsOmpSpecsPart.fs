@@ -28,7 +28,7 @@ let runOmpToolRegistry (h: OmpHarness) (chk: string -> bool -> unit) =
               "browser" ] do
             chk ("e2e-omp.tools." + t) (toolNames.Contains t)
 
-        chk "e2e-omp.methodology.unified" (toolNames.Contains "methodology")
+        chk "e2e-omp.methodology.unified" (toolNames.Contains "meditator")
     }
 
 let runOmpCommandsAndHandlers (h: OmpHarness) (chk: string -> bool -> unit) =

@@ -13,7 +13,7 @@ let runMimoPluginIdentity (h: Harness) (chk: string -> bool -> unit) =
 let runMimoToolPresence (h: Harness) (chk: string -> bool -> unit) =
     let toolNames = h.getToolNames ()
 
-    for t in [ "task"; "coder"; "executor"; "fuzzy_find"; "submit_review"; "methodology" ] do
+    for t in [ "task"; "coder"; "executor"; "fuzzy_find"; "submit_review"; "meditator" ] do
         chk ("mimo.tool.has." + t) (Array.contains t toolNames)
 
 let runMimoTaskSchema (h: Harness) (chk: string -> bool -> unit) =

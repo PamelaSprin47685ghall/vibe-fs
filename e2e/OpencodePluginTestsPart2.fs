@@ -45,7 +45,7 @@ let runPart2
         // --- 4. System Transform & Tools --------------------------------------
         let! systemOutput = harness.runSystemTransform (createEmpty ())
         chk "op.sysTrans.hasWorkDir" ((string (dynGet systemOutput "system")).IndexOf(harness.workDir) >= 0)
-        chk "op.meth.ok" (not (dynIsNull (harness.getToolEntry "methodology")))
+        chk "op.meth.ok" (not (dynIsNull (harness.getToolEntry "meditator")))
 
         let! wsResult =
             harness.executePluginTool

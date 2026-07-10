@@ -78,73 +78,75 @@ let private collectSnapshot
                                 isCompletedAssistantMessage info
                                 && not (isSyntheticAssistantAgent (Dyn.str info "agent")))
 
-                        let lastAssistantText, turnId, agentFromMessage, modelFromMessage =
-                            match lastAssistantIdx with
-                            | None -> "", "", None, None
-                            | Some idx ->
-                                let msg = messagesArr.[idx]
-                                let info = Dyn.get msg "info"
-                                let agentVal = Dyn.get info "agent"
+                        match lastAssistantIdx with
+                        | None -> return None
+                        | Some idx ->
+                            let msg = messagesArr.[idx]
+                            let info = Dyn.get msg "info"
+                            let agentVal = Dyn.get info "agent"
 
-                                let agent =
-                                    if Dyn.isNullish agentVal then
+                            let agent =
+                                if Dyn.isNullish agentVal then
+                                    None
+                                else
+                                    Some(string agentVal)
+
+                            let text = getPartsText (Dyn.get msg "parts")
+                            let time = Dyn.get info "time"
+                            let completed = Dyn.str time "completed"
+                            let tid = if completed <> "" then completed else Dyn.str info "id"
+                            let modelVal = Dyn.get info "model"
+
+                            let model =
+                                if Dyn.isNullish modelVal then
+                                    None
+                                else
+                                    let providerID = Dyn.str modelVal "providerID"
+                                    let modelID = Dyn.str modelVal "modelID"
+
+                                    if providerID = "" || modelID = "" then
                                         None
                                     else
-                                        Some(string agentVal)
+                                        Some(sprintf "%s/%s" providerID modelID)
 
-                                let text = getPartsText (Dyn.get msg "parts")
-                                let time = Dyn.get info "time"
-                                let completed = Dyn.str time "completed"
-                                let tid = if completed <> "" then completed else Dyn.str info "id"
-                                let modelVal = Dyn.get info "model"
+                            let resolvedModel =
+                                Wanxiangshu.Shell.NudgeRuntimeTypes.resolveNudgeModel
+                                    messagesArr
+                                    fallbackRuntime
+                                    sessionIDStr
+                                    model
 
-                                let model =
-                                    if Dyn.isNullish modelVal then
-                                        None
-                                    else
-                                        let providerID = Dyn.str modelVal "providerID"
-                                        let modelID = Dyn.str modelVal "modelID"
+                            let lastAssistantText = text
+                            let turnId = tid
+                            let agentFromMessage = agent
+                            let modelFromMessage = resolvedModel
 
-                                        if providerID = "" || modelID = "" then
-                                            None
-                                        else
-                                            Some(sprintf "%s/%s" providerID modelID)
+                            let directory = pluginDirectoryFromCtx pluginCtx
 
-                                let resolvedModel =
-                                    Wanxiangshu.Shell.NudgeRuntimeTypes.resolveNudgeModel
-                                        messagesArr
-                                        fallbackRuntime
-                                        sessionIDStr
-                                        model
+                            do!
+                                appendAssistantCompletedOrFail
+                                    directory
+                                    sessionIDStr
+                                    lastAssistantText
+                                    agentFromMessage
+                                    modelFromMessage
+                                    turnId
+                                    openTodos
 
-                                text, tid, agent, resolvedModel
+                            let! snap = getNudgeSnapshotFromEventLog directory sessionIDStr
+                            let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
+                            let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
 
-                        let directory = pluginDirectoryFromCtx pluginCtx
-
-                        do!
-                            appendAssistantCompletedOrFail
-                                directory
-                                sessionIDStr
-                                lastAssistantText
-                                agentFromMessage
-                                modelFromMessage
-                                turnId
-                                openTodos
-
-                        let! snap = getNudgeSnapshotFromEventLog directory sessionIDStr
-                        let key = nudgeAnchorKey snap.turnId snap.lastAssistantText
-                        let blocked = Set.contains (key.Trim()) snap.dispatchedAnchors
-
-                        return
-                            Some
-                                { todos = snap.openTodos
-                                  lastAssistantMessage = snap.lastAssistantText
-                                  isLoopActive = snap.isLoopActive
-                                  nudgeBlockedForTurn = blocked
-                                  nudgeAnchorKey = key
-                                  agentFromMessage = snap.agentFromMessage
-                                  modelFromMessage = snap.modelFromMessage
-                                  hasActiveRunner = false }
+                            return
+                                Some
+                                    { todos = snap.openTodos
+                                      lastAssistantMessage = snap.lastAssistantText
+                                      isLoopActive = snap.isLoopActive
+                                      nudgeBlockedForTurn = blocked
+                                      nudgeAnchorKey = key
+                                      agentFromMessage = snap.agentFromMessage
+                                      modelFromMessage = snap.modelFromMessage
+                                      hasActiveRunner = false }
         with _ ->
             return None
     }

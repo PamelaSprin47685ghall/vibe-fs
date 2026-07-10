@@ -69,7 +69,7 @@ let runAll (args: string array) : JS.Promise<int> =
 
         for t in
             [| "coder"
-               "methodology"
+               "meditator"
                "pty_spawn"
                "pty_write"
                "pty_read"
@@ -221,5 +221,14 @@ let runAll (args: string array) : JS.Promise<int> =
                 dynStr
 
         let! _ = OpencodePluginTestsPart3.runPart3 harness chk startHarness jsonStringify ok (fun () -> 0) createEmpty
-        return! Wanxiangshu.E2e.OpencodePluginNudgeTests.runNudgeTests harness chk startHarness jsonStringify ok summary createEmpty
+
+        return!
+            Wanxiangshu.E2e.OpencodePluginNudgeTests.runNudgeTests
+                harness
+                chk
+                startHarness
+                jsonStringify
+                ok
+                summary
+                createEmpty
     }

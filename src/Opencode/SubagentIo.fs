@@ -88,6 +88,15 @@ let runSubagentCoreResult
 
                         if st.Cancelled then
                             return Ok abortedPrefix
+                        elif not st.TaskComplete && st.Phase <> FallbackPhase.Exhausted then
+                            do! waitForSubagentSettle runtime childID
+                            let st2 = runtime.GetOrCreateState childID
+
+                            if st2.Cancelled then
+                                return Ok abortedPrefix
+                            else
+                                let! text = extractSessionText client childID directory
+                                return Ok(formatSubagentReport noOutputText abortedPrefix text false)
                         else
                             let! text = extractSessionText client childID directory
                             return Ok(formatSubagentReport noOutputText abortedPrefix text false)
@@ -112,9 +121,7 @@ let runSubagentCoreResult
                         let st = runtime.GetOrCreateState childID
 
                         let isSuccess =
-                            st.TaskComplete
-                            && st.Phase <> FallbackPhase.Exhausted
-                            && not st.Cancelled
+                            st.TaskComplete && st.Phase <> FallbackPhase.Exhausted && not st.Cancelled
 
                         if isSuccess then
                             let! text = extractSessionText client childID directory

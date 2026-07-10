@@ -127,6 +127,7 @@ export function makeDeps(shapeFn) {
     WaitForPidDeath: (_pid, _remaining) => Promise.resolve(),
     StartPolling: (ms, cb) => setInterval(cb, ms),
     StopPolling: (handle) => clearInterval(handle),
+    RandomGen: () => Math.random(),
     Now: () => nowResult,
   };
 }
