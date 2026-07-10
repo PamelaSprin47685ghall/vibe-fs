@@ -27,7 +27,6 @@ let private snap' todos msg blocked agent isLoop hasActiveRunner : Wanxiangshu.K
 
 let decision () =
     equal "todos -> NudgeTodo" NudgeTodo (deriveAction (snap [ "a" ] "working" false None false))
-    equal "todos+question -> None" NudgeNone (deriveAction (snap [ "a" ] "what now?" false None false))
     equal "todos+skip -> None" NudgeNone (deriveAction (snap [ "a" ] "done <skip-todo-check />" false None false))
 
     equal
@@ -39,9 +38,35 @@ let decision () =
 
     equal "nothing -> None" NudgeNone (deriveAction (snap [] "ok" false None false))
     equal "loop -> NudgeLoop" NudgeLoop (deriveAction (snap [] "ok" false None true))
-    equal "loop+skip -> None" NudgeNone (deriveAction (snap [] "done <skip-loop-check />" false None true))
     equal "loop+emptyText -> NudgeLoop" NudgeLoop (deriveAction (snap [] "" false None true))
     equal "todos+emptyText -> NudgeTodo" NudgeTodo (deriveAction (snap [ "a" ] "" false None false))
+    equal "loop+skip-review -> None" NudgeNone (deriveAction (snap [] "done <skip-review-check />" false None true))
+
+    equal
+        "loop+skip-todo still nudges loop"
+        NudgeLoop
+        (deriveAction (snap [] "done <skip-todo-check />" false None true))
+
+    equal
+        "todos+skip-review still nudges todo"
+        NudgeTodo
+        (deriveAction (snap [ "a" ] "done <skip-review-check />" false None false))
+
+    equal
+        "todos+loop+skip-todo still nudges loop"
+        NudgeLoop
+        (deriveAction (snap [ "a" ] "done <skip-todo-check />" false None true))
+
+    equal
+        "todos+loop+skip-review still nudges todo"
+        NudgeTodo
+        (deriveAction (snap [ "a" ] "done <skip-review-check />" false None true))
+
+    equal
+        "todos+loop+skip-both -> None"
+        NudgeNone
+        (deriveAction (snap [ "a" ] "done <skip-todo-check /><skip-review-check />" false None true))
+
     equal "todos+activeRunner -> None" NudgeNone (deriveAction (snap' [ "a" ] "working" false None false true))
 
 let dedupFromIntegral () =

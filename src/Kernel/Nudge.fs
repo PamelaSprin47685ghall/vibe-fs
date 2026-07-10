@@ -25,8 +25,7 @@ let toString =
     | NudgeNone -> "none"
 
 let skipTodoRe = Regex(@"<skip-todo-check\s*\/?>", RegexOptions.IgnoreCase)
-let skipLoopRe = Regex(@"<skip-loop-check\s*\/?>", RegexOptions.IgnoreCase)
-let questionRe = Regex(@"\?\s*$")
+let skipReviewRe = Regex(@"<skip-review-check\s*\/?>", RegexOptions.IgnoreCase)
 
 let private cleanTextOutsideCodeFences (text: string) : string =
     if not (text.Contains "```") && not (text.Contains "~~~") then
@@ -46,11 +45,8 @@ let private cleanTextOutsideCodeFences (text: string) : string =
 
         String.concat "\n" cleanedLines
 
-let internal isQuestion (text: string) =
-    cleanTextOutsideCodeFences text |> questionRe.IsMatch
-
 let internal skipsTodo (text: string) =
     cleanTextOutsideCodeFences text |> skipTodoRe.IsMatch
 
-let internal skipsLoop (text: string) =
-    cleanTextOutsideCodeFences text |> skipLoopRe.IsMatch
+let internal skipsReview (text: string) =
+    cleanTextOutsideCodeFences text |> skipReviewRe.IsMatch

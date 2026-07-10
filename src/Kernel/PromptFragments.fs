@@ -34,7 +34,8 @@ let todoNudgePromptProse =
 let loopNudgePromptProse =
     "You are in loop mode. You must call the submit_review tool to\n"
     + "submit your detailed report and list of modified files for review\n"
-    + "before finishing. Do not end the conversation without calling submit_review."
+    + "before finishing. Do not end the conversation without calling submit_review.\n"
+    + "If you want to skip this review check, respond with <skip-review-check />."
 
 let todoNudgePromptFor (todos: string list) : string =
     let fields = [ yamlStringSeqField "todos" todos ]
