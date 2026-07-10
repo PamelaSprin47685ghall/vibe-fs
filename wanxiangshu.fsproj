@@ -175,6 +175,7 @@
     <Compile Include="src/Shell/MessageTransformCore.fs"/>
     <Compile Include="src/Shell/MessagingEncodeHelpers.fs"/>
     <Compile Include="src/Shell/SerialStateHolder.fs"/>
+    <Compile Include="src/Shell/ContextBudgetLimitResolver.fs"/>
     <Compile Include="src/Shell/ContextBudgetUsageCodec.fs"/>
     <Compile Include="src/Shell/ContextBudgetStore.fs"/>
     <Compile Include="src/Shell/MessageTransformPipeline.fs"/>
@@ -263,6 +264,7 @@
     <Compile Include="src/Opencode/FallbackCoordinator.fs"/>
     <Compile Include="src/Opencode/NudgeTrigger.fs"/>
     <Compile Include="src/Opencode/SessionLifecycleObserver.fs"/>
+    <Compile Include="src/Opencode/FallbackHooksHelper.fs"/>
     <Compile Include="src/Opencode/FallbackHooks.fs"/>
     <Compile Include="src/Opencode/SubagentTypes.fs"/>
     <Compile Include="src/Opencode/SubagentSpawn.fs"/>
@@ -695,6 +697,7 @@
     <Compile Include="e2e/MuxTests.fs"/>
     <Compile Include="e2e/OpencodePluginTestsPart2.fs"/>
     <Compile Include="e2e/OpencodePluginTestsPart3.fs"/>
+    <Compile Include="e2e/OpencodePluginTestsPart4.fs"/>
     <Compile Include="e2e/OpencodePluginSubagentRecoveryTests.fs"/>
     <Compile Include="e2e/OpencodePluginNudgeTests.fs"/>
     <Compile Include="e2e/OpencodePluginTests.fs"/>

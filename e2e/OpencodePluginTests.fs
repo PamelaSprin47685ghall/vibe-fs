@@ -15,6 +15,7 @@ let private readFileSync (path: string) (encoding: string) : string = jsNative
 let private fileExists (path: string) : bool = jsNative
 
 open Wanxiangshu.E2e.OpencodePluginTestsPart2
+open Wanxiangshu.E2e.OpencodePluginTestsPart4
 
 let private harnessFromObj (o: obj) : Harness = unbox o
 let private createEmpty () = createObj []
@@ -220,7 +221,8 @@ let runAll (args: string array) : JS.Promise<int> =
                 dynIsNull
                 dynStr
 
-        let! _ = OpencodePluginTestsPart3.runPart3 harness chk startHarness jsonStringify ok (fun () -> 0) createEmpty
+        do! OpencodePluginTestsPart3.runPart3 harness chk startHarness jsonStringify createEmpty
+        do! OpencodePluginTestsPart4.runPart4 harness chk startHarness jsonStringify createEmpty
 
         return!
             Wanxiangshu.E2e.OpencodePluginNudgeTests.runNudgeTests
