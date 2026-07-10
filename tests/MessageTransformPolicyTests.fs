@@ -11,6 +11,7 @@ open Wanxiangshu.Shell.MessageTransformCore
 open Wanxiangshu.Shell.MessageTransformPipeline
 open Wanxiangshu.Shell.MessageTransformHostEntry
 open Wanxiangshu.Shell.ReviewRuntime
+open Wanxiangshu.Kernel.BacklogProjectionCore
 
 module Dyn = Wanxiangshu.Shell.Dyn
 

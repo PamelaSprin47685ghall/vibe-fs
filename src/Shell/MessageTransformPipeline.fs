@@ -185,7 +185,9 @@ let applyContextBudget
                 let state_c = state.backlogTokensAtPhaseStart
                 let state_s = state.phaseBaseTokens - state_c
 
-                if ContextBudget.F (int64 currentTokens) (int64 plan.MaxInputTokens) state_c state_s then
+                if ContextBudget.isCompactingRequired state.phaseBaseTokens (int64 plan.MaxInputTokens) then
+                    return messages
+                elif ContextBudget.F (int64 currentTokens) (int64 plan.MaxInputTokens) state_c state_s then
                     let updatedStore = ContextBudgetStore.get plan.Scope plan.SessionID
                     if updatedStore.NudgeInjected then
                         return messages

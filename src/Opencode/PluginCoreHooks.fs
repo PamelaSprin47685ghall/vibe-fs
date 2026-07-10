@@ -69,6 +69,19 @@ let registerHooks (result: obj) (host: Host) (ctx: obj) (services: CoreServices)
 
     setKey
         result
+        "experimental.session.compacting"
+        (twoArgHook (fun input output ->
+            compactingTransform
+                services.ChildAgentRegistry
+                services.Directory
+                services.RuntimeScope
+                services.BacklogSession
+                client
+                input
+                output))
+
+    setKey
+        result
         "command.execute.before"
         (twoArgHook (fun input output ->
             promise {
