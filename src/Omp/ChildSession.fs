@@ -210,7 +210,9 @@ let runSubagentWithId
 
         let run =
             promise {
-                if childId <> "" then
+                if childId <> "" && fallbackConfigOpt.IsSome then
+                    let initSt = fallbackRuntime.GetOrCreateState childId
+                    fallbackRuntime.UpdateState childId { initSt with TaskComplete = false }
                     fallbackRuntime.SetSubsessionPending childId true
 
                 do! sessionPrompt session prompt
@@ -218,7 +220,9 @@ let runSubagentWithId
 
                 if childId <> "" then
                     fallbackRuntime.SetSubsessionPending childId false
-                    do! waitForSubagentSettle fallbackRuntime childId
+
+                    if fallbackConfigOpt.IsSome then
+                        do! waitForSubagentSettle fallbackRuntime childId
 
                 let sm = unbox<ISessionManager> (Dyn.get session "sessionManager")
                 return readAssistantText sm 0 "\n\n" |> Option.defaultValue noOutputText

@@ -5,7 +5,7 @@ open Wanxiangshu.Kernel.FallbackKernel.Types
 open Wanxiangshu.Kernel.SessionLoop
 open Wanxiangshu.Shell.FallbackRuntimeState
 
-// ── Recovery settlement (unchanged logic, kept for backward compat) ──
+// ── Recovery settlement (with TaskComplete prioritizing terminal state) ──
 
 let isRecoverySettled (runtime: FallbackRuntimeState) (sessionID: string) : bool =
     match runtime.GetConsumed sessionID with

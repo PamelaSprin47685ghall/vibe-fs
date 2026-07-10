@@ -77,6 +77,8 @@ let runSubagentCoreResult
                         abortAndUnregister ()
 
                 try
+                    // Continue/spawn runs reuse the childID. Explicitly reset TaskComplete to false
+                    // at the start of a new run to prevent residual state from previous turns from bypassing the settle logic.
                     let initSt = runtime.GetOrCreateState childID
                     runtime.UpdateState childID { initSt with TaskComplete = false }
                     runtime.SetSubsessionPending childID true

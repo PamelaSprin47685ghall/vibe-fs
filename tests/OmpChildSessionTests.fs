@@ -7,6 +7,10 @@ open Wanxiangshu.Kernel.OmpSessionTools
 open Wanxiangshu.Omp.ChildSession
 open Wanxiangshu.Shell.Dyn
 open Wanxiangshu.Shell.RuntimeScope
+open Wanxiangshu.Shell.FallbackRuntimeState
+open Wanxiangshu.Shell.FallbackRecoveryWait
+open Wanxiangshu.Kernel.FallbackKernel.Types
+open Wanxiangshu.Tests.AsyncFlush
 
 module Dyn = Wanxiangshu.Shell.Dyn
 
@@ -69,4 +73,70 @@ let createChildSessionRunnerToolNames () =
 
         for i in 0 .. ompRunnerChildToolNames.Length - 1 do
             equal ("runner child tool " + string i) ompRunnerChildToolNames.[i] captured.Value.[i]
+    }
+
+let runSubagentOnExistingSessionResetsTaskComplete () =
+    promise {
+        let rt = FallbackRuntimeState()
+        let childId = "omp-child-continue-reset"
+        let s0 = rt.GetOrCreateState childId
+        rt.UpdateState childId { s0 with TaskComplete = true }
+
+        let promptCalled = ref false
+        let sessionManagerMock = createObj [ "getSessionId", box (fun () -> box childId) ]
+
+        let sessionMock =
+            createObj
+                [ "prompt",
+                  box (fun (_p: string) ->
+                      promptCalled.Value <- true
+                      Promise.lift ())
+                  "waitForIdle", box (fun () -> Promise.lift ())
+                  "sessionManager", box sessionManagerMock ]
+
+        let scope = RuntimeScope()
+        scope.Add("omp_session_" + childId, sessionMock)
+
+        let pi = createObj []
+        let ctx = createObj [ "sessionId", box "parent-omp-session" ]
+
+        let config =
+            { DefaultChain =
+                [ { ProviderID = "test"
+                    ModelID = "test-model"
+                    Variant = None
+                    Temperature = None
+                    TopP = None
+                    MaxTokens = None
+                    ReasoningEffort = None
+                    Thinking = false } ]
+              AgentChains = Map.empty
+              MaxRetries = 2
+              LoopMaxContinues = 3
+              MaxRecoveries = 5 }
+
+        let runP =
+            Wanxiangshu.Omp.ChildSessionRegistry.runSubagentOnExistingSession
+                scope
+                pi
+                ctx
+                childId
+                "continue prompt"
+                None
+                rt
+                (Some config)
+
+        do! yieldMicrotask ()
+        check "OMP continue resets TaskComplete to false" (not (rt.GetOrCreateState childId).TaskComplete)
+
+        rt.SetTaskComplete childId true
+        let! text = runP
+        equal "OMP continue gets output" "(no output)" text
+    }
+
+let run () =
+    promise {
+        do! createChildSessionReviewToolNames ()
+        do! createChildSessionRunnerToolNames ()
+        do! runSubagentOnExistingSessionResetsTaskComplete ()
     }
