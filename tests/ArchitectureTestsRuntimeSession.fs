@@ -70,8 +70,8 @@ let pluginInjectsSessionScopeForExecutor () =
         (muxCatalog.Contains "executorTool deps toolNames sessionScope")
 
     check
-        "arch: Mux HostTools executor uses sessionScope.EnqueuePerSession"
-        (muxHost.Contains "sessionScope.EnqueuePerSession")
+        "arch: Mux HostTools executor uses sessionScope.EnqueueExecutor"
+        (muxHost.Contains "sessionScope.EnqueueExecutor")
 
     let pluginCore = requireFile "src/Opencode/PluginCoreServices.fs" |> nonCommentCode
     let tools = requireFile "src/Opencode/Tools.fs" |> nonCommentCode
@@ -86,8 +86,8 @@ let pluginInjectsSessionScopeForExecutor () =
         (tools.Contains "executorTool host registry ctx sessionScope")
 
     check
-        "arch: Opencode ExecutorTool uses sessionScope.EnqueuePerSession"
-        (executor.Contains "sessionScope.EnqueuePerSession")
+        "arch: Opencode ExecutorTool uses sessionScope.EnqueueExecutor"
+        (executor.Contains "sessionScope.EnqueueExecutor")
 
 let runtimeScopeNoGetDefault () =
     let code = requireFile "src/Shell/RuntimeScope.fs" |> nonCommentCode
@@ -104,6 +104,6 @@ let sessionExecutorNoModuleMutableQueues () =
     check "arch: SessionExecutor must not call getDefault" (not (code.Contains "getDefault"))
     check "arch: SessionExecutor no module-level mutable queues" (not (code.Contains "mutable queues"))
     let scope = requireFile "src/Shell/RuntimeScope.fs" |> nonCommentCode
-    check "arch: RuntimeScope holds sessionQueues map" (scope.Contains "sessionQueues")
+    check "arch: RuntimeScope holds sessionLocks map" (scope.Contains "sessionLocks")
     check "arch: RuntimeScope defines EnqueuePerSession" (scope.Contains "member _.EnqueuePerSession")
     check "arch: RuntimeScope defines ClearSessionQueues" (scope.Contains "member _.ClearSessionQueues")

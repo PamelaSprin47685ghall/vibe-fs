@@ -61,8 +61,9 @@ let private parseExecutorParams (params': obj) (ctx: obj) =
 let private runExecutorJob (options: ExecuteOptions) (signal: obj) (childId: string) =
     promise {
         let runWork =
-            sessionExecutor.EnqueuePerSession(
+            sessionExecutor.EnqueueExecutor(
                 childId,
+                options.mode,
                 fun () ->
                     promise {
                         let! r = executeWith defaultExecuteDeps options childId None

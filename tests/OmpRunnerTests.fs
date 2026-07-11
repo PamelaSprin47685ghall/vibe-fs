@@ -51,9 +51,10 @@ let hasRunningWhenActiveExecutorRun () =
     reset ()
     let sessionId = "runner-exec-active-1"
     check "not running before register" (not (hasRunningRunnerJob testScope sessionId))
-    registerActiveRun sessionId (fun () -> ())
+    let kill = (fun () -> ())
+    registerActiveRun sessionId kill
     check "running when executor active" (hasRunningRunnerJob testScope sessionId)
-    unregisterActiveRun sessionId
+    unregisterActiveRun sessionId kill
 
 let abortExecutorRunClearsActive () =
     reset ()

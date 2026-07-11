@@ -159,8 +159,9 @@ let executorTool
                             let opts = toExecuteOptions (Some runtime.Execution.Directory) decoded
 
                             let! execResult =
-                                sessionScope.EnqueuePerSession(
+                                sessionScope.EnqueueExecutor(
                                     sessionId,
+                                    opts.mode,
                                     fun () -> Wanxiangshu.Shell.Executor.execute opts sessionId
                                 )
 

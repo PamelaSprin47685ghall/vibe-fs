@@ -64,7 +64,7 @@ let private awaitChild
             if not settled then
                 settled <- true
                 removeListeners ()
-                unregisterActiveRun (defaultArg sessionId "")
+                unregisterActiveRun (defaultArg sessionId "") doKill
                 resolve outcome
 
         onStdoutH <-

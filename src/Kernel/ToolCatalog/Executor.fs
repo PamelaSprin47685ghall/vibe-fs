@@ -13,8 +13,7 @@ let internal executorSpec: ToolSpec =
               "program", "The program to execute."
               "dependencies", "Dependencies to install (for python or javascript)."
               "timeout_type", "Execution timeout budget: 'short' (10s) or 'long' (100s)."
-              "mode",
-              "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)."
+              "mode", "Execution mode: 'ro' (concurrent/unordered), 'rw' (sequential/ordered)."
               "what_to_summarize",
               "What the summary should focus on. Becomes the executor subagent's task description, so phrase it as a directive (e.g. 'only keep stack traces and exit codes')."
               "max_bytes",

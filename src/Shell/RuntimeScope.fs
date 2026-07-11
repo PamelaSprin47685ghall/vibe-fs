@@ -7,6 +7,53 @@ open Wanxiangshu.Shell.FuzzyIteratorStore
 open Wanxiangshu.Shell.SubagentIteratorStore
 open Wanxiangshu.Shell.PromiseQueue
 
+type SessionReaderWriterLock() =
+    let queue = SerialQueue()
+    let mutable activeReaders = 0
+    let mutable readerZeroPromises: (unit -> unit) list = []
+
+    let awaitNoReaders () : JS.Promise<unit> =
+        if activeReaders = 0 then
+            Promise.lift ()
+        else
+            Promise.create (fun resolve _ -> readerZeroPromises <- resolve :: readerZeroPromises)
+
+    let releaseReader () =
+        activeReaders <- activeReaders - 1
+
+        if activeReaders = 0 then
+            let temp = readerZeroPromises
+            readerZeroPromises <- []
+
+            for resolve in temp do
+                resolve ()
+
+    member _.EnqueueRead(work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        Promise.create (fun resolve reject ->
+            queue.Enqueue(fun () ->
+                activeReaders <- activeReaders + 1
+                let p = work ()
+
+                p
+                |> Promise.map (fun res ->
+                    releaseReader ()
+                    resolve res)
+                |> Promise.catch (fun ex ->
+                    releaseReader ()
+                    reject ex)
+                |> Promise.start
+
+                Promise.lift ())
+            |> Promise.catch (fun ex -> reject ex)
+            |> ignore)
+
+    member _.EnqueueWrite(work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        queue.Enqueue(fun () ->
+            promise {
+                do! awaitNoReaders ()
+                return! work ()
+            })
+
 type RuntimeScope() =
     let projection = ProjectionStore()
     let mutable initPromise: JS.Promise<unit> option = None
@@ -16,7 +63,7 @@ type RuntimeScope() =
     let mutable capsInflight = Map.empty<string, JS.Promise<CapsFile list>>
     let iteratorStore = createTypedIteratorStore 200
     let subagentIteratorStore = createSubagentIteratorStore 50
-    let mutable sessionQueues = Map.empty<string, SerialQueue>
+    let mutable sessionLocks = Map.empty<string, SessionReaderWriterLock>
     let mutable extState = Map.empty<string, obj>
     let mutable tempFilesByPrompt = Map.empty<string, string list>
     let mutable childSessionCounter = 0
@@ -76,18 +123,32 @@ type RuntimeScope() =
         clearTypedIteratorStore iteratorStore
         clearSubagentIteratorStore subagentIteratorStore
 
-    member _.ClearSessionQueues() : unit = sessionQueues <- Map.empty
+    member _.ClearSessionQueues() : unit = sessionLocks <- Map.empty
 
     member _.EnqueuePerSession(sessionId: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-        let queue =
-            match Map.tryFind sessionId sessionQueues with
-            | Some q -> q
+        let lock =
+            match Map.tryFind sessionId sessionLocks with
+            | Some l -> l
             | None ->
-                let q = SerialQueue()
-                sessionQueues <- Map.add sessionId q sessionQueues
-                q
+                let l = SessionReaderWriterLock()
+                sessionLocks <- Map.add sessionId l sessionLocks
+                l
 
-        queue.Enqueue(work)
+        lock.EnqueueWrite(work)
+
+    member _.EnqueueExecutor(sessionId: string, mode: string, work: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        let lock =
+            match Map.tryFind sessionId sessionLocks with
+            | Some l -> l
+            | None ->
+                let l = SessionReaderWriterLock()
+                sessionLocks <- Map.add sessionId l sessionLocks
+                l
+
+        if mode = "ro" then
+            lock.EnqueueRead(work)
+        else
+            lock.EnqueueWrite(work)
 
     member _.TryFindKey(key: string) : obj option = Map.tryFind key extState
 

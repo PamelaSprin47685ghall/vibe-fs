@@ -61,51 +61,50 @@ let executorTool
                     if sessionID = "" then
                         resolveStr executorRequiresSession
                     else
-                        sessionScope.EnqueuePerSession(
-                            sessionID,
-                            fun () ->
-                                let options = toExecuteOptions (Some runtime.Execution.Directory) decoded
+                        let options = toExecuteOptions (Some runtime.Execution.Directory) decoded
 
-                                promise {
-                                    let! result = Wanxiangshu.Shell.Executor.execute options sessionID
-                                    let output = outputFromResult result
+                        let runWork () =
+                            promise {
+                                let! result = Wanxiangshu.Shell.Executor.execute options sessionID
+                                let output = outputFromResult result
 
-                                    if not (shouldSummarize byteLength options.maxBytes output) then
-                                        let formatted = formatToolResponse result None
-                                        return prependSafetyWarningForExecution formatted options
-                                    else
-                                        let langStr = languageToString options.language
-                                        let timeoutStr = timeoutToString options.timeoutType
+                                if not (shouldSummarize byteLength options.maxBytes output) then
+                                    let formatted = formatToolResponse result None
+                                    return prependSafetyWarningForExecution formatted options
+                                else
+                                    let langStr = languageToString options.language
+                                    let timeoutStr = timeoutToString options.timeoutType
 
-                                        let prompt =
-                                            formatPrompt
-                                                host
-                                                (ExecutorSummary(
-                                                    output,
-                                                    langStr,
-                                                    options.program,
-                                                    options.dependencies,
-                                                    timeoutStr,
-                                                    options.mode,
-                                                    options.whatToSummarize
-                                                ))
-                                            |> List.head
+                                    let prompt =
+                                        formatPrompt
+                                            host
+                                            (ExecutorSummary(
+                                                output,
+                                                langStr,
+                                                options.program,
+                                                options.dependencies,
+                                                timeoutStr,
+                                                options.mode,
+                                                options.whatToSummarize
+                                            ))
+                                        |> List.head
 
-                                        let! summary =
-                                            resolveSubagentPromise
+                                    let! summary =
+                                        resolveSubagentPromise
+                                            "executor"
+                                            (runSubagentWithCleanup
+                                                fallbackRuntime
+                                                registry
+                                                client
                                                 "executor"
-                                                (runSubagentWithCleanup
-                                                    fallbackRuntime
-                                                    registry
-                                                    client
-                                                    "executor"
-                                                    "Executor summary"
-                                                    prompt
-                                                    runtime.Execution.Directory
-                                                    sessionID
-                                                    context)
+                                                "Executor summary"
+                                                prompt
+                                                runtime.Execution.Directory
+                                                sessionID
+                                                context)
 
-                                        let formatted = formatToolResponse result (Some summary)
-                                        return prependSafetyWarningForExecution formatted options
-                                }
-                        ))
+                                    let formatted = formatToolResponse result (Some summary)
+                                    return prependSafetyWarningForExecution formatted options
+                            }
+
+                        sessionScope.EnqueueExecutor(sessionID, options.mode, runWork))
