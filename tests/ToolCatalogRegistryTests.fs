@@ -94,6 +94,14 @@ let executorAbortNotExist () =
     | Error msg -> check "contains unknown tool" (msg.Contains("unknown tool"))
     | Ok _ -> check "executor_abort should not exist in catalog" false
 
+let executorMaxBytesDocHasHint () =
+    match paramDoc "executor" "max_bytes" with
+    | Ok doc ->
+        check
+            "max_bytes doc contains 8192 hint"
+            (doc.Contains("It is not recommended to exceed 8192 unless there is a special reason"))
+    | Error e -> check ("paramDoc failed: " + e) false
+
 let run () =
     allCountIs19 ()
     allNamesAreNonEmpty ()
@@ -114,3 +122,4 @@ let run () =
     ptySpawnSpecExists ()
     executorWaitNotExist ()
     executorAbortNotExist ()
+    executorMaxBytesDocHasHint ()

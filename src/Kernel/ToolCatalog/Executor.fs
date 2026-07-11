@@ -17,7 +17,8 @@ let internal executorSpec: ToolSpec =
               "Execution mode: 'ro' for read-only/diagnostic/compile/test commands, 'rw' for commands that modify project source files (use ro if modifying no-source files)."
               "what_to_summarize",
               "What the summary should focus on. Becomes the executor subagent's task description, so phrase it as a directive (e.g. 'only keep stack traces and exit codes')."
-              "max_bytes", "超过这个值就会触发总结而不是得到原文。" ]
+              "max_bytes",
+              "Exceeding this value will trigger summarization instead of obtaining the raw output. It is not recommended to exceed 8192 unless there is a special reason." ]
       requiredFields = [ "program"; "timeout_type"; "mode"; "what_to_summarize"; "max_bytes" ] }
 
 let internal ptySpawnSpec: ToolSpec =
